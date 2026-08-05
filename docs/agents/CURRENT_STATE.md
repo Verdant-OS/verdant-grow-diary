@@ -37,20 +37,20 @@ changed readiness evidence, artifacts, and tests only; it is **not** deployment 
 SEO/analytics axes verified directly on 2026-08-02; release identity re-verified
 2026-08-05:
 
-| Axis                                        | Status                                                                                                                                                                                                                                               |
-| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `https://verdantgrowdiary.com/version.json` | `PASS` — HTTP 200 (re-verified 2026-08-05)                                                                                                                                                                                                           |
-| Production commit                           | `FAIL` — release-identity stamping regressed: version.json reports `commit: "unknown"`, `dirty: true`, `ciRunId: null` (2026-08-05) while the 2026-08-02 build carried a real SHA; the payload values are the evidence, the commit itself is UNKNOWN |
-| Production build time                       | `2026-08-05T15:47:45.644Z` — production was republished 2026-08-05, but with commit provenance unknown it cannot be stated which merges that build contains                                                                                          |
-| Public sitemap                              | `PASS` — HTTP 200, 51 `<loc>` entries                                                                                                                                                                                                                |
-| robots.txt                                  | `PASS` — HTTP 200, production sitemap declared; neither lighting route is disallowed                                                                                                                                                                 |
-| Lighting route technical SEO                | `PASS` — two HTTP 200 routes; page metadata and route-scoped JSON-LD verified                                                                                                                                                                        |
-| GA4 explicit lighting-page identity         | `PASS` — nine exact intercepted SPA page-view events; no test traffic transmitted                                                                                                                                                                    |
-| GA4 page-view singleton contract            | `FAIL` — five automatic tag-generated events observed beside explicit application events                                                                                                                                                             |
-| GA4 authenticated baseline                  | `BLOCKED` — authenticated access unavailable                                                                                                                                                                                                         |
-| GSC authenticated baseline                  | `BLOCKED` — authenticated access unavailable                                                                                                                                                                                                         |
-| Measurement Day 0                           | `UNSET`                                                                                                                                                                                                                                              |
-| Four-week measurement clock                 | `NOT_STARTED`                                                                                                                                                                                                                                        |
+| Axis                                        | Status                                                                                                                                                                                                                                                                                                                                                                                                       |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `https://verdantgrowdiary.com/version.json` | `PASS` — HTTP 200 (re-verified 2026-08-05)                                                                                                                                                                                                                                                                                                                                                                   |
+| Production commit                           | `PASS` with incident — re-verified 2026-08-05T16:11Z (`Cache-Control: no-store`): production serves real SHA `acad6cb938e5` (`ref: "__orphan__"`, `ciRunId: null`). The earlier 15:47:45Z build of the same day stamped `commit: "unknown"` (history-less publish sandbox; root-caused and made non-blinding — see blocker 6), so the failure mode is intermittent and single observations are point-in-time |
+| Production build time                       | `2026-08-05T15:52:18.996Z` at the 16:11Z re-verification; two publishes occurred within ~5 minutes that day (15:47:45Z degraded, 15:52:18Z healthy)                                                                                                                                                                                                                                                          |
+| Public sitemap                              | `PASS` — HTTP 200, 51 `<loc>` entries                                                                                                                                                                                                                                                                                                                                                                        |
+| robots.txt                                  | `PASS` — HTTP 200, production sitemap declared; neither lighting route is disallowed                                                                                                                                                                                                                                                                                                                         |
+| Lighting route technical SEO                | `PASS` — two HTTP 200 routes; page metadata and route-scoped JSON-LD verified                                                                                                                                                                                                                                                                                                                                |
+| GA4 explicit lighting-page identity         | `PASS` — nine exact intercepted SPA page-view events; no test traffic transmitted                                                                                                                                                                                                                                                                                                                            |
+| GA4 page-view singleton contract            | `FAIL` — five automatic tag-generated events observed beside explicit application events                                                                                                                                                                                                                                                                                                                     |
+| GA4 authenticated baseline                  | `BLOCKED` — authenticated access unavailable                                                                                                                                                                                                                                                                                                                                                                 |
+| GSC authenticated baseline                  | `BLOCKED` — authenticated access unavailable                                                                                                                                                                                                                                                                                                                                                                 |
+| Measurement Day 0                           | `UNSET`                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Four-week measurement clock                 | `NOT_STARTED`                                                                                                                                                                                                                                                                                                                                                                                                |
 
 No page-level traffic, impression, click, position, or CTR claim is authorized while the
 authenticated GA4/GSC baseline remains blocked. Stream identity alone is not an
@@ -90,8 +90,13 @@ GitHub Actions push runs observed 2026-08-05 ~16:05 UTC for deploy commit
 | Required core schema present               | `FAIL`         | run `31021832568`                                                                                                                                    |
 | Required money-critical migrations present | `FAIL`         | run `31021837013`                                                                                                                                    |
 
-The deploy tip advanced to `acad6cb938e5` (PR #727, bridge-security docs) while this
-update was being written; its runs were still in flight and are not recorded here.
+The validation evidence in this section is tied to deploy commit `5611b130e81a` and
+must not be carried forward to later commits. The tip has since advanced through
+`acad6cb938e5` (#727), `864eab892` (#725), and `1ae1677645a0` (#729 — the commit the
+Branch topology row above names); push-run evidence for those heads is not recorded
+here. Notably, the full enabled Security DB Local run cited above (`31021835479`)
+executed against `5611b130e81a` and is the replay-repair proof point regardless of
+tip movement.
 
 The two failing schema/migration guards remain outside the replay-repair and Mode A SEO
 slices (board item #561). They are not converted to passes and prevent describing the
@@ -147,10 +152,20 @@ Out of scope:
    pass.
 5. Handle the unrelated deploy-head schema/migration guard failures in a separate scoped
    workstream.
-6. Restore production release-identity stamping: the 2026-08-05 production build reports
-   `commit: "unknown"`, `dirty: true`, `ciRunId: null` in `version.json`, so no claim
-   about which merges production contains is possible until a build with real commit
-   provenance ships.
+6. Production release-identity resilience (revised 2026-08-05 after root-cause):
+   the 15:47:45Z production build stamped `commit: "unknown"` because Lovable's
+   publish sandbox was a history-less snapshot (unborn-HEAD `git init`, no
+   `GITHUB_*` env — proven by fallback-semantics analysis and reproduced in a
+   sandbox). Production **self-healed** at 15:52:18Z: a second publish now serves
+   real SHA `acad6cb938e5` (`ref: "__orphan__"`, `dirty: false`, `ciRunId: null`;
+   verified 16:11Z with `Cache-Control: no-store`). The failure mode is therefore
+   intermittent and will recur. Repo-side resilience shipped in the
+   version-stamp-resilience slice: stamps always carry a deterministic `treeHash`
+   content identity, degraded builds use `+<date>.t<hash>` versions instead of
+   `unknown-dirty`, release tags record treeHash → commit
+   (`scripts/resolve-release-provenance.mjs` maps back). Remaining owner items:
+   publish production from a commit containing the resilient stamper, and
+   optionally raise the history-less publish sandbox with Lovable.
 
 No new content family, automation, device control, schema change, or direct production
 write is approved by this state file.

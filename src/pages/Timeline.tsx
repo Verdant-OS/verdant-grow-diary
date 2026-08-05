@@ -115,7 +115,7 @@ import {
   type GrowEventRowForRecent,
 } from "@/lib/growEventToDiaryRawEntry";
 import { ROOT_ZONE_GROW_EVENT_SELECT } from "@/lib/rootZoneObservationRules";
-import { mergeTimelineSources } from "@/lib/timelineMergeRules";
+import { collapseQuickLogSaveFanOut, mergeTimelineSources } from "@/lib/timelineMergeRules";
 import { buildTimelineLocalDateRangeBounds } from "@/lib/timelineDateRangeRules";
 import {
   deriveTimelineEventTypeOptions,
@@ -984,14 +984,14 @@ export default function Timeline() {
   useTimelineHashAnchorHandoff(hash, !loading);
 
   // Merge `grow_events` (Quick Log v2 manual saves) and `diary_entries`
-  // through the tested `mergeTimelineSources` helper so the Recent Quick
-  // Logs panel receives a deterministic, deduplicated, newest-first
-  // stream. The helper enforces:
-  //   - exact-duplicate dedup by (source_table, source_id)
-  //   - logical dedup when a diary row mirrors a grow_event via
-  //     `details.grow_event_id`
-  //   - stable tie-breakers (grow_events first on equal timestamps,
-  //     then source_id lexical)
+  // through the tested helpers so the Recent Quick Logs panel receives a
+  // deterministic, deduplicated, newest-first stream:
+  //   - `collapseQuickLogSaveFanOut` collapses one save's write fan-out
+  //     (manual spine + same-instant environment sibling + diary
+  //     companion, linked or (plant, instant)-paired) to the spine row
+  //   - `mergeTimelineSources` enforces exact-duplicate dedup by
+  //     (source_table, source_id) and stable tie-breakers (grow_events
+  //     first on equal timestamps, then source_id lexical)
   // We then re-hydrate each merged entry back into its original loose
   // shape so the existing RecentQuickLogActivityPanel normalizer
   // continues to see the same fields it always has.
@@ -1019,14 +1019,43 @@ export default function Timeline() {
         linked_grow_event_id,
       };
     });
-    const merged = mergeTimelineSources({
+    // One confirmed Quick Log save fans out into up to three persisted rows
+    // (watering/observation spine + same-instant environment sibling + diary
+    // companion). Collapse that write topology before the merge so the
+    // calendar, recent lane, and history panels count each save exactly once
+    // (live audit #9/#10). Companion-only details are re-attached below.
+    const collapsed = collapseQuickLogSaveFanOut({
       diaryEntries: diaryInputs,
       growEvents,
     });
+    const merged = mergeTimelineSources({
+      diaryEntries: collapsed.diaryEntries,
+      growEvents: collapsed.growEvents,
+    });
     const diaryById = new Map(entries.map((e) => [e.id, e] as const));
     const growMappedById = new Map(
-      mapGrowEventsToRecentRawEntries(growEvents).map((r) => [r.id, r] as const),
+      mapGrowEventsToRecentRawEntries(collapsed.growEvents).map((r) => [r.id, r] as const),
     );
+    // A dropped companion can carry structure the bare spine row lacks
+    // (sensor snapshots, environment_check envelopes, plant_name). Merge it
+    // into the surviving spine's details so it keeps rendering exactly once.
+    // The spine's own keys (event_type, source, root-zone fields) win.
+    for (const [spineId, companions] of collapsed.droppedCompanionsBySpineId) {
+      const mapped = growMappedById.get(spineId);
+      if (!mapped) continue;
+      const companionDetails: Record<string, unknown> = {};
+      for (const companion of companions) {
+        const det = (companion.details ?? null) as Record<string, unknown> | null;
+        if (det && typeof det === "object") Object.assign(companionDetails, det);
+      }
+      delete companionDetails.linked_grow_event_id;
+      delete companionDetails.grow_event_id;
+      if (Object.keys(companionDetails).length === 0) continue;
+      growMappedById.set(spineId, {
+        ...mapped,
+        details: { ...companionDetails, ...mapped.details },
+      });
+    }
     const out: Array<Entry | ReturnType<typeof mapGrowEventsToRecentRawEntries>[number]> = [];
     for (const m of merged) {
       if (m.source_table === "diary_entries") {

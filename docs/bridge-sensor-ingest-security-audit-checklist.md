@@ -195,7 +195,8 @@ branch, never `main`.
       revocation, insert + update telemetry integrity, cross-user denial,
       and the effective DELETE privilege — check this item only from a
       strict-mode run with `passed > 0, failed = 0, skipped = 0`
-      (currently `BLOCKED`, see G3).
+      (first such run recorded 2026-08-05: `passed=9 failed=0 skipped=0`
+      on deploy commit `fc1444854`, run `31019227121` — see G3).
 
 ## 10. Error-response and log redaction
 
@@ -276,7 +277,8 @@ models. Isolation must hold in both directions.
       `last_used_at`) are server-maintained on both write paths: the UPDATE
       guard rejects client-role rewrites and the INSERT validator rejects
       seeded values ([E35], static). Runtime proof rides the [E37] strict
-      harness — `BLOCKED` until it executes with zero skips (G3).
+      harness — first strict execution recorded 2026-08-05 with zero
+      skips (G3).
       Residual: an owner exercising a live DELETE privilege can still erase
       a token row wholesale; `sensor_ingest_audit_log` remains the
       durable record.
@@ -341,12 +343,13 @@ accepted-risk entry in `docs/security-exceptions.md`.
   after #724 restored the local replay (`email_queue_dispatch` handled via
   an existence-guarded replay-compatibility patch); run `31019227121`
   reported `passed=9 failed=0 skipped=0`. The DELETE-measurement test
-  passed, meaning observed behavior matched the measured privilege — the
-  measured value itself lives in the harness artifact
-  (`bridge-tokens-vitest.json`), not in this document. The
+  passed, meaning observed behavior matched the measured privilege — but
+  the harness does NOT persist the measured value (allowed/denied) in its
+  report, so that value is `NOT_MEASURED` as a recorded fact; emitting a
+  sanitized outcome is a candidate harness improvement. The
   `security-db-local` lane runs the harness in strict mode
   (`BRIDGE_TOKENS_DB_SECURITY_REQUIRED=1`): unreachable DB or any
-  skipped test is a hard FAIL, and inspect the job/step result, never the
+  skipped test is a hard FAIL. Inspect the job/step result, never the
   run-level rollup. The harness
   deliberately does not claim `token_hash` non-recoverability — see G10,
   that visibility is real under current grants.

@@ -55,6 +55,39 @@ describe("PhenoHuntSetupProgressCard", () => {
     expect(screen.queryByTestId("pheno-workspace-setup-progress-mark-complete")).toBeNull();
   });
 
+  it("does not report setup complete when a stale flag survives losing all candidates (F11)", () => {
+    // setup_completed_at was stamped while candidates existed, then every
+    // candidate was archived/removed. The card must re-validate instead of
+    // rendering a stale "Setup complete: Yes" that contradicts its own
+    // definition ("has candidates and evidence goals").
+    render(
+      <PhenoHuntSetupProgressCard
+        hunt={hunt({ setupCompletedAt: "2026-08-01T00:00:00Z" })}
+        candidateCount={0}
+      />,
+    );
+    const card = screen.getByTestId("pheno-workspace-setup-progress");
+    expect(card.getAttribute("data-setup-complete")).toBe("false");
+    const setupLine = screen.getByTestId("pheno-workspace-setup-progress-setup-status");
+    expect(setupLine.textContent).not.toMatch(/Yes/);
+    expect(setupLine.textContent).toMatch(/Not yet/);
+    // The checklist still reports the honest per-fact state: candidates
+    // missing, confirmation recorded.
+    expect(
+      screen
+        .getByTestId("pheno-workspace-setup-progress-item-candidates")
+        .getAttribute("data-complete"),
+    ).toBe("false");
+    expect(
+      screen
+        .getByTestId("pheno-workspace-setup-progress-item-confirmation")
+        .getAttribute("data-complete"),
+    ).toBe("true");
+    // No re-mark button: the flag is already recorded; restoring candidates
+    // restores the derived status.
+    expect(screen.queryByTestId("pheno-workspace-setup-progress-mark-complete")).toBeNull();
+  });
+
   it("Mark setup complete is disabled while no candidates or goals", () => {
     const onMarkComplete = vi.fn();
     render(

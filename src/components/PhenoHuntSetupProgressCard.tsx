@@ -7,6 +7,11 @@
  * Setup complete ≠ Comparison-ready. This card renders them as two
  * separate status lines and includes the canonical definitions from
  * `phenoOnboardingCopy` so growers are never misled.
+ *
+ * Honest-state rule (F11): a persisted `setup_completed_at` timestamp alone
+ * never claims setup complete. The card's own definition says setup complete
+ * requires candidates, so a hunt whose candidates were all archived/removed
+ * re-validates to "Not yet" instead of showing a stale "Yes".
  */
 import type { PhenoHuntSummary } from "@/lib/phenoHuntCandidatesService";
 import { Button } from "@/components/ui/button";
@@ -66,7 +71,12 @@ export default function PhenoHuntSetupProgressCard({
 }: PhenoHuntSetupProgressCardProps) {
   const testId = rest["data-testid"] ?? "pheno-workspace-setup-progress";
   const goals = hunt.evidenceGoals ?? [];
-  const setupDone = !!hunt.setupCompletedAt;
+  // F11: the raw confirmation fact (grower did click "Mark setup complete")
+  // is kept separate from the derived setup-complete status. A stale flag on
+  // a hunt whose candidates were all archived/removed must not read "Yes" —
+  // that would contradict the definition this same card renders.
+  const setupConfirmed = !!hunt.setupCompletedAt;
+  const setupDone = setupConfirmed && candidateCount > 0;
 
   const items: ProgressItem[] = [
     {
@@ -98,8 +108,11 @@ export default function PhenoHuntSetupProgressCard({
     {
       id: "confirmation",
       label: "Setup confirmed",
-      complete: setupDone,
-      detail: setupDone ? "Setup marked complete" : "Mark setup complete to finish onboarding",
+      // The checklist item reports the recorded confirmation fact; the
+      // derived setup-complete status line above it is what re-validates
+      // against candidateCount (F11).
+      complete: setupConfirmed,
+      detail: setupConfirmed ? "Setup marked complete" : "Mark setup complete to finish onboarding",
     },
   ];
 
@@ -170,7 +183,10 @@ export default function PhenoHuntSetupProgressCard({
         <p data-testid={`${testId}-definition-comparison`}>{PHENO_COMPARISON_READY_DEFINITION}</p>
       </div>
 
-      {!setupDone && onMarkComplete ? (
+      {/* Button visibility keys off the raw confirmation fact, exactly as
+          before F11: a stale-flag hunt (confirmed, zero candidates) offers no
+          re-mark button — re-adding candidates restores the derived status. */}
+      {!setupConfirmed && onMarkComplete ? (
         <div className="flex justify-end">
           <Button
             type="button"

@@ -56,6 +56,8 @@ describe("runtime deep-link matching — un-nested detail routes", () => {
   it("resolves every un-nested detail URL to the detail route, not a list", () => {
     for (const id of UNNESTED_IDS) {
       const classic = tanstackRouteIdToClassicPath(id);
+      expect(classic, `no classic path derivable for ${id}`).not.toBeNull();
+      if (classic === null) continue;
       const concrete = concretize(classic);
       const deepest = deepestMatch(concrete);
       expect(deepest.routeId, `${concrete} must resolve to ${id}`).toBe(id);
@@ -65,6 +67,8 @@ describe("runtime deep-link matching — un-nested detail routes", () => {
   it("extracts every path param on the deepest match", () => {
     for (const id of UNNESTED_IDS) {
       const classic = tanstackRouteIdToClassicPath(id);
+      expect(classic, `no classic path derivable for ${id}`).not.toBeNull();
+      if (classic === null) continue;
       const paramNames = [...classic.matchAll(/:([A-Za-z0-9_]+)/g)].map((m) => m[1]);
       if (paramNames.length === 0) continue;
       const deepest = deepestMatch(concretize(classic));

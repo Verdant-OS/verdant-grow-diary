@@ -227,8 +227,32 @@ describe("collapseQuickLogSaveFanOut (pure)", () => {
       "de-linked",
     ]);
 
-    // Parent deleted / outside the fetched window: the companion must not
-    // resurrect the save as a second (or any) activity.
+    // Parent never fetched at all in this call (e.g. Timeline's grow_events
+    // read is independently date-range-/keyset-bounded from its
+    // diary_entries read, or a caller never fetches grow_events at all —
+    // the quicklog_save_event Symptom Check E2E proof exercises exactly
+    // this shape). The companion is the only evidence of that save in this
+    // read; it must render standalone, not vanish (live audit regression:
+    // symptom-check-branch.spec.ts's Timeline evidence-card alias anchor).
+    const neverFetched = collapseQuickLogSaveFanOut({
+      diaryEntries: [
+        manualCompanion({
+          id: "de-out-of-window",
+          details: { linked_grow_event_id: "ge-not-in-this-read" },
+        }),
+      ],
+      growEvents: [],
+    });
+    expect(neverFetched.diaryEntries.map((d) => d.id)).toEqual(["de-out-of-window"]);
+    expect(neverFetched.droppedCompanionsBySpineId.size).toBe(0);
+
+    // Parent WAS fetched in this call but did not survive the shared dedupe
+    // (e.g. deleted, or a different tent/grow scope): known gone, so the
+    // companion must not resurrect it as a second activity.
+    const knownDeletedParent = wateringSpine({
+      id: "ge-deleted-parent",
+      is_deleted: true,
+    });
     const orphaned = collapseQuickLogSaveFanOut({
       diaryEntries: [
         manualCompanion({
@@ -236,23 +260,30 @@ describe("collapseQuickLogSaveFanOut (pure)", () => {
           details: { linked_grow_event_id: "ge-deleted-parent" },
         }),
       ],
-      growEvents: [],
+      growEvents: [knownDeletedParent],
     });
     expect(orphaned.diaryEntries).toEqual([]);
     expect(orphaned.droppedCompanionsBySpineId.size).toBe(0);
   });
 
-  it("keeps unlinked diary rows that do not share a (plant, instant) pair with a manual spine", () => {
+  it("keeps unlinked diary rows that do not share a (plant, instant) pair with any fetched manual spine", () => {
     const legacyStandalone = manualCompanion({
       id: "de-legacy",
       entry_at: "2026-07-18T10:00:00.000Z",
       details: { event_type: "watering", watering_amount_ml: 250 },
     });
-    const result = collapseQuickLogSaveFanOut({
+    const differentTimestampSpine = collapseQuickLogSaveFanOut({
       diaryEntries: [legacyStandalone],
       growEvents: [wateringSpine()],
     });
-    expect(result.diaryEntries.map((d) => d.id)).toEqual(["de-legacy"]);
+    expect(differentTimestampSpine.diaryEntries.map((d) => d.id)).toEqual(["de-legacy"]);
+
+    // No grow_events fetched at all — same fall-through, no pair to match.
+    const noGrowEventsFetched = collapseQuickLogSaveFanOut({
+      diaryEntries: [legacyStandalone],
+      growEvents: [],
+    });
+    expect(noGrowEventsFetched.diaryEntries.map((d) => d.id)).toEqual(["de-legacy"]);
   });
 
   it("is deterministic and does not mutate its inputs", () => {
@@ -343,5 +374,28 @@ describe("recent lane end-to-end (audit #9/#10 regression)", () => {
     );
     expect(envelopeCarriers).toHaveLength(1);
     expect((envelopeCarriers[0] as { id?: unknown }).id).toBe("ge-obs");
+  });
+
+  it("keeps a quicklog_save_event linked companion standalone when its grow_event parent is never fetched (Symptom Check E2E regression)", () => {
+    // Mirrors e2e/symptom-check-branch.spec.ts: quicklog_save_event returns
+    // a diary_entries row with details.linked_grow_event_id pointing at a
+    // grow_event id that this read's grow_events fetch never returns at all
+    // (its own bounded/independent read, or a mock/backend that only
+    // populates diary_entries for this RPC). The companion must still
+    // render — under its own id, with its linked_grow_event_id intact — so
+    // Timeline can render the alias anchor the "review evidence" link and
+    // the Symptom Check checklist depend on.
+    const linkedCompanion = manualCompanion({
+      id: "de-symptom-check",
+      details: {
+        event_type: "observation",
+        linked_grow_event_id: "ge-symptom-check-parent",
+        subtype: "issue",
+      },
+    });
+    const lane = buildRecentLane([linkedCompanion], []);
+    expect(lane.map((e) => (e as { id?: unknown }).id)).toEqual(["de-symptom-check"]);
+    const rendered = lane[0] as { details?: { linked_grow_event_id?: unknown } };
+    expect(rendered.details?.linked_grow_event_id).toBe("ge-symptom-check-parent");
   });
 });

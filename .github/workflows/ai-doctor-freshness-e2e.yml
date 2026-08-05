@@ -26,13 +26,17 @@ on:
       - "src/pages/PlantDetail.tsx"
       - "src/components/PlantDetailAiDoctorContextPanel.tsx"
       - "src/components/PlantDetailAiDoctorLiveReview.tsx"
-      - "src/lib/aiDoctorContextRules.ts"
+      # Glob rather than a hand-kept list. PlantDetailAiDoctorLiveReview pulls
+      # 10 `@/lib/aiDoctor*` modules into the chain that decides whether the
+      # review CTA is enabled — reviewRequestPacket and
+      # currentSensorSnapshotRules among them — and this list named only three.
+      # A change to any of the other seven could flip the enabled/blocked
+      # behaviour the spec asserts without the proof ever running.
+      - "src/lib/aiDoctor*.ts"
       # Holds AI_DOCTOR_SNAPSHOT_FRESH_HOURS = 48 — the boundary this lane
       # exists to prove. Without it the window itself could be changed and
       # the proof would never run.
       - "src/constants/aiDoctorContextReadiness.ts"
-      - "src/lib/aiDoctorContextViewModel.ts"
-      - "src/lib/aiDoctorReviewEligibilityRules.ts"
       - "src/hooks/useTimelineMemory.ts"
       - "src/lib/manualSnapshotDiaryAdapter.ts"
       - "playwright.config.ts"

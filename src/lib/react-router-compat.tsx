@@ -27,7 +27,6 @@ import {
 } from "react";
 import {
   Link as TanStackLink,
-  Navigate as TanStackNavigate,
   Outlet as TanStackOutlet,
   useNavigate as useTanStackNavigate,
   useParams as useTanStackParams,
@@ -251,20 +250,35 @@ export interface CompatNavigateProps {
   state?: unknown;
 }
 
-/** react-router `<Navigate to="/path" replace />`. */
+/**
+ * react-router `<Navigate to="/path" replace />`.
+ *
+ * Implemented as a `to`-keyed effect rather than TanStack's `<Navigate>`:
+ * that component re-issues its navigation on every router-state re-render,
+ * and while its own navigation is pending the still-mounted source route
+ * re-renders per state change — each re-issue restarts the transition, which
+ * loops until React throws "Maximum update depth exceeded" (observed on the
+ * /features → /welcome alias). react-router semantics are per-`to`: navigate
+ * on mount, and again only if the destination itself changes.
+ */
 export function Navigate({ to, replace, state }: CompatNavigateProps) {
   const legacy = useContext(LegacyRouterContext);
+  const navigate = useTanStackNavigate();
   useEffect(() => {
-    if (legacy) legacy.navigate(to, { replace, state });
-  }, [legacy, replace, state, to]);
-  if (legacy) return null;
-  return (
-    <TanStackNavigate
-      to={to as never}
-      replace={replace ?? false}
-      {...(state !== undefined ? { state: state as never } : {})}
-    />
-  );
+    if (legacy) {
+      legacy.navigate(to, { replace, state });
+      return;
+    }
+    void navigate({
+      to: to as never,
+      replace: replace ?? false,
+      ...(state !== undefined ? { state: state as never } : {}),
+    } as never);
+    // Re-navigate only when the destination changes — never on router-state
+    // re-renders of the (still mounted, mid-transition) source route.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [legacy, to]);
+  return null;
 }
 
 export type CompatSetSearchParams = (

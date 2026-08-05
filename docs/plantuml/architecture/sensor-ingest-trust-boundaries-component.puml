@@ -1,0 +1,80 @@
+@startuml sensor_ingest_trust_boundaries
+!include ../style.puml
+!pragma layout smetana
+
+title Bridge sensor ingest trust boundaries\nJWT mint/revoke vs vbt_ live write vs service_role
+
+skinparam componentStyle rectangle
+left to right direction
+
+package "Browser / grower session" as Browser {
+  [Dashboard / settings UI] as UI
+  component "User JWT\n(session Bearer)" as JWT
+}
+
+package "Headless bridge" as Headless {
+  [Device / vendor bridge] as Device
+  component "Bridge secret\nvbt_… (plaintext offline)" as Secret
+}
+
+package "Supabase Edge gateway" as Gateway {
+  component "mint-bridge-token\nverify_jwt = true" as Mint
+  component "revoke-bridge-token\nverify_jwt = true" as Revoke
+  component "sensor-ingest-webhook\nverify_jwt = false" as Webhook
+}
+
+package "Handler-owned authZ" as Handler {
+  component "authenticateBearer\nallowJwt: false\nSHA-256 hash lookup" as Auth
+  component "requireLiveSensorEntitlement\nbilling (not the token)" as Ent
+  component "tentScopeMatches +\nnormalize +\n30m freshness" as Gates
+}
+
+package "Data plane" as Data {
+  database "bridge_tokens\nRLS metadata\nhash + prefix only" as BT
+  database "sensor_readings\nservice_role upsert" as SR
+  component "bump_bridge_token_usage\n(service RPC)" as Usage
+  database "sensor_ingest_audit_log\nbest-effort" as Audit
+}
+
+UI --> JWT
+JWT --> Mint : mint / list UX
+JWT --> Revoke : revoke
+Mint --> Ent
+Mint --> BT : insert hash (caller JWT + RLS)
+Revoke --> BT : one-way revoked_at
+
+Device --> Secret
+Secret --> Webhook : Bearer vbt_…
+Webhook --> Auth
+Auth --> BT : hash lookup (service_role)
+Webhook --> Ent
+Webhook --> Gates : checks only\n(no writes from Gates)
+Webhook --> SR : 1. service_role upsert\nowner from token row\nbody user_id ignored
+Webhook --> Usage : 2. after upsert,\nonly if insertedCount > 0
+Webhook --> Audit : 3. best-effort append\n(never fails the ingest)
+
+note right of Webhook
+  **verify_jwt = false**
+  paired with
+  **handler-owned bridge authentication**
+  — not public live-write permission.
+end note
+
+note bottom of SR
+  Telemetry storage only.
+  No AI Doctor invocation.
+  No alert creation.
+  No Action Queue write.
+  No automation.
+  No device control.
+end note
+
+note bottom of BT
+  Client roles cannot clear revoked_at
+  or forge usage counters (migrations
+  20260804213000 / 20260804220000).
+  Strict zero-skip DB harness may still
+  be **BLOCKED** for runtime proof.
+end note
+
+@enduml

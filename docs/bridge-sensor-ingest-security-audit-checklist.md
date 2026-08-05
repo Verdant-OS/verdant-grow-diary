@@ -50,9 +50,12 @@ branch, never `main`.
 - [ ] [E23] TTL is clamped server-side (1 hour – 365 days); the DB
       `bridge_tokens_validate_insert` trigger enforces the same bounds at the
       row level.
-- [ ] [runtime: `supabase/functions/mint-bridge-token/handler_e2e_test.ts`]
+- [ ] [runtime: `supabase/functions/mint-bridge-token/handler_e2e_test.ts`
+      — CI: `sensor-ingest-webhook-edge-tests.yml` ([E36])]
       Free/degraded/unverifiable entitlements are denied before any insert
-      (403 `upgrade_required` / 503 `entitlement_lookup_failed`, zero rows).
+      (403 `upgrade_required` / 503 `entitlement_lookup_failed`, zero rows),
+      and the inserted row is positively hash-only (64-hex `token_hash`, no
+      plaintext).
 - [ ] MANUAL — any new mint parameter must be validated, clamped, and
       impossible to use for cross-user or cross-tent issuance.
 
@@ -74,8 +77,14 @@ branch, never `main`.
       (+ a DELETE policy added 2026-06-22), all anchored on
       `auth.uid() = user_id`, with a `BEFORE UPDATE` trigger freezing
       `user_id`, `tent_id`, `token_hash`, `token_prefix`, `expires_at`,
-      `created_at`. Any new policy or trigger change must keep every policy
-      owner-scoped and must not widen the mutable column set.
+      `created_at` for everyone and — since
+      `20260804213000_bridge_tokens_revocation_integrity` ([E35]) — making
+      `revoked_at` one-way and `last_used_at`/`first_used_at`/`ingest_count`
+      server-maintained for client roles. The only freely client-mutable
+      column is `name`. Any new policy or trigger change must keep every
+      policy owner-scoped and must not widen that mutable set. Note the
+      `SELECT` grant is table-wide and RLS is row-level, so owners can read
+      every column of their own rows, including `token_hash` (gap G10).
 
 ## 3. Presentation and verification (webhook auth)
 
@@ -144,9 +153,10 @@ branch, never `main`.
 - [ ] [E25] The server ingest window is pinned at **30 minutes**
       (`LIVE_INGEST_FRESHNESS_WINDOW_MS`). Changing this value must update
       this checklist and the evidence lane in the same PR — the value is
-      deliberately load-bearing: the webhook's stale rejection is tied to the
-      `sensor_readings` dedupe uniqueness key (`user_id, tent_id, source,
-    metric, captured_at`), so a window change is never a one-line edit.
+      deliberately load-bearing: the webhook's stale rejection is tied to
+      the `sensor_readings` dedupe uniqueness key
+      `user_id, tent_id, source, metric, captured_at`, so a window change
+      is never a one-line edit.
 - [ ] [runtime: `storageMapping` tests via the webhook vitest suites]
       Per-row provenance is demoted `live -> stale` at the same 30m boundary,
       so replayed packets cannot land as live.
@@ -170,12 +180,22 @@ branch, never `main`.
       `.eq("user_id", userId)` under the caller's JWT (RLS enforced), sets
       `revoked_at`, and uses no service-role credentials.
 - [ ] [E3] Revoked tokens are rejected at verification time.
-- [ ] `NOT_MEASURED` — `revoke-bridge-token` has **zero** direct automated
-      coverage (no test pins owner-only revocation, idempotency, or error
-      redaction). See Known gaps.
-- [ ] MANUAL — soft-revocation state is currently client-reversible (see
-      Known gaps G1); until hardened, treat `revoked_at` as owner-honest, not
-      adversary-proof.
+- [ ] [E35] Revocation is **one-way against client roles**: the
+      `bridge_tokens_guard_immutables` trigger (migration
+      `20260804213000_bridge_tokens_revocation_integrity`) rejects clearing
+      or moving an existing `revoked_at` for `anon`/`authenticated`, and the
+      revoke handler stamps only `WHERE revoked_at IS NULL` so bridge
+      retries stay calm (`ok: true, already_revoked`).
+- [ ] [runtime: `supabase/functions/revoke-bridge-token/handler_e2e_test.ts`
+      — CI: `sensor-ingest-webhook-edge-tests.yml` ([E36])] Owner-scoped
+      revocation, foreign-token 404, idempotent re-revoke, caller-supplied
+      `user_id` ignored, and PG-error redaction are pinned at runtime.
+- [ ] [runtime: `src/test/integration/bridge-tokens-rls.integration.test.ts`
+      via `bun run test:bridge-tokens-db-security` ([E37])] One-way
+      revocation, insert + update telemetry integrity, cross-user denial,
+      and the effective DELETE privilege — check this item only from a
+      strict-mode run with `passed > 0, failed = 0, skipped = 0`
+      (currently `BLOCKED`, see G3).
 
 ## 10. Error-response and log redaction
 
@@ -198,15 +218,26 @@ branch, never `main`.
       and never reads the browser session JWT.
 - [ ] [E26] The client/published secret scanner keeps forbidding
       bridge-token identifiers in `src/`, `public/`, and `dist/`.
+- [ ] [runtime: `src/test/sensor-reveal-surface-hardening-static.test.ts`]
+      The one-time reveal box is the SINGLE DOM location for the plaintext
+      (on-screen listener snippet is placeholder-only); the testbench
+      reveal has a Dismiss control; every token-embedding copy path goes
+      through the shared confirmation gate; on-screen response bodies
+      render only via `redactedResponseBodyJson`; failure toasts use the
+      fixed-copy mappers; neither token component touches storage,
+      IndexedDB, or `console.*` (whole-file pins).
+- [ ] [runtime: `tent-bridge-tokens-page-safety.test.tsx`] The DOM leak
+      scan rejects plaintext-token-shaped strings
+      (`vbt_[A-Za-z0-9_-]{16,}`) and proves mint-failure toasts never carry
+      server-controlled text.
 - [ ] MANUAL — the plaintext exists client-side only in component memory
       during the one-time reveal (`TentBridgeTokensCard`,
-      `SensorsTestbenchPanel`); any change must keep it out of storage
-      (`localStorage`/`sessionStorage`/IndexedDB), out of `console.*`, out of
-      analytics/error reporters, and out of persisted exports
-      (`sensorDiagnosticsExportRules` redaction).
+      `SensorsTestbenchPanel`); keep it out of analytics/error reporters
+      and persisted exports (`sensorDiagnosticsExportRules` redaction).
 - [ ] MANUAL — copy-to-clipboard of the plaintext is a deliberate,
-      warned-in-copy exposure; do not add new copy paths without a blocking
-      confirmation (see Known gaps G6 for the two unconfirmed legacy paths).
+      confirmed, warned-in-copy exposure; do not add new copy paths outside
+      the shared `buildTokenEmbeddingCopyWarningState` gate. The OS
+      clipboard is not auto-cleared (accepted residual, see G6).
 
 ## 12. Sibling isolation
 
@@ -241,16 +272,21 @@ models. Isolation must hold in both directions.
       `sensor_ingest_audit_log` row (service-role write, no caller-supplied
       fields; best-effort, never fails the ingest) and bumps per-token usage
       via the locked-down `bump_bridge_token_usage` RPC.
-- [ ] MANUAL — per-token counters (`ingest_count`, `first_used_at`,
-      `last_used_at`) are client-mutable today (Known gaps G1) and must not
-      be presented as tamper-proof audit evidence; `sensor_ingest_audit_log`
-      is the trustworthy record.
+- [ ] [E35] Per-token counters (`ingest_count`, `first_used_at`,
+      `last_used_at`) are server-maintained on both write paths: the UPDATE
+      guard rejects client-role rewrites and the INSERT validator rejects
+      seeded values ([E35], static). Runtime proof rides the [E37] strict
+      harness — `BLOCKED` until it executes with zero skips (G3).
+      Residual: an owner exercising a live DELETE privilege can still erase
+      a token row wholesale; `sensor_ingest_audit_log` remains the
+      durable record.
 
 ## 14. Validation commands
 
 ```bash
 bun run test:bridge-sensor-ingest-evidence
 bun run test:edge:sensor-ingest-webhook
+bun run test:bridge-tokens-db-security   # needs local Supabase; BLOCKED exit otherwise
 bunx vitest run src/test/sensor-ingest-webhook-matrix.test.ts src/test/sensor-ingest-webhook-error-leakage.test.ts src/test/sensor-ingest-webhook-secret-leakage.test.ts src/test/sensor-ingest-webhook-idempotency-race.test.ts src/test/live-sensor-edge-entitlement-gate.test.ts src/test/live-sensor-edge-entitlement-static-safety.test.ts src/test/tent-bridge-tokens-page-safety.test.tsx src/test/tent-bridge-tokens-card-load-failure.test.ts
 ```
 
@@ -265,14 +301,20 @@ Recorded 2026-08-04 from a five-surface audit at `ef11737989e0`. These are
 **not** silently accepted; each needs either a hardening slice or an explicit
 accepted-risk entry in `docs/security-exceptions.md`.
 
-- **G1 — soft-revocation is client-reversible** (established fact).
-  `revoked_at`, `name`, `last_used_at`, `first_used_at`, `ingest_count` are
-  absent from the `bridge_tokens_guard_immutables` trigger, so an owner (or
-  any code running with the owner's session, e.g. XSS) can UPDATE
-  `revoked_at` back to `NULL` and re-activate a revoked token, and can
-  rewrite usage counters. Owner-scoped only — not privilege escalation — but
-  revocation is not authoritative against the client. Hardening candidate:
-  guard `revoked_at` (one-way set) and the usage columns in the trigger.
+- **G1 — soft-revocation was client-reversible** — **hardening
+  IMPLEMENTED 2026-08-04; PASS is `BLOCKED` on runtime proof.** Migration
+  `20260804213000_bridge_tokens_revocation_integrity` makes `revoked_at`
+  one-way and the usage counters server-maintained for client roles on
+  **both write paths** — the UPDATE guard rejects rewrites, and the INSERT
+  validator rejects seeded telemetry and pre-revoked rows ([E35] pins both
+  guards statically). Original finding: an owner session (e.g. XSS) could
+  UPDATE `revoked_at` back to `NULL` and rewrite usage counters — and,
+  found in review, could equally have INSERTed forged counters. Do not
+  record PASS until the [E37] harness has actually executed against a real
+  database with zero skips (see G3); the harness includes the service-role
+  `bump_bridge_token_usage` regression proof. Residual: a live owner
+  DELETE privilege can still erase the row wholesale (see G3's
+  measurement); `name` remains owner-mutable by design.
 - **G2 — direct client INSERT bypasses mint's guarantees** (established
   fact). The INSERT policy lets an authenticated owner insert a
   `bridge_tokens` row with a self-chosen `token_hash`, skipping mint's
@@ -282,18 +324,41 @@ accepted-risk entry in `docs/security-exceptions.md`.
   weak self-chosen tokens become possible. Decision needed: tighten to
   service-role-only INSERT (preferred pattern) or accept with an exceptions
   entry.
-- **G3 — no runtime RLS harness for `bridge_tokens`** (`missing evidence`).
-  Unlike `sensor_readings`, storage, profiles, etc., no harness proves at
-  runtime that cross-user SELECT/UPDATE/DELETE is denied, that `token_hash`
-  is not client-recoverable after mint, or that the DELETE policy actually
-  functions (no `GRANT DELETE` exists in migrations; it depends on platform
-  default privileges — unverifiable from the repo).
-- **G4 — mint/revoke test coverage holes** (`missing evidence`).
-  `mint-bridge-token/handler_e2e_test.ts` is wired to **no** CI workflow or
-  package script (the Deno edge-tests workflow's run list and path filters
-  omit `mint-bridge-token/**`), and `revoke-bridge-token` has zero tests
-  anywhere. Hash-only storage at mint is not positively asserted by any test
-  (only the JWT-absence is).
+- **G3 — no runtime RLS harness for `bridge_tokens`** — **harness EXISTS;
+  status `BLOCKED` until it executes with zero skips.**
+  `src/test/integration/bridge-tokens-rls.integration.test.ts` (via
+  `bun run test:bridge-tokens-db-security`, chained into
+  `test:security-db-local`, [E37]) covers cross-user SELECT/UPDATE/DELETE
+  denial, anon lockout, the column freezes, clean-insert defaults,
+  insert-time forgery rejection, one-way revocation, and the service-role
+  bump regression, and behaviorally **measures** the effective
+  authenticated DELETE privilege (the repo-unverifiable platform-default
+  question). It has NOT yet executed against a real database — the local
+  replay is blocked by the known `email_queue_dispatch` base defect — so
+  no runtime claim is made. The `security-db-local` lane runs it in strict
+  mode (`BRIDGE_TOKENS_DB_SECURITY_REQUIRED=1`): unreachable DB or any
+  skipped test is a hard FAIL, and inspect the job/step result, never the
+  run-level rollup (`continue-on-error` masks it). The harness
+  deliberately does not claim `token_hash` non-recoverability — see G10,
+  that visibility is real under current grants.
+- **G10 — owners can read their own `token_hash`** (established fact).
+  The founding migration grants table-wide `SELECT` to `authenticated` and
+  RLS filters rows, not columns, so an owner (or any code holding the
+  owner's session) can select their own rows' `token_hash` directly; the
+  migration's "hash is opaque" comment is design intent, not an enforced
+  control. Risk is bounded by SHA-256 preimage resistance — the plaintext
+  is never stored — and the exposure is same-owner-only. The one-time-reveal
+  guarantee (§11) applies to the plaintext, not the hash. Hardening
+  candidates: column-level privileges or a metadata-only view for client
+  reads.
+- **G4 — mint/revoke test coverage holes** — **PASS while the Deno
+  edge-test lane is green** (2026-08-04): the lane now runs
+  `mint-bridge-token/handler_e2e_test.ts` and
+  the new `revoke-bridge-token/handler_e2e_test.ts` with matching path
+  filters ([E36]), the mint suite positively asserts hash-only storage
+  (64-hex `token_hash`, no `token` key, plaintext absent from the insert),
+  and revocation behavior is pinned end-to-end (owner scoping, foreign 404,
+  idempotent `already_revoked`, error redaction).
 - **G5 — freshness dual-authority (open product decision, owner: Cheek)**.
   Server ingest accepts and stores `live` up to 30m; open PR #691 moves
   client current-state display to live 15m / manual 24h without touching
@@ -304,16 +369,25 @@ accepted-risk entry in `docs/security-exceptions.md`.
   the 30m window to the dedupe uniqueness key, so server-side alignment is a
   deliberate slice, not a constant edit. This checklist pins the server value
   ([E25]) so any change is forced through review.
-- **G6 — client reveal-surface gaps** (established facts).
-  `SensorsTestbenchPanel`'s reveal has no Dismiss control (its own header
-  comment claims one); during reveal the plaintext renders in two DOM
-  locations (reveal box + always-rendered PowerShell listener snippet);
-  `copyCurl`/`copyPowerShell` embed the real token with no blocking
-  confirmation (only `copyPowerShellIngest` confirms); raw response bodies
-  render on-screen without `redactTokens` (exports are redacted, display is
-  not); the DOM leak-scan test's forbidden-terms list lacks a `/vbt_/`
-  pattern; mint/revoke failure toasts render server-controlled text
-  verbatim; nothing clears the clipboard after a copy.
+- **G6 — client reveal-surface gaps** — **RESOLVED 2026-08-04** (Phase C,
+  slot 3). All findings closed and pinned by
+  `src/test/sensor-reveal-surface-hardening-static.test.ts` plus the
+  strengthened `sensors-testbench-panel-diagnostics-static.test.ts` and
+  `tent-bridge-tokens-page-safety.test.tsx`: the testbench reveal has a
+  Dismiss control; the on-screen listener snippet is placeholder-only
+  (single DOM location for the plaintext — the reveal box); every
+  token-embedding copy path (curl, listener config, ingest script) goes
+  through the shared `buildTokenEmbeddingCopyWarningState` confirmation;
+  on-screen response bodies render via `redactedResponseBodyJson` (the
+  export redaction's DOM twin); the DOM leak scan now enforces a
+  plaintext-token-shape regex (`vbt_[A-Za-z0-9_-]{16,}` — prefixes still
+  render); mint/revoke toasts use fixed-copy mappers
+  (`mintFailureDescription`/`revokeFailureDescription` in
+  `bridgeTokenRules`) and never echo server-controlled text; both
+  components carry whole-file no-storage/no-console pins. Residual
+  (accepted): copy-to-clipboard remains a deliberate, confirmed,
+  warned-in-copy exposure — the OS clipboard is outside app control and is
+  not auto-cleared.
 - **G7 — no audience scoping between `vbt_` consumers** (practical
   observation). One token works on both `sensor-ingest-webhook` and
   `ecowitt-ingest`. Bounded by tent scope + per-request entitlement; record

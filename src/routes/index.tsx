@@ -4,10 +4,13 @@ import RootEntry from "@/components/RootEntry";
 const SITE_URL = "https://verdantgrowdiary.com";
 
 export const Route = createFileRoute("/")({
-  // Canonical is per-route (the root route can't own it without shadowing
-  // every leaf), so the homepage declares its own here.
+  // No head() canonical: usePageSeo owns <link rel="canonical"> app-wide
+  // (Landing calls it with canonicalPath="/"). Declaring one here creates a
+  // React-owned hoistable that the hook then mutates and removes — React
+  // crashes deleting the detached node on the next navigation, silently
+  // freezing every landing-origin route transition
+  // (src/test/page-seo-head-ownership.test.tsx).
   head: () => ({
-    links: [{ rel: "canonical", href: SITE_URL }],
     meta: [
       { property: "og:image", content: `${SITE_URL}/og/home.png` },
       { name: "twitter:image", content: `${SITE_URL}/og/home.png` },

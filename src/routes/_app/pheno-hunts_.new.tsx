@@ -1,15 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
-import PhenoHuntWorkspace from "@/pages/PhenoHuntWorkspace";
+import PhenoHuntNew from "@/pages/PhenoHuntNew";
 import PhenoTrackerUpgradeGate from "@/components/PhenoTrackerUpgradeGate";
 
-export const Route = createFileRoute("/_app/pheno-hunts/$id/workspace")({
+export const Route = createFileRoute("/_app/pheno-hunts_/new")({
   component: RouteComponent,
 });
 
 function RouteComponent() {
   return (
     <PhenoTrackerUpgradeGate>
-      <PhenoHuntWorkspace />
+      <PhenoHuntNew />
     </PhenoTrackerUpgradeGate>
   );
 }

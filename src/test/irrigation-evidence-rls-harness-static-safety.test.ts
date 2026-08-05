@@ -379,7 +379,7 @@ describe("irrigation evidence CI gate — authoritative and non-production", () 
       '"src/components/irrigation/**"',
       '"src/components/ui/**"',
       '"src/lib/irrigation/**"',
-      '"src/index.css"',
+      '"src/styles.css"',
       '"e2e/fixtures/irrigation-overflow*"',
       '"tailwind.config.ts"',
       '"vite.config.ts"',

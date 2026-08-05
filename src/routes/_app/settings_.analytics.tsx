@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import AnalyticsConsentSettings from "@/pages/AnalyticsConsentSettings";
 
-export const Route = createFileRoute("/_app/settings/analytics")({
+export const Route = createFileRoute("/_app/settings_/analytics")({
   head: () => ({
     meta: [
       { title: "Analytics consent — Verdant Grow Diary" },

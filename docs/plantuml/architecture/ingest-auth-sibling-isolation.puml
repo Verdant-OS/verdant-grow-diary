@@ -1,0 +1,62 @@
+@startuml ingest_auth_sibling_isolation
+!include ../style.puml
+!pragma layout smetana
+
+title Sibling ingest authentication isolation\nDo not mix lanes
+
+left to right direction
+
+rectangle "Lane A — Generic trusted live webhook" as A {
+  component "sensor-ingest-webhook\nverify_jwt = false" as GWH
+  component "Bearer vbt_…\nallowJwt: false\nSHA-256 bridge_tokens" as GVBT
+  component "liveSensors entitlement\ntent match\n30m freshness\nservice_role upsert" as GLive
+  GWH --> GVBT
+  GVBT --> GLive
+}
+
+rectangle "Lane B — EcoWitt sanctioned live ingest" as B {
+  component "ecowitt-ingest\nverify_jwt = false" as EWH
+  component "Bearer vbt_…\nallowJwt: false\n(same bridge auth helper)" as EVBT
+  component "liveSensors +\ntent from token\n(vendor fields redacted)" as ELive
+  EWH --> EVBT
+  EVBT --> ELive
+}
+
+rectangle "Lane C — Pi HMAC ingest" as C {
+  component "pi-ingest-readings\nverify_jwt = false" as PWH
+  component "x-bridge-id\nx-bridge-signature\nx-bridge-timestamp\nHMAC over raw body" as PHMAC
+  component "HMAC-proven bridge\nthen owner entitlement" as PLive
+  PWH --> PHMAC
+  PHMAC --> PLive
+}
+
+rectangle "Lane D — EcoWitt validation-only" as D {
+  component "ecowitt-real-ingest\nverify_jwt = false" as RWH
+  component "ECOWITT_BRIDGE_TOKEN\nstatic expected token\n(env secret)" as RStatic
+  component "validate + redacted\naccept/reject only\n**no sensor_readings write**" as RVal
+  RWH --> RStatic
+  RStatic --> RVal
+}
+
+note as N1
+  **Do not mix Pi HMAC headers with vbt_ bearer semantics.**
+  Pi proves identity via HMAC headers, not Authorization: Bearer vbt_….
+  Generic/EcoWitt live lanes use vbt_ bridge tokens (allowJwt: false).
+  EcoWitt real-ingest is validation-only static secret — not live persistence.
+end note
+
+A -[hidden]down- B
+B -[hidden]down- C
+C -[hidden]down- D
+N1 .. A
+N1 .. C
+
+legend right
+  |= Lane |= Auth model |= Live write? |
+  | A Generic webhook | Bearer vbt_ | yes (if entitled) |
+  | B EcoWitt ingest | Bearer vbt_ | yes (if entitled) |
+  | C Pi | HMAC headers | yes (if HMAC + entitled) |
+  | D EcoWitt real | static env token | **no** (validate only) |
+endlegend
+
+@enduml

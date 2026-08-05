@@ -49,6 +49,7 @@ import {
   useRouter,
   useRouterState,
 } from "@tanstack/react-router";
+import { selectCommittedLocation } from "@/lib/routerCommittedLocation";
 
 export { TanStackOutlet as Outlet };
 
@@ -84,7 +85,9 @@ export interface CompatLocation {
 export function useLocation(): CompatLocation {
   return useRouterState({
     select: (state) => {
-      const location = state.location;
+      // Mirror production: a still-mounted page keeps seeing the COMMITTED
+      // location while a navigation is pending (same shared rule).
+      const location = selectCommittedLocation(state);
       return {
         pathname: location.pathname,
         search: location.searchStr ?? "",
@@ -281,7 +284,9 @@ export type CompatSetSearchParams = (
  * react-router accepted (object, string, URLSearchParams, or updater fn).
  */
 export function useSearchParams(): [URLSearchParams, CompatSetSearchParams] {
-  const searchStr = useRouterState({ select: (state) => state.location.searchStr ?? "" });
+  const searchStr = useRouterState({
+    select: (state) => selectCommittedLocation(state).searchStr ?? "",
+  });
   const router = useRouter();
   const searchKey = searchStr.startsWith("?") ? searchStr.slice(1) : searchStr;
   const params = useMemo(() => new URLSearchParams(searchKey), [searchKey]);
@@ -294,7 +299,8 @@ export function useSearchParams(): [URLSearchParams, CompatSetSearchParams] {
         : typeof resolved === "string"
           ? resolved.replace(/^\?/, "")
           : new URLSearchParams(resolved).toString();
-    const { pathname, hash } = router.state.location;
+    // Setter operates from the COMMITTED page location (mirrors production).
+    const { pathname, hash } = selectCommittedLocation(router.state);
     const suffix = `${serialized ? `?${serialized}` : ""}${hash ? (hash.startsWith("#") ? hash : `#${hash}`) : ""}`;
     void router.navigate({
       to: `${pathname}${suffix}` as never,

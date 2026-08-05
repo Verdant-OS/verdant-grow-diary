@@ -82,7 +82,10 @@ function assertOverflowSafe(container: HTMLElement) {
 
 describe("irrigation surfaces are overflow-safe (structural)", () => {
   it("browser proof loads Verdant CSS and asserts computed responsive styles", () => {
-    expect(overflowFixtureSource).toMatch(/import\s+["']@\/index\.css["']/);
+    // src/styles.css is the TanStack-era stylesheet authority; the retired
+    // src/index.css must never return as the protected path.
+    expect(overflowFixtureSource).toMatch(/import\s+["']@\/styles\.css["']/);
+    expect(overflowFixtureSource).not.toMatch(/["']@\/index\.css["']/);
     expect(overflowBrowserSpecSource).toMatch(/getComputedStyle\(/);
     expect(overflowBrowserSpecSource).toContain('toBe("0px")');
     expect(overflowBrowserSpecSource).toContain('toBe("grid")');

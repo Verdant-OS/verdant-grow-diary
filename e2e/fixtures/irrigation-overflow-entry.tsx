@@ -4,7 +4,9 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { StructuredWateringEntry } from "@/components/irrigation/StructuredWateringEntry";
-import "@/index.css";
+// Verdant's real stylesheet (Tailwind v4 entry) — src/index.css was removed in
+// the TanStack Start migration; src/styles.css is its replacement.
+import "@/styles.css";
 
 const noopWriter = (async () => ({
   ok: true as const,

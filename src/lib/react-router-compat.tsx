@@ -34,6 +34,7 @@ import {
   useRouter,
   useRouterState,
 } from "@tanstack/react-router";
+import { selectCommittedLocation } from "@/lib/routerCommittedLocation";
 
 export { TanStackOutlet as Outlet };
 
@@ -70,7 +71,10 @@ export function useLocation(): CompatLocation {
   if (legacy) return legacy.location;
   return useRouterState({
     select: (state) => {
-      const location = state.location;
+      // Same pending-navigation rule as useSearchParams below: while a
+      // navigation is in flight, `state.location` is the TARGET; the pages
+      // still on screen must keep seeing the committed (resolved) location.
+      const location = selectCommittedLocation(state);
       return {
         pathname: location.pathname,
         search: location.searchStr ?? "",
@@ -281,7 +285,15 @@ export type CompatSetSearchParams = (
 export function useSearchParams(): [URLSearchParams, CompatSetSearchParams] {
   const legacy = useContext(LegacyRouterContext);
   // Always subscribe so hooks order is stable; prefer legacy MemoryRouter search when present.
-  const tanstackSearch = useRouterState({ select: (state) => state.location.searchStr ?? "" });
+  // During a pending navigation, TanStack's `state.location` is already the
+  // in-flight TARGET location while the previous page is still mounted. A
+  // still-rendered page reading the target's search here would see its own
+  // params vanish mid-transition (react-router semantics: a rendered page
+  // sees the location it was rendered for). Prefer `resolvedLocation` (the
+  // committed location) while a navigation is pending.
+  const tanstackSearch = useRouterState({
+    select: (state) => selectCommittedLocation(state).searchStr ?? "",
+  });
   const router = useRouter();
   const searchRaw = legacy ? (legacy.location.search ?? "") : tanstackSearch;
   const searchKey = searchRaw.startsWith("?") ? searchRaw.slice(1) : searchRaw;
@@ -304,7 +316,10 @@ export function useSearchParams(): [URLSearchParams, CompatSetSearchParams] {
       );
       return;
     }
-    const { pathname, hash } = router.state.location;
+    // Setter operates from the COMMITTED page location too: while a
+    // navigation is pending, building the next URL from the in-flight
+    // target would move the wrong page's search params.
+    const { pathname, hash } = selectCommittedLocation(router.state);
     const suffix = `${serialized ? `?${serialized}` : ""}${hash ? (hash.startsWith("#") ? hash : `#${hash}`) : ""}`;
     void router.navigate({
       to: `${pathname}${suffix}` as never,

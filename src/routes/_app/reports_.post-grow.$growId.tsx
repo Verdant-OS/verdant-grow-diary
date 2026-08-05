@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import PostGrowLearningReport from "@/pages/PostGrowLearningReport";
 
-export const Route = createFileRoute("/_app/reports/post-grow/$growId")({
+export const Route = createFileRoute("/_app/reports_/post-grow/$growId")({
   component: RouteComponent,
 });
 

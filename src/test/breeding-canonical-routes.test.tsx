@@ -19,8 +19,11 @@ describe("breeding canonical routes", () => {
   it("keeps program creation and event logging mounted at distinct App routes", () => {
     expect(extractMountedAppRoutePaths()).toContain("/breeding/new");
     expect(extractMountedAppRoutePaths()).toContain("/breeding/log/new");
-    expect(APP_SOURCE).toMatch(/BreedingProgramNew|breeding\.new|breeding\/new/);
-    expect(APP_SOURCE).toMatch(/breeding\.log|breeding\/log|BreedingEvent/);
+    // Exact un-nested ids (see authenticated-detail-route-unnesting.test.ts) —
+    // the old regex alternation matched neither the broken nested form nor
+    // the fixed `breeding_.` files reliably.
+    expect(APP_SOURCE).toContain('createFileRoute("/_app/breeding_/new")');
+    expect(APP_SOURCE).toContain('createFileRoute("/_app/breeding_/log/new")');
   });
 
   it("describes both canonical routes independently in the route manifest", () => {

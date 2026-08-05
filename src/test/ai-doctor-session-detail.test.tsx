@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any -- supabase chain mocks */
 /**
  * AI Doctor Session detail (historical, read-only) tests.
  */
@@ -136,8 +135,12 @@ const APP = readAllRouteModuleSources();
 
 describe("AI Doctor Session detail — routing & wiring", () => {
   it("App registers /doctor/sessions/:sessionId route", () => {
-    // File route lives at src/routes/_app/doctor.sessions.$sessionId.tsx
-    expect(APP).toMatch(/doctor\.sessions\.\$sessionId|sessions\/\$sessionId/);
+    // File route lives at src/routes/_app/doctor_.sessions_.$sessionId.tsx
+    // (trailing `_` = TanStack un-nesting marker; URL is /doctor/sessions/:sessionId).
+    // EXACT id required — an optional-underscore regex would match the broken
+    // nested predecessor too. Aggregate contract:
+    // src/test/authenticated-detail-route-unnesting.test.ts
+    expect(APP).toContain('createFileRoute("/_app/doctor_/sessions_/$sessionId")');
   });
   it("hook exports useAiDoctorSession with maybeSingle by id", () => {
     expect(HOOK).toMatch(/export function useAiDoctorSession/);

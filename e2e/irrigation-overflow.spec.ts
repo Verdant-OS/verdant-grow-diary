@@ -6,10 +6,26 @@
 //
 // Runs locally and in CI after the frozen dependency install. The fixture
 // imports Verdant's production stylesheet so Tailwind layout classes are real.
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 
 const MOCKED_PROJECT = "chromium-mocked";
 const FIXTURE = "/e2e/fixtures/irrigation-overflow.html";
+
+// Under TanStack Start the dev server SSR-renders every HTML navigation, so
+// the raw fixture document is no longer served from disk (the /$ catch-all
+// answers instead). Fulfill the document from the repo; the entry module and
+// stylesheet requests it triggers still go to the live Vite transform
+// pipeline, so the rendered CSS stays real. Dev-server-only, exactly as the
+// Vite-served fixture always was.
+const FIXTURE_HTML = readFileSync(resolve("e2e/fixtures/irrigation-overflow.html"), "utf8");
+
+async function serveFixtureDocument(page: Page) {
+  await page.route(`**${FIXTURE}`, (route) =>
+    route.fulfill({ status: 200, contentType: "text/html", body: FIXTURE_HTML }),
+  );
+}
 const LONG_NOTE =
   "A-very-long-unbroken-root-zone-observation-that-must-wrap-without-forcing-the-structured-watering-form-off-a-glove-friendly-phone-screen";
 
@@ -66,6 +82,7 @@ test("StructuredWateringEntry has zero horizontal overflow at every width", asyn
     test.info().project.name !== MOCKED_PROJECT,
     `irrigation overflow proof runs once, under the ${MOCKED_PROJECT} project`,
   );
+  await serveFixtureDocument(page);
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await page.goto(FIXTURE);

@@ -243,7 +243,7 @@ describe("local Supabase replay compatibility workspace", () => {
     expect(report).toMatchObject({
       mode: "verify_only",
       compatibility_entry_count: 18,
-      compatibility_patch_count: 2,
+      compatibility_patch_count: 3,
       compatibility_injection_count: 1,
       source_migrations_unchanged: true,
     });

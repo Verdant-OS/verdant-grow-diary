@@ -27,8 +27,10 @@ jobs:
     name: test:security-db-local
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    # Optional: never blocks the merge queue.
-    continue-on-error: true
+    # Not a required check, so a red run never blocks the merge queue.
+    # Deliberately NOT continue-on-error: that flag rewrote a failing job
+    # into a run-level "success" and masked a real base red for a full day
+    # (run 30940375065, deploy head ef1173798). Failures must stay visible.
     env:
       ENABLED: ${{ (github.event_name == 'workflow_dispatch' && inputs.run_db_security == true) || vars.ENABLE_DB_SECURITY_LANE == 'true' }}
     steps:

@@ -15,10 +15,10 @@ inside the active governance handoff.
 
 ## Branch topology
 
-| Branch               | Role                                             | Verified head                                               |
-| -------------------- | ------------------------------------------------ | ----------------------------------------------------------- |
-| `verdant-grow-diary` | **Deploy branch. Production ships from here.**   | `acad6cb938e59dab9685bfef84fe8c8b04d7898a`                  |
-| `main`               | Integration branch. It is not production parity. | `ecc9ae4b95dcf34163d33465bc442566b359f8e2` at this snapshot |
+| Branch               | Role                                             | Verified head                                                                                                      |
+| -------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| `verdant-grow-diary` | **Deploy branch. Production ships from here.**   | `1ae1677645a0` (#729) at this snapshot; the queue advances it several times daily — re-verify before relying on it |
+| `main`               | Integration branch. It is not production parity. | `ecc9ae4b95dcf34163d33465bc442566b359f8e2` at this snapshot                                                        |
 
 `main` and `verdant-grow-diary` are divergent. Do not infer production behavior from
 `main`, and do not backport deploy-only governance or data rules without a scoped branch
@@ -37,20 +37,20 @@ changed readiness evidence, artifacts, and tests only; it is **not** deployment 
 SEO/analytics axes verified directly on 2026-08-02; release identity re-verified
 2026-08-05:
 
-| Axis                                        | Status                                                                                                                                                                                 |
-| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `https://verdantgrowdiary.com/version.json` | `PASS` — HTTP 200 (re-verified 2026-08-05)                                                                                                                                             |
-| Production commit                           | `UNKNOWN` — version.json reports `commit: "unknown"`, `dirty: true`, `ciRunId: null` (2026-08-05); the 2026-08-02 build carried a real SHA, so release-identity stamping has regressed |
-| Production build time                       | `2026-08-05T15:47:45.644Z` — production was republished 2026-08-05, but with commit provenance unknown it cannot be stated which merges that build contains                            |
-| Public sitemap                              | `PASS` — HTTP 200, 51 `<loc>` entries                                                                                                                                                  |
-| robots.txt                                  | `PASS` — HTTP 200, production sitemap declared; neither lighting route is disallowed                                                                                                   |
-| Lighting route technical SEO                | `PASS` — two HTTP 200 routes; page metadata and route-scoped JSON-LD verified                                                                                                          |
-| GA4 explicit lighting-page identity         | `PASS` — nine exact intercepted SPA page-view events; no test traffic transmitted                                                                                                      |
-| GA4 page-view singleton contract            | `FAIL` — five automatic tag-generated events observed beside explicit application events                                                                                               |
-| GA4 authenticated baseline                  | `BLOCKED` — authenticated access unavailable                                                                                                                                           |
-| GSC authenticated baseline                  | `BLOCKED` — authenticated access unavailable                                                                                                                                           |
-| Measurement Day 0                           | `UNSET`                                                                                                                                                                                |
-| Four-week measurement clock                 | `NOT_STARTED`                                                                                                                                                                          |
+| Axis                                        | Status                                                                                                                                                                                                                                               |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `https://verdantgrowdiary.com/version.json` | `PASS` — HTTP 200 (re-verified 2026-08-05)                                                                                                                                                                                                           |
+| Production commit                           | `FAIL` — release-identity stamping regressed: version.json reports `commit: "unknown"`, `dirty: true`, `ciRunId: null` (2026-08-05) while the 2026-08-02 build carried a real SHA; the payload values are the evidence, the commit itself is UNKNOWN |
+| Production build time                       | `2026-08-05T15:47:45.644Z` — production was republished 2026-08-05, but with commit provenance unknown it cannot be stated which merges that build contains                                                                                          |
+| Public sitemap                              | `PASS` — HTTP 200, 51 `<loc>` entries                                                                                                                                                                                                                |
+| robots.txt                                  | `PASS` — HTTP 200, production sitemap declared; neither lighting route is disallowed                                                                                                                                                                 |
+| Lighting route technical SEO                | `PASS` — two HTTP 200 routes; page metadata and route-scoped JSON-LD verified                                                                                                                                                                        |
+| GA4 explicit lighting-page identity         | `PASS` — nine exact intercepted SPA page-view events; no test traffic transmitted                                                                                                                                                                    |
+| GA4 page-view singleton contract            | `FAIL` — five automatic tag-generated events observed beside explicit application events                                                                                                                                                             |
+| GA4 authenticated baseline                  | `BLOCKED` — authenticated access unavailable                                                                                                                                                                                                         |
+| GSC authenticated baseline                  | `BLOCKED` — authenticated access unavailable                                                                                                                                                                                                         |
+| Measurement Day 0                           | `UNSET`                                                                                                                                                                                                                                              |
+| Four-week measurement clock                 | `NOT_STARTED`                                                                                                                                                                                                                                        |
 
 No page-level traffic, impression, click, position, or CTR claim is authorized while the
 authenticated GA4/GSC baseline remains blocked. Stream identity alone is not an
@@ -85,7 +85,7 @@ GitHub Actions push runs observed 2026-08-05 ~16:05 UTC for deploy commit
 | Irrigation evidence gate                   | `PASS`         | run `31021834439`                                                                                                                                    |
 | Dependency & Security CI                   | `PASS`         | run `31021832498`                                                                                                                                    |
 | auto-tag-release                           | `PASS`         | run `31021832735`                                                                                                                                    |
-| Full Vitest Suite (PR gate)                | `SKIPPED`      | push run `31021833370` cancelled by queue supersession; all 35 required checks were `PASS` on the pre-merge PR head                                  |
+| Full Vitest Suite (PR gate)                | `NOT_MEASURED` | push run `31021833370` cancelled by queue supersession (not an intentional skip); all 35 required checks were `PASS` on the pre-merge PR head        |
 | Core Link and Form Census                  | `NOT_MEASURED` | run `31021832698` still in progress at observation; the census pair is a pre-existing non-required failure on every branch                           |
 | Required core schema present               | `FAIL`         | run `31021832568`                                                                                                                                    |
 | Required money-critical migrations present | `FAIL`         | run `31021837013`                                                                                                                                    |

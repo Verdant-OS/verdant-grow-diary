@@ -301,19 +301,23 @@ Recorded 2026-08-04 from a five-surface audit at `ef11737989e0`. These are
 **not** silently accepted; each needs either a hardening slice or an explicit
 accepted-risk entry in `docs/security-exceptions.md`.
 
-- **G1 — soft-revocation was client-reversible** — **hardening
-  IMPLEMENTED 2026-08-04; PASS is `BLOCKED` on runtime proof.** Migration
+- **G1 — soft-revocation was client-reversible** — **PASS
+  (runtime-proven 2026-08-05).** Migration
   `20260804213000_bridge_tokens_revocation_integrity` makes `revoked_at`
   one-way and the usage counters server-maintained for client roles on
   **both write paths** — the UPDATE guard rejects rewrites, and the INSERT
   validator rejects seeded telemetry and pre-revoked rows ([E35] pins both
   guards statically). Original finding: an owner session (e.g. XSS) could
   UPDATE `revoked_at` back to `NULL` and rewrite usage counters — and,
-  found in review, could equally have INSERTed forged counters. Do not
-  record PASS until the [E37] harness has actually executed against a real
-  database with zero skips (see G3); the harness includes the service-role
-  `bump_bridge_token_usage` regression proof. Residual: a live owner
-  DELETE privilege can still erase the row wholesale (see G3's
+  found in review, could equally have INSERTed forged counters. Runtime
+  proof: the [E37] harness executed against a real replayed database in
+  strict mode on deploy commit `fc1444854` (run `31019227121`, step
+  "Bridge tokens RLS + revocation integrity (strict)":
+  `passed=9 failed=0 skipped=0` under
+  `BRIDGE_TOKENS_DB_SECURITY_REQUIRED=1`), including the one-way
+  revocation, telemetry-rewrite denial, insert-time forgery rejection, and
+  service-role `bump_bridge_token_usage` regression tests. Residual: a
+  live owner DELETE privilege can still erase the row wholesale (see G3's
   measurement); `name` remains owner-mutable by design.
 - **G2 — direct client INSERT bypasses mint's guarantees** (established
   fact). The INSERT policy lets an authenticated owner insert a
@@ -324,8 +328,8 @@ accepted-risk entry in `docs/security-exceptions.md`.
   weak self-chosen tokens become possible. Decision needed: tighten to
   service-role-only INSERT (preferred pattern) or accept with an exceptions
   entry.
-- **G3 — no runtime RLS harness for `bridge_tokens`** — **harness EXISTS;
-  status `BLOCKED` until it executes with zero skips.**
+- **G3 — no runtime RLS harness for `bridge_tokens`** — **resolved
+  (executed 2026-08-05 with zero skips).**
   `src/test/integration/bridge-tokens-rls.integration.test.ts` (via
   `bun run test:bridge-tokens-db-security`, chained into
   `test:security-db-local`, [E37]) covers cross-user SELECT/UPDATE/DELETE
@@ -333,12 +337,17 @@ accepted-risk entry in `docs/security-exceptions.md`.
   insert-time forgery rejection, one-way revocation, and the service-role
   bump regression, and behaviorally **measures** the effective
   authenticated DELETE privilege (the repo-unverifiable platform-default
-  question). It has NOT yet executed against a real database — the local
-  replay is blocked by the known `email_queue_dispatch` base defect — so
-  no runtime claim is made. The `security-db-local` lane runs it in strict
-  mode (`BRIDGE_TOKENS_DB_SECURITY_REQUIRED=1`): unreachable DB or any
+  question). First real-database execution: deploy commit `fc1444854`
+  after #724 restored the local replay (`email_queue_dispatch` handled via
+  an existence-guarded replay-compatibility patch); run `31019227121`
+  reported `passed=9 failed=0 skipped=0`. The DELETE-measurement test
+  passed, meaning observed behavior matched the measured privilege — the
+  measured value itself lives in the harness artifact
+  (`bridge-tokens-vitest.json`), not in this document. The
+  `security-db-local` lane runs the harness in strict mode
+  (`BRIDGE_TOKENS_DB_SECURITY_REQUIRED=1`): unreachable DB or any
   skipped test is a hard FAIL, and inspect the job/step result, never the
-  run-level rollup (`continue-on-error` masks it). The harness
+  run-level rollup. The harness
   deliberately does not claim `token_hash` non-recoverability — see G10,
   that visibility is real under current grants.
 - **G10 — owners can read their own `token_hash`** (established fact).

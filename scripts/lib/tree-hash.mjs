@@ -16,9 +16,11 @@
  *     to the commit(s) carrying identical app content.
  *
  * Properties:
- *   - Deterministic across OSes: every file is CRLF→LF normalized (on raw
- *     bytes) before hashing, so Windows checkouts hash identically to Linux
- *     checkouts of the same content.
+ *   - Deterministic across OSes: text files (per git's NUL heuristic) are
+ *     CRLF→LF normalized before hashing, so Windows checkouts hash
+ *     identically to Linux checkouts of the same content; binary files are
+ *     hashed byte-exact, since git never smudges them and normalizing would
+ *     collide distinct shipped bytes.
  *   - Test-only / docs-only changes outside the roots do not move the hash,
  *     so one hash may map to several commits with identical app content;
  *     the resolver reports every match rather than guessing.
@@ -98,9 +100,20 @@ function* walk(rootAbs, rootRel) {
 }
 
 /**
- * CRLF→LF on raw bytes. Identical input bytes always produce identical
- * output bytes, which is all determinism requires — and text files checked
- * out with CRLF on Windows normalize to their LF (Linux) representation.
+ * Git's own text/binary heuristic: a NUL byte within the first 8000 bytes
+ * marks the file binary. Only text files get CRLF→LF normalization, because
+ * only text files are subject to checkout-variant line endings (git never
+ * smudges binaries) — and normalizing binaries would make distinct shipped
+ * bytes (`...\r\n...` vs `...\n...` inside a PNG) collide to one digest.
+ */
+export function isBinary(buf) {
+  return buf.subarray(0, Math.min(buf.length, 8000)).includes(0x00);
+}
+
+/**
+ * CRLF→LF on raw bytes, applied to TEXT files only (see isBinary): the same
+ * text content hashes identically whether checked out CRLF (Windows) or LF
+ * (Linux, git archive), while binary assets keep byte-exact identity.
  */
 export function normalizeCrlf(buf) {
   if (!buf.includes(0x0d)) return buf;
@@ -143,7 +156,9 @@ export async function computeTreeHash(repoRoot = process.cwd()) {
       const i = next;
       next += 1;
       const buf = await fsp.readFile(files[i].abs);
-      digests[i] = createHash("sha256").update(normalizeCrlf(buf)).digest("hex");
+      digests[i] = createHash("sha256")
+        .update(isBinary(buf) ? buf : normalizeCrlf(buf))
+        .digest("hex");
     }
   }
   await Promise.all(Array.from({ length: Math.min(READ_CONCURRENCY, files.length) }, worker));

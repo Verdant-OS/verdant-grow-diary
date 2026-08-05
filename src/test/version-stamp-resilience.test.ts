@@ -21,7 +21,7 @@ import { execFileSync } from "node:child_process";
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { computeTreeHash, normalizeCrlf } from "../../scripts/lib/tree-hash.mjs";
+import { computeTreeHash, isBinary, normalizeCrlf } from "../../scripts/lib/tree-hash.mjs";
 
 const REPO_ROOT = resolve(__dirname, "../..");
 const STAMPER = resolve(REPO_ROOT, "scripts/stamp-version.mjs");
@@ -151,6 +151,29 @@ describe("tree-hash content identity", () => {
     const after = await computeTreeHash(root);
     expect(after.treeHash).toBe(before.treeHash);
     expect(after.fileCount).toBe(before.fileCount);
+  });
+
+  it("hashes binary files byte-exact: CRLF-vs-LF inside a binary stays distinct", async () => {
+    // Regression (Codex review on #735): normalizing binaries collided
+    // distinct shipped bytes. Binary = NUL in first 8000 bytes (git's rule).
+    const pngIshCrlf = Buffer.concat([
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x00]),
+      Buffer.from("data\r\nmore"),
+    ]);
+    const pngIshLf = Buffer.concat([
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x00]),
+      Buffer.from("data\nmore"),
+    ]);
+    expect(isBinary(pngIshCrlf)).toBe(true);
+    expect(isBinary(Buffer.from("plain text\r\n"))).toBe(false);
+
+    const a = makeTempRoot();
+    const b = makeTempRoot();
+    mkdirSync(join(a, "public"), { recursive: true });
+    mkdirSync(join(b, "public"), { recursive: true });
+    writeFileSync(join(a, "public/asset.png"), pngIshCrlf);
+    writeFileSync(join(b, "public/asset.png"), pngIshLf);
+    expect((await computeTreeHash(a)).treeHash).not.toBe((await computeTreeHash(b)).treeHash);
   });
 
   it("changes when app content changes", async () => {

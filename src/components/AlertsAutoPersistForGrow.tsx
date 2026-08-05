@@ -48,6 +48,7 @@ export default function AlertsAutoPersistForGrow({ growId, stage }: Props) {
     ),
     enabled: !!safeGrowId,
     stage: stage ?? null,
+    tentId: sensorState.status === "ok" ? (sensorState.tentId ?? null) : null,
   });
 
   return null;

@@ -26,11 +26,24 @@ import {
   snapshotFromReadings,
 } from "@/lib/sensorSnapshot";
 
+interface SnapshotQueryResult {
+  snapshot: SensorSnapshot;
+  /**
+   * The tent the winning reading actually came from, when known. Readings
+   * sharing the snapshot's exact `ts` come from one ingest batch for one
+   * tent (same assumption `snapshotFromReadings` already makes for
+   * `device_id`), so this is unambiguous whenever a real reading won.
+   * Null for the diary fallback when that row predates tent tracking, and
+   * for the empty/unavailable cases.
+   */
+  tentId: string | null;
+}
+
 export type SnapshotState =
-  | { status: "idle"; snapshot: SensorSnapshot }
-  | { status: "loading"; snapshot: SensorSnapshot }
-  | { status: "ok"; snapshot: SensorSnapshot }
-  | { status: "unavailable"; snapshot: SensorSnapshot };
+  | { status: "idle"; snapshot: SensorSnapshot; tentId?: string | null }
+  | { status: "loading"; snapshot: SensorSnapshot; tentId?: string | null }
+  | { status: "ok"; snapshot: SensorSnapshot; tentId?: string | null }
+  | { status: "unavailable"; snapshot: SensorSnapshot; tentId?: string | null };
 
 export function useLatestSensorSnapshot(
   growId: string | null | undefined,
@@ -39,7 +52,7 @@ export function useLatestSensorSnapshot(
   const { user } = useAuth();
   const tentKey = tentIds.join("|");
 
-  const query = useQuery<SensorSnapshot>({
+  const query = useQuery<SnapshotQueryResult>({
     queryKey: ["latest-sensor-snapshot", user?.id ?? "anon", growId ?? "none", tentKey],
     enabled: !!user && !!growId,
     queryFn: async () => {
@@ -63,13 +76,19 @@ export function useLatestSensorSnapshot(
                 raw_payload: (r as { raw_payload?: unknown }).raw_payload,
               })),
             );
-            if (snap) return snap;
+            if (snap) {
+              const winningRow = data.find((r) => r.ts === snap.ts);
+              return {
+                snapshot: snap,
+                tentId: (winningRow?.tent_id as string | null | undefined) ?? null,
+              };
+            }
           }
         }
         // 2) Fall back to latest diary_entries.details.sensor_snapshot.
         const { data: diaryRows, error: diaryErr } = await supabase
           .from("diary_entries")
-          .select("entry_at,details")
+          .select("entry_at,details,tent_id")
           .eq("grow_id", growId)
           .order("entry_at", { ascending: false })
           .limit(20);
@@ -83,10 +102,15 @@ export function useLatestSensorSnapshot(
                   details.sensor_snapshot as Record<string, unknown> | undefined,
                 )
               : null;
-          if (snap) return snap;
+          if (snap) {
+            return {
+              snapshot: snap,
+              tentId: (row.tent_id as string | null | undefined) ?? null,
+            };
+          }
         }
         // 3) Nothing available.
-        return EMPTY_SNAPSHOT;
+        return { snapshot: EMPTY_SNAPSHOT, tentId: null };
       } catch {
         throw new Error("unavailable");
       }
@@ -94,15 +118,19 @@ export function useLatestSensorSnapshot(
   });
 
   if (!user || !growId) {
-    return { status: "idle", snapshot: EMPTY_SNAPSHOT };
+    return { status: "idle", snapshot: EMPTY_SNAPSHOT, tentId: null };
   }
   if (query.isLoading || query.isFetching && !query.data) {
-    return { status: "loading", snapshot: EMPTY_SNAPSHOT };
+    return { status: "loading", snapshot: EMPTY_SNAPSHOT, tentId: null };
   }
   if (query.isError) {
-    return { status: "unavailable", snapshot: EMPTY_SNAPSHOT };
+    return { status: "unavailable", snapshot: EMPTY_SNAPSHOT, tentId: null };
   }
-  return { status: "ok", snapshot: query.data ?? EMPTY_SNAPSHOT };
+  return {
+    status: "ok",
+    snapshot: query.data?.snapshot ?? EMPTY_SNAPSHOT,
+    tentId: query.data?.tentId ?? null,
+  };
 }
 
 export default useLatestSensorSnapshot;

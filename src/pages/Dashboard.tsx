@@ -179,6 +179,11 @@ export default function Dashboard() {
   const selectableTents = tents.map((t) => ({ id: t.id, name: t.name }));
   const selectedTentIds = resolveSelectedTentIds(selectableTents, tentSelection);
   const sensorState = useLatestSensorSnapshot(scopedGrowId ?? null, selectedTentIds);
+  // Tent the winning snapshot reading came from; attached to persisted
+  // alert rows so tent-scoped readers (Plant Detail's assigned-tent alerts
+  // panel) can filter. Null when unknown/ambiguous.
+  const snapshotTentId =
+    sensorState.status === "ok" ? (sensorState.tentId ?? null) : null;
   const trendsState = useEnvironmentTrends(
     scopedGrowId ?? null,
     tents.map((t) => t.id),
@@ -218,6 +223,7 @@ export default function Dashboard() {
     ),
     enabled: !!scopedGrowId,
     stage: scopedGrow?.stage ?? null,
+    tentId: snapshotTentId,
   });
 
   const dueToday = tasks.filter((t) => t.status === "today").length;
@@ -1175,6 +1181,7 @@ export default function Dashboard() {
                                         title: a.title,
                                         reason: a.reason,
                                         metric: typeof a.metric === "string" ? a.metric : null,
+                                        tent_id: snapshotTentId,
                                       });
                                       try {
                                         await logAlertEvent({

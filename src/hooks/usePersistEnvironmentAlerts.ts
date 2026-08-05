@@ -61,6 +61,14 @@ export interface PersistEnvironmentAlertsInput {
    * stage-aware bands instead of the legacy generic 0.6–1.6 kPa default.
    */
   stage?: string | null;
+  /**
+   * Tent the snapshot came from, when known (see SnapshotState.tentId on
+   * useLatestSensorSnapshot). Attached to the persisted alert row so
+   * tent-scoped readers can filter correctly. Null/omitted when the
+   * snapshot's tent is unknown or ambiguous — the row is then only
+   * findable at grow scope, same as before this field existed.
+   */
+  tentId?: string | null;
 }
 
 const SOURCE = "environment_alerts";
@@ -94,6 +102,7 @@ export function usePersistEnvironmentAlerts(
   const isDemoData = input.isDemoData === true;
   const stageProvided = "stage" in input;
   const stageKey = stageProvided ? input.stage ?? "__unknown__" : "__legacy__";
+  const tentId = input.tentId ?? null;
 
   useEffect(() => {
     if (!enabled || !growId) {
@@ -200,6 +209,7 @@ export function usePersistEnvironmentAlerts(
             reason: a.reason,
             metric: typeof a.metric === "string" ? a.metric : null,
             source: SOURCE,
+            tent_id: tentId,
           });
           try {
             await logAlertEvent({
@@ -232,7 +242,7 @@ export function usePersistEnvironmentAlerts(
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, growId, tsKey, sourceKey, qualityKey, targetsKey, isDemoData, stageKey, stageProvided]);
+  }, [enabled, growId, tsKey, sourceKey, qualityKey, targetsKey, isDemoData, stageKey, stageProvided, tentId]);
 
   return state;
 }

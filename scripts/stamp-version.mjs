@@ -134,10 +134,18 @@ if (commitSource === "none") {
         );
         if (!m) return "unknown";
         const [y, mo, d, h, mi, s] = m.slice(1, 7).map(Number);
+        // Domain bound: build timestamps predate neither the epoch nor
+        // outlive plausibility; this also keeps the year clear of
+        // Date.UTC's legacy 0–99 → 1900s mapping.
+        if (y < 1970 || y > 2999) return "unknown";
         if (h > 23 || mi > 59 || s > 59) return "unknown";
         const off = m[7];
-        if (off !== "Z" && (Number(off.slice(1, 3)) > 14 || Number(off.slice(4, 6)) > 59)) {
-          return "unknown";
+        if (off !== "Z") {
+          const oh = Number(off.slice(1, 3));
+          const om = Number(off.slice(4, 6));
+          // Real-world UTC offsets end at exactly ±14:00 — nonzero minutes
+          // at the ±14 boundary are out of range.
+          if (oh > 14 || om > 59 || (oh === 14 && om > 0)) return "unknown";
         }
         const utc = new Date(Date.UTC(y, mo - 1, d));
         return utc.getUTCFullYear() === y && utc.getUTCMonth() === mo - 1 && utc.getUTCDate() === d

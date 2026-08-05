@@ -218,6 +218,7 @@ export default function Dashboard() {
     ),
     enabled: !!scopedGrowId,
     stage: scopedGrow?.stage ?? null,
+    tentId: sensorState.status === "ok" ? (sensorState.tentId ?? null) : null,
   });
 
   const dueToday = tasks.filter((t) => t.status === "today").length;
@@ -1175,6 +1176,10 @@ export default function Dashboard() {
                                         title: a.title,
                                         reason: a.reason,
                                         metric: typeof a.metric === "string" ? a.metric : null,
+                                        tent_id:
+                                          sensorState.status === "ok"
+                                            ? (sensorState.tentId ?? null)
+                                            : null,
                                       });
                                       try {
                                         await logAlertEvent({

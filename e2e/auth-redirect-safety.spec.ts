@@ -23,6 +23,10 @@ async function mockAuth(page: Page) {
           id: "test-user-id",
           aud: "authenticated",
           email: "noop@example.invalid",
+          // Verified user: without this the AppShell swaps page content for
+          // the "Verify your email" gate, so the destination-DOM assertions
+          // below could never see the real /plants or /dashboard surfaces.
+          email_confirmed_at: "2026-01-01T00:00:00Z",
         },
       };
       await route.fulfill({
@@ -40,6 +44,7 @@ async function mockAuth(page: Page) {
           id: "test-user-id",
           aud: "authenticated",
           email: "noop@example.invalid",
+          email_confirmed_at: "2026-01-01T00:00:00Z",
         }),
       });
       return;

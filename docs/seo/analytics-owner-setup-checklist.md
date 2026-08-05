@@ -1,6 +1,6 @@
 # Lighting analytics owner setup checklist
 
-**Last reconciled against production (UTC):** 2026-08-02T02:55:07.852Z
+**Last reconciled against production (UTC):** 2026-08-05T16:52:31.830Z
 
 **Production host:** `https://verdantgrowdiary.com`
 
@@ -20,10 +20,12 @@ stale objects, so no further publication is required for that repair. Public
 direct-load/indexability checks and explicit GA4 route identities pass. A controlled
 collection-endpoint test across nine navigation states found five automatic GA4 page views alongside
 Verdant's nine explicit SPA events, so the singleton collection contract fails pending the Enhanced
-Measurement change below. The owner
-has confirmed the production stream name, stream URL, stream ID, and measurement ID, and the
-deployed tag matches that measurement ID. The GA4 property identity and authenticated reporting
-access are still unavailable to Codex, as is authenticated Search Console access.
+Measurement change below. The current production manifest is
+`97e23e1f46a2cb998eed87b75845963bc32f1579`. The owner has confirmed the production stream name,
+stream URL, stream ID, and measurement ID. Current source retains consent-gated
+`send_page_view: false` and explicit, sanitized SPA page views; no new intercepted collection matrix
+was run. The GA4 property identity and authenticated reporting access are unavailable to Codex, as is
+authenticated Search Console access.
 
 Never paste a Google password, OAuth code, client secret, refresh token, access token,
 service-account key, verification token, or private export into chat, an issue, a pull request, a
@@ -43,8 +45,8 @@ local ignored storage, or GitHub Actions secrets. The detailed GSC procedure is 
 | --------------------------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
 | Correct Google account and organization       | `INCOMPLETE`        | Sign in to the account that owns Verdant analytics; keep account identity out of repository artifacts.                                                                                                                                     | Confirm the selected account in an owner-approved session.                                                                   |
 | Correct GA4 property                          | `INCOMPLETE`        | Select the single existing production property and record its name and numeric property ID in the approved handoff. The numeric property ID **must not be inferred** from the measurement ID.                                              | Confirm the authenticated property identity.                                                                                 |
-| Production web data stream                    | `COMPLETE`          | Owner-confirmed stream: `Verdant Grow Diary`; stream URL: `https://verdantgrowdiary.com`; stream ID: `15065867361`; measurement ID: `G-MCXQ9GVS5H`. Do not create a duplicate property or stream.                                          | Owner-supplied stream identity is recorded; Codex verified the same measurement ID in production.                            |
-| Production hostname and deployed tag          | `COMPLETE`          | The owner-confirmed stream URL is the canonical production host, and production loads and targets `G-MCXQ9GVS5H`. Keep preview, Lovable, Vercel, and alternate domains out of the production stream.                                       | Recheck the public host and tag after any analytics or deployment change.                                                    |
+| Production web data stream                    | `COMPLETE`          | Owner-confirmed stream: `Verdant Grow Diary`; stream URL: `https://verdantgrowdiary.com`; stream ID: `15065867361`; measurement ID: `G-MCXQ9GVS5H`. Do not create a duplicate property or stream.                                          | Owner-supplied stream identity is recorded; source resolution is pinned to the same measurement ID.                          |
+| Production hostname and deployed tag          | `COMPLETE`          | The owner-confirmed stream URL is the canonical production host. The consent-gated loader targets `G-MCXQ9GVS5H`; keep preview, Lovable, Vercel, and alternate domains out of the production stream.                                       | Recheck the public host and intercepted collection after any analytics or deployment change.                                 |
 | Read-only reporting access                    | `INCOMPLETE`        | Grant the designated reporting account property-level `Viewer` access, or provide an owner-approved authenticated reporting session. Do not send credentials.                                                                              | Capture the GA4 baseline.                                                                                                    |
 | Enhanced measurement review                   | `BLOCKED_BY_ACCESS` | In the existing production stream, open Enhanced Measurement > Page views > advanced settings and disable **Page changes based on browser history events**. Retain Verdant's explicit SPA `page_view` emitter; do not create a new stream. | Repeat the nine-state direct-load, cross-guide, history, refresh, repeat, and new-tab check with collection blocked locally. |
 | Internal and developer traffic handling       | `BLOCKED_BY_ACCESS` | Decide how owner/developer verification traffic is identified; test a filter before activating it.                                                                                                                                         | Confirm filter state with a controlled, privacy-safe test.                                                                   |

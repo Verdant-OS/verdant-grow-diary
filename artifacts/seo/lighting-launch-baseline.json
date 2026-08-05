@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-02T05:19:48.245Z",
+  "generated_at": "2026-08-05T16:52:31.830Z",
   "artifact_semantics": "POINT_IN_TIME_EVIDENCE_SNAPSHOT",
   "measurement_start_at": null,
   "measurement_status": "blocked",
@@ -12,10 +12,11 @@
     "pull_request": 595,
     "merge_commit": "1223c56c9db586160a2798d017c2e78d1de1dd5a",
     "lovable_project_id": "66255e7b-892c-4be5-8686-ab1cfc3666db",
-    "publisher_latest_commit_sha": "a20776993bd606f07977674934864b888a407e1c",
+    "publisher_latest_commit_sha": "5841d9f22d96aadad255c88369554c52a1691bcd",
+    "production_manifest_commit": "97e23e1f46a2cb998eed87b75845963bc32f1579",
     "production_version_url": "https://verdantgrowdiary.com/version.json",
-    "production_build_time": "2026-08-02T01:28:54.548Z",
-    "production_deployment_id": null,
+    "production_build_time": "2026-08-05T16:38:38.485Z",
+    "production_deployment_id": "256365afe9639452bd62e1051315097ba7239697c486abe8728c63d43ac18fe6",
     "pull_request_merge_in_production_commit": true,
     "measurement_repair_pull_request": 597,
     "measurement_repair_commit": "51363737ca97e74f861558f082b849bbbd389aa2",
@@ -23,14 +24,14 @@
     "structured_data_repair_pull_request": 624,
     "structured_data_repair_commit": "b62aac5d4b0e9296bfdbee4c46e03fc35f350c0c",
     "structured_data_repair_in_production_commit": true,
-    "deploy_branch_head": "a20776993bd606f07977674934864b888a407e1c",
+    "deploy_branch_head": "5841d9f22d96aadad255c88369554c52a1691bcd",
     "production_manifest_is_ancestor_of_deploy_branch_head": true,
-    "production_matches_deploy_branch_head": true,
-    "source_delta_since_manifest": "none_deploy_matches_production",
+    "production_matches_deploy_branch_head": false,
+    "source_delta_since_manifest": "docs_agents_current_state_only_5841d9f2",
     "production_publish_required": false,
     "release_content_match": "pass",
     "release_content_scope": "lighting_guides_only",
-    "full_deploy_branch_parity": "current"
+    "full_deploy_branch_parity": "documentation_only_delta"
   },
   "public_probe": {
     "observed_at": "2026-08-02T02:53:25.627Z",
@@ -46,6 +47,26 @@
     "structured_data_parse_errors_observed": 0,
     "robots_declares_production_sitemap": true,
     "robots_protects_app_prefixes": true
+  },
+  "current_production_recheck": {
+    "observed_at": "2026-08-05T16:52:31.830Z",
+    "host": "https://verdantgrowdiary.com",
+    "deployment_id": "256365afe9639452bd62e1051315097ba7239697c486abe8728c63d43ac18fe6",
+    "version_commit": "97e23e1f46a2cb998eed87b75845963bc32f1579",
+    "version_build_time": "2026-08-05T16:38:38.485Z",
+    "version_dirty": false,
+    "version_commit_is_ancestor_of_deploy_head": true,
+    "deploy_head_ahead_by_commits": 1,
+    "lighting_pages_http_status": 200,
+    "sitemap_http_status": 200,
+    "robots_http_status": 200,
+    "distance_guide_sitemap_occurrences": 1,
+    "light_stress_guide_sitemap_occurrences": 1,
+    "guide_metadata_and_canonicals": "pass",
+    "guide_robots": "index_follow",
+    "analytics_source_contract": "pass_explicit_page_view_with_send_page_view_false",
+    "analytics_runtime_collection_recheck": "blocked_in_app_browser_unavailable_after_router_change",
+    "authenticated_baselines": "blocked_authenticated_access_unavailable"
   },
   "pages": [
     {
@@ -252,7 +273,7 @@
   "launch_gates": {
     "both_pages_http_200": "pass",
     "release_content_match": "pass",
-    "full_deploy_branch_parity": "current",
+    "full_deploy_branch_parity": "documentation_only_delta",
     "intentional_indexability": "pass",
     "canonicals": "pass",
     "sitemap_and_robots": "pass",

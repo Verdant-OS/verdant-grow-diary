@@ -1,6 +1,7 @@
 # Lighting launch verification
 
-**Generated:** 2026-08-02T05:19:48.245Z
+**Generated:** 2026-08-05T16:52:31.830Z
+**Artifact revision:** `2026-08-05T16:52:31.830Z` (`CURRENT_PRODUCTION_AND_SOURCE_CONTRACT_RECHECK`)
 **Production host:** https://verdantgrowdiary.com
 **Merged PR:** [#595](https://github.com/Verdant-OS/verdant-grow-diary/pull/595)
 **Merge commit:** `1223c56c9db586160a2798d017c2e78d1de1dd5a`
@@ -9,9 +10,9 @@ commit `51363737ca97e74f861558f082b849bbbd389aa2`
 **Lovable project:** `66255e7b-892c-4be5-8686-ab1cfc3666db`
 **Structured-data repair:** [#624](https://github.com/Verdant-OS/verdant-grow-diary/pull/624),
 commit `b62aac5d4b0e9296bfdbee4c46e03fc35f350c0c`
-**Production build manifest commit:** `a20776993bd606f07977674934864b888a407e1c`
-**Deploy branch head:** `a20776993bd606f07977674934864b888a407e1c`
-**Production deployment ID:** not exposed by the current production response
+**Production build manifest commit:** `97e23e1f46a2cb998eed87b75845963bc32f1579`
+**Deploy branch head:** `5841d9f22d96aadad255c88369554c52a1691bcd` (documentation-only delta)
+**Production deployment ID:** `256365afe9639452bd62e1051315097ba7239697c486abe8728c63d43ac18fe6`
 
 ## Launch verdict
 
@@ -34,39 +35,29 @@ unset.
 
 The owner-confirmed GA4 production stream is `Verdant Grow Diary`, stream URL
 `https://verdantgrowdiary.com`, stream ID `15065867361`, and measurement ID `G-MCXQ9GVS5H`.
-Production loads and targets that exact measurement ID. This closes stream identity only; the
-numeric property ID and authenticated reporting baseline remain unavailable to Codex.
+The consent-gated source contract retains that exact measurement ID as its target. Historic controlled
+runtime proof exists, but no fresh collection request was captured after the router/AppShell change.
+This closes stream identity only; the numeric property ID and authenticated reporting baseline remain unavailable to Codex.
 
-## Publication and release evidence
+## Current production and release evidence
 
-- `https://verdantgrowdiary.com/version.json` identifies production build commit
-  `a20776993bd606f07977674934864b888a407e1c`, built at
-  `2026-08-02T01:28:54.548Z`.
-- Repository ancestry proves the PR #595 release, PR #597 analytics repair, and PR #624
-  structured-data repair commits are all ancestors of that production manifest commit.
-- Production manifest and deploy head both resolve to `a2077699…`. The production release now has
-  full deploy-branch parity. Lighting release-content verification remains deliberately scoped to the
-  two guides; no runtime publish is required for the measurement evidence itself.
-- The point-in-time readiness artifact identifies the recheck-bearing evidence head
-  (`913f1b9deb0934d5ce76491cbc945816f4581b73`) separately from its audited production release
-  (`a20776993bd606f07977674934864b888a407e1c`). Its pre-recheck audit-start head
-  (`c794e4c6ff0debb6ae2a83566b2a73f690a96393`) was seven evidence-only commits ahead at audit
-  start and is not represented as deployed content. Neither evidence commit identifies deployed
-  application content.
-- Its evidence snapshot remains timestamped `2026-08-02T05:19:48.245Z`. The later
-  `2026-08-02T08:07:28.792Z` revision is classified as
-  `POST_DEPLOY_ANALYTICS_RECHECK_PROVENANCE_CORRECTION_ONLY`; it corrects the audit-head
-  provenance without adding a fresh production or analytics verification.
-- The current production response does not expose a Lovable deployment ID, so none is inferred.
-- Both release-specific URLs, titles, descriptions, H1s, Article/FAQ schema, sitemap entries, and
-  cross-links are present in production.
-- The raw public probe at `2026-08-02T02:53:25.627Z` returned HTTP 200 for `version.json`, both
-  lighting guides, `sitemap.xml`, and `robots.txt`. The sitemap contains 51 URLs and each lighting
-  route exactly once; robots declares the production sitemap and protects app prefixes. Rendered
-  browser checks at `2026-08-02T02:55:02.718Z` and `2026-08-02T02:55:07.852Z` confirmed both
-  pages' route-scoped metadata, JSON-LD identities, cross-links, and zero application errors.
+- At `2026-08-05T16:52:31.830Z`, `version.json` identified the production build as
+  `97e23e1f46a2cb998eed87b75845963bc32f1579`, built at `2026-08-05T16:38:38.485Z`, with
+  `dirty: false`. The host returned the deployment ID recorded above for both guide routes,
+  `robots.txt`, and `sitemap.xml`.
+- The production commit is one commit behind the current deploy head. That delta is
+  `docs/agents/CURRENT_STATE.md` only; it does not alter the lighting routes, router, or analytics
+  source contract. Production therefore remains the verified application release for this slice.
+- Both guide routes, the sitemap, and robots returned HTTP 200. Each guide occurred exactly once in
+  the sitemap, retained its expected title, description, self-canonical, `index, follow`, H1, and
+  JSON-LD script set. Robots declares the production sitemap and disallows protected app prefixes.
+- The completed controlled runtime matrix remains historical evidence. Its recheck-bearing commit
+  was `913f1b9deb0934d5ce76491cbc945816f4581b73`; it is not a deployed application fingerprint.
+  The production deploy now includes a router/AppShell change after that matrix. The current in-app
+  browser control bridge was unavailable, so this refresh does not claim a fresh intercepted
+  collection result.
 
-**Release content match: PASS — LIGHTING GUIDES ONLY; DEPLOYMENT PARITY: PASS**
+**Release content match: PASS — LIGHTING GUIDES ONLY; DEPLOYMENT PARITY: DOCUMENTATION-ONLY DELTA**
 
 ## Exact lighting pages
 
@@ -190,9 +181,10 @@ those navigations if left enabled beside Verdant's explicit SPA owner. The owner
 advanced "page changes based on browser history events" option in the existing stream, retain the
 explicit app emitter, and then authorize the same controlled re-verification.
 
-The production build subsequently advanced to `a2077699…`; its source delta excludes analytics
-paths, and current source inspection preserves the explicit SPA emitter and bootstrap
-`send_page_view: false`. A corrected targeted post-deploy recheck at `2026-08-02T05:19:48.245Z`
+The current production build is `97e23e1f…`. Its router/AppShell change postdates the historic
+matrix, while current source inspection still preserves the explicit SPA emitter and bootstrap
+`send_page_view: false`; a new intercepted collection matrix is required before treating the historic
+runtime result as current. A corrected targeted post-deploy recheck at `2026-08-02T05:19:48.245Z`
 fulfilled every observed GA collection request locally. Across a direct distance-guide load and a
 client transition to the stress guide, it observed two exact app-owned page views and one separate
 automatic page view without the explicit path: three page views for two navigation actions. The
@@ -226,7 +218,8 @@ event or runtime behavior.
 
 - **GA4 baseline:** BLOCKED — AUTHENTICATED ACCESS UNAVAILABLE.
 - **GSC baseline:** BLOCKED — AUTHENTICATED ACCESS UNAVAILABLE.
-- **GA4 production stream identity:** PASS — owner-confirmed values match the deployed host and tag.
+- **GA4 source contract:** PASS — the consent-gated loader configures `send_page_view: false` and the
+  route hook emits one explicit, sanitized `page_view`; this is not a fresh live collection result.
 - At `2026-08-02T02:08:43.179Z`, name-only GitHub secret listings found none of the expected GA4
   or GSC reporting secrets configured at repository scope or in the `verdant-production`,
   `verdant-sandbox`, and `copilot` environments; `.seo/gsc-token.local.json` is also absent. The
@@ -247,12 +240,10 @@ event or runtime behavior.
 - Machine-readable handoff: the current blocked state is recorded in
   [`artifacts/seo/seo-readiness-status.json`](../../artifacts/seo/seo-readiness-status.json).
 
-The current bounded slice is `P2 LIGHTING_GUIDE_CTA_ATTRIBUTION_CONTRACT`: its event classification
-is `MISSING`, while its metric readiness status is `NOT_MEASURED`; downstream activity is not used
-as attribution. The completed `P3 READINESS_ARTIFACT_PROVENANCE` repair keeps the point-in-time
-evidence-branch head separate from the audited production release and distinguishes current
-monitoring evidence from historical dry-run summaries without changing runtime code. The highest
-remaining defect is owner-blocked P0:
+The completed P3 `CURRENT_PRODUCTION_EVIDENCE_REFRESH` keeps the current production fingerprint
+separate from the historical intercepted collection evidence. `LIGHTING_GUIDE_CTA_ATTRIBUTION_CONTRACT` remains
+`MISSING`/`NOT_MEASURED`; downstream activity is not used as attribution. The highest remaining
+defect is owner-blocked P0:
 `GA4_ENHANCED_MEASUREMENT_HISTORY_PAGE_VIEWS`.
 
 Day 0 remains `UNSET`, and the four-week clock remains `NOT_STARTED`, until both authenticated

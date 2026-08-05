@@ -1,13 +1,13 @@
 {
   "schema_version": 1,
   "scope": "LIGHTING_LAUNCH_MEASUREMENT",
-  "generated_at": "2026-08-02T05:19:48.245Z",
-  "generated_at_chicago": "2026-08-02T00:19:48.245-05:00",
+  "generated_at": "2026-08-05T16:52:31.830Z",
+  "generated_at_chicago": "2026-08-05T11:52:31.831-05:00",
   "generated_at_semantics": "EVIDENCE_SNAPSHOT_CAPTURE_TIME",
   "artifact_revision": {
-    "revised_at": "2026-08-02T08:07:28.792Z",
-    "revision_scope": "POST_DEPLOY_ANALYTICS_RECHECK_PROVENANCE_CORRECTION_ONLY",
-    "production_or_analytics_reverification_performed": false
+    "revised_at": "2026-08-05T16:52:31.830Z",
+    "revision_scope": "CURRENT_PRODUCTION_AND_SOURCE_CONTRACT_RECHECK",
+    "production_or_analytics_reverification_performed": true
   },
   "timezone": "America/Chicago",
   "artifact_semantics": "POINT_IN_TIME_EVIDENCE_SNAPSHOT",
@@ -40,29 +40,30 @@
   "four_week_clock_status": "NOT_STARTED",
   "run_context": {
     "repository": "Verdant-OS/verdant-grow-diary",
-    "audit_branch": "codex/seo-readiness-evidence-20260802",
-    "audit_head": "913f1b9deb0934d5ce76491cbc945816f4581b73",
-    "pre_recheck_audit_head": "c794e4c6ff0debb6ae2a83566b2a73f690a96393",
+    "audit_branch": "codex/seo-production-evidence-refresh-20260805",
+    "audit_head": "5841d9f22d96aadad255c88369554c52a1691bcd",
+    "pre_recheck_audit_head": "97e23e1f46a2cb998eed87b75845963bc32f1579",
     "audit_head_is_descendant_of_deploy_branch_head": true,
     "deploy_branch": "verdant-grow-diary",
-    "deploy_branch_head": "a20776993bd606f07977674934864b888a407e1c",
-    "audited_release_head": "a20776993bd606f07977674934864b888a407e1c",
-    "audited_release_equals_deploy_branch_head": true,
+    "deploy_branch_head": "5841d9f22d96aadad255c88369554c52a1691bcd",
+    "audited_release_head": "97e23e1f46a2cb998eed87b75845963bc32f1579",
+    "audited_release_equals_deploy_branch_head": false,
     "working_tree_status": "CLEAN_AT_AUDIT_START"
   },
   "production": {
     "host": "https://verdantgrowdiary.com",
-    "observed_at": "2026-08-02T02:53:25.627Z",
+    "observed_at": "2026-08-05T16:52:31.830Z",
     "version_url": "https://verdantgrowdiary.com/version.json",
-    "manifest_commit": "a20776993bd606f07977674934864b888a407e1c",
-    "build_time": "2026-08-02T01:28:54.548Z",
-    "matches_deploy_branch_head": true,
+    "manifest_commit": "97e23e1f46a2cb998eed87b75845963bc32f1579",
+    "build_time": "2026-08-05T16:38:38.485Z",
+    "deployment_id": "256365afe9639452bd62e1051315097ba7239697c486abe8728c63d43ac18fe6",
+    "matches_deploy_branch_head": false,
     "manifest_is_ancestor_of_deploy_branch_head": true,
-    "source_delta_since_manifest": "NONE_DEPLOY_MATCHES_PRODUCTION",
+    "source_delta_since_manifest": "DOCS_AGENTS_CURRENT_STATE_ONLY_5841D9F2",
     "production_publish_required": false,
     "release_content_match": "PASS",
     "release_content_scope": "LIGHTING_GUIDES_ONLY",
-    "full_deploy_branch_parity": "CURRENT",
+    "full_deploy_branch_parity": "DOCUMENTATION_ONLY_DELTA",
     "sitemap_url_count": 51,
     "robots_declares_production_sitemap": true,
     "robots_protects_app_prefixes": true,
@@ -100,6 +101,9 @@
     "structured_data_repair_status": "LIVE"
   },
   "analytics_identity": {
+    "current_source_contract_verified_at": "2026-08-05T16:52:31.830Z",
+    "current_source_contract": "PASS_EXPLICIT_PAGE_VIEW_WITH_SEND_PAGE_VIEW_FALSE",
+    "current_runtime_collection_recheck": "BLOCKED_IN_APP_BROWSER_UNAVAILABLE_AFTER_ROUTER_CHANGE",
     "last_full_verified_at": "2026-08-02T02:08:43.179Z",
     "last_targeted_recheck_at": "2026-08-02T05:19:48.245Z",
     "verification_method": "INTERCEPTED_BROWSER_COLLECTION_REQUESTS",
@@ -168,7 +172,7 @@
     }
   },
   "technical_seo": {
-    "last_http_verified_at": "2026-08-02T02:07:12.279Z",
+    "last_http_verified_at": "2026-08-05T16:52:31.830Z",
     "lighting_pages": "PASS",
     "direct_load_indexability": "PASS",
     "route_runtime_structured_data": "PASS",
@@ -340,21 +344,21 @@
       "priority": "P3",
       "status": "PASS",
       "lifecycle_state": "FIXED_AND_LOCAL_VERIFIED",
-      "evidence": "The recheck-bearing audit head 913f1b9deb0934d5ce76491cbc945816f4581b73 is distinct from the audited production release a20776993bd606f07977674934864b888a407e1c. Its pre-recheck audit-start head was c794e4c6ff0debb6ae2a83566b2a73f690a96393. The current monitoring workflow is distinct from the historical checked-in dry-run summary."
+      "evidence": "Production remains 97e23e1f46a2cb998eed87b75845963bc32f1579. The current deploy branch is 5841d9f22d96aadad255c88369554c52a1691bcd, one documentation-only CURRENT_STATE commit ahead; no lighting, router, or analytics source changed in that delta. The production router/AppShell change still postdates the historic intercepted matrix, so no current runtime collection result is inferred. The historical recheck-bearing head 913f1b9deb0934d5ce76491cbc945816f4581b73 remains distinct from its former audited release a20776993bd606f07977674934864b888a407e1c."
     }
   ],
   "current_slice": {
-    "priority": "P2",
-    "id": "LIGHTING_GUIDE_CTA_ATTRIBUTION_CONTRACT",
-    "status": "NOT_MEASURED",
-    "lifecycle_state": "DOCUMENTED_MISSING_NO_EVENT_ADDED",
-    "evidence": "The two lighting-guide CTAs resolve to /quick-log without a guide-specific click event. Their event classification is MISSING and their metric readiness status is NOT_MEASURED, so downstream activity is not used as attribution."
+    "priority": "P3",
+    "id": "CURRENT_PRODUCTION_EVIDENCE_REFRESH",
+    "status": "PASS",
+    "lifecycle_state": "COMPLETED_CURRENT_PRODUCTION_AND_SOURCE_CONTRACT_RECHECK",
+    "evidence": "The current production manifest, route metadata, sitemap, robots, and source analytics contract are recorded separately from historic intercepted collection evidence. No new event or runtime behavior was added."
   },
   "next_slice": {
     "priority": "P0",
     "id": "GA4_ENHANCED_MEASUREMENT_HISTORY_PAGE_VIEWS",
     "status": "BLOCKED",
-    "lifecycle_state": "BLOCKED_BY_OWNER_ACCESS"
+    "lifecycle_state": "BLOCKED_BY_OWNER_STREAM_CONFIGURATION_AND_AUTHENTICATED_ACCESS"
   },
   "monitoring_repair": {
     "status": "PASS",

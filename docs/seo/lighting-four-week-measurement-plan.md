@@ -44,8 +44,11 @@ recorded.
 The public release and technical SEO identity are complete, but an analytics collection defect and
 authenticated-access gates remain:
 
-- PR #597 is merged and remains live in production manifest
-  `a20776993bd606f07977674934864b888a407e1c`.
+- The current production manifest is `97e23e1f46a2cb998eed87b75845963bc32f1579`, built at
+  `2026-08-05T16:38:38.485Z`. The deploy branch is one documentation-only `CURRENT_STATE` commit
+  ahead at `5841d9f22d96aadad255c88369554c52a1691bcd`. The production deploy includes a
+  router/AppShell change, so the
+  historical intercepted matrix must be repeated before it can describe current runtime behavior.
 - The last completed intercepted browser matrix (`2026-08-02T02:08:43.179Z`) preserved each exact
   lighting-guide path and page-specific title across nine navigation states, kept protected IDs
   masked, and transmitted no verification events. It observed nine exact app-owned page views plus
@@ -58,15 +61,17 @@ authenticated-access gates remain:
   its matcher and is excluded from this evidence; its transmission status is not asserted.
 - The owner-confirmed GA4 production stream is `Verdant Grow Diary`, stream URL
   `https://verdantgrowdiary.com`, stream ID `15065867361`, and measurement ID `G-MCXQ9GVS5H`;
-  production loads and targets that exact measurement ID. The property ID is still unconfirmed.
-- The current public probe returns HTTP 200 for both guides, the sitemap, robots, and version
-  manifest. The 51-URL sitemap contains each lighting route exactly once, and robots protects app
-  prefixes.
+  the consent-gated source contract retains that exact measurement ID as its target. The property ID is still unconfirmed.
+- The current public probe (`2026-08-05T16:52:31.830Z`) returns HTTP 200 for both guides, the sitemap,
+  robots, and version manifest. Each lighting route occurs exactly once in the sitemap, and robots
+  protects app prefixes. The current source contract preserves consent-gated
+  `send_page_view: false` plus the explicit sanitized page-view emitter; no current intercepted
+  collection result is claimed because the in-app browser control bridge was unavailable.
 - Workflow [30727208474](https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30727208474)
   succeeded across all 51 URLs, but its GSC operation was `SKIPPED`, access was `BLOCKED`,
   execution was `SKIPPED`, OAuth was not configured, and it made 0 API attempts.
-- Production manifest and deploy head both resolve to `a2077699…`, so full deploy-branch parity is
-  `PASS`. Lighting release-content verification remains scoped to the two guides.
+- Production is one documentation-only commit behind the deploy branch. Lighting release-content
+  verification remains scoped to the two guides.
 - PR #624 is live. Its production direct/cross-guide/history/refresh/repeat/new-tab matrix found one
   current `WebPage`, `FAQPage`, `BreadcrumbList`, and `Article` identity set per page state, with
   zero duplicate identities, zero stale prior-route objects, and zero JSON-LD parse errors.

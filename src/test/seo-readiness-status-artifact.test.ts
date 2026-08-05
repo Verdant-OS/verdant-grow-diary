@@ -71,9 +71,9 @@ describe("SEO readiness status artifact", () => {
       scope: "LIGHTING_LAUNCH_MEASUREMENT",
       generated_at_semantics: "EVIDENCE_SNAPSHOT_CAPTURE_TIME",
       artifact_revision: {
-        revised_at: "2026-08-02T08:07:28.792Z",
-        revision_scope: "POST_DEPLOY_ANALYTICS_RECHECK_PROVENANCE_CORRECTION_ONLY",
-        production_or_analytics_reverification_performed: false,
+        revised_at: "2026-08-05T16:52:31.830Z",
+        revision_scope: "CURRENT_PRODUCTION_AND_SOURCE_CONTRACT_RECHECK",
+        production_or_analytics_reverification_performed: true,
       },
       timezone: "America/Chicago",
       artifact_semantics: "POINT_IN_TIME_EVIDENCE_SNAPSHOT",
@@ -99,7 +99,7 @@ describe("SEO readiness status artifact", () => {
     expect(Number.isNaN(Date.parse(String(READINESS.generated_at)))).toBe(false);
     expect(String(READINESS.generated_at)).toMatch(/Z$/);
     expect(String(READINESS.generated_at_chicago)).toMatch(/-05:00$/);
-    expect(RAW_ARTIFACT).toBe(`${JSON.stringify(READINESS, null, 2)}\n`);
+    expect(RAW_ARTIFACT.replace(/\r\n/g, "\n")).toBe(`${JSON.stringify(READINESS, null, 2)}\n`);
   });
 
   it("keeps every generic status field inside the declared vocabulary", () => {
@@ -125,28 +125,29 @@ describe("SEO readiness status artifact", () => {
   it("separates the point-in-time evidence head from the audited deploy release", () => {
     expect(READINESS.run_context).toEqual({
       repository: "Verdant-OS/verdant-grow-diary",
-      audit_branch: "codex/seo-readiness-evidence-20260802",
-      audit_head: "913f1b9deb0934d5ce76491cbc945816f4581b73",
-      pre_recheck_audit_head: "c794e4c6ff0debb6ae2a83566b2a73f690a96393",
+      audit_branch: "codex/seo-production-evidence-refresh-20260805",
+      audit_head: "5841d9f22d96aadad255c88369554c52a1691bcd",
+      pre_recheck_audit_head: "97e23e1f46a2cb998eed87b75845963bc32f1579",
       audit_head_is_descendant_of_deploy_branch_head: true,
       deploy_branch: "verdant-grow-diary",
-      deploy_branch_head: "a20776993bd606f07977674934864b888a407e1c",
-      audited_release_head: "a20776993bd606f07977674934864b888a407e1c",
-      audited_release_equals_deploy_branch_head: true,
+      deploy_branch_head: "5841d9f22d96aadad255c88369554c52a1691bcd",
+      audited_release_head: "97e23e1f46a2cb998eed87b75845963bc32f1579",
+      audited_release_equals_deploy_branch_head: false,
       working_tree_status: "CLEAN_AT_AUDIT_START",
     });
     expect(READINESS.production).toMatchObject({
       host: "https://verdantgrowdiary.com",
-      observed_at: "2026-08-02T02:53:25.627Z",
-      manifest_commit: "a20776993bd606f07977674934864b888a407e1c",
-      build_time: "2026-08-02T01:28:54.548Z",
-      matches_deploy_branch_head: true,
+      observed_at: "2026-08-05T16:52:31.830Z",
+      manifest_commit: "97e23e1f46a2cb998eed87b75845963bc32f1579",
+      build_time: "2026-08-05T16:38:38.485Z",
+      deployment_id: "256365afe9639452bd62e1051315097ba7239697c486abe8728c63d43ac18fe6",
+      matches_deploy_branch_head: false,
       manifest_is_ancestor_of_deploy_branch_head: true,
-      source_delta_since_manifest: "NONE_DEPLOY_MATCHES_PRODUCTION",
+      source_delta_since_manifest: "DOCS_AGENTS_CURRENT_STATE_ONLY_5841D9F2",
       production_publish_required: false,
       release_content_match: "PASS",
       release_content_scope: "LIGHTING_GUIDES_ONLY",
-      full_deploy_branch_parity: "CURRENT",
+      full_deploy_branch_parity: "DOCUMENTATION_ONLY_DELTA",
       sitemap_url_count: 51,
       robots_declares_production_sitemap: true,
       robots_protects_app_prefixes: true,
@@ -317,20 +318,30 @@ describe("SEO readiness status artifact", () => {
     const baselineGsc = BASELINE.gsc_access as Record<string, unknown>;
     const launchGates = BASELINE.launch_gates as Record<string, string>;
 
-    expect(production.manifest_commit).toBe(release.publisher_latest_commit_sha);
+    const currentRecheck = BASELINE.current_production_recheck as Record<string, unknown>;
+    expect(production.manifest_commit).toBe(release.production_manifest_commit);
     expect(production.manifest_is_ancestor_of_deploy_branch_head).toBe(
       release.production_manifest_is_ancestor_of_deploy_branch_head,
     );
     expect(production.production_publish_required).toBe(release.production_publish_required);
-    expect(production.observed_at).toBe(publicProbe.observed_at);
-    expect(production.matches_deploy_branch_head).toBe(true);
-    expect(release.production_matches_deploy_branch_head).toBe(true);
-    expect(production.full_deploy_branch_parity).toBe("CURRENT");
-    expect(release.full_deploy_branch_parity).toBe("current");
+    expect(publicProbe.observed_at).toBe("2026-08-02T02:53:25.627Z");
+    expect(production.observed_at).toBe(currentRecheck.observed_at);
+    expect(production.matches_deploy_branch_head).toBe(false);
+    expect(release.production_matches_deploy_branch_head).toBe(false);
+    expect(production.full_deploy_branch_parity).toBe("DOCUMENTATION_ONLY_DELTA");
+    expect(release.full_deploy_branch_parity).toBe("documentation_only_delta");
     expect(production.release_content_scope).toBe("LIGHTING_GUIDES_ONLY");
     expect(release.release_content_scope).toBe("lighting_guides_only");
     expect(BASELINE.artifact_semantics).toBe("POINT_IN_TIME_EVIDENCE_SNAPSHOT");
     expect(BASELINE.generated_at).toBe(READINESS.generated_at);
+    expect(currentRecheck).toMatchObject({
+      version_commit: production.manifest_commit,
+      version_commit_is_ancestor_of_deploy_head: true,
+      guide_metadata_and_canonicals: "pass",
+      analytics_source_contract: "pass_explicit_page_view_with_send_page_view_false",
+      analytics_runtime_collection_recheck:
+        "blocked_in_app_browser_unavailable_after_router_change",
+    });
     expect(baselineGa4).toMatchObject({
       stream_identity_status: "pass_owner_confirmed_matches_production",
       production_collection_observation_scope: "COMPLETED_NINE_STATE_FULL_MATRIX_ONLY",
@@ -444,18 +455,18 @@ describe("SEO readiness status artifact", () => {
     expect(provenanceDefect?.evidence).toContain(runContext.audited_release_head);
     expect(provenanceDefect?.evidence).toContain("913f1b9deb0934d5ce76491cbc945816f4581b73");
     expect(READINESS.current_slice).toEqual({
-      priority: "P2",
-      id: "LIGHTING_GUIDE_CTA_ATTRIBUTION_CONTRACT",
-      status: "NOT_MEASURED",
-      lifecycle_state: "DOCUMENTED_MISSING_NO_EVENT_ADDED",
+      priority: "P3",
+      id: "CURRENT_PRODUCTION_EVIDENCE_REFRESH",
+      status: "PASS",
+      lifecycle_state: "COMPLETED_CURRENT_PRODUCTION_AND_SOURCE_CONTRACT_RECHECK",
       evidence:
-        "The two lighting-guide CTAs resolve to /quick-log without a guide-specific click event. Their event classification is MISSING and their metric readiness status is NOT_MEASURED, so downstream activity is not used as attribution.",
+        "The current production manifest, route metadata, sitemap, robots, and source analytics contract are recorded separately from historic intercepted collection evidence. No new event or runtime behavior was added.",
     });
     expect(READINESS.next_slice).toEqual({
       priority: "P0",
       id: "GA4_ENHANCED_MEASUREMENT_HISTORY_PAGE_VIEWS",
       status: "BLOCKED",
-      lifecycle_state: "BLOCKED_BY_OWNER_ACCESS",
+      lifecycle_state: "BLOCKED_BY_OWNER_STREAM_CONFIGURATION_AND_AUTHENTICATED_ACCESS",
     });
     expect(RAW_ARTIFACT).not.toContain("PENDING_MERGE");
   });
@@ -525,8 +536,8 @@ describe("SEO readiness status artifact", () => {
     const internalLinkMap = readFileSync(resolve(ROOT, "docs/seo/internal-link-map.md"), "utf8");
     expect(LAUNCH_VERIFICATION).toContain("../../artifacts/seo/seo-readiness-status.json");
     expect(LAUNCH_VERIFICATION).toContain("NOT READY — ANALYTICS INSTRUMENTATION DEFECT FOUND");
-    expect(LAUNCH_VERIFICATION).toContain("P2 LIGHTING_GUIDE_CTA_ATTRIBUTION_CONTRACT");
-    expect(LAUNCH_VERIFICATION).toContain("P3 READINESS_ARTIFACT_PROVENANCE");
+    expect(LAUNCH_VERIFICATION).toContain("CURRENT_PRODUCTION_AND_SOURCE_CONTRACT_RECHECK");
+    expect(LAUNCH_VERIFICATION).toContain("CURRENT_PRODUCTION_EVIDENCE_REFRESH");
     expect(LAUNCH_VERIFICATION).toContain(
       "A preceding exploratory browser probe omitted `analytics.google.com` from its collection-host",
     );

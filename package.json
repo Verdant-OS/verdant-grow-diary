@@ -21,6 +21,7 @@
     "deploy:functions:all": "bun run predeploy:functions:all && supabase functions deploy",
     "merge-queue:snapshot": "node scripts/ci/merge-queue-snapshot.mjs",
     "merge-queue:snapshot:json": "node scripts/ci/merge-queue-snapshot.mjs --json",
+    "merge-queue:snapshot:alert": "node scripts/ci/merge-queue-snapshot.mjs --alert",
     "check:no-src-lib-imports": "node scripts/check-no-src-lib-imports.mjs",
     "check:jsonld": "node scripts/validate-jsonld-rich-results.mjs dist",
     "og:baselines": "bun run scripts/update-og-card-baselines.ts",

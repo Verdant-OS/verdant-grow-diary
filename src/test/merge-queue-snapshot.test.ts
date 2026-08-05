@@ -3,7 +3,11 @@ import {
   classifyPr,
   summarizeOpenPrs,
   summarizeQueue,
+  evaluateAlerts,
+  DEFAULT_THRESHOLDS,
+  loadThresholds,
 } from "../../scripts/ci/merge-queue-snapshot.mjs";
+import { join } from "node:path";
 
 describe("merge-queue-snapshot helpers", () => {
   it("classifies DIRTY / BEHIND / BLOCKED / UNSTABLE", () => {
@@ -64,5 +68,68 @@ describe("merge-queue-snapshot helpers", () => {
     expect(s.medianAgeSec).toBe(450);
     expect(s.entries[0].prNumber).toBe(722);
     expect(s.entries[0].ageSec).toBe(600);
+  });
+
+  it("loads thresholds from JSON file", () => {
+    const loaded = loadThresholds(join(process.cwd(), "scripts/ci/merge-queue-thresholds.json"));
+    expect(loaded.source).toBe("file");
+    expect(loaded.thresholds.queue_depth.warn).toBe(3);
+    expect(loaded.thresholds.queue_depth.critical).toBe(5);
+    expect(loaded.thresholds.max_age_sec.critical).toBe(5400);
+    expect(loaded.thresholds.dirty_open_prs.warn).toBe(5);
+  });
+
+  it("evaluateAlerts is quiet under thresholds", () => {
+    const ev = evaluateAlerts(
+      {
+        queue: { depth: 0, maxAgeSec: null, medianAgeSec: null },
+        openPrs: {
+          counts: { DIRTY: 2, BEHIND: 1, BLOCKED: 1 },
+          autoMergeCount: 0,
+        },
+      },
+      DEFAULT_THRESHOLDS,
+    );
+    expect(ev.ok).toBe(true);
+    expect(ev.warnOnly).toBe(false);
+    expect(ev.alerts).toEqual([]);
+  });
+
+  it("evaluateAlerts emits warn then critical for queue depth", () => {
+    const warn = evaluateAlerts(
+      {
+        queue: { depth: 3, maxAgeSec: null, medianAgeSec: null },
+        openPrs: { counts: { DIRTY: 0, BEHIND: 0, BLOCKED: 0 }, autoMergeCount: 0 },
+      },
+      DEFAULT_THRESHOLDS,
+    );
+    expect(warn.warnOnly).toBe(true);
+    expect(warn.alerts[0].severity).toBe("warn");
+    expect(warn.alerts[0].metric).toBe("queue_depth");
+
+    const crit = evaluateAlerts(
+      {
+        queue: { depth: 5, maxAgeSec: 6000, medianAgeSec: 3000 },
+        openPrs: { counts: { DIRTY: 12, BEHIND: 0, BLOCKED: 0 }, autoMergeCount: 0 },
+      },
+      DEFAULT_THRESHOLDS,
+    );
+    expect(crit.ok).toBe(false);
+    expect(crit.criticalCount).toBeGreaterThanOrEqual(2);
+    const metrics = crit.alerts.map((a) => a.metric);
+    expect(metrics).toContain("queue_depth");
+    expect(metrics).toContain("max_age_sec");
+    expect(metrics).toContain("dirty_open_prs");
+  });
+
+  it("null ages do not alert", () => {
+    const ev = evaluateAlerts(
+      {
+        queue: { depth: 0, maxAgeSec: null, medianAgeSec: null },
+        openPrs: { counts: {}, autoMergeCount: 0 },
+      },
+      DEFAULT_THRESHOLDS,
+    );
+    expect(ev.alerts.filter((a) => a.metric.includes("age"))).toEqual([]);
   });
 });

@@ -65,6 +65,31 @@ bunx vitest run src/test/merge-queue-snapshot.test.ts
 
 Empty queue + high `DIRTY` count is an **ownership/serialisation** signal, not queue latency.
 
+
+## Alert thresholds
+
+Canonical config: [`scripts/ci/merge-queue-thresholds.json`](../../scripts/ci/merge-queue-thresholds.json)
+
+| Metric | Warn | Critical | Intent |
+|--------|-----:|---------:|--------|
+| `queue_depth` | 3 | 5 | Sustained serial backlog |
+| `max_age_sec` | 1800 (30m) | 5400 (90m) | Near ruleset check timeout |
+| `median_age_sec` | 900 | 2700 | Typical clear time when CI green |
+| `dirty_open_prs` | 5 | 10 | Conflicts never enqueue |
+| `behind_open_prs` | 5 | 12 | Stale heads |
+| `blocked_open_prs` | 8 | 15 | Required gates stuck |
+| `auto_merge_waiting` | 3 | 6 | Queue requests not draining |
+
+```bash
+bun run merge-queue:snapshot:alert          # exit 4 on critical
+node scripts/ci/merge-queue-snapshot.mjs --alert --fail-on-warn   # exit 5 on warn
+```
+
+Scheduled job: `.github/workflows/merge-queue-snapshot.yml` (daily 14:05 UTC + workflow_dispatch).  
+Tune thresholds in the JSON file only — no code change required.
+
+Null ages (empty queue) **do not** alert. High `DIRTY` with empty queue is an ownership signal, not queue latency.
+
 ## Conflict flags vs queue
 
 | GitHub state | Meaning | Queue action |

@@ -16,7 +16,12 @@
  *      all legacy fields still present (consumer additivity).
  *   4. auto-tag-release records the treeHash → commit mapping.
  */
-import { describe, expect, it, afterAll } from "vitest";
+import { describe, expect, it, afterAll, vi } from "vitest";
+
+// Integration suite: most tests spawn real git/node child processes, which
+// on a contended host can individually exceed the 5s unit default. The
+// assertions stay strict; only the per-test budget is integration-sized.
+vi.setConfig({ testTimeout: 120_000 });
 import { execFileSync } from "node:child_process";
 import {
   cpSync,
@@ -344,6 +349,36 @@ describe("stamper with real git identity (legacy behavior preserved)", () => {
     expect(inherited.buildTime).toBe("unknown");
     expect(record.treeHashError).toBeNull();
   });
+
+  it("rejects well-shaped but calendar-invalid inherited timestamps (V8 rollover regression)", () => {
+    // Regression (Codex on #737): Date.parse rolls day-overflow over
+    // (2026-02-31 → March 3, non-leap 02-29 → March 1) instead of NaN, so
+    // calendar components must be validated explicitly.
+    const cases: Array<[string, string]> = [
+      ["2026-02-31T00:00:00Z", "unknown"], // day overflow, V8 rolls to March
+      ["2026-04-31T12:00:00Z", "unknown"], // 30-day month overflow
+      ["2026-02-29T00:00:00Z", "unknown"], // non-leap February 29
+      ["2024-02-29T00:00:00Z", "2024-02-29T00:00:00Z"], // leap year — valid
+      ["2026-01-01T24:00:00Z", "unknown"], // hour out of range
+      ["2026-01-01T23:60:00Z", "unknown"], // minute out of range
+      ["2026-01-01T12:00:00+99:00", "unknown"], // impossible offset
+      ["2026-08-04T16:18:29Z", "2026-08-04T16:18:29Z"], // ordinary valid
+    ];
+    // One sandbox reused across the matrix: each case rewrites the tracked
+    // stamp and re-runs the stamper (8 spawns in one box, not 8 boxes).
+    const box = makeSandbox();
+    git(box, ["init", "-q"]);
+    for (const [input, expected] of cases) {
+      writeFileSync(
+        join(box, "public/version.json"),
+        JSON.stringify({ commit: "d".repeat(40), commitTime: input, buildTime: input }) + "\n",
+      );
+      const { record } = runStamper(box);
+      const inherited = record.inherited as Record<string, unknown>;
+      expect(inherited.commitTime, input).toBe(expected);
+      expect(inherited.buildTime, input).toBe(expected);
+    }
+  }, 120_000);
 
   it("prefers GITHUB_* env identity and records commitSource github-env with CI run linkage", () => {
     const box = makeSandbox();

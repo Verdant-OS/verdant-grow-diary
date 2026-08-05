@@ -123,15 +123,27 @@ if (commitSource === "none") {
       // Sanitize every carried field: the tracked stamp is attacker-
       // influenceable content shipping into the client bundle. Formats are
       // enforced, free-text is length-capped and stripped of control chars.
-      // Shape AND calendar validity: the strict ISO shape alone still
-      // admits values like 2026-02-31T00:00:00Z; Date.parse rejects
-      // out-of-range ISO components, so both checks together do.
-      const iso = (v) =>
-        typeof v === "string" &&
-        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|[+-]\d{2}:\d{2})$/.test(v) &&
-        !Number.isNaN(Date.parse(v))
+      // Shape AND explicit calendar validity. Date.parse is NOT sufficient:
+      // V8 rolls day-overflow over (2026-02-31 parses as March 3, non-leap
+      // 02-29 as March 1), so the day is checked via UTC round-trip and the
+      // time/offset components via numeric ranges.
+      const iso = (v) => {
+        if (typeof v !== "string") return "unknown";
+        const m = v.match(
+          /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,6})?(Z|[+-]\d{2}:\d{2})$/,
+        );
+        if (!m) return "unknown";
+        const [y, mo, d, h, mi, s] = m.slice(1, 7).map(Number);
+        if (h > 23 || mi > 59 || s > 59) return "unknown";
+        const off = m[7];
+        if (off !== "Z" && (Number(off.slice(1, 3)) > 14 || Number(off.slice(4, 6)) > 59)) {
+          return "unknown";
+        }
+        const utc = new Date(Date.UTC(y, mo - 1, d));
+        return utc.getUTCFullYear() === y && utc.getUTCMonth() === mo - 1 && utc.getUTCDate() === d
           ? v
           : "unknown";
+      };
       const refText =
         typeof prior.ref === "string"
           ? prior.ref.replace(/[^\x20-\x7e]/g, "").slice(0, 120) || "unknown"

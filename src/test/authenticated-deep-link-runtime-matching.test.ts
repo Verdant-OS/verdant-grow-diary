@@ -18,6 +18,7 @@ import {
   extractTanstackRouteIds,
   tanstackRouteIdToClassicPath,
 } from "./helpers/routeManifestSyncHarness";
+import { UNNESTED_ROUTE_CONTRACTS } from "./helpers/unnestedRouteContracts";
 
 // Trailing `_` on a path segment is TanStack's un-nesting marker
 // (`doctor_/sessions_/$sessionId`). `/_app` is a pathless layout — its
@@ -47,10 +48,24 @@ function deepestMatch(pathname: string) {
 const UNNESTED_IDS = extractTanstackRouteIds().filter((id) => UNNEST_MARKER.test(id));
 
 describe("runtime deep-link matching — un-nested detail routes", () => {
-  it("covers the full un-nested detail route family", () => {
-    // 18 shipped in the un-nesting fix; growth is fine, shrink means a
-    // detail route silently left the contract.
-    expect(UNNESTED_IDS.length).toBeGreaterThanOrEqual(18);
+  it("every persisted inventory route is still present in the route tree", () => {
+    // The loops below derive from the CURRENT marker set, so on their own
+    // they go quiet for a route that gets re-nested (it simply leaves the
+    // set). The persisted inventory is what keeps that removal loud — and a
+    // count floor alone stops detecting one removal as soon as the family
+    // grows past the floor.
+    const derived = new Set(UNNESTED_IDS);
+    const missing = UNNESTED_ROUTE_CONTRACTS.map((c) => c.routeId).filter(
+      (id) => !derived.has(id),
+    );
+    expect(missing, "inventory routes gone from the un-nested marker set").toEqual([]);
+    expect(UNNESTED_IDS.length).toBeGreaterThanOrEqual(UNNESTED_ROUTE_CONTRACTS.length);
+  });
+
+  it("derived classic paths agree with the persisted inventory", () => {
+    for (const c of UNNESTED_ROUTE_CONTRACTS) {
+      expect(tanstackRouteIdToClassicPath(c.routeId), c.routeId).toBe(c.classicPathTemplate);
+    }
   });
 
   it("resolves every un-nested detail URL to the detail route, not a list", () => {

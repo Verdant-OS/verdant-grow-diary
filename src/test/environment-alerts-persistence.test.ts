@@ -488,13 +488,16 @@ describe("regression: both saveAlert call sites wire a tent id (project-plant-as
   });
 
   it("Dashboard passes the resolved snapshot tent to both the auto-persist hook and the manual Save alert button", () => {
-    const occurrences = [
-      ...DASHBOARD.matchAll(
-        /sensorState\.status\s*===\s*["']ok["']\s*\?\s*\(sensorState\.tentId\s*\?\?\s*null\)\s*:\s*null/g,
-      ),
-    ];
-    // One in the usePersistEnvironmentAlerts call, one in the manual saveAlert call.
-    expect(occurrences.length).toBeGreaterThanOrEqual(2);
+    // The tent id is resolved once from the snapshot state...
+    expect(DASHBOARD).toMatch(
+      /const\s+snapshotTentId\s*=\s*\n?\s*sensorState\.status\s*===\s*["']ok["']\s*\?\s*\(sensorState\.tentId\s*\?\?\s*null\)\s*:\s*null/,
+    );
+    // ...and threaded into BOTH write paths: the auto-persist hook input
+    // (tentId) and the manual Save alert payload (tent_id). One short
+    // identifier at each call site keeps the Save-alert handler compact
+    // for alert-events.test.ts's content-anchored block scan.
+    expect(DASHBOARD).toMatch(/tentId:\s*snapshotTentId/);
+    expect(DASHBOARD).toMatch(/tent_id:\s*snapshotTentId/);
   });
 });
 

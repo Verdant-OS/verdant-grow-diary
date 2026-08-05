@@ -157,10 +157,15 @@ describe("local Supabase replay compatibility workspace", () => {
     // and masked a base red for a full day (run 30940375065). The lane stays
     // optional via branch protection (not-required), never via masking.
     const workflow = readFileSync(SECURITY_DB_WORKFLOW, "utf8");
-    const maskingKeys = workflow
+    // Strip YAML comments (a `#` at line start or after whitespace), then
+    // reject the token anywhere in what remains. Every valid key spelling —
+    // plain, quoted, or inside a flow mapping — must contain this token in
+    // non-comment text, so none can slip past while comments stay legal.
+    const uncommented = workflow
       .split(/\r?\n/)
-      .filter((line) => /^\s*continue-on-error\s*:/.test(line));
-    expect(maskingKeys).toEqual([]);
+      .map((line) => line.replace(/(^|\s)#.*$/, "$1"))
+      .join("\n");
+    expect(uncommented).not.toContain("continue-on-error");
   });
 
   it("runs every local Supabase lifecycle command against the disposable workdir", () => {

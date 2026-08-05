@@ -18,7 +18,15 @@
  */
 import { describe, expect, it, afterAll } from "vitest";
 import { execFileSync } from "node:child_process";
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { computeTreeHash, isBinary, normalizeCrlf } from "../../scripts/lib/tree-hash.mjs";
@@ -398,12 +406,16 @@ describe("resolve-release-provenance", () => {
     return { box, headSha: git(box, ["rev-parse", "HEAD"]) };
   }
 
-  function runResolver(cwd: string, args: string[]): { out: string; status: number } {
+  function runResolver(
+    cwd: string,
+    args: string[],
+    envOverrides: Record<string, string> = {},
+  ): { out: string; status: number } {
     try {
       const out = execFileSync("node", ["scripts/resolve-release-provenance.mjs", ...args], {
         cwd,
         encoding: "utf8",
-        env: cleanEnv(),
+        env: cleanEnv(envOverrides),
       });
       return { out, status: 0 };
     } catch (error) {
@@ -489,6 +501,53 @@ describe("resolve-release-provenance", () => {
     expect(status).toBe(0);
     expect(out).toContain("MATCH via recomputation");
     expect(out).toContain(headSha);
+  });
+
+  it("never executes candidate code from commits outside the trust ref, and scrubs env when it does run", async () => {
+    // Security regression (Cursor review on #737): the cross-era fallback
+    // executes a candidate commit's own tree-hash module. That must happen
+    // ONLY for commits that are ancestors of the protected release branch
+    // (--trust-ref), and with a secret-free child environment.
+    const { box } = makeResolverSandbox();
+    const fakeHash = "cd".repeat(32);
+    const canary = join(box, "canary.json").replaceAll("\\", "\\\\");
+    writeFileSync(
+      join(box, "scripts/lib/tree-hash.mjs"),
+      `import { writeFileSync } from "node:fs";\n` +
+        `writeFileSync("${canary}", JSON.stringify(Object.keys(process.env)));\n` +
+        `console.log("${fakeHash}");\n`,
+    );
+    git(box, ["add", "-A"]);
+    git(box, ["-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-qm", "evil"]);
+    // The evil module must exist only in the COMMIT being scanned: restore
+    // the real module in the working tree, since the resolver imports its
+    // own lib from there at startup.
+    cpSync(TREE_HASH_LIB, join(box, "scripts/lib/tree-hash.mjs"));
+
+    // Untrusted: trust-ref names a branch that does NOT contain the commit.
+    git(box, ["branch", "trusted-base", "HEAD~1"]);
+    const blocked = runResolver(box, [
+      `--hash=${fakeHash}`,
+      "--scan=1",
+      "--ref=HEAD",
+      "--trust-ref=trusted-base",
+    ]);
+    expect(blocked.status).toBe(1);
+    expect(blocked.out).toContain("NO_MATCH");
+    expect(existsSync(join(box, "canary.json"))).toBe(false);
+
+    // Trusted: the commit IS an ancestor of trust-ref — module runs, but in
+    // a scrubbed environment with no secrets to exfiltrate.
+    const allowed = runResolver(
+      box,
+      [`--hash=${fakeHash}`, "--scan=1", "--ref=HEAD", "--trust-ref=HEAD"],
+      { SECRET_CANARY: "do-not-leak" },
+    );
+    expect(allowed.status).toBe(0);
+    expect(allowed.out).toContain("MATCH via recomputation");
+    expect(existsSync(join(box, "canary.json"))).toBe(true);
+    const leakedKeys = JSON.parse(readFileSync(join(box, "canary.json"), "utf8")) as string[];
+    expect(leakedKeys).not.toContain("SECRET_CANARY");
   });
 
   it("reports NO_MATCH with the canary hint and exits 1 for an unknown hash", () => {

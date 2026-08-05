@@ -36,11 +36,17 @@ function git(args, opts = {}) {
 }
 
 function parseArgs(argv) {
-  const args = { hash: null, scan: 30, ref: "origin/verdant-grow-diary" };
+  const args = {
+    hash: null,
+    scan: 30,
+    ref: "origin/verdant-grow-diary",
+    trustRef: "origin/verdant-grow-diary",
+  };
   for (const a of argv.slice(2)) {
     if (a.startsWith("--hash=")) args.hash = a.slice(7).toLowerCase();
     else if (a.startsWith("--scan=")) args.scan = Number(a.slice(7));
     else if (a.startsWith("--ref=")) args.ref = a.slice(6);
+    else if (a.startsWith("--trust-ref=")) args.trustRef = a.slice(12);
     else if (a === "--help" || a === "-h") args.help = true;
     else throw new Error(`Unknown argument: ${a}`);
   }
@@ -73,7 +79,32 @@ function tagMatches(hash) {
   return matches;
 }
 
-async function scanMatches(hash, ref, count) {
+/** Ancestor-of-release-branch check: the trust boundary for running a
+ * candidate commit's own code. Anything merged through the protected
+ * branch's queue qualifies; an arbitrary scanned ref does not. */
+function isTrustedCommit(sha, trustRef) {
+  try {
+    execFileSync("git", ["merge-base", "--is-ancestor", sha, trustRef], {
+      stdio: ["ignore", "ignore", "ignore"],
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Minimal child environment for candidate-code execution: enough for node
+ * to start on Windows/Linux, nothing secret-bearing. */
+function scrubbedEnv() {
+  const keep = ["PATH", "SYSTEMROOT", "WINDIR", "TEMP", "TMP", "HOME", "USERPROFILE"];
+  const env = {};
+  for (const k of keep) {
+    if (process.env[k] !== undefined) env[k] = process.env[k];
+  }
+  return env;
+}
+
+async function scanMatches(hash, ref, count, trustRef) {
   let shas = [];
   try {
     shas = git(["rev-list", "-n", String(count), ref])
@@ -101,17 +132,21 @@ async function scanMatches(hash, ref, count) {
       const { treeHash } = await computeTreeHash(resolve(extract));
       if (treeHash === hash) {
         matches.push({ commit: sha });
-      } else {
+      } else if (isTrustedCommit(sha, trustRef)) {
         // Cross-era fallback: if the hash algorithm (roots, normalization)
         // has changed since this candidate was committed, the current
         // module cannot reproduce a stamp that candidate's OWN stamper
-        // emitted. Run the candidate's committed hash module, if present —
-        // this executes repo-committed code from that commit, which is the
-        // same trust domain as checking the commit out and building it.
+        // emitted. This EXECUTES the candidate's committed hash module, so
+        // it is gated to commits that are ancestors of the protected
+        // release branch (--trust-ref): only code that passed the merge
+        // queue runs, never code from an arbitrary scanned ref. The child
+        // gets a scrubbed environment — no secrets to exfiltrate.
         try {
           const eraModule = resolve(extract, "scripts/lib/tree-hash.mjs");
           const eraHash = execFileSync("node", [eraModule, `--root=${resolve(extract)}`], {
             encoding: "utf8",
+            cwd: resolve(extract),
+            env: scrubbedEnv(),
             stdio: ["ignore", "pipe", "ignore"],
           }).trim();
           if (eraHash === hash) matches.push({ commit: sha, era: "candidate-algorithm" });
@@ -153,7 +188,7 @@ async function main() {
 
   console.log(`Recomputing over last ${args.scan} commits of ${args.ref}…`);
   const tagged = new Set(viaTags.map((m) => m.commit));
-  const viaScan = (await scanMatches(args.hash, args.ref, args.scan)).filter(
+  const viaScan = (await scanMatches(args.hash, args.ref, args.scan, args.trustRef)).filter(
     (m) => !tagged.has(m.commit),
   );
   if (viaScan.length > 0) {

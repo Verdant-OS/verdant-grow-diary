@@ -1,18 +1,18 @@
 /**
- * AI Doctor Action Suggestion Preview → Action Queue handoff coverage.
+ * AI Doctor Action Suggestion Preview has no placeholder Action Queue handoff.
  *
- * Proves the preview surface keeps the Action Queue handoff disabled and
- * never invokes a write helper:
- *   - Disabled "Add to Action Queue" button is rendered.
- *   - Clicking it does nothing — no Supabase, no fetch, no functions.invoke.
+ * Proves the preview surface stays read-only without advertising a dead
+ * write path:
+ *   - No "Add to Action Queue" control or not-enabled placeholder is rendered.
+ *   - Rendering never invokes Supabase, fetch, or functions.invoke.
  *   - The preview surface module text contains no Supabase / write-path
  *     imports or write helper references.
- *   - Demo/stale/invalid-only and ineligible contexts also render disabled.
+ *   - Eligible, invalid, and ineligible contexts all keep the same fence.
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it, expect, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import AiDoctorContextReadinessPanel from "@/components/AiDoctorContextReadinessPanel";
 import { compileAiDoctorContextFromRows } from "@/lib/aiDoctorEngine";
 
@@ -34,11 +34,9 @@ vi.mock("@/integrations/supabase/client", () => ({
   },
 }));
 
-const fetchSpy = vi
-  .spyOn(globalThis, "fetch" as never)
-  .mockImplementation((() => {
-    throw new Error("fetch must not be called from preview");
-  }) as never);
+const fetchSpy = vi.spyOn(globalThis, "fetch" as never).mockImplementation((() => {
+  throw new Error("fetch must not be called from preview");
+}) as never);
 
 const NOW = new Date("2026-06-10T12:00:00Z");
 const HOUR = 3600 * 1000;
@@ -65,23 +63,17 @@ function ctxFrom(
   });
 }
 
-function expectDisabledHandoff() {
-  const btn = screen.getByTestId(
-    "ai-doctor-action-suggestion-preview-handoff-button",
-  ) as HTMLButtonElement;
-  expect(btn.disabled).toBe(true);
-  expect(btn.getAttribute("aria-disabled")).toBe("true");
-  const note = screen.getByTestId(
-    "ai-doctor-action-suggestion-preview-handoff-note",
-  );
-  expect(note.textContent ?? "").toMatch(
-    /Action Queue write path not enabled for AI Doctor previews\./,
-  );
-  return btn;
+function expectNoHandoff() {
+  const preview = screen.getByTestId("ai-doctor-action-suggestion-preview");
+  expect(preview.querySelectorAll("button")).toHaveLength(0);
+  expect(screen.queryByTestId("ai-doctor-action-suggestion-preview-handoff-button")).toBeNull();
+  expect(screen.queryByTestId("ai-doctor-action-suggestion-preview-handoff-note")).toBeNull();
+  expect(preview).not.toHaveTextContent("Add to Action Queue");
+  expect(preview).not.toHaveTextContent("write path not enabled");
 }
 
-describe("AI Doctor preview → Action Queue handoff (disabled)", () => {
-  it("renders a disabled handoff button with the not-enabled note (eligible context)", () => {
+describe("AI Doctor preview → Action Queue handoff fence", () => {
+  it("renders no handoff placeholder for an eligible context", () => {
     render(
       <AiDoctorContextReadinessPanel
         context={ctxFrom(
@@ -94,14 +86,17 @@ describe("AI Doctor preview → Action Queue handoff (disabled)", () => {
       />,
     );
     expect(
-      screen
-        .getByTestId("ai-doctor-action-suggestion-preview")
-        .getAttribute("data-status"),
+      screen.getByTestId("ai-doctor-action-suggestion-preview").getAttribute("data-status"),
     ).toBe("eligible");
-    expectDisabledHandoff();
+    expectNoHandoff();
   });
 
-  it("clicking the disabled button does not invoke any write helper or show success", () => {
+  it("rendering the read-only preview does not invoke a write helper or show success", () => {
+    supabaseFrom.mockClear();
+    supabaseRpc.mockClear();
+    supabaseFunctionsInvoke.mockClear();
+    fetchSpy.mockClear();
+
     render(
       <AiDoctorContextReadinessPanel
         context={ctxFrom(
@@ -110,14 +105,7 @@ describe("AI Doctor preview → Action Queue handoff (disabled)", () => {
         )}
       />,
     );
-    const btn = expectDisabledHandoff();
-    supabaseFrom.mockClear();
-    supabaseRpc.mockClear();
-    supabaseFunctionsInvoke.mockClear();
-    fetchSpy.mockClear();
-
-    fireEvent.click(btn);
-    fireEvent.click(btn);
+    expectNoHandoff();
 
     expect(supabaseFrom).not.toHaveBeenCalled();
     expect(supabaseRpc).not.toHaveBeenCalled();
@@ -131,26 +119,22 @@ describe("AI Doctor preview → Action Queue handoff (disabled)", () => {
     expect(text).not.toMatch(/success/i);
   });
 
-  it("demo/stale/invalid-only telemetry still renders the disabled handoff", () => {
+  it("invalid telemetry still renders no handoff placeholder", () => {
     render(
       <AiDoctorContextReadinessPanel
         context={ctxFrom(
           [{ occurred_at: ago(12 * HOUR), event_type: "watering", source: "manual" }],
-          [
-            { metric: "temperature_c", value: 24, captured_at: ago(HOUR), source: "invalid" },
-          ],
+          [{ metric: "temperature_c", value: 24, captured_at: ago(HOUR), source: "invalid" }],
         )}
       />,
     );
     expect(
-      screen
-        .getByTestId("ai-doctor-action-suggestion-preview")
-        .getAttribute("data-status"),
+      screen.getByTestId("ai-doctor-action-suggestion-preview").getAttribute("data-status"),
     ).toBe("blocked_invalid_data");
-    expectDisabledHandoff();
+    expectNoHandoff();
   });
 
-  it("missing-context (ineligible) preview also keeps the handoff disabled", () => {
+  it("missing-context preview also renders no handoff placeholder", () => {
     const context = compileAiDoctorContextFromRows({
       plant: { id: "p1", name: "Plant A", strain: "X", stage: null, grow_id: null, tent_id: "t1" },
       growEvents: [],
@@ -159,11 +143,9 @@ describe("AI Doctor preview → Action Queue handoff (disabled)", () => {
     });
     render(<AiDoctorContextReadinessPanel context={context} />);
     expect(
-      screen
-        .getByTestId("ai-doctor-action-suggestion-preview")
-        .getAttribute("data-status"),
+      screen.getByTestId("ai-doctor-action-suggestion-preview").getAttribute("data-status"),
     ).toBe("missing_context");
-    expectDisabledHandoff();
+    expectNoHandoff();
   });
 });
 

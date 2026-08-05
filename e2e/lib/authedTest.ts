@@ -27,9 +27,10 @@ export const test = base.extend({
       // { origin, entries } — auth.setup records the origin it actually
       // signed in on (published hosts can 302 to the canonical domain, and
       // sessionStorage is origin-scoped), so we inject on that same origin.
-      const saved = JSON.parse(
-        fs.readFileSync(SESSION_STORAGE_PATH, "utf-8"),
-      ) as { origin: string; entries: Record<string, string> };
+      const saved = JSON.parse(fs.readFileSync(SESSION_STORAGE_PATH, "utf-8")) as {
+        origin: string;
+        entries: Record<string, string>;
+      };
       await context.addInitScript(
         (arg: { entries: Record<string, string>; appOrigin: string }) => {
           if (window.location.origin === arg.appOrigin) {

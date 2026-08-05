@@ -82,9 +82,7 @@ export function useQuickLogActivitySave() {
   const [error, setError] = useState<QuickLogActivitySaveReason | null>(null);
 
   const save = useCallback(
-    async (
-      input: QuickLogActivitySaveInput,
-    ): Promise<QuickLogActivitySaveResult> => {
+    async (input: QuickLogActivitySaveInput): Promise<QuickLogActivitySaveResult> => {
       const def = QUICK_LOG_ACTIVITY_DEFINITIONS[input.activityId];
       if (!def) {
         setError("unsupported_activity");
@@ -111,7 +109,7 @@ export function useQuickLogActivitySave() {
       setSaving(true);
       setError(null);
       try {
-        if (plan.saveRoute === "manual_note" || plan.saveRoute === "manual_water") {
+        if (plan.saveRoute === "manual_note") {
           // quicklog_save_manual is target-scoped (p_target_type/p_target_id)
           // and derives grow/tent/plant server-side from the owned target row
           // — mirroring useQuickLogV2Save + quickLogV2SavePayload. No deployed
@@ -144,9 +142,7 @@ export function useQuickLogActivitySave() {
               p_humidity_pct: null,
               p_vpd_kpa: null,
               p_occurred_at: null,
-              ...(Object.keys(manualDetails).length > 0
-                ? { p_details: manualDetails }
-                : {}),
+              ...(Object.keys(manualDetails).length > 0 ? { p_details: manualDetails } : {}),
               p_idempotency_key: manualIdempotencyKey,
             } as unknown as Record<string, unknown>,
           );
@@ -182,6 +178,15 @@ export function useQuickLogActivitySave() {
             ...(input.extraDetails ?? {}),
           };
           if (plan.detailsSubtype) details.subtype = plan.detailsSubtype;
+          // Carry the event type on the diary companion too: diary_entries has
+          // no event_type column and the RPC's mirror INSERT omits it, so
+          // without this the plant-scoped read layer defaults the row to
+          // "note" (wrong badge for e.g. Training). details.event_type is the
+          // established diary convention (action_followup/action_outcome rows
+          // already use it). The server-side migration also stamps this
+          // authoritatively; this client copy covers rows saved before that
+          // migration is applied to prod.
+          details.event_type = plan.eventType;
           const { data, error: rpcErr } = await supabase.rpc(
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             "quicklog_save_event" as any,
@@ -206,10 +211,7 @@ export function useQuickLogActivitySave() {
           if (!r.ok || !r.grow_event_id) {
             // Stale backend fence: v1b client but validator/allow-list
             // does not accept harvest yet. Never fake-save as observation.
-            if (
-              input.activityId === "harvest" &&
-              r.reason === "invalid_event_type"
-            ) {
+            if (input.activityId === "harvest" && r.reason === "invalid_event_type") {
               setError("harvest_backend_unavailable");
               return {
                 ok: false,

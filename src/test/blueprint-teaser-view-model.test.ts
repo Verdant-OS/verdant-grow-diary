@@ -18,7 +18,7 @@ function keys(vm: ReturnType<typeof buildBlueprintTeaserViewModel>) {
 
 describe("buildBlueprintTeaserViewModel", () => {
   it("previews the six scoreable veg targets in overlay order, day temp band when lights on", () => {
-    const vm = buildBlueprintTeaserViewModel({ stage: "veg", isDay: true });
+    const vm = buildBlueprintTeaserViewModel({ stage: "veg", isDay: true }, "celsius");
     expect(vm.stageKnown).toBe(true);
     expect(vm.stageLabel).toBe("Veg");
     // DLI is omitted — the overlay cannot score it yet (dli: null), so the
@@ -41,28 +41,28 @@ describe("buildBlueprintTeaserViewModel", () => {
   });
 
   it("labels the temperature row with the applicable day/night context", () => {
-    const day = buildBlueprintTeaserViewModel({ stage: "veg", isDay: true });
+    const day = buildBlueprintTeaserViewModel({ stage: "veg", isDay: true }, "celsius");
     expect(day.rows.find((r) => r.metricKey === "tempC")?.context).toBe("Day");
-    const night = buildBlueprintTeaserViewModel({ stage: "veg", isDay: false });
+    const night = buildBlueprintTeaserViewModel({ stage: "veg", isDay: false }, "celsius");
     expect(night.rows.find((r) => r.metricKey === "tempC")?.context).toBe("Night");
-    const unknown = buildBlueprintTeaserViewModel({ stage: "veg", isDay: null });
+    const unknown = buildBlueprintTeaserViewModel({ stage: "veg", isDay: null }, "celsius");
     expect(unknown.rows.find((r) => r.metricKey === "tempC")?.context).toBe("Day + night");
     // Non-temperature rows carry no context.
     expect(day.rows.find((r) => r.metricKey === "rh")?.context).toBeUndefined();
   });
 
   it("uses the night temp band when lights are off", () => {
-    const vm = buildBlueprintTeaserViewModel({ stage: "veg", isDay: false });
+    const vm = buildBlueprintTeaserViewModel({ stage: "veg", isDay: false }, "celsius");
     expect(band(vm, "tempC")).toEqual({ min: 19, max: 22 });
   });
 
   it("merges day/night temp to the widest range when the light state is unknown", () => {
-    const vm = buildBlueprintTeaserViewModel({ stage: "veg", isDay: null });
+    const vm = buildBlueprintTeaserViewModel({ stage: "veg", isDay: null }, "celsius");
     expect(band(vm, "tempC")).toEqual({ min: 19, max: 27 });
   });
 
   it("previews only temperature + humidity for the dry & cure (harvest) stage", () => {
-    const vm = buildBlueprintTeaserViewModel({ stage: "harvest" });
+    const vm = buildBlueprintTeaserViewModel({ stage: "harvest" }, "celsius");
     expect(vm.stageKnown).toBe(true);
     expect(vm.stageLabel).toBe("Dry & cure");
     expect(keys(vm)).toEqual(["tempC", "rh"]);
@@ -74,8 +74,11 @@ describe("buildBlueprintTeaserViewModel", () => {
   });
 
   it("normalizes real plants.stage values (cure → harvest, flush → late_flower)", () => {
-    expect(keys(buildBlueprintTeaserViewModel({ stage: "cure" }))).toEqual(["tempC", "rh"]);
-    const flush = buildBlueprintTeaserViewModel({ stage: "flush", isDay: true });
+    expect(keys(buildBlueprintTeaserViewModel({ stage: "cure" }, "celsius"))).toEqual([
+      "tempC",
+      "rh",
+    ]);
+    const flush = buildBlueprintTeaserViewModel({ stage: "flush", isDay: true }, "celsius");
     expect(flush.stageLabel).toBe("Late flower / flush");
     expect(flush.targetCount).toBe(6); // 7 minus the omitted DLI
     expect(band(flush, "ec")).toEqual({ min: 1.0, max: 1.6 }); // late_flower EC
@@ -90,12 +93,21 @@ describe("buildBlueprintTeaserViewModel", () => {
     expect(buildBlueprintTeaserViewModel({ stage: "not-a-stage" }).stageKnown).toBe(false);
   });
 
+  it("converts the temperature band to Fahrenheit under the fahrenheit preference (default)", () => {
+    const vm = buildBlueprintTeaserViewModel({ stage: "veg", isDay: true }, "fahrenheit");
+    expect(band(vm, "tempC")).toEqual({ min: 75.2, max: 80.6 }); // 24-27°C
+    expect(vm.rows.find((r) => r.metricKey === "tempC")?.unit).toBe("°F");
+    // Non-temperature rows are untouched by the unit preference.
+    expect(band(vm, "rh")).toEqual({ min: 60, max: 70 });
+    expect(vm.rows.find((r) => r.metricKey === "rh")?.unit).toBe("%");
+  });
+
   it("honors an injected band table for the non-VPD metrics", () => {
     const bands = {
       ...SOP_BLUEPRINT_TARGETS,
       veg: { ...SOP_BLUEPRINT_TARGETS.veg, rh: { min: 11, max: 22 } },
     };
-    const vm = buildBlueprintTeaserViewModel({ stage: "veg", isDay: true, bands });
+    const vm = buildBlueprintTeaserViewModel({ stage: "veg", isDay: true, bands }, "celsius");
     expect(band(vm, "rh")).toEqual({ min: 11, max: 22 });
     // VPD is single-sourced from getVpdTargetBand, not the override table.
     expect(band(vm, "vpdKpa")).toEqual({ min: 0.8, max: 1.2 });

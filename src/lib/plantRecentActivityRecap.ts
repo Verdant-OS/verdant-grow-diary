@@ -13,6 +13,10 @@ import {
   classifyTimelineEntry,
   type TimelineFilterCategory,
 } from "@/lib/timelineEntryClassification";
+import {
+  INVALID_EVENT_TYPE_IDENTITY,
+  INVALID_EVENT_TYPE_NEUTRAL_LABEL,
+} from "@/lib/quickLogEventIdentityRules";
 import type { PlantRecentActivityRow } from "@/lib/plantRecentActivityRules";
 
 export const PLANT_RECENT_ACTIVITY_RECAP_DEFAULT_LIMIT = 3 as const;
@@ -107,18 +111,40 @@ export function buildPlantRecentActivityRecap(
   const out: PlantRecentActivityRecapItem[] = [];
   for (const r of rows) {
     const source = r.hasPhoto ? "photo" : null;
+    // Prefer the canonical event type resolved by buildPlantRecentActivity
+    // so `quick_log`/`note` envelope wrappers classify as their true action.
+    const effectiveType = r.effectiveEventType ?? r.eventType;
     const category = classifyTimelineEntry({
-      eventType: r.eventType,
+      eventType: effectiveType,
       source,
     });
+    // An `invalid_event_type` identity buckets into "notes" for FILTERING
+    // (there is no better bucket), but its VISIBLE label must stay the
+    // neutral one — the row's kind is unknown, so labeling it "Note" would
+    // misrepresent it.
+    const categoryLabel =
+      effectiveType === INVALID_EVENT_TYPE_IDENTITY
+        ? INVALID_EVENT_TYPE_NEUTRAL_LABEL
+        : CATEGORY_LABELS[category];
+    // When the row has no free-text note but carries a structured Quick
+    // Log summary (e.g. "500 ml"), prefer that over the generic
+    // "No details recorded." placeholder.
+    const structured = (r.summarySuffix ?? "").trim();
+    const summary =
+      r.notePreview && r.notePreview.trim().length > 0
+        ? previewSummary(r.notePreview, r.hasPhoto, r.hasSnapshot)
+        : structured.length > 0
+          ? structured
+          : previewSummary(r.notePreview, r.hasPhoto, r.hasSnapshot);
     out.push({
       key: out.length.toString(),
       category,
-      categoryLabel: CATEGORY_LABELS[category],
-      summary: previewSummary(r.notePreview, r.hasPhoto, r.hasSnapshot),
+      categoryLabel,
+      summary,
       timestampLabel: formatTimestamp(r.occurredAt, r.occurredAtLabel),
     });
     if (out.length >= limit) break;
   }
+
   return out;
 }

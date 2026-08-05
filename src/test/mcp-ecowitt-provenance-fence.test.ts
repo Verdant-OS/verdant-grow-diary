@@ -45,15 +45,25 @@ describe("MCP latest sensor snapshot — ECOWITT provenance fence", () => {
     const mirror = readFileSync(resolve("supabase/functions/mcp/index.ts"), "utf8");
     const publicProjection = mirror.slice(
       mirror.indexOf("function selectLatestMcpSensorReadings"),
-      mirror.indexOf("var get_latest_sensor_snapshot_default"),
+      mirror.indexOf("var get_latest_sensor_snapshot_default") !== -1
+        ? mirror.indexOf("var get_latest_sensor_snapshot_default")
+        : mirror.indexOf("get_latest_sensor_snapshot_default"),
     );
 
-    expect(mirror).toContain(
-      'SENSOR_COLUMNS = "id,tent_id,metric,value,quality,source,ts,captured_at,created_at,raw_payload"',
+    // Bundle may emit const (pretty) or var (min-style); columns may wrap.
+    expect(mirror).toMatch(
+      /(?:const|var)\s+SENSOR_COLUMNS\s*=\s*\n?\s*"id,tent_id,metric,value,quality,source,ts,captured_at,created_at,raw_payload"/,
     );
     expect(mirror).toContain('vendor === "ecowitt_windows_testbench"');
-    expect(mirror).toContain("var SENSOR_CANDIDATE_LIMIT = 25");
-    expect(mirror).toContain("var STALE_THRESHOLD_MS = 30 * 60 * 1e3");
+    expect(mirror).toMatch(/(?:const|var)\s+SENSOR_CANDIDATE_LIMIT\s*=\s*25/);
+    // The 30-minute stale threshold is still pinned; the regenerated bundle
+    // now routes it through the named sensorTiming constant.
+    expect(mirror).toMatch(
+      /(?:const|var)\s+SENSOR_READING_NORMALIZATION_STALE_MS\s*=\s*30\s*\*\s*60\s*\*\s*1e3/,
+    );
+    expect(mirror).toMatch(
+      /(?:const|var)\s+STALE_THRESHOLD_MS\s*=\s*SENSOR_READING_NORMALIZATION_STALE_MS/,
+    );
     expect(mirror).toContain("current_live:");
     expect(mirror).toContain("freshness,");
     expect(mirror).not.toMatch(/import mcp from "npm:[A-Za-z]:\\/);

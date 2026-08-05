@@ -10,8 +10,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import React from "react";
-import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 const useRecentMock = vi.fn();
@@ -84,6 +84,7 @@ function renderCard() {
       <MemoryRouter>
         <PlantDetailAiDoctorReadiness
           plantId="plant-1"
+          growId="grow-1"
           tentId={TENT_ID}
           stage="veg"
           hasPlantPhoto
@@ -161,15 +162,43 @@ describe("PlantDetailAiDoctorReadiness — live caller × real intake classifica
     });
   });
 
-  it("keeps the plant-scoped Ask Doctor CTA on the existing review anchor", () => {
+  it("keeps readiness informational so the live-review surface owns the review action", () => {
     setBridge(null, null);
     renderCard();
 
-    expect(screen.getByTestId("plant-detail-ai-doctor-readiness-cta")).toHaveAttribute(
-      "href",
-      `/plants/plant-1?tentId=${TENT_ID}#plant-ai-doctor-review`,
-    );
+    expect(screen.queryByTestId("plant-detail-ai-doctor-readiness-cta")).toBeNull();
+    expect(screen.queryByTestId("plant-detail-ai-doctor-readiness-history-only-cta")).toBeNull();
+    expect(COMPONENT_SRC).not.toMatch(/buildPlantAiDoctorReviewPath/);
   });
+
+  it.each(["stale", "no_data"] as const)(
+    "status=%s opens plant-targeted Quick Log with an environment snapshot selected",
+    (status) => {
+      setBridge(status, status === "stale" ? "stale_timestamp" : "none_received");
+      const dispatchSpy = vi.spyOn(window, "dispatchEvent");
+      renderCard();
+
+      const action = screen.getByTestId(
+        `plant-detail-ai-doctor-sensor-evidence-next-action-${status}`,
+      );
+      expect(action).toHaveAttribute("data-handoff", "plant-quick-log");
+      fireEvent.click(action);
+
+      const event = dispatchSpy.mock.calls
+        .map(([candidate]) => candidate)
+        .find((candidate) => candidate.type === "verdant:open-quicklog") as CustomEvent;
+      expect(event.detail).toEqual({
+        plantId: "plant-1",
+        plantName: null,
+        growId: "grow-1",
+        tentId: TENT_ID,
+        tentName: null,
+        eventType: "environment",
+        suggestSnapshot: true,
+      });
+      dispatchSpy.mockRestore();
+    },
+  );
 
   describe("UI panel reflects real intake classification", () => {
     const cases: Array<{
@@ -177,36 +206,42 @@ describe("PlantDetailAiDoctorReadiness — live caller × real intake classifica
       reasonCode: SensorSnapshotReasonCode;
       mode: string;
       nextActionLabel: string | null;
+      nextActionHref: string | null;
     }> = [
       {
         status: "usable",
         reasonCode: "fresh_accept",
         mode: "healthy",
         nextActionLabel: null,
+        nextActionHref: null,
       },
       {
         status: "stale",
         reasonCode: "stale_timestamp",
         mode: "cautionary",
         nextActionLabel: "Add fresh sensor snapshot",
+        nextActionHref: null,
       },
       {
         status: "invalid",
         reasonCode: "malformed_payload",
         mode: "unsafe",
         nextActionLabel: "Review sensor intake",
+        nextActionHref: `/sensors?tentId=${TENT_ID}&tentIntent=required`,
       },
       {
         status: "needs_review",
         reasonCode: "none_accepted",
         mode: "unsafe",
         nextActionLabel: "Review snapshot issue",
+        nextActionHref: `/sensors?tentId=${TENT_ID}&tentIntent=required`,
       },
       {
         status: "no_data",
         reasonCode: "none_received",
         mode: "missing",
         nextActionLabel: "Add sensor snapshot",
+        nextActionHref: null,
       },
     ];
 
@@ -233,6 +268,9 @@ describe("PlantDetailAiDoctorReadiness — live caller × real intake classifica
             `plant-detail-ai-doctor-sensor-evidence-next-action-${c.status}`,
           );
           expect(btn.textContent).toContain(c.nextActionLabel);
+          if (c.nextActionHref) {
+            expect(btn.closest("a")).toHaveAttribute("href", c.nextActionHref);
+          }
         } else {
           expect(
             screen.queryByTestId(`plant-detail-ai-doctor-sensor-evidence-next-action-${c.status}`),

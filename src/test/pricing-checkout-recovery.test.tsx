@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -71,12 +71,12 @@ describe("Pricing checkout recovery", () => {
     const user = userEvent.setup();
     renderPricing();
 
-    await user.click(screen.getByTestId("pricing-cta-founder-lifetime"));
+    await user.click(screen.getByTestId("pricing-cta-craft-annual"));
 
     expect(mocks.openCheckout).not.toHaveBeenCalled();
-    expect(screen.getByTestId("subscriber-interest-plan")).toHaveTextContent("Founder Lifetime");
+    expect(screen.getByTestId("subscriber-interest-plan")).toHaveTextContent("Craft Annual");
     expect(mocks.track).toHaveBeenCalledWith("pricing_checkout_blocked", {
-      plan: "founder_lifetime",
+      plan: "craft_annual",
       source: "plan_card",
       reason: "environment_unavailable",
     });
@@ -118,12 +118,12 @@ describe("Pricing checkout recovery", () => {
     const user = userEvent.setup();
     renderPricing();
 
-    await user.click(screen.getByTestId("pricing-cta-founder-lifetime"));
+    await user.click(screen.getByTestId("pricing-cta-craft-annual"));
 
     expect(mocks.openCheckout).not.toHaveBeenCalled();
-    expect(screen.getByTestId("subscriber-interest-plan")).toHaveTextContent("Founder Lifetime");
+    expect(screen.getByTestId("subscriber-interest-plan")).toHaveTextContent("Craft Annual");
     expect(mocks.track).toHaveBeenCalledWith("pricing_checkout_blocked", {
-      plan: "founder_lifetime",
+      plan: "craft_annual",
       source: "plan_card",
       reason: "runtime_failure",
     });

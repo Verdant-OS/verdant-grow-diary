@@ -7,14 +7,8 @@ const TENT = "11111111-2222-3333-4444-555555555555";
 
 describe("EcowittIngestValidationPanel", () => {
   it("renders the empty-state CLI hints when no evidence exists", () => {
-    render(
-      <EcowittIngestValidationPanel
-        input={{ rows: [], tentId: TENT, now: NOW }}
-      />,
-    );
-    expect(screen.getByTestId("validation-status-badge").textContent).toBe(
-      "Not validated yet",
-    );
+    render(<EcowittIngestValidationPanel input={{ rows: [], tentId: TENT, now: NOW }} />);
+    expect(screen.getByTestId("validation-status-badge").textContent).toBe("Not validated yet");
     expect(screen.getByTestId("validation-cli-hints").textContent).toMatch(
       /bun run dev:send-ecowitt/,
     );
@@ -61,19 +55,9 @@ describe("EcowittIngestValidationPanel", () => {
     expect(screen.getByTestId("validation-status-badge").textContent).toBe(
       "Accepted by ingest webhook",
     );
-    expect(screen.getByTestId("test-sender-badge").textContent).toBe(
-      "Local test sender",
-    );
-    for (const key of [
-      "temp_f",
-      "humidity_pct",
-      "vpd_kpa",
-      "co2_ppm",
-      "soil_moisture_pct",
-    ]) {
-      expect(
-        screen.getByTestId(`metric-chip-${key}`).getAttribute("data-present"),
-      ).toBe("true");
+    expect(screen.getByTestId("test-sender-badge").textContent).toBe("Local test sender");
+    for (const key of ["temp_f", "humidity_pct", "vpd_kpa", "co2_ppm", "soil_moisture_pct"]) {
+      expect(screen.getByTestId(`metric-chip-${key}`).getAttribute("data-present")).toBe("true");
     }
   });
 
@@ -100,9 +84,7 @@ describe("EcowittIngestValidationPanel", () => {
         }}
       />,
     );
-    expect(screen.getByTestId("invalid-test-badge").textContent).toBe(
-      "Invalid test",
-    );
+    expect(screen.getByTestId("invalid-test-badge").textContent).toBe("Invalid test");
   });
 
   it("never renders raw bridge tokens / secrets injected via raw_payload", () => {

@@ -8,8 +8,7 @@
 import { CanonicalEcowittTentSnapshot } from "./ecowittTentSnapshot";
 import { EcowittTentKey } from "./ecowittTentNormalizerRouter";
 
-export const ECOWITT_DRY_RUN_NOTICE =
-  "Dry run only. Nothing has been sent." as const;
+export const ECOWITT_DRY_RUN_NOTICE = "Dry run only. Nothing has been sent." as const;
 
 export const ECOWITT_DRY_RUN_FILENAMES: Record<EcowittTentKey, string> = {
   flower: "verdant-ecowitt-flower-tent-ingest-dry-run.json",
@@ -20,8 +19,7 @@ export const ECOWITT_DRY_RUN_FILENAMES: Record<EcowittTentKey, string> = {
 export const ECOWITT_DRY_RUN_TENT_PLACEHOLDER = "preview-only-tent-id" as const;
 
 // UUID v4-ish shape check. Pure, no validation against a database.
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function isPlaceholderTentId(tent_id: string | null | undefined): boolean {
   if (!tent_id) return true;
@@ -93,11 +91,7 @@ export function buildEcowittIngestDryRun(
 
   // EcoWitt canonical source values are live/degraded/invalid, but defend
   // against future widening — manual/csv/demo must never be marked live.
-  if (
-    snap.source !== "live" &&
-    snap.source !== "degraded" &&
-    snap.source !== "invalid"
-  ) {
+  if (snap.source !== "live" && snap.source !== "degraded" && snap.source !== "invalid") {
     warnings.push("manual_or_csv_not_live");
   }
 
@@ -184,9 +178,7 @@ export function ecowittDryRunFilenameFor(tentKey: EcowittTentKey): string {
   return ECOWITT_DRY_RUN_FILENAMES[tentKey];
 }
 
-export function ecowittDryRunToJson(
-  result: EcowittIngestDryRunResult,
-): string {
+export function ecowittDryRunToJson(result: EcowittIngestDryRunResult): string {
   return JSON.stringify(result, null, 2);
 }
 

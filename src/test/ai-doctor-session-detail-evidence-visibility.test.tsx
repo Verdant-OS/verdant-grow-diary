@@ -7,7 +7,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 import AiDoctorSessionDetail from "@/pages/AiDoctorSessionDetail";
@@ -27,7 +27,15 @@ vi.mock("@/integrations/supabase/client", () => ({
     from: () => ({
       select: () => ({
         eq: (_col: string, _value: string) => ({
-          order: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }),
+          order: () => ({
+            limit: () => {
+              const __c: any = {
+                abortSignal: () => __c,
+                then: (r: any, j?: any) => Promise.resolve({ data: [], error: null }).then(r, j),
+              };
+              return __c;
+            },
+          }),
           maybeSingle: () => Promise.resolve({ data: currentFixture, error: null }),
         }),
       }),
@@ -60,8 +68,8 @@ function makeRow(overrides: Partial<AiDoctorSessionRow> = {}): AiDoctorSessionRo
     possibleCauses: [],
     immediateAction: "Raise light.",
     whatNotToDo: [],
-    followUp24h: null,
-    recoveryPlan3d: null,
+    followUp24h: null as never,
+    recoveryPlan3d: null as never,
     riskLevel: "medium",
     suggestedActions: [],
   };
@@ -88,7 +96,7 @@ describe("buildCautionNote (pure helper)", () => {
         riskLevel: "low",
         evidence: ["x"],
         missingInformation: [],
-      } as Diagnosis,
+      } as unknown as Diagnosis,
       displayedConfidence: 0.9,
     });
     const note = buildCautionNote(vm);
@@ -158,12 +166,8 @@ describe("AiDoctorSessionDetail — evidence/missing-info/caution rendering", ()
       <AiDoctorSessionDetail />,
       "/doctor/sessions/:sessionId",
     );
-    expect(
-      await screen.findByTestId("ai-doctor-session-detail-evidence-empty"),
-    ).toBeTruthy();
-    expect(
-      screen.getByTestId("ai-doctor-session-detail-missing-info-empty"),
-    ).toBeTruthy();
+    expect(await screen.findByTestId("ai-doctor-session-detail-evidence-empty")).toBeTruthy();
+    expect(screen.getByTestId("ai-doctor-session-detail-missing-info-empty")).toBeTruthy();
   });
 
   it("shows caution note when confidence is low", async () => {
@@ -176,9 +180,7 @@ describe("AiDoctorSessionDetail — evidence/missing-info/caution rendering", ()
       <AiDoctorSessionDetail />,
       "/doctor/sessions/:sessionId",
     );
-    expect(
-      await screen.findByTestId("ai-doctor-session-detail-caution-note"),
-    ).toBeTruthy();
+    expect(await screen.findByTestId("ai-doctor-session-detail-caution-note")).toBeTruthy();
   });
 
   it("shows caution note when risk is elevated", async () => {
@@ -190,9 +192,7 @@ describe("AiDoctorSessionDetail — evidence/missing-info/caution rendering", ()
       <AiDoctorSessionDetail />,
       "/doctor/sessions/:sessionId",
     );
-    expect(
-      await screen.findByTestId("ai-doctor-session-detail-caution-note"),
-    ).toBeTruthy();
+    expect(await screen.findByTestId("ai-doctor-session-detail-caution-note")).toBeTruthy();
   });
 
   it("does not show caution for high confidence + low risk + no missing info", async () => {
@@ -231,14 +231,8 @@ describe("AiDoctorSessionDetail — evidence/missing-info/caution rendering", ()
 
 describe("Static safety scan — evidence visibility slice", () => {
   const ROOT = resolve(__dirname, "../..");
-  const PAGE = readFileSync(
-    resolve(ROOT, "src/pages/AiDoctorSessionDetail.tsx"),
-    "utf8",
-  );
-  const VM = readFileSync(
-    resolve(ROOT, "src/lib/aiDoctorSessionDetailViewModel.ts"),
-    "utf8",
-  );
+  const PAGE = readFileSync(resolve(ROOT, "src/pages/AiDoctorSessionDetail.tsx"), "utf8");
+  const VM = readFileSync(resolve(ROOT, "src/lib/aiDoctorSessionDetailViewModel.ts"), "utf8");
   const ALL = [PAGE, VM].join("\n");
 
   it("no writes", () => {

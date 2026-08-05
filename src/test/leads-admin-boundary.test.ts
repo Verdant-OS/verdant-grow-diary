@@ -11,6 +11,12 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
+  extractMountedAppRoutePaths,
+  isMountedUnderOperatorLayout,
+  readAllRouteModuleSources,
+  readRouteModuleSourceForPath,
+} from "./helpers/routeManifestSyncHarness";
+import {
   readDesktopGrowerNavigationSource,
   readMobileGrowerNavigationSource,
 } from "@/test/utils/growerNavigationSource";
@@ -18,18 +24,27 @@ import {
 const read = (p: string) => readFileSync(resolve(process.cwd(), p), "utf8");
 
 describe("Leads admin boundary — routing", () => {
-  const APP = read("src/App.tsx");
+  const APP = readAllRouteModuleSources();
 
   it("registers /admin/leads as the primary Leads route", () => {
-    expect(APP).toMatch(/path="\/admin\/leads"\s+element=\{<Leads\s*\/>\}/);
+    expect(extractMountedAppRoutePaths()).toContain("/admin/leads");
+    expect(isMountedUnderOperatorLayout("/admin/leads")).toBe(true);
+    expect(APP).toMatch(/Leads|@\/pages\/Leads|pages\/Leads/);
   });
 
   it("keeps /leads as a back-compat alias only", () => {
-    expect(APP).toMatch(/path="\/leads"\s+element=\{<Leads\s*\/>\}/);
+    expect(extractMountedAppRoutePaths()).toContain("/leads");
+    expect(isMountedUnderOperatorLayout("/leads")).toBe(true);
+    const mod = readRouteModuleSourceForPath("/leads") ?? "";
+    expect(mod).toMatch(/Leads|@\/pages\/Leads|pages\/Leads/);
   });
 
   it("documents the admin/operator scoping next to the route", () => {
-    expect(APP).toMatch(/admin\/operator|back-compat alias|internal admin/i);
+    // Operator layout placement is the gate; docs pin the boundary language.
+    expect(isMountedUnderOperatorLayout("/admin/leads")).toBe(true);
+    expect(read("docs/leads-command-center.md")).toMatch(
+      /admin\/operator|back-compat alias|internal admin/i,
+    );
   });
 });
 

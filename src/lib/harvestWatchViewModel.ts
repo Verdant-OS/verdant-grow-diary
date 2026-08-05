@@ -100,18 +100,23 @@ function lastPhotoAge(now: Date, lastPhotoAt: string | null): number | null {
   return Math.floor(ms / (24 * 60 * 60 * 1000));
 }
 
-export function buildHarvestWatchRowViewModel(
-  input: HarvestWatchInput,
-): HarvestWatchRowViewModel {
+export function buildHarvestWatchRowViewModel(input: HarvestWatchInput): HarvestWatchRowViewModel {
   const readiness = calculateReadinessScore(input);
   const dryback = deriveDrybackVisibility(input);
-  const harvestWindow = predictHarvestWindow(input);
+  const predictedHarvestWindow = predictHarvestWindow(input);
+  const hasFlowerTimingContext =
+    typeof input.daysInFlower === "number" &&
+    Number.isFinite(input.daysInFlower) &&
+    input.daysInFlower >= 0;
+  const harvestWindow = hasFlowerTimingContext
+    ? predictedHarvestWindow
+    : {
+        ...predictedHarvestWindow,
+        caption: "Log a flower start or flip date before using a calendar window.",
+      };
   const photoPrompt = evaluatePhotoPrompt(input.lastPhotoAt, input.now);
   const trichome = deriveTrichomePlaceholder(input.trichome ?? null);
-  const daysVsHistory = computeDaysVsHistory(
-    input.daysInFlower,
-    input.expectedHarvestDay,
-  );
+  const daysVsHistory = computeDaysVsHistory(input.daysInFlower, input.expectedHarvestDay);
   const ageDays = lastPhotoAge(input.now, input.lastPhotoAt);
 
   // Confidence label reflects the weakest of the row's primary signals.
@@ -120,10 +125,7 @@ export function buildHarvestWatchRowViewModel(
     medium: 1,
     high: 2,
   };
-  const candidates: HarvestWatchConfidence[] = [
-    dryback.confidence,
-    harvestWindow.confidence,
-  ];
+  const candidates: HarvestWatchConfidence[] = [dryback.confidence, harvestWindow.confidence];
   const weakest = candidates.reduce<HarvestWatchConfidence>(
     (acc, c) => (confidenceRank[c] < confidenceRank[acc] ? c : acc),
     "high",
@@ -148,7 +150,9 @@ export function buildHarvestWatchRowViewModel(
     daysVsHistory,
     dryback,
     harvestWindow,
-    harvestWindowLabel: `Day ${harvestWindow.startDay}–${harvestWindow.endDay}`,
+    harvestWindowLabel: hasFlowerTimingContext
+      ? `Day ${harvestWindow.startDay}–${harvestWindow.endDay}`
+      : "Flower start date needed",
     confidenceLabel: HARVEST_WATCH_CONFIDENCE_LABEL[downgraded],
     lastPhotoAgeDays: ageDays,
     lastPhotoLabel:

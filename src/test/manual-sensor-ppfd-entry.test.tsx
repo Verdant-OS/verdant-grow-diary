@@ -12,7 +12,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import ManualSensorReadingCard from "@/components/ManualSensorReadingCard";
 import {
   validateManualEntry,
@@ -117,11 +117,37 @@ describe("buildManualReadingPayloads — PPFD save shape", () => {
     expect(ppfd?.value).toBe(420);
     expect(ppfd?.source).toBe("manual");
     expect(ppfd?.ts).toBe(ts);
+    expect(ppfd?.captured_at).toBe(ts);
     expect((ppfd as unknown as Record<string, unknown>).user_id).toBeUndefined();
   });
 });
 
 describe("ManualSensorReadingCard — PPFD save roundtrip", () => {
+  it("saves a multi-metric snapshot in one atomic batch request", async () => {
+    insertedRows.length = 0;
+    renderCard();
+    fireEvent.change(screen.getByLabelText(/Humidity/i), {
+      target: { value: "55" },
+    });
+    fireEvent.change(screen.getByLabelText(/PPFD/i), {
+      target: { value: "780" },
+    });
+    fireEvent.click(screen.getByTestId("manual-reading-save"));
+    fireEvent.click(screen.getByTestId("manual-sensor-review-confirm"));
+
+    for (let i = 0; i < 25 && insertedRows.length === 0; i++) {
+      await new Promise((r) => setTimeout(r, 20));
+    }
+
+    expect(insertedRows).toHaveLength(1);
+    expect(insertedRows[0]).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ metric: "humidity_pct", source: "manual" }),
+        expect.objectContaining({ metric: "ppfd", source: "manual" }),
+      ]),
+    );
+  });
+
   it("includes PPFD in the saved payload, manual source, preserves ts", async () => {
     insertedRows.length = 0;
     renderCard();
@@ -135,13 +161,14 @@ describe("ManualSensorReadingCard — PPFD save roundtrip", () => {
       await new Promise((r) => setTimeout(r, 20));
     }
     expect(insertedRows.length).toBeGreaterThan(0);
-    const ppfdRow = insertedRows.find(
-      (r) => (r as Record<string, unknown>).metric === "ppfd",
-    ) as Record<string, unknown> | undefined;
+    const flattenedRows = insertedRows.flatMap((row) => (Array.isArray(row) ? row : [row]));
+    const ppfdRow = flattenedRows.find((r) => (r as Record<string, unknown>).metric === "ppfd") as
+      Record<string, unknown> | undefined;
     expect(ppfdRow).toBeTruthy();
     expect(ppfdRow?.value).toBe(780);
     expect(ppfdRow?.source).toBe("manual");
     expect(typeof ppfdRow?.ts).toBe("string");
+    expect(ppfdRow?.captured_at).toBe(ppfdRow?.ts);
     expect(ppfdRow?.user_id).toBeUndefined();
   });
 });
@@ -155,13 +182,7 @@ describe("static safety: manual PPFD wiring", () => {
     resolve(process.cwd(), "src/lib/sensorReadingManualEntryRules.ts"),
     "utf8",
   );
-  const forbidden = [
-    "service_role",
-    "device_command",
-    "actuator",
-    "autopilot",
-    "_executed",
-  ];
+  const forbidden = ["service_role", "device_command", "actuator", "autopilot", "_executed"];
   for (const term of forbidden) {
     it(`card does not reference \`${term}\``, () => {
       expect(card).not.toContain(term);

@@ -54,8 +54,11 @@ export async function loadActionFollowUpExistingPhotoCandidates(
     if (error) return { status: "failed", reason: "query_failed" };
     const rows = (data ?? []) as DiaryPhotoRow[];
     const raw: ExistingPhotoCandidate[] = rows
-      .filter((r): r is DiaryPhotoRow & { id: string; grow_id: string; photo_url: string } =>
-        typeof r?.id === "string" && typeof r.grow_id === "string" && typeof r.photo_url === "string",
+      .filter(
+        (r): r is DiaryPhotoRow & { id: string; grow_id: string; photo_url: string } =>
+          typeof r?.id === "string" &&
+          typeof r.grow_id === "string" &&
+          typeof r.photo_url === "string",
       )
       .map((r) => ({
         id: r.id,

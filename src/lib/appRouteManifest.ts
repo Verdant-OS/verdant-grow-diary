@@ -1,38 +1,39 @@
 /**
- * App route manifest — single source of truth for every route mounted in
- * `src/App.tsx`.
+ * App route manifest — single source of truth for every route *policy*
+ * (access, feature, nav) for URLs served by the TanStack file-route tree.
  *
  * Why this exists:
- *   The App router used to be reflected in `src/test/pricing.test.ts` via a
+ *   The router used to be reflected in `src/test/pricing.test.ts` via a
  *   hard-coded sorted list. Any new route silently went stale until the next
  *   test run. This manifest is the *expected* set; the test cross-checks it
- *   against the actual routes scraped from `App.tsx` so drift fails fast in
- *   either direction.
+ *   against mounted paths extracted from `src/routes` (see
+ *   `routeManifestSyncHarness`) so drift fails fast in either direction.
  *
  * Hard constraints (Slice P1):
  *   - Pure data + pure helpers. No React, no component imports.
- *   - No pricing-tier behavior. `protected-tier` / `requiredTier` are
- *     intentionally NOT introduced here — they need product decisions about
- *     which routes are tier-gated and where the current tier comes from.
- *   - `access` reflects today's actual routing behavior only.
+ *   - `access` models routing topology, not billing plans or tiers.
+ *   - Capability-gated presentation is represented by the canonical
+ *     `requiredFeature` key; raw plan metadata and `requiredTier` stay out.
  *   - Deterministic ordering: entries are sorted by `path` ascending.
  */
+
+import type { FeatureKey } from "@/lib/featureEntitlements";
 
 /**
  * What kind of access gate the App router currently applies to a route.
  *
  *  - `public`    — mounted outside `<RequireAuth>` and renders a real page
  *                  (e.g. `/welcome`, `/pricing`, `/auth`, `*` NotFound).
- *  - `auth`      — mounted inside `<RequireAuth>`; available to any signed-in
- *                  user regardless of tier. Today this covers the entire
- *                  product surface (no tier-gating yet).
+ *  - `auth`      — mounted inside `<RequireAuth>`; may also declare a
+ *                  `requiredFeature` when the router applies a presentation
+ *                  capability gate.
  *  - `operator`  — mounted inside `<RequireAuth>` but intended for operator /
  *                  diagnostic use (e.g. `/operator/ecowitt`, `/diagnostics`,
  *                  `/sensors/ecowitt-audit`). Not exposed in normal user nav.
  *  - `internal`  — mounted inside `<RequireAuth>` for internal admin/support
  *                  flows (e.g. `/admin/leads`, `/leads`, `/grow-lineage`).
- *  - `redirect`  — a `<Navigate>` alias to another route (e.g. `/login` →
- *                  `/auth`). Carries no page of its own.
+ *  - `redirect`  — an alias to another route (e.g. `/login` → `/auth`).
+ *                  Carries no page of its own.
  */
 export type AppRouteAccess = "public" | "auth" | "operator" | "internal" | "redirect";
 
@@ -49,6 +50,8 @@ export interface AppRouteEntry {
   path: string;
   /** Current routing gate — see `AppRouteAccess`. */
   access: AppRouteAccess;
+  /** Canonical presentation capability required by the current router. */
+  requiredFeature?: FeatureKey;
   /** Optional short human label. Required when `showInNav` is true. */
   label?: string;
   /** Whether this route is intended for the user-facing primary navigation. */
@@ -101,7 +104,12 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/breeder-beta", access: "public", description: "Breeder beta landing page." },
   { path: "/breeding", access: "auth", description: "Breeding programs index." },
   { path: "/breeding/:programId", access: "auth", description: "Breeding program detail." },
-  { path: "/breeding/new", access: "auth", description: "New breeding event entry." },
+  {
+    path: "/breeding/log/new",
+    access: "auth",
+    description: "Log a grow-scoped breeding event.",
+  },
+  { path: "/breeding/new", access: "auth", description: "Create a new breeding program." },
   { path: "/checkout/cancel", access: "public", description: "Checkout cancellation return." },
   { path: "/checkout/success", access: "public", description: "Checkout success return." },
   { path: "/contact", access: "public", description: "Public support contact page." },
@@ -113,14 +121,10 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     description: "Public per-cultivar guide page (evergreen best-practice content).",
   },
   {
-    path: "/customer/:shareId",
+    path: "/customer/guide/oreoz-vs-gelonade-comparison",
     access: "public",
-    description: "Customer Mode QR guide shell (read-only, no private grow data).",
-  },
-  {
-    path: "/customer/:shareId/cannabis-care",
-    access: "public",
-    description: "Customer Mode cannabis plant care FAQ page (read-only).",
+    description:
+      "ID-free, noindex Next Door Cannabis comparison guide (static education; no Operator data).",
   },
   { path: "/daily-check", access: "auth" },
   {
@@ -136,9 +140,28 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   },
   { path: "/diagnostics", access: "operator" },
   {
+    path: "/diagnostics-seo-artifacts",
+    access: "operator",
+    description:
+      "Operator diagnostics: whether seo-manifest.json and generated static route documents exist in the current build output.",
+  },
+  {
     path: "/diary/environment-summary",
     access: "auth",
     description: "Environment summary report (diary).",
+  },
+  {
+    path: "/diary/pheno-expression-comparison",
+    access: "auth",
+    description:
+      "Read-only comparison of the grower's RLS-scoped Oreoz and Gelonade phenotype records.",
+  },
+  {
+    path: "/diary/strains/:slug",
+    access: "auth",
+    requiredFeature: "pheno_tracker",
+    description:
+      "Editable Oreoz or Gelonade phenotype diary profile backed by owner-scoped Pheno Tracker records.",
   },
   {
     path: "/docs/mcp-api",
@@ -301,9 +324,20 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     description: "EcoWitt per-tent preview (read-only).",
   },
   {
-    path: "/operator/ggs-real-payload-ingest",
+    path: "/operator/edge-alerts",
     access: "operator",
-    description: "GGS Sentinel smoke runner verdict over real Spider Farmer GGS rows.",
+    description:
+      "Operator edge-function alert breach state — live evaluation plus cooldown dispatch history (read-only).",
+  },
+  {
+    path: "/operator/edge-metrics",
+    access: "operator",
+    description: "Operator edge-function metric trend charts (read-only).",
+  },
+  {
+    path: "/operator/mode",
+    access: "operator",
+    description: "Operator Mode landing surface.",
   },
   {
     path: "/operator/one-tent-live-proof",
@@ -337,6 +371,11 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
       "Read-only release readiness / validation status snapshot (static/manual, no live CI feed).",
   },
   {
+    path: "/operator/schema-audit",
+    access: "operator",
+    description: "Operator required-migration and critical-table audit (read-only).",
+  },
+  {
     path: "/operator/subscriber-growth",
     access: "operator",
     description:
@@ -345,7 +384,8 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   {
     path: "/operator/support-inbox",
     access: "operator",
-    description: "Operator support inbox (read-only).",
+    description:
+      "Operator support inbox; original submissions are read-only, while review status and internal notes are editable.",
   },
   {
     path: "/partners/csv-preview",
@@ -366,6 +406,7 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   {
     path: "/pheno-hunts",
     access: "auth",
+    requiredFeature: "pheno_tracker",
     description: "Pheno hunts index (the grower's own hunts).",
   },
   {
@@ -373,15 +414,30 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     access: "public",
     description: "Read-only per-hunt comparison with graceful unauthenticated state.",
   },
-  { path: "/pheno-hunts/:id/keepers", access: "auth", description: "Pheno keeper selection." },
+  {
+    path: "/pheno-hunts/:id/keepers",
+    access: "auth",
+    requiredFeature: "pheno_tracker",
+    description: "Pheno keeper selection.",
+  },
   {
     path: "/pheno-hunts/:id/showcase",
     access: "public",
     description:
       "Read-only per-hunt showcase (pack, contenders, fight, cure, family tree) with graceful demo fallback.",
   },
-  { path: "/pheno-hunts/:id/workspace", access: "auth", description: "Pheno hunt workspace." },
-  { path: "/pheno-hunts/new", access: "auth", description: "New pheno hunt entry." },
+  {
+    path: "/pheno-hunts/:id/workspace",
+    access: "auth",
+    requiredFeature: "pheno_tracker",
+    description: "Pheno hunt workspace.",
+  },
+  {
+    path: "/pheno-hunts/new",
+    access: "auth",
+    requiredFeature: "pheno_tracker",
+    description: "New pheno hunt entry.",
+  },
   { path: "/pi-ingest-status", access: "operator" },
   { path: "/plants", access: "auth" },
   { path: "/plants/:id", access: "auth" },
@@ -420,10 +476,21 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     access: "auth",
     description: "Authenticated agent integrations settings.",
   },
+  {
+    path: "/settings/analytics",
+    access: "auth",
+    description: "Browser-local analytics consent grant/revoke (grow data never sent).",
+  },
   { path: "/signup", access: "redirect", description: "→ /auth" },
+  {
+    path: "/start-room",
+    access: "auth",
+    description:
+      "Guided first-session path: grow → tent → plant with guaranteed grow_id binding for Quick Log.",
+  },
   { path: "/strains", access: "redirect", description: "→ /cultivars" },
   { path: "/strains/:slug", access: "redirect", description: "→ /cultivars/:slug" },
-  { path: "/tasks", access: "auth" },
+  { path: "/tasks", access: "redirect", description: "→ /actions" },
   { path: "/tents", access: "auth" },
   { path: "/tents/:id", access: "auth" },
   { path: "/terms", access: "public", description: "Terms of service." },
@@ -433,6 +500,11 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     path: "/tools/vpd-calculator",
     access: "public",
     description: "Public manual-input, stage-aware air VPD calculator.",
+  },
+  {
+    path: "/unsubscribe",
+    access: "public",
+    description: "Public token-validated email unsubscribe flow.",
   },
   {
     path: "/upgrade",

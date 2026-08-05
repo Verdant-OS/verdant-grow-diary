@@ -8,7 +8,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen, fireEvent, within } from "@testing-library/react";
-import { MemoryRouter, useLocation } from "react-router-dom";
+import { MemoryRouter, useLocation } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 import type { AiDoctorSessionRow } from "@/hooks/use-ai-doctor-sessions";
@@ -29,7 +29,7 @@ let currentRows: AiDoctorSessionRow[] = [];
 vi.mock("@/integrations/supabase/client", () => {
   const result = () => Promise.resolve({ data: currentRows, error: null });
   const chain: Record<string, unknown> = {};
-  const methods = ["select", "eq", "order", "limit", "range", "not", "gte", "or"];
+  const methods = ["select", "eq", "order", "limit", "range", "not", "gte", "or", "abortSignal"];
   for (const m of methods) chain[m] = () => chain;
   chain.then = (resolve: (v: unknown) => unknown) => result().then(resolve);
   return { supabase: { from: () => chain } };
@@ -49,8 +49,8 @@ function makeRow(
     possibleCauses: [],
     immediateAction: "",
     whatNotToDo: [],
-    followUp24h: null,
-    recoveryPlan3d: null,
+    followUp24h: null as never,
+    recoveryPlan3d: null as never,
     riskLevel: "low",
     suggestedActions: [],
     ...diag,
@@ -78,9 +78,7 @@ const healthyRow = (id: string) => makeRow(id);
 describe("preset helpers", () => {
   it("isNeedsAttentionPresetActive only true when both filters set", () => {
     expect(isNeedsAttentionPresetActive(DEFAULT_FILTERS)).toBe(false);
-    expect(
-      isNeedsAttentionPresetActive({ ...DEFAULT_FILTERS, caution: "yes" }),
-    ).toBe(false);
+    expect(isNeedsAttentionPresetActive({ ...DEFAULT_FILTERS, caution: "yes" })).toBe(false);
     expect(
       isNeedsAttentionPresetActive({
         ...DEFAULT_FILTERS,
@@ -150,9 +148,7 @@ describe("AiDoctorSessionsIndex — Needs my attention preset UI", () => {
     currentRows = [healthyRow("a")];
     renderPage();
     await screen.findByTestId("ai-doctor-sessions-index-list");
-    const btn = screen.getByTestId(
-      "ai-doctor-sessions-index-needs-attention-preset",
-    );
+    const btn = screen.getByTestId("ai-doctor-sessions-index-needs-attention-preset");
     expect(btn.textContent).toContain(NEEDS_ATTENTION_PRESET_LABEL);
     expect(btn.getAttribute("aria-pressed")).toBe("false");
   });
@@ -161,9 +157,7 @@ describe("AiDoctorSessionsIndex — Needs my attention preset UI", () => {
     currentRows = [lowConfRow("a"), healthyRow("b")];
     renderPage();
     await screen.findByTestId("ai-doctor-sessions-index-list");
-    fireEvent.click(
-      screen.getByTestId("ai-doctor-sessions-index-needs-attention-preset"),
-    );
+    fireEvent.click(screen.getByTestId("ai-doctor-sessions-index-needs-attention-preset"));
     const cautionSel = (await screen.findByTestId(
       "ai-doctor-sessions-index-filter-caution",
     )) as HTMLSelectElement;
@@ -181,18 +175,12 @@ describe("AiDoctorSessionsIndex — Needs my attention preset UI", () => {
     currentRows = [lowConfRow("a")];
     renderPage();
     await screen.findByTestId("ai-doctor-sessions-index-list");
-    expect(
-      screen.queryByTestId("ai-doctor-sessions-index-needs-attention-badge"),
-    ).toBeNull();
-    fireEvent.click(
-      screen.getByTestId("ai-doctor-sessions-index-needs-attention-preset"),
-    );
+    expect(screen.queryByTestId("ai-doctor-sessions-index-needs-attention-badge")).toBeNull();
+    fireEvent.click(screen.getByTestId("ai-doctor-sessions-index-needs-attention-preset"));
     expect(
       await screen.findByTestId("ai-doctor-sessions-index-needs-attention-badge"),
     ).toBeTruthy();
-    const btn = screen.getByTestId(
-      "ai-doctor-sessions-index-needs-attention-preset",
-    );
+    const btn = screen.getByTestId("ai-doctor-sessions-index-needs-attention-preset");
     expect(btn.getAttribute("aria-pressed")).toBe("true");
   });
 
@@ -200,20 +188,14 @@ describe("AiDoctorSessionsIndex — Needs my attention preset UI", () => {
     currentRows = [lowConfRow("a")];
     renderPage("/doctor/sessions?risk=high");
     await screen.findByTestId("ai-doctor-sessions-index-list");
-    fireEvent.click(
-      screen.getByTestId("ai-doctor-sessions-index-needs-attention-preset"),
-    );
+    fireEvent.click(screen.getByTestId("ai-doctor-sessions-index-needs-attention-preset"));
     await screen.findByTestId("ai-doctor-sessions-index-needs-attention-badge");
-    fireEvent.click(
-      screen.getByTestId("ai-doctor-sessions-index-needs-attention-preset"),
-    );
+    fireEvent.click(screen.getByTestId("ai-doctor-sessions-index-needs-attention-preset"));
     const cautionSel = (await screen.findByTestId(
       "ai-doctor-sessions-index-filter-caution",
     )) as HTMLSelectElement;
     expect(cautionSel.value).toBe("all");
-    const riskSel = screen.getByTestId(
-      "ai-doctor-sessions-index-filter-risk",
-    ) as HTMLSelectElement;
+    const riskSel = screen.getByTestId("ai-doctor-sessions-index-filter-risk") as HTMLSelectElement;
     expect(riskSel.value).toBe("high");
   });
 
@@ -221,33 +203,23 @@ describe("AiDoctorSessionsIndex — Needs my attention preset UI", () => {
     currentRows = [lowConfRow("a")];
     renderPage();
     await screen.findByTestId("ai-doctor-sessions-index-list");
-    fireEvent.click(
-      screen.getByTestId("ai-doctor-sessions-index-needs-attention-preset"),
-    );
+    fireEvent.click(screen.getByTestId("ai-doctor-sessions-index-needs-attention-preset"));
     await screen.findByTestId("ai-doctor-sessions-index-needs-attention-badge");
     fireEvent.click(screen.getByTestId("ai-doctor-sessions-index-clear-filters"));
-    expect(
-      screen.queryByTestId("ai-doctor-sessions-index-needs-attention-badge"),
-    ).toBeNull();
+    expect(screen.queryByTestId("ai-doctor-sessions-index-needs-attention-badge")).toBeNull();
   });
 
   it("individual filter selects still work after preset is applied", async () => {
     currentRows = [lowConfRow("a")];
     renderPage();
     await screen.findByTestId("ai-doctor-sessions-index-list");
-    fireEvent.click(
-      screen.getByTestId("ai-doctor-sessions-index-needs-attention-preset"),
-    );
+    fireEvent.click(screen.getByTestId("ai-doctor-sessions-index-needs-attention-preset"));
     const confSel = (await screen.findByTestId(
       "ai-doctor-sessions-index-filter-confidence",
     )) as HTMLSelectElement;
     fireEvent.change(confSel, { target: { value: "low" } });
     expect(
-      (
-        screen.getByTestId(
-          "ai-doctor-sessions-index-filter-confidence",
-        ) as HTMLSelectElement
-      ).value,
+      (screen.getByTestId("ai-doctor-sessions-index-filter-confidence") as HTMLSelectElement).value,
     ).toBe("low");
   });
 
@@ -255,9 +227,7 @@ describe("AiDoctorSessionsIndex — Needs my attention preset UI", () => {
     currentRows = [lowConfRow("a"), lowConfRow("b"), healthyRow("c")];
     renderPage();
     await screen.findByTestId("ai-doctor-sessions-index-list");
-    const count = screen.getByTestId(
-      "ai-doctor-sessions-index-needs-attention-count",
-    );
+    const count = screen.getByTestId("ai-doctor-sessions-index-needs-attention-count");
     expect(count.textContent).toContain("2 visible");
   });
 
@@ -265,12 +235,8 @@ describe("AiDoctorSessionsIndex — Needs my attention preset UI", () => {
     currentRows = [healthyRow("a")];
     renderPage();
     await screen.findByTestId("ai-doctor-sessions-index-list");
-    fireEvent.click(
-      screen.getByTestId("ai-doctor-sessions-index-needs-attention-preset"),
-    );
-    expect(
-      await screen.findByTestId("ai-doctor-sessions-index-empty-filtered"),
-    ).toBeTruthy();
+    fireEvent.click(screen.getByTestId("ai-doctor-sessions-index-needs-attention-preset"));
+    expect(await screen.findByTestId("ai-doctor-sessions-index-empty-filtered")).toBeTruthy();
   });
 });
 
@@ -280,10 +246,7 @@ describe("Static safety scan — Needs my attention preset slice", () => {
     "src/pages/AiDoctorSessionsIndex.tsx",
     "src/lib/aiDoctorSessionsIndexFilters.ts",
   ].map((p) => readFileSync(resolve(ROOT, p), "utf8"));
-  const TSX = readFileSync(
-    resolve(ROOT, "src/pages/AiDoctorSessionsIndex.tsx"),
-    "utf8",
-  );
+  const TSX = readFileSync(resolve(ROOT, "src/pages/AiDoctorSessionsIndex.tsx"), "utf8");
   const ALL = FILES.join("\n");
 
   it("no writes", () => {

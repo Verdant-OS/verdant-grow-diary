@@ -11,14 +11,9 @@ import { resolve } from "node:path";
  *   - no device-control verbs
  */
 describe("verdantGeneticsXlsxParser — static safety scan", () => {
-  const src = readFileSync(
-    resolve(__dirname, "../lib/verdantGeneticsXlsxParser.ts"),
-    "utf-8",
-  );
+  const src = readFileSync(resolve(__dirname, "../lib/verdantGeneticsXlsxParser.ts"), "utf-8");
   // strip line + block comments to avoid false positives
-  const code = src
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/^\s*\/\/.*$/gm, "");
+  const code = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 
   it("does not import Supabase or call DB write methods", () => {
     expect(code).not.toMatch(/@\/integrations\/supabase\/client/);

@@ -15,11 +15,7 @@ import {
 } from "@/lib/evidenceCoverageViewModel";
 import { EvidenceCoveragePanel } from "@/components/EvidenceCoveragePanel";
 
-function bucket(
-  total: number,
-  linked: number,
-  fallbackOnly: number,
-): EvidenceCoverageBucket {
+function bucket(total: number, linked: number, fallbackOnly: number): EvidenceCoverageBucket {
   return {
     total,
     linked,
@@ -35,12 +31,8 @@ describe("computeCoverageHint", () => {
   });
 
   it("returns hint when fallbackOnly >= linked and total > 0", () => {
-    expect(computeCoverageHint(bucket(4, 2, 2))).toBe(
-      EVIDENCE_COVERAGE_HINT_FALLBACK_HIGH,
-    );
-    expect(computeCoverageHint(bucket(3, 1, 2))).toBe(
-      EVIDENCE_COVERAGE_HINT_FALLBACK_HIGH,
-    );
+    expect(computeCoverageHint(bucket(4, 2, 2))).toBe(EVIDENCE_COVERAGE_HINT_FALLBACK_HIGH);
+    expect(computeCoverageHint(bucket(3, 1, 2))).toBe(EVIDENCE_COVERAGE_HINT_FALLBACK_HIGH);
   });
 
   it("returns hint when fallbackOnly >= 5 even if linked is greater", () => {
@@ -108,9 +100,7 @@ describe("EvidenceCoveragePanel — hint render", () => {
   });
 
   it("does not render hint when null", () => {
-    render(
-      <EvidenceCoveragePanel viewModel={EMPTY_EVIDENCE_COVERAGE_VIEW_MODEL} />,
-    );
+    render(<EvidenceCoveragePanel viewModel={EMPTY_EVIDENCE_COVERAGE_VIEW_MODEL} />);
     expect(screen.queryByTestId("evidence-coverage-hint")).not.toBeInTheDocument();
     expect(screen.queryByText("Evidence coverage note")).not.toBeInTheDocument();
   });

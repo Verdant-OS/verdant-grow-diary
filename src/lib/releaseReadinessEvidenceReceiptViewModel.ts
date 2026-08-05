@@ -13,17 +13,9 @@
  *  - Any active blocker ⇒ HOLD, even with passing CI.
  */
 
-export type ReceiptCategory =
-  | "ci_full_suite"
-  | "local_targeted"
-  | "manual_operator_note";
+export type ReceiptCategory = "ci_full_suite" | "local_targeted" | "manual_operator_note";
 
-export type ReceiptStatus =
-  | "pass"
-  | "fail"
-  | "blocked"
-  | "pending"
-  | "unknown";
+export type ReceiptStatus = "pass" | "fail" | "blocked" | "pending" | "unknown";
 
 export interface EvidenceReceipt {
   id: string;
@@ -57,14 +49,11 @@ export interface ReleaseEvidencePosture {
   operatorWarning: string;
 }
 
-export const RELEASE_GO_REQUIREMENT_COPY =
-  "Missing parser-generated full-suite CI receipt.";
+export const RELEASE_GO_REQUIREMENT_COPY = "Missing parser-generated full-suite CI receipt.";
 
-export const LOCAL_TARGETED_DISCLAIMER =
-  "Supports confidence, does not unlock release GO.";
+export const LOCAL_TARGETED_DISCLAIMER = "Supports confidence, does not unlock release GO.";
 
-export const MANUAL_NOTE_DISCLAIMER =
-  "Context only, does not unlock release GO.";
+export const MANUAL_NOTE_DISCLAIMER = "Context only, does not unlock release GO.";
 
 const CATEGORY_ORDER: Record<ReceiptCategory, number> = {
   ci_full_suite: 0,
@@ -81,9 +70,7 @@ const STATUS_ORDER: Record<ReceiptStatus, number> = {
 };
 
 /** Deterministic sort: category → status → label → id. */
-export function sortEvidenceReceipts(
-  receipts: readonly EvidenceReceipt[],
-): EvidenceReceipt[] {
+export function sortEvidenceReceipts(receipts: readonly EvidenceReceipt[]): EvidenceReceipt[] {
   return [...receipts].sort((a, b) => {
     const c = CATEGORY_ORDER[a.category] - CATEGORY_ORDER[b.category];
     if (c !== 0) return c;
@@ -124,15 +111,9 @@ export function deriveReleaseEvidencePosture(
 ): ReleaseEvidencePosture {
   const sorted = sortEvidenceReceipts(receipts);
   const ci = sorted.filter((r) => r.category === "ci_full_suite");
-  const passingCi = ci.filter(
-    (r) => r.status === "pass" && r.canUnlockReleaseGo === true,
-  );
-  const failingCi = ci.filter(
-    (r) => r.status === "fail" || r.status === "blocked",
-  );
-  const pendingCi = ci.filter(
-    (r) => r.status === "pending" || r.status === "unknown",
-  );
+  const passingCi = ci.filter((r) => r.status === "pass" && r.canUnlockReleaseGo === true);
+  const failingCi = ci.filter((r) => r.status === "fail" || r.status === "blocked");
+  const pendingCi = ci.filter((r) => r.status === "pending" || r.status === "unknown");
 
   const blockingReceipts = sorted.filter((r) => r.blocksReleaseGo === true);
   const supportingReceipts = sorted.filter(
@@ -152,8 +133,7 @@ export function deriveReleaseEvidencePosture(
   if (failingCi.length > 0) {
     return {
       posture: "HOLD",
-      primaryReason:
-        "Full-suite CI receipt is failing or blocked. Release stays HOLD.",
+      primaryReason: "Full-suite CI receipt is failing or blocked. Release stays HOLD.",
       supportingReceipts,
       blockingReceipts,
       missingEvidence,
@@ -186,8 +166,7 @@ export function deriveReleaseEvidencePosture(
   if (blockers.length > 0) {
     return {
       posture: "HOLD",
-      primaryReason:
-        "Active blockers present. Release stays HOLD even with passing CI.",
+      primaryReason: "Active blockers present. Release stays HOLD even with passing CI.",
       supportingReceipts,
       blockingReceipts,
       missingEvidence,
@@ -197,8 +176,7 @@ export function deriveReleaseEvidencePosture(
   if (blockingReceipts.length > 0) {
     return {
       posture: "HOLD",
-      primaryReason:
-        "One or more receipts are marked as blocking release GO.",
+      primaryReason: "One or more receipts are marked as blocking release GO.",
       supportingReceipts,
       blockingReceipts,
       missingEvidence,
@@ -208,8 +186,7 @@ export function deriveReleaseEvidencePosture(
 
   return {
     posture: "GO",
-    primaryReason:
-      "Passing parser-generated full-suite CI receipt with no active blockers.",
+    primaryReason: "Passing parser-generated full-suite CI receipt with no active blockers.",
     supportingReceipts,
     blockingReceipts,
     missingEvidence,
@@ -250,8 +227,7 @@ export const RELEASE_READINESS_EVIDENCE_RECEIPTS: EvidenceReceipt[] = [
     status: "pass",
     sourceLabel: "doc-receipt",
     capturedAt: "",
-    commandOrSource:
-      "node scripts/parse-vitest-batched-workflow-logs.mjs --run-url=<RUN_URL>",
+    commandOrSource: "node scripts/parse-vitest-batched-workflow-logs.mjs --run-url=<RUN_URL>",
     summary:
       "Parser GO on PR head 4eb63ba (run 28463133281): 16/16 batches, 22,187 passed, 0 failed, 6 skipped, 0 OOMs. Merged into verdant-grow-diary at merge commit 5bc657fc.",
     blocksReleaseGo: false,
@@ -271,8 +247,7 @@ export const RELEASE_READINESS_EVIDENCE_RECEIPTS: EvidenceReceipt[] = [
       "Standalone ecowitt-bridge-ci-validation artifact (exit 0 + complete vitest summary) not yet proven green on main.",
     blocksReleaseGo: true,
     canUnlockReleaseGo: false,
-    notes:
-      "Sandbox-bound locally; authoritative receipt must come from CI/Linux/VPS on main.",
+    notes: "Sandbox-bound locally; authoritative receipt must come from CI/Linux/VPS on main.",
   },
   {
     id: "local-targeted-localstorage-helper",
@@ -325,8 +300,7 @@ export const RELEASE_READINESS_EVIDENCE_RECEIPTS: EvidenceReceipt[] = [
       "Auth loading smoke remains red/flaky repo-wide and non-required; explicitly overridden for PR #112 merge because it is red on main and not a PR #112 regression.",
     blocksReleaseGo: false,
     canUnlockReleaseGo: false,
-    notes:
-      "Tracked separately. Do not treat as a reliable release gate until repaired.",
+    notes: "Tracked separately. Do not treat as a reliable release gate until repaired.",
   },
   {
     id: "manual-note-action-queue-preserved",
@@ -336,8 +310,7 @@ export const RELEASE_READINESS_EVIDENCE_RECEIPTS: EvidenceReceipt[] = [
     sourceLabel: "operator-note",
     capturedAt: "",
     commandOrSource: "manual review",
-    summary:
-      "No automation, device control, or auto-execution paths added in this slice.",
+    summary: "No automation, device control, or auto-execution paths added in this slice.",
     blocksReleaseGo: false,
     canUnlockReleaseGo: false,
     notes: MANUAL_NOTE_DISCLAIMER,

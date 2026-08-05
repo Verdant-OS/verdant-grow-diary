@@ -9,11 +9,7 @@
  */
 
 export type ActionQueueSource =
-  | "environment_alert"
-  | "ai_coach"
-  | "ai_doctor"
-  | "manual"
-  | "unknown";
+  "environment_alert" | "ai_coach" | "ai_doctor" | "manual" | "unknown";
 
 /** Persisted `source` values. UI imports these so it never inlines the strings. */
 export const ACTION_QUEUE_SOURCE_VALUES = {
@@ -136,6 +132,32 @@ export function isActionDerivedFromAlert(
   if (!action || typeof alertId !== "string" || !alertId) return false;
   if (!isAlertDerived(action)) return false;
   return extractSourceAlertId(action.reason) === alertId;
+}
+
+export interface RelatedActionRowIdentity {
+  id: string;
+}
+
+export function reconcileRelatedActionRows<T extends RelatedActionRowIdentity>(
+  currentRows: readonly T[] | null | undefined,
+  fetchedRows: readonly T[] | null | undefined,
+): T[] {
+  const fetched = fetchedRows ?? [];
+  const fetchedIds = new Set(fetched.map((row) => row.id));
+  const seenCurrentIds = new Set<string>();
+  const currentOnly = (currentRows ?? []).filter((row) => {
+    if (fetchedIds.has(row.id) || seenCurrentIds.has(row.id)) return false;
+    seenCurrentIds.add(row.id);
+    return true;
+  });
+  const seenFetchedIds = new Set<string>();
+  const deduplicatedFetched = fetched.filter((row) => {
+    if (seenFetchedIds.has(row.id)) return false;
+    seenFetchedIds.add(row.id);
+    return true;
+  });
+
+  return [...currentOnly, ...deduplicatedFetched];
 }
 
 /** Alert statuses considered "closed" for stale-action warning purposes. */

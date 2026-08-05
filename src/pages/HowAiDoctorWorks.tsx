@@ -6,7 +6,7 @@
  * Action Queue writes, no device control. Copy is source-labeled and
  * avoids forbidden automation / device-control language.
  */
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import BrandLogo from "@/components/BrandLogo";
 import { Button } from "@/components/ui/button";
 import { usePageSeo } from "@/hooks/usePageSeo";
@@ -64,7 +64,7 @@ export const AI_DOCTOR_OUTPUT_FIELDS: ReadonlyArray<{
   },
   {
     title: "Action Queue suggestion, if appropriate",
-    body: "When useful, AI Doctor proposes an Action Queue item. Action Queue is approval-required — the grower always confirms before anything is marked done.",
+    body: "When useful, AI Doctor proposes a suggestion. It reaches the approval-required Action Queue only when the grower chooses to add it, and the grower still confirms before anything is marked done.",
   },
 ];
 
@@ -193,8 +193,9 @@ export default function HowAiDoctorWorks() {
           </h2>
           <div className="mt-3 space-y-3 text-base text-foreground/90">
             <p>
-              AI Doctor may suggest actions. The grower decides. Action Queue is approval-required —
-              every meaningful step waits on the human in the loop.
+              AI Doctor may suggest actions. The grower decides. A suggestion reaches the
+              approval-required Action Queue only when the grower chooses to add it, and every
+              meaningful step still waits on the grower.
             </p>
             <p>
               Verdant does not control lights, fans, irrigation, humidifiers, or other equipment. AI

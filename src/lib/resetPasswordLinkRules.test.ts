@@ -1,8 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  diagnoseResetLink,
-  RESTART_FLOW_HREF,
-} from "@/lib/resetPasswordLinkRules";
+import { diagnoseResetLink, RESTART_FLOW_HREF } from "@/lib/resetPasswordLinkRules";
 
 describe("resetPasswordLinkRules", () => {
   it("returns 'ready' when a session exists and no error is in the URL", () => {
@@ -72,9 +69,9 @@ describe("resetPasswordLinkRules", () => {
 
   it("null/undefined URL parts fall through to session check", () => {
     expect(diagnoseResetLink({ hash: null, search: null, hasSession: true }).status).toBe("ready");
-    expect(diagnoseResetLink({ hash: undefined, search: undefined, hasSession: false }).status).toBe(
-      "missing",
-    );
+    expect(
+      diagnoseResetLink({ hash: undefined, search: undefined, hasSession: false }).status,
+    ).toBe("missing");
   });
 
   it("restart href points at the forgot-password tab", () => {

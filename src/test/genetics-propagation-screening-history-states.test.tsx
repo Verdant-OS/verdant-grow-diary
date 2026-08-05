@@ -8,7 +8,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { MemoryRouter, Routes, Route } from "react-router-dom";
+import { MemoryRouter, Routes, Route } from "@/lib/react-router-compat";
 import ScreeningQuarantineHistory from "@/pages/ScreeningQuarantineHistory";
 import { useSubjectScreening, useSubjectQuarantine } from "@/hooks/useGeneticsTrace";
 
@@ -26,7 +26,14 @@ type QueryLike = {
 };
 
 function q(over: Partial<QueryLike> = {}): QueryLike {
-  return { data: [], isLoading: false, isError: false, isSuccess: false, refetch: vi.fn(), ...over };
+  return {
+    data: [],
+    isLoading: false,
+    isError: false,
+    isSuccess: false,
+    refetch: vi.fn(),
+    ...over,
+  };
 }
 
 const mockScreening = vi.mocked(useSubjectScreening);

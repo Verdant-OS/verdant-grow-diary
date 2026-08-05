@@ -4,7 +4,7 @@
  * Reads from the existing `diary_entries` table (same source QuickLog writes
  * to). No writes. No sensor_readings access. No action_queue / alerts.
  */
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { ArrowRight, Camera, Gauge, NotebookPen, Wrench } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,23 +20,65 @@ import {
   PHOTO_NON_DIAGNOSTIC_LABEL,
   PHOTO_NON_DIAGNOSTIC_TESTID,
 } from "@/lib/photoEventNonDiagnosticLabelRules";
+import {
+  describeQuickLogDetailsFromExtras,
+  type QuickLogDetailDisplayLine,
+} from "@/lib/quickLogActivityDetailFields";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 
 interface Props {
   plantId: string | null | undefined;
   plantName?: string | null;
 }
 
-function EntryRow({ row, plantName }: { row: PlantRecentActivityRow; plantName?: string | null }) {
+/**
+ * Format the entry timestamp for display. Falls back to the pre-computed
+ * label (or "Unknown time") when the ISO is missing or malformed —
+ * never leaks a raw ISO string into the badge.
+ */
+function formatEntryTimestamp(iso: string | null, fallback: string): string {
+  const fb = (fallback ?? "").trim();
+  const safeFallback = fb && fb !== iso ? fb : "Unknown time";
+  if (!iso) return safeFallback;
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return safeFallback;
+  try {
+    return new Date(t).toLocaleString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return safeFallback;
+  }
+}
+
+function EntryRow({
+  row,
+  plantName,
+  detailLines,
+}: {
+  row: PlantRecentActivityRow;
+  plantName?: string | null;
+  detailLines: readonly QuickLogDetailDisplayLine[];
+}) {
   return (
     <li
       className="rounded-lg border bg-card/40 p-3 text-sm"
       data-testid="plant-recent-activity-row"
       data-entry-id={row.id}
+      data-effective-event-type={row.effectiveEventType ?? row.eventType}
     >
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2">
-          <Badge variant="secondary" className="capitalize" data-testid="plant-recent-activity-event-type">
-            {row.eventType}
+          {/* No `capitalize`: displayLabel is already title-cased by the
+              identity resolver, and CSS-capitalizing the payload suffix
+              corrupts case-sensitive units ("500 ml" → "500 Ml"). */}
+          <Badge variant="secondary" data-testid="plant-recent-activity-event-type">
+            {row.displayLabel ?? row.eventType}
+            {row.summarySuffix ? ` · ${row.summarySuffix}` : ""}
           </Badge>
           {row.isManualEntry ? (
             <Badge
@@ -48,13 +90,21 @@ function EntryRow({ row, plantName }: { row: PlantRecentActivityRow; plantName?:
               Manual entry
             </Badge>
           ) : null}
-          <span className="text-xs text-muted-foreground" data-testid="plant-recent-activity-timestamp">
-            {row.occurredAtLabel}
+          <span
+            className="text-xs text-muted-foreground"
+            data-testid="plant-recent-activity-timestamp"
+          >
+            {formatEntryTimestamp(row.occurredAt, row.occurredAtLabel)}
           </span>
         </div>
+
         <div className="flex items-center gap-1">
           {row.hasPhoto ? (
-            <Badge variant="outline" className="gap-1" data-testid="plant-recent-activity-photo-badge">
+            <Badge
+              variant="outline"
+              className="gap-1"
+              data-testid="plant-recent-activity-photo-badge"
+            >
               <Camera className="h-3 w-3" /> Photo
             </Badge>
           ) : null}
@@ -71,9 +121,27 @@ function EntryRow({ row, plantName }: { row: PlantRecentActivityRow; plantName?:
           ) : null}
         </div>
       </div>
+      {detailLines.length > 0 ? (
+        <ul
+          className="mt-2 flex flex-wrap gap-1.5"
+          data-testid="plant-recent-activity-detail-lines"
+        >
+          {detailLines.map((line) => (
+            <li key={line.key}>
+              <Badge
+                variant="outline"
+                className="text-[11px] font-normal"
+                data-testid={`plant-recent-activity-detail-${line.key}`}
+              >
+                {line.label}: {line.value}
+              </Badge>
+            </li>
+          ))}
+        </ul>
+      ) : null}
       {row.notePreview ? (
         <p className="mt-2 text-sm leading-snug">{row.notePreview}</p>
-      ) : !row.hasHardwareReadings ? (
+      ) : !row.hasHardwareReadings && detailLines.length === 0 ? (
         <p className="mt-2 text-xs text-muted-foreground italic">No note</p>
       ) : null}
       {row.hasPhoto && row.showPhotoNonDiagnosticLabel ? (
@@ -122,10 +190,22 @@ function EntryRow({ row, plantName }: { row: PlantRecentActivityRow; plantName?:
 
 export default function PlantRecentActivityPanel({ plantId, plantName }: Props) {
   const enabled = !!plantId;
+  const temperatureUnit = useTemperatureUnitPreference();
   const { data, isLoading } = usePlantRecentActivity(plantId);
-  const rows = buildPlantRecentActivity(enabled ? data ?? [] : [], {
+  const rawRows = enabled ? (data ?? []) : [];
+  const rows = buildPlantRecentActivity(rawRows, {
     plantId: plantId ?? null,
   });
+  // Structured activity detail (e.g. training technique) is recovered from the
+  // raw stored details here in the presenter — deliberately NOT in
+  // buildPlantRecentActivity, which is mirrored into the edge bundle and must
+  // stay free of UI-only describe logic. Keyed by entry id for O(1) lookup.
+  const detailLinesById = new Map<string, readonly QuickLogDetailDisplayLine[]>();
+  for (const raw of rawRows as Array<{ id?: unknown; details?: unknown }>) {
+    if (typeof raw?.id !== "string") continue;
+    const lines = describeQuickLogDetailsFromExtras(raw.details, temperatureUnit);
+    if (lines.length > 0) detailLinesById.set(raw.id, lines);
+  }
 
   return (
     <Card
@@ -163,7 +243,12 @@ export default function PlantRecentActivityPanel({ plantId, plantName }: Props) 
         ) : (
           <ul className="space-y-2" data-testid="plant-recent-activity-list">
             {rows.map((r) => (
-              <EntryRow key={r.id} row={r} plantName={plantName} />
+              <EntryRow
+                key={r.id}
+                row={r}
+                plantName={plantName}
+                detailLines={detailLinesById.get(r.id) ?? []}
+              />
             ))}
           </ul>
         )}

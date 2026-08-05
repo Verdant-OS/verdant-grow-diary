@@ -13,9 +13,7 @@ import type { AiDoctorCheckInPreviewView } from "@/lib/aiDoctorCheckInPreviewVie
 
 const NOW = new Date("2026-06-10T12:00:00.000Z");
 
-function makeView(
-  overrides: Partial<AiDoctorCheckInPreviewView> = {},
-): AiDoctorCheckInPreviewView {
+function makeView(overrides: Partial<AiDoctorCheckInPreviewView> = {}): AiDoctorCheckInPreviewView {
   return {
     notices: {
       previewOnly: "Preview only — not saved.",

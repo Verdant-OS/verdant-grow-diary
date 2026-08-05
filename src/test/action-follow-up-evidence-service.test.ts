@@ -216,10 +216,9 @@ describe("saveActionFollowUpEvidence — draft validation", () => {
   it("returns blocked/invalid_draft and never queries when draft invalid", async () => {
     const state = baseState();
     const client = makeClient(state);
-    const res = await saveActionFollowUpEvidence(
-      baseDraft({ outcome: "recovered" as never }),
-      { supabase: client },
-    );
+    const res = await saveActionFollowUpEvidence(baseDraft({ outcome: "recovered" as never }), {
+      supabase: client,
+    });
     expect(res.status).toBe("blocked");
     if (res.status === "blocked") expect(res.reason).toBe("invalid_draft");
     expect(state.actionCalls).toBe(0);

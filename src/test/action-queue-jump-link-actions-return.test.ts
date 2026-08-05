@@ -29,13 +29,9 @@ describe("buildJumpToHighlightedTraceLink — actionsReturn round-trip", () => {
   });
 
   it("preserves only allow-listed keys (drops unknowns)", () => {
-    const sp = new URLSearchParams(
-      "q=mold&focus=raw-id&alert=raw-uuid&secret=x",
-    );
+    const sp = new URLSearchParams("q=mold&focus=raw-id&alert=raw-uuid&secret=x");
     const link = buildJumpToHighlightedTraceLink(token, sp);
-    const ret = new URL(`http://x${link!.href}`).searchParams.get(
-      "actionsReturn",
-    ) ?? "";
+    const ret = new URL(`http://x${link!.href}`).searchParams.get("actionsReturn") ?? "";
     expect(ret).toContain("q=mold");
     expect(ret).not.toContain("focus=");
     expect(ret).not.toContain("alert=");
@@ -45,8 +41,6 @@ describe("buildJumpToHighlightedTraceLink — actionsReturn round-trip", () => {
   it("returns null for malformed highlight tokens (irrespective of params)", () => {
     const sp = new URLSearchParams("q=mold");
     expect(buildJumpToHighlightedTraceLink("garbage", sp)).toBeNull();
-    expect(
-      buildJumpToHighlightedTraceLink("action-queue:bad id:approved", sp),
-    ).toBeNull();
+    expect(buildJumpToHighlightedTraceLink("action-queue:bad id:approved", sp)).toBeNull();
   });
 });

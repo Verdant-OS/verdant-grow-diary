@@ -40,9 +40,7 @@ const plant = {
 function ctx(sensorReadings: ReadonlyArray<Record<string, unknown>>) {
   return compileAiDoctorContextFromRows({
     plant,
-    growEvents: [
-      { occurred_at: ago(12 * HOUR), event_type: "watering", source: "manual" },
-    ],
+    growEvents: [{ occurred_at: ago(12 * HOUR), event_type: "watering", source: "manual" }],
     sensorReadings,
     now: NOW,
   });
@@ -55,9 +53,7 @@ describe("AiDoctorContextReadinessPanel — current snapshot quality badge", () 
       { metric: "humidity_pct", value: 55, captured_at: ago(HOUR), source: "manual" },
     ]);
     render(<AiDoctorContextReadinessPanel context={context} />);
-    const region = screen.getByTestId(
-      "ai-doctor-context-readiness-panel-current-snapshot-quality",
-    );
+    const region = screen.getByTestId("ai-doctor-context-readiness-panel-current-snapshot-quality");
     const quality = within(region).getByTestId("manual-snapshot-quality");
     expect(quality.getAttribute("data-quality")).toBe("usable");
     expect(within(region).getByText("Usable current reading")).toBeInTheDocument();
@@ -70,9 +66,7 @@ describe("AiDoctorContextReadinessPanel — current snapshot quality badge", () 
       { metric: "temperature_c", value: 24, captured_at: ago(HOUR), source: "manual" },
     ]);
     render(<AiDoctorContextReadinessPanel context={context} />);
-    const region = screen.getByTestId(
-      "ai-doctor-context-readiness-panel-current-snapshot-quality",
-    );
+    const region = screen.getByTestId("ai-doctor-context-readiness-panel-current-snapshot-quality");
     const quality = within(region).getByTestId("manual-snapshot-quality");
     expect(quality.getAttribute("data-quality")).toBe("invalid");
     expect(within(region).getByText("Invalid reading")).toBeInTheDocument();
@@ -84,9 +78,7 @@ describe("AiDoctorContextReadinessPanel — current snapshot quality badge", () 
       { metric: "humidity_pct", value: 55, captured_at: ago(2 * HOUR), source: "csv" },
     ]);
     render(<AiDoctorContextReadinessPanel context={context} />);
-    const region = screen.getByTestId(
-      "ai-doctor-context-readiness-panel-current-snapshot-quality",
-    );
+    const region = screen.getByTestId("ai-doctor-context-readiness-panel-current-snapshot-quality");
     const quality = within(region).getByTestId("manual-snapshot-quality");
     expect(quality.getAttribute("data-quality")).toBe("needs_review");
     expect(within(region).getByText("Needs review")).toBeInTheDocument();
@@ -101,9 +93,7 @@ describe("AiDoctorContextReadinessPanel — current snapshot quality badge", () 
   it("shows Missing current reading when no sensor groups exist", () => {
     const context = ctx([]);
     render(<AiDoctorContextReadinessPanel context={context} />);
-    const region = screen.getByTestId(
-      "ai-doctor-context-readiness-panel-current-snapshot-quality",
-    );
+    const region = screen.getByTestId("ai-doctor-context-readiness-panel-current-snapshot-quality");
     const quality = within(region).getByTestId("manual-snapshot-quality");
     expect(quality.getAttribute("data-quality")).toBe("missing");
     expect(within(region).getByText("Missing current reading")).toBeInTheDocument();
@@ -113,9 +103,7 @@ describe("AiDoctorContextReadinessPanel — current snapshot quality badge", () 
     const context = ctx([
       { metric: "temperature_c", value: 24, captured_at: ago(HOUR), source: "manual" },
     ]);
-    const { container } = render(
-      <AiDoctorContextReadinessPanel context={context} />,
-    );
+    const { container } = render(<AiDoctorContextReadinessPanel context={context} />);
     const text = container.textContent ?? "";
     expect(text).not.toMatch(/raw_payload/i);
     expect(text).not.toMatch(/service_role/i);

@@ -24,7 +24,7 @@ const FORBIDDEN_PATTERNS: ReadonlyArray<{ name: string; re: RegExp }> = [
   { name: 'href: "/grows"', re: /href\s*:\s*["']\/grows(?:["'/?])/ },
   { name: 'href="/grows"', re: /href\s*=\s*["']\/grows(?:["'/?])/ },
   { name: "(/grows) markdown link", re: /\]\(\s*\/grows(?:[)/?])/ },
-  { name: "to=\"/grows\" router link", re: /to\s*=\s*["']\/grows(?:["'/?])/ },
+  { name: 'to="/grows" router link', re: /to\s*=\s*["']\/grows(?:["'/?])/ },
   { name: "navigate('/grows')", re: /navigate\(\s*["']\/grows(?:["'/?])/ },
   // Route-list reference: a bullet/heading naming /grows as the demo path
   { name: "demo walkthrough route bullet", re: /demo\s+(?:walkthrough|path)[^\n]*\/grows/i },

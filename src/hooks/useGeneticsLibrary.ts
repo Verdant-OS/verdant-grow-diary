@@ -8,8 +8,10 @@ import { useAuth } from "@/store/auth";
 import {
   listAccessions,
   listBatches,
+  unwrapGeneticsReadResult,
   type AccessionDto,
   type BatchDto,
+  type GeneticsReadError,
 } from "@/lib/genetics/traceabilityApi";
 
 export function accessionsQueryKey(ownerId: string | null, includeArchived: boolean) {
@@ -20,22 +22,24 @@ export function batchesQueryKey(ownerId: string | null) {
   return ["genetics", "batches", ownerId ?? "anon"] as const;
 }
 
-export function useAccessions(includeArchived = false): UseQueryResult<AccessionDto[]> {
+export function useAccessions(
+  includeArchived = false,
+): UseQueryResult<AccessionDto[], GeneticsReadError> {
   const ownerId = useAuth().user?.id ?? null;
   return useQuery({
     queryKey: accessionsQueryKey(ownerId, includeArchived),
     enabled: !!ownerId,
     retry: false,
-    queryFn: () => listAccessions(includeArchived),
+    queryFn: async () => unwrapGeneticsReadResult(await listAccessions(includeArchived)),
   });
 }
 
-export function useBatches(): UseQueryResult<BatchDto[]> {
+export function useBatches(): UseQueryResult<BatchDto[], GeneticsReadError> {
   const ownerId = useAuth().user?.id ?? null;
   return useQuery({
     queryKey: batchesQueryKey(ownerId),
     enabled: !!ownerId,
     retry: false,
-    queryFn: () => listBatches(),
+    queryFn: async () => unwrapGeneticsReadResult(await listBatches()),
   });
 }

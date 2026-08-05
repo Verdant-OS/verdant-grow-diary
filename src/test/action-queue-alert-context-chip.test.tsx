@@ -13,7 +13,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
-import { MemoryRouter, useSearchParams } from "react-router-dom";
+import { MemoryRouter, useSearchParams } from "@/lib/react-router-compat";
 import ActionQueue from "@/pages/ActionQueue";
 
 function LocationProbe() {
@@ -148,52 +148,40 @@ beforeEach(() => {
 describe("ActionQueue — ?alert context chip", () => {
   it("renders 'Filtered by alert' chip when ?alert=<id> is present", async () => {
     renderAt("/actions?alert=alert-xyz");
-    await waitFor(() =>
-      expect(screen.getByTestId("action-queue-alert-context-chip")).toBeTruthy(),
+    await waitFor(() => expect(screen.getByTestId("action-queue-alert-context-chip")).toBeTruthy());
+    expect(screen.getByTestId("action-queue-alert-context-chip").textContent).toContain(
+      "Filtered by alert",
     );
-    expect(
-      screen.getByTestId("action-queue-alert-context-chip").textContent,
-    ).toContain("Filtered by alert");
   });
 
   it("'Back to alert' href uses alertDetailPath(alertId)", async () => {
     renderAt("/actions?alert=alert-xyz");
-    const link = await screen.findByTestId(
-      "action-queue-alert-context-back-link",
-    );
+    const link = await screen.findByTestId("action-queue-alert-context-back-link");
     expect(link.getAttribute("href")).toBe("/alerts/alert-xyz");
     expect(link.textContent).toContain("Back to alert");
   });
 
   it("renders no chip when ?alert is absent", async () => {
     renderAt("/actions");
-    await waitFor(() =>
-      expect(screen.getAllByTestId("action-queue-row").length).toBe(2),
-    );
+    await waitFor(() => expect(screen.getAllByTestId("action-queue-row").length).toBe(2));
     expect(screen.queryByTestId("action-queue-alert-context-chip")).toBeNull();
   });
 
   it("renders no chip when ?alert is empty", async () => {
     renderAt("/actions?alert=");
-    await waitFor(() =>
-      expect(screen.getAllByTestId("action-queue-row").length).toBe(2),
-    );
+    await waitFor(() => expect(screen.getAllByTestId("action-queue-row").length).toBe(2));
     expect(screen.queryByTestId("action-queue-alert-context-chip")).toBeNull();
   });
 
   it("renders no chip when ?alert has unsafe characters", async () => {
     renderAt("/actions?alert=%5Balert%3Afoo%5D");
-    await waitFor(() =>
-      expect(screen.getAllByTestId("action-queue-row").length).toBe(2),
-    );
+    await waitFor(() => expect(screen.getAllByTestId("action-queue-row").length).toBe(2));
     expect(screen.queryByTestId("action-queue-alert-context-chip")).toBeNull();
   });
 
   it("renders both focus chip and alert chip when both params exist", async () => {
     renderAt("/actions?focus=aq-1&alert=alert-xyz");
-    await waitFor(() =>
-      expect(screen.getByTestId("action-queue-alert-context-chip")).toBeTruthy(),
-    );
+    await waitFor(() => expect(screen.getByTestId("action-queue-alert-context-chip")).toBeTruthy());
     expect(screen.getByTestId("action-queue-focus-chip")).toBeTruthy();
   });
 
@@ -205,9 +193,7 @@ describe("ActionQueue — ?alert context chip", () => {
 
     fireEvent.click(screen.getByTestId("action-queue-clear-alert-context"));
 
-    await waitFor(() =>
-      expect(screen.queryByTestId("action-queue-alert-context-chip")).toBeNull(),
-    );
+    await waitFor(() => expect(screen.queryByTestId("action-queue-alert-context-chip")).toBeNull());
     const url = screen.getByTestId("loc-search").textContent ?? "";
     expect(url).not.toContain("alert=");
     expect(url).toContain("focus=aq-1");
@@ -220,15 +206,11 @@ describe("ActionQueue — ?alert context chip", () => {
 
   it("Clear focus still works independently and preserves ?alert", async () => {
     renderAt("/actions?focus=aq-1&alert=alert-xyz");
-    await waitFor(() =>
-      expect(screen.getByTestId("action-queue-clear-focus")).toBeTruthy(),
-    );
+    await waitFor(() => expect(screen.getByTestId("action-queue-clear-focus")).toBeTruthy());
 
     fireEvent.click(screen.getByTestId("action-queue-clear-focus"));
 
-    await waitFor(() =>
-      expect(screen.queryByTestId("action-queue-focus-chip")).toBeNull(),
-    );
+    await waitFor(() => expect(screen.queryByTestId("action-queue-focus-chip")).toBeNull());
     const url = screen.getByTestId("loc-search").textContent ?? "";
     expect(url).toContain("alert=alert-xyz");
     expect(url).not.toContain("focus=");
@@ -246,15 +228,12 @@ describe("ActionQueue — ?alert context chip", () => {
     expect(anchors.length).toBeGreaterThanOrEqual(2);
   });
 
-
   it("chip never leaks raw [alert:<id>] token", async () => {
     renderAt("/actions?alert=alert-xyz");
-    await waitFor(() =>
-      expect(screen.getByTestId("action-queue-alert-context-chip")).toBeTruthy(),
+    await waitFor(() => expect(screen.getByTestId("action-queue-alert-context-chip")).toBeTruthy());
+    expect(screen.getByTestId("action-queue-alert-context-chip").textContent ?? "").not.toContain(
+      "[alert:",
     );
-    expect(
-      screen.getByTestId("action-queue-alert-context-chip").textContent ?? "",
-    ).not.toContain("[alert:");
   });
 
   it("page never renders raw [session:<id>] or [alert:<id>] tokens in visible textContent", async () => {
@@ -269,16 +248,11 @@ describe("ActionQueue — ?alert context chip", () => {
     expect(document.body.innerHTML).not.toContain("[session:");
   });
 
-
   it("alert context chip does not trigger any DB writes", async () => {
     renderAt("/actions?alert=alert-xyz");
-    await waitFor(() =>
-      expect(screen.getByTestId("action-queue-alert-context-chip")).toBeTruthy(),
-    );
+    await waitFor(() => expect(screen.getByTestId("action-queue-alert-context-chip")).toBeTruthy());
     fireEvent.click(screen.getByTestId("action-queue-clear-alert-context"));
-    await waitFor(() =>
-      expect(screen.queryByTestId("action-queue-alert-context-chip")).toBeNull(),
-    );
+    await waitFor(() => expect(screen.queryByTestId("action-queue-alert-context-chip")).toBeNull());
     expect(insertSpy).not.toHaveBeenCalled();
   });
 
@@ -286,25 +260,40 @@ describe("ActionQueue — ?alert context chip", () => {
     renderAt("/actions?alert=alert-xyz");
     const chip = await screen.findByTestId("action-queue-alert-context-chip");
     const text = (chip.textContent ?? "").toLowerCase();
-    for (const tok of [
-      "automate",
-      "auto-",
-      "execute",
-      "actuate",
-      "device",
-      "relay",
-      "mqtt",
-    ]) {
+    for (const tok of ["automate", "auto-", "execute", "actuate", "device", "relay", "mqtt"]) {
       expect(text).not.toContain(tok);
     }
   });
 });
 
 // --- Static safety scan ------------------------------------------------------
-const PAGE = readFileSync(
-  resolve(__dirname, "../..", "src/pages/ActionQueue.tsx"),
-  "utf8",
-);
+const PAGE = readFileSync(resolve(__dirname, "../..", "src/pages/ActionQueue.tsx"), "utf8");
+
+// Only two RPC-invocation shapes are legitimate in this codebase:
+//   1. Direct call:       supabase.rpc("name", args)
+//   2. Cast-wrapped call: (supabase.rpc as unknown as (fn: string, args:
+//      unknown) => Promise<...>)("name", args) — used before the RPC's
+//      generated typing lands (see actionQueueRpcAvailability).
+// In both shapes the RPC name is the literal FIRST token of the call's own
+// argument list (only whitespace may precede it). Anchoring to that,
+// instead of "any quote within N characters of supabase.rpc", closes two
+// Codex-flagged gaps:
+//   - Round 1: a dynamic-name call placed BEFORE the canonical call could
+//     "borrow" the canonical call's own string literal via a lazy gap that
+//     crossed into the second call.
+//   - Round 2: a canonical-looking string sitting inside a dynamic call's
+//     OWN payload (e.g. supabase.rpc(name, { note: "action_queue_transition" }))
+//     could be mistaken for that call's invoked name, since it was merely
+//     "the nearest quote", not the actual first argument.
+const DIRECT_RPC_PATTERN = /supabase\.rpc\s*\(\s*["']([^"']+)["']/g;
+const CAST_RPC_PATTERN =
+  /supabase\.rpc\s+as\s+unknown\s+as\s*\([\s\S]{0,150}?\)\s*=>\s*[\s\S]{0,150}?\)\s*\(\s*["']([^"']+)["']/g;
+
+function extractRpcNames(src: string): string[] {
+  const direct = [...src.matchAll(DIRECT_RPC_PATTERN)].map((match) => match[1]);
+  const cast = [...src.matchAll(CAST_RPC_PATTERN)].map((match) => match[1]);
+  return [...direct, ...cast];
+}
 
 describe("ActionQueue alert context chip — safety scan", () => {
   it("introduces no functions.invoke / service_role / device-control verbs", () => {
@@ -325,14 +314,58 @@ describe("ActionQueue alert context chip — safety scan", () => {
     }
   });
 
-  it("does not add upsert / table-delete / rpc on the supabase client", () => {
+  it("does not add upsert / table-delete / non-transition RPCs on the supabase client", () => {
     expect(PAGE).not.toMatch(/\.upsert\(/);
     expect(PAGE).not.toMatch(/from\(["'][^"']+["']\)[\s\S]{0,200}?\.delete\(/);
-    expect(PAGE).not.toMatch(/\.rpc\(/);
+    const rpcCallSiteCount = (PAGE.match(/supabase\.rpc\b/g) ?? []).length;
+    const rpcNames = extractRpcNames(PAGE);
+    // Every call site must independently resolve a literal first-argument
+    // name — a dynamic/unnamed call site (or a canonical-looking string
+    // buried elsewhere in its arguments) would leave this short rather than
+    // silently merging into the canonical name.
+    expect(rpcNames.length).toBe(rpcCallSiteCount);
+    expect(rpcNames).toEqual(["action_queue_transition"]);
+  });
+
+  it("does not let a preceding dynamic RPC call absorb the canonical call's name (Codex P2 regression guard, round 1)", () => {
+    // An unreviewed dynamic-name RPC call ahead of the canonical
+    // cast-wrapped call must not resolve to (or merge into) the canonical
+    // name — it must simply fail to resolve, which the count check above
+    // turns into a hard failure on the real source.
+    const adversarial = `
+      supabase.rpc(someDynamicName, payload);
+      // unrelated code in between
+      const { data, error } = await (
+        supabase.rpc as unknown as (fn: string, args: unknown) => Promise<{ data: unknown; error: unknown }>
+      )("action_queue_transition", rpcArgs);
+    `;
+    const callSiteCount = (adversarial.match(/supabase\.rpc\b/g) ?? []).length;
+    const names = extractRpcNames(adversarial);
+    expect(callSiteCount).toBe(2);
+    expect(names).toEqual(["action_queue_transition"]);
+    expect(names.length).not.toBe(callSiteCount);
+  });
+
+  it("does not mistake a canonical-looking string in a dynamic call's own payload for its invoked name (Codex P2 regression guard, round 2)", () => {
+    // A dynamic-name call whose OWN payload happens to contain the
+    // canonical string must not be credited with that name — the literal
+    // first argument is the dynamic name, not a quote.
+    const adversarial = `
+      supabase.rpc(someDynamicName, { note: "action_queue_transition" });
+    `;
+    const callSiteCount = (adversarial.match(/supabase\.rpc\b/g) ?? []).length;
+    const names = extractRpcNames(adversarial);
+    expect(callSiteCount).toBe(1);
+    expect(names).toEqual([]);
+    expect(names.length).not.toBe(callSiteCount);
   });
 
   it("does not introduce any alerts or action_queue write paths", () => {
-    expect(PAGE).not.toMatch(/from\(["']alerts["']\)[\s\S]{0,200}?\.(insert|update|delete|upsert)\(/);
-    expect(PAGE).not.toMatch(/from\(["']action_queue["']\)[\s\S]{0,200}?\.(insert|delete|upsert)\(/);
+    expect(PAGE).not.toMatch(
+      /from\(["']alerts["']\)[\s\S]{0,200}?\.(insert|update|delete|upsert)\(/,
+    );
+    expect(PAGE).not.toMatch(
+      /from\(["']action_queue["']\)[\s\S]{0,200}?\.(insert|delete|upsert)\(/,
+    );
   });
 });

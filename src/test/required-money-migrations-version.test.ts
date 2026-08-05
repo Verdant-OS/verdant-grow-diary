@@ -21,10 +21,24 @@ import {
 } from "../../scripts/required-money-migrations.mjs";
 
 describe("migrationVersion()", () => {
-  it("extracts the 14-digit prefix from a well-formed filename", () => {
-    expect(migrationVersion("20260721103000_ai_credit_grants.sql")).toBe(
-      "20260721103000",
+  it("requires the final AI-credit service contract repair in every deploy target", () => {
+    expect(REQUIRED_MONEY_MIGRATIONS).toContain(
+      "20260727050000_ai_credit_service_contract_forward_reassert.sql",
     );
+  });
+
+  it("requires the canonical subscription-authority repair in every deploy target", () => {
+    expect(REQUIRED_MONEY_MIGRATIONS).toContain(
+      "20260728050000_canonical_subscription_authority_reassert.sql",
+    );
+  });
+
+  it("requires the final credit-pack portability spend contract in every deploy target", () => {
+    expect(REQUIRED_MONEY_MIGRATIONS).toContain("20260728090736_ai_credit_pack_portability.sql");
+  });
+
+  it("extracts the 14-digit prefix from a well-formed filename", () => {
+    expect(migrationVersion("20260721103000_ai_credit_grants.sql")).toBe("20260721103000");
   });
 
   it("returns exactly 14 characters, all digits, for every required file", () => {
@@ -113,9 +127,9 @@ describe("applied-check comparison logic", () => {
     // Simulate a truncated / off-by-one prefix in the tracker output.
     // The Set lookup must be exact, otherwise a partially-migrated env
     // silently reads as fully applied.
-    const truncated = REQUIRED_MONEY_MIGRATIONS.map((f) =>
-      migrationVersion(f).slice(0, 13),
-    ).join("\n");
+    const truncated = REQUIRED_MONEY_MIGRATIONS.map((f) => migrationVersion(f).slice(0, 13)).join(
+      "\n",
+    );
     const { applied, missing } = classifyApplied(REQUIRED_MONEY_MIGRATIONS, truncated);
     expect(applied).toEqual([]);
     expect(missing).toEqual([...REQUIRED_MONEY_MIGRATIONS]);
@@ -144,17 +158,15 @@ describe("applied-check comparison — tricky whitespace & line endings", () => 
 
   it("tolerates mixed LF and CRLF line endings in the same payload", () => {
     const versions = REQUIRED_MONEY_MIGRATIONS.map(migrationVersion);
-    const stdout = versions
-      .map((v, i) => (i % 2 === 0 ? `${v}\n` : `${v}\r\n`))
-      .join("");
+    const stdout = versions.map((v, i) => (i % 2 === 0 ? `${v}\n` : `${v}\r\n`)).join("");
     const { missing } = classifyApplied(REQUIRED_MONEY_MIGRATIONS, stdout);
     expect(missing).toEqual([]);
   });
 
   it("tolerates tabs and mixed-width padding around each version", () => {
-    const stdout = REQUIRED_MONEY_MIGRATIONS.map(
-      (f) => `\t  ${migrationVersion(f)}\t\t  `,
-    ).join("\n");
+    const stdout = REQUIRED_MONEY_MIGRATIONS.map((f) => `\t  ${migrationVersion(f)}\t\t  `).join(
+      "\n",
+    );
     const { missing } = classifyApplied(REQUIRED_MONEY_MIGRATIONS, stdout);
     expect(missing).toEqual([]);
   });
@@ -210,9 +222,9 @@ describe("applied-check comparison — partial-file corruption", () => {
 
   it("does not match a version embedded inside a longer token", () => {
     // e.g. psql accidentally returns `<schema>.<version>_<name>` in one column.
-    const stdout = REQUIRED_MONEY_MIGRATIONS.map(
-      (f) => `public.${migrationVersion(f)}_extra`,
-    ).join("\n");
+    const stdout = REQUIRED_MONEY_MIGRATIONS.map((f) => `public.${migrationVersion(f)}_extra`).join(
+      "\n",
+    );
     const { applied, missing } = classifyApplied(REQUIRED_MONEY_MIGRATIONS, stdout);
     expect(applied).toEqual([]);
     expect(missing).toEqual([...REQUIRED_MONEY_MIGRATIONS]);
@@ -244,6 +256,4 @@ describe("applied-check comparison — partial-file corruption", () => {
     const { missing } = classifyApplied(REQUIRED_MONEY_MIGRATIONS, stdout);
     expect(missing).toEqual([]);
   });
-
 });
-

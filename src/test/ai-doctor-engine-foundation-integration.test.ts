@@ -108,7 +108,9 @@ describe("integration: compileAiDoctorContextPayloadFromRows → executeAiDoctor
     expect(s.approval_required).toBe(true);
     expect(["medium", "high"]).toContain(s.risk_level);
     const text = `${s.title} ${s.rationale}`.toLowerCase();
-    expect(text).not.toMatch(/\b(turn on|turn off|execute|run command|set humidifier|set fan|api call)\b/);
+    expect(text).not.toMatch(
+      /\b(turn on|turn off|execute|run command|set humidifier|set fan|api call)\b/,
+    );
   });
 
   it("low confidence never emits an action_queue_suggestion even when telemetry is degraded", async () => {
@@ -191,7 +193,14 @@ describe("sensor_summary: per-metric coverage", () => {
   }
 
   it("source separation: live/manual/csv/demo/stale/invalid are never merged for a single metric", () => {
-    const allSources: AiDoctorSensorSource[] = ["live", "manual", "csv", "demo", "stale", "invalid"];
+    const allSources: AiDoctorSensorSource[] = [
+      "live",
+      "manual",
+      "csv",
+      "demo",
+      "stale",
+      "invalid",
+    ];
     const ctx = compileAiDoctorContextPayloadFromRows({
       ...basePlant(),
       sensorReadings: allSources.map((source) => ({
@@ -229,7 +238,12 @@ describe("staleness boundary at 6h (deterministic, fixed now)", () => {
     const ctx = compileAiDoctorContextPayloadFromRows({
       ...basePlant(),
       sensorReadings: [
-        { metric: "temperature_c", value: 22, captured_at: iso(SIX_HOURS_MS - 1000), source: "live" },
+        {
+          metric: "temperature_c",
+          value: 22,
+          captured_at: iso(SIX_HOURS_MS - 1000),
+          source: "live",
+        },
       ],
     });
     const snap = ctx.sensor_summary.find((m) => m.metric === "temperature_c")!;
@@ -241,7 +255,12 @@ describe("staleness boundary at 6h (deterministic, fixed now)", () => {
     const ctx = compileAiDoctorContextPayloadFromRows({
       ...basePlant(),
       sensorReadings: [
-        { metric: "temperature_c", value: 22, captured_at: iso(SIX_HOURS_MS + 1000), source: "live" },
+        {
+          metric: "temperature_c",
+          value: 22,
+          captured_at: iso(SIX_HOURS_MS + 1000),
+          source: "live",
+        },
       ],
     });
     const snap = ctx.sensor_summary.find((m) => m.metric === "temperature_c")!;

@@ -78,10 +78,7 @@ describe("AUD-006 per-metric YAxis gutter widths", () => {
 });
 
 describe("AUD-006 SensorChart wires the helper", () => {
-  const SRC = readFileSync(
-    resolve(__dirname, "..", "components", "SensorChart.tsx"),
-    "utf8",
-  );
+  const SRC = readFileSync(resolve(__dirname, "..", "components", "SensorChart.tsx"), "utf8");
 
   it("uses the per-metric YAxis width helper instead of a hard-coded 36px gutter", () => {
     expect(SRC).toMatch(/axisMeta\.yAxisWidth/);

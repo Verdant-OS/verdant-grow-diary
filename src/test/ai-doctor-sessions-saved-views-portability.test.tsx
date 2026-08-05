@@ -12,18 +12,30 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { clearLocalStorageForTest, getLocalStorageItemForTest, setLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
+import {
+  clearLocalStorageForTest,
+  getLocalStorageItemForTest,
+  setLocalStorageItemForTest,
+} from "./helpers/localStorageTestHelper";
 
 // supabase noop mock
 const rangeSpy = vi.fn(() => Promise.resolve({ data: [], error: null }));
 const orderSpy = vi.fn(() => ({ range: rangeSpy }));
 const chain: any = {
-  eq: vi.fn(function () { return chain; }),
-  not: vi.fn(function () { return chain; }),
-  gte: vi.fn(function () { return chain; }),
-  or: vi.fn(function () { return chain; }),
+  eq: vi.fn(function () {
+    return chain;
+  }),
+  not: vi.fn(function () {
+    return chain;
+  }),
+  gte: vi.fn(function () {
+    return chain;
+  }),
+  or: vi.fn(function () {
+    return chain;
+  }),
   order: orderSpy,
 };
 vi.mock("@/integrations/supabase/client", () => ({
@@ -57,7 +69,10 @@ function renderAt(initialEntry: string) {
   });
   return render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={[initialEntry]}>
+      <MemoryRouter
+        initialEntries={[initialEntry]}
+        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+      >
         <Routes>
           <Route
             path="/doctor/sessions"
@@ -102,6 +117,7 @@ afterEach(() => {
     Object.defineProperty(window.navigator, "clipboard", originalClipboard);
   }
   originalClipboard = undefined;
+  vi.restoreAllMocks();
 });
 
 const SEED: SavedView[] = [
@@ -314,20 +330,17 @@ describe("AiDoctorSessionsIndex — import action", () => {
         },
       ],
     });
-    fireEvent.change(
-      screen.getByTestId("ai-doctor-sessions-saved-views-import-textarea"),
-      { target: { value: json } },
-    );
+    fireEvent.change(screen.getByTestId("ai-doctor-sessions-saved-views-import-textarea"), {
+      target: { value: json },
+    });
     fireEvent.click(screen.getByTestId("ai-doctor-sessions-saved-views-import-confirm"));
     expect(
       await screen.findByTestId("ai-doctor-sessions-saved-views-import-success"),
     ).toBeInTheDocument();
-    const select = screen.getByTestId(
-      "ai-doctor-sessions-saved-views-select",
-    ) as HTMLSelectElement;
-    expect(
-      Array.from(select.options).some((o) => o.textContent === "Imported critical"),
-    ).toBe(true);
+    const select = screen.getByTestId("ai-doctor-sessions-saved-views-select") as HTMLSelectElement;
+    expect(Array.from(select.options).some((o) => o.textContent === "Imported critical")).toBe(
+      true,
+    );
   });
 
   it("shows clear error state for invalid JSON and does not change storage", async () => {
@@ -335,18 +348,53 @@ describe("AiDoctorSessionsIndex — import action", () => {
     renderAt("/doctor/sessions");
     await screen.findByTestId("ai-doctor-sessions-saved-views-import-toggle");
     openImportPanel();
-    fireEvent.change(
-      screen.getByTestId("ai-doctor-sessions-saved-views-import-textarea"),
-      { target: { value: "{not-json" } },
-    );
+    fireEvent.change(screen.getByTestId("ai-doctor-sessions-saved-views-import-textarea"), {
+      target: { value: "{not-json" },
+    });
     fireEvent.click(screen.getByTestId("ai-doctor-sessions-saved-views-import-confirm"));
     expect(
       await screen.findByTestId("ai-doctor-sessions-saved-views-import-error"),
     ).toBeInTheDocument();
     // Untouched.
-    expect(getLocalStorageItemForTest(SAVED_VIEWS_STORAGE_KEY)).toBe(
-      serializeSavedViews(SEED),
-    );
+    expect(getLocalStorageItemForTest(SAVED_VIEWS_STORAGE_KEY)).toBe(serializeSavedViews(SEED));
+  });
+
+  it("does not claim an imported view when browser storage rejects the write", async () => {
+    renderAt("/doctor/sessions");
+    await screen.findByTestId("ai-doctor-sessions-saved-views-import-toggle");
+    openImportPanel();
+    const json = JSON.stringify({
+      version: 1,
+      views: [
+        {
+          label: "Unsaved import",
+          filters: { ...DEFAULT_FILTERS, risk: "critical" },
+          page: 0,
+          createdAt: "2026-03-01T00:00:00.000Z",
+        },
+      ],
+    });
+    fireEvent.change(screen.getByTestId("ai-doctor-sessions-saved-views-import-textarea"), {
+      target: { value: json },
+    });
+
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("Storage is unavailable", "QuotaExceededError");
+    });
+    fireEvent.click(screen.getByTestId("ai-doctor-sessions-saved-views-import-confirm"));
+
+    expect(
+      await screen.findByTestId("ai-doctor-sessions-saved-views-persistence-error"),
+    ).toHaveTextContent(/couldn't save.*browser storage/i);
+    expect(
+      screen.queryByTestId("ai-doctor-sessions-saved-views-import-success"),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("ai-doctor-sessions-saved-views-import-textarea")).toHaveValue(json);
+    const select = screen.getByTestId("ai-doctor-sessions-saved-views-select") as HTMLSelectElement;
+    expect(
+      Array.from(select.options).some((option) => option.textContent === "Unsaved import"),
+    ).toBe(false);
+    expect(getLocalStorageItemForTest(SAVED_VIEWS_STORAGE_KEY)).toBeNull();
   });
 
   it("imported view can be applied and updates URL params", async () => {
@@ -365,19 +413,14 @@ describe("AiDoctorSessionsIndex — import action", () => {
         },
       ],
     });
-    fireEvent.change(
-      screen.getByTestId("ai-doctor-sessions-saved-views-import-textarea"),
-      { target: { value: json } },
-    );
+    fireEvent.change(screen.getByTestId("ai-doctor-sessions-saved-views-import-textarea"), {
+      target: { value: json },
+    });
     fireEvent.click(screen.getByTestId("ai-doctor-sessions-saved-views-import-confirm"));
     await screen.findByTestId("ai-doctor-sessions-saved-views-import-success");
 
-    const select = screen.getByTestId(
-      "ai-doctor-sessions-saved-views-select",
-    ) as HTMLSelectElement;
-    const opt = Array.from(select.options).find(
-      (o) => o.textContent === "Critical view",
-    );
+    const select = screen.getByTestId("ai-doctor-sessions-saved-views-select") as HTMLSelectElement;
+    const opt = Array.from(select.options).find((o) => o.textContent === "Critical view");
     expect(opt).toBeDefined();
     fireEvent.change(select, { target: { value: opt!.value } });
     await waitFor(() => {

@@ -86,9 +86,7 @@ export function buildSensorIngestAuditReportViewModel(
   };
 }
 
-export const AUDIT_REPORT_EMPTY_NO_READINGS =
-  "No EcoWitt readings found yet." as const;
+export const AUDIT_REPORT_EMPTY_NO_READINGS = "No EcoWitt readings found yet." as const;
 export const AUDIT_REPORT_EMPTY_HINT =
   "Run the dry-run command first, then send one webhook reading." as const;
-export const AUDIT_REPORT_EMPTY_FILTERS =
-  "No readings match the current filters." as const;
+export const AUDIT_REPORT_EMPTY_FILTERS = "No readings match the current filters." as const;

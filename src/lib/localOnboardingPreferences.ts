@@ -14,8 +14,7 @@
  */
 import { useCallback, useSyncExternalStore } from "react";
 
-export const ONBOARDING_CHECKLIST_DISMISSED_KEY =
-  "verdant:onboarding-checklist-dismissed:v1";
+export const ONBOARDING_CHECKLIST_DISMISSED_KEY = "verdant:onboarding-checklist-dismissed:v1";
 
 const listeners = new Set<() => void>();
 function emit() {

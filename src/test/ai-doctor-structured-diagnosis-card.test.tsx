@@ -17,10 +17,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import StructuredDiagnosisCard from "@/components/StructuredDiagnosisCard";
-import {
-  SUGGESTION_APPROVAL_COPY,
-  type Diagnosis,
-} from "@/lib/aiDoctorDiagnosisRules";
+import { SUGGESTION_APPROVAL_COPY, type Diagnosis } from "@/lib/aiDoctorDiagnosisRules";
 
 const ROOT = resolve(__dirname, "../..");
 const COACH = readFileSync(resolve(ROOT, "src/pages/Coach.tsx"), "utf8");
@@ -66,9 +63,7 @@ const diagnosis: Diagnosis = {
 describe("StructuredDiagnosisCard — render", () => {
   it("renders all required sections", () => {
     const onAdd = vi.fn();
-    render(
-      <StructuredDiagnosisCard diagnosis={diagnosis} onAddToQueue={onAdd} />,
-    );
+    render(<StructuredDiagnosisCard diagnosis={diagnosis} onAddToQueue={onAdd} />);
     expect(screen.getByTestId("ai-doctor-diagnosis-summary")).toBeTruthy();
     expect(screen.getByTestId("ai-doctor-diagnosis-likely-issue")).toBeTruthy();
     expect(screen.getByTestId("ai-doctor-diagnosis-evidence")).toBeTruthy();
@@ -79,41 +74,26 @@ describe("StructuredDiagnosisCard — render", () => {
     expect(screen.getByTestId("ai-doctor-diagnosis-follow-up-24h")).toBeTruthy();
     expect(screen.getByTestId("ai-doctor-diagnosis-recovery-3d")).toBeTruthy();
     expect(screen.getByTestId("ai-doctor-diagnosis-suggested-actions")).toBeTruthy();
-    expect(screen.getByTestId("ai-doctor-diagnosis-risk").textContent).toMatch(
-      /medium/i,
-    );
-    expect(
-      screen.getByTestId("ai-doctor-diagnosis-confidence").textContent,
-    ).toMatch(/72%/);
+    expect(screen.getByTestId("ai-doctor-diagnosis-risk").textContent).toMatch(/medium/i);
+    expect(screen.getByTestId("ai-doctor-diagnosis-confidence").textContent).toMatch(/72%/);
   });
 
   it("renders the approval-required copy on every suggestion", () => {
-    render(
-      <StructuredDiagnosisCard
-        diagnosis={diagnosis}
-        onAddToQueue={vi.fn()}
-      />,
-    );
+    render(<StructuredDiagnosisCard diagnosis={diagnosis} onAddToQueue={vi.fn()} />);
     const copies = screen.getAllByText(SUGGESTION_APPROVAL_COPY);
     expect(copies.length).toBe(diagnosis.suggestedActions.length);
   });
 
   it("does NOT call onAddToQueue on render", () => {
     const onAdd = vi.fn();
-    render(
-      <StructuredDiagnosisCard diagnosis={diagnosis} onAddToQueue={onAdd} />,
-    );
+    render(<StructuredDiagnosisCard diagnosis={diagnosis} onAddToQueue={onAdd} />);
     expect(onAdd).not.toHaveBeenCalled();
   });
 
   it("calls onAddToQueue exactly once when the button is clicked", async () => {
     const onAdd = vi.fn().mockResolvedValue(undefined);
-    render(
-      <StructuredDiagnosisCard diagnosis={diagnosis} onAddToQueue={onAdd} />,
-    );
-    const btn = screen.getByTestId(
-      "ai-doctor-diagnosis-suggested-action-0-add-button",
-    );
+    render(<StructuredDiagnosisCard diagnosis={diagnosis} onAddToQueue={onAdd} />);
+    const btn = screen.getByTestId("ai-doctor-diagnosis-suggested-action-0-add-button");
     await act(async () => {
       fireEvent.click(btn);
     });
@@ -123,12 +103,8 @@ describe("StructuredDiagnosisCard — render", () => {
 
   it("does not double-fire on duplicate clicks", async () => {
     const onAdd = vi.fn().mockResolvedValue(undefined);
-    render(
-      <StructuredDiagnosisCard diagnosis={diagnosis} onAddToQueue={onAdd} />,
-    );
-    const btn = screen.getByTestId(
-      "ai-doctor-diagnosis-suggested-action-0-add-button",
-    );
+    render(<StructuredDiagnosisCard diagnosis={diagnosis} onAddToQueue={onAdd} />);
+    const btn = screen.getByTestId("ai-doctor-diagnosis-suggested-action-0-add-button");
     await act(async () => {
       fireEvent.click(btn);
       fireEvent.click(btn);
@@ -171,9 +147,7 @@ describe("Coach.tsx — AI Doctor wiring (static contract)", () => {
 
   it("queues only from an explicit click handler, not from useEffect", () => {
     expect(COACH).toMatch(/onAddToQueue=\{[^}]*addDoctorSuggestionToQueue/);
-    expect(COACH).not.toMatch(
-      /useEffect\([\s\S]{0,400}addDoctorSuggestionToQueue/,
-    );
+    expect(COACH).not.toMatch(/useEffect\([\s\S]{0,400}addDoctorSuggestionToQueue/);
   });
 
   it("dedupes per-suggestion via a queued-keys set", () => {

@@ -23,7 +23,7 @@ describe("sanitizeCheckoutReturnTo", () => {
     );
   });
 
-  it("allows other same-origin absolute app paths", () => {
+  it("allows other manifest-known absolute app paths", () => {
     expect(sanitizeCheckoutReturnTo("/dashboard")).toBe("/dashboard");
     expect(sanitizeCheckoutReturnTo("/grows/abc?tab=timeline")).toBe("/grows/abc?tab=timeline");
     expect(sanitizeCheckoutReturnTo("/plants/plant-123?tentId=tent-1#plant-ai-doctor-review")).toBe(
@@ -77,6 +77,16 @@ describe("sanitizeCheckoutReturnTo", () => {
   it("rejects bare hostname / no leading slash", () => {
     expect(sanitizeCheckoutReturnTo("evil.com")).toBeNull();
     expect(sanitizeCheckoutReturnTo("pheno-hunts/new")).toBeNull();
+  });
+
+  it("rejects unknown app paths and checkout/auth transition loops", () => {
+    expect(sanitizeCheckoutReturnTo("/not-a-verdant-route")).toBeNull();
+    expect(sanitizeCheckoutReturnTo("/checkout/success")).toBeNull();
+    expect(sanitizeCheckoutReturnTo("/checkout/success/")).toBeNull();
+    expect(sanitizeCheckoutReturnTo("/checkout/cancel?returnTo=%2Fpricing")).toBeNull();
+    expect(sanitizeCheckoutReturnTo("/auth?redirectTo=%2Fplants")).toBeNull();
+    expect(sanitizeCheckoutReturnTo("/auth/?redirectTo=%2Fplants")).toBeNull();
+    expect(sanitizeCheckoutReturnTo("/login")).toBeNull();
   });
 });
 
@@ -137,7 +147,7 @@ describe("classifyCheckoutReturnSurface", () => {
     expect(classifyCheckoutReturnSurface("/plants/p1#plant-ai-doctor-review-copy")).toBe("other");
     expect(classifyCheckoutReturnSurface("/grows/g1#plant-ai-doctor-review")).toBe("other");
     expect(classifyCheckoutReturnSurface("/doctor/sessions")).toBe("other");
-    expect(classifyCheckoutReturnSurface("/doctor/sessions/s1/extra")).toBe("other");
+    expect(classifyCheckoutReturnSurface("/doctor/sessions/s1/extra")).toBeNull();
   });
 });
 

@@ -11,8 +11,7 @@
  *  - Bounded ring buffer; corrupt storage resets safely.
  */
 
-export const SENSOR_HISTORY_IMPORT_REPLAY_STORAGE_KEY =
-  "verdant.sensorHistoryImportReplay.v1";
+export const SENSOR_HISTORY_IMPORT_REPLAY_STORAGE_KEY = "verdant.sensorHistoryImportReplay.v1";
 
 export const SENSOR_HISTORY_IMPORT_REPLAY_MAX_ENTRIES = 50;
 
@@ -84,9 +83,7 @@ export function readSensorHistoryImportReplayEntries(
     }
     return [];
   }
-  return parsed
-    .filter(isEntry)
-    .slice(-SENSOR_HISTORY_IMPORT_REPLAY_MAX_ENTRIES);
+  return parsed.filter(isEntry).slice(-SENSOR_HISTORY_IMPORT_REPLAY_MAX_ENTRIES);
 }
 
 export function hasSensorHistoryImportFingerprint(
@@ -94,9 +91,7 @@ export function hasSensorHistoryImportFingerprint(
   opts?: ReplayGuardOptions,
 ): boolean {
   if (!fingerprint) return false;
-  return readSensorHistoryImportReplayEntries(opts).some(
-    (e) => e.fingerprint === fingerprint,
-  );
+  return readSensorHistoryImportReplayEntries(opts).some((e) => e.fingerprint === fingerprint);
 }
 
 export function recordSensorHistoryImportFingerprint(
@@ -114,23 +109,16 @@ export function recordSensorHistoryImportFingerprint(
   const existing = readSensorHistoryImportReplayEntries(opts).filter(
     (e) => e.fingerprint !== fingerprint,
   );
-  const next = [...existing, entry].slice(
-    -SENSOR_HISTORY_IMPORT_REPLAY_MAX_ENTRIES,
-  );
+  const next = [...existing, entry].slice(-SENSOR_HISTORY_IMPORT_REPLAY_MAX_ENTRIES);
   try {
-    storage.setItem(
-      SENSOR_HISTORY_IMPORT_REPLAY_STORAGE_KEY,
-      JSON.stringify(next),
-    );
+    storage.setItem(SENSOR_HISTORY_IMPORT_REPLAY_STORAGE_KEY, JSON.stringify(next));
   } catch {
     // swallow quota/unavailable
   }
   return entry;
 }
 
-export function clearSensorHistoryImportReplayEntries(
-  opts?: ReplayGuardOptions,
-): void {
+export function clearSensorHistoryImportReplayEntries(opts?: ReplayGuardOptions): void {
   const storage = getStorage(opts);
   if (!storage) return;
   try {

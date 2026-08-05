@@ -11,17 +11,14 @@
 import { describe, it, expect } from "vitest";
 import React, { useEffect, useMemo, useState } from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { MemoryRouter, useSearchParams } from "react-router-dom";
+import { MemoryRouter, useSearchParams } from "@/lib/react-router-compat";
 import {
   SENSOR_SOURCES_PARAM,
   encodeSensorSourcesParam,
   parseSensorSourcesParam,
   sensorSourcesEqual,
 } from "@/lib/sensorSourceUrlRules";
-import {
-  SENSOR_SOURCE_KINDS,
-  SENSOR_SOURCE_SHORT_LABEL,
-} from "@/constants/sensorSourceLabels";
+import { SENSOR_SOURCE_KINDS, SENSOR_SOURCE_SHORT_LABEL } from "@/constants/sensorSourceLabels";
 import {
   filterTimelineEvidenceRows,
   isTimelineEvidenceFilterActive,
@@ -72,8 +69,8 @@ const ROWS = [
 
 function Harness() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [sensorSourceFilter, setSensorSourceFilter] = useState<TimelineSensorSourceKind[]>(
-    () => parseSensorSourcesParam(searchParams.get(SENSOR_SOURCES_PARAM)),
+  const [sensorSourceFilter, setSensorSourceFilter] = useState<TimelineSensorSourceKind[]>(() =>
+    parseSensorSourcesParam(searchParams.get(SENSOR_SOURCES_PARAM)),
   );
 
   useEffect(() => {
@@ -195,19 +192,19 @@ describe("Timeline source filter — accessibility & URL sync", () => {
     const clear = screen.getByTestId("timeline-clear-filters");
     expect(clear).not.toBeDisabled();
     fireEvent.click(clear);
-    expect(
-      screen.getByTestId("timeline-sensor-source-toggle-csv"),
-    ).toHaveAttribute("aria-pressed", "false");
-    expect(
-      screen.getByTestId("timeline-url-sensor-sources").textContent,
-    ).toBe("");
+    expect(screen.getByTestId("timeline-sensor-source-toggle-csv")).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+    expect(screen.getByTestId("timeline-url-sensor-sources").textContent).toBe("");
   });
 
   it("seeds filter state from the ?sensorSources= URL param", () => {
     renderHarness("/?sensorSources=manual");
-    expect(
-      screen.getByTestId("timeline-sensor-source-toggle-manual"),
-    ).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("timeline-sensor-source-toggle-manual")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
     expect(screen.getByTestId("row-manual-row")).toBeInTheDocument();
     expect(screen.queryByTestId("row-live-row")).toBeNull();
   });
@@ -215,26 +212,24 @@ describe("Timeline source filter — accessibility & URL sync", () => {
   it("updates the URL param when chip is toggled", () => {
     renderHarness();
     fireEvent.click(screen.getByTestId("timeline-sensor-source-toggle-live"));
-    expect(
-      screen.getByTestId("timeline-url-sensor-sources").textContent,
-    ).toContain("live");
+    expect(screen.getByTestId("timeline-url-sensor-sources").textContent).toContain("live");
   });
 
   it("ignores unknown source tokens in URL without crashing", () => {
     renderHarness("/?sensorSources=live,foo,bar");
-    expect(
-      screen.getByTestId("timeline-sensor-source-toggle-live"),
-    ).toHaveAttribute("aria-pressed", "true");
-    expect(
-      screen.getByTestId("timeline-sensor-source-toggle-csv"),
-    ).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByTestId("timeline-sensor-source-toggle-live")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByTestId("timeline-sensor-source-toggle-csv")).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
   });
 
   it("legend exposes all six definitions and is keyboard reachable", () => {
     renderHarness();
-    const summary = screen.getByTestId(
-      "sensor-source-legend-timeline-filter-summary",
-    );
+    const summary = screen.getByTestId("sensor-source-legend-timeline-filter-summary");
     expect(summary.tagName).toBe("SUMMARY");
     summary.focus();
     expect(document.activeElement).toBe(summary);

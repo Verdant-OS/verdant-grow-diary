@@ -37,8 +37,7 @@ export const EPISODE_DIARY_LIMIT = 400;
 export const EPISODE_SENSOR_LIMIT = 200;
 
 export type PlantMemoryEpisodeLoad =
-  | { status: "ok"; episodes: PlantMemoryEpisode[] }
-  | { status: "error"; message: string };
+  { status: "ok"; episodes: PlantMemoryEpisode[] } | { status: "error"; message: string };
 
 const SANITIZED_ERROR = "Could not load learning episodes. Try again shortly.";
 
@@ -135,8 +134,7 @@ export async function loadPlantMemoryEpisodes(
 // ── Learning-decision persistence (idempotent; grower-initiated only) ──────
 
 export type SaveLearningDecisionResult =
-  | { ok: true; updatedExisting: boolean }
-  | { ok: false; reason: string };
+  { ok: true; updatedExisting: boolean } | { ok: false; reason: string };
 
 /**
  * Persist ONE current learning decision per action/outcome pair:

@@ -19,10 +19,16 @@ describe("<QuickLogTargetPanel />", () => {
   it("renders Grow / Tent / Plant / Strain rows for a plant-scoped log", () => {
     const panel = buildQuickLogTargetPanel({
       resolved: {
-        ok: true, targetType: "plant", targetId: "p1",
-        plantId: "p1", tentId: "t1", growId: "g1",
+        ok: true,
+        targetType: "plant",
+        targetId: "p1",
+        plantId: "p1",
+        tentId: "t1",
+        growId: "g1",
       },
-      plants, tents, grows,
+      plants,
+      tents,
+      grows,
     });
     render(<QuickLogTargetPanel panel={panel} />);
     expect(screen.getByTestId("qlv2-target-panel")).toBeInTheDocument();
@@ -36,10 +42,16 @@ describe("<QuickLogTargetPanel />", () => {
   it("renders 'No tent assigned' warning row when plant has no tent", () => {
     const panel = buildQuickLogTargetPanel({
       resolved: {
-        ok: true, targetType: "plant", targetId: "p2",
-        plantId: "p2", tentId: null, growId: "g1",
+        ok: true,
+        targetType: "plant",
+        targetId: "p2",
+        plantId: "p2",
+        tentId: null,
+        growId: "g1",
       },
-      plants, tents, grows,
+      plants,
+      tents,
+      grows,
     });
     render(<QuickLogTargetPanel panel={panel} />);
     const tentValue = screen.getByTestId("qlv2-target-panel-tent-value");
@@ -57,10 +69,16 @@ describe("<QuickLogTargetPanel />", () => {
   it("renders all four labels for tent scope (mobile-friendly compact)", () => {
     const panel = buildQuickLogTargetPanel({
       resolved: {
-        ok: true, targetType: "tent", targetId: "t1",
-        plantId: null, tentId: "t1", growId: "g1",
+        ok: true,
+        targetType: "tent",
+        targetId: "t1",
+        plantId: null,
+        tentId: "t1",
+        growId: "g1",
       },
-      plants, tents, grows,
+      plants,
+      tents,
+      grows,
     });
     render(<QuickLogTargetPanel panel={panel} />);
     for (const label of ["Grow", "Tent", "Plant", "Strain"]) {

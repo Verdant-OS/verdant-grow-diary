@@ -56,9 +56,7 @@ describe("quicklog_save_manual — input shape blocks mixed-boundary attacks", (
     expect(sql).toMatch(
       /SELECT\s+p\.tent_id\s*,\s*p\.grow_id[\s\S]{0,200}INTO\s+v_tent_id\s*,\s*v_grow_id/i,
     );
-    expect(sql).toMatch(
-      /SELECT\s+t\.id\s*,\s*t\.grow_id\s+INTO\s+v_tent_id\s*,\s*v_grow_id/i,
-    );
+    expect(sql).toMatch(/SELECT\s+t\.id\s*,\s*t\.grow_id\s+INTO\s+v_tent_id\s*,\s*v_grow_id/i);
   });
 
   it("plant lookup and tent lookup are both scoped to auth.uid()", () => {
@@ -78,9 +76,7 @@ describe("quicklog_save_manual — input shape blocks mixed-boundary attacks", (
 
   it("all INSERTs use the local uid binding, never a client value", () => {
     // Parent grow_events insert
-    expect(sql).toMatch(
-      /INSERT\s+INTO\s+public\.grow_events[\s\S]{0,400}VALUES\s*\(\s*uid\s*,/i,
-    );
+    expect(sql).toMatch(/INSERT\s+INTO\s+public\.grow_events[\s\S]{0,400}VALUES\s*\(\s*uid\s*,/i);
     // Environment parent + child both use uid
     expect(sql).toMatch(
       /INSERT\s+INTO\s+public\.environment_events[\s\S]{0,400}VALUES\s*\(\s*v_env_parent\s*,\s*uid\s*,/i,
@@ -89,11 +85,12 @@ describe("quicklog_save_manual — input shape blocks mixed-boundary attacks", (
 });
 
 describe("quicklog_save_manual — integration harness status", () => {
-  it("documents that real cross-user DB integration is BLOCKED until a test harness exists", () => {
-    const doc = readFileSync(
-      resolve(ROOT, "docs/quicklog-rpc-safety.md"),
-      "utf8",
+  it("documents the local-only runtime harness now covering the database boundary", () => {
+    const doc = readFileSync(resolve(ROOT, "docs/quicklog-rpc-safety.md"), "utf8");
+    expect(doc).toMatch(
+      /Integration harness status[\s\S]*?run-quicklog-dual-timestamp-rls-harness\.ts/i,
     );
-    expect(doc).toMatch(/Integration harness status[\s\S]{0,200}BLOCKED/i);
+    expect(doc).toMatch(/local-only/i);
+    expect(doc).not.toMatch(/Integration harness status[\s\S]{0,200}BLOCKED/i);
   });
 });

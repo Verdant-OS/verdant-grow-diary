@@ -31,12 +31,11 @@ const INTERVAL_OPTIONS: { label: string; value: number }[] = [
   { label: "Every 15 min", value: 15 * 60_000 },
 ];
 
-
 interface ResourceCheck {
   name: string;
   path: string;
   /** Optional additional validation on the fetched response. */
-  validate?: (res: Response, body: string) => Promise<string | void> | string | void;
+  validate?: (res: Response, body: string) => Promise<string | undefined> | string | undefined;
   /** If true, response must be valid JSON. */
   json?: boolean;
   status: ResourceStatus;
@@ -75,6 +74,7 @@ const initial: ResourceCheck[] = [
       if (!body.includes("<urlset") && !body.includes("<sitemapindex")) {
         return "missing <urlset> / <sitemapindex> root";
       }
+      return undefined;
     },
   },
   {
@@ -110,8 +110,6 @@ export function ResourceHealthPanel() {
     return INTERVAL_OPTIONS.some((o) => o.value === parsed) ? parsed : 0;
   });
   const runningRef = useRef(false);
-
-
 
   const runAll = useCallback(async () => {
     if (runningRef.current) return;
@@ -151,7 +149,7 @@ export function ResourceHealthPanel() {
               };
             }
           }
-          let extra: string | void;
+          let extra: string | undefined = undefined;
           if (check.validate) {
             extra = await check.validate(res, body);
           }
@@ -209,8 +207,6 @@ export function ResourceHealthPanel() {
     }, intervalMs);
     return () => window.clearInterval(id);
   }, [intervalMs, runAll]);
-
-
 
   const failing = checks.filter((c) => c.status === "fail").length;
   const passing = checks.filter((c) => c.status === "pass").length;
@@ -296,9 +292,7 @@ export function ResourceHealthPanel() {
                 </div>
                 <StatusBadge status={c.status} />
               </div>
-              {c.detail && (
-                <p className="text-xs text-muted-foreground break-words">{c.detail}</p>
-              )}
+              {c.detail && <p className="text-xs text-muted-foreground break-words">{c.detail}</p>}
               <p className="text-[11px] text-muted-foreground opacity-80">
                 {c.checkedAt ? new Date(c.checkedAt).toLocaleTimeString() : "—"}
                 {typeof c.durationMs === "number" ? ` · ${c.durationMs} ms` : ""}
@@ -349,7 +343,6 @@ export function ResourceHealthPanel() {
           Fetches each resource with <code>cache: "no-store"</code> from the current origin.
           Auto-scan pauses while the tab is hidden. No auth, no writes, no secrets.
         </p>
-
       </CardContent>
     </Card>
   );

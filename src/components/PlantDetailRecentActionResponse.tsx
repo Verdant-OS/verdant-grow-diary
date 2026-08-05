@@ -15,12 +15,8 @@
 
 import { useMemo } from "react";
 import { useActionResponseMemory } from "@/hooks/useActionResponseMemory";
-import {
-  selectRecentPlantActionResponse,
-} from "@/lib/actionResponseMemoryRules";
-import {
-  buildActionResponseMemoryCardViewModel,
-} from "@/lib/actionResponseMemoryViewModel";
+import { selectRecentPlantActionResponse } from "@/lib/actionResponseMemoryRules";
+import { buildActionResponseMemoryCardViewModel } from "@/lib/actionResponseMemoryViewModel";
 import ActionResponseMemoryCard from "@/components/ActionResponseMemoryCard";
 import ActionFollowUpExistingPhotoEvidence from "@/components/ActionFollowUpExistingPhotoEvidence";
 

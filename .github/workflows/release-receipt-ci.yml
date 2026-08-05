@@ -1,5 +1,13 @@
 name: Release Receipt CI Upload
 
+# dormant: deliberately main-only for now (#581). Every validation step here
+# is continue-on-error, so as a GATE it adds nothing over ci.yml — its only
+# unique output is the release-receipt.v1.json artifact — and
+# src/test/release-receipt-ci-workflow-contract.test.ts pins this file's
+# shape including the `branch: "main"` literal. Retargeting it is its own
+# slice: decide whether the artifact is wanted per-PR, then update the
+# contract test and this trigger together.
+#
 # Narrowly scoped workflow for Release Receipt CI Workflow Upload v1.
 #
 # Runs a fixed set of Verdant validation commands, structures their outcomes
@@ -45,7 +53,9 @@ jobs:
         run: |
           start=$(date +%s%3N)
           set +e
-          bunx tsgo --noEmit
+          # `tsgo` is the bin shipped by @typescript/native-preview, not an
+          # installable package on its own — bare `bunx tsgo` 404s.
+          bunx --package=@typescript/native-preview tsgo --noEmit
           rc=$?
           set -e
           end=$(date +%s%3N)
@@ -193,7 +203,6 @@ jobs:
           path: artifacts/release-readiness/
           if-no-files-found: warn
           retention-days: 14
-
 
       - name: Preserve CI failure if any validation command failed
         if: always()

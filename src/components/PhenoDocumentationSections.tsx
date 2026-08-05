@@ -14,6 +14,7 @@ import {
 } from "@/constants/phenoDocumentationDefaults";
 
 export type PhenoDocRecordType = "candidate" | "breeding_program";
+type DeviceSaveStatus = "idle" | "saved" | "failed";
 
 export interface PhenoDocDiaryOption {
   readonly id: string;
@@ -44,14 +45,27 @@ function storageKey(recordType: PhenoDocRecordType, recordId: string): string {
 }
 
 function loadSaved(
-  storage: Pick<Storage, "getItem" | "setItem">,
+  storage: Pick<Storage, "getItem" | "setItem"> | null,
   recordType: PhenoDocRecordType,
   recordId: string,
 ): PhenoDocumentationValues | null {
+  if (storage === null) return null;
   try {
     const raw = storage.getItem(storageKey(recordType, recordId));
     if (!raw) return null;
     return JSON.parse(raw) as PhenoDocumentationValues;
+  } catch {
+    return null;
+  }
+}
+
+function resolveDeviceStorage(
+  storage: Pick<Storage, "getItem" | "setItem"> | undefined,
+): Pick<Storage, "getItem" | "setItem"> | null {
+  if (storage) return storage;
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage;
   } catch {
     return null;
   }
@@ -65,21 +79,14 @@ export default function PhenoDocumentationSections({
   storage,
   defaultOpen = true,
 }: Props) {
-  const store = useMemo<Pick<Storage, "getItem" | "setItem">>(
-    () =>
-      storage ??
-      (typeof window !== "undefined"
-        ? window.localStorage
-        : { getItem: () => null, setItem: () => undefined }),
-    [storage],
-  );
+  const store = useMemo(() => resolveDeviceStorage(storage), [storage]);
 
   // Lazy hydration: null = storage not read yet (collapsed mode only). The
   // eager path preserves the original mount-time read for defaultOpen users.
   const [values, setValues] = useState<PhenoDocumentationValues | null>(() =>
     defaultOpen ? mergeDocumentationValues(loadSaved(store, recordType, recordId)) : null,
   );
-  const [savedAt, setSavedAt] = useState<number | null>(null);
+  const [saveStatus, setSaveStatus] = useState<DeviceSaveStatus>("idle");
   const [openSections, setOpenSections] = useState<ReadonlySet<string>>(new Set());
 
   // Re-hydrate if the record identity changes (e.g. switching candidates).
@@ -88,7 +95,7 @@ export default function PhenoDocumentationSections({
       defaultOpen ? mergeDocumentationValues(loadSaved(store, recordType, recordId)) : null,
     );
     setOpenSections(new Set());
-    setSavedAt(null);
+    setSaveStatus("idle");
   }, [store, recordType, recordId, defaultOpen]);
 
   function hydrated(): PhenoDocumentationValues {
@@ -96,7 +103,7 @@ export default function PhenoDocumentationSections({
   }
 
   function setField(sectionKey: string, fieldKey: string, value: string) {
-    setSavedAt(null);
+    setSaveStatus("idle");
     setValues((prev) => {
       const base = prev ?? mergeDocumentationValues(loadSaved(store, recordType, recordId));
       return {
@@ -110,7 +117,7 @@ export default function PhenoDocumentationSections({
   }
 
   function setDiary(sectionKey: string, diaryEntryId: string | null) {
-    setSavedAt(null);
+    setSaveStatus("idle");
     setValues((prev) => {
       const base = prev ?? mergeDocumentationValues(loadSaved(store, recordType, recordId));
       return {
@@ -121,12 +128,16 @@ export default function PhenoDocumentationSections({
   }
 
   function onSave() {
+    if (store === null) {
+      setSaveStatus("failed");
+      return;
+    }
     try {
       store.setItem(storageKey(recordType, recordId), JSON.stringify(hydrated()));
-      setSavedAt(Date.now());
+      setSaveStatus("saved");
     } catch {
       // storage may be unavailable; keep values in-memory
-      setSavedAt(Date.now());
+      setSaveStatus("failed");
     }
   }
 
@@ -138,8 +149,8 @@ export default function PhenoDocumentationSections({
       <header>
         <h3 className="text-base font-semibold">{title}</h3>
         <p className="text-xs text-muted-foreground">
-          Default documentation for this record. Every field is editable and saved values persist.
-          Defaults never overwrite what you have already entered.
+          Saved on this device only. This documentation is not saved to your Verdant account or
+          synced to another browser. Defaults never overwrite what you have already entered.
         </p>
       </header>
 
@@ -235,14 +246,24 @@ export default function PhenoDocumentationSections({
           onClick={onSave}
           className="rounded-md border border-border bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground"
         >
-          Save documentation
+          Save on this device
         </button>
-        {savedAt != null && (
+        {saveStatus === "saved" && (
           <span
+            role="status"
             data-testid={`pheno-doc-saved-${recordType}-${recordId}`}
             className="text-xs text-emerald-600"
           >
-            Saved
+            Saved on this device
+          </span>
+        )}
+        {saveStatus === "failed" && (
+          <span
+            role="alert"
+            data-testid={`pheno-doc-save-failed-${recordType}-${recordId}`}
+            className="text-xs text-amber-700 dark:text-amber-300"
+          >
+            Could not save on this device. Your edits remain open in this tab; try again.
           </span>
         )}
       </div>

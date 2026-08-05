@@ -5,9 +5,10 @@ import {
   resolvePaddleCheckout,
   getCheckoutUnavailableMessage,
   PaddleCheckoutUnavailableError,
+  PaddleCheckoutCatalogUnavailableError,
 } from "@/lib/paddle";
 import { useAuth } from "@/store/auth";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "@/lib/react-router-compat";
 import { toast } from "@/hooks/use-toast";
 import { sanitizeCheckoutReturnTo } from "@/lib/checkoutReturnTo";
 import {
@@ -217,7 +218,23 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
         // The dedicated fail-closed error surfaces as an inline calm state,
         // never a destructive toast. Everything else keeps the existing
         // destructive toast so real Paddle/network failures stay visible.
-        if (err instanceof PaddleCheckoutUnavailableError) {
+        if (
+          err instanceof PaddleCheckoutUnavailableError ||
+          err instanceof PaddleCheckoutCatalogUnavailableError
+        ) {
+          // Non-sensitive telemetry: emit the sanitized server reason on the
+          // funnel bus so we can diagnose missing Paddle env vars / catalog
+          // entries in analytics without ever surfacing the reason code in
+          // user-facing copy. The `blockedReason` string below is the
+          // calm human message; the reason enum is telemetry-only.
+          const reasonToken =
+            err instanceof PaddleCheckoutCatalogUnavailableError
+              ? err.reason
+              : "checkout_env_unavailable";
+          trackFunnelEvent("checkout_catalog_unavailable", {
+            plan: options.priceId,
+            reason: reasonToken,
+          });
           setBlockedReason(err.message);
         } else {
           setBlockedReason(CHECKOUT_RECOVERY_MESSAGE);

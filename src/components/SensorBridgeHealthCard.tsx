@@ -1,4 +1,4 @@
-import { Radio } from "lucide-react";
+import { AlertTriangle, Radio } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useSensorBridgeHealth } from "@/hooks/useSensorBridgeHealth";
 import {
@@ -8,6 +8,10 @@ import {
   type SensorBridgeReadingEvidenceRowLike,
   type SensorBridgeReadingEvidenceStatus,
 } from "@/lib/sensorBridgeHealthViewModel";
+import {
+  classifySensorFeedLiveness,
+  describeSensorFeedLiveness,
+} from "@/lib/sensorFeedLivenessRules";
 
 /**
  * Read-only presenter for sensor bridge intake health. Source-honest:
@@ -49,6 +53,8 @@ export interface SensorBridgeHealthCardProps {
   /** Injectable evidence clock/window for deterministic tests. */
   evidenceNow?: Date;
   evidenceLiveWindowMs?: number;
+  /** Injectable clock for the liveness banner. Falls back to `evidenceNow`. */
+  livenessNow?: Date;
   className?: string;
 }
 
@@ -58,6 +64,7 @@ export default function SensorBridgeHealthCard({
   sensorReadingsStatus,
   evidenceNow,
   evidenceLiveWindowMs,
+  livenessNow,
   className,
 }: SensorBridgeHealthCardProps) {
   const query = useSensorBridgeHealth();
@@ -71,6 +78,22 @@ export default function SensorBridgeHealthCard({
         liveWindowMs: evidenceLiveWindowMs,
       })
     : null;
+
+  // Liveness is a separate question from the card's freshness state: `stale`
+  // covers both a 31-minute gap and a two-week dead feed. We only interrupt
+  // for the latter.
+  //
+  // `no_data` is the shape an account with no bridge takes, so it maps to
+  // "no bridge configured" and never produces a banner — otherwise every
+  // manual-only grower sees an outage warning on day one.
+  const liveness = vm
+    ? classifySensorFeedLiveness({
+        latestAcceptedAtIso: vm.latestAcceptedAtIso,
+        hasConfiguredBridge: vm.state !== "no_data",
+        now: livenessNow ?? evidenceNow ?? new Date(),
+      })
+    : null;
+  const livenessMessage = liveness ? describeSensorFeedLiveness(liveness) : null;
 
   return (
     <div
@@ -99,6 +122,18 @@ export default function SensorBridgeHealthCard({
         {vm?.controlDisclosure ?? "No device control."} Readings are observed only — bridge intake
         never executes equipment changes.
       </p>
+
+      {livenessMessage && (
+        <div
+          role="status"
+          className="mb-3 flex items-start gap-2 rounded-xl border border-destructive/40 bg-destructive/10 p-3"
+          data-testid="sensor-feed-liveness-banner"
+          data-liveness={liveness?.liveness}
+        >
+          <AlertTriangle className="mt-0.5 size-4 shrink-0 text-destructive" aria-hidden />
+          <p className="text-sm text-foreground">{livenessMessage}</p>
+        </div>
+      )}
 
       {isLoading ? (
         <div className="text-sm text-muted-foreground">Loading…</div>

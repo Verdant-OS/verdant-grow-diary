@@ -2,6 +2,7 @@ import VpdStageMissingBadge from "@/components/VpdStageMissingBadge";
 import EcowittLatestSnapshotCard from "@/components/EcowittLatestSnapshotCard";
 import { stripBackPointerTokens } from "@/lib/actionQueueProvenanceRules";
 import { computeEnvironmentStability } from "@/lib/environmentStabilityRules";
+import { resolveAlertContextStage } from "@/lib/alertStageResolution";
 import { formatStabilityChipView } from "@/lib/dashboardStabilityChipCopyRules";
 import StabilityChipDrilldown from "@/components/StabilityChipDrilldown";
 import {
@@ -9,9 +10,9 @@ import {
   STABILITY_ROLLUP_TONE_CLASS,
 } from "@/lib/dashboardStabilityRollupRules";
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 
-import { AlertTriangle, Box, Sprout, ListChecks, Sparkles, ArrowRight } from "lucide-react";
+import { AlertTriangle, Box, Sprout, Sparkles, ArrowRight } from "lucide-react";
 import type { Stage, SensorReading } from "@/mock";
 import PageHeader from "@/components/PageHeader";
 import KpiCard from "@/components/KpiCard";
@@ -25,7 +26,7 @@ import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import DashboardDataSourceDisclosure from "@/components/DashboardDataSourceDisclosure";
 import GrowDataLoadError, { GrowDataLoadingState } from "@/components/GrowDataLoadError";
 // Mock side-panel hooks intentionally removed — the Dashboard renders
-// honest empty states for Tasks and AI Insights until backed by real data.
+// an honest empty state for AI Insights until backed by real data.
 // See docs/qa/v0-demo-loop-checklist.md and docs/safety/static-safety-scans.md.
 import { useGrowPlants, useGrowTents } from "@/hooks/useGrowData";
 import { useGrows } from "@/store/grows";
@@ -34,6 +35,7 @@ import PublicQuickLogHandoffCard from "@/components/PublicQuickLogHandoffCard";
 import OnboardingProgressPill from "@/components/OnboardingProgressPill";
 import DashboardZeroTentEmptyState from "@/components/DashboardZeroTentEmptyState";
 import OperatorModeCallout from "@/components/OperatorModeCallout";
+import DashboardOperatorAccountReadModels from "@/components/DashboardOperatorAccountReadModels";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import ReleaseReadinessOperatorCard from "@/components/ReleaseReadinessOperatorCard";
 import LineageRepairCta from "@/components/LineageRepairCta";
@@ -98,6 +100,7 @@ import { Button } from "@/components/ui/button";
 import GrowTargetsEditor from "@/components/GrowTargetsEditor";
 import DailyGrowCheckStatusCard from "@/components/DailyGrowCheckStatusCard";
 import DashboardDailyGrowCheckPanel from "@/components/DashboardDailyGrowCheckPanel";
+import GuidedActionChecklistPanel from "@/components/GuidedActionChecklistPanel";
 
 import { Badge } from "@/components/ui/badge";
 import SensorSourceBadge from "@/components/SensorSourceBadge";
@@ -139,8 +142,6 @@ export default function Dashboard() {
   const plantsQuery = useGrowPlants(undefined, scopedGrowId);
   const { data: tents = [] } = tentsQuery;
   const { data: plants = [] } = plantsQuery;
-  // Tasks: no real-data hook yet — render an honest empty state below.
-  const tasks: { status: string }[] = [];
   const dashboardReadingsQuery = useSensorReadings();
   const { data: rawReadings = [] } = dashboardReadingsQuery;
   // Diagnostic packets may be stored with a canonical `live` source. Keep
@@ -169,6 +170,21 @@ export default function Dashboard() {
   const selectableTents = tents.map((t) => ({ id: t.id, name: t.name }));
   const selectedTentIds = resolveSelectedTentIds(selectableTents, tentSelection);
   const sensorState = useLatestSensorSnapshot(scopedGrowId ?? null, selectedTentIds);
+  // Stage for alert/threshold evaluation on the scoped Dashboard (live
+  // audit #14). Resolved from the grow row PLUS the tents in the SAME
+  // selection scope as the snapshot being classified — a specific tent
+  // selection evaluates that tent's reading against its own stage; "all"
+  // considers every grow tent (most advanced known stage wins, so a stale
+  // `grows.stage` cannot drive outdated bands while the tent badge shows
+  // a later stage). Unscoped renders pass null: `tents` is the full
+  // account set there, so no tent stage may be inferred.
+  const stageContextTents = tents.filter((t) => selectedTentIds.includes(t.id));
+  const alertContextStage = scopedGrow
+    ? resolveAlertContextStage({
+        growStage: scopedGrow.stage,
+        tentStages: stageContextTents.map((t) => t.stage),
+      }).stage
+    : null;
   const trendsState = useEnvironmentTrends(
     scopedGrowId ?? null,
     tents.map((t) => t.id),
@@ -199,9 +215,7 @@ export default function Dashboard() {
   // details.manual_sensor_snapshot rows + manual environment grow_events).
   // Additive only — the sensor_readings path above is never weakened.
   const quickLogManualSnapshotCount =
-    activationEvidence.status === "ok"
-      ? (activationEvidence.summary.manualSnapshotCount ?? 0)
-      : 0;
+    activationEvidence.status === "ok" ? (activationEvidence.summary.manualSnapshotCount ?? 0) : 0;
   const onboardingVm = buildOnboardingChecklistViewModel({
     growCount: grows.length,
     tentCount: tents.length,
@@ -231,11 +245,14 @@ export default function Dashboard() {
       dashboardHealthSnapshot,
       targetsState.status === "ok" ? targetsState.targets : null,
     ),
-    enabled: !!scopedGrowId,
-    stage: scopedGrow?.stage ?? null,
+    // Gated on the tent read having settled: while it is pending, `tents`
+    // is a placeholder empty array and alertContextStage falls back to the
+    // grow row alone — an alert persisted against a stale grow stage in
+    // that window would not be removed once the tent stages arrive.
+    enabled: !!scopedGrowId && tentsQuery.isFetched,
+    stage: alertContextStage,
   });
 
-  const dueToday = tasks.filter((t) => t.status === "today").length;
   // Open alert count and recent alerts come from real persisted alerts (RLS).
   const openAlerts = persistedAlertsState.alerts.filter((a) => a.status === "open").length;
 
@@ -349,6 +366,8 @@ export default function Dashboard() {
         <OperatorModeCallout />
       </div>
 
+      <DashboardOperatorAccountReadModels growId={scopedGrowId} />
+
       <div className="my-3">
         <ReleaseReadinessOperatorCard />
       </div>
@@ -373,7 +392,9 @@ export default function Dashboard() {
 
       <DashboardDailyGrowCheckPanel scopedGrowId={scopedGrowId ?? null} className="mb-6" />
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+      <GuidedActionChecklistPanel scopedGrowId={scopedGrowId ?? null} className="mb-6" />
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
         <KpiCard label="Active tents" value={tents.length} icon={<Box className="h-3.5 w-3.5" />} />
         <KpiCard
           label="Plants"
@@ -387,13 +408,6 @@ export default function Dashboard() {
           value={openAlerts}
           icon={<AlertTriangle className="h-3.5 w-3.5" />}
           accent={openAlerts > 0 ? "destructive" : "success"}
-        />
-        <KpiCard
-          label="Due today"
-          value={dueToday}
-          hint={dueToday === 0 ? "No tasks yet" : undefined}
-          icon={<ListChecks className="h-3.5 w-3.5" />}
-          accent={dueToday > 0 ? "warning" : "success"}
         />
       </div>
 
@@ -525,7 +539,7 @@ export default function Dashboard() {
                       </Button>
                       <Button asChild size="sm" variant="outline">
                         <Link
-                          to="/sensors#import-sensor-data"
+                          to="/sensors#csv-import"
                           data-testid="dashboard-environment-snapshot-import-sensor-data"
                           aria-label="Import sensor data"
                         >
@@ -1282,7 +1296,7 @@ export default function Dashboard() {
                     const stale = snap ? isStale(snap.ts) : false;
                     const vpd = classifyVpdAgainstStage({
                       value: vpdValue,
-                      stage: scopedGrow?.stage ?? null,
+                      stage: alertContextStage,
                       stale,
                     });
                     const toneCls =
@@ -1338,10 +1352,10 @@ export default function Dashboard() {
                 snapshot: snap,
                 quality,
                 targets: targetsCmp,
-                stage: scopedGrow?.stage ?? null,
+                stage: alertContextStage,
               });
               const vpdStageMissing =
-                snap?.vpd != null && normalizeVpdStage(scopedGrow?.stage) === "unknown";
+                snap?.vpd != null && normalizeVpdStage(alertContextStage) === "unknown";
               return (
                 <div>
                   <div className="flex items-center justify-between mb-2">

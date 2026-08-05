@@ -13,7 +13,7 @@
  *
  * Run on dev/staging only — never against production.
  */
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { createClient, type AuthUser, type SupabaseClient } from "@supabase/supabase-js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL!;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -59,22 +59,19 @@ async function recreateUser(email: string, password: string): Promise<string> {
     page: 1,
     perPage: 200,
   });
-  const prior = list?.users?.find((u) => u.email === email);
+  const users: AuthUser[] = list.users;
+  const prior = users.find((user) => user.email === email);
   if (prior) await admin.auth.admin.deleteUser(prior.id);
   const { data, error } = await admin.auth.admin.createUser({
     email,
     password,
     email_confirm: true,
   });
-  if (error || !data.user)
-    throw new Error(`createUser ${email}: ${error?.message}`);
+  if (error || !data.user) throw new Error(`createUser ${email}: ${error?.message}`);
   return data.user.id;
 }
 
-async function signedInClient(
-  email: string,
-  password: string,
-): Promise<SupabaseClient> {
+async function signedInClient(email: string, password: string): Promise<SupabaseClient> {
   const c = createClient(SUPABASE_URL, ANON_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
@@ -185,8 +182,7 @@ async function main() {
       const after = await countEvents(uidA);
       check(
         "cross-user plant → target_not_owned, no insert",
-        (data as { reason?: string })?.reason === "target_not_owned" &&
-          before === after,
+        (data as { reason?: string })?.reason === "target_not_owned" && before === after,
         JSON.stringify(data),
       );
     }
@@ -217,8 +213,7 @@ async function main() {
       const after = await countEvents(uidA);
       check(
         "invalid action → unsupported_action, no insert",
-        (data as { reason?: string })?.reason === "unsupported_action" &&
-          before === after,
+        (data as { reason?: string })?.reason === "unsupported_action" && before === after,
         JSON.stringify(data),
       );
     }
@@ -366,10 +361,7 @@ async function main() {
         "save_failed reason contains no SQLERRM-like leakage",
         !/select|insert|update|delete|from|where|jwt|bearer|token|secret|public\.|auth\./i.test(
           reason,
-        ) &&
-          !/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(
-            reason,
-          ),
+        ) && !/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(reason),
         reason,
       );
     }

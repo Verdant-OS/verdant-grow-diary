@@ -6,6 +6,7 @@
 
 import type { QuickLogV2Action, ResolvedQuickLogV2Target } from "./quickLogV2Rules";
 import { isTemperatureValid, isHumidityValid, isVpdValid } from "./sensorReadingNormalizationRules";
+import { normalizeQuickLogStage } from "./quickLogStageDefaultRules";
 
 export interface QuickLogV2SavePayload {
   p_target_type: "tent" | "plant";
@@ -18,6 +19,12 @@ export interface QuickLogV2SavePayload {
   p_vpd_kpa: number | null;
   p_occurred_at: string | null;
   p_details?: Record<string, unknown> | null;
+  /**
+   * Canonical stage tag persisted onto the diary companion (audit fix #2).
+   * Normalized client-side; the RPC soft-validates again and a non-null
+   * stage earns the diary row even without structured details.
+   */
+  p_stage?: string | null;
   /**
    * Server-side idempotency key (8..200 chars). One key per logical
    * submission: retries of the same submission MUST reuse the key so
@@ -36,6 +43,8 @@ export interface BuildQuickLogV2PayloadInput {
   vpdKpa: string;
   occurredAt?: string | null;
   details?: Record<string, unknown> | null;
+  /** Stage tag; normalized here — unknown/blank values are simply omitted. */
+  stage?: string | null;
   idempotencyKey: string;
 }
 
@@ -114,6 +123,10 @@ export function buildQuickLogV2SavePayload(input: BuildQuickLogV2PayloadInput): 
       p_vpd_kpa: v,
       p_occurred_at: input.occurredAt ?? null,
       ...(input.details ? { p_details: input.details } : {}),
+      ...((): { p_stage?: string } => {
+        const stage = normalizeQuickLogStage(input.stage ?? "");
+        return stage ? { p_stage: stage } : {};
+      })(),
       p_idempotency_key: idempotencyKey,
     },
   };

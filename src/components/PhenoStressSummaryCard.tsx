@@ -24,9 +24,7 @@ export default function PhenoStressSummaryCard({
       className="rounded border border-border bg-card p-3 text-sm"
     >
       <header className="flex items-center justify-between">
-        <span className="font-medium">
-          {candidateLabel ?? summary.plantId}
-        </span>
+        <span className="font-medium">{candidateLabel ?? summary.plantId}</span>
         {summary.hasDiaryEvidence && (
           <span
             data-testid={`pheno-stress-summary-diary-${summary.plantId}`}

@@ -30,9 +30,7 @@ describe("security exceptions registry", () => {
 
   it("does not accept blanket SECURITY DEFINER usage", () => {
     expect(content).not.toMatch(/blanket\s+SECURITY\s+DEFINER/i);
-    expect(content).toMatch(
-      /New\s+SECURITY\s+DEFINER\s+functions\s+require\s+explicit\s+review/i,
-    );
+    expect(content).toMatch(/New\s+SECURITY\s+DEFINER\s+functions\s+require\s+explicit\s+review/i);
     expect(content).toMatch(/does\s+\*?\*?not\*?\*?\s+authorize/i);
   });
 

@@ -8,7 +8,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import AccountPreferences from "@/pages/AccountPreferences";
 
 const upsertSpy = vi.fn();
@@ -117,6 +117,21 @@ describe("Account Preferences", () => {
     const privacyLink = within(historyCard).getByRole("link", { name: "Privacy Policy" });
     expect(termsLink).toHaveAttribute("href", "/terms");
     expect(privacyLink).toHaveAttribute("href", "/privacy");
+  });
+
+  it("renders an unknown legacy agreement as text instead of a dead hash link", async () => {
+    agreementData = [
+      {
+        agreement_type: "legacy_policy",
+        version: "2024-01-01",
+        effective_date: "2024-01-01",
+        accepted_at: "2024-01-01T10:00:00Z",
+      },
+    ] as unknown as typeof defaultAgreements;
+    renderPage();
+    const label = await screen.findByText("legacy_policy");
+    expect(label.closest("a")).toBeNull();
+    expect(screen.queryByRole("link", { name: "legacy_policy" })).toBeNull();
   });
 
   it("shows an empty state when no agreements are on record", async () => {

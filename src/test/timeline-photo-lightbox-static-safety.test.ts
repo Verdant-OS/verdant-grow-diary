@@ -9,10 +9,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-const FILES = [
-  "src/lib/timelinePhotoLightboxRules.ts",
-  "src/components/TimelinePhotoLightbox.tsx",
-];
+const FILES = ["src/lib/timelinePhotoLightboxRules.ts", "src/components/TimelinePhotoLightbox.tsx"];
 
 const FORBIDDEN: RegExp[] = [
   /\.insert\(/,
@@ -54,10 +51,7 @@ describe("Timeline photo lightbox — static safety", () => {
   }
 
   it("rules helper is DOM-free / React-free", () => {
-    const body = readFileSync(
-      join(process.cwd(), "src/lib/timelinePhotoLightboxRules.ts"),
-      "utf8",
-    );
+    const body = readFileSync(join(process.cwd(), "src/lib/timelinePhotoLightboxRules.ts"), "utf8");
     expect(body).not.toMatch(/from\s+["']react["']/);
     expect(body).not.toMatch(/\bdocument\s*\./);
     expect(body).not.toMatch(/\bwindow\s*\./);

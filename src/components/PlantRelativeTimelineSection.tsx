@@ -7,7 +7,7 @@
  * control. No reminder scheduling. No calendar event tables.
  */
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { Camera, Gauge, ImageUp, NotebookPen, Sprout } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -44,13 +44,6 @@ import {
   buildPlantTimelinePrintSummary,
   buildPlantTimelineReadabilitySummary,
 } from "@/lib/plantTimelineReadabilityViewModel";
-
-
-
-
-
-
-
 
 interface Props {
   plantId: string | null | undefined;
@@ -91,10 +84,7 @@ function TimelineEmptyStateCta({ cta }: { cta: RelativeTimelineCta }) {
           <CtaIcon kind={cta.key} /> {cta.label}
         </Button>
         {cta.disabledReason && (
-          <p
-            className="text-xs text-muted-foreground"
-            data-testid={`${testId}-reason`}
-          >
+          <p className="text-xs text-muted-foreground" data-testid={`${testId}-reason`}>
             {cta.disabledReason}
           </p>
         )}
@@ -123,9 +113,7 @@ function TimelineEmptyStateCta({ cta }: { cta: RelativeTimelineCta }) {
       variant={cta.key === "quicklog" ? "default" : "outline"}
       onClick={() => {
         if (cta.mode !== "event" || !cta.eventName) return;
-        window.dispatchEvent(
-          new CustomEvent(cta.eventName, { detail: cta.eventDetail ?? null }),
-        );
+        window.dispatchEvent(new CustomEvent(cta.eventName, { detail: cta.eventDetail ?? null }));
       }}
       data-testid={testId}
       data-mode="event"
@@ -136,8 +124,6 @@ function TimelineEmptyStateCta({ cta }: { cta: RelativeTimelineCta }) {
     </Button>
   );
 }
-
-
 
 function SourceIcon({ source }: { source: RelativeTimelineItem["source"] }) {
   if (source === "photo") return <Camera className="h-3.5 w-3.5" aria-hidden />;
@@ -166,12 +152,8 @@ function TimelineRow({
         growContextLabel={detail.growContextLabel}
         stageLabel={item.stagePreset?.label ?? null}
         stageColorToken={item.stagePreset?.colorToken ?? null}
-        plantDayLabel={
-          item.plantDay !== null ? `Plant day ${item.plantDay}` : null
-        }
-        stageDayLabel={
-          item.stageDay !== null ? `Stage day ${item.stageDay}` : null
-        }
+        plantDayLabel={item.plantDay !== null ? `Plant day ${item.plantDay}` : null}
+        stageDayLabel={item.stageDay !== null ? `Stage day ${item.stageDay}` : null}
       />
     );
   }
@@ -218,14 +200,10 @@ function TimelineRow({
         </div>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           {item.plantDay !== null && (
-            <span data-testid="relative-timeline-plant-day">
-              Plant day {item.plantDay}
-            </span>
+            <span data-testid="relative-timeline-plant-day">Plant day {item.plantDay}</span>
           )}
           {item.stageDay !== null && (
-            <span data-testid="relative-timeline-stage-day">
-              Stage day {item.stageDay}
-            </span>
+            <span data-testid="relative-timeline-stage-day">Stage day {item.stageDay}</span>
           )}
           <span
             data-testid="relative-timeline-timestamp"
@@ -239,9 +217,7 @@ function TimelineRow({
       <p
         className={cn(
           "mt-1.5 text-sm break-words",
-          detail.summaryIsFallback
-            ? "italic text-muted-foreground"
-            : "text-foreground/90",
+          detail.summaryIsFallback ? "italic text-muted-foreground" : "text-foreground/90",
         )}
         data-testid="relative-timeline-title"
         data-summary-fallback={detail.summaryIsFallback ? "true" : "false"}
@@ -254,19 +230,13 @@ function TimelineRow({
           data-testid="relative-timeline-context"
         >
           {detail.plantContextLabel && (
-            <span data-testid="relative-timeline-context-plant">
-              {detail.plantContextLabel}
-            </span>
+            <span data-testid="relative-timeline-context-plant">{detail.plantContextLabel}</span>
           )}
           {detail.tentContextLabel && (
-            <span data-testid="relative-timeline-context-tent">
-              {detail.tentContextLabel}
-            </span>
+            <span data-testid="relative-timeline-context-tent">{detail.tentContextLabel}</span>
           )}
           {detail.growContextLabel && (
-            <span data-testid="relative-timeline-context-grow">
-              {detail.growContextLabel}
-            </span>
+            <span data-testid="relative-timeline-context-grow">{detail.growContextLabel}</span>
           )}
         </p>
       )}
@@ -311,8 +281,7 @@ export default function PlantRelativeTimelineSection({
   const visibleItems = filterRelativeTimelineItems(items, filter);
   const groups = groupRelativeTimelineByStage(visibleItems);
   const filterDef =
-    RELATIVE_TIMELINE_FILTERS.find((f) => f.key === filter) ??
-    RELATIVE_TIMELINE_FILTERS[0];
+    RELATIVE_TIMELINE_FILTERS.find((f) => f.key === filter) ?? RELATIVE_TIMELINE_FILTERS[0];
   const categorySections = buildDiaryTimelineSections(visibleItems);
   const evidenceSummary = buildDiaryTimelineEvidenceQualitySummary(categorySections);
   const readabilitySummary = buildPlantTimelineReadabilitySummary({
@@ -343,59 +312,53 @@ export default function PlantRelativeTimelineSection({
         <CardTitle className="text-base flex items-center gap-2">
           <Sprout className="h-4 w-4" /> Relative Timeline
         </CardTitle>
-        <p
-          className="text-xs text-muted-foreground"
-          data-testid="relative-timeline-helper"
-        >
+        <p className="text-xs text-muted-foreground" data-testid="relative-timeline-helper">
           This timeline is based on plant days, not just calendar dates.
         </p>
       </CardHeader>
       <CardContent>
-        {!isLoading && (() => {
-          const header = formatRelativeTimelineHeader(items);
-          return (
-            <div
-              data-testid="relative-timeline-header"
-              data-total={header.total}
-              data-last-updated-fallback={header.lastUpdatedIsFallback ? "true" : "false"}
-              className="mb-3 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-xs"
-            >
-              <span
-                data-testid="relative-timeline-header-count"
-                className="font-medium text-foreground"
+        {!isLoading &&
+          (() => {
+            const header = formatRelativeTimelineHeader(items);
+            return (
+              <div
+                data-testid="relative-timeline-header"
+                data-total={header.total}
+                data-last-updated-fallback={header.lastUpdatedIsFallback ? "true" : "false"}
+                className="mb-3 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-xs"
               >
-                {header.countLabel}
-              </span>
-              <span className="text-muted-foreground/60" aria-hidden>
-                ·
-              </span>
-              <span
-                data-testid="relative-timeline-header-last-updated"
-                className={cn(
-                  "text-muted-foreground",
-                  header.lastUpdatedIsFallback && "italic text-muted-foreground/70",
-                )}
-              >
-                {header.lastUpdatedLabel}
-              </span>
-            </div>
-          );
-        })()}
+                <span
+                  data-testid="relative-timeline-header-count"
+                  className="font-medium text-foreground"
+                >
+                  {header.countLabel}
+                </span>
+                <span className="text-muted-foreground/60" aria-hidden>
+                  ·
+                </span>
+                <span
+                  data-testid="relative-timeline-header-last-updated"
+                  className={cn(
+                    "text-muted-foreground",
+                    header.lastUpdatedIsFallback && "italic text-muted-foreground/70",
+                  )}
+                >
+                  {header.lastUpdatedLabel}
+                </span>
+              </div>
+            );
+          })()}
         {isLoading ? (
           <div
             className="h-16 rounded-md bg-muted/40 animate-pulse"
             data-testid="relative-timeline-loading"
           />
         ) : items.length === 0 ? (
-
           <div
             className="rounded-lg border border-dashed border-border/60 bg-muted/10 p-4 space-y-3"
             data-testid="relative-timeline-empty"
           >
-            <p
-              className="text-sm text-foreground/90"
-              data-testid="relative-timeline-empty-copy"
-            >
+            <p className="text-sm text-foreground/90" data-testid="relative-timeline-empty-copy">
               {emptyState.copy}
             </p>
             <div
@@ -409,7 +372,6 @@ export default function PlantRelativeTimelineSection({
           </div>
         ) : (
           <div className="space-y-3">
-
             {(() => {
               const formatted = formatRelativeTimelineSummary(
                 summarizeRelativeTimelineItems(items),
@@ -467,12 +429,12 @@ export default function PlantRelativeTimelineSection({
                     data-count={chip.count}
                     onClick={() => setFilter(chip.key)}
                     className={cn(
-                      "shrink-0 inline-flex items-center gap-1.5 text-xs px-3 py-1 rounded-full border transition-colors min-h-[32px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+                      "shrink-0 inline-flex items-center gap-1.5 text-xs px-3 py-1 rounded-full border transition-colors min-h-[32px] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
                       chip.selected
                         ? "bg-primary text-primary-foreground border-primary"
                         : isMuted
-                        ? "bg-muted/30 text-muted-foreground/60 border-border/30 hover:bg-muted/40"
-                        : "bg-secondary/40 text-foreground border-border/40 hover:bg-secondary/60",
+                          ? "bg-muted/30 text-muted-foreground/60 border-border/30 hover:bg-muted/40"
+                          : "bg-secondary/40 text-foreground border-border/40 hover:bg-secondary/60",
                     )}
                   >
                     <span>{chip.label}</span>
@@ -501,15 +463,10 @@ export default function PlantRelativeTimelineSection({
               data-total-sections={readabilitySummary.totalSections}
               className="rounded-md border border-border/40 bg-muted/10 p-2 text-xs text-muted-foreground space-y-1"
             >
-              <p data-testid="relative-timeline-readability-line">
-                {readabilitySummary.line}
-              </p>
+              <p data-testid="relative-timeline-readability-line">{readabilitySummary.line}</p>
               <p
                 data-testid="relative-timeline-readability-filter-copy"
-                className={cn(
-                  readabilitySummary.isFiltered &&
-                    "text-foreground/80 font-medium",
-                )}
+                className={cn(readabilitySummary.isFiltered && "text-foreground/80 font-medium")}
               >
                 {readabilitySummary.filterCopy}
               </p>
@@ -541,9 +498,7 @@ export default function PlantRelativeTimelineSection({
                         <Badge
                           variant="outline"
                           className={
-                            group.colorToken
-                              ? `stage-token-${group.colorToken}`
-                              : undefined
+                            group.colorToken ? `stage-token-${group.colorToken}` : undefined
                           }
                           data-testid="relative-timeline-group-stage-badge"
                           data-stage-color-token={group.colorToken ?? ""}
@@ -594,18 +549,13 @@ export default function PlantRelativeTimelineSection({
               className="pt-2 border-t border-border/40"
               data-testid="relative-timeline-category-view-wrapper"
             >
-              <h3 className="mb-2 text-xs font-medium text-muted-foreground">
-                Category view
-              </h3>
+              <h3 className="mb-2 text-xs font-medium text-muted-foreground">Category view</h3>
               <DiaryTimelineCategorySections
                 items={visibleItems}
                 ariaLabel="Plant timeline category view"
                 storageKey={PLANT_RELATIVE_TIMELINE_SECTION_STATE_STORAGE_KEY}
                 renderEntry={(item) => {
-                  const detail = formatRelativeTimelineEntryDetail(
-                    item,
-                    entryContext,
-                  )!;
+                  const detail = formatRelativeTimelineEntryDetail(item, entryContext)!;
                   return (
                     <div
                       data-testid="relative-timeline-category-item"
@@ -626,8 +576,7 @@ export default function PlantRelativeTimelineSection({
                       <span
                         className={cn(
                           "text-foreground/90",
-                          detail.summaryIsFallback &&
-                            "italic text-muted-foreground",
+                          detail.summaryIsFallback && "italic text-muted-foreground",
                         )}
                         data-testid="relative-timeline-category-summary"
                       >
@@ -671,4 +620,3 @@ export default function PlantRelativeTimelineSection({
     </Card>
   );
 }
-

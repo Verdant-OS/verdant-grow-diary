@@ -286,7 +286,7 @@ function LinkedEvidenceUnavailableNotice({ onRetry }: { onRetry: () => void }) {
       <button
         type="button"
         onClick={onRetry}
-        className="text-xs px-3 min-h-11 inline-flex items-center rounded-md border border-border/60 hover:bg-secondary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring touch-manipulation"
+        className="text-xs px-3 min-h-11 inline-flex items-center rounded-md border border-border/60 hover:bg-secondary/60 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring touch-manipulation"
       >
         Retry
       </button>
@@ -347,7 +347,7 @@ export default function TimelineMemorySection(props: Props) {
               type="button"
               data-testid="timeline-memory-retry"
               onClick={() => refetch()}
-              className="text-xs px-3 min-h-11 inline-flex items-center rounded-md border border-border/60 hover:bg-secondary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring touch-manipulation"
+              className="text-xs px-3 min-h-11 inline-flex items-center rounded-md border border-border/60 hover:bg-secondary/60 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring touch-manipulation"
             >
               Retry
             </button>

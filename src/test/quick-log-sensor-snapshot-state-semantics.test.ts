@@ -9,9 +9,7 @@
  * Pure adapter/rule tests only. No I/O, no React, no Supabase.
  */
 import { describe, it, expect } from "vitest";
-import {
-  classifySnapshotTrustBadge,
-} from "@/lib/sensorSnapshotTrustBadgeRules";
+import { classifySnapshotTrustBadge } from "@/lib/sensorSnapshotTrustBadgeRules";
 import { buildQuickLogStripFromTentState } from "@/lib/quickLogSnapshotStripAdapter";
 import {
   EMPTY_SENSOR_SNAPSHOT,
@@ -55,6 +53,7 @@ describe("Quick Log sensor snapshot — state semantics", () => {
       snapshot: { ...EMPTY_SENSOR_SNAPSHOT },
       hasTent: true,
       now: NOW,
+      temperatureUnit: "celsius",
     });
     expect(v.status).toBe("no_data");
     expect(v.title).toMatch(/no sensor snapshot attached/i);
@@ -71,6 +70,7 @@ describe("Quick Log sensor snapshot — state semantics", () => {
       snapshot: { ...EMPTY_SENSOR_SNAPSHOT },
       hasTent: false,
       now: NOW,
+      temperatureUnit: "celsius",
     });
     expect(v.status).toBe("no_data");
     expect(v.trustBadge.badge).toBe("none");
@@ -83,6 +83,7 @@ describe("Quick Log sensor snapshot — state semantics", () => {
       snapshot: snap({ status: "invalid", freshness: "invalid" }),
       hasTent: true,
       now: NOW,
+      temperatureUnit: "celsius",
     });
     expect(v.status).toBe("invalid");
     expect(v.trustBadge.badge).toBe("invalid");
@@ -96,6 +97,7 @@ describe("Quick Log sensor snapshot — state semantics", () => {
       snapshot: snap({ status: "stale", freshness: "stale" }),
       hasTent: true,
       now: NOW,
+      temperatureUnit: "celsius",
     });
     expect(v.status).toBe("stale");
     expect(v.trustBadge.badge).toBe("stale");
@@ -108,6 +110,7 @@ describe("Quick Log sensor snapshot — state semantics", () => {
       snapshot: snap({ source: "manual", status: "fresh_non_live" }),
       hasTent: true,
       now: NOW,
+      temperatureUnit: "celsius",
     });
     expect(v.trustBadge.badge).toBe("manual");
     expect(v.trustBadge.attachable).toBe(true);
@@ -119,6 +122,7 @@ describe("Quick Log sensor snapshot — state semantics", () => {
       snapshot: snap({ source: "sim", status: "fresh_non_live" }),
       hasTent: true,
       now: NOW,
+      temperatureUnit: "celsius",
     });
     expect(v.trustBadge.badge).toBe("demo");
     expect(v.trustBadge.attachable).toBe(false);
@@ -130,6 +134,7 @@ describe("Quick Log sensor snapshot — state semantics", () => {
       snapshot: snap({ source: "ecowitt", status: "fresh_live" }),
       hasTent: true,
       now: NOW,
+      temperatureUnit: "celsius",
     });
     expect(v.trustBadge.badge).toBe("live");
     expect(v.trustBadge.attachable).toBe(true);
@@ -160,6 +165,7 @@ describe("Quick Log sensor snapshot — state semantics", () => {
       }),
       hasTent: true,
       now: NOW,
+      temperatureUnit: "celsius",
     });
     expect(v.status).toBe("usable");
     expect(v.trustBadge.badge).toBe("live");
@@ -171,10 +177,17 @@ describe("Quick Log sensor snapshot — state semantics", () => {
       snapshot: snap({
         status: "invalid",
         freshness: "invalid",
-        metrics: { temp_f: 9999, humidity_pct: 5, vpd_kpa: 20, soil_moisture_pct: null, co2_ppm: null },
+        metrics: {
+          temp_f: 9999,
+          humidity_pct: 5,
+          vpd_kpa: 20,
+          soil_moisture_pct: null,
+          co2_ppm: null,
+        },
       }),
       hasTent: true,
       now: NOW,
+      temperatureUnit: "celsius",
     });
     expect(v.trustBadge.badge).toBe("invalid");
     expect(v.classification.isHealthyEvidence).toBe(false);

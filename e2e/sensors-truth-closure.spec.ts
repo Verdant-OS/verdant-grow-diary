@@ -38,13 +38,7 @@ function tent(id: string, name: string) {
   };
 }
 
-function sensorRow(
-  id: string,
-  tentId: string,
-  ts: string,
-  metric: string,
-  value: number,
-) {
+function sensorRow(id: string, tentId: string, ts: string, metric: string, value: number) {
   return {
     id,
     tent_id: tentId,
@@ -193,17 +187,21 @@ test.describe("Sensors truth closure", () => {
     await acceptReconsentGateIfShown(page);
 
     await expect(page.getByRole("heading", { name: "Sensor Data" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Alpha Real Tent" })).toBeVisible();
+    const alphaTent = page.getByRole("button", { name: "Alpha Real Tent" });
+    await expect(alphaTent).toBeVisible();
     await expect(page.getByRole("button", { name: "Beta Real Tent" })).toBeVisible();
+    // Repository order is authoritative for the initial selection. Choose
+    // Alpha explicitly before asserting its tent-scoped evidence.
+    await alphaTent.click();
     await expect(page.getByText("Soil moisture: 61% raw", { exact: true })).toBeVisible();
     await expect(page.getByText("Soil moisture: 11% raw", { exact: true })).toHaveCount(0);
     await expect(page.getByText("Soil moisture: 88% raw", { exact: true })).toHaveCount(0);
     await expect(page.getByTestId("sensor-source-summary-count-csv")).toHaveText("3");
     await expect(page.getByTestId("sensor-source-summary-count-live")).toHaveText("0");
     await expect(page.getByTestId("sensor-source-summary-count-demo")).toHaveText("0");
-    await expect(page.locator('[data-testid="grow-data-source-badge"][data-label="Live"]')).toHaveCount(
-      0,
-    );
+    await expect(
+      page.locator('[data-testid="grow-data-source-badge"][data-label="Live"]'),
+    ).toHaveCount(0);
   });
 
   test("empty authenticated reads show first-tent setup without a t1 sensor query", async ({

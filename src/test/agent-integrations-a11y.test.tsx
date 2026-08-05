@@ -13,7 +13,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import { axe } from "vitest-axe";
 
 /**
@@ -101,9 +101,8 @@ describe("Connect-an-agent checklist — keyboard navigation", () => {
       "mcp-manifest-link",
       "copy-connection-details",
       "open-manifest-summary-modal",
-      // verify-tool-access-button is intentionally absent: with the
-      // production default harness the verify panel is a static
-      // non-interactive status (see AgentIntegrations verifyHarness).
+      // The optional verify-tool-access-button is absent unless a usable
+      // test/development harness is explicitly injected.
       ...CHECKLIST_TAB_ORDER,
     ];
     let cursor = 0;

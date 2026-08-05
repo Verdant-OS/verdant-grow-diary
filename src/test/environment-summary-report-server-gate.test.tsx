@@ -15,7 +15,7 @@
  */
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -116,10 +116,7 @@ function renderPage() {
     <QueryClientProvider client={qc}>
       <MemoryRouter initialEntries={["/diary/environment-summary"]}>
         <Routes>
-          <Route
-            path="/diary/environment-summary"
-            element={<EnvironmentSummaryReportPage />}
-          />
+          <Route path="/diary/environment-summary" element={<EnvironmentSummaryReportPage />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -131,25 +128,21 @@ describe("EnvironmentSummaryReportPage — server-authoritative entitlement gate
     gateMock.outcome = "denied";
     gateMock.clientPremium = true; // client LIES
     renderPage();
-    expect(
-      await screen.findByTestId("environment-summary-report-page-locked"),
-    ).toBeTruthy();
+    expect(await screen.findByTestId("environment-summary-report-page-locked")).toBeTruthy();
     expect(screen.getByTestId("env-report-paywall")).toBeTruthy();
     // Report content must NOT be present.
     expect(screen.queryByTestId("environment-summary-report-page")).toBeNull();
     // Server denial copy is clear and non-generic.
-    expect(
-      screen.getByTestId("env-report-server-gate-message").textContent ?? "",
-    ).toMatch(/Pro feature|Upgrade required/i);
+    expect(screen.getByTestId("env-report-server-gate-message").textContent ?? "").toMatch(
+      /Pro feature|Upgrade required/i,
+    );
   });
 
   it("server 200 renders the report for an eligible user", async () => {
     gateMock.outcome = "allowed";
     gateMock.clientPremium = true;
     renderPage();
-    expect(
-      await screen.findByTestId("environment-summary-report-page"),
-    ).toBeTruthy();
+    expect(await screen.findByTestId("environment-summary-report-page")).toBeTruthy();
     expect(screen.queryByTestId("env-report-paywall")).toBeNull();
   });
 
@@ -157,9 +150,7 @@ describe("EnvironmentSummaryReportPage — server-authoritative entitlement gate
     gateMock.outcome = "error";
     gateMock.clientPremium = true;
     renderPage();
-    const locked = await screen.findByTestId(
-      "environment-summary-report-page-locked",
-    );
+    const locked = await screen.findByTestId("environment-summary-report-page-locked");
     expect(locked).toBeTruthy();
     expect(locked.getAttribute("data-server-gate-status")).toBe("error");
     expect(screen.queryByTestId("environment-summary-report-page")).toBeNull();
@@ -171,9 +162,7 @@ describe("EnvironmentSummaryReportPage — server-authoritative entitlement gate
     gateMock.outcome = "verification_failed";
     gateMock.clientPremium = false;
     renderPage();
-    const locked = await screen.findByTestId(
-      "environment-summary-report-page-locked",
-    );
+    const locked = await screen.findByTestId("environment-summary-report-page-locked");
     expect(locked.getAttribute("data-server-gate-status")).toBe("error");
     expect(screen.queryByTestId("env-report-paywall")).toBeNull();
     expect(screen.getByTestId("env-report-entitlement-retry")).toBeTruthy();
@@ -186,10 +175,7 @@ describe("EnvironmentSummaryReportPage — frontend safety", () => {
     "utf8",
   );
   const HOOK = readFileSync(
-    resolve(
-      process.cwd(),
-      "src/hooks/useEnvironmentSummaryReportServerGate.ts",
-    ),
+    resolve(process.cwd(), "src/hooks/useEnvironmentSummaryReportServerGate.ts"),
     "utf8",
   );
 
@@ -219,10 +205,7 @@ describe("EnvironmentSummaryReportPage — frontend safety", () => {
 
 describe("environment-summary-report-entitlement edge function — server safety", () => {
   const FN = readFileSync(
-    resolve(
-      process.cwd(),
-      "supabase/functions/environment-summary-report-entitlement/index.ts",
-    ),
+    resolve(process.cwd(), "supabase/functions/environment-summary-report-entitlement/index.ts"),
     "utf8",
   );
 

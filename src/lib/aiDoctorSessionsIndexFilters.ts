@@ -54,11 +54,7 @@ export type ConfidenceFilter = "all" | "low" | "medium" | "high" | "unknown";
  *                    then lower/unknown confidence, then newest
  */
 export type SortOption =
-  | "newest"
-  | "oldest"
-  | "highest-risk"
-  | "lowest-confidence"
-  | "review-priority";
+  "newest" | "oldest" | "highest-risk" | "lowest-confidence" | "review-priority";
 
 export interface SessionsIndexFilters {
   risk: RiskFilter;
@@ -103,13 +99,7 @@ export const DATE_RANGE_OPTIONS: DateRangeFilter[] = ["all", "7d", "30d"];
 export const NEEDS_REVIEW_OPTIONS: NeedsReviewFilter[] = ["all", "yes", "no"];
 export const CAUTION_OPTIONS: CautionFilter[] = ["all", "yes", "no"];
 export const HAS_CHECKLIST_OPTIONS: HasChecklistFilter[] = ["all", "yes", "no"];
-export const CONFIDENCE_OPTIONS: ConfidenceFilter[] = [
-  "all",
-  "low",
-  "medium",
-  "high",
-  "unknown",
-];
+export const CONFIDENCE_OPTIONS: ConfidenceFilter[] = ["all", "low", "medium", "high", "unknown"];
 export const REVIEW_STATUS_OPTIONS: AiDoctorSessionReviewStatusFilter[] = [
   "any",
   "not_reviewed",
@@ -128,9 +118,7 @@ export function parseHasActions(value: unknown): HasActionsFilter {
 }
 
 export function parseDateRange(value: unknown): DateRangeFilter {
-  return DATE_RANGE_OPTIONS.includes(value as DateRangeFilter)
-    ? (value as DateRangeFilter)
-    : "all";
+  return DATE_RANGE_OPTIONS.includes(value as DateRangeFilter) ? (value as DateRangeFilter) : "all";
 }
 
 export function parseNeedsReview(value: unknown): NeedsReviewFilter {
@@ -140,9 +128,7 @@ export function parseNeedsReview(value: unknown): NeedsReviewFilter {
 }
 
 export function parseCaution(value: unknown): CautionFilter {
-  return CAUTION_OPTIONS.includes(value as CautionFilter)
-    ? (value as CautionFilter)
-    : "all";
+  return CAUTION_OPTIONS.includes(value as CautionFilter) ? (value as CautionFilter) : "all";
 }
 
 export function parseHasChecklist(value: unknown): HasChecklistFilter {
@@ -158,20 +144,18 @@ export function parseConfidence(value: unknown): ConfidenceFilter {
 }
 
 export function parseSort(value: unknown): SortOption {
-  return SORT_OPTIONS.includes(value as SortOption)
-    ? (value as SortOption)
-    : "newest";
+  return SORT_OPTIONS.includes(value as SortOption) ? (value as SortOption) : "newest";
 }
 
-export function parseReviewStatus(
-  value: unknown,
-): AiDoctorSessionReviewStatusFilter {
+export function parseReviewStatus(value: unknown): AiDoctorSessionReviewStatusFilter {
   return REVIEW_STATUS_OPTIONS.includes(value as AiDoctorSessionReviewStatusFilter)
     ? (value as AiDoctorSessionReviewStatusFilter)
     : "any";
 }
 
-export function parseFilters(input: Partial<Record<keyof SessionsIndexFilters, unknown>>): SessionsIndexFilters {
+export function parseFilters(
+  input: Partial<Record<keyof SessionsIndexFilters, unknown>>,
+): SessionsIndexFilters {
   return {
     risk: parseRisk(input.risk),
     hasActions: parseHasActions(input.hasActions),
@@ -237,10 +221,7 @@ const SORT_LABEL: Record<Exclude<SortOption, "newest">, string> = {
   "review-priority": "Sort: Review priority",
 };
 
-const REVIEW_STATUS_LABEL: Record<
-  Exclude<AiDoctorSessionReviewStatusFilter, "any">,
-  string
-> = {
+const REVIEW_STATUS_LABEL: Record<Exclude<AiDoctorSessionReviewStatusFilter, "any">, string> = {
   not_reviewed: "Review: Not reviewed",
   reviewed: "Review: Reviewed",
   needs_follow_up: "Review: Needs follow-up",
@@ -259,8 +240,7 @@ export function formatActiveFilterLabels(f: SessionsIndexFilters): string[] {
   if (f.hasChecklist === "yes") labels.push("Has review checklist");
   if (f.hasChecklist === "no") labels.push("No review checklist");
   if (f.confidence !== "all") labels.push(CONFIDENCE_LABEL[f.confidence]);
-  if (isReviewStatusFilterActive(f.reviewStatus))
-    labels.push(REVIEW_STATUS_LABEL[f.reviewStatus]);
+  if (isReviewStatusFilterActive(f.reviewStatus)) labels.push(REVIEW_STATUS_LABEL[f.reviewStatus]);
   if (f.sort !== "newest") labels.push(SORT_LABEL[f.sort]);
   return labels;
 }
@@ -296,8 +276,7 @@ export function serializeFilters(f: SessionsIndexFilters): Record<string, string
   if (f.caution !== DEFAULT_FILTERS.caution) out[FILTER_PARAM_KEYS.caution] = f.caution;
   if (f.hasChecklist !== DEFAULT_FILTERS.hasChecklist)
     out[FILTER_PARAM_KEYS.hasChecklist] = f.hasChecklist;
-  if (f.confidence !== DEFAULT_FILTERS.confidence)
-    out[FILTER_PARAM_KEYS.confidence] = f.confidence;
+  if (f.confidence !== DEFAULT_FILTERS.confidence) out[FILTER_PARAM_KEYS.confidence] = f.confidence;
   if (f.reviewStatus !== DEFAULT_FILTERS.reviewStatus)
     out[FILTER_PARAM_KEYS.reviewStatus] = f.reviewStatus;
   if (f.sort !== DEFAULT_FILTERS.sort) out[FILTER_PARAM_KEYS.sort] = f.sort;
@@ -395,9 +374,7 @@ export function rowHasChecklist(row: FilterableSessionRow): boolean {
   return buildSessionRowCautionIndicator(row).checklistItems.length > 0;
 }
 
-export function rowConfidenceBucket(
-  row: FilterableSessionRow,
-): Exclude<ConfidenceFilter, "all"> {
+export function rowConfidenceBucket(row: FilterableSessionRow): Exclude<ConfidenceFilter, "all"> {
   const pct =
     pctFromUnit(row.displayed_confidence) ??
     pctFromUnit(row.raw_confidence) ??
@@ -442,8 +419,7 @@ export function applyClientSideFilters<T extends FilterableSessionRow>(
     if (f.caution === "no" && rowHasCaution(row)) return false;
     if (f.hasChecklist === "yes" && !rowHasChecklist(row)) return false;
     if (f.hasChecklist === "no" && rowHasChecklist(row)) return false;
-    if (f.confidence !== "all" && rowConfidenceBucket(row) !== f.confidence)
-      return false;
+    if (f.confidence !== "all" && rowConfidenceBucket(row) !== f.confidence) return false;
     if (reviewActive) {
       if (rowReviewStatus(row, stateBySession) !== f.reviewStatus) return false;
     }
@@ -485,9 +461,7 @@ export function clearNeedsAttentionPreset(f: SessionsIndexFilters): SessionsInde
  * Count rows in the currently-loaded page that match the preset criteria.
  * Pure. Does NOT query the database — caller passes already-loaded rows.
  */
-export function countNeedsAttentionVisible<T extends FilterableSessionRow>(
-  rows: T[],
-): number {
+export function countNeedsAttentionVisible<T extends FilterableSessionRow>(rows: T[]): number {
   if (!Array.isArray(rows)) return 0;
   let n = 0;
   for (const row of rows) {
@@ -565,28 +539,19 @@ function compareOldest(a: FilterableSessionRow, b: FilterableSessionRow): number
   return -compareNewest(a, b);
 }
 
-function compareHighestRisk(
-  a: FilterableSessionRow,
-  b: FilterableSessionRow,
-): number {
+function compareHighestRisk(a: FilterableSessionRow, b: FilterableSessionRow): number {
   const d = riskRank(b) - riskRank(a);
   if (d !== 0) return d;
   return compareNewest(a, b);
 }
 
-function compareLowestConfidence(
-  a: FilterableSessionRow,
-  b: FilterableSessionRow,
-): number {
+function compareLowestConfidence(a: FilterableSessionRow, b: FilterableSessionRow): number {
   const d = CONFIDENCE_RANK[rowConfidenceBucket(a)] - CONFIDENCE_RANK[rowConfidenceBucket(b)];
   if (d !== 0) return d;
   return compareNewest(a, b);
 }
 
-function compareReviewPriority(
-  a: FilterableSessionRow,
-  b: FilterableSessionRow,
-): number {
+function compareReviewPriority(a: FilterableSessionRow, b: FilterableSessionRow): number {
   // Caution first.
   const ca = rowHasCaution(a) ? 1 : 0;
   const cb = rowHasCaution(b) ? 1 : 0;
@@ -635,4 +600,3 @@ export function applyClientSideSort<T extends FilterableSessionRow>(
   const cmp = COMPARATORS[sort] ?? compareNewest;
   return [...rows].sort(cmp);
 }
-

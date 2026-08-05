@@ -37,9 +37,7 @@ const R_TEMP = "22222222-2222-4222-8222-222222222222";
 
 describe("QuickLogSensorSnapshotStrip — Correct manual reading action", () => {
   it("hides the correction action by default (no IDs supplied)", () => {
-    const { queryByTestId } = render(
-      <QuickLogSensorSnapshotStrip tentId={TENT} attached />,
-    );
+    const { queryByTestId } = render(<QuickLogSensorSnapshotStrip tentId={TENT} attached />);
     expect(queryByTestId("quicklog-sensor-snapshot-correct-action")).toBeNull();
   });
 

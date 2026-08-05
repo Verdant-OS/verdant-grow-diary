@@ -25,12 +25,7 @@ const HOOK = "hooks/useQuickLogGroupedTimeline.ts";
 const PLANT_DETAIL = "pages/PlantDetail.tsx";
 const TENT_DETAIL = "pages/TentDetail.tsx";
 
-const FORBIDDEN_WORDS = [
-  /\blive\b/i,
-  /\bsynced\b/i,
-  /\bconnected\b/i,
-  /\bimported\b/i,
-];
+const FORBIDDEN_WORDS = [/\blive\b/i, /\bsynced\b/i, /\bconnected\b/i, /\bimported\b/i];
 const DEVICE_WORDS = [
   /\bdevice control\b/i,
   /\bpump\b/i,
@@ -84,9 +79,7 @@ describe("QuickLog grouped timeline UX polish — static safety", () => {
 
   it("filter rules live OUTSIDE JSX — presenter imports from the view-model", () => {
     const src = read(PRESENTER);
-    expect(src).toMatch(
-      /from\s+["']@\/lib\/quickLogGroupedTimelineFilterViewModel["']/,
-    );
+    expect(src).toMatch(/from\s+["']@\/lib\/quickLogGroupedTimelineFilterViewModel["']/);
     expect(src).toMatch(/filterQuickLogGroupedTimelineEntries/);
     // No hand-rolled filter switch in the presenter.
     expect(src).not.toMatch(/case\s+["']water["']\s*:/);

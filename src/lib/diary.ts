@@ -99,7 +99,7 @@ export const EVENT_TYPES: EventTypeDef[] = [
     icon: Sprout,
     tone: "bg-primary/20 text-primary border-primary/40",
   },
-  // Breeding crossing-workflow subtypes (logged via /breeding/new). Without
+  // Breeding crossing-workflow subtypes (logged via /breeding/log/new). Without
   // these, getEventType() falls back to "Observation" and hides what was logged.
   {
     value: "reversal_application",

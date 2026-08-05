@@ -32,7 +32,7 @@ describe("analyze-progress — historical shard-1 fixture (run 29171181154)", ()
   it("reproduces 123 numeric / 123 real / 123 extraneous / 0 missing", () => {
     const assigned = Array.from({ length: 123 }, (_, i) => `src/pkg/f${i + 1}.test.ts`);
     const numericIds = Array.from({ length: 123 }, (_, i) => String(-1000000 - i));
-    const lines = [];
+    const lines: string[] = [];
     // 123 numeric file events (opaque IDs)
     for (const id of numericIds) lines.push(JSON.stringify(fileEvent(id)));
     // 123 real events, one per assigned file
@@ -111,10 +111,7 @@ describe("analyze-progress — run directory input", () => {
       path.join(dir, "progress.jsonl"),
       assigned.map((f) => JSON.stringify(fileEvent(f))).join("\n") + "\n",
     );
-    fs.writeFileSync(
-      path.join(dir, "shard-files.json"),
-      JSON.stringify({ files: assigned }),
-    );
+    fs.writeFileSync(path.join(dir, "shard-files.json"), JSON.stringify({ files: assigned }));
     const r = analyzePath(dir);
     expect(r.assignedCount).toBe(2);
     expect(r.realEventCount).toBe(2);

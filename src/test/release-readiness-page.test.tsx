@@ -12,7 +12,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import ReleaseReadiness from "@/pages/ReleaseReadiness";
 import {
   RELEASE_READINESS_VIEW_MODEL,
@@ -45,23 +45,15 @@ describe("ReleaseReadiness page", () => {
 
   it("renders the post-merge ecowitt-artifact blocker and drops closed blockers", () => {
     renderPage();
-    expect(
-      screen.getByTestId("release-readiness-blocker-ecowitt-artifact"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("release-readiness-blocker-ecowitt-artifact")).toBeInTheDocument();
     // Closed blockers must NOT be re-rendered.
-    expect(
-      screen.queryByTestId("release-readiness-blocker-ci-billing"),
-    ).toBeNull();
-    expect(
-      screen.queryByTestId("release-readiness-blocker-pr-112-receipt"),
-    ).toBeNull();
+    expect(screen.queryByTestId("release-readiness-blocker-ci-billing")).toBeNull();
+    expect(screen.queryByTestId("release-readiness-blocker-pr-112-receipt")).toBeNull();
   });
 
   it("renders PR #112 batched full-suite as MERGED with merge details", () => {
     renderPage();
-    const row = screen.getByTestId(
-      "release-readiness-check-pr-112-batched-full-suite",
-    );
+    const row = screen.getByTestId("release-readiness-check-pr-112-batched-full-suite");
     const text = row.textContent ?? "";
     expect(text).toContain("MERGED");
     expect(text).toContain("4eb63ba");
@@ -73,9 +65,7 @@ describe("ReleaseReadiness page", () => {
 
   it("renders the full-suite parser receipt as SATISFIED (no pending copy)", () => {
     renderPage();
-    const row = screen.getByTestId(
-      "release-readiness-check-full-suite-parser",
-    );
+    const row = screen.getByTestId("release-readiness-check-full-suite-parser");
     expect(row.textContent ?? "").toContain("SATISFIED");
     expect(row.textContent ?? "").toContain("28463133281");
     expect(row.textContent ?? "").not.toMatch(/blocked behind ci billing/i);
@@ -84,9 +74,7 @@ describe("ReleaseReadiness page", () => {
 
   it("renders Auth loading smoke WARNING and tracks it separately", () => {
     renderPage();
-    const row = screen.getByTestId(
-      "release-readiness-check-auth-loading-smoke",
-    );
+    const row = screen.getByTestId("release-readiness-check-auth-loading-smoke");
     expect(row.textContent ?? "").toContain("WARNING");
     expect(row.textContent ?? "").toMatch(/flaky/i);
     expect(row.textContent ?? "").toMatch(/repo-wide/i);
@@ -94,9 +82,7 @@ describe("ReleaseReadiness page", () => {
 
   it("renders Action Queue approval-required preservation check", () => {
     renderPage();
-    const row = screen.getByTestId(
-      "release-readiness-check-action-queue-approval",
-    );
+    const row = screen.getByTestId("release-readiness-check-action-queue-approval");
     expect(row.textContent ?? "").toMatch(/approval-required/i);
     expect(row.textContent ?? "").toContain("PRESERVED");
   });
@@ -115,9 +101,7 @@ describe("ReleaseReadiness page", () => {
     for (const phrase of RELEASE_READINESS_FORBIDDEN_PHRASES) {
       expect(text).not.toContain(phrase.toLowerCase());
     }
-    const release = screen
-      .getByTestId("release-readiness-executive")
-      .textContent ?? "";
+    const release = screen.getByTestId("release-readiness-executive").textContent ?? "";
     expect(release).not.toMatch(/release\s*:\s*go/i);
     expect(release).not.toMatch(/fully released/i);
   });
@@ -132,39 +116,29 @@ describe("ReleaseReadiness page", () => {
       renderPage();
       const section = screen.getByTestId("release-readiness-evidence");
       expect(section).toBeInTheDocument();
-      expect(
-        screen.getByTestId("release-readiness-evidence-posture").textContent,
-      ).toBe("HOLD");
+      expect(screen.getByTestId("release-readiness-evidence-posture").textContent).toBe("HOLD");
     });
 
     it("does not show missing CI evidence message now that PR #112 receipt is PASS", () => {
       renderPage();
-      expect(
-        screen.queryByTestId("release-readiness-evidence-missing"),
-      ).toBeNull();
+      expect(screen.queryByTestId("release-readiness-evidence-missing")).toBeNull();
     });
 
     it("shows local targeted disclaimer that it does not unlock GO", () => {
       renderPage();
-      const el = screen.getByTestId(
-        "release-readiness-evidence-disclaimer-local_targeted",
-      );
+      const el = screen.getByTestId("release-readiness-evidence-disclaimer-local_targeted");
       expect(el.textContent ?? "").toMatch(/does not unlock release go/i);
     });
 
     it("shows manual note disclaimer as context only", () => {
       renderPage();
-      const el = screen.getByTestId(
-        "release-readiness-evidence-disclaimer-manual_operator_note",
-      );
+      const el = screen.getByTestId("release-readiness-evidence-disclaimer-manual_operator_note");
       expect(el.textContent ?? "").toMatch(/context only/i);
     });
 
     it("never shows GO posture while active blockers remain", () => {
       renderPage();
-      expect(
-        screen.getByTestId("release-readiness-evidence-posture").textContent,
-      ).not.toBe("GO");
+      expect(screen.getByTestId("release-readiness-evidence-posture").textContent).not.toBe("GO");
     });
 
     it("page source does not add fetch / supabase writes / github API", async () => {
@@ -194,17 +168,13 @@ describe("Release Readiness HOLD invariants (Gate Reliability v1)", () => {
   });
 
   it("view model has at least one WARNING-labeled check until repair lands", () => {
-    const warnings = RELEASE_READINESS_VIEW_MODEL.checks.filter(
-      (c) => c.status === "WARNING",
-    );
+    const warnings = RELEASE_READINESS_VIEW_MODEL.checks.filter((c) => c.status === "WARNING");
     expect(warnings.length).toBeGreaterThan(0);
   });
 
   it("HOLD invariant: overall posture must remain HOLD whenever any blocker OR WARNING exists", () => {
     const hasBlocker = RELEASE_READINESS_VIEW_MODEL.blockers.length > 0;
-    const hasWarning = RELEASE_READINESS_VIEW_MODEL.checks.some(
-      (c) => c.status === "WARNING",
-    );
+    const hasWarning = RELEASE_READINESS_VIEW_MODEL.checks.some((c) => c.status === "WARNING");
     if (hasBlocker || hasWarning) {
       expect(RELEASE_READINESS_VIEW_MODEL.overall.status).toBe("HOLD");
       expect(RELEASE_READINESS_VIEW_MODEL.release.status).toBe("HOLD");
@@ -215,9 +185,7 @@ describe("Release Readiness HOLD invariants (Gate Reliability v1)", () => {
     const overall = RELEASE_READINESS_VIEW_MODEL.overall.status;
     const release = RELEASE_READINESS_VIEW_MODEL.release.status;
     const hasBlocker = RELEASE_READINESS_VIEW_MODEL.blockers.length > 0;
-    const hasWarning = RELEASE_READINESS_VIEW_MODEL.checks.some(
-      (c) => c.status === "WARNING",
-    );
+    const hasWarning = RELEASE_READINESS_VIEW_MODEL.checks.some((c) => c.status === "WARNING");
     if (hasBlocker || hasWarning) {
       // No "green release" labels permitted.
       for (const status of [overall, release]) {
@@ -238,9 +206,7 @@ describe("Release Readiness HOLD invariants (Gate Reliability v1)", () => {
     for (const c of RELEASE_READINESS_VIEW_MODEL.checks) {
       const row = screen.getByTestId(`release-readiness-check-${c.id}`);
       expect(["static", "manual", "doc-receipt"]).toContain(c.source);
-      expect(row.textContent ?? "").toMatch(
-        /static|manual|doc-receipt/i,
-      );
+      expect(row.textContent ?? "").toMatch(/static|manual|doc-receipt/i);
     }
   });
 
@@ -250,9 +216,7 @@ describe("Release Readiness HOLD invariants (Gate Reliability v1)", () => {
         <ReleaseReadiness />
       </MemoryRouter>,
     );
-    const row = screen.getByTestId(
-      "release-readiness-check-auth-loading-smoke",
-    );
+    const row = screen.getByTestId("release-readiness-check-auth-loading-smoke");
     expect(row.textContent ?? "").toContain("WARNING");
   });
 
@@ -264,17 +228,14 @@ describe("Release Readiness HOLD invariants (Gate Reliability v1)", () => {
     );
     const row = screen.getByTestId("release-readiness-check-ecowitt-bridge-ci");
     expect(row.textContent ?? "").toContain("PENDING");
-    expect(
-      screen.getByTestId("release-readiness-blocker-ecowitt-artifact"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("release-readiness-blocker-ecowitt-artifact")).toBeInTheDocument();
   });
 });
 
 describe("Release Readiness ↔ Evidence Receipt label parity", () => {
   it("PR #112 row is MERGED and matches a passing ci_full_suite receipt", async () => {
-    const { RELEASE_READINESS_EVIDENCE_RECEIPTS } = await import(
-      "@/lib/releaseReadinessEvidenceReceiptViewModel"
-    );
+    const { RELEASE_READINESS_EVIDENCE_RECEIPTS } =
+      await import("@/lib/releaseReadinessEvidenceReceiptViewModel");
     const pr112Check = RELEASE_READINESS_VIEW_MODEL.checks.find(
       (c) => c.id === "pr-112-batched-full-suite",
     );
@@ -288,15 +249,13 @@ describe("Release Readiness ↔ Evidence Receipt label parity", () => {
   });
 
   it("Full-suite parser row is SATISFIED", () => {
-    const row = RELEASE_READINESS_VIEW_MODEL.checks.find(
-      (c) => c.id === "full-suite-parser",
-    );
+    const row = RELEASE_READINESS_VIEW_MODEL.checks.find((c) => c.id === "full-suite-parser");
     expect(row?.status).toBe("SATISFIED");
   });
 
   it("Billing blocker no longer appears among active blockers", () => {
-    const billing = RELEASE_READINESS_VIEW_MODEL.blockers.find((b) =>
-      /billing/i.test(b.id) || /billing/i.test(b.label),
+    const billing = RELEASE_READINESS_VIEW_MODEL.blockers.find(
+      (b) => /billing/i.test(b.id) || /billing/i.test(b.label),
     );
     expect(billing).toBeUndefined();
   });
@@ -314,9 +273,8 @@ describe("Release Readiness ↔ Evidence Receipt label parity", () => {
   });
 
   it("Ecowitt evidence receipt stays pending and blocks release GO until artifact proof", async () => {
-    const { RELEASE_READINESS_EVIDENCE_RECEIPTS } = await import(
-      "@/lib/releaseReadinessEvidenceReceiptViewModel"
-    );
+    const { RELEASE_READINESS_EVIDENCE_RECEIPTS } =
+      await import("@/lib/releaseReadinessEvidenceReceiptViewModel");
     const ec = RELEASE_READINESS_EVIDENCE_RECEIPTS.find(
       (r) => r.id === "ecowitt-bridge-ci-artifact",
     );
@@ -325,4 +283,3 @@ describe("Release Readiness ↔ Evidence Receipt label parity", () => {
     expect(ec?.canUnlockReleaseGo).toBe(false);
   });
 });
-

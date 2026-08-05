@@ -43,9 +43,7 @@ let active: ActiveSession | null = null;
  * that hasn't settled is dropped WITHOUT firing its cancel handler — the
  * new open supersedes it (e.g. user clicked a different plan mid-modal).
  */
-export function beginCheckoutSession(
-  onClosedBeforeComplete: () => void,
-): CheckoutSessionId {
+export function beginCheckoutSession(onClosedBeforeComplete: () => void): CheckoutSessionId {
   const id = nextSessionId();
   active = {
     id,
@@ -86,9 +84,7 @@ export interface PaddleCheckoutEventLike {
  *   - `checkout.closed`    — if not completed, fire the cancel handler.
  * Anything else is a no-op.
  */
-export function handlePaddleCheckoutEvent(
-  event: PaddleCheckoutEventLike | null | undefined,
-): void {
+export function handlePaddleCheckoutEvent(event: PaddleCheckoutEventLike | null | undefined): void {
   if (!active || active.settled) return;
   const name = event?.name;
   if (typeof name !== "string") return;

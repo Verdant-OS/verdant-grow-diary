@@ -18,9 +18,13 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { readDesktopGrowerNavigationSource } from "@/test/utils/growerNavigationSource";
+import {
+  extractMountedAppRoutePaths,
+  readAllRouteModuleSources,
+} from "./helpers/routeManifestSyncHarness";
 
 const diagnosticsSource = readFileSync(resolve(process.cwd(), "src/pages/Diagnostics.tsx"), "utf8");
-const appSource = readFileSync(resolve(process.cwd(), "src/App.tsx"), "utf8");
+const appSource = readAllRouteModuleSources();
 const sidebarSource = readDesktopGrowerNavigationSource();
 
 describe("operator nav: Genetics XLSX Import (removed)", () => {
@@ -31,7 +35,7 @@ describe("operator nav: Genetics XLSX Import (removed)", () => {
 
   it("app router does not register OperatorGeneticsImportPage", () => {
     expect(appSource).not.toContain("OperatorGeneticsImportPage");
-    expect(appSource).not.toMatch(/path=["']\/operator\/genetics-import["']/);
+    expect(extractMountedAppRoutePaths()).not.toContain("/operator");
   });
 
   it("AppSidebar does not expose the removed Genetics XLSX Import entry", () => {

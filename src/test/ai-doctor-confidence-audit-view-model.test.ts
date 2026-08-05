@@ -15,9 +15,7 @@ describe("aiDoctorConfidenceAuditViewModel", () => {
 
   it("includes all required hard caps with documented max scores", () => {
     const vm = buildAiDoctorConfidenceAuditViewModel();
-    const caps = Object.fromEntries(
-      vm.hard_caps.map((c) => [c.id, c.max_score]),
-    );
+    const caps = Object.fromEntries(vm.hard_caps.map((c) => [c.id, c.max_score]));
     expect(caps["no-trustworthy-sensors-no-events"]).toBe(35);
     expect(caps["stale-or-invalid-only"]).toBe(30);
     expect(caps["demo-or-csv-only"]).toBe(40);
@@ -54,9 +52,7 @@ describe("aiDoctorConfidenceAuditViewModel", () => {
 
   it("documents that demo/CSV never increase confidence", () => {
     const vm = buildAiDoctorConfidenceAuditViewModel();
-    const demoRule = vm.rules.find(
-      (r) => r.id === "demo-only-or-csv-only-context",
-    );
+    const demoRule = vm.rules.find((r) => r.id === "demo-only-or-csv-only-context");
     expect(demoRule).toBeDefined();
     expect(demoRule!.hard_cap).toBe(40);
     const note = vm.source_quality_notes.join(" ").toLowerCase();
@@ -66,13 +62,9 @@ describe("aiDoctorConfidenceAuditViewModel", () => {
 
   it("documents that stale/invalid lowers confidence and is never healthy", () => {
     const vm = buildAiDoctorConfidenceAuditViewModel();
-    const staleOnly = vm.rules.find(
-      (r) => r.id === "stale-only-or-invalid-only-context",
-    );
+    const staleOnly = vm.rules.find((r) => r.id === "stale-only-or-invalid-only-context");
     expect(staleOnly!.hard_cap).toBe(30);
-    const mixed = vm.rules.find(
-      (r) => r.id === "stale-or-invalid-alongside-other-data",
-    );
+    const mixed = vm.rules.find((r) => r.id === "stale-or-invalid-alongside-other-data");
     expect(mixed).toBeDefined();
     const sourceNotes = vm.source_quality_notes.join(" ").toLowerCase();
     expect(sourceNotes).toMatch(/never read as healthy/);
@@ -85,9 +77,7 @@ describe("aiDoctorConfidenceAuditViewModel", () => {
   });
 
   it("uses the injected `now` for generated_at", () => {
-    const vm = buildAiDoctorConfidenceAuditViewModel(
-      "2027-03-15T12:34:56.000Z",
-    );
+    const vm = buildAiDoctorConfidenceAuditViewModel("2027-03-15T12:34:56.000Z");
     expect(vm.generated_at).toBe("2027-03-15T12:34:56.000Z");
   });
 

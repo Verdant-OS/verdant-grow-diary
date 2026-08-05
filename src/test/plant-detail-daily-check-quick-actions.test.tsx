@@ -7,7 +7,7 @@ import { describe, it, expect, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen, within } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 const PLANT = "plant-1";
@@ -74,9 +74,7 @@ describe("Plant Detail · Daily Check quick method actions", () => {
   });
 
   it("checked-today does not show the quick action group; legacy CTA remains", () => {
-    diaryEntries = [
-      { id: "d1", entry_at: TODAY_ISO, plant_id: PLANT, tent_id: TENT },
-    ];
+    diaryEntries = [{ id: "d1", entry_at: TODAY_ISO, plant_id: PLANT, tent_id: TENT }];
     manualReadings = [];
     renderCard();
     expect(screen.queryByTestId("plant-daily-grow-check-quick-actions")).toBeNull();
@@ -84,9 +82,7 @@ describe("Plant Detail · Daily Check quick method actions", () => {
   });
 
   it("checked-today preserves today method label", () => {
-    diaryEntries = [
-      { id: "d1", entry_at: TODAY_ISO, plant_id: PLANT, tent_id: TENT },
-    ];
+    diaryEntries = [{ id: "d1", entry_at: TODAY_ISO, plant_id: PLANT, tent_id: TENT }];
     manualReadings = [];
     renderCard();
     const label = screen.getByTestId("plant-daily-grow-check-today-method");

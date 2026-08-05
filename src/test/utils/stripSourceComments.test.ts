@@ -52,7 +52,7 @@ describe("stripSourceComments — comment removal", () => {
       "return (",
       "  <div>",
       "    {/* row carries [alert:<id>] in reason — never render raw */}",
-      "    <Badge label=\"Source\" />",
+      '    <Badge label="Source" />',
       "  </div>",
       ");",
     ].join("\n");

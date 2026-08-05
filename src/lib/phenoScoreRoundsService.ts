@@ -11,6 +11,7 @@
  */
 import { supabase } from "@/integrations/supabase/client";
 import { phenoDb } from "@/integrations/supabase/phenoTables";
+import { PhenoEvidenceReadError } from "@/lib/phenoEvidenceReadError";
 
 export const PHENO_SCORE_ROUNDS = [
   "veg",
@@ -114,7 +115,7 @@ export async function listScoreRoundsForHunt(
     .eq("hunt_id", id);
   if (round && isPhenoScoreRound(round)) query = query.eq("round", round);
   const { data, error } = await query.limit(1000);
-  if (error || !data) return {};
+  if (error || !data) throw new PhenoEvidenceReadError("score_rounds");
   const map: Record<string, ScoreRoundRow> = {};
   for (const row of data) {
     if (!row.plant_id || !isPhenoScoreRound(row.round)) continue;

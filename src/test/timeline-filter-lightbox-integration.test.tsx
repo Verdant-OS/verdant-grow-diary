@@ -41,10 +41,46 @@ type Row = {
 };
 
 const ROWS: Row[] = [
-  { id: "e1", note: "Watered today",      photo_url: "https://x/1.jpg", stage: "veg",    plant_id: "p1", tent_id: "t1", details: { event_type: "watering", plant_name: "Blue Dream" },     entry_at: "2025-01-01T00:00:00Z" },
-  { id: "e2", note: "No photo entry",     photo_url: null,              stage: "veg",    plant_id: "p1", tent_id: "t1", details: { event_type: "note",     plant_name: "Blue Dream" },     entry_at: "2025-01-02T00:00:00Z" },
-  { id: "e3", note: "Yellow leaf photo",  photo_url: "https://x/3.jpg", stage: "flower", plant_id: "p2", tent_id: "t1", details: { event_type: "photo",    plant_name: "Northern Lights" },entry_at: "2025-01-03T00:00:00Z" },
-  { id: "e4", note: "Fed nutrients",      photo_url: "https://x/4.jpg", stage: "flower", plant_id: "p2", tent_id: "t1", details: { event_type: "feeding",  plant_name: "Northern Lights" },entry_at: "2025-01-04T00:00:00Z" },
+  {
+    id: "e1",
+    note: "Watered today",
+    photo_url: "https://x/1.jpg",
+    stage: "veg",
+    plant_id: "p1",
+    tent_id: "t1",
+    details: { event_type: "watering", plant_name: "Blue Dream" },
+    entry_at: "2025-01-01T00:00:00Z",
+  },
+  {
+    id: "e2",
+    note: "No photo entry",
+    photo_url: null,
+    stage: "veg",
+    plant_id: "p1",
+    tent_id: "t1",
+    details: { event_type: "note", plant_name: "Blue Dream" },
+    entry_at: "2025-01-02T00:00:00Z",
+  },
+  {
+    id: "e3",
+    note: "Yellow leaf photo",
+    photo_url: "https://x/3.jpg",
+    stage: "flower",
+    plant_id: "p2",
+    tent_id: "t1",
+    details: { event_type: "photo", plant_name: "Northern Lights" },
+    entry_at: "2025-01-03T00:00:00Z",
+  },
+  {
+    id: "e4",
+    note: "Fed nutrients",
+    photo_url: "https://x/4.jpg",
+    stage: "flower",
+    plant_id: "p2",
+    tent_id: "t1",
+    details: { event_type: "feeding", plant_name: "Northern Lights" },
+    entry_at: "2025-01-04T00:00:00Z",
+  },
 ];
 
 function Harness() {
@@ -56,10 +92,7 @@ function Harness() {
     () => filterTimelineEvidenceRows(ROWS, { query, plantId, tentId: "", eventType: "" }),
     [query, plantId],
   );
-  const lightboxItems = useMemo(
-    () => buildTimelinePhotoLightboxList(filtered),
-    [filtered],
-  );
+  const lightboxItems = useMemo(() => buildTimelinePhotoLightboxList(filtered), [filtered]);
   const lightboxIndex = useMemo(
     () => findTimelinePhotoIndexById(lightboxItems, photoId),
     [lightboxItems, photoId],
@@ -93,12 +126,7 @@ function Harness() {
         <option value="p1">p1</option>
         <option value="p2">p2</option>
       </select>
-      <button
-        type="button"
-        data-testid="clear"
-        onClick={clear}
-        disabled={!active}
-      >
+      <button type="button" data-testid="clear" onClick={clear} disabled={!active}>
         Clear filters
       </button>
       <p data-testid="count">
@@ -106,11 +134,7 @@ function Harness() {
       </p>
       <ul>
         {filtered.map((e) => (
-          <li
-            key={e.id}
-            id={`timeline-entry-${e.id}`}
-            data-testid="timeline-entry"
-          >
+          <li key={e.id} id={`timeline-entry-${e.id}`} data-testid="timeline-entry">
             {e.photo_url ? (
               (() => {
                 const idx = findTimelinePhotoIndexById(lightboxItems, e.id);
@@ -251,8 +275,7 @@ describe("Timeline filter + lightbox integration", () => {
  * as `supabase.from("x").delete()` MUST remain blocked. Do not broaden
  * `filterAppDeleteCalls` back into a raw `\.delete\(` scan.
  */
-const URL_PARAM_DELETE_NAMES =
-  /^(next|prev|sp|params|searchParams|urlParams|query|qs)$/i;
+const URL_PARAM_DELETE_NAMES = /^(next|prev|sp|params|searchParams|urlParams|query|qs)$/i;
 const SUPABASE_CHAIN_DELETE = /\.from\([^)]*\)[\s\S]{0,200}?\.delete\(/;
 function filterAppDeleteCalls(source: string): string[] {
   return [...source.matchAll(/([A-Za-z_$][\w$]*)\.delete\(/g)]
@@ -285,8 +308,9 @@ describe("Timeline static-safety guard — URL param allowlist", () => {
 describe("Timeline page source — anchor + label + leak guards", () => {
   const TIMELINE = readFileSync(join(process.cwd(), "src/pages/Timeline.tsx"), "utf8");
 
-  it("renders id=\"timeline-entry-<id>\" on each entry <li>", () => {
-    expect(TIMELINE).toMatch(/id=\{`timeline-entry-\$\{e\.id\}`\}/);
+  it("renders the canonical timeline-entry anchor on each entry <li>", () => {
+    expect(TIMELINE).toMatch(/buildTimelineEntryAnchorId\(e\.id\)/);
+    expect(TIMELINE).toMatch(/id=\{primaryAnchorId\}/);
   });
 
   it("photo button uses accessible Open photo label", () => {
@@ -336,7 +360,9 @@ describe("Timeline page source — anchor + label + leak guards", () => {
     expect(TIMELINE).not.toMatch(/\bai-coach\b/);
     expect(TIMELINE).not.toMatch(/sensor_readings/);
     expect(TIMELINE).not.toMatch(/action_queue\.insert/);
-    expect(TIMELINE).not.toMatch(/\b(turn|activate)\b.*\b(fan|light|pump|heater|humidifier|dehumidifier)\b/i);
+    expect(TIMELINE).not.toMatch(
+      /\b(turn|activate)\b.*\b(fan|light|pump|heater|humidifier|dehumidifier)\b/i,
+    );
     expect(TIMELINE).not.toMatch(/method:\s*["']POST["']/);
   });
 });

@@ -7,7 +7,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import AiDoctorSessionDetail from "@/pages/AiDoctorSessionDetail";
 import type { Diagnosis } from "@/lib/aiDoctorDiagnosisRules";
@@ -20,7 +20,15 @@ vi.mock("@/integrations/supabase/client", () => ({
     from: () => ({
       select: () => ({
         eq: () => ({
-          order: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }),
+          order: () => ({
+            limit: () => {
+              const __c: any = {
+                abortSignal: () => __c,
+                then: (r: any, j?: any) => Promise.resolve({ data: [], error: null }).then(r, j),
+              };
+              return __c;
+            },
+          }),
           maybeSingle: () => Promise.resolve({ data: currentFixture, error: null }),
         }),
       }),
@@ -37,10 +45,7 @@ function renderRoute(row: AiDoctorSessionRow | null) {
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={["/doctor/sessions/sess-x"]}>
         <Routes>
-          <Route
-            path="/doctor/sessions/:sessionId"
-            element={<AiDoctorSessionDetail />}
-          />
+          <Route path="/doctor/sessions/:sessionId" element={<AiDoctorSessionDetail />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -60,8 +65,8 @@ function makeRow(
     possibleCauses: [],
     immediateAction: "",
     whatNotToDo: [],
-    followUp24h: null,
-    recoveryPlan3d: null,
+    followUp24h: null as never,
+    recoveryPlan3d: null as never,
     riskLevel: "low",
     suggestedActions: [],
     ...diagnosisOverrides,
@@ -88,12 +93,8 @@ beforeEach(() => {
 
 describe("Session detail caution banner: compact checklist cue", () => {
   it("renders singular 'Review checklist: 1 check' for one item", async () => {
-    renderRoute(
-      makeRow({}, { displayed_confidence: 0.3, raw_confidence: 0.3 }),
-    );
-    const cue = await screen.findByTestId(
-      "ai-doctor-session-detail-caution-checklist-summary",
-    );
+    renderRoute(makeRow({}, { displayed_confidence: 0.3, raw_confidence: 0.3 }));
+    const cue = await screen.findByTestId("ai-doctor-session-detail-caution-checklist-summary");
     expect(cue.textContent).toBe("Review checklist: 1 check");
     expect(cue.getAttribute("aria-label")).toMatch(/^Review checklist: /);
     expect(cue.getAttribute("title")).toMatch(/^Review checklist: /);
@@ -106,9 +107,7 @@ describe("Session detail caution banner: compact checklist cue", () => {
         { displayed_confidence: 0.3, raw_confidence: 0.3 },
       ),
     );
-    const cue = await screen.findByTestId(
-      "ai-doctor-session-detail-caution-checklist-summary",
-    );
+    const cue = await screen.findByTestId("ai-doctor-session-detail-caution-checklist-summary");
     expect(cue.textContent).toBe("Review checklist: 3 checks");
   });
 
@@ -117,25 +116,15 @@ describe("Session detail caution banner: compact checklist cue", () => {
     await screen.findByTestId("ai-doctor-session-detail-risk-badge").catch(() => null);
     // wait for content to settle
     await screen.findByText(/Likely issue|Summary/i).catch(() => null);
-    expect(
-      screen.queryByTestId("ai-doctor-session-detail-caution-checklist-summary"),
-    ).toBeNull();
-    expect(
-      screen.queryByTestId("ai-doctor-session-detail-caution-note"),
-    ).toBeNull();
+    expect(screen.queryByTestId("ai-doctor-session-detail-caution-checklist-summary")).toBeNull();
+    expect(screen.queryByTestId("ai-doctor-session-detail-caution-note")).toBeNull();
   });
 
   it("keeps existing full checklist + 'Review because:' description rendering", async () => {
-    renderRoute(
-      makeRow({}, { displayed_confidence: 0.3, raw_confidence: 0.3 }),
-    );
-    const fullChecklist = await screen.findByTestId(
-      "ai-doctor-session-detail-caution-checklist",
-    );
+    renderRoute(makeRow({}, { displayed_confidence: 0.3, raw_confidence: 0.3 }));
+    const fullChecklist = await screen.findByTestId("ai-doctor-session-detail-caution-checklist");
     expect(fullChecklist).toBeTruthy();
-    const reason = screen.getByTestId(
-      "ai-doctor-session-detail-caution-reason",
-    );
+    const reason = screen.getByTestId("ai-doctor-session-detail-caution-reason");
     expect(reason.textContent).toMatch(/^Review because: /);
   });
 });

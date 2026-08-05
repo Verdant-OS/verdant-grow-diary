@@ -76,6 +76,55 @@ function check(name: string, ok: boolean, detail?: string | null): void {
   console.log(`  ✗ ${name}${detail ? ` (${detail})` : ""}`);
 }
 
+interface HarnessError {
+  code?: string | null;
+  message?: string | null;
+  details?: string | null;
+  hint?: string | null;
+}
+
+function errorDetail(error: HarnessError | null | undefined): string {
+  if (!error) return "no_error_no_row";
+  return [
+    `code=${error.code ?? "none"}`,
+    error.message ? `message=${error.message}` : null,
+    error.details ? `details=${error.details}` : null,
+    error.hint ? `hint=${error.hint}` : null,
+  ]
+    .filter(Boolean)
+    .join("; ");
+}
+
+// PostgREST and SQLSTATE verdicts always carry an error code; transport-level
+// failures (socket resets, gateway 5xx bodies) do not. Only code-less errors
+// may retry, so a retry can never re-litigate a real allow/deny verdict, and
+// every deny assertion is still decided by the authoritative service readback.
+const FIXTURE_TRANSPORT_ATTEMPTS = 3;
+
+function isTransportError(error: HarnessError | null | undefined): boolean {
+  return !!error && !error.code;
+}
+
+async function withTransportRetry<R extends { error: HarnessError | null }>(
+  label: string,
+  run: () => PromiseLike<R>,
+): Promise<R> {
+  let result = await run();
+  for (
+    let attempt = 2;
+    attempt <= FIXTURE_TRANSPORT_ATTEMPTS && isTransportError(result.error);
+    attempt += 1
+  ) {
+    console.error(
+      `  ! transport error on "${label}" (retry ${attempt}/${FIXTURE_TRANSPORT_ATTEMPTS}): ` +
+        errorDetail(result.error),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 250 * (attempt - 1)));
+    result = await run();
+  }
+  return result;
+}
+
 async function createUser(label: string) {
   const password = `Verdant!${crypto.randomUUID()}`;
   const email = `vpd-provenance-${label}-${crypto.randomUUID()}@verdant.test`;
@@ -84,7 +133,7 @@ async function createUser(label: string) {
     password,
     email_confirm: true,
   });
-  if (error || !data.user) throw new Error(`fixture_user_create_${error?.code ?? "failed"}`);
+  if (error || !data.user) throw new Error(`fixture_user_create_${errorDetail(error)}`);
   return { id: data.user.id, email, password };
 }
 
@@ -93,17 +142,17 @@ async function signIn(email: string, password: string): Promise<SupabaseClient> 
     auth: { autoRefreshToken: false, persistSession: false },
   });
   const { error } = await client.auth.signInWithPassword({ email, password });
-  if (error) throw new Error(`fixture_sign_in_${error.code ?? "failed"}`);
+  if (error) throw new Error(`fixture_sign_in_${errorDetail(error)}`);
   return client;
 }
 
-async function seedTent(userId: string, label: string): Promise<string> {
-  const { data, error } = await admin
+async function seedTent(client: SupabaseClient, userId: string, label: string): Promise<string> {
+  const { data, error } = await client
     .from("tents")
     .insert({ user_id: userId, name: `VPD provenance ${label}` })
     .select("id")
     .single();
-  if (error || !data?.id) throw new Error(`fixture_tent_${error?.code ?? "failed"}`);
+  if (error || !data?.id) throw new Error(`fixture_tent_${errorDetail(error)}`);
   return data.id as string;
 }
 
@@ -131,6 +180,9 @@ async function seedReadingSet(args: {
   legacyTsOnly?: boolean;
 }): Promise<ReadingSet> {
   const observedAt = new Date(Date.now() - args.minutesAgo * 60_000).toISOString();
+  const airId = crypto.randomUUID();
+  const humidityId = crypto.randomUUID();
+  const vpdId = crypto.randomUUID();
   const base = {
     user_id: args.userId,
     tent_id: args.tentId,
@@ -140,11 +192,11 @@ async function seedReadingSet(args: {
     ts: observedAt,
     raw_payload: { harness: args.label },
   };
-  const { data, error } = await admin
-    .from("sensor_readings")
-    .insert([
+  const { error } = await withTransportRetry(`readings fixture ${args.label}`, () =>
+    admin.from("sensor_readings").insert([
       {
         ...base,
+        id: airId,
         metric: "temperature_c",
         value: args.airValue ?? 25,
         device_id: args.airDeviceId === undefined ? "vpd-probe-1" : args.airDeviceId,
@@ -152,6 +204,7 @@ async function seedReadingSet(args: {
       },
       {
         ...base,
+        id: humidityId,
         metric: "humidity_pct",
         value: args.humidityValue ?? 60,
         device_id: args.humidityDeviceId === undefined ? "vpd-probe-1" : args.humidityDeviceId,
@@ -159,22 +212,17 @@ async function seedReadingSet(args: {
       },
       {
         ...base,
+        id: vpdId,
         metric: "vpd_kpa",
         value: args.vpdValue ?? 0.73,
         device_id: args.vpdDeviceId === undefined ? "vpd-probe-1" : args.vpdDeviceId,
         source: args.vpdSource ?? "manual",
       },
-    ])
-    .select("id,metric");
-  if (error || data?.length !== 3) {
-    throw new Error(`fixture_readings_${error?.code ?? "failed"}`);
+    ]),
+  );
+  if (error) {
+    throw new Error(`fixture_readings_${errorDetail(error)}`);
   }
-  const idFor = (metric: string) =>
-    data.find((row) => row.metric === metric)?.id as string | undefined;
-  const airId = idFor("temperature_c");
-  const humidityId = idFor("humidity_pct");
-  const vpdId = idFor("vpd_kpa");
-  if (!airId || !humidityId || !vpdId) throw new Error("fixture_reading_ids_missing");
   return { airId, humidityId, vpdId, observedAt };
 }
 
@@ -258,14 +306,15 @@ async function expectInsertDenied(args: {
 }): Promise<void> {
   const expectedDatabaseErrorCodes = new Set(["23503", "23514", "42501", "P0001"]);
   const id = crypto.randomUUID();
-  const { error } = await args.client
-    .from(args.table)
-    .insert({ ...args.row, id })
-    .select("id");
-  const { count, error: readbackError } = await admin
-    .from(args.table)
-    .select("id", { count: "exact", head: true })
-    .eq("id", id);
+  const { error } = await withTransportRetry(args.label, () =>
+    args.client
+      .from(args.table)
+      .insert({ ...args.row, id })
+      .select("id"),
+  );
+  const { count, error: readbackError } = await withTransportRetry(`${args.label} readback`, () =>
+    admin.from(args.table).select("id", { count: "exact", head: true }).eq("id", id),
+  );
   check(
     args.label,
     !!error?.code && expectedDatabaseErrorCodes.has(error.code) && !readbackError && count === 0,
@@ -300,25 +349,31 @@ async function main(): Promise<void> {
   try {
     owner = await createUser("owner");
     other = await createUser("other");
-    const ownerTentId = await seedTent(owner.id, "owner tent");
-    const otherTentId = await seedTent(other.id, "other tent");
-    tentIds.push(ownerTentId, otherTentId);
-
     const ownerClient = await signIn(owner.email, owner.password);
     const otherClient = await signIn(other.email, other.password);
+    const ownerTentId = await seedTent(ownerClient, owner.id, "owner tent");
+    const otherTentId = await seedTent(otherClient, other.id, "other tent");
+    tentIds.push(ownerTentId, otherTentId);
+
     const verifiedAt = new Date(Date.now() - 30 * 24 * 60 * 60_000).toISOString();
 
-    const { data: calibration, error: calibrationError } = await ownerClient
-      .from("vpd_calibration_records")
-      .insert(calibrationRow({ userId: owner.id, tentId: ownerTentId, verifiedAt }))
-      .select("id")
-      .single();
+    const { data: calibration, error: calibrationError } = await withTransportRetry(
+      "valid calibration fixture",
+      () =>
+        ownerClient
+          .from("vpd_calibration_records")
+          .insert(calibrationRow({ userId: owner!.id, tentId: ownerTentId, verifiedAt }))
+          .select("id")
+          .single(),
+    );
     check(
       "authenticated owner can insert current canopy calibration",
       !calibrationError && !!calibration?.id,
       calibrationError?.code,
     );
-    if (!calibration?.id) throw new Error("valid_calibration_missing");
+    if (!calibration?.id) {
+      throw new Error(`valid_calibration_missing_${errorDetail(calibrationError)}`);
+    }
     const validCalibrationId = calibration.id as string;
     calibrationIds.push(validCalibrationId);
 
@@ -350,42 +405,56 @@ async function main(): Promise<void> {
       ["minus 20 C calibration boundary is accepted", -20],
       ["60 C calibration boundary is accepted", 60],
     ] as const) {
-      const { data, error } = await ownerClient
-        .from("vpd_calibration_records")
-        .insert(
-          calibrationRow({
-            userId: owner.id,
-            tentId: ownerTentId,
-            verifiedAt,
-            temperatureReferenceValue: temperature,
-            temperatureSensorValue: temperature,
-          }),
-        )
-        .select("id")
-        .single();
+      const { data, error } = await withTransportRetry(label, () =>
+        ownerClient
+          .from("vpd_calibration_records")
+          .insert(
+            calibrationRow({
+              userId: owner!.id,
+              tentId: ownerTentId,
+              verifiedAt,
+              temperatureReferenceValue: temperature,
+              temperatureSensorValue: temperature,
+            }),
+          )
+          .select("id")
+          .single(),
+      );
       check(label, !error && !!data?.id, error?.code);
-      if (!data?.id) throw new Error(`temperature_boundary_calibration_${temperature}_missing`);
+      if (!data?.id) {
+        throw new Error(
+          `temperature_boundary_calibration_${temperature}_missing_${errorDetail(error)}`,
+        );
+      }
       calibrationIds.push(data.id as string);
     }
 
-    const { data: upperRhCalibration, error: upperRhCalibrationError } = await ownerClient
-      .from("vpd_calibration_records")
-      .insert(
-        calibrationRow({
-          userId: owner.id,
-          tentId: ownerTentId,
-          verifiedAt,
-          humidityReference: 100,
-        }),
-      )
-      .select("id")
-      .single();
+    const { data: upperRhCalibration, error: upperRhCalibrationError } = await withTransportRetry(
+      "100 percent RH boundary fixture",
+      () =>
+        ownerClient
+          .from("vpd_calibration_records")
+          .insert(
+            calibrationRow({
+              userId: owner!.id,
+              tentId: ownerTentId,
+              verifiedAt,
+              humidityReference: 100,
+            }),
+          )
+          .select("id")
+          .single(),
+    );
     check(
       "100 percent RH reference boundary is accepted",
       !upperRhCalibrationError && !!upperRhCalibration?.id,
       upperRhCalibrationError?.code,
     );
-    if (!upperRhCalibration?.id) throw new Error("upper_rh_boundary_calibration_missing");
+    if (!upperRhCalibration?.id) {
+      throw new Error(
+        `upper_rh_boundary_calibration_missing_${errorDetail(upperRhCalibrationError)}`,
+      );
+    }
     calibrationIds.push(upperRhCalibration.id as string);
 
     for (const [label, temperature] of [
@@ -446,24 +515,29 @@ async function main(): Promise<void> {
       minutesAgo: 4,
     });
     readingIds.push(validReadings.airId, validReadings.humidityId, validReadings.vpdId);
-    const { data: provenance, error: provenanceError } = await ownerClient
-      .from("vpd_measurement_provenance")
-      .insert(
-        leafProvenanceRow({
-          userId: owner.id,
-          tentId: ownerTentId,
-          readings: validReadings,
-          calibrationId: validCalibrationId,
-        }),
-      )
-      .select("id")
-      .single();
+    const { data: provenance, error: provenanceError } = await withTransportRetry(
+      "valid provenance fixture",
+      () =>
+        ownerClient
+          .from("vpd_measurement_provenance")
+          .insert(
+            leafProvenanceRow({
+              userId: owner!.id,
+              tentId: ownerTentId,
+              readings: validReadings,
+              calibrationId: validCalibrationId,
+            }),
+          )
+          .select("id")
+          .single(),
+    );
     check(
       "authenticated owner can insert formula-matched leaf provenance",
       !provenanceError && !!provenance?.id,
       provenanceError?.code,
     );
-    if (!provenance?.id) throw new Error("valid_provenance_missing");
+    if (!provenance?.id)
+      throw new Error(`valid_provenance_missing_${errorDetail(provenanceError)}`);
     const validProvenanceId = provenance.id as string;
     provenanceIds.push(validProvenanceId);
 
@@ -495,22 +569,23 @@ async function main(): Promise<void> {
       otherProvenanceReadError?.code,
     );
 
-    const { data: nonCanopyCalibration, error: nonCanopyCalibrationError } = await ownerClient
-      .from("vpd_calibration_records")
-      .insert(
-        calibrationRow({
-          userId: owner.id,
-          tentId: ownerTentId,
-          verifiedAt,
-          placement: "above_canopy",
-        }),
-      )
-      .select("id")
-      .single();
-    if (nonCanopyCalibrationError || !nonCanopyCalibration?.id) {
-      throw new Error(
-        `non_canopy_calibration_fixture_${nonCanopyCalibrationError?.code ?? "failed"}`,
+    const { data: nonCanopyCalibration, error: nonCanopyCalibrationError } =
+      await withTransportRetry("non-canopy calibration fixture", () =>
+        ownerClient
+          .from("vpd_calibration_records")
+          .insert(
+            calibrationRow({
+              userId: owner!.id,
+              tentId: ownerTentId,
+              verifiedAt,
+              placement: "above_canopy",
+            }),
+          )
+          .select("id")
+          .single(),
       );
+    if (nonCanopyCalibrationError || !nonCanopyCalibration?.id) {
+      throw new Error(`non_canopy_calibration_fixture_${errorDetail(nonCanopyCalibrationError)}`);
     }
     calibrationIds.push(nonCanopyCalibration.id as string);
     const nonCanopyReadings = await seedReadingSet({
@@ -533,15 +608,19 @@ async function main(): Promise<void> {
     });
 
     const staleVerifiedAt = new Date(Date.now() - 366 * 24 * 60 * 60_000).toISOString();
-    const { data: staleCalibration, error: staleCalibrationError } = await ownerClient
-      .from("vpd_calibration_records")
-      .insert(
-        calibrationRow({ userId: owner.id, tentId: ownerTentId, verifiedAt: staleVerifiedAt }),
-      )
-      .select("id")
-      .single();
+    const { data: staleCalibration, error: staleCalibrationError } = await withTransportRetry(
+      "stale calibration fixture",
+      () =>
+        ownerClient
+          .from("vpd_calibration_records")
+          .insert(
+            calibrationRow({ userId: owner!.id, tentId: ownerTentId, verifiedAt: staleVerifiedAt }),
+          )
+          .select("id")
+          .single(),
+    );
     if (staleCalibrationError || !staleCalibration?.id) {
-      throw new Error(`stale_calibration_fixture_${staleCalibrationError?.code ?? "failed"}`);
+      throw new Error(`stale_calibration_fixture_${errorDetail(staleCalibrationError)}`);
     }
     calibrationIds.push(staleCalibration.id as string);
     const staleReadings = await seedReadingSet({
@@ -707,46 +786,60 @@ async function main(): Promise<void> {
       minutesAgo: 3,
       vpdValue: negativeVpd,
     });
-    const { data: negativeProvenance, error: negativeProvenanceError } = await ownerClient
-      .from("vpd_measurement_provenance")
-      .insert(
-        leafProvenanceRow({
-          userId: owner.id,
-          tentId: ownerTentId,
-          readings: negativeReadings,
-          calibrationId: validCalibrationId,
-          leafTemperature: negativeLeafTemperature,
-        }),
-      )
-      .select("id")
-      .single();
+    const { data: negativeProvenance, error: negativeProvenanceError } = await withTransportRetry(
+      "negative leaf VPD provenance fixture",
+      () =>
+        ownerClient
+          .from("vpd_measurement_provenance")
+          .insert(
+            leafProvenanceRow({
+              userId: owner!.id,
+              tentId: ownerTentId,
+              readings: negativeReadings,
+              calibrationId: validCalibrationId,
+              leafTemperature: negativeLeafTemperature,
+            }),
+          )
+          .select("id")
+          .single(),
+    );
     check(
       "formula-matched negative leaf VPD is preserved",
       negativeVpd < 0 && !negativeProvenanceError && !!negativeProvenance?.id,
       negativeProvenanceError?.code,
     );
-    if (!negativeProvenance?.id) throw new Error("negative_leaf_vpd_provenance_missing");
+    if (!negativeProvenance?.id) {
+      throw new Error(
+        `negative_leaf_vpd_provenance_missing_${errorDetail(negativeProvenanceError)}`,
+      );
+    }
     provenanceIds.push(negativeProvenance.id as string);
 
     for (const [label, temperature] of [
       ["minus 20 C measurement boundary is accepted", -20],
       ["60 C measurement boundary is accepted", 60],
     ] as const) {
-      const { data: boundaryCalibration, error: boundaryCalibrationError } = await ownerClient
-        .from("vpd_calibration_records")
-        .insert(
-          calibrationRow({
-            userId: owner.id,
-            tentId: ownerTentId,
-            verifiedAt,
-            temperatureReferenceValue: temperature,
-            temperatureSensorValue: temperature,
-          }),
-        )
-        .select("id")
-        .single();
+      const { data: boundaryCalibration, error: boundaryCalibrationError } =
+        await withTransportRetry(`measurement boundary calibration fixture ${temperature}`, () =>
+          ownerClient
+            .from("vpd_calibration_records")
+            .insert(
+              calibrationRow({
+                userId: owner!.id,
+                tentId: ownerTentId,
+                verifiedAt,
+                temperatureReferenceValue: temperature,
+                temperatureSensorValue: temperature,
+              }),
+            )
+            .select("id")
+            .single(),
+        );
       if (boundaryCalibrationError || !boundaryCalibration?.id) {
-        throw new Error(`measurement_boundary_calibration_${temperature}_missing`);
+        throw new Error(
+          `measurement_boundary_calibration_${temperature}_missing_` +
+            errorDetail(boundaryCalibrationError),
+        );
       }
       calibrationIds.push(boundaryCalibration.id as string);
       const boundaryVpd = expectedLeafVpd({
@@ -763,21 +856,25 @@ async function main(): Promise<void> {
         airValue: temperature,
         vpdValue: boundaryVpd,
       });
-      const { data, error } = await ownerClient
-        .from("vpd_measurement_provenance")
-        .insert(
-          leafProvenanceRow({
-            userId: owner.id,
-            tentId: ownerTentId,
-            readings,
-            calibrationId: boundaryCalibration.id as string,
-            leafTemperature: temperature,
-          }),
-        )
-        .select("id")
-        .single();
+      const { data, error } = await withTransportRetry(label, () =>
+        ownerClient
+          .from("vpd_measurement_provenance")
+          .insert(
+            leafProvenanceRow({
+              userId: owner!.id,
+              tentId: ownerTentId,
+              readings,
+              calibrationId: boundaryCalibration.id as string,
+              leafTemperature: temperature,
+            }),
+          )
+          .select("id")
+          .single(),
+      );
       check(label, !error && !!data?.id, error?.code);
-      if (!data?.id) throw new Error(`measurement_boundary_${temperature}_missing`);
+      if (!data?.id) {
+        throw new Error(`measurement_boundary_${temperature}_missing_${errorDetail(error)}`);
+      }
       provenanceIds.push(data.id as string);
     }
 
@@ -829,74 +926,114 @@ async function main(): Promise<void> {
       });
     }
 
-    const { error: updateError } = await ownerClient
-      .from("vpd_calibration_records")
-      .update({ notes: "must remain immutable" })
-      .eq("id", validCalibrationId);
-    const { data: updateReadback, error: updateReadbackError } = await admin
-      .from("vpd_calibration_records")
-      .select("notes")
-      .eq("id", validCalibrationId)
-      .single();
+    const { error: updateError } = await withTransportRetry("calibration UPDATE attempt", () =>
+      ownerClient
+        .from("vpd_calibration_records")
+        .update({ notes: "must remain immutable" })
+        .eq("id", validCalibrationId),
+    );
+    const { data: updateReadback, error: updateReadbackError } = await withTransportRetry(
+      "calibration UPDATE readback",
+      () =>
+        admin.from("vpd_calibration_records").select("notes").eq("id", validCalibrationId).single(),
+    );
     check(
       "calibration UPDATE is denied",
-      !updateReadbackError && updateReadback?.notes !== "must remain immutable",
+      !isTransportError(updateError) &&
+        !updateReadbackError &&
+        updateReadback?.notes !== "must remain immutable",
       updateError?.code ?? updateReadbackError?.code,
     );
 
-    const { error: deleteError } = await ownerClient
-      .from("vpd_calibration_records")
-      .delete()
-      .eq("id", validCalibrationId);
-    const { count: afterDeleteCount, error: deleteReadbackError } = await admin
-      .from("vpd_calibration_records")
-      .select("id", { count: "exact", head: true })
-      .eq("id", validCalibrationId);
+    const { error: deleteError } = await withTransportRetry("calibration DELETE attempt", () =>
+      ownerClient.from("vpd_calibration_records").delete().eq("id", validCalibrationId),
+    );
+    const { count: afterDeleteCount, error: deleteReadbackError } = await withTransportRetry(
+      "calibration DELETE readback",
+      () =>
+        admin
+          .from("vpd_calibration_records")
+          .select("id", { count: "exact", head: true })
+          .eq("id", validCalibrationId),
+    );
     check(
       "calibration DELETE is denied",
-      !deleteReadbackError && afterDeleteCount === 1,
+      !isTransportError(deleteError) && !deleteReadbackError && afterDeleteCount === 1,
       deleteError?.code ?? deleteReadbackError?.code,
     );
 
-    const { error: provenanceUpdateError } = await ownerClient
-      .from("vpd_measurement_provenance")
-      .update({ algorithm_version: "must_remain_immutable" })
-      .eq("id", validProvenanceId);
-    const { data: provenanceUpdateReadback, error: provenanceUpdateReadbackError } = await admin
-      .from("vpd_measurement_provenance")
-      .select("algorithm_version")
-      .eq("id", validProvenanceId)
-      .single();
+    const { error: provenanceUpdateError } = await withTransportRetry(
+      "provenance UPDATE attempt",
+      () =>
+        ownerClient
+          .from("vpd_measurement_provenance")
+          .update({ algorithm_version: "must_remain_immutable" })
+          .eq("id", validProvenanceId),
+    );
+    const { data: provenanceUpdateReadback, error: provenanceUpdateReadbackError } =
+      await withTransportRetry("provenance UPDATE readback", () =>
+        admin
+          .from("vpd_measurement_provenance")
+          .select("algorithm_version")
+          .eq("id", validProvenanceId)
+          .single(),
+      );
     check(
       "provenance UPDATE is denied",
-      !provenanceUpdateReadbackError &&
+      !isTransportError(provenanceUpdateError) &&
+        !provenanceUpdateReadbackError &&
         provenanceUpdateReadback?.algorithm_version === "tetens_leaf_air_v1",
       provenanceUpdateError?.code ?? provenanceUpdateReadbackError?.code,
     );
 
-    const { error: provenanceDeleteError } = await ownerClient
-      .from("vpd_measurement_provenance")
-      .delete()
-      .eq("id", validProvenanceId);
-    const { count: provenanceAfterDeleteCount, error: provenanceDeleteReadbackError } = await admin
-      .from("vpd_measurement_provenance")
-      .select("id", { count: "exact", head: true })
-      .eq("id", validProvenanceId);
+    const { error: provenanceDeleteError } = await withTransportRetry(
+      "provenance DELETE attempt",
+      () => ownerClient.from("vpd_measurement_provenance").delete().eq("id", validProvenanceId),
+    );
+    const { count: provenanceAfterDeleteCount, error: provenanceDeleteReadbackError } =
+      await withTransportRetry("provenance DELETE readback", () =>
+        admin
+          .from("vpd_measurement_provenance")
+          .select("id", { count: "exact", head: true })
+          .eq("id", validProvenanceId),
+      );
     check(
       "provenance DELETE is denied",
-      !provenanceDeleteReadbackError && provenanceAfterDeleteCount === 1,
+      !isTransportError(provenanceDeleteError) &&
+        !provenanceDeleteReadbackError &&
+        provenanceAfterDeleteCount === 1,
       provenanceDeleteError?.code ?? provenanceDeleteReadbackError?.code,
     );
 
-    const cascadeTentId = await seedTent(owner.id, "tent delete cascade");
+    // The Free plan permits one active tent. All owner-scoped provenance
+    // assertions above are complete, so archive the first fixture before
+    // creating the separate tent-delete cascade fixture.
+    const { data: archivedOwnerTent, error: archiveOwnerTentError } = await withTransportRetry(
+      "free tent slot release",
+      () =>
+        ownerClient
+          .from("tents")
+          .update({ is_archived: true })
+          .eq("id", ownerTentId)
+          .select("id,is_archived")
+          .single(),
+    );
+    if (archiveOwnerTentError || archivedOwnerTent?.is_archived !== true) {
+      throw new Error(`free_tent_slot_release_${errorDetail(archiveOwnerTentError)}`);
+    }
+
+    const cascadeTentId = await seedTent(ownerClient, owner.id, "tent delete cascade");
     tentIds.push(cascadeTentId);
-    const { data: cascadeTentCalibration, error: cascadeTentCalibrationError } = await ownerClient
-      .from("vpd_calibration_records")
-      .insert(calibrationRow({ userId: owner.id, tentId: cascadeTentId, verifiedAt }))
-      .select("id")
-      .single();
+    const { data: cascadeTentCalibration, error: cascadeTentCalibrationError } =
+      await withTransportRetry("tent cascade calibration fixture", () =>
+        ownerClient
+          .from("vpd_calibration_records")
+          .insert(calibrationRow({ userId: owner!.id, tentId: cascadeTentId, verifiedAt }))
+          .select("id")
+          .single(),
+      );
     if (cascadeTentCalibrationError || !cascadeTentCalibration?.id) {
-      throw new Error(`tent_cascade_calibration_${cascadeTentCalibrationError?.code ?? "failed"}`);
+      throw new Error(`tent_cascade_calibration_${errorDetail(cascadeTentCalibrationError)}`);
     }
     calibrationIds.push(cascadeTentCalibration.id as string);
     const cascadeTentReadings = await seedTrackedReadings({
@@ -905,20 +1042,23 @@ async function main(): Promise<void> {
       label: "tent delete cascade",
       minutesAgo: 2,
     });
-    const { data: cascadeTentProvenance, error: cascadeTentProvenanceError } = await ownerClient
-      .from("vpd_measurement_provenance")
-      .insert(
-        leafProvenanceRow({
-          userId: owner.id,
-          tentId: cascadeTentId,
-          readings: cascadeTentReadings,
-          calibrationId: cascadeTentCalibration.id as string,
-        }),
-      )
-      .select("id")
-      .single();
+    const { data: cascadeTentProvenance, error: cascadeTentProvenanceError } =
+      await withTransportRetry("tent cascade provenance fixture", () =>
+        ownerClient
+          .from("vpd_measurement_provenance")
+          .insert(
+            leafProvenanceRow({
+              userId: owner!.id,
+              tentId: cascadeTentId,
+              readings: cascadeTentReadings,
+              calibrationId: cascadeTentCalibration.id as string,
+            }),
+          )
+          .select("id")
+          .single(),
+      );
     if (cascadeTentProvenanceError || !cascadeTentProvenance?.id) {
-      throw new Error(`tent_cascade_provenance_${cascadeTentProvenanceError?.code ?? "failed"}`);
+      throw new Error(`tent_cascade_provenance_${errorDetail(cascadeTentProvenanceError)}`);
     }
     provenanceIds.push(cascadeTentProvenance.id as string);
     const { error: cascadeTentDeleteError } = await ownerClient
@@ -926,15 +1066,21 @@ async function main(): Promise<void> {
       .delete()
       .eq("id", cascadeTentId);
     const [tentCalibrationReadback, tentProvenanceReadback, tentReadback] = await Promise.all([
-      admin
-        .from("vpd_calibration_records")
-        .select("id", { count: "exact", head: true })
-        .eq("id", cascadeTentCalibration.id as string),
-      admin
-        .from("vpd_measurement_provenance")
-        .select("id", { count: "exact", head: true })
-        .eq("id", cascadeTentProvenance.id as string),
-      admin.from("tents").select("id", { count: "exact", head: true }).eq("id", cascadeTentId),
+      withTransportRetry("tent cascade calibration readback", () =>
+        admin
+          .from("vpd_calibration_records")
+          .select("id", { count: "exact", head: true })
+          .eq("id", cascadeTentCalibration.id as string),
+      ),
+      withTransportRetry("tent cascade provenance readback", () =>
+        admin
+          .from("vpd_measurement_provenance")
+          .select("id", { count: "exact", head: true })
+          .eq("id", cascadeTentProvenance.id as string),
+      ),
+      withTransportRetry("tent cascade tent readback", () =>
+        admin.from("tents").select("id", { count: "exact", head: true }).eq("id", cascadeTentId),
+      ),
     ]);
     check(
       "tent deletion cascades calibration and provenance safely",
@@ -953,16 +1099,24 @@ async function main(): Promise<void> {
 
     cascadeUser = await createUser("auth-delete-cascade");
     const cascadeUserClient = await signIn(cascadeUser.email, cascadeUser.password);
-    const cascadeUserTentId = await seedTent(cascadeUser.id, "auth user delete cascade");
+    const cascadeUserTentId = await seedTent(
+      cascadeUserClient,
+      cascadeUser.id,
+      "auth user delete cascade",
+    );
     tentIds.push(cascadeUserTentId);
     const { data: cascadeUserCalibration, error: cascadeUserCalibrationError } =
-      await cascadeUserClient
-        .from("vpd_calibration_records")
-        .insert(calibrationRow({ userId: cascadeUser.id, tentId: cascadeUserTentId, verifiedAt }))
-        .select("id")
-        .single();
+      await withTransportRetry("user cascade calibration fixture", () =>
+        cascadeUserClient
+          .from("vpd_calibration_records")
+          .insert(
+            calibrationRow({ userId: cascadeUser!.id, tentId: cascadeUserTentId, verifiedAt }),
+          )
+          .select("id")
+          .single(),
+      );
     if (cascadeUserCalibrationError || !cascadeUserCalibration?.id) {
-      throw new Error(`user_cascade_calibration_${cascadeUserCalibrationError?.code ?? "failed"}`);
+      throw new Error(`user_cascade_calibration_${errorDetail(cascadeUserCalibrationError)}`);
     }
     calibrationIds.push(cascadeUserCalibration.id as string);
     const cascadeUserReadings = await seedTrackedReadings({
@@ -972,32 +1126,38 @@ async function main(): Promise<void> {
       minutesAgo: 2,
     });
     const { data: cascadeUserProvenance, error: cascadeUserProvenanceError } =
-      await cascadeUserClient
-        .from("vpd_measurement_provenance")
-        .insert(
-          leafProvenanceRow({
-            userId: cascadeUser.id,
-            tentId: cascadeUserTentId,
-            readings: cascadeUserReadings,
-            calibrationId: cascadeUserCalibration.id as string,
-          }),
-        )
-        .select("id")
-        .single();
+      await withTransportRetry("user cascade provenance fixture", () =>
+        cascadeUserClient
+          .from("vpd_measurement_provenance")
+          .insert(
+            leafProvenanceRow({
+              userId: cascadeUser!.id,
+              tentId: cascadeUserTentId,
+              readings: cascadeUserReadings,
+              calibrationId: cascadeUserCalibration.id as string,
+            }),
+          )
+          .select("id")
+          .single(),
+      );
     if (cascadeUserProvenanceError || !cascadeUserProvenance?.id) {
-      throw new Error(`user_cascade_provenance_${cascadeUserProvenanceError?.code ?? "failed"}`);
+      throw new Error(`user_cascade_provenance_${errorDetail(cascadeUserProvenanceError)}`);
     }
     provenanceIds.push(cascadeUserProvenance.id as string);
     const { error: cascadeUserDeleteError } = await admin.auth.admin.deleteUser(cascadeUser.id);
     const [userCalibrationReadback, userProvenanceReadback] = await Promise.all([
-      admin
-        .from("vpd_calibration_records")
-        .select("id", { count: "exact", head: true })
-        .eq("id", cascadeUserCalibration.id as string),
-      admin
-        .from("vpd_measurement_provenance")
-        .select("id", { count: "exact", head: true })
-        .eq("id", cascadeUserProvenance.id as string),
+      withTransportRetry("user cascade calibration readback", () =>
+        admin
+          .from("vpd_calibration_records")
+          .select("id", { count: "exact", head: true })
+          .eq("id", cascadeUserCalibration.id as string),
+      ),
+      withTransportRetry("user cascade provenance readback", () =>
+        admin
+          .from("vpd_measurement_provenance")
+          .select("id", { count: "exact", head: true })
+          .eq("id", cascadeUserProvenance.id as string),
+      ),
     ]);
     check(
       "auth user deletion cascades calibration and provenance safely",

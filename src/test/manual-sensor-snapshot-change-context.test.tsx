@@ -5,11 +5,16 @@
  * (static + behavioral). Read-only derivation only. No new schema,
  * persistence, RPC, ingestion, alerts, action_queue, automation,
  * device control, or service_role.
+ *
+ * Integration suite uses top-level vi.mock + static DailyCheck import.
+ * Do NOT use vi.resetModules() + dynamic import("@/pages/DailyCheck"):
+ * that re-import path hangs indefinitely under Vitest (blocks shard 6/32
+ * sub-shard 44 and the scanner-guardrail CI sentinel).
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
-import { render, screen, fireEvent, act, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { render, screen, act } from "@testing-library/react";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 
@@ -25,9 +30,72 @@ import {
 import { installScannerGuardrail } from "./support/scannerGuardrailHarness";
 installScannerGuardrail({ file: __filename });
 
-
 const T1 = "2026-05-24T09:00:00Z";
 const T2 = "2026-05-24T15:00:00Z";
+
+// ---------------------------------------------------------------------------
+// Stable mocks for DailyCheck integration (same pattern as
+// daily-check-post-submit.test.tsx). Mutable readings array so tests can
+// toggle prior-snapshot data without re-importing the page module.
+// ---------------------------------------------------------------------------
+const mockTents = [{ id: "tent-1", name: "Veg Tent", grow_id: "grow-1" }];
+const mockPlants = [{ id: "plant-1", name: "Plant 1", tent_id: "tent-1", grow_id: "grow-1" }];
+let mockSensorReadings: Array<{
+  ts: string;
+  metric: string;
+  value: number;
+  source: string;
+  tent_id: string;
+}> = [];
+
+vi.mock("@/hooks/use-tents", () => ({
+  useTents: () => ({ data: mockTents, isLoading: false }),
+}));
+vi.mock("@/hooks/use-plants", () => ({
+  usePlants: () => ({ data: mockPlants, isLoading: false }),
+}));
+vi.mock("@/hooks/useScopedGrow", () => ({
+  useScopedGrow: () => ({
+    urlGrowId: "grow-1",
+    scopedGrow: null,
+    scopedGrowName: null,
+    isValidScopedGrow: true,
+    backHref: undefined,
+  }),
+}));
+vi.mock("@/hooks/use-sensor-readings", () => ({
+  useSensorReadings: () => ({ data: mockSensorReadings }),
+}));
+vi.mock("@/components/QuickLog", () => ({
+  default: () => <div data-testid="mock-quicklog" />,
+}));
+vi.mock("@/components/ManualSensorReadingCard", () => ({
+  default: () => <div data-testid="mock-manual-card" />,
+}));
+vi.mock("@/components/PlantStatusStrip", () => ({ default: () => null }));
+vi.mock("@/components/PlantAssignedTentAlertsPanel", () => ({ default: () => null }));
+vi.mock("@/components/PlantAssignedTentActionsPanel", () => ({ default: () => null }));
+vi.mock("@/components/DailyGrowCheckOnboardingCard", () => ({ default: () => null }));
+
+import DailyCheck from "@/pages/DailyCheck";
+
+const PRIOR_READINGS = [
+  { ts: T2, metric: "temperature_c", value: 25, source: "manual", tent_id: "tent-1" },
+  { ts: T2, metric: "humidity_pct", value: 51, source: "manual", tent_id: "tent-1" },
+  { ts: T1, metric: "temperature_c", value: 24, source: "manual", tent_id: "tent-1" },
+  { ts: T1, metric: "humidity_pct", value: 55, source: "manual", tent_id: "tent-1" },
+];
+
+function renderDaily(initialUrl: string) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter initialEntries={[initialUrl]}>
+        <DailyCheck />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
 
 describe("buildManualSnapshotChangeContext — pure helper", () => {
   it("compares temp, RH, VPD, CO2, soil moisture, soil EC, and pH", () => {
@@ -166,62 +234,19 @@ describe("buildManualSnapshotChangeContext — pure helper", () => {
 });
 
 describe("DailyCheck post-submit — change context surfacing", () => {
-  beforeEach(() => vi.resetModules());
+  beforeEach(() => {
+    mockSensorReadings = [];
+  });
 
-  async function renderDaily(initialUrl: string, opts: { withPrior?: boolean } = {}) {
-    vi.doMock("@/hooks/use-tents", () => ({
-      useTents: () => ({ data: [{ id: "tent-1", name: "Veg Tent" }], isLoading: false }),
-    }));
-    vi.doMock("@/hooks/use-plants", () => ({
-      usePlants: () => ({
-        data: [{ id: "plant-1", name: "Plant 1", tent_id: "tent-1", grow_id: "grow-1" }],
-        isLoading: false,
-      }),
-    }));
-    vi.doMock("@/hooks/useScopedGrow", () => ({
-      useScopedGrow: () => ({ urlGrowId: "grow-1" }),
-    }));
-    vi.doMock("@/hooks/use-sensor-readings", () => ({
-      useSensorReadings: () => ({
-        data: opts.withPrior
-          ? [
-              { ts: T2, metric: "temperature_c", value: 25, source: "manual", tent_id: "tent-1" },
-              { ts: T2, metric: "humidity_pct", value: 51, source: "manual", tent_id: "tent-1" },
-              { ts: T1, metric: "temperature_c", value: 24, source: "manual", tent_id: "tent-1" },
-              { ts: T1, metric: "humidity_pct", value: 55, source: "manual", tent_id: "tent-1" },
-            ]
-          : [],
-      }),
-    }));
-    vi.doMock("@/components/QuickLog", () => ({
-      default: () => <div data-testid="mock-quicklog" />,
-    }));
-    vi.doMock("@/components/ManualSensorReadingCard", () => ({
-      default: () => <div data-testid="mock-manual-card" />,
-    }));
-    vi.doMock("@/components/PlantStatusStrip", () => ({ default: () => null }));
-    vi.doMock("@/components/PlantAssignedTentAlertsPanel", () => ({ default: () => null }));
-    vi.doMock("@/components/PlantAssignedTentActionsPanel", () => ({ default: () => null }));
-    vi.doMock("@/components/DailyGrowCheckOnboardingCard", () => ({ default: () => null }));
-
-    const DailyCheck = (await import("@/pages/DailyCheck")).default;
-    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    return render(
-      <QueryClientProvider client={client}>
-        <MemoryRouter initialEntries={[initialUrl]}>
-          <DailyCheck />
-        </MemoryRouter>
-      </QueryClientProvider>,
-    );
-  }
-
-  it("does not render change-context block before any save", async () => {
-    await renderDaily("/daily-check?plantId=plant-1&method=sensor", { withPrior: true });
+  it("does not render change-context block before any save", () => {
+    mockSensorReadings = [...PRIOR_READINGS];
+    renderDaily("/daily-check?plantId=plant-1&method=sensor");
     expect(screen.queryByTestId("daily-grow-check-change-context")).toBeNull();
   });
 
   it("renders change-context with deltas only after a successful sensor save", async () => {
-    await renderDaily("/daily-check?plantId=plant-1&method=sensor", { withPrior: true });
+    mockSensorReadings = [...PRIOR_READINGS];
+    renderDaily("/daily-check?plantId=plant-1&method=sensor");
     act(() => {
       window.dispatchEvent(
         new CustomEvent("verdant:sensor-reading-created", {
@@ -240,7 +265,8 @@ describe("DailyCheck post-submit — change context surfacing", () => {
   });
 
   it("normal QuickLog note success does NOT render change-context block", async () => {
-    await renderDaily("/daily-check?plantId=plant-1", { withPrior: true });
+    mockSensorReadings = [...PRIOR_READINGS];
+    renderDaily("/daily-check?plantId=plant-1");
     act(() => {
       window.dispatchEvent(
         new CustomEvent("verdant:entry-created", {
@@ -253,7 +279,8 @@ describe("DailyCheck post-submit — change context surfacing", () => {
   });
 
   it("shows first-snapshot copy when no prior manual snapshot exists", async () => {
-    await renderDaily("/daily-check?plantId=plant-1&method=sensor", { withPrior: false });
+    mockSensorReadings = [];
+    renderDaily("/daily-check?plantId=plant-1&method=sensor");
     act(() => {
       window.dispatchEvent(
         new CustomEvent("verdant:sensor-reading-created", {
@@ -270,10 +297,7 @@ describe("DailyCheck post-submit — change context surfacing", () => {
 });
 
 describe("safety — change context adds no new writes or wording", () => {
-  const rules = readFileSync(
-    "src/lib/manualSensorSnapshotChangeContextRules.ts",
-    "utf8",
-  );
+  const rules = readFileSync("src/lib/manualSensorSnapshotChangeContextRules.ts", "utf8");
   const page = readFileSync("src/pages/DailyCheck.tsx", "utf8");
 
   it("no persistence, RPC, ingestion, alerts, action_queue, automation, device control, or service_role added", () => {

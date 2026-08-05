@@ -19,12 +19,7 @@
  */
 
 export type ManualCorrectionMetric =
-  | "temperature_c"
-  | "humidity_pct"
-  | "vpd_kpa"
-  | "co2_ppm"
-  | "soil_moisture_pct"
-  | "ppfd";
+  "temperature_c" | "humidity_pct" | "vpd_kpa" | "co2_ppm" | "soil_moisture_pct" | "ppfd";
 
 const ALLOWED: readonly ManualCorrectionMetric[] = [
   "temperature_c",
@@ -64,7 +59,9 @@ export function encodeManualCorrectionHash(ctx: ManualCorrectionContext): string
  * Decode a URL hash into a correction context. Returns null when the
  * hash is not a correction handoff or is malformed. Never throws.
  */
-export function decodeManualCorrectionHash(hash: string | null | undefined): ManualCorrectionContext | null {
+export function decodeManualCorrectionHash(
+  hash: string | null | undefined,
+): ManualCorrectionContext | null {
   if (!hash) return null;
   const raw = hash.startsWith("#") ? hash.slice(1) : hash;
   const qIdx = raw.indexOf("?");

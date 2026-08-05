@@ -33,8 +33,7 @@ describe("grower sensor UI — no mock/demo fallback (Sensor Truth P0)", () => {
       const src = read(path);
       // Block importing the mock-backed useSensorReadings hook.
       expect(
-        /from\s+["']@\/hooks\/useMockData["']/.test(src) &&
-          /\buseSensorReadings\b/.test(src),
+        /from\s+["']@\/hooks\/useMockData["']/.test(src) && /\buseSensorReadings\b/.test(src),
         `${path} must not use mock useSensorReadings`,
       ).toBe(false);
     },
@@ -44,9 +43,7 @@ describe("grower sensor UI — no mock/demo fallback (Sensor Truth P0)", () => {
     "%s does not import the mock sensorReadings fixture directly",
     (path) => {
       const src = read(path);
-      expect(src).not.toMatch(
-        /import[^;]*\bsensorReadings\b[^;]*from\s+["']@\/mock/,
-      );
+      expect(src).not.toMatch(/import[^;]*\bsensorReadings\b[^;]*from\s+["']@\/mock/);
     },
   );
 
@@ -59,9 +56,7 @@ describe("grower sensor UI — no mock/demo fallback (Sensor Truth P0)", () => {
     expect(hookSection).toMatch(/\[\]\s+as\s+SensorReading\[\]/);
     // Explicitly guard against the previous mock-fallback shape.
     expect(hookSection).not.toMatch(/sensorReadings\.filter\(/);
-    expect(hookSection.split("\n").slice(0, 30).join("\n")).not.toMatch(
-      /=>\s*sensorReadings\b/,
-    );
+    expect(hookSection.split("\n").slice(0, 30).join("\n")).not.toMatch(/=>\s*sensorReadings\b/);
   });
 
   it("Sensors.tsx does not synthesize a 'demo' source for real rows lacking a source label", () => {

@@ -11,7 +11,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 
@@ -20,6 +20,7 @@ import ManualSensorReadingCard from "@/components/ManualSensorReadingCard";
 const insertSpy = vi.fn().mockResolvedValue(undefined);
 vi.mock("@/lib/growRepo", () => ({
   insertSensorReading: (...args: unknown[]) => insertSpy(...args),
+  insertSensorReadingsBatch: (...args: unknown[]) => insertSpy(...args),
 }));
 
 const TENT_ID = "11111111-1111-4111-8111-111111111111";
@@ -54,7 +55,9 @@ describe("ManualSensorReadingCard — snapshot quality badge", () => {
     const section = screen.getByTestId("manual-reading-snapshot-quality");
     expect(within(section).getByText(/Snapshot quality/i)).toBeInTheDocument();
     expect(
-      within(section).getByText(/AI Doctor decide whether the reading can support current-room guidance/i),
+      within(section).getByText(
+        /AI Doctor decide whether the reading can support current-room guidance/i,
+      ),
     ).toBeInTheDocument();
   });
 
@@ -66,6 +69,15 @@ describe("ManualSensorReadingCard — snapshot quality badge", () => {
     expect(quality.getAttribute("data-quality")).toBe("usable");
     expect(within(quality).getByText("Usable current reading")).toBeInTheDocument();
     expect(within(quality).getAllByText(/Source: manual/i).length).toBeGreaterThan(0);
+  });
+
+  it("shows Missing current reading for a blank form", () => {
+    renderCard();
+    const quality = screen.getByTestId("manual-snapshot-quality");
+
+    expect(quality.getAttribute("data-quality")).toBe("missing");
+    expect(within(quality).getByText("Missing current reading")).toBeInTheDocument();
+    expect(within(quality).queryByText("Usable current reading")).not.toBeInTheDocument();
   });
 
   it("flags humidity stuck at 0% as invalid with a reason", () => {

@@ -12,10 +12,7 @@ import {
   type EcowittSuspiciousFlagCode,
 } from "@/lib/ecowittCloudCanaryViewModel";
 import fixtures from "../../fixtures/ecowitt-cloud-canary-payloads.json";
-import {
-  MAC_RE,
-  UUID_RE,
-} from "./operator-ecowitt-cloud-canary-per-fixture-table.test";
+import { MAC_RE, UUID_RE } from "./operator-ecowitt-cloud-canary-per-fixture-table.test";
 
 const ORDER = [
   "happy_multi_channel",
@@ -41,9 +38,7 @@ const BANNED = [
   "all clear",
 ];
 
-const mapping = fixtures.mapping as unknown as Parameters<
-  typeof runEcowittCloudCanary
->[1];
+const mapping = fixtures.mapping as unknown as Parameters<typeof runEcowittCloudCanary>[1];
 const opts = { now: new Date(fixtures.now) };
 
 function fx(ids: readonly string[]) {
@@ -64,15 +59,9 @@ describe("cloud-canary view-model — suspicious_flag_codes surfacing", () => {
   });
 
   it("celsius_looking_fahrenheit fixture surfaces celsius_looking_fahrenheit", () => {
-    const v = runEcowittCloudCanary(
-      fx(["celsius_looking_fahrenheit"]),
-      mapping,
-      opts,
-    );
+    const v = runEcowittCloudCanary(fx(["celsius_looking_fahrenheit"]), mapping, opts);
     const vm = buildCloudCanaryPreviewViewModel(v);
-    expect(vm.rows[0].suspicious_flag_codes).toContain(
-      "celsius_looking_fahrenheit",
-    );
+    expect(vm.rows[0].suspicious_flag_codes).toContain("celsius_looking_fahrenheit");
   });
 
   // Note: soil_moisture_stuck_extreme requires a 3-sample history buffer in
@@ -93,9 +82,7 @@ describe("cloud-canary view-model — suspicious_flag_codes surfacing", () => {
     for (const r of vm.rows) for (const c of r.suspicious_flag_codes) fromRows.add(c);
     expect(vm.suspicious_flag_codes).toEqual([...fromRows].sort());
     // Sorted
-    expect(vm.suspicious_flag_codes).toEqual(
-      [...vm.suspicious_flag_codes].sort(),
-    );
+    expect(vm.suspicious_flag_codes).toEqual([...vm.suspicious_flag_codes].sort());
   });
 
   it("ALL surfaced codes (row + top level) belong to the closed enum vocabulary", () => {
@@ -122,9 +109,7 @@ describe("cloud-canary view-model — suspicious_flag_codes surfacing", () => {
       })),
       suspicious_flag_codes: ["AA:BB:CC:DD:EE:01"],
     };
-    expect(() => buildCloudCanaryPreviewViewModel(tainted)).toThrow(
-      /Unknown suspicious flag code/,
-    );
+    expect(() => buildCloudCanaryPreviewViewModel(tainted)).toThrow(/Unknown suspicious flag code/);
   });
 
   it("view-model is ID-free: no MAC/UUID/tent_id on any row or top level", () => {
@@ -161,9 +146,7 @@ describe("CloudCanaryPreviewPanel — renders suspicious_flag_codes (Thread 2)",
   it("renders the new Suspicious codes column with enum codes and no banned/health words, no MAC/UUID", async () => {
     const React = await import("react");
     const { renderToString } = await import("react-dom/server");
-    const { CloudCanaryPreviewPanel } = await import(
-      "@/pages/OperatorEcowittCanary"
-    );
+    const { CloudCanaryPreviewPanel } = await import("@/pages/OperatorEcowittCanary");
     const html = renderToString(React.createElement(CloudCanaryPreviewPanel));
 
     // Column header + per-row column marker exist.

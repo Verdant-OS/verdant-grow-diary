@@ -17,13 +17,9 @@ import { resolve } from "node:path";
 import { stripSourceComments } from "@/test/utils/stripSourceComments";
 
 const ROOT = resolve(__dirname, "../..");
-const read = (p: string) =>
-  stripSourceComments(readFileSync(resolve(ROOT, p), "utf8"));
+const read = (p: string) => stripSourceComments(readFileSync(resolve(ROOT, p), "utf8"));
 
-const FILES = [
-  "src/lib/sensorBridgeIntakeRules.ts",
-  "src/lib/sensorBridgeIntakeViewModel.ts",
-];
+const FILES = ["src/lib/sensorBridgeIntakeRules.ts", "src/lib/sensorBridgeIntakeViewModel.ts"];
 
 describe("sensor bridge intake — static safety", () => {
   for (const path of FILES) {

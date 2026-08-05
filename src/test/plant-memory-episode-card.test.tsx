@@ -5,7 +5,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import { PlantMemoryEpisodeCard } from "../components/PlantMemoryEpisodeCard";
 import { NextRunPlaybook } from "../components/NextRunPlaybook";
 import { buildNextRunPlaybook } from "../lib/nextRunPlaybookRules";
@@ -102,7 +102,8 @@ function episode(outcome?: string, decision?: string) {
   return ep;
 }
 
-const CAUSAL = /\b(caused|fixed the plant|proved effective|guaranteed|cures?|autopilot|controls your grow|definitely worked)\b/i;
+const CAUSAL =
+  /\b(caused|fixed the plant|proved effective|guaranteed|cures?|autopilot|controls your grow|definitely worked)\b/i;
 
 describe("PlantMemoryEpisodeCard", () => {
   it("renders without crashing for a decision-pending episode", () => {

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { Navigate, useNavigate, useSearchParams, Link } from "react-router-dom";
+import { useHydrated } from "@/hooks/useHydrated";
+import { Navigate, useNavigate, useSearchParams, Link } from "@/lib/react-router-compat";
 import { ArrowLeft, Leaf, Gauge, ShieldCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
@@ -80,6 +81,7 @@ export default function Auth() {
     noindex: true,
   });
   const { user, loading } = useAuth();
+  const hydrated = useHydrated();
   const nav = useNavigate();
   const [search] = useSearchParams();
   const explicitRedirect = useMemo(() => {
@@ -139,9 +141,9 @@ export default function Auth() {
     } else {
       clearPendingOAuthReferral();
     }
-    // Google returns to the configured public origin. The helper preserves
-    // only Verdant's fixed CSV onboarding target for the post-OAuth root
-    // handoff; all other destinations are intentionally not persisted.
+    // Google returns to the configured public origin. Preserve one
+    // manifest-validated, non-transitional destination for the post-OAuth
+    // root handoff.
     if (explicitRedirect) {
       savePendingOAuthPostAuthRedirect(explicitRedirect);
     } else {
@@ -151,8 +153,7 @@ export default function Auth() {
     setGoogleError(null);
     try {
       // redirect_uri MUST be a same-origin public URL, not a protected route.
-      // The fixed CSV onboarding intent is applied after Supabase reports a
-      // session; other return paths keep their existing non-OAuth behavior.
+      // The one-shot destination is applied after Supabase reports a session.
       const result = await lovable.auth.signInWithOAuth("google", {
         redirect_uri: window.location.origin,
       });
@@ -231,7 +232,15 @@ export default function Auth() {
     return () => window.clearInterval(id);
   }, [resetResendLastAttemptAt, resetResendNowTick]);
 
-  if (loading) return null;
+  // SSR/hydration contract: the server has no session (auth state lives in
+  // sessionStorage), so it renders null here via `loading`. The client's
+  // hydration render must produce the same output — gating on `hydrated`
+  // guarantees that even when the session resolves before this lazy route
+  // subtree hydrates. Without the gate, the server (no form) and client
+  // (form) disagreed, React discarded the SSR tree, and the regenerated page
+  // read empty search params, silently dropping ?redirectTo deep-link
+  // restoration after sign-in.
+  if (!hydrated || loading) return null;
 
   if (user) return <Navigate to={postSignInTarget()} replace />;
 
@@ -504,12 +513,12 @@ export default function Auth() {
   }
 
   return (
-    <div className="min-h-dvh flex flex-col items-center justify-center px-6 py-10">
+    <main className="min-h-dvh flex flex-col items-center justify-center px-6 py-10">
       <div className="w-full max-w-sm">
         <div className="mb-4">
           <Link
             to="/welcome"
-            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring rounded"
           >
             <ArrowLeft className="h-4 w-4" aria-hidden /> Back to home
           </Link>
@@ -590,7 +599,7 @@ export default function Auth() {
                       // focus handled on next paint
                       window.setTimeout(() => forgotEmailRef.current?.focus(), 0);
                     }}
-                    className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                    className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring rounded"
                   >
                     Forgot password?
                   </button>
@@ -938,6 +947,6 @@ export default function Auth() {
           .
         </p>
       </div>
-    </div>
+    </main>
   );
 }

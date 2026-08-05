@@ -6,11 +6,7 @@
  */
 import type { StabilityResult } from "@/lib/environmentStabilityRules";
 
-export type StabilityRollupTone =
-  | "stable"
-  | "watch"
-  | "unstable"
-  | "unavailable";
+export type StabilityRollupTone = "stable" | "watch" | "unstable" | "unavailable";
 
 export interface StabilityRollupView {
   total: number;

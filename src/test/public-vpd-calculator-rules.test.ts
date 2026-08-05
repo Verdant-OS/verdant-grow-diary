@@ -207,6 +207,25 @@ describe("public VPD calculator rules", () => {
     ).toMatchObject({ state: "invalid", vpdKpa: null, invalidReason: "invalid_humidity" });
   });
 
+  it("does not silently discard an invalid measured leaf temperature", () => {
+    for (const leafTemperature of [Number.NaN, Number.POSITIVE_INFINITY, 60.1, -20.1]) {
+      expect(
+        evaluatePublicVpdCalculator({
+          temperature: 25,
+          leafTemperature,
+          temperatureUnit: "C",
+          humidity: 60,
+          stage: "flower",
+        }),
+      ).toMatchObject({
+        state: "invalid",
+        invalidReason: "invalid_temperature",
+        vpdKpa: null,
+        classification: null,
+      });
+    }
+  });
+
   it("shares a fixed blank calculator URL without grow inputs", () => {
     const share = buildPublicVpdShareData();
     const url = new URL(String(share.url));

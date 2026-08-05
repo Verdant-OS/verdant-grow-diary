@@ -28,22 +28,16 @@ import {
   type GreenhouseSource,
   type PpfdSample,
 } from "./greenhouseLightRules";
+import { assessRootZoneEc, type RootZoneEcInput } from "./greenhouseRootZoneRules";
 import {
-  assessRootZoneEc,
-  type RootZoneEcInput,
-} from "./greenhouseRootZoneRules";
+  celsiusToFahrenheit,
+  loadTemperatureUnitPreference,
+  type TemperatureUnitPreference,
+} from "./temperatureUnitPreference";
 
-export type EnvironmentCheckDiaryStatus =
-  | "valid"
-  | "invalid"
-  | "dst_ambiguous"
-  | "review_required";
+export type EnvironmentCheckDiaryStatus = "valid" | "invalid" | "dst_ambiguous" | "review_required";
 
-export type EnvironmentCheckTone =
-  | "success"
-  | "warning"
-  | "danger"
-  | "neutral";
+export type EnvironmentCheckTone = "success" | "warning" | "danger" | "neutral";
 
 export interface EnvironmentCheckRuleAnnotation {
   ruleId: string;
@@ -117,10 +111,7 @@ const STATUS_RANK: Record<EnvironmentCheckDiaryStatus, number> = {
   invalid: 3,
 };
 
-const REVIEW_SOURCES: ReadonlySet<GreenhouseSource> = new Set<GreenhouseSource>([
-  "stale",
-  "demo",
-]);
+const REVIEW_SOURCES: ReadonlySet<GreenhouseSource> = new Set<GreenhouseSource>(["stale", "demo"]);
 
 export function isEnvironmentCheckKind(kind: string | null | undefined): boolean {
   if (!kind) return false;
@@ -153,9 +144,14 @@ function fmtNumber(n: number | null | undefined, digits = 1, unit = ""): string 
  *  - No snapshot → review_required (nothing to verify).
  *  - Source is stale/invalid/demo → review_required (or invalid).
  *  - DST-ambiguous DLI/dark-window → dst_ambiguous (never styled valid).
+ *
+ * `tempUnit` controls only the DISPLAY unit of the air-temperature value
+ * label. All rule evaluation (VPD, condensation, DLI, root zone) stays on
+ * canonical Celsius; conversion happens strictly at label build time.
  */
 export function buildEnvironmentCheckDiaryViewModel(
   entry: EnvironmentCheckEntryInput,
+  tempUnit: TemperatureUnitPreference = loadTemperatureUnitPreference(),
 ): EnvironmentCheckDiaryViewModel {
   const snapshot = entry.snapshot ?? null;
   const sourceLabel = normalizeGreenhouseSource(snapshot?.source);
@@ -220,7 +216,10 @@ export function buildEnvironmentCheckDiaryViewModel(
     metrics.push({
       metricKey: "temp_c",
       label: "Air temp",
-      valueLabel: fmtNumber(snapshot.tempC, 1, "°C"),
+      valueLabel:
+        tempUnit === "fahrenheit" && Number.isFinite(snapshot.tempC)
+          ? fmtNumber(celsiusToFahrenheit(snapshot.tempC), 1, "°F")
+          : fmtNumber(snapshot.tempC, 1, "°C"),
       status: sourceLabel === "invalid" ? "invalid" : "valid",
     });
   }

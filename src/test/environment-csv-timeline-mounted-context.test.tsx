@@ -10,13 +10,48 @@ import TimelineCsvContextPanel from "@/components/TimelineCsvContextPanel";
 
 const fixtureRows = [
   // tent A, in window of d1
-  { tent_id: "tA", source: "csv", metric: "temperature_c", value: 25, captured_at: "2026-06-01T10:10:00Z", raw_payload: { grow_id: "g1", source_tag: "csv" } },
-  { tent_id: "tA", source: "csv", metric: "humidity_pct", value: 55, captured_at: "2026-06-01T10:10:00Z", raw_payload: { grow_id: "g1", source_tag: "csv" } },
-  { tent_id: "tA", source: "csv", metric: "vpd_kpa", value: 1.42, captured_at: "2026-06-01T10:10:00Z", raw_payload: { grow_id: "g1", source_tag: "csv" } },
+  {
+    tent_id: "tA",
+    source: "csv",
+    metric: "temperature_c",
+    value: 25,
+    captured_at: "2026-06-01T10:10:00Z",
+    raw_payload: { grow_id: "g1", source_tag: "csv" },
+  },
+  {
+    tent_id: "tA",
+    source: "csv",
+    metric: "humidity_pct",
+    value: 55,
+    captured_at: "2026-06-01T10:10:00Z",
+    raw_payload: { grow_id: "g1", source_tag: "csv" },
+  },
+  {
+    tent_id: "tA",
+    source: "csv",
+    metric: "vpd_kpa",
+    value: 1.42,
+    captured_at: "2026-06-01T10:10:00Z",
+    raw_payload: { grow_id: "g1", source_tag: "csv" },
+  },
   // tent B, also in window of d2 but different tent — must not bleed
-  { tent_id: "tB", source: "csv", metric: "temperature_c", value: 22, captured_at: "2026-06-02T10:10:00Z", raw_payload: { grow_id: "g1", source_tag: "csv" } },
+  {
+    tent_id: "tB",
+    source: "csv",
+    metric: "temperature_c",
+    value: 22,
+    captured_at: "2026-06-02T10:10:00Z",
+    raw_payload: { grow_id: "g1", source_tag: "csv" },
+  },
   // CSV row for an unrelated grow
-  { tent_id: "tA", source: "csv", metric: "temperature_c", value: 30, captured_at: "2026-06-03T10:10:00Z", raw_payload: { grow_id: "other-grow", source_tag: "csv" } },
+  {
+    tent_id: "tA",
+    source: "csv",
+    metric: "temperature_c",
+    value: 30,
+    captured_at: "2026-06-03T10:10:00Z",
+    raw_payload: { grow_id: "other-grow", source_tag: "csv" },
+  },
 ];
 
 vi.mock("@/integrations/supabase/client", () => ({
@@ -27,7 +62,14 @@ vi.mock("@/integrations/supabase/client", () => ({
         eq: () => chain,
         in: () => chain,
         order: () => chain,
-        limit: () => Promise.resolve({ data: fixtureRows, error: null }),
+        limit: () => {
+          const __c: any = {
+            abortSignal: () => __c,
+            then: (r: any, j?: any) =>
+              Promise.resolve({ data: fixtureRows, error: null }).then(r, j),
+          };
+          return __c;
+        },
         then: (resolve: (r: { data: unknown; error: null }) => unknown) =>
           resolve({ data: fixtureRows, error: null }),
       };
@@ -57,9 +99,7 @@ describe("TimelineCsvContextPanel", () => {
 
   it("does not render a chip for entries outside the time window (test 20)", async () => {
     render(<TimelineCsvContextPanel growId="g1" entries={ENTRIES} />);
-    await waitFor(() =>
-      expect(screen.queryByTestId("csv-timeline-chip-d1")).toBeTruthy(),
-    );
+    await waitFor(() => expect(screen.queryByTestId("csv-timeline-chip-d1")).toBeTruthy());
     expect(screen.queryByTestId("csv-timeline-chip-d3")).toBeNull();
   });
 
@@ -72,9 +112,7 @@ describe("TimelineCsvContextPanel", () => {
     );
     // d1 is only matched by the `other-grow` row; ensure chip renders since this entry's growId IS other-grow.
     // But for the "different grow" check, swap: entry says g1, only other-grow rows exist for the timestamp.
-    await waitFor(() =>
-      expect(screen.queryByTestId("timeline-csv-context-panel")).toBeTruthy(),
-    );
+    await waitFor(() => expect(screen.queryByTestId("timeline-csv-context-panel")).toBeTruthy());
   });
 
   it("renders nothing when no CSV rows match (covers tests 18, 19, 20 negative case)", async () => {

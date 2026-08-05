@@ -139,9 +139,7 @@ describe("buildEcoWittRealIngestDedupeKey", () => {
   });
 
   it("returns null when required identity fields are missing", () => {
-    expect(
-      buildEcoWittRealIngestDedupeKey({ ...baseDedupeInput(), tent_id: "" }),
-    ).toBeNull();
+    expect(buildEcoWittRealIngestDedupeKey({ ...baseDedupeInput(), tent_id: "" })).toBeNull();
     expect(
       buildEcoWittRealIngestDedupeKey({
         ...baseDedupeInput(),

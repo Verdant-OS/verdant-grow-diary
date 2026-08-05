@@ -9,7 +9,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import StructuredDiagnosisCard from "@/components/StructuredDiagnosisCard";
 import type { Diagnosis } from "@/lib/aiDoctorDiagnosisRules";
@@ -25,7 +25,13 @@ vi.mock("@/integrations/supabase/client", () => {
       in: () => chain,
       like: () => chain,
       order: () => chain,
-      limit: () => Promise.resolve({ data: linkedRows, error: null }),
+      limit: () => {
+        const __c: any = {
+          abortSignal: () => __c,
+          then: (r: any, j?: any) => Promise.resolve({ data: linkedRows, error: null }).then(r, j),
+        };
+        return __c;
+      },
     };
     return chain;
   };
@@ -146,15 +152,11 @@ describe("Coach in-flight panel — Created from this session chip", () => {
     renderCard({ sessionId: SESSION_ID });
     await waitFor(() => {
       expect(
-        screen.queryByTestId(
-          "coach-ai-doctor-diagnosis-suggested-action-1-created-from-session",
-        ),
+        screen.queryByTestId("coach-ai-doctor-diagnosis-suggested-action-1-created-from-session"),
       ).not.toBeNull();
     });
     expect(
-      screen.queryByTestId(
-        "coach-ai-doctor-diagnosis-suggested-action-0-created-from-session",
-      ),
+      screen.queryByTestId("coach-ai-doctor-diagnosis-suggested-action-0-created-from-session"),
     ).toBeNull();
   });
 
@@ -183,9 +185,7 @@ describe("Coach in-flight panel — Created from this session chip", () => {
     ];
     renderCard({ sessionId: SESSION_ID });
     expect(
-      await screen.findByTestId(
-        "coach-ai-doctor-diagnosis-suggested-action-0-add-button",
-      ),
+      await screen.findByTestId("coach-ai-doctor-diagnosis-suggested-action-0-add-button"),
     ).toBeTruthy();
   });
 
@@ -262,10 +262,7 @@ describe("Coach in-flight panel — Created from this session chip", () => {
 
 // --- Static safety scan ------------------------------------------------------
 const ROOT = resolve(__dirname, "../..");
-const CARD = readFileSync(
-  resolve(ROOT, "src/components/StructuredDiagnosisCard.tsx"),
-  "utf8",
-);
+const CARD = readFileSync(resolve(ROOT, "src/components/StructuredDiagnosisCard.tsx"), "utf8");
 const COACH = readFileSync(resolve(ROOT, "src/pages/Coach.tsx"), "utf8");
 
 describe("Coach chip — static safety", () => {

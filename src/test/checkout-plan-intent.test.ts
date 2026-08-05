@@ -73,9 +73,13 @@ function makeStorage(seed: Record<string, string> = {}): PlanIntentStorage & {
 }
 
 describe("isKnownPlanIntent", () => {
-  it.each(["pro_monthly", "pro_annual", "founder_lifetime"] as const)("accepts %s", (id) =>
-    expect(isKnownPlanIntent(id)).toBe(true),
-  );
+  it.each([
+    "pro_monthly",
+    "pro_annual",
+    "craft_monthly",
+    "craft_annual",
+    "founder_lifetime",
+  ] as const)("accepts %s", (id) => expect(isKnownPlanIntent(id)).toBe(true));
   it.each([
     "",
     "PRO_MONTHLY",

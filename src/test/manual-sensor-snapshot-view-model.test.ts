@@ -39,9 +39,7 @@ describe("buildManualSnapshotTimelineCard", () => {
   });
 
   it("never exposes a 'live' label, even as a substring", () => {
-    const card = buildManualSnapshotTimelineCard(
-      mkRecord({ notes: "  manual handheld read  " }),
-    );
+    const card = buildManualSnapshotTimelineCard(mkRecord({ notes: "  manual handheld read  " }));
     const blob = JSON.stringify(card).toLowerCase();
     expect(blob).not.toMatch(/"live"/);
     expect(blob).not.toMatch(/"synced"/);

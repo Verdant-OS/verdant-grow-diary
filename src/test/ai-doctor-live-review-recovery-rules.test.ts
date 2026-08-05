@@ -33,6 +33,7 @@ const EXPECTED_RETRYABILITY = {
   upstream_credit_exhausted: true,
   result_pending: true,
   result_recording_failed: true,
+  credit_rpc: true,
 } as const satisfies Record<AiCreditedFailureReason, boolean>;
 
 const RETRYABILITY_CASES = Object.entries(EXPECTED_RETRYABILITY) as Array<
@@ -57,6 +58,12 @@ describe("shouldReuseAiDoctorReviewIdempotencyKeyAfterResponse", () => {
       shouldReuseAiDoctorReviewIdempotencyKeyAfterResponse(
         { ok: false, reason: "result_pending" },
         "result_pending",
+      ),
+    ).toBe(true);
+    expect(
+      shouldReuseAiDoctorReviewIdempotencyKeyAfterResponse(
+        { ok: false, reason: "credit_rpc" },
+        "credit_rpc",
       ),
     ).toBe(true);
     expect(shouldReuseAiDoctorReviewIdempotencyKeyAfterResponse(null, "empty")).toBe(true);

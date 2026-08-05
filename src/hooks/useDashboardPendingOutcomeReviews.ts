@@ -23,8 +23,7 @@ export type PendingOutcomeReviewsState =
   | { status: "ok"; items: PendingOutcomeReview[] }
   | { status: "unavailable" };
 
-const COMPLETED_ACTION_COLUMNS =
-  "id,status,completed_at,suggested_change,grow_id";
+const COMPLETED_ACTION_COLUMNS = "id,status,completed_at,suggested_change,grow_id";
 const OUTCOME_DIARY_COLUMNS = "id,details";
 
 export function useDashboardPendingOutcomeReviews(
@@ -42,9 +41,7 @@ export function useDashboardPendingOutcomeReviews(
     }
     setState({ status: "loading" });
     try {
-      const cutoffIso = new Date(
-        Date.now() - PENDING_OUTCOME_REVIEW_THRESHOLD_MS,
-      ).toISOString();
+      const cutoffIso = new Date(Date.now() - PENDING_OUTCOME_REVIEW_THRESHOLD_MS).toISOString();
       const [actionsRes, outcomesRes] = await Promise.all([
         supabase
           .from("action_queue")

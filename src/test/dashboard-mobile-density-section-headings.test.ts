@@ -49,7 +49,7 @@ describe("Dashboard · mobile density section headings", () => {
     // Sensors primary + secondary anchors remain.
     expect(DASHBOARD).toMatch(/to="\/sensors"/);
     expect(DASHBOARD).toMatch(/to="\/sensors#manual-reading"/);
-    expect(DASHBOARD).toMatch(/to="\/sensors#import-sensor-data"/);
+    expect(DASHBOARD).toMatch(/to="\/sensors#csv-import"/);
     // AI Doctor link is unchanged.
     expect(DASHBOARD).toMatch(/to="\/doctor"/);
   });

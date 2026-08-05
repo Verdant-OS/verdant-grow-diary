@@ -9,7 +9,7 @@ import { describe, it, expect, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import DashboardDataSourceDisclosure from "@/components/DashboardDataSourceDisclosure";
 import type { GrowDataSourceMeta } from "@/hooks/useGrowData";
 
@@ -127,15 +127,27 @@ vi.mock("@/integrations/supabase/client", () => ({
       select: () => {
         const ordered = {
           order: () => ordered,
-          limit: () =>
-            Promise.resolve({
-              data: table === "sensor_readings" ? SIM_READINGS : [],
-              error: null,
-            }),
+          limit: () => {
+            const __c: any = {
+              abortSignal: () => __c,
+              then: (r: any, j?: any) =>
+                Promise.resolve({
+                  data: table === "sensor_readings" ? SIM_READINGS : [],
+                  error: null,
+                }).then(r, j),
+            };
+            return __c;
+          },
         };
         return {
           in: () => ordered,
-          limit: () => Promise.resolve({ data: [], error: null }),
+          limit: () => {
+            const __c: any = {
+              abortSignal: () => __c,
+              then: (r: any, j?: any) => Promise.resolve({ data: [], error: null }).then(r, j),
+            };
+            return __c;
+          },
         };
       },
     }),

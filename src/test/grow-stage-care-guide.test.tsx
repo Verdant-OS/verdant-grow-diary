@@ -9,7 +9,7 @@
  */
 import { describe, it, expect, afterEach } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "@/lib/react-router-compat";
 import GrowStageCareGuide from "@/pages/GrowStageCareGuide";
 import GuidesIndex from "@/pages/GuidesIndex";
 import { APP_ROUTES } from "@/lib/appRouteManifest";
@@ -58,6 +58,10 @@ describe("GrowStageCareGuide page", () => {
     expect(screen.getByTestId("grow-stage-care-seedling")).toBeInTheDocument();
     expect(screen.getByTestId("grow-stage-care-veg")).toBeInTheDocument();
     expect(screen.getByTestId("grow-stage-care-flower")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Watering" })).toHaveClass("text-blue-300");
+    expect(screen.getByRole("button", { name: "Nutrients" })).toHaveClass("text-green-300");
+    expect(screen.getByRole("button", { name: "Environment" })).toHaveClass("text-amber-300");
+    expect(screen.getByRole("button", { name: "Harvest" })).toHaveClass("text-purple-300");
   });
 
   it("filters to one stage when a stage button is clicked", () => {

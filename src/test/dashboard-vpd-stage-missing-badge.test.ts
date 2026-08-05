@@ -2,10 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import { resolve } from "path";
 
-const SRC = readFileSync(
-  resolve(__dirname, "../pages/Dashboard.tsx"),
-  "utf8",
-);
+const SRC = readFileSync(resolve(__dirname, "../pages/Dashboard.tsx"), "utf8");
 
 describe("Dashboard VPD stage-missing info badge", () => {
   it("uses the shared VpdStageMissingBadge component", () => {
@@ -18,8 +15,10 @@ describe("Dashboard VPD stage-missing info badge", () => {
   });
 
   it("computes vpdStageMissing from current VPD value and unknown-normalized stage", () => {
+    // Live audit #14: the stage is the shared resolveAlertContextStage
+    // output (grow row + the grow's tents), not raw scopedGrow?.stage.
     expect(SRC).toMatch(
-      /vpdStageMissing\s*=\s*\n?\s*snap\?\.vpd\s*!=\s*null\s*&&\s*normalizeVpdStage\(scopedGrow\?\.stage\)\s*===\s*"unknown"/,
+      /vpdStageMissing\s*=\s*\n?\s*snap\?\.vpd\s*!=\s*null\s*&&\s*normalizeVpdStage\(alertContextStage\)\s*===\s*"unknown"/,
     );
   });
 
@@ -30,9 +29,7 @@ describe("Dashboard VPD stage-missing info badge", () => {
   });
 
   it("badge branch performs no alert/queue/automation writes", () => {
-    const m = SRC.match(
-      /\{vpdStageMissing\s*&&\s*\(([\s\S]*?)\)\}/,
-    );
+    const m = SRC.match(/\{vpdStageMissing\s*&&\s*\(([\s\S]*?)\)\}/);
     expect(m).toBeTruthy();
     expect(m![1]).not.toMatch(
       /saveAlert|logAlertEvent|action_queue|service_role|automation|device.control|from\(['"]alerts['"]\)/i,

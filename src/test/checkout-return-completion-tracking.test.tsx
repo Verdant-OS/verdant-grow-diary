@@ -1,6 +1,6 @@
 import { StrictMode } from "react";
 import { render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter, useLocation } from "react-router-dom";
+import { MemoryRouter, useLocation } from "@/lib/react-router-compat";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { buildCheckoutReturnNavigationState } from "@/lib/checkoutReturnTo";
 import { useCheckoutReturnCompletionTracking } from "@/hooks/useCheckoutReturnCompletionTracking";

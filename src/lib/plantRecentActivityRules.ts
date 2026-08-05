@@ -7,17 +7,37 @@
  *
  * Read-only. Not used for alerts, actions, AI Doctor, or device control.
  */
-import {
-  normalizeDiaryEntries,
-  type NormalizedDiaryEntry,
-} from "@/lib/diaryEntryRules";
+import { normalizeDiaryEntries, type NormalizedDiaryEntry } from "@/lib/diaryEntryRules";
 import { isStale } from "@/lib/sensorSnapshot";
 import { splitHardwareReadingsFromNote } from "@/lib/quickLogHardwareReadingsDisplayRules";
 import { shouldShowPhotoNonDiagnosticLabel } from "@/lib/photoEventNonDiagnosticLabelRules";
+import { resolveQuickLogEventIdentity } from "@/lib/quickLogEventIdentityRules";
 
 export interface PlantRecentActivityRow {
   id: string;
+  /**
+   * Raw envelope event_type from the diary_entries row. Kept for
+   * back-compat / debugging. Presenters should render `displayLabel`
+   * and classify with `effectiveEventType`.
+   */
   eventType: string;
+  /**
+   * Canonical event type after Quick Log envelope promotion (e.g.
+   * "watering" for a `quick_log` wrapper whose details declared
+   * `event_type: "watering"`). Deterministic — see
+   * `resolveQuickLogEventIdentity`. Optional for back-compat with
+   * hand-built test fixtures; presenters fall back to `eventType`.
+   */
+  effectiveEventType?: string;
+  /** Grower-facing label for the badge (e.g. "Watering"). */
+  displayLabel?: string;
+  /**
+   * Compact structured summary built from normalized details (e.g.
+   * "500 ml", "pH 6.1 · EC 1.2"). Empty when no structured summary is
+   * available — never invented.
+   */
+  summarySuffix?: string;
+
   occurredAt: string | null;
   occurredAtLabel: string;
   notePreview: string;
@@ -59,20 +79,22 @@ function previewNote(note: string): string {
   return trimmed.slice(0, NOTE_PREVIEW_MAX - 1).trimEnd() + "…";
 }
 
-function toRow(
-  entry: NormalizedDiaryEntry,
-  now: number,
-): PlantRecentActivityRow {
+function toRow(entry: NormalizedDiaryEntry, now: number): PlantRecentActivityRow {
   const snap = entry.details.sensorSnapshot;
   const snapshotAt = snap?.at ?? null;
   const hasSnapshot = !!snap;
   const split = splitHardwareReadingsFromNote(entry.note);
+  const identity = resolveQuickLogEventIdentity(entry);
   return {
     id: entry.id,
     eventType: entry.eventType,
+    effectiveEventType: identity.effectiveEventType,
+    displayLabel: identity.displayLabel,
+    summarySuffix: identity.summarySuffix,
     occurredAt: entry.createdAt,
     occurredAtLabel: entry.createdAtLabel,
     notePreview: previewNote(split.body),
+
     plantId: entry.plantId,
     tentId: entry.tentId,
     hasPhoto: !!entry.photoUrl,
@@ -82,9 +104,18 @@ function toRow(
     // QuickLog does not currently persist a source label on the snapshot.
     // We never invent one — leave null unless future writers store it.
     snapshotSourceLabel: null,
-    // Quick Log entries are the only manual diary writers today. We rely on
-    // the deterministic event_type tag from quickLogRules.QUICK_LOG_EVENT_TYPE.
-    isManualEntry: entry.eventType === "quick_log",
+    // Manual provenance: the legacy deterministic quick_log event_type, OR the
+    // provenance markers the quick-log writers stamp into details — companions
+    // now normalize to their DISPLAY type (training/photo/environment), so the
+    // display type alone can no longer prove manual origin.
+    isManualEntry:
+      entry.eventType === "quick_log" ||
+      identity.fromQuickLog ||
+      (entry.details.extras?.source as unknown) === "manual" ||
+      entry.details.extras?.quick_log_version != null ||
+      entry.details.extras?.linked_grow_event_id != null ||
+      entry.details.extras?.grow_event_id != null,
+
     warnings: entry.warnings,
     hasHardwareReadings: split.hasHardwareBlock,
     hardwareReadingLines: split.hardwareLines,
@@ -95,10 +126,7 @@ function toRow(
   };
 }
 
-function compareNewestFirst(
-  a: PlantRecentActivityRow,
-  b: PlantRecentActivityRow,
-): number {
+function compareNewestFirst(a: PlantRecentActivityRow, b: PlantRecentActivityRow): number {
   const aHas = a.occurredAt !== null;
   const bHas = b.occurredAt !== null;
   if (aHas && bHas) {

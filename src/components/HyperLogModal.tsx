@@ -12,12 +12,7 @@
  *  - Commit is a callback-only handoff; this component performs no I/O.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import {
   Droplets,
@@ -33,13 +28,15 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { GeneticsBadge } from "@/components/GeneticsBadge";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
+import {
+  celsiusToFahrenheit,
+  fahrenheitToCelsius,
+  getTemperatureUnitSymbol,
+  type TemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
 
-export type HyperLogAction =
-  | "water"
-  | "feed"
-  | "defoliate"
-  | "note"
-  | "environment";
+export type HyperLogAction = "water" | "feed" | "defoliate" | "note" | "environment";
 
 export interface HyperLogDemoFormState {
   waterAmount: string;
@@ -87,16 +84,18 @@ const ACTION_TILES: Array<{
   label: string;
   icon: typeof Droplets;
 }> = [
-  { id: "water", label: "Water", icon: Droplets },
   { id: "feed", label: "Feed", icon: Leaf },
   { id: "defoliate", label: "Defoliate", icon: Scissors },
   { id: "note", label: "Note", icon: NotebookPen },
   { id: "environment", label: "Env Check", icon: Gauge },
 ];
 
-// Hardcoded demo values — NOT live telemetry.
+// Hardcoded demo values — NOT live telemetry. Temp is stored canonically in
+// °C and formatted per the active temperatureUnit preference at render time
+// (see demoSnapshotTempDisplay) so it never mismatches the unit-aware Temp
+// input/preview shown lower in this same modal.
+const DEMO_SNAPSHOT_TEMP_C = 24.6;
 const DEMO_SNAPSHOT = {
-  temp: "24.6°C",
   rh: "58%",
   vpd: "1.12 kPa",
 };
@@ -104,6 +103,24 @@ const DEMO_SNAPSHOT = {
 const WATER_UNITS = ["ml", "L", "cups"] as const;
 
 const VERDANT_GREEN = "#00C853";
+
+const PLAIN_TEMP_INPUT = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/;
+
+/**
+ * Convert the grower-typed environment temperature (entered in the active
+ * preference unit) into a canonical-°C string EXACTLY ONCE at the commit
+ * handoff — the dispatched draft stores canonical °C, which is what
+ * hyperLogDraftRules renders as "Temp X°C". Blank stays blank and
+ * non-numeric text passes through unchanged.
+ */
+function typedTempToCelsiusInput(raw: string, unit: TemperatureUnitPreference): string {
+  if (unit !== "fahrenheit") return raw;
+  const trimmed = raw.trim();
+  if (trimmed === "" || !PLAIN_TEMP_INPUT.test(trimmed)) return raw;
+  const parsed = Number(trimmed);
+  if (!Number.isFinite(parsed)) return raw;
+  return String(Math.round(fahrenheitToCelsius(parsed) * 100) / 100);
+}
 
 const EMPTY_FORM: HyperLogDemoFormState = {
   waterAmount: "",
@@ -129,14 +146,29 @@ export function HyperLogModal({
   initialAction = null,
   strain,
 }: HyperLogModalProps) {
-  const [selected, setSelected] = useState<HyperLogAction | null>(initialAction);
+  const [selected, setSelected] = useState<HyperLogAction | null>(
+    initialAction === "water" ? null : initialAction,
+  );
   const [form, setForm] = useState<HyperLogDemoFormState>(EMPTY_FORM);
   const [photos, setPhotos] = useState<Array<{ id: string; url: string; name: string }>>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const temperatureUnit = useTemperatureUnitPreference();
+  const temperatureUnitSymbol = getTemperatureUnitSymbol(temperatureUnit);
+  const demoSnapshotTempDisplay =
+    temperatureUnit === "celsius"
+      ? `${DEMO_SNAPSHOT_TEMP_C.toFixed(1)}°C`
+      : `${celsiusToFahrenheit(DEMO_SNAPSHOT_TEMP_C).toFixed(1)}°F`;
+  // Pattern-A draft-input race guard: pins the ACTIVE temperatureUnit at the
+  // moment the raw envTemp draft transitions from empty to non-empty, so a
+  // live preference flip (e.g. from another tab) between typing and Commit
+  // can never silently reinterpret already-typed digits under the new unit.
+  // Cleared back to null whenever the draft returns to empty or the modal
+  // resets.
+  const envTempEntryUnitRef = useRef<TemperatureUnitPreference | null>(null);
 
   // Sync initialAction when modal re-opens with a preselect.
   useEffect(() => {
-    if (open) setSelected(initialAction ?? null);
+    if (open) setSelected(initialAction === "water" ? null : (initialAction ?? null));
   }, [open, initialAction]);
 
   // Revoke any local object URLs on unmount.
@@ -155,9 +187,22 @@ export function HyperLogModal({
 
   const updateField = useCallback(
     <K extends keyof HyperLogDemoFormState>(key: K, value: HyperLogDemoFormState[K]) => {
+      if (key === "envTemp") {
+        const nextRaw = String(value);
+        setForm((prev) => {
+          const prevRaw = prev.envTemp;
+          if (prevRaw.trim() === "" && nextRaw.trim() !== "") {
+            envTempEntryUnitRef.current = temperatureUnit;
+          } else if (nextRaw.trim() === "") {
+            envTempEntryUnitRef.current = null;
+          }
+          return { ...prev, [key]: value };
+        });
+        return;
+      }
       setForm((prev) => ({ ...prev, [key]: value }));
     },
-    [],
+    [temperatureUnit],
   );
 
   const handleFiles = useCallback((files: FileList | null) => {
@@ -202,12 +247,22 @@ export function HyperLogModal({
       return [];
     });
     setForm(EMPTY_FORM);
+    envTempEntryUnitRef.current = null;
     setSelected(null);
   }, []);
 
   const handleCommit = () => {
     if (!selected) return;
-    onCommit?.(selected, form, { photoCount: photos.length });
+    // Unit seam: envTemp was typed in the preference unit; the committed
+    // draft stores canonical °C. Converted exactly once, right here.
+    const committedForm: HyperLogDemoFormState = {
+      ...form,
+      envTemp: typedTempToCelsiusInput(
+        form.envTemp,
+        envTempEntryUnitRef.current ?? temperatureUnit,
+      ),
+    };
+    onCommit?.(selected, committedForm, { photoCount: photos.length });
     onOpenChange(false);
     resetAll();
   };
@@ -217,9 +272,17 @@ export function HyperLogModal({
     onOpenChange(next);
   };
 
+  // Pin read for the live preview line: labels the raw draft with whatever
+  // unit is currently pinned (or the live preference if nothing is pinned
+  // yet), so the preview never relabels itself mid-edit due to an
+  // unrelated preference flip in another tab.
+  const envTempPreviewUnitSymbol = getTemperatureUnitSymbol(
+    envTempEntryUnitRef.current ?? temperatureUnit,
+  );
+
   const timelinePreview = useMemo(
-    () => buildTimelinePreview(selected, form, photos.length),
-    [selected, form, photos.length],
+    () => buildTimelinePreview(selected, form, photos.length, envTempPreviewUnitSymbol),
+    [selected, form, photos.length, envTempPreviewUnitSymbol],
   );
 
   return (
@@ -240,8 +303,7 @@ export function HyperLogModal({
           data-testid="hyperlog-modal"
           className="bg-[#0a0a0a] border border-white/[0.06] rounded-t-2xl sm:rounded-2xl overflow-hidden flex flex-col max-h-[92vh] font-mono"
           style={{
-            boxShadow:
-              "0 24px 60px -20px rgba(0,0,0,0.8), 0 0 0 1px rgba(0,200,83,0.06)",
+            boxShadow: "0 24px 60px -20px rgba(0,0,0,0.8), 0 0 0 1px rgba(0,200,83,0.06)",
           }}
         >
           {/* Header */}
@@ -271,9 +333,7 @@ export function HyperLogModal({
           <div className="px-5 py-5 space-y-5 overflow-y-auto">
             {/* Action Tiles */}
             <div>
-              <p className="text-[10px] uppercase tracking-[0.18em] text-white/40 mb-2.5">
-                Action
-              </p>
+              <p className="text-[10px] uppercase tracking-[0.18em] text-white/40 mb-2.5">Action</p>
               <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
                 {ACTION_TILES.map((tile) => {
                   const Icon = tile.icon;
@@ -302,7 +362,10 @@ export function HyperLogModal({
                       }
                       aria-pressed={isActive}
                     >
-                      <Icon className="h-4 w-4" style={isActive ? { color: VERDANT_GREEN } : undefined} />
+                      <Icon
+                        className="h-4 w-4"
+                        style={isActive ? { color: VERDANT_GREEN } : undefined}
+                      />
                       <span className="text-[11px] font-medium tracking-wide">{tile.label}</span>
                     </button>
                   );
@@ -398,7 +461,7 @@ export function HyperLogModal({
                 <div className="space-y-2.5" data-testid="hyperlog-env-fields">
                   <FieldRow>
                     <DemoInput
-                      placeholder="Temp (°C)"
+                      placeholder={`Temp (${temperatureUnitSymbol})`}
                       value={form.envTemp}
                       onChange={(v) => updateField("envTemp", v)}
                       aria-label="Environment temperature"
@@ -458,7 +521,7 @@ export function HyperLogModal({
                 </span>
               </div>
               <div className="grid grid-cols-3 gap-3">
-                <SnapshotCell icon={Thermometer} label="Temp" value={DEMO_SNAPSHOT.temp} />
+                <SnapshotCell icon={Thermometer} label="Temp" value={demoSnapshotTempDisplay} />
                 <SnapshotCell icon={Droplet} label="RH" value={DEMO_SNAPSHOT.rh} />
                 <SnapshotCell icon={Gauge} label="VPD" value={DEMO_SNAPSHOT.vpd} />
               </div>
@@ -488,11 +551,7 @@ export function HyperLogModal({
                       key={p.id}
                       className="relative aspect-square rounded-lg overflow-hidden border border-white/[0.08] bg-[#0d0d0d]"
                     >
-                      <img
-                        src={p.url}
-                        alt={p.name}
-                        className="h-full w-full object-cover"
-                      />
+                      <img src={p.url} alt={p.name} className="h-full w-full object-cover" />
                       <button
                         type="button"
                         data-testid={`hyperlog-photo-remove-${p.id}`}
@@ -567,13 +626,9 @@ export function HyperLogModal({
                 <p className="text-[11px] uppercase tracking-wider text-white/40">
                   {timelinePreview.headline}
                 </p>
-                <p className="mt-1 text-sm text-white/85 leading-snug">
-                  {timelinePreview.summary}
-                </p>
+                <p className="mt-1 text-sm text-white/85 leading-snug">{timelinePreview.summary}</p>
                 {timelinePreview.meta ? (
-                  <p className="mt-1.5 text-[10px] text-white/40">
-                    {timelinePreview.meta}
-                  </p>
+                  <p className="mt-1.5 text-[10px] text-white/40">{timelinePreview.meta}</p>
                 ) : null}
               </div>
 
@@ -625,12 +680,15 @@ function buildTimelinePreview(
   action: HyperLogAction | null,
   form: HyperLogDemoFormState,
   photoCount: number,
+  temperatureUnitSymbol: string,
 ): { headline: string; summary: string; meta: string | null } {
-  const photoMeta = photoCount > 0 ? `${photoCount} photo${photoCount === 1 ? "" : "s"} attached` : null;
+  const photoMeta =
+    photoCount > 0 ? `${photoCount} photo${photoCount === 1 ? "" : "s"} attached` : null;
   if (!action) {
     return {
       headline: "No entry yet",
-      summary: "Choose Water, Feed, Defoliate, or Note to see how this entry will appear in the plant memory timeline.",
+      summary:
+        "Choose Feed, Defoliate, Note, or Env Check to see how this entry will appear in the plant memory timeline.",
       meta: null,
     };
   }
@@ -652,7 +710,10 @@ function buildTimelinePreview(
   }
   if (action === "environment") {
     const parts: string[] = [];
-    if (form.envTemp.trim()) parts.push(`Temp ${form.envTemp.trim()}°C`);
+    // Live preview shows the raw typed value (not yet converted — that
+    // happens once in handleCommit), so the symbol must match what the
+    // grower is actually typing right now.
+    if (form.envTemp.trim()) parts.push(`Temp ${form.envTemp.trim()}${temperatureUnitSymbol}`);
     if (form.envHumidity.trim()) parts.push(`RH ${form.envHumidity.trim()}%`);
     if (form.envVpd.trim()) parts.push(`VPD ${form.envVpd.trim()} kPa`);
     if (form.envCo2.trim()) parts.push(`CO₂ ${form.envCo2.trim()} ppm`);
@@ -704,7 +765,7 @@ function DemoInput({
       value={value}
       placeholder={placeholder}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full rounded-lg bg-[#0d0d0d] border border-white/[0.08] px-3 py-2 text-xs text-white placeholder:text-white/30 focus:outline-none focus:border-[#00C853]/60 font-mono"
+      className="w-full rounded-lg bg-[#0d0d0d] border border-white/[0.08] px-3 py-2 text-xs text-white placeholder:text-white/30 focus:outline-hidden focus:border-[#00C853]/60 font-mono"
     />
   );
 }
@@ -724,7 +785,7 @@ function DemoSelect({
       {...rest}
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full rounded-lg bg-[#0d0d0d] border border-white/[0.08] px-3 py-2 text-xs text-white focus:outline-none focus:border-[#00C853]/60 font-mono"
+      className="w-full rounded-lg bg-[#0d0d0d] border border-white/[0.08] px-3 py-2 text-xs text-white focus:outline-hidden focus:border-[#00C853]/60 font-mono"
     >
       {options.map((o) => (
         <option key={o} value={o} className="bg-[#0d0d0d]">
@@ -752,7 +813,7 @@ function DemoTextarea({
       placeholder={placeholder}
       rows={minRows}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full resize-none rounded-lg bg-[#0d0d0d] border border-white/[0.08] px-3 py-2 text-xs text-white placeholder:text-white/30 focus:outline-none focus:border-[#00C853]/60 font-mono"
+      className="w-full resize-none rounded-lg bg-[#0d0d0d] border border-white/[0.08] px-3 py-2 text-xs text-white placeholder:text-white/30 focus:outline-hidden focus:border-[#00C853]/60 font-mono"
     />
   );
 }

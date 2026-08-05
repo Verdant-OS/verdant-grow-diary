@@ -53,4 +53,16 @@ describe("Pricing plan-card CTAs wrap instead of forcing page overflow", () => {
     // its own overflow-x-auto wrapper, never at page level.
     expect(PRICING).toMatch(/overflow-x-auto[\s\S]{0,200}pricing-comparison-table/);
   });
+
+  it("gives the pricing cards a level-two section heading before card headings", () => {
+    expect(PRICING).toMatch(
+      /aria-labelledby="pricing-plans-heading"[\s\S]{0,300}<h2 id="pricing-plans-heading"/,
+    );
+  });
+
+  it("makes the mobile comparison scroller keyboard-focusable and named", () => {
+    expect(PRICING).toMatch(
+      /tabIndex=\{0\}[\s\S]{0,120}role="region"[\s\S]{0,120}aria-label="Plan feature comparison"/,
+    );
+  });
 });

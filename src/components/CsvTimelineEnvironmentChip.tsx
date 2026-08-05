@@ -9,6 +9,11 @@
  *  - Renders nothing when no snapshot matched.
  */
 import type { CsvTimelineSnapshot } from "@/lib/environmentCsvTimelineContextViewModel";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
+import {
+  celsiusToFahrenheit,
+  type TemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
 
 export interface CsvTimelineEnvironmentChipProps {
   diaryEntryId: string;
@@ -20,10 +25,22 @@ function fmt(v: number | null, digits = 1): string {
   return v.toFixed(digits);
 }
 
-export function CsvTimelineEnvironmentChip(
-  props: CsvTimelineEnvironmentChipProps,
-) {
+/**
+ * Display-only temperature. The CSV import stores canonical Celsius —
+ * that storage contract is unchanged; only this rendered value converts,
+ * exactly once. The celsius preference renders the legacy "25.0 °C"
+ * shape unchanged; invalid stays "—".
+ */
+function fmtTemp(v: number | null, unit: TemperatureUnitPreference): string {
+  const symbol = unit === "celsius" ? "°C" : "°F";
+  if (v == null || !Number.isFinite(v)) return `— ${symbol}`;
+  const shown = unit === "celsius" ? v : celsiusToFahrenheit(v);
+  return `${shown.toFixed(1)} ${symbol}`;
+}
+
+export function CsvTimelineEnvironmentChip(props: CsvTimelineEnvironmentChipProps) {
   const { diaryEntryId, snapshot } = props;
+  const temperatureUnit = useTemperatureUnitPreference();
   if (!snapshot) return null;
 
   let captured = "—";
@@ -55,7 +72,9 @@ export function CsvTimelineEnvironmentChip(
       <dl className="mt-1 grid grid-cols-2 gap-x-3 gap-y-1 text-muted-foreground">
         <div>
           <dt className="inline">Temp:</dt>{" "}
-          <dd className="inline text-foreground">{fmt(snapshot.temperatureC)} °C</dd>
+          <dd className="inline text-foreground">
+            {fmtTemp(snapshot.temperatureC, temperatureUnit)}
+          </dd>
         </div>
         <div>
           <dt className="inline">RH:</dt>{" "}
@@ -64,9 +83,7 @@ export function CsvTimelineEnvironmentChip(
         {snapshot.derivedVpdKpa != null ? (
           <div className="col-span-2">
             <dt className="inline">{snapshot.derivedVpdLabel}:</dt>{" "}
-            <dd className="inline text-foreground">
-              {fmt(snapshot.derivedVpdKpa, 2)} kPa
-            </dd>
+            <dd className="inline text-foreground">{fmt(snapshot.derivedVpdKpa, 2)} kPa</dd>
           </div>
         ) : null}
         <div className="col-span-2 text-[10px]">Captured: {captured}</div>

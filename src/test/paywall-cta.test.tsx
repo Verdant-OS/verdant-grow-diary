@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { render, screen, within } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
@@ -44,8 +44,7 @@ describe("paywallCtaViewModel — calm defaults", () => {
       featureTitle: "Sensor snapshot history",
       requiredPlanLabel: "Pro",
       currentPlanLabel: "Free",
-      secondaryCopy:
-        "This panel describes what upgrading would unlock.",
+      secondaryCopy: "This panel describes what upgrading would unlock.",
     });
     const banned = paywallCtaFindBannedWords(paywallCtaViewModelText(vm));
     expect(banned).toEqual([]);
@@ -69,7 +68,7 @@ describe("paywallCtaViewModel — calm defaults", () => {
 describe("PaywallCta presenter", () => {
   function renderCta() {
     const vm = buildPaywallCtaViewModel({
-      featureTitle: "Full Action Queue",
+      featureTitle: "Advanced timeline filtering",
       requiredPlanLabel: "Pro",
       currentPlanLabel: "Free",
     });
@@ -103,10 +102,7 @@ describe("PaywallCta presenter", () => {
 
 describe("PaywallCta source — no payment/checkout imports", () => {
   it("PaywallCta.tsx imports no payment or checkout modules", () => {
-    const src = readFileSync(
-      resolve(__dirname, "../components/PaywallCta.tsx"),
-      "utf8",
-    );
+    const src = readFileSync(resolve(__dirname, "../components/PaywallCta.tsx"), "utf8");
     const imports = src.match(/^\s*import[^\n]+from\s+["'][^"']+["']/gm) ?? [];
     const joined = imports.join("\n");
     expect(joined).not.toMatch(/paddle/i);
@@ -116,10 +112,7 @@ describe("PaywallCta source — no payment/checkout imports", () => {
   });
 
   it("paywallCtaViewModel.ts imports no React or payment modules", () => {
-    const src = readFileSync(
-      resolve(__dirname, "../lib/paywallCtaViewModel.ts"),
-      "utf8",
-    );
+    const src = readFileSync(resolve(__dirname, "../lib/paywallCtaViewModel.ts"), "utf8");
     const imports = src.match(/^\s*import[^\n]+from\s+["'][^"']+["']/gm) ?? [];
     const joined = imports.join("\n");
     expect(joined).not.toMatch(/react/i);
@@ -128,4 +121,3 @@ describe("PaywallCta source — no payment/checkout imports", () => {
     expect(joined).not.toMatch(/checkout/i);
   });
 });
-

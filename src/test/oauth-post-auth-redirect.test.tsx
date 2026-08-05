@@ -1,5 +1,5 @@
 import { render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "@/lib/react-router-compat";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import OAuthPostAuthRedirect from "@/components/OAuthPostAuthRedirect";
 import {
@@ -19,7 +19,9 @@ vi.mock("@/store/auth", () => ({
 function LocationProbe() {
   const location = useLocation();
   return (
-    <output data-testid="oauth-post-auth-location">{`${location.pathname}${location.search}`}</output>
+    <output data-testid="oauth-post-auth-location">
+      {`${location.pathname}${location.search}${location.hash}`}
+    </output>
   );
 }
 
@@ -30,6 +32,7 @@ function renderRedirect(initialEntry = "/") {
       <Routes>
         <Route path="/" element={<LocationProbe />} />
         <Route path="/onboarding" element={<LocationProbe />} />
+        <Route path="/plants/:plantId" element={<LocationProbe />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -43,12 +46,12 @@ describe("OAuthPostAuthRedirect", () => {
   });
 
   it("restores a one-shot safe destination after OAuth returns to the app root", async () => {
-    savePendingOAuthPostAuthRedirect("/onboarding?intent=csv_history");
+    savePendingOAuthPostAuthRedirect("/plants/plant-123?tentId=tent-1#plant-ai-doctor-review");
     renderRedirect();
 
     await waitFor(() =>
       expect(screen.getByTestId("oauth-post-auth-location")).toHaveTextContent(
-        "/onboarding?intent=csv_history",
+        "/plants/plant-123?tentId=tent-1#plant-ai-doctor-review",
       ),
     );
     expect(window.sessionStorage.getItem(OAUTH_POST_AUTH_REDIRECT_STORAGE_KEY)).toBeNull();

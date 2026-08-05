@@ -14,9 +14,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import {
-  buildPlantRecentActivity,
-} from "@/lib/plantRecentActivityRules";
+import { buildPlantRecentActivity } from "@/lib/plantRecentActivityRules";
 
 const ROOT = resolve(__dirname, "../..");
 const read = (p: string) => readFileSync(resolve(ROOT, p), "utf8");
@@ -97,10 +95,10 @@ describe("buildPlantRecentActivity (pure)", () => {
   });
 
   it("flags photo presence when photo_url is set", () => {
-    const [row] = buildPlantRecentActivity(
-      [entry({ photo_url: "user/x.jpg" })],
-      { plantId: "p1", now: NOW },
-    );
+    const [row] = buildPlantRecentActivity([entry({ photo_url: "user/x.jpg" })], {
+      plantId: "p1",
+      now: NOW,
+    });
     expect(row.hasPhoto).toBe(true);
   });
 
@@ -167,10 +165,7 @@ describe("buildPlantRecentActivity (pure)", () => {
   });
 
   it("does not show unknown telemetry as healthy — no zero fallbacks for missing sensors", () => {
-    const [row] = buildPlantRecentActivity(
-      [entry({ details: {} })],
-      { plantId: "p1", now: NOW },
-    );
+    const [row] = buildPlantRecentActivity([entry({ details: {} })], { plantId: "p1", now: NOW });
     expect(row.hasSnapshot).toBe(false);
     expect(row.snapshotAt).toBeNull();
     expect(row.snapshotStale).toBe(false);
@@ -179,11 +174,25 @@ describe("buildPlantRecentActivity (pure)", () => {
   });
 
   it("flags quick_log entries as manual entries for source-badge rendering", () => {
-    const [row] = buildPlantRecentActivity(
-      [entry({ event_type: "quick_log" })],
+    const [row] = buildPlantRecentActivity([entry({ event_type: "quick_log" })], {
+      plantId: "p1",
+      now: NOW,
+    });
+    expect(row.isManualEntry).toBe(true);
+  });
+
+  it("keeps the Manual entry badge for typed quick-log companions via provenance markers", () => {
+    // Companions now normalize to their DISPLAY type (training/photo/...), so
+    // manual provenance must come from the writer's own markers.
+    const rows = buildPlantRecentActivity(
+      [
+        entry({ id: "a", event_type: "training", details: { quick_log_version: 2 } }),
+        entry({ id: "b", event_type: "photo", details: { source: "manual" } }),
+        entry({ id: "c", event_type: "watering", details: { grow_event_id: "ge-1" } }),
+      ],
       { plantId: "p1", now: NOW },
     );
-    expect(row.isManualEntry).toBe(true);
+    for (const r of rows) expect(r.isManualEntry).toBe(true);
   });
 
   it("does not flag non-quick_log entries as manual entries", () => {

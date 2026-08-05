@@ -6,6 +6,7 @@
  * Queue, or device-control behavior is introduced by this link.
  */
 import { readFileSync } from "node:fs";
+import { describe, expect, it } from "vitest";
 import { resolve } from "node:path";
 
 const SIDEBAR_SRC = readFileSync(resolve(__dirname, "../components/AppSidebar.tsx"), "utf8");

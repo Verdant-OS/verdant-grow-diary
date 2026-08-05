@@ -22,6 +22,7 @@ function row(
     metric,
     value,
     source: "live",
+    quality: "ok",
     captured_at: capturedAt,
     raw_payload: { source_app: "spider_farmer_ggs", sensor_id: "GGS-1" },
     ...opts,
@@ -48,11 +49,7 @@ describe("buildGgsSentinelEvidenceViewModel", () => {
   it("maps PASS state to pass verdict with no warnings", () => {
     const ts = offset(60_000);
     const ev = evaluateGgsSentinelReadiness({
-      rows: [
-        row("soil_moisture_pct", 40, ts),
-        row("ec", 1, ts),
-        row("soil_temp_c", 22, ts),
-      ],
+      rows: [row("soil_moisture_pct", 40, ts), row("ec", 1, ts), row("soil_temp_c", 22, ts)],
       snapshot: SNAP,
       now: NOW,
     });
@@ -84,16 +81,15 @@ describe("buildGgsSentinelEvidenceViewModel", () => {
     expect(vm.verdict).toBe("blocked");
     expect(vm.hasFreshnessWarning).toBe(true);
     expect(vm.freshnessWarnings.some((w) => /stale/i.test(w))).toBe(true);
-    expect(vm.nextSteps).toContain("Refresh evidence — at least one metric is past the freshness window.");
+    expect(vm.nextSteps).toContain(
+      "Refresh evidence — at least one metric is past the freshness window.",
+    );
   });
 
   it("flags missing metric and recommends verifying the right row", () => {
     const ts = offset(60_000);
     const ev = evaluateGgsSentinelReadiness({
-      rows: [
-        row("soil_moisture_pct", 40, ts),
-        row("soil_temp_c", 22, ts),
-      ],
+      rows: [row("soil_moisture_pct", 40, ts), row("soil_temp_c", 22, ts)],
       snapshot: SNAP,
       now: NOW,
     });
@@ -117,9 +113,7 @@ describe("buildGgsSentinelEvidenceViewModel", () => {
     });
     const vm = buildGgsSentinelEvidenceViewModel({ evaluation: ev })!;
     expect(vm.verdict).toBe("blocked");
-    expect(vm.nextSteps).toContain(
-      "Confirm source label is canonical (live / manual / csv).",
-    );
+    expect(vm.nextSteps).toContain("Confirm source label is canonical (live / manual / csv).");
   });
 
   it("renders all three canonical metric rows in deterministic order", () => {
@@ -130,11 +124,7 @@ describe("buildGgsSentinelEvidenceViewModel", () => {
       now: NOW,
     });
     const vm = buildGgsSentinelEvidenceViewModel({ evaluation: ev })!;
-    expect(vm.metrics.map((m) => m.metric)).toEqual([
-      "soil_moisture_pct",
-      "ec",
-      "soil_temp_c",
-    ]);
+    expect(vm.metrics.map((m) => m.metric)).toEqual(["soil_moisture_pct", "ec", "soil_temp_c"]);
     // Missing metrics keep value null — never a fabricated value.
     const moisture = vm.metrics.find((m) => m.metric === "soil_moisture_pct")!;
     expect(moisture.value).toBeNull();

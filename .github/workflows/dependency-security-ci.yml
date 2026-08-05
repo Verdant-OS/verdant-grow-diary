@@ -2,10 +2,11 @@ name: Dependency & Security CI
 
 on:
   workflow_dispatch:
+  merge_group:
   push:
-    branches: [main]
+    branches: [verdant-grow-diary]
   pull_request:
-    branches: [main]
+    branches: [verdant-grow-diary]
 
 # Read-only workflow: no secrets used, no artifacts uploaded that could
 # contain tokens. See scripts/check-dependency-security.mjs for the
@@ -37,19 +38,32 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-bun-
 
-      - name: Install dependencies (frozen lockfile)
-        run: bun install --frozen-lockfile
-
-      # 1. Text-lockfile discipline: bun.lock only, exact pin for
-      #    @lovable.dev/mcp-js, no binary/npm/yarn/pnpm lockfiles.
+      # 1. bun.lock stays canonical. package-lock.json remains synchronized
+      #    only for the owned, dated npm-consumer transition contract.
       - name: Lockfile policy check
         run: bun run check:lockfile
 
-      # 2. Dependency security scan. Fails on any advisory for
-      #    @lovable.dev/mcp-js, esbuild, ajv, or any high/critical
-      #    finding. See scripts/check-dependency-security.mjs.
+      - name: npm compatibility lock semantic check
+        run: bun run check:npm-lock-semantic
+
+      - name: Install dependencies (frozen lockfile)
+        run: bun install --frozen-lockfile
+
+      # 2. Dual Bun + npm compatibility-lock security scan. npm propagation
+      #    metadata is normalized to atomic advisories before the same exact,
+      #    expiring exception policy is applied to both sources.
       - name: Dependency security scan
         run: bun run check:deps
+
+      - name: Dependency security contract tests
+        run: >-
+          bunx vitest run
+          src/test/check-bun-lockfile-policy.test.ts
+          src/test/check-dependency-security.test.ts
+          src/test/dependency-security-ci-workflow.test.ts
+          src/test/dependency-security-phase-a-contract.test.ts
+          src/test/vite-dev-server-binding.test.ts
+          --reporter=dot
 
       - name: Typecheck
         run: bun run typecheck
@@ -57,13 +71,12 @@ jobs:
       - name: Build
         run: bun run build
 
-      - name: Unit tests
-        run: bunx vitest run
+      # Repo-wide Vitest coverage is intentionally delegated to the existing
+      # sharded `CI` and `Full Vitest Suite (PR gate)` workflows. This job owns
+      # only the focused dependency-security contract tests above.
 
-      # Playwright smoke suite (chromium project against the built app).
-      # `--project` is a no-op when the project name doesn't exist in
-      # playwright.config.ts; adjust the project name to match the repo's
-      # smoke project as needed.
+      # Pinned mocked browser compatibility only. Repo-wide browser coverage
+      # remains owned by the existing dedicated E2E workflows.
       - name: Cache Playwright browsers
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
@@ -76,5 +89,10 @@ jobs:
         run: bunx playwright install --with-deps chromium
 
       - name: Playwright smoke suite
-        run: bunx playwright test --project=chromium-mocked
+        run: >-
+          bunx playwright test
+          e2e/auth-loading.spec.ts
+          e2e/auth-route-protection.spec.ts
+          e2e/legal-seo-metadata.spec.ts
+          --project=chromium-mocked
         continue-on-error: false

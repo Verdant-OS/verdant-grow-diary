@@ -37,9 +37,7 @@ function liveVerifiedForm(): EcowittLiveEvidenceFormState {
     normalized_payload_present: true,
     operator_compared_controller: true,
     metric_rows: base.metric_rows.map((r) =>
-      r.key === "temp_f"
-        ? { ...r, enabled: true, backend_value: "72", controller_value: "72" }
-        : r,
+      r.key === "temp_f" ? { ...r, enabled: true, backend_value: "72", controller_value: "72" } : r,
     ),
   };
 }
@@ -209,9 +207,7 @@ describe("buildEcowittTonightModeViewModel", () => {
       export_ready: true,
       snapshot_exported: true,
     });
-    expect(
-      vm2.checklist_items.find((c) => c.id === "snapshot-exported")!.status,
-    ).toBe("done");
+    expect(vm2.checklist_items.find((c) => c.id === "snapshot-exported")!.status).toBe("done");
   });
 
   it("does not mutate input", () => {

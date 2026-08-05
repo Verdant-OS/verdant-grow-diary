@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation, useNavigate } from "@/lib/react-router-compat";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const harness = vi.hoisted(() => ({
@@ -232,7 +232,27 @@ function renderTimeline(route = "/timeline") {
   return render(
     <MemoryRouter initialEntries={[route]}>
       <Timeline />
+      <LocationProbe />
     </MemoryRouter>,
+  );
+}
+
+function LocationProbe() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  return (
+    <>
+      <output data-testid="timeline-location-search">{location.search}</output>
+      <button
+        type="button"
+        data-testid="timeline-external-plant-navigation"
+        onClick={() =>
+          navigate("/timeline?sensorSources=csv&plantId=plant-a&from=2026-07-01&to=2026-07-31")
+        }
+      >
+        Navigate to Plant A
+      </button>
+    </>
   );
 }
 
@@ -300,6 +320,57 @@ describe("Timeline mounted read-state boundary", () => {
     expect(harness.executeQuery).not.toHaveBeenCalled();
     expectNoFalseEmptyOrResults();
     expectNoTimelineContinuation();
+  });
+
+  it("labels plant/tent filter options from the archived-inclusive name directory", async () => {
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "diary_entries") {
+        return {
+          data: [
+            {
+              ...diaryEntry("entry-archived-refs", "Log against archived plant"),
+              plant_id: "5d7206aa-0000-4000-8000-000000000001",
+              tent_id: "6b1faabb-0000-4000-8000-000000000002",
+            },
+          ],
+          error: null,
+          count: 1,
+        };
+      }
+      if (spec.table === "plants") {
+        // The directory read must NOT filter on is_archived — archived
+        // rows still carry names and must stay resolvable. It MUST
+        // filter on user_id: additive operator RLS policies would
+        // otherwise return every grower's rows on this owner-facing page.
+        expect(spec.filters.some((f) => f.column === "is_archived")).toBe(false);
+        expect(spec.filters).toContainEqual({ op: "eq", column: "user_id", value: "owner-1" });
+        return {
+          data: [{ id: "5d7206aa-0000-4000-8000-000000000001", name: "Project McDonald #3" }],
+          error: null,
+        };
+      }
+      if (spec.table === "tents") {
+        expect(spec.filters.some((f) => f.column === "is_archived")).toBe(false);
+        expect(spec.filters).toContainEqual({ op: "eq", column: "user_id", value: "owner-1" });
+        return {
+          data: [{ id: "6b1faabb-0000-4000-8000-000000000002", name: "Retired 4x4" }],
+          error: null,
+        };
+      }
+      return defaultResult(spec);
+    });
+
+    renderTimeline();
+
+    expect(await screen.findByText("Log against archived plant")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByTestId("timeline-plant-filter")).toHaveTextContent(
+        "Project McDonald #3 (1)",
+      );
+      expect(screen.getByTestId("timeline-tent-filter")).toHaveTextContent("Retired 4x4 (1)");
+    });
+    expect(screen.getByTestId("timeline-plant-filter")).not.toHaveTextContent("Plant 5d7206");
+    expect(screen.getByTestId("timeline-tent-filter")).not.toHaveTextContent("Tent 6b1faa");
   });
 
   it("treats a blank URL grow id as absent and reads the active grow", async () => {
@@ -411,6 +482,117 @@ describe("Timeline mounted read-state boundary", () => {
       "1 stage-tagged log",
     );
     expect(screen.getByTestId("timeline-one-tent-loop-next-step-card")).toBeInTheDocument();
+  });
+
+  it("applies and canonicalizes plantId with source/date params without cross-plant bleed", async () => {
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "diary_entries") {
+        return {
+          data: [
+            {
+              ...diaryEntry("plant-a-csv", "Plant A CSV reading"),
+              plant_id: "plant-a",
+              details: {
+                event_type: "sensor_snapshot",
+                plant_name: "Plant A",
+                sensor_snapshot: { source: "csv" },
+              },
+            },
+            {
+              ...diaryEntry("plant-b-csv", "Plant B CSV reading"),
+              plant_id: "plant-b",
+              details: {
+                event_type: "sensor_snapshot",
+                plant_name: "Plant B",
+                sensor_snapshot: { source: "csv" },
+              },
+            },
+          ],
+          error: null,
+          count: 2,
+        };
+      }
+      return defaultResult(spec);
+    });
+
+    renderTimeline("/timeline?sensorSources=csv&plantId=plant-a&from=2026-07-01&to=2026-07-31");
+
+    expect(await screen.findByText("Plant A CSV reading")).toBeInTheDocument();
+    expect(screen.queryByText("Plant B CSV reading")).not.toBeInTheDocument();
+    expect(screen.getByTestId("timeline-results-count")).toHaveTextContent(
+      "Detailed diary: showing 1 of 2 entries",
+    );
+
+    fireEvent.change(screen.getByTestId("timeline-plant-filter"), {
+      target: { value: "plant-b" },
+    });
+
+    expect(await screen.findByText("Plant B CSV reading")).toBeInTheDocument();
+    expect(screen.queryByText("Plant A CSV reading")).not.toBeInTheDocument();
+    await waitFor(() => {
+      const params = new URLSearchParams(
+        screen.getByTestId("timeline-location-search").textContent ?? "",
+      );
+      expect(params.get("plantId")).toBe("plant-b");
+      expect(params.get("sensorSources")).toBe("csv");
+      expect(params.get("from")).toBe("2026-07-01");
+      expect(params.get("to")).toBe("2026-07-31");
+    });
+
+    fireEvent.click(screen.getByTestId("timeline-external-plant-navigation"));
+    expect(await screen.findByText("Plant A CSV reading")).toBeInTheDocument();
+    expect(screen.queryByText("Plant B CSV reading")).not.toBeInTheDocument();
+    await waitFor(() => {
+      const params = new URLSearchParams(
+        screen.getByTestId("timeline-location-search").textContent ?? "",
+      );
+      expect(params.get("plantId")).toBe("plant-a");
+      expect(params.get("sensorSources")).toBe("csv");
+      expect(params.get("from")).toBe("2026-07-01");
+      expect(params.get("to")).toBe("2026-07-31");
+    });
+  });
+
+  it("fails closed for an unknown plantId and treats a missing plantId as unscoped", async () => {
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "diary_entries") {
+        return {
+          data: [
+            {
+              ...diaryEntry("plant-a-csv", "Plant A CSV reading"),
+              plant_id: "plant-a",
+              details: {
+                event_type: "sensor_snapshot",
+                plant_name: "Plant A",
+                sensor_snapshot: { source: "csv" },
+              },
+            },
+            {
+              ...diaryEntry("plant-b-csv", "Plant B CSV reading"),
+              plant_id: "plant-b",
+              details: {
+                event_type: "sensor_snapshot",
+                plant_name: "Plant B",
+                sensor_snapshot: { source: "csv" },
+              },
+            },
+          ],
+          error: null,
+          count: 2,
+        };
+      }
+      return defaultResult(spec);
+    });
+
+    const view = renderTimeline("/timeline?sensorSources=csv&plantId=unknown-plant");
+    expect(await screen.findByText("No matches")).toBeInTheDocument();
+    expect(screen.queryByText("Plant A CSV reading")).not.toBeInTheDocument();
+    expect(screen.queryByText("Plant B CSV reading")).not.toBeInTheDocument();
+
+    view.unmount();
+    renderTimeline("/timeline?sensorSources=csv");
+    expect(await screen.findByText("Plant A CSV reading")).toBeInTheDocument();
+    expect(screen.getByText("Plant B CSV reading")).toBeInTheDocument();
   });
 
   it("unlocks the Sensors continuation for V2 grow-event-only evidence", async () => {

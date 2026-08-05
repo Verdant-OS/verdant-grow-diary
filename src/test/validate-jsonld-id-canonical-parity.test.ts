@@ -157,14 +157,10 @@ describe("validateDocument", () => {
     expect(issues).toEqual([]);
   });
 
-
   it("walks top-level array", () => {
     const issues = validateDocument({
       file: "x.html",
-      html: docWith([
-        { "@type": "WebPage", "@id": CANONICAL },
-        { "@type": "BreadcrumbList" },
-      ]),
+      html: docWith([{ "@type": "WebPage", "@id": CANONICAL }, { "@type": "BreadcrumbList" }]),
     });
     expect(issues).toEqual([]);
   });

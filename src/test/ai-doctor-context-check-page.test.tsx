@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 
 const mocks = vi.hoisted(() => ({ track: vi.fn() }));
 
@@ -28,9 +28,9 @@ beforeEach(() => mocks.track.mockReset());
 
 afterEach(() => {
   if (originalClipboard) Object.defineProperty(navigator, "clipboard", originalClipboard);
-  else delete (navigator as Navigator & { clipboard?: Clipboard }).clipboard;
+  else delete (navigator as unknown as { clipboard?: Clipboard }).clipboard;
   if (originalShare) Object.defineProperty(navigator, "share", originalShare);
-  else delete (navigator as Navigator & { share?: Navigator["share"] }).share;
+  else delete (navigator as unknown as { share?: Navigator["share"] }).share;
 });
 
 describe("AI Doctor Context Check page", () => {

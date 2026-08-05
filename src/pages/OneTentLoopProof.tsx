@@ -41,19 +41,13 @@ function BulletList({
 }) {
   if (!items || items.length === 0) {
     return (
-      <p
-        data-testid={`${testId}-empty`}
-        className="text-xs italic text-muted-foreground"
-      >
+      <p data-testid={`${testId}-empty`} className="text-xs italic text-muted-foreground">
         {emptyMessage}
       </p>
     );
   }
   return (
-    <ul
-      data-testid={testId}
-      className="list-disc space-y-1 pl-5 text-sm text-foreground"
-    >
+    <ul data-testid={testId} className="list-disc space-y-1 pl-5 text-sm text-foreground">
       {items.map((item, i) => (
         <li key={`${testId}-${i}`}>{item}</li>
       ))}
@@ -79,9 +73,7 @@ function StepCard({ step }: { step: OneTentLoopProofStep }) {
         testId={`one-tent-loop-proof-step-${step.id}-evidence`}
       />
 
-      <p className="text-xs font-medium text-muted-foreground">
-        Missing pieces
-      </p>
+      <p className="text-xs font-medium text-muted-foreground">Missing pieces</p>
       <BulletList
         items={step.missing_pieces}
         emptyMessage="No missing pieces."
@@ -97,9 +89,7 @@ function StepCard({ step }: { step: OneTentLoopProofStep }) {
 
       <p className="text-sm">
         <span className="font-medium">Next fix: </span>
-        <span data-testid={`one-tent-loop-proof-step-${step.id}-next-fix`}>
-          {step.next_fix}
-        </span>
+        <span data-testid={`one-tent-loop-proof-step-${step.id}-next-fix`}>{step.next_fix}</span>
       </p>
     </section>
   );
@@ -115,10 +105,7 @@ export default function OneTentLoopProof(): JSX.Element {
     >
       <header className="space-y-2 rounded-md border border-border bg-muted/30 p-4">
         <h1 className="text-lg font-semibold">{vm.title}</h1>
-        <p
-          data-testid="one-tent-loop-proof-subtitle"
-          className="text-sm text-muted-foreground"
-        >
+        <p data-testid="one-tent-loop-proof-subtitle" className="text-sm text-muted-foreground">
           {vm.subtitle}
         </p>
         <div className="flex flex-wrap gap-1">
@@ -132,10 +119,7 @@ export default function OneTentLoopProof(): JSX.Element {
             </span>
           ))}
         </div>
-        <p
-          data-testid="one-tent-loop-proof-generated-at"
-          className="text-xs text-muted-foreground"
-        >
+        <p data-testid="one-tent-loop-proof-generated-at" className="text-xs text-muted-foreground">
           Generated at: {vm.generated_at}
         </p>
       </header>

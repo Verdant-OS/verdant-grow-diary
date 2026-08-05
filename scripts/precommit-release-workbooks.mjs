@@ -35,15 +35,16 @@ export function pickRelevantStaged(staged) {
 }
 
 function getStaged() {
-  const r = spawnSync(
-    "git",
-    ["diff", "--cached", "--name-only", "--diff-filter=ACMR"],
-    { encoding: "utf8" },
-  );
+  const r = spawnSync("git", ["diff", "--cached", "--name-only", "--diff-filter=ACMR"], {
+    encoding: "utf8",
+  });
   if (r.status !== 0) {
     throw new Error(`git diff --cached failed: ${r.stderr?.trim() || "unknown"}`);
   }
-  return r.stdout.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+  return r.stdout
+    .split(/\r?\n/)
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 
 function main() {

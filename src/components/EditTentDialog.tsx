@@ -23,10 +23,7 @@ import { Switch } from "@/components/ui/switch";
 import { Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { STAGES } from "@/lib/grow";
-import {
-  buildTentUpdatePayload,
-  isTentUpdatePayloadValid,
-} from "@/lib/tentManagementRules";
+import { buildTentUpdatePayload, isTentUpdatePayloadValid } from "@/lib/tentManagementRules";
 
 /**
  * Edits an existing tent's user-facing fields. Mirrors EditPlantDialog
@@ -120,12 +117,7 @@ export default function EditTentDialog({ tent, trigger }: Props) {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {trigger ?? (
-          <Button
-            size="sm"
-            variant="outline"
-            className="gap-1"
-            data-testid="edit-tent-trigger"
-          >
+          <Button size="sm" variant="outline" className="gap-1" data-testid="edit-tent-trigger">
             <Pencil className="h-4 w-4" /> Edit Tent
           </Button>
         )}
@@ -166,10 +158,7 @@ export default function EditTentDialog({ tent, trigger }: Props) {
           </div>
           <div>
             <Label>Stage</Label>
-            <Select
-              value={form.stage}
-              onValueChange={(v) => setForm({ ...form, stage: v })}
-            >
+            <Select value={form.stage} onValueChange={(v) => setForm({ ...form, stage: v })}>
               <SelectTrigger data-testid="edit-tent-stage">
                 <SelectValue />
               </SelectTrigger>

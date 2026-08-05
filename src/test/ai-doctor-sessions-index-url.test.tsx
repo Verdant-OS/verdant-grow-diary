@@ -14,7 +14,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 
@@ -65,9 +65,7 @@ const HELPERS = read("src/lib/aiDoctorSessionsIndexFilters.ts");
 
 function LocationProbe() {
   const loc = useLocation();
-  return (
-    <div data-testid="location-search">{loc.search}</div>
-  );
+  return <div data-testid="location-search">{loc.search}</div>;
 }
 
 function renderAt(initialEntry: string) {
@@ -108,28 +106,30 @@ describe("serializeFilters", () => {
     expect(serializeFilters(DEFAULT_FILTERS)).toEqual({});
   });
   it("includes non-default risk", () => {
-    expect(
-      serializeFilters({ ...DEFAULT_FILTERS, risk: "high" }),
-    ).toEqual({ risk: "high" });
+    expect(serializeFilters({ ...DEFAULT_FILTERS, risk: "high" })).toEqual({ risk: "high" });
   });
   it("includes non-default has-actions", () => {
-    expect(
-      serializeFilters({ ...DEFAULT_FILTERS, hasActions: "yes" }),
-    ).toEqual({ hasActions: "yes" });
-    expect(
-      serializeFilters({ ...DEFAULT_FILTERS, hasActions: "no" }),
-    ).toEqual({ hasActions: "no" });
+    expect(serializeFilters({ ...DEFAULT_FILTERS, hasActions: "yes" })).toEqual({
+      hasActions: "yes",
+    });
+    expect(serializeFilters({ ...DEFAULT_FILTERS, hasActions: "no" })).toEqual({
+      hasActions: "no",
+    });
   });
   it("includes non-default date range", () => {
-    expect(
-      serializeFilters({ ...DEFAULT_FILTERS, dateRange: "7d" }),
-    ).toEqual({ dateRange: "7d" });
+    expect(serializeFilters({ ...DEFAULT_FILTERS, dateRange: "7d" })).toEqual({ dateRange: "7d" });
   });
   it("round-trips through parseFilters for all valid values", () => {
     const cases: SessionsIndexFilters[] = [
       DEFAULT_FILTERS,
       { ...DEFAULT_FILTERS, risk: "low" },
-      { ...DEFAULT_FILTERS, risk: "critical", hasActions: "yes", dateRange: "30d", needsReview: "yes" },
+      {
+        ...DEFAULT_FILTERS,
+        risk: "critical",
+        hasActions: "yes",
+        dateRange: "30d",
+        needsReview: "yes",
+      },
       { ...DEFAULT_FILTERS, risk: "medium", hasActions: "no", dateRange: "7d", needsReview: "no" },
     ];
     for (const f of cases) {
@@ -141,9 +141,9 @@ describe("serializeFilters", () => {
 
 describe("parseFilters — invalid input", () => {
   it("normalizes garbage values back to defaults", () => {
-    expect(
-      parseFilters({ risk: "neon", hasActions: "maybe", dateRange: "yesterday" }),
-    ).toEqual(DEFAULT_FILTERS);
+    expect(parseFilters({ risk: "neon", hasActions: "maybe", dateRange: "yesterday" })).toEqual(
+      DEFAULT_FILTERS,
+    );
   });
 });
 
@@ -180,14 +180,11 @@ describe("AiDoctorSessionsIndex — URL persistence", () => {
       (screen.getByTestId("ai-doctor-sessions-index-filter-risk") as HTMLSelectElement).value,
     ).toBe("high");
     expect(
-      (screen.getByTestId(
-        "ai-doctor-sessions-index-filter-has-actions",
-      ) as HTMLSelectElement).value,
+      (screen.getByTestId("ai-doctor-sessions-index-filter-has-actions") as HTMLSelectElement)
+        .value,
     ).toBe("yes");
     expect(
-      (screen.getByTestId(
-        "ai-doctor-sessions-index-filter-date-range",
-      ) as HTMLSelectElement).value,
+      (screen.getByTestId("ai-doctor-sessions-index-filter-date-range") as HTMLSelectElement).value,
     ).toBe("7d");
   });
 
@@ -198,14 +195,11 @@ describe("AiDoctorSessionsIndex — URL persistence", () => {
       (screen.getByTestId("ai-doctor-sessions-index-filter-risk") as HTMLSelectElement).value,
     ).toBe("all");
     expect(
-      (screen.getByTestId(
-        "ai-doctor-sessions-index-filter-has-actions",
-      ) as HTMLSelectElement).value,
+      (screen.getByTestId("ai-doctor-sessions-index-filter-has-actions") as HTMLSelectElement)
+        .value,
     ).toBe("all");
     expect(
-      (screen.getByTestId(
-        "ai-doctor-sessions-index-filter-date-range",
-      ) as HTMLSelectElement).value,
+      (screen.getByTestId("ai-doctor-sessions-index-filter-date-range") as HTMLSelectElement).value,
     ).toBe("all");
   });
 
@@ -277,9 +271,7 @@ describe("AiDoctorSessionsIndex — URL persistence", () => {
 
   it("filtered empty state renders when URL filters are active", async () => {
     renderAt("/doctor/sessions?risk=critical");
-    expect(
-      await screen.findByTestId("ai-doctor-sessions-index-empty-filtered"),
-    ).toBeTruthy();
+    expect(await screen.findByTestId("ai-doctor-sessions-index-empty-filtered")).toBeTruthy();
   });
 });
 

@@ -15,7 +15,7 @@
  *     read-only Phase 1 result locally with the pure foundation engine.
  */
 import * as React from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "@/lib/react-router-compat";
 import { plantDetailPath, plantsPath } from "@/lib/routes";
 import {
   AiDoctorPhase1PlantPicker,
@@ -160,7 +160,7 @@ export default function OperatorAiDoctorPhase1(
   const ariaWho = plantNameForAria ? `for ${plantNameForAria}` : "for selected plant";
 
   return (
-    <main
+    <div
       data-testid="operator-ai-doctor-phase1-page"
       className={`mx-auto max-w-4xl space-y-4 p-4 ${showMobileStickyBar ? "pb-24 sm:pb-4" : ""}`}
     >
@@ -472,7 +472,7 @@ export default function OperatorAiDoctorPhase1(
           </div>
         </div>
       )}
-    </main>
+    </div>
   );
 }
 

@@ -54,12 +54,22 @@ export function routeForStartScreen(choice: StartScreenChoice): string {
 /**
  * Consume Verdant's one-shot Quick Log start intent while preserving unrelated
  * query parameters. Returns null when no valid intent is present.
+ *
+ * The intent's companion `type` marker (the preset a grower picked before
+ * being routed here — see globalSearchQuickLogFallbackRules) and closed
+ * `prompt` marker (guide handoff) are consumed too, so neither can linger in
+ * the URL and re-seed the draft on refresh/back. Callers that need either
+ * value must read it BEFORE consuming. They are stripped only alongside a
+ * valid intent: bare markers with no `open=quick-log` belong to someone else
+ * and are untouched.
  */
 export function consumeQuickLogStartIntent(search: string): string | null {
   if (typeof search !== "string") return null;
   const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
   if (params.get("open") !== "quick-log") return null;
   params.delete("open");
+  params.delete("type");
+  params.delete("prompt");
   const remaining = params.toString();
   return remaining ? `?${remaining}` : "";
 }
@@ -106,24 +116,34 @@ export function getStartScreenChoiceOrDefault(userId: string): StartScreenChoice
   return getStartScreenChoice(userId) ?? DEFAULT_START_SCREEN;
 }
 
-export function setStartScreenChoice(userId: string, choice: StartScreenChoice): void {
+/**
+ * Persist a start-screen choice and confirm it can be read back.
+ *
+ * Returns false when storage is unavailable, the inputs are invalid, or the
+ * browser rejects/does not retain the write. Callers can then avoid claiming
+ * that a preference was saved when it was not.
+ */
+export function setStartScreenChoice(userId: string, choice: StartScreenChoice): boolean {
   const key = storageKey(userId);
   const s = safeStorage();
-  if (!key || !s || !isValid(choice)) return;
+  if (!key || !s || !isValid(choice)) return false;
   try {
     s.setItem(key, choice);
+    return s.getItem(key) === choice;
   } catch {
-    /* fail open */
+    return false;
   }
 }
 
-export function clearStartScreenChoice(userId: string): void {
+/** Remove a saved choice and confirm the key is absent. */
+export function clearStartScreenChoice(userId: string): boolean {
   const key = storageKey(userId);
   const s = safeStorage();
-  if (!key || !s) return;
+  if (!key || !s) return false;
   try {
     s.removeItem(key);
+    return s.getItem(key) === null;
   } catch {
-    /* ignore */
+    return false;
   }
 }

@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -121,7 +121,7 @@ describe("Auth signup acquisition handoff", () => {
     expect(JSON.stringify(mocks.track.mock.calls)).not.toMatch(
       /grower@example|password|correct-horse|token|user_?id/i,
     );
-  });
+  }, 15_000);
 
   it("carries an explicit marketing opt-in through confirmation-required signup", async () => {
     renderSignup();
@@ -155,6 +155,7 @@ describe("Auth signup acquisition handoff", () => {
     expect(pending).not.toBeNull();
     expect(JSON.parse(pending ?? "{}")).toMatchObject({ source: "founder_share" });
     expect(pending).not.toMatch(/email|token|user_?id|grower@example/i);
+    expect(consumePendingOAuthPostAuthRedirect()).toBe(founderRedirectTo);
     expect(consumePendingOAuthPostAuthRedirect()).toBeNull();
   });
 

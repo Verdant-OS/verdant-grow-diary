@@ -1,0 +1,274 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://verdantgrowdiary.com/schemas/knowledge/equipment.schema.json",
+  "title": "Verdant equipment and integration reference page",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "pageManifest",
+    "slug",
+    "name",
+    "identity",
+    "productCapabilities",
+    "selection",
+    "installation",
+    "calibrationAndMaintenance",
+    "verdantDataPath",
+    "verdantCompatibility",
+    "failureModes",
+    "claims",
+    "sources",
+    "editorial",
+    "conversion"
+  ],
+  "properties": {
+    "pageManifest": { "$ref": "common.schema.json#/$defs/pageManifest" },
+    "slug": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+    "name": { "type": "string", "minLength": 3 },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "equipmentNodeId",
+        "category",
+        "manufacturer",
+        "model",
+        "hardwareRevision",
+        "firmwareVersion",
+        "documentationVersion",
+        "manualSourceId"
+      ],
+      "properties": {
+        "equipmentNodeId": { "$ref": "common.schema.json#/$defs/nodeId" },
+        "category": { "type": "string", "minLength": 3 },
+        "manufacturer": { "type": ["string", "null"] },
+        "model": { "type": ["string", "null"] },
+        "hardwareRevision": { "type": ["string", "null"] },
+        "firmwareVersion": { "type": ["string", "null"] },
+        "documentationVersion": { "type": ["string", "null"] },
+        "manualSourceId": {
+          "anyOf": [{ "$ref": "common.schema.json#/$defs/nodeId" }, { "type": "null" }]
+        }
+      }
+    },
+    "productCapabilities": {
+      "type": "array",
+      "minItems": 1,
+      "description": "What the equipment itself can do. This is separate from Verdant's read-only data path.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["capabilityId", "name", "status", "evidenceSourceIds", "limitations"],
+        "properties": {
+          "capabilityId": { "$ref": "common.schema.json#/$defs/nodeId" },
+          "name": { "type": "string", "minLength": 3 },
+          "status": {
+            "enum": ["verified", "documented", "experimental", "blocked", "unsupported", "retired"]
+          },
+          "evidenceSourceIds": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "$ref": "common.schema.json#/$defs/nodeId" },
+            "uniqueItems": true
+          },
+          "limitations": { "type": "array", "minItems": 1, "items": { "type": "string" } }
+        }
+      }
+    },
+    "selection": { "type": "array", "minItems": 3, "items": { "type": "string" } },
+    "installation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["prerequisites", "placement", "electricalOrStructuralBoundary", "verification"],
+      "properties": {
+        "prerequisites": { "type": "array", "items": { "type": "string" } },
+        "placement": { "type": "array", "items": { "type": "string" } },
+        "electricalOrStructuralBoundary": { "type": "string", "minLength": 12 },
+        "verification": { "type": "array", "minItems": 1, "items": { "type": "string" } }
+      }
+    },
+    "calibrationAndMaintenance": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["protocolId", "interval", "procedure", "verification", "sourceIds"],
+        "properties": {
+          "protocolId": { "$ref": "common.schema.json#/$defs/nodeId" },
+          "interval": { "type": "string", "minLength": 3 },
+          "procedure": { "type": "string", "minLength": 8 },
+          "verification": { "type": "string", "minLength": 8 },
+          "sourceIds": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "$ref": "common.schema.json#/$defs/nodeId" },
+            "uniqueItems": true
+          }
+        }
+      }
+    },
+    "verdantDataPath": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Verdant's information path only; it does not redefine the equipment's native functions.",
+      "required": [
+        "integrationIds",
+        "transports",
+        "exportFormats",
+        "readOnly",
+        "directDeviceControl",
+        "allowedSources",
+        "provenance",
+        "freshness",
+        "credentialHandling"
+      ],
+      "properties": {
+        "integrationIds": {
+          "type": "array",
+          "items": { "$ref": "common.schema.json#/$defs/nodeId" },
+          "uniqueItems": true
+        },
+        "transports": { "type": "array", "items": { "type": "string" } },
+        "exportFormats": { "type": "array", "items": { "type": "string" } },
+        "readOnly": { "const": true },
+        "directDeviceControl": { "const": false },
+        "allowedSources": {
+          "type": "array",
+          "minItems": 1,
+          "description": "The canonical source labels this specific equipment or integration page can substantiate; never assume the full global vocabulary.",
+          "items": { "enum": ["live", "manual", "csv", "demo", "stale", "invalid"] },
+          "uniqueItems": true
+        },
+        "provenance": { "type": "string", "minLength": 8 },
+        "freshness": { "type": "string", "minLength": 8 },
+        "credentialHandling": { "type": "string", "minLength": 12 }
+      }
+    },
+    "verdantCompatibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "verifiedOn",
+        "verifiedVersions",
+        "evidenceSourceIds",
+        "supportedMetricIds",
+        "supportedCapabilityIds",
+        "unsupportedCapabilities",
+        "setupPath"
+      ],
+      "properties": {
+        "status": {
+          "enum": ["verified", "documented", "experimental", "blocked", "unsupported", "retired"]
+        },
+        "verifiedOn": { "type": ["string", "null"], "format": "date" },
+        "verifiedVersions": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "evidenceSourceIds": {
+          "type": "array",
+          "items": { "$ref": "common.schema.json#/$defs/nodeId" },
+          "uniqueItems": true
+        },
+        "supportedMetricIds": {
+          "type": "array",
+          "items": { "$ref": "common.schema.json#/$defs/nodeId" },
+          "uniqueItems": true
+        },
+        "supportedCapabilityIds": {
+          "type": "array",
+          "items": { "$ref": "common.schema.json#/$defs/nodeId" },
+          "uniqueItems": true
+        },
+        "unsupportedCapabilities": { "type": "array", "items": { "type": "string" } },
+        "setupPath": {
+          "type": ["string", "null"],
+          "pattern": "^/[a-z0-9]+(?:[/-][a-z0-9]+)*$"
+        }
+      }
+    },
+    "failureModes": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "detection", "impact", "safeResponse", "recoveryEvidence"],
+        "properties": {
+          "name": { "type": "string", "minLength": 3 },
+          "detection": { "type": "string", "minLength": 8 },
+          "impact": { "type": "string", "minLength": 8 },
+          "safeResponse": { "type": "string", "minLength": 8 },
+          "recoveryEvidence": { "type": "string", "minLength": 8 }
+        }
+      }
+    },
+    "claims": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "common.schema.json#/$defs/claim" }
+    },
+    "sources": {
+      "type": "array",
+      "minItems": 2,
+      "items": { "$ref": "common.schema.json#/$defs/source" }
+    },
+    "editorial": { "$ref": "common.schema.json#/$defs/editorial" },
+    "conversion": { "$ref": "common.schema.json#/$defs/conversion" }
+  },
+  "allOf": [
+    {
+      "type": "object",
+      "properties": {
+        "pageManifest": {
+          "type": "object",
+          "properties": {
+            "metadata": {
+              "type": "object",
+              "properties": {
+                "pageType": { "const": "equipment" },
+                "pageFamily": { "const": "entity" }
+              }
+            },
+            "graph": {
+              "type": "object",
+              "properties": {
+                "node": {
+                  "type": "object",
+                  "properties": { "type": { "const": "Equipment" } }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "verdantCompatibility": {
+            "type": "object",
+            "properties": { "status": { "const": "verified" } },
+            "required": ["status"]
+          }
+        },
+        "required": ["verdantCompatibility"]
+      },
+      "then": {
+        "type": "object",
+        "properties": {
+          "verdantCompatibility": {
+            "type": "object",
+            "properties": {
+              "verifiedOn": { "type": "string", "format": "date" },
+              "verifiedVersions": { "type": "array", "minItems": 1 },
+              "evidenceSourceIds": { "type": "array", "minItems": 1 },
+              "supportedCapabilityIds": { "type": "array", "minItems": 1 }
+            }
+          }
+        }
+      }
+    },
+    { "$ref": "common.schema.json#/$defs/pageSafetyReviewGate" }
+  ]
+}

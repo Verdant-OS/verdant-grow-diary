@@ -8,10 +8,7 @@
  * and valid normalized pH/EC/watering/feeding/photo context can improve it.
  */
 
-import {
-  normalizeDiaryEntries,
-  type NormalizedDiaryEntry,
-} from "./diaryEntryRules";
+import { normalizeDiaryEntries, type NormalizedDiaryEntry } from "./diaryEntryRules";
 import type {
   AiContextDiaryEntryInput,
   AiContextSensorReadingInput,
@@ -42,21 +39,15 @@ function isWaterOrFeedType(t: string | null | undefined): boolean {
   return s.includes("water") || s.includes("feed") || s.includes("irrig");
 }
 
-export function adaptDiaryForAiContext(
-  input: CoachContextAdapterInput,
-): CoachContextAdapterResult {
+export function adaptDiaryForAiContext(input: CoachContextAdapterInput): CoachContextAdapterResult {
   const normalized = normalizeDiaryEntries({
-    rawEntries: Array.isArray(input?.rawDiaryEntries)
-      ? input.rawDiaryEntries
-      : [],
+    rawEntries: Array.isArray(input?.rawDiaryEntries) ? input.rawDiaryEntries : [],
     growStartedAt: input?.growStartedAt,
     plantStartedAt: input?.plantStartedAt,
     now: input?.now,
   });
 
-  const rawCount = Array.isArray(input?.rawDiaryEntries)
-    ? input.rawDiaryEntries.length
-    : 0;
+  const rawCount = Array.isArray(input?.rawDiaryEntries) ? input.rawDiaryEntries.length : 0;
 
   const recentDiaryEntries: AiContextDiaryEntryInput[] = [];
   const recentWateringOrFeeding: AiContextDiaryEntryInput[] = [];
@@ -102,8 +93,7 @@ export function adaptDiaryForAiContext(
 
   // Dropped rows (failed even to normalize) + entries flagged invalid
   // both indicate malformed diary data.
-  const malformedDiaryCount =
-    Math.max(0, rawCount - normalized.length) + invalidNormalized;
+  const malformedDiaryCount = Math.max(0, rawCount - normalized.length) + invalidNormalized;
 
   return {
     recentDiaryEntries,

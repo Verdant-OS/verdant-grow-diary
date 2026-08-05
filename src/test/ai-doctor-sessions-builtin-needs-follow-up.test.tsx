@@ -8,12 +8,16 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { MemoryRouter, useLocation } from "react-router-dom";
+import { MemoryRouter, useLocation } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 import type { AiDoctorSessionRow } from "@/hooks/use-ai-doctor-sessions";
 import type { Diagnosis } from "@/lib/aiDoctorDiagnosisRules";
-import { getLocalStorageItemForTest, removeLocalStorageItemForTest, setLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
+import {
+  getLocalStorageItemForTest,
+  removeLocalStorageItemForTest,
+  setLocalStorageItemForTest,
+} from "./helpers/localStorageTestHelper";
 import {
   BUILTIN_SAVED_VIEWS,
   BUILTIN_SAVED_VIEW_NEEDS_ATTENTION_ID,
@@ -35,7 +39,7 @@ let currentRows: AiDoctorSessionRow[] = [];
 vi.mock("@/integrations/supabase/client", () => {
   const result = () => Promise.resolve({ data: currentRows, error: null });
   const chain: Record<string, unknown> = {};
-  const methods = ["select", "eq", "order", "limit", "range", "not", "gte", "or"];
+  const methods = ["select", "eq", "order", "limit", "range", "not", "gte", "or", "abortSignal"];
   for (const m of methods) chain[m] = () => chain;
   chain.then = (resolve: (v: unknown) => unknown) => result().then(resolve);
   return { supabase: { from: () => chain } };
@@ -51,8 +55,8 @@ function makeRow(id: string, over: Partial<AiDoctorSessionRow> = {}): AiDoctorSe
     possibleCauses: [],
     immediateAction: "",
     whatNotToDo: [],
-    followUp24h: null,
-    recoveryPlan3d: null,
+    followUp24h: null as never,
+    recoveryPlan3d: null as never,
     riskLevel: "low",
     suggestedActions: [],
   };
@@ -159,17 +163,11 @@ describe("AiDoctorSessionsIndex — built-in 'Needs follow-up' UI", () => {
   it("appears as an option in the saved-views selector", async () => {
     renderPage();
     await screen.findByTestId("ai-doctor-sessions-index-list");
-    const select = screen.getByTestId(
-      "ai-doctor-sessions-saved-views-select",
-    ) as HTMLSelectElement;
+    const select = screen.getByTestId("ai-doctor-sessions-saved-views-select") as HTMLSelectElement;
     const opts = Array.from(select.options).map((o) => o.value);
     expect(opts).toContain(BUILTIN_SAVED_VIEW_NEEDS_FOLLOW_UP_ID);
-    const builtinOpts = screen.getAllByTestId(
-      "ai-doctor-sessions-saved-views-builtin-option",
-    );
-    expect(
-      builtinOpts.some((o) => (o.textContent ?? "").includes("Needs follow-up")),
-    ).toBe(true);
+    const builtinOpts = screen.getAllByTestId("ai-doctor-sessions-saved-views-builtin-option");
+    expect(builtinOpts.some((o) => (o.textContent ?? "").includes("Needs follow-up"))).toBe(true);
   });
 
   it("the option carries the Built-in tooltip + (Built-in) label", async () => {
@@ -186,10 +184,9 @@ describe("AiDoctorSessionsIndex — built-in 'Needs follow-up' UI", () => {
   it("selecting it applies reviewStatus=needs_follow_up and updates URL", async () => {
     renderPage();
     await screen.findByTestId("ai-doctor-sessions-index-list");
-    fireEvent.change(
-      screen.getByTestId("ai-doctor-sessions-saved-views-select"),
-      { target: { value: BUILTIN_SAVED_VIEW_NEEDS_FOLLOW_UP_ID } },
-    );
+    fireEvent.change(screen.getByTestId("ai-doctor-sessions-saved-views-select"), {
+      target: { value: BUILTIN_SAVED_VIEW_NEEDS_FOLLOW_UP_ID },
+    });
     const reviewSel = (await screen.findByTestId(
       "ai-doctor-sessions-index-filter-review-status",
     )) as HTMLSelectElement;
@@ -201,36 +198,29 @@ describe("AiDoctorSessionsIndex — built-in 'Needs follow-up' UI", () => {
   it("shows the Built-in badge with tooltip when selected", async () => {
     renderPage();
     await screen.findByTestId("ai-doctor-sessions-index-list");
-    fireEvent.change(
-      screen.getByTestId("ai-doctor-sessions-saved-views-select"),
-      { target: { value: BUILTIN_SAVED_VIEW_NEEDS_FOLLOW_UP_ID } },
-    );
-    const badge = await screen.findByTestId(
-      "ai-doctor-sessions-saved-views-builtin-badge",
-    );
+    fireEvent.change(screen.getByTestId("ai-doctor-sessions-saved-views-select"), {
+      target: { value: BUILTIN_SAVED_VIEW_NEEDS_FOLLOW_UP_ID },
+    });
+    const badge = await screen.findByTestId("ai-doctor-sessions-saved-views-builtin-badge");
     expect(badge.getAttribute("title")).toBe(BUILTIN_SAVED_VIEW_TOOLTIP);
   });
 
   it("has no Delete button (non-deletable)", async () => {
     renderPage();
     await screen.findByTestId("ai-doctor-sessions-index-list");
-    fireEvent.change(
-      screen.getByTestId("ai-doctor-sessions-saved-views-select"),
-      { target: { value: BUILTIN_SAVED_VIEW_NEEDS_FOLLOW_UP_ID } },
-    );
+    fireEvent.change(screen.getByTestId("ai-doctor-sessions-saved-views-select"), {
+      target: { value: BUILTIN_SAVED_VIEW_NEEDS_FOLLOW_UP_ID },
+    });
     await screen.findByTestId("ai-doctor-sessions-saved-views-builtin-badge");
-    expect(
-      screen.queryByTestId("ai-doctor-sessions-saved-views-delete"),
-    ).toBeNull();
+    expect(screen.queryByTestId("ai-doctor-sessions-saved-views-delete")).toBeNull();
   });
 
   it("is not persisted to localStorage after selecting it", async () => {
     renderPage();
     await screen.findByTestId("ai-doctor-sessions-index-list");
-    fireEvent.change(
-      screen.getByTestId("ai-doctor-sessions-saved-views-select"),
-      { target: { value: BUILTIN_SAVED_VIEW_NEEDS_FOLLOW_UP_ID } },
-    );
+    fireEvent.change(screen.getByTestId("ai-doctor-sessions-saved-views-select"), {
+      target: { value: BUILTIN_SAVED_VIEW_NEEDS_FOLLOW_UP_ID },
+    });
     await screen.findByTestId("ai-doctor-sessions-saved-views-builtin-badge");
     const raw = getLocalStorageItemForTest(SAVED_VIEWS_STORAGE_KEY) ?? "[]";
     const persisted = parseSavedViews(raw);
@@ -240,23 +230,19 @@ describe("AiDoctorSessionsIndex — built-in 'Needs follow-up' UI", () => {
   it("saved-view summary preview shows 'Review: Needs follow-up'", async () => {
     renderPage();
     await screen.findByTestId("ai-doctor-sessions-index-list");
-    fireEvent.change(
-      screen.getByTestId("ai-doctor-sessions-saved-views-select"),
-      { target: { value: BUILTIN_SAVED_VIEW_NEEDS_FOLLOW_UP_ID } },
-    );
-    const preview = await screen.findByTestId(
-      "ai-doctor-sessions-saved-views-summary-preview",
-    );
+    fireEvent.change(screen.getByTestId("ai-doctor-sessions-saved-views-select"), {
+      target: { value: BUILTIN_SAVED_VIEW_NEEDS_FOLLOW_UP_ID },
+    });
+    const preview = await screen.findByTestId("ai-doctor-sessions-saved-views-summary-preview");
     expect(preview.textContent).toContain("Review: Needs follow-up");
   });
 
   it("existing 'Needs my attention' built-in still works unchanged", async () => {
     renderPage();
     await screen.findByTestId("ai-doctor-sessions-index-list");
-    fireEvent.change(
-      screen.getByTestId("ai-doctor-sessions-saved-views-select"),
-      { target: { value: BUILTIN_SAVED_VIEW_NEEDS_ATTENTION_ID } },
-    );
+    fireEvent.change(screen.getByTestId("ai-doctor-sessions-saved-views-select"), {
+      target: { value: BUILTIN_SAVED_VIEW_NEEDS_ATTENTION_ID },
+    });
     const cautionSel = (await screen.findByTestId(
       "ai-doctor-sessions-index-filter-caution",
     )) as HTMLSelectElement;
@@ -276,9 +262,7 @@ describe("AiDoctorSessionsIndex — built-in 'Needs follow-up' UI", () => {
     setLocalStorageItemForTest(SAVED_VIEWS_STORAGE_KEY, JSON.stringify(user));
     renderPage();
     await screen.findByTestId("ai-doctor-sessions-index-list");
-    const select = screen.getByTestId(
-      "ai-doctor-sessions-saved-views-select",
-    ) as HTMLSelectElement;
+    const select = screen.getByTestId("ai-doctor-sessions-saved-views-select") as HTMLSelectElement;
     const labels = Array.from(select.options).map((o) => o.textContent ?? "");
     expect(labels.some((l) => l.includes("Needs follow-up"))).toBe(true);
     expect(labels.some((l) => l.includes("Needs my attention"))).toBe(true);

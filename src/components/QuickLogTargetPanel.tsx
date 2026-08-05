@@ -28,10 +28,7 @@ export default function QuickLogTargetPanel({ panel, className }: Props) {
       aria-label="Quick Log target details"
       data-testid="qlv2-target-panel"
       data-scope={panel.scope}
-      className={[
-        "mt-2 rounded-md border border-border/60 bg-secondary/10 p-3",
-        className ?? "",
-      ]
+      className={["mt-2 rounded-md border border-border/60 bg-secondary/10 p-3", className ?? ""]
         .filter(Boolean)
         .join(" ")}
     >

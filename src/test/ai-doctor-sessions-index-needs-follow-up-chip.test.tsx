@@ -8,7 +8,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { AiDoctorSessionRow } from "@/hooks/use-ai-doctor-sessions";
 import type { Diagnosis } from "@/lib/aiDoctorDiagnosisRules";
@@ -100,7 +100,17 @@ vi.mock("@/integrations/supabase/client", () => {
   function makeChain(initial: unknown[]) {
     let current = initial;
     const chain: Record<string, unknown> = {};
-    const passthrough = ["select", "eq", "order", "limit", "range", "not", "gte", "or"];
+    const passthrough = [
+      "select",
+      "eq",
+      "order",
+      "limit",
+      "range",
+      "not",
+      "gte",
+      "or",
+      "abortSignal",
+    ];
     for (const m of passthrough) chain[m] = () => chain;
     chain.in = (_column: string, values: unknown) => {
       if (Array.isArray(values)) {
@@ -135,8 +145,8 @@ function makeRow(id: string, over: Partial<AiDoctorSessionRow> = {}): AiDoctorSe
     possibleCauses: [],
     immediateAction: "",
     whatNotToDo: [],
-    followUp24h: null,
-    recoveryPlan3d: null,
+    followUp24h: null as never,
+    recoveryPlan3d: null as never,
     riskLevel: "low",
     suggestedActions: [],
   };
@@ -198,9 +208,7 @@ describe("AiDoctorSessionsIndex — Needs follow-up visible chip", () => {
     renderPage();
     await screen.findByTestId("ai-doctor-sessions-index-list");
     const chip = await screen.findByTestId(CHIP_TID);
-    await waitFor(() =>
-      expect(chip.textContent).toBe("Needs follow-up: 0 visible"),
-    );
+    await waitFor(() => expect(chip.textContent).toBe("Needs follow-up: 0 visible"));
   });
 
   it("renders '1 visible' when exactly one loaded session needs follow-up", async () => {
@@ -208,9 +216,7 @@ describe("AiDoctorSessionsIndex — Needs follow-up visible chip", () => {
     renderPage();
     await screen.findByTestId("ai-doctor-sessions-index-list");
     const chip = await screen.findByTestId(CHIP_TID);
-    await waitFor(() =>
-      expect(chip.textContent).toBe("Needs follow-up: 1 visible"),
-    );
+    await waitFor(() => expect(chip.textContent).toBe("Needs follow-up: 1 visible"));
   });
 
   it("renders '3 visible' when multiple loaded sessions need follow-up", async () => {
@@ -222,9 +228,7 @@ describe("AiDoctorSessionsIndex — Needs follow-up visible chip", () => {
     renderPage();
     await screen.findByTestId("ai-doctor-sessions-index-list");
     const chip = await screen.findByTestId(CHIP_TID);
-    await waitFor(() =>
-      expect(chip.textContent).toBe("Needs follow-up: 3 visible"),
-    );
+    await waitFor(() => expect(chip.textContent).toBe("Needs follow-up: 3 visible"));
   });
 
   it("count works when built-in 'Needs follow-up' view is selected", async () => {
@@ -234,26 +238,19 @@ describe("AiDoctorSessionsIndex — Needs follow-up visible chip", () => {
     ];
     renderPage();
     await screen.findByTestId("ai-doctor-sessions-index-list");
-    fireEvent.change(
-      screen.getByTestId("ai-doctor-sessions-saved-views-select"),
-      { target: { value: BUILTIN_SAVED_VIEW_NEEDS_FOLLOW_UP_ID } },
-    );
+    fireEvent.change(screen.getByTestId("ai-doctor-sessions-saved-views-select"), {
+      target: { value: BUILTIN_SAVED_VIEW_NEEDS_FOLLOW_UP_ID },
+    });
     const chip = await screen.findByTestId(CHIP_TID);
-    await waitFor(() =>
-      expect(chip.textContent).toBe("Needs follow-up: 2 visible"),
-    );
+    await waitFor(() => expect(chip.textContent).toBe("Needs follow-up: 2 visible"));
   });
 
   it("count works when other filters/sort are active", async () => {
     reviewRows = [followUpEvent("e1", "a", "2026-05-28T10:00:00Z")];
-    renderPage(
-      "/doctor/sessions?sort=oldest&caution=no",
-    );
+    renderPage("/doctor/sessions?sort=oldest&caution=no");
     await screen.findByTestId("ai-doctor-sessions-index-list");
     const chip = await screen.findByTestId(CHIP_TID);
-    await waitFor(() =>
-      expect(chip.textContent).toBe("Needs follow-up: 1 visible"),
-    );
+    await waitFor(() => expect(chip.textContent).toBe("Needs follow-up: 1 visible"));
   });
 
   it("does not trigger an extra ai_doctor_session_reviews query beyond the existing review hook", async () => {
@@ -271,9 +268,7 @@ describe("AiDoctorSessionsIndex — Needs follow-up visible chip", () => {
     await screen.findByTestId("ai-doctor-sessions-index-list");
     const chip = await screen.findByTestId(CHIP_TID);
     expect(chip.getAttribute("aria-label")).toBe("Needs follow-up: 0 visible");
-    expect((chip.getAttribute("title") ?? "").toLowerCase()).toContain(
-      "visible count only",
-    );
+    expect((chip.getAttribute("title") ?? "").toLowerCase()).toContain("visible count only");
   });
 });
 

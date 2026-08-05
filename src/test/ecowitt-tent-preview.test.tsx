@@ -29,7 +29,9 @@ describe("OperatorEcowittTentPreview (read-only)", () => {
     expect(screen.getByTestId("tent-label").textContent).toBe("Vegetation Tent");
     expect(screen.getByTestId("metric-air_temp_f").textContent).toMatch(/temp3f/);
     expect(screen.getByTestId("metric-humidity_pct").textContent).toMatch(/humidity3/);
-    expect(screen.getByTestId("metric-soil_moisture_pct_primary").textContent).toMatch(/soilmoisture1/);
+    expect(screen.getByTestId("metric-soil_moisture_pct_primary").textContent).toMatch(
+      /soilmoisture1/,
+    );
     expect(screen.getByTestId("root-zone-confidence").textContent).toBe("partial");
   });
 

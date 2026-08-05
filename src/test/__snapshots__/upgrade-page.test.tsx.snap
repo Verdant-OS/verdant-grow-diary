@@ -20,14 +20,10 @@ exports[`Upgrade page — success panel feature order snapshots > locks feature 
   },
   {
     "key": "feat-7",
-    "text": "Priority support",
+    "text": "Date-range diary & post-grow reports",
   },
   {
-    "key": "feat-8",
-    "text": "Advanced grow reports (planned)",
-  },
-  {
-    "key": "feat-13",
+    "key": "feat-12",
     "text": "Founder badge & early-supporter perks",
   },
 ]
@@ -53,11 +49,7 @@ exports[`Upgrade page — success panel feature order snapshots > locks feature 
   },
   {
     "key": "feat-7",
-    "text": "Priority support",
-  },
-  {
-    "key": "feat-8",
-    "text": "Advanced grow reports (planned)",
+    "text": "Date-range diary & post-grow reports",
   },
 ]
 `;
@@ -82,11 +74,7 @@ exports[`Upgrade page — success panel feature order snapshots > locks feature 
   },
   {
     "key": "feat-7",
-    "text": "Priority support",
-  },
-  {
-    "key": "feat-8",
-    "text": "Advanced grow reports (planned)",
+    "text": "Date-range diary & post-grow reports",
   },
 ]
 `;

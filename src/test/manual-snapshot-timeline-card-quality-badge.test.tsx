@@ -47,15 +47,11 @@ describe("ManualSnapshotTimelineCard — historical quality badge", () => {
     const section = screen.getByTestId("manual-snapshot-timeline-card-quality");
     // Risky "usable" copy must NOT appear in the historical card.
     expect(within(section).queryByText(/Historical usable reading/i)).toBeNull();
-    expect(
-      within(section).getByText("Historical review reading"),
-    ).toBeInTheDocument();
+    expect(within(section).getByText("Historical review reading")).toBeInTheDocument();
     expect(
       within(section).getByText(/Historical reading — quality reflects captured values/i),
     ).toBeInTheDocument();
-    const chips = within(section).getByTestId(
-      "manual-snapshot-timeline-card-truth-chips",
-    );
+    const chips = within(section).getByTestId("manual-snapshot-timeline-card-truth-chips");
     expect(within(chips).getByText("Source: manual")).toBeInTheDocument();
     expect(within(chips).getByText("Identity: manual_entry")).toBeInTheDocument();
     expect(within(chips).getByText("Transport: manual")).toBeInTheDocument();
@@ -71,9 +67,7 @@ describe("ManualSnapshotTimelineCard — historical quality badge", () => {
     render(
       <ManualSnapshotTimelineCard
         card={baseCard({
-          readings: [
-            { field: "humidity_pct", value: 0, unit: "%", derived: false },
-          ],
+          readings: [{ field: "humidity_pct", value: 0, unit: "%", derived: false }],
         })}
       />,
     );
@@ -87,15 +81,11 @@ describe("ManualSnapshotTimelineCard — historical quality badge", () => {
         /Bad or unknown telemetry is not treated as healthy\./i,
       ),
     ).toBeInTheDocument();
-    expect(
-      within(quality).getByText(/Humidity appears stuck at 0 or 100%/i),
-    ).toBeInTheDocument();
+    expect(within(quality).getByText(/Humidity appears stuck at 0 or 100%/i)).toBeInTheDocument();
   });
 
   it("does not leak raw_payload, tokens, or fixture JSON", () => {
-    const { container } = render(
-      <ManualSnapshotTimelineCard card={baseCard()} />,
-    );
+    const { container } = render(<ManualSnapshotTimelineCard card={baseCard()} />);
     const text = container.textContent ?? "";
     expect(text).not.toMatch(/raw_payload/i);
     expect(text).not.toMatch(/service_role/i);

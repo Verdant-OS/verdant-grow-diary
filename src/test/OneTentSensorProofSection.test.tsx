@@ -3,7 +3,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import OneTentSensorProofSection from "@/components/OneTentSensorProofSection";
 import { buildOneTentSensorProofViewModel } from "@/lib/oneTentSensorProofViewModel";
 
@@ -67,9 +67,7 @@ describe("OneTentSensorProofSection", () => {
 
   it("renders the Sensors Operator shortcut preserving operator=1", () => {
     const { container } = renderWith("tent-1");
-    const anchor = container.querySelector(
-      'a[href="/sensors?operator=1"]',
-    );
+    const anchor = container.querySelector('a[href="/sensors?operator=1"]');
     expect(anchor).toBeTruthy();
   });
 

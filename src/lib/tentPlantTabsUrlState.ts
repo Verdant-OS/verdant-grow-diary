@@ -39,9 +39,7 @@ function normalizePlantId(plantId: unknown): string | null {
   return trimmed;
 }
 
-function toSearchParams(
-  search: string | URLSearchParams | null | undefined,
-): URLSearchParams {
+function toSearchParams(search: string | URLSearchParams | null | undefined): URLSearchParams {
   if (search == null) return new URLSearchParams();
   if (search instanceof URLSearchParams) return new URLSearchParams(search);
   try {

@@ -27,14 +27,10 @@ import {
 
 const ROOT = resolve(__dirname, "../..");
 const DASHBOARD = readFileSync(resolve(ROOT, "src/pages/Dashboard.tsx"), "utf8");
-const HOOK = readFileSync(
-  resolve(ROOT, "src/hooks/useLatestSensorSnapshot.ts"),
-  "utf8",
-);
+const HOOK = readFileSync(resolve(ROOT, "src/hooks/useLatestSensorSnapshot.ts"), "utf8");
 
 const AI_COACH_CALL = /["'`]ai-coach["'`]|functions\/ai-coach|ai_coach/;
-const DEVICE_SURFACE =
-  /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|\brelay\b|\bactuator\b/i;
+const DEVICE_SURFACE = /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|\brelay\b|\bactuator\b/i;
 const WRITE_PATH = /\.from\(['"][^'"]+['"]\)\s*\.(insert|update|delete|upsert)/;
 
 describe("sensorSnapshot pure helpers", () => {
@@ -139,6 +135,35 @@ describe("useLatestSensorSnapshot hook — source priority and safety", () => {
     expect(HOOK).toMatch(/sensor_snapshot/);
   });
 
+  it("consults environment_check as manual evidence only after sensor_snapshot (#596)", () => {
+    // Within a diary row the richer sensor_snapshot blob wins; the env-check
+    // envelope is a manual-evidence fallback, never a replacement.
+    expect(HOOK).toMatch(/snapshotFromDiary\([\s\S]*?snapshotFromEnvironmentCheck\(/);
+    expect(HOOK).toMatch(/details\.environment_check/);
+  });
+
+  it("never lets a stale sensor row suppress fresher diary evidence (Codex, PR #601)", () => {
+    // Fresh sensor rows return immediately; a stale sensor snapshot is only
+    // a candidate that strictly newer manual/env-check evidence replaces.
+    expect(HOOK).toMatch(/if \(snap && !isStale\(snap\.ts\)\) return snap;/);
+    expect(HOOK).toMatch(/staleSensorCandidate = snap;/);
+    expect(HOOK).toMatch(/return preferNewer\(staleSensorCandidate, snap\);/);
+    expect(HOOK).toMatch(/return preferNewer\(staleSensorCandidate, envSnap\);/);
+    expect(HOOK).toMatch(/return staleSensorCandidate \?\? EMPTY_SNAPSHOT;/);
+  });
+
+  it("scopes environment_check evidence to the requested tents (Codex, PR #601)", () => {
+    // The diary query selects tent_id, and a tent-scoped view only accepts
+    // env checks attributed to one of those tents — null/foreign tent_id
+    // rows must not surface as the selected tent's evidence.
+    expect(HOOK).toMatch(/\.select\(\s*['"]entry_at,details,tent_id['"]\s*\)/);
+    expect(HOOK).toMatch(
+      /tentIds\.length === 0 \|\| \(row\.tent_id != null && tentIds\.includes\(row\.tent_id\)\)/,
+    );
+    // The scope gate must sit before the env-check fallback returns.
+    expect(HOOK).toMatch(/envScopeOk[\s\S]*?snapshotFromEnvironmentCheck\(/);
+  });
+
   it("idles when growId is missing (does not query)", () => {
     expect(HOOK).toMatch(/if\s*\(\s*!user\s*||\s*!growId\s*\)/);
   });
@@ -193,9 +218,7 @@ describe("Dashboard — Latest Environment card wiring", () => {
     expect(DASHBOARD).toMatch(
       /formatSensorSourceLabel\(\{[\s\S]{0,200}source:\s*sensorState\.snapshot\.source/,
     );
-    expect(DASHBOARD).toMatch(
-      /deviceId:\s*sensorState\.snapshot\.device_id/,
-    );
+    expect(DASHBOARD).toMatch(/deviceId:\s*sensorState\.snapshot\.device_id/);
   });
 
   it("links to the canonical /timeline route via timelinePath (no dead links, no legacy /logs)", () => {

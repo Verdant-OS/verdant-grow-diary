@@ -61,10 +61,7 @@ export function EcowittDetectedChannelsPanel({ payload, options }: Props) {
         <CardTitle>Detected EcoWitt channels</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <p
-          className="text-sm text-muted-foreground"
-          data-testid="ecowitt-channels-readonly-notice"
-        >
+        <p className="text-sm text-muted-foreground" data-testid="ecowitt-channels-readonly-notice">
           {READ_ONLY_CHANNEL_NOTICE}
         </p>
 
@@ -112,9 +109,7 @@ export function EcowittDetectedChannelsPanel({ payload, options }: Props) {
                       <span className="text-xs text-muted-foreground">
                         Channel {ch.channel ?? "—"}
                       </span>
-                      <Badge variant={statusVariant(ch.status)}>
-                        {STATUS_LABEL[ch.status]}
-                      </Badge>
+                      <Badge variant={statusVariant(ch.status)}>{STATUS_LABEL[ch.status]}</Badge>
                       <span
                         className="ml-auto font-mono"
                         data-testid={`ecowitt-channel-value-${ch.rawKey}`}
@@ -124,18 +119,13 @@ export function EcowittDetectedChannelsPanel({ payload, options }: Props) {
                     </div>
                     <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                       <span data-testid={`ecowitt-channel-assignment-${ch.rawKey}`}>
-                        {ch.knownLabel
-                          ? `Known label: ${ch.knownLabel}`
-                          : ch.assignmentLabel}
+                        {ch.knownLabel ? `Known label: ${ch.knownLabel}` : ch.assignmentLabel}
                       </span>
-                      {ch.capturedAt ? (
-                        <span>captured_at {ch.capturedAt}</span>
-                      ) : null}
+                      {ch.capturedAt ? <span>captured_at {ch.capturedAt}</span> : null}
                     </div>
                     {ch.knownLabel === null && ch.status === "accepted" ? (
                       <p className="mt-1 text-xs text-amber-600">
-                        Unassigned channel — label this before relying on
-                        plant-specific decisions.
+                        Unassigned channel — label this before relying on plant-specific decisions.
                       </p>
                     ) : null}
                     {warn ? (
@@ -147,9 +137,7 @@ export function EcowittDetectedChannelsPanel({ payload, options }: Props) {
                       </p>
                     ) : null}
                     {ch.reason ? (
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {ch.reason}
-                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">{ch.reason}</p>
                     ) : null}
                   </li>
                 );
@@ -159,10 +147,7 @@ export function EcowittDetectedChannelsPanel({ payload, options }: Props) {
         ))}
 
         {vm.unsupported.length > 0 ? (
-          <section
-            data-testid="ecowitt-channel-group-unsupported"
-            className="space-y-2"
-          >
+          <section data-testid="ecowitt-channel-group-unsupported" className="space-y-2">
             <h3 className="text-sm font-semibold">Unsupported channels</h3>
             <ul className="space-y-2">
               {vm.unsupported.map((ch) => (

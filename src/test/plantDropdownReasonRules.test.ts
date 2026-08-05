@@ -70,10 +70,7 @@ describe("summarizePlantDropdown (extended) counts already-in-tent", () => {
   });
 
   it("counts missing-grow-context plants", () => {
-    const plants = [
-      p("a", { grow_id: GROW }),
-      p("b" /* no grow, no tent */),
-    ];
+    const plants = [p("a", { grow_id: GROW }), p("b" /* no grow, no tent */)];
     const s = summarizePlantDropdown(plants, tents, {
       context: "merge_target",
       growId: GROW,
@@ -91,12 +88,8 @@ describe("formatHiddenPlantReason", () => {
   });
 
   it("formats archived/merged count", () => {
-    expect(formatHiddenPlantReason("archived_or_merged", 1)).toBe(
-      "1 archived/merged hidden.",
-    );
-    expect(formatHiddenPlantReason("archived_or_merged", 3)).toBe(
-      "3 archived/merged hidden.",
-    );
+    expect(formatHiddenPlantReason("archived_or_merged", 1)).toBe("1 archived/merged hidden.");
+    expect(formatHiddenPlantReason("archived_or_merged", 3)).toBe("3 archived/merged hidden.");
   });
 
   it("formats missing grow context (singular vs plural)", () => {
@@ -110,12 +103,8 @@ describe("formatHiddenPlantReason", () => {
 
   it("formats cross-grow / already-in-tent / source", () => {
     expect(formatHiddenPlantReason("cross_grow", 2)).toBe("2 in another grow.");
-    expect(formatHiddenPlantReason("already_in_tent", 1)).toBe(
-      "1 plant already in this tent.",
-    );
-    expect(formatHiddenPlantReason("source_plant", 1)).toBe(
-      "1 source plant excluded.",
-    );
+    expect(formatHiddenPlantReason("already_in_tent", 1)).toBe("1 plant already in this tent.");
+    expect(formatHiddenPlantReason("source_plant", 1)).toBe("1 source plant excluded.");
   });
 });
 
@@ -169,21 +158,20 @@ describe("getPlantDropdownHelperText", () => {
 
 describe("getPlantOptionDisabledReason", () => {
   it("returns null for enabled options", () => {
-    const opt = classifyPlantForDropdown(
-      p("a", { grow_id: GROW }),
-      tents,
-      { context: "quick_log", growId: GROW },
-    );
+    const opt = classifyPlantForDropdown(p("a", { grow_id: GROW }), tents, {
+      context: "quick_log",
+      growId: GROW,
+    });
     expect(opt).not.toBeNull();
     expect(getPlantOptionDisabledReason(opt!)).toBeNull();
   });
 
   it("returns the already-in-tent reason when disabled by tent match", () => {
-    const opt = classifyPlantForDropdown(
-      p("a", { grow_id: GROW, tent_id: TENT }),
-      tents,
-      { context: "add_existing_to_tent", growId: GROW, tentId: TENT },
-    );
+    const opt = classifyPlantForDropdown(p("a", { grow_id: GROW, tent_id: TENT }), tents, {
+      context: "add_existing_to_tent",
+      growId: GROW,
+      tentId: TENT,
+    });
     expect(opt!.disabled).toBe(true);
     expect(getPlantOptionDisabledReason(opt!)).toMatch(/already in this tent/i);
   });
@@ -312,7 +300,9 @@ describe("safety guards — no out-of-scope strings introduced", () => {
         "action_queue",
         "action_queue_events",
       ]) {
-        expect(src).not.toMatch(new RegExp(`\\.from\\(["']${t}["']\\)\\s*\\.(insert|update|delete|upsert)\\(`));
+        expect(src).not.toMatch(
+          new RegExp(`\\.from\\(["']${t}["']\\)\\s*\\.(insert|update|delete|upsert)\\(`),
+        );
       }
     });
   }

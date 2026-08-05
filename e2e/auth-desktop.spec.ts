@@ -11,23 +11,17 @@ const SAFE_EMAIL = "playwright-desktop-noop@example.invalid";
 const SAFE_PWD = "playwright-desktop-noop-1";
 const SAFE_NEW_PWD = "playwright-desktop-noop-2";
 
-const SB_PROJECT_REF = "FAKE-PROJECT-REF-PLACEHOLDER-NOT-REAL";
+const SB_PROJECT_REF = "knkwiiywfkbqznbxwqfh";
 const SB_SESSION_KEY = `sb-${SB_PROJECT_REF}-auth-token`;
 
-function holdAndCount(
-  page: Page,
-  pathFragment: RegExp,
-  responseBody: unknown,
-  status = 200,
-) {
+function holdAndCount(page: Page, pathFragment: RegExp, responseBody: unknown, status = 200) {
   let release: () => void = () => {};
   let count = 0;
   const gate = new Promise<void>((res) => {
     release = res;
   });
   page.route(/\/auth\/v1\//, async (route: Route, req: Request) => {
-    const matches =
-      ["POST", "PUT", "PATCH"].includes(req.method()) && pathFragment.test(req.url());
+    const matches = ["POST", "PUT", "PATCH"].includes(req.method()) && pathFragment.test(req.url());
     if (matches) {
       count += 1;
       await gate;
@@ -102,9 +96,7 @@ test.describe("Desktop auth loading/disabled smoke (mocked, 1280x800)", () => {
     await expect(page.getByRole("button", { name: /^create account$/i })).toBeEnabled();
   });
 
-  test("desktop forgot password: loading + generic non-enumerating success", async ({
-    page,
-  }) => {
+  test("desktop forgot password: loading + generic non-enumerating success", async ({ page }) => {
     const gate = holdAndCount(page, /recover/i, {}, 200);
     await page.goto("/auth");
     await page.getByRole("tab", { name: /forgot password/i }).click();
@@ -115,24 +107,34 @@ test.describe("Desktop auth loading/disabled smoke (mocked, 1280x800)", () => {
     await loading.click({ force: true }).catch(() => {});
     expect(gate.count()).toBe(1);
     gate.release();
-    await expect(page.getByRole("status")).toContainText(
-      /if an account exists for that email/i,
-    );
+    await expect(page.getByRole("status")).toContainText(/if an account exists for that email/i);
   });
 
   test("desktop reset password: loading + disable + retry re-enable", async ({ page }) => {
     await page.addInitScript(
       ({ key }) => {
+        const encodeSegment = (value: object) =>
+          btoa(JSON.stringify(value)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+        const expiresAt = Math.floor(Date.now() / 1000) + 3600;
         const fakeSession = {
-          access_token: "FAKE-ACCESS-TOKEN-NOT-REAL",
+          access_token: [
+            encodeSegment({ alg: "HS256", typ: "JWT" }),
+            encodeSegment({
+              aud: "authenticated",
+              exp: expiresAt,
+              role: "authenticated",
+              sub: "test-user",
+            }),
+            "FAKE-SIGNATURE-NOT-REAL",
+          ].join("."),
           refresh_token: "FAKE-REFRESH-TOKEN-NOT-REAL",
           expires_in: 3600,
-          expires_at: Math.floor(Date.now() / 1000) + 3600,
+          expires_at: expiresAt,
           token_type: "bearer",
           user: { id: "test-user", aud: "authenticated", email: "x@example.invalid" },
         };
         try {
-          sessionStorage.setItem(key, JSON.stringify({ currentSession: fakeSession }));
+          sessionStorage.setItem(key, JSON.stringify(fakeSession));
         } catch {
           /* ignore */
         }
@@ -147,8 +149,7 @@ test.describe("Desktop auth loading/disabled smoke (mocked, 1280x800)", () => {
     );
     await page.goto("/reset-password");
     const newPwd = page.getByLabel(/^new password$/i);
-    const ready = await newPwd.waitFor({ timeout: 5000 }).then(() => true).catch(() => false);
-    test.skip(!ready, "Reset form did not render with synthetic session — covered by Vitest.");
+    await expect(newPwd).toBeVisible();
     await newPwd.fill(SAFE_NEW_PWD + "a");
     await page.getByLabel(/^confirm new password$/i).fill(SAFE_NEW_PWD + "a");
     await page.getByRole("button", { name: /^update password$/i }).click();

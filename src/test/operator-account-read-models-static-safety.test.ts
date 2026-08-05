@@ -8,6 +8,7 @@ const FILES = [
   "src/lib/operatorWateringContextViewModel.ts",
   "src/hooks/useOperatorAccountReadModels.ts",
   "src/components/OperatorAccountReadModelsPanel.tsx",
+  "src/components/DashboardOperatorAccountReadModels.tsx",
   "src/pages/OperatorDemoPreview.tsx",
 ];
 
@@ -43,6 +44,7 @@ describe("owner-scoped Operator read-model safety", () => {
       "src/lib/operatorWateringContextViewModel.ts",
       "src/hooks/useOperatorAccountReadModels.ts",
       "src/components/OperatorAccountReadModelsPanel.tsx",
+      "src/components/DashboardOperatorAccountReadModels.tsx",
       "src/pages/OperatorDemoPreview.tsx",
     ]) {
       expect(codeOnly(source(path))).not.toMatch(/\braw_payload\b/);

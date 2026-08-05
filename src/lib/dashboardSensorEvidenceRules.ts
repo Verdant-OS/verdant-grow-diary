@@ -123,7 +123,7 @@ export function isDashboardSnapshotEligibleForHealthyCues(
 export function dashboardSnapshotForHealthyCues(
   snapshot: SensorSnapshot | null | undefined,
 ): SensorSnapshot | null {
-  return isDashboardSnapshotEligibleForHealthyCues(snapshot) ? snapshot : null;
+  return isDashboardSnapshotEligibleForHealthyCues(snapshot) ? (snapshot ?? null) : null;
 }
 
 /**

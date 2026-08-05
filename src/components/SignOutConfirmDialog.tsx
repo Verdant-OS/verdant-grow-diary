@@ -9,7 +9,7 @@
 //    redirects to a safe internal page
 // On cancel: leaves the user in place.
 import { useState, type ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "@/lib/react-router-compat";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -68,9 +68,8 @@ export default function SignOutConfirmDialog({
         <AlertDialogHeader>
           <AlertDialogTitle>Sign out?</AlertDialogTitle>
           <AlertDialogDescription>
-            You&apos;ll be returned to the Verdant home page. Your grow data,
-            logs, and start-screen preference stay safe — you can sign back in
-            at any time.
+            You&apos;ll be returned to the Verdant home page. Your grow data, logs, and start-screen
+            preference stay safe — you can sign back in at any time.
           </AlertDialogDescription>
         </AlertDialogHeader>
         {error ? (

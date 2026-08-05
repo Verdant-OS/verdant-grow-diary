@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type { ReactNode } from "react";
 import { render, screen, act, waitFor, within } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import MobileNav, { moreGroups, more } from "@/components/MobileNav";
 
@@ -17,6 +17,11 @@ function wrap(children: ReactNode) {
 }
 
 describe("MobileNav primary tabs", () => {
+  it("labels the primary navigation landmark", () => {
+    render(wrap(<MobileNav />));
+    expect(screen.getByRole("navigation", { name: "Primary navigation" })).toBeInTheDocument();
+  });
+
   it("renders the canonical primary tabs", () => {
     render(wrap(<MobileNav />));
     expect(screen.getByText("Home")).toBeInTheDocument();
@@ -81,7 +86,6 @@ describe("MobileNav More sheet — Slice 4 grouping", () => {
       Daily: [
         ["Quick Log", "/daily-check"],
         ["Action Queue", "/actions"],
-        ["Tasks", "/tasks"],
       ],
       Insight: [
         ["Sensors", "/sensors"],

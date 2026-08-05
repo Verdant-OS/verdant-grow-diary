@@ -72,10 +72,7 @@ export function buildQuickLogAiContext(
   const diary = Array.isArray(input?.diaryRows) ? input.diaryRows : [];
 
   // Index companions by linked_grow_event_id. Last-write-wins on dup.
-  const companionByEventId = new Map<
-    string,
-    ReturnType<typeof extractQuickLogCompanionView>
-  >();
+  const companionByEventId = new Map<string, ReturnType<typeof extractQuickLogCompanionView>>();
   const orphanCompanionIds: string[] = [];
   const knownEventIds = new Set(events.map((e) => e.id));
   for (const row of diary) {
@@ -112,11 +109,7 @@ export function buildQuickLogAiContext(
   entries.sort((a, b) => {
     if (a.occurredAt > b.occurredAt) return -1;
     if (a.occurredAt < b.occurredAt) return 1;
-    return a.growEventId < b.growEventId
-      ? -1
-      : a.growEventId > b.growEventId
-        ? 1
-        : 0;
+    return a.growEventId < b.growEventId ? -1 : a.growEventId > b.growEventId ? 1 : 0;
   });
 
   const limit =

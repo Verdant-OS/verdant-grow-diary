@@ -2,7 +2,9 @@
  * Render + safety tests for PlantSensorContextAuditPanel.
  */
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render as renderTestingLibrary, screen, fireEvent } from "@testing-library/react";
+import type { ReactElement } from "react";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import fs from "node:fs";
 import path from "node:path";
 import PlantSensorContextAuditPanel from "@/components/PlantSensorContextAuditPanel";
@@ -19,16 +21,15 @@ vi.mock("@/integrations/supabase/client", () => ({
 const NOW = new Date("2026-06-12T12:00:00Z");
 const HOUR = 3_600_000;
 const ago = (h: number) => new Date(NOW.getTime() - h * HOUR).toISOString();
+const render = (ui: ReactElement) => renderTestingLibrary(<MemoryRouter>{ui}</MemoryRouter>);
 
 describe("PlantSensorContextAuditPanel", () => {
   it("renders missing-state copy when no logs are passed", () => {
     render(<PlantSensorContextAuditPanel logs={[]} now={NOW} />);
-    expect(
-      screen.getByTestId("plant-sensor-context-audit-message").textContent,
-    ).toMatch(/No plant-level manual sensor snapshots/);
-    expect(
-      screen.getByTestId("plant-sensor-context-audit-status").textContent,
-    ).toMatch(/Missing/);
+    expect(screen.getByTestId("plant-sensor-context-audit-message").textContent).toMatch(
+      /No plant-level manual sensor snapshots/,
+    );
+    expect(screen.getByTestId("plant-sensor-context-audit-status").textContent).toMatch(/Missing/);
   });
 
   it("renders stale-state copy when latest snapshot is older than 72h", () => {
@@ -40,12 +41,8 @@ describe("PlantSensorContextAuditPanel", () => {
       } as ManualSensorLog,
     ];
     render(<PlantSensorContextAuditPanel logs={logs} now={NOW} />);
-    expect(
-      screen.getByTestId("plant-sensor-context-audit-message").textContent,
-    ).toMatch(/stale/i);
-    expect(
-      screen.getByTestId("plant-sensor-context-audit-status").textContent,
-    ).toMatch(/Stale/);
+    expect(screen.getByTestId("plant-sensor-context-audit-message").textContent).toMatch(/stale/i);
+    expect(screen.getByTestId("plant-sensor-context-audit-status").textContent).toMatch(/Stale/);
   });
 
   it("renders available metric labels", () => {
@@ -57,9 +54,7 @@ describe("PlantSensorContextAuditPanel", () => {
       } as ManualSensorLog,
     ];
     render(<PlantSensorContextAuditPanel logs={logs} now={NOW} />);
-    const container = screen.getByTestId(
-      "plant-sensor-context-audit-metrics",
-    );
+    const container = screen.getByTestId("plant-sensor-context-audit-metrics");
     expect(container.textContent).toMatch(/Temperature/);
     expect(container.textContent).toMatch(/Humidity/);
     expect(container.textContent).toMatch(/pH/);
@@ -86,9 +81,9 @@ describe("PlantSensorContextAuditPanel — Quick Log sensor snapshot CTA", () =>
         onOpenManualSensorEntry={onOpen}
       />,
     );
-    expect(
-      screen.getByTestId("plant-sensor-context-audit-cta-button").textContent,
-    ).toMatch(/Add manual sensor snapshot/);
+    expect(screen.getByTestId("plant-sensor-context-audit-cta-button").textContent).toMatch(
+      /Add manual sensor snapshot/,
+    );
   });
 
   it("stale status renders 'Add fresh sensor snapshot' CTA", () => {
@@ -108,9 +103,9 @@ describe("PlantSensorContextAuditPanel — Quick Log sensor snapshot CTA", () =>
         onOpenManualSensorEntry={onOpen}
       />,
     );
-    expect(
-      screen.getByTestId("plant-sensor-context-audit-cta-button").textContent,
-    ).toMatch(/Add fresh sensor snapshot/);
+    expect(screen.getByTestId("plant-sensor-context-audit-cta-button").textContent).toMatch(
+      /Add fresh sensor snapshot/,
+    );
   });
 
   it("strong status does not render a CTA", () => {
@@ -129,12 +124,8 @@ describe("PlantSensorContextAuditPanel — Quick Log sensor snapshot CTA", () =>
         onOpenManualSensorEntry={() => {}}
       />,
     );
-    expect(
-      screen.queryByTestId("plant-sensor-context-audit-cta"),
-    ).toBeNull();
-    expect(
-      screen.queryByTestId("plant-sensor-context-audit-cta-inert"),
-    ).toBeNull();
+    expect(screen.queryByTestId("plant-sensor-context-audit-cta")).toBeNull();
+    expect(screen.queryByTestId("plant-sensor-context-audit-cta-recovery")).toBeNull();
   });
 
   it("limited status does not render a CTA", () => {
@@ -153,9 +144,7 @@ describe("PlantSensorContextAuditPanel — Quick Log sensor snapshot CTA", () =>
         onOpenManualSensorEntry={() => {}}
       />,
     );
-    expect(
-      screen.queryByTestId("plant-sensor-context-audit-cta"),
-    ).toBeNull();
+    expect(screen.queryByTestId("plant-sensor-context-audit-cta")).toBeNull();
   });
 
   it("clicking CTA calls handler with identity-only manual prefill (no sensor values)", () => {
@@ -168,9 +157,7 @@ describe("PlantSensorContextAuditPanel — Quick Log sensor snapshot CTA", () =>
         onOpenManualSensorEntry={onOpen}
       />,
     );
-    fireEvent.click(
-      screen.getByTestId("plant-sensor-context-audit-cta-button"),
-    );
+    fireEvent.click(screen.getByTestId("plant-sensor-context-audit-cta-button"));
     expect(onOpen).toHaveBeenCalledTimes(1);
     const payload = onOpen.mock.calls[0][0];
     expect(payload).toMatchObject({
@@ -183,45 +170,39 @@ describe("PlantSensorContextAuditPanel — Quick Log sensor snapshot CTA", () =>
     expect(json).not.toMatch(/temp|humidity|ec|ph|vpd|co2|moisture/i);
   });
 
-  it("renders inert fallback when no handler is provided", () => {
-    render(
-      <PlantSensorContextAuditPanel logs={[]} now={NOW} identity={ID} />,
-    );
-    expect(
-      screen.getByTestId("plant-sensor-context-audit-cta-inert").textContent,
-    ).toMatch(/not wired here yet/);
-    expect(
-      screen.queryByTestId("plant-sensor-context-audit-cta-button"),
-    ).toBeNull();
+  it("renders a real Plant Detail recovery link when no handler is provided", () => {
+    render(<PlantSensorContextAuditPanel logs={[]} now={NOW} identity={ID} />);
+    const recovery = screen.getByTestId("plant-sensor-context-audit-cta-recovery");
+    expect(recovery.textContent).toMatch(/plant overview.*Quick Log/i);
+    const link = screen.getByTestId("plant-sensor-context-audit-cta-recovery-link");
+    expect(link.getAttribute("href")).toBe("/plants/p1#plant-overview");
+    expect(link.textContent).toMatch(/Open plant Quick Log/i);
+    expect(screen.queryByTestId("plant-sensor-context-audit-cta-button")).toBeNull();
   });
 
-  it("renders inert fallback when identity context is incomplete", () => {
+  it("renders assignment recovery when identity context is missing a tent", () => {
     render(
       <PlantSensorContextAuditPanel
         logs={[]}
         now={NOW}
-        identity={{ plantId: "p1", growId: null, tentId: null }}
+        identity={{ plantId: "p1", growId: "g1", tentId: null }}
         onOpenManualSensorEntry={() => {}}
       />,
     );
+    const recovery = screen.getByTestId("plant-sensor-context-audit-cta-recovery");
+    expect(recovery.textContent).toMatch(/Assign this plant to a tent/i);
     expect(
-      screen.queryByTestId("plant-sensor-context-audit-cta-inert"),
-    ).not.toBeNull();
+      screen.getByTestId("plant-sensor-context-audit-cta-recovery-link").getAttribute("href"),
+    ).toBe("/plants/p1#plant-overview");
   });
 });
 
 describe("PlantSensorContextAuditPanel — static safety guard", () => {
   it("does not import Supabase, fetch, RPC, alerts, Action Queue, or model clients", () => {
     const files = [
-      path.resolve(
-        __dirname,
-        "../components/PlantSensorContextAuditPanel.tsx",
-      ),
+      path.resolve(__dirname, "../components/PlantSensorContextAuditPanel.tsx"),
       path.resolve(__dirname, "../lib/plantSensorContextAuditViewModel.ts"),
-      path.resolve(
-        __dirname,
-        "../lib/plantSensorContextAuditCtaViewModel.ts",
-      ),
+      path.resolve(__dirname, "../lib/plantSensorContextAuditCtaViewModel.ts"),
     ];
     const forbidden = [
       /@\/integrations\/supabase/,

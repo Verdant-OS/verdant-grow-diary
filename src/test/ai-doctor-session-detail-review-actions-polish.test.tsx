@@ -13,7 +13,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import React from "react";
 import {
   buildSessionReviewActionsCopy,
@@ -51,9 +51,7 @@ describe("buildSessionReviewActionsCopy", () => {
   it("exposes calm append-only and no-side-effects helper text", () => {
     const c = buildSessionReviewActionsCopy("not_reviewed");
     expect(c.appendOnlyHelperText).toBe(REVIEW_ACTIONS_APPEND_ONLY_HELPER_TEXT);
-    expect(c.noSideEffectsHelperText).toBe(
-      REVIEW_ACTIONS_NO_SIDE_EFFECTS_HELPER_TEXT,
-    );
+    expect(c.noSideEffectsHelperText).toBe(REVIEW_ACTIONS_NO_SIDE_EFFECTS_HELPER_TEXT);
     expect(REVIEW_ACTIONS_APPEND_ONLY_HELPER_TEXT).toMatch(/append-only event/i);
     expect(REVIEW_ACTIONS_NO_SIDE_EFFECTS_HELPER_TEXT).toMatch(
       /does not change alerts.*tasks.*action queue/i,
@@ -132,8 +130,7 @@ vi.mock("@/integrations/supabase/client", () => {
       return {
         select: () => ({
           eq: () => ({
-            maybeSingle: () =>
-              Promise.resolve({ data: sessionRow, error: null }),
+            maybeSingle: () => Promise.resolve({ data: sessionRow, error: null }),
           }),
         }),
       };
@@ -147,8 +144,14 @@ vi.mock("@/integrations/supabase/client", () => {
         select: () => ({
           in: () => ({
             order: () => ({
-              limit: () =>
-                Promise.resolve({ data: mockState.reviewEvents, error: null }),
+              limit: () => {
+                const __c: any = {
+                  abortSignal: () => __c,
+                  then: (r: any, j?: any) =>
+                    Promise.resolve({ data: mockState.reviewEvents, error: null }).then(r, j),
+                };
+                return __c;
+              },
             }),
           }),
         }),
@@ -159,12 +162,24 @@ vi.mock("@/integrations/supabase/client", () => {
         eq: () => ({
           maybeSingle: () => Promise.resolve({ data: null, error: null }),
           order: () => ({
-            limit: () => Promise.resolve({ data: [], error: null }),
+            limit: () => {
+              const c: any = {
+                abortSignal: () => c,
+                then: (r: any) => Promise.resolve({ data: [], error: null }).then(r),
+              };
+              return c;
+            },
           }),
         }),
         in: () => ({
           order: () => ({
-            limit: () => Promise.resolve({ data: [], error: null }),
+            limit: () => {
+              const c: any = {
+                abortSignal: () => c,
+                then: (r: any) => Promise.resolve({ data: [], error: null }).then(r),
+              };
+              return c;
+            },
           }),
         }),
       }),
@@ -187,10 +202,7 @@ function renderPage() {
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={[`/ai-doctor/sessions/${SESSION_ID}`]}>
         <Routes>
-          <Route
-            path="/ai-doctor/sessions/:sessionId"
-            element={<AiDoctorSessionDetail />}
-          />
+          <Route path="/ai-doctor/sessions/:sessionId" element={<AiDoctorSessionDetail />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -212,22 +224,17 @@ describe("AiDoctorSessionDetail — review action polish", () => {
       ).toBeInTheDocument(),
     );
     expect(
-      screen.getByTestId("ai-doctor-session-detail-review-helper-append-only")
-        .textContent,
+      screen.getByTestId("ai-doctor-session-detail-review-helper-append-only").textContent,
     ).toMatch(/append-only event/i);
     expect(
-      screen.getByTestId(
-        "ai-doctor-session-detail-review-helper-no-side-effects",
-      ).textContent,
+      screen.getByTestId("ai-doctor-session-detail-review-helper-no-side-effects").textContent,
     ).toMatch(/does not change alerts.*tasks.*action queue/i);
   });
 
   it("Clear button is disabled with reason when status is not_reviewed", async () => {
     setReviewEvents([]);
     renderPage();
-    const btn = await screen.findByTestId(
-      "ai-doctor-session-detail-review-clear",
-    );
+    const btn = await screen.findByTestId("ai-doctor-session-detail-review-clear");
     expect(btn).toBeDisabled();
     expect(btn.getAttribute("title")).toMatch(/no review status/i);
     expect(btn.getAttribute("aria-label")).toMatch(/no review status/i);
@@ -237,13 +244,9 @@ describe("AiDoctorSessionDetail — review action polish", () => {
   });
 
   it("Mark reviewed button is disabled with reason when already reviewed", async () => {
-    setReviewEvents([
-      { id: "e1", event_type: "marked_reviewed" },
-    ]);
+    setReviewEvents([{ id: "e1", event_type: "marked_reviewed" }]);
     renderPage();
-    const btn = await screen.findByTestId(
-      "ai-doctor-session-detail-review-mark-reviewed",
-    );
+    const btn = await screen.findByTestId("ai-doctor-session-detail-review-mark-reviewed");
     await waitFor(() => expect(btn).toBeDisabled());
     expect(btn.getAttribute("title")).toMatch(/already.*reviewed/i);
     expect(btn.getAttribute("aria-label")).toMatch(/already.*reviewed/i);
@@ -252,9 +255,7 @@ describe("AiDoctorSessionDetail — review action polish", () => {
   it("Needs follow-up button is disabled with reason when already flagged", async () => {
     setReviewEvents([{ id: "e1", event_type: "needs_follow_up" }]);
     renderPage();
-    const btn = await screen.findByTestId(
-      "ai-doctor-session-detail-review-needs-follow-up",
-    );
+    const btn = await screen.findByTestId("ai-doctor-session-detail-review-needs-follow-up");
     await waitFor(() => expect(btn).toBeDisabled());
     expect(btn.getAttribute("title")).toMatch(/already.*follow.?up/i);
     expect(btn.getAttribute("aria-label")).toMatch(/already.*follow.?up/i);
@@ -263,9 +264,7 @@ describe("AiDoctorSessionDetail — review action polish", () => {
   it("enabled Mark reviewed button still inserts an append-only review event", async () => {
     setReviewEvents([]);
     renderPage();
-    const btn = await screen.findByTestId(
-      "ai-doctor-session-detail-review-mark-reviewed",
-    );
+    const btn = await screen.findByTestId("ai-doctor-session-detail-review-mark-reviewed");
     fireEvent.click(btn);
     await waitFor(() => expect(mockState.insertCalls.length).toBeGreaterThan(0));
     expect(mockState.insertCalls[0].table).toBe("ai_doctor_session_reviews");
@@ -280,10 +279,7 @@ describe("AiDoctorSessionDetail — review action polish", () => {
 
 // --- Static safety scan ------------------------------------------------------
 const ROOT = resolve(__dirname, "../..");
-const PAGE_SRC = readFileSync(
-  resolve(ROOT, "src/pages/AiDoctorSessionDetail.tsx"),
-  "utf8",
-);
+const PAGE_SRC = readFileSync(resolve(ROOT, "src/pages/AiDoctorSessionDetail.tsx"), "utf8");
 const RULES_SRC = readFileSync(
   resolve(ROOT, "src/lib/aiDoctorSessionReviewStatusRules.ts"),
   "utf8",

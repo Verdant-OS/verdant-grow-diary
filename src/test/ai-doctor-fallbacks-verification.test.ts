@@ -129,11 +129,7 @@ describe("VERDANT-18 · 1. Stale telemetry fallback", () => {
     expect(dx.automated_confidence).toEqual(CONSERVATIVE_FALLBACK);
     expect(dx.automated_confidence.level).toBe("Low");
     // No "healthy" classification language
-    const blob = [
-      dx.summary,
-      ...dx.recommended_actions,
-      ...dx.contributing_factors,
-    ]
+    const blob = [dx.summary, ...dx.recommended_actions, ...dx.contributing_factors]
       .join(" ")
       .toLowerCase();
     expect(blob).not.toMatch(/\bhealthy\b/);
@@ -189,9 +185,7 @@ describe("VERDANT-18 · 2. Seedling / Autoflower protection", () => {
       evidence: ["Definitely a nitrogen deficiency"],
     });
     expect(diagnosis!.summary).toMatch(/\[removed: over-promising language\]/);
-    expect(diagnosis!.evidence[0]).toMatch(
-      /\[removed: over-promising language\]/,
-    );
+    expect(diagnosis!.evidence[0]).toMatch(/\[removed: over-promising language\]/);
   });
 
   it("caps suggestions to MAX_SUGGESTED_ACTIONS to favor conservative guidance", () => {
@@ -208,9 +202,7 @@ describe("VERDANT-18 · 2. Seedling / Autoflower protection", () => {
       riskLevel: "low",
       suggestedActions: many,
     });
-    expect(diagnosis!.suggestedActions.length).toBeLessThanOrEqual(
-      MAX_SUGGESTED_ACTIONS,
-    );
+    expect(diagnosis!.suggestedActions.length).toBeLessThanOrEqual(MAX_SUGGESTED_ACTIONS);
     expect(notes.some((n) => /trimmed/i.test(n))).toBe(true);
   });
 
@@ -221,9 +213,7 @@ describe("VERDANT-18 · 2. Seedling / Autoflower protection", () => {
       riskLevel: "low",
     });
     expect(diagnosis!.missingInformation.length).toBeGreaterThan(0);
-    expect(diagnosis!.missingInformation.join(" ")).toMatch(
-      /fresh photo|sensor snapshot/i,
-    );
+    expect(diagnosis!.missingInformation.join(" ")).toMatch(/fresh photo|sensor snapshot/i);
   });
 });
 
@@ -256,8 +246,7 @@ describe("VERDANT-18 · 3. Backend timeout / AI client failure fallback", () => 
   });
 
   it("returns CONSERVATIVE_FALLBACK on HTTP 500", async () => {
-    const fetchImpl = (async () =>
-      new Response("err", { status: 500 })) as unknown as typeof fetch;
+    const fetchImpl = (async () => new Response("err", { status: 500 })) as unknown as typeof fetch;
     const r = await calculateConfidenceViaEdgeFunction(sampleInput, {
       ...baseOpts,
       fetchImpl,
@@ -367,8 +356,7 @@ describe("VERDANT-18 · 4. Danger Zone telemetry fallback", () => {
 
   it("sanitizer blocks aggressive nutrient/irrigation/equipment recommendations from weak evidence", () => {
     const { diagnosis, notes } = validateAndSanitizeDiagnosis({
-      summary:
-        "Reservoir EC reads 9.8 mS/cm and pH 3.2 — extreme. Recommend immediate flush.",
+      summary: "Reservoir EC reads 9.8 mS/cm and pH 3.2 — extreme. Recommend immediate flush.",
       confidence: 0.2, // weak evidence
       riskLevel: "high",
       evidence: ["EC=9.8", "pH=3.2"],

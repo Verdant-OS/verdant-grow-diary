@@ -9,10 +9,7 @@
  *  - manual & csv carry through as their own source; freshness still
  *    informs the age label but they are not promoted to "live".
  */
-import {
-  normalizeSensorSource,
-  type SensorSource,
-} from "./sensorSourceRules";
+import { normalizeSensorSource, type SensorSource } from "./sensorSourceRules";
 
 export type SensorMetrics = Partial<{
   temp_f: number | null;
@@ -22,7 +19,8 @@ export type SensorMetrics = Partial<{
   soil_moisture: number | null;
   ec: number | null;
   ph: number | null;
-}> & Record<string, number | null | undefined>;
+}> &
+  Record<string, number | null | undefined>;
 
 export interface SensorSnapshot {
   source: SensorSource | string;

@@ -46,9 +46,15 @@ describe("paddle_event_processing migration", () => {
   it("uses service-role-only access with RLS default-deny for client roles", () => {
     expect(MIGRATION).toContain("REVOKE ALL ON TABLE public.paddle_event_processing FROM PUBLIC");
     expect(MIGRATION).toContain("REVOKE ALL ON TABLE public.paddle_event_processing FROM anon");
-    expect(MIGRATION).toContain("REVOKE ALL ON TABLE public.paddle_event_processing FROM authenticated");
-    expect(MIGRATION).toContain("GRANT ALL ON TABLE public.paddle_event_processing TO service_role");
-    expect(MIGRATION).toContain("ALTER TABLE public.paddle_event_processing ENABLE ROW LEVEL SECURITY");
+    expect(MIGRATION).toContain(
+      "REVOKE ALL ON TABLE public.paddle_event_processing FROM authenticated",
+    );
+    expect(MIGRATION).toContain(
+      "GRANT ALL ON TABLE public.paddle_event_processing TO service_role",
+    );
+    expect(MIGRATION).toContain(
+      "ALTER TABLE public.paddle_event_processing ENABLE ROW LEVEL SECURITY",
+    );
     expect(MIGRATION).not.toMatch(/CREATE\s+POLICY/i);
   });
 

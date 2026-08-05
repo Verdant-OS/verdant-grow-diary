@@ -1,38 +1,47 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import {
+  extractMountedAppRoutePaths,
+  getRouteAliasRedirectTarget,
+  readAllRouteModuleSources,
+} from "./helpers/routeManifestSyncHarness";
 
-const ROOT = resolve(__dirname, "../..");
-const APP = readFileSync(resolve(ROOT, "src/App.tsx"), "utf8");
+const APP = readAllRouteModuleSources();
 
 describe("Deprecated auth route redirects", () => {
-  it("/login redirects to /auth", () => {
-    expect(APP).toMatch(/path="\/login"\s+element=\{<Navigate\s+to="\/auth"/);
+  it("/login redirects through the context-preserving alias", () => {
+    expect(extractMountedAppRoutePaths()).toContain("/login");
+    expect(getRouteAliasRedirectTarget("/login")).toBe("/auth");
   });
 
-  it("/signup redirects to /auth", () => {
-    expect(APP).toMatch(/path="\/signup"\s+element=\{<Navigate\s+to="\/auth"/);
+  it("/signup redirects to signup mode through the context-preserving alias", () => {
+    expect(extractMountedAppRoutePaths()).toContain("/signup");
+    expect(getRouteAliasRedirectTarget("/signup")).toBe("/auth?mode=signup");
   });
 
-  it("/register redirects to /auth", () => {
-    expect(APP).toMatch(/path="\/register"\s+element=\{<Navigate\s+to="\/auth"/);
+  it("/register redirects to signup mode through the context-preserving alias", () => {
+    expect(extractMountedAppRoutePaths()).toContain("/register");
+    expect(getRouteAliasRedirectTarget("/register")).toBe("/auth?mode=signup");
   });
 
   it("/auth route still exists directly (regression guard)", () => {
-    expect(APP).toMatch(/path="\/auth"\s+element=\{<Auth\s*\/>\}/);
+    expect(extractMountedAppRoutePaths()).toContain("/auth");
+    expect(APP).toMatch(/Auth|@\/pages\/Auth|pages\/Auth/);
   });
 
-  it("/features redirects to /welcome", () => {
-    expect(APP).toMatch(/path="\/features"\s+element=\{<Navigate\s+to="\/welcome"/);
+  it("/features redirects to /welcome through the context-preserving alias", () => {
+    expect(extractMountedAppRoutePaths()).toContain("/features");
+    expect(getRouteAliasRedirectTarget("/features")).toBe("/welcome");
   });
 });
 
 describe("Auth route redirects — static safety", () => {
   it("does not duplicate the Auth page component", () => {
-    // Only one import for the Auth page. Pages are code-split via React.lazy,
-    // so App.tsx pulls them in with a dynamic import("./pages/Auth").
-    const importMatches = APP.match(/import\(\s*["']\.\/pages\/Auth["']\s*\)/g);
-    expect(importMatches).toHaveLength(1);
+    // Auth is mounted once via createFileRoute + @/pages/Auth import.
+    const importMatches = APP.match(/@\/pages\/Auth|from\s+["'][^"']*pages\/Auth["']/g) ?? [];
+    expect(importMatches.length).toBeGreaterThanOrEqual(1);
+    // No classic lazy("./pages/Auth") duplicates.
+    const classic = APP.match(/import\(\s*["']\.\/pages\/Auth["']\s*\)/g) ?? [];
+    expect(classic).toHaveLength(0);
   });
 
   it("does not introduce new Supabase auth logic", () => {

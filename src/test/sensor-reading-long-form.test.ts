@@ -69,7 +69,6 @@ describe("normalizedReadingToLongFormRows", () => {
     expect(r.source).toBe("live");
   });
 
-
   it("rejects readings without tent_id", () => {
     const r = normalizeSensorReading(
       { temperature_c: 24, humidity: 50 },

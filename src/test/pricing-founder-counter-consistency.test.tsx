@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -34,9 +34,13 @@ vi.mock("@/lib/funnelAnalytics", () => ({ trackFunnelEvent: vi.fn() }));
 
 import Pricing from "@/pages/Pricing";
 
+// Founder Lifetime left the public pricing grid; it now renders only on an
+// explicit `?plan=founder_lifetime` deep link. These assertions still cover
+// the Founder card exactly as before — they just have to arrive the way a
+// grower with an existing Founder link does.
 function renderPricing() {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={["/pricing?plan=founder_lifetime"]}>
       <Pricing />
     </MemoryRouter>,
   );

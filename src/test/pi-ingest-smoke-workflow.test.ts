@@ -42,9 +42,10 @@ describe("pi-ingest smoke workflow — static guardrails", () => {
     const denoTestLines = yml.match(/deno test[^\n]*/g) ?? [];
     expect(denoTestLines.length).toBe(1);
     // No reference to other Edge Function paths.
-    expect(yml).not.toMatch(/supabase\/functions\/(?!pi-ingest-readings\/smoke\.test\.ts|pi-ingest-readings\b\s*$)/m);
+    expect(yml).not.toMatch(
+      /supabase\/functions\/(?!pi-ingest-readings\/smoke\.test\.ts|pi-ingest-readings\b\s*$)/m,
+    );
   });
-
 
   it("references all required secrets via secrets.* expressions", () => {
     for (const name of [
@@ -53,9 +54,7 @@ describe("pi-ingest smoke workflow — static guardrails", () => {
       "PI_INGEST_SMOKE_BRIDGE_SECRET",
       "PI_INGEST_SMOKE_TENT_ID",
     ]) {
-      const re = new RegExp(
-        `${name}:\\s*\\$\\{\\{\\s*secrets\\.${name}\\s*\\}\\}`,
-      );
+      const re = new RegExp(`${name}:\\s*\\$\\{\\{\\s*secrets\\.${name}\\s*\\}\\}`);
       expect(yml).toMatch(re);
     }
   });

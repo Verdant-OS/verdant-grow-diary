@@ -14,10 +14,7 @@
  */
 import { type EcUnit } from "@/constants/units";
 
-export function toCanonicalMscm(
-  value: number | null | undefined,
-  unit: EcUnit,
-): number | null {
+export function toCanonicalMscm(value: number | null | undefined, unit: EcUnit): number | null {
   if (value === null || value === undefined) return null;
   if (!Number.isFinite(value)) return null;
   switch (unit) {

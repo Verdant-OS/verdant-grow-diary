@@ -12,7 +12,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams } from "@/lib/react-router-compat";
 import { ArrowLeft, Bell, History, ListChecks } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
@@ -65,13 +65,13 @@ import {
   hasPendingActionsForClosedAlert,
   isActionDerivedFromAlert,
   isAiDoctorDerived,
+  reconcileRelatedActionRows,
 } from "@/lib/actionQueueProvenanceRules";
 import {
   pickLatestOutcomeForAction,
   type RawOutcomeDiaryRow,
 } from "@/lib/relatedActionOutcomeRules";
 import { ACTION_OUTCOME_EVENT_TYPE } from "@/lib/actionOutcomeRules";
-
 
 import { supabase } from "@/integrations/supabase/client";
 
@@ -117,22 +117,16 @@ export default function AlertDetail() {
   const [status, setStatus] = useState<LoadStatus>("idle");
   const [alert, setAlert] = useState<AlertRow | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const linkedActionAlertIds = useMemo(
-    () => (alert ? [alert.id] : []),
-    [alert],
-  );
+  const linkedActionAlertIds = useMemo(() => (alert ? [alert.id] : []), [alert]);
   const linkedActionCounts = useAlertsLinkedActionCounts(linkedActionAlertIds);
   const [eventsKey, setEventsKey] = useState(0);
   const [existingActionId, setExistingActionId] = useState<string | null>(null);
-  const [existingActionRows, setExistingActionRows] = useState<
-    ActionQueueRowForDedupe[]
-  >([]);
+  const [existingActionRows, setExistingActionRows] = useState<ActionQueueRowForDedupe[]>([]);
   const [queuing, setQueuing] = useState(false);
   const [relatedActions, setRelatedActions] = useState<RelatedActionRow[]>([]);
   const [relatedLoaded, setRelatedLoaded] = useState(false);
   const [outcomeRows, setOutcomeRows] = useState<RawOutcomeDiaryRow[]>([]);
   const [linkedAiDoctorSessionIds, setLinkedAiDoctorSessionIds] = useState<string[]>([]);
-
 
   const load = useCallback(async () => {
     if (!alertId) return;
@@ -228,7 +222,6 @@ export default function AlertDetail() {
     };
   }, [alert]);
 
-
   // Read-only reverse provenance: list action_queue rows derived from this alert.
   useEffect(() => {
     let cancelled = false;
@@ -261,7 +254,7 @@ export default function AlertDetail() {
           if (tb !== ta) return tb - ta;
           return a.id.localeCompare(b.id);
         });
-      setRelatedActions(matched);
+      setRelatedActions((current) => reconcileRelatedActionRows(current, matched));
       setRelatedLoaded(true);
     })();
     return () => {
@@ -371,8 +364,7 @@ export default function AlertDetail() {
         // shared adapter. If the alert has no refs, an explicit empty array
         // is persisted — never inferred from prose, timestamps, plant/tent,
         // alert id, or metric name.
-        originating_timeline_events:
-          forwardAlertRefsToActionQueue(alert) as unknown as never,
+        originating_timeline_events: forwardAlertRefsToActionQueue(alert) as unknown as never,
       })
       .select("id,grow_id")
       .single();
@@ -406,6 +398,23 @@ export default function AlertDetail() {
           reason: draft.reason,
         },
       ]);
+      setRelatedActions((rows) => {
+        if (rows.some((row) => row.id === inserted.id)) return rows;
+        return [
+          {
+            id: inserted.id as string,
+            grow_id: (inserted.grow_id as string | null) ?? draft.grow_id,
+            source: draft.source,
+            reason: draft.reason,
+            status: draft.status,
+            risk_level: draft.risk_level,
+            suggested_change: draft.suggested_change,
+            action_type: draft.action_type,
+            created_at: new Date().toISOString(),
+          },
+          ...rows,
+        ];
+      });
       const { error: auditError } = await supabase.from("action_queue_events").insert({
         action_queue_id: inserted.id,
         grow_id: inserted.grow_id ?? draft.grow_id,
@@ -426,11 +435,7 @@ export default function AlertDetail() {
     toast.success("Action queued for approval.");
   }
 
-  const derivedSensorSource = useMemo(
-    () => deriveAlertReadingSource(alert),
-    [alert],
-  );
-
+  const derivedSensorSource = useMemo(() => deriveAlertReadingSource(alert), [alert]);
 
   return (
     <div>
@@ -467,12 +472,8 @@ export default function AlertDetail() {
         </div>
       ) : status === "error" ? (
         <div role="alert" className="glass rounded-2xl p-6">
-          <p className="text-sm font-medium">
-            Alert unavailable{error ? `: ${error}` : "."}
-          </p>
-          <p className="text-xs text-muted-foreground mt-1">
-            Check your connection and try again.
-          </p>
+          <p className="text-sm font-medium">Alert unavailable{error ? `: ${error}` : "."}</p>
+          <p className="text-xs text-muted-foreground mt-1">Check your connection and try again.</p>
           <Button
             size="sm"
             variant="outline"
@@ -483,7 +484,6 @@ export default function AlertDetail() {
             Retry
           </Button>
         </div>
-
       ) : alert ? (
         <div className="space-y-4">
           <section className="glass rounded-2xl p-4" aria-labelledby="alert-detail-title">
@@ -530,16 +530,15 @@ export default function AlertDetail() {
               ) : null}
             </div>
 
-            <h2 id="alert-detail-title" className="font-display font-semibold text-base">{alert.title}</h2>
+            <h2 id="alert-detail-title" className="font-display font-semibold text-base">
+              {alert.title}
+            </h2>
             <p className="text-sm text-muted-foreground mt-1">{alert.reason}</p>
 
             <div className="mt-3">
               <AlertWhyContext alert={alert} variant="detailed" />
             </div>
-            <div
-              className="mt-3"
-              data-testid="alert-detail-evidence-linkage"
-            >
+            <div className="mt-3" data-testid="alert-detail-evidence-linkage">
               <EvidenceLinkageBadges
                 events={adaptOriginatingTimelineEventsFromRow(alert)}
                 surface="alert-review"
@@ -620,7 +619,11 @@ export default function AlertDetail() {
               </div>
             </dl>
 
-            <div className="flex flex-wrap gap-2 mt-4" role="group" aria-label={`Status actions for alert: ${alert.title}`}>
+            <div
+              className="flex flex-wrap gap-2 mt-4"
+              role="group"
+              aria-label={`Status actions for alert: ${alert.title}`}
+            >
               {alert.status === "open" && (
                 <Button
                   size="sm"
@@ -667,7 +670,6 @@ export default function AlertDetail() {
                   aria-label={`Reopen alert: ${alert.title}`}
                   data-testid="alert-detail-reopen"
                   onClick={() => runStatusChange("reopened", () => reopenAlert(alert.id), "reopen")}
-
                 >
                   Reopen
                 </Button>
@@ -714,8 +716,7 @@ export default function AlertDetail() {
                           <Button asChild size="sm" variant="secondary">
                             <Link
                               to={`/actions/${
-                                existingActionId ??
-                                addButtonDecision.existingActionId
+                                existingActionId ?? addButtonDecision.existingActionId
                               }`}
                               data-testid="alert-handoff-already-queued-link"
                             >
@@ -731,11 +732,7 @@ export default function AlertDetail() {
                         <Button
                           size="sm"
                           variant="outline"
-                          disabled={
-                            !canQueue ||
-                            queuing ||
-                            addButtonDecision.state !== "can_add"
-                          }
+                          disabled={!canQueue || queuing || addButtonDecision.state !== "can_add"}
                           onClick={addAlertToActionQueue}
                           data-testid="alert-handoff-add-button"
                           aria-busy={queuing || undefined}
@@ -744,7 +741,6 @@ export default function AlertDetail() {
                         </Button>
                       )}
                     </div>
-
                   </div>
                 </div>
               </div>
@@ -766,7 +762,8 @@ export default function AlertDetail() {
                 data-testid="stale-action-warning"
                 className="mb-3 rounded-lg border border-amber-500/60 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-300"
               >
-                This alert is no longer open, but related actions are still pending review. Confirm the current grow conditions before approving.
+                This alert is no longer open, but related actions are still pending review. Confirm
+                the current grow conditions before approving.
               </div>
             )}
 
@@ -782,74 +779,78 @@ export default function AlertDetail() {
                   const outcome = pickLatestOutcomeForAction(outcomeRows, a.id);
                   const isCompleted = a.status === "completed";
                   return (
-                  <li key={a.id} className="rounded-lg border border-border/40 bg-secondary/20 p-2">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {a.status && (
-                        <Badge variant="outline" className="text-[10px] uppercase">
-                          {a.status}
-                        </Badge>
-                      )}
-                      {a.risk_level && (
-                        <Badge variant="outline" className="text-[10px] uppercase">
-                          {a.risk_level}
-                        </Badge>
-                      )}
-                      <Badge
-                        variant="outline"
-                        className="text-[10px] uppercase border-primary text-primary"
-                      >
-                        {getActionQueueSourceLabel(a)}
-                      </Badge>
-                      {outcome && (
+                    <li
+                      key={a.id}
+                      className="rounded-lg border border-border/40 bg-secondary/20 p-2"
+                    >
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {a.status && (
+                          <Badge variant="outline" className="text-[10px] uppercase">
+                            {a.status}
+                          </Badge>
+                        )}
+                        {a.risk_level && (
+                          <Badge variant="outline" className="text-[10px] uppercase">
+                            {a.risk_level}
+                          </Badge>
+                        )}
                         <Badge
                           variant="outline"
-                          data-testid="related-action-outcome-badge"
-                          className="text-[10px] uppercase border-emerald-500/60 text-emerald-600 dark:text-emerald-300"
+                          className="text-[10px] uppercase border-primary text-primary"
                         >
-                          Outcome: {outcome.label}
+                          {getActionQueueSourceLabel(a)}
                         </Badge>
-                      )}
-                      <Link
-                        to={actionDetailPath(a.id)}
-                        className="ml-auto text-xs text-primary hover:underline"
-                      >
-                        Open
-                      </Link>
-                    </div>
-                    <p className="text-sm mt-1 break-words">
-                      {a.suggested_change ?? a.action_type ?? a.id}
-                    </p>
-                    {a.created_at && (
-                      <p className="text-[10px] text-muted-foreground mt-0.5">
-                        {formatDistanceToNow(new Date(a.created_at), {
-                          addSuffix: true,
-                        })}
-                      </p>
-                    )}
-                    {outcome ? (
-                      <div className="mt-1 text-[11px] text-muted-foreground">
-                        <span>Grower-recorded outcome</span>
-                        {outcome.recorded_at && (
-                          <span>
-                            {" "}— recorded{" "}
-                            {formatDistanceToNow(new Date(outcome.recorded_at), {
-                              addSuffix: true,
-                            })}
-                          </span>
+                        {outcome && (
+                          <Badge
+                            variant="outline"
+                            data-testid="related-action-outcome-badge"
+                            className="text-[10px] uppercase border-emerald-500/60 text-emerald-600 dark:text-emerald-300"
+                          >
+                            Outcome: {outcome.label}
+                          </Badge>
                         )}
-                        <div className="text-[10px] opacity-80">Recorded after follow-up</div>
-                        {outcome.note && (
-                          <div className="text-[11px] mt-0.5 opacity-90 break-words">
-                            {outcome.note}
-                          </div>
-                        )}
+                        <Link
+                          to={actionDetailPath(a.id)}
+                          className="ml-auto text-xs text-primary hover:underline"
+                        >
+                          Open
+                        </Link>
                       </div>
-                    ) : isCompleted ? (
-                      <p className="text-[11px] text-muted-foreground mt-1">
-                        No outcome recorded yet
+                      <p className="text-sm mt-1 break-words">
+                        {a.suggested_change ?? a.action_type ?? a.id}
                       </p>
-                    ) : null}
-                  </li>
+                      {a.created_at && (
+                        <p className="text-[10px] text-muted-foreground mt-0.5">
+                          {formatDistanceToNow(new Date(a.created_at), {
+                            addSuffix: true,
+                          })}
+                        </p>
+                      )}
+                      {outcome ? (
+                        <div className="mt-1 text-[11px] text-muted-foreground">
+                          <span>Grower-recorded outcome</span>
+                          {outcome.recorded_at && (
+                            <span>
+                              {" "}
+                              — recorded{" "}
+                              {formatDistanceToNow(new Date(outcome.recorded_at), {
+                                addSuffix: true,
+                              })}
+                            </span>
+                          )}
+                          <div className="text-[10px] opacity-80">Recorded after follow-up</div>
+                          {outcome.note && (
+                            <div className="text-[11px] mt-0.5 opacity-90 break-words">
+                              {outcome.note}
+                            </div>
+                          )}
+                        </div>
+                      ) : isCompleted ? (
+                        <p className="text-[11px] text-muted-foreground mt-1">
+                          No outcome recorded yet
+                        </p>
+                      ) : null}
+                    </li>
                   );
                 })}
               </ul>
@@ -872,8 +873,8 @@ export default function AlertDetail() {
                 </Badge>
               </div>
               <p className="text-[11px] text-muted-foreground">
-                This alert is connected to an approval-required action that came
-                from an AI Doctor review.
+                This alert is connected to an approval-required action that came from an AI Doctor
+                review.
               </p>
               <ul className="mt-2 space-y-1">
                 {linkedAiDoctorSessionIds.map((sid) => (
@@ -890,8 +891,6 @@ export default function AlertDetail() {
               </ul>
             </section>
           )}
-
-
 
           <section className="glass rounded-2xl p-4" aria-label="Alert history">
             <div className="flex items-center gap-2 mb-2">

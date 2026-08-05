@@ -7,7 +7,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 import type { AiDoctorSessionRow } from "@/hooks/use-ai-doctor-sessions";
@@ -30,7 +30,14 @@ vi.mock("@/integrations/supabase/client", () => ({
         }),
         eq: () => ({
           order: () => ({
-            limit: () => Promise.resolve({ data: currentRows, error: null }),
+            limit: () => {
+              const __c: any = {
+                abortSignal: () => __c,
+                then: (r: any, j?: any) =>
+                  Promise.resolve({ data: currentRows, error: null }).then(r, j),
+              };
+              return __c;
+            },
           }),
         }),
       }),
@@ -68,8 +75,8 @@ function makeRow(
     possibleCauses: [],
     immediateAction: "",
     whatNotToDo: [],
-    followUp24h: null,
-    recoveryPlan3d: null,
+    followUp24h: null as never,
+    recoveryPlan3d: null as never,
     riskLevel: "low",
     suggestedActions: [],
     ...diagnosisOverrides,
@@ -112,23 +119,17 @@ describe("formatSessionRowCautionReasonText — pure formatter", () => {
   });
 
   it("returns concise text for low confidence only", () => {
-    const vm = vmFor(
-      makeRow("a", {}, { displayed_confidence: 0.3, raw_confidence: 0.3 }),
-    );
+    const vm = vmFor(makeRow("a", {}, { displayed_confidence: 0.3, raw_confidence: 0.3 }));
     const tokens = buildCautionReasonTokens(vm);
     expect(tokens).toEqual(["low confidence"]);
-    expect(formatSessionRowCautionReasonText(tokens)).toBe(
-      "Review because: low confidence.",
-    );
+    expect(formatSessionRowCautionReasonText(tokens)).toBe("Review because: low confidence.");
   });
 
   it("returns concise text for elevated risk only", () => {
     const vm = vmFor(makeRow("a", { riskLevel: "high" }));
     const tokens = buildCautionReasonTokens(vm);
     expect(tokens).toEqual(["elevated risk"]);
-    expect(formatSessionRowCautionReasonText(tokens)).toBe(
-      "Review because: elevated risk.",
-    );
+    expect(formatSessionRowCautionReasonText(tokens)).toBe("Review because: elevated risk.");
   });
 
   it("combines multiple reasons in deterministic order", () => {
@@ -147,9 +148,7 @@ describe("formatSessionRowCautionReasonText — pure formatter", () => {
   });
 
   it("buildSessionRowCautionIndicator exposes description when caution applies", () => {
-    const indicator = buildSessionRowCautionIndicator(
-      makeRow("a", { riskLevel: "high" }),
-    );
+    const indicator = buildSessionRowCautionIndicator(makeRow("a", { riskLevel: "high" }));
     expect(indicator.show).toBe(true);
     expect(indicator.description).toBe("Review because: elevated risk.");
   });
@@ -167,21 +166,13 @@ describe("AiDoctorSessionsIndex — caution explainer", () => {
       makeRow("a", { riskLevel: "high" }, { displayed_confidence: 0.3, raw_confidence: 0.3 }),
     ];
     renderWithProviders(<AiDoctorSessionsIndex />);
-    const reason = await screen.findByTestId(
-      "ai-doctor-sessions-index-caution-reason",
-    );
-    expect(reason.textContent).toBe(
-      "Review because: low confidence, elevated risk.",
-    );
+    const reason = await screen.findByTestId("ai-doctor-sessions-index-caution-reason");
+    expect(reason.textContent).toBe("Review because: low confidence, elevated risk.");
   });
 
   it("limited-context badge still renders independently", async () => {
     currentRows = [
-      makeRow(
-        "a",
-        { evidence: [] },
-        { plant_id: null, tent_id: null, grow_id: null },
-      ),
+      makeRow("a", { evidence: [] }, { plant_id: null, tent_id: null, grow_id: null }),
     ];
     renderWithProviders(<AiDoctorSessionsIndex />);
     expect(
@@ -208,9 +199,7 @@ describe("PlantAiDoctorSessionsPanel — caution explainer", () => {
 
 describe("TentAiDoctorSessionsPanel — caution explainer", () => {
   it("renders the caution reason", async () => {
-    currentRows = [
-      makeRow("a", {}, { displayed_confidence: 0.2, raw_confidence: 0.2 }),
-    ];
+    currentRows = [makeRow("a", {}, { displayed_confidence: 0.2, raw_confidence: 0.2 })];
     renderWithProviders(<TentAiDoctorSessionsPanel tentId="t1" />);
     const reason = await screen.findByTestId("tent-ai-doctor-session-caution-reason");
     expect(reason.textContent).toBe("Review because: low confidence.");
@@ -235,9 +224,7 @@ describe("CoachAiDoctorHistoryPanel — caution explainer", () => {
     ];
     renderWithProviders(<CoachAiDoctorHistoryPanel growId="g1" />);
     const reason = await screen.findByTestId("coach-ai-doctor-history-caution-reason");
-    expect(reason.textContent).toBe(
-      "Review because: low confidence, elevated risk, missing info.",
-    );
+    expect(reason.textContent).toBe("Review because: low confidence, elevated risk, missing info.");
   });
 
   it("preserves View session link", async () => {

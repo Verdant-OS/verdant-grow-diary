@@ -183,18 +183,14 @@ describe("EcowittTimelineSnapshotChip presenter", () => {
       <EcowittTimelineSnapshotChip diaryEntryId="d1" snapshot={ctx.snapshot} />,
     );
     expect(getByTestId("ecowitt-timeline-chip-d1")).toBeTruthy();
-    expect(getByTestId("ecowitt-timeline-chip-freshness-d1").textContent).toBe(
-      "Fresh",
-    );
+    expect(getByTestId("ecowitt-timeline-chip-freshness-d1").textContent).toBe("Fresh");
     const text = container.textContent ?? "";
     expect(text).toContain("Derived VPD");
     expect(text).not.toMatch(/Live VPD|VPD Live/i);
   });
 
   it("renders nothing when no snapshot matched", () => {
-    const { container } = render(
-      <EcowittTimelineSnapshotChip diaryEntryId="d1" snapshot={null} />,
-    );
+    const { container } = render(<EcowittTimelineSnapshotChip diaryEntryId="d1" snapshot={null} />);
     expect(container.firstChild).toBeNull();
   });
 
@@ -218,9 +214,7 @@ describe("EcowittTimelineSnapshotChip presenter", () => {
     const { getByTestId } = render(
       <EcowittTimelineSnapshotChip diaryEntryId="d1" snapshot={ctx.snapshot} />,
     );
-    expect(getByTestId("ecowitt-timeline-chip-freshness-d1").textContent).toBe(
-      "Stale",
-    );
+    expect(getByTestId("ecowitt-timeline-chip-freshness-d1").textContent).toBe("Stale");
   });
 
   it("shows Invalid for a suspicious reading", () => {
@@ -268,7 +262,7 @@ describe("EcoWitt timeline static safety", () => {
     for (const f of files) {
       const src = readFileSync(resolve(process.cwd(), f), "utf8");
       expect(src).not.toMatch(/Live VPD|VPD Live/i);
-      const __forbid = ["switch","bot"].join("");
+      const __forbid = ["switch", "bot"].join("");
       expect(src.toLowerCase()).not.toContain(__forbid);
       expect(src).not.toMatch(/service_role/);
       expect(src.toLowerCase()).not.toMatch(/turn[_ ]?on|turn[_ ]?off/);

@@ -15,17 +15,18 @@
  * (server-only; may legitimately reference `service_role`), test fixtures
  * dedicated to this scanner (allow-listed by exact path).
  *
- * Uses strip-comments-and-string-literals scrubbing (borrowed from
- * assert-client-secret-boundary.mjs) so denylist string arrays and
- * documentation comments are permitted.
+ * Uses TypeScript AST masking so comments, strings, and regular-expression
+ * literals are ignored without confusing comment markers or quote characters
+ * inside another token class.
  */
 import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import { resolve, join, relative } from "node:path";
+import { fileURLToPath } from "node:url";
+import ts from "typescript";
 
 export const SCAN_ROOTS = ["src", "public", "dist"];
 
-export const FILE_EXT =
-  /\.(ts|tsx|js|jsx|mjs|cjs|html|css|json|map|txt|md)$/;
+export const FILE_EXT = /\.(ts|tsx|js|jsx|mjs|cjs|html|css|json|map|txt|md)$/;
 
 /**
  * Patterns that must never appear in scanned code, even as identifiers.
@@ -66,27 +67,110 @@ export const PREFIX_ALLOWLIST = [
   "src/integrations/supabase/types.ts",
 ];
 
-function stripComments(src) {
-  return src
-    .replace(/\/\*[\s\S]*?\*\//g, " ")
-    .replace(/(^|[^:])\/\/[^\n]*/g, "$1 ");
-}
-function stripLiteralsAndRegex(src) {
-  let out = src.replace(/`(?:\\.|\$\{[^}]*\}|[^`\\])*`/g, '""');
-  out = out.replace(/"(?:\\.|[^"\\\n])*"/g, '""');
-  out = out.replace(/'(?:\\.|[^'\\\n])*'/g, "''");
-  out = out.replace(
-    /([=(,;:!&|?{}\[\n>])\s*\/(?:\\.|[^\/\\\n])+\/[gimsuy]*/g,
-    "$1/_/",
-  );
-  return out;
-}
-export function scrubSource(src) {
-  return stripLiteralsAndRegex(stripComments(src));
+/**
+ * Server modules are deliberately named with the TanStack Start `*.server.*`
+ * convention. They are not browser or published-client source and are
+ * therefore outside this scanner's client-facing scope. Do not broaden this
+ * to a directory exemption: ordinary modules in `src/` must remain scanned.
+ */
+export function isServerOnlySourcePath(relPath) {
+  const normalized = relPath.replace(/\\/g, "/");
+  return normalized.startsWith("src/") && /\.server\.(ts|tsx|js|jsx|mjs|cjs)$/.test(normalized);
 }
 
-export function findOffending(src, { scrub = true } = {}) {
-  const body = scrub ? scrubSource(src) : src;
+const MASKED_SYNTAX_KINDS = new Set([
+  ts.SyntaxKind.StringLiteral,
+  ts.SyntaxKind.NoSubstitutionTemplateLiteral,
+  ts.SyntaxKind.RegularExpressionLiteral,
+  ts.SyntaxKind.TemplateHead,
+  ts.SyntaxKind.TemplateMiddle,
+  ts.SyntaxKind.TemplateTail,
+  ts.SyntaxKind.JsxText,
+]);
+
+function isLineBreak(ch) {
+  return ch === "\n" || ch === "\r";
+}
+
+function scriptKindForPath(filePath) {
+  const lower = filePath.toLowerCase();
+  if (lower.endsWith(".tsx")) return ts.ScriptKind.TSX;
+  if (lower.endsWith(".jsx")) return ts.ScriptKind.JSX;
+  if (lower.endsWith(".js") || lower.endsWith(".mjs") || lower.endsWith(".cjs")) {
+    return ts.ScriptKind.JS;
+  }
+  return ts.ScriptKind.TS;
+}
+
+function blankRange(out, start, end) {
+  for (let index = start; index < end; index += 1) {
+    if (!isLineBreak(out[index])) out[index] = " ";
+  }
+}
+
+function blankComments(out) {
+  let index = 0;
+  while (index < out.length) {
+    if (out[index] !== "/") {
+      index += 1;
+      continue;
+    }
+
+    if (out[index + 1] === "/") {
+      const start = index;
+      index += 2;
+      while (index < out.length && !isLineBreak(out[index])) index += 1;
+      blankRange(out, start, index);
+      continue;
+    }
+
+    if (out[index + 1] === "*") {
+      const start = index;
+      index += 2;
+      while (index < out.length && !(out[index] === "*" && out[index + 1] === "/")) {
+        index += 1;
+      }
+      if (index < out.length) index += 2;
+      blankRange(out, start, index);
+      continue;
+    }
+
+    index += 1;
+  }
+}
+
+export function scrubSource(src, filePath = "scan.ts") {
+  const out = src.split("");
+  const sourceFile = ts.createSourceFile(
+    filePath,
+    src,
+    ts.ScriptTarget.Latest,
+    true,
+    scriptKindForPath(filePath),
+  );
+
+  // Fail closed. Returning the raw source can cause a harmless literal or
+  // comment to be reported, but it never hides executable code after malformed
+  // syntax.
+  if (sourceFile.parseDiagnostics.length > 0) {
+    return src;
+  }
+
+  function visit(node) {
+    if (MASKED_SYNTAX_KINDS.has(node.kind)) {
+      blankRange(out, node.getStart(sourceFile), node.end);
+      return;
+    }
+    ts.forEachChild(node, visit);
+  }
+
+  visit(sourceFile);
+  blankComments(out);
+  return out.join("");
+}
+
+export function findOffending(src, { scrub = true, filePath = "scan.ts" } = {}) {
+  const body = scrub ? scrubSource(src, filePath) : src;
   const hits = [];
   for (const p of FORBIDDEN_PATTERNS) {
     const re = new RegExp(p.re.source, p.re.flags.includes("i") ? "gi" : "g");
@@ -128,6 +212,7 @@ export function scanRepo(rootDir = process.cwd()) {
       const relPath = relative(rootDir, file).replace(/\\/g, "/");
       if (EXACT_PATH_ALLOWLIST.has(relPath)) continue;
       if (PREFIX_ALLOWLIST.some((p) => relPath.startsWith(p))) continue;
+      if (isServerOnlySourcePath(relPath)) continue;
       let src;
       try {
         src = readFileSync(file, "utf8");
@@ -137,7 +222,7 @@ export function scanRepo(rootDir = process.cwd()) {
       // For non-source assets (json/html/css/map/txt/md) do NOT scrub —
       // any occurrence is a real leak.
       const isCode = /\.(ts|tsx|js|jsx|mjs|cjs)$/.test(relPath);
-      const hits = findOffending(src, { scrub: isCode });
+      const hits = findOffending(src, { scrub: isCode, filePath: relPath });
       if (hits.length > 0) violations.push({ file: relPath, hits });
     }
   }
@@ -147,7 +232,7 @@ export function scanRepo(rootDir = process.cwd()) {
 const isMain =
   typeof process !== "undefined" &&
   process.argv[1] &&
-  resolve(process.argv[1]) === resolve(new URL(import.meta.url).pathname);
+  resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url));
 
 if (isMain) {
   const violations = scanRepo(process.cwd());

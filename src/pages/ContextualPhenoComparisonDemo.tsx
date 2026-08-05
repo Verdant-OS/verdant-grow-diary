@@ -19,15 +19,12 @@ import {
 
 export default function ContextualPhenoComparisonDemo() {
   const view = useMemo(
-    () =>
-      buildContextualPhenoComparisonView(
-        CONTEXTUAL_PHENO_COMPARISON_DEMO_PLANT_INPUTS,
-      ),
+    () => buildContextualPhenoComparisonView(CONTEXTUAL_PHENO_COMPARISON_DEMO_PLANT_INPUTS),
     [],
   );
 
   return (
-    <div
+    <main
       data-testid="contextual-pheno-comparison-demo-page"
       className="container mx-auto max-w-5xl px-4 py-6"
     >
@@ -39,6 +36,6 @@ export default function ContextualPhenoComparisonDemo() {
         view={view}
         demoBannerText={CONTEXTUAL_PHENO_COMPARISON_DEMO_BANNER}
       />
-    </div>
+    </main>
   );
 }

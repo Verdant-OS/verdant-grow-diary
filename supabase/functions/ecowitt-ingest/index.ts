@@ -39,6 +39,9 @@ import {
   type EcoWittTimestampSource,
 } from "../_shared/ecowittRoutedRowBuilder.ts";
 import type { EcoWittRouterEligibleTent } from "../_shared/ecowittChannelTentRouter.ts";
+import { requireLiveSensorEntitlement } from "../_shared/liveSensorEntitlementGate.ts";
+import { resolveServerBillingEnvironment } from "../_shared/unionEntitlementLookup.ts";
+import type { LovableBillingEnvironment } from "../_shared/lib/lib/entitlements/lovablePaddleAdapter.ts";
 
 export interface EcoWittIngestAdminClient {
   // Supabase's generated query-builder type resolves untyped Edge schemas to
@@ -53,6 +56,8 @@ export interface EcoWittIngestHandlerDeps {
   admin?: EcoWittIngestAdminClient;
   /** One request clock shared by auth and gateway timestamp validation. */
   now?: () => Date;
+  /** Test-only server environment override; never read from request input. */
+  expectedBillingEnvironment?: LovableBillingEnvironment;
 }
 
 const corsHeaders = {
@@ -248,6 +253,20 @@ export async function handleEcoWittIngestRequest(
     return json({ error: "bridge_required" }, 403);
   }
   const auth = authRes.auth;
+
+  // A bridge token authenticates a tent but does not grant paid access.
+  // Re-resolve the token owner's liveSensors capability on every request so
+  // Free, downgraded, or unverifiable owners fail before payload processing.
+  const liveSensorAccess = await requireLiveSensorEntitlement(
+    admin,
+    auth.userId,
+    deps.expectedBillingEnvironment ?? resolveServerBillingEnvironment(),
+    requestNow,
+  );
+  if (!liveSensorAccess.ok) {
+    const status = liveSensorAccess.reason === "entitlement_lookup_failed" ? 503 : 403;
+    return json({ error: liveSensorAccess.reason }, status);
+  }
 
   // The authenticated bridge token is the only tent-routing authority.
   // Query parameters, headers, and payload fields cannot widen this scope.

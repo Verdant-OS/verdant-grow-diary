@@ -16,7 +16,9 @@ const root = resolve(process.argv[2] ?? "test-results");
 if (!existsSync(root)) {
   console.error(`Input path not found: ${root}`);
   console.error("Pass a path explicitly, e.g.:");
-  console.error("  node scripts/summarize-demo-proof-playwright-results.mjs .artifacts/demo-proof-playwright-results");
+  console.error(
+    "  node scripts/summarize-demo-proof-playwright-results.mjs .artifacts/demo-proof-playwright-results",
+  );
   process.exit(2);
 }
 

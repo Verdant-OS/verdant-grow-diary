@@ -62,7 +62,11 @@ function pushIssue(issues, ctx, message) {
 function requireField(obj, field, ctx, issues) {
   const v = obj?.[field];
   if (v === undefined || v === null || (typeof v === "string" && !v.trim())) {
-    pushIssue(issues, { ...ctx, path: `${ctx.path}.${field}` }, `missing required field "${field}"`);
+    pushIssue(
+      issues,
+      { ...ctx, path: `${ctx.path}.${field}` },
+      `missing required field "${field}"`,
+    );
     return false;
   }
   return true;
@@ -104,7 +108,11 @@ function scanForForbiddenPrimitives(node, ctx, issues, path = ctx.path) {
 const validators = {
   FAQPage(obj, ctx, issues, warnings) {
     if (!Array.isArray(obj.mainEntity) || obj.mainEntity.length === 0) {
-      pushIssue(issues, { ...ctx, path: `${ctx.path}.mainEntity` }, "FAQPage.mainEntity must be a non-empty array");
+      pushIssue(
+        issues,
+        { ...ctx, path: `${ctx.path}.mainEntity` },
+        "FAQPage.mainEntity must be a non-empty array",
+      );
       return;
     }
     obj.mainEntity.forEach((q, i) => {
@@ -115,10 +123,18 @@ const validators = {
       requireField(q, "name", qctx, issues);
       const ans = q?.acceptedAnswer;
       if (!isPlainObject(ans)) {
-        pushIssue(issues, { ...qctx, path: `${qctx.path}.acceptedAnswer` }, "missing acceptedAnswer object");
+        pushIssue(
+          issues,
+          { ...qctx, path: `${qctx.path}.acceptedAnswer` },
+          "missing acceptedAnswer object",
+        );
       } else {
         if (ans["@type"] !== "Answer") {
-          pushIssue(issues, { ...qctx, path: `${qctx.path}.acceptedAnswer.@type` }, 'acceptedAnswer.@type must be "Answer"');
+          pushIssue(
+            issues,
+            { ...qctx, path: `${qctx.path}.acceptedAnswer.@type` },
+            'acceptedAnswer.@type must be "Answer"',
+          );
         }
         requireField(ans, "text", { ...qctx, path: `${qctx.path}.acceptedAnswer` }, issues);
       }
@@ -129,15 +145,27 @@ const validators = {
     requireAbsoluteUrl(obj, "url", ctx, issues);
     if (requireField(obj, "datePublished", ctx, issues)) {
       if (!ISO_DATE.test(String(obj.datePublished))) {
-        pushIssue(issues, { ...ctx, path: `${ctx.path}.datePublished` }, `datePublished must be ISO-8601 (got ${JSON.stringify(obj.datePublished)})`);
+        pushIssue(
+          issues,
+          { ...ctx, path: `${ctx.path}.datePublished` },
+          `datePublished must be ISO-8601 (got ${JSON.stringify(obj.datePublished)})`,
+        );
       }
     }
     if (obj.dateModified !== undefined && !ISO_DATE.test(String(obj.dateModified))) {
-      pushIssue(issues, { ...ctx, path: `${ctx.path}.dateModified` }, `dateModified must be ISO-8601 (got ${JSON.stringify(obj.dateModified)})`);
+      pushIssue(
+        issues,
+        { ...ctx, path: `${ctx.path}.dateModified` },
+        `dateModified must be ISO-8601 (got ${JSON.stringify(obj.dateModified)})`,
+      );
     }
     const author = obj.author;
     if (!isPlainObject(author) && !Array.isArray(author)) {
-      pushIssue(issues, { ...ctx, path: `${ctx.path}.author` }, "Article.author is required (Person or Organization object)");
+      pushIssue(
+        issues,
+        { ...ctx, path: `${ctx.path}.author` },
+        "Article.author is required (Person or Organization object)",
+      );
     } else {
       const authors = Array.isArray(author) ? author : [author];
       authors.forEach((a, i) => {
@@ -145,21 +173,37 @@ const validators = {
         if (!isPlainObject(a) || !a["@type"]) {
           pushIssue(issues, actx, "author entry must be an object with @type");
         } else if (!["Person", "Organization"].includes(a["@type"])) {
-          pushIssue(issues, { ...actx, path: `${actx.path}.@type` }, `author.@type must be "Person" or "Organization" (got ${JSON.stringify(a["@type"])})`);
+          pushIssue(
+            issues,
+            { ...actx, path: `${actx.path}.@type` },
+            `author.@type must be "Person" or "Organization" (got ${JSON.stringify(a["@type"])})`,
+          );
         }
         requireField(a ?? {}, "name", actx, issues);
       });
     }
     if (obj.image === undefined) {
-      warnings.push({ ...ctx, path: `${ctx.path}.image`, message: "Article.image is recommended by Google Rich Results" });
+      warnings.push({
+        ...ctx,
+        path: `${ctx.path}.image`,
+        message: "Article.image is recommended by Google Rich Results",
+      });
     }
     if (obj.dateModified === undefined) {
-      warnings.push({ ...ctx, path: `${ctx.path}.dateModified`, message: "Article.dateModified is recommended" });
+      warnings.push({
+        ...ctx,
+        path: `${ctx.path}.dateModified`,
+        message: "Article.dateModified is recommended",
+      });
     }
   },
   BreadcrumbList(obj, ctx, issues) {
     if (!Array.isArray(obj.itemListElement) || obj.itemListElement.length === 0) {
-      pushIssue(issues, { ...ctx, path: `${ctx.path}.itemListElement` }, "BreadcrumbList.itemListElement must be a non-empty array");
+      pushIssue(
+        issues,
+        { ...ctx, path: `${ctx.path}.itemListElement` },
+        "BreadcrumbList.itemListElement must be a non-empty array",
+      );
       return;
     }
     obj.itemListElement.forEach((it, i) => {
@@ -168,7 +212,11 @@ const validators = {
         pushIssue(issues, { ...ictx, path: `${ictx.path}.@type` }, '@type must be "ListItem"');
       }
       if (typeof it?.position !== "number" || it.position !== i + 1) {
-        pushIssue(issues, { ...ictx, path: `${ictx.path}.position` }, `position must be ${i + 1} (got ${JSON.stringify(it?.position)})`);
+        pushIssue(
+          issues,
+          { ...ictx, path: `${ictx.path}.position` },
+          `position must be ${i + 1} (got ${JSON.stringify(it?.position)})`,
+        );
       }
       requireField(it, "name", ictx, issues);
       requireAbsoluteUrl(it, "item", ictx, issues);
@@ -181,7 +229,8 @@ const validators = {
       warnings.push({
         ...ctx,
         path: `${ctx.path}`,
-        message: "SoftwareApplication is not eligible for Google's rich result without offers or aggregateRating (intentional for Verdant — no fake reviews)",
+        message:
+          "SoftwareApplication is not eligible for Google's rich result without offers or aggregateRating (intentional for Verdant — no fake reviews)",
       });
     }
   },
@@ -223,15 +272,27 @@ export function validateJsonLdObject(obj, ctx = { file: "<inline>", index: 0, pa
   const contexts = Array.isArray(context) ? context : [context];
   const contextOk = contexts.some((c) => typeof c === "string" && REQUIRED_CONTEXT.test(c));
   if (!contextOk) {
-    pushIssue(issues, { ...ctx, path: `${ctx.path}.@context` }, `@context must include https://schema.org (got ${JSON.stringify(context)})`);
+    pushIssue(
+      issues,
+      { ...ctx, path: `${ctx.path}.@context` },
+      `@context must include https://schema.org (got ${JSON.stringify(context)})`,
+    );
   }
   const type = obj["@type"];
   if (!type || typeof type !== "string") {
-    pushIssue(issues, { ...ctx, path: `${ctx.path}.@type` }, `@type is required and must be a string (got ${JSON.stringify(type)})`);
+    pushIssue(
+      issues,
+      { ...ctx, path: `${ctx.path}.@type` },
+      `@type is required and must be a string (got ${JSON.stringify(type)})`,
+    );
     return { issues, warnings };
   }
   if (!KNOWN_TYPES.has(type)) {
-    pushIssue(issues, { ...ctx, path: `${ctx.path}.@type` }, `@type "${type}" is not one of the known types this project ships (${[...KNOWN_TYPES].join(", ")})`);
+    pushIssue(
+      issues,
+      { ...ctx, path: `${ctx.path}.@type` },
+      `@type "${type}" is not one of the known types this project ships (${[...KNOWN_TYPES].join(", ")})`,
+    );
     return { issues, warnings };
   }
   scanForForbiddenPrimitives(obj, ctx, issues);
@@ -260,14 +321,18 @@ export function validateHtmlDocument(html, file) {
     const ctx = { file, index: i, path: "$" };
     const trimmed = block.raw.trim();
     if (!trimmed) {
-      pushIssue(issues, ctx, "empty <script type=\"application/ld+json\"> block");
+      pushIssue(issues, ctx, 'empty <script type="application/ld+json"> block');
       return;
     }
     // Detect a raw `</script` sequence inside the payload — must be escaped.
     // We check the pre-parse raw text since parsing would already have failed
     // if a real </script broke the outer element.
     if (/<\/script/i.test(trimmed)) {
-      pushIssue(issues, ctx, 'unescaped "</script" inside JSON-LD payload (use safeJsonLdStringify)');
+      pushIssue(
+        issues,
+        ctx,
+        'unescaped "</script" inside JSON-LD payload (use safeJsonLdStringify)',
+      );
     }
     let parsed;
     try {
@@ -284,14 +349,16 @@ export function validateHtmlDocument(html, file) {
     nodes.forEach((node, ni) => {
       const nctx = { ...ctx, path: isGraph ? `$.@graph[${ni}]` : "$" };
       const nodeForValidation =
-        isGraph && isPlainObject(node) && node["@context"] === undefined && inheritedContext !== undefined
+        isGraph &&
+        isPlainObject(node) &&
+        node["@context"] === undefined &&
+        inheritedContext !== undefined
           ? { "@context": inheritedContext, ...node }
           : node;
       const res = validateJsonLdObject(nodeForValidation, nctx);
       issues.push(...res.issues);
       warnings.push(...res.warnings);
     });
-
   });
   return { issues, warnings, blockCount: blocks.length };
 }

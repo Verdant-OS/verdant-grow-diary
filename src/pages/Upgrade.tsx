@@ -18,7 +18,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "@/lib/react-router-compat";
 import { toast } from "sonner";
 
 import { Check, Loader2, X } from "lucide-react";

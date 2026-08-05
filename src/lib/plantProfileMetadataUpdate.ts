@@ -48,10 +48,7 @@ export async function updatePlantProfileMetadata(
     throw new Error("updatePlantProfileMetadata: plantId is required");
   }
   const payload = buildPlantProfileMetadataPayload(draft);
-  const { error } = await supabase
-    .from("plants")
-    .update(payload)
-    .eq("id", plantId);
+  const { error } = await supabase.from("plants").update(payload).eq("id", plantId);
   if (error) {
     throw new Error(`updatePlantProfileMetadata: ${error.message}`);
   }

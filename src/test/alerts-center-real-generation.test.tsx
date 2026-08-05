@@ -22,13 +22,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 
 import Alerts from "@/pages/Alerts";
-import {
-  buildEnvironmentAlerts,
-  type EnvironmentAlert,
-} from "@/lib/environmentAlerts";
+import { buildEnvironmentAlerts, type EnvironmentAlert } from "@/lib/environmentAlerts";
 import {
   isSnapshotPersistable,
   selectPersistableAlerts,
@@ -39,10 +36,7 @@ import { compareSnapshotToTargets } from "@/lib/environmentTargetComparison";
 import { evaluateSensorQuality } from "@/lib/sensorQuality";
 
 const ROOT = resolve(__dirname, "../..");
-const ALERTS_PAGE = readFileSync(
-  resolve(ROOT, "src/pages/Alerts.tsx"),
-  "utf8",
-);
+const ALERTS_PAGE = readFileSync(resolve(ROOT, "src/pages/Alerts.tsx"), "utf8");
 const PERSIST_GATE = readFileSync(
   resolve(ROOT, "src/components/AlertsAutoPersistForGrow.tsx"),
   "utf8",
@@ -167,9 +161,7 @@ describe("alert persistence — source-truth guards", () => {
   });
 
   it("never persists when there is no snapshot", () => {
-    expect(
-      isSnapshotPersistable({ snapshot: null, quality: "unavailable" }),
-    ).toBe(false);
+    expect(isSnapshotPersistable({ snapshot: null, quality: "unavailable" })).toBe(false);
   });
 
   it("dedupes a derived alert against an existing open row for the same rule/scope", () => {
@@ -187,9 +179,7 @@ describe("alert persistence — source-truth guards", () => {
       source: "environment_alerts",
       title: "Humidity above target",
     };
-    expect(derivedAlertKey(alert)).toBe(
-      `environment_alerts::rh::humidity above target`,
-    );
+    expect(derivedAlertKey(alert)).toBe(`environment_alerts::rh::humidity above target`);
     expect(dedupeAgainstOpen([alert], [openRow]).length).toBe(0);
     expect(dedupeAgainstOpen([alert], []).length).toBe(1);
   });
@@ -201,9 +191,7 @@ describe("alert persistence — source-truth guards", () => {
 const listAlertsMock = vi.fn();
 
 vi.mock("@/lib/alerts", async () => {
-  const actual = await vi.importActual<typeof import("@/lib/alerts")>(
-    "@/lib/alerts",
-  );
+  const actual = await vi.importActual<typeof import("@/lib/alerts")>("@/lib/alerts");
   return {
     ...actual,
     listAlerts: (...args: unknown[]) => listAlertsMock(...args),
@@ -221,7 +209,13 @@ vi.mock("@/integrations/supabase/client", () => {
     eq: () => chain,
     in: () => chain,
     order: () => chain,
-    limit: () => Promise.resolve({ data: [], error: null }),
+    limit: () => {
+      const __c: any = {
+        abortSignal: () => __c,
+        then: (r: any, j?: any) => Promise.resolve({ data: [], error: null }).then(r, j),
+      };
+      return __c;
+    },
     then: (resolve: (r: { data: unknown; error: null }) => unknown) =>
       resolve({ data: [], error: null }),
   };
@@ -235,7 +229,9 @@ vi.mock("@/hooks/useAlertsLinkedActionCounts", () => ({
   useAlertsLinkedActionCounts: () => ({ get: () => undefined }),
 }));
 vi.mock("@/hooks/useGrowData", () => ({
-  useGrowTents: () => ({ data: [] }),
+  // Settled empty tent read: persistence gates on `isFetched` so a pending
+  // tent query can never persist against the grow row's stage alone.
+  useGrowTents: () => ({ data: [], isFetched: true }),
 }));
 vi.mock("@/hooks/useLatestSensorSnapshot", () => ({
   useLatestSensorSnapshot: () => ({ status: "loading" }),
@@ -277,13 +273,9 @@ describe("Alerts page — empty state + auto-persist wiring", () => {
         <Alerts />
       </MemoryRouter>,
     );
-    await waitFor(() =>
-      expect(screen.getByText("No open alerts.")).toBeTruthy(),
-    );
+    await waitFor(() => expect(screen.getByText("No open alerts.")).toBeTruthy());
     expect(
-      screen.getByText(
-        /Check targets or enter a fresh manual snapshot if you expected one\./,
-      ),
+      screen.getByText(/Check targets or enter a fresh manual snapshot if you expected one\./),
     ).toBeTruthy();
   });
 
@@ -295,10 +287,10 @@ describe("Alerts page — empty state + auto-persist wiring", () => {
       </MemoryRouter>,
     );
     await waitFor(() => expect(persistMock).toHaveBeenCalled());
-    const calls = persistMock.mock.calls.map((c) => c[0] as { growId: string | null; enabled: boolean });
-    expect(calls.some((c) => c.growId === "g1" && c.enabled === true)).toBe(
-      true,
+    const calls = persistMock.mock.calls.map(
+      (c) => c[0] as { growId: string | null; enabled: boolean },
     );
+    expect(calls.some((c) => c.growId === "g1" && c.enabled === true)).toBe(true);
   });
 });
 
@@ -316,9 +308,7 @@ describe("Alerts page + persist gate — static safety", () => {
 
   it("Alerts page contains no service_role / device-control strings / autopilot", () => {
     expect(ALERTS_PAGE).not.toMatch(/service_role/);
-    expect(ALERTS_PAGE).not.toMatch(
-      /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|relay|actuator/i,
-    );
+    expect(ALERTS_PAGE).not.toMatch(/mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|relay|actuator/i);
     expect(ALERTS_PAGE).not.toMatch(/_executed\b/);
     expect(ALERTS_PAGE).not.toMatch(/autopilot/i);
   });
@@ -329,9 +319,7 @@ describe("Alerts page + persist gate — static safety", () => {
     expect(PERSIST_GATE).not.toMatch(/user_id\s*:/);
     expect(PERSIST_GATE).not.toMatch(/_executed\b/);
     expect(PERSIST_GATE).not.toMatch(/autopilot/i);
-    expect(PERSIST_GATE).not.toMatch(
-      /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|relay|actuator/i,
-    );
+    expect(PERSIST_GATE).not.toMatch(/mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|relay|actuator/i);
   });
 
   it("persist hook does not automatically create Action Queue items", () => {

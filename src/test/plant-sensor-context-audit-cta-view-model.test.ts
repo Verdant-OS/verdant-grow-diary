@@ -60,24 +60,72 @@ describe("buildPlantSensorContextAuditCta", () => {
     ).toBe("none");
   });
 
-  it("missing but no handler → inert fallback", () => {
+  it("complete identity but no handler routes to the real Plant Detail Quick Log surface", () => {
     const v = buildPlantSensorContextAuditCta({
       status: "missing",
       identity: ID,
       hasOpenHandler: false,
     });
-    expect(v.kind).toBe("inert");
-    expect(v.inertMessage).toMatch(/not wired here yet/);
+    expect(v.kind).toBe("recovery");
+    expect(v.label).toBe("Open plant Quick Log");
+    expect(v.recoveryMessage).toMatch(/plant overview.*Quick Log/i);
+    expect(v.recoveryHref).toBe("/plants/p1#plant-overview");
     expect(v.prefill).toBeNull();
   });
 
-  it("missing but no identity → inert fallback", () => {
+  it("null identity routes to the real plant picker without claiming a sensor action ran", () => {
     const v = buildPlantSensorContextAuditCta({
       status: "missing",
       identity: null,
       hasOpenHandler: true,
     });
-    expect(v.kind).toBe("inert");
+    expect(v.kind).toBe("recovery");
+    expect(v.label).toBe("Choose a plant");
+    expect(v.recoveryMessage).toMatch(/Choose a plant before adding/i);
+    expect(v.recoveryHref).toBe("/plants");
+    expect(v.prefill).toBeNull();
+  });
+
+  it("missing grow assignment routes to Grows before offering a sensor entry", () => {
+    const v = buildPlantSensorContextAuditCta({
+      status: "missing",
+      identity: { ...ID, growId: null, tentId: null },
+      hasOpenHandler: true,
+    });
+    expect(v).toMatchObject({
+      kind: "recovery",
+      label: "Review grow setup",
+      recoveryHref: "/grows",
+      prefill: null,
+    });
+    expect(v.recoveryMessage).toMatch(/grow assignment/i);
+  });
+
+  it("missing tent assignment routes to the existing Plant Detail assignment control", () => {
+    const v = buildPlantSensorContextAuditCta({
+      status: "missing",
+      identity: { ...ID, tentId: null },
+      hasOpenHandler: true,
+    });
+    expect(v).toMatchObject({
+      kind: "recovery",
+      label: "Assign plant to a tent",
+      recoveryHref: "/plants/p1#plant-overview",
+      prefill: null,
+    });
+    expect(v.recoveryMessage).toMatch(/Assign this plant to a tent/i);
+  });
+
+  it("stale context with a missing tent stays degraded and uses assignment recovery", () => {
+    const v = buildPlantSensorContextAuditCta({
+      status: "stale",
+      identity: { ...ID, tentId: null },
+      hasOpenHandler: true,
+    });
+    expect(v.kind).toBe("recovery");
+    expect(v.recoveryHref).toBe("/plants/p1#plant-overview");
+    expect(v.recoveryMessage).toMatch(/fresh manual sensor snapshot/i);
+    expect(v.recoveryMessage).not.toMatch(/\bhealthy\b|\blive\b/i);
     expect(v.prefill).toBeNull();
   });
 });

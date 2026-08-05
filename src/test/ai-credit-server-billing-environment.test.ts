@@ -10,9 +10,11 @@ const EXPAND = read(
 const CONTRACT = read(
   "supabase/contract-migrations/ai_credit_server_billing_environment_contract.sql",
 );
+const PORTABILITY = read("supabase/migrations/20260728090736_ai_credit_pack_portability.sql");
 const DOCTOR = read("supabase/functions/ai-doctor-review/index.ts");
 const COACH = read("supabase/functions/ai-coach/index.ts");
 const HARNESS = read("scripts/run-ai-credits-rls-harness.ts");
+const PORTABILITY_HARNESS = read("scripts/run-ai-credit-pack-portability-harness.ts");
 
 function executableSource(source: string): string {
   return source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
@@ -37,7 +39,7 @@ describe("AI credit server billing-environment boundary", () => {
     );
   });
 
-  it("keeps legacy grants during expand and retires them only in the isolated contract template", () => {
+  it("keeps legacy grants during expand and retires them in the contract template and hardened forward path", () => {
     for (const role of ["PUBLIC", "anon", "authenticated", "service_role"]) {
       const spendRevoke = `REVOKE ALL ON FUNCTION public.ai_credit_spend(text, uuid, text, text, jsonb) FROM ${role}`;
       const refundRevoke = `REVOKE ALL ON FUNCTION public.ai_credit_refund(uuid, text, text) FROM ${role}`;
@@ -45,6 +47,8 @@ describe("AI credit server billing-environment boundary", () => {
       expect(EXPAND).not.toContain(refundRevoke);
       expect(CONTRACT).toContain(spendRevoke);
       expect(CONTRACT).toContain(refundRevoke);
+      expect(PORTABILITY).toContain(spendRevoke);
+      expect(PORTABILITY).toContain(refundRevoke);
     }
     expect(EXPAND).toContain("EXPAND STAGE ONLY");
     expect(CONTRACT).toContain("NOT AUTO-APPLIED");
@@ -56,16 +60,10 @@ describe("AI credit server billing-environment boundary", () => {
         name.includes("ai_credit_server_billing_environment_contract"),
       ),
     ).toBe(false);
-    const pendingAiCreditSql = automaticMigrations
-      .filter((name) => name >= "20260718160000" && name.endsWith(".sql"))
-      .map((name) => read(`supabase/migrations/${name}`))
-      .join("\n");
-    expect(pendingAiCreditSql).not.toContain(
-      "REVOKE ALL ON FUNCTION public.ai_credit_spend(text, uuid, text, text, jsonb)",
+    expect(PORTABILITY).toContain(
+      "to_regprocedure('public.ai_credit_spend(text,uuid,text,text,jsonb)')",
     );
-    expect(pendingAiCreditSql).not.toContain(
-      "REVOKE ALL ON FUNCTION public.ai_credit_refund(uuid, text, text)",
-    );
+    expect(PORTABILITY).toContain("to_regprocedure('public.ai_credit_refund(uuid,text,text)')");
     expect(HARNESS).toContain('process.env.AI_CREDIT_ROLLOUT_PHASE ?? "contract"');
     expect(HARNESS).toContain("if (isContractPhase)");
     expect(HARNESS).toContain(
@@ -73,6 +71,12 @@ describe("AI credit server billing-environment boundary", () => {
     );
     expect(HARNESS).toContain(
       "expand: legacy authenticated refund remains available for rollback safety",
+    );
+    expect(PORTABILITY_HARNESS).toContain(
+      "${role} cannot execute the legacy AI-credit spend overload",
+    );
+    expect(PORTABILITY_HARNESS).toContain(
+      "${role} cannot execute the legacy AI-credit refund overload",
     );
   });
 
@@ -194,7 +198,8 @@ describe("AI credit server billing-environment boundary", () => {
       expect(code).not.toMatch(/(?:body|requestBody)\.user_?[Ii]d/);
       expect(code).not.toMatch(/(?:body|requestBody)\.(?:modelTier|model_tier|weight|plan)/);
       expect(code).not.toMatch(/creditSupabase\s*\.from\(/);
-      expect(code).toContain("isMissingAiCreditRpcOverload(");
+      expect(code).not.toContain("isMissingAiCreditRpcOverload(");
+      expect(code).not.toMatch(/supabase\.rpc\(\s*["']ai_credit_(?:spend|refund)["']/);
 
       const jwtIndex = code.indexOf("await supabase.auth.getUser()");
       const spendIndex = code.indexOf('creditSupabase.rpc("ai_credit_spend"');

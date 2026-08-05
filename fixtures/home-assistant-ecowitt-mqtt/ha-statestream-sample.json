@@ -1,0 +1,30 @@
+{
+  "note": "HA MQTT Statestream real wire format: individual sibling topics per entity (state, last_updated, last_changed, and one topic per attribute such as unit_of_measurement / device_class). No wire-level /attributes JSON-blob topic exists and none is required by the adapter.",
+  "prefix": "homeassistant",
+  "parts": [
+    {
+      "topic": "homeassistant/sensor/ecowitt_gw1200_outdoor_temperature/state",
+      "payload": "78.6",
+      "retained": false,
+      "receivedAt": "2026-07-22T18:00:01.000Z"
+    },
+    {
+      "topic": "homeassistant/sensor/ecowitt_gw1200_outdoor_temperature/last_updated",
+      "payload": "\"2026-07-22T18:00:00.000Z\"",
+      "retained": false,
+      "receivedAt": "2026-07-22T18:00:01.005Z"
+    },
+    {
+      "topic": "homeassistant/sensor/ecowitt_gw1200_outdoor_temperature/unit_of_measurement",
+      "payload": "°F",
+      "retained": false,
+      "receivedAt": "2026-07-22T18:00:01.010Z"
+    },
+    {
+      "topic": "homeassistant/sensor/ecowitt_gw1200_outdoor_temperature/device_class",
+      "payload": "temperature",
+      "retained": false,
+      "receivedAt": "2026-07-22T18:00:01.015Z"
+    }
+  ]
+}

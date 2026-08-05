@@ -8,8 +8,7 @@
  */
 
 const runbookPath = "docs/ecowitt-live-soil-bridge.md";
-const canonicalDryRunCommand =
-  "bun run scripts/ecowitt-live-soil-bridge.ts --dry-run --once";
+const canonicalDryRunCommand = "bun run scripts/ecowitt-live-soil-bridge.ts --dry-run --once";
 
 const checklist = [
   "Verdant - Ecowitt PC dry-run checklist",
@@ -64,5 +63,4 @@ const checklist = [
   "- Bad, stale, invalid, or unknown telemetry is never treated as healthy live context.",
 ].join("\n");
 
-// eslint-disable-next-line no-console
 console.log(checklist);

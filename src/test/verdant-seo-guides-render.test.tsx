@@ -8,48 +8,59 @@
  *
  * No Supabase, no network, no AI, no device control.
  */
-import { describe, it, expect, afterEach } from "vitest";
+import { createElement } from "react";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, screen, cleanup, waitFor, fireEvent } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
 import GuidesIndex from "@/pages/GuidesIndex";
 import GuidePage from "@/pages/GuidePage";
 import { VERDANT_SEO_GUIDES } from "@/constants/verdantSeoContent";
 
+const routeState = vi.hoisted(() => ({ slug: "", hash: "" }));
+
+vi.mock("@/lib/react-router-compat", () => ({
+  Link: ({ to, children, ...props }: { to: string; children?: React.ReactNode }) =>
+    createElement("a", { href: to, ...props }, children),
+  Navigate: ({ to }: { to: string }) => createElement("span", { "data-redirect-to": to }),
+  useLocation: () => ({ hash: routeState.hash }),
+  useParams: () => ({ slug: routeState.slug }),
+}));
+
+vi.mock("@/components/DiaryFaqLinkStatsPanel", () => ({ default: () => null }));
+vi.mock("@/components/customer/CustomerComparisonGuideQrOption", () => ({
+  default: () => null,
+}));
+
 afterEach(() => {
   cleanup();
   // Clean up any JSON-LD scripts injected by useEffect.
-  document
-    .querySelectorAll('script[type="application/ld+json"]')
-    .forEach((el) => el.remove());
+  document.querySelectorAll('script[type="application/ld+json"]').forEach((el) => el.remove());
   const canonical = document.head.querySelector('link[rel="canonical"]');
   if (canonical) canonical.remove();
 });
 
 function renderAt(path: string) {
-  return render(
-    <MemoryRouter initialEntries={[path]}>
-      <Routes>
-        <Route path="/guides" element={<GuidesIndex />} />
-        <Route path="/guides/:slug" element={<GuidePage />} />
-      </Routes>
-    </MemoryRouter>,
-  );
+  const [pathname, hash = ""] = path.split("#", 2);
+  routeState.slug = pathname.startsWith("/guides/") ? pathname.slice("/guides/".length) : "";
+  routeState.hash = hash ? `#${hash}` : "";
+  return render(pathname === "/guides" ? <GuidesIndex /> : <GuidePage />);
 }
 
 function readMeta(selector: string): string | null {
-  return (
-    document.head.querySelector<HTMLMetaElement>(selector)?.getAttribute(
-      "content",
-    ) ?? null
-  );
+  return document.head.querySelector<HTMLMetaElement>(selector)?.getAttribute("content") ?? null;
 }
 
 function readJsonLd(marker: string): unknown {
-  const el = document.head.querySelector<HTMLScriptElement>(
-    `script[data-page-ldjson="${marker}"]`,
-  );
+  const el = document.head.querySelector<HTMLScriptElement>(`script[data-page-ldjson="${marker}"]`);
   if (!el || !el.textContent) return null;
   return JSON.parse(el.textContent);
+}
+
+function appendStaticRouteJsonLd(data: unknown) {
+  const script = document.createElement("script");
+  script.type = "application/ld+json";
+  script.setAttribute("data-static-route-ldjson", "true");
+  script.text = JSON.stringify(data);
+  document.head.appendChild(script);
 }
 
 describe("/guides hub — public render", () => {
@@ -64,25 +75,17 @@ describe("/guides hub — public render", () => {
   it("emits canonical, title, description, OG and Twitter metadata", () => {
     renderAt("/guides");
     expect(document.title).toContain("Grower Guides");
-    expect(readMeta('meta[name="description"]')).toMatch(
-      /source-labeled sensor data/i,
-    );
+    expect(readMeta('meta[name="description"]')).toMatch(/source-labeled sensor data/i);
     const canonical = document.head
       .querySelector<HTMLLinkElement>('link[rel="canonical"]')
       ?.getAttribute("href");
     expect(canonical).toBe("https://verdantgrowdiary.com/guides");
-    expect(readMeta('meta[property="og:url"]')).toBe(
-      "https://verdantgrowdiary.com/guides",
-    );
-    expect(readMeta('meta[property="og:title"]')).toContain(
-      "Grower Guides",
-    );
+    expect(readMeta('meta[property="og:url"]')).toBe("https://verdantgrowdiary.com/guides");
+    expect(readMeta('meta[property="og:title"]')).toContain("Grower Guides");
     expect(readMeta('meta[property="og:description"]')).toBeTruthy();
     expect(readMeta('meta[property="og:type"]')).toBe("website");
     expect(readMeta('meta[name="twitter:card"]')).toBe("summary_large_image");
-    expect(readMeta('meta[name="twitter:title"]')).toContain(
-      "Grower Guides",
-    );
+    expect(readMeta('meta[name="twitter:title"]')).toContain("Grower Guides");
   });
 
   it("injects FAQPage + BreadcrumbList JSON-LD", () => {
@@ -101,16 +104,14 @@ describe("/guides hub — public render", () => {
     expect(crumbs?.["@type"]).toBe("BreadcrumbList");
     expect(crumbs?.itemListElement.length).toBe(2);
     expect(crumbs?.itemListElement[0].position).toBe(1);
-    expect(crumbs?.itemListElement[1].item).toBe(
-      "https://verdantgrowdiary.com/guides",
-    );
+    expect(crumbs?.itemListElement[1].item).toBe("https://verdantgrowdiary.com/guides");
   });
 
   it("does not link to protected/auth-only app routes", () => {
     renderAt("/guides");
-    const hrefs = Array.from(
-      document.querySelectorAll<HTMLAnchorElement>("a[href]"),
-    ).map((a) => a.getAttribute("href") ?? "");
+    const hrefs = Array.from(document.querySelectorAll<HTMLAnchorElement>("a[href]")).map(
+      (a) => a.getAttribute("href") ?? "",
+    );
     for (const forbidden of [
       "/dashboard",
       "/diary",
@@ -125,6 +126,18 @@ describe("/guides hub — public render", () => {
       expect(hrefs.some((h) => h.startsWith(forbidden))).toBe(false);
     }
   });
+
+  it("surfaces both lighting decisions from the guide hub", () => {
+    renderAt("/guides");
+    expect(screen.getByRole("link", { name: /grow-light distance and schedule/i })).toHaveAttribute(
+      "href",
+      "/guides/cannabis-grow-light-distance-and-schedule",
+    );
+    expect(screen.getByRole("link", { name: /light-stress troubleshooting/i })).toHaveAttribute(
+      "href",
+      "/guides/cannabis-light-stress-light-burn-bleaching-or-heat",
+    );
+  });
 });
 
 describe("/guides/:slug detail — public render", () => {
@@ -132,17 +145,13 @@ describe("/guides/:slug detail — public render", () => {
     renderAt("/guides/grow-diary-app");
     const page = screen.getByTestId("guide-page");
     expect(page.getAttribute("data-guide-slug")).toBe("grow-diary-app");
-    expect(
-      screen.getByText(/Best grow diary app for serious growers/i),
-    ).toBeTruthy();
+    expect(screen.getByText(/Best grow diary app for serious growers/i)).toBeTruthy();
   });
 
   it("emits unique canonical + OG url per guide", () => {
     for (const g of VERDANT_SEO_GUIDES) {
       cleanup();
-      document
-        .querySelectorAll('script[type="application/ld+json"]')
-        .forEach((el) => el.remove());
+      document.querySelectorAll('script[type="application/ld+json"]').forEach((el) => el.remove());
       const prevCanon = document.head.querySelector('link[rel="canonical"]');
       if (prevCanon) prevCanon.remove();
 
@@ -158,9 +167,7 @@ describe("/guides/:slug detail — public render", () => {
       expect(readMeta('meta[property="og:title"]')).toBe(g.title);
       expect(readMeta('meta[property="og:description"]')).toBe(g.description);
       expect(readMeta('meta[name="twitter:title"]')).toBe(g.title);
-      expect(readMeta('meta[name="twitter:card"]')).toBe(
-        "summary_large_image",
-      );
+      expect(readMeta('meta[name="twitter:card"]')).toBe("summary_large_image");
 
       const crumbs = readJsonLd(`guide-${g.slug}-breadcrumb`) as {
         itemListElement: Array<{ position: number; item: string; name: string }>;
@@ -175,6 +182,86 @@ describe("/guides/:slug detail — public render", () => {
     renderAt("/guides/grow-diary-app");
     // FAQ heading is present.
     expect(screen.getByText(/Common questions/i)).toBeTruthy();
+  });
+
+  it("renders lighting sources, scope notes, provenance, and truthful Article dates", () => {
+    renderAt("/guides/cannabis-grow-light-distance-and-schedule");
+
+    expect(screen.getByTestId("guide-editorial-provenance")).toHaveTextContent(
+      /Published 2026-07-30.*Reviewed 2026-07-30/i,
+    );
+    expect(screen.getByTestId("guide-sources")).toHaveTextContent(/Evidence and scope/i);
+    expect(screen.getAllByRole("link", { name: /et al\./i }).length).toBeGreaterThanOrEqual(3);
+
+    const article = readJsonLd("guide-cannabis-grow-light-distance-and-schedule-article") as {
+      datePublished?: string;
+      dateModified?: string;
+    } | null;
+    expect(article?.datePublished).toBe("2026-07-30");
+    expect(article?.dateModified).toBe("2026-07-30");
+  });
+
+  it("replaces static route JSON-LD with one current guide-owned set across hydration and navigation", async () => {
+    const distance = VERDANT_SEO_GUIDES.find(
+      (guide) => guide.slug === "cannabis-grow-light-distance-and-schedule",
+    )!;
+    const stress = VERDANT_SEO_GUIDES.find(
+      (guide) => guide.slug === "cannabis-light-stress-light-burn-bleaching-or-heat",
+    )!;
+    const staleUrl = "https://verdantgrowdiary.com/guides/stale-static-route";
+    for (const type of ["WebPage", "FAQPage", "BreadcrumbList", "Article"]) {
+      appendStaticRouteJsonLd({ "@context": "https://schema.org", "@type": type, url: staleUrl });
+    }
+
+    const rendered = renderAt(`/guides/${distance.slug}`);
+
+    await waitFor(() => {
+      expect(document.head.querySelectorAll("script[data-static-route-ldjson]")).toHaveLength(0);
+      expect(
+        document.head.querySelectorAll(`script[data-page-ldjson^="guide-${distance.slug}-"]`),
+      ).toHaveLength(4);
+    });
+    expect((readJsonLd(`guide-${distance.slug}-webpage`) as { url: string }).url).toBe(
+      `https://verdantgrowdiary.com/guides/${distance.slug}`,
+    );
+    expect(document.head.textContent).not.toContain(staleUrl);
+
+    const crossGuideLink = document.querySelector<HTMLAnchorElement>(
+      `a[href="/guides/${stress.slug}"]`,
+    );
+    expect(crossGuideLink).toBeTruthy();
+    routeState.slug = stress.slug;
+    routeState.hash = "";
+    rendered.rerender(<GuidePage />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("guide-page")).toHaveAttribute("data-guide-slug", stress.slug);
+      expect(
+        document.head.querySelectorAll(`script[data-page-ldjson^="guide-${stress.slug}-"]`),
+      ).toHaveLength(4);
+    });
+    expect(
+      document.head.querySelectorAll(`script[data-page-ldjson^="guide-${distance.slug}-"]`),
+    ).toHaveLength(0);
+    const currentUrl = `https://verdantgrowdiary.com/guides/${stress.slug}`;
+    const currentScripts = Array.from(
+      document.head.querySelectorAll<HTMLScriptElement>(
+        `script[data-page-ldjson^="guide-${stress.slug}-"]`,
+      ),
+    );
+    expect(currentScripts.map((script) => script.text).join("\n")).toContain(currentUrl);
+    expect(currentScripts.map((script) => script.text)).toHaveLength(
+      new Set(currentScripts.map((script) => script.text)).size,
+    );
+    expect(document.head.textContent).not.toContain(staleUrl);
+    expect(document.head.textContent).not.toContain(
+      `https://verdantgrowdiary.com/guides/${distance.slug}`,
+    );
+  });
+
+  it("omits Article schema when a legacy guide has no verified publication date", () => {
+    renderAt("/guides/grow-diary-app");
+    expect(readJsonLd("guide-grow-diary-app-article")).toBeNull();
   });
 
   it("moves keyboard focus to the deep-linked FAQ accordion item", async () => {
@@ -202,9 +289,7 @@ describe("/guides/:slug detail — public render", () => {
     const trigger = target?.querySelector("button");
     expect(trigger).toBeTruthy();
     fireEvent.click(trigger!);
-    await waitFor(() =>
-      expect(target).not.toHaveAttribute("data-highlighted", "true"),
-    );
+    await waitFor(() => expect(target).not.toHaveAttribute("data-highlighted", "true"));
   });
 
   it("honors prefers-reduced-motion and still highlights the deep-linked item", async () => {
@@ -219,7 +304,7 @@ describe("/guides/:slug detail — public render", () => {
         addEventListener: () => {},
         removeEventListener: () => {},
         dispatchEvent: () => false,
-      } as unknown as MediaQueryList);
+      }) as unknown as MediaQueryList;
 
     try {
       renderAt("/guides/cannabis-plant-care#faq-2");

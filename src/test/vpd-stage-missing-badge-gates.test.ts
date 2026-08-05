@@ -33,15 +33,18 @@ const SITES: { file: string; gate: RegExp }[] = [
     gate: /normalizeVpdStage\(plantStage\)\s*===\s*"unknown"/,
   },
   {
+    // Live audit #14: the Dashboard's alert/threshold stage now comes from
+    // resolveAlertContextStage (grow row + the grow's tents), so the badge
+    // gate reads the shared resolved value instead of raw grows.stage.
     file: "src/pages/Dashboard.tsx",
-    gate: /normalizeVpdStage\(scopedGrow\?\.stage\)\s*===\s*"unknown"/,
+    gate: /normalizeVpdStage\(alertContextStage\)\s*===\s*"unknown"/,
   },
 ];
 
 const FORBIDDEN = [
   "saveAlert(",
   "logAlertEvent(",
-  "from \"@/lib/alerts\"",
+  'from "@/lib/alerts"',
   "action_queue",
   "service_role",
   "device_control",
@@ -55,9 +58,7 @@ describe("VPD stage-missing badge gates", () => {
       expect(src).toContain("VpdStageMissingBadge");
       expect(src).toMatch(gate);
       // No legacy null-only gates remain.
-      expect(src).not.toMatch(
-        /VpdStageMissingBadge[\s\S]{0,400}stage\s*\)?\s*==\s*null/,
-      );
+      expect(src).not.toMatch(/VpdStageMissingBadge[\s\S]{0,400}stage\s*\)?\s*==\s*null/);
     });
 
     it(`${file} introduces no alert/queue/automation/device-control strings via this slice`, () => {
@@ -94,7 +95,9 @@ describe("normalizeVpdStage classifies adapter output correctly", () => {
   };
 
   it("badge fires when adapter receives a null stage", () => {
-    const t = mapTentRow({ ...baseTent, stage: null });
+    const t = mapTentRow({ ...baseTent, stage: null } as unknown as Parameters<
+      typeof mapTentRow
+    >[0]);
     expect(normalizeVpdStage(t.stage)).toBe("unknown");
   });
 
@@ -128,13 +131,17 @@ describe("normalizeVpdStage classifies adapter output correctly", () => {
       medium: null,
       pot_size: null,
       pheno_hunt_id: null,
+      plant_type: "unknown",
       candidate_label: null,
+      candidate_number: 0,
       created_at: "x",
       updated_at: "x",
     };
-    expect(normalizeVpdStage(mapPlantRow(basePlant).stage)).toBe("unknown");
     expect(
-      normalizeVpdStage(mapPlantRow({ ...basePlant, stage: "veg" }).stage),
-    ).toBe("veg");
+      normalizeVpdStage(
+        mapPlantRow(basePlant as unknown as Parameters<typeof mapPlantRow>[0]).stage,
+      ),
+    ).toBe("unknown");
+    expect(normalizeVpdStage(mapPlantRow({ ...basePlant, stage: "veg" }).stage)).toBe("veg");
   });
 });

@@ -50,10 +50,7 @@ export default function TentManualSnapshotHistoryList({
   const entries = buildManualSnapshotHistoryList(rows, { tentId, limit });
 
   return (
-    <div
-      className="glass rounded-2xl p-4 mb-6"
-      data-testid="tent-manual-snapshot-history"
-    >
+    <div className="glass rounded-2xl p-4 mb-6" data-testid="tent-manual-snapshot-history">
       <div className="flex items-center justify-between gap-2 flex-wrap mb-3">
         <h2 className="font-display font-semibold flex items-center gap-2">
           <History className="h-4 w-4" />
@@ -101,9 +98,7 @@ export default function TentManualSnapshotHistoryList({
                       data-metric={m.key}
                       className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-background/40 px-2 py-0.5 text-[11px]"
                     >
-                      <span className="font-medium text-foreground/80">
-                        {m.label}
-                      </span>
+                      <span className="font-medium text-foreground/80">{m.label}</span>
                       <span className="text-muted-foreground">{m.formatted}</span>
                     </span>
                   ))}
@@ -156,9 +151,7 @@ export default function TentManualSnapshotHistoryList({
                       data-direction={d.direction}
                       className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-background/40 px-2 py-0.5 text-[11px] text-muted-foreground"
                     >
-                      <span className="font-medium text-foreground/80">
-                        {d.label}
-                      </span>
+                      <span className="font-medium text-foreground/80">{d.label}</span>
                       <span>{d.formatted}</span>
                     </span>
                   ))}

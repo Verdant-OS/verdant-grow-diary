@@ -33,6 +33,7 @@ import {
   classifyManualMetric,
 } from "@/lib/sensorTruthRules";
 
+import { ECOWITT_LIVE_SOIL_STALE_MS } from "../constants/sensorTiming";
 // ---------------------------------------------------------------------------
 // Contract
 // ---------------------------------------------------------------------------
@@ -42,7 +43,7 @@ export const ECOWITT_LIVE_SOIL_SOURCE = "ecowitt" as const;
 export const ECOWITT_LIVE_SOIL_TRANSPORT = "mqtt" as const;
 
 /** Stale window for live bridge readings. Anything older than this is invalid. */
-export const ECOWITT_LIVE_SOIL_STALE_MS = 15 * 60 * 1000;
+export { ECOWITT_LIVE_SOIL_STALE_MS };
 /** Future-tolerance for sensor clock skew. */
 export const ECOWITT_LIVE_SOIL_FUTURE_MS = 5 * 60 * 1000;
 
@@ -174,10 +175,7 @@ function resolveAirTempF(payload: Record<string, unknown>): number | null {
 }
 
 /** Resolve soil temperature in Fahrenheit for a given channel suffix. */
-function resolveSoilTempF(
-  payload: Record<string, unknown>,
-  channelIdx: number,
-): number | null {
+function resolveSoilTempF(payload: Record<string, unknown>, channelIdx: number): number | null {
   const f = pick(payload, [`soiltemp${channelIdx}f`]);
   if (f !== null) return f;
   const c = pick(payload, [`soiltemp${channelIdx}c`]);
@@ -266,7 +264,11 @@ export function normalizeEcowittLiveSoilPayload(
     now.toISOString();
   // We always have a captured_at (fallback to injected now). But if dateutc
   // was provided AND unparsable, flag malformed and bail.
-  if ("dateutc" in payload && payload["dateutc"] !== null && parseEcowittDateUtc(payload["dateutc"]) === null) {
+  if (
+    "dateutc" in payload &&
+    payload["dateutc"] !== null &&
+    parseEcowittDateUtc(payload["dateutc"]) === null
+  ) {
     return { payloads: [], reasons: ["missing_captured_at"], chips: ["Missing captured_at"] };
   }
 
@@ -355,9 +357,7 @@ export function normalizeEcowittLiveSoilPayload(
   for (const key of soilKeys) {
     const idx = soilChannelIndex(key);
     if (idx === null) continue;
-    const target =
-      input.soilChannelMap?.[key] ??
-      input.soilChannelMap?.[key.toLowerCase()];
+    const target = input.soilChannelMap?.[key] ?? input.soilChannelMap?.[key.toLowerCase()];
 
     const raw = toNum(payload[key]);
     if (raw === null) continue;
@@ -457,6 +457,234 @@ export function parseEcowittSoilChannelMap(raw: unknown): EcowittSoilChannelMap 
     };
   }
   return Object.freeze(out);
+}
+
+// ---------------------------------------------------------------------------
+// Single-tent startup guard
+// ---------------------------------------------------------------------------
+
+/**
+ * Typed configuration error raised at bridge startup when the parsed
+ * soil channel map violates the "one bridge process → one tent" rule.
+ *
+ * Deliberately carries only a stable, non-sensitive message. Tent IDs,
+ * bridge tokens, raw JSON, PASSKEYs, and private IPs MUST NOT be
+ * included — this error is written to logs and process exit paths.
+ */
+export class EcowittBridgeConfigError extends Error {
+  readonly code:
+    "mixed_tent_channel_map" | "channel_map_tent_mismatch" | "invalid_channel_map_schema";
+  /**
+   * Optional per-field diagnostic paths that pinpoint the exact offending
+   * entries inside `ECOWITT_SOIL_CHANNEL_MAP_JSON` (e.g.
+   * `$.soilmoisture2.tent_id`). Never contains raw UUIDs, tokens, or the
+   * raw JSON — only structural paths and stable reason strings.
+   */
+  readonly fields?: EcowittSoilChannelMapSchemaError[];
+  constructor(
+    code: EcowittBridgeConfigError["code"],
+    message: string,
+    fields?: EcowittSoilChannelMapSchemaError[],
+  ) {
+    super(message);
+    this.name = "EcowittBridgeConfigError";
+    this.code = code;
+    if (fields && fields.length > 0) this.fields = fields;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// JSON Schema validation for ECOWITT_SOIL_CHANNEL_MAP_JSON
+// ---------------------------------------------------------------------------
+
+/**
+ * Stable `$id` of the published JSON Schema for the channel-map env var.
+ * The schema itself lives at `docs/schemas/ecowitt-soil-channel-map.schema.json`
+ * and is served from the docs site. Kept in sync by
+ * `src/test/ecowitt-soil-channel-map-schema.test.ts`.
+ */
+export const ECOWITT_SOIL_CHANNEL_MAP_SCHEMA_ID =
+  "https://verdantgrowdiary.com/schemas/ecowitt-soil-channel-map.schema.json" as const;
+
+const CHANNEL_KEY_RE = /^soilmoisture([1-9]|[1-9][0-9])$/;
+const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+const ALLOWED_TARGET_KEYS = new Set(["tent_id", "plant_id", "label"]);
+
+export interface EcowittSoilChannelMapSchemaError {
+  path: string;
+  message: string;
+}
+
+export interface EcowittSoilChannelMapSchemaResult {
+  ok: boolean;
+  errors: EcowittSoilChannelMapSchemaError[];
+}
+
+/**
+ * Validate a raw `ECOWITT_SOIL_CHANNEL_MAP_JSON` env value against the
+ * published JSON Schema (`ECOWITT_SOIL_CHANNEL_MAP_SCHEMA_ID`). Pure and
+ * deterministic — no I/O, no throws. Empty / unset input is valid
+ * (equivalent to `{}`). Never echoes tent IDs, tokens, or the raw JSON
+ * back in error messages: only structural paths and stable reasons.
+ */
+export function validateEcowittSoilChannelMapJsonEnv(
+  raw: unknown,
+): EcowittSoilChannelMapSchemaResult {
+  const errors: EcowittSoilChannelMapSchemaError[] = [];
+  if (raw === undefined || raw === null) return { ok: true, errors };
+  if (typeof raw !== "string") {
+    return { ok: false, errors: [{ path: "$", message: "env value must be a string" }] };
+  }
+  const trimmed = raw.trim();
+  if (trimmed === "") return { ok: true, errors };
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(trimmed);
+  } catch {
+    return { ok: false, errors: [{ path: "$", message: "value is not valid JSON" }] };
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return { ok: false, errors: [{ path: "$", message: "root must be a JSON object" }] };
+  }
+
+  for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
+    const at = `$.${key}`;
+    if (!CHANNEL_KEY_RE.test(key)) {
+      errors.push({
+        path: at,
+        message: "channel key must match /^soilmoisture([1-9]|[1-9][0-9])$/",
+      });
+      continue;
+    }
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      errors.push({ path: at, message: "channel target must be an object" });
+      continue;
+    }
+    const target = value as Record<string, unknown>;
+    for (const k of Object.keys(target)) {
+      if (!ALLOWED_TARGET_KEYS.has(k)) {
+        errors.push({ path: `${at}.${k}`, message: "unknown property" });
+      }
+    }
+    if (typeof target.tent_id !== "string" || !UUID_RE.test(target.tent_id)) {
+      errors.push({ path: `${at}.tent_id`, message: "required UUID string" });
+    }
+    if (target.plant_id !== undefined && target.plant_id !== null) {
+      if (typeof target.plant_id !== "string" || !UUID_RE.test(target.plant_id)) {
+        errors.push({ path: `${at}.plant_id`, message: "must be UUID string or null" });
+      }
+    }
+    if (target.label !== undefined && target.label !== null) {
+      if (typeof target.label !== "string") {
+        errors.push({ path: `${at}.label`, message: "must be string or null" });
+      } else if (target.label.length > 120) {
+        errors.push({ path: `${at}.label`, message: "must be ≤ 120 chars" });
+      }
+    }
+  }
+
+  return { ok: errors.length === 0, errors };
+}
+
+/**
+ * Startup-time assertion wrapper. Throws `EcowittBridgeConfigError` with
+ * code `invalid_channel_map_schema` when the env value violates the
+ * published schema. Message is a compact, non-sensitive summary.
+ */
+export function assertEcowittSoilChannelMapJsonEnv(raw: unknown): void {
+  const res = validateEcowittSoilChannelMapJsonEnv(raw);
+  if (res.ok) return;
+  const capped = res.errors.slice(0, 20);
+  const summary = capped
+    .slice(0, 5)
+    .map((e) => `${e.path}: ${e.message}`)
+    .join("; ");
+  throw new EcowittBridgeConfigError(
+    "invalid_channel_map_schema",
+    `ECOWITT_SOIL_CHANNEL_MAP_JSON does not match ${ECOWITT_SOIL_CHANNEL_MAP_SCHEMA_ID} (${summary})`,
+    capped,
+  );
+}
+
+/** Numeric comparator for soilmoistureN keys so soilmoisture10 > soilmoisture2. */
+function compareChannelKeys(a: string, b: string): number {
+  const na = Number(a.match(CHANNEL_KEY_RE)?.[1] ?? "0");
+  const nb = Number(b.match(CHANNEL_KEY_RE)?.[1] ?? "0");
+  if (na !== nb) return na - nb;
+  return a.localeCompare(b);
+}
+
+/**
+ * Enforce "one bridge process → one tent → one bridge token" at the
+ * process boundary. The pure normalizer is intentionally multi-tent
+ * capable; this guard only restricts what a single bridge *process*
+ * may be configured to forward.
+ *
+ * Rules:
+ *   - Empty map → accepted.
+ *   - All channels mapped to the same tent → accepted.
+ *   - Any two channels mapped to different tents → rejected.
+ *   - If `defaultTentId` is provided and the map's tent does not match
+ *     it → rejected.
+ *
+ * Does not mutate `map`. Never echoes tent IDs, tokens, or raw JSON.
+ */
+export function assertSingleTentSoilChannelMap(
+  map: EcowittSoilChannelMap,
+  defaultTentId?: string | null,
+): void {
+  if (!map || typeof map !== "object") return;
+
+  // Collect (channelKey, tent_id) pairs in natural channel order so that
+  // reference-tent selection and reported field paths are deterministic.
+  const orderedKeys = Object.keys(map).sort(compareChannelKeys);
+  const perChannel: Array<{ key: string; tent: string }> = [];
+  for (const key of orderedKeys) {
+    const target = map[key];
+    if (target && typeof target.tent_id === "string" && target.tent_id) {
+      perChannel.push({ key, tent: target.tent_id });
+    }
+  }
+  if (perChannel.length === 0) return;
+
+  const tents = new Set(perChannel.map((c) => c.tent));
+  if (tents.size > 1) {
+    // Reference tent = tent of the first-in-natural-order channel; every
+    // channel with a different tent_id is reported by its structural path.
+    const referenceTent = perChannel[0].tent;
+    const fields: EcowittSoilChannelMapSchemaError[] = perChannel
+      .filter((c) => c.tent !== referenceTent)
+      .slice(0, 20)
+      .map((c) => ({
+        path: `$.${c.key}.tent_id`,
+        message: "tent_id differs from tent_id used by other channels in the map",
+      }));
+    throw new EcowittBridgeConfigError(
+      "mixed_tent_channel_map",
+      "EcoWitt bridge configuration must map every soil channel to one tent and match VERDANT_TENT_ID.",
+      fields,
+    );
+  }
+
+  const expected = typeof defaultTentId === "string" ? defaultTentId.trim() : "";
+  if (expected) {
+    const [only] = tents;
+    if (only !== expected) {
+      const fields: EcowittSoilChannelMapSchemaError[] = perChannel
+        .filter((c) => c.tent !== expected)
+        .slice(0, 20)
+        .map((c) => ({
+          path: `$.${c.key}.tent_id`,
+          message: "tent_id does not match VERDANT_TENT_ID",
+        }));
+      throw new EcowittBridgeConfigError(
+        "channel_map_tent_mismatch",
+        "EcoWitt bridge configuration must map every soil channel to one tent and match VERDANT_TENT_ID.",
+        fields,
+      );
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------

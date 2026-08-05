@@ -14,10 +14,7 @@ import { scanSource } from "@/test/utils/contextualPhenoComparisonStaticSafety";
 
 describe("contextualPhenoComparisonStaticSafety — multiline / template literal", () => {
   it("flags forbidden phrase inside a multiline string", () => {
-    const src = [
-      "const a = 'first line' +",
-      "  ' winner of the round';",
-    ].join("\n");
+    const src = ["const a = 'first line' +", "  ' winner of the round';"].join("\n");
     const findings = scanSource("fake.ts", src);
     expect(findings.some((f) => f.phrase === "winner")).toBe(true);
     expect(findings.find((f) => f.phrase === "winner")?.line).toBe(2);
@@ -31,11 +28,7 @@ describe("contextualPhenoComparisonStaticSafety — multiline / template literal
   });
 
   it("flags forbidden phrase on second line of a template literal", () => {
-    const src = [
-      "const t = `header text",
-      "winner of the comparison",
-      "footer text`;",
-    ].join("\n");
+    const src = ["const t = `header text", "winner of the comparison", "footer text`;"].join("\n");
     const findings = scanSource("fake.ts", src);
     const winner = findings.find((f) => f.phrase === "winner");
     expect(winner).toBeDefined();
@@ -43,12 +36,7 @@ describe("contextualPhenoComparisonStaticSafety — multiline / template literal
   });
 
   it("flags forbidden phrase on third line of a template literal", () => {
-    const src = [
-      "const t = `line1",
-      "line2",
-      "scoreboard goes here",
-      "line4`;",
-    ].join("\n");
+    const src = ["const t = `line1", "line2", "scoreboard goes here", "line4`;"].join("\n");
     const findings = scanSource("fake.ts", src);
     const sb = findings.find((f) => f.phrase === "scoreboard");
     expect(sb).toBeDefined();
@@ -101,20 +89,13 @@ describe("contextualPhenoComparisonStaticSafety — multiline / template literal
   it("flags healthy-near-degraded wording on a single line", () => {
     const src = "const label = 'healthy (demo only)';";
     const findings = scanSource("fake.ts", src);
-    expect(findings.some((f) => f.phrase === "healthy-near-degraded")).toBe(
-      true,
-    );
+    expect(findings.some((f) => f.phrase === "healthy-near-degraded")).toBe(true);
   });
 
   it("does not flag 'healthy' on its own line without degraded terms", () => {
-    const src = [
-      "const a = 'plant looks healthy';",
-      "const b = 'all good';",
-    ].join("\n");
+    const src = ["const a = 'plant looks healthy';", "const b = 'all good';"].join("\n");
     const findings = scanSource("fake.ts", src);
-    expect(findings.some((f) => f.phrase === "healthy-near-degraded")).toBe(
-      false,
-    );
+    expect(findings.some((f) => f.phrase === "healthy-near-degraded")).toBe(false);
   });
 
   it("does not flag 'healthy' when degraded term sits on a different line (per-line heuristic)", () => {
@@ -126,8 +107,6 @@ describe("contextualPhenoComparisonStaticSafety — multiline / template literal
       "const c = 'demo only';",
     ].join("\n");
     const findings = scanSource("fake.ts", src);
-    expect(findings.some((f) => f.phrase === "healthy-near-degraded")).toBe(
-      false,
-    );
+    expect(findings.some((f) => f.phrase === "healthy-near-degraded")).toBe(false);
   });
 });

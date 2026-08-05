@@ -21,6 +21,11 @@ import {
   type EnvStage,
 } from "@/lib/environmentStageTargetRules";
 import { getVpdTargetBand, normalizeVpdStage } from "@/lib/vpdStageTargetRules";
+import {
+  celsiusToFahrenheit,
+  loadTemperatureUnitPreference,
+  type TemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
 
 export type AlertWhyMetric = "temp" | "rh" | "vpd";
 
@@ -29,10 +34,15 @@ export interface AlertWhyStageContext {
   metric: AlertWhyMetric;
   stage: EnvStage;
   stageLabel: string;
+  /**
+   * Band bounds in the DISPLAY unit (`unit`). Temperature bands are
+   * stored canonical Celsius in the rules layer and converted exactly
+   * once here when the display unit is Fahrenheit.
+   */
   min: number;
   max: number;
-  unit: "°C" | "%" | "kPa";
-  /** Compact display string, e.g. "Veg target: 22–28°C". */
+  unit: "°F" | "°C" | "%" | "kPa";
+  /** Compact display string, e.g. "Veg target: 71.6–82.4°F". */
   text: string;
 }
 
@@ -50,10 +60,7 @@ export interface AlertWhyContextOnly {
   text: string;
 }
 
-export type AlertWhyContext =
-  | AlertWhyStageContext
-  | AlertWhyContextOnly
-  | AlertWhyUnavailable;
+export type AlertWhyContext = AlertWhyStageContext | AlertWhyContextOnly | AlertWhyUnavailable;
 
 const UNAVAILABLE: AlertWhyUnavailable = {
   kind: "unavailable",
@@ -118,6 +125,10 @@ function parseStageLoose(text: string): EnvStage | null {
 function fmtTemp(v: number): string {
   return Number.isInteger(v) ? `${v}` : `${v.toFixed(1)}`;
 }
+/** Round a converted band bound to 1 decimal so float noise never renders. */
+function roundTo1(v: number): number {
+  return Math.round(v * 10) / 10;
+}
 function fmtRh(v: number): string {
   return Number.isInteger(v) ? `${v}` : `${v.toFixed(0)}`;
 }
@@ -131,7 +142,19 @@ export interface AlertLike {
   reason: string;
 }
 
-export function deriveAlertWhyContext(alert: AlertLike): AlertWhyContext {
+/**
+ * Derive the "Why this alert?" display context.
+ *
+ * `tempUnit` selects the DISPLAY unit for temperature bands only
+ * (default: the grower's saved preference, which defaults to
+ * Fahrenheit). Stored band values stay canonical Celsius in the rules
+ * layer; conversion happens exactly once here. RH and VPD are never
+ * unit-converted.
+ */
+export function deriveAlertWhyContext(
+  alert: AlertLike,
+  tempUnit: TemperatureUnitPreference = loadTemperatureUnitPreference(),
+): AlertWhyContext {
   if (!alert || typeof alert.title !== "string") return UNAVAILABLE;
   const metric = (alert.metric ?? "").toLowerCase();
   const isStageAware = /stage range/i.test(alert.title);
@@ -155,15 +178,19 @@ export function deriveAlertWhyContext(alert: AlertLike): AlertWhyContext {
   if (metric === "temp") {
     const band = getTempTargetBand(stage);
     if (band.min === null || band.max === null) return UNAVAILABLE;
+    const celsius = tempUnit === "celsius";
+    const min = celsius ? band.min : roundTo1(celsiusToFahrenheit(band.min));
+    const max = celsius ? band.max : roundTo1(celsiusToFahrenheit(band.max));
+    const unit = celsius ? ("°C" as const) : ("°F" as const);
     return {
       kind: "stage",
       metric: "temp",
       stage,
       stageLabel,
-      min: band.min,
-      max: band.max,
-      unit: "°C",
-      text: `${stageLabel} target: ${fmtTemp(band.min)}–${fmtTemp(band.max)}°C`,
+      min,
+      max,
+      unit,
+      text: `${stageLabel} target: ${fmtTemp(min)}–${fmtTemp(max)}${unit}`,
     };
   }
   if (metric === "rh") {

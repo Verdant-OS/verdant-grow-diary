@@ -26,11 +26,7 @@
  *   - Operator-safe error copy never leaks raw DB constraint names.
  */
 
-export type AlertTransitionStatus =
-  | "open"
-  | "acknowledged"
-  | "resolved"
-  | "dismissed";
+export type AlertTransitionStatus = "open" | "acknowledged" | "resolved" | "dismissed";
 
 /**
  * Resolve patch intentionally OMITS `acknowledged_at` so any historical
@@ -73,9 +69,7 @@ function nowIso(now?: Date | string | null): string {
  * Resolve transition. Preserves any historical `acknowledged_at` on the
  * row by NOT including the column in the patch.
  */
-export function buildResolveAlertPatch(
-  now?: Date | string | null,
-): AlertResolvePatch {
+export function buildResolveAlertPatch(now?: Date | string | null): AlertResolvePatch {
   return {
     status: "resolved",
     resolved_at: nowIso(now),
@@ -83,9 +77,7 @@ export function buildResolveAlertPatch(
 }
 
 /** Acknowledging clears any stale `resolved_at` to satisfy the resolved CHECK. */
-export function buildAcknowledgeAlertPatch(
-  now?: Date | string | null,
-): AlertAcknowledgePatch {
+export function buildAcknowledgeAlertPatch(now?: Date | string | null): AlertAcknowledgePatch {
   return {
     status: "acknowledged",
     acknowledged_at: nowIso(now),
@@ -128,29 +120,16 @@ const RAW_DB_NEEDLES = [
   /sqlstate/i,
 ];
 
-export type AlertTransitionKind =
-  | "acknowledge"
-  | "resolve"
-  | "dismiss"
-  | "reopen";
+export type AlertTransitionKind = "acknowledge" | "resolve" | "dismiss" | "reopen";
 
 /**
  * Map any thrown error to a calm operator-facing message that never leaks
  * raw DB constraint names, SQLSTATE codes, or PostgREST internals.
  */
-export function safeAlertTransitionErrorCopy(
-  kind: AlertTransitionKind,
-  error: unknown,
-): string {
-  const fallback =
-    SAFE_TRANSITION_COPY[kind] ?? "Couldn't update this alert. Please try again.";
+export function safeAlertTransitionErrorCopy(kind: AlertTransitionKind, error: unknown): string {
+  const fallback = SAFE_TRANSITION_COPY[kind] ?? "Couldn't update this alert. Please try again.";
   if (!error) return fallback;
-  const raw =
-    error instanceof Error
-      ? error.message
-      : typeof error === "string"
-        ? error
-        : "";
+  const raw = error instanceof Error ? error.message : typeof error === "string" ? error : "";
   if (!raw) return fallback;
   for (const needle of RAW_DB_NEEDLES) {
     if (needle.test(raw)) return fallback;

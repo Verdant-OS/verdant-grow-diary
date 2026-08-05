@@ -23,10 +23,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 
-const DOC_PATH = resolve(
-  process.cwd(),
-  "docs/paid-launch-entitlement-blocker.md",
-);
+const DOC_PATH = resolve(process.cwd(), "docs/paid-launch-entitlement-blocker.md");
 const HOOK_PATH = resolve(process.cwd(), "src/hooks/useMyEntitlements.ts");
 
 describe("paid-launch entitlement blocker doc", () => {
@@ -45,17 +42,13 @@ describe("paid-launch entitlement blocker doc", () => {
   });
 
   it("marks Environment Summary Report as SERVER-VALIDATED (paid-launch blocker fixed)", () => {
-    expect(doc).toMatch(
-      /Environment Summary Report[\s\S]*SERVER-VALIDATED/,
-    );
+    expect(doc).toMatch(/Environment Summary Report[\s\S]*SERVER-VALIDATED/);
     // And references the dedicated edge function that re-resolves entitlement.
     expect(doc).toMatch(/environment-summary-report-entitlement/);
   });
 
   it("marks Premium CSV / report exporters as SERVER-GATED PREFLIGHT (paid-launch blocker fixed)", () => {
-    expect(doc).toMatch(
-      /Premium CSV[\s\S]*SERVER-GATED PREFLIGHT/,
-    );
+    expect(doc).toMatch(/Premium CSV[\s\S]*SERVER-GATED PREFLIGHT/);
     expect(doc).toMatch(/premium-export-entitlement/);
   });
 

@@ -32,7 +32,11 @@ describe("evaluatePreflight", () => {
       tent: {
         ...goodTent,
         hardware_config: {
-          ecowitt: { ...goodTent.hardware_config.ecowitt, air_channels: ["1"], soil_channels: ["1"] },
+          ecowitt: {
+            ...goodTent.hardware_config.ecowitt,
+            air_channels: ["1"],
+            soil_channels: ["1"],
+          },
         },
       },
     });
@@ -72,7 +76,10 @@ describe("evaluatePreflight", () => {
       tent: {
         ...goodTent,
         hardware_config: {
-          ecowitt: { ...goodTent.hardware_config.ecowitt, passkey_fingerprint: "AA:BB:CC:DD:EE:FF" },
+          ecowitt: {
+            ...goodTent.hardware_config.ecowitt,
+            passkey_fingerprint: "AA:BB:CC:DD:EE:FF",
+          },
         },
       },
     });
@@ -144,7 +151,11 @@ const passingPreflight = evaluatePreflight({ authAvailable: true, tent: goodTent
 
 describe("computeVerdict", () => {
   it("classifies all-green report as GO", () => {
-    const v = computeVerdict({ preflight: passingPreflight, report: greenReport, logReviewed: true });
+    const v = computeVerdict({
+      preflight: passingPreflight,
+      report: greenReport,
+      logReviewed: true,
+    });
     expect(v.verdict).toBe("go");
   });
 
@@ -187,7 +198,10 @@ describe("computeVerdict", () => {
   it("classifies malformed vpd_kpa as NO-GO", () => {
     const v = computeVerdict({
       preflight: passingPreflight,
-      report: { ...greenReport, malformed_row_counts: { humidity: 1, soil_moisture: 1, vpd_kpa: 1 } },
+      report: {
+        ...greenReport,
+        malformed_row_counts: { humidity: 1, soil_moisture: 1, vpd_kpa: 1 },
+      },
       logReviewed: true,
     });
     expect(v.verdict).toBe("no_go");
@@ -214,7 +228,11 @@ describe("computeVerdict", () => {
 
 describe("buildAuditReport", () => {
   it("includes verdict and safety notes, never includes raw secrets", () => {
-    const verdict = computeVerdict({ preflight: passingPreflight, report: greenReport, logReviewed: true });
+    const verdict = computeVerdict({
+      preflight: passingPreflight,
+      report: greenReport,
+      logReviewed: true,
+    });
     const r = buildAuditReport({
       tent: { id: "t1", name: "Canary" },
       endpoint: "/functions/v1/ecowitt-ingest",

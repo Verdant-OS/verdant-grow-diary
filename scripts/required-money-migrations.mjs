@@ -23,6 +23,28 @@ export const REQUIRED_MONEY_MIGRATIONS = [
   "20260721105000_ai_credit_grants_non_paddle_grants.sql",
   "20260721106000_referrals_conversion.sql",
   "20260721107000_referral_code_and_pending_capture.sql",
+  // Craft entitlement parity. REQUIRED rather than merely KNOWN, because its
+  // absence does silently regress money behaviour: a paying Craft subscriber
+  // is denied the Pheno Tracker feature the pricing page sells them. Listing
+  // it here also makes the deploy verify it was APPLIED and not merely
+  // merged — the gap that previously left plants.candidate_number undeployed
+  // while the code depending on it shipped.
+  "20260725220000_craft_pheno_tracker_entitlement.sql",
+  // Final service-only AI credit spend/refund contract. A later immutable
+  // export reintroduced stale overload bodies, so production must carry this
+  // forward reassertion or paid pack overflow, idempotent result replay, grow
+  // ownership, and service-role-only execution can silently regress.
+  "20260727050000_ai_credit_service_contract_forward_reassert.sql",
+  // Canonical entitlement authority for server lookups, Free creation caps,
+  // sensor-history retention, and PhenoID. Production must carry this repair
+  // before the affected Edge Functions ship or legacy audit rows can regain
+  // authority over paid capabilities.
+  "20260728050000_canonical_subscription_authority_reassert.sql",
+  // Purchased/granted AI-credit balance remains usable after a paid plan
+  // lapses, while live and sandbox ledgers stay isolated. This is the final
+  // authoritative service-spend definition and closes the checkout-to-
+  // settlement race for completed credit-pack purchases.
+  "20260728090736_ai_credit_pack_portability.sql",
 ];
 
 /**

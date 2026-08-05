@@ -6,7 +6,9 @@
  * occur during render.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render as renderTestingLibrary, screen } from "@testing-library/react";
+import type { ReactElement } from "react";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import PlantDetailAiDoctorContextReadinessMount from "@/components/PlantDetailAiDoctorContextReadinessMount";
 
 vi.mock("@/integrations/supabase/client", () => ({
@@ -28,6 +30,7 @@ const fetchSpy = vi.spyOn(globalThis, "fetch" as never).mockImplementation((() =
 
 const HOUR = 3600 * 1000;
 const ago = (ms: number) => new Date(Date.now() - ms).toISOString();
+const render = (ui: ReactElement) => renderTestingLibrary(<MemoryRouter>{ui}</MemoryRouter>);
 
 let recentActivityState: { data?: unknown; isLoading: boolean } = {
   data: [],
@@ -102,32 +105,20 @@ describe("PlantDetailAiDoctorContextReadinessMount", () => {
     alertsState = { rows: [{ id: "a1" }, { id: "a2" }] };
 
     render(<PlantDetailAiDoctorContextReadinessMount {...baseProps} />);
-    expect(
-      screen.getByTestId("plant-detail-ai-doctor-context-readiness-mount"),
-    ).toBeTruthy();
-    expect(
-      screen.getByTestId("ai-doctor-context-readiness-panel"),
-    ).toBeTruthy();
+    expect(screen.getByTestId("plant-detail-ai-doctor-context-readiness-mount")).toBeTruthy();
+    expect(screen.getByTestId("ai-doctor-context-readiness-panel")).toBeTruthy();
     // Stage from props flowed through
-    expect(
-      screen.getByTestId("ai-doctor-context-readiness-panel-stage").textContent,
-    ).toBe("veg");
+    expect(screen.getByTestId("ai-doctor-context-readiness-panel-stage").textContent).toBe("veg");
     // Open alerts forwarded
     expect(
       screen.getByTestId("ai-doctor-context-readiness-panel-count-open-alerts").textContent,
     ).toBe("2");
     // Manual source labeled, no live label
-    expect(
-      screen.getByTestId("ai-doctor-context-readiness-panel-source-manual"),
-    ).toBeTruthy();
-    expect(
-      screen.queryByTestId("ai-doctor-context-readiness-panel-source-live"),
-    ).toBeNull();
+    expect(screen.getByTestId("ai-doctor-context-readiness-panel-source-manual")).toBeTruthy();
+    expect(screen.queryByTestId("ai-doctor-context-readiness-panel-source-live")).toBeNull();
     expect(fetchSpy).not.toHaveBeenCalled();
     // Sensor context audit panel is mounted near AI Doctor readiness area
-    expect(
-      screen.getByTestId("plant-sensor-context-audit-panel"),
-    ).toBeTruthy();
+    expect(screen.getByTestId("plant-sensor-context-audit-panel")).toBeTruthy();
   });
 
   it("renders 'Sensor data missing' when no sensor data exists", () => {
@@ -139,6 +130,19 @@ describe("PlantDetailAiDoctorContextReadinessMount", () => {
     render(<PlantDetailAiDoctorContextReadinessMount {...baseProps} />);
     const panel = screen.getByTestId("ai-doctor-context-readiness-panel");
     expect(panel.getAttribute("data-readiness-state")).toBe("sensor_missing");
+  });
+
+  it("routes an unassigned plant to its existing tent-assignment control", () => {
+    manualLogsState = { data: [], isLoading: false };
+
+    render(<PlantDetailAiDoctorContextReadinessMount {...baseProps} tentId={null} />);
+
+    const recovery = screen.getByTestId("plant-sensor-context-audit-cta-recovery");
+    expect(recovery.textContent).toMatch(/Assign this plant to a tent/i);
+    expect(
+      screen.getByTestId("plant-sensor-context-audit-cta-recovery-link").getAttribute("href"),
+    ).toBe("/plants/p1#plant-overview");
+    expect(screen.queryByTestId("plant-sensor-context-audit-cta-button")).toBeNull();
   });
 
   it("renders safe fallback when compilation throws", () => {
@@ -156,10 +160,7 @@ describe("PlantDetailAiDoctorContextReadinessMount", () => {
 
   it("static guard: mount source imports no Supabase/network/write helpers", async () => {
     const { readFileSync } = await import("node:fs");
-    const src = readFileSync(
-      "src/components/PlantDetailAiDoctorContextReadinessMount.tsx",
-      "utf8",
-    );
+    const src = readFileSync("src/components/PlantDetailAiDoctorContextReadinessMount.tsx", "utf8");
     expect(src).not.toMatch(/integrations\/supabase/);
     expect(src).not.toMatch(/functions\s*\.\s*invoke/);
     expect(src).not.toMatch(/\bfetch\s*\(/);

@@ -7,6 +7,7 @@
  */
 import { describe, it, expect } from "vitest";
 import {
+  buildTimelineNameLookup,
   deriveTimelineEventTypeOptions,
   deriveTimelinePlantOptions,
   deriveTimelineTentOptions,
@@ -86,19 +87,21 @@ describe("keyword search", () => {
 
 describe("dimension filters", () => {
   it("plant filter narrows to that plant id", () => {
-    expect(
-      filterTimelineEvidenceRows(ROWS, { plantId: "p1" }).map((r) => r.id),
-    ).toEqual(["r1", "r3"]);
+    expect(filterTimelineEvidenceRows(ROWS, { plantId: "p1" }).map((r) => r.id)).toEqual([
+      "r1",
+      "r3",
+    ]);
   });
   it("tent filter narrows to that tent id", () => {
-    expect(
-      filterTimelineEvidenceRows(ROWS, { tentId: "t1" }).map((r) => r.id),
-    ).toEqual(["r1", "r2"]);
+    expect(filterTimelineEvidenceRows(ROWS, { tentId: "t1" }).map((r) => r.id)).toEqual([
+      "r1",
+      "r2",
+    ]);
   });
   it("log type filter narrows to that event_type", () => {
-    expect(
-      filterTimelineEvidenceRows(ROWS, { eventType: "note" }).map((r) => r.id),
-    ).toEqual(["r3"]);
+    expect(filterTimelineEvidenceRows(ROWS, { eventType: "note" }).map((r) => r.id)).toEqual([
+      "r3",
+    ]);
   });
   it("combined filters AND-narrow results", () => {
     expect(
@@ -114,6 +117,48 @@ describe("dimension filters", () => {
     const reordered = [ROWS[2], ROWS[0], ROWS[1], ROWS[3]];
     const out = filterTimelineEvidenceRows(reordered, { plantId: "p1" });
     expect(out.map((r) => r.id)).toEqual(["r3", "r1"]);
+  });
+
+  it("keeps only the requested plant when two plants share one sensor source", () => {
+    const sameSourceRows = [
+      {
+        ...ROWS[0],
+        id: "plant-a-csv",
+        plant_id: "plant-a",
+        details: {
+          event_type: "sensor_snapshot",
+          sensor_snapshot: { source: "csv" },
+        },
+      },
+      {
+        ...ROWS[1],
+        id: "plant-b-csv",
+        plant_id: "plant-b",
+        details: {
+          event_type: "sensor_snapshot",
+          sensor_snapshot: { source: "csv" },
+        },
+      },
+    ];
+
+    expect(
+      filterTimelineEvidenceRows(sameSourceRows, {
+        plantId: "plant-a",
+        sensorSources: ["csv"],
+      }).map((row) => row.id),
+    ).toEqual(["plant-a-csv"]);
+    expect(
+      filterTimelineEvidenceRows(sameSourceRows, {
+        plantId: "unknown-plant",
+        sensorSources: ["csv"],
+      }),
+    ).toEqual([]);
+    expect(
+      filterTimelineEvidenceRows(sameSourceRows, {
+        plantId: null,
+        sensorSources: ["csv"],
+      }).map((row) => row.id),
+    ).toEqual(["plant-a-csv", "plant-b-csv"]);
   });
 });
 
@@ -133,22 +178,12 @@ describe("safe search scope", () => {
         },
       },
     ];
-    expect(
-      filterTimelineEvidenceRows(rows, { query: "PASSKEY" }),
-    ).toHaveLength(0);
-    expect(
-      filterTimelineEvidenceRows(rows, { query: "vbt_" }),
-    ).toHaveLength(0);
-    expect(
-      filterTimelineEvidenceRows(rows, { query: "Bearer" }),
-    ).toHaveLength(0);
-    expect(
-      filterTimelineEvidenceRows(rows, { query: "bridge.example.com" }),
-    ).toHaveLength(0);
+    expect(filterTimelineEvidenceRows(rows, { query: "PASSKEY" })).toHaveLength(0);
+    expect(filterTimelineEvidenceRows(rows, { query: "vbt_" })).toHaveLength(0);
+    expect(filterTimelineEvidenceRows(rows, { query: "Bearer" })).toHaveLength(0);
+    expect(filterTimelineEvidenceRows(rows, { query: "bridge.example.com" })).toHaveLength(0);
     // The safe field still matches.
-    expect(
-      filterTimelineEvidenceRows(rows, { query: "safe note" }),
-    ).toHaveLength(1);
+    expect(filterTimelineEvidenceRows(rows, { query: "safe note" })).toHaveLength(1);
   });
 });
 
@@ -194,6 +229,107 @@ describe("derived option lists", () => {
   });
 });
 
+describe("archived/merged name resolution (presenter)", () => {
+  // Diary rows referencing an archived plant/tent: no snapshot name in
+  // details, entity absent from the active-entity queries. The directory
+  // lookup (loaded without the is_archived filter) must still label them.
+  const ARCHIVED_ROWS = [
+    {
+      id: "a1",
+      note: "Watered before archive",
+      stage: "veg",
+      plant_id: "5d7206aa-0000-4000-8000-000000000001",
+      tent_id: "6b1faabb-0000-4000-8000-000000000002",
+      details: { event_type: "watering" },
+    },
+    {
+      id: "a2",
+      note: "Second log",
+      stage: "veg",
+      plant_id: "5d7206aa-0000-4000-8000-000000000001",
+      tent_id: "6b1faabb-0000-4000-8000-000000000002",
+      details: { event_type: "note" },
+    },
+  ];
+
+  it("plant label resolves from the directory when the plant is archived/merged", () => {
+    const directory = new Map([["5d7206aa-0000-4000-8000-000000000001", "Project McDonald #3"]]);
+    const opts = deriveTimelinePlantOptions(ARCHIVED_ROWS, directory);
+    expect(opts).toEqual([
+      { id: "5d7206aa-0000-4000-8000-000000000001", label: "Project McDonald #3", count: 2 },
+    ]);
+  });
+
+  it("tent label resolves from the directory when the tent is archived", () => {
+    const directory = new Map([["6b1faabb-0000-4000-8000-000000000002", "Retired 4x4"]]);
+    const opts = deriveTimelineTentOptions(ARCHIVED_ROWS, directory);
+    expect(opts).toEqual([
+      { id: "6b1faabb-0000-4000-8000-000000000002", label: "Retired 4x4", count: 2 },
+    ]);
+  });
+
+  it("directory name wins over the row's snapshot plant_name (rename-aware)", () => {
+    const directory = new Map([["p1", "Blue Dream (renamed)"]]);
+    const opts = deriveTimelinePlantOptions(ROWS, directory);
+    expect(opts.find((o) => o.id === "p1")?.label).toBe("Blue Dream (renamed)");
+    // p2 is absent from the directory but keeps its snapshot name.
+    expect(opts.find((o) => o.id === "p2")?.label).toBe("Northern Lights");
+  });
+
+  it("keeps a neutral fragment fallback for unresolvable ids — never asserts an archival state", () => {
+    // A loaded-but-unresolving directory covers hard-deleted tents
+    // (deleteTent preserves logs) and entities created after the
+    // directory snapshot; archived rows resolve normally, so claiming
+    // "Archived …" here would be wrong.
+    const emptyDirectory = new Map<string, string>();
+    expect(deriveTimelinePlantOptions(ARCHIVED_ROWS, emptyDirectory)[0]?.label).toBe(
+      "Plant 5d7206",
+    );
+    expect(deriveTimelineTentOptions(ARCHIVED_ROWS, emptyDirectory)[0]?.label).toBe("Tent 6b1faa");
+  });
+
+  it("keeps the same neutral fragment label while the directory is unavailable (null/undefined)", () => {
+    expect(deriveTimelinePlantOptions(ARCHIVED_ROWS)[0]?.label).toBe("Plant 5d7206");
+    expect(deriveTimelinePlantOptions(ARCHIVED_ROWS, null)[0]?.label).toBe("Plant 5d7206");
+    expect(deriveTimelineTentOptions(ARCHIVED_ROWS, null)[0]?.label).toBe("Tent 6b1faa");
+  });
+});
+
+describe("buildTimelineNameLookup", () => {
+  it("returns null (lookup unavailable) for non-array input", () => {
+    expect(buildTimelineNameLookup(null)).toBeNull();
+    expect(buildTimelineNameLookup(undefined)).toBeNull();
+    expect(buildTimelineNameLookup({})).toBeNull();
+    expect(buildTimelineNameLookup("rows")).toBeNull();
+  });
+
+  it("builds a trimmed id → name map and skips malformed rows", () => {
+    const lookup = buildTimelineNameLookup([
+      { id: " p1 ", name: "  Blue Dream  " },
+      { id: "p2", name: "" },
+      { id: "", name: "No id" },
+      { id: "p3" },
+      { id: "p4", name: 42 },
+      null,
+      "junk",
+      { id: "p5", name: "Kept" },
+    ]);
+    expect(lookup).not.toBeNull();
+    expect(lookup?.size).toBe(2);
+    expect(lookup?.get("p1")).toBe("Blue Dream");
+    expect(lookup?.get("p5")).toBe("Kept");
+  });
+
+  it("is deterministic: first name wins on duplicate ids, empty array → empty map", () => {
+    const lookup = buildTimelineNameLookup([
+      { id: "p1", name: "First" },
+      { id: "p1", name: "Second" },
+    ]);
+    expect(lookup?.get("p1")).toBe("First");
+    expect(buildTimelineNameLookup([])?.size).toBe(0);
+  });
+});
+
 describe("timelineEvidenceRowMatches — direct predicate", () => {
   it("returns false for null/undefined row", () => {
     expect(
@@ -208,8 +344,6 @@ describe("timelineEvidenceRowMatches — direct predicate", () => {
 describe("exported copy", () => {
   it("placeholder and empty copy are stable", () => {
     expect(TIMELINE_EVIDENCE_SEARCH_PLACEHOLDER).toBe("Search timeline");
-    expect(TIMELINE_EVIDENCE_EMPTY_DESC).toBe(
-      "No timeline entries match these filters.",
-    );
+    expect(TIMELINE_EVIDENCE_EMPTY_DESC).toBe("No timeline entries match these filters.");
   });
 });

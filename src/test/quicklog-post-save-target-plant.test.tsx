@@ -1,7 +1,7 @@
 /**
- * QuickLog post-save target-plant navigation + keyboard/a11y polish:
- *  - After save the dialog stays open and reveals a "View {plant}" action
- *    pointing at the exact saved target plant id.
+ * QuickLog post-save grow-scoped diary navigation + keyboard/a11y polish:
+ *  - After save the dialog stays open and reveals a "View diary" action
+ *    pointing at the grow-scoped Timeline for the saved setup.
  *  - The action is a keyboard-reachable anchor with focus styling.
  *  - A blocked named target is screen-reader discoverable but not tabbable.
  *  - The stale helper copy includes the formatted captured timestamp and
@@ -14,7 +14,10 @@ import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/re
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 const { rpcMock, snapshotState } = vi.hoisted(() => ({
-  rpcMock: vi.fn().mockResolvedValue({ data: { ok: true }, error: null }),
+  rpcMock: vi.fn().mockResolvedValue({
+    data: { ok: true, grow_event_id: "ge-saved-1" },
+    error: null,
+  }),
   snapshotState: {
     status: "ready" as "ready" | "loading" | "empty",
     payload: {
@@ -78,7 +81,10 @@ function renderQL(props: Parameters<typeof QuickLog>[0]) {
 
 beforeEach(() => {
   rpcMock.mockClear();
-  rpcMock.mockResolvedValue({ data: { ok: true }, error: null });
+  rpcMock.mockResolvedValue({
+    data: { ok: true, grow_event_id: "ge-saved-1" },
+    error: null,
+  });
   snapshotState.status = "ready";
   snapshotState.payload = {
     status: "fresh_live",
@@ -89,7 +95,7 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 describe("QuickLog post-save target plant action", () => {
-  it("reveals a 'View {target plant}' action with the saved plant id after save", async () => {
+  it("reveals a grow-scoped 'View diary' action after save (not Plant Detail)", async () => {
     renderQL({
       open: true,
       onOpenChange: () => {},
@@ -103,12 +109,16 @@ describe("QuickLog post-save target plant action", () => {
     fireEvent.submit(form);
     const link = (await screen.findByTestId("quick-log-view-target-plant")) as HTMLAnchorElement;
     expect(link.tagName).toBe("A");
-    expect(link.getAttribute("href")).toBe("/plants/p2");
+    expect(link.getAttribute("href")).toBe(
+      "/timeline?growId=g1&plantId=p2&tentId=t1#timeline-entry-ge-saved-1",
+    );
+    expect(link.getAttribute("href")).not.toMatch(/^\/plants\//);
     expect(link.getAttribute("data-target-plant-id")).toBe("p2");
-    expect(link.textContent ?? "").toMatch(/View timeline/);
+    expect(link.getAttribute("data-target-grow-id")).toBe("g1");
+    expect(link.textContent ?? "").toMatch(/View diary/);
   });
 
-  it("View target plant button is keyboard reachable and focusable", async () => {
+  it("View diary button is keyboard reachable and focusable", async () => {
     renderQL({
       open: true,
       onOpenChange: () => {},

@@ -34,9 +34,7 @@ function manualLog(
 describe("computeChronologyDelta — basic rules", () => {
   it("returns null when current value is not finite", () => {
     expect(computeChronologyDelta("ph", null, NOW, [])).toBeNull();
-    expect(
-      computeChronologyDelta("ph", Number.NaN, NOW, []),
-    ).toBeNull();
+    expect(computeChronologyDelta("ph", Number.NaN, NOW, [])).toBeNull();
   });
 
   it("first_log when no prior manual reading exists for that metric", () => {
@@ -174,10 +172,7 @@ describe("chronology / back-dating", () => {
     // Two logs share capturedAt; neither should be picked as prior for the
     // current snapshot taken at the same instant.
     const sameTs = iso(-24);
-    const history = [
-      manualLog(sameTs, { ph: 6.0 }, "a"),
-      manualLog(sameTs, { ph: 6.4 }, "b"),
-    ];
+    const history = [manualLog(sameTs, { ph: 6.0 }, "a"), manualLog(sameTs, { ph: 6.4 }, "b")];
     const tied = computeChronologyDelta("ph", 6.2, sameTs, history);
     expect(tied?.first_log).toBe(true);
 
@@ -206,7 +201,7 @@ describe("formatting", () => {
   });
 
   it("ec delta keeps 2 decimals", () => {
-    const history = [manualLog(iso(-2), { ec: 1.40 })];
+    const history = [manualLog(iso(-2), { ec: 1.4 })];
     const d = computeChronologyDelta("ec", 1.65, NOW, history);
     expect(d?.label).toBe("+0.25 2 hours ago");
   });
@@ -264,10 +259,7 @@ describe("deriveManualSensorLogs", () => {
 
 // ---------- Source-level safety contract for the new helper ----------
 const ROOT = resolve(__dirname, "../..");
-const HELPER = readFileSync(
-  resolve(ROOT, "src/lib/manualSensorChronologyDeltaRules.ts"),
-  "utf8",
-);
+const HELPER = readFileSync(resolve(ROOT, "src/lib/manualSensorChronologyDeltaRules.ts"), "utf8");
 
 describe("manualSensorChronologyDeltaRules safety contract", () => {
   it("carries the documented chronology + source comment", () => {

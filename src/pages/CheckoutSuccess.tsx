@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "@/lib/react-router-compat";
 import { Button } from "@/components/ui/button";
 import BrandLogo from "@/components/BrandLogo";
 import AccountPlanBadge from "@/components/AccountPlanBadge";
@@ -38,8 +38,9 @@ import { CheckCircle2, Info, Loader2 } from "lucide-react";
  *      "confirmed"  — resolver confirmed an active paid plan.
  *      "verification_failed" — resolver read failed; neutral retry state,
  *                               never inferred as Free or promoted to pricing.
- *  - "Verdant Pro is active." is shown ONLY after `isActive` is true and
- *    `effectivePlanId !== 'free'`.
+ *  - The paid-plan activation claim is shown ONLY after `isActive` is true
+ *    and `effectivePlanId !== 'free'`. The exact resolved tier is rendered
+ *    by AccountPlanBadge instead of labeling every paid tier as Pro.
  */
 
 // L4 (audit fix): extended the bounded poll window from ~10s to ~30s. Paddle
@@ -57,10 +58,7 @@ export default function CheckoutSuccess() {
   const navigate = useNavigate();
 
   const confirmed =
-    !loading &&
-    !lookupFailed &&
-    entitlement.isActive &&
-    entitlement.effectivePlanId !== "free";
+    !loading && !lookupFailed && entitlement.isActive && entitlement.effectivePlanId !== "free";
 
   // Sanitize the returnTo query param. Never trust the raw value: only
   // same-origin absolute app paths are allowed (see checkoutReturnTo).
@@ -96,14 +94,16 @@ export default function CheckoutSuccess() {
   usePageSeo({
     title:
       view === "confirmed"
-        ? "Verdant Pro is active | Verdant Grow Diary"
+        ? "Your Verdant plan is active | Verdant Grow Diary"
         : view === "verification_failed"
           ? "Plan check unavailable | Verdant Grow Diary"
-        : view === "confirming"
-          ? "Confirming your Verdant Pro access | Verdant Grow Diary"
-          : "Checkout status | Verdant Grow Diary",
-    description: "Verdant Pro access is confirmed server-side by the billing webhook.",
+          : view === "confirming"
+            ? "Confirming your Verdant access | Verdant Grow Diary"
+            : "Checkout status | Verdant Grow Diary",
+    description: "Paid Verdant access is confirmed server-side by the billing webhook.",
     path: "/checkout/success",
+    // A transactional confirmation route is useful to the buyer, not a search result.
+    noindex: true,
   });
 
   // Funnel ping once per mount, only after the server-side resolver has
@@ -118,6 +118,12 @@ export default function CheckoutSuccess() {
       ...(checkoutReturnSurface ? { surface: checkoutReturnSurface } : {}),
     });
   }, [checkoutReturnSurface, confirmed, entitlement.effectivePlanId, hasCheckoutContext]);
+
+  // Order-confirmation email is dispatched server-side from the
+  // payments-webhook after transaction.completed is durably processed.
+  // The client no longer invokes send-transactional-email — the webhook
+  // is the single source of truth so private-mode / closed-tab buyers
+  // still receive the receipt.
 
   // Bounded poll — stops when confirmed or after POLL_TIMEOUT_MS. Runs in
   // BOTH unconfirmed states: "confirming" shows it explicitly, while
@@ -143,7 +149,7 @@ export default function CheckoutSuccess() {
   }, [view, refetch]);
 
   // Auto-redirect to the sanitized returnTo path ONLY after entitlement has
-  // confirmed active Pro. Waiting on `confirmed` prevents flicker back into
+  // confirmed an active paid plan. Waiting on `confirmed` prevents flicker back into
   // the upgrade gate on a gated Pheno route. If returnTo is missing or
   // unsafe, we stay on this page (existing behavior).
   const redirectedRef = useRef(false);
@@ -192,7 +198,7 @@ export default function CheckoutSuccess() {
               className="mt-6 font-display text-3xl md:text-4xl font-bold tracking-tight"
               data-testid="checkout-success-confirmed-heading"
             >
-              Verdant Pro is active.
+              Your Verdant plan is active.
             </h1>
             <p className="mt-4 text-muted-foreground">
               Thanks for backing Verdant. Your grow memory system is ready.
@@ -240,8 +246,8 @@ export default function CheckoutSuccess() {
               Confirming your checkout…
             </h1>
             <p className="mt-4 text-muted-foreground">
-              We're confirming your Verdant Pro access with the payment provider. This usually takes
-              a few seconds while the billing webhook is processed.
+              We're confirming your Verdant plan with the payment provider. This usually takes a few
+              seconds while the billing webhook is processed.
             </p>
             {pollExhausted && (
               <p

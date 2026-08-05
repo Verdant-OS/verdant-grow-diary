@@ -11,12 +11,14 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { act, renderHook } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import type { ReactNode } from "react";
 
 const navigateMock = vi.fn();
-vi.mock("react-router-dom", async () => {
-  const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
+vi.mock("@/lib/react-router-compat", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/react-router-compat")>(
+    "@/lib/react-router-compat",
+  );
   return { ...actual, useNavigate: () => navigateMock };
 });
 
@@ -31,8 +33,10 @@ vi.mock("@/hooks/use-toast", () => ({ toast: vi.fn() }));
 
 vi.mock("@/lib/paddle", () => {
   class PaddleCheckoutUnavailableError extends Error {}
+  class PaddleCheckoutCatalogUnavailableError extends Error {}
   return {
     PaddleCheckoutUnavailableError,
+    PaddleCheckoutCatalogUnavailableError,
     resolvePaddleCheckout: () => "sandbox",
     getCheckoutUnavailableMessage: () => null,
     initializePaddle: vi.fn(async () => {}),

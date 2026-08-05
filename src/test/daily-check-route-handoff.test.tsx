@@ -12,7 +12,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import {
@@ -145,8 +145,8 @@ const mockPlants = [
   },
 ];
 const mockTents = [
-  { id: "t1", name: "Tent A" },
-  { id: "t2", name: "Tent B" },
+  { id: "t1", name: "Tent A", grow_id: "g1" },
+  { id: "t2", name: "Tent B", grow_id: "g2" },
 ];
 
 vi.mock("@/hooks/use-tents", () => ({
@@ -214,9 +214,7 @@ describe("DailyCheck route handoff", () => {
 
   it("valid plantId prefills QuickLog with that plant", async () => {
     renderRoute("/daily-check?plantId=p1");
-    expect(
-      screen.queryByTestId("daily-grow-check-plant-rejected"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("daily-grow-check-plant-rejected")).not.toBeInTheDocument();
     const ql = await screen.findByTestId("mock-quicklog");
     expect(ql.getAttribute("data-prefill-plant-id")).toBe("p1");
   });
@@ -224,9 +222,7 @@ describe("DailyCheck route handoff", () => {
   it("missing plantId renders the chooser with no rejection banner", () => {
     renderRoute("/daily-check");
     expect(screen.getByTestId("daily-grow-check-plant-select")).toBeInTheDocument();
-    expect(
-      screen.queryByTestId("daily-grow-check-plant-rejected"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("daily-grow-check-plant-rejected")).not.toBeInTheDocument();
   });
 
   it("invalid plantId shows a safe rejection banner and does not auto-pick another plant", () => {
@@ -253,10 +249,7 @@ describe("DailyCheck route handoff", () => {
 // ---------------------------------------------------------------------------
 describe("Daily Check CTA contract + safety", () => {
   const root = resolve(__dirname, "../..");
-  const rules = readFileSync(
-    resolve(root, "src/lib/dailyCheckPlantSelectionRules.ts"),
-    "utf8",
-  );
+  const rules = readFileSync(resolve(root, "src/lib/dailyCheckPlantSelectionRules.ts"), "utf8");
   const page = readFileSync(resolve(root, "src/pages/DailyCheck.tsx"), "utf8");
   const dashboardPanel = readFileSync(
     resolve(root, "src/components/DashboardDailyGrowCheckPanel.tsx"),
@@ -275,7 +268,6 @@ describe("Daily Check CTA contract + safety", () => {
     expect(dashboardRules).toMatch(/\/daily-check\?plantId=\$\{plant\.id\}/);
     expect(dashboardPanel).toMatch(/buildDailyCheckEntryHref/);
     expect(dashboardPanel).toMatch(/source:\s*"dashboard"/);
-
   });
 
   it("Plant Detail consistency card CTA still routes to /daily-check?plantId=<id>", () => {
@@ -286,6 +278,20 @@ describe("Daily Check CTA contract + safety", () => {
     expect(page).toMatch(/resolveDailyCheckPlantSelection/);
     expect(page).toMatch(/plant-rejected/);
     expect(page).toMatch(/DAILY_CHECK_WHAT_COUNTS_HINT/);
+  });
+
+  it("the test/debug-only step-list span is aria-hidden, not announced to real screen readers", () => {
+    // Found via a live production browser walkthrough: this sr-only span is
+    // explicitly commented "for tests/debug only — non-visual", but sr-only
+    // alone still puts the raw, comma-joined internal step-slug list
+    // ("select,environment,manual,quicklog,handheld,review,done") in front
+    // of every real screen-reader user. aria-hidden removes it from the
+    // accessibility tree while keeping it queryable by test tooling.
+    const stepListBlock = page.match(
+      /<span[^>]*data-testid="daily-grow-check-step-list"[^>]*>/,
+    )?.[0];
+    expect(stepListBlock, "daily-grow-check-step-list span not found").toBeDefined();
+    expect(stepListBlock).toMatch(/aria-hidden="true"/);
   });
 
   it("rules module is I/O-free (no supabase / React)", () => {

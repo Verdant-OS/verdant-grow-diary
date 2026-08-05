@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import type { AiDoctorPhase1TimelineEvidenceViewModel } from "@/lib/aiDoctorPhase1TimelineEvidenceViewModel";
 import { AI_DOCTOR_PHASE1_FOCUS_VISIBLE_LINK_CLASSES } from "@/lib/aiDoctorPhase1A11yClassNames";
 

@@ -18,22 +18,15 @@ describe("PlantProfileContextCard", () => {
 
   it("renders missing medium and pot size copy", () => {
     render(<PlantProfileContextCard stage="Veg" />);
-    expect(
-      screen.getByText("Medium is not available on this plant profile yet."),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText("Pot size is not available on this plant profile yet."),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Medium has not been added yet.")).toBeInTheDocument();
+    expect(screen.getByText("Pot size has not been added yet.")).toBeInTheDocument();
   });
 
-  it("renders disabled coming-soon controls when no onSave is provided", () => {
+  it("stays read-only when no onSave is provided", () => {
     render(<PlantProfileContextCard />);
-    const addMedium = screen.getByTestId("plant-profile-context-add-medium");
-    const addPot = screen.getByTestId("plant-profile-context-add-pot-size");
-    expect(addMedium).toBeDisabled();
-    expect(addMedium).toHaveTextContent(/coming soon/i);
-    expect(addPot).toBeDisabled();
-    expect(addPot).toHaveTextContent(/coming soon/i);
+    expect(screen.queryByTestId("plant-profile-context-add-medium")).toBeNull();
+    expect(screen.queryByTestId("plant-profile-context-add-pot-size")).toBeNull();
+    expect(document.body.textContent).not.toMatch(/coming soon/i);
   });
 
   it("does not call fetch / storage on render", () => {
@@ -47,25 +40,13 @@ describe("PlantProfileContextCard", () => {
   });
 
   it("renders known medium and pot size when provided", () => {
-    render(
-      <PlantProfileContextCard
-        stage="Flower"
-        strain="BD"
-        medium="coco"
-        potSize="11 L"
-      />,
-    );
+    render(<PlantProfileContextCard stage="Flower" strain="BD" medium="coco" potSize="11 L" />);
     expect(screen.getByText("Medium: coco")).toBeInTheDocument();
     expect(screen.getByText("Pot size: 11 L")).toBeInTheDocument();
   });
 
   it("does not infer medium/pot size from strain or freeform values", () => {
-    render(
-      <PlantProfileContextCard
-        stage="Flower"
-        strain="Coco 5gal organic super soil"
-      />,
-    );
+    render(<PlantProfileContextCard stage="Flower" strain="Coco 5gal organic super soil" />);
     expect(
       screen.getByTestId("plant-profile-context-field-medium").getAttribute("data-known"),
     ).toBe("false");
@@ -117,7 +98,10 @@ describe("PlantProfileContextCard inline edit", () => {
   it("disables save while saving and shows saving label", async () => {
     let release: () => void = () => {};
     const onSave = vi.fn(
-      () => new Promise<void>((resolve) => { release = resolve; }),
+      () =>
+        new Promise<void>((resolve) => {
+          release = resolve;
+        }),
     );
     render(<PlantProfileContextCard onSave={onSave} />);
     fireEvent.click(screen.getByTestId("plant-profile-context-add-medium"));
@@ -127,9 +111,7 @@ describe("PlantProfileContextCard inline edit", () => {
     expect(saveBtn).toHaveTextContent(/saving/i);
     expect(screen.getByTestId("plant-profile-context-cancel")).toBeDisabled();
     release();
-    await waitFor(() =>
-      expect(screen.queryByTestId("plant-profile-context-edit-form")).toBeNull(),
-    );
+    await waitFor(() => expect(screen.queryByTestId("plant-profile-context-edit-form")).toBeNull());
   });
 
   it("shows error state when update fails and stays in edit mode", async () => {
@@ -146,12 +128,8 @@ describe("PlantProfileContextCard inline edit", () => {
     const { rerender } = render(
       <PlantProfileContextCard medium={null} potSize={null} onSave={vi.fn()} />,
     );
-    expect(
-      screen.getByText("Medium is not available on this plant profile yet."),
-    ).toBeInTheDocument();
-    rerender(
-      <PlantProfileContextCard medium="coco" potSize="11 L" onSave={vi.fn()} />,
-    );
+    expect(screen.getByText("Medium has not been added yet.")).toBeInTheDocument();
+    rerender(<PlantProfileContextCard medium="coco" potSize="11 L" onSave={vi.fn()} />);
     expect(screen.getByText("Medium: coco")).toBeInTheDocument();
     expect(screen.getByText("Pot size: 11 L")).toBeInTheDocument();
   });
@@ -210,10 +188,7 @@ describe("PlantProfileContext static safety scan", () => {
       const src = readFileSync(resolve(process.cwd(), rel), "utf8");
       const code = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
       for (const pattern of forbidden) {
-        expect(
-          pattern.test(code),
-          `${rel} must not contain ${pattern}`,
-        ).toBe(false);
+        expect(pattern.test(code), `${rel} must not contain ${pattern}`).toBe(false);
       }
     }
   });

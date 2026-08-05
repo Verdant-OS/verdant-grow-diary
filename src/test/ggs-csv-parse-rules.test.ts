@@ -9,10 +9,7 @@
  *  - no silent clamping; NaN/Infinity/impossible values rejected
  */
 import { describe, it, expect } from "vitest";
-import {
-  GGS_CSV_SOURCE_APP,
-  parseGgsCsvRow,
-} from "@/lib/ggsCsvParseRules";
+import { GGS_CSV_SOURCE_APP, parseGgsCsvRow } from "@/lib/ggsCsvParseRules";
 
 const NOW = new Date("2026-06-17T12:00:00.000Z");
 const TS = "2026-06-17T10:15:00.000Z";
@@ -50,7 +47,6 @@ describe("parseGgsCsvRow — happy path", () => {
     expect(r.skippedMetrics).toEqual([]);
   });
 
-
   it("accepts camelCase aliases", () => {
     const r = parseGgsCsvRow(
       {
@@ -71,50 +67,35 @@ describe("parseGgsCsvRow — happy path", () => {
 
 describe("parseGgsCsvRow — unit normalization", () => {
   it("VWC fraction 0..1 converts to percent and records original_units", () => {
-    const r = parseGgsCsvRow(
-      { timestamp: TS, tent_id: "t", vwc: 0.425 },
-      { now: NOW },
-    );
+    const r = parseGgsCsvRow({ timestamp: TS, tent_id: "t", vwc: 0.425 }, { now: NOW });
     const d = r.drafts.find((x) => x.metric === "soil_moisture_pct")!;
     expect(d.value).toBeCloseTo(42.5);
     expect(d.raw_payload.original_units.soil_moisture_pct).toBe("fraction_0_1");
   });
 
   it("VWC percent 0..100 stays percent", () => {
-    const r = parseGgsCsvRow(
-      { timestamp: TS, tent_id: "t", vwc: 42.5 },
-      { now: NOW },
-    );
+    const r = parseGgsCsvRow({ timestamp: TS, tent_id: "t", vwc: 42.5 }, { now: NOW });
     const d = r.drafts.find((x) => x.metric === "soil_moisture_pct")!;
     expect(d.value).toBeCloseTo(42.5);
     expect(d.raw_payload.original_units.soil_moisture_pct).toBe("percent_0_100");
   });
 
   it("µS/cm divides by 1000 → mS/cm", () => {
-    const r = parseGgsCsvRow(
-      { timestamp: TS, tent_id: "t", ec_us_cm: 850 },
-      { now: NOW },
-    );
+    const r = parseGgsCsvRow({ timestamp: TS, tent_id: "t", ec_us_cm: 850 }, { now: NOW });
     const d = r.drafts.find((x) => x.metric === "ec")!;
     expect(d.value).toBeCloseTo(0.85);
     expect(d.raw_payload.original_units.ec).toBe("us_cm");
   });
 
   it("mS/cm stays mS/cm", () => {
-    const r = parseGgsCsvRow(
-      { timestamp: TS, tent_id: "t", ec_ms_cm: 1.4 },
-      { now: NOW },
-    );
+    const r = parseGgsCsvRow({ timestamp: TS, tent_id: "t", ec_ms_cm: 1.4 }, { now: NOW });
     const d = r.drafts.find((x) => x.metric === "ec")!;
     expect(d.value).toBeCloseTo(1.4);
     expect(d.raw_payload.original_units.ec).toBe("ms_cm");
   });
 
   it("generic suspiciously-large EC is flagged and not silently converted", () => {
-    const r = parseGgsCsvRow(
-      { timestamp: TS, tent_id: "t", ec: 1450 },
-      { now: NOW },
-    );
+    const r = parseGgsCsvRow({ timestamp: TS, tent_id: "t", ec: 1450 }, { now: NOW });
     expect(r.drafts.find((d) => d.metric === "ec")).toBeUndefined();
     expect(r.warnings).toContain("soil_ec_unit_mismatch_suspected");
     expect(r.raw_payload.original_units.ec).toBe("unknown_large");
@@ -174,23 +155,16 @@ describe("parseGgsCsvRow — soil temperature draft emission", () => {
   });
 });
 
-
 describe("parseGgsCsvRow — bad data is never healthy", () => {
   it("rejects malformed timestamp", () => {
-    const r = parseGgsCsvRow(
-      { timestamp: "not-a-date", tent_id: "t", vwc: 40 },
-      { now: NOW },
-    );
+    const r = parseGgsCsvRow({ timestamp: "not-a-date", tent_id: "t", vwc: 40 }, { now: NOW });
     expect(r.source).toBe("invalid");
     expect(r.warnings).toContain("malformed_timestamp");
     expect(r.drafts).toEqual([]);
   });
 
   it("rejects missing tent_id", () => {
-    const r = parseGgsCsvRow(
-      { timestamp: TS, vwc: 40, ec_ms_cm: 1 },
-      { now: NOW },
-    );
+    const r = parseGgsCsvRow({ timestamp: TS, vwc: 40, ec_ms_cm: 1 }, { now: NOW });
     expect(r.source).toBe("invalid");
     expect(r.warnings).toContain("tent_id_missing");
     expect(r.drafts).toEqual([]);
@@ -217,19 +191,13 @@ describe("parseGgsCsvRow — bad data is never healthy", () => {
   });
 
   it("rejects impossible moisture (>100) without clamping", () => {
-    const r = parseGgsCsvRow(
-      { timestamp: TS, tent_id: "t", vwc: 150 },
-      { now: NOW },
-    );
+    const r = parseGgsCsvRow({ timestamp: TS, tent_id: "t", vwc: 150 }, { now: NOW });
     expect(r.warnings).toContain("soil_moisture_out_of_range");
     expect(r.drafts).toEqual([]);
   });
 
   it("rejects negative EC", () => {
-    const r = parseGgsCsvRow(
-      { timestamp: TS, tent_id: "t", ec_ms_cm: -1 },
-      { now: NOW },
-    );
+    const r = parseGgsCsvRow({ timestamp: TS, tent_id: "t", ec_ms_cm: -1 }, { now: NOW });
     expect(r.warnings).toContain("ec_negative");
     expect(r.drafts).toEqual([]);
   });
@@ -243,10 +211,7 @@ describe("parseGgsCsvRow — bad data is never healthy", () => {
 
 describe("parseGgsCsvRow — canonical labels and vendor identity", () => {
   it("never emits ggs_live or ggs_csv", () => {
-    const r = parseGgsCsvRow(
-      { timestamp: TS, tent_id: "t", vwc: 40, ec_ms_cm: 1 },
-      { now: NOW },
-    );
+    const r = parseGgsCsvRow({ timestamp: TS, tent_id: "t", vwc: 40, ec_ms_cm: 1 }, { now: NOW });
     const json = JSON.stringify(r);
     expect(json).not.toContain("ggs_live");
     expect(json).not.toContain("ggs_csv");
@@ -256,10 +221,7 @@ describe("parseGgsCsvRow — canonical labels and vendor identity", () => {
   });
 
   it("vendor identity preserved as raw_payload.source_app", () => {
-    const r = parseGgsCsvRow(
-      { timestamp: TS, tent_id: "t", vwc: 40 },
-      { now: NOW },
-    );
+    const r = parseGgsCsvRow({ timestamp: TS, tent_id: "t", vwc: 40 }, { now: NOW });
     expect(r.raw_payload.source_app).toBe("spider_farmer_ggs");
     for (const d of r.drafts) {
       expect(d.raw_payload.source_app).toBe("spider_farmer_ggs");
@@ -277,10 +239,7 @@ describe("parseGgsCsvRow — static safety", () => {
   it("module source has no DB writes, no edge invokes, no AI, no device control", async () => {
     const fs = await import("node:fs");
     const path = await import("node:path");
-    const src = fs.readFileSync(
-      path.resolve(process.cwd(), "src/lib/ggsCsvParseRules.ts"),
-      "utf8",
-    );
+    const src = fs.readFileSync(path.resolve(process.cwd(), "src/lib/ggsCsvParseRules.ts"), "utf8");
     // No client-side DB writes.
     expect(src).not.toMatch(/\.insert\s*\(/);
     expect(src).not.toMatch(/\.update\s*\(/);

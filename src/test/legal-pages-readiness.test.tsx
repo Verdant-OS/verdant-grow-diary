@@ -13,11 +13,16 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter, Navigate, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Navigate, Route, Routes } from "@/lib/react-router-compat";
 import TermsOfService from "@/pages/TermsOfService";
 import PrivacyPolicy from "@/pages/PrivacyPolicy";
 import RefundPolicy from "@/pages/RefundPolicy";
 import { VERDANT_FORBIDDEN_PUBLIC_PHRASES } from "@/constants/verdantSeoCopy";
+import {
+  extractMountedAppRoutePaths,
+  getRouteAliasRedirectTarget,
+  readAllRouteModuleSources,
+} from "./helpers/routeManifestSyncHarness";
 
 const ROOT = resolve(__dirname, "../..");
 const read = (p: string) => readFileSync(resolve(ROOT, p), "utf8");
@@ -27,7 +32,7 @@ const PRIVACY_SRC = read("src/pages/PrivacyPolicy.tsx");
 const REFUND_SRC = read("src/pages/RefundPolicy.tsx");
 const SHELL_SRC = read("src/pages/legal/LegalPageShell.tsx");
 const FOOTER_SRC = read("src/components/LegalFooterLinks.tsx");
-const APP_SRC = read("src/App.tsx");
+const APP_SRC = readAllRouteModuleSources();
 const SITEMAP = read("public/sitemap.xml");
 const ROBOTS = read("public/robots.txt");
 const NEW_FILES = [
@@ -57,7 +62,9 @@ function renderAt(path: string) {
 describe("/terms disclosures", () => {
   it("loads and names the seller Matthew Tyler Cheek", () => {
     renderAt("/terms");
-    expect(screen.getByRole("heading", { name: /terms of service/i, level: 1 })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: /terms of service/i, level: 1 }),
+    ).toBeInTheDocument();
     expect(screen.getAllByText(/Matthew Tyler Cheek/).length).toBeGreaterThan(0);
   });
 
@@ -175,17 +182,22 @@ describe("redirect aliases", () => {
     });
   }
 
-  it("App.tsx wires all four aliases as Navigate redirects", () => {
-    expect(APP_SRC).toMatch(/path="\/terms-of-service" element=\{<Navigate to="\/terms" replace/);
-    expect(APP_SRC).toMatch(/path="\/privacy-policy" element=\{<Navigate to="\/privacy" replace/);
-    expect(APP_SRC).toMatch(/path="\/refunds" element=\{<Navigate to="\/refund" replace/);
-    expect(APP_SRC).toMatch(/path="\/refund-policy" element=\{<Navigate to="\/refund" replace/);
+  it("File routes wire all four aliases through location-preserving redirects", () => {
+    for (const [alias, canonical] of [
+      ["/terms-of-service", "/terms"],
+      ["/privacy-policy", "/privacy"],
+      ["/refunds", "/refund"],
+      ["/refund-policy", "/refund"],
+    ] as const) {
+      expect(extractMountedAppRoutePaths()).toContain(alias);
+      expect(getRouteAliasRedirectTarget(alias)).toBe(canonical);
+    }
   });
 
-  it("App.tsx mounts /terms /privacy /refund as public routes", () => {
-    expect(APP_SRC).toMatch(/path="\/terms" element=\{<Terms/);
-    expect(APP_SRC).toMatch(/path="\/privacy" element=\{<Privacy/);
-    expect(APP_SRC).toMatch(/path="\/refund" element=\{<Refund/);
+  it("File routes mount /terms /privacy /refund as public routes", () => {
+    expect(extractMountedAppRoutePaths()).toContain("/terms");
+    expect(extractMountedAppRoutePaths()).toContain("/privacy");
+    expect(extractMountedAppRoutePaths()).toContain("/refund");
   });
 });
 
@@ -250,7 +262,9 @@ describe("forbidden claims + secret scan", () => {
       const hits = [...f.matchAll(/sell(s|ing)? cannabis/gi)];
       for (const m of hits) {
         const before = f.slice(Math.max(0, m.index! - 60), m.index!);
-        expect(/not|never/i.test(before), `non-negated sales claim: …${before}[${m[0]}]`).toBe(true);
+        expect(/not|never/i.test(before), `non-negated sales claim: …${before}[${m[0]}]`).toBe(
+          true,
+        );
       }
     }
   });

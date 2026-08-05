@@ -12,7 +12,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { act, render } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import {
@@ -91,7 +91,7 @@ describe("DailyCheck · Choose today's check section", () => {
     expect(PAGE).toMatch(/data-testid="daily-grow-check-choose-no-tent"/);
     // The button must be disabled when a plant is selected without a tent —
     // never silently routes to an arbitrary tent.
-    expect(PAGE).toMatch(/disabled=\{!!selectedPlant && !selectedPlant\.tent_id\}/);
+    expect(PAGE).toMatch(/disabled=\{!effectiveTentId\}/);
   });
 
   it("listens for the sensor success event to drive the success card", () => {

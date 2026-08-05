@@ -8,7 +8,10 @@
  * stays comparable across candidates.
  */
 import { useState } from "react";
-import { usePhenoSamplingOptional } from "@/context/PhenoSamplingContext";
+import {
+  PHENO_SAMPLING_SESSION_ONLY_NOTICE,
+  usePhenoSamplingOptional,
+} from "@/context/PhenoSamplingContext";
 import {
   PHENO_SAMPLING_HEADING,
   PHENO_SAMPLING_INTRO_PARAGRAPHS,
@@ -40,8 +43,7 @@ function Field({ id, label, children, hint }: FieldProps) {
   );
 }
 
-const inputClass =
-  "w-full rounded border border-border bg-background px-2 py-1 text-sm";
+const inputClass = "w-full rounded border border-border bg-background px-2 py-1 text-sm";
 
 export default function PhenoProductSamplingSection() {
   const sampling = usePhenoSamplingOptional();
@@ -65,10 +67,7 @@ export default function PhenoProductSamplingSection() {
       className="space-y-4 rounded-lg border border-border bg-card p-4"
     >
       <header className="space-y-2">
-        <h2
-          id="pheno-product-sampling-heading"
-          className="text-lg font-semibold"
-        >
+        <h2 id="pheno-product-sampling-heading" className="text-lg font-semibold">
           {PHENO_SAMPLING_HEADING}
         </h2>
         {PHENO_SAMPLING_INTRO_PARAGRAPHS.map((p, i) => (
@@ -78,12 +77,16 @@ export default function PhenoProductSamplingSection() {
         ))}
       </header>
 
+      <p
+        data-testid="pheno-sampling-session-only-disclosure"
+        className="rounded border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200"
+      >
+        {PHENO_SAMPLING_SESSION_ONLY_NOTICE}
+      </p>
+
       <div>
         <h3 className="text-sm font-semibold">Sampling comparison points</h3>
-        <ul
-          data-testid="pheno-sampling-comparison-points"
-          className="mt-2 space-y-2 text-sm"
-        >
+        <ul data-testid="pheno-sampling-comparison-points" className="mt-2 space-y-2 text-sm">
           {PHENO_SAMPLING_COMPARISON_POINTS.map((point) => (
             <li
               key={point.key}
@@ -95,10 +98,7 @@ export default function PhenoProductSamplingSection() {
             </li>
           ))}
         </ul>
-        <p
-          data-testid="pheno-sampling-disclaimer"
-          className="mt-2 text-xs text-muted-foreground"
-        >
+        <p data-testid="pheno-sampling-disclaimer" className="mt-2 text-xs text-muted-foreground">
           {PHENO_SAMPLING_OBSERVATION_DISCLAIMER}
         </p>
       </div>
@@ -108,23 +108,24 @@ export default function PhenoProductSamplingSection() {
         className="grid gap-3 md:grid-cols-2"
         onSubmit={(e) => {
           e.preventDefault();
-          const overallNum =
-            overall.trim() === "" ? null : Number(overall);
-          if (sampling) {
-            sampling.recordSubmission({
-              testerCode,
-              candidateId,
-              sampleFormat,
-              dryHit,
-              flavor,
-              burnQuality,
-              ashColor,
-              oilRing,
-              effect,
-              overall: Number.isFinite(overallNum) ? (overallNum as number) : null,
-              notes,
-            });
+          if (!sampling) {
+            setRecorded(false);
+            return;
           }
+          const overallNum = overall.trim() === "" ? null : Number(overall);
+          sampling.recordSubmission({
+            testerCode,
+            candidateId,
+            sampleFormat,
+            dryHit,
+            flavor,
+            burnQuality,
+            ashColor,
+            oilRing,
+            effect,
+            overall: Number.isFinite(overallNum) ? (overallNum as number) : null,
+            notes,
+          });
           setRecorded(true);
         }}
       >
@@ -327,16 +328,23 @@ export default function PhenoProductSamplingSection() {
           <button
             type="submit"
             data-testid="pheno-sampling-record"
+            disabled={!sampling}
             className="rounded border border-border bg-secondary px-3 py-1.5 text-sm font-medium"
           >
-            Record tester feedback
+            {sampling ? "Add feedback to this session" : "Session recording unavailable"}
           </button>
+          {!sampling && (
+            <span role="status" className="text-xs text-muted-foreground">
+              Open this form from a Pheno Hunt workspace to record feedback for the current session.
+            </span>
+          )}
           {recorded && (
             <span
+              role="status"
               data-testid="pheno-sampling-recorded"
               className="text-xs text-emerald-600"
             >
-              Recorded locally — feedback stays with this session.
+              Added to this session only.
             </span>
           )}
         </div>

@@ -15,7 +15,7 @@
  */
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { BrowserRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import Pricing from "@/pages/Pricing";
 import { PRICING, AI_CREDIT_EXPLAINER, TRUST_STRIP } from "@/constants/pricing";
 
@@ -24,19 +24,30 @@ vi.mock("@/lib/pricingAnalytics", () => ({
   PRICING_ANALYTICS_EVENT: "verdant:analytics",
 }));
 
-function renderPricing() {
+// Founder Lifetime left the public pricing grid; it now renders only on an
+// explicit `?plan=founder_lifetime` deep link. MemoryRouter owns the entry so
+// useSearchParams sees the plan preselect (BrowserRouter history tricks flaked).
+function renderPricing({ founderDeepLink = false } = {}) {
+  const entry = founderDeepLink ? "/pricing?plan=founder_lifetime" : "/pricing";
   return render(
-    <BrowserRouter>
+    <MemoryRouter initialEntries={[entry]}>
       <Pricing />
-    </BrowserRouter>,
+    </MemoryRouter>,
   );
 }
 
 describe("Pricing Page UI", () => {
-  it("renders all three pricing cards from constants", () => {
+  it("renders the public pricing cards from constants", () => {
     renderPricing();
     expect(screen.getByTestId("pricing-card-free")).toBeInTheDocument();
     expect(screen.getByTestId("pricing-card-pro")).toBeInTheDocument();
+    // Founder Lifetime is retired from the public grid — see the deep-link
+    // cases below, which still cover the card itself.
+    expect(screen.queryByTestId("pricing-card-founder")).toBeNull();
+  });
+
+  it("still shows Founder Lifetime on an explicit deep link", () => {
+    renderPricing({ founderDeepLink: true });
     expect(screen.getByTestId("pricing-card-founder")).toBeInTheDocument();
   });
 
@@ -82,13 +93,13 @@ describe("Pricing Page UI", () => {
   });
 
   it("Founder Lifetime card displays 100 AI Doctor credits/month", () => {
-    renderPricing();
+    renderPricing({ founderDeepLink: true });
     const founderCard = screen.getByTestId("pricing-card-founder");
     expect(founderCard.textContent).toContain("100 AI Doctor credits / month");
   });
 
   it("Founder Lifetime card never says unlimited AI", () => {
-    renderPricing();
+    renderPricing({ founderDeepLink: true });
     const founderCard = screen.getByTestId("pricing-card-founder");
     expect(founderCard.textContent?.toLowerCase()).not.toContain("unlimited ai");
   });
@@ -115,7 +126,7 @@ describe("Pricing Page UI", () => {
   });
 
   it("Founder Lifetime card price is $129 one-time", () => {
-    renderPricing();
+    renderPricing({ founderDeepLink: true });
     const founderPrice = screen.getByTestId("pricing-card-founder-price");
     expect(founderPrice.textContent).toContain("$129");
     expect(founderPrice.textContent).toContain("one-time");

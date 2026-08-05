@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   clearLocalStorageForTest,
+  ensureLocalStorageForTest,
   setLocalStorageItemForTest,
 } from "./helpers/localStorageTestHelper";
 import {
@@ -21,6 +22,10 @@ beforeEach(() => {
   }
 });
 
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 describe("startScreenPreferences", () => {
   it("defaults to quickLog (diary-first)", () => {
     expect(DEFAULT_START_SCREEN).toBe("quickLog");
@@ -33,8 +38,8 @@ describe("startScreenPreferences", () => {
   });
 
   it("persists and reads back a valid choice per-user", () => {
-    setStartScreenChoice("user-1", "timeline");
-    setStartScreenChoice("user-2", "dashboard");
+    expect(setStartScreenChoice("user-1", "timeline")).toBe(true);
+    expect(setStartScreenChoice("user-2", "dashboard")).toBe(true);
     expect(getStartScreenChoice("user-1")).toBe("timeline");
     expect(getStartScreenChoice("user-2")).toBe("dashboard");
     expect(getStartScreenChoice("user-3")).toBeNull();
@@ -42,13 +47,36 @@ describe("startScreenPreferences", () => {
 
   it("clears safely", () => {
     setStartScreenChoice("user-1", "timeline");
-    clearStartScreenChoice("user-1");
+    expect(clearStartScreenChoice("user-1")).toBe(true);
     expect(getStartScreenChoice("user-1")).toBeNull();
   });
 
   it("rejects unsafe userId characters", () => {
-    setStartScreenChoice("../evil", "timeline");
+    expect(setStartScreenChoice("../evil", "timeline")).toBe(false);
     expect(getStartScreenChoice("../evil")).toBeNull();
+  });
+
+  it("reports a failed write instead of claiming the preference persisted", () => {
+    const storage = ensureLocalStorageForTest();
+    const storagePrototype = Object.getPrototypeOf(storage) as Storage;
+    vi.spyOn(storagePrototype, "setItem").mockImplementation(() => {
+      throw new Error("storage blocked");
+    });
+
+    expect(setStartScreenChoice("user-1", "timeline")).toBe(false);
+    expect(getStartScreenChoice("user-1")).toBeNull();
+  });
+
+  it("reports a failed reset and preserves the stored preference", () => {
+    expect(setStartScreenChoice("user-1", "timeline")).toBe(true);
+    const storage = ensureLocalStorageForTest();
+    const storagePrototype = Object.getPrototypeOf(storage) as Storage;
+    vi.spyOn(storagePrototype, "removeItem").mockImplementation(() => {
+      throw new Error("storage blocked");
+    });
+
+    expect(clearStartScreenChoice("user-1")).toBe(false);
+    expect(getStartScreenChoice("user-1")).toBe("timeline");
   });
 
   it("ignores tampered stored values", () => {
@@ -78,6 +106,12 @@ describe("startScreenPreferences", () => {
     expect(consumeQuickLogStartIntent("?grow=recent&open=quick-log&utm=owned")).toBe(
       "?grow=recent&utm=owned",
     );
+    expect(
+      consumeQuickLogStartIntent(
+        "?open=quick-log&type=observation&prompt=oreoz-vs-gelonade&utm=guide",
+      ),
+    ).toBe("?utm=guide");
+    expect(consumeQuickLogStartIntent("?prompt=oreoz-vs-gelonade")).toBeNull();
     expect(consumeQuickLogStartIntent("?open=dashboard")).toBeNull();
     expect(consumeQuickLogStartIntent("")).toBeNull();
   });

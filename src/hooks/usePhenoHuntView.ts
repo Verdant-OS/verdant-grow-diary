@@ -1,16 +1,17 @@
 /**
  * usePhenoHuntView — composes the live pheno reads into the source-agnostic
- * bundle the showcase surfaces consume, with the labeled demo hunt as fallback.
+ * bundle the showcase surfaces consume, with the labeled demo hunt reserved for
+ * signed-out/no-hunt previews.
  *
  * It reads the grower's OWN hunt (RLS owner-only) through the existing hooks —
  * usePhenoHuntWorkspace (candidate scores + keeper decisions) and usePhenoKeepers
  * (keepers, clones, crosses, reversals) — projects those rows onto the adapter's
  * source contract, and runs them through phenoHuntViewAdapter. No session / no
  * hunt id → the demo fixture, clearly flagged by `source`. A signed-in grower
- * pointing at a SPECIFIC hunt id that resolves to nothing (no row, RLS-hidden,
- * or zero candidates) gets `source: "not_found"` with EMPTY data — the demo
- * never stands in for a particular hunt, so a missing hunt is never mistaken
- * for a persisted one.
+ * pointing at a SPECIFIC hunt id sees empty data while reads are pending, a
+ * retryable unavailable state when either read fails, and `source: "not_found"`
+ * only after both reads settle successfully with no candidates. The demo never
+ * stands in for a particular hunt.
  *
  * Read-only: no writes, no AI, no automation. Security is the tables' RLS; this
  * hook is presentation only.
@@ -23,7 +24,7 @@
  *    per-round grow nodes (veg→flower) and aroma chips are follow-up enrichment
  *    (needs the on-demand round load + flavor coercion) — omitted, never faked.
  */
-import { useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { useAuth } from "@/store/auth";
 import { usePhenoHuntWorkspace } from "@/hooks/usePhenoHuntWorkspace";
 import { usePhenoKeepers } from "@/hooks/usePhenoKeepers";
@@ -54,12 +55,14 @@ export interface PhenoHuntViewMeta {
 }
 
 export interface UsePhenoHuntViewResult {
-  readonly status: "loading" | "ready";
+  readonly status: "loading" | "ready" | "unavailable";
   readonly source: PhenoHuntViewSource;
   readonly meta: PhenoHuntViewMeta;
   readonly data: PhenoHuntViewData;
   /** Clone lineage per keeper id, for the family tree's Detailed view. */
   readonly cloneRowsByKeeperId: Record<string, CloneTreeRow[]>;
+  /** Retry both RLS-scoped live reads. */
+  readonly retry: () => void;
 }
 
 const DEMO_META: PhenoHuntViewMeta = {
@@ -110,14 +113,14 @@ function demoBundle(): {
 
 const DEMO = demoBundle();
 
-/** Empty bundle for `not_found` — a missing hunt renders nothing, never demo rows. */
-const NOT_FOUND_DATA: PhenoHuntViewData = buildPhenoHuntView({
+/** Empty bundle for pending, unavailable, and not-found live reads. */
+const EMPTY_DATA: PhenoHuntViewData = buildPhenoHuntView({
   candidates: [],
   keepers: [],
   crosses: [],
   clones: [],
 });
-const NOT_FOUND_CLONE_ROWS: Record<string, CloneTreeRow[]> = {};
+const EMPTY_CLONE_ROWS: Record<string, CloneTreeRow[]> = {};
 
 function candidateDisplayName(c: {
   candidateLabel?: string | null;
@@ -141,16 +144,24 @@ function coerceDescriptors(value: unknown): string[] {
 }
 
 export function usePhenoHuntView(huntId: string | null | undefined): UsePhenoHuntViewResult {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   // Read the hunt ONLY for a signed-in grower (their own hunt, via RLS). Signed
   // out → pass null so the reads never fire → the public showcase renders the
   // demo with zero private-table hits (the mobile auth-route guardrail).
   const liveHuntId = user ? huntId : null;
   const ws = usePhenoHuntWorkspace(liveHuntId);
   const kp = usePhenoKeepers(liveHuntId);
+  const { reload: reloadWorkspace } = ws;
+  const { reload: reloadKeepers } = kp;
+  const retry = useCallback(() => {
+    reloadWorkspace();
+    reloadKeepers();
+  }, [reloadKeepers, reloadWorkspace]);
 
-  const wantsLive = !!user && (huntId?.trim().length ?? 0) > 0;
-  const hasLive = wantsLive && ws.candidates.length > 0;
+  const hasRequestedHunt = (huntId?.trim().length ?? 0) > 0;
+  const wantsLive = !!user && hasRequestedHunt;
+  const liveReadsReady = ws.status === "ok" && kp.status === "ok";
+  const hasLive = wantsLive && liveReadsReady && ws.candidates.length > 0;
 
   // Load each scoring round on demand so the cure timeline can draw the grow
   // nodes (veg→flower→cure), not just the cure marker. Idempotent per round;
@@ -248,60 +259,78 @@ export function usePhenoHuntView(huntId: string | null | undefined): UsePhenoHun
     kp.crosses,
   ]);
 
-  const loading = ws.status === "loading" || kp.status === "loading";
-
-  if (hasLive) {
+  if (authLoading && hasRequestedHunt) {
     return {
-      status: "ready",
+      status: "loading",
       source: "live",
       meta: {
-        name: ws.hunt?.name ?? kp.hunt?.name ?? "Your hunt",
+        name: "This hunt",
         packLabel: null,
-        packSize: ws.totalCandidateCount ?? ws.candidates.length,
+        packSize: null,
       },
-      data: live.data,
-      cloneRowsByKeeperId: live.cloneRowsByKeeperId,
+      data: EMPTY_DATA,
+      cloneRowsByKeeperId: EMPTY_CLONE_ROWS,
+      retry,
     };
   }
 
   if (wantsLive) {
-    // Signed-in grower asking for a SPECIFIC hunt. While the workspace reads
-    // are in flight ("idle" = pre-effect mount, "loading" = fetch running)
-    // stay in loading; only once BOTH hooks settle ("ok"/"error") with zero
-    // candidates do we conclude the hunt resolves to nothing — no pheno_hunts
-    // row, RLS-hidden, or simply empty. That is not_found, never the demo:
-    // sample data must not impersonate a particular hunt.
-    const settled =
-      (ws.status === "ok" || ws.status === "error") &&
-      (kp.status === "ok" || kp.status === "error");
-    if (!settled) {
+    const meta = {
+      name: ws.hunt?.name ?? kp.hunt?.name ?? "This hunt",
+      packLabel: null,
+      packSize: null,
+    };
+    if (ws.status === "error" || kp.status === "error") {
+      return {
+        status: "unavailable",
+        source: "live",
+        meta,
+        data: EMPTY_DATA,
+        cloneRowsByKeeperId: EMPTY_CLONE_ROWS,
+        retry,
+      };
+    }
+    if (!liveReadsReady) {
       return {
         status: "loading",
-        source: "demo",
-        meta: DEMO_META,
-        data: DEMO.data,
-        cloneRowsByKeeperId: DEMO.cloneRowsByKeeperId,
+        source: "live",
+        meta,
+        data: EMPTY_DATA,
+        cloneRowsByKeeperId: EMPTY_CLONE_ROWS,
+        retry,
+      };
+    }
+    if (hasLive) {
+      return {
+        status: "ready",
+        source: "live",
+        meta: {
+          name: ws.hunt?.name ?? kp.hunt?.name ?? "Your hunt",
+          packLabel: null,
+          packSize: ws.totalCandidateCount ?? ws.candidates.length,
+        },
+        data: live.data,
+        cloneRowsByKeeperId: live.cloneRowsByKeeperId,
+        retry,
       };
     }
     return {
       status: "ready",
       source: "not_found",
-      meta: {
-        name: ws.hunt?.name ?? kp.hunt?.name ?? "This hunt",
-        packLabel: null,
-        packSize: null,
-      },
-      data: NOT_FOUND_DATA,
-      cloneRowsByKeeperId: NOT_FOUND_CLONE_ROWS,
+      meta,
+      data: EMPTY_DATA,
+      cloneRowsByKeeperId: EMPTY_CLONE_ROWS,
+      retry,
     };
   }
 
   // Signed out (public preview) or signed in with no hunt id: the labeled demo.
   return {
-    status: loading ? "loading" : "ready",
+    status: "ready",
     source: "demo",
     meta: DEMO_META,
     data: DEMO.data,
     cloneRowsByKeeperId: DEMO.cloneRowsByKeeperId,
+    retry,
   };
 }

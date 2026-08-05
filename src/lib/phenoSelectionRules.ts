@@ -60,9 +60,7 @@ export interface PhenotypeTraitInput {
   value?: number | string | null;
   note?: string | null;
 }
-export type PhenotypeInput = Partial<
-  Record<PhenotypeTraitKey, PhenotypeTraitInput>
->;
+export type PhenotypeInput = Partial<Record<PhenotypeTraitKey, PhenotypeTraitInput>>;
 
 export interface PhenotypeTraitCell {
   key: PhenotypeTraitKey;
@@ -230,13 +228,9 @@ export interface ReplicationAssessment {
   label: string;
 }
 
-export function assessReplication(
-  count: number | null | undefined,
-): ReplicationAssessment {
+export function assessReplication(count: number | null | undefined): ReplicationAssessment {
   const n =
-    typeof count === "number" && Number.isFinite(count) && count > 0
-      ? Math.floor(count)
-      : null;
+    typeof count === "number" && Number.isFinite(count) && count > 0 ? Math.floor(count) : null;
   const replicated = n !== null && n >= 2;
   let label: string;
   if (n === null) label = "Replication not recorded";
@@ -266,9 +260,7 @@ export interface PostCureAssessment {
   label: string;
 }
 
-export function assessPostCure(
-  input: PostCureInput | null | undefined,
-): PostCureAssessment {
+export function assessPostCure(input: PostCureInput | null | undefined): PostCureAssessment {
   const src = input ?? {};
   // Require at least one full cured day. A sub-day fraction (e.g. 0.5 from a
   // timestamp diff) must not floor to "Cured 0 days" and clear the not-cured
@@ -334,9 +326,7 @@ export interface DeriveSelectionCaveatsInput {
   postCure: PostCureAssessment;
 }
 
-export function deriveSelectionCaveats(
-  input: DeriveSelectionCaveatsInput,
-): SelectionCaveat[] {
+export function deriveSelectionCaveats(input: DeriveSelectionCaveatsInput): SelectionCaveat[] {
   const out: SelectionCaveat[] = [];
 
   if (input.selection.strength === "thin") {
@@ -346,9 +336,7 @@ export function deriveSelectionCaveats(
       copy: "Too few phenotype traits recorded to compare.",
     });
   } else if (input.phenotype.missingCoreKeys.length > 0) {
-    const names = input.phenotype.missingCoreKeys
-      .map((k) => PHENOTYPE_TRAIT_LABELS[k])
-      .join(", ");
+    const names = input.phenotype.missingCoreKeys.map((k) => PHENOTYPE_TRAIT_LABELS[k]).join(", ");
     out.push({
       code: "missing_phenotype",
       label: CAVEAT_LABELS.missing_phenotype,
@@ -385,19 +373,14 @@ export function deriveSelectionCaveats(
     });
   }
 
-  return out.sort(
-    (a, b) => CAVEAT_ORDER.indexOf(a.code) - CAVEAT_ORDER.indexOf(b.code),
-  );
+  return out.sort((a, b) => CAVEAT_ORDER.indexOf(a.code) - CAVEAT_ORDER.indexOf(b.code));
 }
 
 // ---------------------------------------------------------------------------
 // Comparability grade — grades the COMPARISON, not each candidate.
 // ---------------------------------------------------------------------------
 
-export type ComparabilityVerdict =
-  | "comparable"
-  | "comparable_with_caveats"
-  | "not_comparable";
+export type ComparabilityVerdict = "comparable" | "comparable_with_caveats" | "not_comparable";
 
 export interface ComparabilityGrade {
   verdict: ComparabilityVerdict;
@@ -441,9 +424,7 @@ export function gradeComparability(
   const dayTol = opts.dayTolerance ?? DEFAULT_DAY_OF_FLOWER_TOLERANCE;
 
   if (candidates.length < 2) {
-    return grade("not_comparable", [
-      "Fewer than two candidates — nothing to compare yet.",
-    ]);
+    return grade("not_comparable", ["Fewer than two candidates — nothing to compare yet."]);
   }
 
   const reasons: string[] = [];
@@ -453,30 +434,17 @@ export function gradeComparability(
   // IDs OR distinct names are a hard confound (clearly different environments).
   // Parity is only *confirmed* when every candidate shares one tent ID and one
   // grow ID; a shared name without matching IDs cannot prove parity → caveat.
-  const tentIds = new Set(
-    candidates.map((c) => c.tentId).filter((v): v is string => !!v),
-  );
-  const growIds = new Set(
-    candidates.map((c) => c.growId).filter((v): v is string => !!v),
-  );
-  const tentNames = new Set(
-    candidates.map((c) => c.tentName).filter((v): v is string => !!v),
-  );
-  const growNames = new Set(
-    candidates.map((c) => c.growName).filter((v): v is string => !!v),
-  );
+  const tentIds = new Set(candidates.map((c) => c.tentId).filter((v): v is string => !!v));
+  const growIds = new Set(candidates.map((c) => c.growId).filter((v): v is string => !!v));
+  const tentNames = new Set(candidates.map((c) => c.tentName).filter((v): v is string => !!v));
+  const growNames = new Set(candidates.map((c) => c.growName).filter((v): v is string => !!v));
 
   // Growing medium (root zone). Different media (e.g. coco vs hydro) is a hard
   // confound even in the same tent; a missing medium can't confirm parity.
-  const media = new Set(
-    candidates.map((c) => c.medium).filter((v): v is string => !!v),
-  );
+  const media = new Set(candidates.map((c) => c.medium).filter((v): v is string => !!v));
 
   const idConfound =
-    tentIds.size > 1 ||
-    growIds.size > 1 ||
-    tentNames.size > 1 ||
-    growNames.size > 1;
+    tentIds.size > 1 || growIds.size > 1 || tentNames.size > 1 || growNames.size > 1;
   const mediaConfound = media.size > 1;
   const envConfound = idConfound || mediaConfound;
 
@@ -485,8 +453,7 @@ export function gradeComparability(
     tentIds.size === 1 &&
     candidates.every((c) => !!c.growId) &&
     growIds.size === 1;
-  const mediaParityConfirmed =
-    candidates.every((c) => !!c.medium) && media.size === 1;
+  const mediaParityConfirmed = candidates.every((c) => !!c.medium) && media.size === 1;
   const parityConfirmed = idParityConfirmed && mediaParityConfirmed;
   const envUnknown = !envConfound && !parityConfirmed;
 
@@ -544,16 +511,12 @@ export function gradeComparability(
 
   const allReplicated = candidates.every((c) => c.replicated);
   if (!allReplicated) {
-    reasons.push(
-      "At least one candidate is a single specimen — pheno stability is unknown.",
-    );
+    reasons.push("At least one candidate is a single specimen — pheno stability is unknown.");
   }
 
   const allCured = candidates.every((c) => c.cured);
   if (!allCured) {
-    reasons.push(
-      "At least one candidate is not cured yet — selection is incomplete.",
-    );
+    reasons.push("At least one candidate is not cured yet — selection is incomplete.");
   }
 
   const allStrong = candidates.every((c) => c.strength === "strong");
@@ -573,10 +536,7 @@ export function gradeComparability(
   ]);
 }
 
-function grade(
-  verdict: ComparabilityVerdict,
-  reasons: string[],
-): ComparabilityGrade {
+function grade(verdict: ComparabilityVerdict, reasons: string[]): ComparabilityGrade {
   return {
     verdict,
     label: COMPARABILITY_LABELS[verdict],
@@ -607,5 +567,4 @@ export function containsSelectionOverclaim(raw: string): boolean {
 }
 
 /** Header for the demoted telemetry section. */
-export const PHENO_ENVIRONMENT_CONTEXT_LABEL =
-  "Environment context — not a selection signal";
+export const PHENO_ENVIRONMENT_CONTEXT_LABEL = "Environment context — not a selection signal";

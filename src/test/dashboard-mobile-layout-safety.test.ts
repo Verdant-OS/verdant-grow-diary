@@ -27,13 +27,25 @@ const DAILY_GROW_CHECK_PANEL = read("src/components/DashboardDailyGrowCheckPanel
 const DISCLOSURE = read("src/components/DashboardDataSourceDisclosure.tsx");
 
 describe("AppShell mobile layout safety", () => {
+  it("does not conceal oversized route content at the application root", () => {
+    const shellRoot = APP_SHELL.match(
+      /<div className="relative isolate flex min-h-screen w-full[^"]*"/,
+    )?.[0];
+
+    expect(shellRoot).toBeTruthy();
+    expect(shellRoot).not.toMatch(/overflow-x-(?:clip|hidden)/);
+  });
+
   it("main content reserves bottom padding for fixed nav/FAB on mobile", () => {
     expect(APP_SHELL).toMatch(/pb-(2[0-9]|28|24|32)/);
   });
 
   it("mobile floating Quick Log button sits above the bottom nav", () => {
-    // Bottom nav is h-16 fixed at bottom-0 → FAB must clear ~64px.
-    expect(APP_SHELL).toMatch(/md:hidden[\s\S]{0,400}bottom-(?:1[6-9]|2[0-9])/);
+    // Bottom nav is fixed at the safe-area edge. The shell FAB must clear the
+    // full nav plus the device inset rather than relying on a fixed low offset.
+    expect(APP_SHELL).toMatch(
+      /bottom-\[calc\(5rem\+env\(safe-area-inset-bottom\)\)\][\s\S]{0,400}md:hidden/,
+    );
   });
 });
 
@@ -45,9 +57,7 @@ describe("QuickLogV2Fab mobile safety", () => {
 
   it("FAB does not hard-code an overlapping low offset without responsive guard", () => {
     // No bare `bottom-6` / `bottom-4` without a md: counterpart on mobile.
-    const hasBareLow = /className="[^"]*\bbottom-(?:4|6)\b[^"]*"/.test(
-      QUICK_LOG_FAB,
-    );
+    const hasBareLow = /className="[^"]*\bbottom-(?:4|6)\b[^"]*"/.test(QUICK_LOG_FAB);
     const hasResponsive = /md:bottom-/.test(QUICK_LOG_FAB);
     expect(hasBareLow && !hasResponsive).toBe(false);
   });
@@ -60,17 +70,18 @@ describe("PageHeader wrap safety", () => {
     expect(PAGE_HEADER).toMatch(/break-words/);
   });
 
-  it("allows the action wrapper to shrink below the small-screen breakpoint", () => {
-    expect(PAGE_HEADER).toMatch(/flex items-center gap-2 flex-wrap sm:shrink-0/);
-    expect(PAGE_HEADER).not.toMatch(/flex items-center gap-2 flex-wrap shrink-0/);
+  it("stacks the title and actions until the desktop breakpoint", () => {
+    expect(PAGE_HEADER).toMatch(/flex min-w-0 flex-col gap-4 lg:flex-row/);
+    expect(PAGE_HEADER).toMatch(
+      /flex w-full min-w-0 flex-wrap items-center gap-2 lg:w-auto lg:shrink-0/,
+    );
+    expect(PAGE_HEADER).not.toMatch(/gap-4 sm:flex-row/);
   });
 });
 
 describe("Dashboard Daily Grow Check narrow-screen safety", () => {
   it("stacks row content below 390px so the action group can wrap inside the row", () => {
-    expect(DAILY_GROW_CHECK_PANEL).toMatch(
-      /max-\[389px\]:flex-col max-\[389px\]:items-stretch/,
-    );
+    expect(DAILY_GROW_CHECK_PANEL).toMatch(/max-\[389px\]:flex-col max-\[389px\]:items-stretch/);
   });
 });
 

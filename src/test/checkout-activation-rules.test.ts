@@ -10,6 +10,7 @@ describe("checkout activation rules", () => {
     expect(buildCheckoutActivationViewModel(null)).toMatchObject({
       primaryHref: "/grows",
       primaryLabel: "Start my grow memory",
+      heading: "Put Verdant to work in one real grow",
     });
     expect(CHECKOUT_ACTIVATION_STEPS).toHaveLength(3);
   });

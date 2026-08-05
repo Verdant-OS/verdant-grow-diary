@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { UserCircle } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import PageHeader from "@/components/PageHeader";
@@ -8,11 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import {
-  CURRENT_AGREEMENTS,
-  CURRENT_AGREEMENT_LIST,
-  type AgreementType,
-} from "@/constants/agreements";
+import { CURRENT_AGREEMENTS, CURRENT_AGREEMENT_LIST } from "@/constants/agreements";
 import {
   buildAcceptanceRows,
   computeAgreementGaps,
@@ -31,7 +27,7 @@ export default function AccountPreferences() {
   const [error, setError] = useState<string | null>(null);
   const [agreements, setAgreements] = useState<
     {
-      agreement_type: AgreementType;
+      agreement_type: string;
       version: string;
       effective_date: string;
       accepted_at: string;
@@ -150,11 +146,14 @@ export default function AccountPreferences() {
     setReconsentStatus("You're up to date on all current agreements.");
   }
 
-  function labelForAgreementType(type: AgreementType): { label: string; href: string } {
-    const agreement = CURRENT_AGREEMENTS[type];
+  function labelForAgreementType(type: string): {
+    label: string;
+    href: string | null;
+  } {
+    const agreement = type === "terms" || type === "privacy" ? CURRENT_AGREEMENTS[type] : null;
     return {
       label: agreement?.label ?? type,
-      href: agreement?.href ?? "#",
+      href: agreement?.href ?? null,
     };
   }
 
@@ -317,12 +316,16 @@ export default function AccountPreferences() {
                       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
                         <div>
                           <p className="text-sm font-medium">
-                            <Link
-                              to={href}
-                              className="hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
-                            >
-                              {label}
-                            </Link>
+                            {href ? (
+                              <Link
+                                to={href}
+                                className="hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring rounded"
+                              >
+                                {label}
+                              </Link>
+                            ) : (
+                              <span>{label}</span>
+                            )}
                           </p>
                           <p className="text-xs text-muted-foreground">
                             Version {a.version} · effective {a.effective_date}

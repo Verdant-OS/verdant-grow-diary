@@ -10,10 +10,7 @@
 
 const STORAGE_PREFIX = "verdant.mcp.lastValidInputs.v1";
 
-export type ToolName =
-  | "list_grows"
-  | "list_recent_diary_entries"
-  | "get_latest_sensor_snapshot";
+export type ToolName = "list_grows" | "list_recent_diary_entries" | "get_latest_sensor_snapshot";
 
 function storageKey(tool: ToolName) {
   return `${STORAGE_PREFIX}.${tool}`;
@@ -46,10 +43,7 @@ export function loadLastValidInputs<T extends Record<string, unknown>>(
   }
 }
 
-export function saveLastValidInputs(
-  tool: ToolName,
-  inputs: Record<string, unknown>,
-): void {
+export function saveLastValidInputs(tool: ToolName, inputs: Record<string, unknown>): void {
   const s = safeStorage();
   if (!s) return;
   try {

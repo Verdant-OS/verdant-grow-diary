@@ -7,10 +7,13 @@ on:
   # firing on unrelated PRs.
   pull_request:
     paths:
+      - "src/components/PhenoComparisonView.tsx"
       - "src/pages/PhenoComparison.tsx"
+      - "src/pages/PhenoExpressionShowcase.tsx"
       - "src/lib/phenoComparison*"
       - "src/lib/phenoSelectionRules.ts"
       - "src/test/pheno-comparison-*"
+      - "src/test/pheno-expression-showcase.test.tsx"
       - "e2e/pheno-comparison-*.spec.ts"
       - "src/App.tsx"
       - "src/lib/appRouteManifest.ts"
@@ -59,6 +62,8 @@ jobs:
       - name: Vitest — Pheno Comparison
         run: |
           bunx vitest run \
+            src/test/pheno-comparison-a11y.test.tsx \
+            src/test/pheno-expression-showcase.test.tsx \
             src/test/pheno-comparison-view-model.test.ts \
             src/test/pheno-comparison-static-safety.test.ts
 
@@ -84,13 +89,18 @@ jobs:
       - name: Lint — Pheno owned files
         run: |
           bunx eslint \
+            src/components/PhenoComparisonView.tsx \
             src/pages/PhenoComparison.tsx \
+            src/pages/PhenoExpressionShowcase.tsx \
             src/lib/phenoComparisonRules.ts \
             src/lib/phenoComparisonViewModel.ts \
             src/lib/phenoSelectionRules.ts \
             src/lib/phenoComparisonFixtures.ts \
+            src/test/pheno-comparison-a11y.test.tsx \
+            src/test/pheno-expression-showcase.test.tsx \
             src/test/pheno-comparison-view-model.test.ts \
             src/test/pheno-comparison-static-safety.test.ts \
+            e2e/pheno-comparison-public-accessibility.spec.ts \
             e2e/pheno-comparison-visual-style.spec.ts \
             e2e/pheno-comparison-readonly.spec.ts
 
@@ -106,7 +116,8 @@ jobs:
             --project=chromium-mocked \
             --reporter=list,html \
             e2e/pheno-comparison-readonly.spec.ts \
-            e2e/pheno-comparison-visual-style.spec.ts
+            e2e/pheno-comparison-visual-style.spec.ts \
+            e2e/pheno-comparison-public-accessibility.spec.ts
 
       # On failure, upload Playwright debugging artifacts for triage:
       # HTML report, traces/videos/screenshots (test-results/), and the

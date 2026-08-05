@@ -72,11 +72,40 @@ describe("buildPlantTentEnvironmentView (pure)", () => {
     const temp = view.metrics.find((m) => m.key === "temp")!;
     const vpd = view.metrics.find((m) => m.key === "vpd")!;
     expect(temp.hasValue).toBe(true);
-    // 24.5°C displayed as Fahrenheit per Verdant convention: 24.5*9/5+32 = 76.1°F
+    // 24.5°C displayed as Fahrenheit — the default preference (no explicit
+    // unit passed, no localStorage entry in this pure unit test):
+    // 24.5*9/5+32 = 76.1°F
     expect(temp.display).toContain("76.1");
     expect(temp.display).toContain("°F");
     expect(vpd.hasValue).toBe(false);
     expect(vpd.display).toBe("Unknown");
+  });
+
+  it("displays in °C, unconverted, when the grower's preference is celsius (live-reactive, not fixed-Fahrenheit)", () => {
+    const ts = new Date().toISOString();
+    const view = buildPlantTentEnvironmentView(
+      [
+        { ts, metric: "temperature_c", value: 24.5, source: "live" },
+        { ts, metric: "soil_temp_c", value: 21, source: "live" },
+      ],
+      undefined,
+      "celsius",
+    );
+    const temp = view.metrics.find((m) => m.key === "temp")!;
+    const soilTemp = view.metrics.find((m) => m.key === "soil_temp")!;
+    expect(temp.display).toBe("24.5°C");
+    expect(soilTemp.display).toBe("21.0°C");
+  });
+
+  it("displays in °F when explicitly passed, matching the default-preference numbers above", () => {
+    const ts = new Date().toISOString();
+    const view = buildPlantTentEnvironmentView(
+      [{ ts, metric: "temperature_c", value: 24.5, source: "live" }],
+      undefined,
+      "fahrenheit",
+    );
+    const temp = view.metrics.find((m) => m.key === "temp")!;
+    expect(temp.display).toBe("76.1°F");
   });
 
   it("non-canonical source strings never earn the Live sensor label", () => {

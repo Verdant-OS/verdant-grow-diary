@@ -20,10 +20,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import {
-  buildActionButtonAriaLabel,
-  buildStatusBadgeAriaLabel,
-} from "@/lib/actionQueueRowView";
+import { buildActionButtonAriaLabel, buildStatusBadgeAriaLabel } from "@/lib/actionQueueRowView";
 import { stripSourceComments } from "@/test/utils/stripSourceComments";
 
 const QUEUE = stripSourceComments(
@@ -32,15 +29,35 @@ const QUEUE = stripSourceComments(
 const DETAIL = stripSourceComments(
   readFileSync(resolve(__dirname, "../..", "src/pages/ActionDetail.tsx"), "utf8"),
 );
-const BUTTON = readFileSync(
-  resolve(__dirname, "../..", "src/components/ui/button.tsx"),
-  "utf8",
-);
+const BUTTON = readFileSync(resolve(__dirname, "../..", "src/components/ui/button.tsx"), "utf8");
 
-const FORBIDDEN_IN_LABELS = [
-  "[alert:",
-  "[session:",
-];
+// Only two RPC-invocation shapes are legitimate in this codebase (see
+// action-detail-linked-alert.test.tsx for the full writeup):
+//   1. Direct call:       supabase.rpc("name", args)
+//   2. Cast-wrapped call: (supabase.rpc as unknown as (fn: string, args:
+//      unknown) => Promise<...>)("name", args) — used before the RPC's
+//      generated typing lands (see actionQueueRpcAvailability).
+// Anchoring to the call's own first argument (and second argument
+// identifier) rather than "any quote within N characters of supabase.rpc"
+// stops a dynamic/foreign RPC call from being credited with the canonical
+// name or the expected rpcArgs binding (Codex P2).
+const DIRECT_RPC_CALL_PATTERN = /supabase\.rpc\s*\(\s*["']([^"']+)["']\s*(?:,\s*(\w+))?\s*,?\s*\)/g;
+const CAST_RPC_CALL_PATTERN =
+  /supabase\.rpc\s+as\s+unknown\s+as\s*\([\s\S]{0,150}?\)\s*=>\s*[\s\S]{0,150}?\)\s*\(\s*["']([^"']+)["']\s*(?:,\s*(\w+))?\s*,?\s*\)/g;
+
+function resolveRpcCalls(src: string): Array<{ name: string; argsVar?: string }> {
+  const direct = [...src.matchAll(DIRECT_RPC_CALL_PATTERN)].map((m) => ({
+    name: m[1],
+    argsVar: m[2],
+  }));
+  const cast = [...src.matchAll(CAST_RPC_CALL_PATTERN)].map((m) => ({
+    name: m[1],
+    argsVar: m[2],
+  }));
+  return [...direct, ...cast];
+}
+
+const FORBIDDEN_IN_LABELS = ["[alert:", "[session:"];
 
 // Patterns that must never appear in any accessible name produced by
 // the helper, regardless of input.
@@ -48,23 +65,28 @@ const ID_LIKE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 
 const SAMPLE_ROW = { action_type: "raise_light" };
 
+function buttonOpeningTag(source: string, testId: string): string | undefined {
+  const marker = `data-testid="${testId}"`;
+  const markerIndex = source.indexOf(marker);
+  if (markerIndex < 0) return undefined;
+
+  const buttonStart = source.lastIndexOf("<Button", markerIndex);
+  const previousButtonEnd = source.lastIndexOf("</Button>", markerIndex);
+  const buttonEnd = source.indexOf("</Button>", markerIndex);
+  if (buttonStart < 0 || buttonStart < previousButtonEnd || buttonEnd < 0) return undefined;
+
+  return source.slice(buttonStart, buttonEnd + "</Button>".length);
+}
+
 describe("buildActionButtonAriaLabel — pure helper", () => {
   it("composes a descriptive label per transition kind", () => {
-    expect(buildActionButtonAriaLabel("approve", SAMPLE_ROW)).toBe(
-      "Approve action: Raise Light",
-    );
-    expect(buildActionButtonAriaLabel("reject", SAMPLE_ROW)).toBe(
-      "Reject action: Raise Light",
-    );
-    expect(buildActionButtonAriaLabel("simulate", SAMPLE_ROW)).toBe(
-      "Simulate action: Raise Light",
-    );
+    expect(buildActionButtonAriaLabel("approve", SAMPLE_ROW)).toBe("Approve action: Raise Light");
+    expect(buildActionButtonAriaLabel("reject", SAMPLE_ROW)).toBe("Reject action: Raise Light");
+    expect(buildActionButtonAriaLabel("simulate", SAMPLE_ROW)).toBe("Simulate action: Raise Light");
     expect(buildActionButtonAriaLabel("complete", SAMPLE_ROW)).toBe(
       "Mark action complete: Raise Light",
     );
-    expect(buildActionButtonAriaLabel("cancel", SAMPLE_ROW)).toBe(
-      "Cancel action: Raise Light",
-    );
+    expect(buildActionButtonAriaLabel("cancel", SAMPLE_ROW)).toBe("Cancel action: Raise Light");
   });
 
   it("falls back to 'Suggested action' when action_type is missing", () => {
@@ -83,12 +105,12 @@ describe("buildActionButtonAriaLabel — pure helper", () => {
       }),
     ).toBe("Approve action: Raise Light. Saving — please wait");
     // Empty/whitespace reasons are ignored.
-    expect(
-      buildActionButtonAriaLabel("approve", SAMPLE_ROW, { disabledReason: "   " }),
-    ).toBe("Approve action: Raise Light");
-    expect(
-      buildActionButtonAriaLabel("approve", SAMPLE_ROW, { disabledReason: null }),
-    ).toBe("Approve action: Raise Light");
+    expect(buildActionButtonAriaLabel("approve", SAMPLE_ROW, { disabledReason: "   " })).toBe(
+      "Approve action: Raise Light",
+    );
+    expect(buildActionButtonAriaLabel("approve", SAMPLE_ROW, { disabledReason: null })).toBe(
+      "Approve action: Raise Light",
+    );
   });
 
   it("never leaks ids, back-pointer tokens, or raw reason text into the label", () => {
@@ -109,9 +131,7 @@ describe("buildActionButtonAriaLabel — pure helper", () => {
 
 describe("buildStatusBadgeAriaLabel — pure helper", () => {
   it("describes the current status for assistive tech", () => {
-    expect(buildStatusBadgeAriaLabel("pending_approval")).toBe(
-      "Current status: Pending review",
-    );
+    expect(buildStatusBadgeAriaLabel("pending_approval")).toBe("Current status: Pending review");
     expect(buildStatusBadgeAriaLabel("approved")).toBe("Current status: Approved");
     expect(buildStatusBadgeAriaLabel("simulated")).toBe("Current status: Simulated");
     expect(buildStatusBadgeAriaLabel("rejected")).toBe("Current status: Rejected");
@@ -129,9 +149,7 @@ describe("ActionQueue — status-control aria wiring", () => {
 
   it("wires aria-label on every status-change button via the helper", () => {
     for (const kind of ["approve", "simulate", "reject", "complete", "cancel"] as const) {
-      const re = new RegExp(
-        `aria-label=\\{buildActionButtonAriaLabel\\(\\s*["']${kind}["']`,
-      );
+      const re = new RegExp(`aria-label=\\{buildActionButtonAriaLabel\\(\\s*["']${kind}["']`);
       expect(QUEUE).toMatch(re);
     }
   });
@@ -154,9 +172,7 @@ describe("ActionDetail — status-control aria wiring", () => {
 
   it("wires aria-label on every status-change button via the helper", () => {
     for (const kind of ["approve", "simulate", "reject", "complete", "cancel"] as const) {
-      const re = new RegExp(
-        `aria-label=\\{buildActionButtonAriaLabel\\(\\s*["']${kind}["']`,
-      );
+      const re = new RegExp(`aria-label=\\{buildActionButtonAriaLabel\\(\\s*["']${kind}["']`);
       expect(DETAIL).toMatch(re);
     }
   });
@@ -169,11 +185,26 @@ describe("ActionDetail — status-control aria wiring", () => {
   it("exposes the current status on the header status badge", () => {
     expect(DETAIL).toMatch(/aria-label=\{buildStatusBadgeAriaLabel\(row\.status\)\}/);
   });
+
+  it("keeps every detail decision control directly selectable and touch-safe on mobile", () => {
+    for (const testId of [
+      "action-detail-approve",
+      "action-detail-simulate",
+      "action-detail-reject",
+      "action-detail-complete",
+      "action-detail-cancel",
+    ]) {
+      const control = buttonOpeningTag(DETAIL, testId);
+      expect(control, `${testId} must be a directly selectable Button`).toBeTruthy();
+      expect(control, `${testId} must expose a 44px mobile touch target`).toContain("min-h-11");
+      expect(control, `${testId} may return to the compact desktop height`).toContain("sm:min-h-9");
+    }
+  });
 });
 
 describe("shared Button primitive — focus-visible preserved", () => {
   it("renders a focus-visible ring on all interactive status controls", () => {
-    expect(BUTTON).toMatch(/focus-visible:outline-none/);
+    expect(BUTTON).toMatch(/focus-visible:outline-hidden/);
     expect(BUTTON).toMatch(/focus-visible:ring-2/);
     expect(BUTTON).toMatch(/focus-visible:ring-ring/);
   });
@@ -199,11 +230,19 @@ describe("static safety — no automation/device-command copy introduced", () =>
   it("ActionDetail.tsx executable code is clean", () => {
     for (const re of FORBIDDEN) expect(DETAIL).not.toMatch(re);
   });
-  it("client never inserts user_id on the audit row", () => {
+  it("client never supplies identity to the transition RPC", () => {
     const m = QUEUE.match(
-      /\.from\(\s*["']action_queue_events["']\s*\)\s*\.insert\(\s*\{([\s\S]*?)\}\s*\)/,
+      /const\s+rpcArgs\s*=\s*buildActionQueueTransitionRpcArgs\(\s*\{([\s\S]*?)\}\s*\)/,
     );
     expect(m).not.toBeNull();
-    expect(m![1]).not.toMatch(/\buser_id\s*:/);
+    expect(m![1]).not.toMatch(/\buser_id\b|\bgrow_id\b|\bevent_type\b|\bnew_status\b/);
+    const rpcCallSiteCount = (QUEUE.match(/supabase\.rpc\b/g) ?? []).length;
+    const rpcCalls = resolveRpcCalls(QUEUE);
+    // Every call site must independently resolve its own first-argument
+    // name and second-argument identifier — a dynamic/foreign call site
+    // would leave this short rather than being credited with the
+    // canonical name or rpcArgs binding.
+    expect(rpcCalls.length).toBe(rpcCallSiteCount);
+    expect(rpcCalls).toEqual([{ name: "action_queue_transition", argsVar: "rpcArgs" }]);
   });
 });

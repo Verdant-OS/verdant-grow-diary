@@ -7,7 +7,7 @@
  * no backend, no device control).
  */
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { Search } from "lucide-react";
 import BrandLogo from "@/components/BrandLogo";
 import { usePageSeo } from "@/hooks/usePageSeo";
@@ -45,10 +45,10 @@ const PAGE_URL = `${VERDANT_SITE_ORIGIN}/guides/grow-stage-care-guide`;
 type StageFilter = "all" | GrowStage;
 
 const categoryClasses: Record<CareCategory, string> = {
-  watering: "bg-blue-500/10 text-blue-700 hover:bg-blue-500/20",
-  nutrients: "bg-green-500/10 text-green-700 hover:bg-green-500/20",
-  environment: "bg-amber-500/10 text-amber-700 hover:bg-amber-500/20",
-  harvest: "bg-purple-500/10 text-purple-700 hover:bg-purple-500/20",
+  watering: "bg-blue-500/10 text-blue-300 hover:bg-blue-500/20",
+  nutrients: "bg-green-500/10 text-green-300 hover:bg-green-500/20",
+  environment: "bg-amber-500/10 text-amber-300 hover:bg-amber-500/20",
+  harvest: "bg-purple-500/10 text-purple-300 hover:bg-purple-500/20",
 };
 
 function normalizeSearch(text: string): string {

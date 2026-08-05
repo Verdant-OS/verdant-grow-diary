@@ -5,10 +5,7 @@ import type {
 import type { SignupAcquisitionCounts } from "@/lib/signupAcquisitionSnapshotRules";
 
 export type SubscriberGrowthSprintStatus =
-  | "goal_reached"
-  | "deadline_passed"
-  | "on_pace"
-  | "behind_pace";
+  "goal_reached" | "deadline_passed" | "on_pace" | "behind_pace";
 
 export type SubscriberGrowthSprintPriority = "urgent" | "high" | "normal";
 

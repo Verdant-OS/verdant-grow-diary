@@ -84,9 +84,10 @@ describe("IngestAttemptReportPanel", () => {
   });
 
   it("does not import db/write helpers", async () => {
-    const src = (
-      await import("node:fs")
-    ).readFileSync("src/components/IngestAttemptReportPanel.tsx", "utf8");
+    const src = (await import("node:fs")).readFileSync(
+      "src/components/IngestAttemptReportPanel.tsx",
+      "utf8",
+    );
     expect(src).not.toMatch(/@\/integrations\/supabase/);
     expect(src).not.toMatch(/\.(insert|upsert|update|delete)\s*\(/);
     expect(src).not.toMatch(/action_queue/i);

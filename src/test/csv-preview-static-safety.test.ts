@@ -49,7 +49,7 @@ describe("csv preview — static safety scan", () => {
     expect(raw).toMatch(/Preview only/);
     expect(raw).toMatch(/No data has been saved/);
     expect(raw).toMatch(/CSV source, not live data/);
-    expect(raw).toMatch(/Review units before trusting values/);
+    expect(raw).toMatch(/Review\s+units before trusting values/);
     expect(raw).toMatch(/blocked from canonical preview/i);
   });
 

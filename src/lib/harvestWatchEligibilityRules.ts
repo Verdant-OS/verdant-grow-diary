@@ -13,11 +13,7 @@
 import { normalizeQuickLogStage } from "@/lib/quickLogStageDefaultRules";
 
 export type HarvestWatchEligibilityReason =
-  | "eligible"
-  | "stage_unknown"
-  | "stage_ineligible"
-  | "plant_archived"
-  | "plant_merged";
+  "eligible" | "stage_unknown" | "stage_ineligible" | "plant_archived" | "plant_merged";
 
 export interface HarvestWatchEligibilityInput {
   stage?: unknown;

@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 
 vi.mock("@/store/auth", () => ({
   useAuth: () => ({ user: { id: "grower-1" } }),
@@ -85,7 +85,7 @@ function selectPhoto(file: File) {
 
 const clearRect = vi.fn();
 const drawImage = vi.fn();
-let getContextSpy: ReturnType<typeof vi.spyOn>;
+let getContextSpy: { mockRestore: () => void };
 
 beforeEach(() => {
   clearRect.mockReset();

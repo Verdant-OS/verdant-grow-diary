@@ -28,8 +28,7 @@ import {
 } from "@/lib/csvRowValidationRules";
 
 /** Stable, presenter-safe source label. Never "live". */
-export const TIMELINE_PREVIEW_SOURCE_LABEL =
-  "csv / representative sample / not live" as const;
+export const TIMELINE_PREVIEW_SOURCE_LABEL = "csv / representative sample / not live" as const;
 
 /** Default number of valid rows shown in the timeline preview section. */
 export const TIMELINE_PREVIEW_DEFAULT_LIMIT = 8;
@@ -112,13 +111,23 @@ interface MetricDescriptor {
 
 const METRIC_DESCRIPTORS: ReadonlyArray<MetricDescriptor> = [
   { field: "air_temp_c", mappingField: "air_temp", draftKey: "air_temp_c", unit: "°C" },
-  { field: "substrate_temp_c", mappingField: "substrate_temp", draftKey: "substrate_temp_c", unit: "°C" },
+  {
+    field: "substrate_temp_c",
+    mappingField: "substrate_temp",
+    draftKey: "substrate_temp_c",
+    unit: "°C",
+  },
   { field: "humidity_pct", mappingField: "humidity", draftKey: "humidity_pct", unit: "%" },
   { field: "vpd_kpa", mappingField: "vpd", draftKey: "vpd_kpa", unit: "kPa" },
   { field: "co2_ppm", mappingField: "co2", draftKey: "co2_ppm", unit: "ppm" },
   { field: "ppfd", mappingField: "ppfd", draftKey: "ppfd", unit: "µmol" },
   { field: "vwc_pct", mappingField: "vwc", draftKey: "vwc_pct", unit: "%" },
-  { field: "substrate_ec_mscm", mappingField: "substrate_ec", draftKey: "substrate_ec_mscm", unit: "mS/cm" },
+  {
+    field: "substrate_ec_mscm",
+    mappingField: "substrate_ec",
+    draftKey: "substrate_ec_mscm",
+    unit: "mS/cm",
+  },
 ];
 
 function mappingHeader(
@@ -131,10 +140,7 @@ function mappingHeader(
   return v.column;
 }
 
-function rawCellPresent(
-  row: RepresentativeDraftReading,
-  header: string | null,
-): boolean {
+function rawCellPresent(row: RepresentativeDraftReading, header: string | null): boolean {
   if (!header) return false;
   const cell = row.raw_payload[header];
   if (cell === undefined || cell === null) return false;
@@ -142,17 +148,19 @@ function rawCellPresent(
 }
 
 function clampLimit(limit: number | undefined): number {
-  const n = typeof limit === "number" && Number.isFinite(limit)
-    ? Math.floor(limit)
-    : TIMELINE_PREVIEW_DEFAULT_LIMIT;
+  const n =
+    typeof limit === "number" && Number.isFinite(limit)
+      ? Math.floor(limit)
+      : TIMELINE_PREVIEW_DEFAULT_LIMIT;
   if (n < TIMELINE_PREVIEW_MIN_LIMIT) return TIMELINE_PREVIEW_MIN_LIMIT;
   if (n > TIMELINE_PREVIEW_MAX_LIMIT) return TIMELINE_PREVIEW_MAX_LIMIT;
   return n;
 }
 
-function hintsToReasons(
-  hints: ReadonlyArray<CsvRowValidationHint>,
-): { codes: string[]; messages: string[] } {
+function hintsToReasons(hints: ReadonlyArray<CsvRowValidationHint>): {
+  codes: string[];
+  messages: string[];
+} {
   const codeSet = new Set<string>();
   const msgSet = new Set<string>();
   for (const h of hints) {
@@ -222,9 +230,7 @@ function buildEvent(
  *  - Events are capped by `limit` (clamped 5..10).
  *  - Invalid rows are returned in `reviewRows` (never silently hidden).
  */
-export function buildCsvTimelinePreview(
-  args: BuildTimelinePreviewArgs,
-): TimelinePreviewResult {
+export function buildCsvTimelinePreview(args: BuildTimelinePreviewArgs): TimelinePreviewResult {
   const { rows, mapping } = args;
   const limit = clampLimit(args.limit);
 
@@ -271,9 +277,7 @@ export function buildCsvTimelinePreview(
     return a.row.rowIndex - b.row.rowIndex;
   });
 
-  const events = ready
-    .slice(0, limit)
-    .map(({ row, hints }) => buildEvent(row, mapping, hints));
+  const events = ready.slice(0, limit).map(({ row, hints }) => buildEvent(row, mapping, hints));
 
   reviewRows.sort((a, b) => a.rowIndex - b.rowIndex);
 

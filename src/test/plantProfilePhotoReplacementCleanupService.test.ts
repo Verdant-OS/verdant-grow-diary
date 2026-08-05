@@ -33,9 +33,7 @@ function makeClient(s: Scenario) {
                 }
                 return Promise.resolve({
                   data:
-                    s.currentPhoto === undefined
-                      ? []
-                      : [{ id: PLANT, photo_url: s.currentPhoto }],
+                    s.currentPhoto === undefined ? [] : [{ id: PLANT, photo_url: s.currentPhoto }],
                   error: null,
                 });
               }
@@ -92,10 +90,7 @@ describe("retirePreviousPlantProfilePhoto", () => {
 
   it("persistence mismatch (row has different photo_url) → skipped_for_safety", async () => {
     const remove = vi.fn(async () => ({ ok: true }));
-    const { result } = await run(
-      { currentPhoto: "https://legacy/x.jpg" },
-      remove,
-    );
+    const { result } = await run({ currentPhoto: "https://legacy/x.jpg" }, remove);
     expect(result).toEqual({
       status: "skipped_for_safety",
       reason: "persistence_unconfirmed",
@@ -105,10 +100,7 @@ describe("retirePreviousPlantProfilePhoto", () => {
 
   it("persistence lookup errors → skipped_for_safety, no removal", async () => {
     const remove = vi.fn(async () => ({ ok: true }));
-    const { result } = await run(
-      { currentError: { message: "db" } },
-      remove,
-    );
+    const { result } = await run({ currentError: { message: "db" } }, remove);
     expect(result).toEqual({
       status: "skipped_for_safety",
       reason: "persistence_unconfirmed",
@@ -125,10 +117,7 @@ describe("retirePreviousPlantProfilePhoto", () => {
 
   it("reference-query failure → skipped_for_safety, no removal", async () => {
     const remove = vi.fn(async () => ({ ok: true }));
-    const { result } = await run(
-      { currentPhoto: NEW_REF, refError: { message: "db" } },
-      remove,
-    );
+    const { result } = await run({ currentPhoto: NEW_REF, refError: { message: "db" } }, remove);
     expect(result).toEqual({
       status: "skipped_for_safety",
       reason: "reference_check_failed",
@@ -138,10 +127,7 @@ describe("retirePreviousPlantProfilePhoto", () => {
 
   it("reference-query throws → skipped_for_safety", async () => {
     const remove = vi.fn(async () => ({ ok: true }));
-    const { result } = await run(
-      { currentPhoto: NEW_REF, throwOnRef: true },
-      remove,
-    );
+    const { result } = await run({ currentPhoto: NEW_REF, throwOnRef: true }, remove);
     expect(result.status).toBe("skipped_for_safety");
     expect(remove).not.toHaveBeenCalled();
   });

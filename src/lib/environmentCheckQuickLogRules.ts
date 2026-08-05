@@ -16,17 +16,15 @@
  *    the same guards Quick Log v2 uses. Pure import (no I/O) so v1 and v2
  *    can never disagree on what counts as a physically real reading.
  */
-import {
-  isTemperatureValid,
-  isHumidityValid,
-  isVpdValid,
-} from "./sensorReadingNormalizationRules";
+import { isTemperatureValid, isHumidityValid, isVpdValid } from "./sensorReadingNormalizationRules";
 
 export type EnvironmentCheckWaterTempUnit = "F" | "C";
 
 export interface EnvironmentCheckFormInput {
-  /** Room temperature in Fahrenheit (string from form input). */
+  /** Room temperature (string from form input; unit given by roomTempUnit). */
   roomTempF?: string | null;
+  /** Unit of `roomTempF`. Defaults to "F" when omitted (legacy callers). */
+  roomTempUnit?: EnvironmentCheckWaterTempUnit;
   /** Relative humidity percentage 0-100 (string from form input). */
   humidityPct?: string | null;
   /** Optional VPD in kPa (string from form input). */
@@ -43,6 +41,9 @@ export interface EnvironmentCheckFormInput {
 
 export interface EnvironmentCheckEnvelope {
   room_temp_f: number | null;
+  /** Derived Celsius pairing of room_temp_f, so downstream consumers never
+   * have to convert or guess which unit the grower entered in. */
+  temp_c: number | null;
   humidity_pct: number | null;
   vpd_kpa: number | null;
   water_temp_f: number | null;
@@ -82,11 +83,7 @@ function parseFinite(raw: string | null | undefined): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-function clampOrNull(
-  n: number | null,
-  min: number,
-  max: number,
-): number | null {
+function clampOrNull(n: number | null, min: number, max: number): number | null {
   if (n === null) return null;
   if (n < min || n > max) return null;
   return n;
@@ -116,10 +113,14 @@ export function celsiusToFahrenheit(c: number): number {
  * nothing meaningful — callers should then omit the envelope entirely.
  *
  * Unit policy:
- *  - room_temp_f / water_temp_f are stored in °F (form's primary unit).
- *  - water_temp_c is stored only when the grower picked °C explicitly,
- *    OR is derived from °F as a paired convenience field so downstream
- *    consumers don't have to re-convert. We never silently infer units.
+ *  - room_temp_f / water_temp_f default to °F when no unit is given
+ *    (legacy callers, backward compatible).
+ *  - Both room and water temperature always store BOTH the °F and °C
+ *    pairing once a valid value is entered, derived from whichever unit
+ *    the grower actually typed in (roomTempUnit / waterTempUnit) — so
+ *    downstream consumers never have to re-convert or guess. We never
+ *    silently infer units when none is given for water temp; room temp
+ *    defaults to °F only for backward compatibility with existing data.
  */
 export function buildEnvironmentCheckDetails(
   input: EnvironmentCheckFormInput,
@@ -131,10 +132,20 @@ export function buildEnvironmentCheckDetails(
   // sees in-band values; this guard just guarantees the builder can never
   // emit an out-of-band reading even if called ungated.
   const roomRaw = parseFinite(input.roomTempF);
-  const room_temp_f =
-    roomRaw !== null && isTemperatureValid(fahrenheitToCelsius(roomRaw))
-      ? roomRaw
-      : null;
+  const roomUnit = input.roomTempUnit ?? "F";
+  let room_temp_f: number | null = null;
+  let temp_c: number | null = null;
+  if (roomRaw !== null) {
+    if (roomUnit === "C") {
+      if (isTemperatureValid(roomRaw)) {
+        temp_c = roomRaw;
+        room_temp_f = roundTo(celsiusToFahrenheit(roomRaw), 1);
+      }
+    } else if (isTemperatureValid(fahrenheitToCelsius(roomRaw))) {
+      room_temp_f = roomRaw;
+      temp_c = roundTo(fahrenheitToCelsius(roomRaw), 2);
+    }
+  }
   const humRaw = parseFinite(input.humidityPct);
   const humidity_pct = humRaw !== null && isHumidityValid(humRaw) ? humRaw : null;
   const vpdRaw = parseFinite(input.vpdKpa);
@@ -163,6 +174,7 @@ export function buildEnvironmentCheckDetails(
 
   if (
     room_temp_f === null &&
+    temp_c === null &&
     humidity_pct === null &&
     vpd_kpa === null &&
     water_temp_f === null &&
@@ -175,6 +187,7 @@ export function buildEnvironmentCheckDetails(
 
   return {
     room_temp_f,
+    temp_c,
     humidity_pct,
     vpd_kpa,
     water_temp_f,
@@ -189,13 +202,10 @@ export function buildEnvironmentCheckDetails(
  * quickLogReasonToOperatorMessage mapping renders both paths' copy.
  */
 export type EnvironmentCheckSensorBandReason =
-  | "temperature_out_of_range"
-  | "humidity_out_of_range"
-  | "vpd_out_of_range";
+  "temperature_out_of_range" | "humidity_out_of_range" | "vpd_out_of_range";
 
 export type EnvironmentCheckSensorBandResult =
-  | { ok: true }
-  | { ok: false; reason: EnvironmentCheckSensorBandReason };
+  { ok: true } | { ok: false; reason: EnvironmentCheckSensorBandReason };
 
 /**
  * Blocking plausibility gate for the three air-sensor metrics, reconciled
@@ -210,11 +220,14 @@ export type EnvironmentCheckSensorBandResult =
  * out of scope here (no canonical counterpart; unchanged this slice).
  */
 export function validateEnvironmentCheckSensorBand(
-  input: Pick<EnvironmentCheckFormInput, "roomTempF" | "humidityPct" | "vpdKpa">,
+  input: Pick<EnvironmentCheckFormInput, "roomTempF" | "roomTempUnit" | "humidityPct" | "vpdKpa">,
 ): EnvironmentCheckSensorBandResult {
   const roomRaw = parseFinite(input.roomTempF);
-  if (roomRaw !== null && !isTemperatureValid(fahrenheitToCelsius(roomRaw))) {
-    return { ok: false, reason: "temperature_out_of_range" };
+  if (roomRaw !== null) {
+    const roomC = input.roomTempUnit === "C" ? roomRaw : fahrenheitToCelsius(roomRaw);
+    if (!isTemperatureValid(roomC)) {
+      return { ok: false, reason: "temperature_out_of_range" };
+    }
   }
   const humRaw = parseFinite(input.humidityPct);
   if (humRaw !== null && !isHumidityValid(humRaw)) {
@@ -228,9 +241,7 @@ export function validateEnvironmentCheckSensorBand(
 }
 
 /** True when any measurement field has a parseable, in-range value. */
-export function hasAnyEnvironmentCheckMeasurement(
-  input: EnvironmentCheckFormInput,
-): boolean {
+export function hasAnyEnvironmentCheckMeasurement(input: EnvironmentCheckFormInput): boolean {
   const e = buildEnvironmentCheckDetails({ ...input, note: null });
   return e !== null;
 }

@@ -147,9 +147,7 @@ describe("AUD-005 'No tent' bucket", () => {
         search: "",
       });
       const all = chips.find((c) => c.id === "all");
-      const sum = chips
-        .filter((c) => c.id !== "all")
-        .reduce((acc, c) => acc + c.count, 0);
+      const sum = chips.filter((c) => c.id !== "all").reduce((acc, c) => acc + c.count, 0);
       expect(sum).toBe(all?.count);
     }
   });
@@ -164,9 +162,10 @@ describe("AUD-005 'No tent' bucket", () => {
 
   it("filterPlantsByTentChip mirrors the chip buckets exactly", () => {
     const visible = filterVisiblePlants(plantsWithNoTent, { showArchived: false });
-    expect(
-      filterPlantsByTentChip(visible, NO_TENT_FILTER_CHIP_ID).map((p) => p.id),
-    ).toEqual(["p2", "p3"]);
+    expect(filterPlantsByTentChip(visible, NO_TENT_FILTER_CHIP_ID).map((p) => p.id)).toEqual([
+      "p2",
+      "p3",
+    ]);
     expect(filterPlantsByTentChip(visible, "tent-a").map((p) => p.id)).toEqual(["p1"]);
     expect(filterPlantsByTentChip(visible, "all").length).toBe(visible.length);
   });

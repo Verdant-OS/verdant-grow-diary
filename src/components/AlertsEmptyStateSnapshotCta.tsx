@@ -9,7 +9,7 @@
  *  - Tone copy is derived from the same gate the alert engine uses.
  */
 import { useMemo } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { Button } from "@/components/ui/button";
 import { useGrowTents } from "@/hooks/useGrowData";
 import { useLatestSensorSnapshot } from "@/hooks/useLatestSensorSnapshot";

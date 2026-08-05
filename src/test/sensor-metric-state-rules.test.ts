@@ -155,14 +155,8 @@ describe("sensorMetricStateRules", () => {
 });
 
 describe("sensorMetricStateRules static safety", () => {
-  const SRC = readFileSync(
-    resolve(__dirname, "../lib/sensorMetricStateRules.ts"),
-    "utf8",
-  );
-  const VPD_SRC = readFileSync(
-    resolve(__dirname, "../lib/vpdCalculationRules.ts"),
-    "utf8",
-  );
+  const SRC = readFileSync(resolve(__dirname, "../lib/sensorMetricStateRules.ts"), "utf8");
+  const VPD_SRC = readFileSync(resolve(__dirname, "../lib/vpdCalculationRules.ts"), "utf8");
 
   it("contains no AI / alerts / Action Queue / automation / device control imports", () => {
     for (const src of [SRC, VPD_SRC]) {
@@ -209,14 +203,9 @@ describe("optional metric invalid detection", () => {
     ["soil", 15, false],
     ["soil", 45, false],
     ["soil", 80, false],
-  ] as const)(
-    "isOptionalMetricInvalid(%s, %s) -> %s",
-    (metric, value, expected) => {
-      expect(isOptionalMetricInvalid(metric as SensorMetricKey, value)).toBe(
-        expected,
-      );
-    },
-  );
+  ] as const)("isOptionalMetricInvalid(%s, %s) -> %s", (metric, value, expected) => {
+    expect(isOptionalMetricInvalid(metric as SensorMetricKey, value)).toBe(expected);
+  });
 
   it("classifies CO2 6000 as caution with units copy", () => {
     const s = classifySensorMetricState({
@@ -364,7 +353,6 @@ describe("stale vs invalid caution-tone coverage", () => {
     },
   );
 });
-
 
 import { describeSoilMoistureStuckWindow } from "@/lib/sensorMetricStateRules";
 

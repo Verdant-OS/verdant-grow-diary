@@ -18,10 +18,7 @@
  */
 
 import { PPFD_MAX } from "@/lib/ppfdRules";
-import {
-  computeVpdKpa,
-  fahrenheitToCelsius,
-} from "@/lib/sensorReadingManualEntryRules";
+import { computeVpdKpa, fahrenheitToCelsius } from "@/lib/sensorReadingManualEntryRules";
 
 export type SensorSnapshotReviewSeverity = "ok" | "warning" | "blocker";
 
@@ -119,7 +116,13 @@ export function reviewManualSensorSnapshot(
   // VPD auto-preview (derived, only for display — never silently persisted).
   let vpdPreview: number | null = vpd;
   let vpdDerived = false;
-  if (vpdPreview === null && tempF !== null && humidity !== null && humidity >= 0 && humidity <= 100) {
+  if (
+    vpdPreview === null &&
+    tempF !== null &&
+    humidity !== null &&
+    humidity >= 0 &&
+    humidity <= 100
+  ) {
     vpdPreview = computeVpdKpa(fahrenheitToCelsius(tempF), humidity);
     vpdDerived = true;
   }
@@ -380,17 +383,9 @@ export function reviewManualSensorSnapshot(
 
   const hasBlocker = findings.some((f) => f.severity === "blocker");
   const warningCount = findings.filter((f) => f.severity === "warning").length;
-  const metricCount = [
-    tempF,
-    humidity,
-    vpd,
-    soilWc,
-    soilEc,
-    resEc,
-    resPh,
-    co2,
-    ppfd,
-  ].filter((v) => v !== null).length;
+  const metricCount = [tempF, humidity, vpd, soilWc, soilEc, resEc, resPh, co2, ppfd].filter(
+    (v) => v !== null,
+  ).length;
 
   let confidence: "high" | "medium" | "low";
   if (hasBlocker || suspiciousUnitOrRail) {

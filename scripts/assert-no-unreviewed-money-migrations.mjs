@@ -30,10 +30,7 @@
 import { readdirSync, existsSync } from "node:fs";
 import { resolve, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import {
-  KNOWN_MONEY_MIGRATIONS,
-  isMoneyMigrationFilename,
-} from "./required-money-migrations.mjs";
+import { KNOWN_MONEY_MIGRATIONS, isMoneyMigrationFilename } from "./required-money-migrations.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const MIGRATIONS_DIR = join(REPO_ROOT, "supabase", "migrations");
@@ -53,9 +50,7 @@ let failed = false;
 
 if (unreviewed.length > 0) {
   failed = true;
-  console.error(
-    "✗ Unreviewed money-adjacent migration(s) added outside the allowlist:",
-  );
+  console.error("✗ Unreviewed money-adjacent migration(s) added outside the allowlist:");
   for (const f of unreviewed) console.error(`    supabase/migrations/${f}`);
   console.error(
     "\nThese filenames match a money pattern (credit, referral, entitlement,\n" +
@@ -72,9 +67,7 @@ if (unreviewed.length > 0) {
 
 if (missing.length > 0) {
   failed = true;
-  console.error(
-    "✗ Allowlisted money migration file(s) missing from supabase/migrations/:",
-  );
+  console.error("✗ Allowlisted money migration file(s) missing from supabase/migrations/:");
   for (const f of missing) console.error(`    ${f}`);
   console.error(
     "\nA KNOWN money migration was renamed or deleted. In the SAME PR,\n" +

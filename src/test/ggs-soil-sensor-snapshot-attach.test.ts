@@ -77,10 +77,9 @@ describe("buildGgsSoilSnapshotAttachDraft", () => {
   });
 
   it("blocks and visibly marks invalid readings", () => {
-    const d = buildGgsSoilSnapshotAttachDraft(
-      liveDraft({ source: "invalid", status: "invalid" }),
-      { tentId: "tent-1" },
-    );
+    const d = buildGgsSoilSnapshotAttachDraft(liveDraft({ source: "invalid", status: "invalid" }), {
+      tentId: "tent-1",
+    });
     expect(d.attachable).toBe(false);
     expect(d.blockedReason).toBe("invalid");
     expect(d.attachLabel).toMatch(/invalid/i);
@@ -97,10 +96,9 @@ describe("buildGgsSoilSnapshotAttachDraft", () => {
   });
 
   it("never invents missing metrics", () => {
-    const d = buildGgsSoilSnapshotAttachDraft(
-      liveDraft({ readings: { soil_moisture_pct: 30 } }),
-      { tentId: "tent-1" },
-    );
+    const d = buildGgsSoilSnapshotAttachDraft(liveDraft({ readings: { soil_moisture_pct: 30 } }), {
+      tentId: "tent-1",
+    });
     expect(d.readings.soil_temp_c).toBeUndefined();
     expect(d.readings.ec).toBeUndefined();
   });

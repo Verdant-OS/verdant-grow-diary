@@ -24,7 +24,6 @@ import { describe, it, expect, afterEach } from "vitest";
 import { render, cleanup } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { format } from "date-fns";
 
 import SensorChart from "@/components/SensorChart";
 import {
@@ -124,9 +123,7 @@ describe("SensorChart — PPFD as selectable metric", () => {
 
   it("renders the PPFD legend label from the shared meta", () => {
     const { getByTestId } = render(<SensorChart data={data} metric="ppfd" />);
-    expect(getByTestId("sensor-chart-legend").textContent).toContain(
-      "PPFD (µmol/m²/s)",
-    );
+    expect(getByTestId("sensor-chart-legend").textContent).toContain("PPFD (µmol/m²/s)");
   });
 
   it("exposes the CSV export button by default", () => {
@@ -144,9 +141,7 @@ describe("SensorChart — PPFD as selectable metric", () => {
       reading({ ts: "2026-01-09T12:00:00Z", ppfd: null }),
       reading({ ts: "2026-01-10T12:00:00Z", ppfd: 700 }),
     ];
-    expect(() =>
-      render(<SensorChart data={partial} metric="ppfd" />),
-    ).not.toThrow();
+    expect(() => render(<SensorChart data={partial} metric="ppfd" />)).not.toThrow();
   });
 });
 
@@ -189,8 +184,8 @@ describe("buildSensorReadingsCsv — PPFD column", () => {
     const b = reading({ ts: "2026-01-10T12:00:00Z", ppfd: 800 });
     const csv = buildSensorReadingsCsv([a, b]);
     const lines = csv.split("\n");
-    expect(lines[1]).toContain(format(new Date(a.ts), "yyyy-MM-dd HH:mm:ss"));
-    expect(lines[2]).toContain(format(new Date(b.ts), "yyyy-MM-dd HH:mm:ss"));
+    expect(lines[1]).toMatch(/^2026-01-08 12:00:00,/);
+    expect(lines[2]).toMatch(/^2026-01-10 12:00:00,/);
   });
 
   it("preserves the source label and captured_at column", () => {
@@ -222,16 +217,12 @@ describe("AI Doctor sensor context — PPFD wiring", () => {
   });
 
   it("routes implausibly high PPFD (>2500) to invalidMetrics", () => {
-    const ctx = mapSensorReadingToAiDoctorContext(
-      nex5({ ppfd_umol_m2s: 9999 }),
-    );
+    const ctx = mapSensorReadingToAiDoctorContext(nex5({ ppfd_umol_m2s: 9999 }));
     expect(ctx.invalidMetrics).toContain("ppfd_umol_m2s");
   });
 
   it("missing PPFD is reported as missing (never silently 'healthy')", () => {
-    const ctx = mapSensorReadingToAiDoctorContext(
-      nex5({ ppfd_umol_m2s: null }),
-    );
+    const ctx = mapSensorReadingToAiDoctorContext(nex5({ ppfd_umol_m2s: null }));
     expect(ctx.missingMetrics).toContain("ppfd_umol_m2s");
     expect(ctx.usableMetrics).not.toContain("ppfd_umol_m2s");
   });
@@ -261,17 +252,9 @@ describe("AI Doctor sensor context — PPFD wiring", () => {
     );
     // PPFD-only is environment-only → must include the env-only and
     // telemetry-alone safety notes.
-    expect(
-      ctx.safetyNotes.some((n) => /Environment readings only/i.test(n)),
-    ).toBe(true);
-    expect(
-      ctx.safetyNotes.some((n) =>
-        /cannot confirm or deny plant health/i.test(n),
-      ),
-    ).toBe(true);
-    expect(
-      ctx.safetyNotes.some((n) => /PPFD is context-only/i.test(n)),
-    ).toBe(true);
+    expect(ctx.safetyNotes.some((n) => /Environment readings only/i.test(n))).toBe(true);
+    expect(ctx.safetyNotes.some((n) => /cannot confirm or deny plant health/i.test(n))).toBe(true);
+    expect(ctx.safetyNotes.some((n) => /PPFD is context-only/i.test(n))).toBe(true);
     // Even one valid metric on a "live" source resolves to "none" by
     // design — but the safety notes above prevent over-confidence.
     expect(ctx.confidenceImpact).toBe("none");
@@ -294,26 +277,18 @@ describe("PPFD wiring — static safety", () => {
     "components/SensorChart.tsx",
   ];
 
-  it.each(FILES)(
-    "%s has no service_role / automation / device-control / *_executed",
-    (rel) => {
-      const lower = readSrc(rel).toLowerCase();
-      // Allow the literal token only inside a no-op safety comment ("no
-      // service_role usage."); flag any code reference (quoted string,
-      // property access, function call).
-      expect(/["'`]service_role["'`]|service_role\s*\(|\.service_role\b/.test(lower)).toBe(false);
-      expect(lower.includes("autopilot")).toBe(false);
-      expect(/[a-z0-9]_executed\b/.test(lower)).toBe(false);
-      for (const banned of [
-        "turn_on_",
-        "turn_off_",
-        "device_command",
-        "execute_device",
-      ]) {
-        expect(lower.includes(banned)).toBe(false);
-      }
-    },
-  );
+  it.each(FILES)("%s has no service_role / automation / device-control / *_executed", (rel) => {
+    const lower = readSrc(rel).toLowerCase();
+    // Allow the literal token only inside a no-op safety comment ("no
+    // service_role usage."); flag any code reference (quoted string,
+    // property access, function call).
+    expect(/["'`]service_role["'`]|service_role\s*\(|\.service_role\b/.test(lower)).toBe(false);
+    expect(lower.includes("autopilot")).toBe(false);
+    expect(/[a-z0-9]_executed\b/.test(lower)).toBe(false);
+    for (const banned of ["turn_on_", "turn_off_", "device_command", "execute_device"]) {
+      expect(lower.includes(banned)).toBe(false);
+    }
+  });
 
   it("SensorChart does not embed an inline PPFD metric table — uses shared meta", () => {
     const src = readSrc("components/SensorChart.tsx");

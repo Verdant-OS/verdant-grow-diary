@@ -27,11 +27,13 @@ import {
   createQuickLogPhotoDiaryEntry,
   QUICK_LOG_PHOTO_DIARY_DEFAULT_NOTE,
 } from "@/lib/quickLogPhotoDiaryEntry";
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 import * as supabaseModule from "@/integrations/supabase/client";
-const mock = (supabaseModule as unknown as {
-  __mock: { from: ReturnType<typeof vi.fn>; insert: ReturnType<typeof vi.fn> };
-}).__mock;
+const mock = (
+  supabaseModule as unknown as {
+    __mock: { from: ReturnType<typeof vi.fn>; insert: ReturnType<typeof vi.fn> };
+  }
+).__mock;
 
 const FIXED_NOW = new Date("2026-07-07T12:00:00.000Z");
 const now = () => FIXED_NOW;
@@ -94,9 +96,7 @@ describe("createQuickLogPhotoDiaryEntry", () => {
     expect(mock.from).toHaveBeenCalledTimes(1);
     expect(mock.from).toHaveBeenCalledWith("diary_entries");
     expect(mock.insert).toHaveBeenCalledTimes(1);
-    expect(mock.insert.mock.calls[0][0]).toEqual(
-      buildQuickLogPhotoDiaryEntryRow(baseInput),
-    );
+    expect(mock.insert.mock.calls[0][0]).toEqual(buildQuickLogPhotoDiaryEntryRow(baseInput));
   });
 
   it("returns a failure message on insert error and does not throw", async () => {
@@ -123,14 +123,56 @@ describe("createQuickLogPhotoDiaryEntry", () => {
 });
 
 describe("QuickLogV2Sheet static safety — photo diary extraction", () => {
+  it("merges optional extraDetails while the fixed identity keys always win", () => {
+    const row = buildQuickLogPhotoDiaryEntryRow({
+      growId: "g1",
+      tentId: null,
+      plantId: "p1",
+      photoPath: "u1/g1/1.jpg",
+      noteRaw: "day 40",
+      action: "photo",
+      extraDetails: {
+        subject: "buds",
+        caption: "day 40 flower",
+        // Attempted spoofs of the fixed envelope must lose:
+        event_type: "fake",
+        source: "live",
+      },
+      now: () => new Date("2026-07-23T00:00:00Z"),
+    });
+    expect(row.details).toEqual({
+      subject: "buds",
+      caption: "day 40 flower",
+      event_type: "quicklog_photo_attachment",
+      source: "manual",
+      attached_to_action: "photo",
+    });
+  });
+
+  it("eventType override gives standalone Photo saves a displayable type (default marker preserved)", () => {
+    const base = {
+      growId: "g1",
+      tentId: null,
+      plantId: "p1",
+      photoPath: "u1/g1/1.jpg",
+      noteRaw: "",
+      action: "photo",
+      now: () => new Date("2026-07-23T00:00:00Z"),
+    };
+    expect(buildQuickLogPhotoDiaryEntryRow(base).details.event_type).toBe(
+      "quicklog_photo_attachment",
+    );
+    expect(
+      buildQuickLogPhotoDiaryEntryRow({ ...base, eventType: "photo" }).details.event_type,
+    ).toBe("photo");
+  });
+
   it("QuickLogV2Sheet.tsx no longer contains a direct supabase.from(...) write", () => {
     const raw = readFileSync(
       join(process.cwd(), "src", "components", "QuickLogV2Sheet.tsx"),
       "utf8",
     );
-    const stripped = raw
-      .replace(/\/\*[\s\S]*?\*\//g, "")
-      .replace(/\/\/.*$/gm, "");
+    const stripped = raw.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
     // storage.from is allowed (photo upload); .from( on its own must be gone.
     expect(stripped).not.toMatch(/[^.]supabase\.from\(/);
   });

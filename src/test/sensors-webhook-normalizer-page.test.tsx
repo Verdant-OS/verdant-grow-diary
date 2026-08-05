@@ -9,7 +9,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import SensorsIngestNormalizer from "@/pages/SensorsIngestNormalizer";
 
 // Spy on Supabase client to ensure the page never invokes any write
@@ -59,7 +59,9 @@ describe("SensorsIngestNormalizer", () => {
     renderPage();
     expect(screen.getByTestId("webhook-normalizer-textarea")).toBeInTheDocument();
     expect(screen.getByTestId("webhook-normalizer-example-ecowitt-mqtt")).toBeInTheDocument();
-    expect(screen.getByTestId("webhook-normalizer-example-home-assistant-webhook")).toBeInTheDocument();
+    expect(
+      screen.getByTestId("webhook-normalizer-example-home-assistant-webhook"),
+    ).toBeInTheDocument();
     expect(screen.getByTestId("webhook-normalizer-example-generic-mqtt")).toBeInTheDocument();
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(supabaseSpies.functions.invoke).not.toHaveBeenCalled();
@@ -78,8 +80,9 @@ describe("SensorsIngestNormalizer", () => {
     expect(screen.getByTestId("sensor-source-lineage-source").textContent).toBe("MQTT");
     expect(screen.getByTestId("sensor-source-lineage-vendor").textContent).toBe("EcoWitt");
     // Disclaimer must always render with a successful preview.
-    expect(screen.getByTestId("webhook-normalizer-disclaimer").textContent?.toLowerCase())
-      .toContain("not been ingested");
+    expect(
+      screen.getByTestId("webhook-normalizer-disclaimer").textContent?.toLowerCase(),
+    ).toContain("not been ingested");
   });
 
   it("renders rejected/skipped field reasons", () => {
@@ -140,9 +143,9 @@ describe("SensorsIngestNormalizer", () => {
     fireEvent.click(screen.getByTestId("webhook-normalizer-parse"));
     expect(screen.getByTestId("webhook-normalizer-result")).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("webhook-normalizer-clear"));
-    expect(
-      (screen.getByTestId("webhook-normalizer-textarea") as HTMLTextAreaElement).value,
-    ).toBe("");
+    expect((screen.getByTestId("webhook-normalizer-textarea") as HTMLTextAreaElement).value).toBe(
+      "",
+    );
     expect(screen.queryByTestId("webhook-normalizer-result")).toBeNull();
   });
 

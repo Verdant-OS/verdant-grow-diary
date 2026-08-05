@@ -5,7 +5,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import SensorSourceSummaryWidget from "@/components/SensorSourceSummaryWidget";
 
 const READINGS = [
@@ -40,9 +40,7 @@ describe("SensorSourceSummaryWidget — clickable rows", () => {
     const demoRow = screen.getByTestId("sensor-source-summary-row-demo");
     expect(demoRow).toHaveAttribute("data-clickable", "false");
     expect(demoRow).toHaveAttribute("aria-disabled", "true");
-    expect(
-      screen.queryByTestId("sensor-source-summary-link-demo"),
-    ).toBeNull();
+    expect(screen.queryByTestId("sensor-source-summary-link-demo")).toBeNull();
   });
 
   it("preserves date range in click-through URL", () => {
@@ -71,8 +69,6 @@ describe("SensorSourceSummaryWidget — clickable rows", () => {
     const csvRow = screen.getByTestId("sensor-source-summary-row-csv");
     expect(liveRow.getAttribute("aria-label")).toMatch(/Live:/);
     expect(csvRow.getAttribute("aria-label")).toMatch(/CSV:/);
-    expect(liveRow.getAttribute("aria-label")).not.toBe(
-      csvRow.getAttribute("aria-label"),
-    );
+    expect(liveRow.getAttribute("aria-label")).not.toBe(csvRow.getAttribute("aria-label"));
   });
 });

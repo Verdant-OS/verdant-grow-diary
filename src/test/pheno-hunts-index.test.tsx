@@ -8,7 +8,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor, within, fireEvent } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import PhenoHuntsIndex from "@/pages/PhenoHuntsIndex";
 import type { PhenoHuntListItem } from "@/lib/phenoHuntCandidatesService";
 import type { KeeperStabilityRow } from "@/lib/phenoKeepersService";
@@ -156,9 +156,9 @@ describe("PhenoHuntsIndex — cross-keeper stability dashboard", () => {
     );
     // Aggregate counts present (1 holding, 1 drifting, 1 no-runs).
     const counts = screen.getByTestId("pheno-stability-dashboard-counts");
-    expect(within(counts).getByTestId("pheno-stability-dashboard-filter-holding")).toHaveTextContent(
-      "1",
-    );
+    expect(
+      within(counts).getByTestId("pheno-stability-dashboard-filter-holding"),
+    ).toHaveTextContent("1");
     expect(
       within(counts).getByTestId("pheno-stability-dashboard-filter-drifting"),
     ).toHaveTextContent("1");

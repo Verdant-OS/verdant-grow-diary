@@ -22,7 +22,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { readFileSync } from "node:fs";
 import { resolveEntitlements } from "@/lib/entitlements";
@@ -133,10 +133,7 @@ function renderAt(path: string) {
     <QueryClientProvider client={qc}>
       <MemoryRouter initialEntries={[path]}>
         <Routes>
-          <Route
-            path="/diary/environment-summary"
-            element={<EnvironmentSummaryReportPage />}
-          />
+          <Route path="/diary/environment-summary" element={<EnvironmentSummaryReportPage />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -154,28 +151,18 @@ describe("Environment Summary Report — print/export browser smoke gate", () =>
     const cover = screen.getByTestId("env-report-print-cover-page");
     expect(cover).toBeTruthy();
     // Cover page indicator (print-only, visually hidden on screen).
-    expect(
-      within(cover).getByTestId("env-report-print-cover-page-page-indicator"),
-    ).toBeTruthy();
+    expect(within(cover).getByTestId("env-report-print-cover-page-page-indicator")).toBeTruthy();
     // Cover renders status counts.
-    expect(
-      within(cover).getByTestId("env-report-print-cover-page-status-counts"),
-    ).toBeTruthy();
+    expect(within(cover).getByTestId("env-report-print-cover-page-status-counts")).toBeTruthy();
   });
 
   it("drilldown header exposes a print-only page indicator when an issue is active", () => {
-    renderAt(
-      "/diary/environment-summary?start=2026-06-01&end=2026-06-07&issue=source.review",
-    );
-    expect(
-      screen.getByTestId("env-report-drilldown-page-indicator"),
-    ).toBeTruthy();
+    renderAt("/diary/environment-summary?start=2026-06-01&end=2026-06-07&issue=source.review");
+    expect(screen.getByTestId("env-report-drilldown-page-indicator")).toBeTruthy();
   });
 
   it("Download PDF opens the pre-print modal before window.print()", () => {
-    const printSpy = vi
-      .spyOn(window, "print")
-      .mockImplementation(() => undefined);
+    const printSpy = vi.spyOn(window, "print").mockImplementation(() => undefined);
     renderAt("/diary/environment-summary?start=2026-06-01&end=2026-06-07");
     fireEvent.click(screen.getByTestId("env-report-download-pdf"));
     expect(screen.getByTestId("env-report-pre-print-modal")).toBeTruthy();
@@ -185,20 +172,14 @@ describe("Environment Summary Report — print/export browser smoke gate", () =>
   });
 
   it("confirming export triggers local audit write, window.print, and refreshes export history", () => {
-    const printSpy = vi
-      .spyOn(window, "print")
-      .mockImplementation(() => undefined);
-    const fetchSpy = vi
-      .spyOn(globalThis, "fetch" as any)
-      .mockImplementation((() => {
-        throw new Error("fetch not allowed in print/export flow");
-      }) as any);
+    const printSpy = vi.spyOn(window, "print").mockImplementation(() => undefined);
+    const fetchSpy = vi.spyOn(globalThis, "fetch" as any).mockImplementation((() => {
+      throw new Error("fetch not allowed in print/export flow");
+    }) as any);
     renderAt("/diary/environment-summary?start=2026-06-01&end=2026-06-07");
 
     // Export history starts empty.
-    expect(
-      screen.getByTestId("env-report-export-history-empty"),
-    ).toBeTruthy();
+    expect(screen.getByTestId("env-report-export-history-empty")).toBeTruthy();
 
     fireEvent.click(screen.getByTestId("env-report-download-pdf"));
     fireEvent.click(screen.getByTestId("env-report-pre-print-modal-confirm"));
@@ -215,31 +196,21 @@ describe("Environment Summary Report — print/export browser smoke gate", () =>
       startDate: "2026-06-01",
       endDate: "2026-06-07",
     });
-    expect(
-      typeof getLocalStorageItemForTest(
-        ENVIRONMENT_SUMMARY_EXPORT_AUDIT_STORAGE_KEY,
-      ),
-    ).toBe("string");
+    expect(typeof getLocalStorageItemForTest(ENVIRONMENT_SUMMARY_EXPORT_AUDIT_STORAGE_KEY)).toBe(
+      "string",
+    );
 
     // Panel refreshed: count chip updated and list now contains the item.
-    expect(
-      screen.getByTestId("env-report-export-history-count").textContent,
-    ).toBe("(1)");
-    expect(
-      screen.getAllByTestId("env-report-export-history-item"),
-    ).toHaveLength(1);
+    expect(screen.getByTestId("env-report-export-history-count").textContent).toBe("(1)");
+    expect(screen.getAllByTestId("env-report-export-history-item")).toHaveLength(1);
 
     printSpy.mockRestore();
     fetchSpy.mockRestore();
   });
 
   it("Reopen restores start/end and clears issue for a full-report event", () => {
-    const printSpy = vi
-      .spyOn(window, "print")
-      .mockImplementation(() => undefined);
-    renderAt(
-      "/diary/environment-summary?start=2026-06-01&end=2026-06-07&issue=source.review",
-    );
+    const printSpy = vi.spyOn(window, "print").mockImplementation(() => undefined);
+    renderAt("/diary/environment-summary?start=2026-06-01&end=2026-06-07&issue=source.review");
 
     // Mutate the date inputs after exporting so we can prove Reopen restored.
     fireEvent.click(screen.getByTestId("env-report-download-pdf"));
@@ -254,24 +225,20 @@ describe("Environment Summary Report — print/export browser smoke gate", () =>
     fireEvent.click(screen.getByTestId("env-report-export-history-reopen"));
 
     // Range restored. Issue cleared because the exported event was full_report.
-    expect(
-      (screen.getByTestId("env-report-start-date") as HTMLInputElement).value,
-    ).toBe("2026-06-01");
-    expect(
-      (screen.getByTestId("env-report-end-date") as HTMLInputElement).value,
-    ).toBe("2026-06-07");
+    expect((screen.getByTestId("env-report-start-date") as HTMLInputElement).value).toBe(
+      "2026-06-01",
+    );
+    expect((screen.getByTestId("env-report-end-date") as HTMLInputElement).value).toBe(
+      "2026-06-07",
+    );
     // Drilldown section should not render without an active issue.
     expect(screen.queryByTestId("env-report-drilldown-section")).toBeNull();
     printSpy.mockRestore();
   });
 
   it("Reopen restores the issue filter (mode = drilldown) for a drilldown event", () => {
-    const printSpy = vi
-      .spyOn(window, "print")
-      .mockImplementation(() => undefined);
-    renderAt(
-      "/diary/environment-summary?start=2026-06-01&end=2026-06-07&issue=source.review",
-    );
+    const printSpy = vi.spyOn(window, "print").mockImplementation(() => undefined);
+    renderAt("/diary/environment-summary?start=2026-06-01&end=2026-06-07&issue=source.review");
     fireEvent.click(screen.getByTestId("env-report-download-drilldown-pdf"));
     fireEvent.click(screen.getByTestId("env-report-pre-print-modal-confirm"));
 
@@ -289,9 +256,7 @@ describe("Environment Summary Report — print/export browser smoke gate", () =>
   });
 
   it("export history panel is hidden from print output", () => {
-    const { container } = renderAt(
-      "/diary/environment-summary?start=2026-06-01&end=2026-06-07",
-    );
+    const { container } = renderAt("/diary/environment-summary?start=2026-06-01&end=2026-06-07");
     const panel = container.querySelector(
       '[data-testid="env-report-export-history"]',
     ) as HTMLElement;
@@ -300,9 +265,7 @@ describe("Environment Summary Report — print/export browser smoke gate", () =>
   });
 
   it("reopening an export does not add a duplicate history row", () => {
-    const printSpy = vi
-      .spyOn(window, "print")
-      .mockImplementation(() => undefined);
+    const printSpy = vi.spyOn(window, "print").mockImplementation(() => undefined);
     renderAt("/diary/environment-summary?start=2026-06-01&end=2026-06-07");
     fireEvent.click(screen.getByTestId("env-report-download-pdf"));
     fireEvent.click(screen.getByTestId("env-report-pre-print-modal-confirm"));
@@ -313,21 +276,15 @@ describe("Environment Summary Report — print/export browser smoke gate", () =>
     fireEvent.click(screen.getByTestId("env-report-export-history-reopen"));
 
     expect(readEnvironmentSummaryExportAuditEvents()).toHaveLength(1);
-    expect(
-      screen.getAllByTestId("env-report-export-history-item"),
-    ).toHaveLength(1);
+    expect(screen.getAllByTestId("env-report-export-history-item")).toHaveLength(1);
     printSpy.mockRestore();
   });
 
   it("full-report export flow works with no issue filter", () => {
-    const printSpy = vi
-      .spyOn(window, "print")
-      .mockImplementation(() => undefined);
+    const printSpy = vi.spyOn(window, "print").mockImplementation(() => undefined);
     renderAt("/diary/environment-summary?start=2026-06-01&end=2026-06-07");
     // No drilldown button without an active issue.
-    expect(
-      screen.queryByTestId("env-report-download-drilldown-pdf"),
-    ).toBeNull();
+    expect(screen.queryByTestId("env-report-download-drilldown-pdf")).toBeNull();
     fireEvent.click(screen.getByTestId("env-report-download-pdf"));
     fireEvent.click(screen.getByTestId("env-report-pre-print-modal-confirm"));
     const events = readEnvironmentSummaryExportAuditEvents();
@@ -338,9 +295,7 @@ describe("Environment Summary Report — print/export browser smoke gate", () =>
   });
 
   it("does not touch Supabase during the full export flow (no writes, no functions.invoke)", () => {
-    const printSpy = vi
-      .spyOn(window, "print")
-      .mockImplementation(() => undefined);
+    const printSpy = vi.spyOn(window, "print").mockImplementation(() => undefined);
     renderAt("/diary/environment-summary?start=2026-06-01&end=2026-06-07");
     const before = supabaseCalls.count;
     fireEvent.click(screen.getByTestId("env-report-download-pdf"));
@@ -352,22 +307,13 @@ describe("Environment Summary Report — print/export browser smoke gate", () =>
 });
 
 describe("Environment Summary Report — print/export static safety", () => {
-  const pageSrc = readFileSync(
-    "src/pages/EnvironmentSummaryReportPage.tsx",
-    "utf8",
-  );
-  const auditSrc = readFileSync(
-    "src/lib/environmentSummaryExportAuditRules.ts",
-    "utf8",
-  );
+  const pageSrc = readFileSync("src/pages/EnvironmentSummaryReportPage.tsx", "utf8");
+  const auditSrc = readFileSync("src/lib/environmentSummaryExportAuditRules.ts", "utf8");
   const historyPanelSrc = readFileSync(
     "src/components/EnvironmentSummaryExportHistoryPanel.tsx",
     "utf8",
   );
-  const modalSrc = readFileSync(
-    "src/components/EnvironmentSummaryPrePrintModal.tsx",
-    "utf8",
-  );
+  const modalSrc = readFileSync("src/components/EnvironmentSummaryPrePrintModal.tsx", "utf8");
 
   it("window.print() is only invoked through the confirm handler (triggerPrint)", () => {
     // Exactly one window.print() call site in the page.
@@ -376,12 +322,8 @@ describe("Environment Summary Report — print/export static safety", () => {
     // window.print is invoked inside triggerPrint, which is called only by
     // handleConfirmPrint. The two download handlers must only set
     // pendingPrintMode (they must not call triggerPrint or window.print).
-    const fullHandler = pageSrc.match(
-      /const handleDownloadPdf[\s\S]*?\};/,
-    )?.[0];
-    const drilldownHandler = pageSrc.match(
-      /const handleDownloadDrilldownPdf[\s\S]*?\};/,
-    )?.[0];
+    const fullHandler = pageSrc.match(/const handleDownloadPdf[\s\S]*?\};/)?.[0];
+    const drilldownHandler = pageSrc.match(/const handleDownloadDrilldownPdf[\s\S]*?\};/)?.[0];
     expect(fullHandler).toBeTruthy();
     expect(drilldownHandler).toBeTruthy();
     expect(fullHandler!).not.toMatch(/window\.print/);
@@ -407,14 +349,14 @@ describe("Environment Summary Report — print/export static safety", () => {
   it("export history panel does not introduce a Supabase write path", () => {
     expect(historyPanelSrc).not.toMatch(/from\s+["']@\/integrations\/supabase/);
     expect(historyPanelSrc).not.toMatch(/fetch\s*\(/);
-    expect(historyPanelSrc).not.toMatch(
-      /\.(insert|update|delete|upsert|rpc)\s*\(/,
-    );
+    expect(historyPanelSrc).not.toMatch(/\.(insert|update|delete|upsert|rpc)\s*\(/);
   });
 
   it("report page export flow does not call Supabase write methods or functions.invoke directly", () => {
     // The page should not contain direct write/RPC/edge-function call sites.
-    expect(pageSrc).not.toMatch(/supabase\.(from\([^)]*\)\.)?(insert|update|delete|upsert|rpc)\s*\(/);
+    expect(pageSrc).not.toMatch(
+      /supabase\.(from\([^)]*\)\.)?(insert|update|delete|upsert|rpc)\s*\(/,
+    );
     expect(pageSrc).not.toMatch(/functions\.invoke\s*\(/);
   });
 });

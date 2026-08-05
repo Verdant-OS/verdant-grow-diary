@@ -1,7 +1,7 @@
 import type React from "react";
 import { useCallback, useId, useRef, useState } from "react";
 import { Download, HelpCircle, Image as ImageIcon, Info, ListChecks, Printer } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { toast } from "sonner";
 import SensorProvenanceLegend from "@/components/SensorProvenanceLegend";
 
@@ -77,16 +77,12 @@ export const REPORT_SECTION_LABELS = {
   avoidNextRun: "What to avoid next run",
 } as const;
 
-export const REPORT_EMPTY_SUMMARY_COPY =
-  "Not enough evidence to summarize this section yet.";
+export const REPORT_EMPTY_SUMMARY_COPY = "Not enough evidence to summarize this section yet.";
 export const REPORT_NO_LOGGED_DATA_COPY = "No logged data yet.";
 
 export function PostGrowReportHeaderHelper(_: PostGrowReportHeaderHelperProps = {}) {
   return (
-    <p
-      data-testid="post-grow-report-header-helper"
-      className="text-sm text-muted-foreground"
-    >
+    <p data-testid="post-grow-report-header-helper" className="text-sm text-muted-foreground">
       {REPORT_HEADER_HELPER_COPY}
     </p>
   );
@@ -101,18 +97,9 @@ export interface PostGrowReportTopSummaryPanelProps {
   readonly vm: PostGrowLearningReportViewModel;
 }
 
-export function PostGrowReportTopSummaryPanel({
-  vm,
-}: PostGrowReportTopSummaryPanelProps) {
-  const sensorReadingCount = vm.environment.reduce(
-    (sum, m) => sum + (m.count ?? 0),
-    0,
-  );
-  const statusLabel = !vm.eligible
-    ? "Draft"
-    : vm.header.archived
-      ? "Archived run"
-      : "In review";
+export function PostGrowReportTopSummaryPanel({ vm }: PostGrowReportTopSummaryPanelProps) {
+  const sensorReadingCount = vm.environment.reduce((sum, m) => sum + (m.count ?? 0), 0);
+  const statusLabel = !vm.eligible ? "Draft" : vm.header.archived ? "Archived run" : "In review";
 
   return (
     <section
@@ -122,12 +109,8 @@ export function PostGrowReportTopSummaryPanel({
     >
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-            Run summary
-          </p>
-          <h2 className="font-display text-lg font-semibold">
-            {vm.header.growName}
-          </h2>
+          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Run summary</p>
+          <h2 className="font-display text-lg font-semibold">{vm.header.growName}</h2>
         </div>
         <Badge variant="outline" data-testid="post-grow-top-summary-status">
           {statusLabel}
@@ -176,17 +159,10 @@ interface SummaryStatProps {
 
 function SummaryStat({ testId, label, value, hint }: SummaryStatProps) {
   return (
-    <div
-      data-testid={testId}
-      className="rounded-xl border border-border/50 bg-secondary/20 p-2"
-    >
-      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
-        {label}
-      </p>
+    <div data-testid={testId} className="rounded-xl border border-border/50 bg-secondary/20 p-2">
+      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
       <p className="text-sm font-display">{value}</p>
-      {hint ? (
-        <p className="text-[10px] text-muted-foreground">{hint}</p>
-      ) : null}
+      {hint ? <p className="text-[10px] text-muted-foreground">{hint}</p> : null}
     </div>
   );
 }
@@ -196,14 +172,9 @@ export interface PostGrowReportActionSafetyNoteProps {
   readonly _reserved?: never;
 }
 
-export function PostGrowReportActionSafetyNote(
-  _: PostGrowReportActionSafetyNoteProps = {},
-) {
+export function PostGrowReportActionSafetyNote(_: PostGrowReportActionSafetyNoteProps = {}) {
   return (
-    <p
-      data-testid="post-grow-action-safety-note"
-      className="text-[11px] text-muted-foreground"
-    >
+    <p data-testid="post-grow-action-safety-note" className="text-[11px] text-muted-foreground">
       {REPORT_ACTION_SAFETY_COPY}
     </p>
   );
@@ -217,16 +188,15 @@ export function DataCompletenessBadge({ vm }: DataCompletenessBadgeProps) {
   return (
     <div className="glass rounded-2xl p-3" data-testid="post-grow-completeness-badge">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-xs uppercase tracking-wide text-muted-foreground">Data completeness</span>
+        <span className="text-xs uppercase tracking-wide text-muted-foreground">
+          Data completeness
+        </span>
         <Badge variant="outline" className="text-[10px] uppercase">
           {vm.dataCompleteness.label} · {vm.dataCompleteness.score}%
         </Badge>
       </div>
       <div className="mt-2 h-2 rounded-full bg-secondary overflow-hidden" aria-hidden="true">
-        <div
-          className="h-full bg-primary"
-          style={{ width: `${vm.dataCompleteness.score}%` }}
-        />
+        <div className="h-full bg-primary" style={{ width: `${vm.dataCompleteness.score}%` }} />
       </div>
       {vm.dataCompleteness.missing.length > 0 && (
         <p className="mt-2 text-[11px] text-muted-foreground">
@@ -312,7 +282,7 @@ export function EnvironmentStabilityCard({
               <li key={row.kind} className="inline-flex">
                 <Badge
                   variant={row.healthy ? "outline" : "secondary"}
-                  className="text-[10px] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  className="text-[10px] focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   title={row.description}
                   aria-label={ariaLabel}
                   tabIndex={0}
@@ -332,7 +302,7 @@ export function EnvironmentStabilityCard({
           aria-expanded={legendOpen}
           aria-controls={legendPanelId}
           data-testid="post-grow-provenance-help-toggle"
-          className="inline-flex items-center gap-1 text-[11px] text-muted-foreground underline underline-offset-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded"
+          className="inline-flex items-center gap-1 text-[11px] text-muted-foreground underline underline-offset-2 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded"
         >
           <HelpCircle className="h-3 w-3" aria-hidden="true" />
           What do these badges mean?
@@ -344,16 +314,16 @@ export function EnvironmentStabilityCard({
         ) : null}
       </div>
       {!hasSensorData ? (
-        <p
-          className="text-sm text-muted-foreground"
-          data-testid="post-grow-sensor-empty-state"
-        >
+        <p className="text-sm text-muted-foreground" data-testid="post-grow-sensor-empty-state">
           {POST_GROW_SENSOR_EMPTY_STATE_COPY}
         </p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
           {metrics.map((metric) => (
-            <div key={metric.key} className="rounded-xl border border-border/50 bg-secondary/20 p-3">
+            <div
+              key={metric.key}
+              className="rounded-xl border border-border/50 bg-secondary/20 p-3"
+            >
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs text-muted-foreground">{metric.label}</span>
                 <Badge variant="outline" className="text-[10px]">
@@ -364,11 +334,15 @@ export function EnvironmentStabilityCard({
                 {display(metric.avg, metric.key === "vpd_kpa" ? 2 : 1)} {metric.unit}
               </p>
               <p className="text-[11px] text-muted-foreground">
-                Range {display(metric.min, metric.key === "vpd_kpa" ? 2 : 1)}–{display(metric.max, metric.key === "vpd_kpa" ? 2 : 1)} {metric.unit}
+                Range {display(metric.min, metric.key === "vpd_kpa" ? 2 : 1)}–
+                {display(metric.max, metric.key === "vpd_kpa" ? 2 : 1)} {metric.unit}
               </p>
               <Sparkline points={metric.sparkline} />
               <p className="mt-1 text-[11px] text-muted-foreground">
-                Stability window: {metric.stablePct === null ? "not enough data" : `${metric.stablePct}% in practical range`}
+                Stability window:{" "}
+                {metric.stablePct === null
+                  ? "not enough data"
+                  : `${metric.stablePct}% in practical range`}
               </p>
             </div>
           ))}
@@ -378,16 +352,37 @@ export function EnvironmentStabilityCard({
   );
 }
 
-
 export function PostHarvestPerformanceCard({ vm }: { vm: PostGrowLearningReportViewModel }) {
   return (
-    <ReportCard title="Post-Harvest Performance" subtitle={`${REPORT_SECTION_LABELS.whatWasLogged} (harvest)`} testId="post-grow-post-harvest">
+    <ReportCard
+      title="Post-Harvest Performance"
+      subtitle={`${REPORT_SECTION_LABELS.whatWasLogged} (harvest)`}
+      testId="post-grow-post-harvest"
+    >
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3">
-        <Stat label="Final yield" value={vm.postHarvest.yieldGrams === null ? "—" : `${display(vm.postHarvest.yieldGrams)} g`} />
-        <Stat label="Weight loss" value={vm.postHarvest.weightLossPct === null ? "—" : `${display(vm.postHarvest.weightLossPct)}%`} />
+        <Stat
+          label="Final yield"
+          value={
+            vm.postHarvest.yieldGrams === null ? "—" : `${display(vm.postHarvest.yieldGrams)} g`
+          }
+        />
+        <Stat
+          label="Weight loss"
+          value={
+            vm.postHarvest.weightLossPct === null
+              ? "—"
+              : `${display(vm.postHarvest.weightLossPct)}%`
+          }
+        />
         <Stat
           label="RH stabilization"
-          value={vm.postHarvest.rhStabilized === null ? "Thin data" : vm.postHarvest.rhStabilized ? "Stable" : "Still moving"}
+          value={
+            vm.postHarvest.rhStabilized === null
+              ? "Thin data"
+              : vm.postHarvest.rhStabilized
+                ? "Stable"
+                : "Still moving"
+          }
         />
       </div>
       {vm.postHarvest.points.length === 0 ? (
@@ -406,7 +401,9 @@ export function PostHarvestPerformanceCard({ vm }: { vm: PostGrowLearningReportV
 function PostHarvestPointRow({ point }: { point: PostHarvestPoint }) {
   return (
     <div className="rounded-xl border border-border/50 bg-secondary/20 p-2 text-xs flex items-center justify-between gap-2">
-      <span className="text-muted-foreground">{new Date(point.capturedAt).toLocaleDateString()}</span>
+      <span className="text-muted-foreground">
+        {new Date(point.capturedAt).toLocaleDateString()}
+      </span>
       <span>{point.weightGrams === null ? "Weight —" : `${display(point.weightGrams)} g`}</span>
       <span>{point.rhPct === null ? "RH —" : `${display(point.rhPct)}% RH`}</span>
     </div>
@@ -415,7 +412,11 @@ function PostHarvestPointRow({ point }: { point: PostHarvestPoint }) {
 
 export function ActionEffectivenessCard({ vm }: { vm: PostGrowLearningReportViewModel }) {
   return (
-    <ReportCard title="Action Effectiveness" subtitle={REPORT_SECTION_LABELS.actionsReviewed} testId="post-grow-action-effectiveness">
+    <ReportCard
+      title="Action Effectiveness"
+      subtitle={REPORT_SECTION_LABELS.actionsReviewed}
+      testId="post-grow-action-effectiveness"
+    >
       <div className="grid grid-cols-2 gap-2 mb-3">
         <Stat label="Completed actions" value={String(vm.actionEffectiveness.completedActions)} />
         <Stat label="Outcome notes" value={String(vm.actionEffectiveness.outcomeNotes)} />
@@ -448,7 +449,11 @@ export function LessonsCard({
   busy: boolean;
 }) {
   return (
-    <ReportCard title="My Lessons & Notes" subtitle={`${REPORT_SECTION_LABELS.repeatNextRun} · ${REPORT_SECTION_LABELS.avoidNextRun}`} testId="post-grow-lessons">
+    <ReportCard
+      title="My Lessons & Notes"
+      subtitle={`${REPORT_SECTION_LABELS.repeatNextRun} · ${REPORT_SECTION_LABELS.avoidNextRun}`}
+      testId="post-grow-lessons"
+    >
       <Textarea
         value={lesson}
         onChange={(e) => onLessonChange(e.target.value)}
@@ -474,7 +479,8 @@ export function LessonsCard({
         </Button>
       </div>
       <p className="mt-2 text-[11px] text-muted-foreground">
-        Apply creates a pending, approval-required Action Queue item only. No device command is sent.
+        Apply creates a pending, approval-required Action Queue item only. No device command is
+        sent.
       </p>
     </ReportCard>
   );
@@ -482,13 +488,20 @@ export function LessonsCard({
 
 export function PhotoGridCard({ vm }: { vm: PostGrowLearningReportViewModel }) {
   return (
-    <ReportCard title="Photo Grid" subtitle={`${REPORT_SECTION_LABELS.whatWasLogged} (photos)`} testId="post-grow-photo-grid">
+    <ReportCard
+      title="Photo Grid"
+      subtitle={`${REPORT_SECTION_LABELS.whatWasLogged} (photos)`}
+      testId="post-grow-photo-grid"
+    >
       {vm.photos.length === 0 ? (
         <p className="text-sm text-muted-foreground">No photos found for this grow.</p>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           {vm.photos.map((photo) => (
-            <figure key={photo.id} className="overflow-hidden rounded-xl border border-border/50 bg-secondary/20">
+            <figure
+              key={photo.id}
+              className="overflow-hidden rounded-xl border border-border/50 bg-secondary/20"
+            >
               <img src={photo.url} alt={photo.alt} className="aspect-square w-full object-cover" />
               <figcaption className="p-2 text-[10px] text-muted-foreground">
                 Visual record · no AI analysis
@@ -509,8 +522,11 @@ export function ExportSummaryButtons({
   learningSummary?: PostGrowLearningLoopSummary;
 }) {
   return (
-    <div className="flex flex-col items-end gap-1" data-testid="post-grow-export-actions">
-      <div className="flex flex-wrap gap-2">
+    <div
+      className="flex w-full min-w-0 flex-col items-stretch gap-1 xl:w-auto xl:items-end"
+      data-testid="post-grow-export-actions"
+    >
+      <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap xl:w-auto">
         <Button
           variant="default"
           size="sm"
@@ -557,7 +573,10 @@ export function ExportSummaryButtons({
           <Download className="h-4 w-4 mr-1" /> Summary text
         </Button>
       </div>
-      <p className="text-[11px] text-muted-foreground" data-testid="post-grow-export-helper">
+      <p
+        className="w-full text-[11px] text-muted-foreground xl:max-w-md xl:text-right"
+        data-testid="post-grow-export-helper"
+      >
         {PRINT_HELPER_COPY}
       </p>
     </div>

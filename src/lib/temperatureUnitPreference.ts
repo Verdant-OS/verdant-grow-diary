@@ -10,8 +10,8 @@
  *  - Never double-converts: callers tell the formatter whether the
  *    `value` is already Celsius (the canonical store) or already
  *    Fahrenheit (rare — e.g. legacy form input). No silent unit guessing.
- *  - Storage failures (Safari private mode, SSR, blocked storage) fail
- *    OPEN: the default (`fahrenheit`) is returned.
+ *  - Reads fail open to the default (`fahrenheit`) when storage is unavailable.
+ *    Writes return false unless the new state can be confirmed by read-back.
  *
  * Storage key (scoped, opaque enum only): `verdant:temperatureUnit`.
  */
@@ -34,20 +34,35 @@ export const TEMPERATURE_UNIT_OPTIONS: ReadonlyArray<{
     key: "fahrenheit",
     symbol: "°F",
     label: "Fahrenheit (°F)",
-    description:
-      "Default. Stored sensor values are unchanged — only the display unit switches.",
+    description: "Default. Stored sensor values are unchanged — only the display unit switches.",
     recommended: true,
   },
   {
     key: "celsius",
     symbol: "°C",
     label: "Celsius (°C)",
-    description:
-      "Show temperatures in °C. Stored sensor values are unchanged.",
+    description: "Show temperatures in °C. Stored sensor values are unchanged.",
   },
 ];
 
 const STORAGE_KEY = "verdant:temperatureUnit" as const;
+
+/**
+ * Dispatched on `window` whenever the preference is saved/cleared, so
+ * same-document listeners (useTemperatureUnitPreference) can react —
+ * the native `storage` event only fires in OTHER tabs/windows, never
+ * the one that made the change.
+ */
+export const TEMPERATURE_UNIT_CHANGE_EVENT = "verdant:temperatureUnitChange" as const;
+
+function notifyChange(): void {
+  try {
+    if (typeof window === "undefined") return;
+    window.dispatchEvent(new Event(TEMPERATURE_UNIT_CHANGE_EVENT));
+  } catch {
+    /* ignore */
+  }
+}
 
 /** Pure conversion. Single source of truth. */
 export function celsiusToFahrenheit(celsius: number): number {
@@ -83,32 +98,34 @@ export function loadTemperatureUnitPreference(): TemperatureUnitPreference {
   }
 }
 
-export function saveTemperatureUnitPreference(
-  choice: TemperatureUnitPreference,
-): void {
+export function saveTemperatureUnitPreference(choice: TemperatureUnitPreference): boolean {
   const s = safeStorage();
-  if (!s || !isValid(choice)) return;
+  if (!s || !isValid(choice)) return false;
   try {
     s.setItem(STORAGE_KEY, choice);
+    if (s.getItem(STORAGE_KEY) !== choice) return false;
   } catch {
-    /* fail open */
+    return false;
   }
+  notifyChange();
+  return true;
 }
 
-export function clearTemperatureUnitPreference(): void {
+export function clearTemperatureUnitPreference(): boolean {
   const s = safeStorage();
-  if (!s) return;
+  if (!s) return false;
   try {
     s.removeItem(STORAGE_KEY);
+    if (s.getItem(STORAGE_KEY) !== null) return false;
   } catch {
-    /* ignore */
+    return false;
   }
+  notifyChange();
+  return true;
 }
 
 /** Resolve any unknown candidate into a valid preference. */
-export function resolveTemperatureUnitPreference(
-  value: unknown,
-): TemperatureUnitPreference {
+export function resolveTemperatureUnitPreference(value: unknown): TemperatureUnitPreference {
   return isValid(value) ? value : DEFAULT_TEMPERATURE_UNIT;
 }
 
@@ -172,9 +189,7 @@ export function formatTemperatureDisplay(
  * Symbol-only helper for chips that already split value/unit slots.
  * Honors the saved preference (or the explicit override).
  */
-export function getTemperatureUnitSymbol(
-  unit?: TemperatureUnitPreference,
-): "°F" | "°C" {
+export function getTemperatureUnitSymbol(unit?: TemperatureUnitPreference): "°F" | "°C" {
   const displayUnit = unit ?? loadTemperatureUnitPreference();
   return displayUnit === "fahrenheit" ? "°F" : "°C";
 }

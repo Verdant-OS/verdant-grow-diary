@@ -11,16 +11,25 @@ import {
   allowedTransitions,
   buildTransitionPatch,
   buildAuditEventPayload,
+  buildActionQueueTransitionRpcArgs,
   eventTypeFor,
   nextStatusFor,
   normalizeNote,
+  parseActionQueueTransitionRpcResult,
 } from "@/lib/actionQueueTransitions";
 
 describe("actionQueueTransitions — shared rules", () => {
+  const actionId = "4467a124-33a6-42d9-967c-b68926af5b93";
+  const eventId = "3eef729f-00ff-474f-bb39-d03d46dd2f47";
+  const rpcArgs = buildActionQueueTransitionRpcArgs({
+    actionQueueId: actionId,
+    transition: "approve",
+    expectedStatus: "pending_approval",
+    note: "grower confirmed",
+  });
+
   it("TERMINAL_STATUSES contains completed/rejected/cancelled and nothing else", () => {
-    expect([...TERMINAL_STATUSES].sort()).toEqual(
-      ["cancelled", "completed", "rejected"].sort(),
-    );
+    expect([...TERMINAL_STATUSES].sort()).toEqual(["cancelled", "completed", "rejected"].sort());
   });
 
   it("allowedTransitions returns the documented set per status", () => {
@@ -30,9 +39,7 @@ describe("actionQueueTransitions — shared rules", () => {
     expect(allowedTransitions("simulated").sort()).toEqual(
       ["approve", "cancel", "complete"].sort(),
     );
-    expect(allowedTransitions("approved").sort()).toEqual(
-      ["cancel", "complete"].sort(),
-    );
+    expect(allowedTransitions("approved").sort()).toEqual(["cancel", "complete"].sort());
     for (const s of ["completed", "rejected", "cancelled"] as ActionStatus[]) {
       expect(allowedTransitions(s)).toEqual([]);
       expect(isTerminalStatus(s)).toBe(true);
@@ -130,13 +137,141 @@ describe("actionQueueTransitions — shared rules", () => {
     expect(normalizeNote(undefined)).toBeUndefined();
     expect(normalizeNote("  hello ")).toBe("hello");
   });
+
+  it("builds the canonical RPC args without caller-controlled identity or lifecycle fields", () => {
+    const args = buildActionQueueTransitionRpcArgs({
+      actionQueueId: "action-1",
+      transition: "approve",
+      expectedStatus: "pending_approval",
+      note: "  grower confirmed  ",
+    });
+    expect(args).toEqual({
+      p_action_queue_id: "action-1",
+      p_transition: "approve",
+      p_expected_status: "pending_approval",
+      p_note: "grower confirmed",
+    });
+    expect(Object.keys(args)).not.toEqual(
+      expect.arrayContaining(["user_id", "grow_id", "event_type", "new_status", "transitioned_at"]),
+    );
+  });
+
+  it("normalizes an empty RPC note to null deterministically", () => {
+    const input = {
+      actionQueueId: "action-1",
+      transition: "simulate" as const,
+      expectedStatus: "pending_approval" as const,
+      note: "   ",
+    };
+    expect(buildActionQueueTransitionRpcArgs(input)).toEqual(
+      buildActionQueueTransitionRpcArgs(input),
+    );
+    expect(buildActionQueueTransitionRpcArgs(input).p_note).toBeNull();
+  });
+
+  it("parses a complete transactional RPC success result", () => {
+    expect(
+      parseActionQueueTransitionRpcResult(
+        {
+          ok: true,
+          action_queue_id: actionId,
+          previous_status: "pending_approval",
+          new_status: "approved",
+          event_id: eventId,
+          transitioned_at: "2030-01-01T00:00:00.000Z",
+          reused: false,
+        },
+        rpcArgs,
+      ),
+    ).toEqual({
+      ok: true,
+      action_queue_id: actionId,
+      previous_status: "pending_approval",
+      new_status: "approved",
+      event_id: eventId,
+      transitioned_at: "2030-01-01T00:00:00.000Z",
+      reused: false,
+    });
+  });
+
+  it("parses expected failures but rejects malformed or unknown-status success data", () => {
+    expect(
+      parseActionQueueTransitionRpcResult({ ok: false, reason: "status_conflict" }, rpcArgs),
+    ).toEqual({ ok: false, reason: "status_conflict" });
+    expect(parseActionQueueTransitionRpcResult(null, rpcArgs)).toBeNull();
+    expect(parseActionQueueTransitionRpcResult([], rpcArgs)).toBeNull();
+    expect(parseActionQueueTransitionRpcResult({ ok: false, reason: "" }, rpcArgs)).toBeNull();
+    expect(
+      parseActionQueueTransitionRpcResult({ ok: false, reason: "database_said_secret" }, rpcArgs),
+    ).toBeNull();
+    expect(
+      parseActionQueueTransitionRpcResult(
+        {
+          ok: true,
+          action_queue_id: actionId,
+          previous_status: "pending_approval",
+          new_status: "executed",
+          event_id: eventId,
+          transitioned_at: "2030-01-01T00:00:00.000Z",
+          reused: false,
+        },
+        rpcArgs,
+      ),
+    ).toBeNull();
+  });
+
+  it("rejects a structurally valid success that does not match the submitted request", () => {
+    const base = {
+      ok: true,
+      action_queue_id: actionId,
+      previous_status: "pending_approval",
+      new_status: "approved",
+      event_id: eventId,
+      transitioned_at: "2030-01-01T00:00:00.000Z",
+      reused: false,
+    };
+
+    expect(
+      parseActionQueueTransitionRpcResult(
+        { ...base, action_queue_id: "c4ccbd0d-052c-4a8f-b518-0731da38f298" },
+        rpcArgs,
+      ),
+    ).toBeNull();
+    expect(
+      parseActionQueueTransitionRpcResult({ ...base, previous_status: "simulated" }, rpcArgs),
+    ).toBeNull();
+    expect(
+      parseActionQueueTransitionRpcResult({ ...base, new_status: "cancelled" }, rpcArgs),
+    ).toBeNull();
+  });
+
+  it("rejects malformed UUIDs and non-RFC3339 transition timestamps", () => {
+    const base = {
+      ok: true,
+      action_queue_id: actionId,
+      previous_status: "pending_approval",
+      new_status: "approved",
+      event_id: eventId,
+      transitioned_at: "2030-01-01T00:00:00.000Z",
+      reused: false,
+    };
+
+    expect(
+      parseActionQueueTransitionRpcResult({ ...base, event_id: "event-1" }, rpcArgs),
+    ).toBeNull();
+    expect(
+      parseActionQueueTransitionRpcResult({ ...base, transitioned_at: "next Thursday" }, rpcArgs),
+    ).toBeNull();
+  });
 });
 
 describe("actionQueueTransitions — safety surface", () => {
   it("does not export any device-control symbol", async () => {
     const mod = (await import("@/lib/actionQueueTransitions")) as Record<string, unknown>;
     for (const k of Object.keys(mod)) {
-      expect(k.toLowerCase()).not.toMatch(/mqtt|home.?assistant|pi.?bridge|webhook|relay|actuator|service_role/);
+      expect(k.toLowerCase()).not.toMatch(
+        /mqtt|home.?assistant|pi.?bridge|webhook|relay|actuator|service_role/,
+      );
     }
   });
 });

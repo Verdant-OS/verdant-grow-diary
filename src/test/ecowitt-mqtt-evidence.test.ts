@@ -201,7 +201,8 @@ describe("buildRedactedReportJson (runner)", () => {
 
   it("does NOT list co2_ppm in metric_keys for the real gateway payload", () => {
     expect((json as { metric_keys: string[] }).metric_keys).not.toContain("co2_ppm");
-    expect((json as { evidence: { missing_metrics: string[] } }).evidence.missing_metrics)
-      .toContain("co2_ppm");
+    expect(
+      (json as { evidence: { missing_metrics: string[] } }).evidence.missing_metrics,
+    ).toContain("co2_ppm");
   });
 });

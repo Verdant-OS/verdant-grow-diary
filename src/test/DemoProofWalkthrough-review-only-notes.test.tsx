@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import DemoProofWalkthrough from "@/pages/DemoProofWalkthrough";
 import { buildDemoProofWalkthroughViewModel } from "@/lib/demoProofWalkthroughViewModel";
 
@@ -24,9 +24,7 @@ describe("DemoProofWalkthrough — review-only per-link notes", () => {
   });
 
   it("read-only steps do not carry a reviewOnlyNote", () => {
-    const readOnlyIds = vm.steps
-      .map((s) => s.id)
-      .filter((id) => !(id in WRITE_CAPABLE));
+    const readOnlyIds = vm.steps.map((s) => s.id).filter((id) => !(id in WRITE_CAPABLE));
     for (const id of readOnlyIds) {
       const step = vm.steps.find((s) => s.id === id)!;
       expect(step.reviewOnlyNote ?? undefined).toBeFalsy();
@@ -40,9 +38,7 @@ describe("DemoProofWalkthrough — review-only per-link notes", () => {
       </MemoryRouter>,
     );
     for (const [id, re] of Object.entries(WRITE_CAPABLE)) {
-      const node = screen.getByTestId(
-        `demo-proof-walkthrough-step-${id}-review-only-note`,
-      );
+      const node = screen.getByTestId(`demo-proof-walkthrough-step-${id}-review-only-note`);
       expect(node.textContent ?? "").toMatch(re);
     }
   });

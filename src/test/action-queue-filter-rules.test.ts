@@ -84,14 +84,10 @@ describe("actionMatchesSearch", () => {
 describe("actionMatchesTraceFailedFilter", () => {
   it("returns false when no failure or different id", () => {
     expect(actionMatchesTraceFailedFilter(ROW_A, null)).toBe(false);
-    expect(
-      actionMatchesTraceFailedFilter(ROW_A, { actionId: "other" }),
-    ).toBe(false);
+    expect(actionMatchesTraceFailedFilter(ROW_A, { actionId: "other" })).toBe(false);
   });
   it("returns true when failure matches row id", () => {
-    expect(
-      actionMatchesTraceFailedFilter(ROW_A, { actionId: "aq-1" }),
-    ).toBe(true);
+    expect(actionMatchesTraceFailedFilter(ROW_A, { actionId: "aq-1" })).toBe(true);
   });
 });
 

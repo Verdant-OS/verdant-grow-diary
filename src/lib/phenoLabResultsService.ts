@@ -10,6 +10,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { phenoDb } from "@/integrations/supabase/phenoTables";
 import type { Json } from "@/integrations/supabase/types";
+import { PhenoEvidenceReadError } from "@/lib/phenoEvidenceReadError";
 
 export const PHENO_LAB_SOURCES = ["coa", "estimate", "unspecified"] as const;
 export type PhenoLabSource = (typeof PHENO_LAB_SOURCES)[number];
@@ -108,7 +109,7 @@ export async function listLabResultsForHunt(
     // Up to 3 rows per candidate (coa/estimate/unspecified); explicit bound
     // keeps large hunts from hitting the server's silent row ceiling.
     .limit(1500);
-  if (error || !data) return {};
+  if (error || !data) throw new PhenoEvidenceReadError("lab_results");
   const map: Record<string, LabResultRow> = {};
   for (const row of data) {
     if (!row.plant_id) continue;

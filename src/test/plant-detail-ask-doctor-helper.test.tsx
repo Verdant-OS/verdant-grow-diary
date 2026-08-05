@@ -10,7 +10,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import React from "react";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 
 const useRecentMock = vi.fn();
 vi.mock("@/hooks/usePlantRecentActivity", () => ({
@@ -24,10 +24,7 @@ import {
 import PlantDetailAskDoctorHelper from "@/components/PlantDetailAskDoctorHelper";
 
 const ROOT = resolve(__dirname, "../..");
-const HELPER = readFileSync(
-  resolve(ROOT, "src/lib/plantDetailAskDoctorHelper.ts"),
-  "utf8",
-);
+const HELPER = readFileSync(resolve(ROOT, "src/lib/plantDetailAskDoctorHelper.ts"), "utf8");
 const COMPONENT = readFileSync(
   resolve(ROOT, "src/components/PlantDetailAskDoctorHelper.tsx"),
   "utf8",
@@ -52,7 +49,9 @@ const FORBIDDEN = [
   /\bdevice[-\s]?control\b/i,
 ];
 
-function makeInput(p: Partial<PlantDetailAskDoctorHelperInput> = {}): PlantDetailAskDoctorHelperInput {
+function makeInput(
+  p: Partial<PlantDetailAskDoctorHelperInput> = {},
+): PlantDetailAskDoctorHelperInput {
   return {
     stage: null,
     hasTimelineEntries: false,
@@ -67,7 +66,9 @@ describe("buildPlantDetailAskDoctorHelper", () => {
   it("returns 'none' and correct copy when zero signals present", () => {
     const result = buildPlantDetailAskDoctorHelper(makeInput());
     expect(result.level).toBe("none");
-    expect(result.copy).toBe("Add a quick note, photo, or manual sensor snapshot first for a stronger check-in.");
+    expect(result.copy).toBe(
+      "Add a quick note, photo, or manual sensor snapshot first for a stronger check-in.",
+    );
     expect(result.presentCount).toBe(0);
     expect(result.totalSignals).toBe(5);
   });
@@ -75,7 +76,9 @@ describe("buildPlantDetailAskDoctorHelper", () => {
   it("returns 'partial' when exactly one signal is present", () => {
     const result = buildPlantDetailAskDoctorHelper(makeInput({ stage: "veg" }));
     expect(result.level).toBe("partial");
-    expect(result.copy).toBe("AI Doctor works better with recent notes, photos, or a manual sensor snapshot.");
+    expect(result.copy).toBe(
+      "AI Doctor works better with recent notes, photos, or a manual sensor snapshot.",
+    );
     expect(result.presentCount).toBe(1);
   });
 
@@ -126,15 +129,12 @@ describe("<PlantDetailAskDoctorHelper />", () => {
     useRecentMock.mockReturnValue({ data: [], isLoading: false });
   });
 
-  function renderHelper(props: Partial<React.ComponentProps<typeof PlantDetailAskDoctorHelper>> = {}) {
+  function renderHelper(
+    props: Partial<React.ComponentProps<typeof PlantDetailAskDoctorHelper>> = {},
+  ) {
     return render(
       <MemoryRouter>
-        <PlantDetailAskDoctorHelper
-          plantId="p1"
-          stage={null}
-          hasPlantPhoto={false}
-          {...props}
-        />
+        <PlantDetailAskDoctorHelper plantId="p1" stage={null} hasPlantPhoto={false} {...props} />
       </MemoryRouter>,
     );
   }
@@ -142,22 +142,24 @@ describe("<PlantDetailAskDoctorHelper />", () => {
   it("renders 'none' helper copy when no context exists", () => {
     renderHelper();
     expect(
-      screen.getByText("Add a quick note, photo, or manual sensor snapshot first for a stronger check-in."),
+      screen.getByText(
+        "Add a quick note, photo, or manual sensor snapshot first for a stronger check-in.",
+      ),
     ).toBeInTheDocument();
   });
 
   it("renders 'partial' helper copy when context is partial", () => {
     renderHelper({ stage: "veg" });
     expect(
-      screen.getByText("AI Doctor works better with recent notes, photos, or a manual sensor snapshot."),
+      screen.getByText(
+        "AI Doctor works better with recent notes, photos, or a manual sensor snapshot.",
+      ),
     ).toBeInTheDocument();
   });
 
   it("renders 'has_context' helper copy when enough context exists", () => {
     useRecentMock.mockReturnValue({
-      data: [
-        { id: "r1", event_type: "watering", occurred_at: "2026-06-01T10:00:00Z" },
-      ],
+      data: [{ id: "r1", event_type: "watering", occurred_at: "2026-06-01T10:00:00Z" }],
       isLoading: false,
     });
     renderHelper({ stage: "veg", hasPlantPhoto: true });

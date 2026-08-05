@@ -23,6 +23,7 @@ import {
   CSV_HISTORY_DEDUPE_CONFLICT_COPY,
   type ExistingKeysQueryScope,
 } from "@/lib/csv-import/sensorReadingsBatchInsert";
+import { buildCsvImportFailureMessage } from "@/lib/environmentCsvPreviewCopyRules";
 
 export const CSV_SENSOR_SOURCE = "csv" as const;
 
@@ -122,6 +123,9 @@ export interface PersistResult {
   /** Rows skipped because they duplicate another row in this file or an
    *  already-imported reading for this tent. Never crashes the import. */
   duplicateCount: number;
+  /** True when earlier atomic batches committed before a later batch failed. */
+  partialWrite: boolean;
+  /** Always grower-safe copy. Raw database diagnostics never cross this boundary. */
   error: string | null;
 }
 
@@ -144,7 +148,14 @@ export async function persistCsvEnvironmentRows(
   chunkSize = 500,
 ): Promise<PersistResult> {
   const inserts = buildSensorReadingInserts(rows, scope);
-  if (inserts.length === 0) return { insertedCount: 0, duplicateCount: 0, error: null };
+  if (inserts.length === 0) {
+    return {
+      insertedCount: 0,
+      duplicateCount: 0,
+      partialWrite: false,
+      error: null,
+    };
+  }
 
   const fetchExistingKeys = client.fetchExistingSensorReadingKeys
     ? client.fetchExistingSensorReadingKeys.bind(client)
@@ -162,6 +173,7 @@ export async function persistCsvEnvironmentRows(
   });
 
   if (!result.ok) {
+    const partialWrite = result.batchResult?.partialWrite === true || result.insertedRows > 0;
     if (result.error && isSensorReadingsDedupeUniqueViolation(result.error)) {
       // Safety net: Postgres still rejected a duplicate we could not
       // pre-filter (no fetchExistingSensorReadingKeys, or a race with
@@ -169,19 +181,24 @@ export async function persistCsvEnvironmentRows(
       return {
         insertedCount: result.insertedRows,
         duplicateCount: result.duplicateRows,
-        error: CSV_HISTORY_DEDUPE_CONFLICT_COPY,
+        partialWrite,
+        error: partialWrite
+          ? buildCsvImportFailureMessage(result.insertedRows, true)
+          : CSV_HISTORY_DEDUPE_CONFLICT_COPY,
       };
     }
     return {
       insertedCount: result.insertedRows,
       duplicateCount: result.duplicateRows,
-      error: result.error?.message ?? "Import failed.",
+      partialWrite,
+      error: buildCsvImportFailureMessage(result.insertedRows, partialWrite),
     };
   }
 
   return {
     insertedCount: result.insertedRows,
     duplicateCount: result.duplicateRows,
+    partialWrite: false,
     error: null,
   };
 }

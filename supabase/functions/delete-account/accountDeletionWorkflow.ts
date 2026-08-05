@@ -109,10 +109,7 @@ export function compileAccountSubscriptions(
     // The retired BYO webhook was sandbox-only. Anything other than a
     // complete Paddle link cannot be safely canceled and therefore blocks
     // destructive deletion for operator resolution.
-    if (
-      row.provider !== "paddle" ||
-      !isNonEmpty(row.provider_subscription_id)
-    ) {
+    if (row.provider !== "paddle" || !isNonEmpty(row.provider_subscription_id)) {
       return { ok: false };
     }
     compiled.push({

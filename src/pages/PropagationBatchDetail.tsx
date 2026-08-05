@@ -2,17 +2,15 @@
  * Propagation batch detail — operational batch record plus multi-plant
  * assignment. Counts and origin stay explicit; unknown is shown as unknown.
  */
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link } from "@/lib/react-router-compat";
 import { Boxes, Loader2 } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { useBatches } from "@/hooks/useGeneticsLibrary";
+import { GeneticsReadUnavailable } from "@/components/genetics/GeneticsReadUnavailable";
 import { PlantAssignmentPanel } from "@/components/genetics/PlantAssignmentPanel";
 import { UnknownStateChip } from "@/components/genetics/UnknownStateChip";
-import {
-  batchStatusLabel,
-  propagationMethodLabel,
-} from "@/lib/genetics/traceabilityTypes";
+import { batchStatusLabel, propagationMethodLabel } from "@/lib/genetics/traceabilityTypes";
 import { geneticsTracePath, geneticsHealthHistoryPath } from "@/lib/routes";
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
@@ -35,6 +33,20 @@ export default function PropagationBatchDetail() {
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> Loading…
         </div>
+      </div>
+    );
+  }
+
+  if (batches.isError) {
+    return (
+      <div className="container max-w-3xl py-6">
+        <GeneticsReadUnavailable
+          testId="batch-unavailable"
+          message="This propagation batch could not be loaded. Its availability is unknown."
+          onRetry={() => {
+            void batches.refetch();
+          }}
+        />
       </div>
     );
   }
@@ -73,15 +85,25 @@ export default function PropagationBatchDetail() {
         <Field label="Method" value={propagationMethodLabel(b.propagationMethod)} />
         <Field
           label="Origin"
-          value={b.originUnknown || (!b.motherPlantId && !b.sourceAccessionId)
-            ? <UnknownStateChip kind="unknown" label="Unknown origin" />
-            : b.motherPlantId ? "Mother tracked" : "From accession"}
+          value={
+            b.originUnknown || (!b.motherPlantId && !b.sourceAccessionId) ? (
+              <UnknownStateChip kind="unknown" label="Unknown origin" />
+            ) : b.motherPlantId ? (
+              "Mother tracked"
+            ) : (
+              "From accession"
+            )
+          }
         />
         <Field
           label="Counts"
-          value={b.countsUnknown || b.initialQuantity === null
-            ? <UnknownStateChip kind="unknown" label="Counts unknown" />
-            : `${b.viableQuantity ?? "—"} / ${b.initialQuantity} viable`}
+          value={
+            b.countsUnknown || b.initialQuantity === null ? (
+              <UnknownStateChip kind="unknown" label="Counts unknown" />
+            ) : (
+              `${b.viableQuantity ?? "—"} / ${b.initialQuantity} viable`
+            )
+          }
         />
       </dl>
 

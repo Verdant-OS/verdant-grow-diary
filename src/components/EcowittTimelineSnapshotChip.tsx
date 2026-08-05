@@ -13,6 +13,11 @@ import {
   ECOWITT_DERIVED_VPD_LABEL,
   type EcowittSnapshotViewModel,
 } from "@/lib/ecowittReadingViewModel";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
+import {
+  celsiusToFahrenheit,
+  type TemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
 
 export interface EcowittTimelineSnapshotChipProps {
   diaryEntryId: string;
@@ -22,6 +27,18 @@ export interface EcowittTimelineSnapshotChipProps {
 function fmt(v: number | null | undefined, digits = 1): string {
   if (v == null || !Number.isFinite(v)) return "—";
   return v.toFixed(digits);
+}
+
+/**
+ * Display-only temperature. `snapshot.metrics.temperature_c` is canonical
+ * Celsius; conversion happens exactly once, here. The celsius preference
+ * renders the legacy "25.0 °C" shape unchanged; invalid stays "—".
+ */
+function fmtTemp(v: number | null | undefined, unit: TemperatureUnitPreference): string {
+  const symbol = unit === "celsius" ? "°C" : "°F";
+  if (v == null || !Number.isFinite(v)) return `— ${symbol}`;
+  const shown = unit === "celsius" ? v : celsiusToFahrenheit(v);
+  return `${shown.toFixed(1)} ${symbol}`;
 }
 
 function freshnessLabel(vm: EcowittSnapshotViewModel): string {
@@ -42,10 +59,9 @@ function capturedLabel(iso: string | null | undefined): string {
   }
 }
 
-export function EcowittTimelineSnapshotChip(
-  props: EcowittTimelineSnapshotChipProps,
-) {
+export function EcowittTimelineSnapshotChip(props: EcowittTimelineSnapshotChipProps) {
   const { diaryEntryId, snapshot } = props;
+  const temperatureUnit = useTemperatureUnitPreference();
   if (!snapshot || !snapshot.hasReading) return null;
 
   const freshness = freshnessLabel(snapshot);
@@ -75,7 +91,7 @@ export function EcowittTimelineSnapshotChip(
         {temp !== undefined ? (
           <div>
             <dt className="inline">Temp:</dt>{" "}
-            <dd className="inline text-foreground">{fmt(temp)} °C</dd>
+            <dd className="inline text-foreground">{fmtTemp(temp, temperatureUnit)}</dd>
           </div>
         ) : null}
         {rh !== undefined ? (

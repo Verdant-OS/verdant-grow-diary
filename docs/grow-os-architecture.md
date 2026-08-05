@@ -59,20 +59,23 @@ inside `diary_entries.details` jsonb instead:
 
 | File / Surface                                | Source                                                     |
 | --------------------------------------------- | ---------------------------------------------------------- |
-| `src/mock/index.ts`                           | Static fake tents, plants, sensors, cameras, tasks, alerts |
+| `src/mock/index.ts`                           | Static fake tents, plants, sensors, cameras, alerts        |
 | `src/hooks/useMockData.ts`                    | React Query wrappers over `src/mock`                       |
 | `src/hooks/useGrowData.ts`                    | Supabase-first but **silently falls back to mock** on empty/error (see §4) |
-| `src/pages/Dashboard.tsx`                     | Uses `useGrowData` (mock-fallback) + `useAlerts/useTasks/useAIInsights` from `useMockData` |
+| `src/pages/Dashboard.tsx`                     | Uses grow-, alert-, action-, and sensor-backed hooks; AI Insights remains an honest empty state |
 | `src/pages/Sensors.tsx`                       | `useGrowTents` + `useGrowSensorReadings` (mock-fallback); default tent id `"t1"` is a mock id |
 | `src/pages/Plants.tsx`                        | Real plants via `useGrowPlants` but **tent filter chips read mock tents** from `useMockData` |
 | `src/pages/Tents.tsx`                         | `useGrowTents` (mock-fallback) + mock `useSensorReadings`/`usePlants` |
 | `src/pages/TentDetail.tsx`                    | Mock `usePlants` / `useSensorReadings` / `useCameras`      |
 | `src/pages/PlantDetail.tsx`                   | Mock `useTent`                                             |
 | `src/pages/Cameras.tsx`                       | Mock `useCameras` / `useTents`                             |
-| `src/pages/Tasks.tsx`                         | Mock `useTasks` / `useTents`                               |
 | `src/components/AppShell.tsx` (alerts badge)  | Mock `useAlerts` from `useMockData`                        |
 | `src/components/SensorChart.tsx`              | Renders whatever it is given — has no demo/live awareness  |
 | `src/lib/growRepo.ts` / `src/lib/growAdapters.ts` | Adapt between Supabase rows and mock shape (used by `useGrowData`) |
+
+The retired `/tasks` URL is a context-preserving redirect to the
+approval-required `/actions` surface. There is no standalone Tasks page,
+`useTasks` hook, or mock Task dataset.
 
 ## 3. Live vs Demo Contract
 

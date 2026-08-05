@@ -20,7 +20,9 @@ function vm(input: Parameters<typeof buildTimelineEvidenceDetailViewModel>[0]) {
 describe("timelineEvidenceDetailViewModel", () => {
   it("returns null for invalid inputs", () => {
     expect(buildTimelineEvidenceDetailViewModel(null)).toBeNull();
-    expect(buildTimelineEvidenceDetailViewModel({ id: "" } as unknown as { id: string })).toBeNull();
+    expect(
+      buildTimelineEvidenceDetailViewModel({ id: "" } as unknown as { id: string }),
+    ).toBeNull();
   });
 
   it("renders a diary entry with photo + recent sensor as strong AI Doctor context", () => {

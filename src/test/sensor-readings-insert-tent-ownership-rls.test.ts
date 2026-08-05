@@ -76,6 +76,16 @@ describe("sensor_readings INSERT RLS: tent-ownership fence", () => {
     expect(latest.withCheck).toMatch(/source\s+IN\s*\(\s*'manual'\s*,\s*'csv'\s*\)/i);
   });
 
+  it("reserves both operator-attested GGS provenance markers for server writes", () => {
+    const latest = policies[policies.length - 1];
+    expect(latest.withCheck).toMatch(
+      /COALESCE\s*\(\s*raw_payload\s*->>\s*'provenance'\s*,\s*''\s*\)\s*<>\s*'operator_attested_real_payload'/i,
+    );
+    expect(latest.withCheck).toMatch(
+      /COALESCE\s*\(\s*raw_payload\s*#>>\s*'\{operator_attestation,boundary\}'\s*,\s*''\s*\)\s*<>\s*'operator-ggs-real-payload-commit'/i,
+    );
+  });
+
   it.each(["live", "ecowitt", "mqtt", "webhook", "pi_bridge"])(
     "does not grant authenticated clients direct %s provenance",
     (source) => {

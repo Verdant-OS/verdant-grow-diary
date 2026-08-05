@@ -40,8 +40,7 @@ export interface AiDoctorReadinessDiaryDraft {
 }
 
 export type AiDoctorReadinessDiaryBuildResult =
-  | { ok: true; draft: AiDoctorReadinessDiaryDraft }
-  | { ok: false; reason: string };
+  { ok: true; draft: AiDoctorReadinessDiaryDraft } | { ok: false; reason: string };
 
 export interface BuildAiDoctorReadinessDiaryEntryArgs {
   readiness: AiDoctorContextReadiness;
@@ -53,10 +52,7 @@ export interface BuildAiDoctorReadinessDiaryEntryArgs {
   now?: number;
 }
 
-function readinessNote(
-  readiness: AiDoctorContextReadiness,
-  freshnessLabel: string,
-): string {
+function readinessNote(readiness: AiDoctorContextReadiness, freshnessLabel: string): string {
   switch (readiness) {
     case "strong":
       return `AI Doctor readiness: allowed (strong context). Snapshot: ${freshnessLabel}.`;
@@ -74,10 +70,7 @@ export function buildAiDoctorReadinessDiaryEntry(
   if (growId.length === 0) {
     return { ok: false, reason: "missing_grow_id" };
   }
-  const nowMs =
-    typeof args.now === "number" && Number.isFinite(args.now)
-      ? args.now
-      : Date.now();
+  const nowMs = typeof args.now === "number" && Number.isFinite(args.now) ? args.now : Date.now();
   const freshness = buildAiDoctorSnapshotFreshnessStatus({
     latestSnapshotAtIso: args.latestSnapshotAtIso,
     now: nowMs,
@@ -91,13 +84,9 @@ export function buildAiDoctorReadinessDiaryEntry(
     draft: {
       grow_id: growId,
       plant_id:
-        typeof args.plantId === "string" && args.plantId.trim().length > 0
-          ? args.plantId
-          : null,
+        typeof args.plantId === "string" && args.plantId.trim().length > 0 ? args.plantId : null,
       tent_id:
-        typeof args.tentId === "string" && args.tentId.trim().length > 0
-          ? args.tentId
-          : null,
+        typeof args.tentId === "string" && args.tentId.trim().length > 0 ? args.tentId : null,
       note,
       details: {
         kind: AI_DOCTOR_READINESS_CHECK_KIND,

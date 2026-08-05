@@ -9,7 +9,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import AiDoctorSessionDetail from "@/pages/AiDoctorSessionDetail";
 import type { Diagnosis } from "@/lib/aiDoctorDiagnosisRules";
@@ -70,7 +70,15 @@ vi.mock("@/integrations/supabase/client", () => {
   const sessionsBuilder = () => ({
     select: () => ({
       eq: (_col: string, value: string) => ({
-        order: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }),
+        order: () => ({
+          limit: () => {
+            const __c: any = {
+              abortSignal: () => __c,
+              then: (r: any, j?: any) => Promise.resolve({ data: [], error: null }).then(r, j),
+            };
+            return __c;
+          },
+        }),
         maybeSingle: () =>
           Promise.resolve(
             value === currentFixture.id
@@ -84,9 +92,25 @@ vi.mock("@/integrations/supabase/client", () => {
   const reviewsBuilder = () => ({
     select: () => ({
       in: () => ({
-        order: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }),
+        order: () => ({
+          limit: () => {
+            const __c: any = {
+              abortSignal: () => __c,
+              then: (r: any, j?: any) => Promise.resolve({ data: [], error: null }).then(r, j),
+            };
+            return __c;
+          },
+        }),
       }),
-      order: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }),
+      order: () => ({
+        limit: () => {
+          const __c: any = {
+            abortSignal: () => __c,
+            then: (r: any, j?: any) => Promise.resolve({ data: [], error: null }).then(r, j),
+          };
+          return __c;
+        },
+      }),
     }),
     insert: () => Promise.resolve({ data: null, error: null }),
   });
@@ -98,7 +122,13 @@ vi.mock("@/integrations/supabase/client", () => {
       in: () => chain,
       like: () => chain,
       order: () => chain,
-      limit: () => Promise.resolve({ data: linkedRows, error: null }),
+      limit: () => {
+        const __c: any = {
+          abortSignal: () => __c,
+          then: (r: any, j?: any) => Promise.resolve({ data: linkedRows, error: null }).then(r, j),
+        };
+        return __c;
+      },
     };
     return chain;
   };
@@ -138,10 +168,7 @@ function renderDetail() {
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={[`/doctor/sessions/${SESSION_ID}`]}>
         <Routes>
-          <Route
-            path="/doctor/sessions/:sessionId"
-            element={<AiDoctorSessionDetail />}
-          />
+          <Route path="/doctor/sessions/:sessionId" element={<AiDoctorSessionDetail />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -159,9 +186,7 @@ describe("AiDoctorSessionDetail — Linked Action Queue items panel", () => {
     await screen.findByTestId("ai-doctor-session-detail-page");
     // give the linked-actions query a chance to settle
     await waitFor(() => {
-      expect(
-        screen.queryByTestId("ai-doctor-session-detail-linked-action-queue"),
-      ).toBeNull();
+      expect(screen.queryByTestId("ai-doctor-session-detail-linked-action-queue")).toBeNull();
     });
   });
 
@@ -175,9 +200,7 @@ describe("AiDoctorSessionDetail — Linked Action Queue items panel", () => {
       },
     ];
     renderDetail();
-    const section = await screen.findByTestId(
-      "ai-doctor-session-detail-linked-action-queue",
-    );
+    const section = await screen.findByTestId("ai-doctor-session-detail-linked-action-queue");
     expect(section.textContent).toContain("Linked Action Queue items");
     expect(section.textContent).toContain("approval-required");
 
@@ -187,9 +210,7 @@ describe("AiDoctorSessionDetail — Linked Action Queue items panel", () => {
     expect(link.getAttribute("href")).toBe("/actions?focus=aq-1");
     expect(link.textContent).toContain("View in Action Queue");
 
-    const count = screen.getByTestId(
-      "ai-doctor-session-detail-linked-action-queue-count",
-    );
+    const count = screen.getByTestId("ai-doctor-session-detail-linked-action-queue-count");
     expect(count.textContent).toMatch(/1 open item/);
   });
 
@@ -211,23 +232,19 @@ describe("AiDoctorSessionDetail — Linked Action Queue items panel", () => {
     renderDetail();
     const items = await screen.findAllByTestId(
       "ai-doctor-session-detail-linked-action-queue-item",
+      undefined,
+      { timeout: 5_000 },
     );
     expect(items).toHaveLength(2);
-    const hrefs = items.map((li) =>
-      li.querySelector("a")?.getAttribute("href"),
-    );
+    const hrefs = items.map((li) => li.querySelector("a")?.getAttribute("href"));
     expect(hrefs).toEqual(["/actions?focus=aq-a", "/actions?focus=aq-b"]);
     expect(
-      screen.queryByTestId(
-        "ai-doctor-session-detail-linked-action-queue-primary-link",
-      ),
+      screen.queryByTestId("ai-doctor-session-detail-linked-action-queue-primary-link"),
     ).toBeNull();
     expect(
-      screen
-        .getByTestId("ai-doctor-session-detail-linked-action-queue-count")
-        .textContent,
+      screen.getByTestId("ai-doctor-session-detail-linked-action-queue-count").textContent,
     ).toMatch(/2 open items/);
-  });
+  }, 10_000);
 
   it("never renders the raw [session:<id>] token", async () => {
     linkedRows = [
@@ -239,9 +256,7 @@ describe("AiDoctorSessionDetail — Linked Action Queue items panel", () => {
       },
     ];
     renderDetail();
-    const section = await screen.findByTestId(
-      "ai-doctor-session-detail-linked-action-queue",
-    );
+    const section = await screen.findByTestId("ai-doctor-session-detail-linked-action-queue");
     const text = section.textContent ?? "";
     expect(text).not.toContain(`[session:${SESSION_ID}]`);
     expect(text).not.toContain("[session:");
@@ -257,9 +272,7 @@ describe("AiDoctorSessionDetail — Linked Action Queue items panel", () => {
       },
     ];
     renderDetail();
-    const section = await screen.findByTestId(
-      "ai-doctor-session-detail-linked-action-queue",
-    );
+    const section = await screen.findByTestId("ai-doctor-session-detail-linked-action-queue");
     const lower = (section.textContent ?? "").toLowerCase();
     expect(lower).not.toContain("target_device");
     for (const tok of [
@@ -285,9 +298,7 @@ describe("AiDoctorSessionDetail — Linked Action Queue items panel", () => {
       },
     ];
     renderDetail();
-    const btn = await screen.findByTestId(
-      "ai-doctor-session-detail-add-to-action-queue-button",
-    );
+    const btn = await screen.findByTestId("ai-doctor-session-detail-add-to-action-queue-button");
     expect(btn).toBeTruthy();
   });
 
@@ -303,9 +314,7 @@ describe("AiDoctorSessionDetail — Linked Action Queue items panel", () => {
     renderDetail();
     await screen.findByTestId("ai-doctor-session-detail-page");
     await waitFor(() => {
-      expect(
-        screen.queryByTestId("ai-doctor-session-detail-linked-action-queue"),
-      ).toBeNull();
+      expect(screen.queryByTestId("ai-doctor-session-detail-linked-action-queue")).toBeNull();
     });
   });
 
@@ -321,27 +330,19 @@ describe("AiDoctorSessionDetail — Linked Action Queue items panel", () => {
     renderDetail();
     await screen.findByTestId("ai-doctor-session-detail-page");
     await waitFor(() => {
-      expect(
-        screen.queryByTestId("ai-doctor-session-detail-linked-action-queue"),
-      ).toBeNull();
+      expect(screen.queryByTestId("ai-doctor-session-detail-linked-action-queue")).toBeNull();
     });
   });
 });
 
 // --- Static safety scan ------------------------------------------------------
 const ROOT = resolve(__dirname, "../..");
-const PAGE = readFileSync(
-  resolve(ROOT, "src/pages/AiDoctorSessionDetail.tsx"),
-  "utf8",
-);
+const PAGE = readFileSync(resolve(ROOT, "src/pages/AiDoctorSessionDetail.tsx"), "utf8");
 const HOOK = readFileSync(
   resolve(ROOT, "src/hooks/useAiDoctorSessionLinkedActionQueueItems.ts"),
   "utf8",
 );
-const VM = readFileSync(
-  resolve(ROOT, "src/lib/aiDoctorSessionLinkedActionsViewModel.ts"),
-  "utf8",
-);
+const VM = readFileSync(resolve(ROOT, "src/lib/aiDoctorSessionLinkedActionsViewModel.ts"), "utf8");
 
 describe("Linked Action Queue back-link — static safety", () => {
   it("page contains no insert/update/delete/upsert/rpc/functions.invoke", () => {

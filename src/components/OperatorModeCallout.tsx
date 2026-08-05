@@ -9,7 +9,7 @@
  *  - no writes; navigation only.
  *  - no IDs, role rows, RPC names, or tokens rendered.
  */
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { ShieldCheck } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -26,9 +26,7 @@ export default function OperatorModeCallout() {
         <CardTitle className="flex items-center gap-2 text-base">
           <ShieldCheck className="h-4 w-4" /> Operator Mode
         </CardTitle>
-        <CardDescription>
-          Open the protected demo preview and operator diagnostics.
-        </CardDescription>
+        <CardDescription>Open the protected demo preview and operator diagnostics.</CardDescription>
       </CardHeader>
       <CardContent>
         <Button asChild data-testid="operator-mode-callout-cta">

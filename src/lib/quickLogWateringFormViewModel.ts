@@ -90,8 +90,7 @@ export type WateringFormFailureReason =
   | "vpd_out_of_range";
 
 export type BuildWateringFormPayloadResult =
-  | { ok: true; payload: WateringTypedEventInput }
-  | { ok: false; reason: WateringFormFailureReason };
+  { ok: true; payload: WateringTypedEventInput } | { ok: false; reason: WateringFormFailureReason };
 
 const PLAIN_NUMBER = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/;
 const POT_WEIGHT_VALUES = new Set<PotWeightFeel>(["", ...ROOT_ZONE_POT_WEIGHT_FEELS]);

@@ -45,9 +45,7 @@ describe("resolvePiIngestBridgeCredentialMetadata — mapping", () => {
 
   it("copies allowed_tent_ids defensively", () => {
     const tents = ["tent-1", "tent-2"];
-    const [out] = resolvePiIngestBridgeCredentialMetadata([
-      row({ allowed_tent_ids: tents }),
-    ]);
+    const [out] = resolvePiIngestBridgeCredentialMetadata([row({ allowed_tent_ids: tents })]);
     expect(out.allowedTentIds).toEqual(tents);
     expect(out.allowedTentIds).not.toBe(tents);
   });
@@ -145,10 +143,7 @@ describe("resolvePiIngestBridgeCredentialMetadata — static safety", () => {
     ["no crypto.subtle.decrypt", /crypto\.subtle\.decrypt/],
     ["no Deno.env.get", /Deno\.env\.get/],
     ["no process.env reads", /process\.env\./],
-    [
-      "no plaintext secret field on the output type",
-      /\bsecret\s*:\s*string/,
-    ],
+    ["no plaintext secret field on the output type", /\bsecret\s*:\s*string/],
   ])("source has no forbidden surface: %s", (_l, re) => {
     expect(SRC).not.toMatch(re);
   });

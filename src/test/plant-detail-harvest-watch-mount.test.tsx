@@ -31,6 +31,7 @@ const ROOT = resolve(__dirname, "../..");
 const read = (p: string) => readFileSync(resolve(ROOT, p), "utf8");
 
 const PLANT_DETAIL = read("src/pages/PlantDetail.tsx");
+const WHATS_MISSING = read("src/components/PlantDetailWhatsMissing.tsx");
 const CARD = read("src/components/PlantDetailHarvestWatchCard.tsx");
 const RULES = read("src/lib/harvestWatchRules.ts");
 const ROW_VM = read("src/lib/harvestWatchViewModel.ts");
@@ -67,9 +68,9 @@ describe("Plant Detail Harvest Watch mount", () => {
   });
 
   it("PlantDetail.tsx mounts <PlantDetailHarvestWatchCard /> exactly once", () => {
-    const occurrences =
-      PLANT_DETAIL.match(/<PlantDetailHarvestWatchCard\b/g) ?? [];
+    const occurrences = PLANT_DETAIL.match(/<PlantDetailHarvestWatchCard\b/g) ?? [];
     expect(occurrences.length).toBe(1);
+    expect(WHATS_MISSING).not.toMatch(/PlantDetailHarvestWatchCard/);
   });
 
   it("guards the card and evidence report behind the shared eligibility fence", () => {
@@ -80,9 +81,7 @@ describe("Plant Detail Harvest Watch mount", () => {
   });
 
   it("mount passes only safe Plant Detail context props", () => {
-    const mountMatch = PLANT_DETAIL.match(
-      /<PlantDetailHarvestWatchCard[\s\S]*?\/>/,
-    );
+    const mountMatch = PLANT_DETAIL.match(/<PlantDetailHarvestWatchCard[\s\S]*?\/>/);
     expect(mountMatch).not.toBeNull();
     const mount = mountMatch![0];
     expect(mount).toMatch(/plantId=/);
@@ -110,9 +109,7 @@ describe("Plant Detail Harvest Watch mount", () => {
     mocks.useGrowPlant.mockReturnValue({ data: null, isLoading: true });
     mocks.usePlantRecentActivity.mockReturnValue({ data: [], isLoading: false });
     render(<PlantDetailHarvestWatchCard plantId="p1" />);
-    expect(
-      screen.getByTestId("plant-detail-harvest-watch-card-loading"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("plant-detail-harvest-watch-card-loading")).toBeInTheDocument();
   });
 
   it("renders mandated evidence-only caution copy on the loaded card", () => {
@@ -136,9 +133,7 @@ describe("Plant Detail Harvest Watch mount", () => {
       isLoading: false,
     });
     render(<PlantDetailHarvestWatchCard plantId="p1" />);
-    const caution = screen.getByTestId(
-      "plant-detail-harvest-watch-evidence-only-caution",
-    );
+    const caution = screen.getByTestId("plant-detail-harvest-watch-evidence-only-caution");
     expect(caution.textContent).toMatch(
       /Harvest Watch is evidence-only\. Confirm with direct plant inspection before making harvest decisions\./,
     );
@@ -148,5 +143,54 @@ describe("Plant Detail Harvest Watch mount", () => {
     expect(html).not.toContain("ready to harvest");
     expect(html).not.toContain("guaranteed");
     expect(html).not.toContain("optimal");
+  });
+
+  it("does not render Harvest Watch for a seedling", () => {
+    mocks.useGrowPlant.mockReturnValue({
+      data: {
+        id: "p-seedling",
+        name: "Seedling",
+        strain: "Test Strain",
+        stage: "seedling",
+        startedAt: new Date(Date.now() - 7 * 86400_000).toISOString(),
+        tentId: "t1",
+        growId: "g1",
+        photo: "",
+        health: "healthy",
+        lastNote: "",
+      },
+      isLoading: false,
+    });
+    mocks.usePlantRecentActivity.mockReturnValue({ data: [], isLoading: false });
+
+    render(<PlantDetailHarvestWatchCard plantId="p-seedling" />);
+
+    expect(screen.queryByTestId("plant-detail-harvest-watch-card")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("plant-detail-harvest-watch-card-loading")).not.toBeInTheDocument();
+  });
+
+  it("does not flash a loading Harvest Watch for a resolved seedling", () => {
+    mocks.useGrowPlant.mockReturnValue({
+      data: {
+        id: "p-seedling",
+        name: "Seedling",
+        stage: "seedling",
+      },
+      isLoading: false,
+    });
+    mocks.usePlantRecentActivity.mockReturnValue({ data: [], isLoading: true });
+
+    render(<PlantDetailHarvestWatchCard plantId="p-seedling" />);
+
+    expect(screen.queryByTestId("plant-detail-harvest-watch-card-loading")).not.toBeInTheDocument();
+  });
+
+  it("does not claim loading when the plant lookup resolved without a plant", () => {
+    mocks.useGrowPlant.mockReturnValue({ data: null, isLoading: false });
+    mocks.usePlantRecentActivity.mockReturnValue({ data: [], isLoading: false });
+
+    render(<PlantDetailHarvestWatchCard plantId="missing-plant" />);
+
+    expect(screen.queryByTestId("plant-detail-harvest-watch-card-loading")).not.toBeInTheDocument();
   });
 });

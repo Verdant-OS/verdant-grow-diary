@@ -9,10 +9,7 @@ describe("Plant Detail photos anchor", () => {
   });
 
   it("renders a wrapper using PLANT_PHOTOS_ANCHOR_ID around PlantDetailPhotoStrip", () => {
-    const src = readFileSync(
-      resolve(__dirname, "../pages/PlantDetail.tsx"),
-      "utf8",
-    );
+    const src = readFileSync(resolve(__dirname, "../pages/PlantDetail.tsx"), "utf8");
     expect(src).toMatch(/PLANT_PHOTOS_ANCHOR_ID/);
     expect(src).toMatch(/id=\{PLANT_PHOTOS_ANCHOR_ID\}/);
     expect(src).toMatch(/PlantDetailPhotoStrip/);

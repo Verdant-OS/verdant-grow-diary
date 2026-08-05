@@ -1,15 +1,46 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import {
+  extractMountedAppRoutePaths,
+  readAllRouteModuleSources,
+} from "./helpers/routeManifestSyncHarness";
 
 const ROOT = resolve(__dirname, "../..");
-const APP = readFileSync(resolve(ROOT, "src/App.tsx"), "utf8");
+const APP = readAllRouteModuleSources();
 const DETAIL = readFileSync(resolve(ROOT, "src/pages/ActionDetail.tsx"), "utf8");
 
+// Only two RPC-invocation shapes are legitimate in this codebase (see
+// action-detail-linked-alert.test.tsx for the full writeup):
+//   1. Direct call:       supabase.rpc("name", args)
+//   2. Cast-wrapped call: (supabase.rpc as unknown as (fn: string, args:
+//      unknown) => Promise<...>)("name", args) — used before the RPC's
+//      generated typing lands (see actionQueueRpcAvailability).
+// Anchoring to the call's own first argument (and, here, its second
+// argument identifier) rather than "any quote within N characters of
+// supabase.rpc" stops a dynamic/foreign RPC call from being credited with
+// the canonical name or the expected rpcArgs binding (Codex P2).
+const DIRECT_RPC_CALL_PATTERN = /supabase\.rpc\s*\(\s*["']([^"']+)["']\s*(?:,\s*(\w+))?\s*,?\s*\)/g;
+const CAST_RPC_CALL_PATTERN =
+  /supabase\.rpc\s+as\s+unknown\s+as\s*\([\s\S]{0,150}?\)\s*=>\s*[\s\S]{0,150}?\)\s*\(\s*["']([^"']+)["']\s*(?:,\s*(\w+))?\s*,?\s*\)/g;
+
+function resolveRpcCalls(src: string): Array<{ name: string; argsVar?: string }> {
+  const direct = [...src.matchAll(DIRECT_RPC_CALL_PATTERN)].map((m) => ({
+    name: m[1],
+    argsVar: m[2],
+  }));
+  const cast = [...src.matchAll(CAST_RPC_CALL_PATTERN)].map((m) => ({
+    name: m[1],
+    argsVar: m[2],
+  }));
+  return [...direct, ...cast];
+}
+
 describe("Action Queue detail view", () => {
-  it("registers the /actions/:actionId route in App.tsx", () => {
-    expect(APP).toMatch(/path="\/actions\/:actionId"\s+element=\{<ActionDetail\s*\/>\}/);
-    expect(APP).toMatch(/ActionDetail\s*=\s*lazy\(\(\)\s*=>\s*import\("\.\/pages\/ActionDetail"\)\)/);
+  it("registers the /actions/:actionId route in file routes", () => {
+    expect(extractMountedAppRoutePaths()).toContain("/actions/:actionId");
+    expect(APP).toMatch(/ActionDetail/);
+    expect(APP).toMatch(/@\/pages\/ActionDetail|pages\/ActionDetail/);
   });
 
   it("uses the useParams actionId from the URL", () => {
@@ -65,12 +96,21 @@ describe("Action Queue detail view", () => {
     );
   });
 
-  it("audit insert omits user_id (DB default auth.uid() wins)", () => {
+  it("uses the atomic transition RPC without caller-supplied identity", () => {
     const m = DETAIL.match(
-      /\.from\(\s*["']action_queue_events["']\s*\)\s*\.insert\(\{([\s\S]*?)\}\)/,
+      /const\s+rpcArgs\s*=\s*buildActionQueueTransitionRpcArgs\(\s*\{([\s\S]*?)\}\s*\)/,
     );
     expect(m).toBeTruthy();
-    expect(m![1]).not.toMatch(/user_id/);
+    expect(m![1]).not.toMatch(/\buser_id\b|\bgrow_id\b|\bevent_type\b|\bnew_status\b/);
+    const rpcCallSiteCount = (DETAIL.match(/supabase\.rpc\b/g) ?? []).length;
+    const rpcCalls = resolveRpcCalls(DETAIL);
+    // Every call site must independently resolve its own first-argument
+    // name and second-argument identifier — a dynamic/foreign call site
+    // would leave this short rather than being credited with the
+    // canonical name or rpcArgs binding.
+    expect(rpcCalls.length).toBe(rpcCallSiteCount);
+    expect(rpcCalls).toEqual([{ name: "action_queue_transition", argsVar: "rpcArgs" }]);
+    expect(DETAIL).not.toMatch(/\.from\(\s*["']action_queue_events["']\s*\)\s*\.insert\(/);
   });
 
   it("introduces no device-control surface or service_role", () => {

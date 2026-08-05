@@ -19,10 +19,8 @@ const EXPECTED_ORDER = [
   "one-tent-live-proof",
 ];
 
-const UUID_RE =
-  /\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b/;
-const ISO_SECOND_RE =
-  /\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})\b/;
+const UUID_RE = /\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b/;
+const ISO_SECOND_RE = /\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})\b/;
 const FORBIDDEN_TOKENS = [
   "service_role",
   "SERVICE_ROLE",
@@ -39,9 +37,7 @@ describe("demoProofWalkthroughViewModel", () => {
   const vm = buildDemoProofWalkthroughViewModel();
 
   it("exposes the canonical internal route", () => {
-    expect(DEMO_PROOF_WALKTHROUGH_ROUTE).toBe(
-      "/internal/demo-proof-walkthrough",
-    );
+    expect(DEMO_PROOF_WALKTHROUGH_ROUTE).toBe("/internal/demo-proof-walkthrough");
   });
 
   it("uses the current-proof-window scope label, not all-time", () => {
@@ -63,12 +59,7 @@ describe("demoProofWalkthroughViewModel", () => {
       expect(s.expectedEvidence.length).toBeGreaterThan(0);
       expect(s.href.length).toBeGreaterThan(0);
       expect(s.safetyNote.length).toBeGreaterThan(0);
-      expect([
-        "ready",
-        "operator_only",
-        "limited",
-        "unavailable",
-      ]).toContain(s.statusKind);
+      expect(["ready", "operator_only", "limited", "unavailable"]).toContain(s.statusKind);
     }
   });
 
@@ -99,7 +90,6 @@ describe("demoProofWalkthroughViewModel", () => {
     expect(vm.steps[2].href).toBe("/plants");
   });
 
-
   it("safety summary calls out the verified role gate, no automation, no device control", () => {
     const joined = vm.safetySummary.join(" ");
     expect(joined).toMatch(/server-verified operator role/i);
@@ -127,7 +117,6 @@ describe("demoProofWalkthroughViewModel", () => {
     expect(blob).not.toMatch(/\bis healthy\b/);
     expect(blob).not.toMatch(/\bmarked healthy\b/);
   });
-
 
   it("'what this proves' and 'what this does not prove' are non-empty and distinct", () => {
     expect(vm.whatThisProves.length).toBeGreaterThanOrEqual(3);

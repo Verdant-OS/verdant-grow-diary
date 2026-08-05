@@ -9,8 +9,7 @@ import type { PageSeo } from "@/hooks/usePageSeo";
 
 export const CULTIVARS_INDEX_PATH = "/cultivars" as const;
 
-const INDEX_TITLE =
-  "Cannabis Cultivar Guides: Oreoz, Do-Si-Dos & More | Verdant";
+const INDEX_TITLE = "Cannabis Cultivar Guides: Oreoz, Do-Si-Dos & More | Verdant";
 
 const INDEX_DESCRIPTION =
   "Evergreen cultivar profiles for serious home growers: environment ranges, flower windows, common issues, and what to compare when pheno-hunting.";

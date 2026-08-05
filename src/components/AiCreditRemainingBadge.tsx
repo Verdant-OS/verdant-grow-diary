@@ -32,15 +32,10 @@ export default function AiCreditRemainingBadge({
       data-scope={vm.scope}
       className="mt-2 inline-flex flex-col items-start gap-0.5 rounded-md border border-border/60 bg-background/40 px-2 py-1 text-[11px] text-muted-foreground"
     >
-      <span
-        className="font-medium text-foreground"
-        data-testid={`${testId}-label`}
-      >
+      <span className="font-medium text-foreground" data-testid={`${testId}-label`}>
         {vm.label}
       </span>
-      {vm.helper ? (
-        <span data-testid={`${testId}-helper`}>{vm.helper}</span>
-      ) : null}
+      {vm.helper ? <span data-testid={`${testId}-helper`}>{vm.helper}</span> : null}
     </div>
   );
 }

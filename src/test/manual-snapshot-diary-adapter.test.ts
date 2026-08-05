@@ -57,9 +57,7 @@ describe("diaryRowToManualSnapshotRecord", () => {
   });
 
   it("returns null when no manual_sensor_snapshot payload is present", () => {
-    expect(
-      diaryRowToManualSnapshotRecord(row({ details: { event_type: "note" } })),
-    ).toBeNull();
+    expect(diaryRowToManualSnapshotRecord(row({ details: { event_type: "note" } }))).toBeNull();
     expect(diaryRowToManualSnapshotRecord(row({ details: null }))).toBeNull();
   });
 

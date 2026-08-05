@@ -2,9 +2,8 @@
  * Verdant Quick Log Activity Types — pure constant/rule tests.
  *
  * Covers:
- *  - all canonical activity labels present
- *  - Harvest enabled with cautious safety copy
- *  - Harvest persists through the canonical event route
+ *  - all supported activity labels present
+ *  - Harvest has the real event persistence plan (never fake-remapped)
  *  - Defoliation persists as event_type=training with subtype fence
  *  - Generic training does not render as Defoliation
  *  - Only DB-validator-allowed event_type values are emitted
@@ -15,7 +14,6 @@ import { describe, it, expect } from "vitest";
 import {
   QUICK_LOG_ACTIVITY_DEFINITIONS,
   QUICK_LOG_ACTIVITY_IDS,
-  QUICK_LOG_HARVEST_DISABLED_REASON,
   type QuickLogActivityId,
   type QuickLogEventTypeValue,
 } from "@/constants/quickLogActivityTypes";
@@ -26,7 +24,7 @@ import {
   resolveQuickLogEventTimelineLabel,
 } from "@/lib/quickLogActivityRules";
 
-const V1A_ENABLED: QuickLogActivityId[] = [
+const SUPPORTED_ACTIVITY_IDS: QuickLogActivityId[] = [
   "note",
   "photo",
   "watering",
@@ -68,22 +66,21 @@ function assertSafe(s: string) {
 
 describe("quickLogActivityTypes constants", () => {
   it("registers exactly the v1b activity ids (harvest now enabled)", () => {
-    expect(new Set(QUICK_LOG_ACTIVITY_IDS)).toEqual(new Set(V1A_ENABLED));
+    expect(new Set(QUICK_LOG_ACTIVITY_IDS)).toEqual(new Set(SUPPORTED_ACTIVITY_IDS));
   });
 
-  it.each(V1A_ENABLED)("%s is enabled and has no disabled reason", (id) => {
-    expect(isQuickLogActivityEnabled(id)).toBe(true);
-    expect(getQuickLogDisabledReason(id)).toBeNull();
-  });
+  it.each(SUPPORTED_ACTIVITY_IDS)(
+    "%s is enabled and has no taxonomy-level disabled reason",
+    (id) => {
+      expect(isQuickLogActivityEnabled(id)).toBe(true);
+      expect(getQuickLogDisabledReason(id)).toBeNull();
+    },
+  );
 
   it("Harvest safety copy denies readiness/yield claims", () => {
     const note = QUICK_LOG_ACTIVITY_DEFINITIONS.harvest.safetyNote.toLowerCase();
     expect(note).toMatch(/does not claim/);
     expect(note).toMatch(/readiness|yield/);
-    // Legacy disabled-reason constant is still exported for out-of-date
-    // callers, but must NOT be used as Harvest's live safety copy.
-    expect(note).not.toBe(QUICK_LOG_HARVEST_DISABLED_REASON.toLowerCase());
-    expect(QUICK_LOG_HARVEST_DISABLED_REASON).toMatch(/backend update/i);
   });
 
   it("safety copy across every activity avoids recommendation/diagnosis/readiness language", () => {
@@ -162,13 +159,13 @@ describe("planQuickLogPersistence", () => {
     });
   });
 
-  it("Watering routes to quicklog_save_manual with p_action=water", () => {
+  it("Watering is a structured handoff and has no legacy manual persistence plan", () => {
     const plan = planQuickLogPersistence("watering");
     expect(plan).toEqual({
       activityId: "watering",
-      saveRoute: "manual_water",
-      manualAction: "water",
+      saveRoute: "structured_water",
     });
+    expect(JSON.stringify(QUICK_LOG_ACTIVITY_DEFINITIONS)).not.toContain("manual_water");
   });
 
   it.each([

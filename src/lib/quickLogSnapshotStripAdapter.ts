@@ -24,12 +24,12 @@ import {
   classifySnapshotTrustBadge,
   type SnapshotTrustBadgeView,
 } from "@/lib/sensorSnapshotTrustBadgeRules";
+import {
+  formatTemperatureDisplay,
+  type TemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
 
-export type QuickLogSnapshotStripStatus =
-  | "usable"
-  | "stale"
-  | "invalid"
-  | "no_data";
+export type QuickLogSnapshotStripStatus = "usable" | "stale" | "invalid" | "no_data";
 
 export type QuickLogSnapshotStripAction =
   | { kind: "none" }
@@ -136,7 +136,20 @@ export function formatCapturedAtAbsolute(iso: string | null | undefined): string
   const ms = Date.parse(iso);
   if (!Number.isFinite(ms)) return null;
   const d = new Date(ms);
-  const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const MONTHS = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ];
   const mo = MONTHS[d.getUTCMonth()];
   const day = d.getUTCDate();
   const yr = d.getUTCFullYear();
@@ -147,8 +160,6 @@ export function formatCapturedAtAbsolute(iso: string | null | undefined): string
   if (h === 0) h = 12;
   return `${mo} ${day}, ${yr}, ${h}:${m} ${ampm} UTC`;
 }
-
-
 
 function formatAge(capturedMs: number, nowMs: number): string {
   const diff = Math.max(0, nowMs - capturedMs);
@@ -164,9 +175,19 @@ function formatAge(capturedMs: number, nowMs: number): string {
 
 function buildMetrics(
   snapshot: SensorSnapshot,
+  temperatureUnit: TemperatureUnitPreference,
 ): ReadonlyArray<{ label: string; value: string }> {
   const out: { label: string; value: string }[] = [];
-  if (snapshot.temp !== null) out.push({ label: "Temp", value: `${snapshot.temp.toFixed(1)}°C` });
+  if (snapshot.temp !== null) {
+    out.push({
+      label: "Temp",
+      value: formatTemperatureDisplay(snapshot.temp, {
+        valueUnit: "C",
+        unit: temperatureUnit,
+        digits: 1,
+      }),
+    });
+  }
   if (snapshot.rh !== null) out.push({ label: "RH", value: `${snapshot.rh.toFixed(0)}%` });
   if (snapshot.vpd !== null) out.push({ label: "VPD", value: `${snapshot.vpd.toFixed(2)} kPa` });
   return out;
@@ -198,6 +219,15 @@ export interface BuildQuickLogStripArgs {
    */
   attached?: boolean;
   now?: Date;
+  /**
+   * Active temperature display unit. REQUIRED — this adapter is pure
+   * (no I/O, never reads the live preference itself), so a caller that
+   * omits this can only ever get a silently-wrong-unit reading. This is
+   * exactly the bug class Codex flagged repeatedly across Quick Log:
+   * making the field compulsory means tsc catches a forgotten unit at
+   * every call site instead of it shipping as a hardcoded °C.
+   */
+  temperatureUnit: TemperatureUnitPreference;
 }
 
 export function buildQuickLogSnapshotStrip(
@@ -209,15 +239,12 @@ export function buildQuickLogSnapshotStrip(
     hasTent = true,
     attached = true,
     now = new Date(),
+    temperatureUnit,
   } = args;
 
   // No tent selected or loader still in flight or empty snapshot ⇒ no_data.
   const isEmpty =
-    !snapshot ||
-    !hasTent ||
-    loading ||
-    snapshot.source === "unavailable" ||
-    !snapshot.ts;
+    !snapshot || !hasTent || loading || snapshot.source === "unavailable" || !snapshot.ts;
 
   if (isEmpty) {
     const classification = classifyAuditRow(null, { now });
@@ -252,10 +279,10 @@ export function buildQuickLogSnapshotStrip(
   );
 
   const status = narrowStatus(classification.status);
-  const capturedMs = new Date(snapshot.ts).getTime();
-  const ageLabel = Number.isFinite(capturedMs)
-    ? formatAge(capturedMs, now.getTime())
-    : null;
+  // `isEmpty` above already rejected a missing `ts`; re-read it as non-null.
+  const capturedAtIso = snapshot.ts ?? "";
+  const capturedMs = new Date(capturedAtIso).getTime();
+  const ageLabel = Number.isFinite(capturedMs) ? formatAge(capturedMs, now.getTime()) : null;
 
   // Resolve title/description/action with the attach-toggle override:
   // when a snapshot is technically usable but the grower has toggled
@@ -271,12 +298,11 @@ export function buildQuickLogSnapshotStrip(
   // in a detached-toggle state, prefer the edit action so growers can
   // correct/update the manual reading directly. Never applied for live,
   // sim, demo, csv, or unknown sources.
-  const finalAction: QuickLogSnapshotStripAction =
-    usableButDetached
-      ? { kind: "none" }
-      : src === "manual" && (status === "usable" || status === "stale")
-        ? MANUAL_SNAPSHOT_EDIT_ACTION
-        : baseAction;
+  const finalAction: QuickLogSnapshotStripAction = usableButDetached
+    ? { kind: "none" }
+    : src === "manual" && (status === "usable" || status === "stale")
+      ? MANUAL_SNAPSHOT_EDIT_ACTION
+      : baseAction;
 
   return {
     status,
@@ -285,7 +311,7 @@ export function buildQuickLogSnapshotStrip(
     capturedAt: snapshot.ts,
     capturedAtLabel: formatCapturedAtAbsolute(snapshot.ts),
     ageLabel,
-    metrics: buildMetrics(snapshot),
+    metrics: buildMetrics(snapshot, temperatureUnit),
     action: finalAction,
     classification,
     providerLabel: deriveProviderLabel(src),
@@ -324,6 +350,15 @@ export interface BuildQuickLogStripFromTentStateArgs {
   hasTent: boolean;
   attached?: boolean;
   now?: Date;
+  /**
+   * Active temperature display unit. REQUIRED — this adapter is pure
+   * (no I/O, never reads the live preference itself), so a caller that
+   * omits this can only ever get a silently-wrong-unit reading. This is
+   * exactly the bug class Codex flagged repeatedly across Quick Log:
+   * making the field compulsory means tsc catches a forgotten unit at
+   * every call site instead of it shipping as a hardcoded °C.
+   */
+  temperatureUnit: TemperatureUnitPreference;
 }
 
 function narrowStrict(s: StrictSnapshotStatus): QuickLogSnapshotStripStatus {
@@ -341,10 +376,7 @@ function narrowStrict(s: StrictSnapshotStatus): QuickLogSnapshotStripStatus {
   }
 }
 
-function synthClassification(
-  status: QuickLogSnapshotStripStatus,
-  label: string,
-): Classification {
+function synthClassification(status: QuickLogSnapshotStripStatus, label: string): Classification {
   const reason =
     status === "usable"
       ? "fresh_accepted"
@@ -361,17 +393,21 @@ function synthClassification(
   };
 }
 
-function fToC(f: number): number {
-  return ((f - 32) * 5) / 9;
-}
-
 function buildStrictMetrics(
   snap: StrictSensorSnapshot,
+  temperatureUnit: TemperatureUnitPreference,
 ): ReadonlyArray<{ label: string; value: string }> {
   const out: { label: string; value: string }[] = [];
   const tempF = snap.metrics.temp_f;
   if (typeof tempF === "number" && Number.isFinite(tempF)) {
-    out.push({ label: "Temp", value: `${fToC(tempF).toFixed(1)}°C` });
+    out.push({
+      label: "Temp",
+      value: formatTemperatureDisplay(tempF, {
+        valueUnit: "F",
+        unit: temperatureUnit,
+        digits: 1,
+      }),
+    });
   }
   const rh = snap.metrics.humidity_pct;
   if (typeof rh === "number" && Number.isFinite(rh)) {
@@ -387,7 +423,14 @@ function buildStrictMetrics(
 export function buildQuickLogStripFromTentState(
   args: BuildQuickLogStripFromTentStateArgs,
 ): QuickLogSnapshotStripViewModel {
-  const { status: loaderStatus, snapshot, hasTent, attached = true, now = new Date() } = args;
+  const {
+    status: loaderStatus,
+    snapshot,
+    hasTent,
+    attached = true,
+    now = new Date(),
+    temperatureUnit,
+  } = args;
 
   // Treat idle/loading/empty/error/no-tent as no_data (UI parity with the
   // legacy dashboard-shape adapter). The strict resolver never invents
@@ -418,10 +461,10 @@ export function buildQuickLogStripFromTentState(
   }
 
   const status = narrowStrict(snapshot.status);
-  const capturedMs = Date.parse(snapshot.captured_at);
-  const ageLabel = Number.isFinite(capturedMs)
-    ? formatAge(capturedMs, now.getTime())
-    : null;
+  // `isEmpty` above already rejected a missing `captured_at`.
+  const capturedAtIso = snapshot.captured_at ?? "";
+  const capturedMs = Date.parse(capturedAtIso);
+  const ageLabel = Number.isFinite(capturedMs) ? formatAge(capturedMs, now.getTime()) : null;
 
   const usableButDetached = status === "usable" && !attached;
   const title = usableButDetached ? "Sensor snapshot available" : TITLES[status];
@@ -445,7 +488,7 @@ export function buildQuickLogStripFromTentState(
     capturedAt: snapshot.captured_at,
     capturedAtLabel: formatCapturedAtAbsolute(snapshot.captured_at),
     ageLabel,
-    metrics: buildStrictMetrics(snapshot),
+    metrics: buildStrictMetrics(snapshot, temperatureUnit),
     action,
     classification: synthClassification(status, snapshot.badge_label),
     providerLabel: deriveProviderLabel(snapshot.source),

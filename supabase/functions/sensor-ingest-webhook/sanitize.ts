@@ -42,7 +42,6 @@ function looksLikeSecret(s: string): boolean {
   return false;
 }
 
-
 function sanitizeString(s: string): string {
   if (looksLikeSecret(s)) return REDACTED;
   // Strip embedded Bearer ... fragments.
@@ -78,18 +77,23 @@ export function sanitizeErrorMessage(value: unknown): string {
   else if (typeof value === "string") raw = value;
   else if (value === null || value === undefined) raw = "error";
   else {
-    try { raw = JSON.stringify(value) ?? "error"; } catch { raw = "error"; }
+    try {
+      raw = JSON.stringify(value) ?? "error";
+    } catch {
+      raw = "error";
+    }
   }
   if (typeof raw !== "string") raw = "error";
   raw = raw.replace(/[\r\n]+/g, " ").slice(0, 200);
   return sanitizeString(raw);
 }
 
-
 // Safe console logger. Only stable string event names + sanitized details.
 // Never accepts the raw req or raw body.
 export function safeLog(event: string, details?: Record<string, unknown>): void {
-  const safeEvent = String(event).replace(/[^A-Za-z0-9._:\- ]/g, "").slice(0, 120);
+  const safeEvent = String(event)
+    .replace(/[^A-Za-z0-9._:\- ]/g, "")
+    .slice(0, 120);
   if (!details) {
     console.log(`[sensor-ingest-webhook] ${safeEvent}`);
     return;

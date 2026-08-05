@@ -70,6 +70,9 @@ describe("FounderOwnerPrefsForm — invoke happy path", () => {
     const user = userEvent.setup();
     render(<FounderOwnerPrefsForm />);
 
+    // Wait for row → form state hydration (display style Select is controlled).
+    await waitFor(() => expect(screen.getByLabelText(/Display name/i)).toHaveValue("Alice"));
+
     const link = screen.getByLabelText(/Optional link/i);
     await user.clear(link);
     await user.type(link, "  https://verdant.example/me  ");
@@ -94,6 +97,7 @@ describe("FounderOwnerPrefsForm — invoke happy path", () => {
   it("blocks non-https link client-side before invoke fires", async () => {
     const user = userEvent.setup();
     render(<FounderOwnerPrefsForm />);
+    await waitFor(() => expect(screen.getByLabelText(/Display name/i)).toHaveValue("Alice"));
 
     const link = screen.getByLabelText(/Optional link/i);
     await user.clear(link);
@@ -111,23 +115,20 @@ describe("FounderOwnerPrefsForm — invoke happy path", () => {
     });
     const user = userEvent.setup();
     render(<FounderOwnerPrefsForm />);
+    await waitFor(() => expect(screen.getByLabelText(/Display name/i)).toHaveValue("Alice"));
 
     await user.click(screen.getByRole("button", { name: /save founder settings/i }));
 
     await waitFor(() => expect(invokeSpy).toHaveBeenCalled());
     expect(refetchSpy).not.toHaveBeenCalled();
     expect(await screen.findByRole("alert")).toHaveTextContent(/update_failed/);
-    expect(toastSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ variant: "destructive" }),
-    );
+    expect(toastSpy).toHaveBeenCalledWith(expect.objectContaining({ variant: "destructive" }));
   });
 
   it("locks the form for refunded seats", async () => {
     mockRow = { ...(mockRow as MyFounderRow), status: "refunded" };
     render(<FounderOwnerPrefsForm />);
-    expect(
-      screen.getByRole("button", { name: /save founder settings/i }),
-    ).toBeDisabled();
+    expect(screen.getByRole("button", { name: /save founder settings/i })).toBeDisabled();
     expect(screen.getByText(/refunded/i)).toBeInTheDocument();
   });
 });

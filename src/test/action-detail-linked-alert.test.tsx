@@ -9,7 +9,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import ActionDetail from "@/pages/ActionDetail";
 import { alertDetailPath, aiDoctorSessionDetailPath } from "@/lib/routes";
 
@@ -94,15 +94,17 @@ vi.mock("@/integrations/supabase/client", () => {
   };
   return {
     supabase: {
-      from: (table: string) =>
-        table === "action_queue" ? makeActionQueueChain() : makeGeneric(),
+      from: (table: string) => (table === "action_queue" ? makeActionQueueChain() : makeGeneric()),
     },
   };
 });
 
-vi.mock("@/store/auth", () => ({
-  useAuth: () => ({ user: { id: "u1", email: "u@example.com" } }),
-}));
+vi.mock("@/store/auth", () => {
+  const user = { id: "u1", email: "u@example.com" };
+  return {
+    useAuth: () => ({ user }),
+  };
+});
 vi.mock("@/store/grows", () => ({
   useGrows: () => ({
     grows: [{ id: "g1", name: "G1" }],
@@ -113,14 +115,6 @@ vi.mock("@/store/grows", () => ({
 vi.mock("sonner", () => ({
   toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn(), message: vi.fn() },
 }));
-
-// ActionDetail resolves its row through async effects that can exceed
-// testing-library's 1s findBy default AND vitest's 5s per-test timeout on
-// loaded shared CI runners (observed repeatedly across full-suite batches;
-// passes locally in <2s). Raise the per-test budget for this file and give
-// the async-load awaits a generous findBy timeout beneath it.
-vi.setConfig({ testTimeout: 60_000 });
-const FIND_TIMEOUT = { timeout: 30_000 };
 
 beforeEach(() => {
   detailRow = ALERT_DERIVED_ROW;
@@ -139,12 +133,10 @@ function renderDetail(actionId = "aq-1") {
 describe("ActionDetail header — Linked alert link", () => {
   it("renders chip + link for an alert-derived action with a safe alert id", async () => {
     renderDetail();
-    const header = await screen.findByTestId("action-detail-linked-alert-header", undefined, FIND_TIMEOUT);
+    const header = await screen.findByTestId("action-detail-linked-alert-header");
     expect(header.textContent ?? "").toMatch(/linked alert/i);
     const link = (await screen.findByTestId(
       "action-detail-linked-alert-link",
-      undefined,
-      FIND_TIMEOUT,
     )) as HTMLAnchorElement;
     expect(link.textContent).toBe("View linked alert");
     expect(link.getAttribute("href")).toBe(alertDetailPath("alert-abc"));
@@ -155,14 +147,10 @@ describe("ActionDetail header — Linked alert link", () => {
     renderDetail("aq-2");
     const aiLink = (await screen.findByTestId(
       "action-detail-ai-doctor-saved-session-link",
-      undefined,
-      FIND_TIMEOUT,
     )) as HTMLAnchorElement;
     expect(aiLink.getAttribute("href")).toBe(aiDoctorSessionDetailPath("sess-xyz"));
     const alertLink = (await screen.findByTestId(
       "action-detail-linked-alert-link",
-      undefined,
-      FIND_TIMEOUT,
     )) as HTMLAnchorElement;
     expect(alertLink.getAttribute("href")).toBe(alertDetailPath("alert-abc"));
   });
@@ -170,7 +158,7 @@ describe("ActionDetail header — Linked alert link", () => {
   it("does not render Linked alert when no alert id is parseable", async () => {
     detailRow = NO_ALERT_ROW;
     renderDetail("aq-3");
-    await screen.findByText("Drop EC slightly", undefined, FIND_TIMEOUT);
+    await screen.findByText("Drop EC slightly");
     expect(screen.queryByTestId("action-detail-linked-alert-link")).toBeNull();
     expect(screen.queryByTestId("action-detail-linked-alert-header")).toBeNull();
   });
@@ -178,17 +166,15 @@ describe("ActionDetail header — Linked alert link", () => {
   it("renders nothing on actions without any alert or AI Doctor token", async () => {
     detailRow = NON_ALERT_NON_AI_ROW;
     renderDetail("aq-4");
-    await screen.findByText("Manual note", undefined, FIND_TIMEOUT);
+    await screen.findByText("Manual note");
     expect(screen.queryByTestId("action-detail-linked-alert-link")).toBeNull();
-    expect(
-      screen.queryByTestId("action-detail-ai-doctor-saved-session-link"),
-    ).toBeNull();
+    expect(screen.queryByTestId("action-detail-ai-doctor-saved-session-link")).toBeNull();
   });
 
   it("does not leak raw [alert:<id>], [session:<id>] tokens, or target_device", async () => {
     detailRow = AI_DOCTOR_ROW_WITH_ALERT;
     const { container } = renderDetail("aq-2");
-    await screen.findByTestId("action-detail-linked-alert-link", undefined, FIND_TIMEOUT);
+    await screen.findByTestId("action-detail-linked-alert-link");
     const text = container.textContent ?? "";
     expect(text).not.toContain("[alert:");
     expect(text).not.toContain("[session:");
@@ -198,7 +184,7 @@ describe("ActionDetail header — Linked alert link", () => {
 
   it("link copy does not imply automation, execution, or status transition", async () => {
     renderDetail();
-    const link = await screen.findByTestId("action-detail-linked-alert-link", undefined, FIND_TIMEOUT);
+    const link = await screen.findByTestId("action-detail-linked-alert-link");
     const lower = (link.textContent ?? "").toLowerCase();
     for (const tok of [
       "auto-execute",
@@ -222,32 +208,91 @@ describe("ActionDetail header — Linked alert link", () => {
   it("preserves the existing AI Doctor 'Suggestion origin' panel when applicable", async () => {
     detailRow = AI_DOCTOR_ROW_WITH_ALERT;
     renderDetail("aq-2");
-    const panel = await screen.findByTestId("action-detail-ai-doctor-provenance", undefined, FIND_TIMEOUT);
+    const panel = await screen.findByTestId("action-detail-ai-doctor-provenance");
     expect(panel.textContent ?? "").toContain("Suggestion origin");
   });
 });
 
 // --- Static safety scans ----------------------------------------------------
-const DETAIL_SRC = readFileSync(
-  resolve(__dirname, "../..", "src/pages/ActionDetail.tsx"),
-  "utf8",
-);
+const DETAIL_SRC = readFileSync(resolve(__dirname, "../..", "src/pages/ActionDetail.tsx"), "utf8");
+
+// Only two RPC-invocation shapes are legitimate in this codebase:
+//   1. Direct call:       supabase.rpc("name", args)
+//   2. Cast-wrapped call: (supabase.rpc as unknown as (fn: string, args:
+//      unknown) => Promise<...>)("name", args) — used before the RPC's
+//      generated typing lands (see actionQueueRpcAvailability).
+// In both shapes the RPC name is the literal FIRST token of the call's own
+// argument list (only whitespace may precede it). Anchoring to that,
+// instead of "any quote within N characters of supabase.rpc", closes two
+// Codex-flagged gaps:
+//   - Round 1: a dynamic-name call placed BEFORE the canonical call could
+//     "borrow" the canonical call's own string literal via a lazy gap that
+//     crossed into the second call.
+//   - Round 2: a canonical-looking string sitting inside a dynamic call's
+//     OWN payload (e.g. supabase.rpc(name, { note: "action_queue_transition" }))
+//     could be mistaken for that call's invoked name, since it was merely
+//     "the nearest quote", not the actual first argument.
+const DIRECT_RPC_PATTERN = /supabase\.rpc\s*\(\s*["']([^"']+)["']/g;
+const CAST_RPC_PATTERN =
+  /supabase\.rpc\s+as\s+unknown\s+as\s*\([\s\S]{0,150}?\)\s*=>\s*[\s\S]{0,150}?\)\s*\(\s*["']([^"']+)["']/g;
+
+function extractRpcNames(src: string): string[] {
+  const direct = [...src.matchAll(DIRECT_RPC_PATTERN)].map((match) => match[1]);
+  const cast = [...src.matchAll(CAST_RPC_PATTERN)].map((match) => match[1]);
+  return [...direct, ...cast];
+}
 
 describe("ActionDetail Linked alert — static safety", () => {
   it("introduces no new write paths into action_queue or alerts", () => {
     const lower = DETAIL_SRC.toLowerCase();
     expect(lower).not.toContain("functions.invoke");
     expect(lower).not.toContain("service_role");
-    expect(lower).not.toMatch(
-      /from\(["']action_queue["'][\s\S]{0,200}?\.upsert\(/,
-    );
-    expect(lower).not.toMatch(
-      /from\(["']action_queue["'][\s\S]{0,200}?\.delete\(/,
-    );
+    expect(lower).not.toMatch(/from\(["']action_queue["'][\s\S]{0,200}?\.upsert\(/);
+    expect(lower).not.toMatch(/from\(["']action_queue["'][\s\S]{0,200}?\.delete\(/);
     expect(lower).not.toMatch(
       /from\(["']alerts["'][\s\S]{0,200}?\.(insert|update|delete|upsert)\(/,
     );
-    expect(lower).not.toMatch(/\.rpc\(/);
+    const rpcCallSiteCount = (lower.match(/supabase\.rpc\b/g) ?? []).length;
+    const rpcNames = extractRpcNames(lower);
+    // Every call site must independently resolve a literal first-argument
+    // name — a dynamic/unnamed call site (or a canonical-looking string
+    // buried elsewhere in its arguments) would leave this short rather than
+    // silently merging into the canonical name.
+    expect(rpcNames.length).toBe(rpcCallSiteCount);
+    expect(rpcNames).toEqual(["action_queue_transition"]);
+  });
+
+  it("does not let a preceding dynamic RPC call absorb the canonical call's name (Codex P2 regression guard, round 1)", () => {
+    // An unreviewed dynamic-name RPC call ahead of the canonical
+    // cast-wrapped call must not resolve to (or merge into) the canonical
+    // name — it must simply fail to resolve, which the count check above
+    // turns into a hard failure on the real source.
+    const adversarial = `
+      supabase.rpc(somedynamicname, payload);
+      // unrelated code in between
+      const { data, error } = await (
+        supabase.rpc as unknown as (fn: string, args: unknown) => promise<{ data: unknown; error: unknown }>
+      )("action_queue_transition", rpcargs);
+    `;
+    const callSiteCount = (adversarial.match(/supabase\.rpc\b/g) ?? []).length;
+    const names = extractRpcNames(adversarial);
+    expect(callSiteCount).toBe(2);
+    expect(names).toEqual(["action_queue_transition"]);
+    expect(names.length).not.toBe(callSiteCount);
+  });
+
+  it("does not mistake a canonical-looking string in a dynamic call's own payload for its invoked name (Codex P2 regression guard, round 2)", () => {
+    // A dynamic-name call whose OWN payload happens to contain the
+    // canonical string must not be credited with that name — the literal
+    // first argument is the dynamic name, not a quote.
+    const adversarial = `
+      supabase.rpc(somedynamicname, { note: "action_queue_transition" });
+    `;
+    const callSiteCount = (adversarial.match(/supabase\.rpc\b/g) ?? []).length;
+    const names = extractRpcNames(adversarial);
+    expect(callSiteCount).toBe(1);
+    expect(names).toEqual([]);
+    expect(names.length).not.toBe(callSiteCount);
   });
 
   it("uses the shared route helper and pure extractor", () => {

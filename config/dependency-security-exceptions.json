@@ -1,0 +1,162 @@
+{
+  "schemaVersion": 1,
+  "notes": "Exact, temporary exceptions for audit findings that cannot be removed safely in Phase A. New package/advisory pairs or lockfile resolution drift fail closed.",
+  "exceptions": [
+    {
+      "package": "esbuild",
+      "advisoryId": "1120680",
+      "severity": "low",
+      "expectedNpmAdvisoryUrl": "https://github.com/advisories/GHSA-g7r4-m6w7-qqqr",
+      "expectedNpmVulnerableRange": ">=0.27.3 <0.28.1",
+      "owner": "Verdant dependency security",
+      "reason": "esbuild@0.27.7 is the single hoisted resolution shared by the exact @lovable.dev/mcp-js pin, vite@8.2.0 (peer ^0.27.0 || ^0.28.0), the vite@7.3.6 copies under vitest/vite-node, and unplugin. The fixed esbuild 0.28.1 cannot be adopted until the exact upstream @lovable.dev/mcp-js pin and the nested vite 7 toolchain move to it.",
+      "reachability": "esbuild is build-time tooling only; no production source imports it and the source-import fence stays empty. The advisory concerns esbuild's development server; Verdant development uses Vite's loopback dev server and CI builds run non-interactively.",
+      "recheckOn": "2026-08-08",
+      "expiresOn": "2026-08-25",
+      "expectedLockResolutions": [
+        {
+          "key": "esbuild",
+          "version": "0.27.7"
+        }
+      ],
+      "expectedBunAffectedKeys": ["esbuild"],
+      "expectedNpmLockResolutions": [
+        {
+          "path": "node_modules/esbuild",
+          "version": "0.27.7"
+        }
+      ],
+      "expectedParentKeys": [
+        "@lovable.dev/mcp-js",
+        "unplugin",
+        "vite",
+        "vite-node/vite",
+        "vitest/vite"
+      ],
+      "expectedNpmParentPaths": [
+        "node_modules/@lovable.dev/mcp-js",
+        "node_modules/unplugin",
+        "node_modules/vite",
+        "node_modules/vite-node/node_modules/vite",
+        "node_modules/vitest/node_modules/vite"
+      ],
+      "expectedNpmAffectedPaths": ["node_modules/esbuild"],
+      "allowedImportPaths": [],
+      "allowedScriptNames": [],
+      "expectedBunDirectRootAncestors": [
+        {
+          "package": "@lovable.dev/mcp-js",
+          "group": "dependencies",
+          "spec": "0.24.0"
+        },
+        {
+          "package": "@tailwindcss/vite",
+          "group": "dependencies",
+          "spec": "^4.2.1"
+        },
+        {
+          "package": "@tanstack/react-start",
+          "group": "dependencies",
+          "spec": "^1.168.32"
+        },
+        {
+          "package": "@tanstack/router-plugin",
+          "group": "dependencies",
+          "spec": "^1.168.23"
+        },
+        {
+          "package": "vite-tsconfig-paths",
+          "group": "dependencies",
+          "spec": "^6.0.2"
+        },
+        {
+          "package": "@lovable.dev/vite-tanstack-config",
+          "group": "devDependencies",
+          "spec": "^2.8.5"
+        },
+        {
+          "package": "@vitejs/plugin-react",
+          "group": "devDependencies",
+          "spec": "^5.2.0"
+        },
+        {
+          "package": "nitro",
+          "group": "devDependencies",
+          "spec": "3.0.260603-beta"
+        },
+        {
+          "package": "vite",
+          "group": "devDependencies",
+          "spec": "^8.1.5"
+        },
+        {
+          "package": "vitest-axe",
+          "group": "devDependencies",
+          "spec": "^0.1.0"
+        },
+        {
+          "package": "vitest",
+          "group": "devDependencies",
+          "spec": "^3.2.6"
+        }
+      ],
+      "expectedNpmDirectRootAncestors": [
+        {
+          "package": "@lovable.dev/mcp-js",
+          "group": "dependencies",
+          "spec": "0.24.0"
+        },
+        {
+          "package": "@tailwindcss/vite",
+          "group": "dependencies",
+          "spec": "^4.2.1"
+        },
+        {
+          "package": "@tanstack/react-start",
+          "group": "dependencies",
+          "spec": "^1.168.32"
+        },
+        {
+          "package": "@tanstack/router-plugin",
+          "group": "dependencies",
+          "spec": "^1.168.23"
+        },
+        {
+          "package": "vite-tsconfig-paths",
+          "group": "dependencies",
+          "spec": "^6.0.2"
+        },
+        {
+          "package": "@lovable.dev/vite-tanstack-config",
+          "group": "devDependencies",
+          "spec": "^2.8.5"
+        },
+        {
+          "package": "@vitejs/plugin-react",
+          "group": "devDependencies",
+          "spec": "^5.2.0"
+        },
+        {
+          "package": "nitro",
+          "group": "devDependencies",
+          "spec": "3.0.260603-beta"
+        },
+        {
+          "package": "vite",
+          "group": "devDependencies",
+          "spec": "^8.1.5"
+        },
+        {
+          "package": "vitest-axe",
+          "group": "devDependencies",
+          "spec": "^0.1.0"
+        },
+        {
+          "package": "vitest",
+          "group": "devDependencies",
+          "spec": "^3.2.6"
+        }
+      ]
+    }
+  ]
+}

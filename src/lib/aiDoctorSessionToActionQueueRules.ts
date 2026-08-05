@@ -53,8 +53,7 @@ export interface AiDoctorActionQueueDraft {
 }
 
 export type AiDoctorDraftResult =
-  | { ok: true; draft: AiDoctorActionQueueDraft }
-  | { ok: false; reason: string };
+  { ok: true; draft: AiDoctorActionQueueDraft } | { ok: false; reason: string };
 
 // ---------------------------------------------------------------------------
 // Forbidden language — device control + execution verbs (mirrors AI Doctor sanitizer)
@@ -122,8 +121,7 @@ function normalizeRisk(
 const ALLOWED_ACTION_TYPES = new Set(["task", "alert", "note", "advisory"]);
 
 function normalizeActionType(action: AiDoctorSuggestedActionLike): string {
-  const raw =
-    typeof action.type === "string" ? action.type.trim().toLowerCase() : "";
+  const raw = typeof action.type === "string" ? action.type.trim().toLowerCase() : "";
   if (ALLOWED_ACTION_TYPES.has(raw)) return raw;
   return "advisory";
 }
@@ -142,7 +140,8 @@ export function isSessionSuggestionEligibleForActionQueue(
 ): boolean {
   if (!session || !action) return false;
   if (!session.id || typeof session.id !== "string" || !session.id.trim()) return false;
-  if (!session.grow_id || typeof session.grow_id !== "string" || !session.grow_id.trim()) return false;
+  if (!session.grow_id || typeof session.grow_id !== "string" || !session.grow_id.trim())
+    return false;
   if (action.approvalRequired !== true) return false;
   const title = typeof action.title === "string" ? action.title.trim() : "";
   const detail = typeof action.detail === "string" ? action.detail.trim() : "";

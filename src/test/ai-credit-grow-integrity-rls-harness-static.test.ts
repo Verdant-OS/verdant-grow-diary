@@ -12,6 +12,7 @@ const RECEIPT_HARNESS = readFileSync(
   resolve(ROOT, "scripts/run-ai-doctor-review-evidence-receipt-rls-harness.ts"),
   "utf8",
 );
+const NORMALIZED_RECEIPT_HARNESS = RECEIPT_HARNESS.replace(/\r\n?/g, "\n");
 
 describe("AI credit grow-integrity runtime harness contracts", () => {
   it("keeps the broad credit harness opt-in, local-first, unique, and cleanup-safe", () => {
@@ -122,8 +123,10 @@ describe("AI credit grow-integrity runtime harness contracts", () => {
     expect(RECEIPT_HARNESS).toContain("hasIntactPair(pairAfterGrowDelete, args)");
     expect(RECEIPT_HARNESS).toContain("const { error: growDeleteError } = await owner");
     expect(RECEIPT_HARNESS).toContain('.eq("user_id", uidA)');
-    const growDeleteIndex = RECEIPT_HARNESS.indexOf('from("grows")\n      .delete()');
-    const accountDeleteIndex = RECEIPT_HARNESS.indexOf("admin.auth.admin.deleteUser(uidA)");
+    const growDeleteIndex = NORMALIZED_RECEIPT_HARNESS.indexOf('from("grows")\n      .delete()');
+    const accountDeleteIndex = NORMALIZED_RECEIPT_HARNESS.indexOf(
+      "admin.auth.admin.deleteUser(uidA)",
+    );
     expect(growDeleteIndex).toBeGreaterThanOrEqual(0);
     expect(accountDeleteIndex).toBeGreaterThanOrEqual(0);
     expect(growDeleteIndex).toBeLessThan(accountDeleteIndex);

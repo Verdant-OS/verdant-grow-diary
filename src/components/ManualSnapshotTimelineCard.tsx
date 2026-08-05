@@ -11,7 +11,7 @@
  *  - No reads, no writes, no Supabase, no automation.
  */
 import { useMemo } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { Gauge, AlertTriangle, XCircle, History } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -86,7 +86,11 @@ function severityIcon(severity: ManualSnapshotTimelineCardModel["severity"]) {
   return null;
 }
 
-export default function ManualSnapshotTimelineCard({ card, editSummary, originalReadingIds }: Props) {
+export default function ManualSnapshotTimelineCard({
+  card,
+  editSummary,
+  originalReadingIds,
+}: Props) {
   // Build correction context ONLY from real caller-supplied UUIDs and
   // real captured numeric values. Never infer IDs from timestamp/metric.
   const correctionHash = useMemo(() => {
@@ -178,9 +182,7 @@ export default function ManualSnapshotTimelineCard({ card, editSummary, original
           >
             <span className="rounded-full border border-border/50 bg-secondary/40 px-1.5 py-0.5">
               Edited{" "}
-              {editSummary.lastChangedAt
-                ? formatSnapshotTimestamp(editSummary.lastChangedAt)
-                : "—"}{" "}
+              {editSummary.lastChangedAt ? formatSnapshotTimestamp(editSummary.lastChangedAt) : "—"}{" "}
               · {editSummary.count} field{editSummary.count === 1 ? "" : "s"}
             </span>
           </p>

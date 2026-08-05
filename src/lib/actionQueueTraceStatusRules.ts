@@ -18,10 +18,8 @@ export const ACTION_TRACE_BADGE_LABEL: Record<ActionTraceBadgeState, string> = {
 };
 
 export const ACTION_TRACE_BADGE_HELP: Record<ActionTraceBadgeState, string> = {
-  idle:
-    "Diary timeline trace is ready. No equipment is controlled from this surface.",
-  retrying:
-    "Retrying the diary timeline trace. The action's status is not being changed again.",
+  idle: "Diary timeline trace is ready. No equipment is controlled from this surface.",
+  retrying: "Retrying the diary timeline trace. The action's status is not being changed again.",
   failed:
     "Status was saved, but the diary timeline trace failed to write. Approval is not being repeated.",
 };

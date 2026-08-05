@@ -1,4 +1,4 @@
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "@/lib/react-router-compat";
 import {
   Sprout,
   Filter,
@@ -43,6 +43,7 @@ import {
   isArchivedPlant,
   isMergedPlant,
 } from "@/lib/archivedPlantVisibilityRules";
+import { buildTentGrowIndex } from "@/lib/growAttributionRules";
 import {
   buildGrowFilterOptions,
   filterPlantsByGrow,
@@ -97,7 +98,7 @@ export default function Plants() {
     error: growsError = null,
     refresh: refreshGrows,
   } = useGrows();
-  const validGrowId = isValidScopedGrow ? urlGrowId ?? undefined : undefined;
+  const validGrowId = isValidScopedGrow ? (urlGrowId ?? undefined) : undefined;
   const scopeState = classifyPlantsScopeState({
     hasRequestedGrow: !!urlGrowId,
     isLoading: growsLoading,
@@ -207,17 +208,26 @@ export default function Plants() {
     return map;
   }, [allPlants, tents, rawReadings, rawDiary, urlGrowId, dailyCheckEvidenceReady]);
 
+  // Tent → grow rollup index (BUG-A): resolves a plant's grow through its
+  // tent when the plant's own grow_id is null, so tent-owned plants count
+  // under their grow instead of "Unassigned". Built from the tents the page
+  // already loads for chips.
+  const tentGrowById = useMemo(
+    () => buildTentGrowIndex(tents.map((t) => ({ id: t.id, growId: t.growId ?? null }))),
+    [tents],
+  );
+
   // Grow filter — sourced from the workspace grows list + active plants.
   const growFilterOptions = useMemo(
-    () => buildGrowFilterOptions(grows, allGrowsActivePlants),
-    [grows, allGrowsActivePlants],
+    () => buildGrowFilterOptions(grows, allGrowsActivePlants, tentGrowById),
+    [grows, allGrowsActivePlants, tentGrowById],
   );
 
   // Grow scope: real grows are scoped server-side via urlGrowId; the
   // unassigned bucket is display-side only, so it is applied here before
   // every consumer (chips, grid, summary) reads the list.
   const growScopedPlants = showUnassignedOnly
-    ? filterPlantsByGrow(allPlants, UNASSIGNED_GROW_FILTER_ID)
+    ? filterPlantsByGrow(allPlants, UNASSIGNED_GROW_FILTER_ID, tentGrowById)
     : allPlants;
 
   const hasArchived = shouldShowArchivedToggle(growScopedPlants);
@@ -449,7 +459,7 @@ export default function Plants() {
             aria-label="Filter plants by grow"
             value={showUnassignedOnly ? UNASSIGNED_GROW_FILTER_ID : (urlGrowId ?? "")}
             onChange={(e) => handleGrowFilterChange(e.target.value)}
-            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-hidden focus:ring-2 focus:ring-ring"
           >
             {growFilterOptions.map((o) => (
               <option
@@ -888,7 +898,7 @@ export default function Plants() {
                       id: p.id,
                       name: p.name,
                       strain: p.strain ?? null,
-                      stage: p.stage,
+                      stage: p.stage ?? "",
                       health: p.health,
                       startedAt: p.startedAt ?? null,
                       tentId: p.tentId ?? null,

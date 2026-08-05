@@ -7,11 +7,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import {
-  runV0Loop,
-  AI_DOCTOR_MIN_ACTION_CONFIDENCE,
-  type V0LoopInput,
-} from "@/lib/v0LoopHarness";
+import { runV0Loop, AI_DOCTOR_MIN_ACTION_CONFIDENCE, type V0LoopInput } from "@/lib/v0LoopHarness";
 import type { NormalizedSensorReading } from "@/lib/sensorReadingNormalizationRules";
 
 // ---------------------------------------------------------------------------
@@ -333,10 +329,7 @@ describe("V0 loop harness — traceability", () => {
 // ---------------------------------------------------------------------------
 
 describe("V0 loop harness — static safety scan", () => {
-  const src = readFileSync(
-    resolve(process.cwd(), "src/lib/v0LoopHarness.ts"),
-    "utf-8",
-  );
+  const src = readFileSync(resolve(process.cwd(), "src/lib/v0LoopHarness.ts"), "utf-8");
 
   it("contains no service_role references", () => {
     expect(src.toLowerCase()).not.toContain("service_role");

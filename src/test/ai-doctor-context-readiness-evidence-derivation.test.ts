@@ -43,9 +43,7 @@ describe("deriveAiDoctorContextEvidenceFlags", () => {
   it("derives watering from event_type containing 'water'", () => {
     const flags = deriveAiDoctorContextEvidenceFlags(
       ctx({
-        growEvents: [
-          { occurred_at: ago(2 * HOUR), event_type: "watering", source: "manual" },
-        ],
+        growEvents: [{ occurred_at: ago(2 * HOUR), event_type: "watering", source: "manual" }],
       }),
       0,
     );
@@ -70,9 +68,7 @@ describe("deriveAiDoctorContextEvidenceFlags", () => {
   it("derives recent photo from event_type containing 'photo'", () => {
     const flags = deriveAiDoctorContextEvidenceFlags(
       ctx({
-        growEvents: [
-          { occurred_at: ago(HOUR), event_type: "photo", source: "manual" },
-        ],
+        growEvents: [{ occurred_at: ago(HOUR), event_type: "photo", source: "manual" }],
       }),
       0,
     );
@@ -99,9 +95,7 @@ describe("buildAiDoctorReadinessView confidence class", () => {
   it("classifies trustworthy live + recent events as 'ready'", () => {
     const v = buildAiDoctorReadinessView({
       context: ctx({
-        growEvents: [
-          { occurred_at: ago(HOUR), event_type: "watering", source: "manual" },
-        ],
+        growEvents: [{ occurred_at: ago(HOUR), event_type: "watering", source: "manual" }],
         sensorReadings: [
           { metric: "temperature_c", value: 24, captured_at: ago(HOUR), source: "live" },
           { metric: "humidity_pct", value: 55, captured_at: ago(HOUR), source: "live" },
@@ -123,13 +117,9 @@ describe("buildAiDoctorReadinessView confidence class", () => {
       openAlertsCount: 0,
     });
     expect(v.confidenceClass).toBe("not_trustworthy");
-    expect(v.confidenceClassCopy).toBe(
-      AI_DOCTOR_CONFIDENCE_CLASS_COPY.not_trustworthy,
-    );
+    expect(v.confidenceClassCopy).toBe(AI_DOCTOR_CONFIDENCE_CLASS_COPY.not_trustworthy);
     // Stale source must surface as stale (not promoted to live).
-    expect(v.sourceBadges.find((b) => b.source === "stale")?.isTrustworthy).toBe(
-      false,
-    );
+    expect(v.sourceBadges.find((b) => b.source === "stale")?.isTrustworthy).toBe(false);
     expect(v.sourceBadges.find((b) => b.source === "live")).toBeUndefined();
   });
 
@@ -157,9 +147,7 @@ describe("buildAiDoctorReadinessView confidence class", () => {
   it("exposes evidenceFlags on the view", () => {
     const v = buildAiDoctorReadinessView({
       context: ctx({
-        growEvents: [
-          { occurred_at: ago(HOUR), event_type: "watering", source: "manual" },
-        ],
+        growEvents: [{ occurred_at: ago(HOUR), event_type: "watering", source: "manual" }],
       }),
       openAlertsCount: 1,
     });

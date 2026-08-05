@@ -22,9 +22,7 @@ export interface SoilMoistureCalibrationContext {
 }
 
 export type SoilMoistureCalibrationSelectionReason =
-  | "missing_context"
-  | "no_matching_calibration"
-  | "invalid_baseline";
+  "missing_context" | "no_matching_calibration" | "invalid_baseline";
 
 export type SoilMoistureCalibrationMatchScope = "plant" | "tent";
 

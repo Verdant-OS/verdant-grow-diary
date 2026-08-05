@@ -18,7 +18,7 @@ const SITE_ORIGIN = "https://verdantgrowdiary.com";
 const SITE_NAME = "Verdant Grow Diary";
 const DEFAULT_DESCRIPTION =
   "Grow logs, sensor-aware insights, environment alerts, and cautious AI coaching for serious cultivators.";
-const DEFAULT_OG_IMAGE = `${SITE_ORIGIN}/brand/verdant-logo.png`;
+const DEFAULT_OG_IMAGE = `${SITE_ORIGIN}/brand/verdant-logo-512.png`;
 
 export interface PageSeo {
   /** Full <title>. Include the brand suffix, e.g. "Pricing | Verdant Grow Diary". */
@@ -44,11 +44,21 @@ function upsertMeta(selector: string, attr: "name" | "property", key: string, co
   el.setAttribute("content", content);
 }
 
+/**
+ * Marks head nodes this hook created, so cleanup can distinguish them from
+ * server-rendered or React-owned (hoistable) nodes. Removing a node a React
+ * fiber owns detaches it under React's feet; React later throws removing it
+ * again during commit, and the router swallows that error — freezing the
+ * navigation with the old page still on screen.
+ */
+const OWNED_ATTR = "data-page-seo-owned";
+
 function upsertLink(rel: string, href: string) {
   let el = document.head.querySelector<HTMLLinkElement>(`link[rel="${rel}"]`);
   if (!el) {
     el = document.createElement("link");
     el.setAttribute("rel", rel);
+    el.setAttribute(OWNED_ATTR, "");
     document.head.appendChild(el);
   }
   el.setAttribute("href", href);
@@ -97,8 +107,11 @@ export function usePageSeo(seo: PageSeo): void {
       document.title = SITE_NAME;
       upsertMeta('meta[name="description"]', "name", "description", DEFAULT_DESCRIPTION);
       upsertMeta('meta[name="robots"]', "name", "robots", "index, follow");
+      // Remove ONLY a canonical this hook created. A foreign one (SSR-emitted
+      // or React-owned via a route head()) must never be detached here — see
+      // OWNED_ATTR above and src/test/page-seo-head-ownership.test.tsx.
       const canonical = document.head.querySelector('link[rel="canonical"]');
-      if (canonical) canonical.remove();
+      if (canonical?.hasAttribute(OWNED_ATTR)) canonical.remove();
 
       // Keep the OG/Twitter tags symmetric with the mount above so a stale
       // page-specific card never survives an in-session client-side navigation.

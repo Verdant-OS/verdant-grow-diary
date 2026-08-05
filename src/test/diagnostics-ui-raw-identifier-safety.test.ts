@@ -9,10 +9,7 @@ import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 
-const SRC = fs.readFileSync(
-  path.resolve(__dirname, "../pages/Diagnostics.tsx"),
-  "utf8",
-);
+const SRC = fs.readFileSync(path.resolve(__dirname, "../pages/Diagnostics.tsx"), "utf8");
 
 describe("Diagnostics UI — raw identifier exposure safety", () => {
   it("does not interpolate raw user_id or email into result detail strings", () => {

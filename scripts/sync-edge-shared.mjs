@@ -49,8 +49,7 @@ const ALLOWED_ALIAS_EXACT = {
   "@/integrations/supabase/types": path.join("integrations", "supabase", "types.ts"),
 };
 
-const IMPORT_RE =
-  /((?:^|\n)\s*(?:import|export)(?:\s+[\s\S]*?\s+from)?\s*["'])([^"']+)(["'])/g;
+const IMPORT_RE = /((?:^|\n)\s*(?:import|export)(?:\s+[\s\S]*?\s+from)?\s*["'])([^"']+)(["'])/g;
 const DYNAMIC_IMPORT_RE = /(\bimport\s*\(\s*["'])([^"']+)(["']\s*\))/g;
 const INLINE_TYPE_IMPORT_RE = /(import\(\s*["'])([^"']+)(["']\s*\))/g;
 
@@ -329,12 +328,10 @@ async function main() {
   // output dir via SYNC_TMP_OUT so they can diff committed mirror files
   // against the freshly generated content to compute a real line number.
   const outRoot = CHECK
-    ? (process.env.SYNC_TMP_OUT
-        ? (await fs.mkdir(process.env.SYNC_TMP_OUT, { recursive: true }),
-          process.env.SYNC_TMP_OUT)
-        : await fs.mkdtemp(path.join(os.tmpdir(), "edge-shared-")))
+    ? process.env.SYNC_TMP_OUT
+      ? (await fs.mkdir(process.env.SYNC_TMP_OUT, { recursive: true }), process.env.SYNC_TMP_OUT)
+      : await fs.mkdtemp(path.join(os.tmpdir(), "edge-shared-"))
     : MIRROR_ABS;
-
 
   const entries = await findEntryFiles();
   const collected = await collectFromEntries(entries);
@@ -352,10 +349,18 @@ async function main() {
     sourceHashes[srcRel] = hash;
   }
 
+  // Manifest key order must be platform-independent: collection order
+  // follows fs.readdir / import-graph traversal, which differs between
+  // filesystems (NTFS vs ext4), and the drift check compares serialized
+  // objects. Emit sorted so the same tree serializes identically anywhere.
+  const sortedSourceHashes = Object.fromEntries(
+    Object.entries(sourceHashes).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
+  );
+
   const manifest = {
     generator: "scripts/sync-edge-shared.mjs",
     sourceCount: mirrorFiles.size,
-    sourceHashes,
+    sourceHashes: sortedSourceHashes,
   };
 
   if (CHECK) {
@@ -404,10 +409,13 @@ async function main() {
       const committedManifest = JSON.parse(
         await fs.readFile(path.join(MIRROR_ABS, ".sync-manifest.json"), "utf8"),
       );
-      if (
-        JSON.stringify(committedManifest.sourceHashes) !==
-        JSON.stringify(sourceHashes)
-      ) {
+      // Key-order-independent comparison: the committed manifest may have
+      // been generated on a filesystem with different enumeration order.
+      const canonical = (hashes) =>
+        JSON.stringify(
+          Object.entries(hashes ?? {}).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
+        );
+      if (canonical(committedManifest.sourceHashes) !== canonical(sourceHashes)) {
         drift.push("DRIFT: .sync-manifest.json sourceHashes differ");
       }
     } catch {
@@ -428,9 +436,7 @@ async function main() {
             return resolved !== null && isMirrorable(resolved);
           })();
         if (badAlias || badRelative) {
-          drift.push(
-            `ENTRY not rewritten: ${path.relative(ROOT, entry)} still imports "${spec}"`,
-          );
+          drift.push(`ENTRY not rewritten: ${path.relative(ROOT, entry)} still imports "${spec}"`);
           break;
         }
       }

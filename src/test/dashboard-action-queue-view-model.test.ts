@@ -66,10 +66,9 @@ describe("buildApprovalQueueViewItems", () => {
   });
 
   it("falls back from nickname to strain", () => {
-    const vm = buildApprovalQueueViewItems(
-      [{ ...BASE, plant_id: "p2" }],
-      { plantsById: { p2: { strain: "GG4" } } },
-    );
+    const vm = buildApprovalQueueViewItems([{ ...BASE, plant_id: "p2" }], {
+      plantsById: { p2: { strain: "GG4" } },
+    });
     expect(vm[0].plantLabel).toBe("GG4");
   });
 
@@ -101,15 +100,9 @@ describe("SAFE_BY_DESIGN_COPY", () => {
     expect(SAFE_BY_DESIGN_COPY.badge).toBe("Safe by Design");
     expect(SAFE_BY_DESIGN_COPY.readOnly).toBe("Read-Only");
     expect(SAFE_BY_DESIGN_COPY.approvalRequired).toBe("Approval Required");
-    expect(SAFE_BY_DESIGN_COPY.explainer.toLowerCase()).toContain(
-      "verdant suggests",
-    );
-    expect(SAFE_BY_DESIGN_COPY.explainer.toLowerCase()).toContain(
-      "grower approves",
-    );
-    expect(SAFE_BY_DESIGN_COPY.explainer.toLowerCase()).toContain(
-      "no device control",
-    );
+    expect(SAFE_BY_DESIGN_COPY.explainer.toLowerCase()).toContain("verdant suggests");
+    expect(SAFE_BY_DESIGN_COPY.explainer.toLowerCase()).toContain("grower approves");
+    expect(SAFE_BY_DESIGN_COPY.explainer.toLowerCase()).toContain("no device control");
   });
 });
 
@@ -118,11 +111,7 @@ describe("APPROVAL_QUEUE_EMPTY_COPY", () => {
     expect(APPROVAL_QUEUE_EMPTY_COPY.title.toLowerCase()).toContain(
       "no recommendations awaiting approval",
     );
-    expect(APPROVAL_QUEUE_EMPTY_COPY.hint.toLowerCase()).not.toContain(
-      "autopilot",
-    );
-    expect(APPROVAL_QUEUE_EMPTY_COPY.hint.toLowerCase()).not.toContain(
-      "automatically",
-    );
+    expect(APPROVAL_QUEUE_EMPTY_COPY.hint.toLowerCase()).not.toContain("autopilot");
+    expect(APPROVAL_QUEUE_EMPTY_COPY.hint.toLowerCase()).not.toContain("automatically");
   });
 });

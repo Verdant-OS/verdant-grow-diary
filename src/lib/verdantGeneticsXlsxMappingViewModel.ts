@@ -68,5 +68,4 @@ export const XLSX_MAPPING_REQUIRED_COPY =
 export const XLSX_NO_TENTS_COPY =
   "No tents available. Create or select a tent before importing this XLSX history." as const;
 
-export const XLSX_IMPORT_SAVING_DISABLED_COPY =
-  "XLSX import saving is not enabled yet." as const;
+export const XLSX_IMPORT_SAVING_DISABLED_COPY = "XLSX import saving is not enabled yet." as const;

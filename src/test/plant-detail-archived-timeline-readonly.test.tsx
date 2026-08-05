@@ -15,12 +15,10 @@
  */
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
-import {
-  derivePlantDetailBlockedStateView,
-} from "@/lib/plantDetailBlockedStateViewModel";
+import { derivePlantDetailBlockedStateView } from "@/lib/plantDetailBlockedStateViewModel";
 
 let mockState: { data: unknown; isLoading: boolean; isError: boolean } = {
   data: null,
@@ -99,9 +97,7 @@ describe("derivePlantDetailBlockedStateView archivedTimelineAction", () => {
     });
     expect(view!.kind).toBe("archived");
     expect(view!.archivedTimelineAction).not.toBeNull();
-    expect(view!.archivedTimelineAction!.testId).toBe(
-      "plant-detail-view-archived-timeline",
-    );
+    expect(view!.archivedTimelineAction!.testId).toBe("plant-detail-view-archived-timeline");
     expect(view!.archivedTimelineAction!.path).toBe(
       "/plants/p-archived?tentId=tent-7&mode=archived-timeline",
     );
@@ -112,9 +108,7 @@ describe("derivePlantDetailBlockedStateView archivedTimelineAction", () => {
       loadState: "ready",
       plant: { ...archivedPlant, tentId: null } as never,
     });
-    expect(view!.archivedTimelineAction!.path).toBe(
-      "/plants/p-archived?mode=archived-timeline",
-    );
+    expect(view!.archivedTimelineAction!.path).toBe("/plants/p-archived?mode=archived-timeline");
   });
 });
 
@@ -124,10 +118,7 @@ describe("PlantDetail archived screen → archived timeline", () => {
     renderAt("/plants/p-archived");
     expect(screen.getByTestId("plant-detail-archived")).toBeInTheDocument();
     const link = screen.getByTestId("plant-detail-view-archived-timeline");
-    expect(link).toHaveAttribute(
-      "href",
-      "/plants/p-archived?tentId=tent-7&mode=archived-timeline",
-    );
+    expect(link).toHaveAttribute("href", "/plants/p-archived?tentId=tent-7&mode=archived-timeline");
     // Default archived view is the blocked state — not the writable page.
     expect(screen.queryByTestId("quick-log-v2-fab-mounted")).toBeNull();
     expect(screen.queryByTestId("plant-detail-quick-actions-mounted")).toBeNull();
@@ -139,9 +130,7 @@ describe("PlantDetail archived-timeline read-only mode", () => {
     mockState = { data: archivedPlant, isLoading: false, isError: false };
     renderAt("/plants/p-archived?tentId=tent-7&mode=archived-timeline");
 
-    expect(
-      screen.getByTestId("plant-detail-archived-timeline-readonly"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("plant-detail-archived-timeline-readonly")).toBeInTheDocument();
     const banner = screen.getByTestId("plant-detail-archived-timeline-banner");
     expect(banner).toHaveTextContent(/archived timeline.*read-only/i);
 
@@ -159,13 +148,9 @@ describe("PlantDetail archived-timeline read-only mode", () => {
 
     // No AI Doctor launch / readiness surfaces.
     expect(screen.queryByTestId("ai-doctor-readiness-mounted")).toBeNull();
-    expect(
-      screen.queryByTestId("ai-doctor-context-readiness-mounted"),
-    ).toBeNull();
+    expect(screen.queryByTestId("ai-doctor-context-readiness-mounted")).toBeNull();
     expect(screen.queryByTestId("ai-doctor-live-review-mounted")).toBeNull();
-    expect(
-      screen.queryByTestId("ai-doctor-safe-review-start-mounted"),
-    ).toBeNull();
+    expect(screen.queryByTestId("ai-doctor-safe-review-start-mounted")).toBeNull();
 
     // No Action Queue write surface.
     expect(screen.queryByTestId("assigned-tent-actions-mounted")).toBeNull();
@@ -182,9 +167,7 @@ describe("PlantDetail archived-timeline read-only mode", () => {
     };
     renderAt("/plants/p-archived?mode=archived-timeline");
     // Active plant → no archived blocked state, no read-only mode either.
-    expect(
-      screen.queryByTestId("plant-detail-archived-timeline-readonly"),
-    ).toBeNull();
+    expect(screen.queryByTestId("plant-detail-archived-timeline-readonly")).toBeNull();
     expect(screen.queryByTestId("plant-detail-archived")).toBeNull();
   });
 });

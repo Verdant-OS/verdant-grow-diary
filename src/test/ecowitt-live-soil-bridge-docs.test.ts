@@ -2,10 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-const DOCS = readFileSync(
-  resolve(__dirname, "../../docs/ecowitt-live-soil-bridge.md"),
-  "utf8",
-);
+const DOCS = readFileSync(resolve(__dirname, "../../docs/ecowitt-live-soil-bridge.md"), "utf8");
 
 describe("docs/ecowitt-live-soil-bridge.md operator-polish sections", () => {
   it("contains a Rollback section", () => {
@@ -39,9 +36,7 @@ describe("docs/ecowitt-live-soil-bridge.md operator-polish sections", () => {
   });
 
   it("contains a MQTT → normalized mapping section", () => {
-    expect(DOCS).toMatch(
-      /^##\s+MQTT message → Verdant normalized payload mapping\s*$/m,
-    );
+    expect(DOCS).toMatch(/^##\s+MQTT message → Verdant normalized payload mapping\s*$/m);
     for (const key of [
       "tempf",
       "tempc",

@@ -44,23 +44,20 @@ describe("Slice 7: Dashboard Timeline links preserve growId via timelinePath", (
     expect(DASHBOARD).not.toMatch(/href=\{?["']\/logs(?:["'?])/);
   });
 
-  it.each(TIMELINE_LINK_LABELS)(
-    "link labeled %s uses timelinePath(scopedGrowId)",
-    (label) => {
-      const idx = DASHBOARD.indexOf(label);
-      expect(idx, `expected to find Dashboard link labeled "${label}"`).toBeGreaterThan(-1);
-      // Walk back ~600 chars from the label to find the nearest preceding
-      // `to={...}` attribute on the same <Link>.
-      const windowStart = Math.max(0, idx - 600);
-      const slice = DASHBOARD.slice(windowStart, idx);
-      const toMatches = [...slice.matchAll(/to=\{([^}]+)\}/g)];
-      const nearestTo = toMatches.at(-1)?.[1] ?? "";
-      expect(
-        nearestTo,
-        `link "${label}" should resolve to a timelinePath(scopedGrowId) target`,
-      ).toMatch(/timelinePath\s*\(\s*scopedGrowId\s*\)/);
-    },
-  );
+  it.each(TIMELINE_LINK_LABELS)("link labeled %s uses timelinePath(scopedGrowId)", (label) => {
+    const idx = DASHBOARD.indexOf(label);
+    expect(idx, `expected to find Dashboard link labeled "${label}"`).toBeGreaterThan(-1);
+    // Walk back ~600 chars from the label to find the nearest preceding
+    // `to={...}` attribute on the same <Link>.
+    const windowStart = Math.max(0, idx - 600);
+    const slice = DASHBOARD.slice(windowStart, idx);
+    const toMatches = [...slice.matchAll(/to=\{([^}]+)\}/g)];
+    const nearestTo = toMatches.at(-1)?.[1] ?? "";
+    expect(
+      nearestTo,
+      `link "${label}" should resolve to a timelinePath(scopedGrowId) target`,
+    ).toMatch(/timelinePath\s*\(\s*scopedGrowId\s*\)/);
+  });
 
   it("uses timelinePath at least 5 times (once per known Timeline/history link)", () => {
     const occurrences = [...DASHBOARD.matchAll(/timelinePath\s*\(\s*scopedGrowId\s*\)/g)];
@@ -75,28 +72,24 @@ describe("Slice 7: Dashboard Timeline links preserve growId via timelinePath", (
     expect(timelinePath("a b/c")).toBe("/timeline?growId=a%20b%2Fc");
   });
 
-  it("legacy logsPath helper remains available but resolves to /logs (alias)", () => {
-    // The helper is retained for backward-compatibility in non-Dashboard
-    // surfaces and tests. The App.tsx redirect alias is what actually
-    // forwards /logs → /timeline at runtime; this helper must NOT be used
-    // by user-facing Dashboard links (asserted above).
-    expect(logsPath("grow-abc")).toBe("/logs?growId=grow-abc");
+  it("legacy logsPath helper remains available but resolves to canonical /timeline", () => {
+    // Existing imports stay source-compatible while no new user-facing
+    // navigation incurs a redirect hop.
+    expect(logsPath("grow-abc")).toBe("/timeline?growId=grow-abc");
   });
 
   it("Dashboard currently scopes Timeline links by growId only (no plantId/tentId/filter Timeline links exist)", () => {
     // Documented invariant: no Dashboard Timeline/history link currently
     // carries a plantId, tentId, or filter param. If a future slice adds
     // one, this assertion should be tightened, not deleted.
-    const timelineCalls = [
-      ...DASHBOARD.matchAll(/timelinePath\s*\(([^)]*)\)/g),
-    ].map((m) => m[1].trim());
+    const timelineCalls = [...DASHBOARD.matchAll(/timelinePath\s*\(([^)]*)\)/g)].map((m) =>
+      m[1].trim(),
+    );
     expect(timelineCalls.length).toBeGreaterThan(0);
     for (const arg of timelineCalls) {
       expect(arg).toBe("scopedGrowId");
     }
     // No hand-built timeline URL appending plantId/tentId/filter.
-    expect(DASHBOARD).not.toMatch(
-      /["']\/timeline\?[^"']*\b(plantId|tentId|filter|filters)=/,
-    );
+    expect(DASHBOARD).not.toMatch(/["']\/timeline\?[^"']*\b(plantId|tentId|filter|filters)=/);
   });
 });

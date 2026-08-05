@@ -392,7 +392,7 @@ describe("Workflow: deep-link artifact uploads", () => {
     {
       name: "quicklog-playwright-traces",
       id: "upload_playwright_traces",
-      path: /test-results\/\*\*\/\*\.zip/,
+      path: /test-results\/\*\*\/trace\.zip/,
     },
     {
       name: "quicklog-playwright-media",
@@ -430,13 +430,12 @@ describe("Workflow: deep-link artifact uploads", () => {
     });
   }
 
-  it("summary links each dedicated artifact via artifact-url with fallback to ARTIFACTS_URL", () => {
+  it("summary links safe artifacts and only links traces when an upload is proven", () => {
     const summary = wf.match(
       /-\s*name:\s*Write Quick Log smoke run summary[\s\S]*?(?=\n {6}- name:|\n*$)/,
     );
     const block = summary![0];
     for (const env of [
-      "PLAYWRIGHT_TRACES_ARTIFACT_URL",
       "PLAYWRIGHT_MEDIA_ARTIFACT_URL",
       "SMOKE_REPORT_JSON_ARTIFACT_URL",
       "SMOKE_REPORT_TXT_ARTIFACT_URL",
@@ -444,7 +443,11 @@ describe("Workflow: deep-link artifact uploads", () => {
       expect(block).toContain(env);
       expect(block).toMatch(new RegExp(`\\$\\{${env}:-\\$fallback\\}`));
     }
-    expect(block).toContain("[Playwright traces](${pw_traces_url})");
+    expect(block).toContain("PLAYWRIGHT_TRACES_ARTIFACT_URL");
+    expect(block).toContain('TRACE_FILES_PRESENT}" = "true"');
+    expect(block).toContain("[Playwright traces (${TRACE_FILE_COUNT})]");
+    expect(block).toContain("intentionally disabled/unavailable for this authenticated run");
+    expect(block).not.toMatch(/\$\{PLAYWRIGHT_TRACES_ARTIFACT_URL:-\$fallback\}/);
     expect(block).toContain("[Playwright media (screenshots/videos)](${pw_media_url})");
     expect(block).toContain("[Smoke report JSON](${smoke_json_url})");
     expect(block).toContain("[Smoke report TXT](${smoke_txt_url})");

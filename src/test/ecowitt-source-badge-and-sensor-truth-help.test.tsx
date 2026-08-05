@@ -119,9 +119,7 @@ describe("sensorSourceLabelRules.resolveSensorSourceLabel", () => {
 
 function badgeOf(props: React.ComponentProps<typeof SensorSourceBadge>) {
   const { container } = render(<SensorSourceBadge {...props} />);
-  const root = container.querySelector(
-    '[data-testid="sensor-source-badge"]',
-  ) as HTMLElement;
+  const root = container.querySelector('[data-testid="sensor-source-badge"]') as HTMLElement;
   return {
     text: root.textContent ?? "",
     severity: root.getAttribute("data-severity"),
@@ -193,9 +191,7 @@ describe("SensorSourceBadge — vendor (Ecowitt) integration", () => {
 describe("SensorTruthHelp", () => {
   it("renders title 'Sensor truth'", () => {
     const { getByTestId } = render(<SensorTruthHelp />);
-    expect(getByTestId("sensor-truth-help-title").textContent).toBe(
-      "Sensor truth",
-    );
+    expect(getByTestId("sensor-truth-help-title").textContent).toBe("Sensor truth");
   });
 
   it("body explains Ecowitt / Manual / CSV / Stale / Unknown", () => {
@@ -220,15 +216,12 @@ describe("SensorTruthHelp", () => {
     const { getByTestId } = render(<SensorTruthHelp />);
     const root = getByTestId("sensor-truth-help");
     expect(root.tagName.toLowerCase()).toBe("section");
-    expect(root.getAttribute("aria-labelledby")).toBe(
-      "sensor-truth-help-title",
-    );
+    expect(root.getAttribute("aria-labelledby")).toBe("sensor-truth-help-title");
   });
 
   it("does not imply device control or automation", () => {
     const { getByTestId } = render(<SensorTruthHelp />);
-    const text = (getByTestId("sensor-truth-help").textContent ?? "")
-      .toLowerCase();
+    const text = (getByTestId("sensor-truth-help").textContent ?? "").toLowerCase();
     for (const banned of [
       "autopilot",
       "automation",
@@ -265,12 +258,7 @@ describe("Ecowitt badge + help — static safety", () => {
     // *_executed event names
     expect(/[a-z0-9]_executed\b/.test(src)).toBe(false);
     // device-control verbs
-    for (const banned of [
-      "turn_on_",
-      "turn_off_",
-      "device_command",
-      "execute_device",
-    ]) {
+    for (const banned of ["turn_on_", "turn_off_", "device_command", "execute_device"]) {
       expect(src.includes(banned)).toBe(false);
     }
   });
@@ -279,9 +267,7 @@ describe("Ecowitt badge + help — static safety", () => {
     const src = readSrc("components/SensorSourceBadge.tsx");
     expect(src).toMatch(/resolveSensorSourceLabel/);
     // No second hard-coded source→label map living in the component.
-    expect(src.match(/Record<SensorReadingSource, string>/g) ?? []).toHaveLength(
-      0,
-    );
+    expect(src.match(/Record<SensorReadingSource, string>/g) ?? []).toHaveLength(0);
   });
 
   it("does not introduce a fake-live fallback (unknown → Live)", () => {

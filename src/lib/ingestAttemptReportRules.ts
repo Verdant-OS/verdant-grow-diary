@@ -16,11 +16,7 @@ import { redactBridgeToken } from "@/lib/ecowittLocalTestPayloadRules";
 import type { EcowittIngestEvidence } from "@/lib/ecowittMqttIngestRules";
 
 export type IngestAttemptStatus =
-  | "accepted"
-  | "rejected"
-  | "dry_run"
-  | "network_error"
-  | "unknown_response";
+  "accepted" | "rejected" | "dry_run" | "network_error" | "unknown_response";
 
 export type IngestAttemptClassification =
   | "accepted"
@@ -47,6 +43,8 @@ export type IngestRejectionReason =
   | "invalid_co2"
   | "bridge_token_rejected"
   | "forbidden_tent"
+  | "ingest_not_accepted"
+  | "no_rows_inserted"
   | "malformed_response"
   | "network_unreachable"
   | "request_timeout";
@@ -125,7 +123,115 @@ const DESCRIPTION: Record<IngestAttemptStatus, string> = {
 const STORAGE_NOTICE =
   "Nothing was stored by this report panel. Persistence is the ingest webhook's job.";
 
-function classifyHttp(status: number, body: string | null | undefined): {
+export type IngestWriteAcknowledgement =
+  | {
+      kind: "accepted";
+      classification: "accepted";
+      reasons: [];
+    }
+  | {
+      kind: "rejected";
+      classification: "stale_reading" | "unknown";
+      reasons: IngestRejectionReason[];
+    }
+  | {
+      kind: "unknown_response";
+      classification: "unknown";
+      reasons: ["malformed_response"];
+    };
+
+/**
+ * Interpret the sensor-ingest webhook's JSON acknowledgement.
+ *
+ * HTTP 2xx alone does not prove a write landed: the webhook intentionally
+ * returns 200 with `accepted:false` / `inserted:0` for non-retryable stale
+ * or duplicate input. A live one-shot may claim success only when the body
+ * explicitly confirms `accepted:true` or a positive integer `inserted`.
+ *
+ * Pure and fail-closed. It never returns or logs response fields.
+ */
+export function classifyIngestWriteAcknowledgement(
+  body: string | null | undefined,
+): IngestWriteAcknowledgement {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(body ?? "");
+  } catch {
+    return {
+      kind: "unknown_response",
+      classification: "unknown",
+      reasons: ["malformed_response"],
+    };
+  }
+
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return {
+      kind: "unknown_response",
+      classification: "unknown",
+      reasons: ["malformed_response"],
+    };
+  }
+
+  const acknowledgement = parsed as Record<string, unknown>;
+  const hasAccepted = Object.prototype.hasOwnProperty.call(acknowledgement, "accepted");
+  const hasInserted = Object.prototype.hasOwnProperty.call(acknowledgement, "inserted");
+
+  // Validate every acknowledgement field that is present before considering
+  // either positive signal. A valid sibling must never mask a malformed one.
+  if (
+    (hasAccepted && typeof acknowledgement.accepted !== "boolean") ||
+    (hasInserted &&
+      (typeof acknowledgement.inserted !== "number" ||
+        !Number.isInteger(acknowledgement.inserted) ||
+        acknowledgement.inserted < 0))
+  ) {
+    return {
+      kind: "unknown_response",
+      classification: "unknown",
+      reasons: ["malformed_response"],
+    };
+  }
+
+  const explicitlyRejected = acknowledgement.accepted === false;
+  const insertedZero = acknowledgement.inserted === 0;
+
+  // A negative marker always wins if a response contains conflicting fields.
+  if (explicitlyRejected || insertedZero) {
+    const reasons: IngestRejectionReason[] = [];
+    if (explicitlyRejected) reasons.push("ingest_not_accepted");
+    if (insertedZero) reasons.push("no_rows_inserted");
+
+    const stale =
+      typeof acknowledgement.reason === "string" &&
+      acknowledgement.reason.toLowerCase().includes("stale");
+    if (stale) reasons.push("stale_timestamp");
+
+    return {
+      kind: "rejected",
+      classification: stale ? "stale_reading" : "unknown",
+      reasons,
+    };
+  }
+
+  const positiveInsertedCount =
+    typeof acknowledgement.inserted === "number" &&
+    Number.isInteger(acknowledgement.inserted) &&
+    acknowledgement.inserted > 0;
+  if (acknowledgement.accepted === true || positiveInsertedCount) {
+    return { kind: "accepted", classification: "accepted", reasons: [] };
+  }
+
+  return {
+    kind: "unknown_response",
+    classification: "unknown",
+    reasons: ["malformed_response"],
+  };
+}
+
+function classifyHttp(
+  status: number,
+  body: string | null | undefined,
+): {
   classification: IngestAttemptClassification;
   reasons: IngestRejectionReason[];
 } {
@@ -170,9 +276,10 @@ function classifyHttp(status: number, body: string | null | undefined): {
   return { classification: cls, reasons };
 }
 
-function classifyNormalizerReasons(
-  reasons: readonly string[],
-): { classification: IngestAttemptClassification; rejection: IngestRejectionReason[] } {
+function classifyNormalizerReasons(reasons: readonly string[]): {
+  classification: IngestAttemptClassification;
+  rejection: IngestRejectionReason[];
+} {
   const out: IngestRejectionReason[] = [];
   let cls: IngestAttemptClassification = "invalid_payload";
   for (const r of reasons) {
@@ -211,9 +318,7 @@ function classifyNormalizerReasons(
   return { classification: cls, rejection: out };
 }
 
-export function buildIngestAttemptReport(
-  input: IngestAttemptInput,
-): IngestAttemptReport {
+export function buildIngestAttemptReport(input: IngestAttemptInput): IngestAttemptReport {
   const tokenLabel = redactBridgeToken(input.token ?? null);
   const authPreview = `Bearer ${tokenLabel}`;
   const normalizerReasons = input.normalizerReasons ?? [];
@@ -248,10 +353,11 @@ export function buildIngestAttemptReport(
     classification = "unknown";
   }
 
-  // Normalizer rejections always override "accepted" — defense in depth.
+  // Local normalizer rejections are definitive even when no HTTP response
+  // exists. They must never be mislabeled as dry-run or unknown success.
   if (hasNormalizerReject && status !== "dry_run") {
     const norm = classifyNormalizerReasons(normalizerReasons);
-    if (classification === "accepted") {
+    if (status === "accepted" || status === "unknown_response") {
       status = "rejected";
     }
     classification = norm.classification;
@@ -286,6 +392,42 @@ export function buildIngestAttemptReport(
     storageNotice: STORAGE_NOTICE,
     trustedLive,
     evidence: input.evidence ?? null,
+  };
+}
+
+/**
+ * Tighten an HTTP-success report with the sensor-ingest write contract.
+ *
+ * This is opt-in so generic report callers may retain status-only behavior;
+ * the live EcoWitt runner applies it before printing, persisting a redacted
+ * report, or choosing its one-shot exit code.
+ */
+export function applyIngestWriteAcknowledgement(
+  report: IngestAttemptReport,
+  responseBody: string | null | undefined,
+): IngestAttemptReport {
+  if (report.status !== "accepted") return report;
+
+  const acknowledgement = classifyIngestWriteAcknowledgement(responseBody);
+  if (acknowledgement.kind === "accepted") return report;
+
+  const status: IngestAttemptStatus = acknowledgement.kind;
+  const classification = acknowledgement.classification;
+  const reasons = [...acknowledgement.reasons];
+  const chips: string[] = [];
+  if (report.httpStatus !== null) chips.push(`HTTP ${report.httpStatus}`);
+  chips.push(classification.replace(/_/g, " "));
+  for (const reason of reasons) chips.push(reason.replace(/_/g, " "));
+
+  return {
+    ...report,
+    status,
+    classification,
+    reasons,
+    chips,
+    title: TITLE[status],
+    description: DESCRIPTION[status],
+    trustedLive: false,
   };
 }
 

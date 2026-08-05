@@ -44,10 +44,7 @@ export const INITIAL_DAILY_GROW_CHECK_STATE: DailyGrowCheckState = {
 
 export interface DailyGrowCheckGuard {
   ok: boolean;
-  reason?:
-    | "no-tents"
-    | "no-plants"
-    | "plant-needs-tent";
+  reason?: "no-tents" | "no-plants" | "plant-needs-tent";
   message?: string;
 }
 
@@ -73,17 +70,13 @@ export function evaluateDailyGrowCheckGuard(input: {
   return { ok: true };
 }
 
-export function nextStep(
-  current: DailyGrowCheckStep,
-): DailyGrowCheckStep {
+export function nextStep(current: DailyGrowCheckStep): DailyGrowCheckStep {
   const i = DAILY_GROW_CHECK_STEPS.indexOf(current);
   if (i < 0 || i >= DAILY_GROW_CHECK_STEPS.length - 1) return "done";
   return DAILY_GROW_CHECK_STEPS[i + 1];
 }
 
-export function previousStep(
-  current: DailyGrowCheckStep,
-): DailyGrowCheckStep {
+export function previousStep(current: DailyGrowCheckStep): DailyGrowCheckStep {
   const i = DAILY_GROW_CHECK_STEPS.indexOf(current);
   if (i <= 0) return "select";
   return DAILY_GROW_CHECK_STEPS[i - 1];
@@ -119,7 +112,7 @@ export function buildDailyGrowCheckSummary(
     },
     {
       key: "tasks",
-      label: "Pending tasks",
+      label: "Pending actions",
       outcome: state.tasksReviewed ? "reviewed" : "not-reviewed",
     },
   ];
@@ -138,17 +131,21 @@ export function canCompleteDailyGrowCheck(_state: DailyGrowCheckState): boolean 
  * render as "Added"; user-marked steps without save confirmation render as
  * "Visited" so we never overclaim that data was written.
  */
-export function formatOutcomeLabel(
-  outcome: StepOutcome | "reviewed" | "not-reviewed",
-): string {
+export function formatOutcomeLabel(outcome: StepOutcome | "reviewed" | "not-reviewed"): string {
   switch (outcome) {
-    case "added": return "Added";
-    case "skipped": return "Skipped";
-    case "visited": return "Visited";
-    case "reviewed": return "Reviewed";
-    case "not-reviewed": return "Not reviewed";
+    case "added":
+      return "Added";
+    case "skipped":
+      return "Skipped";
+    case "visited":
+      return "Visited";
+    case "reviewed":
+      return "Reviewed";
+    case "not-reviewed":
+      return "Not reviewed";
     case "pending":
-    default: return "Pending";
+    default:
+      return "Pending";
   }
 }
 

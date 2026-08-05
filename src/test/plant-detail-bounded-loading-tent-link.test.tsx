@@ -8,7 +8,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, act } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import {
@@ -165,14 +165,11 @@ describe("PlantDetail bounded loading", () => {
     expect(slow).toHaveAttribute("role", "alert");
     expect(screen.queryByTestId("plant-detail-loading")).toBeNull();
     // Safe escape route always available in the bounded-loading surface.
-    expect(
-      screen.getByRole("link", { name: /back to plants/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /back to plants/i })).toBeInTheDocument();
     // Bounded retry: clicking Retry calls refetch.
     fireEvent.click(screen.getByTestId("plant-detail-loading-slow-retry"));
     expect(refetch).toHaveBeenCalledTimes(1);
   });
-
 
   it("never mounts AI Doctor surfaces while loading or in a bounded-loading state (no unrelated fetch fan-out)", () => {
     mockState = { data: null, isLoading: true, isError: false };

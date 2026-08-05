@@ -63,7 +63,14 @@ export function useTentIrrigationLedger(
   const enabled = !!ownerId && !!tentId;
 
   const query = useInfiniteQuery<LedgerPage>({
-    queryKey: ["irrigation", "ledger", ownerId ?? "anon", tentId ?? "none", plantId ?? "all", pageSize],
+    queryKey: [
+      "irrigation",
+      "ledger",
+      ownerId ?? "anon",
+      tentId ?? "none",
+      plantId ?? "all",
+      pageSize,
+    ],
     enabled,
     retry: false,
     initialPageParam: null as IrrigationCursor | null,

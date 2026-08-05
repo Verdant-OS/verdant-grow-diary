@@ -20,25 +20,16 @@ import {
   VWC_RANGE,
 } from "@/constants/csvValidationRanges";
 
+import { MANUAL_SNAPSHOT_CURRENT_STALE_HOURS } from "../constants/sensorTiming";
 /** Default staleness threshold for "current" room confidence. */
-export const MANUAL_SNAPSHOT_CURRENT_STALE_HOURS = 6;
+export { MANUAL_SNAPSHOT_CURRENT_STALE_HOURS };
 /** Realistic VPD window for indoor grow rooms (kPa). */
 export const VPD_REALISTIC_RANGE = { min: 0.2, max: 2.5 } as const;
 
-export type ManualSnapshotQuality =
-  | "usable"
-  | "needs_review"
-  | "invalid"
-  | "missing";
+export type ManualSnapshotQuality = "usable" | "needs_review" | "invalid" | "missing";
 
 export type ManualSnapshotSourceLabel =
-  | "manual"
-  | "live"
-  | "csv"
-  | "demo"
-  | "stale"
-  | "invalid"
-  | "unknown";
+  "manual" | "live" | "csv" | "demo" | "stale" | "invalid" | "unknown";
 
 export interface ManualSensorSnapshotInput {
   readonly source?: string | null;
@@ -141,6 +132,20 @@ export function evaluateManualSensorSnapshotQuality(
     reasons.push("Missing captured-at timestamp.");
   }
 
+  const hasPresentMetric = [
+    input.temperature_c,
+    input.humidity_pct,
+    input.vpd_kpa,
+    input.soil_temp_c,
+    input.soil_moisture_pct,
+    input.soil_ec_mscm,
+    input.ph,
+  ].some((value) => typeof value === "number" && Number.isFinite(value));
+
+  if (!hasPresentMetric) {
+    missingFields.push("metrics");
+  }
+
   // Numeric range checks (only when value is present)
   const checkNum = (
     field: string,
@@ -155,18 +160,8 @@ export function evaluateManualSensorSnapshotQuality(
     }
   };
 
-  checkNum(
-    "temperature_c",
-    input.temperature_c,
-    AIR_TEMP_C_RANGE,
-    "Air temperature",
-  );
-  checkNum(
-    "soil_temp_c",
-    input.soil_temp_c,
-    SUBSTRATE_TEMP_C_RANGE,
-    "Soil temperature",
-  );
+  checkNum("temperature_c", input.temperature_c, AIR_TEMP_C_RANGE, "Air temperature");
+  checkNum("soil_temp_c", input.soil_temp_c, SUBSTRATE_TEMP_C_RANGE, "Soil temperature");
   checkNum("vpd_kpa", input.vpd_kpa, VPD_REALISTIC_RANGE, "VPD");
   checkNum("ph", input.ph, PH_REALISTIC_RANGE, "pH");
 
@@ -180,17 +175,11 @@ export function evaluateManualSensorSnapshotQuality(
     }
   }
 
-  if (
-    input.soil_moisture_pct != null &&
-    Number.isFinite(input.soil_moisture_pct)
-  ) {
+  if (input.soil_moisture_pct != null && Number.isFinite(input.soil_moisture_pct)) {
     if (!inRange(input.soil_moisture_pct, VWC_RANGE)) {
       invalidFields.push("soil_moisture_pct");
       reasons.push("Soil moisture outside 0–100%.");
-    } else if (
-      input.soil_moisture_pct === 0 ||
-      input.soil_moisture_pct === 100
-    ) {
+    } else if (input.soil_moisture_pct === 0 || input.soil_moisture_pct === 100) {
       invalidFields.push("soil_moisture_pct");
       reasons.push("Soil moisture appears stuck at 0 or 100%.");
     }
@@ -232,16 +221,15 @@ export function evaluateManualSensorSnapshotQuality(
 
   const isHistorical = mode === "historical";
 
-  if (sourceLabel === "invalid" || invalidFields.length > 0) {
+  if (!hasPresentMetric) {
+    quality = "missing";
+    summary = isHistorical ? "Historical reading needs review" : "Missing current reading";
+  } else if (sourceLabel === "invalid" || invalidFields.length > 0) {
     quality = "invalid";
-    summary = isHistorical
-      ? "Historical invalid reading — review before use"
-      : "Invalid reading";
+    summary = isHistorical ? "Historical invalid reading — review before use" : "Invalid reading";
   } else if (capturedMs == null) {
     quality = "missing";
-    summary = isHistorical
-      ? "Missing captured timestamp"
-      : "Missing current reading";
+    summary = isHistorical ? "Missing captured timestamp" : "Missing current reading";
   } else if (sourceLabel === "unknown") {
     quality = "needs_review";
     summary = isHistorical ? "Historical reading needs review" : "Needs review";
@@ -329,9 +317,7 @@ const SOURCE_PRIORITY: ReadonlyArray<ManualSnapshotSourceLabel> = [
   "invalid",
 ];
 
-const METRIC_MAP: Readonly<
-  Record<string, keyof ManualSensorSnapshotInput>
-> = Object.freeze({
+const METRIC_MAP: Readonly<Record<string, keyof ManualSensorSnapshotInput>> = Object.freeze({
   temperature_c: "temperature_c",
   humidity_pct: "humidity_pct",
   vpd_kpa: "vpd_kpa",

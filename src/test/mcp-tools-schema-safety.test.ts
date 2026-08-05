@@ -25,17 +25,12 @@ describe("MCP tools — schema regression", () => {
     const tool = MCP_MANIFEST.tools.find((t) => t.name === "list_grows");
     expect(tool).toBeDefined();
     expect(tool!.readOnly).toBe(true);
-    expect(tool!.params.map((p) => p.name).sort()).toEqual([
-      "includeArchived",
-      "limit",
-    ]);
+    expect(tool!.params.map((p) => p.name).sort()).toEqual(["includeArchived", "limit"]);
     expect(tool!.params.every((p) => p.required === false)).toBe(true);
   });
 
   it("list_recent_diary_entries requires growId only", () => {
-    const tool = MCP_MANIFEST.tools.find(
-      (t) => t.name === "list_recent_diary_entries",
-    );
+    const tool = MCP_MANIFEST.tools.find((t) => t.name === "list_recent_diary_entries");
     expect(tool).toBeDefined();
     expect(tool!.readOnly).toBe(true);
     const required = tool!.params.filter((p) => p.required).map((p) => p.name);
@@ -45,9 +40,7 @@ describe("MCP tools — schema regression", () => {
   });
 
   it("get_latest_sensor_snapshot requires tentId only", () => {
-    const tool = MCP_MANIFEST.tools.find(
-      (t) => t.name === "get_latest_sensor_snapshot",
-    );
+    const tool = MCP_MANIFEST.tools.find((t) => t.name === "get_latest_sensor_snapshot");
     expect(tool).toBeDefined();
     expect(tool!.readOnly).toBe(true);
     expect(tool!.params.map((p) => p.name)).toEqual(["tentId"]);
@@ -77,9 +70,7 @@ describe("MCP connection copy payload — no secrets", () => {
   );
 
   it("includes endpoint, consent URL, and every tool name", () => {
-    expect(payload).toContain(
-      "https://knkwiiywfkbqznbxwqfh.supabase.co/functions/v1/mcp",
-    );
+    expect(payload).toContain("https://knkwiiywfkbqznbxwqfh.supabase.co/functions/v1/mcp");
     expect(payload).toContain("/.lovable/oauth/consent");
     expect(payload).toContain("list_grows");
     expect(payload).toContain("list_recent_diary_entries");

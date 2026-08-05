@@ -41,9 +41,7 @@ import { classifySnapshotTrustBadge } from "@/lib/sensorSnapshotTrustBadgeRules"
 const NOW = new Date("2026-06-02T12:00:00Z");
 const FIVE_MIN_AGO = "2026-06-02T11:55:00Z";
 
-function strictSnap(
-  partial: Partial<StrictSensorSnapshot> = {},
-): StrictSensorSnapshot {
+function strictSnap(partial: Partial<StrictSensorSnapshot> = {}): StrictSensorSnapshot {
   return {
     ...EMPTY_SENSOR_SNAPSHOT,
     sensor_snapshot_id: "s1",
@@ -88,6 +86,7 @@ describe("manual sensor snapshot — trust badge proof", () => {
       snapshot: strictSnap(),
       hasTent: true,
       now: NOW,
+      temperatureUnit: "celsius",
     });
     expect(view.trustBadge.badge).toBe("manual");
     expect(view.trustBadge.badge).not.toBe("live");
@@ -108,6 +107,7 @@ describe("manual sensor snapshot — trust badge proof", () => {
       }),
       hasTent: true,
       now: NOW,
+      temperatureUnit: "celsius",
     });
     expect(view.trustBadge.badge).toBe("stale");
     expect(view.trustBadge.badge).not.toBe("live");
@@ -124,6 +124,7 @@ describe("manual sensor snapshot — trust badge proof", () => {
       }),
       hasTent: true,
       now: NOW,
+      temperatureUnit: "celsius",
     });
     expect(view.trustBadge.badge).toBe("invalid");
     expect(view.status).toBe("invalid");
@@ -135,6 +136,7 @@ describe("manual sensor snapshot — trust badge proof", () => {
       snapshot: { ...EMPTY_SENSOR_SNAPSHOT },
       hasTent: true,
       now: NOW,
+      temperatureUnit: "celsius",
     });
     expect(view.status).toBe("no_data");
     expect(view.trustBadge.badge).toBe("none");
@@ -221,6 +223,7 @@ describe("manual sensor snapshot — Quick Log CTA deep link", () => {
       hasTent: true,
       loading: true,
       now: NOW,
+      temperatureUnit: "celsius",
     });
     expect(v.status).toBe("no_data");
     expect(v.action.kind).toBe("add");
@@ -236,6 +239,7 @@ describe("manual sensor snapshot — Quick Log CTA deep link", () => {
       snapshot: { ...EMPTY_SENSOR_SNAPSHOT },
       hasTent: true,
       now: NOW,
+      temperatureUnit: "celsius",
     });
     expect(v.status).toBe("no_data");
     expect(v.action.kind).toBe("add");
@@ -250,6 +254,7 @@ describe("manual sensor snapshot — Quick Log CTA deep link", () => {
       snapshot: strictSnap(),
       hasTent: true,
       now: NOW,
+      temperatureUnit: "celsius",
     });
     expect(v.status).toBe("usable");
     expect(v.action.kind).toBe("edit");
@@ -266,6 +271,7 @@ describe("manual sensor snapshot — negative safety: no fake live promotion", (
       snapshot: legacySnap(),
       hasTent: true,
       now: NOW,
+      temperatureUnit: "celsius",
     });
     expect(v.trustBadge.badge).not.toBe("live");
   });

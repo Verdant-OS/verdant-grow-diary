@@ -35,7 +35,9 @@ const EMPTY_ITEMS: readonly never[] = Object.freeze([] as never[]);
 type TentReadStatus = "loading" | "unavailable" | "empty" | "selection_required" | "ready";
 
 export interface UseOperatorAccountReadModelsOptions {
-  /** Required when the active grow has more than one valid tent. */
+  /** Optional owner-visible grow scope. Omit to use the account's active grow. */
+  growId?: string | null;
+  /** Required when the selected grow has more than one valid tent. */
   selectedTentId?: string | null;
 }
 
@@ -126,8 +128,17 @@ export function useOperatorAccountReadModels(
   options: UseOperatorAccountReadModelsOptions = {},
 ): OperatorAccountReadModelsPanelModel {
   const { user } = useAuth();
-  const { activeGrow, activeGrowId, loading: growsLoading, error: growsError } = useGrows();
-  const validGrowId = activeGrowId && isUuid(activeGrowId) ? activeGrowId : null;
+  const { grows, activeGrow, activeGrowId, loading: growsLoading, error: growsError } = useGrows();
+  const requestedGrowId = options.growId ?? null;
+  const selectedGrowId = requestedGrowId ?? activeGrowId;
+  const selectedGrow = requestedGrowId
+    ? (grows.find((grow) => grow.id === requestedGrowId) ??
+      (activeGrow?.id === requestedGrowId ? activeGrow : null))
+    : activeGrow;
+  const validGrowId =
+    selectedGrowId && isUuid(selectedGrowId) && selectedGrow?.id === selectedGrowId
+      ? selectedGrowId
+      : null;
   // `useGrowTents` intentionally treats undefined as all tents. Use an invalid
   // sentinel until a real grow exists; fetchTents then returns [] without a DB
   // request, preventing aggregate cross-grow cache reuse.
@@ -153,10 +164,10 @@ export function useOperatorAccountReadModels(
 
   return useMemo(() => {
     if (!user || growsLoading) return { status: "loading" };
-    if (growsError || (activeGrowId !== null && !validGrowId)) {
+    if (growsError || (selectedGrowId !== null && !validGrowId)) {
       return { status: "unavailable" };
     }
-    if (!validGrowId || !activeGrow) return { status: "no_grow" };
+    if (!validGrowId || !selectedGrow) return { status: "no_grow" };
 
     const tentStatus: TentReadStatus = tentsQuery.isLoading
       ? "loading"
@@ -237,7 +248,7 @@ export function useOperatorAccountReadModels(
 
     return {
       status: "ready",
-      growName: activeGrow.name?.trim() || "Unnamed grow",
+      growName: selectedGrow.name?.trim() || "Unnamed grow",
       tentOptions: tentScope.options,
       tentScopeStatus,
       selectedTentId: validTentId,
@@ -251,8 +262,6 @@ export function useOperatorAccountReadModels(
       }),
     };
   }, [
-    activeGrow,
-    activeGrowId,
     diaryQuery,
     growsError,
     growsLoading,
@@ -261,6 +270,8 @@ export function useOperatorAccountReadModels(
     rootZoneQuery.isLoading,
     rootZoneQuery.manualObservationStatus,
     rootZoneQuery.records,
+    selectedGrow,
+    selectedGrowId,
     selectedTent,
     sensorQuery,
     tentDiaryQuery,

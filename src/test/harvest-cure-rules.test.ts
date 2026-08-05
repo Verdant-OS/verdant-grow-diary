@@ -74,12 +74,8 @@ describe("validateCureCheckDetails", () => {
   });
 
   it("rejects unrealistic temperatures", () => {
-    expect(validateCureCheckDetails({ cure_temp_f: 5 }).errors.cure_temp_f).toBe(
-      "invalid_range",
-    );
-    expect(validateCureCheckDetails({ cure_temp_f: 200 }).errors.cure_temp_f).toBe(
-      "invalid_range",
-    );
+    expect(validateCureCheckDetails({ cure_temp_f: 5 }).errors.cure_temp_f).toBe("invalid_range");
+    expect(validateCureCheckDetails({ cure_temp_f: 200 }).errors.cure_temp_f).toBe("invalid_range");
   });
 
   it("rejects fractional/negative cure_day", () => {

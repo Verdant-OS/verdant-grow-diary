@@ -12,10 +12,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import {
-  normalizeDiaryEntries,
-  type NormalizeDiaryInput,
-} from "@/lib/diaryEntryRules";
+import { normalizeDiaryEntries, type NormalizeDiaryInput } from "@/lib/diaryEntryRules";
 import {
   buildMeasurementHistory,
   buildObservationHistory,
@@ -69,11 +66,8 @@ function liftEntries(rawEntries: NormalizeDiaryInput["rawEntries"]) {
     const r = (raw ?? {}) as Record<string, unknown>;
     if (r.entry_type || r.entryType || r.event_type || r.eventType) return r;
     const det = (r.details ?? null) as Record<string, unknown> | null;
-    const lifted =
-      det && typeof det === "object" ? det.event_type : undefined;
-    return typeof lifted === "string" && lifted.length > 0
-      ? { ...r, entry_type: lifted }
-      : r;
+    const lifted = det && typeof det === "object" ? det.event_type : undefined;
+    return typeof lifted === "string" && lifted.length > 0 ? { ...r, entry_type: lifted } : r;
   });
 }
 
@@ -130,8 +124,7 @@ function ManualReadingsChips({ row }: { row: QuickLogHistoryRow }) {
   if (m.runoffPh) items.push({ label: "Runoff pH", value: m.runoffPh });
   if (m.runoffEc) items.push({ label: "Runoff EC/PPM", value: m.runoffEc });
   if (m.ppfdCanopy) items.push({ label: "PPFD canopy", value: m.ppfdCanopy });
-  if (m.lightDistance)
-    items.push({ label: "Light distance", value: m.lightDistance });
+  if (m.lightDistance) items.push({ label: "Light distance", value: m.lightDistance });
   if (m.other) m.other.forEach((o) => items.push(o));
   if (items.length === 0) return null;
   return (
@@ -191,15 +184,16 @@ function Row({ row }: { row: QuickLogHistoryRow }) {
             title={row.warnings.join(" · ")}
           >
             <AlertTriangle className="h-3 w-3" />
-            {row.warnings.length === 1
-              ? "1 warning"
-              : `${row.warnings.length} warnings`}
+            {row.warnings.length === 1 ? "1 warning" : `${row.warnings.length} warnings`}
           </span>
         )}
       </div>
 
       {row.photoUrl && (
-        <div className="mb-3 overflow-hidden rounded-lg border border-border/40 bg-secondary/20" data-testid="quicklog-history-photo-summary">
+        <div
+          className="mb-3 overflow-hidden rounded-lg border border-border/40 bg-secondary/20"
+          data-testid="quicklog-history-photo-summary"
+        >
           <img
             src={row.photoUrl}
             alt="Quick Log attached photo"
@@ -214,14 +208,18 @@ function Row({ row }: { row: QuickLogHistoryRow }) {
       )}
 
       {row.noteBody ? (
-        <div className="rounded-lg bg-background/30 p-2" data-testid="quicklog-history-note-summary">
+        <div
+          className="rounded-lg bg-background/30 p-2"
+          data-testid="quicklog-history-note-summary"
+        >
           <p className="text-sm font-medium text-muted-foreground">Note</p>
-          <p className="mt-1 text-sm text-foreground/90 whitespace-pre-wrap">
-            {row.noteBody}
-          </p>
+          <p className="mt-1 text-sm text-foreground/90 whitespace-pre-wrap">{row.noteBody}</p>
         </div>
       ) : row.photoUrl ? (
-        <p className="rounded-lg bg-background/30 p-2 text-sm text-muted-foreground" data-testid="quicklog-history-photo-only-note">
+        <p
+          className="rounded-lg bg-background/30 p-2 text-sm text-muted-foreground"
+          data-testid="quicklog-history-photo-only-note"
+        >
           Photo-only Quick Log. Add a note later from the timeline if needed.
         </p>
       ) : null}
@@ -255,28 +253,22 @@ function QuickLogHistorySection({
       aria-label={title}
       data-testid={`quicklog-history-section-${laneKey}`}
     >
-      <header className="flex items-start justify-between gap-3 mb-3">
-        <h2 className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+      <header className="mb-3 flex min-w-0 flex-col items-stretch gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <h2 className="inline-flex min-w-0 items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           {icon}
           {title}
         </h2>
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
           {headerAction}
           <span className="text-xs text-muted-foreground">
-            {rows.length === 0
-              ? "0"
-              : rows.length === 1
-                ? "1 entry"
-                : `${rows.length} entries`}
+            {rows.length === 0 ? "0" : rows.length === 1 ? "1 entry" : `${rows.length} entries`}
           </span>
         </div>
       </header>
       {rows.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border/50 bg-secondary/20 p-4 text-center">
           <p className="text-sm text-muted-foreground">{emptyTitle}</p>
-          <p className="text-sm text-muted-foreground/80 mt-1">
-            {emptyHelp}
-          </p>
+          <p className="text-sm text-muted-foreground/80 mt-1">{emptyHelp}</p>
         </div>
       ) : (
         <ul className="space-y-2">
@@ -297,13 +289,9 @@ export function RecentQuickLogActivityPanel({
   limit?: number;
 }) {
   const handleExport = () => {
-    const result = exportGrowDiaryReportAsPdf(
-      buildRecentDiaryPdfInput(rawEntries, limit),
-    );
+    const result = exportGrowDiaryReportAsPdf(buildRecentDiaryPdfInput(rawEntries, limit));
     if (result === "unavailable") {
-      toast.error(
-        "Couldn't open the diary PDF export window. Check popup blockers and try again.",
-      );
+      toast.error("Couldn't open the diary PDF export window. Check popup blockers and try again.");
     } else {
       toast.success("Diary PDF export opened. Choose 'Save as PDF' to save.");
     }

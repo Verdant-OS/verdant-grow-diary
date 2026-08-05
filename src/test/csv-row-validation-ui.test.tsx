@@ -29,12 +29,8 @@ async function uploadCsv(text: string) {
 }
 
 describe("RepresentativeCsvPreview — validation hint rendering", () => {
-
   it("shows canonical field names in hint copy", async () => {
-    const csv = [
-      "Timestamp,Air_Temp_C,Humidity_%",
-      "2026-05-01T10:00:00Z,24,100",
-    ].join("\n");
+    const csv = ["Timestamp,Air_Temp_C,Humidity_%", "2026-05-01T10:00:00Z,24,100"].join("\n");
     await uploadCsv(csv);
     expect(
       await screen.findByText(/humidity — header "Humidity_%" value "100"/i),
@@ -42,23 +38,14 @@ describe("RepresentativeCsvPreview — validation hint rendering", () => {
   });
 
   it("renders duplicate canonical mapping warning above the table", async () => {
-    const csv = [
-      "Timestamp,Temp",
-      "2026-05-01T10:00:00Z,24",
-    ].join("\n");
+    const csv = ["Timestamp,Temp", "2026-05-01T10:00:00Z,24"].join("\n");
     await uploadCsv(csv);
     // Map both Air Temp and Substrate Temp to "Temp" via the mapping UI.
-    const subTempSelect = screen.getByLabelText(
-      /Map Substrate temperature/i,
-    ) as HTMLSelectElement;
-    const airTempSelect = screen.getByLabelText(
-      /Map Air temperature/i,
-    ) as HTMLSelectElement;
+    const subTempSelect = screen.getByLabelText(/Map Substrate temperature/i) as HTMLSelectElement;
+    const airTempSelect = screen.getByLabelText(/Map Air temperature/i) as HTMLSelectElement;
     fireEvent.change(airTempSelect, { target: { value: "Temp" } });
     fireEvent.change(subTempSelect, { target: { value: "Temp" } });
-    expect(
-      await screen.findByText(/Duplicate canonical mapping/i),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/Duplicate canonical mapping/i)).toBeInTheDocument();
     expect(
       screen.getByText(/multiple canonical fields: air_temp, substrate_temp/i),
     ).toBeInTheDocument();

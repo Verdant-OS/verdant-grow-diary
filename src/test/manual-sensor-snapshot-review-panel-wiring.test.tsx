@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import ManualSensorReadingCard from "@/components/ManualSensorReadingCard";
@@ -14,6 +14,7 @@ const insertSpy = vi.fn().mockResolvedValue(undefined);
 
 vi.mock("@/lib/growRepo", () => ({
   insertSensorReading: (...args: unknown[]) => insertSpy(...args),
+  insertSensorReadingsBatch: (...args: unknown[]) => insertSpy(...args),
 }));
 
 const TENT_ID = "22222222-2222-4222-8222-222222222222";
@@ -73,9 +74,12 @@ describe("ManualSensorReadingCard — review panel wiring inside mandatory gate"
 
     fireEvent.click(confirm);
     await waitFor(() => expect(insertSpy).toHaveBeenCalled());
-    for (const call of insertSpy.mock.calls) {
-      expect(call[0].source).toBe("manual");
-      expect(call[0].source).not.toBe("live");
+    const savedRows = insertSpy.mock.calls.flatMap(([payload]) =>
+      Array.isArray(payload) ? payload : [payload],
+    );
+    for (const row of savedRows) {
+      expect(row.source).toBe("manual");
+      expect(row.source).not.toBe("live");
     }
   });
 
@@ -90,8 +94,11 @@ describe("ManualSensorReadingCard — review panel wiring inside mandatory gate"
 
     fireEvent.click(screen.getByTestId("manual-sensor-review-confirm"));
     await waitFor(() => expect(insertSpy).toHaveBeenCalled());
-    for (const call of insertSpy.mock.calls) {
-      expect(call[0].source).toBe("manual");
+    const savedRows = insertSpy.mock.calls.flatMap(([payload]) =>
+      Array.isArray(payload) ? payload : [payload],
+    );
+    for (const row of savedRows) {
+      expect(row.source).toBe("manual");
     }
   });
 });

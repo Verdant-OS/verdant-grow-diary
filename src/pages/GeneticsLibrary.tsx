@@ -5,7 +5,7 @@
  * always visible; nothing is inferred.
  */
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { Dna, Loader2, Plus } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAccessions, useBatches } from "@/hooks/useGeneticsLibrary";
 import { AccessionForm } from "@/components/genetics/AccessionForm";
+import { GeneticsReadUnavailable } from "@/components/genetics/GeneticsReadUnavailable";
 import { UnknownStateChip } from "@/components/genetics/UnknownStateChip";
 import {
   accessionSourceLabel,
@@ -75,7 +76,10 @@ function BatchCard({ b }: { b: BatchDto }) {
     <div className="glass rounded-2xl overflow-hidden border border-border p-4 flex flex-col gap-2 min-w-0">
       <div className="flex min-w-0 items-start justify-between gap-2">
         <Link to={geneticsBatchDetailPath(b.id)} className="min-w-0">
-          <span className="block truncate text-sm font-medium text-white/90" title={b.name || b.batchCode}>
+          <span
+            className="block truncate text-sm font-medium text-white/90"
+            title={b.name || b.batchCode}
+          >
             {b.name || b.batchCode}
           </span>
         </Link>
@@ -142,6 +146,14 @@ export default function GeneticsLibrary() {
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> Loading accessions…
             </div>
+          ) : accessions.isError ? (
+            <GeneticsReadUnavailable
+              testId="accessions-unavailable"
+              message="Accessions could not be loaded. This is not the same as having no accessions."
+              onRetry={() => {
+                void accessions.refetch();
+              }}
+            />
           ) : (accessions.data ?? []).length === 0 ? (
             <div
               data-testid="accessions-empty"
@@ -163,6 +175,14 @@ export default function GeneticsLibrary() {
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> Loading batches…
             </div>
+          ) : batches.isError ? (
+            <GeneticsReadUnavailable
+              testId="batches-unavailable"
+              message="Propagation batches could not be loaded. This is not the same as having no batches."
+              onRetry={() => {
+                void batches.refetch();
+              }}
+            />
           ) : (batches.data ?? []).length === 0 ? (
             <div
               data-testid="batches-empty"

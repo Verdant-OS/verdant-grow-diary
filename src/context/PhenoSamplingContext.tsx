@@ -8,6 +8,9 @@
  */
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
 
+export const PHENO_SAMPLING_SESSION_ONLY_NOTICE =
+  "Session only — tester feedback is not saved to your Verdant account and will be lost if you leave or reload this page.";
+
 export interface PhenoSamplingSubmission {
   readonly id: string;
   readonly submittedAt: string; // ISO timestamp
@@ -24,10 +27,7 @@ export interface PhenoSamplingSubmission {
   readonly notes: string;
 }
 
-export type PhenoSamplingInput = Omit<
-  PhenoSamplingSubmission,
-  "id" | "submittedAt"
-> & {
+export type PhenoSamplingInput = Omit<PhenoSamplingSubmission, "id" | "submittedAt"> & {
   readonly submittedAt?: string;
 };
 
@@ -71,11 +71,7 @@ export function PhenoSamplingProvider({ children }: { children: React.ReactNode 
     [submissions, recordSubmission],
   );
 
-  return (
-    <PhenoSamplingContext.Provider value={value}>
-      {children}
-    </PhenoSamplingContext.Provider>
-  );
+  return <PhenoSamplingContext.Provider value={value}>{children}</PhenoSamplingContext.Provider>;
 }
 
 /** Returns null when no provider is present (existing standalone usage). */

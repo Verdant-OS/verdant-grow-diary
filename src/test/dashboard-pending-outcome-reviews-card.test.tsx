@@ -9,7 +9,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 
 import DashboardPendingOutcomeReviewsCard from "@/components/DashboardPendingOutcomeReviewsCard";
 import { stripSourceComments } from "./utils/stripSourceComments";
@@ -22,23 +22,15 @@ import { useDashboardPendingOutcomeReviews } from "@/hooks/useDashboardPendingOu
 
 const ROOT = resolve(__dirname, "../..");
 const COMP = stripSourceComments(
-  readFileSync(
-    resolve(ROOT, "src/components/DashboardPendingOutcomeReviewsCard.tsx"),
-    "utf8",
-  ),
+  readFileSync(resolve(ROOT, "src/components/DashboardPendingOutcomeReviewsCard.tsx"), "utf8"),
 );
 const HOOK = stripSourceComments(
-  readFileSync(
-    resolve(ROOT, "src/hooks/useDashboardPendingOutcomeReviews.ts"),
-    "utf8",
-  ),
+  readFileSync(resolve(ROOT, "src/hooks/useDashboardPendingOutcomeReviews.ts"), "utf8"),
 );
 const RULES = stripSourceComments(
   readFileSync(resolve(ROOT, "src/lib/pendingOutcomeReviewRules.ts"), "utf8"),
 );
-const DASH = stripSourceComments(
-  readFileSync(resolve(ROOT, "src/pages/Dashboard.tsx"), "utf8"),
-);
+const DASH = stripSourceComments(readFileSync(resolve(ROOT, "src/pages/Dashboard.tsx"), "utf8"));
 
 function renderCard() {
   return render(
@@ -92,9 +84,7 @@ describe("DashboardPendingOutcomeReviewsCard render", () => {
       ],
     });
     renderCard();
-    expect(
-      screen.getByText(/Record what changed after completed actions/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Record what changed after completed actions/i)).toBeInTheDocument();
     expect(screen.getByTestId("pending-outcome-reviews-count")).toHaveTextContent(
       /2 completed actions are waiting/i,
     );

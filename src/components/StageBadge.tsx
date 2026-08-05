@@ -1,18 +1,13 @@
 import { cn } from "@/lib/utils";
-import {
-  normalizeGrowStage,
-  formatGrowStageBadge,
-} from "@/constants/growStages";
+import { normalizeGrowStage, formatGrowStageBadge } from "@/constants/growStages";
 
 /* ── canonical stage styles ── */
 const CANONICAL_STYLE_MAP: Record<string, string> = {
-  seedling:
-    "bg-[hsl(var(--info))]/15 text-[hsl(var(--info))] border-[hsl(var(--info))]/30",
+  seedling: "bg-[hsl(var(--info))]/15 text-[hsl(var(--info))] border-[hsl(var(--info))]/30",
   vegetative: "bg-primary/15 text-primary border-primary/30",
   flower:
     "bg-[hsl(var(--leaf-glow))]/15 text-[hsl(var(--leaf-glow))] border-[hsl(var(--leaf-glow))]/30",
-  harvest:
-    "bg-[hsl(var(--warning))]/15 text-[hsl(var(--warning))] border-[hsl(var(--warning))]/30",
+  harvest: "bg-[hsl(var(--warning))]/15 text-[hsl(var(--warning))] border-[hsl(var(--warning))]/30",
 };
 
 /* ── legacy mock stages not yet in canonical taxonomy ── */

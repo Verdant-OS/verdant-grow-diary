@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
-import { MemoryRouter, Routes, Route } from "react-router-dom";
+import { MemoryRouter, Routes, Route } from "@/lib/react-router-compat";
 
 import PhenoHuntNew from "@/pages/PhenoHuntNew";
 import { defaultCandidateLabel } from "@/lib/phenoHuntService";
@@ -56,7 +56,10 @@ vi.mock("sonner", () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 
-function mockData(plants: { id: string; name: string; strain: string | null; tent_id: string | null }[]) {
+function mockData(
+  plants: { id: string; name: string; strain: string | null; tent_id: string | null }[],
+  tents: { id: string }[] = [],
+) {
   fromMock.mockImplementation((table: string) => {
     if (table === "grows") {
       return {
@@ -70,10 +73,22 @@ function mockData(plants: { id: string; name: string; strain: string | null; ten
         }),
       };
     }
+    // BUG-A grow attribution: the page now resolves the grow's tent ids
+    // first so orphan-attributed plants can appear as candidates.
+    if (table === "tents") {
+      const builder = {
+        select: () => builder,
+        eq: () => builder,
+        then: (res: (v: unknown) => unknown) =>
+          Promise.resolve({ data: tents, error: null }).then(res),
+      } as unknown as PromiseLike<unknown> & Record<string, unknown>;
+      return builder;
+    }
     if (table === "plants") {
       const builder = {
         select: () => builder,
         eq: () => builder,
+        or: () => builder,
         then: (res: (v: unknown) => unknown) =>
           Promise.resolve({ data: plants, error: null }).then(res),
       } as unknown as PromiseLike<unknown> & Record<string, unknown>;
@@ -103,9 +118,7 @@ describe("PhenoHuntNew empty state", () => {
   async function goToCandidatesStep() {
     await screen.findByTestId("pheno-step-basics");
     fireEvent.click(screen.getByRole("button", { name: /next/i }));
-    await waitFor(() =>
-      expect(screen.getByTestId("pheno-step-candidates")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByTestId("pheno-step-candidates")).toBeInTheDocument());
   }
 
   it("shows empty state CTA when the grow has no plants", async () => {
@@ -115,9 +128,7 @@ describe("PhenoHuntNew empty state", () => {
     const cta = (await screen.findByTestId("ph-empty-cta")) as HTMLElement;
     const anchor = cta.querySelector("a") ?? cta;
     expect(anchor.getAttribute("href")).toBe("/grows/g1");
-    expect(screen.getByTestId("ph-empty").textContent).toMatch(
-      /No plants in this grow yet/i,
-    );
+    expect(screen.getByTestId("ph-empty").textContent).toMatch(/No plants in this grow yet/i);
   });
 
   it("keeps the candidate list when plants exist", async () => {
@@ -127,9 +138,7 @@ describe("PhenoHuntNew empty state", () => {
     ]);
     renderPage();
     await goToCandidatesStep();
-    await waitFor(() =>
-      expect(screen.getByTestId("ph-plant-list")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByTestId("ph-plant-list")).toBeInTheDocument());
     expect(screen.queryByTestId("ph-empty")).toBeNull();
     expect(screen.getByTestId("ph-toggle-p1")).toBeInTheDocument();
     expect(screen.getByTestId("ph-toggle-p2")).toBeInTheDocument();
@@ -159,10 +168,6 @@ describe("deterministic candidate label generation", () => {
     sel.add("a");
     expect(Array.from(sel)).toEqual(["b", "c", "a"]);
     // Labels follow the resulting order.
-    expect(Array.from(sel).map((_, i) => defaultCandidateLabel(i))).toEqual([
-      "#1",
-      "#2",
-      "#3",
-    ]);
+    expect(Array.from(sel).map((_, i) => defaultCandidateLabel(i))).toEqual(["#1", "#2", "#3"]);
   });
 });

@@ -23,9 +23,7 @@ export type PaddleCheckoutEnvironment = "sandbox" | "live" | "unavailable";
  *
  * The token payload after the prefix is never inspected and never returned.
  */
-export function classifyPaddleToken(
-  token: string | null | undefined,
-): PaddleTokenClass {
+export function classifyPaddleToken(token: string | null | undefined): PaddleTokenClass {
   if (typeof token !== "string") return "unavailable";
   const trimmed = token.trim();
   if (trimmed.length === 0) return "unavailable";
@@ -51,9 +49,7 @@ export function classifyPaddleToken(
  *   - IPv6 loopback "::1" (with or without zone/port stripped by caller)
  *   - "0.0.0.0"
  */
-export function isLoopbackHostname(
-  hostname: string | null | undefined,
-): boolean {
+export function isLoopbackHostname(hostname: string | null | undefined): boolean {
   if (typeof hostname !== "string") return false;
   const h = hostname.trim().toLowerCase();
   if (h.length === 0) return false;

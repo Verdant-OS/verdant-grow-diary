@@ -33,6 +33,5 @@ export const SENSOR_SOURCE_LEGEND: Record<TimelineSensorSourceKind, string> = {
   csv: "Explicitly labeled historical CSV context. Not live data.",
   demo: "Sample/demo data shown only in demo mode.",
   stale: "Previously valid reading that is too old to treat as current.",
-  invalid:
-    "Missing, malformed, unknown, or suspicious telemetry. Do not treat as healthy.",
+  invalid: "Missing, malformed, unknown, or suspicious telemetry. Do not treat as healthy.",
 };

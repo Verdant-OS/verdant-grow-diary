@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -139,6 +139,24 @@ describe("public One-Tent tour", () => {
     expect(screen.getByTestId("public-one-tent-tour-pricing-cta")).toHaveAttribute(
       "href",
       "/pricing?utm_source=grower_invite&utm_medium=referral&utm_campaign=grower_invite",
+    );
+  });
+
+  it("preserves a validated protected return target after the product tour", () => {
+    const returnTo = "/plants/plant-123?tentId=tent-1#plant-ai-doctor-review";
+    render(
+      <MemoryRouter>
+        <PublicOneTentTour
+          hasAccount={false}
+          acquisitionSource="landing_page"
+          redirectTo={returnTo}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByTestId("public-one-tent-tour-signup-cta")).toHaveAttribute(
+      "href",
+      `/auth?mode=signup&redirectTo=${encodeURIComponent(returnTo)}&utm_source=landing_page&utm_medium=owned&utm_campaign=paid_launch`,
     );
   });
 

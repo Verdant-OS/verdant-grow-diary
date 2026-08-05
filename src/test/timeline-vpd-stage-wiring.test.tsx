@@ -18,8 +18,10 @@ describe("Timeline — stage-aware VPD wiring (static)", () => {
     expect(SRC).toMatch(/from\s+["']@\/lib\/vpdStageTargetRules["']/);
   });
 
-  it("passes the diary entry's stage and a stale flag to the classifier", () => {
-    expect(SRC).toMatch(/classifyVpdAgainstStage\(\s*\{[\s\S]{0,300}stage:\s*e\.stage/);
+  it("passes the validated effective diary stage and a stale flag to the classifier", () => {
+    expect(SRC).toMatch(
+      /classifyVpdAgainstStage\(\s*\{[\s\S]{0,300}stage:\s*resolveTimelineDiaryEntryStage\(e\)/,
+    );
     expect(SRC).toMatch(/stale:\s*snapStale/);
   });
 

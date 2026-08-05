@@ -54,17 +54,16 @@ export type FounderAllocationResult =
  * on paddle_transaction_id).
  */
 export type CreditPackAllocationResult =
-  | { ok: true; reason: "granted" | "idempotent" }
-  | { ok: false; reason: "invalid_input" | string };
+  { ok: true; reason: "granted" | "idempotent" } | { ok: false; reason: "invalid_input" | string };
+
+import type { EventLike } from "./eventProcessor.ts";
 
 export interface ExistingEventRow {
   processing_status: ProcessingStatus;
 }
 
-export interface EventLikeWithId {
+export interface EventLikeWithId extends EventLike {
   eventId?: string;
-  eventType?: string;
-  data?: unknown;
 }
 
 export interface MarkPatch {
@@ -389,8 +388,37 @@ export async function handleVerifiedEvent(
       }
       writeRes = { ok: true };
     } else {
-      // Dep not wired (pure subscription-path unit tests) → no-op success.
-      writeRes = { ok: true };
+      // Dep NOT wired. Previously this returned a silent no-op success, which
+      // marked a paid credit-pack purchase "processed" with no grant written
+      // and no error raised — charged, nothing recorded, invisible. In
+      // production that can only happen via a deps-wiring regression, and it
+      // would hit EVERY pack purchase while looking completely healthy.
+      //
+      // Codex (P1): my first fix marked this `skipped` — but `skipped` is a
+      // TERMINAL status in the duplicate-event branch above
+      // (`prior === "skipped"` short-circuits to `duplicate_skipped`, 200, no
+      // reprocessing). So once this fired, redeploying the fixed dependency
+      // could never recover the purchase: neither a Paddle retry (we already
+      // said 200, so none comes) nor a manual replay of the same event
+      // (permanently short-circuited) would ever re-attempt the grant.
+      // Charged, nothing granted, no path back — a worse trap than the
+      // original silent success, because it looks properly handled.
+      //
+      // `failed` is NOT in that terminal set, so it falls through to
+      // "reprocess". Marking `failed` + 500 here — mirroring the RPC-failure
+      // branch just above — gives this BOTH normal Paddle retry semantics
+      // (grant_lovable_credit_pack is idempotent, so a retry is safe) AND
+      // future-replay recoverability through the existing reprocess path,
+      // rather than inventing a separate reconciliation mechanism for a
+      // failure mode the retry machinery already knows how to handle.
+      const err = "credit_pack_grant_unwired";
+      await deps.markEvent(paddleEventId, {
+        processing_status: "failed",
+        processed_ok: false,
+        skip_reason: null,
+        last_error: redactError(err),
+      });
+      return { httpStatus: 500, reason: `write_failed:${redactError(err)}` };
     }
   } else if (decision.kind === "upsert_subscription") {
     writeRes = await deps.upsertSubscription(decision.row);
@@ -425,16 +453,24 @@ export async function handleVerifiedEvent(
     return { httpStatus: 500, reason: `write_failed:${redactError(err)}` };
   }
 
-  // 4) Mark processed. A failed post-grant provider cancellation rides on
-  // last_error (processed_ok stays true — the grant itself succeeded) so
-  // the operator audit surface can reconcile the double-bill risk.
+  // 4) Mark processed. Provider cancellation is best-effort after a Founder
+  // grant, so that anomaly rides alongside success and reaches the durable
+  // audit row. Credit-pack settlement needs no entitlement annotation here:
+  // the authoritative spend function preserves already-purchased grant value
+  // across plan scopes.
+  const anomalyFlags: string[] = [];
+  const anomalyDetails: string[] = [];
+  if (providerCancelError) {
+    anomalyFlags.push("provider_cancel_failed");
+    anomalyDetails.push(`provider_cancel_failed:${providerCancelError}`);
+  }
+  const lastError = anomalyDetails.length > 0 ? redactError(anomalyDetails.join(";")) : null;
+
   const mark = await deps.markEvent(paddleEventId, {
     processing_status: "processed",
     processed_ok: true,
     skip_reason: null,
-    last_error: providerCancelError
-      ? redactError(`provider_cancel_failed:${providerCancelError}`)
-      : null,
+    last_error: lastError,
   });
   if ("error" in mark) {
     // Subscription upsert is idempotent (unique paddle_subscription_id), so
@@ -444,8 +480,9 @@ export async function handleVerifiedEvent(
 
   return {
     httpStatus: 200,
-    reason: providerCancelError
-      ? `processed:${decision.kind};provider_cancel_failed`
-      : `processed:${decision.kind}`,
+    reason:
+      anomalyFlags.length > 0
+        ? `processed:${decision.kind};${anomalyFlags.join(";")}`
+        : `processed:${decision.kind}`,
   };
 }

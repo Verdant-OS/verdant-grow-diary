@@ -69,6 +69,38 @@ describe("SensorBridgeHealthCard", () => {
     );
   });
 
+  // Regression #584: a fresh raw vendor-string row (transport evidence only)
+  // used to skip every downgrade and keep the healthy claim. Only a verified
+  // `live` source may do that.
+  it("downgrades a fresh unverified vendor-string row instead of keeping the healthy claim", () => {
+    const rows: SensorBridgeAuditRowLike[] = [
+      {
+        source: "pi_bridge",
+        rows_received: 2,
+        rows_inserted: 2,
+        created_at: minutesAgo(10),
+      },
+    ];
+    const vm = buildSensorBridgeHealthViewModel({ rows, now: NOW });
+    renderCard(vm, {
+      status: "success",
+      rows: [
+        {
+          source: "ecowitt",
+          captured_at: minutesAgo(1),
+          raw_payload: { vendor: "ecowitt" },
+        },
+      ],
+    });
+    expect(screen.getByTestId("sensor-bridge-health-state")).toHaveAttribute(
+      "data-state",
+      "needs_review",
+    );
+    expect(screen.getByTestId("sensor-bridge-health-message")).toHaveTextContent(
+      /arriving from an unverified source/i,
+    );
+  });
+
   it("renders safe reason code only for rejected/partial state", () => {
     const rows: SensorBridgeAuditRowLike[] = [
       {

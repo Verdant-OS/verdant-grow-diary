@@ -10,8 +10,7 @@ import {
 } from "../lib/aiDoctorContextCompiler";
 
 const NOW = new Date("2026-06-04T12:00:00Z");
-const iso = (offsetMs: number) =>
-  new Date(NOW.getTime() - offsetMs).toISOString();
+const iso = (offsetMs: number) => new Date(NOW.getTime() - offsetMs).toISOString();
 
 const basePlant = {
   id: "p1",
@@ -75,14 +74,7 @@ describe("compilePlantContextFromRows — source separation", () => {
       ],
       now: NOW,
     });
-    expect(ctx.source_tags).toEqual([
-      "live",
-      "manual",
-      "csv",
-      "demo",
-      "stale",
-      "invalid",
-    ]);
+    expect(ctx.source_tags).toEqual(["live", "manual", "csv", "demo", "stale", "invalid"]);
     const live = ctx.sensor_groups.find((g) => g.source === "live")!;
     const csv = ctx.sensor_groups.find((g) => g.source === "csv")!;
     const demo = ctx.sensor_groups.find((g) => g.source === "demo")!;
@@ -188,9 +180,7 @@ describe("compilePlantContextFromRows — windows + determinism", () => {
       ],
       now: NOW,
     });
-    expect(ctx.recent_grow_events.map((e) => e.event_type)).toEqual([
-      "watering",
-    ]);
+    expect(ctx.recent_grow_events.map((e) => e.event_type)).toEqual(["watering"]);
   });
 
   it("computes 7-day averages deterministically regardless of row order", () => {
@@ -455,4 +445,3 @@ describe("compilePlantContextFromRows — source variant table (untrusted/never-
     },
   );
 });
-

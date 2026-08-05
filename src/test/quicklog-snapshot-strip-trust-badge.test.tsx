@@ -15,9 +15,7 @@ import {
   type SensorSnapshot as StrictSensorSnapshot,
   type SensorSnapshotStatus,
 } from "@/lib/latestSensorSnapshotRules";
-import {
-  buildQuickLogStripFromTentState,
-} from "@/lib/quickLogSnapshotStripAdapter";
+import { buildQuickLogStripFromTentState } from "@/lib/quickLogSnapshotStripAdapter";
 import type { LatestTentSensorSnapshotState } from "@/lib/sensor";
 
 const NOW = new Date("2026-06-02T12:00:00Z");
@@ -41,7 +39,13 @@ function snap(partial: Partial<StrictSensorSnapshot> = {}): StrictSensorSnapshot
     freshness: "fresh",
     status: "fresh_live" as SensorSnapshotStatus,
     badge_label: "Live • ecowitt",
-    metrics: { temp_f: 75.74, humidity_pct: 55, vpd_kpa: 1.12, soil_moisture_pct: null, co2_ppm: null },
+    metrics: {
+      temp_f: 75.74,
+      humidity_pct: 55,
+      vpd_kpa: 1.12,
+      soil_moisture_pct: null,
+      co2_ppm: null,
+    },
     metricDetails: { ...EMPTY_SENSOR_SNAPSHOT.metricDetails },
     warnings: [],
     usable: true,
@@ -72,7 +76,9 @@ describe("QuickLogSensorSnapshotStrip — trust badge rendering", () => {
   });
 
   it("stale Ecowitt → trust badge Stale, not attachable", () => {
-    mockHook.mockReturnValue(ready(snap({ source: "ecowitt", status: "stale", freshness: "stale" })));
+    mockHook.mockReturnValue(
+      ready(snap({ source: "ecowitt", status: "stale", freshness: "stale" })),
+    );
     render(<QuickLogSensorSnapshotStrip tentId="t1" />);
     const badge = screen.getByTestId("snapshot-trust-badge");
     expect(badge).toHaveAttribute("data-badge", "stale");
@@ -80,7 +86,9 @@ describe("QuickLogSensorSnapshotStrip — trust badge rendering", () => {
   });
 
   it("invalid Ecowitt → trust badge Invalid, not attachable", () => {
-    mockHook.mockReturnValue(ready(snap({ source: "ecowitt", status: "invalid", freshness: "invalid" })));
+    mockHook.mockReturnValue(
+      ready(snap({ source: "ecowitt", status: "invalid", freshness: "invalid" })),
+    );
     render(<QuickLogSensorSnapshotStrip tentId="t1" />);
     const badge = screen.getByTestId("snapshot-trust-badge");
     expect(badge).toHaveAttribute("data-badge", "invalid");
@@ -115,6 +123,7 @@ describe("buildQuickLogStripFromTentState — trust badge gating (no Live for ve
       snapshot: snap({ source: "ecowitt_mqtt", status: "stale", freshness: "stale" }),
       hasTent: true,
       now: NOW,
+      temperatureUnit: "celsius",
     });
     expect(v.trustBadge.badge).not.toBe("live");
     expect(v.trustBadge.badge).toBe("stale");
@@ -127,6 +136,7 @@ describe("buildQuickLogStripFromTentState — trust badge gating (no Live for ve
       snapshot: snap({ source: "wat", status: "stale", freshness: "stale" }),
       hasTent: true,
       now: NOW,
+      temperatureUnit: "celsius",
     });
     expect(v.trustBadge.badge).not.toBe("live");
     expect(v.trustBadge.attachable).toBe(false);
@@ -138,6 +148,7 @@ describe("buildQuickLogStripFromTentState — trust badge gating (no Live for ve
       snapshot: { ...EMPTY_SENSOR_SNAPSHOT },
       hasTent: true,
       now: NOW,
+      temperatureUnit: "celsius",
     });
     expect(v.status).toBe("no_data");
     expect(v.trustBadge.badge).not.toBe("live");
@@ -150,6 +161,7 @@ describe("buildQuickLogStripFromTentState — trust badge gating (no Live for ve
       snapshot: snap({ source: "ecowitt", status: "fresh_live" }),
       hasTent: true,
       now: NOW,
+      temperatureUnit: "celsius",
     });
     expect(v.trustBadge.badge).toBe("live");
     expect(v.providerLabel).toBe("EcoWitt");

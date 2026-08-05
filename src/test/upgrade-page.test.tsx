@@ -8,7 +8,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, within, act } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 
 // --- Mocks (hoisted so vi.mock factories can reach them) --------------------
 const paddleMock = vi.hoisted(() => ({
@@ -268,6 +268,8 @@ describe("Upgrade page", () => {
     expect(allAnswers).toMatch(/runs your grow for you/);
     expect(allAnswers).toMatch(/grower-approved/);
     expect(allAnswers).toMatch(/paddle/);
+    expect(allAnswers).toMatch(/current plan and price/);
+    expect(allAnswers).not.toMatch(/provisional|placeholder|being finalized/);
     expect(allAnswers).toMatch(/founder/);
     expect(allAnswers).toMatch(/cancel|stop when your billing/);
   });

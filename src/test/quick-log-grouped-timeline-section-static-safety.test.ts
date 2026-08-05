@@ -15,12 +15,7 @@ function read(rel: string): string {
   return readFileSync(join(ROOT, rel), "utf8");
 }
 
-const FORBIDDEN_WORDS = [
-  /\blive\b/i,
-  /\bsynced\b/i,
-  /\bconnected\b/i,
-  /\bimported\b/i,
-];
+const FORBIDDEN_WORDS = [/\blive\b/i, /\bsynced\b/i, /\bconnected\b/i, /\bimported\b/i];
 const FORBIDDEN_WRITES_HOOK = [
   /\.insert\(/,
   /\.upsert\(/,
@@ -76,7 +71,9 @@ describe("QuickLogGroupedTimelineSection — static safety", () => {
   }
 
   it("hook: no writes / RPC / forbidden tables", () => {
-    const src = read(HOOK).replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+    const src = read(HOOK)
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
     for (const re of FORBIDDEN_WRITES_HOOK) {
       expect(src).not.toMatch(re);
     }

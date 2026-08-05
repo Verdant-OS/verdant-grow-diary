@@ -13,19 +13,20 @@
  * handed an authenticated-user adapter, so RLS remains part of the
  * safety boundary.
  *
- * DELETE ORDER (child before parent — audited against actual FKs in
- * supabase/migrations; grow_events / sensor_readings / plants.tent_id
- * are soft references that do NOT cascade, hence explicit stages):
+ * DELETE / VERIFY ORDER (child before parent — audited against actual
+ * FKs in supabase/migrations; grow_events / sensor_readings /
+ * plants.tent_id are soft references that do NOT cascade, hence
+ * explicit stages):
  *
  *   1. diary_entries follow-up markers (details.event_type=action_followup)
- *   2. action_queue rows            (cascades action_queue_events)
- *   3. alerts                       (cascades alert_events)
- *   4. grow_events quick logs
- *   5. sensor_readings              (see KNOWN LIMIT below)
- *   6. grow_targets
- *   7. plants
- *   8. tents
- *   9. the fixture grow itself
+ *   2. alerts                       (cascades alert_events)
+ *   3. grow_events quick logs
+ *   4. sensor_readings              (see KNOWN LIMIT below)
+ *   5. grow_targets
+ *   6. plants
+ *   7. tents
+ *   8. the fixture grow itself      (cascades action_queue + events)
+ *   9. verify action_queue rows are gone; report their discovered count
  *
  * KNOWN LIMIT (documented, honest): sensor_readings currently has NO
  * owner-scoped DELETE policy and no cascading FK, so an authenticated
@@ -62,7 +63,7 @@ export const ACTION_FOLLOWUP_EVENT_TYPE = "action_followup";
 
 export const ONE_TENT_TEARDOWN_JSON_PREFIX = "ONE_TENT_TEARDOWN_JSON=";
 
-/** Ordered stage descriptors. Order IS the contract (child → parent). */
+/** Stable report descriptors. Execution order is defined in executeTeardown. */
 export const TEARDOWN_STAGES = [
   { key: "follow_ups", countKey: "follow_ups_deleted", table: "diary_entries" },
   { key: "action_queue", countKey: "action_queue_deleted", table: "action_queue" },
@@ -181,7 +182,6 @@ export function renderTeardownReceipt(receipt) {
  *     countSensorRows(tentIds) -> number
  *     countGrowTargets(growId) -> number
  *     deleteFollowUps(growId) -> number      (rows actually deleted)
- *     deleteActionQueue(growId) -> number
  *     deleteAlerts(growId) -> number
  *     deleteQuickLogs(growId) -> number
  *     deleteSensorRows(tentIds) -> number
@@ -282,7 +282,6 @@ export async function executeTeardown(ops, discovery, { dryRun }) {
 
   const stages = [
     ["follow_ups", () => ops.deleteFollowUps(growId), () => ops.countFollowUps(growId)],
-    ["action_queue", () => ops.deleteActionQueue(growId), () => ops.countActionQueue(growId)],
     ["alerts", () => ops.deleteAlerts(growId), () => ops.countAlerts(growId)],
     ["quick_logs", () => ops.deleteQuickLogs(growId), () => ops.countQuickLogs(growId)],
     [
@@ -327,6 +326,29 @@ export async function executeTeardown(ops, discovery, { dryRun }) {
       return { status: "failed", reason, counts: withTotal(counts) };
     }
   }
+
+  // Authenticated clients cannot delete Action Queue rows directly because
+  // their audit history is immutable. The fixture grow owns these rows with
+  // ON DELETE CASCADE, so verify the database removed them only after the
+  // exact-marker grow was deleted.
+  let remainingActions;
+  try {
+    remainingActions = await ops.countActionQueue(growId);
+  } catch {
+    return {
+      status: "failed",
+      reason: "action_queue_cascade_verify_failed",
+      counts: withTotal(counts),
+    };
+  }
+  if (remainingActions > 0) {
+    return {
+      status: "failed",
+      reason: "action_queue_rows_survived_grow_delete",
+      counts: withTotal(counts),
+    };
+  }
+  counts.action_queue_deleted = discovery.counts.action_queue;
 
   return { status: "completed", reason: null, counts: withTotal(counts) };
 }

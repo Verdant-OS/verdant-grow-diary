@@ -12,6 +12,7 @@ import { describe, it, expect } from "vitest";
 import {
   listEligibleHandoffPlants,
   mapDraftToQuickLogPrefill,
+  matchesReviewedPublicStarterDraftRevision,
   matchHandoffPlant,
   normalizeHandoffNickname,
   resolvePublicQuickLogHandoffDraft,
@@ -26,9 +27,7 @@ import {
 
 const NOW = new Date("2026-07-15T12:00:00.000Z");
 
-function draft(
-  overrides: Partial<PublicQuickLogStarterDraft> = {},
-): PublicQuickLogStarterDraft {
+function draft(overrides: Partial<PublicQuickLogStarterDraft> = {}): PublicQuickLogStarterDraft {
   return {
     v: 1,
     id: "draft-1",
@@ -62,9 +61,7 @@ describe("resolvePublicQuickLogHandoffDraft — fail-closed gate", () => {
         NOW.getTime() - PUBLIC_QUICK_LOG_STARTER_HANDOFF_FRESHNESS_MS,
       ).toISOString(),
     });
-    expect(resolvePublicQuickLogHandoffDraft({ draft: atCap, now: NOW }).status).toBe(
-      "ready",
-    );
+    expect(resolvePublicQuickLogHandoffDraft({ draft: atCap, now: NOW }).status).toBe("ready");
     const past = draft({
       updatedAt: new Date(
         NOW.getTime() - PUBLIC_QUICK_LOG_STARTER_HANDOFF_FRESHNESS_MS - 1,
@@ -79,18 +76,14 @@ describe("resolvePublicQuickLogHandoffDraft — fail-closed gate", () => {
     const future = draft({
       updatedAt: new Date(NOW.getTime() + 60_000).toISOString(),
     });
-    expect(
-      resolvePublicQuickLogHandoffDraft({ draft: future, now: NOW }).status,
-    ).toBe("stale");
+    expect(resolvePublicQuickLogHandoffDraft({ draft: future, now: NOW }).status).toBe("stale");
   });
 
   it("malformed storage payloads fail closed at the parser → missing here", () => {
     for (const raw of ["not json", "{}", '{"v":1}', '"just a string"', ""]) {
       const parsed = parsePublicQuickLogStarterDraft(raw);
       expect(parsed, `parser must reject: ${raw}`).toBeNull();
-      expect(
-        resolvePublicQuickLogHandoffDraft({ draft: parsed, now: NOW }).status,
-      ).toBe("missing");
+      expect(resolvePublicQuickLogHandoffDraft({ draft: parsed, now: NOW }).status).toBe("missing");
     }
   });
 
@@ -101,9 +94,7 @@ describe("resolvePublicQuickLogHandoffDraft — fail-closed gate", () => {
     });
     const parsed = parsePublicQuickLogStarterDraft(v2);
     expect(parsed).toBeNull();
-    expect(
-      resolvePublicQuickLogHandoffDraft({ draft: parsed, now: NOW }).status,
-    ).toBe("missing");
+    expect(resolvePublicQuickLogHandoffDraft({ draft: parsed, now: NOW }).status).toBe("missing");
   });
 });
 
@@ -142,9 +133,7 @@ describe("listEligibleHandoffPlants", () => {
       [{ id: "p9", name: "Camel", tentId: "t1", growId: "g1", isArchived: false }],
       [],
     );
-    expect(eligible).toEqual([
-      { id: "p9", name: "Camel", tentId: "t1", growId: "g1" },
-    ]);
+    expect(eligible).toEqual([{ id: "p9", name: "Camel", tentId: "t1", growId: "g1" }]);
   });
 
   it("falls back to the owning tent's grow when the plant row has no grow id", () => {
@@ -250,10 +239,7 @@ describe("matchHandoffPlant", () => {
 });
 
 describe("mapDraftToQuickLogPrefill — supported fields only, nothing invented", () => {
-  const uniqueMatch = matchHandoffPlant(
-    "Blue Dream #1",
-    listEligibleHandoffPlants([plant()], []),
-  );
+  const uniqueMatch = matchHandoffPlant("Blue Dream #1", listEligibleHandoffPlants([plant()], []));
 
   it("maps the supported fields 1:1 with plant identity from the MATCH", () => {
     const prefill = mapDraftToQuickLogPrefill({ draft: draft(), match: uniqueMatch });
@@ -263,6 +249,7 @@ describe("mapDraftToQuickLogPrefill — supported fields only, nothing invented"
       growId: "g1",
       tentId: "t1",
       eventType: "observation",
+      activityId: null,
       note: "First true leaves look healthy.",
       wateringVolumeMl: null,
       suggestSnapshot: false,
@@ -279,6 +266,7 @@ describe("mapDraftToQuickLogPrefill — supported fields only, nothing invented"
       match: uniqueMatch,
     });
     expect(prefill.eventType).toBe("watering");
+    expect(prefill.activityId).toBeNull();
     expect(prefill.wateringVolumeMl).toBe(500);
     expect(prefill.note).toBeNull();
   });
@@ -291,9 +279,10 @@ describe("mapDraftToQuickLogPrefill — supported fields only, nothing invented"
     // Stage is deliberately unmapped: an anonymous draft never mutates an
     // existing plant's stage; the form derives stage from the plant itself.
     expect("stage" in prefill).toBe(false);
-    // Feeding passes through truthfully — the existing form owns the
-    // "Coming soon" honesty; we never silently re-type the entry.
+    // Feeding passes through truthfully and selects the canonical editor.
+    // Selection is still review-only; this pure mapper performs no write.
     expect(prefill.eventType).toBe("feeding");
+    expect(prefill.activityId).toBe("feeding");
     // A volume must never appear on a non-watering draft.
     expect(prefill.wateringVolumeMl).toBeNull();
     // Attribution/UTM payloads never enter the prefill.
@@ -304,10 +293,7 @@ describe("mapDraftToQuickLogPrefill — supported fields only, nothing invented"
   it("ambiguous/none matches emit NO plant identity (grower chooses in the form)", () => {
     const ambiguous = matchHandoffPlant(
       "Blue Dream #1",
-      listEligibleHandoffPlants(
-        [plant(), plant({ id: "p2", name: "Blue Dream #1" })],
-        [],
-      ),
+      listEligibleHandoffPlants([plant(), plant({ id: "p2", name: "Blue Dream #1" })], []),
     );
     const prefill = mapDraftToQuickLogPrefill({ draft: draft(), match: ambiguous });
     expect(prefill.plantId).toBeNull();
@@ -325,13 +311,13 @@ describe("mapDraftToQuickLogPrefill — supported fields only, nothing invented"
 
   it("suggestion-less matches always carry suppressPlantDefault; suggestions never do", () => {
     const none = matchHandoffPlant("Anything", []);
-    expect(
-      mapDraftToQuickLogPrefill({ draft: draft(), match: none }).suppressPlantDefault,
-    ).toBe(true);
+    expect(mapDraftToQuickLogPrefill({ draft: draft(), match: none }).suppressPlantDefault).toBe(
+      true,
+    );
     const only = matchHandoffPlant("No Match", listEligibleHandoffPlants([plant()], []));
-    expect(
-      mapDraftToQuickLogPrefill({ draft: draft(), match: only }).suppressPlantDefault,
-    ).toBe(false);
+    expect(mapDraftToQuickLogPrefill({ draft: draft(), match: only }).suppressPlantDefault).toBe(
+      false,
+    );
   });
 
   it("never emits URLs or query strings (grower content stays in memory)", () => {
@@ -348,5 +334,49 @@ describe("mapDraftToQuickLogPrefill — supported fields only, nothing invented"
   it("suggestSnapshot is always false — the handoff never pushes sensor capture", () => {
     const prefill = mapDraftToQuickLogPrefill({ draft: draft(), match: uniqueMatch });
     expect(prefill.suggestSnapshot).toBe(false);
+  });
+});
+
+describe("matchesReviewedPublicStarterDraftRevision", () => {
+  it("matches only the exact reviewed id and updatedAt revision", () => {
+    const storedDraft = draft();
+    expect(
+      matchesReviewedPublicStarterDraftRevision({
+        storedDraft,
+        reviewedDraftId: storedDraft.id,
+        reviewedUpdatedAt: storedDraft.updatedAt,
+      }),
+    ).toBe(true);
+    expect(
+      matchesReviewedPublicStarterDraftRevision({
+        storedDraft,
+        reviewedDraftId: storedDraft.id,
+        reviewedUpdatedAt: "2026-07-15T11:00:00.000Z",
+      }),
+    ).toBe(false);
+    expect(
+      matchesReviewedPublicStarterDraftRevision({
+        storedDraft,
+        reviewedDraftId: "another-draft",
+        reviewedUpdatedAt: storedDraft.updatedAt,
+      }),
+    ).toBe(false);
+  });
+
+  it("fails closed for missing drafts or revision markers", () => {
+    expect(
+      matchesReviewedPublicStarterDraftRevision({
+        storedDraft: null,
+        reviewedDraftId: "draft-1",
+        reviewedUpdatedAt: "2026-07-15T10:00:00.000Z",
+      }),
+    ).toBe(false);
+    expect(
+      matchesReviewedPublicStarterDraftRevision({
+        storedDraft: draft(),
+        reviewedDraftId: null,
+        reviewedUpdatedAt: null,
+      }),
+    ).toBe(false);
   });
 });

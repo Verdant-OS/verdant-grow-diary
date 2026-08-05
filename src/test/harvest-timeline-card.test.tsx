@@ -11,21 +11,14 @@ describe("HarvestTimelineCard", () => {
   it("renders label, timestamp, and headline", () => {
     render(
       <ul>
-        <HarvestTimelineCard
-          entryId="e1"
-          timestampLabel="2 hours ago"
-        />
+        <HarvestTimelineCard entryId="e1" timestampLabel="2 hours ago" />
       </ul>,
     );
-    expect(
-      screen.getByTestId("harvest-timeline-card-label"),
-    ).toHaveTextContent(/Harvest/i);
-    expect(
-      screen.getByTestId("harvest-timeline-card-headline"),
-    ).toHaveTextContent(/Harvest logged/i);
-    expect(
-      screen.getByTestId("harvest-timeline-card-timestamp"),
-    ).toHaveTextContent("2 hours ago");
+    expect(screen.getByTestId("harvest-timeline-card-label")).toHaveTextContent(/Harvest/i);
+    expect(screen.getByTestId("harvest-timeline-card-headline")).toHaveTextContent(
+      /Harvest logged/i,
+    );
+    expect(screen.getByTestId("harvest-timeline-card-timestamp")).toHaveTextContent("2 hours ago");
   });
 
   it("shows wet + dry weight with unit when present", () => {
@@ -38,12 +31,8 @@ describe("HarvestTimelineCard", () => {
         />
       </ul>,
     );
-    expect(
-      screen.getByTestId("harvest-timeline-card-wet-weight"),
-    ).toHaveTextContent("120 g");
-    expect(
-      screen.getByTestId("harvest-timeline-card-dry-weight"),
-    ).toHaveTextContent("22 g");
+    expect(screen.getByTestId("harvest-timeline-card-wet-weight")).toHaveTextContent("120 g");
+    expect(screen.getByTestId("harvest-timeline-card-dry-weight")).toHaveTextContent("22 g");
   });
 
   it("hides missing weight fields", () => {
@@ -56,12 +45,8 @@ describe("HarvestTimelineCard", () => {
         />
       </ul>,
     );
-    expect(
-      screen.getByTestId("harvest-timeline-card-wet-weight"),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByTestId("harvest-timeline-card-dry-weight"),
-    ).toBeNull();
+    expect(screen.getByTestId("harvest-timeline-card-wet-weight")).toBeInTheDocument();
+    expect(screen.queryByTestId("harvest-timeline-card-dry-weight")).toBeNull();
   });
 
   it("shows note when present, hides when empty", () => {
@@ -74,9 +59,7 @@ describe("HarvestTimelineCard", () => {
         />
       </ul>,
     );
-    expect(
-      screen.getByTestId("harvest-timeline-card-note"),
-    ).toHaveTextContent(/Removed main cola/);
+    expect(screen.getByTestId("harvest-timeline-card-note")).toHaveTextContent(/Removed main cola/);
 
     rerender(
       <ul>
@@ -89,10 +72,7 @@ describe("HarvestTimelineCard", () => {
   it("does not surface entryId as visible text", () => {
     render(
       <ul>
-        <HarvestTimelineCard
-          entryId="priv-uuid-should-not-render"
-          timestampLabel="t"
-        />
+        <HarvestTimelineCard entryId="priv-uuid-should-not-render" timestampLabel="t" />
       </ul>,
     );
     const card = screen.getByTestId("harvest-timeline-card");

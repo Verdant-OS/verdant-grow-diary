@@ -3,7 +3,7 @@
  * keeper, clone, or cross. Reads the subject from the route, resolves the trace
  * server-side, and renders it as a semantic, keyboard-operable tree.
  */
-import { useParams } from "react-router-dom";
+import { useParams } from "@/lib/react-router-compat";
 import { GitBranch, Loader2 } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -33,11 +33,7 @@ export default function TraceabilityView() {
         icon={<GitBranch className="h-5 w-5" />}
       />
 
-      <div
-        className="flex flex-wrap items-center gap-2"
-        role="group"
-        aria-label="Trace direction"
-      >
+      <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Trace direction">
         {DIRECTIONS.map((d) => (
           <Button
             key={d.value}

@@ -202,7 +202,7 @@ describe("contextualPhenoComparisonStaticSafety — changed-file filter", () => 
   it("ignores unrelated files", () => {
     const out = filterChangedContextualPhenoFiles([
       "README.md",
-      "src/pages/Tasks.tsx",
+      "src/pages/Settings.tsx",
       "src/hooks/use-plants.ts",
     ]);
     expect(out).toEqual([]);

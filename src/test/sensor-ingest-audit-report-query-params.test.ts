@@ -19,30 +19,22 @@ describe("parseAuditUrlState", () => {
   });
 
   it("falls back to default for an invalid last-N", () => {
-    const out = parseAuditUrlState(
-      new URLSearchParams({ audit_n: "999" }),
-    );
+    const out = parseAuditUrlState(new URLSearchParams({ audit_n: "999" }));
     expect(out.pageSize).toBe(25);
   });
 
   it("falls back to 'all' for unsafe provider strings", () => {
-    const out = parseAuditUrlState(
-      new URLSearchParams({ audit_provider: "Bearer abc1234567" }),
-    );
+    const out = parseAuditUrlState(new URLSearchParams({ audit_provider: "Bearer abc1234567" }));
     expect(out.provider).toBe("all");
   });
 
   it("drops unsafe device queries", () => {
-    const out = parseAuditUrlState(
-      new URLSearchParams({ audit_q: "AA:BB:CC:DD:EE:FF" }),
-    );
+    const out = parseAuditUrlState(new URLSearchParams({ audit_q: "AA:BB:CC:DD:EE:FF" }));
     expect(out.deviceQuery).toBe("");
   });
 
   it("drops invalid dates", () => {
-    const out = parseAuditUrlState(
-      new URLSearchParams({ audit_from: "not-a-date", audit_to: "" }),
-    );
+    const out = parseAuditUrlState(new URLSearchParams({ audit_from: "not-a-date", audit_to: "" }));
     expect(out.fromDateInput).toBe("");
     expect(out.toDateInput).toBe("");
   });

@@ -13,12 +13,7 @@
  */
 
 export type QuickLogDraftSource =
-  | "hyperlog"
-  | "plant-detail"
-  | "fast-add"
-  | string
-  | null
-  | undefined;
+  "hyperlog" | "plant-detail" | "fast-add" | string | null | undefined;
 
 export interface QuickLogDraftPreviewInput {
   /** Mirrors the optional QuickLogPrefill exposed by QuickLog.tsx. */
@@ -127,23 +122,20 @@ export function buildQuickLogDraftPreview(
     const sourceLabel = isHyperLog
       ? "From HyperLog draft (manual)"
       : prefill.source
-      ? `From ${prefill.source} draft`
-      : null;
+        ? `From ${prefill.source} draft`
+        : null;
 
     // Snapshot guidance — never call HyperLog data "live".
     let snapshotLabel: string | null = null;
     if (isHyperLog) {
       snapshotLabel = QUICK_LOG_DRAFT_DEMO_SNAPSHOT_COPY;
     } else if (prefill.suggestSnapshot && prefill.tentId) {
-      snapshotLabel =
-        "Sensor snapshot suggested — confirm in Quick Log before saving.";
+      snapshotLabel = "Sensor snapshot suggested — confirm in Quick Log before saving.";
     }
 
     const photoCount = Number(prefill.photoCount ?? 0);
     const photoLabel =
-      Number.isFinite(photoCount) && photoCount > 0
-        ? QUICK_LOG_DRAFT_PHOTO_BLOCKED_COPY
-        : null;
+      Number.isFinite(photoCount) && photoCount > 0 ? QUICK_LOG_DRAFT_PHOTO_BLOCKED_COPY : null;
 
     const show =
       Boolean(eventTypeLabel) ||

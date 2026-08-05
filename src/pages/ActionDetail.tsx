@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams } from "@/lib/react-router-compat";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
 import { useAuth } from "@/store/auth";
@@ -45,11 +45,18 @@ import {
   canReject,
   canComplete,
   canCancel,
-  buildTransitionPatch,
-  eventTypeFor,
+  buildActionQueueTransitionRpcArgs,
+  parseActionQueueTransitionRpcResult,
   nextStatusFor,
   normalizeNote,
 } from "@/lib/actionQueueTransitions";
+import { safeActionQueueFailureCopy } from "@/lib/actionQueueFailureCopy";
+import {
+  isMissingActionQueueTransitionRpcError,
+  ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY,
+} from "@/lib/actionQueueRpcAvailability";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertTriangle } from "lucide-react";
 import {
   actionsPath,
   aiDoctorSessionDetailPath,
@@ -84,8 +91,6 @@ import {
   buildMissingEvidenceReviewLink,
   ACTION_EVIDENCE_REVIEW_LINK_ARIA_LABEL,
 } from "@/lib/actionQueueMissingEvidenceLink";
-
-
 
 import { emitBreedingAuditEvent, isBreedingFollowUpAction } from "@/lib/genetics/breedingAuditLog";
 
@@ -212,6 +217,8 @@ export default function ActionDetail() {
   const [notFound, setNotFound] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Persistent flag for a missing/renamed `action_queue_transition` RPC.
+  const [rpcUnavailable, setRpcUnavailable] = useState(false);
   const [dialog, setDialog] = useState<Kind | null>(null);
   const [noteDraft, setNoteDraft] = useState("");
   const [sourceAlertStatus, setSourceAlertStatus] = useState<string | null>(null);
@@ -399,7 +406,9 @@ export default function ActionDetail() {
       details: draft.details as unknown as Json,
     });
     if (error) {
-      toast.error("Failed to record outcome", { description: error.message });
+      toast.error("Failed to record outcome", {
+        description: safeActionQueueFailureCopy("outcome", error),
+      });
     } else {
       setExistingOutcome({ status: outcomeStatus });
       toast.success("Outcome recorded");
@@ -410,53 +419,64 @@ export default function ActionDetail() {
     setOutcomeNote("");
   }
 
-  // SECURITY: audit-only insert. No device commands. user_id omitted (DB default auth.uid()).
-  async function logEvent(
-    current: ActionRow,
-    event_type: EventType,
-    new_status: Status,
-    note?: string,
-  ): Promise<boolean> {
-    const { error } = await supabase.from("action_queue_events").insert({
-      action_queue_id: current.id,
-      grow_id: current.grow_id,
-      event_type,
-      previous_status: current.status,
-      new_status,
-      note: note ?? null,
-    });
-    if (error) {
-      toast.warning("Status updated, but audit log failed", { description: error.message });
-      return false;
-    }
-    return true;
-  }
-
   async function transition(
     current: ActionRow,
-    next: Partial<ActionRow>,
-    event_type: EventType,
-    new_status: Status,
+    kind: TransitionKind,
     note?: string,
   ): Promise<boolean> {
     setBusy(true);
-    const { error } = await supabase.from("action_queue").update(next).eq("id", current.id);
-    if (error) {
+    const rpcArgs = buildActionQueueTransitionRpcArgs({
+      actionQueueId: current.id,
+      transition: kind,
+      expectedStatus: current.status,
+      note,
+    });
+    const { data, error } = await (
+      supabase.rpc as unknown as (
+        fn: string,
+        args: unknown,
+      ) => Promise<{ data: unknown; error: unknown }>
+    )("action_queue_transition", rpcArgs);
+    const result = parseActionQueueTransitionRpcResult(data, rpcArgs);
+    if (error || !result || result.ok !== true) {
+      if (isMissingActionQueueTransitionRpcError(error)) {
+        setRpcUnavailable(true);
+        console.warn(
+          JSON.stringify({
+            event: "action_queue_transition_rpc_unavailable",
+            severity: "critical",
+            surface: "action_detail",
+            transition: kind,
+          }),
+        );
+        toast.error(ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY.title, {
+          id: "action-queue-transition-rpc-unavailable",
+          description: ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY.body,
+          duration: 10000,
+        });
+        setBusy(false);
+        return false;
+      }
+      const shouldReload =
+        result?.ok === false &&
+        (result.reason === "status_conflict" || result.reason === "action_not_found");
+      if (shouldReload) await load();
       setBusy(false);
-      toast.error(error.message);
+      toast.error(safeActionQueueFailureCopy("transition", error ?? result));
       return false;
     }
-    await logEvent(current, event_type, new_status, note);
+
     // Follow-up diary entry: ONLY when this transition completes the action.
     // Non-blocking — if it fails we keep the completed status + audit row.
-    if (new_status === "completed") {
+    if (result.new_status === "completed") {
       await maybeCreateFollowupDiaryEntry({
         ...current,
-        ...next,
         status: "completed",
+        completed_at: result.transitioned_at,
       });
     }
     setBusy(false);
+    if (rpcUnavailable) setRpcUnavailable(false);
     await load();
     return true;
   }
@@ -500,7 +520,7 @@ export default function ActionDetail() {
     });
     if (insErr) {
       toast.warning("Action completed, but follow-up note could not be created.", {
-        description: insErr.message,
+        description: safeActionQueueFailureCopy("followup", insErr),
       });
     }
   }
@@ -518,11 +538,10 @@ export default function ActionDetail() {
     setDialog(null);
     setNoteDraft("");
 
-    if (kind === "simulate") {
+    const success = await transition(row, kind, note);
+    if (success && kind === "simulate") {
       toast.message("Simulated (no device command sent)");
     }
-    const patch = buildTransitionPatch(kind);
-    const success = await transition(row, patch, eventTypeFor(kind), nextStatusFor(kind), note);
     if (success && isBreedingFollowUpAction(row.action_type)) {
       const now = new Date().toISOString();
       if (kind === "approve") {
@@ -564,7 +583,7 @@ export default function ActionDetail() {
         role="status"
         aria-live="polite"
         aria-busy="true"
-        className="flex flex-col items-center justify-center gap-3 py-20 text-muted-foreground"
+        className="mx-auto flex min-h-56 max-w-2xl flex-col items-center justify-center gap-3 rounded-3xl border border-border/60 bg-card/70 px-6 py-16 text-center text-muted-foreground shadow-card backdrop-blur-xl"
       >
         <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
         <p className="text-sm">Loading action…</p>
@@ -574,11 +593,21 @@ export default function ActionDetail() {
 
   if (loadError) {
     return (
-      <div className="max-w-xl mx-auto">
+      <div className="mx-auto max-w-2xl">
         <BackLink />
-        <div role="alert" aria-live="assertive" className="glass rounded-2xl p-6 text-center">
-          <h1 className="text-lg font-semibold mb-2">We couldn't load this action</h1>
-          <p className="text-sm text-muted-foreground mb-4">{loadError}</p>
+        <div
+          role="alert"
+          aria-live="assertive"
+          className="relative overflow-hidden rounded-3xl border border-border/60 bg-card/70 p-8 text-center shadow-card backdrop-blur-xl"
+        >
+          <div aria-hidden="true" className="absolute inset-x-0 top-0 h-1 bg-destructive/70" />
+          <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-2xl border border-destructive/20 bg-destructive/10 text-destructive">
+            <Ban className="size-5" aria-hidden="true" />
+          </div>
+          <h1 className="mb-2 font-display text-xl font-bold tracking-tight">
+            We couldn't load this action
+          </h1>
+          <p className="mx-auto mb-5 max-w-md text-sm text-muted-foreground">{loadError}</p>
           <Button
             onClick={() => load()}
             className="focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
@@ -592,11 +621,15 @@ export default function ActionDetail() {
 
   if (notFound || !row) {
     return (
-      <div className="max-w-xl mx-auto">
+      <div className="mx-auto max-w-2xl">
         <BackLink />
-        <div className="glass rounded-2xl p-6 text-center">
-          <h1 className="text-lg font-semibold mb-2">Action not found</h1>
-          <p className="text-sm text-muted-foreground">
+        <div className="relative overflow-hidden rounded-3xl border border-border/60 bg-card/70 p-8 text-center shadow-card backdrop-blur-xl">
+          <div aria-hidden="true" className="absolute inset-x-0 top-0 h-1 bg-primary/70" />
+          <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary">
+            <CircleCheckBig className="size-5" aria-hidden="true" />
+          </div>
+          <h1 className="mb-2 font-display text-xl font-bold tracking-tight">Action not found</h1>
+          <p className="mx-auto max-w-md text-sm text-muted-foreground">
             This action may have been removed, or you do not have access to it.
           </p>
         </div>
@@ -606,7 +639,7 @@ export default function ActionDetail() {
 
   const growName = grows.find((g) => g.id === row.grow_id)?.name ?? null;
   return (
-    <div className="max-w-3xl mx-auto">
+    <div className="mx-auto max-w-5xl">
       <GrowBreadcrumbs
         growId={row.grow_id}
         growName={growName}
@@ -616,7 +649,26 @@ export default function ActionDetail() {
       />
       <BackLink />
 
-      <header className="glass rounded-2xl p-4 mb-4">
+      {rpcUnavailable && (
+        <Alert
+          variant="destructive"
+          className="mb-4"
+          role="alert"
+          data-testid="action-detail-transition-rpc-unavailable-banner"
+        >
+          <AlertTriangle className="h-4 w-4" aria-hidden="true" />
+          <AlertTitle>{ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY.title}</AlertTitle>
+          <AlertDescription className="mt-1">
+            {ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY.body}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      <header className="relative mb-6 overflow-hidden rounded-3xl border border-border/60 bg-card/70 p-5 shadow-card backdrop-blur-xl">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-y-0 left-0 w-1 bg-primary/80"
+        />
         <div className="flex items-center gap-2 flex-wrap mb-2">
           <Badge
             variant="outline"
@@ -633,8 +685,12 @@ export default function ActionDetail() {
             {getActionQueueSourceLabel(row)}
           </Badge>
         </div>
-        <h1 className="text-xl font-display font-bold">{sanitizeActionCopy(row.suggested_change)}</h1>
-        <p className="text-sm text-muted-foreground mt-1">{sanitizeActionCopy(stripBackPointerTokens(row.reason))}</p>
+        <h1 className="font-display text-2xl font-bold tracking-tight md:text-3xl">
+          {sanitizeActionCopy(row.suggested_change)}
+        </h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          {sanitizeActionCopy(stripBackPointerTokens(row.reason))}
+        </p>
         {isAiDoctorDerived(row) &&
           (() => {
             const headerSessionId = extractSourceAiDoctorSessionId(row.reason);
@@ -744,7 +800,11 @@ export default function ActionDetail() {
                   </div>
                 )}
                 {(() => {
-                  const ev = buildActionEvidenceViewModel({ source: row.source, action_type: row.action_type, captured_at: row.created_at });
+                  const ev = buildActionEvidenceViewModel({
+                    source: row.source,
+                    action_type: row.action_type,
+                    captured_at: row.created_at,
+                  });
                   return (
                     <>
                       <p
@@ -754,47 +814,51 @@ export default function ActionDetail() {
                         {ev.evidenceQualityLabel}
                       </p>
                       {!ev.hasSnapshotQuality && (
-                        <div className="flex flex-col gap-2" data-testid="action-detail-missing-evidence-group">
+                        <div
+                          className="flex flex-col gap-2"
+                          data-testid="action-detail-missing-evidence-group"
+                        >
                           <p
                             className="text-[11px] text-muted-foreground"
                             data-testid="action-detail-evidence-missing-help"
                           >
                             {ACTION_EVIDENCE_MISSING_PANEL_HELP}
                           </p>
-                          {!ev.hasSnapshotQuality && (() => {
-                            const link = buildMissingEvidenceReviewLink({
-                              grow_id: row.grow_id,
-                              tent_id: row.tent_id,
-                              plant_id: row.plant_id,
-                            });
-                            if (!link) return null;
-                            return (
-                              <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2">
-                                <Button asChild size="sm" variant="outline" className="w-full sm:w-auto min-h-[2.25rem] justify-center">
-                                  <Link
-                                    to={link.to}
-                                    data-testid={link.testId}
-                                    aria-label={ACTION_EVIDENCE_REVIEW_LINK_ARIA_LABEL}
+                          {!ev.hasSnapshotQuality &&
+                            (() => {
+                              const link = buildMissingEvidenceReviewLink({
+                                grow_id: row.grow_id,
+                                tent_id: row.tent_id,
+                                plant_id: row.plant_id,
+                              });
+                              if (!link) return null;
+                              return (
+                                <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2">
+                                  <Button
+                                    asChild
+                                    size="sm"
+                                    variant="outline"
+                                    className="min-h-11 min-w-0 w-full sm:w-auto justify-center whitespace-normal"
                                   >
-                                    {link.label}
-                                  </Link>
-                                </Button>
-                                <p className="text-[11px] text-muted-foreground">
-                                  {link.helper}
-                                </p>
-                              </div>
-                            );
-                          })()}
+                                    <Link
+                                      to={link.to}
+                                      data-testid={link.testId}
+                                      aria-label={ACTION_EVIDENCE_REVIEW_LINK_ARIA_LABEL}
+                                    >
+                                      {link.label}
+                                    </Link>
+                                  </Button>
+                                  <p className="text-[11px] text-muted-foreground">{link.helper}</p>
+                                </div>
+                              );
+                            })()}
                         </div>
                       )}
                     </>
                   );
                 })()}
 
-                <div
-                  className="mt-3"
-                  data-testid="action-detail-alert-evidence-linkage"
-                >
+                <div className="mt-3" data-testid="action-detail-alert-evidence-linkage">
                   <EvidenceLinkageBadges
                     events={adaptOriginatingTimelineEventsFromRow(row)}
                     surface="action-queue-suggestion"
@@ -836,7 +900,11 @@ export default function ActionDetail() {
                   </Button>
                 )}
                 {(() => {
-                  const ev = buildActionEvidenceViewModel({ source: row.source, action_type: row.action_type, captured_at: row.created_at });
+                  const ev = buildActionEvidenceViewModel({
+                    source: row.source,
+                    action_type: row.action_type,
+                    captured_at: row.created_at,
+                  });
                   return (
                     <>
                       <p
@@ -846,47 +914,51 @@ export default function ActionDetail() {
                         {ev.evidenceQualityLabel}
                       </p>
                       {!ev.hasSnapshotQuality && (
-                        <div className="flex flex-col gap-2" data-testid="action-detail-missing-evidence-group">
+                        <div
+                          className="flex flex-col gap-2"
+                          data-testid="action-detail-missing-evidence-group"
+                        >
                           <p
                             className="text-[11px] text-muted-foreground"
                             data-testid="action-detail-evidence-missing-help"
                           >
                             {ACTION_EVIDENCE_MISSING_PANEL_HELP}
                           </p>
-                          {!ev.hasSnapshotQuality && (() => {
-                            const link = buildMissingEvidenceReviewLink({
-                              grow_id: row.grow_id,
-                              tent_id: row.tent_id,
-                              plant_id: row.plant_id,
-                            });
-                            if (!link) return null;
-                            return (
-                              <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2">
-                                <Button asChild size="sm" variant="outline" className="w-full sm:w-auto min-h-[2.25rem] justify-center">
-                                  <Link
-                                    to={link.to}
-                                    data-testid={link.testId}
-                                    aria-label={ACTION_EVIDENCE_REVIEW_LINK_ARIA_LABEL}
+                          {!ev.hasSnapshotQuality &&
+                            (() => {
+                              const link = buildMissingEvidenceReviewLink({
+                                grow_id: row.grow_id,
+                                tent_id: row.tent_id,
+                                plant_id: row.plant_id,
+                              });
+                              if (!link) return null;
+                              return (
+                                <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2">
+                                  <Button
+                                    asChild
+                                    size="sm"
+                                    variant="outline"
+                                    className="min-h-11 min-w-0 w-full sm:w-auto justify-center whitespace-normal"
                                   >
-                                    {link.label}
-                                  </Link>
-                                </Button>
-                                <p className="text-[11px] text-muted-foreground">
-                                  {link.helper}
-                                </p>
-                              </div>
-                            );
-                          })()}
+                                    <Link
+                                      to={link.to}
+                                      data-testid={link.testId}
+                                      aria-label={ACTION_EVIDENCE_REVIEW_LINK_ARIA_LABEL}
+                                    >
+                                      {link.label}
+                                    </Link>
+                                  </Button>
+                                  <p className="text-[11px] text-muted-foreground">{link.helper}</p>
+                                </div>
+                              );
+                            })()}
                         </div>
                       )}
                     </>
                   );
                 })()}
 
-                <div
-                  className="mt-3"
-                  data-testid="action-detail-ai-doctor-evidence-linkage"
-                >
+                <div className="mt-3" data-testid="action-detail-ai-doctor-evidence-linkage">
                   <EvidenceLinkageBadges
                     events={adaptOriginatingTimelineEventsFromRow(row)}
                     surface="action-queue-suggestion"
@@ -901,13 +973,14 @@ export default function ActionDetail() {
           (() => {
             const disabledReason = busy ? "Saving — please wait" : null;
             return (
-              <div className="flex flex-wrap gap-2 mt-4">
+              <div className="mt-4 flex min-w-0 flex-wrap gap-2">
                 {canApprove(row.status) && (
                   <Button
                     size="sm"
                     disabled={busy}
                     onClick={() => openDialog("approve")}
-                    className="gradient-leaf text-primary-foreground"
+                    className="gradient-leaf min-h-11 min-w-0 whitespace-normal text-primary-foreground sm:min-h-9"
+                    data-testid="action-detail-approve"
                     aria-label={buildActionButtonAriaLabel("approve", row, { disabledReason })}
                     title={disabledReason ?? undefined}
                   >
@@ -920,6 +993,8 @@ export default function ActionDetail() {
                     variant="secondary"
                     disabled={busy}
                     onClick={() => openDialog("simulate")}
+                    className="min-h-11 min-w-0 whitespace-normal sm:min-h-9"
+                    data-testid="action-detail-simulate"
                     aria-label={buildActionButtonAriaLabel("simulate", row, { disabledReason })}
                     title={disabledReason ?? undefined}
                   >
@@ -932,6 +1007,8 @@ export default function ActionDetail() {
                     variant="secondary"
                     disabled={busy}
                     onClick={() => openDialog("complete")}
+                    className="min-h-11 min-w-0 whitespace-normal sm:min-h-9"
+                    data-testid="action-detail-complete"
                     aria-label={buildActionButtonAriaLabel("complete", row, { disabledReason })}
                     title={disabledReason ?? undefined}
                   >
@@ -944,6 +1021,8 @@ export default function ActionDetail() {
                     variant="ghost"
                     disabled={busy}
                     onClick={() => openDialog("reject")}
+                    className="min-h-11 min-w-0 whitespace-normal sm:min-h-9"
+                    data-testid="action-detail-reject"
                     aria-label={buildActionButtonAriaLabel("reject", row, { disabledReason })}
                     title={disabledReason ?? undefined}
                   >
@@ -956,6 +1035,8 @@ export default function ActionDetail() {
                     variant="ghost"
                     disabled={busy}
                     onClick={() => openDialog("cancel")}
+                    className="min-h-11 min-w-0 whitespace-normal sm:min-h-9"
+                    data-testid="action-detail-cancel"
                     aria-label={buildActionButtonAriaLabel("cancel", row, { disabledReason })}
                     title={disabledReason ?? undefined}
                   >
@@ -1036,8 +1117,6 @@ export default function ActionDetail() {
           }}
         />
       )}
-
-
 
       <section className="glass rounded-2xl p-4" aria-label="Audit history">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1">
@@ -1181,7 +1260,7 @@ function BackLink() {
   return (
     <Link
       to={actionsPath()}
-      className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-3 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-3 rounded focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
     >
       <ArrowLeft className="h-4 w-4" /> Back to Action Queue
     </Link>

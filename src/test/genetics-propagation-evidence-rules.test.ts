@@ -45,7 +45,13 @@ describe("screening evidence rules — honesty invariants", () => {
   it("excludes superseded rows from current posture", () => {
     const s = computeEvidence([
       { id: "a", target: "HLVd", result: "negative", collectedDate: "2026-07-10" },
-      { id: "b", target: "HLVd", result: "positive", collectedDate: "2026-07-12", supersedesId: "a" },
+      {
+        id: "b",
+        target: "HLVd",
+        result: "positive",
+        collectedDate: "2026-07-12",
+        supersedesId: "a",
+      },
     ]);
     // 'a' is superseded by 'b' (positive) → posture is positive, not negative.
     expect(s.state).toBe("positive");

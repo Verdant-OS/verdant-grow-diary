@@ -29,8 +29,12 @@ describe("CanonicalSourceLegend", () => {
 
   it("does not classify stale or invalid as healthy", () => {
     render(<CanonicalSourceLegend defaultOpen />);
-    const stale = (screen.getByTestId("canonical-source-legend-entry-stale").textContent ?? "").toLowerCase();
-    const invalid = (screen.getByTestId("canonical-source-legend-entry-invalid").textContent ?? "").toLowerCase();
+    const stale = (
+      screen.getByTestId("canonical-source-legend-entry-stale").textContent ?? ""
+    ).toLowerCase();
+    const invalid = (
+      screen.getByTestId("canonical-source-legend-entry-invalid").textContent ?? ""
+    ).toLowerCase();
     // Stale must say it is NOT current/healthy.
     expect(stale).toMatch(/(not.*current|old)/);
     expect(stale).not.toMatch(/is\s+healthy/);

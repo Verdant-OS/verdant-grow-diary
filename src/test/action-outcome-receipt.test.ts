@@ -3,7 +3,7 @@
  * + report view model + static architecture guards.
  */
 import { describe, it, expect } from "vitest";
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { join, resolve } from "node:path";
 import {
@@ -17,6 +17,16 @@ import { analyzeActionOutcomeFromRows } from "@/lib/actionOutcomeEvidenceCompile
 import type { ActionOutcomeAnalysisReceipt } from "@/lib/actionOutcomeAnalysisTypes";
 
 const ROOT = resolve(__dirname, "../..");
+
+function listTsxFiles(directory: string): string[] {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) {
+      return entry.name === "test" ? [] : listTsxFiles(path);
+    }
+    return entry.isFile() && entry.name.endsWith(".tsx") ? [path] : [];
+  });
+}
 
 function receipt(): ActionOutcomeAnalysisReceipt {
   const r = analyzeActionOutcomeFromRows({
@@ -264,11 +274,11 @@ describe("static architecture", () => {
   });
 
   it("no product code imports the outcome engine yet (report-only until integration)", () => {
-    const grep = execSync(
-      "grep -rl \"actionOutcomeAnalysisEngine\\|actionOutcomeEvidenceCompiler\" src --include='*.tsx' | grep -v '/test/' || true",
-      { cwd: ROOT, encoding: "utf8" },
-    );
-    expect(grep.trim()).toBe("");
+    const importingFiles = listTsxFiles(join(ROOT, "src")).filter((file) => {
+      const source = readFileSync(file, "utf8");
+      return /actionOutcomeAnalysisEngine|actionOutcomeEvidenceCompiler/.test(source);
+    });
+    expect(importingFiles).toEqual([]);
   });
 
   it("no scheduler / cron / background jobs introduced", () => {

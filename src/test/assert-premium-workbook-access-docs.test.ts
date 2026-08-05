@@ -58,7 +58,13 @@ describe("assert-premium-workbook-access-docs — happy paths", () => {
     );
     const tokens = FORBIDDEN_TOKEN_PATTERNS.map((p: { name: string }) => p.name);
     expect(tokens).toEqual(
-      expect.arrayContaining(["X-Amz-Signature", "access_token=", "token=", "signature=", "expires="]),
+      expect.arrayContaining([
+        "X-Amz-Signature",
+        "access_token=",
+        "token=",
+        "signature=",
+        "expires=",
+      ]),
     );
   });
 });
@@ -73,9 +79,7 @@ describe("assert-premium-workbook-access-docs — negative cases (must FAIL)", (
   it("fails on misspelled placeholder PREMIMUM_WORKBOOK_COPY_URL", () => {
     const text = `# Premium workbook spec\n\n{{PREMIMUM_WORKBOOK_COPY_URL}}\n`;
     const v = scanPremiumWorkbookDoc(text);
-    expect(
-      v.some((x: { rule: string }) => x.rule.includes("typo-placeholder")),
-    ).toBe(true);
+    expect(v.some((x: { rule: string }) => x.rule.includes("typo-placeholder"))).toBe(true);
   });
 
   it("fails on bare service_role mention in premium-workbook context", () => {
@@ -110,7 +114,9 @@ describe("assert-premium-workbook-access-docs — negative cases (must FAIL)", (
 
   it("fails on literal entitlement secret assignment", () => {
     const v = scanPremiumWorkbookDoc(wrap(`workbook_secret="abc123xyz"`));
-    expect(v.some((x: { rule: string }) => x.rule.includes("entitlement-secret-literal"))).toBe(true);
+    expect(v.some((x: { rule: string }) => x.rule.includes("entitlement-secret-literal"))).toBe(
+      true,
+    );
   });
 
   it("flags drive.google.com URLs", () => {

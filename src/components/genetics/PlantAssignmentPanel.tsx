@@ -86,7 +86,12 @@ export function PlantAssignmentPanel({ batchId }: PlantAssignmentPanelProps) {
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <Button type="button" className="min-h-11" onClick={handleAssign} disabled={chosen.length === 0 || status === "pending"}>
+        <Button
+          type="button"
+          className="min-h-11"
+          onClick={handleAssign}
+          disabled={chosen.length === 0 || status === "pending"}
+        >
           Assign {chosen.length} plant{chosen.length === 1 ? "" : "s"}
         </Button>
         <SaveStateBar status={status} error={error} onRetry={retry} />

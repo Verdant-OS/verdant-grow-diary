@@ -18,9 +18,8 @@ import {
   renderMarkdownReport,
 } from "../../scripts/validate-static-route-head-fidelity.mjs";
 
-
 const FIXTURE_META = {
-  title: "Pricing — Free, Pro & Founder Lifetime | Verdant Grow Diary",
+  title: "Pricing — Free, Pro & Craft | Verdant Grow Diary",
   description: "Free grow diary forever. Pro adds multi-tent support.",
   url: "https://verdantgrowdiary.com/pricing",
   image: "https://verdantgrowdiary.com/og/pricing.png",
@@ -39,7 +38,8 @@ const VALID_JSONLD = {
     { "@type": "Offer", name: "Free", price: "0", priceCurrency: "USD" },
     { "@type": "Offer", name: "Pro (monthly)", price: "9", priceCurrency: "USD" },
     { "@type": "Offer", name: "Pro (annual)", price: "90", priceCurrency: "USD" },
-    { "@type": "Offer", name: "Founder Lifetime", price: "129", priceCurrency: "USD" },
+    { "@type": "Offer", name: "Craft (monthly)", price: "19", priceCurrency: "USD" },
+    { "@type": "Offer", name: "Craft (annual)", price: "190", priceCurrency: "USD" },
   ],
 };
 
@@ -167,10 +167,11 @@ describe("static route head fidelity helpers", () => {
       fileName: "clean.html",
       metadata: FIXTURE_META,
     });
-    const drifted = diffRouteHead(
-      extractHead(fixtureHtml({ title: "Wrong title" })),
-      { path: "/pricing", fileName: "pricing.html", metadata: FIXTURE_META },
-    );
+    const drifted = diffRouteHead(extractHead(fixtureHtml({ title: "Wrong title" })), {
+      path: "/pricing",
+      fileName: "pricing.html",
+      metadata: FIXTURE_META,
+    });
     const md = renderMarkdownReport([cleanDiff, drifted], {
       generatedAt: "2026-07-20T00:00:00.000Z",
       distDir: "/tmp/dist",
@@ -183,7 +184,7 @@ describe("static route head fidelity helpers", () => {
     expect(md).toContain("`/gone`");
     expect(md).toContain("### `/pricing`");
     expect(md).toContain("Wrong title");
-    expect(md).toContain("Pricing — Free, Pro & Founder Lifetime");
+    expect(md).toContain("Pricing — Free, Pro & Craft");
     // Clean route must not appear as a drifted section.
     expect(md).not.toContain("### `/clean`");
   });
@@ -212,9 +213,9 @@ describe("static route head fidelity helpers", () => {
     it("flags a missing og:type as a mismatch (not silently allowed)", () => {
       const html = fixtureHtml().replace(/<meta property="og:type"[^>]*>/, "");
       const diff = diffRouteHead(extractHead(html), { path: "/pricing", metadata: FIXTURE_META });
-      expect(diff.mismatched.some((f: any) => f.label.includes("og:type") && f.actual === null)).toBe(
-        true,
-      );
+      expect(
+        diff.mismatched.some((f: any) => f.label.includes("og:type") && f.actual === null),
+      ).toBe(true);
     });
 
     it("requires an explicit robots directive on every route (default index, follow)", () => {
@@ -314,9 +315,7 @@ describe("static route head fidelity helpers", () => {
       expect(presence).toBeTruthy();
       expect(presence!.ok).toBe(false);
       // The required SoftwareApplication node is also missing.
-      expect(
-        diff.mismatched.some((f: any) => f.label.includes('SoftwareApplication')),
-      ).toBe(true);
+      expect(diff.mismatched.some((f: any) => f.label.includes("SoftwareApplication"))).toBe(true);
     });
 
     it("flags a malformed JSON-LD block", () => {
@@ -344,9 +343,7 @@ describe("static route head fidelity helpers", () => {
         path: "/pricing",
         metadata: FIXTURE_META,
       });
-      const field = diff.mismatched.find((f: any) =>
-        f.label === "JSON-LD SoftwareApplication.@id",
-      );
+      const field = diff.mismatched.find((f: any) => f.label === "JSON-LD SoftwareApplication.@id");
       expect(field).toBeTruthy();
       expect(field!.expected).toBe("https://verdantgrowdiary.com/#app");
       expect(field!.actual).toBe("https://verdantgrowdiary.com/#wrong");
@@ -355,17 +352,17 @@ describe("static route head fidelity helpers", () => {
     it("flags a missing offer in the SoftwareApplication catalog", () => {
       const bad = {
         ...VALID_JSONLD,
-        offers: VALID_JSONLD.offers.filter((o) => o.name !== "Founder Lifetime"),
+        offers: VALID_JSONLD.offers.filter((o) => o.name !== "Craft (annual)"),
       };
       const diff = diffRouteHead(extractHead(fixtureHtml({}, { jsonLd: bad })), {
         path: "/pricing",
         metadata: FIXTURE_META,
       });
-      const field = diff.mismatched.find((f: any) =>
-        f.label === "JSON-LD SoftwareApplication.offers[] names",
+      const field = diff.mismatched.find(
+        (f: any) => f.label === "JSON-LD SoftwareApplication.offers[] names",
       );
       expect(field).toBeTruthy();
-      expect(field!.actual).not.toContain("Founder Lifetime");
+      expect(field!.actual).not.toContain("Craft (annual)");
     });
 
     it("accepts a SoftwareApplication node nested under @graph", () => {

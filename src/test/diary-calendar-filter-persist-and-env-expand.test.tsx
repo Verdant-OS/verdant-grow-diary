@@ -5,11 +5,15 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { render, screen, fireEvent, cleanup, within } from "@testing-library/react";
 import DiaryCalendarSection from "@/components/DiaryCalendarSection";
-import { clearLocalStorageForTest, setLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
+import {
+  clearLocalStorageForTest,
+  setLocalStorageItemForTest,
+} from "./helpers/localStorageTestHelper";
 import {
   DIARY_CALENDAR_FILTER_STORAGE_KEY,
   readPersistedDiaryCalendarFilter,
 } from "@/lib/diaryCalendarFilterPersistence";
+import { saveTemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 
 const ENV_FULL = {
   id: "e1",
@@ -57,9 +61,10 @@ describe("DiaryCalendarSection — persisted filter", () => {
     fireEvent.click(screen.getByTestId("diary-calendar-filter-environment"));
     cleanup();
     render(<DiaryCalendarSection rawEntries={MIXED} />);
-    expect(
-      screen.getByTestId("diary-calendar-filter-environment"),
-    ).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("diary-calendar-filter-environment")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
     // Only Environment Check events should be visible.
     const events = screen.getAllByTestId("diary-calendar-event");
     expect(events).toHaveLength(1);
@@ -69,9 +74,7 @@ describe("DiaryCalendarSection — persisted filter", () => {
   it("rejects an invalid persisted filter and falls back to 'all'", () => {
     setLocalStorageItemForTest(DIARY_CALENDAR_FILTER_STORAGE_KEY, "garbage");
     render(<DiaryCalendarSection rawEntries={MIXED} />);
-    expect(
-      screen.getByTestId("diary-calendar-filter-all"),
-    ).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("diary-calendar-filter-all")).toHaveAttribute("aria-pressed", "true");
   });
 
   it.each([
@@ -84,27 +87,34 @@ describe("DiaryCalendarSection — persisted filter", () => {
     fireEvent.click(screen.getByTestId(`diary-calendar-filter-${kind}`));
     cleanup();
     render(<DiaryCalendarSection rawEntries={MIXED} />);
-    expect(
-      screen.getByTestId(`diary-calendar-filter-${kind}`),
-    ).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId(`diary-calendar-filter-${kind}`)).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
     expect(screen.getAllByTestId("diary-calendar-event")).toHaveLength(expected);
   });
 });
 
 describe("DiaryCalendarSection — Environment Check tap-for-details", () => {
-  it("renders Environment Check collapsed by default (compact line, no expanded grid)", () => {
+  it("renders Environment Check collapsed by default (compact line, no expanded grid, celsius preference)", () => {
+    saveTemperatureUnitPreference("celsius");
     render(<DiaryCalendarSection rawEntries={[ENV_FULL]} />);
-    expect(screen.getByTestId("diary-calendar-env-compact")).toHaveTextContent(
-      /24\.6°C/,
-    );
+    expect(screen.getByTestId("diary-calendar-env-compact")).toHaveTextContent(/24\.6°C/);
     expect(screen.queryByTestId("diary-calendar-env-expanded")).toBeNull();
     // Disclaimer visible while collapsed
-    expect(
-      screen.getByTestId("diary-calendar-event-subtitle"),
-    ).toHaveTextContent(/not live sensor telemetry/i);
+    expect(screen.getByTestId("diary-calendar-event-subtitle")).toHaveTextContent(
+      /not live sensor telemetry/i,
+    );
   });
 
-  it("Show details expands Environment Check with full temp/RH/VPD/CO2 + note + disclaimer", () => {
+  it("renders Environment Check compact temp converted to Fahrenheit by default", () => {
+    render(<DiaryCalendarSection rawEntries={[ENV_FULL]} />);
+    // 24.6°C → 76.28°F, displayed to 1 decimal.
+    expect(screen.getByTestId("diary-calendar-env-compact")).toHaveTextContent(/76\.3°F/);
+  });
+
+  it("Show details expands Environment Check with full temp/RH/VPD/CO2 + note + disclaimer (celsius preference)", () => {
+    saveTemperatureUnitPreference("celsius");
     render(<DiaryCalendarSection rawEntries={[ENV_FULL]} />);
     fireEvent.click(screen.getByTestId("diary-calendar-env-toggle"));
     const expanded = screen.getByTestId("diary-calendar-env-expanded");
@@ -113,9 +123,9 @@ describe("DiaryCalendarSection — Environment Check tap-for-details", () => {
     expect(within(expanded).getByText(/1\.12 kPa/)).toBeInTheDocument();
     expect(within(expanded).getByText(/720 ppm/)).toBeInTheDocument();
     expect(within(expanded).getByText(/Morning check/i)).toBeInTheDocument();
-    expect(
-      screen.getByTestId("diary-calendar-event-subtitle"),
-    ).toHaveTextContent(/not live sensor telemetry/i);
+    expect(screen.getByTestId("diary-calendar-event-subtitle")).toHaveTextContent(
+      /not live sensor telemetry/i,
+    );
     expect(screen.getByTestId("diary-calendar-env-toggle")).toHaveAttribute(
       "aria-expanded",
       "true",
@@ -132,13 +142,11 @@ describe("DiaryCalendarSection — Environment Check tap-for-details", () => {
 
   it("Empty Environment Check shows fallback copy and no toggle", () => {
     render(<DiaryCalendarSection rawEntries={[ENV_EMPTY]} />);
-    expect(
-      screen.getByText("No environment values captured."),
-    ).toBeInTheDocument();
+    expect(screen.getByText("No environment values captured.")).toBeInTheDocument();
     expect(screen.queryByTestId("diary-calendar-env-toggle")).toBeNull();
-    expect(
-      screen.getByTestId("diary-calendar-event-subtitle"),
-    ).toHaveTextContent(/not live sensor telemetry/i);
+    expect(screen.getByTestId("diary-calendar-event-subtitle")).toHaveTextContent(
+      /not live sensor telemetry/i,
+    );
   });
 
   it("Malformed Environment Check values do not crash", () => {
@@ -156,12 +164,8 @@ describe("DiaryCalendarSection — Environment Check tap-for-details", () => {
         },
       },
     };
-    expect(() =>
-      render(<DiaryCalendarSection rawEntries={[bad as never]} />),
-    ).not.toThrow();
-    expect(
-      screen.getByText("No environment values captured."),
-    ).toBeInTheDocument();
+    expect(() => render(<DiaryCalendarSection rawEntries={[bad as never]} />)).not.toThrow();
+    expect(screen.getByText("No environment values captured.")).toBeInTheDocument();
   });
 });
 

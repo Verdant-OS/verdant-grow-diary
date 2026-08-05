@@ -9,7 +9,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
-import { MemoryRouter, useSearchParams } from "react-router-dom";
+import { MemoryRouter, useSearchParams } from "@/lib/react-router-compat";
 import ActionQueue from "@/pages/ActionQueue";
 import {
   parseAlertContextParam,
@@ -186,9 +186,9 @@ beforeEach(() => {
 });
 
 function visibleRowIds(): string[] {
-  return Array.from(
-    document.querySelectorAll('[data-testid="action-queue-row"]'),
-  ).map((el) => el.getAttribute("data-action-id") ?? "");
+  return Array.from(document.querySelectorAll('[data-testid="action-queue-row"]')).map(
+    (el) => el.getAttribute("data-action-id") ?? "",
+  );
 }
 
 // --- Pure helpers -----------------------------------------------------------
@@ -278,18 +278,14 @@ describe("ActionQueue — client-side ?alert filter", () => {
 
   it("renders 'No actions linked to this alert yet.' title when no rows match", async () => {
     renderAt("/actions?alert=unknown-alert");
-    const title = await screen.findByTestId(
-      "action-queue-alert-context-empty-title",
-    );
+    const title = await screen.findByTestId("action-queue-alert-context-empty-title");
     expect(title.textContent).toBe("No actions linked to this alert yet.");
     expect(visibleRowIds()).toEqual([]);
   });
 
   it("renders helper text under the alert-filtered empty state", async () => {
     renderAt("/actions?alert=unknown-alert");
-    const help = await screen.findByTestId(
-      "action-queue-alert-context-empty-help",
-    );
+    const help = await screen.findByTestId("action-queue-alert-context-empty-help");
     expect(help.textContent).toBe(
       "Review the alert detail and add a suggested action when appropriate.",
     );
@@ -297,17 +293,13 @@ describe("ActionQueue — client-side ?alert filter", () => {
 
   it("alert-filtered empty state includes a 'Back to alert' link", async () => {
     renderAt("/actions?alert=unknown-alert");
-    const back = await screen.findByTestId(
-      "action-queue-alert-context-empty-back-link",
-    );
+    const back = await screen.findByTestId("action-queue-alert-context-empty-back-link");
     expect(back.getAttribute("href")).toBe("/alerts/unknown-alert");
   });
 
   it("chip-area 'Back to alert' link also renders when no matching actions exist", async () => {
     renderAt("/actions?alert=unknown-alert");
-    const back = await screen.findByTestId(
-      "action-queue-alert-context-back-link",
-    );
+    const back = await screen.findByTestId("action-queue-alert-context-back-link");
     expect(back.getAttribute("href")).toBe("/alerts/unknown-alert");
     expect(back.textContent).toContain("Back to alert");
     // No raw token leakage in the chip-area back link.
@@ -318,9 +310,7 @@ describe("ActionQueue — client-side ?alert filter", () => {
   it("invalid/unsafe alert param does not render the chip-area 'Back to alert' link", async () => {
     renderAt("/actions?alert=%5Balert%3Afoo%5D");
     await waitFor(() => expect(visibleRowIds().length).toBe(4));
-    expect(
-      screen.queryByTestId("action-queue-alert-context-back-link"),
-    ).toBeNull();
+    expect(screen.queryByTestId("action-queue-alert-context-back-link")).toBeNull();
   });
 
   it("invalid/unsafe alert param does not show the alert-filtered empty state", async () => {
@@ -329,7 +319,6 @@ describe("ActionQueue — client-side ?alert filter", () => {
     expect(screen.queryByTestId("action-queue-alert-context-empty")).toBeNull();
   });
 
-
   it("does not render the alert-empty state when ?alert is absent", async () => {
     renderAt("/actions");
     await waitFor(() => expect(visibleRowIds().length).toBe(4));
@@ -337,9 +326,7 @@ describe("ActionQueue — client-side ?alert filter", () => {
   });
 
   it("Clear alert filter restores all rows and preserves focus/growId/page/q", async () => {
-    renderAt(
-      "/actions?alert=alert-xyz&focus=aq-alert-1&growId=g1&page=2&view=card",
-    );
+    renderAt("/actions?alert=alert-xyz&focus=aq-alert-1&growId=g1&page=2&view=card");
     await waitFor(() => expect(visibleRowIds().length).toBe(2));
 
     fireEvent.click(screen.getByTestId("action-queue-clear-alert-context"));
@@ -402,14 +389,37 @@ describe("ActionQueue — client-side ?alert filter", () => {
 });
 
 // --- Static safety scan ------------------------------------------------------
-const PAGE = readFileSync(
-  resolve(__dirname, "../..", "src/pages/ActionQueue.tsx"),
-  "utf8",
-);
+const PAGE = readFileSync(resolve(__dirname, "../..", "src/pages/ActionQueue.tsx"), "utf8");
 const HELPER = readFileSync(
   resolve(__dirname, "../..", "src/lib/actionQueueAlertContextFilter.ts"),
   "utf8",
 );
+
+// Only two RPC-invocation shapes are legitimate in this codebase:
+//   1. Direct call:       supabase.rpc("name", args)
+//   2. Cast-wrapped call: (supabase.rpc as unknown as (fn: string, args:
+//      unknown) => Promise<...>)("name", args) — used before the RPC's
+//      generated typing lands (see actionQueueRpcAvailability).
+// In both shapes the RPC name is the literal FIRST token of the call's own
+// argument list (only whitespace may precede it). Anchoring to that,
+// instead of "any quote within N characters of supabase.rpc", closes two
+// Codex-flagged gaps:
+//   - Round 1: a dynamic-name call placed BEFORE the canonical call could
+//     "borrow" the canonical call's own string literal via a lazy gap that
+//     crossed into the second call.
+//   - Round 2: a canonical-looking string sitting inside a dynamic call's
+//     OWN payload (e.g. supabase.rpc(name, { note: "action_queue_transition" }))
+//     could be mistaken for that call's invoked name, since it was merely
+//     "the nearest quote", not the actual first argument.
+const DIRECT_RPC_PATTERN = /supabase\.rpc\s*\(\s*["']([^"']+)["']/g;
+const CAST_RPC_PATTERN =
+  /supabase\.rpc\s+as\s+unknown\s+as\s*\([\s\S]{0,150}?\)\s*=>\s*[\s\S]{0,150}?\)\s*\(\s*["']([^"']+)["']/g;
+
+function extractRpcNames(src: string): string[] {
+  const direct = [...src.matchAll(DIRECT_RPC_PATTERN)].map((match) => match[1]);
+  const cast = [...src.matchAll(CAST_RPC_PATTERN)].map((match) => match[1]);
+  return [...direct, ...cast];
+}
 
 describe("alert-context filter — safety scan", () => {
   it("page introduces no new write paths or privileged calls", () => {
@@ -430,15 +440,55 @@ describe("alert-context filter — safety scan", () => {
     }
   });
 
-  it("page has no action_queue or alerts insert/update/delete/upsert paths added", () => {
+  it("page has no creation/deletion paths or non-transition RPCs added", () => {
     expect(PAGE).not.toMatch(/\.upsert\(/);
-    expect(PAGE).not.toMatch(/\.rpc\(/);
+    const rpcCallSiteCount = (PAGE.match(/supabase\.rpc\b/g) ?? []).length;
+    const rpcNames = extractRpcNames(PAGE);
+    // Every call site must independently resolve a literal first-argument
+    // name — a dynamic/unnamed call site (or a canonical-looking string
+    // buried elsewhere in its arguments) would leave this short rather than
+    // silently merging into the canonical name.
+    expect(rpcNames.length).toBe(rpcCallSiteCount);
+    expect(rpcNames).toEqual(["action_queue_transition"]);
     expect(PAGE).not.toMatch(
       /from\(["']action_queue["']\)[\s\S]{0,200}?\.(insert|delete|upsert)\(/,
     );
     expect(PAGE).not.toMatch(
       /from\(["']alerts["']\)[\s\S]{0,200}?\.(insert|update|delete|upsert)\(/,
     );
+  });
+
+  it("does not let a preceding dynamic RPC call absorb the canonical call's name (Codex P2 regression guard, round 1)", () => {
+    // An unreviewed dynamic-name RPC call ahead of the canonical
+    // cast-wrapped call must not resolve to (or merge into) the canonical
+    // name — it must simply fail to resolve, which the count check above
+    // turns into a hard failure on the real source.
+    const adversarial = `
+      supabase.rpc(someDynamicName, payload);
+      // unrelated code in between
+      const { data, error } = await (
+        supabase.rpc as unknown as (fn: string, args: unknown) => Promise<{ data: unknown; error: unknown }>
+      )("action_queue_transition", rpcArgs);
+    `;
+    const callSiteCount = (adversarial.match(/supabase\.rpc\b/g) ?? []).length;
+    const names = extractRpcNames(adversarial);
+    expect(callSiteCount).toBe(2);
+    expect(names).toEqual(["action_queue_transition"]);
+    expect(names.length).not.toBe(callSiteCount);
+  });
+
+  it("does not mistake a canonical-looking string in a dynamic call's own payload for its invoked name (Codex P2 regression guard, round 2)", () => {
+    // A dynamic-name call whose OWN payload happens to contain the
+    // canonical string must not be credited with that name — the literal
+    // first argument is the dynamic name, not a quote.
+    const adversarial = `
+      supabase.rpc(someDynamicName, { note: "action_queue_transition" });
+    `;
+    const callSiteCount = (adversarial.match(/supabase\.rpc\b/g) ?? []).length;
+    const names = extractRpcNames(adversarial);
+    expect(callSiteCount).toBe(1);
+    expect(names).toEqual([]);
+    expect(names.length).not.toBe(callSiteCount);
   });
 
   it("filter helper is pure: no supabase / fetch / network imports", () => {

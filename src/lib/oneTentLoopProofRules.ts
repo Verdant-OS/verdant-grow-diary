@@ -61,12 +61,7 @@ export interface EvidenceRef {
 }
 
 export type EvidenceProvenance =
-  | "direct"
-  | "inferred"
-  | "missing"
-  | "stale"
-  | "invalid"
-  | "demo_only";
+  "direct" | "inferred" | "missing" | "stale" | "invalid" | "demo_only";
 
 export interface MissingEvidenceDrilldown {
   /** Plain, user-facing "what is missing". Never raw IDs / payloads / secrets. */
@@ -747,7 +742,7 @@ export function evaluateActionQueue(a: ActionQueueEvidence | null): LoopStepRow 
     evidence: ev,
     missing_info: [],
     safety_note: "Approval required. Grower decides. No device command.",
-    deep_link: `/action-queue/${a.id}`,
+    deep_link: `/actions/${a.id}`,
   };
 }
 

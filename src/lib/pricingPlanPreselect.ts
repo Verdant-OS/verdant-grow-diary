@@ -16,11 +16,7 @@
 export type PricingBillingPeriod = "monthly" | "annual";
 
 export type PricingPreselectPlan =
-  | "pro_monthly"
-  | "pro_annual"
-  | "craft_monthly"
-  | "craft_annual"
-  | "founder_lifetime";
+  "pro_monthly" | "pro_annual" | "craft_monthly" | "craft_annual" | "founder_lifetime";
 
 export interface PricingPlanPreselect {
   /** Canonical plan id chosen by the query param, or `null` when absent/unknown. */

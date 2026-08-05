@@ -9,6 +9,7 @@ import {
   type EnvironmentCheckInsightsTargets,
 } from "@/lib/environmentCheckInsightsViewModel";
 import type { EnvironmentCheckTimelineRawEntry } from "@/lib/environmentCheckTimelineViewModel";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 import { cn } from "@/lib/utils";
 
 export const ENVIRONMENT_CHECK_INSIGHTS_EXPAND_LABEL = "Show insights";
@@ -26,9 +27,11 @@ export default function EnvironmentCheckInsightsPanel({
   plantSpecificTargets,
 }: EnvironmentCheckInsightsPanelProps) {
   const [expanded, setExpanded] = useState(false);
+  const temperatureUnit = useTemperatureUnitPreference();
   const vm = buildEnvironmentCheckInsightsViewModel(rawEntries, {
     targets,
     plantSpecificTargets,
+    tempUnit: temperatureUnit,
   });
 
   const regionId = "env-check-insights-region";
@@ -52,7 +55,7 @@ export default function EnvironmentCheckInsightsPanel({
         data-testid="env-check-insights-toggle"
         className={cn(
           "flex w-full items-start gap-2 text-left",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 rounded-md",
+          "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary/60 rounded-md",
         )}
       >
         <Sparkles className="h-3.5 w-3.5 mt-0.5 text-primary shrink-0" aria-hidden />
@@ -67,13 +70,8 @@ export default function EnvironmentCheckInsightsPanel({
               <ChevronRight className="h-3 w-3 text-muted-foreground" aria-hidden />
             )}
           </div>
-          <p
-            className="text-[11px] text-foreground mt-1"
-            data-testid="env-check-insights-summary"
-          >
-            {vm.hasEnoughHistory
-              ? vm.summary
-              : ENVIRONMENT_CHECK_INSIGHTS_NOT_ENOUGH}
+          <p className="text-[11px] text-foreground mt-1" data-testid="env-check-insights-summary">
+            {vm.hasEnoughHistory ? vm.summary : ENVIRONMENT_CHECK_INSIGHTS_NOT_ENOUGH}
           </p>
           <p
             className="text-[10px] text-muted-foreground mt-1 italic"
@@ -129,7 +127,10 @@ export default function EnvironmentCheckInsightsPanel({
                   >
                     <span className="text-muted-foreground">{m.label}</span>
                     <span className="text-foreground">
-                      min {m.min}{m.unit} · avg {m.avg}{m.unit} · max {m.max}{m.unit}
+                      min {m.min}
+                      {m.unit} · avg {m.avg}
+                      {m.unit} · max {m.max}
+                      {m.unit}
                       {m.outOfRange && (
                         <span
                           className="ml-2 inline-flex items-center rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 text-[10px]"

@@ -24,10 +24,7 @@ const HOOK = readFileSync(
   resolve(process.cwd(), "src/hooks/usePremiumExportServerGate.ts"),
   "utf8",
 );
-const DOC = readFileSync(
-  resolve(process.cwd(), "docs/paid-launch-entitlement-blocker.md"),
-  "utf8",
-);
+const DOC = readFileSync(resolve(process.cwd(), "docs/paid-launch-entitlement-blocker.md"), "utf8");
 
 describe("premium export edge function — strict body validation", () => {
   it("declares a narrow feature allow-list including all 3 AI Doctor exports", () => {
@@ -225,6 +222,8 @@ describe("audit doc — confirmed premium export surfaces", () => {
     expect(DOC).toMatch(/Environment Summary Report[\s\S]{0,200}SERVER-VALIDATED/);
   });
   it("Live sensor surfaces have server gate scaffold (no active premium surface today)", () => {
-    expect(DOC).toMatch(/Live sensor surfaces[\s\S]{0,400}DOCUMENTED \/ NO ACTIVE PREMIUM LIVE-SENSOR SURFACE/);
+    expect(DOC).toMatch(
+      /Live sensor surfaces[\s\S]{0,400}DOCUMENTED \/ NO ACTIVE PREMIUM LIVE-SENSOR SURFACE/,
+    );
   });
 });

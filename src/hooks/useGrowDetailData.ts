@@ -18,7 +18,7 @@
  * No device-control surface. No elevated keys. RLS enforces ownership.
  */
 import { useCallback, useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams } from "@/lib/react-router-compat";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import { alertDetailPath } from "@/lib/routes";
@@ -52,6 +52,7 @@ import {
   type ConnectedActivationGrowEventRow,
 } from "@/lib/connectedOneTentActivationRules";
 import { resolveQuickLogEventTimelineLabel } from "@/lib/quickLogActivityRules";
+import { buildGrowScopedPlantsOrFilter } from "@/lib/growAttributionRules";
 
 /** Bounded dedupe window for merging diary rows with the grow_events spine. */
 const ACTIVITY_MERGE_WINDOW = 1000;
@@ -110,9 +111,7 @@ export const EMPTY_COUNTS: GrowCounts = {
 };
 
 export type RecentState =
-  | { status: "loading" }
-  | { status: "ok"; items: RecentItem[] }
-  | { status: "unavailable" };
+  { status: "loading" } | { status: "ok"; items: RecentItem[] } | { status: "unavailable" };
 
 export interface UseGrowDetailData {
   grow: GrowRow | null;
@@ -126,7 +125,6 @@ export interface UseGrowDetailData {
   growId: string | undefined;
   refetch: () => void;
 }
-
 
 export function useGrowDetailData(): UseGrowDetailData {
   const { growId } = useParams<{ growId: string }>();
@@ -203,6 +201,31 @@ export function useGrowDetailData(): UseGrowDetailData {
       }
     }
 
+    // Plants count resolves grow attribution (BUG-A): a plant belongs to
+    // this grow when its own grow_id matches OR it lives in one of the
+    // grow's tents (orphaned-tent rollup). Tent-id lookup failure degrades
+    // to "unavailable" — never a silent undercount.
+    async function countGrowScopedPlants(): Promise<CountValue> {
+      try {
+        const { data: tentRows, error: tErr } = await supabase
+          .from("tents")
+          .select("id")
+          .eq("grow_id", growId!);
+        if (tErr) return "unavailable";
+        const tentIds = (tentRows ?? [])
+          .map((r) => (r as { id?: string | null }).id ?? "")
+          .filter((id): id is string => typeof id === "string" && id.length > 0);
+        const { count, error: cErr } = await supabase
+          .from("plants")
+          .select("id", { count: "exact", head: true })
+          .or(buildGrowScopedPlantsOrFilter(growId!, tentIds));
+        if (cErr) return "unavailable";
+        return count ?? 0;
+      } catch {
+        return "unavailable";
+      }
+    }
+
     const [
       plants,
       tents,
@@ -215,7 +238,7 @@ export function useGrowDetailData(): UseGrowDetailData {
       alertsCritical,
       alertsWarning,
     ] = await Promise.all([
-      countFrom("plants"),
+      countGrowScopedPlants(),
       countFrom("tents"),
       countFrom("diary_entries"),
       countFrom("grow_events", (q) => q.eq("source", "manual").eq("is_deleted", false)),
@@ -242,7 +265,9 @@ export function useGrowDetailData(): UseGrowDetailData {
           .limit(ACTIVITY_MERGE_WINDOW),
         supabase
           .from("grow_events")
-          .select("id,tent_id,plant_id,event_type,occurred_at,created_at,source,is_deleted,deleted_at")
+          .select(
+            "id,tent_id,plant_id,event_type,occurred_at,created_at,source,is_deleted,deleted_at",
+          )
           .eq("grow_id", growId)
           .eq("source", "manual")
           .eq("is_deleted", false)
@@ -257,8 +282,7 @@ export function useGrowDetailData(): UseGrowDetailData {
           growEvents: spineRows,
         });
         const windowSaturated =
-          diaryRows.length >= ACTIVITY_MERGE_WINDOW ||
-          spineRows.length >= ACTIVITY_MERGE_WINDOW;
+          diaryRows.length >= ACTIVITY_MERGE_WINDOW || spineRows.length >= ACTIVITY_MERGE_WINDOW;
         diary = windowSaturated
           ? Math.max(
               merged,
@@ -513,5 +537,16 @@ export function useGrowDetailData(): UseGrowDetailData {
     load();
   }, [load]);
 
-  return { grow, loading, notFound, error, counts, recent, status, outcomes, growId, refetch: load };
+  return {
+    grow,
+    loading,
+    notFound,
+    error,
+    counts,
+    recent,
+    status,
+    outcomes,
+    growId,
+    refetch: load,
+  };
 }

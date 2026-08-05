@@ -66,20 +66,15 @@ describe("ActionQueueDetailDrawer — diary-trace link return state", () => {
 
   it("omits actionsReturn when no currentActionsParams are provided", () => {
     const { getByTestId } = render(
-      <ActionQueueDetailDrawer
-        open
-        onOpenChange={() => {}}
-        row={buildRow()}
-      />,
+      <ActionQueueDetailDrawer open onOpenChange={() => {}} row={buildRow()} />,
     );
-    const href = getByTestId("action-queue-detail-drawer-diary-trace-link").getAttribute("href") ?? "";
+    const href =
+      getByTestId("action-queue-detail-drawer-diary-trace-link").getAttribute("href") ?? "";
     expect(href).not.toContain("actionsReturn");
   });
 
   it("does not change href when drawer is reopened with the same params (highlight preserved via URL)", () => {
-    const params = new URLSearchParams(
-      "status=approved&highlight=action-queue:aq-77:approved",
-    );
+    const params = new URLSearchParams("status=approved&highlight=action-queue:aq-77:approved");
     const first = render(
       <ActionQueueDetailDrawer
         open
@@ -88,7 +83,9 @@ describe("ActionQueueDetailDrawer — diary-trace link return state", () => {
         currentActionsParams={params}
       />,
     );
-    const hrefA = first.getByTestId("action-queue-detail-drawer-diary-trace-link").getAttribute("href");
+    const hrefA = first
+      .getByTestId("action-queue-detail-drawer-diary-trace-link")
+      .getAttribute("href");
     first.unmount();
     const second = render(
       <ActionQueueDetailDrawer
@@ -98,7 +95,9 @@ describe("ActionQueueDetailDrawer — diary-trace link return state", () => {
         currentActionsParams={params}
       />,
     );
-    const hrefB = second.getByTestId("action-queue-detail-drawer-diary-trace-link").getAttribute("href");
+    const hrefB = second
+      .getByTestId("action-queue-detail-drawer-diary-trace-link")
+      .getAttribute("href");
     expect(hrefA).toBe(hrefB);
     // Highlight is owned by the URL; drawer does not strip it.
     const retQs = new URLSearchParams(

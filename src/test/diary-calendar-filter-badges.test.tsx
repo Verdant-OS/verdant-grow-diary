@@ -4,7 +4,10 @@
 import { describe, it, expect } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import DiaryCalendarSection from "@/components/DiaryCalendarSection";
-import { computeDiaryCalendarFilterCounts, buildDiaryCalendarViewModel } from "@/lib/diaryCalendarViewModel";
+import {
+  computeDiaryCalendarFilterCounts,
+  buildDiaryCalendarViewModel,
+} from "@/lib/diaryCalendarViewModel";
 
 const FIXTURE_MIXED = [
   { id: "w1", entry_at: "2026-06-10T09:00:00Z", event_type: "watering" },
@@ -80,9 +83,7 @@ describe("DiaryCalendarSection — filter chip count badges", () => {
   it("singular event uses 'event' in accessible name", () => {
     render(
       <DiaryCalendarSection
-        rawEntries={[
-          { id: "w1", entry_at: "2026-06-10T09:00:00Z", event_type: "watering" },
-        ]}
+        rawEntries={[{ id: "w1", entry_at: "2026-06-10T09:00:00Z", event_type: "watering" }]}
       />,
     );
     expect(screen.getByTestId("diary-calendar-filter-watering")).toHaveAttribute(
@@ -95,16 +96,20 @@ describe("DiaryCalendarSection — filter chip count badges", () => {
     render(<DiaryCalendarSection rawEntries={FIXTURE_MIXED} />);
     expect(screen.getByTestId("diary-calendar-filter-all")).toHaveAttribute("aria-pressed", "true");
     fireEvent.click(screen.getByTestId("diary-calendar-filter-watering"));
-    expect(screen.getByTestId("diary-calendar-filter-watering")).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByTestId("diary-calendar-filter-all")).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByTestId("diary-calendar-filter-watering")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByTestId("diary-calendar-filter-all")).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
   });
 
   it("zero-count filters remain visible, enabled, and show empty state on click", () => {
     render(
       <DiaryCalendarSection
-        rawEntries={[
-          { id: "w1", entry_at: "2026-06-10T09:00:00Z", event_type: "watering" },
-        ]}
+        rawEntries={[{ id: "w1", entry_at: "2026-06-10T09:00:00Z", event_type: "watering" }]}
       />,
     );
     expect(screen.getByTestId("diary-calendar-filter-feeding")).toHaveTextContent("0");

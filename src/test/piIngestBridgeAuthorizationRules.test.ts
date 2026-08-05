@@ -4,9 +4,7 @@ import { resolve } from "node:path";
 import { evaluateBridgeAuthorization } from "@/lib/piIngestBridgeAuthorizationRules";
 import type { BridgeCredentialMetadata } from "@/lib/piIngestBridgeCredentialMetadataResolver";
 
-function cred(
-  overrides: Partial<BridgeCredentialMetadata> = {},
-): BridgeCredentialMetadata {
+function cred(overrides: Partial<BridgeCredentialMetadata> = {}): BridgeCredentialMetadata {
   return {
     id: "id-1",
     userId: "user-1",

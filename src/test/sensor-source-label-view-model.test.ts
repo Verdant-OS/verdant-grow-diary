@@ -3,10 +3,7 @@
  * No I/O. No React.
  */
 import { describe, it, expect } from "vitest";
-import {
-  buildSensorSourceBadge,
-  sourceBadgeToneClass,
-} from "@/lib/sensorSourceLabelViewModel";
+import { buildSensorSourceBadge, sourceBadgeToneClass } from "@/lib/sensorSourceLabelViewModel";
 
 describe("sensorSourceLabelViewModel", () => {
   it("labels manual readings prominently and never as Live", () => {
@@ -80,12 +77,8 @@ describe("sensorSourceLabelViewModel", () => {
 
   it("renders demo/stale/invalid with clear degraded copy", () => {
     expect(buildSensorSourceBadge({ source: "demo" }).label).toBe("Demo data");
-    expect(buildSensorSourceBadge({ source: "stale" }).label).toBe(
-      "Stale reading",
-    );
-    expect(buildSensorSourceBadge({ source: "invalid" }).label).toBe(
-      "Invalid reading",
-    );
+    expect(buildSensorSourceBadge({ source: "stale" }).label).toBe("Stale reading");
+    expect(buildSensorSourceBadge({ source: "invalid" }).label).toBe("Invalid reading");
   });
 
   it("collapses unknown/missing source to Unknown source — never Live", () => {

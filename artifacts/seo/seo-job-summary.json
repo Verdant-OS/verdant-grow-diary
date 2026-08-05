@@ -2,8 +2,20 @@
   "generated_at": "2026-07-02T23:49:05.536Z",
   "mode": "dry-run",
   "status": "PASS",
+  "status_scope": "OPERATION",
   "allowlist_source": "/dev-server/config/seo-allowlist.json",
   "urls_evaluated": 2,
+  "workflow_run_url": null,
+  "oauth_configured": null,
+  "gsc_skipped": true,
+  "gsc_access_status": "NOT_APPLICABLE",
+  "gsc_execution_status": "SKIPPED",
+  "gsc_token_refresh_status": "SKIPPED",
+  "gsc_inspection_attempted": 0,
+  "gsc_inspection_succeeded": 0,
+  "gsc_inspection_failed": 0,
+  "previous_baseline_found": false,
+  "diff_comparison_ran": true,
   "simulated_classification_counts": {
     "never_allowlisted": 1,
     "suppressed": 1,
@@ -14,6 +26,7 @@
   "live_suppressed_issue_count": null,
   "live_critical_issue_count": null,
   "expired_entries": [],
+  "expired_allowlist_ids": [],
   "suppression_diff": {
     "previous_available": false,
     "previous_generated_at": null,
@@ -21,6 +34,9 @@
     "removed": 0,
     "unchanged": 0
   },
+  "last_finding_status": null,
+  "regression_status": null,
+  "regression_outcome_groups": null,
   "artifacts": {
     "job_summary_md": "artifacts/seo/seo-job-summary.md",
     "job_summary_json": "artifacts/seo/seo-job-summary.json",

@@ -39,7 +39,10 @@ const feedbackSchema = z.object({
 type FeedbackValues = z.infer<typeof feedbackSchema>;
 
 const SPECIFIC_RATINGS: Array<{
-  key: keyof Pick<FeedbackValues, "ai_doctor_rating" | "sensors_rating" | "quicklog_rating" | "trust_rating">;
+  key: keyof Pick<
+    FeedbackValues,
+    "ai_doctor_rating" | "sensors_rating" | "quicklog_rating" | "trust_rating"
+  >;
   title: string;
   hint: string;
 }> = [
@@ -96,7 +99,7 @@ function StarRating({
             aria-checked={value === n}
             aria-label={`${n} out of 5 — ${RATING_LABELS[n - 1]}`}
             onClick={() => onChange(n)}
-            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md p-2.5 text-muted-foreground transition hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md p-2.5 text-muted-foreground transition hover:text-primary focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             <Star
               className={`h-6 w-6 ${active ? "fill-primary text-primary" : ""}`}
@@ -113,7 +116,9 @@ function StarRating({
 }
 
 export default function Feedback() {
-  const [submitState, setSubmitState] = useState<"idle" | "submitting" | "success" | "error">("idle");
+  const [submitState, setSubmitState] = useState<"idle" | "submitting" | "success" | "error">(
+    "idle",
+  );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [honeypot, setHoneypot] = useState("");
   const formOpenedAt = useRef<number>(Date.now());
@@ -158,15 +163,11 @@ export default function Feedback() {
     });
     if (!guard.ok) {
       setSubmitState("error");
-      setErrorMessage(guard.message);
+      setErrorMessage(guard.message ?? "Submission blocked.");
       return;
     }
 
-    const { data: sessionData } = await supabase.auth.getSession();
-    const userId = sessionData.session?.user?.id ?? null;
-
     const payload = {
-      user_id: userId,
       overall_rating: values.overall_rating,
       ai_doctor_rating: values.ai_doctor_rating,
       sensors_rating: values.sensors_rating,
@@ -252,7 +253,9 @@ export default function Feedback() {
             <Label className="text-base">
               Overall experience <span className="text-destructive">*</span>
             </Label>
-            <p className="text-xs text-muted-foreground">How is Verdant working for you right now?</p>
+            <p className="text-xs text-muted-foreground">
+              How is Verdant working for you right now?
+            </p>
           </div>
           <StarRating
             value={overall && overall > 0 ? overall : null}
@@ -381,7 +384,10 @@ export default function Feedback() {
         <PrivacyNote />
 
         {submitState === "error" && errorMessage ? (
-          <div role="alert" className="rounded-lg border border-destructive/60 bg-destructive/10 p-3 text-sm text-destructive">
+          <div
+            role="alert"
+            className="rounded-lg border border-destructive/60 bg-destructive/10 p-3 text-sm text-destructive"
+          >
             {errorMessage}
           </div>
         ) : null}

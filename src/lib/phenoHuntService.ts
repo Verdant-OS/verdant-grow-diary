@@ -36,7 +36,7 @@ export interface CreatePhenoHuntResult {
 export class PhenoHuntError extends Error {
   constructor(
     message: string,
-    public cause?: unknown,
+    public override cause?: unknown,
   ) {
     super(message);
     this.name = "PhenoHuntError";
@@ -147,9 +147,7 @@ const KNOWN_EVIDENCE_GOAL_IDS = new Set([
   "keeper_decision",
 ]);
 
-export function sanitizeEvidenceGoals(
-  input: readonly string[] | null | undefined,
-): string[] {
+export function sanitizeEvidenceGoals(input: readonly string[] | null | undefined): string[] {
   if (!input || !Array.isArray(input)) return [];
   const seen = new Set<string>();
   const out: string[] = [];
@@ -222,21 +220,23 @@ export async function createPhenoHunt(
         const override = input.labels?.[plantId]?.trim();
         const label =
           override && override.length > 0 ? override : defaultCandidateLabel(start + offset);
-        const { error: updErr } = await client
+        const { data: taggedPlant, error: updErr } = await client
           .from("plants")
           .update({
             pheno_hunt_id: huntId,
             candidate_label: label,
           } as never)
-          .eq("id", plantId);
-        return { plantId, updErr };
+          .eq("id", plantId)
+          .select("id")
+          .maybeSingle();
+        return { plantId, taggedPlant, updErr };
       }),
     );
-    const failed = results.find((r) => r.updErr);
+    const failed = results.find((r) => r.updErr || !r.taggedPlant);
     for (const r of results) {
-      if (!r.updErr) tagged.push(r.plantId);
+      if (!r.updErr && r.taggedPlant) tagged.push(r.plantId);
     }
-    if (failed?.updErr) {
+    if (failed) {
       // Best-effort rollback: untag anything already tagged, then remove the
       // hunt row (RLS allows the owner to delete/update own rows). Rollback
       // failures are swallowed — they must never mask the original error.
@@ -252,7 +252,7 @@ export async function createPhenoHunt(
       }
       await client.from("pheno_hunts").delete().eq("id", huntId);
       throw new PhenoHuntError(
-        `Could not tag candidate plant: ${failed.updErr.message}`,
+        `Could not tag candidate plant: ${failed.updErr?.message ?? "no visible row was updated"}`,
         failed.updErr,
       );
     }
@@ -301,16 +301,24 @@ export async function deletePhenoHunt(
   const linkedIds = (linked ?? []).map((r) => (r as { id: string }).id);
 
   if (linkedIds.length > 0) {
-    const { error: untagErr } = await client
+    const { data: untagged, error: untagErr } = await client
       .from("plants")
       .update({
         pheno_hunt_id: null,
         candidate_label: null,
       } as never)
-      .eq("pheno_hunt_id", huntId);
+      .eq("pheno_hunt_id", huntId)
+      .select("id");
 
-    if (untagErr) {
-      throw new PhenoHuntError(`Could not untag linked plants: ${untagErr.message}`, untagErr);
+    const untaggedIds = new Set((untagged ?? []).map((row) => (row as { id: string }).id));
+    const allLinkedPlantsUntagged =
+      untaggedIds.size === linkedIds.length && linkedIds.every((id) => untaggedIds.has(id));
+
+    if (untagErr || !allLinkedPlantsUntagged) {
+      throw new PhenoHuntError(
+        `Could not untag linked plants: ${untagErr?.message ?? "not every linked row was updated"}`,
+        untagErr,
+      );
     }
   }
 

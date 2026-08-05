@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import TentPlantActivityPanels from "@/components/TentPlantActivityPanels";
@@ -44,17 +44,14 @@ function listen() {
   window.addEventListener("verdant:open-quicklog", listener as EventListener);
   return {
     received,
-    cleanup: () =>
-      window.removeEventListener("verdant:open-quicklog", listener as EventListener),
+    cleanup: () => window.removeEventListener("verdant:open-quicklog", listener as EventListener),
   };
 }
 
 describe("TentPlantActivityPanels — Evidence notes draft section", () => {
   it("renders the Evidence notes label", () => {
     wrap(<TentPlantActivityPanels viewModel={vm()} />);
-    expect(screen.getByTestId(`${TID}-evidence-notes-label`)).toHaveTextContent(
-      "Evidence notes",
-    );
+    expect(screen.getByTestId(`${TID}-evidence-notes-label`)).toHaveTextContent("Evidence notes");
   });
 
   it("renders the helper copy exactly", () => {
@@ -122,9 +119,7 @@ describe("TentPlantActivityPanels — Evidence notes draft section", () => {
     wrap(<TentPlantActivityPanels viewModel={vm()} />);
     const ta = screen.getByTestId(`${TID}-evidence-notes-textarea`) as HTMLTextAreaElement;
     fireEvent.change(ta, { target: { value: "   Trichomes mostly cloudy.  \n" } });
-    (
-      screen.getByTestId(`${TID}-evidence-notes-send`) as HTMLButtonElement
-    ).click();
+    (screen.getByTestId(`${TID}-evidence-notes-send`) as HTMLButtonElement).click();
     cleanup();
     expect(received).toHaveLength(1);
     expect(received[0]).toMatchObject({
@@ -142,9 +137,7 @@ describe("TentPlantActivityPanels — Evidence notes draft section", () => {
   it("does not dispatch when draft is blank", () => {
     const { received, cleanup } = listen();
     wrap(<TentPlantActivityPanels viewModel={vm()} />);
-    (
-      screen.getByTestId(`${TID}-evidence-notes-send`) as HTMLButtonElement
-    ).click();
+    (screen.getByTestId(`${TID}-evidence-notes-send`) as HTMLButtonElement).click();
     cleanup();
     expect(received).toHaveLength(0);
   });
@@ -152,9 +145,7 @@ describe("TentPlantActivityPanels — Evidence notes draft section", () => {
   it("Add note button accessible label includes plant name", () => {
     wrap(<TentPlantActivityPanels viewModel={vm()} />);
     const btn = screen.getByTestId(`${TID}-evidence-notes-send`);
-    expect(btn.getAttribute("aria-label")).toBe(
-      "Add evidence note to Quick Log for Blue Dream",
-    );
+    expect(btn.getAttribute("aria-label")).toBe("Add evidence note to Quick Log for Blue Dream");
   });
 
   it("textarea is connected to label and helper/caution via aria attributes", () => {
@@ -165,9 +156,7 @@ describe("TentPlantActivityPanels — Evidence notes draft section", () => {
     const caution = screen.getByTestId(`${TID}-evidence-notes-caution`);
     expect(ta.getAttribute("aria-labelledby")).toBe(label.id);
     const describedBy = ta.getAttribute("aria-describedby") ?? "";
-    expect(describedBy.split(/\s+/)).toEqual(
-      expect.arrayContaining([helper.id, caution.id]),
-    );
+    expect(describedBy.split(/\s+/)).toEqual(expect.arrayContaining([helper.id, caution.id]));
     expect(ta.getAttribute("id")).toBe(label.getAttribute("for"));
   });
 
@@ -176,9 +165,7 @@ describe("TentPlantActivityPanels — Evidence notes draft section", () => {
     wrap(<TentPlantActivityPanels viewModel={vm()} />);
     const ta = screen.getByTestId(`${TID}-evidence-notes-textarea`) as HTMLTextAreaElement;
     fireEvent.change(ta, { target: { value: "Pistils mostly amber" } });
-    (
-      screen.getByTestId(`${TID}-evidence-notes-send`) as HTMLButtonElement
-    ).click();
+    (screen.getByTestId(`${TID}-evidence-notes-send`) as HTMLButtonElement).click();
     cleanup();
     expect(ta.value).toBe("Pistils mostly amber");
   });
@@ -191,9 +178,7 @@ describe("TentPlantActivityPanels — Evidence notes static safety", () => {
   ];
   for (const path of sources) {
     const raw = readFileSync(path, "utf8");
-    const content = raw
-      .replace(/\/\*[\s\S]*?\*\//g, "")
-      .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+    const content = raw.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
     const short = path.split("/").slice(-2).join("/");
     it(`no Supabase write imports in ${short}`, () => {
       expect(content).not.toMatch(/from\s+["']@\/integrations\/supabase/);

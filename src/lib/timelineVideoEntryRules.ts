@@ -37,9 +37,7 @@ function readNumber(v: unknown): number | null {
   return typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : null;
 }
 
-export function extractTimelineVideoSlot(
-  details: unknown,
-): TimelineVideoSlot | null {
+export function extractTimelineVideoSlot(details: unknown): TimelineVideoSlot | null {
   if (!details || typeof details !== "object") return null;
   const video = (details as Record<string, unknown>).video;
   if (!video || typeof video !== "object") return null;
@@ -53,9 +51,7 @@ export function extractTimelineVideoSlot(
   return { path, mime, sizeBytes: size, durationS: duration, posterPath: poster };
 }
 
-export function resolveTimelineVideoEntry(
-  input: TimelineVideoInput,
-): TimelineVideoResolution {
+export function resolveTimelineVideoEntry(input: TimelineVideoInput): TimelineVideoResolution {
   const video = extractTimelineVideoSlot(input.details ?? null);
   const hasPhoto = readString(input.photoUrl ?? null) !== null;
   if (video && hasPhoto) {

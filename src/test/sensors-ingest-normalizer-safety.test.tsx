@@ -19,7 +19,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import SensorsIngestNormalizer from "@/pages/SensorsIngestNormalizer";
 
 const writeMethodSpies = vi.hoisted(() => ({
@@ -91,17 +91,13 @@ describe("SensorsIngestNormalizer — read-only safety", () => {
     // accidental write attempts even if the page mistakenly chains one.
     supabaseSpies.from.mockImplementation(() => writeMethodSpies);
 
-    fetchSpy = vi
-      .spyOn(globalThis, "fetch" as never)
-      .mockImplementation(() => {
-        throw new Error("fetch must not be called by the normalizer screen");
-      }) as never;
+    fetchSpy = vi.spyOn(globalThis, "fetch" as never).mockImplementation(() => {
+      throw new Error("fetch must not be called by the normalizer screen");
+    }) as never;
 
-    xhrSpy = vi
-      .spyOn(XMLHttpRequest.prototype, "open")
-      .mockImplementation(() => {
-        throw new Error("XMLHttpRequest must not be opened by the normalizer screen");
-      }) as never;
+    xhrSpy = vi.spyOn(XMLHttpRequest.prototype, "open").mockImplementation(() => {
+      throw new Error("XMLHttpRequest must not be opened by the normalizer screen");
+    }) as never;
   });
 
   afterEach(() => {
@@ -122,9 +118,7 @@ describe("SensorsIngestNormalizer — read-only safety", () => {
     renderPage();
     fireEvent.click(screen.getByTestId("webhook-normalizer-example-ecowitt-mqtt"));
     fireEvent.click(screen.getByTestId("webhook-normalizer-example-generic-mqtt"));
-    fireEvent.click(
-      screen.getByTestId("webhook-normalizer-example-home-assistant-webhook"),
-    );
+    fireEvent.click(screen.getByTestId("webhook-normalizer-example-home-assistant-webhook"));
     expectNoNetworkOrWrites(fetchSpy, xhrSpy);
   });
 
@@ -176,9 +170,7 @@ describe("SensorsIngestNormalizer — Normalization Results UX", () => {
   it("shows an empty state before parsing", () => {
     renderPage();
     const empty = screen.getByTestId("webhook-normalizer-empty-state");
-    expect(empty.textContent?.toLowerCase()).toContain(
-      "paste a payload and run normalization",
-    );
+    expect(empty.textContent?.toLowerCase()).toContain("paste a payload and run normalization");
     expect(screen.queryByTestId("webhook-normalizer-result")).toBeNull();
   });
 
@@ -214,15 +206,9 @@ describe("SensorsIngestNormalizer — Normalization Results UX", () => {
       target: { value: JSON.stringify(payload) },
     });
     fireEvent.click(screen.getByTestId("webhook-normalizer-parse"));
-    expect(screen.getByTestId("webhook-normalizer-accepted").textContent).toMatch(
-      /humidity_pct/,
-    );
-    expect(screen.getByTestId("webhook-normalizer-skipped").textContent).toMatch(
-      /made_up_metric/,
-    );
-    expect(screen.getByTestId("webhook-normalizer-rejected").textContent).toMatch(
-      /temp_c/,
-    );
+    expect(screen.getByTestId("webhook-normalizer-accepted").textContent).toMatch(/humidity_pct/);
+    expect(screen.getByTestId("webhook-normalizer-skipped").textContent).toMatch(/made_up_metric/);
+    expect(screen.getByTestId("webhook-normalizer-rejected").textContent).toMatch(/temp_c/);
   });
 
   it("surfaces unsafe ignored fields under 'Ignored unsafe fields' (not 'trusted')", () => {
@@ -245,8 +231,7 @@ describe("SensorsIngestNormalizer — Normalization Results UX", () => {
     expect(text.toLowerCase()).toContain("user_id");
     expect(text.toLowerCase()).toContain("api_key");
     // Sanitized preview must not contain the unsafe keys verbatim.
-    const sanitized =
-      screen.getByTestId("webhook-normalizer-sanitized").textContent ?? "";
+    const sanitized = screen.getByTestId("webhook-normalizer-sanitized").textContent ?? "";
     expect(sanitized).not.toContain("user_id");
     expect(sanitized).not.toContain("api_key");
   });

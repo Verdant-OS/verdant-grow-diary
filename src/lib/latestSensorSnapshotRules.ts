@@ -16,7 +16,8 @@
 
 import { withoutDiagnosticSensorRows } from "@/lib/sensorProvenanceFenceRules";
 
-export const SENSOR_FRESH_WINDOW_MINUTES = 15;
+import { SENSOR_FRESH_WINDOW_MINUTES } from "../constants/sensorTiming";
+export { SENSOR_FRESH_WINDOW_MINUTES };
 export const SENSOR_FUTURE_SKEW_LIMIT_MINUTES = 5;
 /** Metrics outside this window are not one coherent sensor snapshot. */
 const SENSOR_SNAPSHOT_COHERENCE_MS = 5 * 60 * 1000;
@@ -26,11 +27,7 @@ export type SensorSnapshotStatus = "fresh_live" | "fresh_non_live" | "stale" | "
 export type SensorSnapshotFreshness = "fresh" | "stale" | "invalid" | "unknown";
 
 export type SensorMetricKey =
-  | "temp_f"
-  | "humidity_pct"
-  | "vpd_kpa"
-  | "soil_moisture_pct"
-  | "co2_ppm";
+  "temp_f" | "humidity_pct" | "vpd_kpa" | "soil_moisture_pct" | "co2_ppm";
 
 export const REQUIRED_SNAPSHOT_METRICS: readonly SensorMetricKey[] = ["temp_f", "humidity_pct"];
 

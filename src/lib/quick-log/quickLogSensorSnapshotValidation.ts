@@ -24,8 +24,7 @@
 import type { QuickLogSensorSnapshot } from "./createQuickLogEvent";
 
 export type QuickLogSnapshotValidation =
-  | { ok: true; snapshot: QuickLogSensorSnapshot | null }
-  | { ok: false; error: string };
+  { ok: true; snapshot: QuickLogSensorSnapshot | null } | { ok: false; error: string };
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
   return !!v && typeof v === "object" && !Array.isArray(v);
@@ -41,9 +40,7 @@ function isValidIsoDate(v: unknown): v is string {
  * Validate and normalize a sensor snapshot payload prior to embedding in a
  * Quick Log diary companion row.
  */
-export function validateQuickLogSensorSnapshot(
-  raw: unknown,
-): QuickLogSnapshotValidation {
+export function validateQuickLogSensorSnapshot(raw: unknown): QuickLogSnapshotValidation {
   if (raw === null || raw === undefined) {
     return { ok: true, snapshot: null };
   }

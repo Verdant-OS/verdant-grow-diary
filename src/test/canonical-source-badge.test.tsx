@@ -39,9 +39,9 @@ describe("CanonicalSourceBadge view model", () => {
   });
 
   it("formats provider label when known", () => {
-    expect(
-      buildCanonicalSourceBadge({ source: "live", provider: "ecowitt" }).providerLabel,
-    ).toBe("EcoWitt");
+    expect(buildCanonicalSourceBadge({ source: "live", provider: "ecowitt" }).providerLabel).toBe(
+      "EcoWitt",
+    );
   });
 
   it("does not let provider become canonical source", () => {

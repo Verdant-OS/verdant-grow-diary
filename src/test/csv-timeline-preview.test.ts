@@ -40,12 +40,9 @@ function previewFrom(text: string) {
   return { rows: result.rows, mapping: result.mapping };
 }
 
-const OK_ROW_A =
-  "2026-01-01T10:00:00Z,probe-1,Room A,Zone 1,22.5,21.0,55,1.1,900,650,40,2.5";
-const OK_ROW_B =
-  "2026-01-01T11:00:00Z,probe-1,Room A,Zone 1,23.0,21.2,56,1.2,920,660,41,2.6";
-const OK_ROW_C =
-  "2026-01-01T09:00:00Z,probe-1,Room A,Zone 1,21.0,20.5,54,1.0,880,640,39,2.4";
+const OK_ROW_A = "2026-01-01T10:00:00Z,probe-1,Room A,Zone 1,22.5,21.0,55,1.1,900,650,40,2.5";
+const OK_ROW_B = "2026-01-01T11:00:00Z,probe-1,Room A,Zone 1,23.0,21.2,56,1.2,920,660,41,2.6";
+const OK_ROW_C = "2026-01-01T09:00:00Z,probe-1,Room A,Zone 1,21.0,20.5,54,1.0,880,640,39,2.4";
 
 describe("buildCsvTimelinePreview — happy path", () => {
   it("creates timeline events from valid mapped rows", () => {
@@ -65,9 +62,7 @@ describe("buildCsvTimelinePreview — happy path", () => {
       expect(ev.data_context).toBe(REPRESENTATIVE_CSV_DATA_CONTEXT);
       expect(ev.source_label).toBe(TIMELINE_PREVIEW_SOURCE_LABEL);
       expect(ev.metrics.length).toBeGreaterThan(0);
-      expect(ev.metrics.map((m) => m.field)).toEqual(
-        [...ev.metrics.map((m) => m.field)].sort(),
-      );
+      expect(ev.metrics.map((m) => m.field)).toEqual([...ev.metrics.map((m) => m.field)].sort());
     }
   });
 

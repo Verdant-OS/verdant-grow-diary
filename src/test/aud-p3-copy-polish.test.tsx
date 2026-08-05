@@ -3,11 +3,11 @@
  * the new helper copy without changing runtime behavior:
  *   1. Bridge token card — shown once, store securely, revoke if exposed
  *   2. Sensor Source Health — source-only states, stale threshold in plain language
- *   3. Settings page — available / coming soon / not configured tiles
+ *   3. Settings page — shipped controls remain actionable and capability-true
  */
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 
 vi.mock("@/hooks/use-sensor-readings", () => ({
   useSensorReadings: () => ({ data: [], isLoading: false, error: null }),
@@ -22,18 +22,7 @@ vi.mock("@/integrations/supabase/client", () => {
   const makeQuery = () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const q: any = {};
-    for (const m of [
-      "select",
-      "eq",
-      "neq",
-      "not",
-      "in",
-      "order",
-      "limit",
-      "range",
-      "gte",
-      "lte",
-    ]) {
+    for (const m of ["select", "eq", "neq", "not", "in", "order", "limit", "range", "gte", "lte"]) {
       q[m] = () => q;
     }
     q.maybeSingle = async () => ({ data: null, error: null });
@@ -52,6 +41,28 @@ vi.mock("@/integrations/supabase/client", () => {
 
 vi.mock("@/store/auth", () => ({
   useAuth: () => ({ user: { email: "grower@example.com" }, signOut: vi.fn() }),
+}));
+
+vi.mock("@/hooks/useMyEntitlements", () => ({
+  useMyEntitlements: () => ({
+    loading: false,
+    lookupFailed: false,
+    entitlement: { displayPlanId: "free", status: "active", isStaff: false },
+    refetch: vi.fn(),
+  }),
+}));
+
+vi.mock("@/hooks/usePaddleCancelNotice", () => ({
+  usePaddleCancelNotice: () => ({
+    visible: false,
+    accessUntilIso: null,
+    accessUntilLabel: "",
+    reason: null,
+  }),
+}));
+
+vi.mock("@/components/RewardedReferralCard", () => ({
+  default: () => <div data-testid="rewarded-referral-card-stub">Referral card</div>,
 }));
 
 // Return a STABLE toast identity. A fresh `{ toast: vi.fn() }` on every render
@@ -95,7 +106,7 @@ describe("AUD-P3 sensor source health copy", () => {
 });
 
 describe("AUD-P3 settings tile copy", () => {
-  it("distinguishes available, coming-soon, and not-configured tiles", () => {
+  it("keeps every rendered tile actionable without placeholder states", () => {
     render(
       <MemoryRouter>
         <Settings />
@@ -103,21 +114,27 @@ describe("AUD-P3 settings tile copy", () => {
     );
     const tiles = screen.getAllByTestId("settings-tile");
     const states = tiles.map((t) => t.getAttribute("data-tile-state"));
-    expect(states).toContain("available");
-    expect(states).toContain("coming_soon");
-    expect(states).toContain("disabled");
+    expect(new Set(states)).toEqual(new Set(["available"]));
 
     // Profile is available and live
     const profile = tiles.find((t) => within(t).queryByText("Profile"));
     expect(profile).toBeTruthy();
     expect(within(profile!).getByTestId("settings-tile-helper")).toHaveTextContent(/live/i);
 
-    // Integrations tile no longer mislabels everything as "soon"
-    const integrations = tiles.find((t) => within(t).queryByText("Integrations"));
-    expect(integrations).toBeTruthy();
-    expect(integrations!.textContent ?? "").not.toMatch(/· soon/);
-    expect(within(integrations!).getByTestId("settings-tile-helper")).toHaveTextContent(
-      /not connected|no data/i,
+    const notifications = tiles.find((t) => within(t).queryByText("Notifications"));
+    expect(notifications).toBeTruthy();
+    expect(within(notifications!).getByRole("link", { name: "Open alerts" })).toHaveAttribute(
+      "href",
+      "/alerts",
     );
+    expect(notifications).not.toHaveTextContent(/email/i);
+
+    const integrations = tiles.find((t) => within(t).queryByText("Sensor integrations"));
+    expect(integrations).toBeTruthy();
+    expect(within(integrations!).getByRole("link", { name: "Open sensor data" })).toHaveAttribute(
+      "href",
+      "/sensors",
+    );
+    expect(integrations).toHaveTextContent(/source-labeled sensor readings/i);
   });
 });

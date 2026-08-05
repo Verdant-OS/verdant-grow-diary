@@ -1,4 +1,4 @@
-import { Link, NavLink, useLocation } from "react-router-dom";
+import { Link, NavLink, useLocation } from "@/lib/react-router-compat";
 import {
   LayoutDashboard,
   Box,
@@ -92,7 +92,6 @@ export const moreGroups: MoreGroup[] = [
     items: [
       { to: "/daily-check", label: "Quick Log", icon: ClipboardCheck },
       { to: "/actions", label: "Action Queue", icon: ListChecks },
-      { to: "/tasks", label: "Tasks", icon: ListChecks },
     ],
   },
   {
@@ -127,7 +126,10 @@ export default function MobileNav() {
   const [open, setOpen] = useState(false);
   const { pathname } = useLocation();
   return (
-    <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 backdrop-blur-xl bg-background/85 border-t border-border/40 pb-[env(safe-area-inset-bottom)]">
+    <nav
+      aria-label="Primary navigation"
+      className="fixed inset-x-2 bottom-2 z-30 rounded-2xl border border-border/60 bg-card/90 shadow-elevated backdrop-blur-2xl pb-[env(safe-area-inset-bottom)] md:hidden"
+    >
       <div className="grid grid-cols-6 h-16">
         {primary.map((n) => {
           const active = isNavigationItemActive(pathname, n);
@@ -137,8 +139,10 @@ export default function MobileNav() {
               to={n.to}
               aria-current={active ? "page" : undefined}
               className={cn(
-                "flex flex-col items-center justify-center gap-0.5 text-[10px] transition",
-                active ? "text-primary" : "text-muted-foreground hover:text-foreground",
+                "relative flex flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] transition-colors",
+                active
+                  ? "bg-primary/10 text-primary"
+                  : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
               )}
             >
               <n.icon className="h-5 w-5" />
@@ -147,7 +151,7 @@ export default function MobileNav() {
           );
         })}
         <Sheet open={open} onOpenChange={setOpen}>
-          <SheetTrigger className="flex flex-col items-center justify-center gap-0.5 text-[10px] text-muted-foreground hover:text-foreground">
+          <SheetTrigger className="flex flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] text-muted-foreground hover:bg-muted/50 hover:text-foreground">
             <MoreHorizontal className="h-5 w-5" />
             More
           </SheetTrigger>
@@ -165,7 +169,7 @@ export default function MobileNav() {
               aria-label="More navigation destinations"
               tabIndex={0}
               data-testid="mobile-more-scroll-region"
-              className="mt-4 min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain pb-[calc(1.5rem+env(safe-area-inset-bottom))] pr-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              className="mt-4 min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain pb-[calc(1.5rem+env(safe-area-inset-bottom))] pr-1 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
               {moreGroups.map((group) => (
                 <section

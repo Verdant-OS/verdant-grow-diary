@@ -4,15 +4,20 @@
  * Narrowly-scoped static scan that prevents user-facing Dashboard, mobile,
  * and sidebar nav from regressing back to the legacy /logs route.
  *
- * The /logs route still exists in App.tsx as a redirect alias to /timeline,
- * and the logsPath helper still exists in src/lib/routes.ts for backward
- * compatibility — both are explicitly allowed here.
+ * The /logs route still exists in file routes as a redirect alias to /timeline,
+ * and the logsPath helper still exists in src/lib/routes.ts for source
+ * compatibility, but the helper itself emits canonical /timeline URLs.
  *
  * Read-only. No React render, no fetch, no Supabase, no schema work.
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import {
+  extractMountedAppRoutePaths,
+  getRouteAliasRedirectTarget,
+  readAllRouteModuleSources,
+} from "./helpers/routeManifestSyncHarness";
 import {
   readDesktopGrowerNavigationSource,
   readMobileGrowerNavigationSource,
@@ -24,7 +29,7 @@ const read = (p: string) => readFileSync(resolve(ROOT, p), "utf8");
 const DASHBOARD = read("src/pages/Dashboard.tsx");
 const MOBILE = readMobileGrowerNavigationSource();
 const SIDEBAR = readDesktopGrowerNavigationSource();
-const APP = read("src/App.tsx");
+const APP = readAllRouteModuleSources();
 
 const USER_FACING = [
   ["Dashboard", DASHBOARD] as const,
@@ -61,15 +66,14 @@ describe("Slice 7: user-facing nav never points at the legacy /logs path", () =>
   });
 });
 
-describe("Slice 7: /logs remains a legacy redirect alias in App.tsx", () => {
-  it("App.tsx registers a scope-preserving /logs alias to /timeline", () => {
-    expect(APP).toMatch(/path=["']\/logs["']/);
-    expect(APP).toMatch(
-      /<Route[^>]*path=["']\/logs["'][^>]*element=\{<RouteAliasRedirect\s+to=["']\/timeline["']\s*\/>\}/,
-    );
+describe("Slice 7: /logs remains a legacy redirect alias in file routes", () => {
+  it("File routes register a scope-preserving /logs alias to /timeline", () => {
+    expect(extractMountedAppRoutePaths()).toContain("/logs");
+    expect(getRouteAliasRedirectTarget("/logs")).toBe("/timeline");
   });
 
-  it("App.tsx still mounts the canonical /timeline route", () => {
-    expect(APP).toMatch(/<Route[^>]*path=["']\/timeline["']/);
+  it("File routes still mount the canonical /timeline route", () => {
+    expect(extractMountedAppRoutePaths()).toContain("/timeline");
+    expect(APP).toMatch(/Timeline|@\/pages\/Timeline|pages\/Timeline/);
   });
 });

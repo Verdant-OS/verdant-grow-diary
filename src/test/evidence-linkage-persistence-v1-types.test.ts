@@ -51,7 +51,7 @@ describe("Evidence Linkage Persistence v1 — schema + wiring", () => {
       const start = src.indexOf(anchor);
       expect(start).toBeGreaterThan(-1);
       const rest = src.slice(start + anchor.length);
-      const nextTable = rest.search(/\n {6}[a-z_]+: \{\n/);
+      const nextTable = rest.search(/\r?\n {6}[a-z_]+: \{\r?\n/);
       const end = nextTable >= 0 ? start + anchor.length + nextTable : src.length;
       return src.slice(start, end);
     }
@@ -66,9 +66,7 @@ describe("Evidence Linkage Persistence v1 — schema + wiring", () => {
         "prompt",
         "completion",
       ]) {
-        expect(block.includes(banned), `${anchor} contains ${banned}`).toBe(
-          false,
-        );
+        expect(block.includes(banned), `${anchor} contains ${banned}`).toBe(false);
       }
     }
   });
@@ -89,9 +87,7 @@ describe("Evidence Linkage Persistence v1 — schema + wiring", () => {
     const src = read("src/pages/ActionDetail.tsx");
     expect(src).toContain("adaptOriginatingTimelineEventsFromRow");
     expect(src).toContain("ACTION_QUEUE_ALERT_DERIVED_EVIDENCE_NOT_LINKED_COPY");
-    expect(src).toContain(
-      "ACTION_QUEUE_AI_DOCTOR_DERIVED_EVIDENCE_NOT_LINKED_COPY",
-    );
+    expect(src).toContain("ACTION_QUEUE_AI_DOCTOR_DERIVED_EVIDENCE_NOT_LINKED_COPY");
     expect(src.includes("events={[]}")).toBe(false);
     expect(src).toContain("originating_timeline_events");
   });
@@ -102,24 +98,22 @@ describe("Evidence Linkage Persistence v1 — schema + wiring", () => {
     // forwarding adapter — never inferred from prose, timestamps, plant/tent,
     // alert id, or metric name. The adapter itself returns an explicit array
     // (possibly empty) so the persisted column is always a sanitized array.
-    expect(src).toContain(
-      'from "@/lib/originatingTimelineEventForwardRules"',
-    );
+    expect(src).toContain('from "@/lib/originatingTimelineEventForwardRules"');
     expect(src).toContain("forwardAlertRefsToActionQueue");
     expect(src).toMatch(
       /originating_timeline_events:\s*[\s\S]{0,80}forwardAlertRefsToActionQueue\(\s*alert\s*\)/,
     );
     // Guard against accidental reintroduction of inference: no nearest-reading
     // / timestamp / metric-name heuristics in the insert payload region.
-    const insertRegion =
-      src.slice(src.indexOf("originating_timeline_events:"), src.indexOf("originating_timeline_events:") + 400);
+    const insertRegion = src.slice(
+      src.indexOf("originating_timeline_events:"),
+      src.indexOf("originating_timeline_events:") + 400,
+    );
     expect(insertRegion).not.toMatch(/nearest|inferFrom|guessFrom|approximate/i);
   });
 
   it("AI Doctor→action insert path persists an explicit refs array", () => {
-    const src = read(
-      "src/hooks/useAddAiDoctorSessionSuggestionToActionQueue.ts",
-    );
+    const src = read("src/hooks/useAddAiDoctorSessionSuggestionToActionQueue.ts");
     expect(src).toMatch(/originating_timeline_events:\s*\[\]/);
   });
 
@@ -130,15 +124,7 @@ describe("Evidence Linkage Persistence v1 — schema + wiring", () => {
   });
 
   it("fallback copy constants remain calm and free of certainty/automation tokens", () => {
-    const banned = [
-      "auto",
-      "automated",
-      "device",
-      "command",
-      "execute",
-      "guaranteed",
-      "certain",
-    ];
+    const banned = ["auto", "automated", "device", "command", "execute", "guaranteed", "certain"];
     for (const copy of [
       ALERT_REVIEW_EVIDENCE_NOT_LINKED_COPY,
       ACTION_QUEUE_ALERT_DERIVED_EVIDENCE_NOT_LINKED_COPY,

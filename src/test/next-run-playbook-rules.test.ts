@@ -217,10 +217,7 @@ describe("deterministic sorting and grouping", () => {
     const repeat = playbook.groups.find((g) => g.section === "repeat")!;
     expect(repeat.items).toHaveLength(2);
     // Same recordedAt in this fixture -> tiebreak by episodeKey ascending.
-    expect(repeat.items.map((i) => i.episodeKey)).toEqual([
-      "episode:a",
-      "episode:b",
-    ]);
+    expect(repeat.items.map((i) => i.episodeKey)).toEqual(["episode:a", "episode:b"]);
   });
 
   it("null-safe: empty episode list produces an empty playbook", () => {

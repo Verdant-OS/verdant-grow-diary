@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import {
   AiDoctorPhase1EvidenceShortcuts,
   AI_DOCTOR_PHASE1_DIARY_SHORTCUTS_MAX,
@@ -34,11 +34,7 @@ describe("sortRecentActivityNewestFirst", () => {
       row("a", "2026-06-10T00:00:00Z"),
       row("c", "2026-06-12T00:00:00Z"),
     ];
-    expect(sortRecentActivityNewestFirst(rows).map((r) => r.id)).toEqual([
-      "c",
-      "a",
-      "b",
-    ]);
+    expect(sortRecentActivityNewestFirst(rows).map((r) => r.id)).toEqual(["c", "a", "b"]);
   });
 
   it("ignores malformed rows", () => {
@@ -61,24 +57,12 @@ describe("AiDoctorPhase1EvidenceShortcuts — render", () => {
       row("e4", "2026-06-04T00:00:00Z"),
       row("e5", "2026-06-05T00:00:00Z"),
     ];
-    renderWithRouter(
-      <AiDoctorPhase1EvidenceShortcuts items={items} context={CTX} />,
-    );
-    expect(
-      screen.getByTestId("ai-doctor-phase1-diary-shortcut-e5"),
-    ).toBeTruthy();
-    expect(
-      screen.getByTestId("ai-doctor-phase1-diary-shortcut-e4"),
-    ).toBeTruthy();
-    expect(
-      screen.getByTestId("ai-doctor-phase1-diary-shortcut-e3"),
-    ).toBeTruthy();
-    expect(
-      screen.queryByTestId("ai-doctor-phase1-diary-shortcut-e1"),
-    ).toBeNull();
-    expect(
-      screen.queryByTestId("ai-doctor-phase1-diary-shortcut-e2"),
-    ).toBeNull();
+    renderWithRouter(<AiDoctorPhase1EvidenceShortcuts items={items} context={CTX} />);
+    expect(screen.getByTestId("ai-doctor-phase1-diary-shortcut-e5")).toBeTruthy();
+    expect(screen.getByTestId("ai-doctor-phase1-diary-shortcut-e4")).toBeTruthy();
+    expect(screen.getByTestId("ai-doctor-phase1-diary-shortcut-e3")).toBeTruthy();
+    expect(screen.queryByTestId("ai-doctor-phase1-diary-shortcut-e1")).toBeNull();
+    expect(screen.queryByTestId("ai-doctor-phase1-diary-shortcut-e2")).toBeNull();
   });
 
   it("preserves plantId/growId/tentId in each href", () => {
@@ -89,9 +73,7 @@ describe("AiDoctorPhase1EvidenceShortcuts — render", () => {
       />,
     );
     const href =
-      screen
-        .getByTestId("ai-doctor-phase1-diary-shortcut-only")
-        .getAttribute("href") ?? "";
+      screen.getByTestId("ai-doctor-phase1-diary-shortcut-only").getAttribute("href") ?? "";
     expect(href).toContain("/plants/plant-a");
     expect(href).toContain("growId=grow-1");
     expect(href).toContain("tentId=tent-1");
@@ -99,20 +81,15 @@ describe("AiDoctorPhase1EvidenceShortcuts — render", () => {
   });
 
   it("renders calm empty copy when there are no rows", () => {
-    renderWithRouter(
-      <AiDoctorPhase1EvidenceShortcuts items={[]} context={CTX} />,
+    renderWithRouter(<AiDoctorPhase1EvidenceShortcuts items={[]} context={CTX} />);
+    expect(screen.getByTestId("ai-doctor-phase1-diary-shortcuts-empty").textContent).toContain(
+      "No recent diary evidence available yet.",
     );
-    expect(
-      screen.getByTestId("ai-doctor-phase1-diary-shortcuts-empty").textContent,
-    ).toContain("No recent diary evidence available yet.");
   });
 
   it("anchors have no onClick mutation handlers", () => {
     renderWithRouter(
-      <AiDoctorPhase1EvidenceShortcuts
-        items={[row("x", "2026-06-10T00:00:00Z")]}
-        context={CTX}
-      />,
+      <AiDoctorPhase1EvidenceShortcuts items={[row("x", "2026-06-10T00:00:00Z")]} context={CTX} />,
     );
     const anchor = screen.getByTestId("ai-doctor-phase1-diary-shortcut-x");
     expect(anchor.tagName.toLowerCase()).toBe("a");
@@ -126,9 +103,7 @@ describe("AiDoctorPhase1EvidenceShortcuts — render", () => {
         context={{ plantId: null }}
       />,
     );
-    expect(
-      screen.getByTestId("ai-doctor-phase1-diary-shortcut-only-unavailable"),
-    ).toBeTruthy();
+    expect(screen.getByTestId("ai-doctor-phase1-diary-shortcut-only-unavailable")).toBeTruthy();
   });
 });
 
@@ -199,10 +174,7 @@ describe("AiDoctorPhase1EvidenceShortcuts — accessibility polish", () => {
 
   it("uses generic aria-label when plantName is unavailable", () => {
     renderWithRouter(
-      <AiDoctorPhase1EvidenceShortcuts
-        items={[row("x", "2026-06-10T00:00:00Z")]}
-        context={CTX}
-      />,
+      <AiDoctorPhase1EvidenceShortcuts items={[row("x", "2026-06-10T00:00:00Z")]} context={CTX} />,
     );
     const a = screen.getByTestId("ai-doctor-phase1-diary-shortcut-x");
     expect(a.getAttribute("aria-label") ?? "").toMatch(/for selected plant/);
@@ -223,17 +195,12 @@ describe("AiDoctorPhase1EvidenceShortcuts — accessibility polish", () => {
 
 describe("AiDoctorPhase1EvidenceShortcuts — shared a11y utility", () => {
   it("diary shortcut className contains the shared focus-visible recipe", async () => {
-    const { AI_DOCTOR_PHASE1_FOCUS_VISIBLE_LINK_CLASSES } = await import(
-      "@/lib/aiDoctorPhase1A11yClassNames"
-    );
+    const { AI_DOCTOR_PHASE1_FOCUS_VISIBLE_LINK_CLASSES } =
+      await import("@/lib/aiDoctorPhase1A11yClassNames");
     renderWithRouter(
-      <AiDoctorPhase1EvidenceShortcuts
-        items={[row("x", "2026-06-10T00:00:00Z")]}
-        context={CTX}
-      />,
+      <AiDoctorPhase1EvidenceShortcuts items={[row("x", "2026-06-10T00:00:00Z")]} context={CTX} />,
     );
-    const cls =
-      screen.getByTestId("ai-doctor-phase1-diary-shortcut-x").getAttribute("class") ?? "";
+    const cls = screen.getByTestId("ai-doctor-phase1-diary-shortcut-x").getAttribute("class") ?? "";
     for (const token of AI_DOCTOR_PHASE1_FOCUS_VISIBLE_LINK_CLASSES.split(/\s+/)) {
       expect(cls).toContain(token);
     }

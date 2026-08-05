@@ -12,11 +12,9 @@ import {
 } from "@/lib/oneTentSensorProofViewModel";
 import { buildEcowittIngestAuditProof } from "@/lib/ecowittIngestAuditProofRules";
 
-const UUID_RE =
-  /\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b/;
+const UUID_RE = /\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b/;
 // ISO timestamps with second precision: 2025-01-15T11:00:00Z etc.
-const ISO_SECOND_RE =
-  /\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})\b/;
+const ISO_SECOND_RE = /\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})\b/;
 
 const TENT = "11111111-2222-3333-4444-555555555555";
 const NOW = new Date("2025-01-15T12:00:00Z");

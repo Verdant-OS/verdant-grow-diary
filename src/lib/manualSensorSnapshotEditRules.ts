@@ -50,17 +50,12 @@ export interface ManualEditDiffOk {
 
 export interface ManualEditDiffErr {
   ok: false;
-  reason:
-    | "non_manual_source"
-    | "empty_diff"
-    | "invalid_input";
+  reason: "non_manual_source" | "empty_diff" | "invalid_input";
 }
 
 export type ManualEditDiffResult = ManualEditDiffOk | ManualEditDiffErr;
 
-function pickNumeric(
-  snap: ManualEditSnapshotInput,
-): Partial<Record<ManualEditField, number>> {
+function pickNumeric(snap: ManualEditSnapshotInput): Partial<Record<ManualEditField, number>> {
   const out: Partial<Record<ManualEditField, number>> = {};
   for (const key of Object.keys(snap)) {
     if (!ALLOWED_SET.has(key)) continue;
@@ -88,9 +83,7 @@ export interface BuildDiffArgs {
  * Compute a sanitized, deterministic diff between two manual sensor
  * snapshots. Rejects any input whose source is not "manual".
  */
-export function buildManualSensorSnapshotEditDiff(
-  args: BuildDiffArgs,
-): ManualEditDiffResult {
+export function buildManualSensorSnapshotEditDiff(args: BuildDiffArgs): ManualEditDiffResult {
   if (!args || !args.original || !args.replacement) {
     return { ok: false, reason: "invalid_input" };
   }

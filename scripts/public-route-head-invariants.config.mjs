@@ -28,10 +28,7 @@ export const DEFAULT_ROBOTS_DIRECTIVE = "index, follow";
  * Allowed robots values. Any value outside this set (e.g. "none",
  * "noai", accidental empty string) fails validation immediately.
  */
-export const ALLOWED_ROBOTS_DIRECTIVES = Object.freeze([
-  "index, follow",
-  "noindex, follow",
-]);
+export const ALLOWED_ROBOTS_DIRECTIVES = Object.freeze(["index, follow", "noindex, follow"]);
 
 /**
  * Twitter handle assertions.
@@ -75,11 +72,15 @@ export const EXPECTED_JSONLD_NODES = Object.freeze([
       operatingSystem: "Web",
       url: "https://verdantgrowdiary.com",
     }),
+    // Publicly purchasable SKUs only. Founder Lifetime is retired from the
+    // public pricing grid (deep-link-only) and must NOT be advertised here —
+    // src/test/software-application-offers-truth.test.ts pins this list.
     offerNames: Object.freeze([
       "Free",
       "Pro (monthly)",
       "Pro (annual)",
-      "Founder Lifetime",
+      "Craft (monthly)",
+      "Craft (annual)",
     ]),
   }),
 ]);

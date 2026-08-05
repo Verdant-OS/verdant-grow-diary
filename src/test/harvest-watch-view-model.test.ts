@@ -4,9 +4,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import {
-  buildHarvestWatchRowViewModel,
-} from "@/lib/harvestWatchViewModel";
+import { buildHarvestWatchRowViewModel } from "@/lib/harvestWatchViewModel";
 import type { HarvestWatchInput } from "@/lib/harvestWatchRules";
 
 const SOURCE = readFileSync(
@@ -58,9 +56,7 @@ describe("row view model", () => {
   });
 
   it("keeps dryback visible but muted when plant selection skipped", () => {
-    const vm = buildHarvestWatchRowViewModel(
-      input({ irrigationPlantSelectionQuality: "skipped" }),
-    );
+    const vm = buildHarvestWatchRowViewModel(input({ irrigationPlantSelectionQuality: "skipped" }));
     expect(vm.dryback.visible).toBe(true);
     expect(vm.dryback.muted).toBe(true);
     expect(vm.dryback.label).toBe("Lower Confidence");
@@ -76,9 +72,7 @@ describe("row view model", () => {
   });
 
   it("surfaces trichome insight only at high confidence", () => {
-    const hidden = buildHarvestWatchRowViewModel(
-      input({ trichome: { confidence: "medium" } }),
-    );
+    const hidden = buildHarvestWatchRowViewModel(input({ trichome: { confidence: "medium" } }));
     expect(hidden.trichome.visible).toBe(false);
 
     const shown = buildHarvestWatchRowViewModel(
@@ -125,6 +119,23 @@ describe("row view model", () => {
     expect(vm.readiness.score).toBeNull();
     expect(vm.confidenceLabel).toBe("Low");
     expect(vm.lastPhotoLabel).toBe("No photos yet");
+    expect(vm.harvestWindowLabel).toBe("Flower start date needed");
+    expect(vm.harvestWindow.caption).toMatch(/flower start|flip date/i);
+    expect(vm.harvestWindowLabel).not.toMatch(/^Day /);
+  });
+
+  it("does not treat a negative flower-day value as a usable date anchor", () => {
+    const vm = buildHarvestWatchRowViewModel(input({ daysInFlower: -1, expectedHarvestDay: null }));
+
+    expect(vm.harvestWindowLabel).toBe("Flower start date needed");
+    expect(vm.harvestWindow.caption).toMatch(/flower start|flip date/i);
+  });
+
+  it("does not treat phenotype duration history as this plant's flower-date anchor", () => {
+    const vm = buildHarvestWatchRowViewModel(input({ daysInFlower: null, expectedHarvestDay: 63 }));
+
+    expect(vm.harvestWindowLabel).toBe("Flower start date needed");
+    expect(vm.harvestWindow.caption).toMatch(/flower start|flip date/i);
   });
 
   it("computes days-vs-history delta with sign-aware label", () => {

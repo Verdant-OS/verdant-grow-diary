@@ -32,14 +32,7 @@ export type OneTentLoopGapStatus = LoopStepStatus | "resolved";
 export type OneTentLoopGapEvidenceKind = EvidenceProvenance | "resolved";
 
 export type OneTentLoopGapEvidenceState =
-  | "present"
-  | "missing"
-  | "weak"
-  | "stale"
-  | "invalid"
-  | "demo_only"
-  | "unknown"
-  | "blocked";
+  "present" | "missing" | "weak" | "stale" | "invalid" | "demo_only" | "unknown" | "blocked";
 
 export interface OneTentLoopGapEvidenceChecklistItem {
   kind: "loop-step";

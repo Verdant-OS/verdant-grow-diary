@@ -74,23 +74,57 @@ export function getGrowDataMeta(
 export function combineGrowDataMeta(metas: readonly GrowDataSourceMeta[]): GrowDataSourceMeta {
   if (metas.length === 0) return DEFAULT_GROW_DATA_META;
   const sources = new Set(metas.map((m) => m.dataSource));
-  if (sources.size === 1) {
-    const only = metas[0];
-    return { ...only, sourceReason: only.sourceReason };
-  }
   const hasReal = sources.has("supabase");
   const hasMock = sources.has("mock");
-  if (hasReal && hasMock) {
+  const hasMixed = sources.has("mixed");
+  const hasDemoData = metas.some((meta) => meta.isDemoData);
+
+  // A combined meta may itself be combined again by a parent surface.
+  // Preserve that nested provenance, and preserve any explicit demo truth,
+  // before considering whether real rows are also present. Otherwise
+  // {supabase, mixed} or {supabase, demo-marked unavailable} can be
+  // incorrectly promoted to blanket Supabase/live data.
+  if (hasMixed || (hasReal && (hasMock || hasDemoData))) {
+    const includesDemo = hasMock || hasDemoData;
     return {
-      isDemoData: true,
+      isDemoData: includesDemo,
       dataSource: "mixed",
-      sourceReason: "mixed:real-and-demo",
+      sourceReason: includesDemo ? "mixed:real-and-demo" : "mixed:preserved",
     };
   }
-  // Any combination involving unavailable is treated as unavailable-degraded.
+  if (sources.size === 1) {
+    const only = metas[0];
+    return {
+      ...only,
+      // A mock source is demo by definition. For repeated same-source metas,
+      // use a conservative OR so input ordering cannot erase demo truth.
+      isDemoData: hasMock || hasDemoData,
+      sourceReason: only.sourceReason,
+    };
+  }
+  // Real data present, and the only other source(s) here are "unavailable"
+  // (no mixed/demo provenance) — e.g. a freshly created plant with no tent assigned
+  // yet, where plantMeta is real Supabase data and tentMeta simply never
+  // queried anything. This is NOT demo data. Falling through to "mixed"
+  // here (as this branch used to, contradicting its own comment above) fed
+  // straight into PlantDetailDataSourceDisclosure treating any "mixed"
+  // record source as "Demo" — mislabeling a brand new, genuinely real plant
+  // as "Demo / sample data ... not a real reading" on its own detail page.
+  // Confirmed live: a plant created via the real Create Plant flow, with no
+  // tent yet, showed the Demo badge despite every field on the page
+  // correctly reading "No tent assigned" / "NO READING" — i.e. an honest
+  // empty state, not fabricated demo content.
+  if (hasReal) {
+    return {
+      isDemoData: false,
+      dataSource: "supabase",
+      sourceReason: "partial-real",
+    };
+  }
+  // No real data anywhere — genuinely unavailable-degraded.
   return {
-    isDemoData: metas.some((m) => m.isDemoData),
-    dataSource: hasReal ? "mixed" : "unavailable",
+    isDemoData: hasMock || hasDemoData,
+    dataSource: "unavailable",
     sourceReason: "partial",
   };
 }

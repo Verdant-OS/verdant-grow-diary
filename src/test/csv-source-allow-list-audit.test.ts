@@ -15,10 +15,7 @@ import {
   buildRegistryCsvInsertRows,
 } from "@/lib/registryCsvInsertRowsAdapter";
 import { PREVIEW_PERSISTENCE_ENABLED } from "@/lib/sensorImportPreviewCopy";
-import {
-  CSV_SOURCE_AC_INFINITY,
-  csvSourceTagFor,
-} from "@/lib/csvSensorImportRules";
+import { CSV_SOURCE_AC_INFINITY, csvSourceTagFor } from "@/lib/csvSensorImportRules";
 
 /** Sources verified against the deployed trigger on 2026-06-13. */
 const DEPLOYED_ACCEPTED_SOURCES = [

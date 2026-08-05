@@ -17,9 +17,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 
-const FIXED_NOW = new Date("2026-05-26T15:00:00Z");
+const FIXED_NOW = new Date(2026, 4, 26, 15, 0, 0);
 const TENT_ID = "tent-1";
 const PLANT_ID = "plant-1";
 const OTHER_TENT = "tent-2";
@@ -94,10 +94,7 @@ function renderSection() {
             tentIds={[TENT_ID]}
             hideWhenReady
           />
-          <PlantDailyGrowCheckConsistencyCard
-            plantId={PLANT_ID}
-            currentTentId={TENT_ID}
-          />
+          <PlantDailyGrowCheckConsistencyCard plantId={PLANT_ID} currentTentId={TENT_ID} />
           <PlantDailyGrowCheckHistoryCard
             plantId={PLANT_ID}
             currentTentId={TENT_ID}
@@ -115,9 +112,7 @@ function renderSection() {
  * tag, role hint, and short visible text. This is the snapshot payload.
  */
 function summarizeHierarchy(container: HTMLElement): string {
-  const nodes = Array.from(
-    container.querySelectorAll<HTMLElement>("[data-testid]"),
-  );
+  const nodes = Array.from(container.querySelectorAll<HTMLElement>("[data-testid]"));
   return nodes
     .map((el, i) => {
       const id = el.getAttribute("data-testid");
@@ -130,10 +125,7 @@ function summarizeHierarchy(container: HTMLElement): string {
             : tag === "h1" || tag === "h2" || tag === "h3"
               ? "[heading]"
               : "";
-      const text = (el.textContent ?? "")
-        .replace(/\s+/g, " ")
-        .trim()
-        .slice(0, 80);
+      const text = (el.textContent ?? "").replace(/\s+/g, " ").trim().slice(0, 80);
       return `${String(i).padStart(2, "0")} ${id}${role ? " " + role : ""}${
         text ? ` :: "${text}"` : ""
       }`;
@@ -267,8 +259,6 @@ describe("Plant Detail · Daily Grow Check section · visual hierarchy snapshots
       expect(text).not.toContain(banned);
     }
     // Sensor labels from non-tent should not leak.
-    expect(container.querySelectorAll(`[data-tent-id="${OTHER_TENT}"]`).length).toBe(
-      0,
-    );
+    expect(container.querySelectorAll(`[data-tent-id="${OTHER_TENT}"]`).length).toBe(0);
   });
 });

@@ -23,9 +23,7 @@ const TARGET_PATHS = [
 function stripComments(src: string): string {
   // Strip block + line comments so doc text mentioning forbidden patterns
   // cannot trip the scan.
-  return src
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/(^|[^:])\/\/.*$/gm, "$1");
+  return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
 }
 
 const sources = TARGET_PATHS.map((p) => ({
@@ -67,13 +65,10 @@ describe("ecowitt-real-ingest — Phase 0 static safety", () => {
     expect(src).not.toMatch(/\bsessionStorage\b/);
   });
 
-  it.each(sources)(
-    "[$path] does not reference action_queue or alerts write paths",
-    ({ src }) => {
-      expect(src).not.toMatch(/from\(["']action_queue["']\)/);
-      expect(src).not.toMatch(/from\(["']alerts["']\)/);
-    },
-  );
+  it.each(sources)("[$path] does not reference action_queue or alerts write paths", ({ src }) => {
+    expect(src).not.toMatch(/from\(["']action_queue["']\)/);
+    expect(src).not.toMatch(/from\(["']alerts["']\)/);
+  });
 
   it.each(sources)(
     "[$path] does not embed device-control words in code identifiers/strings",
@@ -93,19 +88,16 @@ describe("ecowitt-real-ingest — Phase 0 static safety", () => {
     },
   );
 
-  it.each(sources)(
-    "[$path] does not embed executable command language",
-    ({ src }) => {
-      const banned = [
-        /["']\s*turn\s+(on|off)\b/i,
-        /["']\s*power\s+(on|off)\b/i,
-        /["']\s*set\s+(fan|light|pump|heater)/i,
-        /["']\s*dose\s+\d/i,
-        /["']\s*irrigate\s+now/i,
-      ];
-      for (const rx of banned) expect(src).not.toMatch(rx);
-    },
-  );
+  it.each(sources)("[$path] does not embed executable command language", ({ src }) => {
+    const banned = [
+      /["']\s*turn\s+(on|off)\b/i,
+      /["']\s*power\s+(on|off)\b/i,
+      /["']\s*set\s+(fan|light|pump|heater)/i,
+      /["']\s*dose\s+\d/i,
+      /["']\s*irrigate\s+now/i,
+    ];
+    for (const rx of banned) expect(src).not.toMatch(rx);
+  });
 
   it("validator source does not call Date.now() directly", () => {
     const validatorSrc = sources.find(

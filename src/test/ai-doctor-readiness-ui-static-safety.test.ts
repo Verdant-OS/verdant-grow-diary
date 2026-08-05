@@ -61,13 +61,7 @@ const FORBIDDEN_PHRASES: readonly string[] = [
   "diagnosed from photo",
 ];
 
-const UNTRUSTED_NEAR_HEALTHY_TOKENS = [
-  "invalid",
-  "stale",
-  "demo",
-  "unknown",
-  "untrusted",
-];
+const UNTRUSTED_NEAR_HEALTHY_TOKENS = ["invalid", "stale", "demo", "unknown", "untrusted"];
 
 /**
  * Strip block and line comments to avoid false positives in JSDoc /
@@ -77,8 +71,9 @@ function stripComments(source: string): string {
   // Block comments
   let out = source.replace(/\/\*[\s\S]*?\*\//g, (m) => " ".repeat(m.length));
   // Line comments
-  out = out.replace(/(^|[^:])\/\/[^\n]*/g, (m, pre: string) =>
-    pre + " ".repeat(m.length - pre.length),
+  out = out.replace(
+    /(^|[^:])\/\/[^\n]*/g,
+    (m, pre: string) => pre + " ".repeat(m.length - pre.length),
   );
   return out;
 }
@@ -141,9 +136,7 @@ describe("ai-doctor-readiness-ui-static-safety", () => {
   });
 
   it("scans at least one file", () => {
-    const present = SCANNED_FILES.filter((f) =>
-      existsSync(resolve(REPO_ROOT, f)),
-    );
+    const present = SCANNED_FILES.filter((f) => existsSync(resolve(REPO_ROOT, f)));
     expect(present.length).toBeGreaterThan(0);
   });
 
@@ -156,14 +149,9 @@ describe("ai-doctor-readiness-ui-static-safety", () => {
 
     if (all.length > 0) {
       const report = all
-        .map(
-          (f) =>
-            `  - ${f.file}:${f.line}  [${f.phrase}]  → ${f.excerpt}`,
-        )
+        .map((f) => `  - ${f.file}:${f.line}  [${f.phrase}]  → ${f.excerpt}`)
         .join("\n");
-      throw new Error(
-        `Forbidden phrases detected on AI Doctor readiness UI path:\n${report}`,
-      );
+      throw new Error(`Forbidden phrases detected on AI Doctor readiness UI path:\n${report}`);
     }
     expect(all).toEqual([]);
   });

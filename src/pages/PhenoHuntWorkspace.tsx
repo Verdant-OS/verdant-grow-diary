@@ -15,7 +15,7 @@
  * authoritative for numbering and Pro access.
  */
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams } from "@/lib/react-router-compat";
 import { usePhenoHuntWorkspace, CANDIDATE_PAGE_SIZE } from "@/hooks/usePhenoHuntWorkspace";
 import { buildPhenoHuntCsv, phenoHuntCsvFilename } from "@/lib/phenoHuntCsvExport";
 import { LOUD_TRAIT_AXES } from "@/lib/phenoExpressionRules";
@@ -87,7 +87,10 @@ import {
   PHENO_COHORT_MIN,
   PHENO_COHORT_MAX,
 } from "@/lib/phenoComparisonCohort";
-import type { AssignCandidateNumberResult } from "@/lib/phenoCandidateNumberService";
+import type {
+  AssignCandidateNumberFailure,
+  AssignCandidateNumberResult,
+} from "@/lib/phenoCandidateNumberService";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { canWriteFeatureData } from "@/lib/featureEntitlements";
 
@@ -205,17 +208,71 @@ const CandidateNumberAssign = memo(function CandidateNumberAssign({
   plantId,
   candidateNumber,
   canAssign,
+  onRecheckPlan,
   onAssign,
 }: {
   plantId: string;
   candidateNumber: number | null;
   canAssign: boolean;
+  /** Resolves to true when the plan lookup itself FAILED (not "you are Free"). */
+  onRecheckPlan: () => Promise<boolean>;
   onAssign: (plantId: string, candidateNumber: number) => Promise<AssignCandidateNumberResult>;
 }) {
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // Kept alongside the message so the entitlement denial can offer the right
+  // remedy. Every other reason — including `network` — stays a plain message:
+  // a transport failure must never be dressed up as an account problem.
+  const [errReason, setErrReason] = useState<AssignCandidateNumberFailure | null>(null);
   const [assigned, setAssigned] = useState<number | null>(null);
+  const [rechecking, setRechecking] = useState(false);
+
+  // An entitlement rejection means the CLIENT believed the grower could write
+  // (canAssign gated this control) but the database disagreed — a stale or
+  // diverged plan read, not a known Free grower. The remedy is to re-check the
+  // plan, never to sell: /pricing does not inspect the current entitlement
+  // before opening checkout, so an upsell here could bill an already-paying
+  // grower a second time.
+  const recheckPlan = async () => {
+    setRechecking(true);
+    try {
+      const lookupFailed = await onRecheckPlan();
+      if (lookupFailed) {
+        // A failed lookup resolves the entitlement to Free for presentation,
+        // which would otherwise flip canAssign off and silently swap this
+        // control for "Unnumbered" — hiding an actionable server denial behind
+        // a verification problem. Keep the denial visible and say so honestly.
+        setErr("Couldn't verify your plan just now. Your plan hasn't changed — try again.");
+        return;
+      }
+      setErr(null);
+      setErrReason(null);
+    } finally {
+      setRechecking(false);
+    }
+  };
+
+  const denialWithRecheck = (
+    <>
+      <span
+        role="alert"
+        data-testid={`workspace-assign-number-error-${plantId}`}
+        className="font-medium text-red-600 dark:text-red-400"
+      >
+        {err}
+      </span>{" "}
+      <button
+        type="button"
+        disabled={rechecking}
+        onClick={() => void recheckPlan()}
+        data-testid={`workspace-assign-number-recheck-${plantId}`}
+        className="font-medium underline underline-offset-2 disabled:opacity-50"
+      >
+        {rechecking ? "Re-checking…" : "Re-check my plan"}
+      </button>
+    </>
+  );
 
   const current = assigned ?? candidateNumber;
   if (current != null) {
@@ -229,6 +286,19 @@ const CandidateNumberAssign = memo(function CandidateNumberAssign({
     );
   }
   if (!canAssign) {
+    // A live entitlement denial outranks the plain read-only label: losing it
+    // here is exactly how a failed re-check would silently swallow the server's
+    // answer for a grower who is probably still paying.
+    if (err && errReason === "entitlement") {
+      return (
+        <div
+          data-testid={`workspace-assign-number-${plantId}`}
+          className="flex flex-wrap items-center gap-2 text-xs"
+        >
+          {denialWithRecheck}
+        </div>
+      );
+    }
     return (
       <span
         data-testid={`workspace-candidate-unnumbered-${plantId}`}
@@ -243,16 +313,20 @@ const CandidateNumberAssign = memo(function CandidateNumberAssign({
     const n = Number(value.trim());
     if (!Number.isInteger(n) || n <= 0) {
       setErr("Enter a positive whole number.");
+      setErrReason("invalid");
       return;
     }
     setBusy(true);
     setErr(null);
+    setErrReason(null);
     const res = await onAssign(plantId, n);
     setBusy(false);
     if (res.ok === false) {
       setErr(res.error);
+      setErrReason(res.reason);
       return;
     }
+    setErrReason(null);
     setAssigned(res.candidateNumber);
     setValue("");
   };
@@ -272,6 +346,7 @@ const CandidateNumberAssign = memo(function CandidateNumberAssign({
           value={value}
           onChange={(e) => {
             setErr(null);
+            setErrReason(null);
             setValue(e.target.value);
           }}
           onKeyDown={(e) => {
@@ -292,7 +367,9 @@ const CandidateNumberAssign = memo(function CandidateNumberAssign({
         {busy ? "Saving…" : "Assign number"}
       </button>
       <span className="text-muted-foreground">Becomes permanently fixed for this hunt.</span>
-      {err ? (
+      {err && errReason === "entitlement" ? (
+        denialWithRecheck
+      ) : err ? (
         <span
           role="alert"
           data-testid={`workspace-assign-number-error-${plantId}`}
@@ -308,10 +385,12 @@ const CandidateNumberAssign = memo(function CandidateNumberAssign({
 /** Post-cure smoke test — the deciding gate. Own state + save. */
 function SmokeTestFields({
   plantId,
+  candidateLabel,
   row,
   onSave,
 }: {
   plantId: string;
+  candidateLabel: string;
   row: SmokeTestRow | undefined;
   onSave: (
     plantId: string,
@@ -368,6 +447,7 @@ function SmokeTestFields({
               type="number"
               min={1}
               max={5}
+              aria-label={`${candidateLabel}: Post-cure smoothness score (1–5)`}
               data-testid={`workspace-smoke-smoothness-${plantId}`}
               value={smoothness}
               onChange={(e) => {
@@ -383,6 +463,7 @@ function SmokeTestFields({
               type="number"
               min={1}
               max={5}
+              aria-label={`${candidateLabel}: Post-cure potency impression (1–5)`}
               data-testid={`workspace-smoke-potency-${plantId}`}
               value={potency}
               onChange={(e) => {
@@ -430,10 +511,12 @@ function SmokeTestFields({
 /** COA / lab numbers — grower-attached, source-tagged, never fabricated. */
 function LabFields({
   plantId,
+  candidateLabel,
   row,
   onSave,
 }: {
   plantId: string;
+  candidateLabel: string;
   row: LabResultRow | undefined;
   onSave: (
     plantId: string,
@@ -478,6 +561,7 @@ function LabFields({
             <input
               type="number"
               step="0.1"
+              aria-label={`${candidateLabel}: Lab THC percentage`}
               data-testid={`workspace-lab-thc-${plantId}`}
               value={thc}
               onChange={(e) => {
@@ -492,6 +576,7 @@ function LabFields({
             <input
               type="number"
               step="0.1"
+              aria-label={`${candidateLabel}: Lab CBD percentage`}
               data-testid={`workspace-lab-cbd-${plantId}`}
               value={cbd}
               onChange={(e) => {
@@ -556,6 +641,8 @@ interface EditorProps {
   selected: boolean;
   onToggleSelect: (plantId: string) => void;
   canAssign: boolean;
+  /** Resolves to true when the plan lookup itself FAILED (not "you are Free"). */
+  onRecheckPlan: () => Promise<boolean>;
   onAssignNumber: (
     plantId: string,
     candidateNumber: number,
@@ -642,6 +729,7 @@ const CandidateEditor = memo(function CandidateEditor({
   selected,
   onToggleSelect,
   canAssign,
+  onRecheckPlan,
   onAssignNumber,
   onSaveScore,
   onSaveRound,
@@ -774,6 +862,7 @@ const CandidateEditor = memo(function CandidateEditor({
           plantId={plantId}
           candidateNumber={candidate.candidateNumber ?? null}
           canAssign={canAssign}
+          onRecheckPlan={onRecheckPlan}
           onAssign={onAssignNumber}
         />
         <PhenoCandidateEvidenceCoverage
@@ -802,6 +891,7 @@ const CandidateEditor = memo(function CandidateEditor({
               min={axis.min}
               max={axis.max}
               step={1}
+              aria-label={`${displayLabel}: ${axis.label} score (${axis.min}–${axis.max})`}
               data-testid={`workspace-trait-${plantId}-${axis.key}`}
               value={traits[axis.key] ?? ""}
               onChange={(e) => setTrait(axis.key, e.target.value)}
@@ -848,6 +938,7 @@ const CandidateEditor = memo(function CandidateEditor({
       <label className="block text-sm">
         <span className="mb-1 block">Notes</span>
         <textarea
+          aria-label={`${displayLabel}: Notes`}
           data-testid={`workspace-note-${plantId}`}
           value={note}
           onChange={(e) => {
@@ -968,8 +1059,18 @@ const CandidateEditor = memo(function CandidateEditor({
         </div>
       )}
 
-      <SmokeTestFields plantId={plantId} row={smokeRow} onSave={onSaveSmokeTest} />
-      <LabFields plantId={plantId} row={labRow} onSave={onSaveLabResult} />
+      <SmokeTestFields
+        plantId={plantId}
+        candidateLabel={displayLabel}
+        row={smokeRow}
+        onSave={onSaveSmokeTest}
+      />
+      <LabFields
+        plantId={plantId}
+        candidateLabel={displayLabel}
+        row={labRow}
+        onSave={onSaveLabResult}
+      />
 
       <PhenoDocumentationSections
         recordId={plantId}
@@ -1051,7 +1152,7 @@ export default function PhenoHuntWorkspace() {
     plantIds: loadedCandidateIds,
     configuredGoals: ws.hunt?.evidenceGoals ?? [],
   });
-  const { entitlement } = useMyEntitlements();
+  const { entitlement, refetch: refetchEntitlement } = useMyEntitlements();
   // Owner-only + Pro. Pheno surfaces are owner-only via RLS, so the viewer owns
   // the hunt; the presentation gate is an active Pheno Tracker Pro plan. The
   // database trigger is authoritative regardless.
@@ -1072,6 +1173,10 @@ export default function PhenoHuntWorkspace() {
   const [objectiveSaving, setObjectiveSaving] = useState(false);
   const effectiveBreedingObjective: BreedingObjectiveTarget[] =
     breedingObjectiveLocal ?? ws.hunt?.breedingObjective ?? [];
+  const selectedRoundLoadState =
+    round === "overall"
+      ? null
+      : (ws.roundLoadStates?.[round] ?? { status: "idle" as const, error: null });
 
   const { setFilter } = ws;
 
@@ -1330,7 +1435,8 @@ export default function PhenoHuntWorkspace() {
 
   return (
     <PhenoSamplingProvider>
-      <main
+      <section
+        aria-label="Pheno hunt workspace"
         data-testid="pheno-workspace"
         className="container mx-auto max-w-5xl space-y-4 px-4 py-6"
       >
@@ -1484,6 +1590,7 @@ export default function PhenoHuntWorkspace() {
                 Decision
                 <select
                   data-testid="workspace-filter-decision"
+                  aria-label="Filter candidates by keeper decision"
                   value={ws.filters.decision ?? "all"}
                   onChange={(e) =>
                     setFilter({ decision: e.target.value === "all" ? undefined : e.target.value })
@@ -1503,6 +1610,7 @@ export default function PhenoHuntWorkspace() {
                 Sex
                 <select
                   data-testid="workspace-filter-sex"
+                  aria-label="Filter candidates by sex"
                   value={ws.filters.sex ?? "all"}
                   onChange={(e) =>
                     setFilter({ sex: e.target.value === "all" ? undefined : e.target.value })
@@ -1521,6 +1629,7 @@ export default function PhenoHuntWorkspace() {
                 Readiness
                 <select
                   data-testid="workspace-filter-readiness"
+                  aria-label="Filter candidates by readiness"
                   value={readinessFilter}
                   onChange={(e) => setReadinessFilter(e.target.value as typeof readinessFilter)}
                   className="rounded border border-border bg-background px-2 py-1"
@@ -1552,9 +1661,7 @@ export default function PhenoHuntWorkspace() {
                 }
                 className="ml-auto rounded border border-border bg-secondary px-2 py-1 text-xs font-medium disabled:opacity-50"
               >
-                {evidencePackets.status === "loading"
-                  ? "Preparing evidence…"
-                  : "Export loaded CSV"}
+                {evidencePackets.status === "loading" ? "Preparing evidence…" : "Export loaded CSV"}
               </button>
               {evidencePackets.status === "loading" ? (
                 <span
@@ -1611,6 +1718,42 @@ export default function PhenoHuntWorkspace() {
               >
                 No loaded candidates match these filters.
               </p>
+            ) : round !== "overall" && selectedRoundLoadState?.status !== "ready" ? (
+              <div
+                data-testid={
+                  selectedRoundLoadState?.status === "error"
+                    ? "workspace-round-error"
+                    : "workspace-round-loading"
+                }
+                className="space-y-3 rounded-lg border border-border bg-card p-4"
+              >
+                <p
+                  role={selectedRoundLoadState?.status === "error" ? "alert" : "status"}
+                  className="text-sm text-muted-foreground"
+                >
+                  {selectedRoundLoadState?.status === "error"
+                    ? (selectedRoundLoadState.error ?? "Could not load this scoring round.")
+                    : `Loading ${PHENO_SCORE_ROUND_LABELS[round]} scores…`}
+                </p>
+                {selectedRoundLoadState?.status === "error" ? (
+                  <button
+                    type="button"
+                    data-testid="workspace-round-retry"
+                    onClick={() => void ws.loadRound(round)}
+                    className="rounded border border-border px-3 py-1.5 text-sm font-medium"
+                  >
+                    Retry round
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  data-testid="workspace-round-save-disabled"
+                  disabled
+                  className="rounded-md border border-border bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground opacity-50"
+                >
+                  Save unavailable
+                </button>
+              </div>
             ) : (
               <div className="grid gap-4 md:grid-cols-2">
                 {visibleCandidates.map((c) => (
@@ -1630,6 +1773,7 @@ export default function PhenoHuntWorkspace() {
                     selected={selectedIds.includes(c.candidateId)}
                     onToggleSelect={onToggleSelect}
                     canAssign={canAssign}
+                    onRecheckPlan={refetchEntitlement}
                     onAssignNumber={ws.assignCandidateNumber}
                     onSaveScore={ws.saveScore}
                     onSaveRound={ws.saveRound}
@@ -1655,19 +1799,38 @@ export default function PhenoHuntWorkspace() {
               </div>
             )}
 
-            {ws.hasMore && (
-              <div className="flex justify-center">
-                <button
-                  type="button"
-                  data-testid="workspace-show-more"
-                  disabled={ws.loadingMore}
-                  onClick={ws.loadNextPage}
-                  className="rounded border border-border bg-secondary px-3 py-1.5 text-sm font-medium disabled:opacity-50"
-                >
-                  {ws.loadingMore ? "Loading…" : `Load up to ${CANDIDATE_PAGE_SIZE} more`}
-                </button>
-              </div>
-            )}
+            {ws.hasMore &&
+              (ws.loadMoreError ? (
+                <div className="flex flex-col items-center gap-2">
+                  <p
+                    data-testid="workspace-load-more-error"
+                    role="alert"
+                    className="text-sm text-muted-foreground"
+                  >
+                    {ws.loadMoreError}
+                  </p>
+                  <button
+                    type="button"
+                    data-testid="workspace-load-more-retry"
+                    onClick={ws.loadNextPage}
+                    className="rounded border border-border bg-secondary px-3 py-1.5 text-sm font-medium"
+                  >
+                    Retry loading candidates
+                  </button>
+                </div>
+              ) : (
+                <div className="flex justify-center">
+                  <button
+                    type="button"
+                    data-testid="workspace-show-more"
+                    disabled={ws.loadingMore}
+                    onClick={ws.loadNextPage}
+                    className="rounded border border-border bg-secondary px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+                  >
+                    {ws.loadingMore ? "Loading…" : `Load up to ${CANDIDATE_PAGE_SIZE} more`}
+                  </button>
+                </div>
+              ))}
           </>
         )}
 
@@ -1697,7 +1860,7 @@ export default function PhenoHuntWorkspace() {
             candidateLabel: c.candidateLabel,
           }))}
         />
-      </main>
+      </section>
     </PhenoSamplingProvider>
   );
 }

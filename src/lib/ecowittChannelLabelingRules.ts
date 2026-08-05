@@ -16,33 +16,16 @@
  *    channel indices are preserved but flagged "unsupported".
  */
 
-export type EcowittChannelFamily =
-  | "soil_moisture"
-  | "air_temperature"
-  | "humidity"
-  | "other";
+import { ECOWITT_CHANNEL_LABELING_STALE_AFTER_MS } from "../constants/sensorTiming";
+export type EcowittChannelFamily = "soil_moisture" | "air_temperature" | "humidity" | "other";
 
 export type EcowittChannelStatus =
-  | "accepted"
-  | "rejected"
-  | "missing"
-  | "invalid"
-  | "stale"
-  | "not_checked";
+  "accepted" | "rejected" | "missing" | "invalid" | "stale" | "not_checked";
 
 export type EcowittEvidenceSource =
-  | "live"
-  | "local"
-  | "test"
-  | "manual"
-  | "csv"
-  | "stale"
-  | "unknown";
+  "live" | "local" | "test" | "manual" | "csv" | "stale" | "unknown";
 
-export type EcowittCanonicalMetric =
-  | "soil_moisture_pct"
-  | "temp_f"
-  | "humidity_pct";
+export type EcowittCanonicalMetric = "soil_moisture_pct" | "temp_f" | "humidity_pct";
 
 export interface DetectedEcowittChannel {
   rawKey: string;
@@ -99,13 +82,12 @@ export interface BuildEcowittChannelLabelingOptions {
   staleAfterMs?: number;
 }
 
-export const READ_ONLY_CHANNEL_NOTICE =
-  "Read-only channel review. Assignments are not saved yet.";
+export const READ_ONLY_CHANNEL_NOTICE = "Read-only channel review. Assignments are not saved yet.";
 
 export const MULTI_SOIL_MOISTURE_WARNING =
   "Multiple soil moisture channels detected — Verdant currently surfaces the primary channel as `soil_moisture_pct`; review raw channels before plant-specific interpretation.";
 
-const DEFAULT_STALE_AFTER_MS = 60 * 60 * 1000;
+const DEFAULT_STALE_AFTER_MS = ECOWITT_CHANNEL_LABELING_STALE_AFTER_MS;
 
 const SOIL_RE = /^soilmoisture(\d{1,2})$/i;
 const TEMP_F_RE = /^temp(\d{1,2})f$/i;
@@ -118,10 +100,7 @@ const FAMILY_LABELS: Record<EcowittChannelFamily, string> = {
   other: "Other",
 };
 
-const FAMILY_METRICS: Record<
-  Exclude<EcowittChannelFamily, "other">,
-  EcowittCanonicalMetric
-> = {
+const FAMILY_METRICS: Record<Exclude<EcowittChannelFamily, "other">, EcowittCanonicalMetric> = {
   soil_moisture: "soil_moisture_pct",
   air_temperature: "temp_f",
   humidity: "humidity_pct",
@@ -174,10 +153,7 @@ function coerceNumber(raw: unknown): { value: number | null; invalid: boolean } 
   return { value: n, invalid: false };
 }
 
-function formatValueLabel(
-  family: EcowittChannelFamily,
-  value: number | null,
-): string {
+function formatValueLabel(family: EcowittChannelFamily, value: number | null): string {
   if (value === null) return "—";
   const rounded = Math.round(value * 10) / 10;
   const text = Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
@@ -258,18 +234,14 @@ export function buildEcowittChannelLabelingViewModel(
 
       const { value, invalid } = coerceNumber(rawValue);
       const familyLabel = FAMILY_LABELS[parsed.family];
-      const canonicalMetric =
-        parsed.family === "other"
-          ? null
-          : FAMILY_METRICS[parsed.family];
+      const canonicalMetric = parsed.family === "other" ? null : FAMILY_METRICS[parsed.family];
 
       let status: EcowittChannelStatus;
       let reason: string;
 
       if (!parsed.supported) {
         status = "not_checked";
-        reason =
-          "Unsupported channel — raw key preserved but not mapped to a canonical metric.";
+        reason = "Unsupported channel — raw key preserved but not mapped to a canonical metric.";
       } else if (invalid) {
         status = "invalid";
         reason = "Value is not a finite number.";
@@ -336,10 +308,7 @@ export function buildEcowittChannelLabelingViewModel(
     other: 3,
   };
 
-  const sortChannels = (
-    a: DetectedEcowittChannel,
-    b: DetectedEcowittChannel,
-  ): number => {
+  const sortChannels = (a: DetectedEcowittChannel, b: DetectedEcowittChannel): number => {
     const ac = a.channel ?? Number.POSITIVE_INFINITY;
     const bc = b.channel ?? Number.POSITIVE_INFINITY;
     if (ac !== bc) return ac - bc;
@@ -354,17 +323,12 @@ export function buildEcowittChannelLabelingViewModel(
   }
   unsupported.sort(sortChannels);
 
-  const groups: DetectedEcowittChannelGroup[] = Array.from(
-    groupsByFamily.entries(),
-  )
+  const groups: DetectedEcowittChannelGroup[] = Array.from(groupsByFamily.entries())
     .map(([family, channels]) => {
       channels.sort(sortChannels);
-      const canonicalMetric =
-        family === "other" ? null : FAMILY_METRICS[family];
+      const canonicalMetric = family === "other" ? null : FAMILY_METRICS[family];
       const multiChannelWarning =
-        family === "soil_moisture" && channels.length > 1
-          ? MULTI_SOIL_MOISTURE_WARNING
-          : null;
+        family === "soil_moisture" && channels.length > 1 ? MULTI_SOIL_MOISTURE_WARNING : null;
       return {
         family,
         familyLabel: FAMILY_LABELS[family],

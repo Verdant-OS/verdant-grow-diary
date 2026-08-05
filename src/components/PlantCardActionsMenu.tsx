@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
@@ -71,11 +71,7 @@ interface Props {
  *
  * Out of scope: alerts, Action Queue, sensors, automation, device control.
  */
-export default function PlantCardActionsMenu({
-  plant,
-  variant = "menu",
-  hideView = false,
-}: Props) {
+export default function PlantCardActionsMenu({ plant, variant = "menu", hideView = false }: Props) {
   const qc = useQueryClient();
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [confirmArchive, setConfirmArchive] = useState(false);
@@ -127,8 +123,7 @@ export default function PlantCardActionsMenu({
           <AlertDialogHeader>
             <AlertDialogTitle>Remove this plant from this tent?</AlertDialogTitle>
             <AlertDialogDescription>
-              The plant stays in your grow. Logs, photos, and diary history
-              are not deleted.
+              The plant stays in your grow. Logs, photos, and diary history are not deleted.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -149,8 +144,8 @@ export default function PlantCardActionsMenu({
           <AlertDialogHeader>
             <AlertDialogTitle>Archive {plant.name}?</AlertDialogTitle>
             <AlertDialogDescription>
-              Archiving hides the plant from your active lists. Logs, photos,
-              and diary history are kept. You can restore it later.
+              Archiving hides the plant from your active lists. Logs, photos, and diary history are
+              kept. You can restore it later.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -170,10 +165,7 @@ export default function PlantCardActionsMenu({
 
   if (variant === "row") {
     return (
-      <div
-        className="flex flex-wrap gap-2"
-        data-testid="plant-card-actions-row"
-      >
+      <div className="flex flex-wrap gap-2" data-testid="plant-card-actions-row">
         <EditPlantDialog
           plant={plant}
           trigger={
@@ -221,7 +213,7 @@ export default function PlantCardActionsMenu({
             grow_id: plant.growId ?? null,
             tent_id: plant.tentId ?? null,
             started_at: plant.startedAt ?? null,
-              is_archived: plant.isArchived ?? false,
+            is_archived: plant.isArchived ?? false,
           }}
           trigger={
             <Button

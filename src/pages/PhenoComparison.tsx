@@ -6,6 +6,7 @@
  * live per-hunt comparison lives in PhenoHuntCompare (/pheno-hunts/:id/compare).
  */
 import PhenoComparisonView from "@/components/PhenoComparisonView";
+import PublicPageRecoveryNav from "@/components/PublicPageRecoveryNav";
 import { PHENO_COMPARISON_DEMO_CANDIDATES } from "@/lib/phenoComparisonFixtures";
 import { usePageSeo } from "@/hooks/usePageSeo";
 
@@ -16,5 +17,10 @@ export default function PhenoComparison() {
       "Read-only preview of Verdant's pheno-hunt comparison view: structure, resin, aroma, vigor, and finish laid side by side. Demo fixtures only.",
     path: "/pheno-comparison",
   });
-  return <PhenoComparisonView inputs={PHENO_COMPARISON_DEMO_CANDIDATES} mode="demo" />;
+  return (
+    <>
+      <PhenoComparisonView inputs={PHENO_COMPARISON_DEMO_CANDIDATES} mode="demo" />
+      <PublicPageRecoveryNav className="container mx-auto max-w-6xl border-t border-border px-4 pt-4 pb-6" />
+    </>
+  );
 }

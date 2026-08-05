@@ -19,7 +19,18 @@ const PRIVATE_TABLES = [
   "action_queue",
 ];
 
-const PROTECTED_TABLES = [...PRIVATE_TABLES, "pheno_hunts", "pheno_keepers"];
+const PROTECTED_TABLES = [
+  ...PRIVATE_TABLES,
+  "pheno_hunts",
+  "pheno_keepers",
+  // Read by /operator/edge-alerts and /operator/edge-metrics — added when
+  // those two routes joined PROTECTED_MOBILE_ROUTES below, so a redirect-race
+  // read of either table now actually fails the "no private hits" assertion
+  // instead of passing silently.
+  "edge_metrics_alert_dispatches",
+  "edge_metrics_webhook_attempts",
+  "edge_function_metric_events",
+];
 
 // Representative protected/operator/internal mobile coverage. Kept in sync
 // with src/lib/appRouteManifest.ts via src/test/operator-route-mobile-coverage.test.ts.
@@ -27,23 +38,28 @@ const PROTECTED_TABLES = [...PRIVATE_TABLES, "pheno_hunts", "pheno_keepers"];
 const PROTECTED_MOBILE_ROUTES: string[] = [
   // operator
   "/diagnostics",
+  "/diagnostics-seo-artifacts",
   "/ingest-inspector",
   "/operator/ai-doctor-phase1",
   "/operator/billing-entitlement-resolution",
   "/operator/billing-subscription-updates",
+  "/operator/credits-audit",
   "/operator/ecowitt",
   "/operator/ecowitt-bridge-status",
   "/operator/ecowitt-bridge-debug",
   "/operator/ecowitt-live-bringup",
   "/operator/ecowitt-tent-preview",
-  "/operator/ggs-real-payload-ingest",
+  "/operator/edge-alerts",
+  "/operator/edge-metrics",
   "/demo/one-tent-live-proof",
+  "/operator/mode",
   "/operator/one-tent-live-proof",
   "/operator/one-tent-loop-smoke-test",
   "/operator/one-tent-proof-record",
   "/operator/paddle-processing-audit",
   "/operator/post-grow-reflection-dry-run",
   "/operator/release-readiness",
+  "/operator/schema-audit",
   "/operator/subscriber-growth",
   "/operator/support-inbox",
   "/operator/demo-preview",
@@ -79,6 +95,9 @@ const PUBLIC_MOBILE_ROUTES: string[] = [
   "/guides",
   "/guides/:slug",
   "/guides/grow-stage-care-guide",
+  // Exact ID-free Customer Mode guide: static/noindex and must make no
+  // private-table requests. Dynamic /customer/:shareId remains retired.
+  "/customer/guide/oreoz-vs-gelonade-comparison",
   "/cultivars",
   // Template entry satisfies the manifest coverage guard; ":slug" resolves
   // to the unknown-slug redirect, so also exercise a real detail page.
@@ -89,8 +108,6 @@ const PUBLIC_MOBILE_ROUTES: string[] = [
   "/how-ai-doctor-works",
   "/partners/csv-preview",
   "/sensors/csv-preview",
-  "/customer/:shareId",
-  "/customer/:shareId/cannabis-care",
   // Read-only Pheno Comparison preview: public, fixture-only, mounted outside
   // AuthProvider/GrowsProvider/AppShell — must render signed-out on mobile with
   // zero private-table fetches.
@@ -110,6 +127,7 @@ const PUBLIC_MOBILE_ROUTES: string[] = [
   "/upgrade",
   "/checkout/success",
   "/checkout/cancel",
+  "/unsubscribe",
   "/terms",
   "/privacy",
   "/refund",
@@ -240,6 +258,21 @@ test.describe("Auth route-protection MOBILE (mocked, 390x844)", () => {
           body: JSON.stringify([]),
         });
       });
+      // /operator/edge-alerts invokes the `edge-metrics-alert-check` edge
+      // function. Without this, a redirect-race window could fire a REAL
+      // supabase.functions.invoke() call, breaking this file's own stated
+      // contract ("No real Supabase calls are made") — a stricter failure
+      // than a merely-unasserted REST read, so every /functions/v1/ hit
+      // counts here, not just ones matching a name allowlist.
+      const functionHits: string[] = [];
+      await page.route(/\/functions\/v1\//, (route, req) => {
+        functionHits.push(req.url());
+        return route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({}),
+        });
+      });
       // Reliability v1: avoid waiting on full network idle (mobile cold-boot
       // for 40+ protected routes is too tight at 8s and causes repo-wide
       // flake). Use domcontentloaded for the navigation and a polling URL
@@ -257,6 +290,10 @@ test.describe("Auth route-protection MOBILE (mocked, 390x844)", () => {
       expect(
         privateHits,
         `Private-table hits while signed out (mobile, ${path}): ${privateHits.join(", ")}`,
+      ).toHaveLength(0);
+      expect(
+        functionHits,
+        `Edge Function invocation while signed out (mobile, ${path}): ${functionHits.join(", ")}`,
       ).toHaveLength(0);
       const body = ((await page.locator("body").textContent()) ?? "").toLowerCase();
       expect(body).not.toContain("page not found");

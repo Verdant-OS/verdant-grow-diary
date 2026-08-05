@@ -20,14 +20,8 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const ROOT = resolve(__dirname, "../..");
-const RULES = readFileSync(
-  resolve(ROOT, "src/lib/relativeStageTimelineRules.ts"),
-  "utf8",
-);
-const DOC = readFileSync(
-  resolve(ROOT, "docs/relative-cultivation-timeline.md"),
-  "utf8",
-);
+const RULES = readFileSync(resolve(ROOT, "src/lib/relativeStageTimelineRules.ts"), "utf8");
+const DOC = readFileSync(resolve(ROOT, "docs/relative-cultivation-timeline.md"), "utf8");
 
 describe("relative cultivation timeline — static guardrails (rules module)", () => {
   it("does not reference calendar_events / notifications / reminders tables", () => {

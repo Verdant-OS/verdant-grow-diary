@@ -30,6 +30,18 @@ export const PUBLIC_QUICK_LOG_STARTER_COPY = {
   ctaLine:
     "Create a free account to start your grow diary — the draft stays on this device for you to copy over.",
   signupCtaLabel: "Create a free account",
+  /**
+   * Signed-in variants. This surface is public and stays device-local for
+   * everyone, but telling a grower who already has an account to create one
+   * is false and dead-ends them. These point at the dashboard, where the
+   * existing handoff card picks the draft up. Must stay clear of the
+   * static-safety scanner's dishonest-persistence patterns — in particular
+   * it may never claim the draft is "saved to your diary", because on this
+   * page it still is not.
+   */
+  signedInCtaLine:
+    "You're signed in already. This page still keeps its draft on this device only — open your dashboard to carry it into your grow diary.",
+  signedInCtaLabel: "Continue in your grow diary",
   clearDraftLabel: "Delete draft",
   saveDraftLabel: "Save draft to this device",
   storageErrorLine:

@@ -6,6 +6,7 @@
  * - Derivation lives in `@/lib/alertWhyContext` — this file only renders.
  */
 import { deriveAlertWhyContext, WHY_PREFIX, type AlertLike } from "@/lib/alertWhyContext";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 
 export interface AlertWhyContextProps {
   alert: AlertLike;
@@ -13,7 +14,8 @@ export interface AlertWhyContextProps {
 }
 
 export function AlertWhyContext({ alert, variant = "compact" }: AlertWhyContextProps) {
-  const why = deriveAlertWhyContext(alert);
+  const temperatureUnit = useTemperatureUnitPreference();
+  const why = deriveAlertWhyContext(alert, temperatureUnit);
 
   if (variant === "compact") {
     return (
@@ -22,8 +24,7 @@ export function AlertWhyContext({ alert, variant = "compact" }: AlertWhyContextP
         data-kind={why.kind}
         className="text-[11px] text-muted-foreground/90"
       >
-        <span className="font-medium">{WHY_PREFIX}</span>{" "}
-        <span>{why.text}</span>
+        <span className="font-medium">{WHY_PREFIX}</span> <span>{why.text}</span>
       </p>
     );
   }

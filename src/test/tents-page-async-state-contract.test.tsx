@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 
 const mocks = vi.hoisted(() => {
   const tentId = "5a1c6e0f-2b3d-4c5e-8f90-1a2b3c4d5e6f";

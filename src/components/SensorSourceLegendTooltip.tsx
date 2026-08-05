@@ -25,7 +25,7 @@ export default function SensorSourceLegendTooltip({ className, testIdSuffix }: P
   return (
     <details className={className} data-testid={tid}>
       <summary
-        className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-border/50 bg-secondary/40 px-2 py-0.5 text-[11px] font-medium text-foreground hover:bg-secondary/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+        className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-border/50 bg-secondary/40 px-2 py-0.5 text-[11px] font-medium text-foreground hover:bg-secondary/60 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary/60"
         aria-label="Sensor source legend"
         data-testid={`${tid}-summary`}
       >

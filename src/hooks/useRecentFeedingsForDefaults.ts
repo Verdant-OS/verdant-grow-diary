@@ -66,7 +66,7 @@ export function useRecentFeedingsForDefaults(input: RecentFeedingsForDefaultsInp
       // fallback so a migration gap does not erase Last-Used defaults.
       let legacy = supabase
         .from("diary_entries")
-        .select("id,grow_id,plant_id,tent_id,entry_type,entry_at,note,details")
+        .select("id,grow_id,plant_id,tent_id,entry_at,note,details")
         .order("entry_at", { ascending: false })
         .limit(RECENT_FEEDINGS_DEFAULTS_LIMIT);
       if (plantId) {

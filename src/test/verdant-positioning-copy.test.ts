@@ -37,7 +37,7 @@ describe("Verdant positioning copy constants", () => {
 
   it("exposes signup, pricing, and honest product-discovery CTAs", () => {
     expect(VERDANT_HERO.primaryCtaLabel).toBe("Start Free");
-    expect(VERDANT_HERO.pricingCtaLabel).toBe("See Pro & Founder plans");
+    expect(VERDANT_HERO.pricingCtaLabel).toBe("See Pro & Craft plans");
     expect(VERDANT_HERO.secondaryCtaLabel).toBe("Take the 60-second tour");
   });
 
@@ -101,7 +101,7 @@ describe("Landing page renders the polished positioning", () => {
     expect(LANDING).toMatch(/to=\{signInPath\}/);
     expect(LANDING).toMatch(/const signInPath = returnTo \? [\s\S]{0,80}: "\/auth"/);
     expect(LANDING).toMatch(/href="#loop"/);
-    // /demo is not primary-marketed here; App.tsx redirects it to /welcome.
+    // /demo is not primary-marketed here; File routes redirect it to /welcome.
     expect(LANDING).not.toMatch(/to="\/demo"/);
     expect(LANDING).not.toMatch(/href="\/demo"/);
   });

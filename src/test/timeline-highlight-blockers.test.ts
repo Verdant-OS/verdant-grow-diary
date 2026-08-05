@@ -34,9 +34,7 @@ describe("detectTimelineHighlightBlockers", () => {
   });
 
   it("treats whitespace-only search as inactive", () => {
-    expect(
-      detectTimelineHighlightBlockers({ searchQuery: "   " }),
-    ).toEqual([]);
+    expect(detectTimelineHighlightBlockers({ searchQuery: "   " })).toEqual([]);
   });
 });
 
@@ -48,17 +46,13 @@ describe("formatTimelineHighlightBlockersLine", () => {
   });
 
   it("formats blockers into a single human-readable line", () => {
-    expect(
-      formatTimelineHighlightBlockersLine(["search", "stage"]),
-    ).toBe("Active filters: search, stage.");
+    expect(formatTimelineHighlightBlockersLine(["search", "stage"])).toBe(
+      "Active filters: search, stage.",
+    );
   });
 
   it("never includes raw UUIDs", () => {
-    const line = formatTimelineHighlightBlockersLine([
-      "search",
-      "plant",
-      "tent",
-    ]) ?? "";
+    const line = formatTimelineHighlightBlockersLine(["search", "plant", "tent"]) ?? "";
     expect(line).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}/i);
   });
 });

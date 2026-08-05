@@ -1,0 +1,1268 @@
+import { describe, expect, it } from "vitest";
+import {
+  buildSymptomEvidenceChecklist,
+  buildSymptomEvidenceTimelineRows,
+} from "@/lib/symptomEvidenceChecklistRules";
+
+const symptom = {
+  id: "symptom-1",
+  grow_id: "grow-1",
+  tent_id: "tent-1",
+  plant_id: "plant-1",
+  entry_at: "2026-08-01T12:00:00.000Z",
+  event_type: "observation",
+  note: "Yellowing on lower leaves",
+  details: {
+    subtype: "issue",
+    observedSign: "discoloration",
+    observationLocation: "lower_leaves",
+    observation_stage: "flower",
+  },
+};
+
+function category(view: NonNullable<ReturnType<typeof buildSymptomEvidenceChecklist>>, id: string) {
+  return view.categories.find((entry) => entry.id === id)!;
+}
+
+describe("symptom evidence checklist", () => {
+  it("uses an exact inclusive 14-day window and excludes future evidence", () => {
+    const view = buildSymptomEvidenceChecklist({
+      symptomEntry: symptom,
+      historyComplete: true,
+      entries: [
+        {
+          id: "boundary",
+          grow_id: "grow-1",
+          plant_id: "plant-1",
+          occurred_at: "2026-07-18T12:00:00.000Z",
+          event_type: "watering",
+        },
+        {
+          id: "older",
+          grow_id: "grow-1",
+          plant_id: "plant-1",
+          occurred_at: "2026-07-18T11:59:59.999Z",
+          event_type: "watering",
+        },
+        {
+          id: "future",
+          grow_id: "grow-1",
+          plant_id: "plant-1",
+          occurred_at: "2026-08-01T12:00:00.001Z",
+          event_type: "watering",
+        },
+      ],
+    })!;
+    expect(category(view, "watering").items.map((item) => item.id)).toEqual(["boundary"]);
+  });
+
+  it("enforces grow, plant, and tent scoping without inference", () => {
+    const view = buildSymptomEvidenceChecklist({
+      symptomEntry: symptom,
+      historyComplete: true,
+      entries: [
+        {
+          id: "other-grow",
+          grow_id: "grow-2",
+          plant_id: "plant-1",
+          occurred_at: "2026-07-31T12:00:00Z",
+          event_type: "feeding",
+        },
+        {
+          id: "other-plant",
+          grow_id: "grow-1",
+          plant_id: "plant-2",
+          tent_id: "tent-1",
+          occurred_at: "2026-07-31T12:00:00Z",
+          event_type: "feeding",
+        },
+        {
+          id: "same-plant",
+          grow_id: "grow-1",
+          plant_id: "plant-1",
+          tent_id: "tent-1",
+          occurred_at: "2026-07-31T12:00:00Z",
+          event_type: "feeding",
+        },
+        {
+          id: "other-tent",
+          grow_id: "grow-1",
+          plant_id: "plant-2",
+          tent_id: "tent-2",
+          occurred_at: "2026-07-31T12:00:00Z",
+          event_type: "environment",
+        },
+        {
+          id: "same-plant-other-tent-environment",
+          grow_id: "grow-1",
+          plant_id: "plant-1",
+          tent_id: "tent-2",
+          occurred_at: "2026-07-31T13:00:00Z",
+          event_type: "environment",
+        },
+        {
+          id: "same-plant-other-tent-lighting",
+          grow_id: "grow-1",
+          plant_id: "plant-1",
+          tent_id: "tent-2",
+          occurred_at: "2026-07-31T13:00:00Z",
+          event_type: "observation",
+          details: { checkType: "light" },
+        },
+        {
+          id: "same-tent",
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          occurred_at: "2026-07-31T12:00:00Z",
+          event_type: "environment",
+        },
+      ],
+    })!;
+    expect(category(view, "feeding").items.map((item) => item.id)).toEqual(["same-plant"]);
+    expect(category(view, "environment").items.map((item) => item.id)).toEqual(["same-tent"]);
+    expect(category(view, "lighting").items).toEqual([]);
+  });
+
+  it("returns four ordered categories, newest first, capped to three with a stable tie break", () => {
+    const entries = ["d", "b", "a", "c"].map((id, index) => ({
+      id,
+      grow_id: "grow-1",
+      plant_id: "plant-1",
+      occurred_at: index === 0 ? "2026-07-31T13:00:00Z" : "2026-07-31T12:00:00Z",
+      event_type: "watering",
+    }));
+    const view = buildSymptomEvidenceChecklist({
+      symptomEntry: symptom,
+      entries,
+      historyComplete: true,
+    })!;
+    expect(view.categories.map((entry) => entry.title)).toEqual([
+      "Environment Check",
+      "Watering",
+      "Feeding",
+      "Lighting",
+    ]);
+    expect(category(view, "watering").totalMatches).toBe(4);
+    expect(category(view, "watering").items.map((item) => item.id)).toEqual(["d", "a", "b"]);
+  });
+
+  it("uses the shared explicit-light classifier and ignores generic uses of light", () => {
+    const view = buildSymptomEvidenceChecklist({
+      symptomEntry: symptom,
+      historyComplete: true,
+      entries: [
+        {
+          id: "generic",
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          occurred_at: "2026-07-31T12:00:00Z",
+          event_type: "observation",
+          note: "Light watering",
+        },
+        {
+          id: "explicit",
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          occurred_at: "2026-07-31T13:00:00Z",
+          event_type: "observation",
+          details: { checkType: "light" },
+        },
+      ],
+    })!;
+    expect(category(view, "lighting").items.map((item) => item.id)).toEqual(["explicit"]);
+  });
+
+  it("does not count a symptom diary companion's grow-event parent as prior evidence", () => {
+    const view = buildSymptomEvidenceChecklist({
+      symptomEntry: {
+        ...symptom,
+        id: "symptom-diary-row",
+        details: {
+          ...symptom.details,
+          linked_grow_event_id: "symptom-grow-event",
+        },
+      },
+      historyComplete: true,
+      entries: [
+        {
+          id: "symptom-grow-event",
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          plant_id: "plant-1",
+          occurred_at: "2026-08-01T12:00:00Z",
+          event_type: "observation",
+          note: "Raised the grow light; upper leaves look pale.",
+        },
+      ],
+    })!;
+
+    expect(category(view, "lighting").items).toEqual([]);
+    expect(category(view, "lighting").status).toBe("missing");
+  });
+
+  it("never turns partial history or missing scope into a confirmed absence", () => {
+    const partial = buildSymptomEvidenceChecklist({
+      symptomEntry: symptom,
+      entries: [],
+      historyComplete: false,
+    })!;
+    expect(partial.categories.every((entry) => entry.status === "limited")).toBe(true);
+    const noPlant = buildSymptomEvidenceChecklist({
+      symptomEntry: { ...symptom, plant_id: null },
+      entries: [],
+      historyComplete: true,
+    })!;
+    expect(category(noPlant, "watering").status).toBe("limited");
+    expect(category(noPlant, "feeding").status).toBe("limited");
+  });
+
+  it("keeps provenance honest and exposes only allow-listed friendly details", () => {
+    const view = buildSymptomEvidenceChecklist({
+      symptomEntry: symptom,
+      historyComplete: true,
+      entries: [
+        {
+          id: "env",
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          occurred_at: "2026-07-31T12:00:00Z",
+          event_type: "environment",
+          source: "mqtt",
+          details: {
+            temp_c: 25,
+            humidity_pct: 62,
+            bridge_token: "vbt_secret",
+            raw_payload: "secret",
+          },
+        },
+      ],
+    })!;
+    const item = category(view, "environment").items[0];
+    expect(item.sourceLabel).toBe("Unverified source");
+    expect(item.detailLines).toEqual(["Temperature: 25 °C", "Humidity: 62 % RH"]);
+    expect(JSON.stringify(item)).not.toMatch(/vbt_secret|raw_payload|bridge_token/);
+  });
+
+  it("keeps blank numeric evidence absent instead of coercing it to zero", () => {
+    const view = buildSymptomEvidenceChecklist({
+      symptomEntry: symptom,
+      historyComplete: true,
+      entries: [
+        {
+          id: "blank-numeric-evidence",
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          occurred_at: "2026-07-31T12:00:00Z",
+          event_type: "environment",
+          details: {
+            temp_c: "",
+            humidity_pct: "   ",
+            environment_check: { vpd_kpa: "\t" },
+          },
+        },
+      ],
+    })!;
+
+    expect(category(view, "environment").items[0].detailLines).toEqual([]);
+  });
+
+  it.each([
+    ["watering", "watering", { watering_amount_ml: 700 }, ["Volume: 700 mL"]],
+    ["feeding", "feeding", { input_ec: 1.4 }, ["Input EC: 1.4 mS/cm"]],
+  ] as const)(
+    "keeps canonical %s evidence in its activity lane and also surfaces its attached environment snapshot",
+    (eventType, activityCategory, activityDetails, activityDetailLines) => {
+      const view = buildSymptomEvidenceChecklist({
+        symptomEntry: symptom,
+        historyComplete: true,
+        entries: [
+          {
+            id: `${eventType}-with-environment`,
+            grow_id: "grow-1",
+            tent_id: "tent-1",
+            plant_id: "plant-1",
+            occurred_at: "2026-07-31T12:00:00Z",
+            event_type: eventType,
+            source: "manual",
+            details: {
+              ...activityDetails,
+              sensor_snapshot: {
+                source: "manual",
+                captured_at: "2026-07-31T12:00:00Z",
+                metrics: {
+                  temperature_c: 24.5,
+                  humidity_pct: 61,
+                  vpd_kpa: 1.08,
+                },
+              },
+            },
+          },
+        ],
+      })!;
+
+      expect(category(view, activityCategory)).toMatchObject({
+        status: "recorded",
+        totalMatches: 1,
+      });
+      expect(category(view, activityCategory).items[0].detailLines).toEqual(activityDetailLines);
+      expect(category(view, "environment")).toMatchObject({
+        status: "recorded",
+        totalMatches: 1,
+      });
+      expect(category(view, "environment").items[0]).toMatchObject({
+        id: `${eventType}-with-environment`,
+        sourceLabel: "Manual observation",
+        detailLines: ["Temperature: 24.5 °C", "Humidity: 61 % RH", "VPD: 1.08 kPa"],
+      });
+    },
+  );
+
+  it("uses attached snapshot capture time for the environment window while preserving the parent event time", () => {
+    const attachedSnapshot = (id: string, capturedAt: string, occurredAt: string) => ({
+      id,
+      grow_id: "grow-1",
+      tent_id: "tent-1",
+      plant_id: "plant-1",
+      occurred_at: occurredAt,
+      event_type: "watering",
+      source: "manual",
+      details: {
+        watering_amount_ml: 500,
+        sensor_snapshot: {
+          source: "manual",
+          captured_at: capturedAt,
+          metrics: { temperature_c: 24.5 },
+        },
+      },
+    });
+    const view = buildSymptomEvidenceChecklist({
+      symptomEntry: symptom,
+      historyComplete: true,
+      entries: [
+        attachedSnapshot(
+          "old-snapshot-new-parent",
+          "2026-07-18T11:59:59.999Z",
+          "2026-07-31T15:00:00Z",
+        ),
+        attachedSnapshot("window-start", "2026-07-18T12:00:00.000Z", "2026-07-31T14:00:00Z"),
+        attachedSnapshot("window-end", "2026-08-01T12:00:00.000Z", "2026-07-31T13:00:00Z"),
+        attachedSnapshot("future-snapshot", "2026-08-01T12:00:00.001Z", "2026-07-31T12:00:00Z"),
+      ],
+    })!;
+
+    expect(category(view, "watering").items.map((item) => item.id)).toEqual([
+      "old-snapshot-new-parent",
+      "window-start",
+      "window-end",
+    ]);
+    expect(category(view, "watering").totalMatches).toBe(4);
+    expect(category(view, "environment").items.map((item) => item.id)).toEqual([
+      "window-end",
+      "window-start",
+    ]);
+    expect(category(view, "environment").items[0]).toMatchObject({
+      occurredAt: "2026-07-31T13:00:00.000Z",
+      snapshotCapturedAt: "2026-08-01T12:00:00.000Z",
+    });
+    expect(category(view, "environment").items[1]).toMatchObject({
+      occurredAt: "2026-07-31T14:00:00.000Z",
+      snapshotCapturedAt: "2026-07-18T12:00:00.000Z",
+    });
+  });
+
+  it("fails closed on malformed or unlabeled nested snapshots without losing watering evidence", () => {
+    const view = buildSymptomEvidenceChecklist({
+      symptomEntry: symptom,
+      historyComplete: true,
+      entries: [
+        {
+          id: "watering-with-unlabeled-snapshot",
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          plant_id: "plant-1",
+          occurred_at: "2026-07-31T12:00:00Z",
+          event_type: "watering",
+          source: "manual",
+          details: {
+            watering_amount_ml: 500,
+            sensor_snapshot: {
+              captured_at: "2026-07-31T12:00:00Z",
+              metrics: { temperature_c: 24 },
+            },
+          },
+        },
+        {
+          id: "watering-with-string-metrics",
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          plant_id: "plant-1",
+          occurred_at: "2026-07-31T13:00:00Z",
+          event_type: "watering",
+          source: "manual",
+          details: {
+            watering_amount_ml: 600,
+            sensor_snapshot: {
+              source: "manual",
+              captured_at: "2026-07-31T13:00:00Z",
+              metrics: { temperature_c: "24" },
+            },
+          },
+        },
+        {
+          id: "environment-with-missing-capture",
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          occurred_at: "2026-07-31T14:00:00Z",
+          event_type: "environment",
+          source: "manual",
+          details: {
+            sensor_snapshot: {
+              source: "manual",
+              metrics: { temperature_c: 24 },
+            },
+          },
+        },
+        {
+          id: "environment-with-malformed-capture",
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          occurred_at: "2026-07-31T15:00:00Z",
+          event_type: "environment",
+          source: "manual",
+          details: {
+            sensor_snapshot: {
+              source: "manual",
+              captured_at: "not-a-time",
+              metrics: { humidity_pct: 61 },
+            },
+          },
+        },
+      ],
+    })!;
+
+    expect(category(view, "watering").totalMatches).toBe(2);
+    expect(category(view, "environment").items).toEqual([]);
+  });
+
+  it("does not count an attached snapshot whose air metrics are all implausible", () => {
+    const view = buildSymptomEvidenceChecklist({
+      symptomEntry: symptom,
+      historyComplete: true,
+      entries: [
+        {
+          id: "watering-with-implausible-snapshot",
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          plant_id: "plant-1",
+          occurred_at: "2026-07-31T12:00:00Z",
+          event_type: "watering",
+          source: "manual",
+          details: {
+            watering_amount_ml: 500,
+            sensor_snapshot: {
+              source: "manual",
+              captured_at: "2026-07-31T12:00:00Z",
+              metrics: {
+                temperature_c: 61,
+                humidity_pct: 101,
+                vpd_kpa: 10.1,
+              },
+            },
+          },
+        },
+      ],
+    })!;
+
+    expect(category(view, "watering").totalMatches).toBe(1);
+    expect(category(view, "environment").items).toEqual([]);
+  });
+
+  it("keeps only plausible air metrics when an attached snapshot mixes valid and invalid values", () => {
+    const view = buildSymptomEvidenceChecklist({
+      symptomEntry: symptom,
+      historyComplete: true,
+      entries: [
+        {
+          id: "feeding-with-partial-valid-snapshot",
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          plant_id: "plant-1",
+          occurred_at: "2026-07-31T12:00:00Z",
+          event_type: "feeding",
+          source: "manual",
+          details: {
+            input_ec: 1.3,
+            sensor_snapshot: {
+              source: "manual",
+              captured_at: "2026-07-31T12:00:00Z",
+              metrics: {
+                temperature_c: 24.5,
+                humidity_pct: 101,
+                vpd_kpa: -0.1,
+              },
+            },
+          },
+        },
+      ],
+    })!;
+
+    expect(category(view, "feeding").totalMatches).toBe(1);
+    expect(category(view, "environment").items[0]).toMatchObject({
+      id: "feeding-with-partial-valid-snapshot",
+      sourceLabel: "Manual observation",
+      detailLines: ["Temperature: 24.5 °C"],
+    });
+  });
+
+  it("does not count invalid-only legacy environment measurements as usable evidence", () => {
+    const view = buildSymptomEvidenceChecklist({
+      symptomEntry: symptom,
+      historyComplete: true,
+      entries: [
+        {
+          id: "invalid-top-level-fallback",
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          occurred_at: "2026-07-31T12:00:00Z",
+          event_type: "environment",
+          source: "manual",
+          details: { temperature_c: 61, humidity_pct: 101, vpd_kpa: 10.1 },
+        },
+        {
+          id: "invalid-environment-check-fallback",
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          occurred_at: "2026-07-31T13:00:00Z",
+          event_type: "environment_check",
+          source: "manual",
+          details: {
+            environment_check: { temp_c: -10.1, humidity_pct: -0.1, vpd_kpa: -0.1 },
+          },
+        },
+      ],
+    })!;
+
+    expect(category(view, "environment")).toMatchObject({
+      status: "missing",
+      totalMatches: 0,
+      items: [],
+    });
+    expect(view.overallState).not.toBe("ready_to_compare");
+  });
+
+  it("preserves a qualitative Environment Check while omitting its rejected telemetry", () => {
+    const view = buildSymptomEvidenceChecklist({
+      symptomEntry: symptom,
+      historyComplete: true,
+      entries: [
+        {
+          id: "qualitative-with-invalid-fallback",
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          occurred_at: "2026-07-31T12:00:00Z",
+          event_type: "environment_check",
+          note: "Fan sounded rough during the walkthrough.",
+          source: "manual",
+          details: {
+            checkType: "airflow",
+            environment_check: { temp_c: 61, humidity_pct: 101 },
+          },
+        },
+        {
+          id: "qualitative-with-malformed-snapshot",
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          occurred_at: "2026-07-31T13:00:00Z",
+          event_type: "environment_check",
+          source: "manual",
+          details: {
+            checkType: "equipment",
+            sensor_snapshot: {
+              source: "manual",
+              captured_at: "not-a-time",
+              metrics: { temperature_c: 24 },
+            },
+          },
+        },
+      ],
+    })!;
+
+    expect(category(view, "environment")).toMatchObject({
+      status: "recorded",
+      totalMatches: 2,
+    });
+    expect(category(view, "environment").items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "qualitative-with-invalid-fallback",
+          detailLines: [],
+        }),
+        expect.objectContaining({
+          id: "qualitative-with-malformed-snapshot",
+          detailLines: [],
+        }),
+      ]),
+    );
+  });
+
+  it("rejects explicitly malformed fallback metrics without hiding a later plausible value", () => {
+    const view = buildSymptomEvidenceChecklist({
+      symptomEntry: symptom,
+      historyComplete: true,
+      entries: [
+        {
+          id: "malformed-only-fallback",
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          occurred_at: "2026-07-31T12:00:00Z",
+          event_type: "environment_check",
+          source: "manual",
+          details: {
+            temperature_c: "bad",
+            humidity_pct: Number.POSITIVE_INFINITY,
+            vpd_kpa: { value: 1.2 },
+          },
+        },
+        {
+          id: "malformed-then-plausible",
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          occurred_at: "2026-07-31T13:00:00Z",
+          event_type: "environment_check",
+          source: "manual",
+          details: {
+            temperature_c: Number.NaN,
+            humidity_pct: "bad",
+            environment_check: { temp_c: "24.5", rh_pct: "61" },
+          },
+        },
+      ],
+    })!;
+
+    expect(category(view, "environment")).toMatchObject({
+      status: "recorded",
+      totalMatches: 1,
+    });
+    expect(category(view, "environment").items[0]).toMatchObject({
+      id: "malformed-then-plausible",
+      detailLines: ["Temperature: 24.5 °C", "Humidity: 61 % RH"],
+    });
+  });
+
+  it("keeps plausible legacy environment measurements while omitting rejected siblings", () => {
+    const view = buildSymptomEvidenceChecklist({
+      symptomEntry: symptom,
+      historyComplete: true,
+      entries: [
+        {
+          id: "mixed-environment-check-fallback",
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          occurred_at: "2026-07-31T13:00:00Z",
+          event_type: "environment_check",
+          source: "manual",
+          details: {
+            environment_check: { temp_c: 24.5, humidity_pct: 101, vpd_kpa: -0.1 },
+          },
+        },
+      ],
+    })!;
+
+    expect(category(view, "environment")).toMatchObject({
+      status: "recorded",
+      totalMatches: 1,
+    });
+    expect(category(view, "environment").items[0]).toMatchObject({
+      id: "mixed-environment-check-fallback",
+      sourceLabel: "Manual observation",
+      detailLines: ["Temperature: 24.5 °C"],
+      snapshotCapturedAt: null,
+    });
+  });
+
+  it("finds the first plausible legacy alias without letting an invalid earlier value mask it", () => {
+    const view = buildSymptomEvidenceChecklist({
+      symptomEntry: symptom,
+      historyComplete: true,
+      entries: [
+        {
+          id: "later-plausible-fallback",
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          occurred_at: "2026-07-31T13:00:00Z",
+          event_type: "environment_check",
+          source: "manual",
+          details: {
+            temp_c: 61,
+            humidity_pct: 101,
+            vpd_kpa: -0.1,
+            environment_check: {
+              temperature_c: 24.5,
+              rh_pct: 61,
+              vpd_kpa: 1.08,
+            },
+          },
+        },
+      ],
+    })!;
+
+    expect(category(view, "environment").items[0]).toMatchObject({
+      id: "later-plausible-fallback",
+      detailLines: ["Temperature: 24.5 °C", "Humidity: 61 % RH", "VPD: 1.08 kPa"],
+    });
+  });
+
+  it("treats an explicit null snapshot as absent without hiding valid manual fallback evidence", () => {
+    const view = buildSymptomEvidenceChecklist({
+      symptomEntry: symptom,
+      historyComplete: true,
+      entries: [
+        {
+          id: "null-snapshot-with-environment-check",
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          occurred_at: "2026-07-31T13:00:00Z",
+          event_type: "environment_check",
+          source: "manual",
+          details: {
+            sensor_snapshot: null,
+            environment_check: { temp_c: 24.5, humidity_pct: 61 },
+          },
+        },
+      ],
+    })!;
+
+    expect(category(view, "environment").items[0]).toMatchObject({
+      id: "null-snapshot-with-environment-check",
+      detailLines: ["Temperature: 24.5 °C", "Humidity: 61 % RH"],
+    });
+  });
+
+  it("never fills a partial canonical envelope from conflicting fallback measurements", () => {
+    const view = buildSymptomEvidenceChecklist({
+      symptomEntry: symptom,
+      historyComplete: true,
+      entries: [
+        {
+          id: "watering-with-conflicting-fallbacks",
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          plant_id: "plant-1",
+          occurred_at: "2026-07-31T12:00:00Z",
+          event_type: "watering",
+          source: "manual",
+          details: {
+            temperature_c: 31,
+            humidity_pct: 40,
+            vpd_kpa: 2.2,
+            environment_check: {
+              temp_c: 32,
+              humidity_pct: 41,
+              vpd_kpa: 2.3,
+            },
+            sensor_snapshot: {
+              source: "manual",
+              captured_at: "2026-07-31T12:00:00Z",
+              temperature_c: 33,
+              humidity_pct: 42,
+              vpd_kpa: 2.4,
+              metrics: { humidity_pct: 61 },
+            },
+          },
+        },
+      ],
+    })!;
+
+    expect(category(view, "environment").items[0]).toMatchObject({
+      id: "watering-with-conflicting-fallbacks",
+      sourceLabel: "Manual observation",
+      detailLines: ["Humidity: 61 % RH"],
+    });
+  });
+
+  it("downgrades stale, future, and untrusted-live attached snapshots instead of presenting them as live", () => {
+    const view = buildSymptomEvidenceChecklist({
+      symptomEntry: symptom,
+      historyComplete: true,
+      entries: [
+        {
+          id: "stale-live-snapshot",
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          plant_id: "plant-1",
+          occurred_at: "2026-07-31T12:00:00Z",
+          event_type: "watering",
+          source: "live",
+          details: {
+            sensor_snapshot: {
+              source: "live",
+              captured_at: "2026-07-31T11:00:00Z",
+              metrics: { humidity_pct: 60 },
+            },
+          },
+        },
+        {
+          id: "future-live-snapshot",
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          plant_id: "plant-1",
+          occurred_at: "2026-07-31T13:00:00Z",
+          event_type: "feeding",
+          source: "live",
+          details: {
+            sensor_snapshot: {
+              source: "live",
+              captured_at: "2026-07-31T13:01:00Z",
+              metrics: { vpd_kpa: 1.1 },
+            },
+          },
+        },
+        {
+          id: "client-live-claim",
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          plant_id: "plant-1",
+          occurred_at: "2026-07-31T14:00:00Z",
+          event_type: "watering",
+          source: "manual",
+          details: {
+            sensor_snapshot: {
+              source: "live",
+              captured_at: "2026-07-31T14:00:00Z",
+              metrics: { temperature_c: 25 },
+            },
+          },
+        },
+      ],
+    })!;
+
+    expect(category(view, "environment").items.map((item) => [item.id, item.sourceLabel])).toEqual([
+      ["client-live-claim", "Unverified source"],
+      ["future-live-snapshot", "invalid"],
+      ["stale-live-snapshot", "stale"],
+    ]);
+    expect(JSON.stringify(category(view, "environment").items)).not.toContain(
+      '"sourceLabel":"live"',
+    );
+  });
+
+  it("normalizes control characters without exposing hidden payload text", () => {
+    const view = buildSymptomEvidenceChecklist({
+      symptomEntry: symptom,
+      historyComplete: true,
+      entries: [
+        {
+          id: "control-characters",
+          grow_id: "grow-1",
+          plant_id: "plant-1",
+          occurred_at: "2026-07-31T12:00:00Z",
+          event_type: "watering",
+          note: "Watered\u0000then\u001fchecked runoff",
+        },
+      ],
+    })!;
+
+    expect(category(view, "watering").items[0].summary).toBe("Watered then checked runoff");
+  });
+
+  it("does not invent manual provenance from a source-less environment event", () => {
+    const view = buildSymptomEvidenceChecklist({
+      symptomEntry: symptom,
+      historyComplete: true,
+      entries: [
+        {
+          id: "source-less",
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          occurred_at: "2026-07-31T12:00:00Z",
+          event_type: "environment",
+        },
+        {
+          id: "structured-manual-check",
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          occurred_at: "2026-07-31T13:00:00Z",
+          event_type: "environment",
+          details: { environment_check: { temp_c: 25 } },
+        },
+      ],
+    })!;
+
+    expect(category(view, "environment").items.map((item) => [item.id, item.sourceLabel])).toEqual([
+      ["structured-manual-check", "Manual observation"],
+      ["source-less", "Unverified source"],
+    ]);
+  });
+
+  it("does not trust a diary details.source claim as live provenance", () => {
+    const view = buildSymptomEvidenceChecklist({
+      symptomEntry: symptom,
+      historyComplete: true,
+      entries: [
+        {
+          id: "untrusted-diary-light",
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          occurred_at: "2026-07-31T12:00:00Z",
+          event_type: "observation",
+          note: "Grow light schedule changed to 12/12.",
+          details: { source: "live" },
+        },
+      ],
+    })!;
+
+    expect(category(view, "lighting").items[0].sourceLabel).toBe("Unverified source");
+  });
+
+  it("excludes diary-companion measurements from a live parent evidence row", () => {
+    const parentId = "live-environment-grow-event";
+    const rows = buildSymptomEvidenceTimelineRows({
+      growId: "grow-1",
+      recentLaneEntries: [
+        {
+          id: parentId,
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          plant_id: "plant-1",
+          entry_at: "2026-07-31T12:00:00Z",
+          entry_type: "environment_check",
+          note: "Trusted sensor snapshot.",
+          details: {
+            event_type: "environment_check",
+            sensor_snapshot: { temp_c: 23, humidity_pct: 58 },
+          },
+        },
+      ],
+      diaryEntries: [
+        {
+          id: "fabricated-environment-diary-companion",
+          tent_id: "tent-1",
+          plant_id: "plant-1",
+          entry_at: "2026-07-31T12:00:00Z",
+          note: "Client-controlled companion.",
+          details: {
+            event_type: "environment_check",
+            linked_grow_event_id: parentId,
+            source: "live",
+            checkType: "light",
+            environment_check: { temp_c: 99, humidity_pct: 100, vpd_kpa: 0 },
+          },
+        },
+      ],
+      growEvents: [
+        {
+          id: parentId,
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          plant_id: "plant-1",
+          occurred_at: "2026-07-31T12:00:00Z",
+          event_type: "environment_check",
+          source: "live",
+        },
+      ],
+      renderedDiaryEntryIds: new Set(["fabricated-environment-diary-companion"]),
+    });
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      id: parentId,
+      source: "live",
+    });
+    expect(rows[0].details).toEqual({
+      event_type: "environment_check",
+      sensor_snapshot: { temp_c: 23, humidity_pct: 58 },
+    });
+
+    const view = buildSymptomEvidenceChecklist({
+      symptomEntry: symptom,
+      historyComplete: true,
+      entries: rows,
+    })!;
+    expect(category(view, "environment").items[0]).toMatchObject({
+      id: parentId,
+      sourceLabel: "live",
+      detailLines: ["Temperature: 23 °C", "Humidity: 58 % RH"],
+    });
+    expect(category(view, "lighting").items).toEqual([]);
+  });
+
+  it("preserves canonical companion evidence while keeping grow-event provenance authoritative", () => {
+    const parentId = "environment-grow-event";
+    const rows = buildSymptomEvidenceTimelineRows({
+      growId: "grow-1",
+      recentLaneEntries: [
+        {
+          id: parentId,
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          plant_id: "plant-1",
+          entry_at: "2026-07-31T12:00:00Z",
+          entry_type: "environment_check",
+          note: "Checked canopy environment and fixture height.",
+          details: { event_type: "environment_check", source: "manual" },
+        },
+      ],
+      diaryEntries: [
+        {
+          id: "environment-diary-companion",
+          tent_id: "tent-1",
+          plant_id: "plant-1",
+          entry_at: "2026-07-31T12:00:00Z",
+          note: "Checked canopy environment and fixture height.",
+          details: {
+            event_type: "environment_check",
+            linked_grow_event_id: parentId,
+            source: "live",
+            checkType: "light",
+            environment_check: { temp_c: 25, humidity_pct: 62 },
+          },
+        },
+      ],
+      growEvents: [
+        {
+          id: parentId,
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          plant_id: "plant-1",
+          occurred_at: "2026-07-31T12:00:00Z",
+          event_type: "environment_check",
+          source: "manual",
+        },
+      ],
+      renderedDiaryEntryIds: new Set(["environment-diary-companion"]),
+    });
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].source).toBe("manual");
+    expect(rows[0].details).toMatchObject({
+      checkType: "light",
+      environment_check: { temp_c: 25, humidity_pct: 62 },
+    });
+
+    const view = buildSymptomEvidenceChecklist({
+      symptomEntry: symptom,
+      historyComplete: true,
+      entries: rows,
+    })!;
+    expect(category(view, "environment").items[0]).toMatchObject({
+      id: parentId,
+      sourceLabel: "Manual observation",
+      detailLines: ["Temperature: 25 °C", "Humidity: 62 % RH"],
+    });
+    expect(category(view, "lighting").items.map((item) => item.id)).toEqual([parentId]);
+  });
+
+  it("suppresses a Timeline link when grow-event-only evidence has no rendered entry anchor", () => {
+    const parentId = "watering-grow-event-only";
+    const rows = buildSymptomEvidenceTimelineRows({
+      growId: "grow-1",
+      recentLaneEntries: [
+        {
+          id: parentId,
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          plant_id: "plant-1",
+          entry_at: "2026-07-31T12:00:00Z",
+          entry_type: "watering",
+          note: "Watered 700 mL.",
+        },
+      ],
+      diaryEntries: [],
+      growEvents: [
+        {
+          id: parentId,
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          plant_id: "plant-1",
+          occurred_at: "2026-07-31T12:00:00Z",
+          event_type: "watering",
+          source: "manual",
+        },
+      ],
+      renderedDiaryEntryIds: new Set(),
+    });
+
+    const view = buildSymptomEvidenceChecklist({
+      symptomEntry: symptom,
+      historyComplete: true,
+      entries: rows,
+    })!;
+
+    expect(category(view, "watering").items[0]).toMatchObject({
+      id: parentId,
+      timelineAnchor: null,
+      timelineHref: null,
+    });
+  });
+
+  it("keeps the exact grow-event anchor when a rendered diary companion owns its alias", () => {
+    const parentId = "watering-grow-event-with-companion";
+    const rows = buildSymptomEvidenceTimelineRows({
+      growId: "grow-1",
+      recentLaneEntries: [
+        {
+          id: parentId,
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          plant_id: "plant-1",
+          entry_at: "2026-07-31T12:00:00Z",
+          entry_type: "watering",
+          note: "Watered 700 mL.",
+        },
+      ],
+      diaryEntries: [
+        {
+          id: "watering-diary-companion",
+          tent_id: "tent-1",
+          plant_id: "plant-1",
+          entry_at: "2026-07-31T12:00:00Z",
+          event_type: "watering",
+          details: { linked_grow_event_id: parentId },
+        },
+      ],
+      growEvents: [
+        {
+          id: parentId,
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          plant_id: "plant-1",
+          occurred_at: "2026-07-31T12:00:00Z",
+          event_type: "watering",
+          source: "manual",
+        },
+      ],
+      renderedDiaryEntryIds: new Set(["watering-diary-companion"]),
+    });
+
+    const view = buildSymptomEvidenceChecklist({
+      symptomEntry: symptom,
+      historyComplete: true,
+      entries: rows,
+    })!;
+
+    expect(category(view, "watering").items[0]).toMatchObject({
+      id: parentId,
+      timelineAnchor: `timeline-entry-${parentId}`,
+      timelineHref: `/timeline?growId=grow-1#timeline-entry-${parentId}`,
+    });
+  });
+
+  it("keeps loaded companion evidence but unlinks it when the companion row is filtered out", () => {
+    const parentId = "watering-grow-event-with-hidden-companion";
+    const rows = buildSymptomEvidenceTimelineRows({
+      growId: "grow-1",
+      recentLaneEntries: [
+        {
+          id: parentId,
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          plant_id: "plant-1",
+          entry_at: "2026-07-31T12:00:00Z",
+          entry_type: "watering",
+          note: "Watered after checking dryback.",
+        },
+      ],
+      diaryEntries: [
+        {
+          id: "watering-diary-companion-hidden-by-stage-filter",
+          tent_id: "tent-1",
+          plant_id: "plant-1",
+          entry_at: "2026-07-31T12:00:00Z",
+          event_type: "watering",
+          details: {
+            linked_grow_event_id: parentId,
+            watering_amount_ml: 700,
+          },
+        },
+      ],
+      growEvents: [
+        {
+          id: parentId,
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          plant_id: "plant-1",
+          occurred_at: "2026-07-31T12:00:00Z",
+          event_type: "watering",
+          source: "manual",
+        },
+      ],
+      renderedDiaryEntryIds: new Set(),
+    });
+
+    const view = buildSymptomEvidenceChecklist({
+      symptomEntry: symptom,
+      historyComplete: true,
+      entries: rows,
+    })!;
+
+    expect(category(view, "watering")).toMatchObject({
+      status: "recorded",
+      totalMatches: 1,
+    });
+    expect(category(view, "watering").items[0]).toMatchObject({
+      id: parentId,
+      detailLines: ["Volume: 700 mL"],
+      timelineAnchor: null,
+      timelineHref: null,
+    });
+  });
+
+  it("returns symptom identity, location, time, hub path, and category-specific verification prompts", () => {
+    const view = buildSymptomEvidenceChecklist({
+      symptomEntry: symptom,
+      entries: [],
+      historyComplete: true,
+    })!;
+
+    expect(view.title).toBe(
+      "Yellowing / discoloration: verify the record before changing anything",
+    );
+    expect(view.observationStageLabel).toBe("Flowering");
+    expect(view.observationLocationLabel).toBe("Lower leaves");
+    expect(view.observedAt).toBe("2026-08-01T12:00:00.000Z");
+    expect(view.hubPath).toBe("/guides/cannabis-leaf-symptoms");
+    expect(view.categories.map((entry) => entry.verifyNext)).toEqual([
+      expect.stringMatching(/environment check/i),
+      expect.stringMatching(/watering/i),
+      expect.stringMatching(/feeding/i),
+      expect.stringMatching(/light/i),
+    ]);
+  });
+
+  it.each([
+    ["flush", "Flushing"],
+    ["cure", "Drying / Curing"],
+    ["drying", "Drying / Curing"],
+  ] as const)("presents %s evidence with canonical stage label %s", (storedStage, label) => {
+    const view = buildSymptomEvidenceChecklist({
+      symptomEntry: {
+        ...symptom,
+        details: { ...symptom.details, observation_stage: storedStage },
+      },
+      entries: [],
+      historyComplete: true,
+    })!;
+
+    expect(view.observationStageLabel).toBe(label);
+  });
+
+  it("returns null for a generic issue or unsupported sign", () => {
+    expect(
+      buildSymptomEvidenceChecklist({
+        symptomEntry: { ...symptom, details: { subtype: "issue", observedSign: "curling" } },
+        entries: [],
+        historyComplete: true,
+      }),
+    ).toBeNull();
+  });
+
+  it("fails closed when the symptom observation has no valid timestamp", () => {
+    expect(
+      buildSymptomEvidenceChecklist({
+        symptomEntry: { ...symptom, entry_at: "not-a-date" },
+        entries: [],
+        historyComplete: true,
+      }),
+    ).toBeNull();
+  });
+});

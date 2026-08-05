@@ -335,21 +335,58 @@ async function removeRaceBarrier(): Promise<void> {
   await raceDb.unsafe(`DROP SCHEMA IF EXISTS ${RACE_BARRIER_SCHEMA} CASCADE`);
 }
 
-async function waitForRaceContention(): Promise<boolean> {
+async function waitForRaceContention(userId: string, idempotencyKey: string): Promise<boolean> {
   const deadline = Date.now() + 2_500;
   while (Date.now() < deadline) {
-    const rows = (await raceDb.unsafe(`
+    const rows = (await raceDb.unsafe(
+      `
       SELECT
-        count(*) FILTER (WHERE granted)::integer AS granted_count,
-        count(*) FILTER (WHERE NOT granted)::integer AS waiting_count
+        count(*) FILTER (
+          WHERE granted
+            AND classid = ${RACE_ADVISORY_CLASS_ID}::oid
+            AND objid = ${RACE_ADVISORY_OBJECT_ID}::oid
+            AND objsubid = 2
+        )::integer AS barrier_granted_count,
+        count(*) FILTER (
+          WHERE NOT granted
+            AND classid = ${RACE_ADVISORY_CLASS_ID}::oid
+            AND objid = ${RACE_ADVISORY_OBJECT_ID}::oid
+            AND objsubid = 2
+        )::integer AS barrier_waiting_count,
+        count(*) FILTER (
+          WHERE granted
+            AND objsubid = 1
+            AND ((classid::bigint << 32) | objid::bigint)
+              = pg_catalog.hashtextextended($1::text || ':' || $2::text, 0)
+        )::integer AS quicklog_granted_count,
+        count(*) FILTER (
+          WHERE NOT granted
+            AND objsubid = 1
+            AND ((classid::bigint << 32) | objid::bigint)
+              = pg_catalog.hashtextextended($1::text || ':' || $2::text, 0)
+        )::integer AS quicklog_waiting_count
       FROM pg_catalog.pg_locks
       WHERE locktype = 'advisory'
-        AND classid = ${RACE_ADVISORY_CLASS_ID}::oid
-        AND objid = ${RACE_ADVISORY_OBJECT_ID}::oid
-        AND objsubid = 2
-    `)) as unknown as Array<{ granted_count: number | string; waiting_count: number | string }>;
+        AND database = (
+          SELECT oid
+          FROM pg_catalog.pg_database
+          WHERE datname = pg_catalog.current_database()
+        )
+    `,
+      [userId, idempotencyKey],
+    )) as unknown as Array<{
+      barrier_granted_count: number | string;
+      barrier_waiting_count: number | string;
+      quicklog_granted_count: number | string;
+      quicklog_waiting_count: number | string;
+    }>;
     const row = rows[0];
-    if (Number(row?.granted_count ?? 0) >= 1 && Number(row?.waiting_count ?? 0) >= 1) {
+    const barrierContended =
+      Number(row?.barrier_granted_count ?? 0) >= 1 && Number(row?.barrier_waiting_count ?? 0) >= 1;
+    const quicklogContended =
+      Number(row?.quicklog_granted_count ?? 0) >= 1 &&
+      Number(row?.quicklog_waiting_count ?? 0) >= 1;
+    if (barrierContended || quicklogContended) {
       return true;
     }
     await new Promise((resolve) => setTimeout(resolve, 25));
@@ -378,8 +415,12 @@ async function signIn(email: string, password: string): Promise<SupabaseClient> 
   if (error) throw new Error(`sign_in_failed:${error.message ?? "unknown"}`);
   return c;
 }
-async function seedId(table: string, row: Record<string, unknown>): Promise<string> {
-  const { data, error } = await admin.from(table).insert(row).select("id").single();
+async function seedId(
+  client: SupabaseClient,
+  table: string,
+  row: Record<string, unknown>,
+): Promise<string> {
+  const { data, error } = await client.from(table).insert(row).select("id").single();
   if (error || !data?.id) throw new Error(`seed_${table}_failed:${error?.message ?? "unknown"}`);
   return data.id as string;
 }
@@ -402,25 +443,47 @@ async function main() {
   const anonC = createClient(SUPABASE_URL, ANON_KEY, { auth: { persistSession: false } });
 
   // Owner scope: grow, tent, plant-in-tent, untented plant, other tent.
-  const oGrow = await seedId("grows", { user_id: owner.id, name: `irr grow ${runId}` });
-  const oTent = await seedId("tents", { user_id: owner.id, grow_id: oGrow, name: "T1" });
-  const oTent2 = await seedId("tents", { user_id: owner.id, grow_id: oGrow, name: "T2" });
-  const oPlantInTent = await seedId("plants", {
+  const oGrow = await seedId(ownerC, "grows", {
+    user_id: owner.id,
+    name: `irr grow ${runId}`,
+  });
+  const oTent = await seedId(ownerC, "tents", {
+    user_id: owner.id,
+    grow_id: oGrow,
+    name: "T1",
+  });
+  // The irrigation matrix needs a second owned tent to prove wrong-tent
+  // rejection. Free users are correctly limited to one active tent, so seed
+  // only this over-cap test fixture through the trusted service-role setup
+  // client. Do not manufacture a billing entitlement for an RLS harness.
+  const oTent2 = await seedId(admin, "tents", {
+    user_id: owner.id,
+    grow_id: oGrow,
+    name: "T2",
+  });
+  const oPlantInTent = await seedId(ownerC, "plants", {
     user_id: owner.id,
     grow_id: oGrow,
     tent_id: oTent,
     name: "P-tented",
   });
-  const oPlantUntented = await seedId("plants", {
+  const oPlantUntented = await seedId(ownerC, "plants", {
     user_id: owner.id,
     grow_id: oGrow,
     tent_id: null,
     name: "P-untented",
   });
   // Stranger scope.
-  const sGrow = await seedId("grows", { user_id: stranger.id, name: `irr strange grow ${runId}` });
-  const sTent = await seedId("tents", { user_id: stranger.id, grow_id: sGrow, name: "ST1" });
-  const sPlant = await seedId("plants", {
+  const sGrow = await seedId(strangerC, "grows", {
+    user_id: stranger.id,
+    name: `irr strange grow ${runId}`,
+  });
+  const sTent = await seedId(strangerC, "tents", {
+    user_id: stranger.id,
+    grow_id: sGrow,
+    name: "ST1",
+  });
+  const sPlant = await seedId(strangerC, "plants", {
     user_id: stranger.id,
     grow_id: sGrow,
     tent_id: sTent,
@@ -452,7 +515,6 @@ async function main() {
     p_feed: feed,
     ...over,
   });
-
 
   // 1. owner success
   const ok = await save(ownerC, baseArgs({}));
@@ -557,15 +619,16 @@ async function main() {
   check("ownership-spoofing detail key rejected", reasonOf(spoof.env) === "invalid_typed_payload");
 
   // 12. Install a disposable database-only barrier. For race-prefixed keys,
-  // the first INSERT holds a transaction-scoped advisory lock while the second
-  // waits on the same lock. pg_locks must show both transactions before the
-  // response assertions are allowed to count as concurrent-race proof.
+  // the first request holds either the wrapper's per-user/key serialization
+  // lock or the INSERT barrier lock while the second waits on that exact lock.
+  // pg_locks must show both transactions before response assertions count as
+  // concurrent-race proof.
   await installRaceBarrier();
   const parallelReplayKey = raceKey();
   const parallelReplayArgs = baseArgs({ p_idempotency_key: parallelReplayKey });
   const parallelReplayAPromise = save(ownerC, parallelReplayArgs);
   const parallelReplayBPromise = save(ownerC, parallelReplayArgs);
-  const parallelReplayContention = await waitForRaceContention();
+  const parallelReplayContention = await waitForRaceContention(owner.id, parallelReplayKey);
   const [parallelReplayA, parallelReplayB] = await Promise.all([
     parallelReplayAPromise,
     parallelReplayBPromise,
@@ -576,7 +639,7 @@ async function main() {
     .map((result) => result.env?.reused)
     .sort((a, b) => Number(a) - Number(b));
   check(
-    "parallel identical requests overlapped at the idempotency insert",
+    "parallel identical requests prove Quick Log idempotency serialization/contention",
     parallelReplayContention,
   );
   check(
@@ -621,7 +684,7 @@ async function main() {
       p_water: { volume_ml: 1300, ph: 6.1, ec_ms_cm: 1.8 },
     }),
   );
-  const parallelConflictContention = await waitForRaceContention();
+  const parallelConflictContention = await waitForRaceContention(owner.id, parallelConflictKey);
   const [parallelConflictA, parallelConflictB] = await Promise.all([
     parallelConflictAPromise,
     parallelConflictBPromise,
@@ -634,7 +697,7 @@ async function main() {
     (result) => reasonOf(result.env) === "idempotency_key_conflict",
   );
   check(
-    "parallel different requests overlapped at the idempotency insert",
+    "parallel different requests prove Quick Log idempotency serialization/contention",
     parallelConflictContention,
   );
   check(
@@ -687,24 +750,30 @@ async function main() {
   // (genuine-permission-denial / missing-function / schema-cache-miss /
   //  unexpected-error / success-instead-of-denial) so the diagnostic column
   // makes remediation obvious.
-  const legacyWatering = await ownerC.rpc("create_watering_event" as never, {
-    _grow_id: oGrow,
-    _volume_ml: 100,
-    _tent_id: oTent,
-    _plant_id: oPlantInTent,
-  } as never);
+  const legacyWatering = await ownerC.rpc(
+    "create_watering_event" as never,
+    {
+      _grow_id: oGrow,
+      _volume_ml: 100,
+      _tent_id: oTent,
+      _plant_id: oPlantInTent,
+    } as never,
+  );
   check(
     "authenticated denied create_watering_event with genuine permission error (not missing-function)",
     isGenuinePermissionDenial(legacyWatering.error) && !isMissingFunction(legacyWatering.error),
     formatDenialDetail(legacyWatering.error),
   );
-  const legacyFeeding = await ownerC.rpc("create_feeding_event" as never, {
-    _grow_id: oGrow,
-    _line_id: "default",
-    _products: [],
-    _tent_id: oTent,
-    _plant_id: oPlantInTent,
-  } as never);
+  const legacyFeeding = await ownerC.rpc(
+    "create_feeding_event" as never,
+    {
+      _grow_id: oGrow,
+      _line_id: "default",
+      _products: [],
+      _tent_id: oTent,
+      _plant_id: oPlantInTent,
+    } as never,
+  );
   check(
     "authenticated denied create_feeding_event with genuine permission error (not missing-function)",
     isGenuinePermissionDenial(legacyFeeding.error) && !isMissingFunction(legacyFeeding.error),
@@ -831,8 +900,6 @@ async function main() {
   // retains SELECT/INSERT/UPDATE/DELETE on the three event tables) is proved
   // out-of-band in the pgTAP suites under supabase/tests/.
 }
-
-
 
 async function teardown(): Promise<void> {
   try {

@@ -47,8 +47,7 @@ export interface AiDoctorReviewResult {
 }
 
 export type AiDoctorReviewValidation =
-  | { ok: true; result: AiDoctorReviewResult }
-  | { ok: false; reason: string };
+  { ok: true; result: AiDoctorReviewResult } | { ok: false; reason: string };
 
 const REQUIRED_STRING_FIELDS = [
   "summary",

@@ -1,14 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import OperatorOneTentLoopSmokeTest from "@/pages/OperatorOneTentLoopSmokeTest";
 
-const SRC = readFileSync(
-  resolve(__dirname, "../pages/OperatorOneTentLoopSmokeTest.tsx"),
-  "utf8",
-);
+const SRC = readFileSync(resolve(__dirname, "../pages/OperatorOneTentLoopSmokeTest.tsx"), "utf8");
 
 describe("OperatorOneTentLoopSmokeTest — render", () => {
   it("renders checklist groups", () => {
@@ -38,9 +35,7 @@ describe("OperatorOneTentLoopSmokeTest — render", () => {
     );
     expect(screen.getByText(/No fake live data\./)).toBeInTheDocument();
     expect(screen.getByText(/No device control\./)).toBeInTheDocument();
-    expect(
-      screen.getByText(/Action Queue must remain approval-required/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Action Queue must remain approval-required/i)).toBeInTheDocument();
   });
 });
 

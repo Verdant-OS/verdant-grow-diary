@@ -15,7 +15,6 @@ import { useState } from "react";
 import { Sprout } from "lucide-react";
 import {
   buildPlantProfileContextViewModel,
-  PLANT_PROFILE_CONTEXT_COPY,
   type PlantProfileContextInput,
 } from "@/lib/plantProfileContextViewModel";
 
@@ -27,8 +26,8 @@ export interface PlantProfileContextEditableDraft {
 export interface PlantProfileContextCardProps extends PlantProfileContextInput {
   className?: string;
   /**
-   * Persistence callback. When provided, the card switches its
-   * "coming soon" buttons for a real inline edit flow.
+   * Persistence callback. When provided, the card exposes its inline
+   * edit flow. Without it, the card remains read-only.
    * The callback receives ONLY the two editable fields.
    */
   onSave?: (draft: PlantProfileContextEditableDraft) => Promise<void>;
@@ -49,9 +48,7 @@ const EDIT_COPY = Object.freeze({
   genericError: "Couldn't save. Try again.",
 });
 
-export default function PlantProfileContextCard(
-  props: PlantProfileContextCardProps,
-) {
+export default function PlantProfileContextCard(props: PlantProfileContextCardProps) {
   const vm = buildPlantProfileContextViewModel(props);
   const editable = typeof props.onSave === "function";
 
@@ -88,9 +85,7 @@ export default function PlantProfileContextCard(
       });
       setEditing(false);
     } catch (err) {
-      setError(
-        err instanceof Error && err.message ? err.message : EDIT_COPY.genericError,
-      );
+      setError(err instanceof Error && err.message ? err.message : EDIT_COPY.genericError);
     } finally {
       setSaving(false);
     }
@@ -202,7 +197,7 @@ export default function PlantProfileContextCard(
             </button>
           </div>
         </form>
-      ) : (
+      ) : editable ? (
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
@@ -216,11 +211,7 @@ export default function PlantProfileContextCard(
                 : "text-xs px-2 py-1 rounded-md border border-border bg-muted/40 text-muted-foreground cursor-not-allowed"
             }
           >
-            {editable
-              ? vm.medium.known
-                ? EDIT_COPY.editMediumKnown
-                : EDIT_COPY.editMedium
-              : PLANT_PROFILE_CONTEXT_COPY.addMedium}
+            {vm.medium.known ? EDIT_COPY.editMediumKnown : EDIT_COPY.editMedium}
           </button>
           <button
             type="button"
@@ -234,14 +225,10 @@ export default function PlantProfileContextCard(
                 : "text-xs px-2 py-1 rounded-md border border-border bg-muted/40 text-muted-foreground cursor-not-allowed"
             }
           >
-            {editable
-              ? vm.potSize.known
-                ? EDIT_COPY.editPotSizeKnown
-                : EDIT_COPY.editPotSize
-              : PLANT_PROFILE_CONTEXT_COPY.addPotSize}
+            {vm.potSize.known ? EDIT_COPY.editPotSizeKnown : EDIT_COPY.editPotSize}
           </button>
         </div>
-      )}
+      ) : null}
 
       <p className="text-[11px] text-muted-foreground">{vm.rationale}</p>
     </section>

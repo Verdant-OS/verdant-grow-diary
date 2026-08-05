@@ -7,7 +7,7 @@ import { describe, it, expect, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import AlertDetail from "@/pages/AlertDetail";
 
 const ALERT_TITLE = "VPD too high";
@@ -192,10 +192,7 @@ describe("AlertDetail — accessibility & review-state clarity", () => {
 });
 
 // --- Static safety scans ----------------------------------------------------
-const PAGE_SRC = readFileSync(
-  resolve(__dirname, "../pages/AlertDetail.tsx"),
-  "utf8",
-);
+const PAGE_SRC = readFileSync(resolve(__dirname, "../pages/AlertDetail.tsx"), "utf8");
 
 describe("AlertDetail a11y polish — static safety", () => {
   it("introduces no AI/coach calls", () => {
@@ -203,7 +200,9 @@ describe("AlertDetail a11y polish — static safety", () => {
     expect(PAGE_SRC).not.toMatch(/functions\.invoke/);
   });
   it("contains no automation/device-control copy", () => {
-    expect(PAGE_SRC).not.toMatch(/actuator|auto-execute|automatically execute|mqtt|home[\s_-]?assistant|\brelay\b|webhook/i);
+    expect(PAGE_SRC).not.toMatch(
+      /actuator|auto-execute|automatically execute|mqtt|home[\s_-]?assistant|\brelay\b|webhook/i,
+    );
   });
   it("does not use service_role", () => {
     expect(PAGE_SRC).not.toMatch(/service_role/i);

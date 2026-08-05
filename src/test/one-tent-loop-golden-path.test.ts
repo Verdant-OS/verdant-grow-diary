@@ -44,13 +44,13 @@ import {
 // ---------------------------------------------------------------------------
 
 /** Stage 1 — ownership graph. Never accepts cross-user rows. */
-function scopeGrowGraph<
-  T extends { user_id: string; grow_id?: string; tent_id?: string },
->(rows: readonly T[], userId: string, growId: string): T[] {
+function scopeGrowGraph<T extends { user_id: string; grow_id?: string; tent_id?: string }>(
+  rows: readonly T[],
+  userId: string,
+  growId: string,
+): T[] {
   return rows.filter(
-    (r) =>
-      r.user_id === userId &&
-      (r.grow_id === undefined || r.grow_id === growId),
+    (r) => r.user_id === userId && (r.grow_id === undefined || r.grow_id === growId),
   );
 }
 
@@ -60,9 +60,7 @@ function persistQuickLog(
   entry: GoldenQuickLog,
 ): { row: GoldenQuickLog; created: boolean } {
   const existing = store.find(
-    (e) =>
-      e.idempotency_key === entry.idempotency_key &&
-      e.user_id === entry.user_id,
+    (e) => e.idempotency_key === entry.idempotency_key && e.user_id === entry.user_id,
   );
   if (existing) return { row: existing, created: false };
   store.push(entry);
@@ -70,10 +68,7 @@ function persistQuickLog(
 }
 
 /** Stage 3 — Timeline view model. Dedupes by id, orders by occurred_at desc. */
-function buildTimeline(
-  logs: readonly GoldenQuickLog[],
-  plantId: string,
-): GoldenQuickLog[] {
+function buildTimeline(logs: readonly GoldenQuickLog[], plantId: string): GoldenQuickLog[] {
   const seen = new Set<string>();
   const out: GoldenQuickLog[] = [];
   for (const l of logs) {
@@ -101,9 +96,7 @@ function labelSnapshot(snap: GoldenSensorSnapshot): {
   } as const;
   const displaySource = map[snap.source];
   const neverHealthy =
-    snap.source === "stale" ||
-    snap.source === "invalid" ||
-    snap.source === "demo";
+    snap.source === "stale" || snap.source === "invalid" || snap.source === "demo";
   return { displaySource, neverHealthy };
 }
 
@@ -173,15 +166,13 @@ function runAiDoctorStub(ctx: AiDoctorContext): AiDoctorResult {
       "root-zone dryness (unverified)",
       "airflow imbalance (unverified)",
     ],
-    immediate_action:
-      "Observe over next two lights-on cycles before making any change.",
+    immediate_action: "Observe over next two lights-on cycles before making any change.",
     what_not_to_do: [
       "Do not flush or change nutrients from one reading.",
       "Do not increase feed strength.",
       "Do not defoliate reactively.",
     ],
-    follow_up_24h:
-      "Re-check VPD and take one canopy photo at the same clock time tomorrow.",
+    follow_up_24h: "Re-check VPD and take one canopy photo at the same clock time tomorrow.",
     recovery_plan_3d:
       "If VPD stays above target for two consecutive days, review airflow and lights-on temperature — no nutrient change.",
     risk_level: "low",
@@ -205,10 +196,7 @@ interface Alert {
   evidence_snapshot_id: string;
   auto_created_action_queue_item: false;
 }
-function deriveAlert(
-  snap: GoldenSensorSnapshot,
-  targets: GoldenGrowTargets,
-): Alert | null {
+function deriveAlert(snap: GoldenSensorSnapshot, targets: GoldenGrowTargets): Alert | null {
   if (snap.vpd_kpa > targets.vpd_kpa_max) {
     return {
       id: `alert-vpd-${snap.id}`,
@@ -250,10 +238,7 @@ function suggestAqItemFromAlert(
     return { error: "aq_must_be_user_initiated" };
   }
   const existing = store.find(
-    (i) =>
-      i.alert_id === alert.id &&
-      i.user_id === initiator.userId &&
-      i.status === "suggested",
+    (i) => i.alert_id === alert.id && i.user_id === initiator.userId && i.status === "suggested",
   );
   if (existing) return { item: existing, created: false };
   const item: AqItem = {
@@ -360,10 +345,7 @@ describe("One-Tent Loop Golden Path — stitched regression", () => {
     expect(mount2).toHaveLength(1);
     expect(mount1[0].id).toBe(ONE_TENT_GOLDEN_QUICK_LOG.id);
     // No duplicate even when the same log appears twice in the source list.
-    const doubled = buildTimeline(
-      [...logStore, ...logStore],
-      ONE_TENT_GOLDEN_PLANT.id,
-    );
+    const doubled = buildTimeline([...logStore, ...logStore], ONE_TENT_GOLDEN_PLANT.id);
     expect(doubled).toHaveLength(1);
 
     // -- Stage 4: Sensor snapshot provenance -----------------------------
@@ -379,9 +361,7 @@ describe("One-Tent Loop Golden Path — stitched regression", () => {
     expect(label.displaySource).not.toBe("Live");
     // Stale/invalid can never appear healthy.
     expect(labelSnapshot({ ...snap, source: "stale" }).neverHealthy).toBe(true);
-    expect(labelSnapshot({ ...snap, source: "invalid" }).neverHealthy).toBe(
-      true,
-    );
+    expect(labelSnapshot({ ...snap, source: "invalid" }).neverHealthy).toBe(true);
 
     // -- Stage 5: AI Doctor context compilation --------------------------
     const ctx = compileAiDoctorContext({
@@ -533,12 +513,7 @@ describe("One-Tent Loop Golden Path — stitched regression", () => {
       now,
     ) as AqItem;
     expect(
-      transitionAq(
-        rejected,
-        "completed",
-        { userId: ONE_TENT_GOLDEN_USER_ID, kind: "grower" },
-        now,
-      ),
+      transitionAq(rejected, "completed", { userId: ONE_TENT_GOLDEN_USER_ID, kind: "grower" }, now),
     ).toEqual({ error: "aq_invalid_transition" });
 
     // -- Stage 10: Follow-up traceability -------------------------------

@@ -5,7 +5,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 import AiDoctorSessionDetail from "@/pages/AiDoctorSessionDetail";
@@ -67,7 +67,15 @@ vi.mock("@/integrations/supabase/client", () => ({
     from: () => ({
       select: () => ({
         eq: () => ({
-          order: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }),
+          order: () => ({
+            limit: () => {
+              const __c: any = {
+                abortSignal: () => __c,
+                then: (r: any, j?: any) => Promise.resolve({ data: [], error: null }).then(r, j),
+              };
+              return __c;
+            },
+          }),
           maybeSingle: () => Promise.resolve({ data: currentRow, error: null }),
         }),
       }),
@@ -147,9 +155,7 @@ describe("AiDoctorSessionDetail — Copy review summary button", () => {
 
   it("renders the copy button", async () => {
     renderRoute(<AiDoctorSessionDetail />);
-    expect(
-      await screen.findByTestId("ai-doctor-session-detail-copy-review-button"),
-    ).toBeTruthy();
+    expect(await screen.findByTestId("ai-doctor-session-detail-copy-review-button")).toBeTruthy();
   });
 
   it("uses Clipboard API when available and shows Copied success", async () => {
@@ -167,9 +173,7 @@ describe("AiDoctorSessionDetail — Copy review summary button", () => {
     expect(writeText.mock.calls[0][0]).toMatch(/Review Summary/);
     expect(writeText.mock.calls[0][0]).toMatch(/Tip curl visible/);
     expect(writeText.mock.calls[0][0]).toMatch(/No leaf-surface temp/);
-    expect(
-      await screen.findByTestId("ai-doctor-session-detail-copy-review-success"),
-    ).toBeTruthy();
+    expect(await screen.findByTestId("ai-doctor-session-detail-copy-review-success")).toBeTruthy();
   });
 
   it("falls back to execCommand when clipboard is unavailable", async () => {
@@ -185,9 +189,7 @@ describe("AiDoctorSessionDetail — Copy review summary button", () => {
     await waitFor(() => {
       expect(execSpy).toHaveBeenCalledWith("copy");
     });
-    expect(
-      await screen.findByTestId("ai-doctor-session-detail-copy-review-success"),
-    ).toBeTruthy();
+    expect(await screen.findByTestId("ai-doctor-session-detail-copy-review-success")).toBeTruthy();
   });
 
   it("shows error state when copy fails", async () => {
@@ -201,9 +203,7 @@ describe("AiDoctorSessionDetail — Copy review summary button", () => {
     renderRoute(<AiDoctorSessionDetail />);
     const btn = await screen.findByTestId("ai-doctor-session-detail-copy-review-button");
     fireEvent.click(btn);
-    expect(
-      await screen.findByTestId("ai-doctor-session-detail-copy-review-error"),
-    ).toBeTruthy();
+    expect(await screen.findByTestId("ai-doctor-session-detail-copy-review-error")).toBeTruthy();
   });
 });
 

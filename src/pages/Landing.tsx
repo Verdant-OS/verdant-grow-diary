@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "@/lib/react-router-compat";
 import { Button } from "@/components/ui/button";
 import {
   Accordion,
@@ -54,16 +54,17 @@ export default function Landing({ canonicalPath = "/welcome" }: LandingProps) {
     () => buildAttributedPricingPath({ source: acquisitionSource }),
     [acquisitionSource],
   );
-  const signupPath = useMemo(
-    () => buildAttributedSignupPath({ source: acquisitionSource }),
-    [acquisitionSource],
-  );
   // Deep-link return-to: AppShell bounces signed-out visits to
   // /welcome?redirectTo=<intended path>. Forward it (manifest-validated,
-  // never a raw query value) to /auth so sign-in can restore the bookmark.
+  // never a raw query value) to /auth so sign-in or signup can restore the
+  // bookmark.
   const returnTo = useMemo(
     () => resolveKnownRouteReturnTo(searchParams.get("redirectTo")),
     [searchParams],
+  );
+  const signupPath = useMemo(
+    () => buildAttributedSignupPath({ source: acquisitionSource, redirectTo: returnTo }),
+    [acquisitionSource, returnTo],
   );
   const signInPath = returnTo ? `/auth?redirectTo=${encodeURIComponent(returnTo)}` : "/auth";
 
@@ -203,7 +204,11 @@ export default function Landing({ canonicalPath = "/welcome" }: LandingProps) {
         {user && <LandingAuthedOnboardingBridge />}
       </section>
 
-      <PublicOneTentTour hasAccount={Boolean(user)} acquisitionSource={acquisitionSource} />
+      <PublicOneTentTour
+        hasAccount={Boolean(user)}
+        acquisitionSource={acquisitionSource}
+        redirectTo={returnTo}
+      />
 
       {/* Value drivers */}
       <section id="features" className="px-6 py-14 max-w-5xl mx-auto">
@@ -267,7 +272,7 @@ export default function Landing({ canonicalPath = "/welcome" }: LandingProps) {
           <li>Plant and tent tracking</li>
           <li>Sensor-aware dashboard — for safer insight, never blind automation</li>
           <li>Environment alerts</li>
-          <li>AI Coach — cautious, evidence-based</li>
+          <li>AI Doctor — cautious, evidence-based</li>
           <li>Approval-required Action Queue</li>
         </ul>
       </section>
@@ -319,8 +324,9 @@ export default function Landing({ canonicalPath = "/welcome" }: LandingProps) {
           Start with your real grow
         </h2>
         <p className="mt-3 text-muted-foreground">
-          Create a free account to begin logging your tents, plants, and sensor readings. Verdant
-          tracks real grow data — there is no synthetic preview mode.
+          Create a free account to begin logging your tents, plants, and sensor readings. Your
+          signed-in diary starts with your own saved grow data; Verdant does not fill it with sample
+          rows.
         </p>
         <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
           {user ? (

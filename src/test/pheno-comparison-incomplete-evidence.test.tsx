@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import type { PhenoCandidateInput } from "@/lib/phenoComparisonViewModel";
 import type { UsePhenoHuntCandidatesState } from "@/hooks/usePhenoHuntCandidates";
 
@@ -25,7 +25,6 @@ vi.mock("@/hooks/usePhenoEvidencePackets", () => ({
     truncated: false,
   }),
 }));
-
 
 const HUNT_ID = "hunt-inc-1";
 
@@ -75,9 +74,7 @@ describe("PhenoHuntCompare — incomplete evidence hides conclusions", () => {
     const page = screen.getByTestId("pheno-comparison-page");
     expect(page.getAttribute("data-allow-conclusions")).toBe("false");
     // Warning banner remains the primary label.
-    expect(
-      screen.getByTestId("pheno-hunt-compare-readiness-warning"),
-    ).toBeVisible();
+    expect(screen.getByTestId("pheno-hunt-compare-readiness-warning")).toBeVisible();
   });
 
   it("no ranking / verdict / keeper conclusion language rendered when not ready", () => {
@@ -109,9 +106,7 @@ describe("PhenoHuntCompare — incomplete evidence hides conclusions", () => {
       },
     });
     mount({ candidates: [ready("p1"), ready("p2")] });
-    expect(
-      screen.queryByTestId("pheno-hunt-compare-readiness-warning"),
-    ).toBeNull();
+    expect(screen.queryByTestId("pheno-hunt-compare-readiness-warning")).toBeNull();
     const page = screen.getByTestId("pheno-comparison-page");
     expect(page.getAttribute("data-allow-conclusions")).toBe("true");
   });

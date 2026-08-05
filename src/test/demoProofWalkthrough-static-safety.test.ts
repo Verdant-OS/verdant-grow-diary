@@ -9,10 +9,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-const FILES = [
-  "src/lib/demoProofWalkthroughViewModel.ts",
-  "src/pages/DemoProofWalkthrough.tsx",
-];
+const FILES = ["src/lib/demoProofWalkthroughViewModel.ts", "src/pages/DemoProofWalkthrough.tsx"];
 
 function read(path: string): string {
   return readFileSync(resolve(process.cwd(), path), "utf8");
@@ -50,7 +47,6 @@ describe("Demo Proof Walkthrough — static safety", () => {
       expect(src).not.toMatch(/setAutomation|runAutomation/);
     }
   });
-
 
   it("does not reference raw payloads, service role keys, bridge tokens, or env secrets", () => {
     for (const f of FILES) {

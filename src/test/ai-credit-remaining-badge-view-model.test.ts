@@ -30,24 +30,32 @@ describe("buildAiCreditRemainingBadgeViewModel — pack balance", () => {
     expect(vm.label).toContain("1 pack credit available");
   });
 
-  it("omits pack copy when the pack balance is zero / absent / free scope", () => {
-    const noPack = buildAiCreditRemainingBadgeViewModel({
-      remaining: 5,
-      scope: "per_month",
-      scope_limit: 100,
-      pack_balance: 0,
-    });
-    expect(noPack.label).not.toContain("pack");
-    expect(noPack.packBalance).toBeUndefined();
-    // Packs are paid per-month only — never surfaced on the Free per-grow scope.
+  it("surfaces remaining pack credits under the Free per-grow scope", () => {
     const freeScope = buildAiCreditRemainingBadgeViewModel({
       remaining: 1,
       scope: "per_grow",
       scope_limit: 3,
       pack_balance: 20,
     });
-    expect(freeScope.label).not.toContain("pack");
-    expect(freeScope.packBalance).toBeUndefined();
+    expect(freeScope.visible).toBe(true);
+    expect(freeScope.packBalance).toBe(20);
+    expect(freeScope.label).toContain("1 of 3 AI Doctor credits left for this grow");
+    expect(freeScope.label).toContain("20 pack credits available");
+  });
+
+  it.each([
+    ["zero", 0],
+    ["negative", -1],
+    ["not finite", Number.NaN],
+  ])("omits pack copy when the pack balance is %s", (_label, packBalance) => {
+    const vm = buildAiCreditRemainingBadgeViewModel({
+      remaining: 5,
+      scope: "per_month",
+      scope_limit: 100,
+      pack_balance: packBalance,
+    });
+    expect(vm.label).not.toContain("pack");
+    expect(vm.packBalance).toBeUndefined();
   });
 });
 

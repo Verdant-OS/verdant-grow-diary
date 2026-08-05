@@ -14,6 +14,11 @@ name: Agent Integrations Playwright smoke (mocked)
 #  - No schedule/cron trigger.
 
 on:
+  # Dispatchable on purpose: this gate is otherwise pull_request-only, so when
+  # it goes red nobody can establish whether the base is already broken or
+  # confirm a fix without opening a throwaway PR. A gate you cannot run is a
+  # gate you cannot repair.
+  workflow_dispatch:
   pull_request:
     branches: [verdant-grow-diary]
     paths:
@@ -23,7 +28,12 @@ on:
       - "src/lib/mcp/**"
       - "playwright.config.ts"
       - ".github/workflows/agent-integrations-smoke.yml"
-      - "package.json"
+      # `bun.lock*` stays — a real dependency change (Playwright, browser deps)
+      # genuinely can break this smoke. `package.json` was REMOVED: in a bun
+      # repo a dependency change touches the lockfile too, so lockfile coverage
+      # loses nothing, while a plain script or metadata edit touches only
+      # package.json and was dragging this MCP-page smoke into unrelated PRs.
+      # Those PRs then inherit a red they did not cause and cannot fix.
       - "bun.lock"
       - "bun.lockb"
 

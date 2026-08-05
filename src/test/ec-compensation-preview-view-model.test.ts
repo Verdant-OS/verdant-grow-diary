@@ -11,8 +11,12 @@ import {
 
 describe("buildEcCompensationPreview — safe paths", () => {
   it("hides preview when EC or temp is missing", () => {
-    expect(buildEcCompensationPreview({ ec: "", waterTempC: "22", sourceLabel: "manual" }).visible).toBe(false);
-    expect(buildEcCompensationPreview({ ec: "1.8", waterTempC: "", sourceLabel: "manual" }).visible).toBe(false);
+    expect(
+      buildEcCompensationPreview({ ec: "", waterTempC: "22", sourceLabel: "manual" }).visible,
+    ).toBe(false);
+    expect(
+      buildEcCompensationPreview({ ec: "1.8", waterTempC: "", sourceLabel: "manual" }).visible,
+    ).toBe(false);
   });
 
   it("safe mS/cm + Celsius (manual) shows compensated value", () => {

@@ -7,7 +7,7 @@ import { auth, defineMcp } from "npm:@lovable.dev/mcp-js@0.24.0";
 
 // src/lib/mcp/tools/list-grows.ts
 import { defineTool } from "npm:@lovable.dev/mcp-js@0.24.0";
-import { z } from "npm:zod@^4.4.3";
+import { z } from "npm:zod@^3.24.2";
 
 // src/lib/mcp/tools/_supabase.ts
 import { createClient } from "npm:@supabase/supabase-js@^2.105.4";
@@ -67,7 +67,7 @@ ${JSON.stringify(rows, null, 2)}`
 
 // src/lib/mcp/tools/list-recent-diary-entries.ts
 import { defineTool as defineTool2 } from "npm:@lovable.dev/mcp-js@0.24.0";
-import { z as z2 } from "npm:zod@^4.4.3";
+import { z as z2 } from "npm:zod@^3.24.2";
 
 // src/lib/sensor/sensorSourceRules.ts
 var ALIAS = {
@@ -181,8 +181,22 @@ function classifySnapshotFreshness(snapshot, options = {}) {
   };
 }
 
-// src/lib/sensorTestbenchIndicatorRules.ts
+// src/constants/sensorTiming.ts
+var ECOWITT_LIVE_SOIL_STALE_MS = 15 * 60 * 1e3;
+var ECOWITT_MQTT_STALE_MS = 15 * 60 * 1e3;
+var GROW_DATA_SOURCE_LABEL_STALE_MS = 15 * 60 * 1e3;
+var ECOWITT_BRIDGE_TROUBLESHOOTING_STALE_MS = 15 * 60 * 1e3;
 var SENSOR_TESTBENCH_LIVE_WINDOW_MS = 15 * 60 * 1e3;
+var SENSOR_SNAPSHOT_STALE_THRESHOLD_MS = 30 * 60 * 1e3;
+var SENSOR_READING_NORMALIZATION_STALE_MS = 30 * 60 * 1e3;
+var DEFAULT_AI_COACH_STALE_THRESHOLD_MS = 30 * 60 * 1e3;
+var DEFAULT_AI_SENSOR_STALE_THRESHOLD_MS = 30 * 60 * 1e3;
+var ECOWITT_CHANNEL_LABELING_STALE_AFTER_MS = 60 * 60 * 1e3;
+var DEFAULT_SENSOR_STALE_MS = 6 * 60 * 60 * 1e3;
+var DEFAULT_STALE_WINDOW_MS = 24 * 60 * 60 * 1e3;
+var ECOWITT_INGEST_VALIDATION_STALE_AFTER_MS = 24 * 60 * 60 * 1e3;
+
+// src/lib/sensorTestbenchIndicatorRules.ts
 function readString(obj, key) {
   if (!obj || typeof obj !== "object") return null;
   const v = obj[key];
@@ -249,7 +263,7 @@ function withoutDiagnosticSensorRows(rows) {
 }
 
 // src/lib/sensorReadingNormalizationRules.ts
-var STALE_THRESHOLD_MS = 30 * 60 * 1e3;
+var STALE_THRESHOLD_MS = SENSOR_READING_NORMALIZATION_STALE_MS;
 
 // src/lib/ecUnits.ts
 var EC_PLAUSIBLE_MAX = {
@@ -542,7 +556,7 @@ ${JSON.stringify(rows, null, 2)}`
 
 // src/lib/mcp/tools/get-latest-sensor-snapshot.ts
 import { defineTool as defineTool3 } from "npm:@lovable.dev/mcp-js@0.24.0";
-import { z as z3 } from "npm:zod@^4.4.3";
+import { z as z3 } from "npm:zod@^3.24.2";
 var get_latest_sensor_snapshot_default = defineTool3({
   name: "get_latest_sensor_snapshot",
   title: "Get latest sensor snapshot",

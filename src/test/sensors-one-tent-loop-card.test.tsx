@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
 import { ONE_TENT_LOOP_SENSOR_SOURCES } from "@/lib/oneTentLoopNavigationRules";
 
@@ -29,9 +29,9 @@ describe("Sensors One-Tent Loop next-step card wiring", () => {
     const card = screen.getByTestId("sensors-one-tent-loop-next-step-card");
     expect(card.getAttribute("data-current-step")).toBe("sensor-snapshot");
     expect(card.getAttribute("data-next-step")).toBe("ai-doctor");
-    expect(
-      screen.getByTestId("sensors-one-tent-loop-next-step-card-cta"),
-    ).toHaveTextContent(/Open AI Doctor/i);
+    expect(screen.getByTestId("sensors-one-tent-loop-next-step-card-cta")).toHaveTextContent(
+      /Open AI Doctor/i,
+    );
   });
 
   it("renders the AI Doctor helper copy", () => {
@@ -41,9 +41,7 @@ describe("Sensors One-Tent Loop next-step card wiring", () => {
         testId="sensors-one-tent-loop-next-step-card"
       />,
     );
-    expect(
-      screen.getByTestId("sensors-one-tent-loop-next-step-card-helper"),
-    ).toHaveTextContent(
+    expect(screen.getByTestId("sensors-one-tent-loop-next-step-card-helper")).toHaveTextContent(
       /Open AI Doctor page to review available context and prepare for next actions\./,
     );
   });
@@ -101,7 +99,9 @@ describe("Sensors One-Tent Loop next-step card wiring", () => {
   it("Sensors source imports and renders the card near the top", async () => {
     const fs = await import("node:fs/promises");
     const src = await fs.readFile("src/pages/Sensors.tsx", "utf8");
-    expect(src).toContain('import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard"');
+    expect(src).toContain(
+      'import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard"',
+    );
     expect(src).toContain('current="sensor-snapshot"');
     expect(src).toContain('testId="sensors-one-tent-loop-next-step-card"');
     // Page must not silently classify unknown telemetry as healthy.

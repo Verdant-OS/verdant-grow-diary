@@ -20,17 +20,12 @@ import {
 
 export default function EcowittBridgeDebug() {
   return (
-    <div
-      className="container mx-auto py-6 space-y-6"
-      data-testid="ecowitt-bridge-debug-page"
-    >
+    <div className="container mx-auto py-6 space-y-6" data-testid="ecowitt-bridge-debug-page">
       <header className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          EcoWitt Bridge Debug
-        </h1>
+        <h1 className="text-2xl font-semibold tracking-tight">EcoWitt Bridge Debug</h1>
         <p className="text-sm text-muted-foreground">
-          Operator-only diagnostics for the local EcoWitt listener. Reads
-          localhost only — no data is sent to Verdant from this page.
+          Operator-only diagnostics for the local EcoWitt listener. Reads localhost only — no data
+          is sent to Verdant from this page.
         </p>
       </header>
 
@@ -39,10 +34,7 @@ export default function EcowittBridgeDebug() {
         data-testid="ecowitt-bridge-debug-forwarding-status-section"
         className="space-y-2"
       >
-        <h2
-          id="forwarding-status-heading"
-          className="text-lg font-medium"
-        >
+        <h2 id="forwarding-status-heading" className="text-lg font-medium">
           Forwarding status
         </h2>
         <p className="text-xs text-muted-foreground">
@@ -65,26 +57,19 @@ export default function EcowittBridgeDebug() {
         data-testid="ecowitt-bridge-debug-forwarding-error-report-section"
         className="space-y-2"
       >
-        <h2
-          id="forwarding-error-report-heading"
-          className="text-lg font-medium"
-        >
+        <h2 id="forwarding-error-report-heading" className="text-lg font-medium">
           Forwarding error report
         </h2>
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">
-              Sanitized forwarding error report
-            </CardTitle>
+            <CardTitle className="text-base">Sanitized forwarding error report</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
             <p className="text-muted-foreground">
               The forwarding status card above includes a{" "}
-              <span className="font-medium">
-                Copy sanitized forwarding report
-              </span>{" "}
-              button that fetches the local error report and copies an
-              allow-listed JSON payload to your clipboard.
+              <span className="font-medium">Copy sanitized forwarding report</span> button that
+              fetches the local error report and copies an allow-listed JSON payload to your
+              clipboard.
             </p>
             <p className="text-xs text-muted-foreground">
               Source:{" "}
@@ -99,9 +84,8 @@ export default function EcowittBridgeDebug() {
               </a>
             </p>
             <p className="text-xs text-muted-foreground">
-              The copied payload never includes bridge tokens, Authorization
-              headers, PASSKEY, ingest URL, raw payloads, .env values, or
-              database error messages.
+              The copied payload never includes bridge tokens, Authorization headers, PASSKEY,
+              ingest URL, raw payloads, .env values, or database error messages.
             </p>
           </CardContent>
         </Card>

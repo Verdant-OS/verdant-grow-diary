@@ -25,14 +25,8 @@ import {
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 
 const ROOT = resolve(__dirname, "../..");
-const HELPER = readFileSync(
-  resolve(ROOT, "src/lib/growRoomQuickActionLauncher.ts"),
-  "utf8",
-);
-const CARD = readFileSync(
-  resolve(ROOT, "src/components/GrowRoomQuickActionsCard.tsx"),
-  "utf8",
-);
+const HELPER = readFileSync(resolve(ROOT, "src/lib/growRoomQuickActionLauncher.ts"), "utf8");
+const CARD = readFileSync(resolve(ROOT, "src/components/GrowRoomQuickActionsCard.tsx"), "utf8");
 const PAGE = readFileSync(resolve(ROOT, "src/pages/GrowRoomMode.tsx"), "utf8");
 
 const FORBIDDEN_COPY = [
@@ -47,9 +41,7 @@ const FORBIDDEN_COPY = [
 
 describe("buildGrowRoomLauncherEntries · ordering and completeness", () => {
   it("returns the 5 expected kinds in deterministic order", () => {
-    const kinds = buildGrowRoomLauncherEntries({ scopedGrowId: null }).map(
-      (e) => e.kind,
-    );
+    const kinds = buildGrowRoomLauncherEntries({ scopedGrowId: null }).map((e) => e.kind);
     expect(kinds).toEqual([
       "quicklog",
       "manual_sensor_snapshot",
@@ -231,8 +223,6 @@ describe("GrowRoomMode page · launcher wiring", () => {
   });
 
   it("uses the shared useScopedGrow hook for scope (no duplicated URL parsing)", () => {
-    expect(PAGE).toMatch(
-      /from\s+["']@\/hooks\/useScopedGrow["']/,
-    );
+    expect(PAGE).toMatch(/from\s+["']@\/hooks\/useScopedGrow["']/);
   });
 });

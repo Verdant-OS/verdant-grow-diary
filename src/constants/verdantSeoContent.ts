@@ -1,6 +1,6 @@
 /**
  * verdantSeoContent — shared content constants for the public /guides hub
- * and the first seven grower-intent SEO guide pages.
+ * and the grower-intent SEO guide pages.
  *
  * Presenter-only copy. No business logic, no data access, no side effects.
  * Centralized here so visible page copy and FAQPage JSON-LD share the same
@@ -14,7 +14,24 @@
  */
 
 import type { FaqEntry } from "./verdantSeoCopy";
-import { CANNABIS_PLANT_CARE_FAQ } from "./cannabisPlantCareFaq";
+import {
+  CANNABIS_LIGHTING_SETUP_FAQ,
+  CANNABIS_LIGHT_STRESS_FAQ,
+  CANNABIS_NUTRIENT_FAQ,
+  CANNABIS_PLANT_CARE_FAQ,
+} from "./cannabisPlantCareFaq";
+import {
+  GELONADE_DIARY_PROFILE_PATH,
+  OREOZ_DIARY_PROFILE_PATH,
+  OREOZ_GELONADE_DIARY_COMPARISON_PATH,
+  OREOZ_GELONADE_GUIDE_QUICK_LOG_PATH,
+} from "./oreozGelonadeExperience";
+import {
+  CANNABIS_SYMPTOM_REFERENCE_TABLE,
+  SYMPTOM_NO_STACK_RULE,
+  symptomReferenceTableFor,
+  type SymptomReferenceTableData,
+} from "./cannabisSymptomReference";
 
 export interface GuideSectionLink {
   readonly label: string;
@@ -39,6 +56,29 @@ export interface GuideCallToAction {
   readonly prompts?: ReadonlyArray<string>;
 }
 
+export interface GuideSource {
+  readonly label: string;
+  /** Absolute HTTPS URL for a primary research or authoritative source. */
+  readonly href: string;
+  /** Why the source is relevant and what not to generalize from it. */
+  readonly note: string;
+}
+
+export interface GuideEvidenceTableRow {
+  readonly evidence: string;
+  readonly usable: string;
+  readonly conditional: string;
+  readonly untrusted: string;
+}
+
+export interface GuideEvidenceTable {
+  readonly heading: string;
+  readonly description: string;
+  /** Concise accessible name for the table itself. */
+  readonly ariaLabel: string;
+  readonly rows: ReadonlyArray<GuideEvidenceTableRow>;
+}
+
 export interface SeoGuidePage {
   readonly slug: string;
   readonly title: string;
@@ -52,6 +92,15 @@ export interface SeoGuidePage {
   readonly related: ReadonlyArray<string>;
   /** Optional prominent CTA rendered near the top of the guide. */
   readonly cta?: GuideCallToAction;
+  /** Visible editorial sources. Never copied into claims beyond their scope. */
+  readonly sources?: ReadonlyArray<GuideSource>;
+  /** Optional evidence gate for decisions that need scannable trust states. */
+  readonly evidenceTable?: GuideEvidenceTable;
+  /** Repository-backed publication/review provenance for Article JSON-LD. */
+  readonly publishedOn?: string;
+  readonly modifiedOn?: string;
+  /** Optional shared comparison table rendered accessibly below the introduction. */
+  readonly referenceTable?: SymptomReferenceTableData;
 }
 
 /* ------------------------------------------------------------------ */
@@ -97,7 +146,39 @@ export const VERDANT_GROWER_GUIDE_FAQ: ReadonlyArray<FaqEntry> = [
   {
     question: "How do approval-required actions work?",
     answer:
-      "AI Doctor and alerts may suggest actions and drop them into an Action Queue with a reason, evidence, and risk level. Verdant does not execute them for you. The grower reviews, approves, adjusts, or rejects each item. Verdant suggests; the grower decides. Verdant cannot touch your equipment.",
+      "AI Doctor and alerts may suggest actions with a reason, evidence, and risk level. A suggestion reaches the approval-required Action Queue only when the grower chooses to add it. Verdant does not execute actions for you. The grower reviews, approves, adjusts, or rejects each item. Verdant suggests; the grower decides. Verdant cannot touch your equipment.",
+  },
+];
+
+/* ------------------------------------------------------------------ */
+/* Cultivar comparison FAQ (Oreoz vs Gelonade pheno expression)        */
+/* ------------------------------------------------------------------ */
+
+export const OREOZ_VS_GELONADE_FAQ: ReadonlyArray<FaqEntry> = [
+  {
+    question: "What is the main difference between Oreoz and Gelonade?",
+    answer:
+      "Public grower reports describe Oreoz as compact, dense, and dessert/fuel aromatic, and Gelonade as taller, stretchier, and citrus-leaning. Those are directional descriptions, not guarantees. Pheno variation within one pack often exceeds the reported difference between the two cultivars, so treat both as starting expectations and let your own logged record decide.",
+  },
+  {
+    question: "Which one is easier to grow indoors?",
+    answer:
+      "Neither has a reliable public difficulty ranking worth trusting. What is reported is that compact, dense structure — commonly attributed to Oreoz expressions — asks for closer attention to interior airflow and late-flower humidity, while a stretchier habit asks for earlier canopy and trellis planning. The right answer for your room comes from measuring stretch and canopy density at flip, not from a label.",
+  },
+  {
+    question: "How do I tell my phenos apart during a run?",
+    answer:
+      "Record the same fields at the same points for every plant: internode spacing and height at flip, stretch through early flower, aroma direction at week 4 and at chop, and photos from repeatable angles. Attach feed, runoff, and source-labeled environment context to the same window. Consistent fields at consistent times are what make two cuts comparable later.",
+  },
+  {
+    question: "Does Verdant have a Gelonade cultivar profile?",
+    answer:
+      "Not yet. Verdant carries a first-party Oreoz reference and leaves timing and potency fields blank where public evidence is too thin. Gelonade context in this guide comes from public grower reports and is labeled as directional. If you run it, your own per-plant record becomes the reliable source.",
+  },
+  {
+    question: "How does Verdant help with pheno hunting?",
+    answer:
+      "Pheno Tracker keeps per-plant structure, aroma, photo, and environment evidence side by side across runs, with every sensor reading labeled live, manual, csv, demo, stale, or invalid. It does not score a winner for you. It keeps the evidence readable so the grower can compare cuts and decide which one to keep.",
   },
 ];
 
@@ -130,7 +211,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       },
       {
         heading: "Grower-approved decisions, never hands-off",
-        body: "Verdant suggests; the grower decides. AI Doctor can point at likely causes and cite the evidence, but every recommended action stays in an approval-required Action Queue. Verdant cannot touch your equipment.",
+        body: "Verdant suggests; the grower decides. AI Doctor can point at likely causes and cite the evidence, but a recommendation reaches the approval-required Action Queue only when the grower chooses to add it. Verdant cannot touch your equipment.",
       },
     ],
     faq: [
@@ -185,39 +266,171 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
   },
   {
     slug: "grow-room-vpd-tracker",
-    title: "Grow room VPD tracker without fake live data | Verdant",
-    h1: "How to track VPD in a grow room without fake live data",
+    title: "Accurate Grow Room VPD: Sensor & Leaf Checks | Verdant",
+    h1: "How to calculate grow room VPD from trustworthy inputs",
     description:
-      "How growers should track VPD safely: source-labeled temperature and humidity, stage-aware context, and never treating stale or demo readings as healthy live tent data.",
+      "Calculate grow room VPD from verified temperature, humidity, leaf-temperature, placement, and calibration evidence without mistaking an estimate for sensor truth.",
     targetKeyword: "grow room VPD tracker",
     intro:
-      "VPD is useful, but only if the underlying readings are honest. A grow room VPD tracker that silently uses stale, sample, or demo values is worse than no tracker. Here is how Verdant handles VPD without pretending to know things it does not.",
+      "A grow room VPD tracker is only as trustworthy as the evidence behind its inputs. VPD is calculated, not directly measured, and it inherits every error in air temperature, relative humidity, leaf-temperature basis, probe placement, and time. A screen can update every minute and still be wrong for the canopy. Treat the result as authoritative only when its inputs have current evidence; otherwise label it air VPD, conditional, stale, or untrusted and verify what is missing before changing the room.",
     sections: [
       {
-        heading: "Source labels on every reading",
-        body: "Verdant labels every temperature and humidity reading as live, manual, csv, demo, stale, or invalid. VPD is computed from those readings, and if the underlying value is stale or invalid, the VPD is flagged too — never rendered as healthy.",
+        heading: "Start with the calculation, not the display label",
+        body: "Air VPD combines saturation vapor pressure at the measured air temperature with actual vapor pressure derived from relative humidity. A plant-facing vapor-pressure difference also needs a measured leaf-temperature basis. Record which calculation you are using, its units, the source of each input, and the captured time. Never describe a controller's derived VPD field as directly measured.",
+        links: [
+          { label: "Understand sensor truth", to: "/guides/sensor-truth-grow-room" },
+          { label: "Open the stage-aware VPD calculator", to: "/tools/vpd-calculator" },
+        ],
       },
       {
-        heading: "Stage-aware context, not chasing a single number",
-        body: "VPD targets shift across seedling, veg, and flower. Verdant shows VPD alongside stage so growers can read it in context instead of chasing one universal number.",
+        heading: "Verify temperature and high-range humidity",
+        body: "Compare the grow-room temperature probe with a suitable reference at operating conditions, then record the reference identity, both readings, and any offset. For humidity, Verdant's practical minimum is an independent stable comparison at or above 75% RH with chamber temperature and method recorded. One point is a check, not a complete calibration; use more than one point when the room spans a wide range and follow the reference or instrument procedure rather than improvising a chemical setup.",
       },
       {
-        heading: "Manual and CSV VPD are first-class",
-        body: "If your controller does not stream live data, you can log temp/RH manually or import a CSV. The reading is labeled 'manual' or 'csv' and treated honestly — not upgraded to 'live'.",
+        heading: "Measure the leaf-temperature offset under normal lights",
+        body: "Sample representative leaves across the canopy while the room is at normal light, airflow, and irrigation conditions. Record the leaf instrument, measurement locations, air temperature at the same time, and the observed leaf-temperature offset. If leaf temperature was not measured, keep the result labeled air VPD; do not apply a guessed offset or call it leaf VPD.",
+        links: [
+          {
+            label: "Measure grow-light distance, PPFD, and DLI",
+            to: "/guides/cannabis-grow-light-distance-and-schedule",
+          },
+          {
+            label: "Compare possible light and heat stress",
+            to: "/guides/cannabis-light-stress-light-burn-bleaching-or-heat",
+          },
+        ],
       },
       {
-        heading: "No blind automation on top of VPD",
-        body: "Verdant never opens vents, changes fan speeds, or triggers humidifiers based on VPD. Suggestions stay approval-required. The grower decides.",
+        heading: "Put the probe at the canopy and document the point",
+        body: "Place the air probe at representative canopy height, protected from direct fixture radiation, irrigation spray, and local humidifier, dehumidifier, heater, or fan extremes. One probe describes one point. Map more than one position when the room has gradients, and log the height and location so a later reading is comparable.",
+      },
+      {
+        heading: "Keep identity, calibration, confidence, and response together",
+        body: "A usable record carries sensor identity, source label, captured time, units, placement, reference method, calibration date, and any applied offset. An older or unverified sensor remains lower confidence even when its transport is live. Read the result beside stage, light, airflow, root-zone history, and plant response; recheck over a stable window before reacting. Verdant never changes equipment from this number, and the grower decides.",
+        links: [
+          {
+            label: "What to record with an environment change",
+            to: "/guides/what-to-log-in-a-grow-journal",
+          },
+          { label: "Draft an environment note in Quick Log", to: "/quick-log" },
+          {
+            label: "Use the daily grow log checklist",
+            to: "/guides/daily-grow-log-checklist",
+          },
+        ],
       },
     ],
+    evidenceTable: {
+      heading: "VPD evidence gate",
+      description:
+        "Use this gate before a derived value informs a room decision. Conditional evidence can still be logged and compared, but it must not be presented as authoritative or healthy live truth.",
+      ariaLabel: "VPD evidence gate",
+      rows: [
+        {
+          evidence: "Temperature",
+          usable:
+            "Compared with a suitable reference at operating conditions; result and offset logged.",
+          conditional:
+            "Plausible reading, but reference check is old, remote from the operating range, or incomplete.",
+          untrusted:
+            "Unknown units, implausible value, failed comparison, or no attributable sensor.",
+        },
+        {
+          evidence: "Relative humidity",
+          usable:
+            "Independent stable comparison includes a high point at or above 75% RH; method and chamber temperature logged.",
+          conditional:
+            "Only a single informal comparison or a check outside the humidity range being interpreted.",
+          untrusted:
+            "Stuck, condensed, contaminated, implausible, or materially disagrees with a credible reference.",
+        },
+        {
+          evidence: "Leaf-temperature basis",
+          usable:
+            "Representative canopy leaves measured under normal lights; leaf-temperature offset and method logged.",
+          conditional: "No leaf measurement; result is labeled air VPD only, not leaf VPD.",
+          untrusted: "A default or guessed leaf-temperature offset is presented as measured.",
+        },
+        {
+          evidence: "Probe placement",
+          usable:
+            "Representative canopy location and height recorded; shielded from direct local extremes.",
+          conditional:
+            "Location is known but one point cannot represent a documented room gradient.",
+          untrusted:
+            "Placement is unknown or dominated by fixture radiation, spray, wall, door, or equipment discharge.",
+        },
+        {
+          evidence: "Identity and time",
+          usable:
+            "Sensor ID, source, units, captured time, calibration date, and applied offsets are attached.",
+          conditional:
+            "One provenance field is missing or overdue, so the reading stays lower confidence.",
+          untrusted:
+            "Unknown sensor, unknown time, stale value presented as current, or source upgraded without evidence.",
+        },
+        {
+          evidence: "Derived result",
+          usable:
+            "Formula and input basis are explicit; output is labeled air VPD or leaf-based difference accurately.",
+          conditional:
+            "Inputs are plausible but incomplete; output is visibly conditional and cannot drive a confident recommendation.",
+          untrusted:
+            "Missing or invalid inputs are converted to a healthy number or described as directly measured.",
+        },
+      ],
+    },
     faq: [
       {
-        question: "How should growers track VPD safely?",
+        question: "Is VPD measured directly by a grow-room sensor?",
         answer:
-          "Track VPD from source-labeled temperature and humidity readings, read it in the context of the current stage, and never treat demo or stale values as healthy live data. Verdant computes VPD only from labeled readings and flags stale or invalid inputs.",
+          "No. VPD is calculated, not directly measured. Air VPD is derived from air temperature and relative humidity. A leaf-based vapor-pressure difference also needs a measured leaf-temperature basis. The calculation inherits the uncertainty, placement, freshness, and provenance of every input.",
+      },
+      {
+        question: "Can I use VPD without measuring leaf temperature?",
+        answer:
+          "Yes, as air VPD, not leaf VPD. It can describe the drying power of the measured air at that point, but it does not prove the vapor-pressure gradient at the leaf. Keep the limitation visible and do not apply a guessed leaf-temperature offset.",
+      },
+      {
+        question: "Is one 75% RH check a complete humidity calibration?",
+        answer:
+          "No. A stable comparison at or above 75% RH is Verdant's practical high-humidity minimum, not a full characterization of the sensor. Record the method and temperature, and use multiple appropriate points or a calibrated reference when the operating range or consequence requires stronger evidence.",
+      },
+      {
+        question: "How often should a grow-room sensor be rechecked?",
+        answer:
+          "Use the manufacturer's interval and shorten it when conditions or consequences justify it. Recheck after condensation, contamination, relocation, cleaning, unexplained drift, or disagreement with another credible instrument. Until the check is current, keep the sensor lower confidence.",
       },
     ],
-    related: ["sensor-truth-grow-room", "ac-infinity-data-logging"],
+    related: [
+      "sensor-truth-grow-room",
+      "cannabis-grow-light-distance-and-schedule",
+      "cannabis-light-stress-light-burn-bleaching-or-heat",
+      "ac-infinity-data-logging",
+    ],
+    sources: [
+      {
+        label: "Greenspan — humidity fixed points of saturated aqueous solutions (NIST)",
+        href: "https://nvlpubs.nist.gov/nistpubs/jres/081/1/V81.N01.A06.pdf",
+        note: "Primary metrology reference for equilibrium relative-humidity fixed points across temperatures. It supports recognized humidity-reference concepts, not an improvised calibration procedure.",
+      },
+      {
+        label: "FAO Irrigation and Drainage Paper 56 — meteorological data",
+        href: "https://www.fao.org/4/X0490E/x0490e07.htm",
+        note: "Authoritative equations and definitions showing vapor-pressure deficit as a derived difference built from temperature and humidity data. It does not define cannabis setpoints.",
+      },
+      {
+        label: "Vincent et al. — reporting environmental conditions in plant science",
+        href: "https://pmc.ncbi.nlm.nih.gov/articles/PMC12571154/",
+        note: "Peer-reviewed measurement guidance distinguishing ambient VPD from a leaf-to-air vapor-pressure difference and explaining the role of leaf temperature.",
+      },
+      {
+        label: "USDA ARS — measuring the greenhouse environment",
+        href: "https://www.ars.usda.gov/ARSUserFiles/50820500/Publications/Frantz187999_2005_GrnHseEnv.pdf",
+        note: "Technical measurement guide supporting point-specific air measurements, spatial checks, and canopy or leaf-temperature measurement. It does not make one location representative of a whole room.",
+      },
+    ],
+    modifiedOn: "2026-08-02",
   },
   {
     slug: "ac-infinity-data-logging",
@@ -285,35 +498,156 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
   },
   {
     slug: "sensor-truth-grow-room",
-    title: "What is sensor truth in a grow room? | Verdant Grow Diary",
-    h1: "What is sensor truth in a grow room?",
+    title: "Grow Room Sensor Accuracy: A Trust Decision Matrix | Verdant",
+    h1: "How to decide whether a grow-room sensor reading is trustworthy",
     description:
-      "Why grow sensor readings should be source-labeled — live, manual, csv, demo, stale, invalid — and how Verdant refuses to show bad telemetry as healthy live data.",
+      "Classify grow-room sensor readings by source, freshness, calibration, placement, units, agreement, and failure evidence before using derived VPD.",
     targetKeyword: "grow room sensor log",
     intro:
-      "A grow room sensor log is only useful if every number is honest about where it came from. Verdant's rule is simple: every reading carries a source label, a captured_at timestamp, and a confidence score. Demo, stale, and invalid values are never presented as healthy live tent data.",
+      "A grow room sensor log should preserve the evidence behind every value, not treat the number as truth by default. Classify the stream before interpreting it: who or what produced it, when it was captured, whether the units are plausible, where the probe sat, how it compared with a reference at operating conditions, and whether it agrees with the room. VPD is calculated, not directly measured, so air VPD can never be more trustworthy than its temperature and humidity inputs; a leaf-based difference also depends on its leaf-temperature basis.",
     sections: [
       {
-        heading: "The six source labels",
-        body: "Verdant uses exactly six sources: live, manual, csv, demo, stale, and invalid. Live means a fresh reading from a real sensor. Manual is a grower entry. CSV is imported history. Demo is example data. Stale is a real reading that has aged out. Invalid is telemetry that failed a safety check.",
+        heading: "Start with source, identity, and time",
+        body: "Verdant presents six grower-facing truth states: live, manual, csv, demo, stale, and invalid. Transport names do not override those states. Keep the sensor identity, original source, captured time, received time when available, and units attached. A live transport with unknown identity or stale evidence is not automatically trustworthy.",
+        links: [{ label: "Track VPD with honest inputs", to: "/guides/grow-room-vpd-tracker" }],
       },
       {
-        heading: "Bad telemetry is flagged, not hidden",
-        body: "Humidity stuck at 0 or 100, pH outside a realistic range, or a reading with a bad captured_at is labeled invalid and shown as such. Verdant refuses to render it as healthy live data.",
+        heading: "Verify temperature and humidity at operating conditions",
+        body: "Compare the temperature probe with a suitable reference near the room's normal operating range. For humidity, Verdant's practical minimum includes an independent stable high-humidity comparison at or above 75% RH, with the method and chamber temperature recorded. One point is a check rather than full calibration. Log the calibration date, result, and any offset; an older or unverified sensor remains lower confidence.",
       },
       {
-        heading: "Provenance travels with the reading",
-        body: "Vendor lineage lives in the raw payload so Verdant can trace where a reading actually came from. Nothing is silently upgraded from 'csv' to 'live'.",
+        heading: "Placement is part of the measurement",
+        body: "Record the canopy height and room position. Shield environment probes from direct fixture radiation, irrigation spray, and local equipment discharge. One point cannot prove uniform conditions across a room; compare positions when a gradient matters. A calibrated probe in the wrong location is still conditional or untrusted for the claimed canopy.",
+        links: [
+          { label: "Review hardware integration options", to: "/hardware-integrations" },
+          {
+            label: "Set a repeatable light-distance and canopy baseline",
+            to: "/guides/cannabis-grow-light-distance-and-schedule",
+          },
+          {
+            label: "Attach trustworthy context to a grow journal",
+            to: "/guides/what-to-log-in-a-grow-journal",
+          },
+        ],
+      },
+      {
+        heading: "Check units and failure states before deriving anything",
+        body: "Reject impossible values, unknown unit conversions, future timestamps, and stuck or contradictory streams. Air VPD requires attributable air temperature and relative humidity; a leaf-based difference also requires a measured leaf-temperature offset under representative lights. If that basis is absent, label the result air VPD. Stale, invalid, demo, unit-ambiguous, or unverified inputs can never become healthy live truth through a calculation.",
+        links: [
+          {
+            label: "Review the VPD evidence gate",
+            to: "/guides/grow-room-vpd-tracker",
+          },
+        ],
+      },
+      {
+        heading: "Keep the reading beside the plant response",
+        body: "A usable value becomes more informative beside the event it may help explain: a light change, watering, feeding, symptom, or repeat photo. Preserve corrections instead of silently rewriting history. Verdant keeps this context on the timeline so a later review can compare sequence and evidence without turning one number into a diagnosis.",
+        links: [
+          {
+            label: "Compare light burn, bleaching, heat, and look-alikes",
+            to: "/guides/cannabis-light-stress-light-burn-bleaching-or-heat",
+          },
+          { label: "Start a source-labeled Quick Log", to: "/quick-log" },
+        ],
       },
     ],
+    evidenceTable: {
+      heading: "Sensor-trust decision matrix",
+      description:
+        "Classify the claimed use, not just the number. A stream may be usable for one local comparison while remaining conditional for a whole-room or derived-metric claim.",
+      ariaLabel: "Sensor trust decision matrix",
+      rows: [
+        {
+          evidence: "Source and identity",
+          usable: "Original source and stable sensor identity are preserved.",
+          conditional: "Source is known but device identity or transport lineage is incomplete.",
+          untrusted: "Source is unknown, upgraded, or demo/manual data is presented as live.",
+        },
+        {
+          evidence: "Freshness",
+          usable: "Captured time is valid and current for the stated use.",
+          conditional:
+            "Real historical reading is labeled stale or used only for retrospective comparison.",
+          untrusted: "Missing, future, or stale time is presented as current.",
+        },
+        {
+          evidence: "Reference and calibration",
+          usable:
+            "Operating-range comparison, calibration date, result, and offset are documented.",
+          conditional: "Reference evidence is old, single-point, or outside the interpreted range.",
+          untrusted:
+            "Failed, absent, or unattributable reference evidence supports a confident claim.",
+        },
+        {
+          evidence: "Placement",
+          usable:
+            "Claim matches the documented canopy position and representative measurement point.",
+          conditional: "Local point is valid, but room gradient or height coverage is unknown.",
+          untrusted: "Unknown or distorted location is presented as whole-canopy truth.",
+        },
+        {
+          evidence: "Units and plausibility",
+          usable: "Canonical unit, conversion history, and plausible range are explicit.",
+          conditional: "Value is plausible but conversion or device resolution limits comparison.",
+          untrusted: "Unit mismatch, impossible range, stuck value, or contradictory payload.",
+        },
+        {
+          evidence: "Derived metrics",
+          usable:
+            "Air VPD has trustworthy air temperature and RH; a leaf-based difference also has a measured leaf-temperature basis.",
+          conditional:
+            "A bounded air-VPD comparison is labeled as air VPD; leaf VPD is not claimed without a measured leaf basis.",
+          untrusted: "Missing, guessed, stale, or invalid inputs become a healthy derived value.",
+        },
+      ],
+    },
     faq: [
       {
-        question: "Why should grow sensor readings be source-labeled?",
+        question: "What makes a grow-room sensor reading trustworthy?",
         answer:
-          "Because a stale, demo, or invalid reading is dangerous when it is treated as current. Source labels let growers and AI Doctor tell the difference between a live tent reading and last week's CSV import. Verdant enforces this on every reading.",
+          "Trust requires more than a plausible number: source and identity, valid captured time, canonical units, reference or calibration evidence, representative placement, and a failure-state check. Missing evidence lowers the allowed confidence rather than being filled in by assumption.",
+      },
+      {
+        question: "Does live mean calibrated and accurate?",
+        answer:
+          "No. Live describes transport and freshness, not calibration or placement. An older or unverified live sensor remains lower confidence until it has current comparison evidence at operating conditions and a documented calibration date.",
+      },
+      {
+        question: "Can a sensor report VPD directly?",
+        answer:
+          "A device may report a VPD field, but VPD is calculated, not directly measured. Verify the temperature, humidity, formula, units, and leaf-temperature basis. Without measured leaf temperature, call the result air VPD rather than leaf VPD.",
       },
     ],
-    related: ["grow-room-vpd-tracker", "ai-grow-doctor"],
+    related: [
+      "grow-room-vpd-tracker",
+      "cannabis-grow-light-distance-and-schedule",
+      "cannabis-light-stress-light-burn-bleaching-or-heat",
+      "ai-grow-doctor",
+    ],
+    sources: [
+      {
+        label: "Greenspan — humidity fixed points of saturated aqueous solutions (NIST)",
+        href: "https://nvlpubs.nist.gov/nistpubs/jres/081/1/V81.N01.A06.pdf",
+        note: "Primary metrology reference for humidity fixed points and their temperature dependence. It supports reference evidence, not a blanket claim that one field check fully calibrates a sensor.",
+      },
+      {
+        label: "FAO Irrigation and Drainage Paper 56 — meteorological data",
+        href: "https://www.fao.org/4/X0490E/x0490e07.htm",
+        note: "Authoritative definition and calculation context for vapor pressure and VPD from temperature and humidity measurements.",
+      },
+      {
+        label: "Vincent et al. — reporting environmental conditions in plant science",
+        href: "https://pmc.ncbi.nlm.nih.gov/articles/PMC12571154/",
+        note: "Peer-reviewed guidance on reporting measurement location and distinguishing ambient VPD from a leaf-to-air vapor-pressure difference.",
+      },
+      {
+        label: "USDA ARS — measuring the greenhouse environment",
+        href: "https://www.ars.usda.gov/ARSUserFiles/50820500/Publications/Frantz187999_2005_GrnHseEnv.pdf",
+        note: "Technical guidance supporting calibration checks, point-specific air measurements, spatial sampling, and canopy or leaf-temperature context.",
+      },
+    ],
+    modifiedOn: "2026-08-02",
   },
   {
     slug: "ai-grow-doctor",
@@ -335,7 +669,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       },
       {
         heading: "Approval-required, never automatic",
-        body: "AI Doctor may suggest actions and drop them into the Action Queue. Verdant does not execute them. The grower reviews, adjusts, approves, or rejects. Verdant cannot touch your equipment.",
+        body: "AI Doctor may suggest actions. A suggestion reaches the Action Queue only when the grower chooses to add it. Verdant does not execute actions. The grower reviews, adjusts, approves, or rejects. Verdant cannot touch your equipment.",
       },
     ],
     faq: [
@@ -349,25 +683,51 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
   },
   {
     slug: "cannabis-plant-care",
-    title: "Cannabis plant care FAQ for home growers | Verdant Grow Diary",
-    h1: "Cannabis plant care FAQ: the five questions every home grower asks",
+    title: "Cannabis Plant Care FAQ: Water, Light, Nutrients | Verdant",
+    h1: "Cannabis plant care FAQ: practical answers with the context to use them safely",
     description:
-      "Answers to the five most common cannabis plant care questions for home growers: watering, nutrients, yellow leaves, temperature and humidity, and harvest timing.",
+      "Practical cannabis plant care answers for watering, nutrients, yellow leaves, temperature, humidity, grow lights, PPFD, light stress, and harvest timing.",
     targetKeyword: "cannabis plant care",
     intro:
-      "New home growers usually ask the same five questions: how often to water, what to feed, why leaves turn yellow, what temperature and humidity to keep, and when to harvest. These answers are grounded in horticultural basics — not brand-specific schedules or bro-science — and tie back to the plant memory that makes good care repeatable.",
+      "Cannabis plant care questions rarely have a useful answer without the medium, stage, recent changes, environment, and plant response. This FAQ covers watering, nutrients, yellow leaves, temperature and humidity, grow-light distance and schedules, possible light or heat stress, and harvest timing. The guidance is conservative, evidence-led, and designed to leave a record you can compare rather than a universal number to chase.",
     sections: [
       {
         heading: "Watering is the most common early mistake",
         body: "Overwatering is more common than underwatering. The right frequency depends on medium, pot size, plant stage, temperature, and humidity. A soil grower might water when the top inch dries and the pot feels light; a coco or hydro grower uses a different rhythm. The goal is a moist, oxygenated root zone, not a soaked one.",
+        links: [{ label: "Build a useful plant watering log", to: "/guides/plant-watering-log" }],
       },
       {
         heading: "Nutrients follow the plant, not the bottle",
         body: "Cannabis needs more nitrogen in vegetative growth and more phosphorus and potassium in flowering, but the exact strength depends on the medium, cultivar, and environment. Start at a lower dose, watch the plant, and adjust by EC or PPM. pH matters more than the brand: most soil grows sit near 6.0–6.8, and most soilless or hydro grows near 5.5–6.5.",
+        links: [
+          {
+            label: "Use the stage-aware nutrient schedule method",
+            to: "/guides/cannabis-nutrient-schedule",
+          },
+        ],
       },
       {
         heading: "Environment and observation beat guessing",
-        body: "A stable grow room, a careful eye, and a simple log turn symptoms into diagnosis. Vapor-pressure deficit (VPD), light intensity, airflow, and root-zone health explain most leaf issues better than a single product. If context is missing, the safest answer is to gather more evidence before treating.",
+        body: "A stable grow room, a careful eye, and a simple log turn symptoms into a traceable investigation. Vapor-pressure deficit (VPD), light intensity, airflow, and root-zone health provide more useful context than a single product. If context is missing, the safest answer is to gather more evidence before treating.",
+        links: [
+          { label: "Start with the cannabis symptom hub", to: "/guides/cannabis-leaf-symptoms" },
+          { label: "Track VPD with source-labeled readings", to: "/guides/grow-room-vpd-tracker" },
+          {
+            label: "Compare possible light and heat stress",
+            to: "/guides/cannabis-light-stress-light-burn-bleaching-or-heat",
+          },
+        ],
+      },
+      {
+        heading: "Treat grow-light distance and schedules as measurements",
+        body: "Hanging distance alone does not describe the dose at an uneven canopy. Start with the fixture guidance, then record distance in inches or centimeters, dimmer setting, a PPFD map or clearly labeled estimate, and the photoperiod used to calculate DLI. For autoflowers, a stable schedule plus measured context is more useful than arguing for one universal number of hours.",
+        links: [
+          {
+            label: "Measure grow-light distance, PPFD, DLI, and schedule",
+            to: "/guides/cannabis-grow-light-distance-and-schedule",
+          },
+          { label: "Log the baseline before changing it", to: "/quick-log" },
+        ],
       },
       {
         heading: "Harvest timing needs trichome and pistil evidence",
@@ -375,7 +735,27 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       },
     ],
     faq: CANNABIS_PLANT_CARE_FAQ,
-    related: ["grow-room-vpd-tracker", "grow-diary-app"],
+    related: [
+      "cannabis-grow-light-distance-and-schedule",
+      "cannabis-light-stress-light-burn-bleaching-or-heat",
+      "cannabis-nutrient-schedule",
+      "cannabis-leaf-symptoms",
+      "grow-room-vpd-tracker",
+      "grow-diary-app",
+    ],
+    sources: [
+      {
+        label: "Chandra et al. — light and temperature interaction in cannabis",
+        href: "https://pmc.ncbi.nlm.nih.gov/articles/PMC3550641/",
+        note: "A controlled study supporting the guide's instruction to compare environmental variables together. It does not turn one visible symptom into a diagnosis.",
+      },
+      {
+        label: "Rodriguez-Morrison et al. — cannabis response to light intensity",
+        href: "https://pmc.ncbi.nlm.nih.gov/articles/PMC8144505/",
+        note: "A controlled flowering study supporting stage, canopy, and production-context qualifiers. It is not a universal home-grow care schedule.",
+      },
+    ],
+    modifiedOn: "2026-07-30",
   },
   {
     slug: "how-to-start-a-grow-journal",
@@ -420,10 +800,10 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
   },
   {
     slug: "what-to-log-in-a-grow-journal",
-    title: "What to log in a grow journal (and what to skip) | Verdant Grow Diary",
+    title: "What to Log in a Grow Journal, Including Light Changes | Verdant",
     h1: "What to log in a grow journal — and what you can safely skip",
     description:
-      "What to log in a grow journal: waterings, feedings, training, symptoms, photos, and sensor context — and the fields you can skip until they earn their place.",
+      "What to log in a grow journal: water, feed, training, symptoms, photos, sensor context, and measurable light changes—plus what can wait.",
     targetKeyword: "what to log in a grow journal",
     intro:
       "Deciding what to log in a grow journal is a trade between completeness and consistency. The entries that pay off later are the ones that capture change: what you did, what you saw, and the conditions around it. Everything else can wait until it earns its place in your routine.",
@@ -431,6 +811,13 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       {
         heading: "The core four: water, feed, training, observation",
         body: "Waterings (with volume), feedings (with what you fed), training or defoliation, and plain observations cover most of what future-you needs. The public starter at /quick-log covers observation, watering, feeding, and environment drafts without an account — the draft stays in your browser until you keep it — and the full diary adds more entry types once you're signed in.",
+        links: [
+          { label: "Draft the first entry in Quick Log", to: "/quick-log" },
+          {
+            label: "Use the one-minute daily checklist",
+            to: "/guides/daily-grow-log-checklist",
+          },
+        ],
       },
       {
         heading: "Log inputs with their numbers, not adjectives",
@@ -439,6 +826,23 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       {
         heading: "Photos and sensor snapshots: the context multipliers",
         body: "A photo turns a note into evidence. A sensor snapshot — temperature, humidity, VPD — turns it into context. Verdant labels every reading's source (live, manual, csv, demo, stale, invalid) so the context you attach stays trustworthy as it ages.",
+        links: [
+          { label: "Understand source-labeled sensor truth", to: "/guides/sensor-truth-grow-room" },
+        ],
+      },
+      {
+        heading: "Log a light change as an event, not a new normal",
+        body: "When you move or dim a fixture or change the timer, record the old and new setting, distance in inches or centimeters, photoperiod, canopy position, PPFD source or method, temperature and humidity, and a repeatable photo. Add the exact change time so the next light period and the next few days can be compared. If symptoms already exist, photograph exposed and shaded growth before changing several variables.",
+        links: [
+          {
+            label: "Build a PPFD, DLI, distance, and schedule baseline",
+            to: "/guides/cannabis-grow-light-distance-and-schedule",
+          },
+          {
+            label: "Use the light-stress evidence checklist",
+            to: "/guides/cannabis-light-stress-light-burn-bleaching-or-heat",
+          },
+        ],
       },
       {
         heading: "What to skip until later",
@@ -457,7 +861,21 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
           "That it captures change with context: what changed, when, what it looked like (photo), and the conditions around it (source-labeled sensor snapshot). Entries like that let you — or a cautious AI review — reason from evidence instead of memory.",
       },
     ],
-    related: ["how-to-start-a-grow-journal", "plant-watering-log", "sensor-truth-grow-room"],
+    related: [
+      "how-to-start-a-grow-journal",
+      "cannabis-grow-light-distance-and-schedule",
+      "cannabis-light-stress-light-burn-bleaching-or-heat",
+      "plant-watering-log",
+      "sensor-truth-grow-room",
+    ],
+    sources: [
+      {
+        label: "Rodriguez-Morrison et al. — documented cannabis lighting treatments",
+        href: "https://pmc.ncbi.nlm.nih.gov/articles/PMC8144505/",
+        note: "A controlled study illustrating why treatment, timing, location, and response must stay together when results are compared. It does not prescribe a diary format or universal target.",
+      },
+    ],
+    modifiedOn: "2026-07-30",
   },
   {
     slug: "grow-journal-template",
@@ -588,17 +1006,18 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
   },
   {
     slug: "daily-grow-log-checklist",
-    title: "Daily grow log checklist (60-second routine) | Verdant Grow Diary",
+    title: "Daily Grow Log Checklist: Water, Light, and Symptoms | Verdant",
     h1: "A daily grow log checklist you can finish in a minute",
     description:
-      "A daily grow log checklist for real routines: look, touch, log what changed — with a 30-second entry format and source-labeled sensor context when you have it.",
+      "A one-minute daily grow log checklist: check water, exposed and shaded growth, light or heat signals, then log only what changed with honest sensor context.",
     targetKeyword: "daily grow log checklist",
     intro:
       "A daily grow log checklist works when it matches what you already do at the tent: look, touch, adjust, leave. The checklist's job is to catch what changed on the way out — in about a minute, not ten.",
     sections: [
       {
         heading: "The 60-second pass",
-        body: "Look: color, posture, new growth, anything weird. Touch: pot weight or medium moisture. Then log only what changed — a watering with its volume, a feeding, or one observation line. If nothing changed, an honest empty day beats a filler entry.",
+        body: "Look at color, posture, new growth, and both the most exposed and shaded leaves. Touch or lift for pot weight or medium moisture. Notice local heat or airflow near the canopy. Then log only what changed — a watering with its volume, a feeding, a fixture or timer change, or one observation line. If nothing changed, an honest empty day beats a filler entry.",
+        links: [{ label: "Draft the observation in Quick Log", to: "/quick-log" }],
       },
       {
         heading: "One entry per change, against the plant",
@@ -607,10 +1026,31 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       {
         heading: "Weekly additions that stay cheap",
         body: "Once or twice a week, add a photo from the same angle and, if you track conditions, a sensor snapshot. Verdant labels each snapshot's source — live, manual, csv, demo, stale, invalid — so a week-old number is flagged as stale rather than passing as today's truth.",
+        links: [
+          { label: "Keep sensor context honest", to: "/guides/sensor-truth-grow-room" },
+          {
+            label: "Record the useful fields, skip the rest",
+            to: "/guides/what-to-log-in-a-grow-journal",
+          },
+        ],
       },
       {
         heading: "When the checklist catches something",
         body: "The checklist's real value is the day something looks off. Your recent entries become the evidence trail: last watering volume, last feed, the photo from three days ago. Verdant's cautious AI Doctor works from exactly that context, and a suggested step reaches the approval-required Action Queue only when you choose to add it — you stay the one who decides.",
+      },
+      {
+        heading: "When the signal appears near the top of the canopy",
+        body: "Do not label pale, curled, or dry-looking top growth from position alone. Note whether it followed a dimmer, height, schedule, irrigation, or environment change. Save fixture distance, PPFD source, temperature and humidity source, and matched photos of affected and unaffected growth. Address electrical or unsafe-heat conditions immediately; otherwise make one measured, reversible change only after the baseline is clear.",
+        links: [
+          {
+            label: "Compare light burn, bleaching, heat, and look-alikes",
+            to: "/guides/cannabis-light-stress-light-burn-bleaching-or-heat",
+          },
+          {
+            label: "Review grow-light distance, PPFD, DLI, and schedules",
+            to: "/guides/cannabis-grow-light-distance-and-schedule",
+          },
+        ],
       },
     ],
     faq: [
@@ -625,7 +1065,21 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
           "Keep the entry under a minute and tie it to a trigger you already have — the moment you leave the tent. Formats you can complete every time beat thorough formats you abandon.",
       },
     ],
-    related: ["plant-watering-log", "how-to-start-a-grow-journal", "sensor-truth-grow-room"],
+    related: [
+      "cannabis-light-stress-light-burn-bleaching-or-heat",
+      "cannabis-grow-light-distance-and-schedule",
+      "plant-watering-log",
+      "how-to-start-a-grow-journal",
+      "sensor-truth-grow-room",
+    ],
+    sources: [
+      {
+        label: "Chandra et al. — measured light and temperature response",
+        href: "https://pmc.ncbi.nlm.nih.gov/articles/PMC3550641/",
+        note: "A controlled study supporting the checklist's instruction to keep light and temperature evidence together. It does not validate a diagnosis or a universal daily setting.",
+      },
+    ],
+    modifiedOn: "2026-07-30",
   },
   {
     slug: "cronk-nutrients-grow-diary",
@@ -965,7 +1419,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       },
       {
         heading: "A cautious response, not a panic response",
-        body: "If you confirm bud rot, remove affected buds with clean scissors, cutting well below the visible damage, and dispose of them away from the tent. Reduce humidity, improve airflow, and inspect neighboring colas the next day. Verdant's cautious AI Doctor can review your photos and sensor history and suggest a step — improve airflow, adjust dehumidifier setpoint, or increase inspection cadence — but any equipment change is grower-approved through the Action Queue. Verdant suggests; the grower decides. Verdant will never touch your dehumidifier, fans, or lights.",
+        body: "If you confirm bud rot, remove affected buds with clean scissors, cutting well below the visible damage, and dispose of them away from the tent. Reduce humidity, improve airflow, and inspect neighboring colas the next day. Verdant's cautious AI Doctor can review your photos and sensor history and suggest a step — improve airflow, adjust dehumidifier setpoint, or increase inspection cadence — but the equipment change remains the grower's decision. The suggestion reaches the approval-required Action Queue only when the grower chooses to add it. Verdant suggests; the grower decides. Verdant will never touch your dehumidifier, fans, or lights.",
         links: [
           { label: "AI Doctor readiness check", to: "/ai-doctor-readiness-check" },
           { label: "How AI Doctor works", to: "/how-ai-doctor-works" },
@@ -986,7 +1440,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       {
         question: "Can Verdant automatically prevent bud rot?",
         answer:
-          "No. Verdant does not control your dehumidifier, fans, or lights. It gives you plant memory, source-labeled sensor history, and cautious AI Doctor context so bud rot risk is visible earlier. Any equipment change or pruning decision stays with the grower through the approval-required Action Queue.",
+          "No. Verdant does not control your dehumidifier, fans, or lights. It gives you plant memory, source-labeled sensor history, and cautious AI Doctor context so bud rot risk is visible earlier. Any equipment change or pruning decision stays with the grower. If AI Doctor suggests one, it reaches the approval-required Action Queue only when the grower chooses to add it.",
       },
       {
         question: "How do I use sensor history to spot bud rot risk?",
@@ -1016,6 +1470,600 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       "what-to-log-in-a-grow-journal",
     ],
   },
+  {
+    slug: "cannabis-nutrient-schedule",
+    title: "Cannabis nutrient schedule by stage | Verdant Grow Diary",
+    h1: "Cannabis nutrient schedule: what plants need at each stage, and how often to feed",
+    description:
+      "What cannabis plants need in each stage, how often to feed, and how to read feed vs runoff EC — plus how to recover from nutrient burn. Directional guidance and your own record, not a brand chart.",
+    targetKeyword: "cannabis nutrient schedule",
+    intro:
+      "Most nutrient questions come down to three: what does the plant need right now, how often should I feed it, and what do I do when I have overdone it. The honest answer to all three starts the same way — there is no universal schedule. Cultivar, medium, light intensity, and room temperature all move the target, which is why two growers following the same chart get different results. What travels is the method: feed conservatively, measure what goes in and what comes out, change one thing at a time, and keep a record you can actually compare against.",
+    sections: [
+      {
+        heading: "What the plant needs shifts by stage, directionally",
+        body: "Seedlings need almost nothing — a lightly buffered medium and water usually carry them until the first true leaves are working. Vegetative growth leans on nitrogen for leaves and stems, with steady calcium and magnesium underneath. Flowering shifts toward phosphorus and potassium while nitrogen tapers, and late flower wants less of everything as the plant finishes. Treat that as a direction of travel rather than a dosing table: the same stage in a 3-gallon coco pot under heavy light behaves differently than in amended soil under a modest fixture.",
+        links: [
+          { label: "Grow stage care guide", to: "/guides/grow-stage-care-guide" },
+          { label: "Cannabis plant care FAQ", to: "/guides/cannabis-plant-care" },
+        ],
+      },
+      {
+        heading: "Feed frequency follows the medium, not the calendar",
+        body: "Soil holds a nutrient charge, so many soil growers alternate feed and plain water and let the medium buffer the difference. Coco and hydro are inert — they hold almost nothing back — so they are usually fed at every watering at a lower strength. Neither approach is more correct; they are different rhythms for different root zones. The part that decides whether it works is consistency plus a written record of strength and date, because a feed interval you cannot reconstruct is a feed interval you cannot fix.",
+        links: [{ label: "Log a feeding in Quick Log", to: "/quick-log" }],
+      },
+      {
+        heading: "Read feed against runoff instead of chasing an EC number",
+        body: "Published EC and PPM targets vary so widely because they are downstream of everything else in the room. A single number is far less useful than a comparison: measure the EC of what you feed, then the EC of what runs off. Runoff meaningfully higher than the feed means salts are accumulating and the plant is taking up less than you are giving — ease off, or water plain until it settles. Runoff meaningfully lower means heavier uptake and room to feed. Measure the same way every time, and note whether your meter uses the 500 or 700 PPM scale, because the number is only comparable to your own history.",
+      },
+      {
+        heading: "Burn and lockout look similar and want opposite responses",
+        body: "Nutrient burn typically shows as crisping or browning leaf tips after a strength increase; the fix is to stop feeding at that strength and water plain until runoff EC settles. Scorched tissue does not recover, so judge the outcome by new growth, not by the damaged leaves. Lockout is the opposite problem: the nutrient is present but unavailable, usually because pH drifted outside roughly 6.0–6.8 in soil or 5.5–6.5 in soilless and hydro. Feeding more into a lockout makes it worse, so check pH and runoff before adding anything.",
+        links: [
+          {
+            label: "Bud rot prevention and identification",
+            to: "/guides/bud-rot-prevention-identification",
+          },
+        ],
+      },
+      {
+        heading: "The record is what makes the next grow better",
+        body: "Nutrient decisions are only as good as the evidence behind them, and the evidence is easy to lose. Log each feed with its strength, note runoff when you measure it, and photograph tip burn the day you notice it rather than a week later. In Verdant, sensor context attached to an entry stays source-labeled — live, manual, csv, demo, stale, or invalid — so a reading you typed yourself never later reads as something a device measured. When there is enough history, the cautious AI Doctor can point at likely causes and cite your own logged entries; a suggested step only reaches the approval-required Action Queue if you choose to add it. The record informs; the grower decides.",
+        links: [
+          { label: "Sensor truth in the grow room", to: "/guides/sensor-truth-grow-room" },
+          { label: "What to log in a grow journal", to: "/guides/what-to-log-in-a-grow-journal" },
+        ],
+      },
+    ],
+    faq: CANNABIS_NUTRIENT_FAQ,
+    related: [
+      "cannabis-plant-care",
+      "plant-watering-log",
+      "what-to-log-in-a-grow-journal",
+      "ai-grow-doctor",
+    ],
+  },
+  {
+    slug: "cannabis-grow-light-distance-and-schedule",
+    title: "Cannabis Grow Light Distance, PPFD & DLI Guide | Verdant",
+    h1: "Cannabis grow light distance, PPFD, DLI, and schedules: what to measure before changing anything",
+    description:
+      "Learn why fixture distance alone is not enough. Map canopy PPFD, calculate DLI from the light schedule, and log one cannabis grow-light change at a time.",
+    targetKeyword: "cannabis grow light distance",
+    intro:
+      "Cannabis grow light distance is a starting measurement, not a dose. Two fixtures hung at the same height can deliver different intensity and coverage, and the same fixture changes as the canopy rises. A useful lighting decision connects distance, dimmer setting, canopy PPFD, photoperiod, calculated DLI, temperature and humidity, stage, and the plant's response — then changes one variable at a time.",
+    sections: [
+      {
+        heading: "Start with a repeatable baseline, not a large adjustment",
+        body: "Record the fixture and model, dimmer setting, distance from the light to the highest canopy point in both inches and centimeters, photoperiod, plant stage, and a photo. Use the manufacturer's range as a safe starting boundary, then verify your canopy. If there is an electrical or unsafe-heat concern, address that first through appropriate local expertise rather than waiting for a plant comparison.",
+        links: [
+          { label: "Draft the baseline in Quick Log", to: "/quick-log" },
+          {
+            label: "Keep every measurement source honest",
+            to: "/guides/sensor-truth-grow-room",
+          },
+        ],
+      },
+      {
+        heading: "Map PPFD across the canopy instead of trusting the center",
+        body: "PPFD is the photosynthetic photon flux density arriving at a square meter each second, written as micromoles per square meter per second. Make a small, repeatable grid at canopy height and include the center, edges, corners, and any visibly high or low area. Record whether each value came from a PAR meter, manufacturer map, phone estimate, or another method. A center reading alone can hide a hot spot or dim edge, and values collected by different methods are not a clean trend.",
+        links: [
+          { label: "Review read-only hardware integrations", to: "/hardware-integrations" },
+          { label: "Understand grow-room sensor logs", to: "/guides/sensor-truth-grow-room" },
+        ],
+      },
+      {
+        heading: "Use DLI to connect intensity with the light schedule",
+        body: "DLI is the daily light integral: PPFD multiplied by light-hours and 3,600, divided by 1,000,000, reported as moles per square meter per day. A hypothetical 500 micromoles per square meter per second for 18 hours calculates to 32.4 moles per square meter per day; that illustrates the math, not a target. Autoflowers do not need a 12/12 switch to initiate flowering, but schedule choices still change DLI, heat, water demand, and recovery time. Keep the timer stable and compare the full context rather than treating 18/6, 20/4, or another schedule as universally best.",
+        links: [
+          { label: "Open the stage-aware VPD calculator", to: "/tools/vpd-calculator" },
+          { label: "Review the grow-stage care guide", to: "/guides/grow-stage-care-guide" },
+        ],
+      },
+      {
+        heading: "Let the plant response limit the next change",
+        body: "Controlled cannabis studies show that responses depend on cultivar, stage, local canopy intensity, photoperiod, temperature, irrigation, nutrition, carbon dioxide, and the production setup. They do not create one safe PPFD or DLI target for every home grow. If exposed growth becomes pale, curled, dry, or less vigorous after a documented light change, pause escalation and compare light, heat, airflow, watering, feeding, pests, and root-zone context before deciding what the symptom means.",
+        links: [
+          {
+            label: "Compare light burn, bleaching, heat, and look-alikes",
+            to: "/guides/cannabis-light-stress-light-burn-bleaching-or-heat",
+          },
+          { label: "Use the cannabis plant care FAQ", to: "/guides/cannabis-plant-care" },
+        ],
+      },
+      {
+        heading: "Log one change, its time, and the next observation window",
+        body: "Write the old and new height, dimmer, or schedule and the exact change time. Keep temperature and humidity source-labeled, photograph affected and unaffected growth from repeatable angles, and check again during the next light period and over the next few days. Do not change lighting, feeding, watering, and airflow together; an honest unchanged variable is part of the evidence.",
+        links: [
+          {
+            label: "See what belongs in a grow journal",
+            to: "/guides/what-to-log-in-a-grow-journal",
+          },
+          {
+            label: "Use the one-minute daily grow checklist",
+            to: "/guides/daily-grow-log-checklist",
+          },
+        ],
+      },
+    ],
+    faq: CANNABIS_LIGHTING_SETUP_FAQ,
+    related: [
+      "cannabis-light-stress-light-burn-bleaching-or-heat",
+      "grow-room-vpd-tracker",
+      "sensor-truth-grow-room",
+      "what-to-log-in-a-grow-journal",
+      "cannabis-plant-care",
+    ],
+    cta: {
+      label: "Draft the lighting baseline",
+      to: "/quick-log",
+      heading: "Keep the light change attached to the plant's history",
+      description:
+        "Use an observation or environment note to save the fixture setting, distance, schedule, measurement source, and repeatable photo before you adjust anything.",
+      prompts: [
+        "Old and new setting with the exact change time",
+        "Distance, PPFD method, schedule, and temperature/RH source",
+        "A repeatable photo of exposed and shaded growth",
+      ],
+    },
+    sources: [
+      {
+        label: "Rodriguez-Morrison et al. — cannabis response to increasing light intensity",
+        href: "https://pmc.ncbi.nlm.nih.gov/articles/PMC8144505/",
+        note: "A controlled indoor flowering study across a wide PPFD range. It supports measuring local intensity and respecting production context; it is not a universal home-grow target table.",
+      },
+      {
+        label: "Ahrens et al. — cultivar-specific flowering response to photoperiod",
+        href: "https://pmc.ncbi.nlm.nih.gov/articles/PMC10386198/",
+        note: "A controlled study of ten photoperiod-sensitive cultivars. It demonstrates cultivar variation and strict light-period controls; it does not establish an autoflower schedule.",
+      },
+      {
+        label: "Peterswald et al. — 12-hour versus 13-hour flowering photoperiod",
+        href: "https://pmc.ncbi.nlm.nih.gov/articles/PMC10857075/",
+        note: "A two-cultivar trial connecting photoperiod and DLI. Its narrow treatments are context for comparison, not permission to generalize one schedule to every cultivar or room.",
+      },
+    ],
+    publishedOn: "2026-07-30",
+    modifiedOn: "2026-07-30",
+  },
+  {
+    slug: "cannabis-light-stress-light-burn-bleaching-or-heat",
+    title: "Cannabis Light Stress: Burn, Bleaching, or Heat? | Verdant",
+    h1: "Cannabis light stress: compare light burn, bleaching, heat, and look-alikes before reacting",
+    description:
+      "A cautious flow for comparing cannabis light burn, bleaching, heat stress, and root-zone look-alikes—plus what to log before changing several variables.",
+    targetKeyword: "cannabis light stress",
+    intro:
+      "Cannabis light stress is easy to overcall from one pale, curled, or dry-looking leaf near the top of a canopy. Light intensity, local heat, airflow, water status, nutrient or pH problems, pests, and normal tissue differences can overlap. This flow does not diagnose from a photo. It helps you compare the timing and distribution, identify missing evidence, and record a stable baseline before making a measured, reversible change.",
+    sections: [
+      {
+        heading: "First, preserve the evidence and address immediate safety",
+        body: "If there is an electrical, fire, unsafe-heat, contamination, or severe plant-health concern, address that directly through appropriate local expertise. Otherwise, do not move the fixture, change the timer, alter feed strength, change watering frequency, and redesign airflow all at once. Photograph affected and unaffected growth, record when the pattern started, and list every recent change before the evidence disappears.",
+        links: [
+          { label: "Draft a symptom baseline in Quick Log", to: "/quick-log" },
+          {
+            label: "Use the daily observation checklist",
+            to: "/guides/daily-grow-log-checklist",
+          },
+        ],
+      },
+      {
+        heading: "Compare possible excess light with visible bleaching",
+        body: "A possible excess-light pattern is strongest when the affected tissue sits in the most exposed canopy area and the timing follows a documented increase in output, lower hanging height, longer schedule, or rapid canopy rise. Bleaching describes pigment loss at exposed tissue, but color alone does not prove the cause. Compare the light map, affected and shaded positions, new and older growth, fixture change time, and PPFD method before treating either label as a diagnosis.",
+        links: [
+          {
+            label: "Verify distance, PPFD, DLI, and schedule",
+            to: "/guides/cannabis-grow-light-distance-and-schedule",
+          },
+          { label: "Review the cannabis plant care FAQ", to: "/guides/cannabis-plant-care" },
+        ],
+      },
+      {
+        heading: "Compare local heat with root-zone and nutrition look-alikes",
+        body: "Heat evidence includes a local temperature or airflow event, a humidity shift, and symptoms that line up with that event; a room sensor far below the canopy may miss the hot pocket. Root-zone, watering, nutrient, or pH problems are more plausible when the timing follows irrigation or feeding and the distribution does not match the high-light area. The causes can coexist, so keep measured temperature and humidity, VPD, watering, feed, runoff, and pest observations beside the photos.",
+        links: [
+          { label: "Track VPD with honest inputs", to: "/guides/grow-room-vpd-tracker" },
+          {
+            label: "Compare feed and runoff evidence",
+            to: "/guides/cannabis-nutrient-schedule",
+          },
+          { label: "Understand sensor truth", to: "/guides/sensor-truth-grow-room" },
+        ],
+      },
+      {
+        heading: "Use a 24-hour and three-day observation sequence",
+        body: "Right now, save the photo pair, canopy position, fixture setting and distance, PPFD source, schedule, stage, temperature and humidity source, and recent water or feed events. During the next light period, repeat the same views and note local heat or airflow you can verify. Over the next few days, compare progression on old tissue with new growth. Damaged tissue may not recover, so the useful signal is whether the pattern stops advancing and new growth remains stable.",
+        links: [
+          {
+            label: "Record the fields that matter in a grow journal",
+            to: "/guides/what-to-log-in-a-grow-journal",
+          },
+          { label: "Start a source-labeled observation", to: "/quick-log" },
+        ],
+      },
+      {
+        heading: "What not to do while the cause is uncertain",
+        body: "Do not diagnose from canopy position or color alone, increase light to fix a weak plant, chase a single PPFD or VPD number, or combine a lighting adjustment with aggressive irrigation or nutrient changes. Choose the smallest reversible response supported by the record, write down what stayed unchanged, and let the next observation window show whether the evidence moved in the expected direction. Verdant keeps the comparison; the grower decides.",
+        links: [
+          {
+            label: "Return to the measured grow-light guide",
+            to: "/guides/cannabis-grow-light-distance-and-schedule",
+          },
+          {
+            label: "Keep the daily record short and repeatable",
+            to: "/guides/daily-grow-log-checklist",
+          },
+        ],
+      },
+    ],
+    faq: CANNABIS_LIGHT_STRESS_FAQ,
+    related: [
+      "cannabis-grow-light-distance-and-schedule",
+      "grow-room-vpd-tracker",
+      "cannabis-plant-care",
+      "sensor-truth-grow-room",
+      "daily-grow-log-checklist",
+    ],
+    cta: {
+      label: "Log the symptom baseline",
+      to: "/quick-log",
+      heading: "Keep the comparison attached to the plant's timeline",
+      description:
+        "Save the timing, canopy position, lighting and environment context, recent care changes, and repeatable photos before the next observation window.",
+      prompts: [
+        "Affected and unaffected canopy photos from repeatable angles",
+        "Fixture, distance, PPFD method, schedule, temperature, and humidity",
+        "Recent watering, feeding, root-zone, airflow, and pest observations",
+      ],
+    },
+    sources: [
+      {
+        label: "Chandra et al. — photosynthetic response to PPFD and temperature",
+        href: "https://pmc.ncbi.nlm.nih.gov/articles/PMC3550641/",
+        note: "A controlled gas-exchange study showing that light and temperature interact. It supports checking both variables and does not validate symptom diagnosis from appearance.",
+      },
+      {
+        label: "Rodriguez-Morrison et al. — localized and canopy light response",
+        href: "https://pmc.ncbi.nlm.nih.gov/articles/PMC8144505/",
+        note: "A controlled flowering study showing local leaf and whole-plant responses are not interchangeable. It supports canopy-position context, not a universal stress threshold.",
+      },
+    ],
+    publishedOn: "2026-07-30",
+    modifiedOn: "2026-07-30",
+  },
+  {
+    slug: "oreoz-vs-gelonade-comparison",
+    title: "Oreoz vs Gelonade: pheno expression compared | Verdant",
+    h1: "Oreoz vs Gelonade: comparing pheno expression, structure, and what to record per cut",
+    description:
+      "A cautious Oreoz vs Gelonade comparison for growers running multiple cuts — reported structure and aroma directions, what public descriptions can't tell you, and the evidence to log per pheno.",
+    targetKeyword: "oreoz vs gelonade",
+    intro:
+      "Oreoz vs gelonade searches usually come from one of two places: choosing what to pop next, or trying to work out which cut in a tent is actually worth keeping. Public cultivar descriptions are directional, not predictive — two growers running the same pack can end up with plants that look and smell nothing alike. This comparison stays honest about that. It sets out what is commonly reported for each cultivar, names what those reports do not prove, and shows the per-plant record Verdant keeps so your own phenos, not a marketing blurb, decide the keeper.",
+    cta: {
+      label: "Log a phenotypic observation",
+      to: OREOZ_GELONADE_GUIDE_QUICK_LOG_PATH,
+      heading: "Record each cut before the differences blur",
+      description:
+        "Open the authenticated diary Quick Log with a cautious phenotype prompt. You still choose the plant, review the note, and save it yourself.",
+      prompts: [
+        "Which plant number, from which pack or cut?",
+        "Internode spacing, stretch, and canopy habit at flip",
+        "Aroma direction at week 4 and again at chop",
+        "Feed, runoff EC, and environment context for the same window",
+      ],
+    },
+    sections: [
+      {
+        heading: "What is commonly reported about Oreoz",
+        body: "Oreoz (Cookies & Cream × Secret Weapon, 3rd Coast Genetics) is commonly described as compact and resin-forward, with dessert, earthy, and fuel aroma descriptors. Short internodes and dense interior growth show up often in grower reports, which is why airflow observation matters in some expressions. Verdant's cultivar reference deliberately leaves flowering timing and potency summaries blank where the public evidence is thin — an unknown is recorded as unknown, not filled in with a plausible number.",
+        links: [
+          { label: "Oreoz cultivar reference", to: "/cultivars/oreoz" },
+          { label: "Open your Oreoz diary profile", to: OREOZ_DIARY_PROFILE_PATH },
+          { label: "Browse the cultivar index", to: "/cultivars" },
+        ],
+      },
+      {
+        heading: "What is commonly reported about Gelonade",
+        body: "Gelonade is generally described as a Gelato-line, citrus-leaning cultivar — lemon and sweet-gas descriptors are the ones growers repeat most, alongside a taller, more stretch-prone habit than the compact end of the Oreoz descriptions. Verdant does not yet carry a first-party Gelonade profile, so treat this paragraph as directional context from public grower reports rather than a verified profile. If you run it, your own logged record becomes the reliable source.",
+        links: [
+          { label: "Open your Gelonade diary profile", to: GELONADE_DIARY_PROFILE_PATH },
+          { label: "What to log in a grow journal", to: "/guides/what-to-log-in-a-grow-journal" },
+          { label: "Log a phenotypic observation", to: OREOZ_GELONADE_GUIDE_QUICK_LOG_PATH },
+        ],
+      },
+      {
+        heading: "Where the two actually differ in a tent",
+        body: "The practical oreoz vs gelonade difference growers report is habit and aroma direction: a compact, dense, dessert-and-fuel Oreoz expression against a stretchier, citrus-forward Gelonade expression. That changes canopy planning, trellis timing, and how closely you watch interior humidity on dense colas. It does not tell you which plant in your tent will do what. Pheno variation inside a single pack routinely exceeds the difference between two cultivar descriptions, so plan the room from what you measure at flip, not from the label.",
+        links: [
+          {
+            label: "Compare your Oreoz and Gelonade records",
+            to: OREOZ_GELONADE_DIARY_COMPARISON_PATH,
+          },
+          { label: "Grow-room VPD tracker guide", to: "/guides/grow-room-vpd-tracker" },
+          {
+            label: "Bud rot identification and prevention",
+            to: "/guides/bud-rot-prevention-identification",
+          },
+        ],
+      },
+      {
+        heading: "Record the evidence that separates one cut from another",
+        body: "For each plant, capture the same fields at the same points: internode spacing and height at flip, stretch through the first two weeks of flower, aroma direction at week 4 and at chop, trichome and structure photos from repeatable angles, plus the feed, runoff, and source-labeled temperature and humidity context for that window. Verdant keeps every reading tagged live, manual, csv, demo, stale, or invalid, so a comparison never rests on a number that was already out of date when you read it.",
+        links: [
+          { label: "Sensor truth in a grow room", to: "/guides/sensor-truth-grow-room" },
+          { label: "Daily grow log checklist", to: "/guides/daily-grow-log-checklist" },
+        ],
+      },
+      {
+        heading: "Turn the record into a keeper decision",
+        body: "At the end of the run, compare plants on the evidence you actually collected rather than on memory: which cut held structure without extra support, which aroma held through dry and cure, and which one behaved predictably under your environment. Pheno Tracker keeps those per-plant records side by side across runs so a keeper from this pack is still comparable to the next one. Verdant surfaces the comparison; the grower makes the call.",
+        links: [
+          { label: "See how Verdant tracks phenos", to: "/pricing" },
+          { label: "Back to all grower guides", to: "/guides" },
+        ],
+      },
+    ],
+    faq: OREOZ_VS_GELONADE_FAQ,
+    related: [
+      "cannabis-plant-care",
+      "what-to-log-in-a-grow-journal",
+      "sensor-truth-grow-room",
+      "bud-rot-prevention-identification",
+      "daily-grow-log-checklist",
+    ],
+    sources: [
+      {
+        label: "Leafly — Oreoz cultivar information",
+        href: "https://www.leafly.com/strains/oreoz",
+        note: "A directional public community profile. It supports commonly reported aroma and structure descriptors; it does not establish flowering timing, potency, or how a specific pheno will express.",
+      },
+    ],
+    publishedOn: "2026-07-30",
+    modifiedOn: "2026-07-30",
+  },
+  {
+    slug: "cannabis-leaf-symptoms",
+    title: "Cannabis Plant Symptoms: Evidence-First Checks | Verdant",
+    h1: "Cannabis plant symptoms: record the sign, then compare the evidence",
+    description:
+      "An evidence-first cannabis symptom hub for yellowing, spots or lesions, and burnt or crispy tips—with cautious checks before changing the grow.",
+    targetKeyword: "cannabis plant symptoms",
+    intro:
+      "A visible sign is the start of an investigation, not the name of a cause. Record where it appears, the confirmed plant stage, and what changed nearby. Then compare environment, watering, feeding, and lighting history before deciding what deserves a controlled follow-up.",
+    referenceTable: CANNABIS_SYMPTOM_REFERENCE_TABLE,
+    sections: [
+      {
+        heading: "Start with what is visible",
+        body: "Use plain observations: yellowing, discrete spots or lesions, or dry tips and edges. Add location, timing, progression, and whether new growth differs from older growth. Avoid naming a deficiency, pest, pathogen, or burn until the surrounding evidence supports that comparison.",
+        links: [
+          { label: "Yellowing leaves", to: "/guides/cannabis-leaves-turning-yellow" },
+          { label: "Leaf spots and lesions", to: "/guides/cannabis-leaf-spots-lesions" },
+          { label: "Burnt or crispy tips", to: "/guides/cannabis-burnt-crispy-leaf-tips" },
+        ],
+      },
+      {
+        heading: "Compare the prior 14 days",
+        body: "Look back across the same plant for watering and feeding, and the same plant or tent for environment and explicit lighting context. Missing history is not proof that nothing happened. A partial timeline stays labeled limited so a grower can fill the gap without false certainty.",
+      },
+      {
+        heading: "Make one controlled follow-up",
+        body: SYMPTOM_NO_STACK_RULE,
+        links: [
+          { label: "Daily grow log checklist", to: "/guides/daily-grow-log-checklist" },
+          { label: "Sensor truth in a grow room", to: "/guides/sensor-truth-grow-room" },
+        ],
+      },
+    ],
+    faq: [
+      {
+        question: "Can a photo identify a cannabis plant problem?",
+        answer:
+          "A photo can preserve pattern and progression, but one image rarely establishes cause. Compare stage, location, environment, watering, feeding, lighting, and changes over time.",
+      },
+      {
+        question: "What should I log first when I see a symptom?",
+        answer:
+          "Log the visible sign, confirmed stage, plant location, a short note, and repeatable photos. Then check the prior 14 days of plant and tent evidence before changing more than one variable.",
+      },
+    ],
+    related: [
+      "cannabis-leaves-turning-yellow",
+      "cannabis-leaf-spots-lesions",
+      "cannabis-burnt-crispy-leaf-tips",
+      "cannabis-plant-care",
+      "sensor-truth-grow-room",
+    ],
+    publishedOn: "2026-08-01",
+    modifiedOn: "2026-08-01",
+  },
+  {
+    slug: "cannabis-leaves-turning-yellow",
+    title: "Cannabis Leaves Turning Yellow: What to Check | Verdant",
+    h1: "Cannabis leaves turning yellow: compare the pattern before calling the cause",
+    description:
+      "Record cannabis leaf yellowing by stage and location, then compare root-zone, feeding, environment, and light history without jumping to a deficiency claim.",
+    targetKeyword: "cannabis leaves turning yellow",
+    intro:
+      "Yellowing describes a color change. It does not, by itself, identify a nutrient deficiency, pH problem, watering problem, root issue, light response, or normal aging. The safest first move is to preserve the pattern and compare it with recent plant history.",
+    referenceTable: symptomReferenceTableFor("yellowing"),
+    cta: {
+      label: "Open the symptom evidence hub",
+      to: "/guides/cannabis-leaf-symptoms",
+      heading: "Compare yellowing evidence before changing inputs",
+      description:
+        "Use the symptom evidence hub to compare this visible pattern with environment, watering, feeding, and lighting context before deciding what to verify next.",
+    },
+    sections: [
+      {
+        heading: "Map the pattern and age of growth",
+        body: "Record whether yellowing begins on older lower leaves, newer upper growth, leaf edges, tissue between veins, or across the whole plant. Compare an affected leaf with an unaffected leaf under the same light and photograph both from a repeatable angle.",
+      },
+      {
+        heading: "Compare root-zone and feeding history",
+        body: "Review the same plant's recent watering volume, timing, dryback or substrate observations, input pH and EC when available, runoff, and recorded feeding. A missing measurement remains missing; do not replace it with a guessed value or assume the latest feed caused the change.",
+        links: [
+          { label: "Plant watering log", to: "/guides/plant-watering-log" },
+          { label: "Cannabis nutrient schedule guide", to: "/guides/cannabis-nutrient-schedule" },
+        ],
+      },
+      {
+        heading: "Compare environment and lighting context",
+        body: "Check source-labeled temperature and humidity, canopy position, explicit light changes, and whether the pattern follows the most exposed area. Stale, manual, demo, or invalid readings should never be presented as healthy live evidence.",
+      },
+      { heading: "Avoid stacked corrections", body: SYMPTOM_NO_STACK_RULE },
+    ],
+    faq: [
+      {
+        question: "Do yellow cannabis leaves always mean nitrogen deficiency?",
+        answer:
+          "No. Yellowing is a visible sign shared by multiple conditions and by normal late-cycle aging. Pattern, stage, root-zone history, feeding, environment, and progression matter.",
+      },
+      {
+        question: "Should I feed immediately when leaves turn yellow?",
+        answer:
+          "Not from color alone. Preserve the observation and compare recent watering, feeding, pH or EC evidence, environment, and stage before making a controlled change.",
+      },
+    ],
+    related: [
+      "cannabis-leaf-symptoms",
+      "cannabis-leaf-spots-lesions",
+      "cannabis-burnt-crispy-leaf-tips",
+      "plant-watering-log",
+      "cannabis-nutrient-schedule",
+      "grow-room-vpd-tracker",
+    ],
+    publishedOn: "2026-08-01",
+    modifiedOn: "2026-08-01",
+  },
+  {
+    slug: "cannabis-leaf-spots-lesions",
+    title: "Cannabis Leaf Spots and Lesions: Evidence Checks | Verdant",
+    h1: "Cannabis leaf spots and lesions: preserve distribution, surfaces, and timing",
+    description:
+      "Use an evidence-first checklist for cannabis leaf spots and lesions: distribution, both leaf surfaces, recent inputs, environment, progression, and honest uncertainty.",
+    targetKeyword: "cannabis leaf spots",
+    intro:
+      "Spots and lesions can overlap across physical damage, residue, spray response, pests, pathogens, environment, root-zone problems, and nutrition. A single photograph should not turn that overlap into certainty. Record the distribution and compare how the pattern changes.",
+    referenceTable: symptomReferenceTableFor("spots"),
+    cta: {
+      label: "Open the symptom evidence hub",
+      to: "/guides/cannabis-leaf-symptoms",
+      heading: "Compare spots and lesions without naming a cause",
+      description:
+        "Use the symptom evidence hub to compare this visible pattern with environment, watering, feeding, and lighting context before deciding what to verify next.",
+    },
+    sections: [
+      {
+        heading: "Photograph both leaf surfaces",
+        body: "Capture affected and unaffected leaves, the upper and lower surface, the wider plant, and the neighboring plant if relevant. Record whether marks rub off, cross veins, have sharp or diffuse edges, or are paired with insects, webbing, eggs, residue, or odor without treating any one clue as a confirmed cause.",
+      },
+      {
+        heading: "Check distribution and room context",
+        body: "Map whether spots occur on one plant, one canopy zone, multiple plants, or near an airflow, splash, or contact point. Review same-tent temperature, humidity, condensation, and scouting records while keeping manual and stale evidence clearly labeled.",
+        links: [
+          {
+            label: "Bud rot identification and prevention",
+            to: "/guides/bud-rot-prevention-identification",
+          },
+          { label: "Sensor truth in a grow room", to: "/guides/sensor-truth-grow-room" },
+        ],
+      },
+      {
+        heading: "Compare recent plant inputs",
+        body: "Review the same plant's watering, feeding, foliar contact, handling, and cleaning history. If a record is absent, label the evidence limited instead of saying the event did not happen.",
+      },
+      { heading: "Avoid stacked corrections", body: SYMPTOM_NO_STACK_RULE },
+    ],
+    faq: [
+      {
+        question: "Do leaf spots prove a pest or pathogen?",
+        answer:
+          "No. Spots are not specific enough by themselves. Distribution, both leaf surfaces, progression, room context, scouting, and recent inputs are needed before escalating a hypothesis.",
+      },
+      {
+        question: "What evidence should I preserve?",
+        answer:
+          "Repeatable photos, location, stage, progression, same-plant watering and feeding, same-tent environment, and any scouting or contact observations.",
+      },
+    ],
+    related: [
+      "cannabis-leaf-symptoms",
+      "cannabis-leaves-turning-yellow",
+      "cannabis-burnt-crispy-leaf-tips",
+      "sensor-truth-grow-room",
+      "daily-grow-log-checklist",
+      "bud-rot-prevention-identification",
+    ],
+    publishedOn: "2026-08-01",
+    modifiedOn: "2026-08-01",
+  },
+  {
+    slug: "cannabis-burnt-crispy-leaf-tips",
+    title: "Burnt or Crispy Cannabis Leaf Tips: What to Check | Verdant",
+    h1: "Burnt or crispy cannabis leaf tips: compare feed, roots, light, and heat",
+    description:
+      "An evidence-first guide to burnt or crispy cannabis leaf tips with feed, root-zone, light, heat, and progression checks—without assuming nutrient burn.",
+    targetKeyword: "cannabis leaf tips",
+    intro:
+      "Dry brown tips and edges are easy to label and hard to explain from appearance alone. Record where they occur, whether damage is progressing, and what changed before comparing feeding, root-zone, light, and heat evidence.",
+    referenceTable: symptomReferenceTableFor("tip_damage"),
+    cta: {
+      label: "Open the symptom evidence hub",
+      to: "/guides/cannabis-leaf-symptoms",
+      heading: "Compare tip-damage evidence before another change",
+      description:
+        "Use the symptom evidence hub to compare this visible pattern with environment, watering, feeding, and lighting context before deciding what to verify next.",
+    },
+    sections: [
+      {
+        heading: "Separate exposed zones from whole-plant patterns",
+        body: "Record whether damage is concentrated at the highest canopy, at leaf edges across the plant, on older growth, or near a local hot or dry pocket. Compare affected and shaded tissue and note whether new growth is stable after the observation.",
+      },
+      {
+        heading: "Compare feeding and root-zone evidence",
+        body: "Review the same plant's input EC and pH, runoff EC when recorded, watering volume, timing, drainage, and dryback or substrate observations. Tip damage alone does not prove excess nutrients, and an absent runoff record is not a zero.",
+        links: [
+          { label: "Cannabis nutrient schedule guide", to: "/guides/cannabis-nutrient-schedule" },
+          { label: "Plant watering log", to: "/guides/plant-watering-log" },
+        ],
+      },
+      {
+        heading: "Compare explicit light and heat context",
+        body: "Look for a documented fixture, dimmer, distance, PPFD, schedule, canopy-growth, temperature, humidity, or airflow change. The word light in unrelated notes is not lighting evidence, and room temperature alone may miss a canopy hot spot.",
+        links: [
+          {
+            label: "Light stress and look-alikes",
+            to: "/guides/cannabis-light-stress-light-burn-bleaching-or-heat",
+          },
+        ],
+      },
+      { heading: "Avoid stacked corrections", body: SYMPTOM_NO_STACK_RULE },
+    ],
+    faq: [
+      {
+        question: "Do crispy tips always mean nutrient burn?",
+        answer:
+          "No. Tip damage can overlap with several plant and room conditions. Compare same-plant feeding and root-zone history plus explicit light, heat, and airflow context.",
+      },
+      {
+        question: "Should I flush immediately?",
+        answer:
+          "Not from tip appearance alone. Preserve the evidence, verify measurements and units, and make only a controlled grower-approved change when the history supports it.",
+      },
+    ],
+    related: [
+      "cannabis-leaf-symptoms",
+      "cannabis-leaves-turning-yellow",
+      "cannabis-leaf-spots-lesions",
+      "cannabis-nutrient-schedule",
+      "plant-watering-log",
+      "cannabis-light-stress-light-burn-bleaching-or-heat",
+    ],
+    publishedOn: "2026-08-01",
+    modifiedOn: "2026-08-01",
+  },
 ];
 
 /** Return the full published guide slugs, in the same order rendered on /guides. */
@@ -1031,13 +2079,6 @@ export function findGuideBySlug(slug: string | undefined): SeoGuidePage | null {
 /* ------------------------------------------------------------------ */
 
 export const VERDANT_SITE_ORIGIN = "https://verdantgrowdiary.com";
-
-/**
- * Canonical public entry-point for the Customer Mode guide shell. The
- * :shareId segment is opaque and rendered as placeholder copy in this
- * shell, so a stable "guide" slug is a safe internal link target.
- */
-export const VERDANT_CUSTOMER_GUIDE_PATH = "/customer/guide";
 
 export const VERDANT_GUIDES_BREADCRUMB_ITEMS: ReadonlyArray<{
   name: string;

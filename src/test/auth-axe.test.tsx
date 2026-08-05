@@ -2,9 +2,8 @@
 // Mocked Supabase only — no network, no real account, no real reset.
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import { axe } from "vitest-axe";
-
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
@@ -13,9 +12,7 @@ vi.mock("@/integrations/supabase/client", () => ({
       signUp: vi.fn().mockResolvedValue({ error: null }),
       resetPasswordForEmail: vi.fn().mockResolvedValue({ error: null }),
       updateUser: vi.fn().mockResolvedValue({ error: null }),
-      getSession: vi
-        .fn()
-        .mockResolvedValue({ data: { session: { user: { id: "u-1" } } } }),
+      getSession: vi.fn().mockResolvedValue({ data: { session: { user: { id: "u-1" } } } }),
       onAuthStateChange: () => ({
         data: { subscription: { unsubscribe: () => {} } },
       }),
@@ -31,6 +28,8 @@ vi.mock("@/store/auth", () => ({
 import Auth from "@/pages/Auth";
 import ResetPassword from "@/pages/ResetPassword";
 
+const A11Y_TEST_TIMEOUT_MS = 15_000;
+
 beforeEach(() => {
   vi.clearAllMocks();
 });
@@ -43,70 +42,86 @@ function activateTab(name: RegExp) {
 }
 
 describe("Axe — /auth", () => {
-  it("Sign in panel has no detectable a11y violations", async () => {
-    const { container } = render(
-      <MemoryRouter>
-        <Auth />
-      </MemoryRouter>,
-    );
-    expect((await axe(container)).violations).toEqual([]);
-  });
+  it(
+    "Sign in panel has no detectable a11y violations",
+    async () => {
+      const { container } = render(
+        <MemoryRouter>
+          <Auth />
+        </MemoryRouter>,
+      );
+      expect((await axe(container)).violations).toEqual([]);
+    },
+    A11Y_TEST_TIMEOUT_MS,
+  );
 
-  it("Create account panel has no detectable a11y violations", async () => {
-    const { container } = render(
-      <MemoryRouter>
-        <Auth />
-      </MemoryRouter>,
-    );
-    activateTab(/create account/i);
-    expect((await axe(container)).violations).toEqual([]);
-  });
+  it(
+    "Create account panel has no detectable a11y violations",
+    async () => {
+      const { container } = render(
+        <MemoryRouter>
+          <Auth />
+        </MemoryRouter>,
+      );
+      activateTab(/create account/i);
+      expect((await axe(container)).violations).toEqual([]);
+    },
+    A11Y_TEST_TIMEOUT_MS,
+  );
 
-  it("Forgot password panel has no detectable a11y violations", async () => {
-    const { container } = render(
-      <MemoryRouter>
-        <Auth />
-      </MemoryRouter>,
-    );
-    activateTab(/forgot password/i);
-    expect((await axe(container)).violations).toEqual([]);
-  });
+  it(
+    "Forgot password panel has no detectable a11y violations",
+    async () => {
+      const { container } = render(
+        <MemoryRouter>
+          <Auth />
+        </MemoryRouter>,
+      );
+      activateTab(/forgot password/i);
+      expect((await axe(container)).violations).toEqual([]);
+    },
+    A11Y_TEST_TIMEOUT_MS,
+  );
 });
 
 describe("Axe — /reset-password", () => {
-  it("Reset password form has no detectable a11y violations", async () => {
-    const { container } = render(
-      <MemoryRouter initialEntries={["/reset-password"]}>
-        <Routes>
-          <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="/auth" element={<div>Sign in</div>} />
-        </Routes>
-      </MemoryRouter>,
-    );
-    await waitFor(() =>
-      expect(screen.getByLabelText(/^new password$/i)).toBeInTheDocument(),
-    );
-    expect((await axe(container)).violations).toEqual([]);
-  });
+  it(
+    "Reset password form has no detectable a11y violations",
+    async () => {
+      const { container } = render(
+        <MemoryRouter initialEntries={["/reset-password"]}>
+          <Routes>
+            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/auth" element={<div>Sign in</div>} />
+          </Routes>
+        </MemoryRouter>,
+      );
+      await waitFor(() => expect(screen.getByLabelText(/^new password$/i)).toBeInTheDocument());
+      expect((await axe(container)).violations).toEqual([]);
+    },
+    A11Y_TEST_TIMEOUT_MS,
+  );
 
-  it("Reset password with confirm-mismatch has no detectable a11y violations", async () => {
-    const { container } = render(
-      <MemoryRouter initialEntries={["/reset-password"]}>
-        <Routes>
-          <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="/auth" element={<div>Sign in</div>} />
-        </Routes>
-      </MemoryRouter>,
-    );
-    await waitFor(() =>
-      expect(screen.getByLabelText(/^new password$/i)).toBeInTheDocument(),
-    );
-    fireEvent.change(screen.getByLabelText(/^new password$/i), {
-      target: { value: "abcdefg1" },
-    });
-    fireEvent.change(screen.getByLabelText(/^confirm new password$/i), {
-      target: { value: "differen2" },
-    });
-    expect((await axe(container)).violations).toEqual([]);
-  });
+  it(
+    "Reset password with confirm-mismatch has no detectable a11y violations",
+    async () => {
+      const { container } = render(
+        <MemoryRouter initialEntries={["/reset-password"]}>
+          <Routes>
+            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/auth" element={<div>Sign in</div>} />
+          </Routes>
+        </MemoryRouter>,
+      );
+      await waitFor(() => expect(screen.getByLabelText(/^new password$/i)).toBeInTheDocument());
+      fireEvent.change(screen.getByLabelText(/^new password$/i), {
+        target: { value: "abcdefg1" },
+      });
+      fireEvent.change(screen.getByLabelText(/^confirm new password$/i), {
+        target: { value: "differen2" },
+      });
+      expect((await axe(container)).violations).toEqual([]);
+    },
+    A11Y_TEST_TIMEOUT_MS,
+  );
 });

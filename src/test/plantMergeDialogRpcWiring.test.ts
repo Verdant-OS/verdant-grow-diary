@@ -45,7 +45,10 @@ describe("mapMergeRpcError", () => {
     expect(m.message).toMatch(/same grow/i);
   });
   it("recognises ownership / not found", () => {
-    const m = mapMergeRpcError({ code: "42501", message: "source plant not found or not owned by caller" });
+    const m = mapMergeRpcError({
+      code: "42501",
+      message: "source plant not found or not owned by caller",
+    });
     expect(m.kind).toBe("ownership_or_not_found");
     expect(m.message).toMatch(/Check that both plants/i);
   });

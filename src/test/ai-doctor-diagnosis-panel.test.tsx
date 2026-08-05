@@ -72,10 +72,9 @@ describe("AiDoctorDiagnosisPanel", () => {
 
   it("renders confidence explanation", () => {
     render(<AiDoctorDiagnosisPanel diagnosis={baseResult()} />);
-    expect(
-      screen.getByTestId("ai-doctor-diagnosis-confidence-explanation")
-        .textContent,
-    ).toBe("Mixed signals across sources.");
+    expect(screen.getByTestId("ai-doctor-diagnosis-confidence-explanation").textContent).toBe(
+      "Mixed signals across sources.",
+    );
   });
 
   it("hides raw model confidence from primary confidence display", () => {
@@ -87,13 +86,9 @@ describe("AiDoctorDiagnosisPanel", () => {
 
   it("exposes raw model confidence only in audit metadata", () => {
     render(<AiDoctorDiagnosisPanel diagnosis={baseResult()} />);
-    const audit = screen.getByTestId(
-      "ai-doctor-diagnosis-audit-raw-model-confidence",
-    );
+    const audit = screen.getByTestId("ai-doctor-diagnosis-audit-raw-model-confidence");
     expect(audit.getAttribute("data-raw-model-confidence")).toBe("High");
-    expect(
-      screen.getByTestId("ai-doctor-diagnosis-audit-downgrade"),
-    ).toBeTruthy();
+    expect(screen.getByTestId("ai-doctor-diagnosis-audit-downgrade")).toBeTruthy();
   });
 
   it("renders conflicts with calm review-first language and severity", () => {
@@ -114,9 +109,9 @@ describe("AiDoctorDiagnosisPanel", () => {
         })}
       />,
     );
-    expect(
-      screen.getByTestId("ai-doctor-diagnosis-confidence-fallback").textContent,
-    ).toBe(AI_DOCTOR_DIAGNOSIS_FALLBACK_CONFIDENCE_COPY);
+    expect(screen.getByTestId("ai-doctor-diagnosis-confidence-fallback").textContent).toBe(
+      AI_DOCTOR_DIAGNOSIS_FALLBACK_CONFIDENCE_COPY,
+    );
     const panel = screen.getByTestId("ai-doctor-diagnosis-panel");
     expect(panel.getAttribute("data-confidence-fallback")).toBe("true");
   });
@@ -143,9 +138,7 @@ describe("AiDoctorDiagnosisPanel", () => {
     );
     expect(screen.getByTestId("ai-doctor-diagnosis-panel")).toBeTruthy();
     // No conflicts subsection when conflicts are absent
-    expect(
-      screen.queryByTestId("ai-doctor-diagnosis-conflicts"),
-    ).toBeNull();
+    expect(screen.queryByTestId("ai-doctor-diagnosis-conflicts")).toBeNull();
   });
 
   it("renders all content sections when populated", () => {
@@ -164,10 +157,7 @@ describe("AiDoctorDiagnosisPanel", () => {
 });
 
 describe("AiDoctorDiagnosisPanel — static safety", () => {
-  const SRC = readFileSync(
-    resolve(__dirname, "../components/AiDoctorDiagnosisPanel.tsx"),
-    "utf8",
-  );
+  const SRC = readFileSync(resolve(__dirname, "../components/AiDoctorDiagnosisPanel.tsx"), "utf8");
 
   it("contains no privileged service key references", () => {
     expect(SRC).not.toMatch(/service_role/i);

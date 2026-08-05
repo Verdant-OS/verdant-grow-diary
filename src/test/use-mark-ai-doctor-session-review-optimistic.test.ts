@@ -42,12 +42,9 @@ const forbidden = {
 
 function deferInsert() {
   let resolveOuter!: () => void;
-  const promise = new Promise<{ data: null; error: { message: string } | null }>(
-    (res) => {
-      resolveOuter = () =>
-        res({ data: null, error: nextInsertError });
-    },
-  );
+  const promise = new Promise<{ data: null; error: { message: string } | null }>((res) => {
+    resolveOuter = () => res({ data: null, error: nextInsertError });
+  });
   pendingInsert = { promise, resolve: resolveOuter };
   return pendingInsert;
 }
@@ -74,7 +71,13 @@ vi.mock("@/integrations/supabase/client", () => {
     select: () => ({
       in: () => ({
         order: () => ({
-          limit: () => Promise.resolve({ data: [], error: null }),
+          limit: () => {
+            const c: any = {
+              abortSignal: () => c,
+              then: (r: any) => Promise.resolve({ data: [], error: null }).then(r),
+            };
+            return c;
+          },
         }),
       }),
     }),
@@ -123,10 +126,7 @@ function getCache(
   client: QueryClient,
   scope: string[] | null,
 ): UseAiDoctorSessionReviewsResult | undefined {
-  return client.getQueryData<UseAiDoctorSessionReviewsResult>([
-    "ai_doctor_session_reviews",
-    scope,
-  ]);
+  return client.getQueryData<UseAiDoctorSessionReviewsResult>(["ai_doctor_session_reviews", scope]);
 }
 
 beforeEach(() => {
@@ -181,9 +181,7 @@ describe("useMarkAiDoctorSessionReview — optimistic cache", () => {
     });
     const cache = getCache(client, ["s1"])!;
     expect(cache.events[0].event_type).toBe("marked_reviewed");
-    expect(cache.events[0].id.startsWith(OPTIMISTIC_REVIEW_EVENT_ID_PREFIX)).toBe(
-      true,
-    );
+    expect(cache.events[0].id.startsWith(OPTIMISTIC_REVIEW_EVENT_ID_PREFIX)).toBe(true);
     expect(cache.stateBySession.get("s1")?.status).toBe("reviewed");
 
     deferred.resolve();
@@ -205,9 +203,7 @@ describe("useMarkAiDoctorSessionReview — optimistic cache", () => {
     });
 
     await waitFor(() => {
-      expect(getCache(client, ["s1"])?.events[0]?.event_type).toBe(
-        "needs_follow_up",
-      );
+      expect(getCache(client, ["s1"])?.events[0]?.event_type).toBe("needs_follow_up");
     });
     const cache = getCache(client, ["s1"])!;
     expect(cache.events[0].note).toBe("watch overnight");

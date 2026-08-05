@@ -10,11 +10,18 @@
  *     - `observation` form event → RPC `note` action
  *     - `note` form event → RPC `note` action
  * - All other event types (photo, feeding, training, reminder, etc.)
- *   are rejected with `unsupported_event_type` and surfaced as
- *   "Coming soon" in UI. We do not extend the RPC or validator in this
- *   slice.
- * - Sensor snapshot values are NOT persisted via this adapter. The
- *   strip remains pre-save trust UI only.
+ *   are rejected with `unsupported_event_type`. The ordinary selector
+ *   filters them out because they belong in the structured Quick Log path.
+ * - Sensor-strip readings are persisted only as the redacted envelope
+ *   under `p_details.sensor` (see `sensorAttachPayload`); they are never
+ *   promoted to the RPC's first-class sensor params.
+ * - Environment Check air metrics (temp/RH/VPD) DO ride the first-class
+ *   `p_temperature_c` / `p_humidity_pct` / `p_vpd_kpa` params, mirroring
+ *   Quick Log v2, so `quicklog_save_manual` persists the structured
+ *   `environment_events` row. Alert evaluation does NOT read that table
+ *   (it reads sensor_readings, then diary `details.sensor_snapshot`), so
+ *   env checks still cannot trigger environment alerts — from either
+ *   Quick Log variant. Tracked on the zero-defect board.
  * - Plant selection is required because the RPC needs a tent or plant
  *   target; the legacy dialog has no tent picker.
  * - Free-text "more details" (pH/EC/runoff/nutrients/training) are
@@ -23,6 +30,7 @@
  */
 
 import type { QuickLogV2SavePayload } from "./quickLogV2SavePayload";
+import { normalizeQuickLogStage } from "./quickLogStageDefaultRules";
 import type { buildSensorSnapshotSavePayload } from "./latestSensorSnapshotRules";
 import type { PhenoEvidenceReceiptDetails } from "./phenoEvidenceCaptureRules";
 
@@ -46,7 +54,55 @@ export function isSupportedLegacyEventType(value: string): value is SupportedLeg
 }
 
 export const UNSUPPORTED_EVENT_TYPE_COPY =
-  "Coming soon in the new Quick Log path. Use Water or Observation for now.";
+  "This activity uses its dedicated Quick Log form. Choose Observation or Environment check here.";
+
+export const ORDINARY_LEGACY_WATERING_BLOCKED_COPY =
+  "Watering now uses the structured Water form. Choose Watering under All activity types to continue.";
+
+interface PublicStarterWateringPrefillLike {
+  eventType?: unknown;
+  source?: unknown;
+  wateringVolumeMl?: unknown;
+  publicStarterDraftId?: unknown;
+  publicStarterDraftUpdatedAt?: unknown;
+}
+
+interface PublicStarterWateringDraftLike {
+  v?: unknown;
+  id?: unknown;
+  updatedAt?: unknown;
+  logType?: unknown;
+  wateringVolumeMl?: unknown;
+}
+
+/**
+ * Narrow compatibility fence for the public starter's richer legacy handoff.
+ * Both opaque marker and exact revision must match the currently stored v1
+ * watering draft; ordinary/crafted Water state is rejected.
+ */
+export function isVerifiedPublicStarterWateringHandoff(
+  prefill: PublicStarterWateringPrefillLike | null | undefined,
+  storedDraft: PublicStarterWateringDraftLike | null | undefined,
+): boolean {
+  return !!(
+    prefill &&
+    storedDraft &&
+    prefill.eventType === "watering" &&
+    prefill.source === "public-starter" &&
+    typeof prefill.publicStarterDraftId === "string" &&
+    prefill.publicStarterDraftId.length > 0 &&
+    prefill.publicStarterDraftId === storedDraft.id &&
+    typeof prefill.publicStarterDraftUpdatedAt === "string" &&
+    prefill.publicStarterDraftUpdatedAt.length > 0 &&
+    prefill.publicStarterDraftUpdatedAt === storedDraft.updatedAt &&
+    storedDraft.v === 1 &&
+    storedDraft.logType === "watering" &&
+    typeof storedDraft.wateringVolumeMl === "number" &&
+    Number.isFinite(storedDraft.wateringVolumeMl) &&
+    storedDraft.wateringVolumeMl > 0 &&
+    prefill.wateringVolumeMl === storedDraft.wateringVolumeMl
+  );
+}
 
 import { type EcUnit } from "@/constants/units";
 
@@ -74,6 +130,12 @@ export interface LegacyQuickLogFormInput {
   plantId: string | null;
   plantTentId: string | null;
   details: LegacyQuickLogDetails;
+  /**
+   * Stage tag from the dialog's stage select (audit fix #2). Normalized in
+   * the builder; unknown/blank values are omitted so a bad stage never
+   * blocks a save.
+   */
+  stage?: string | null;
   /**
    * Optional redacted sensor envelope from buildSensorSnapshotSavePayload.
    * When non-null, emitted as `p_details: { sensor: ... }` on the RPC
@@ -111,11 +173,14 @@ export interface LegacyQuickLogFormInput {
 }
 
 export type LegacyUnifiedBuildResult =
-  | { ok: true; payload: QuickLogV2SavePayload }
-  | { ok: false; reason: string; message: string };
+  { ok: true; payload: QuickLogV2SavePayload } | { ok: false; reason: string; message: string };
 
 function trimStr(value: string | undefined | null): string {
   return (value ?? "").toString().trim();
+}
+
+function finiteOrNull(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
 export function appendLegacyDetailsToNote(
@@ -183,6 +248,20 @@ export function buildLegacyQuickLogUnifiedPayload(
   }
   const detailsEnvelope: Record<string, unknown> | null =
     Object.keys(envelopeFields).length > 0 ? envelopeFields : null;
+  // Stage tag rides on every save; the RPC persists it onto the diary
+  // companion (and writes that companion for stage-only saves).
+  const stageTag = normalizeQuickLogStage(input.stage ?? "") || null;
+
+  // Environment Check air metrics must reach the RPC's first-class sensor
+  // params — quicklog_save_manual only writes an environment_events row when
+  // at least one of them is non-null, and the envelope JSON alone never
+  // reaches that gate. Values in the envelope already passed the canonical
+  // band gate; reading defensively keeps this adapter null-safe when called
+  // ungated.
+  const envCheck = input.eventType === "environment" ? input.environmentCheck : null;
+  const envTempC = finiteOrNull(envCheck?.["temp_c"]);
+  const envHumidityPct = finiteOrNull(envCheck?.["humidity_pct"]);
+  const envVpdKpa = finiteOrNull(envCheck?.["vpd_kpa"]);
 
   if (input.eventType === "watering") {
     const raw = trimStr(input.details.watering);
@@ -207,6 +286,7 @@ export function buildLegacyQuickLogUnifiedPayload(
         p_vpd_kpa: null,
         p_occurred_at: null,
         p_details: detailsEnvelope,
+        p_stage: stageTag,
         p_idempotency_key: input.idempotencyKey,
       },
     };
@@ -228,11 +308,12 @@ export function buildLegacyQuickLogUnifiedPayload(
       p_action: "note",
       p_volume_ml: null,
       p_note: note,
-      p_temperature_c: null,
-      p_humidity_pct: null,
-      p_vpd_kpa: null,
+      p_temperature_c: envTempC,
+      p_humidity_pct: envHumidityPct,
+      p_vpd_kpa: envVpdKpa,
       p_occurred_at: null,
       p_details: detailsEnvelope,
+      p_stage: stageTag,
       p_idempotency_key: input.idempotencyKey,
     },
   };

@@ -22,7 +22,6 @@ describe("contextual-pheno-comparison static safety", () => {
       const findings = scanFile(file);
       if (findings.length > 0) {
         if (process.env.GITHUB_ACTIONS === "true") {
-          // eslint-disable-next-line no-console
           console.log(formatGithubAnnotations(findings));
         }
         throw new Error(formatLocalReport(findings));

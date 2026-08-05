@@ -16,6 +16,9 @@ import { authenticateBearer, tentScopeMatches } from "./auth.ts";
 import { sanitizeForResponse, safeLog } from "./sanitize.ts";
 import { buildStoredRow, classifyInsertError } from "./storageMapping.ts";
 import { classifyIngestTimestampFreshness } from "../_shared/sensorIngestFreshness.ts";
+import { requireLiveSensorEntitlement } from "../_shared/liveSensorEntitlementGate.ts";
+import { resolveServerBillingEnvironment } from "../_shared/unionEntitlementLookup.ts";
+import type { LovableBillingEnvironment } from "../_shared/lib/lib/entitlements/lovablePaddleAdapter.ts";
 
 export interface SensorWebhookAdminClient {
   // Supabase's generated query-builder type resolves untyped Edge schemas to
@@ -30,6 +33,8 @@ export interface SensorWebhookHandlerDeps {
   admin?: SensorWebhookAdminClient;
   /** One request clock shared by auth, validation, and storage freshness. */
   now?: () => Date;
+  /** Test-only server environment override; never read from request input. */
+  expectedBillingEnvironment?: LovableBillingEnvironment;
 }
 
 // Centralized CORS handling. Allowed origins are explicit — no wildcard is
@@ -40,7 +45,14 @@ export interface SensorWebhookHandlerDeps {
 const ALLOWED_ORIGINS = new Set<string>([
   "https://verdantgrowdiary.com",
   "https://www.verdantgrowdiary.com",
+  // Published Lovable site — distinct domain from the editor preview below.
   "https://verdantgrowdiary-com.lovable.app",
+  // Lovable's live EDITOR preview iframe for this project (id-preview--
+  // <project-uuid>.lovable.app). Not the same host as the published site
+  // above — omitting it meant the editor's own preview could never
+  // exercise live sensor ingest, failing browser-side as a CORS-blocked
+  // "Failed to fetch" / status 0 with no distinguishing server-side signal.
+  "https://id-preview--66255e7b-892c-4be5-8686-ab1cfc3666db.lovable.app",
   "http://localhost:5173",
   "http://localhost:3000",
   "http://localhost:8080",
@@ -155,6 +167,20 @@ async function handle(req: Request, deps: SensorWebhookHandlerDeps): Promise<Res
     return json(req, { error: "bridge_required" }, 403);
   }
   const auth = authRes.auth;
+
+  // Re-check entitlement on every use of an existing token. A downgrade,
+  // expiration, or lookup failure therefore closes live ingest immediately;
+  // the bridge token alone is authentication, never billing authority.
+  const liveSensorAccess = await requireLiveSensorEntitlement(
+    admin,
+    auth.userId,
+    deps.expectedBillingEnvironment ?? resolveServerBillingEnvironment(),
+    requestNow,
+  );
+  if (!liveSensorAccess.ok) {
+    const status = liveSensorAccess.reason === "entitlement_lookup_failed" ? 503 : 403;
+    return json(req, { error: liveSensorAccess.reason }, status);
+  }
 
   let body: WebhookIngestPayload;
   try {

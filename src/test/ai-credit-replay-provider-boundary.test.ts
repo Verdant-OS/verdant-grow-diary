@@ -31,7 +31,9 @@ describe("AI credit replay provider boundary", () => {
     expect(replayBlock).toContain('"result_recording_failed"');
     expect(replayBlock).toContain('spendDecision.kind === "refunded"');
     expect(replayBlock).toContain("validateAiDoctorReviewResult(spendDecision.result)");
-    expect(replayBlock).toContain("return safeOk(cached.result, { replayed: true })");
+    expect(replayBlock).toContain(
+      "return safeOk(cached.result, buildAiCreditReceiptContext(spendObj, true))",
+    );
     expect(replayBlock).not.toContain("fetch(");
   });
 
@@ -140,16 +142,19 @@ describe("AI credit replay provider boundary", () => {
     }
   });
 
-  it("AI Coach rejects cross-feature/tier and every replay before its single provider call", () => {
+  it("AI Coach rejects cross-scope spends and resolves every replay before its single provider call", () => {
+    const decisionIndex = COACH.indexOf("const spendDecision = classifyAiDoctorCreditSpend");
     const scopeIndex = COACH.indexOf("spendObj.feature !== FEATURE");
-    const replayStart = COACH.indexOf('if (spendObj.status === "replayed")');
     const providerIndex = COACH.indexOf('fetch("https://ai.gateway.lovable.dev');
+    expect(decisionIndex).toBeGreaterThan(-1);
     expect(scopeIndex).toBeGreaterThan(-1);
-    expect(replayStart).toBeGreaterThan(scopeIndex);
-    expect(providerIndex).toBeGreaterThan(replayStart);
-    expect(COACH.slice(scopeIndex, providerIndex)).toContain(
-      'return json({ ok: false, reason: "invalid" }, 200)',
-    );
+    expect(scopeIndex).toBeGreaterThan(decisionIndex);
+    expect(providerIndex).toBeGreaterThan(scopeIndex);
+    const replayBlock = COACH.slice(decisionIndex, providerIndex);
+    expect(replayBlock).toContain('spendDecision.kind === "pending"');
+    expect(replayBlock).toContain('spendDecision.kind === "stale"');
+    expect(replayBlock).toContain('spendDecision.kind === "cached"');
+    expect(replayBlock).toContain("return safeOk(cached.result");
     expect(COACH.match(/fetch\("https:\/\/ai\.gateway\.lovable\.dev/g) ?? []).toHaveLength(1);
   });
 

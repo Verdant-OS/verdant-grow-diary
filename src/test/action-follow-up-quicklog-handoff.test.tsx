@@ -71,12 +71,8 @@ describe("buildActionFollowUpQuickLogPrefill", () => {
 
   it("returns null when action id or grow id are missing", () => {
     expect(buildActionFollowUpQuickLogPrefill(null)).toBeNull();
-    expect(
-      buildActionFollowUpQuickLogPrefill({ ...ACTION, actionId: "" }),
-    ).toBeNull();
-    expect(
-      buildActionFollowUpQuickLogPrefill({ ...ACTION, growId: "   " }),
-    ).toBeNull();
+    expect(buildActionFollowUpQuickLogPrefill({ ...ACTION, actionId: "" })).toBeNull();
+    expect(buildActionFollowUpQuickLogPrefill({ ...ACTION, growId: "   " })).toBeNull();
   });
 
   it("is deterministic for identical input", () => {
@@ -176,12 +172,7 @@ describe("ActionFollowUpQuickLogHandoffButton", () => {
   });
 
   it("renders CTA with copy, accessible name, and min 44px tap target", () => {
-    render(
-      <ActionFollowUpQuickLogHandoffButton
-        action={ACTION}
-        onPhotoCreated={() => {}}
-      />,
-    );
+    render(<ActionFollowUpQuickLogHandoffButton action={ACTION} onPhotoCreated={() => {}} />);
     const btn = screen.getByTestId("action-followup-quicklog-handoff-btn");
     expect(btn).toHaveAccessibleName(ACTION_FOLLOWUP_QUICKLOG_CTA_LABEL);
     expect(btn.className).toMatch(/min-h-\[44px\]/);
@@ -191,12 +182,7 @@ describe("ActionFollowUpQuickLogHandoffButton", () => {
   });
 
   it("dispatches only the existing verdant:open-quicklog event on click", () => {
-    render(
-      <ActionFollowUpQuickLogHandoffButton
-        action={ACTION}
-        onPhotoCreated={() => {}}
-      />,
-    );
+    render(<ActionFollowUpQuickLogHandoffButton action={ACTION} onPhotoCreated={() => {}} />);
     fireEvent.click(screen.getByTestId("action-followup-quicklog-handoff-btn"));
     const opens = dispatched.filter((e) => e.type === ACTION_FOLLOWUP_QUICKLOG_EVENT);
     expect(opens).toHaveLength(1);
@@ -211,24 +197,14 @@ describe("ActionFollowUpQuickLogHandoffButton", () => {
   });
 
   it("does not visibly render the action id or raw storage refs", () => {
-    render(
-      <ActionFollowUpQuickLogHandoffButton
-        action={ACTION}
-        onPhotoCreated={() => {}}
-      />,
-    );
+    render(<ActionFollowUpQuickLogHandoffButton action={ACTION} onPhotoCreated={() => {}} />);
     expect(screen.queryByText(/act-1/)).toBeNull();
     expect(screen.queryByText(/storage:\/\//)).toBeNull();
   });
 
   it("refreshes only after click, when verdant:entry-created fires", () => {
     const onCreated = vi.fn();
-    render(
-      <ActionFollowUpQuickLogHandoffButton
-        action={ACTION}
-        onPhotoCreated={onCreated}
-      />,
-    );
+    render(<ActionFollowUpQuickLogHandoffButton action={ACTION} onPhotoCreated={onCreated} />);
     // Stray entry-created without a prior click does nothing.
     window.dispatchEvent(new Event("verdant:entry-created"));
     expect(onCreated).not.toHaveBeenCalled();
@@ -245,12 +221,7 @@ describe("ActionFollowUpQuickLogHandoffButton", () => {
 
   it("cancel semantics: no click → onPhotoCreated never fires even if the modal opens elsewhere", () => {
     const onCreated = vi.fn();
-    render(
-      <ActionFollowUpQuickLogHandoffButton
-        action={ACTION}
-        onPhotoCreated={onCreated}
-      />,
-    );
+    render(<ActionFollowUpQuickLogHandoffButton action={ACTION} onPhotoCreated={onCreated} />);
     // Simulate an unrelated Quick Log save (e.g. FAB) — must not
     // touch this handoff's refresh.
     window.dispatchEvent(new Event("verdant:entry-created"));
@@ -263,12 +234,7 @@ describe("ActionFollowUpQuickLogHandoffButton", () => {
     // selection or calls a save service. Enforced by inspecting the
     // component's exported prop surface.
     const onCreated = vi.fn();
-    render(
-      <ActionFollowUpQuickLogHandoffButton
-        action={ACTION}
-        onPhotoCreated={onCreated}
-      />,
-    );
+    render(<ActionFollowUpQuickLogHandoffButton action={ACTION} onPhotoCreated={onCreated} />);
     fireEvent.click(screen.getByTestId("action-followup-quicklog-handoff-btn"));
     window.dispatchEvent(new Event("verdant:entry-created"));
     expect(onCreated).toHaveBeenCalledTimes(1);

@@ -7,7 +7,7 @@
  */
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import Pricing from "@/pages/Pricing";
 
 vi.mock("@/hooks/usePaddleCheckout", () => ({
@@ -42,9 +42,13 @@ const FORBIDDEN = [
   "fake live",
 ];
 
+// Founder Lifetime left the public pricing grid; it now renders only on an
+// explicit `?plan=founder_lifetime` deep link. These assertions still cover
+// the Founder card exactly as before — they just have to arrive the way a
+// grower with an existing Founder link does.
 function renderPricing() {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={["/pricing?plan=founder_lifetime"]}>
       <Pricing />
     </MemoryRouter>,
   );
@@ -71,7 +75,8 @@ describe("Pricing — proof polish copy", () => {
     expect(block.textContent).toContain("Post-Grow Learning Report");
     expect(block.textContent).toContain("Print / Save PDF export");
     expect(block.textContent).toContain("Sensor truth");
-    expect(block.textContent).toContain("Approval-required actions");
+    expect(block.textContent).toContain("Advanced timeline filtering");
+    expect(block.textContent).not.toContain("Approval-required actions");
     expect(screen.getAllByTestId("pricing-proof-callout")).toHaveLength(4);
   });
 

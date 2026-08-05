@@ -45,11 +45,7 @@ Deno.test("malformed header rejects", async () => {
 });
 
 Deno.test("non-numeric ts rejects", async () => {
-  const r = await verifyPaddleWebhookSignature(
-    TEST_SECRET,
-    "ts=notanumber;h1=abcd",
-    RAW,
-  );
+  const r = await verifyPaddleWebhookSignature(TEST_SECRET, "ts=notanumber;h1=abcd", RAW);
   assertEquals(r, { ok: false, reason: "invalid_signature_header" });
 });
 

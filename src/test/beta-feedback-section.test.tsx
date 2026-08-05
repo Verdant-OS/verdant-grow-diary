@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 
 vi.mock("@/hooks/usePageSeo", () => ({ usePageSeo: () => undefined }));
 
@@ -58,22 +58,19 @@ describe.each<Variant>(["creator", "breeder"])(
       expect(prompts.querySelectorAll("li").length).toBeGreaterThanOrEqual(3);
     });
 
-    it("falls back to a real disabled <button> when the URL is missing", async () => {
+    it("falls back to Verdant's working feedback form when the URL is missing", async () => {
       await renderVariant(variant);
-      const disabled = screen.getByTestId(`${root}-feedback-cta-disabled`);
-      expect(disabled.tagName).toBe("BUTTON");
-      expect(disabled).toBeDisabled();
-      expect(disabled).toHaveAttribute("aria-disabled", "true");
-      expect(disabled).not.toHaveAttribute("href");
-      expect(disabled).toHaveTextContent(/feedback form coming soon/i);
-      expect(screen.queryByTestId(`${root}-feedback-cta`)).not.toBeInTheDocument();
+      const cta = screen.getByTestId(`${root}-feedback-cta`);
+      expect(cta.tagName).toBe("A");
+      expect(cta).toHaveAttribute("href", "/feedback");
+      expect(cta).not.toHaveAttribute("target");
+      expect(cta).toHaveAccessibleName(/share post-demo feedback/i);
     });
 
-    it("rejects non-http(s) URLs and shows the disabled placeholder", async () => {
+    it("rejects non-http(s) URLs and uses the internal feedback form", async () => {
       vi.stubEnv("VITE_BETA_FEEDBACK_FORM_URL", "javascript:alert(1)");
       await renderVariant(variant);
-      expect(screen.getByTestId(`${root}-feedback-cta-disabled`)).toBeInTheDocument();
-      expect(screen.queryByTestId(`${root}-feedback-cta`)).not.toBeInTheDocument();
+      expect(screen.getByTestId(`${root}-feedback-cta`)).toHaveAttribute("href", "/feedback");
     });
 
     it("renders an external anchor with target=_blank + rel noopener noreferrer when configured", async () => {
@@ -91,8 +88,7 @@ describe.each<Variant>(["creator", "breeder"])(
       vi.stubEnv("VITE_BETA_FEEDBACK_FORM_URL", "https://forms.example.com/verdant-feedback");
       stubSearch("?utm_source=verdant-post&utm_medium=beta&secret=drop");
       await renderVariant(variant);
-      const href =
-        screen.getByTestId(`${root}-feedback-cta`).getAttribute("href") ?? "";
+      const href = screen.getByTestId(`${root}-feedback-cta`).getAttribute("href") ?? "";
       const url = new URL(href);
       expect(url.origin + url.pathname).toBe("https://forms.example.com/verdant-feedback");
       expect(url.searchParams.get("utm_source")).toBe("verdant-post");

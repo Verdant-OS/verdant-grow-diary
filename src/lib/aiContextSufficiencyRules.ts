@@ -9,16 +9,12 @@
  * cap the ceiling at medium. Demo/unavailable cap at low.
  */
 
+import { DEFAULT_SENSOR_STALE_MS } from "../constants/sensorTiming";
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-export type AiContextDataSource =
-  | "supabase"
-  | "mock"
-  | "mixed"
-  | "unavailable"
-  | "unknown";
+export type AiContextDataSource = "supabase" | "mock" | "mixed" | "unavailable" | "unknown";
 
 export interface AiContextDataMeta {
   /** Optional data-source label aligned with GrowDataSourceMeta. */
@@ -50,11 +46,7 @@ export interface AiContextSensorReadingInput {
   ec?: number | null;
 }
 
-export type AiCoachQuestionKind =
-  | "general"
-  | "environment"
-  | "nutrient"
-  | "visual-diagnosis";
+export type AiCoachQuestionKind = "general" | "environment" | "nutrient" | "visual-diagnosis";
 
 export interface AiContextInput {
   activeGrow?: { id?: string } | null;
@@ -91,12 +83,11 @@ export interface AiContextSufficiencyResult {
 // ---------------------------------------------------------------------------
 
 /** Sensor reading older than this is considered stale. */
-export const DEFAULT_SENSOR_STALE_MS = 6 * 60 * 60 * 1000; // 6h
+export { DEFAULT_SENSOR_STALE_MS };
 /** Diary/watering activity older than this is considered missing-recent. */
 export const DEFAULT_RECENT_ACTIVITY_MS = 7 * 24 * 60 * 60 * 1000; // 7d
 
-const FINITE = (n: unknown): n is number =>
-  typeof n === "number" && Number.isFinite(n);
+const FINITE = (n: unknown): n is number => typeof n === "number" && Number.isFinite(n);
 
 function toEpoch(at: string | number | Date | null | undefined): number | null {
   if (at == null) return null;
@@ -129,21 +120,12 @@ export function evaluateAiContextSufficiency(
 
   const safe: AiContextInput = input ?? {};
   const kind: AiCoachQuestionKind = safe.questionKind ?? "general";
-  const now =
-    typeof safe.now === "number" && Number.isFinite(safe.now)
-      ? safe.now
-      : Date.now();
+  const now = typeof safe.now === "number" && Number.isFinite(safe.now) ? safe.now : Date.now();
 
   const plants = Array.isArray(safe.plants) ? safe.plants : [];
-  const diary = Array.isArray(safe.recentDiaryEntries)
-    ? safe.recentDiaryEntries
-    : [];
-  const watering = Array.isArray(safe.recentWateringOrFeeding)
-    ? safe.recentWateringOrFeeding
-    : [];
-  const sensors = Array.isArray(safe.recentSensorReadings)
-    ? safe.recentSensorReadings
-    : [];
+  const diary = Array.isArray(safe.recentDiaryEntries) ? safe.recentDiaryEntries : [];
+  const watering = Array.isArray(safe.recentWateringOrFeeding) ? safe.recentWateringOrFeeding : [];
+  const sensors = Array.isArray(safe.recentSensorReadings) ? safe.recentSensorReadings : [];
 
   // --- Hard floor: no active grow / no plants ------------------------------
   if (!safe.activeGrow || !nonBlank(safe.activeGrow.id)) {
@@ -229,8 +211,7 @@ export function evaluateAiContextSufficiency(
   if (sensors.length > 0 && newestSensorAt == null) {
     warnings.push("sensor-reading:no-valid-timestamps");
   }
-  const sensorStale =
-    newestSensorAt != null && now - newestSensorAt > DEFAULT_SENSOR_STALE_MS;
+  const sensorStale = newestSensorAt != null && now - newestSensorAt > DEFAULT_SENSOR_STALE_MS;
   if (sensorStale) warnings.push("sensor-reading:stale");
 
   // --- Question-kind-specific signal checks -------------------------------
@@ -263,13 +244,9 @@ export function evaluateAiContextSufficiency(
   let ceiling: AiContextConfidenceCeiling = "high";
 
   const demoAnywhere =
-    sensorSource === "mock" ||
-    sensorIsDemo ||
-    contextSource === "mock" ||
-    contextIsDemo;
+    sensorSource === "mock" || sensorIsDemo || contextSource === "mock" || contextIsDemo;
   const mixedAnywhere = sensorSource === "mixed" || contextSource === "mixed";
-  const unavailableAnywhere =
-    sensorSource === "unavailable" || contextSource === "unavailable";
+  const unavailableAnywhere = sensorSource === "unavailable" || contextSource === "unavailable";
 
   if (demoAnywhere) {
     ceiling = "low";
@@ -319,8 +296,7 @@ export function evaluateAiContextSufficiency(
     sufficiency = "limited";
   }
 
-  const trustedForAi =
-    sufficiency !== "insufficient" && !demoAnywhere && !unavailableAnywhere;
+  const trustedForAi = sufficiency !== "insufficient" && !demoAnywhere && !unavailableAnywhere;
 
   if (sufficiency === "sufficient" && reasons.length === 0) {
     reasons.push("sufficient-real-context");

@@ -95,12 +95,9 @@ export default function GrowLineageRepair() {
       <div className="flex items-center gap-3">
         <Wrench className="h-6 w-6 text-primary" />
         <div>
-          <h1 className="text-2xl font-display font-semibold">
-            Grow Lineage Repair
-          </h1>
+          <h1 className="text-2xl font-display font-semibold">Grow Lineage Repair</h1>
           <p className="text-sm text-muted-foreground">
-            Assign unlinked tents to one of your grows so the Action Queue can
-            target them safely.
+            Assign unlinked tents to one of your grows so the Action Queue can target them safely.
           </p>
         </div>
       </div>
@@ -109,8 +106,8 @@ export default function GrowLineageRepair() {
         <AlertTriangle className="h-4 w-4" />
         <AlertTitle>Assignments affect Action Queue targeting</AlertTitle>
         <AlertDescription>
-          Once a tent is linked to a grow, suggested actions can reference it.
-          Suggestions still require approval; nothing is sent to devices.
+          Once a tent is linked to a grow, suggested actions can reference it. Suggestions still
+          require approval; nothing is sent to devices.
         </AlertDescription>
       </Alert>
 
@@ -124,22 +121,19 @@ export default function GrowLineageRepair() {
           className="rounded-lg border border-border bg-card p-6 text-center space-y-3"
         >
           <Check className="h-5 w-5 text-emerald-400 mx-auto" />
-          <h2 className="font-display font-semibold text-base">
-            No lineage repairs needed
-          </h2>
+          <h2 className="font-display font-semibold text-base">No lineage repairs needed</h2>
           <p className="text-sm text-muted-foreground max-w-md mx-auto">
-            All tents are assigned to grows. Your current tents and grows are
-            already connected. If something looks missing, start by checking
-            the grow and tent records from the Harvest Archive.
+            All tents are assigned to grows. Your current tents and grows are already connected. If
+            something looks missing, start by checking the grow and tent records from the Harvest
+            Archive.
           </p>
           <p
             className="text-xs text-muted-foreground max-w-md mx-auto"
             data-testid="grow-lineage-empty-state-first-step"
           >
-            First step: open Harvest Archive and confirm the grow exists, then
-            return here if a tent needs to be reconnected. Verdant never
-            changes lineage automatically — every repair waits for your
-            approval.
+            First step: open Harvest Archive and confirm the grow exists, then return here if a tent
+            needs to be reconnected. Verdant never changes lineage automatically — every repair
+            waits for your approval.
           </p>
           <div>
             <Button asChild variant="outline" size="sm">
@@ -166,16 +160,12 @@ export default function GrowLineageRepair() {
               <div className="flex items-center gap-2">
                 <Select
                   value={selection[t.id] ?? ""}
-                  onValueChange={(v) =>
-                    setSelection((s) => ({ ...s, [t.id]: v }))
-                  }
+                  onValueChange={(v) => setSelection((s) => ({ ...s, [t.id]: v }))}
                   disabled={grows.length === 0}
                 >
                   <SelectTrigger className="w-56">
                     <SelectValue
-                      placeholder={
-                        grows.length === 0 ? "No grows yet" : "Select a grow"
-                      }
+                      placeholder={grows.length === 0 ? "No grows yet" : "Select a grow"}
                     />
                   </SelectTrigger>
                   <SelectContent>
@@ -191,11 +181,7 @@ export default function GrowLineageRepair() {
                   onClick={() => save(t.id)}
                   disabled={busyId === t.id || !selection[t.id]}
                 >
-                  {busyId === t.id ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    "Save"
-                  )}
+                  {busyId === t.id ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
                 </Button>
               </div>
             </div>

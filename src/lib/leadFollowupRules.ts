@@ -18,11 +18,7 @@ export type LeadQuickFilter =
   | "closed"
   | "spam";
 
-export type FollowUpBadge =
-  | "overdue"
-  | "due_today"
-  | "upcoming"
-  | "no_follow_up";
+export type FollowUpBadge = "overdue" | "due_today" | "upcoming" | "no_follow_up";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -73,10 +69,7 @@ export function isUpcoming(lead: LeadRow, now: number = Date.now()): boolean {
   return t >= startOfDay(now) + DAY_MS;
 }
 
-export function followUpBadge(
-  lead: LeadRow,
-  now: number = Date.now(),
-): FollowUpBadge | null {
+export function followUpBadge(lead: LeadRow, now: number = Date.now()): FollowUpBadge | null {
   if (lead.status !== "follow_up") return null;
   if (!lead.follow_up_at) return "no_follow_up";
   if (isOverdue(lead, now)) return "overdue";
@@ -94,10 +87,7 @@ export interface LeadSummary {
   closed: number;
 }
 
-export function summarizeLeads(
-  leads: LeadRow[],
-  now: number = Date.now(),
-): LeadSummary {
+export function summarizeLeads(leads: LeadRow[], now: number = Date.now()): LeadSummary {
   const s: LeadSummary = {
     new_leads: 0,
     needs_action: 0,

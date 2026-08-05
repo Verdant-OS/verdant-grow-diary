@@ -1,13 +1,12 @@
 /**
  * OAuthPostAuthRedirect — consumes a one-shot, manifest-validated OAuth
- * CSV-onboarding destination after the provider returns to the public app
- * origin.
+ * destination after the provider returns to the public app origin.
  *
  * It never reads URL values as authority, never writes data, and only runs at
  * the apex after a verified client session exists.
  */
 import { useEffect } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "@/lib/react-router-compat";
 import { useAuth } from "@/store/auth";
 import { consumePendingOAuthPostAuthRedirect } from "@/lib/oauthPostAuthRedirectRules";
 

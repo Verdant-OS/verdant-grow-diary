@@ -13,26 +13,18 @@ import {
   type AiDoctorReviewRiskLevel,
 } from "@/lib/aiDoctorReviewResultContract";
 
-export const AI_DOCTOR_REVIEW_EMPTY_STATE =
-  "No AI Doctor review result yet.";
-export const AI_DOCTOR_REVIEW_PREVIEW_LABEL =
-  "Review result preview — no AI request sent.";
+export const AI_DOCTOR_REVIEW_EMPTY_STATE = "No AI Doctor review result yet.";
+export const AI_DOCTOR_REVIEW_PREVIEW_LABEL = "Review result preview — no AI request sent.";
 export const AI_DOCTOR_REVIEW_SUGGESTION_NOTICE =
   "Suggestion preview only — grower approval required.";
 
-export const AI_DOCTOR_REVIEW_CONFIDENCE_LABELS: Record<
-  AiDoctorReviewConfidence,
-  string
-> = {
+export const AI_DOCTOR_REVIEW_CONFIDENCE_LABELS: Record<AiDoctorReviewConfidence, string> = {
   low: "Low confidence",
   medium: "Medium confidence",
   high: "High confidence",
 };
 
-export const AI_DOCTOR_REVIEW_RISK_LABELS: Record<
-  AiDoctorReviewRiskLevel,
-  string
-> = {
+export const AI_DOCTOR_REVIEW_RISK_LABELS: Record<AiDoctorReviewRiskLevel, string> = {
   low: "Low risk",
   watch: "Watch",
   elevated: "Elevated risk",
@@ -59,9 +51,7 @@ const EMPTY_VIEW: AiDoctorReviewResultView = Object.freeze({
   suggestionNotice: AI_DOCTOR_REVIEW_SUGGESTION_NOTICE,
 }) as AiDoctorReviewResultView;
 
-export function buildAiDoctorReviewResultView(
-  input: unknown,
-): AiDoctorReviewResultView {
+export function buildAiDoctorReviewResultView(input: unknown): AiDoctorReviewResultView {
   if (input == null) return EMPTY_VIEW;
   const v = validateAiDoctorReviewResult(input);
   if (v.ok === false) return EMPTY_VIEW;

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { ArrowRight, Calculator, Gauge, RotateCcw, Share2, ShieldCheck } from "lucide-react";
 
 import BrandLogo from "@/components/BrandLogo";
@@ -21,11 +21,14 @@ import { trackPricingEvent } from "@/lib/pricingAnalytics";
 import {
   buildPublicVpdShareData,
   evaluatePublicVpdCalculator,
+  parsePublicVpdTemperatureField,
   PUBLIC_VPD_CALCULATOR_FAQ,
   PUBLIC_VPD_CALCULATOR_PATH,
   PUBLIC_VPD_CALCULATOR_URL,
   PUBLIC_VPD_GUIDE_PATH,
   PUBLIC_VPD_STAGE_OPTIONS,
+  redisplayPublicVpdTemperatureField,
+  toPublicVpdTemperatureEvaluationValue,
 } from "@/lib/publicVpdCalculatorRules";
 import { buildFaqPageJsonLd, safeJsonLdStringify } from "@/lib/seoStructuredData";
 import { buildAttributedSignupPath } from "@/lib/signupAcquisitionRules";
@@ -33,6 +36,7 @@ import { cn } from "@/lib/utils";
 import type { TempUnit } from "@/lib/vpdRules";
 import type { VpdClassification, VpdStage } from "@/lib/vpdStageTargetRules";
 import type { VpdSensorPlacement } from "@/lib/vpdMeasurementTrustStatusRules";
+import { getClipboardWriteText, getNativeShare } from "@/lib/webShareCapabilities";
 
 const SIGNUP_PATH = buildAttributedSignupPath({ source: "vpd_calculator" });
 const PRICING_PATH = buildAttributedPricingPath({ source: "vpd_calculator" });
@@ -55,8 +59,10 @@ function parseNumber(value: string): number | null {
 }
 
 export default function PublicVpdCalculator() {
-  const [temperature, setTemperature] = useState("");
-  const [leafTemperature, setLeafTemperature] = useState("");
+  const [temperature, setTemperature] = useState(() => parsePublicVpdTemperatureField("", "F"));
+  const [leafTemperature, setLeafTemperature] = useState(() =>
+    parsePublicVpdTemperatureField("", "F"),
+  );
   const [temperatureUnit, setTemperatureUnit] = useState<TempUnit>("F");
   const [humidity, setHumidity] = useState("");
   const [stage, setStage] = useState<VpdStage>("unknown");
@@ -75,9 +81,9 @@ export default function PublicVpdCalculator() {
   const result = useMemo(
     () =>
       evaluatePublicVpdCalculator({
-        temperature: parseNumber(temperature),
-        leafTemperature: parseNumber(leafTemperature),
-        temperatureUnit,
+        temperature: toPublicVpdTemperatureEvaluationValue(temperature),
+        leafTemperature: toPublicVpdTemperatureEvaluationValue(leafTemperature),
+        temperatureUnit: "C",
         humidity: parseNumber(humidity),
         stage,
         nowMs: measurementNowMs,
@@ -108,7 +114,6 @@ export default function PublicVpdCalculator() {
       temperature,
       temperatureAtOperatingConditions,
       temperatureReference,
-      temperatureUnit,
       temperatureVerifiedAt,
     ],
   );
@@ -155,9 +160,17 @@ export default function PublicVpdCalculator() {
     setMeasurementNowMs(Date.now());
   }
 
+  function changeTemperatureUnit(nextUnit: TempUnit) {
+    if (nextUnit === temperatureUnit) return;
+    setTemperature((current) => redisplayPublicVpdTemperatureField(current, nextUnit));
+    setLeafTemperature((current) => redisplayPublicVpdTemperatureField(current, nextUnit));
+    setTemperatureUnit(nextUnit);
+    invalidateVisibleResult();
+  }
+
   function reset() {
-    setTemperature("");
-    setLeafTemperature("");
+    setTemperature(parsePublicVpdTemperatureField("", "F"));
+    setLeafTemperature(parsePublicVpdTemperatureField("", "F"));
     setTemperatureUnit("F");
     setHumidity("");
     setStage("unknown");
@@ -177,8 +190,8 @@ export default function PublicVpdCalculator() {
 
   async function shareCalculator() {
     const shareData = buildPublicVpdShareData();
-    const nativeShare = navigator.share?.bind(navigator);
-    const clipboard = navigator.clipboard?.writeText?.bind(navigator.clipboard);
+    const nativeShare = getNativeShare();
+    const clipboard = getClipboardWriteText();
     const source = nativeShare ? "native_share" : "copy_link";
     trackPricingEvent("vpd_calculator_share_clicked", { source });
 
@@ -261,10 +274,13 @@ export default function PublicVpdCalculator() {
         <section className="mx-auto mt-10 max-w-3xl" aria-labelledby="calculator-heading">
           <Card>
             <CardHeader>
-              <CardTitle id="calculator-heading" className="flex items-center gap-2 font-display">
+              <h2
+                id="calculator-heading"
+                className="flex items-center gap-2 font-display text-2xl font-semibold leading-none tracking-tight"
+              >
                 <Calculator aria-hidden="true" className="h-5 w-5 text-primary" />
                 Calculate from a manual reading
-              </CardTitle>
+              </h2>
             </CardHeader>
             <CardContent>
               <form onSubmit={calculate} className="space-y-6">
@@ -279,9 +295,15 @@ export default function PublicVpdCalculator() {
                         step="0.1"
                         min={temperatureUnit === "C" ? -20 : -4}
                         max={temperatureUnit === "C" ? 60 : 140}
-                        value={temperature}
+                        value={temperature.displayValue}
+                        aria-invalid={
+                          temperature.validity === "invalid" ||
+                          temperature.validity === "out_of_range"
+                        }
                         onChange={(event) => {
-                          setTemperature(event.target.value);
+                          setTemperature(
+                            parsePublicVpdTemperatureField(event.target.value, temperatureUnit),
+                          );
                           invalidateVisibleResult();
                         }}
                         placeholder={temperatureUnit === "C" ? "25" : "77"}
@@ -291,8 +313,7 @@ export default function PublicVpdCalculator() {
                         aria-label="Temperature unit"
                         value={temperatureUnit}
                         onChange={(event) => {
-                          setTemperatureUnit(event.target.value as TempUnit);
-                          invalidateVisibleResult();
+                          changeTemperatureUnit(event.target.value as TempUnit);
                         }}
                         className="h-10 rounded-md border border-input bg-background px-3 text-sm"
                       >
@@ -341,9 +362,15 @@ export default function PublicVpdCalculator() {
                         step="0.1"
                         min={temperatureUnit === "C" ? -20 : -4}
                         max={temperatureUnit === "C" ? 60 : 140}
-                        value={leafTemperature}
+                        value={leafTemperature.displayValue}
+                        aria-invalid={
+                          leafTemperature.validity === "invalid" ||
+                          leafTemperature.validity === "out_of_range"
+                        }
                         onChange={(event) => {
-                          setLeafTemperature(event.target.value);
+                          setLeafTemperature(
+                            parsePublicVpdTemperatureField(event.target.value, temperatureUnit),
+                          );
                           invalidateVisibleResult();
                         }}
                         placeholder={temperatureUnit === "C" ? "23" : "73.4"}
@@ -536,8 +563,8 @@ export default function PublicVpdCalculator() {
                     Calculate VPD
                     <ArrowRight aria-hidden="true" className="ml-2 h-4 w-4" />
                   </Button>
-                  {(temperature ||
-                    leafTemperature ||
+                  {(temperature.validity !== "blank" ||
+                    leafTemperature.validity !== "blank" ||
                     humidity ||
                     stage !== "unknown" ||
                     showResult) && (
@@ -683,7 +710,12 @@ export default function PublicVpdCalculator() {
               selected above.
             </p>
             <div className="mt-5">
-              <BlueprintTeaser vm={buildBlueprintTeaserViewModel({ stage })} />
+              <BlueprintTeaser
+                vm={buildBlueprintTeaserViewModel(
+                  { stage },
+                  temperatureUnit === "C" ? "celsius" : "fahrenheit",
+                )}
+              />
             </div>
             <div className="mt-5 flex flex-wrap gap-3">
               <Button asChild>

@@ -67,7 +67,11 @@ export interface LinkSnapshotInput {
   hrefBuilder?: (params: { tentId: string; plantId: string | null; capturedAt: string }) => string;
 }
 
-function defaultHref(params: { tentId: string; plantId: string | null; capturedAt: string }): string {
+function defaultHref(params: {
+  tentId: string;
+  plantId: string | null;
+  capturedAt: string;
+}): string {
   const q = new URLSearchParams();
   q.set("tent", params.tentId);
   if (params.plantId) q.set("plant", params.plantId);
@@ -91,7 +95,11 @@ export function linkEnvironmentCheckToSnapshot(input: LinkSnapshotInput): Snapsh
     if (hit) {
       const href =
         entry.tentId && hit.capturedAt
-          ? hrefBuilder({ tentId: entry.tentId, plantId: entry.plantId ?? null, capturedAt: hit.capturedAt })
+          ? hrefBuilder({
+              tentId: entry.tentId,
+              plantId: entry.plantId ?? null,
+              capturedAt: hit.capturedAt,
+            })
           : null;
       return {
         matchKind: "exact_id",
@@ -99,7 +107,10 @@ export function linkEnvironmentCheckToSnapshot(input: LinkSnapshotInput): Snapsh
         href,
         reason: null,
         vpdKpa: sanitizeVpd(hit.vpdKpa),
-        soilMoisturePct: typeof hit.soilMoisturePct === "number" && Number.isFinite(hit.soilMoisturePct) ? hit.soilMoisturePct : null,
+        soilMoisturePct:
+          typeof hit.soilMoisturePct === "number" && Number.isFinite(hit.soilMoisturePct)
+            ? hit.soilMoisturePct
+            : null,
         staleOrInvalid: hit.isStaleOrInvalid === true,
       };
     }
@@ -137,7 +148,11 @@ export function linkEnvironmentCheckToSnapshot(input: LinkSnapshotInput): Snapsh
   const hit = candidates[0];
   const href =
     hit.capturedAt && entry.tentId
-      ? hrefBuilder({ tentId: entry.tentId, plantId: entry.plantId ?? null, capturedAt: hit.capturedAt })
+      ? hrefBuilder({
+          tentId: entry.tentId,
+          plantId: entry.plantId ?? null,
+          capturedAt: hit.capturedAt,
+        })
       : null;
 
   return {

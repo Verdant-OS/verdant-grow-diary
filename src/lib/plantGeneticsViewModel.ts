@@ -122,12 +122,9 @@ export function buildPlantGeneticsViewModel(
     }
 
     const pick = (key: string): unknown =>
-      (strainObj && strainObj[key] !== undefined ? strainObj[key] : root[key]);
+      strainObj && strainObj[key] !== undefined ? strainObj[key] : root[key];
 
-    const strainName =
-      trimToNull(strainObj?.name) ??
-      trimToNull(root.strainName) ??
-      strainAsString;
+    const strainName = trimToNull(strainObj?.name) ?? trimToNull(root.strainName) ?? strainAsString;
 
     const breeder = trimToNull(pick("breeder"));
     const genetics = trimToNull(pick("genetics"));

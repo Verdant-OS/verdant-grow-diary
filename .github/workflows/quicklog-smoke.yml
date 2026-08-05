@@ -24,9 +24,63 @@ name: Quick Log Playwright smoke
 #   vars.E2E_BASE_URL              (e.g. https://<preview-or-staging>.example)
 #   vars.E2E_GROW_1_PLANT_URL      (full URL of a Grow #1 plant page)
 #   vars.E2E_GROW_1_SECOND_PLANT_NAME (optional; defaults to "E2E Test Plant 2")
+#
+# PR-comment controls (workflow_dispatch only; push/pull_request use the
+# defaults below):
+#   pr_comment_min_failed  Minimum hard-failure count to post at all. Default 1.
+#   pr_comment_disabled    "true" fully suppresses the PR comment for this run,
+#                          unconditionally — even with hard failures. Overrides
+#                          pr_comment_min_failed. Default "false".
+#   pr_comment_mode        "sticky" (default) updates the same comment across
+#                          runs; "new-per-run" posts a fresh comment every run.
+#   pr_number              Required alongside the three inputs above for a
+#                          workflow_dispatch run: a plain manual dispatch has
+#                          no pull_request event context, so PR-comment steps
+#                          only run on workflow_dispatch when this is set (or
+#                          on a real pull_request event, where it's inferred
+#                          automatically). Leave blank to just run the smoke
+#                          suite with no PR-comment behavior at all.
+#
+# Each failed/flaky test also gets its own dedicated artifact (uploaded via
+# scripts/upload-per-test-artifacts.mjs) in addition to the shared
+# quicklog-playwright-traces/-media bundles, so the PR comment can link
+# directly to just that test's evidence. Per-test upload failures are
+# warnings only and never fail the job.
 
 on:
   workflow_dispatch:
+    inputs:
+      playwright_retries:
+        description: "Playwright retry count per test (default 1 in CI). Increase to 2 or 3 for deeper flake triage."
+        required: false
+        default: "1"
+      pr_comment_min_failed:
+        description: "Minimum hard-failure count required to post the PR comment. 0 = always post; 1 = only when at least one test stays red after retries."
+        required: false
+        default: "1"
+      pr_comment_disabled:
+        description: "Fully disable PR comment posting for this run, unconditionally — even when there are hard failures. Overrides pr_comment_min_failed."
+        required: false
+        default: "false"
+        type: choice
+        options: ["false", "true"]
+      pr_comment_mode:
+        description: "'sticky' updates the same PR comment across runs; 'new-per-run' posts a fresh comment every run instead."
+        required: false
+        default: "sticky"
+        type: choice
+        options: ["sticky", "new-per-run"]
+      pr_number:
+        description: "PR number to comment on for a manual workflow_dispatch run. Required for pr_comment_disabled/pr_comment_mode/pr_comment_min_failed to have any effect on a dispatched run — a plain workflow_dispatch has no pull_request event context to infer this from. Leave blank for a run that isn't about PR-comment behavior."
+        required: false
+        default: ""
+      upload_html_report:
+        description: "Upload the generated Playwright HTML report (playwright-report/) as the 'quicklog-playwright-report' artifact so failures can be browsed offline even when the flake summary is missing. Default true."
+        required: false
+        default: "true"
+        type: choice
+        options: ["true", "false"]
+
   push:
     branches: [verdant-grow-diary]
     paths:
@@ -46,7 +100,19 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
+    # Job scope: read code, post a sticky PR comment linking to Playwright
+    # artifact bundles for failed/flaky tests. No other write scopes.
+    permissions:
+      contents: read
+      pull-requests: write
+
     env:
+      # Run-specific suffix appended to every upload-artifact `name:` so
+      # multiple runs (re-runs, retries, dispatch-after-push) don't clash in
+      # the Actions UI. Combines run_id (unique per workflow run) with
+      # run_attempt (bumps on re-run) and a short commit SHA for at-a-glance
+      # traceability from the Artifacts dropdown.
+      ARTIFACT_SUFFIX: run-${{ github.run_id }}-attempt-${{ github.run_attempt }}-sha-${{ github.sha }}
       E2E_BASE_URL: ${{ vars.E2E_BASE_URL }}
       E2E_GROW_1_PLANT_URL: ${{ vars.E2E_GROW_1_PLANT_URL }}
       E2E_GROW_1_SECOND_PLANT_NAME: ${{ vars.E2E_GROW_1_SECOND_PLANT_NAME }}
@@ -61,6 +127,30 @@ jobs:
       E2E_FIXTURE_EXPECTED_ACCOUNT_HINT: ${{ vars.E2E_FIXTURE_EXPECTED_ACCOUNT_HINT }}
       # Optional, off by default. Enables the UI-only fixture bootstrap step.
       E2E_ALLOW_FIXTURE_BOOTSTRAP: ${{ vars.E2E_ALLOW_FIXTURE_BOOTSTRAP }}
+      # Playwright retry policy for flake triage. Defaults to 1 retry in CI
+      # (playwright.config.ts). workflow_dispatch can override for deeper runs.
+      PLAYWRIGHT_RETRIES: ${{ github.event_name == 'workflow_dispatch' && inputs.playwright_retries || '1' }}
+      # PR-comment posting mode, read by the two "Post ... PR comment" steps'
+      # own `if:` conditions below. push/pull_request always default to
+      # 'sticky'; only workflow_dispatch can choose 'new-per-run'.
+      PR_COMMENT_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.pr_comment_mode || 'sticky' }}
+      # Unconditional PR-comment kill switch, read by both the per-test
+      # artifact upload step (skip the work entirely) and the comment-body
+      # builder step (skip even when there are hard failures). Overrides
+      # PR_COMMENT_MIN_FAILED. push/pull_request always default to 'false'.
+      PR_COMMENT_DISABLED: ${{ github.event_name == 'workflow_dispatch' && inputs.pr_comment_disabled || 'false' }}
+      # The PR number to comment on: inferred automatically on a real
+      # pull_request event, or from the pr_number input on workflow_dispatch.
+      # Empty on push, and empty on workflow_dispatch when pr_number is unset.
+      PR_NUMBER: ${{ github.event.pull_request.number || (github.event_name == 'workflow_dispatch' && inputs.pr_number || '') }}
+      # Whether THIS run is in a context where a PR comment can be built and
+      # posted at all — a real pull_request event, or workflow_dispatch with
+      # an explicit pr_number. Without this, pr_comment_disabled/pr_comment_mode
+      # would only ever be readable on workflow_dispatch, while the only
+      # steps that build/post a comment were pull_request-only — two
+      # mutually exclusive event types that could never both be true in one
+      # run, making every pr_comment_* input permanently unreachable.
+      PR_COMMENT_CONTEXT_OK: ${{ (github.event_name == 'pull_request') && 'true' || (github.event_name == 'workflow_dispatch' && inputs.pr_number != '' && 'true') || 'false' }}
 
     steps:
       - name: Checkout
@@ -211,6 +301,41 @@ jobs:
 
           exit "$status"
 
+      - name: Summarize failed step metadata in Job Summary
+        if: failure()
+        shell: bash
+        env:
+          BOOTSTRAP_FIXTURE_OUTCOME: ${{ steps.bootstrap_fixture.outcome }}
+          VERIFY_FIXTURE_OUTCOME: ${{ steps.verify_fixture.outcome }}
+          QUICKLOG_SMOKE_OUTCOME: ${{ steps.quicklog_smoke.outcome }}
+        run: |
+          RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          ATTEMPT_URL="${RUN_URL}/attempts/${GITHUB_RUN_ATTEMPT}"
+          failed_step="untracked setup or post-smoke step"
+          failed_outcome="failure"
+          if [ "${BOOTSTRAP_FIXTURE_OUTCOME}" = "failure" ]; then
+            failed_step="Bootstrap disposable E2E fixture"
+            failed_outcome="${BOOTSTRAP_FIXTURE_OUTCOME}"
+          elif [ "${VERIFY_FIXTURE_OUTCOME}" = "failure" ]; then
+            failed_step="Verify disposable E2E fixture"
+            failed_outcome="${VERIFY_FIXTURE_OUTCOME}"
+          elif [ "${QUICKLOG_SMOKE_OUTCOME}" = "failure" ]; then
+            failed_step="Run Quick Log Playwright smoke"
+            failed_outcome="${QUICKLOG_SMOKE_OUTCOME}"
+          fi
+          {
+            echo ""
+            echo "## ❌ Quick Log smoke failed"
+            echo ""
+            echo "- Workflow: \`${GITHUB_WORKFLOW}\`"
+            echo "- Run: [#${GITHUB_RUN_NUMBER} attempt ${GITHUB_RUN_ATTEMPT}](${ATTEMPT_URL})"
+            echo "- Failed step: \`${failed_step}\`"
+            echo "- Outcome: \`${failed_outcome}\`"
+            echo ""
+            echo "Open the [run-attempt logs](${ATTEMPT_URL}) for the masked command output. Raw logs, smoke-report contents, and Playwright DOM context are not copied into this summary or retained in a diagnostic artifact."
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Capture Quick Log smoke metadata
         id: smoke_meta
         if: always() && steps.e2e_config.outputs.should_run == 'true'
@@ -296,46 +421,700 @@ jobs:
 
           exit 0
 
+      - name: Upload Playwright HTML report
+        id: upload_playwright_report
+        # Always uploaded on push/pull_request; on workflow_dispatch, honors the
+        # upload_html_report input (default true). Kept independent of the flake
+        # summary so failures can still be browsed offline via the standalone
+        # HTML report even when playwright-flake-summary.md is missing.
+        # Runs before any $GITHUB_STEP_SUMMARY writer so the link section
+        # immediately below is the first thing reviewers see in the summary.
+        if: >-
+          always()
+          && steps.e2e_config.outputs.should_run == 'true'
+          && (github.event_name != 'workflow_dispatch' || inputs.upload_html_report != 'false')
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: quicklog-playwright-report-${{ env.ARTIFACT_SUFFIX }}
+          path: playwright-report/
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: Link Playwright HTML report in Job Summary
+        if: always() && steps.e2e_config.outputs.should_run == 'true'
+        shell: bash
+        env:
+          HTML_REPORT_URL: ${{ steps.upload_playwright_report.outputs.artifact-url }}
+          UPLOAD_HTML_REPORT_INPUT: ${{ github.event_name == 'workflow_dispatch' && inputs.upload_html_report || 'true' }}
+        run: |
+          # First section written to $GITHUB_STEP_SUMMARY on purpose: moved
+          # above the flake summarizer so the HTML report link is pinned at
+          # the top of the run's Job Summary for immediate visibility.
+          # FLAKE_SUMMARY_PRESENT is not yet known at this point in the run
+          # (check_flake_summary hasn't executed), so the "primary source of
+          # truth" note is omitted here; the later flake-summary section
+          # remains the place where that relationship is spelled out.
+          # Enrichment only — never fails the job.
+          {
+            echo "### 🧭 Playwright HTML report"
+            echo ""
+            if [ ! -d "playwright-report" ]; then
+              echo "**Status:** ❌ \`playwright-report/\` directory not produced — Playwright likely did not run to completion. See earlier steps."
+            elif [ "${UPLOAD_HTML_REPORT_INPUT}" = "false" ]; then
+              echo "**Status:** ⏭️ Upload skipped for this run (\`upload_html_report=false\` on workflow_dispatch)."
+              echo ""
+              echo "Re-dispatch with \`upload_html_report=true\` (default) to publish the \`quicklog-playwright-report\` artifact."
+            elif [ -n "${HTML_REPORT_URL}" ]; then
+              echo "Browse failures offline via the standalone HTML report:"
+              echo ""
+              echo "- [\`quicklog-playwright-report\`](${HTML_REPORT_URL}) — unzip and open \`index.html\`"
+            else
+              echo "**Status:** _HTML report artifact URL unavailable — check the run's Artifacts dropdown for \`quicklog-playwright-report\`._"
+            fi
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Summarize Playwright flakes
+        id: summarize_flakes
+        if: always() && steps.e2e_config.outputs.should_run == 'true'
+        shell: bash
+        run: |
+          # Parses e2e/results/playwright-report.json (Playwright JSON reporter)
+          # and appends a flake summary to $GITHUB_STEP_SUMMARY. Flakes = tests
+          # that failed on attempt 0 but passed on retry1. Retry counts and
+          # artifact paths (trace/video/screenshot) are included per flake.
+          # Never fails the job on presence of flakes — informational only.
+          if [ ! -f "e2e/results/playwright-report.json" ]; then
+            echo "::warning::Playwright JSON report not found; skipping flake summary."
+            {
+              echo ""
+              echo "## Playwright flake summary"
+              echo ""
+              echo "_No Playwright JSON report was produced for this run — flake classification skipped._"
+              echo ""
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "pw_counts_available=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          node scripts/summarize-playwright-flakes.mjs \
+            --report=e2e/results/playwright-report.json \
+            --out=e2e/results/playwright-flake-summary.md \
+            2> >(tee /tmp/summarize_flakes_stderr.txt >&2) \
+            || echo "::warning::flake summarizer exited non-zero (see logs)"
+
+          # The script's own final stderr line is the single source of truth
+          # for these counts (`total=N passed=N failed=N flaky=N skipped=N`).
+          # Parsed here rather than re-derived from the JSON report so the
+          # counts shown in the Job Summary's gate explanation can never
+          # disagree with what actually decided whether the file is non-empty.
+          counts_line="$(grep -oE 'total=[0-9]+ passed=[0-9]+ failed=[0-9]+ flaky=[0-9]+ skipped=[0-9]+' /tmp/summarize_flakes_stderr.txt | tail -n1 || true)"
+          if [ -n "${counts_line}" ]; then
+            echo "pw_counts_available=true" >> "$GITHUB_OUTPUT"
+            for pair in ${counts_line}; do
+              key="${pair%%=*}"; val="${pair##*=}"
+              echo "pw_${key}=${val}" >> "$GITHUB_OUTPUT"
+            done
+          else
+            echo "::warning::Could not parse test counts from the flake summarizer's output."
+            echo "pw_counts_available=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Dedicated single-file upload of the flake summary markdown so
+      # reviewers can grab just the summary from the run's artifacts
+      # dropdown without downloading the full smoke bundle. The same file
+      # is also included in `quicklog-smoke-artifacts` below for archival.
+      # Pre-check: the flake summary markdown is only meaningful when there
+      # were failed or flaky tests. If summarize-playwright-flakes.mjs
+      # produced no file (nothing to report) or an empty file, we skip the
+      # dedicated upload and record a clear note in the Job Summary instead
+      # of shipping an empty artifact reviewers might mistake for evidence.
+      - name: Check flake summary presence
+        id: check_flake_summary
+        if: always() && steps.e2e_config.outputs.should_run == 'true'
+        shell: bash
+        env:
+          PW_COUNTS_AVAILABLE: ${{ steps.summarize_flakes.outputs.pw_counts_available }}
+          PW_FAILED: ${{ steps.summarize_flakes.outputs.pw_failed }}
+          PW_FLAKY: ${{ steps.summarize_flakes.outputs.pw_flaky }}
+        run: |
+          file="e2e/results/playwright-flake-summary.md"
+
+          # `-s` (non-empty) does NOT distinguish "nothing to report" from
+          # "something to report": buildSummary() in summarize-playwright-flakes.mjs
+          # always writes a header + counts line + either the flake/failure
+          # tables or "_No flaky tests detected in this run._" — the file is
+          # non-empty on EVERY successful run, including a fully green one.
+          # Verified directly: a synthetic all-passing report still produces a
+          # non-empty file. Gating on `-s` alone would upload the dedicated
+          # artifact on every green run too, contradicting the intent that
+          # it's "only meaningful when there were failed or flaky tests".
+          #
+          # The real signal is the counts captured by the previous step. Fall
+          # back to file presence only when counts genuinely could not be
+          # parsed — and fail OPEN in that case (upload anyway): withholding
+          # possible evidence is worse than an occasional unnecessary artifact.
+          if [ "${PW_COUNTS_AVAILABLE}" = "true" ]; then
+            noteworthy=$(( ${PW_FAILED:-0} + ${PW_FLAKY:-0} ))
+            if [ -f "${file}" ] && [ "${noteworthy}" -gt 0 ]; then
+              echo "present=true" >> "$GITHUB_OUTPUT"
+              echo "reason=" >> "$GITHUB_OUTPUT"
+              echo "OK: ${PW_FAILED:-0} failed + ${PW_FLAKY:-0} flaky — uploading dedicated artifact."
+            else
+              echo "present=false" >> "$GITHUB_OUTPUT"
+              echo "reason=clean" >> "$GITHUB_OUTPUT"
+              echo "NOTE: 0 failed, 0 flaky — nothing worth a dedicated artifact."
+            fi
+          elif [ -s "${file}" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+            echo "reason=" >> "$GITHUB_OUTPUT"
+            echo "OK: ${file} is present and non-empty (counts unavailable — uploading to be safe)."
+          elif [ -f "${file}" ]; then
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "reason=empty" >> "$GITHUB_OUTPUT"
+            echo "NOTE: ${file} exists but is empty — nothing to upload."
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "reason=missing" >> "$GITHUB_OUTPUT"
+            echo "NOTE: ${file} was not produced — nothing to upload."
+          fi
+
+      - name: Upload flake summary markdown
+        id: upload_flake_summary
+        if: always() && steps.e2e_config.outputs.should_run == 'true' && steps.check_flake_summary.outputs.present == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: quicklog-flake-summary-${{ env.ARTIFACT_SUFFIX }}
+          path: e2e/results/playwright-flake-summary.md
+          retention-days: 30
+          if-no-files-found: warn
+
+      # Append a direct download link to the just-uploaded flake summary
+      # artifact into the GitHub Actions Job Summary. `artifact-url` is only
+      # populated by actions/upload-artifact@v4 AFTER the upload step runs,
+      # so this must live immediately after upload_flake_summary rather than
+      # inside the earlier summarizer step. When the upload was skipped
+      # because there were no failed/flaky tests, record that explicitly
+      # instead so reviewers know why no artifact is attached. Enrichment
+      # only — never fails.
+      - name: Link flake summary artifact in Job Summary
+        if: always() && steps.e2e_config.outputs.should_run == 'true'
+        shell: bash
+        env:
+          FLAKE_SUMMARY_URL: ${{ steps.upload_flake_summary.outputs.artifact-url }}
+          HTML_REPORT_URL: ${{ steps.upload_playwright_report.outputs.artifact-url }}
+
+          FLAKE_SUMMARY_PRESENT: ${{ steps.check_flake_summary.outputs.present }}
+          FLAKE_SUMMARY_REASON: ${{ steps.check_flake_summary.outputs.reason }}
+          PW_COUNTS_AVAILABLE: ${{ steps.summarize_flakes.outputs.pw_counts_available }}
+          PW_TOTAL: ${{ steps.summarize_flakes.outputs.pw_total }}
+          PW_PASSED: ${{ steps.summarize_flakes.outputs.pw_passed }}
+          PW_FAILED: ${{ steps.summarize_flakes.outputs.pw_failed }}
+          PW_FLAKY: ${{ steps.summarize_flakes.outputs.pw_flaky }}
+          PW_SKIPPED: ${{ steps.summarize_flakes.outputs.pw_skipped }}
+        run: |
+          {
+            echo ""
+            echo "### 📎 Flake summary artifact"
+            echo ""
+            # Direct top-of-section link when the dedicated upload actually
+            # succeeded. Reviewers should not have to scroll through the
+            # upload-gate breakdown below to grab the file. `artifact-url`
+            # is populated by actions/upload-artifact@v4 only on a real
+            # successful upload, so its presence here is a strong signal
+            # that the download link is live. The fuller status/gate
+            # explanation still follows for the skipped/missing cases.
+            # The run/job URLs are stable GitHub-provided identifiers, so we
+            # can always build them from env — no extra API call needed. The
+            # per-attempt URL points at the exact retry that produced the
+            # uploaded artifact, which is what a reviewer usually wants when
+            # cross-referencing a flake summary against raw step logs.
+            RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            RUN_ATTEMPT_URL="${RUN_URL}/attempts/${GITHUB_RUN_ATTEMPT}"
+            if [ "${FLAKE_SUMMARY_PRESENT}" = "true" ] && [ -n "${FLAKE_SUMMARY_URL}" ]; then
+              echo "**Download:** [\`quicklog-flake-summary-${ARTIFACT_SUFFIX}\`](${FLAKE_SUMMARY_URL}) — single-file artifact containing \`playwright-flake-summary.md\`."
+              echo ""
+              # One-click access to the exact file the artifact contains.
+              # GitHub Actions has no public deep-link into a zip artifact,
+              # so the closest "one click" is the artifact URL labeled with
+              # the archive-relative path, plus the file contents inlined
+              # below so reviewers do not have to download + unzip just to
+              # read it. Skipped when the file is unreadable so the summary
+              # never breaks. Truncated to keep the Job Summary well under
+              # GitHub's 1 MiB $GITHUB_STEP_SUMMARY cap even if a future
+              # summarizer produces a very large report.
+              echo "**Open the exact file (\`playwright-flake-summary.md\` at the root of the zip):** [\`quicklog-flake-summary-${ARTIFACT_SUFFIX}/playwright-flake-summary.md\`](${FLAKE_SUMMARY_URL}) — one-click download; the zip contains only this single file, so no unzipping is required to locate it."
+              echo ""
+              flake_summary_file="e2e/results/playwright-flake-summary.md"
+              if [ -r "${flake_summary_file}" ]; then
+                flake_summary_bytes=$(wc -c < "${flake_summary_file}" | tr -d ' ')
+                echo "<details><summary>📄 Inline preview of <code>playwright-flake-summary.md</code> (${flake_summary_bytes} bytes) — click to expand</summary>"
+                echo ""
+                echo "> Rendered from the exact file that was uploaded as \`quicklog-flake-summary-${ARTIFACT_SUFFIX}/playwright-flake-summary.md\` in this run. Contents are truncated to the first 64 KiB to stay under the Job Summary size cap; download the artifact for the full file."
+                echo ""
+                echo '```markdown'
+                head -c 65536 "${flake_summary_file}"
+                if [ "${flake_summary_bytes}" -gt 65536 ]; then
+                  echo ""
+                  echo "... [truncated in Job Summary — see artifact for full contents] ..."
+                fi
+                echo ""
+                echo '```'
+                echo ""
+                echo "</details>"
+                echo ""
+              fi
+
+              if [ -n "${HTML_REPORT_URL}" ]; then
+                echo "**Playwright HTML report for the same run:** [\`quicklog-playwright-report-${ARTIFACT_SUFFIX}\`](${HTML_REPORT_URL}) — unzip and open \`index.html\` to browse the exact test tree the flake summary counts came from. _Uploaded as a sibling artifact rather than inside the flake summary zip (which holds only \`playwright-flake-summary.md\`)._"
+              else
+                echo "**Playwright HTML report for the same run:** _URL unavailable — check this run's Artifacts dropdown for \`quicklog-playwright-report-${ARTIFACT_SUFFIX}\` (unzip and open \`index.html\`). It is uploaded as a sibling artifact rather than inside the flake summary zip._"
+              fi
+              echo ""
+              echo "**Raw workflow logs for this upload:** [run #${GITHUB_RUN_NUMBER} attempt ${GITHUB_RUN_ATTEMPT}](${RUN_ATTEMPT_URL}) — expand the \`${GITHUB_JOB}\` job, then the \`Upload playwright-flake-summary.md as artifact\` step for the exact upload output, or the \`Summarize Playwright flakes\` step for how the file was generated. Full run page: [${GITHUB_WORKFLOW} #${GITHUB_RUN_NUMBER}](${RUN_URL})."
+              echo ""
+            elif [ "${FLAKE_SUMMARY_PRESENT}" = "true" ]; then
+
+              echo "**Download:** _Standalone artifact was uploaded, but its direct URL is unavailable in this Job Summary._"
+              echo ""
+              echo "Open this run's **Artifacts** dropdown (top-right of the run page) and download:"
+              echo ""
+              echo "- **Artifact name:** \`quicklog-flake-summary-${ARTIFACT_SUFFIX}\`"
+              echo "- **File inside the zip:** \`playwright-flake-summary.md\` (at the root of the archive)"
+              echo ""
+              echo "**Raw workflow logs for this upload:** [run #${GITHUB_RUN_NUMBER} attempt ${GITHUB_RUN_ATTEMPT}](${RUN_ATTEMPT_URL}) — expand the \`${GITHUB_JOB}\` job, then the \`Upload playwright-flake-summary.md as artifact\` step. Full run page: [${GITHUB_WORKFLOW} #${GITHUB_RUN_NUMBER}](${RUN_URL})."
+              echo ""
+
+            else
+              echo "**Download:** _Standalone \`quicklog-flake-summary-${ARTIFACT_SUFFIX}\` artifact was **not uploaded** for this run (see the **Upload gate** breakdown below for the exact reason)._"
+              echo ""
+              echo "Fallback — the same file is archived inside the always-uploaded smoke bundle whenever it exists on disk:"
+              echo ""
+              echo "- **Bundle artifact name:** \`quicklog-smoke-artifacts-${ARTIFACT_SUFFIX}\` (Artifacts dropdown on this run's page)"
+              echo "- **Path inside the bundle zip:** \`e2e/results/playwright-flake-summary.md\`"
+              echo "- **Sibling source of truth (same folder):** \`e2e/results/playwright-report.json\` — regenerate the summary locally by passing this to \`scripts/summarize-playwright-flakes.mjs --report=\`."
+              echo ""
+              echo "If neither artifact contains the file, it was never produced — jump to **How to (re)generate \`playwright-flake-summary.md\` locally** below."
+              echo ""
+              echo "**Raw workflow logs for the skipped/failed upload:** [run #${GITHUB_RUN_NUMBER} attempt ${GITHUB_RUN_ATTEMPT}](${RUN_ATTEMPT_URL}) — expand the \`${GITHUB_JOB}\` job, then the \`Check flake summary presence\` step to see the gate decision, and the \`Upload playwright-flake-summary.md as artifact\` step to confirm it was skipped or errored. Full run page: [${GITHUB_WORKFLOW} #${GITHUB_RUN_NUMBER}](${RUN_URL})."
+              echo ""
+            fi
+
+            echo "**Expected path (in this workspace):** \`e2e/results/playwright-flake-summary.md\`"
+            echo "**Uploaded artifact name (standalone):** \`quicklog-flake-summary-${ARTIFACT_SUFFIX}\` (single file: \`playwright-flake-summary.md\`)"
+            echo "**Also archived inside:** \`quicklog-smoke-artifacts-${ARTIFACT_SUFFIX}\` bundle at \`e2e/results/playwright-flake-summary.md\` — alongside the source it was generated from, \`e2e/results/playwright-report.json\` (Playwright's own JSON reporter output; not uploaded as a standalone artifact)."
+
+            echo ""
+            echo "#### Upload gate"
+            echo ""
+            # Compute every input the real gate in `Check flake summary presence`
+            # branched on, then render each one so reviewers can reproduce the
+            # decision without reading the workflow YAML.
+            file="e2e/results/playwright-flake-summary.md"
+            if [ -f "${file}" ]; then
+              file_exists="true"
+              file_size=$(wc -c < "${file}" | tr -d ' ')
+            else
+              file_exists="false"
+              file_size="0"
+            fi
+            if [ "${file_exists}" = "true" ] && [ "${file_size}" -gt 0 ]; then
+              file_nonempty="true"
+            else
+              file_nonempty="false"
+            fi
+            noteworthy=$(( ${PW_FAILED:-0} + ${PW_FLAKY:-0} ))
+            failed_threshold=0
+            flaky_threshold=0
+            case "${FLAKE_SUMMARY_PRESENT}" in
+              true)  gate_result="upload" ;;
+              *)     gate_result="skip" ;;
+            esac
+            case "${FLAKE_SUMMARY_REASON}" in
+              "")      reason_display="(none — uploaded)" ;;
+              clean)   reason_display="clean — 0 failed + 0 flaky" ;;
+              empty)   reason_display="empty — file existed but had zero bytes" ;;
+              missing) reason_display="missing — summarizer did not produce the file" ;;
+              *)       reason_display="${FLAKE_SUMMARY_REASON}" ;;
+            esac
+            echo "**Thresholds (hardcoded in \`Check flake summary presence\`):**"
+            echo ""
+            echo "| threshold | value | meaning |"
+            echo "| --------- | ----- | ------- |"
+            echo "| \`failed\` | \`> ${failed_threshold}\` | any hard failure contributes to \`noteworthy\` |"
+            echo "| \`flaky\` | \`> ${flaky_threshold}\` | any retry-recovered test contributes to \`noteworthy\` |"
+            echo "| \`noteworthy = failed + flaky\` | \`> 0\` | primary gate — upload only when at least one test was failed or flaky |"
+            echo ""
+            echo "**Computed inputs for this run:**"
+            echo ""
+            echo "| input | value | source |"
+            echo "| ----- | ----- | ------ |"
+            echo "| \`pw_counts_available\` | \`${PW_COUNTS_AVAILABLE:-false}\` | \`summarize_flakes\` step output |"
+            echo "| \`pw_failed\` | \`${PW_FAILED:-?}\` | \`summarize_flakes\` step output |"
+            echo "| \`pw_flaky\` | \`${PW_FLAKY:-?}\` | \`summarize_flakes\` step output |"
+            echo "| \`pw_passed\` | \`${PW_PASSED:-?}\` | \`summarize_flakes\` step output |"
+            echo "| \`pw_skipped\` | \`${PW_SKIPPED:-?}\` | \`summarize_flakes\` step output |"
+            echo "| \`pw_total\` | \`${PW_TOTAL:-?}\` | \`summarize_flakes\` step output |"
+            echo "| \`noteworthy\` (\`failed + flaky\`) | \`${noteworthy}\` | computed here |"
+            echo "| \`playwright-flake-summary.md\` exists | \`${file_exists}\` | filesystem check |"
+            echo "| \`playwright-flake-summary.md\` size (bytes) | \`${file_size}\` | filesystem check |"
+            echo "| \`playwright-flake-summary.md\` non-empty | \`${file_nonempty}\` | filesystem check |"
+            echo ""
+            if [ "${PW_COUNTS_AVAILABLE}" = "true" ]; then
+              echo "| total | passed | failed | flaky | skipped |"
+              echo "| ----- | ------ | ------ | ----- | ------- |"
+              echo "| ${PW_TOTAL:-?} | ${PW_PASSED:-?} | ${PW_FAILED:-?} | ${PW_FLAKY:-?} | ${PW_SKIPPED:-?} |"
+              echo ""
+              echo "**Gate rule (primary):** upload only when \`failed + flaky > 0\` AND the file exists."
+              echo "**Gate rule (fallback, when counts unavailable):** upload when the file exists and is non-empty."
+              echo ""
+              echo "**Applied branch:** counts available (\`pw_counts_available=true\`) → primary rule."
+              echo "**Evaluation:** \`${PW_FAILED:-0} failed + ${PW_FLAKY:-0} flaky = ${noteworthy}\` and \`file_exists=${file_exists}\` → **${gate_result}**."
+              echo ""
+              if [ "${noteworthy}" -gt 0 ] && [ "${file_exists}" = "true" ]; then
+                echo "**Generated from failed/flaky tests?** ✅ Yes — \`playwright-flake-summary.md\` reflects **${PW_FAILED:-0} failed** and **${PW_FLAKY:-0} flaky** test(s). Gate result: **upload** (${noteworthy} > 0)."
+              else
+                echo "**Generated from failed/flaky tests?** ❌ No — clean run (**0 failed, 0 flaky**) or missing file. Gate result: **skip upload**."
+              fi
+            else
+              echo "**Gate rule (primary):** upload only when \`failed + flaky > 0\`."
+              echo "**Gate rule (fallback, applied here):** counts unavailable → upload if the file exists and is non-empty (fail-open — withholding possible evidence is worse than an occasional unnecessary artifact)."
+              echo ""
+              echo "**Applied branch:** counts unavailable (\`pw_counts_available!=true\`) → fallback rule."
+              echo "**Evaluation:** \`file_exists=${file_exists}\`, \`file_nonempty=${file_nonempty}\` → **${gate_result}**."
+              echo ""
+              echo "_Cannot determine whether the summary was generated from failed/flaky tests — counts weren't parsed._"
+            fi
+            echo ""
+            echo "**Gate decision:** \`${gate_result}\` — reason: \`${reason_display}\`."
+            echo ""
+            if [ "${FLAKE_SUMMARY_PRESENT}" != "true" ]; then
+              case "${FLAKE_SUMMARY_REASON}" in
+                clean)
+                  echo "**Status:** _0 failed, 0 flaky — dedicated \`quicklog-flake-summary\` artifact skipped. This is the expected outcome on a clean run, not a build error._"
+                  ;;
+                empty)
+                  echo "**Status:** _\`playwright-flake-summary.md\` was written but empty, so the dedicated artifact was skipped._"
+                  ;;
+                *)
+                  echo "**Status:** _\`playwright-flake-summary.md\` was not produced, so the dedicated artifact was skipped._"
+                  ;;
+              esac
+              echo ""
+              echo "#### How to (re)generate \`playwright-flake-summary.md\` locally"
+              echo ""
+              echo "These commands mirror the exact steps this workflow runs (\`.github/workflows/quicklog-smoke.yml\`): the \`e2e:install:ci\` + \`e2e:quicklog-smoke\` scripts defined in \`package.json\`, followed by \`scripts/summarize-playwright-flakes.mjs\` against Playwright's JSON reporter output at \`e2e/results/playwright-report.json\`."
+              echo ""
+              echo '```bash'
+              echo "# 0. Install deps once (matches the workflow's setup step)"
+              echo "bun install --frozen-lockfile"
+              echo ""
+              echo "# 1. Install the Chromium browser Playwright needs (matches CI's \`bun run e2e:install:ci\`)"
+              echo "#    Script: \"e2e:install:ci\": \"playwright install --with-deps chromium\""
+              echo "bun run e2e:install:ci"
+              echo ""
+              echo "# 2. Run the Quick Log smoke — produces e2e/results/playwright-report.json"
+              echo "#    Script: \"e2e:quicklog-smoke\": \"playwright test e2e/quicklog-smoke.spec.ts --project=chromium-authed\""
+              echo "bun run e2e:quicklog-smoke"
+              echo ""
+              echo "# 3. Regenerate the flake summary markdown from the JSON report"
+              echo "#    (identical invocation to the \`Summarize Playwright flakes\` step above)"
+              echo "node scripts/summarize-playwright-flakes.mjs \\"
+              echo "  --report=e2e/results/playwright-report.json \\"
+              echo "  --out=e2e/results/playwright-flake-summary.md"
+              echo ""
+              echo "# 4. Open the regenerated summary"
+              echo "cat e2e/results/playwright-flake-summary.md"
+              echo '```'
+              echo ""
+              echo "Prefer \`node\` over \`bun\` for step 3 to match CI exactly — the summarizer is invoked with \`node\` in the workflow. If \`bun run e2e:quicklog-smoke\` cannot reach the same fixture (missing env, auth secrets, network), regenerate the summary from any existing Playwright JSON report by pointing \`--report=\` at that file instead."
+              echo ""
+              echo "Note: \`playwright-flake-summary.md\` is written on every successful run — including a clean one — with at least the header and the counts table, and it says explicitly when no flakes were found. It is the COUNTS (above), not file emptiness, that decide whether the dedicated artifact is worth downloading."
+            elif [ -n "${FLAKE_SUMMARY_URL}" ]; then
+              echo "**Status:** Download the standalone \`playwright-flake-summary.md\` here: [quicklog-flake-summary](${FLAKE_SUMMARY_URL})"
+            else
+              echo "**Status:** _Flake summary artifact URL unavailable — check the run's Artifacts dropdown for \`quicklog-flake-summary\`._"
+            fi
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Upload smoke artifacts
+        id: upload_smoke_bundle
         if: always() && steps.e2e_config.outputs.should_run == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: quicklog-smoke-artifacts
+          name: quicklog-smoke-artifacts-${{ env.ARTIFACT_SUFFIX }}
           if-no-files-found: warn
           retention-days: 30
           path: |
             e2e/results/quicklog-smoke-report.json
             e2e/results/quicklog-smoke-report.txt
+            e2e/results/playwright-report.json
+            e2e/results/playwright-flake-summary.md
             playwright-report/
-            test-results/
 
-      - name: Upload Playwright HTML report
-        id: upload_playwright_report
+      # Consolidated at-a-glance index of the three primary uploads for this
+      # run (smoke bundle, standalone flake summary, standalone Playwright
+      # HTML report) so a reviewer can grab any of them from one place
+      # without scrolling through the per-artifact sections that already
+      # exist above/below. Written after upload_smoke_bundle so every
+      # `artifact-url` output is populated. Enrichment only — never fails.
+      - name: List uploaded artifacts in Job Summary
         if: always() && steps.e2e_config.outputs.should_run == 'true'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: quicklog-playwright-report
-          path: playwright-report/
-          retention-days: 30
-          if-no-files-found: warn
+        shell: bash
+        env:
+          SMOKE_BUNDLE_URL: ${{ steps.upload_smoke_bundle.outputs.artifact-url }}
+          FLAKE_SUMMARY_URL: ${{ steps.upload_flake_summary.outputs.artifact-url }}
+          FLAKE_SUMMARY_PRESENT: ${{ steps.check_flake_summary.outputs.present }}
+          HTML_REPORT_URL: ${{ steps.upload_playwright_report.outputs.artifact-url }}
+        run: |
+          # Renders one Markdown row per artifact with the exact uploaded
+          # name (including the run-scoped ARTIFACT_SUFFIX) and a Download
+          # column that becomes a clickable link only when the upload
+          # actually succeeded. Absent uploads (skipped by the flake gate,
+          # disabled via `upload_html_report=false`, failed upload) render
+          # as an italic "not uploaded" note in the same row so reviewers
+          # never wonder whether they missed a link.
+          fmt_link() {
+            local url="$1" label="$2" missing_note="$3"
+            if [ -n "${url}" ]; then
+              printf '[%s](%s)' "${label}" "${url}"
+            else
+              printf '_%s_' "${missing_note}"
+            fi
+          }
+          smoke_link=$(fmt_link "${SMOKE_BUNDLE_URL}" "Download" "not uploaded — check the run's Artifacts dropdown")
+          if [ "${FLAKE_SUMMARY_PRESENT}" = "true" ]; then
+            flake_link=$(fmt_link "${FLAKE_SUMMARY_URL}" "Download" "uploaded, URL unavailable — see Artifacts dropdown")
+          else
+            flake_link='_not uploaded — 0 failed + 0 flaky (see Flake summary section)_'
+          fi
+          html_link=$(fmt_link "${HTML_REPORT_URL}" "Download" "not uploaded — see HTML report section for reason")
+          {
+            echo ""
+            echo "### 📦 Uploaded artifacts (this run)"
+            echo ""
+            echo "One-stop index of every standalone artifact this workflow published. Each row shows the exact uploaded name (with the run-scoped suffix \`${ARTIFACT_SUFFIX}\`), what it contains, and a direct download link when available. Per-artifact sections above/below add gate breakdowns, inline previews, and fallback paths for the missing cases."
+            echo ""
+            echo "| Artifact name | Contents | Download |"
+            echo "| ------------- | -------- | -------- |"
+            echo "| \`quicklog-smoke-artifacts-${ARTIFACT_SUFFIX}\` | Smoke bundle: \`quicklog-smoke-report.{json,txt}\`, \`playwright-report.json\`, \`playwright-flake-summary.md\`, \`playwright-report/\` (HTML) | ${smoke_link} |"
+            echo "| \`quicklog-flake-summary-${ARTIFACT_SUFFIX}\` | Single file: \`playwright-flake-summary.md\` (uploaded only when \`failed + flaky > 0\`) | ${flake_link} |"
+            echo "| \`quicklog-playwright-report-${ARTIFACT_SUFFIX}\` | Standalone \`playwright-report/\` (unzip and open \`index.html\`) | ${html_link} |"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Follow-up to the pinned "🧭 Playwright HTML report" section at the
+      # top of the Job Summary: the same `playwright-report/` tree is also
+      # packaged inside the `quicklog-smoke-artifacts` bundle. Surface that
+      # copy's artifact URL too so reviewers who already downloaded the
+      # bundle for other files (JSON report, TXT report, flake summary)
+      # don't need to grab the standalone HTML report artifact separately.
+      # `upload-artifact@v4`'s `artifact-url` output is only populated after
+      # the upload step runs, so this must live immediately after
+      # upload_smoke_bundle. Enrichment only — never fails the job.
+      - name: Link smoke bundle HTML report in Job Summary
+        if: always() && steps.e2e_config.outputs.should_run == 'true'
+        shell: bash
+        env:
+          SMOKE_BUNDLE_URL: ${{ steps.upload_smoke_bundle.outputs.artifact-url }}
+        run: |
+          {
+            echo ""
+            echo "### 🧭 Playwright HTML report (bundled copy)"
+            echo ""
+            if [ ! -d "playwright-report" ]; then
+              echo "**Status:** ❌ \`playwright-report/\` not produced — no bundled HTML report to link. See the pinned HTML report section at the top of this summary."
+            elif [ -n "${SMOKE_BUNDLE_URL}" ]; then
+              echo "The same \`playwright-report/\` tree is also included inside the smoke artifacts bundle:"
+              echo ""
+              echo "- [\`quicklog-smoke-artifacts\`](${SMOKE_BUNDLE_URL}) — unzip and open \`playwright-report/index.html\`"
+              echo ""
+              echo "_Prefer the pinned [\`quicklog-playwright-report\`](#user-content-playwright-html-report) artifact at the top of this summary if you only need the HTML report; use this bundle when you also want the JSON/TXT reports or the flake summary markdown._"
+            else
+              echo "**Status:** _Smoke bundle artifact URL unavailable — check the run's Artifacts dropdown for \`quicklog-smoke-artifacts\` and open \`playwright-report/index.html\` inside it._"
+            fi
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Moved: Upload Playwright HTML report + Link in Job Summary now run
+      # earlier (right before "Summarize Playwright flakes") so the HTML report
+      # link is the FIRST section written to $GITHUB_STEP_SUMMARY and is
+      # immediately visible at the top of the run's summary. $GITHUB_STEP_SUMMARY
+      # is append-only, so ordering is controlled purely by step execution order.
+      # Downstream steps that reference steps.upload_playwright_report.outputs.artifact-url
+      # still resolve because those steps run after the moved position.
+
+      - name: Detect Playwright trace files
+        id: trace_files
+        if: always() && steps.e2e_config.outputs.should_run == 'true'
+        shell: bash
+        run: |
+          count=0
+          if [ -d "test-results" ]; then
+            count="$(find test-results -type f -name 'trace.zip' -print 2>/dev/null | wc -l | tr -d ' ')"
+          fi
+          echo "count=${count}" >> "$GITHUB_OUTPUT"
+          if [ "${count}" -gt 0 ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Upload Playwright traces
         id: upload_playwright_traces
-        if: always() && steps.e2e_config.outputs.should_run == 'true'
+        if: >-
+          always()
+          && steps.e2e_config.outputs.should_run == 'true'
+          && steps.trace_files.outputs.present == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: quicklog-playwright-traces
+          name: quicklog-playwright-traces-${{ env.ARTIFACT_SUFFIX }}
           path: |
-            test-results/**/*.zip
+            test-results/**/trace.zip
           retention-days: 30
           if-no-files-found: warn
 
+      # Compute artifact file sizes + SHA-256 checksums for the flake summary
+      # and Playwright traces so the Job Summary carries independent integrity
+      # metadata for the exact bytes uploaded. Never fails the job — pure
+      # enrichment. All values are derived from local files (same bytes
+      # actions/upload-artifact consumed), never from network calls.
+      - name: Artifact checksums (trace + flake summary)
+        id: artifact_checksums
+        if: always() && steps.e2e_config.outputs.should_run == 'true'
+        shell: bash
+        env:
+          FLAKE_SUMMARY_PRESENT: ${{ steps.check_flake_summary.outputs.present }}
+          FLAKE_SUMMARY_URL: ${{ steps.upload_flake_summary.outputs.artifact-url }}
+          TRACES_URL: ${{ steps.upload_playwright_traces.outputs.artifact-url }}
+        run: |
+          human_bytes() {
+            # POSIX-portable human-readable byte formatter (no `numfmt` dep).
+            awk -v b="$1" 'BEGIN {
+              split("B KiB MiB GiB TiB", u, " ");
+              i = 1;
+              while (b >= 1024 && i < 5) { b /= 1024; i++; }
+              if (i == 1) printf "%d %s", b, u[i];
+              else printf "%.2f %s", b, u[i];
+            }'
+          }
+
+          flake_file="e2e/results/playwright-flake-summary.md"
+          flake_line="_Not generated for this run — no failed or flaky tests to report._"
+          if [ "${FLAKE_SUMMARY_PRESENT}" = "true" ] && [ -r "${flake_file}" ]; then
+            flake_bytes=$(wc -c < "${flake_file}" | tr -d ' ')
+            flake_sha=$(sha256sum "${flake_file}" | awk '{print $1}')
+            flake_hr=$(human_bytes "${flake_bytes}")
+            flake_line="| \`playwright-flake-summary.md\` | ${flake_hr} (${flake_bytes} bytes) | \`${flake_sha}\` |"
+          fi
+
+          # Playwright traces artifact = every test-results/**/trace.zip. Report
+          # per-file rows (bounded to 25 to stay well under the 1 MiB
+          # $GITHUB_STEP_SUMMARY cap) plus totals + a manifest checksum that
+          # covers every trace zip, so tampering with any single trace is
+          # detectable from the summary alone.
+          trace_rows=""
+          trace_total_bytes=0
+          trace_file_count=0
+          trace_manifest_sha=""
+          if compgen -G "test-results/**/trace.zip" > /dev/null 2>&1 || \
+             find test-results -type f -name 'trace.zip' -print -quit 2>/dev/null | grep -q .; then
+            tmp_manifest="$(mktemp)"
+            # Deterministic ordering so the manifest checksum is reproducible.
+            while IFS= read -r -d '' f; do
+              bytes=$(wc -c < "$f" | tr -d ' ')
+              sha=$(sha256sum "$f" | awk '{print $1}')
+              trace_total_bytes=$((trace_total_bytes + bytes))
+              trace_file_count=$((trace_file_count + 1))
+              printf '%s  %s  %s\n' "$sha" "$bytes" "$f" >> "$tmp_manifest"
+            done < <(find test-results -type f -name 'trace.zip' -print0 | sort -z)
+            trace_manifest_sha=$(sha256sum "$tmp_manifest" | awk '{print $1}')
+            # Cap displayed rows so a run with hundreds of trace zips doesn't
+            # overflow the Job Summary size cap. Full manifest is still
+            # covered by trace_manifest_sha (computed over the full list).
+            trace_rows=$(head -n 25 "$tmp_manifest" | awk '{
+              sha=$1; bytes=$2; $1=""; $2=""; path=$0; sub(/^  /,"",path);
+              printf "| `%s` | %s bytes | `%s` |\n", path, bytes, sha;
+            }')
+            if [ "${trace_file_count}" -gt 25 ]; then
+              trace_rows="${trace_rows}"$'\n'"| _…and $((trace_file_count - 25)) more trace zip(s) — full list covered by the manifest SHA-256 below._ | | |"
+            fi
+            rm -f "$tmp_manifest"
+          fi
+
+          {
+            echo ""
+            echo "### 🔐 Artifact checksums (SHA-256)"
+            echo ""
+            echo "Independent integrity metadata for the exact bytes uploaded above. Recompute locally with \`sha256sum <file>\` after unzipping the artifact to verify."
+            echo ""
+            echo "**Flake summary (\`quicklog-flake-summary-${ARTIFACT_SUFFIX}\`)**"
+            echo ""
+            echo "| File | Size | SHA-256 |"
+            echo "|------|------|---------|"
+            echo "${flake_line}"
+            echo ""
+            echo "**Playwright traces (\`quicklog-playwright-traces-${ARTIFACT_SUFFIX}\`)**"
+            echo ""
+            if [ "${trace_file_count}" -gt 0 ]; then
+              trace_total_hr=$(human_bytes "${trace_total_bytes}")
+              echo "- **Files:** ${trace_file_count} \`trace.zip\`(s)"
+              echo "- **Total size:** ${trace_total_hr} (${trace_total_bytes} bytes)"
+              echo "- **Manifest SHA-256:** \`${trace_manifest_sha}\` — computed over a deterministic \`<sha>  <bytes>  <path>\` listing of every uploaded trace zip; any change to any single trace changes this value."
+              echo ""
+              echo "| File | Size | SHA-256 |"
+              echo "|------|------|---------|"
+              echo "${trace_rows}"
+            else
+              echo "_No \`test-results/**/trace.zip\` files were produced for this run — nothing to checksum._"
+            fi
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Real-auth runs force trace off in playwright.config.ts. Viewer/download
+      # guidance is emitted only when trace files were proven to exist and the
+      # upload action returned an actual artifact URL.
+      - name: Link Playwright trace viewer in Job Summary
+        if: always() && steps.e2e_config.outputs.should_run == 'true'
+        shell: bash
+        env:
+          TRACE_FILES_PRESENT: ${{ steps.trace_files.outputs.present }}
+          TRACE_FILE_COUNT: ${{ steps.trace_files.outputs.count }}
+          TRACES_URL: ${{ steps.upload_playwright_traces.outputs.artifact-url }}
+        run: |
+          RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          ATTEMPT_URL="${RUN_URL}/attempts/${GITHUB_RUN_ATTEMPT}"
+          {
+            echo ""
+            echo "### 🎬 Playwright trace status"
+            echo ""
+            echo "Run: [#${GITHUB_RUN_NUMBER} attempt ${GITHUB_RUN_ATTEMPT}](${ATTEMPT_URL})"
+            echo ""
+            if [ "${TRACE_FILES_PRESENT}" = "true" ] && [ -n "${TRACES_URL}" ]; then
+              echo "Trace files detected: \`${TRACE_FILE_COUNT}\`. [Download \`quicklog-playwright-traces-${ARTIFACT_SUFFIX}\`](${TRACES_URL})."
+              echo ""
+              echo "The upload wildcard strips the \`test-results/\` prefix. After extracting, locate traces from the artifact root:"
+              echo ""
+              echo '  ```bash'
+              echo "  find quicklog-playwright-traces-${ARTIFACT_SUFFIX} -type f -name 'trace.zip'"
+              echo '  ```'
+              echo ""
+              echo "Retry traces use sibling directories such as \`<test>-retry1/trace.zip\`. Open a located trace with \`bunx playwright show-trace <path-to-trace.zip>\`."
+            elif [ "${TRACE_FILES_PRESENT}" = "true" ]; then
+              echo "Trace files were detected, but no trace artifact URL is available. Viewer/download instructions are withheld until an upload is proven."
+            else
+              echo "Trace intentionally disabled/unavailable for this authenticated smoke run."
+            fi
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Upload Playwright media (screenshots/videos)
         id: upload_playwright_media
+
         if: always() && steps.e2e_config.outputs.should_run == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: quicklog-playwright-media
+          name: quicklog-playwright-media-${{ env.ARTIFACT_SUFFIX }}
           path: |
             test-results/**/*.png
             test-results/**/*.jpg
@@ -352,7 +1131,7 @@ jobs:
         if: always() && steps.e2e_config.outputs.should_run == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: quicklog-smoke-report-json
+          name: quicklog-smoke-report-json-${{ env.ARTIFACT_SUFFIX }}
           path: e2e/results/quicklog-smoke-report.json
           retention-days: 30
           if-no-files-found: warn
@@ -362,10 +1141,159 @@ jobs:
         if: always() && steps.e2e_config.outputs.should_run == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: quicklog-smoke-report-txt
+          name: quicklog-smoke-report-txt-${{ env.ARTIFACT_SUFFIX }}
           path: e2e/results/quicklog-smoke-report.txt
           retention-days: 30
           if-no-files-found: warn
+
+      - name: Link Playwright JSON report source in Job Summary
+        if: always() && steps.e2e_config.outputs.should_run == 'true'
+        shell: bash
+        env:
+          BUNDLE_URL: ${{ steps.upload_smoke_bundle.outputs.artifact-url }}
+          SMOKE_JSON_URL: ${{ steps.upload_smoke_report_json.outputs.artifact-url }}
+          HTML_REPORT_URL: ${{ steps.upload_playwright_report.outputs.artifact-url }}
+        run: |
+          # Traceability: point reviewers at the exact Playwright JSON report
+          # directory that fed scripts/summarize-playwright-flakes.mjs, so
+          # playwright-flake-summary.md can always be traced back to its
+          # source. Enrichment only — never fails the job.
+          REPORT_PATH="e2e/results/playwright-report.json"
+          {
+            echo ""
+            echo "### 📄 Playwright JSON report source"
+            echo ""
+            echo "\`playwright-flake-summary.md\` is generated from the Playwright JSON report at:"
+            echo ""
+            echo "- **Local path:** \`${REPORT_PATH}\`"
+            echo "- **Local HTML report dir:** \`playwright-report/\`"
+            echo ""
+            if [ -f "${REPORT_PATH}" ]; then
+              SIZE_BYTES=$(wc -c < "${REPORT_PATH}" | tr -d ' ')
+              echo "- **Report file present in this run:** ✅ (\`${SIZE_BYTES}\` bytes)"
+            else
+              echo "- **Report file present in this run:** ❌ not generated (Playwright likely did not run — see earlier steps)"
+            fi
+            echo ""
+            echo "**Downloads (this run):**"
+            echo ""
+            if [ -n "${SMOKE_JSON_URL}" ]; then
+              echo "- [\`quicklog-smoke-report-json\`](${SMOKE_JSON_URL}) — bundles \`e2e/results/quicklog-smoke-report.json\`"
+            else
+              echo "- \`quicklog-smoke-report-json\` — artifact URL unavailable, see Artifacts dropdown"
+            fi
+            if [ -n "${BUNDLE_URL}" ]; then
+              echo "- [\`quicklog-smoke-artifacts\`](${BUNDLE_URL}) — bundles \`playwright-report.json\`, \`playwright-report/\`, and the smoke/flake summaries"
+            else
+              echo "- \`quicklog-smoke-artifacts\` — artifact URL unavailable, see Artifacts dropdown"
+            fi
+            if [ -n "${HTML_REPORT_URL}" ]; then
+              echo "- [\`quicklog-playwright-report\`](${HTML_REPORT_URL}) — standalone HTML report directory"
+            else
+              echo "- \`quicklog-playwright-report\` — artifact URL unavailable, see Artifacts dropdown"
+            fi
+            echo ""
+            echo "_Download any of the above, then re-run \`node scripts/summarize-playwright-flakes.mjs --report=<path-to-playwright-report.json>\` locally to reproduce \`playwright-flake-summary.md\` byte-for-byte._"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload per-test failure artifacts
+        id: upload_per_test_artifacts
+        if: always() && steps.e2e_config.outputs.should_run == 'true' && env.PR_COMMENT_CONTEXT_OK == 'true' && env.PR_COMMENT_DISABLED != 'true'
+        shell: bash
+        run: |
+          # One dedicated artifact per failed/flaky test, so the PR comment
+          # can link directly to just that test's evidence instead of the
+          # whole run's shared bundle. Enrichment only: this script never
+          # exits non-zero, so it can never fail the job. Skipped entirely
+          # when PR comments are disabled — nothing would ever link to it.
+          if [ ! -f "e2e/results/playwright-report.json" ]; then
+            echo "::notice::No Playwright JSON report — skipping per-test artifact uploads."
+            exit 0
+          fi
+          node scripts/upload-per-test-artifacts.mjs \
+            --report=e2e/results/playwright-report.json \
+            --out=e2e/results/per-test-artifacts.json \
+            || echo "::warning::per-test artifact uploader exited non-zero (see logs) — this is enrichment only and does not affect the smoke result"
+
+      - name: Build Playwright failure PR-comment body
+        id: build_pr_comment
+        if: always() && steps.e2e_config.outputs.should_run == 'true' && env.PR_COMMENT_CONTEXT_OK == 'true'
+        shell: bash
+        env:
+          TRACES_URL: ${{ steps.upload_playwright_traces.outputs.artifact-url }}
+          MEDIA_URL: ${{ steps.upload_playwright_media.outputs.artifact-url }}
+          REPORT_URL: ${{ steps.upload_playwright_report.outputs.artifact-url }}
+          BUNDLE_URL: ${{ steps.upload_smoke_bundle.outputs.artifact-url }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          PR_COMMENT_MIN_FAILED: ${{ github.event_name == 'workflow_dispatch' && inputs.pr_comment_min_failed || '1' }}
+        run: |
+          # Regenerates the flake summary as a PR-comment body with direct
+          # links to the uploaded artifact bundles for both attempt 1 and
+          # retry1. `artifact-url` outputs are only populated by
+          # actions/upload-artifact@v4 AFTER the upload step runs, so this
+          # step must live after every upload_playwright_* step.
+          #
+          # PR_COMMENT_DISABLED is checked FIRST and unconditionally — it
+          # overrides PR_COMMENT_MIN_FAILED and posts nothing even when there
+          # are hard failures. This is the one authoritative gate: the "Post
+          # ... PR comment" steps below only ever look at comment_ready, so
+          # disabling here is enough to suppress posting everywhere.
+          if [ "${PR_COMMENT_DISABLED}" = "true" ]; then
+            echo "::notice::pr_comment_disabled=true — skipping PR comment unconditionally, even if there are hard failures."
+            echo "comment_ready=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          #
+          # PR_COMMENT_MIN_FAILED gates comment creation: the file (and
+          # therefore the sticky comment) is only written when the hard-
+          # failure count is >= this threshold. Default 1 keeps PRs quiet
+          # on flake-only runs; set to 0 to always post.
+          if [ ! -f "e2e/results/playwright-report.json" ]; then
+            echo "::notice::No Playwright JSON report — skipping PR comment."
+            echo "comment_ready=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          node scripts/summarize-playwright-flakes.mjs \
+            --report=e2e/results/playwright-report.json \
+            --pr-comment=e2e/results/playwright-flake-pr-comment.md \
+            --traces-url="${TRACES_URL}" \
+            --media-url="${MEDIA_URL}" \
+            --report-url="${REPORT_URL}" \
+            --bundle-url="${BUNDLE_URL}" \
+            --run-url="${RUN_URL}" \
+            --per-test-artifacts=e2e/results/per-test-artifacts.json \
+            --min-failed="${PR_COMMENT_MIN_FAILED:-1}" \
+            > /dev/null \
+            || echo "::warning::PR-comment builder exited non-zero (see logs)"
+          if [ -s "e2e/results/playwright-flake-pr-comment.md" ]; then
+            echo "comment_ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "comment_ready=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Post Playwright failure artifacts PR comment (sticky)
+        if: always() && steps.build_pr_comment.outputs.comment_ready == 'true' && env.PR_COMMENT_MODE == 'sticky'
+        uses: marocchino/sticky-pull-request-comment@773744901bac0e8cbb5a0dc842800d45e9b2b405 # v2
+        with:
+          header: verdant-playwright-flake-artifacts
+          path: e2e/results/playwright-flake-pr-comment.md
+          # Explicit PR number so this also works when comment_ready came
+          # from a workflow_dispatch run (no pull_request event context to
+          # auto-detect from — see PR_NUMBER/PR_COMMENT_CONTEXT_OK above).
+          number: ${{ env.PR_NUMBER }}
+
+      - name: Post Playwright failure artifacts PR comment (new per run)
+        if: always() && steps.build_pr_comment.outputs.comment_ready == 'true' && env.PR_COMMENT_MODE == 'new-per-run'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Deliberately bypasses the sticky-comment action: with no header
+          # to match against, every run posts a brand-new comment instead of
+          # updating a prior one. Same body (and sticky marker inside it) as
+          # the 'sticky' mode above — only the posting behavior differs.
+          gh pr comment "${PR_NUMBER}" --body-file e2e/results/playwright-flake-pr-comment.md
 
       - name: Write Quick Log smoke run summary
         if: always()
@@ -390,6 +1318,8 @@ jobs:
           SMOKE_STEP_CONCLUSION: ${{ steps.quicklog_smoke.conclusion }}
           PLAYWRIGHT_REPORT_ARTIFACT_URL: ${{ steps.upload_playwright_report.outputs.artifact-url }}
           PLAYWRIGHT_TRACES_ARTIFACT_URL: ${{ steps.upload_playwright_traces.outputs.artifact-url }}
+          TRACE_FILES_PRESENT: ${{ steps.trace_files.outputs.present }}
+          TRACE_FILE_COUNT: ${{ steps.trace_files.outputs.count }}
           PLAYWRIGHT_MEDIA_ARTIFACT_URL: ${{ steps.upload_playwright_media.outputs.artifact-url }}
           SMOKE_REPORT_JSON_ARTIFACT_URL: ${{ steps.upload_smoke_report_json.outputs.artifact-url }}
           SMOKE_REPORT_TXT_ARTIFACT_URL: ${{ steps.upload_smoke_report_txt.outputs.artifact-url }}
@@ -402,7 +1332,6 @@ jobs:
           # Never echo secret values. Only references to secret NAMES are written.
           fallback="${ARTIFACTS_URL}"
           pw_report_url="${PLAYWRIGHT_REPORT_ARTIFACT_URL:-$fallback}"
-          pw_traces_url="${PLAYWRIGHT_TRACES_ARTIFACT_URL:-$fallback}"
           pw_media_url="${PLAYWRIGHT_MEDIA_ARTIFACT_URL:-$fallback}"
           smoke_json_url="${SMOKE_REPORT_JSON_ARTIFACT_URL:-$fallback}"
           smoke_txt_url="${SMOKE_REPORT_TXT_ARTIFACT_URL:-$fallback}"
@@ -440,7 +1369,11 @@ jobs:
             echo "- [Workflow run](${RUN_URL})"
             echo "- [Artifacts](${ARTIFACTS_URL})"
             echo "- [Playwright HTML report](${pw_report_url})"
-            echo "- [Playwright traces](${pw_traces_url})"
+            if [ "${TRACE_FILES_PRESENT}" = "true" ] && [ -n "${PLAYWRIGHT_TRACES_ARTIFACT_URL}" ]; then
+              echo "- [Playwright traces (${TRACE_FILE_COUNT})](${PLAYWRIGHT_TRACES_ARTIFACT_URL})"
+            else
+              echo "- Playwright traces: intentionally disabled/unavailable for this authenticated run"
+            fi
             echo "- [Playwright media (screenshots/videos)](${pw_media_url})"
             echo "- [Smoke report JSON](${smoke_json_url})"
             echo "- [Smoke report TXT](${smoke_txt_url})"
@@ -467,6 +1400,9 @@ jobs:
               echo "- Command: \`bun run e2e:quicklog-smoke\`"
               echo "- Browser: \`chromium\`"
               echo "- Playwright: \`${PLAYWRIGHT_VERSION:-unavailable}\`"
+              echo "- Playwright retries per test: \`${PLAYWRIGHT_RETRIES:-1}\` (override via workflow_dispatch \`playwright_retries\` input)"
+              echo ""
+              echo "  Retry artifacts use sibling directories such as \`test-results/<test>-retry1/\`. Authenticated tracing is intentionally off; screenshots/videos may still be retained by Playwright."
               echo ""
               echo "### Smoke counts"
               echo ""
@@ -486,7 +1422,7 @@ jobs:
               echo "- Report parse status: \`${REPORT_PARSE_STATUS:-unknown}\`"
               echo ""
               if [ "${SMOKE_STEP_OUTCOME}" = "failure" ] || [ "${SMOKE_STEP_CONCLUSION}" = "failure" ]; then
-                echo "Smoke command failed: the Playwright smoke step did not complete successfully. Inspect \`quicklog-smoke-report.txt\`, Playwright trace, screenshots, and videos."
+                echo "Smoke command failed: the Playwright smoke step did not complete successfully. Inspect the masked run logs and the available report/media artifacts."
               fi
               case "${REPORT_PARSE_STATUS}" in
                 parsed)
@@ -511,7 +1447,11 @@ jobs:
               echo ""
               echo "- Bundled artifact: \`quicklog-smoke-artifacts\` (retention: 30 days)"
               echo "- Playwright HTML report artifact: \`quicklog-playwright-report\` (retention: 30 days)"
-              echo "- Playwright traces artifact: \`quicklog-playwright-traces\` (retention: 30 days)"
+              if [ "${TRACE_FILES_PRESENT}" = "true" ] && [ -n "${PLAYWRIGHT_TRACES_ARTIFACT_URL}" ]; then
+                echo "- Playwright traces artifact: \`quicklog-playwright-traces\` (${TRACE_FILE_COUNT} file(s), retention: 30 days)"
+              else
+                echo "- Playwright traces artifact: not uploaded — trace intentionally disabled/unavailable"
+              fi
               echo "- Playwright media artifact: \`quicklog-playwright-media\` (retention: 30 days)"
               echo "- Smoke report JSON artifact: \`quicklog-smoke-report-json\` (retention: 30 days)"
               echo "- Smoke report TXT artifact: \`quicklog-smoke-report-txt\` (retention: 30 days)"
@@ -521,12 +1461,13 @@ jobs:
               echo ""
               echo "- \`e2e/results/quicklog-smoke-report.json\`"
               echo "- \`e2e/results/quicklog-smoke-report.txt\`"
+              echo "- \`e2e/results/playwright-report.json\` (Playwright's own JSON reporter — source of the flake summary above)"
+              echo "- \`e2e/results/playwright-flake-summary.md\` (present even on a clean run — see the flake summary section above)"
               echo "- \`playwright-report/\`"
-              echo "- \`test-results/\`"
               echo ""
               echo "### Troubleshooting"
               echo ""
-              echo "Open \`quicklog-smoke-report.txt\` first (then the JSON sibling) and find the first \`✗\` line. Then inspect the matching Playwright trace, screenshots, and video under \`playwright-report/\` and \`test-results/\`."
+              echo "Open \`quicklog-smoke-report.txt\` first (then the JSON sibling) and find the first \`✗\` line. Use the masked run logs and any uploaded screenshots/videos for additional context."
 
             else
               echo "- Smoke executed: no (skipped)"

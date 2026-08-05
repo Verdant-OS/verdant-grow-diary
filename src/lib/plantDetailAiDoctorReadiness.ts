@@ -15,11 +15,7 @@
 export type AiDoctorReadinessLevel = "ready" | "partial" | "empty";
 
 export type AiDoctorMissingKind =
-  | "stage_unknown"
-  | "no_timeline"
-  | "no_photo"
-  | "no_sensor_snapshot"
-  | "no_watering_or_feed";
+  "stage_unknown" | "no_timeline" | "no_photo" | "no_sensor_snapshot" | "no_watering_or_feed";
 
 export interface AiDoctorReadinessMissingBullet {
   kind: AiDoctorMissingKind;
@@ -76,11 +72,7 @@ export interface PlantDetailAiDoctorReadinessInput {
 }
 
 export type AiDoctorSensorEvidenceMode =
-  | "healthy"
-  | "cautionary"
-  | "unsafe"
-  | "missing"
-  | "unknown";
+  "healthy" | "cautionary" | "unsafe" | "missing" | "unknown";
 
 export interface AiDoctorSensorEvidence {
   mode: AiDoctorSensorEvidenceMode;
@@ -123,9 +115,7 @@ import { countsAsHealthyEvidence as contractCountsAsHealthyEvidence } from "@/li
  * `Classification` from the contract. Without one, the snapshot is
  * treated as `no_data` and excluded from healthy evidence.
  */
-function evaluateSensorEvidence(
-  input: PlantDetailAiDoctorReadinessInput,
-): AiDoctorSensorEvidence {
+function evaluateSensorEvidence(input: PlantDetailAiDoctorReadinessInput): AiDoctorSensorEvidence {
   const snap = input.sensorSnapshot ?? null;
   if (!snap) {
     // No structured Classification → never healthy, regardless of the
@@ -189,9 +179,7 @@ function countPresent(
   return count;
 }
 
-function buildMissing(
-  input: PlantDetailAiDoctorReadinessInput,
-): AiDoctorReadinessMissingBullet[] {
+function buildMissing(input: PlantDetailAiDoctorReadinessInput): AiDoctorReadinessMissingBullet[] {
   const out: AiDoctorReadinessMissingBullet[] = [];
   if (!isStageKnown(input.stage)) {
     out.push({ kind: "stage_unknown", label: MISSING_BULLETS.stage_unknown });

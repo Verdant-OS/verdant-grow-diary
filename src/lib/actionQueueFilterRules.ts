@@ -36,9 +36,7 @@ export interface TraceFailureLike {
   actionId: string;
 }
 
-export function normalizeActionSearchQuery(
-  query: string | null | undefined,
-): string {
+export function normalizeActionSearchQuery(query: string | null | undefined): string {
   if (typeof query !== "string") return "";
   return query.trim().toLowerCase();
 }
@@ -57,8 +55,7 @@ export function collectActionSearchFields(
   if (row.reason) fields.push(stripBackPointerTokens(row.reason));
   const sourceLabel = lookups?.sourceLabelFor?.(row);
   if (sourceLabel) fields.push(sourceLabel);
-  const plantName =
-    row.plant_id && lookups?.plantsById?.[row.plant_id]?.name;
+  const plantName = row.plant_id && lookups?.plantsById?.[row.plant_id]?.name;
   if (plantName) fields.push(plantName);
   return fields;
 }

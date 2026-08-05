@@ -1,4 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import TimelineEmptyState from "@/components/TimelineEmptyState";
+import TimelineLightingGuideCard from "@/components/TimelineLightingGuideCard";
+import SymptomEvidenceChecklistCard from "@/components/SymptomEvidenceChecklistCard";
+import {
+  resolveTimelineEmptyState,
+  TIMELINE_EMPTY_STATE_FALLBACK,
+} from "@/lib/timelineEmptyStateRules";
+import { resolveTimelineLightingGuide } from "@/lib/timelineLightingGuideRules";
+import {
+  buildSymptomEvidenceChecklist,
+  buildSymptomEvidenceTimelineRows,
+  SYMPTOM_EVIDENCE_LOOKBACK_DAYS,
+} from "@/lib/symptomEvidenceChecklistRules";
+import { isTimelineSymptomEvidenceWindowComplete } from "@/lib/timelineSymptomEvidenceWindowCoverageRules";
+import type { FastAddSelectionContext } from "@/lib/fastAddActionRules";
+import PageHeader from "@/components/PageHeader";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
 import { supabase } from "@/integrations/supabase/client";
 import { useGrows } from "@/store/grows";
@@ -26,10 +42,12 @@ import { buildActionResponseMemoryCardViewModel } from "@/lib/actionResponseMemo
 import { useActionResponseMemory } from "@/hooks/useActionResponseMemory";
 import ActionResponseMemoryCard from "@/components/ActionResponseMemoryCard";
 import { Button } from "@/components/ui/button";
-import { Link, useLocation, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "@/lib/react-router-compat";
 import {
+  SENSOR_PLANT_PARAM,
   SENSOR_SOURCES_PARAM,
   encodeSensorSourcesParam,
+  parseTimelinePlantIdParam,
   parseSensorSourcesParam,
   sensorSourcesEqual,
 } from "@/lib/sensorSourceUrlRules";
@@ -85,8 +103,12 @@ import TimelineCsvContextPanel from "@/components/TimelineCsvContextPanel";
 import PhenoHuntTimelineSection from "@/components/PhenoHuntTimelineSection";
 import { cn } from "@/lib/utils";
 import { getEventType } from "@/lib/diary";
-import { buildGrowDiaryTimeline } from "@/lib/growDiaryTimelineRules";
+import {
+  buildGrowDiaryTimeline,
+  resolveTimelineDiaryEntryStage,
+} from "@/lib/growDiaryTimelineRules";
 import { MEASUREMENT_DETAIL_KEYS } from "@/lib/timelineEntryClassification";
+import { presentTimelineDiaryEntryDetails } from "@/lib/timelineDiaryEntryDetailPresentationRules";
 import { classifyVpdAgainstStage } from "@/lib/vpdStageTargetRules";
 import {
   mapGrowEventsToRecentRawEntries,
@@ -94,6 +116,7 @@ import {
 } from "@/lib/growEventToDiaryRawEntry";
 import { ROOT_ZONE_GROW_EVENT_SELECT } from "@/lib/rootZoneObservationRules";
 import { collapseQuickLogSaveFanOut, mergeTimelineSources } from "@/lib/timelineMergeRules";
+import { buildTimelineLocalDateRangeBounds } from "@/lib/timelineDateRangeRules";
 import {
   deriveTimelineEventTypeOptions,
   deriveTimelinePlantOptions,
@@ -101,8 +124,6 @@ import {
   filterTimelineEvidenceRows,
   isTimelineDateFilterValue,
   isTimelineEvidenceFilterActive,
-  TIMELINE_EVIDENCE_EMPTY_DESC,
-  TIMELINE_EVIDENCE_EMPTY_TITLE,
   TIMELINE_EVIDENCE_SEARCH_PLACEHOLDER,
 } from "@/lib/timelineEvidenceFilterRules";
 import {
@@ -115,6 +136,8 @@ import {
   type MissingActionResult,
 } from "@/lib/timelineMissingActionRules";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
+import { useTimelineNameDirectory } from "@/hooks/useTimelineNameDirectory";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 import { canUseFeature } from "@/lib/featureEntitlements";
 import {
   buildTimelinePhotoLightboxList,
@@ -168,6 +191,10 @@ import CopyTraceLinkButton from "@/components/CopyTraceLinkButton";
 import { useTimelineHighlightAutoScroll } from "@/lib/useTimelineHighlightAutoScroll";
 import { useTimelineHashAnchorHandoff } from "@/hooks/useTimelineHashAnchorHandoff";
 import {
+  buildLinkedGrowEventTimelineAnchorId,
+  buildTimelineEntryAnchorId,
+} from "@/lib/timelineEntryAnchorRules";
+import {
   buildTimelinePageReadKey,
   buildTimelinePageReadView,
   hasTimelineRequiredReadError,
@@ -183,6 +210,11 @@ const TIMELINE_SNAPSHOT_STALE_MS = 30 * 60 * 1000;
 const TIMELINE_START_DATE_PARAM = "start";
 const TIMELINE_END_DATE_PARAM = "end";
 
+// The grower's own timezone, read once — used to interpret the plain
+// YYYY-MM-DD date-range filter as the grower's local day rather than a
+// UTC day (issue #587).
+const TIMELINE_LOCAL_TIME_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
 interface Entry {
   id: string;
   note: string;
@@ -195,13 +227,7 @@ interface Entry {
 }
 
 type ActionEventType =
-  | "created"
-  | "simulated"
-  | "approved"
-  | "rejected"
-  | "completed"
-  | "cancelled"
-  | "note";
+  "created" | "simulated" | "approved" | "rejected" | "completed" | "cancelled" | "note";
 
 interface ActionQueueEvent {
   id: string;
@@ -266,6 +292,7 @@ function entryKinds(e: Entry): EventFilter[] {
 }
 
 export default function Timeline() {
+  const temperatureUnit = useTemperatureUnitPreference();
   const authUser = useAuth().user;
   // Keep the read callback keyed to a stable primitive. Auth providers and
   // test adapters may return an equivalent user object with a new identity on
@@ -283,6 +310,7 @@ export default function Timeline() {
   const ownerId = user;
 
   const { pathname, hash } = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   // Shared URL `?growId=` resolution. urlGrowId is preserved as the source of truth
   // for filter precedence; scopedGrowName/backHref come from the same hook.
   const {
@@ -318,6 +346,7 @@ export default function Timeline() {
   const [entriesTotal, setEntriesTotal] = useState<number | null>(null);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [growEvents, setGrowEvents] = useState<GrowEventRowForRecent[]>([]);
+  const [growEventsTotal, setGrowEventsTotal] = useState<number | null>(null);
   const [actionEvents, setActionEvents] = useState<ActionQueueEvent[]>([]);
   const [alertEvents, setAlertEvents] = useState<AlertEventRow[]>([]);
 
@@ -333,19 +362,18 @@ export default function Timeline() {
   const [eventFilter, setEventFilter] = useState<EventFilter>("all");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [plantFilter, setPlantFilter] = useState("");
+  const plantFilter = parseTimelinePlantIdParam(searchParams.get(SENSOR_PLANT_PARAM)) ?? "";
   const [tentFilter, setTentFilter] = useState("");
-  // Seed plant/tent filters from URL on mount so deep links from Quick
-  // Log → /timeline?growId=&plantId=&tentId= land on the right scope.
-  // One-shot seed; later user edits remain authoritative.
-  const [didSeedScopeFilters, setDidSeedScopeFilters] = useState(false);
+  // Tent remains a one-shot continuity seed. Plant scope is canonical URL
+  // state and is mirrored below so source-summary links, filter edits, and
+  // clear actions stay in sync.
+  const [didSeedTentFilter, setDidSeedTentFilter] = useState(false);
   const [eventTypeFilter, setEventTypeFilter] = useState("");
   const [lightboxPhotoId, setLightboxPhotoId] = useState<string | null>(null);
   const [detailEntryId, setDetailEntryId] = useState<string | null>(null);
   // Source filter state is mirrored to/from the `?sensorSources=` URL
   // query param so the Sensors page summary widget can link directly into
   // a pre-filtered Timeline without introducing app-wide global state.
-  const [searchParams, setSearchParams] = useSearchParams();
   // Read-only diary-trace highlight from ?highlight=action-queue:<id>:<kind>.
   // Pure parse; never alters sorting or fetches.
   const highlight = useMemo(
@@ -363,6 +391,18 @@ export default function Timeline() {
   const [sensorSourceFilter, setSensorSourceFilter] = useState<TimelineSensorSourceKind[]>(() =>
     parseSensorSourcesParam(searchParams.get(SENSOR_SOURCES_PARAM)),
   );
+
+  // Plant scope has one canonical source: the URL. Filter edits replace
+  // only `plantId`, preserving source/date/grow and unrelated params.
+  // The opaque id is applied only to owner/grow-scoped rows, and an
+  // unknown id fails closed instead of selecting a different plant.
+  function setPlantFilter(value: string) {
+    const next = new URLSearchParams(searchParams);
+    const encoded = parseTimelinePlantIdParam(value);
+    if (encoded) next.set(SENSOR_PLANT_PARAM, encoded);
+    else next.delete(SENSOR_PLANT_PARAM);
+    setSearchParams(next, { replace: true });
+  }
 
   // Pull URL → state when the param changes externally (e.g. via Link).
   useEffect(() => {
@@ -419,16 +459,26 @@ export default function Timeline() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startDateFilter, endDateFilter]);
 
-  // Applied bounds: only when the Pro gate is open and values are valid
-  // ISO dates. An inverted range applies nothing (honest no-op + notice).
-  const appliedStartDate =
-    advancedTimelineUnlocked && isTimelineDateFilterValue(startDateFilter) ? startDateFilter : null;
-  const appliedEndDate =
-    advancedTimelineUnlocked && isTimelineDateFilterValue(endDateFilter) ? endDateFilter : null;
+  // Applied bounds: any valid ISO date applies. Date-range filtering is
+  // available on every plan — it is a purely client/query-level narrowing of
+  // the grower's OWN already-authorized diary rows, so there is no cost or
+  // trust surface to gate. An inverted range applies nothing (honest no-op).
+  const appliedStartDate = isTimelineDateFilterValue(startDateFilter) ? startDateFilter : null;
+  const appliedEndDate = isTimelineDateFilterValue(endDateFilter) ? endDateFilter : null;
   const dateRangeInvalid =
     appliedStartDate !== null && appliedEndDate !== null && appliedStartDate > appliedEndDate;
   const effectiveStartDate = dateRangeInvalid ? null : appliedStartDate;
   const effectiveEndDate = dateRangeInvalid ? null : appliedEndDate;
+  // Computed once per effective range; both the initial reads and
+  // loadOlder()'s keyset page share these exact bounds (issue #587).
+  const timelineDateRangeBounds = useMemo(
+    () =>
+      buildTimelineLocalDateRangeBounds({
+        startDate: effectiveStartDate,
+        endDate: effectiveEndDate,
+      }),
+    [effectiveStartDate, effectiveEndDate],
+  );
   const activeReadKey = buildTimelinePageReadKey({
     ownerId,
     growId: activeGrowId,
@@ -438,15 +488,13 @@ export default function Timeline() {
   const activeReadKeyRef = useRef(activeReadKey);
   activeReadKeyRef.current = activeReadKey;
 
-  // One-shot seed of plant/tent filters from URL params written by the
-  // Quick Log → Timeline continuity link. Never overwrites later edits.
+  // One-shot seed of tent filter from URL params written by the Quick
+  // Log → Timeline continuity link. Plant is canonical URL state above.
   useEffect(() => {
-    if (didSeedScopeFilters) return;
-    const seededPlant = searchParams.get("plantId");
+    if (didSeedTentFilter) return;
     const seededTent = searchParams.get("tentId");
-    if (seededPlant && !plantFilter) setPlantFilter(seededPlant);
     if (seededTent && !tentFilter) setTentFilter(seededTent);
-    if (seededPlant || seededTent) setDidSeedScopeFilters(true);
+    if (seededTent) setDidSeedTentFilter(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
@@ -456,6 +504,7 @@ export default function Timeline() {
       setEntries([]);
       setEntriesTotal(null);
       setGrowEvents([]);
+      setGrowEventsTotal(null);
       setActionEvents([]);
       setAlertEvents([]);
       setPartialReadSources([]);
@@ -473,6 +522,7 @@ export default function Timeline() {
       setEntries([]);
       setEntriesTotal(null);
       setGrowEvents([]);
+      setGrowEventsTotal(null);
       setActionEvents([]);
       setAlertEvents([]);
       setPartialReadSources([]);
@@ -506,10 +556,10 @@ export default function Timeline() {
         .eq("grow_id", activeGrowId)
         .order("entry_at", { ascending: false })
         .limit(100);
-      if (effectiveStartDate)
-        entriesQuery = entriesQuery.gte("entry_at", `${effectiveStartDate}T00:00:00.000Z`);
-      if (effectiveEndDate)
-        entriesQuery = entriesQuery.lte("entry_at", `${effectiveEndDate}T23:59:59.999Z`);
+      if (timelineDateRangeBounds.startIso)
+        entriesQuery = entriesQuery.gte("entry_at", timelineDateRangeBounds.startIso);
+      if (timelineDateRangeBounds.endIso)
+        entriesQuery = entriesQuery.lte("entry_at", timelineDateRangeBounds.endIso);
       const entriesResult = await entriesQuery;
       if (!isCurrentRequest()) return;
       if (hasTimelineRequiredReadError(entriesResult)) throw entriesResult.error;
@@ -525,15 +575,15 @@ export default function Timeline() {
 
       let growEventsQuery = supabase
         .from("grow_events")
-        .select(ROOT_ZONE_GROW_EVENT_SELECT)
+        .select(ROOT_ZONE_GROW_EVENT_SELECT, { count: "exact" })
         .eq("grow_id", activeGrowId)
         .eq("is_deleted", false)
         .order("occurred_at", { ascending: false })
         .limit(100);
-      if (effectiveStartDate)
-        growEventsQuery = growEventsQuery.gte("occurred_at", `${effectiveStartDate}T00:00:00.000Z`);
-      if (effectiveEndDate)
-        growEventsQuery = growEventsQuery.lte("occurred_at", `${effectiveEndDate}T23:59:59.999Z`);
+      if (timelineDateRangeBounds.startIso)
+        growEventsQuery = growEventsQuery.gte("occurred_at", timelineDateRangeBounds.startIso);
+      if (timelineDateRangeBounds.endIso)
+        growEventsQuery = growEventsQuery.lte("occurred_at", timelineDateRangeBounds.endIso);
       const growEventsResult = await growEventsQuery;
       if (!isCurrentRequest()) return;
       if (hasTimelineRequiredReadError(growEventsResult)) throw growEventsResult.error;
@@ -545,6 +595,9 @@ export default function Timeline() {
       setEntries(coreRows);
       setEntriesTotal(typeof entriesResult.count === "number" ? entriesResult.count : null);
       setGrowEvents(nextGrowEvents);
+      setGrowEventsTotal(
+        typeof growEventsResult.count === "number" ? growEventsResult.count : null,
+      );
       setActionEvents([]);
       setAlertEvents([]);
       setPartialReadSources([]);
@@ -643,7 +696,7 @@ export default function Timeline() {
       setCoreRead({ status: "error", readKey: requestedReadKey });
       setLoading(false);
     }
-  }, [activeGrowId, activeReadKey, effectiveEndDate, effectiveStartDate, user]);
+  }, [activeGrowId, activeReadKey, timelineDateRangeBounds, user]);
 
   /**
    * Keyset "Load older" — fetches the next page strictly before the oldest
@@ -679,10 +732,10 @@ export default function Timeline() {
         .lt("entry_at", cursor)
         .order("entry_at", { ascending: false })
         .limit(100);
-      if (effectiveStartDate)
-        olderQuery = olderQuery.gte("entry_at", `${effectiveStartDate}T00:00:00.000Z`);
-      if (effectiveEndDate)
-        olderQuery = olderQuery.lte("entry_at", `${effectiveEndDate}T23:59:59.999Z`);
+      if (timelineDateRangeBounds.startIso)
+        olderQuery = olderQuery.gte("entry_at", timelineDateRangeBounds.startIso);
+      if (timelineDateRangeBounds.endIso)
+        olderQuery = olderQuery.lte("entry_at", timelineDateRangeBounds.endIso);
       const olderResult = await olderQuery;
       if (!isCurrentPage()) return;
       if (hasTimelineRequiredReadError(olderResult)) throw olderResult.error;
@@ -745,7 +798,7 @@ export default function Timeline() {
   const stageCounts = useMemo(() => {
     const m: Record<string, number> = {};
     entries.forEach((e) => {
-      const stage = normalizeQuickLogStage(e.stage);
+      const stage = resolveTimelineDiaryEntryStage(e);
       if (stage) m[stage] = (m[stage] || 0) + 1;
     });
     return m;
@@ -790,9 +843,34 @@ export default function Timeline() {
     }
     return map;
   }, [actionResponseState]);
+  const lightingGuideByEntryId = useMemo(() => {
+    const map = new Map<string, NonNullable<ReturnType<typeof resolveTimelineLightingGuide>>>();
+    for (const entry of entries) {
+      const view = resolveTimelineLightingGuide({
+        note: entry.note,
+        details: entry.details,
+      });
+      if (view) map.set(entry.id, view);
+    }
+    return map;
+  }, [entries]);
 
-  const plantOptions = useMemo(() => deriveTimelinePlantOptions(entries), [entries]);
-  const tentOptions = useMemo(() => deriveTimelineTentOptions(entries), [entries]);
+  // Archived/merged plants and tents disappear from the active-entity
+  // queries but their diary history remains. This read-only directory
+  // (includes is_archived rows) keeps filter labels on real names.
+  // Gated on a resolved grow scope so a rejected/invalid scope issues
+  // no reads at all, matching the page's fail-closed read policy.
+  const { plantNamesById, tentNamesById } = useTimelineNameDirectory(
+    user && activeGrowId ? user : null,
+  );
+  const plantOptions = useMemo(
+    () => deriveTimelinePlantOptions(entries, plantNamesById),
+    [entries, plantNamesById],
+  );
+  const tentOptions = useMemo(
+    () => deriveTimelineTentOptions(entries, tentNamesById),
+    [entries, tentNamesById],
+  );
   const eventTypeOptions = useMemo(() => deriveTimelineEventTypeOptions(entries), [entries]);
 
   const evidenceFilterInput = {
@@ -803,12 +881,32 @@ export default function Timeline() {
     sensorSources: sensorSourceFilter,
     startDate: effectiveStartDate,
     endDate: effectiveEndDate,
+    // Rows are matched against the grower's own local day, agreeing with
+    // the query-level local-day bounds above (issue #587) — otherwise a
+    // row the query correctly fetched could be dropped again here by a
+    // second, stale UTC-day interpretation.
+    timeZone: TIMELINE_LOCAL_TIME_ZONE,
   };
   const evidenceActive = isTimelineEvidenceFilterActive(evidenceFilterInput);
 
+  // Selection context handed to the empty-state fast-add buttons. The
+  // timeline's own plant/tent filters ARE the grower's current selection,
+  // so a filtered view can log straight into that scope. Presenter-only —
+  // the Quick Log surface still owns confirmation and save.
+  const fastAddContext = useMemo<FastAddSelectionContext | null>(() => {
+    if (!plantFilter && !tentFilter) return null;
+    return {
+      plantId: plantFilter || null,
+      plantName: plantFilter ? (plantNamesById?.get(plantFilter) ?? null) : null,
+      tentId: tentFilter || null,
+      tentName: tentFilter ? (tentNamesById?.get(tentFilter) ?? null) : null,
+      growId: activeGrowId ?? null,
+    };
+  }, [plantFilter, tentFilter, plantNamesById, tentNamesById, activeGrowId]);
+
   const filtered = useMemo(() => {
     const afterStageEvent = entries.filter((e) => {
-      if (stageFilter !== "all" && normalizeQuickLogStage(e.stage) !== stageFilter) return false;
+      if (stageFilter !== "all" && resolveTimelineDiaryEntryStage(e) !== stageFilter) return false;
       if (eventFilter !== "all" && !entryKinds(e).includes(eventFilter)) return false;
       return true;
     });
@@ -913,7 +1011,7 @@ export default function Timeline() {
         entry_at: e.entry_at,
         plant_id: e.plant_id,
         tent_id: e.tent_id,
-        stage: e.stage,
+        stage: resolveTimelineDiaryEntryStage(e),
         note: e.note,
         photo_url: e.photo_url,
         details,
@@ -971,6 +1069,71 @@ export default function Timeline() {
     return out;
   }, [entries, growEvents]);
 
+  const symptomEvidenceByEntryId = useMemo(() => {
+    const result = new Map<string, NonNullable<ReturnType<typeof buildSymptomEvidenceChecklist>>>();
+    if (!activeReadKey || coreRead.status !== "success" || coreRead.readKey !== activeReadKey)
+      return result;
+
+    const canAssessWindowCoverage = !effectiveStartDate && !effectiveEndDate;
+    const diaryHasMore = entriesTotal === null ? null : entriesTotal > entries.length;
+    const growEventsHasMore = growEventsTotal === null ? null : growEventsTotal > growEvents.length;
+    const diaryEvidenceTimestamps = entries.map((row) => row.entry_at);
+    const growEventEvidenceTimestamps = growEvents.map((row) => row.occurred_at);
+    const evidenceSourceLanes = [
+      {
+        timestamps: diaryEvidenceTimestamps,
+        hasMore: diaryHasMore,
+        coverageMode: "exhaustion_only",
+      },
+      {
+        timestamps: growEventEvidenceTimestamps,
+        hasMore: growEventsHasMore,
+        coverageMode: "contiguous_newest_page",
+      },
+    ] as const;
+    const evidenceRows = buildSymptomEvidenceTimelineRows({
+      growId: activeGrowId,
+      recentLaneEntries: recentLaneRawEntries,
+      diaryEntries: entries,
+      growEvents,
+      renderedDiaryEntryIds: new Set(filtered.map((entry) => entry.id)),
+    });
+    for (const entry of entries) {
+      const historyComplete =
+        canAssessWindowCoverage &&
+        isTimelineSymptomEvidenceWindowComplete({
+          observationAt: entry.entry_at,
+          lookbackDays: SYMPTOM_EVIDENCE_LOOKBACK_DAYS,
+          sourceLanes: evidenceSourceLanes,
+        });
+      const view = buildSymptomEvidenceChecklist({
+        symptomEntry: {
+          ...entry,
+          grow_id: activeGrowId,
+          event_type: entry.details?.event_type,
+          source: entry.details?.source,
+        },
+        entries: evidenceRows,
+        historyComplete,
+      });
+      if (view) result.set(entry.id, view);
+    }
+    return result;
+  }, [
+    activeGrowId,
+    activeReadKey,
+    coreRead.readKey,
+    coreRead.status,
+    effectiveEndDate,
+    effectiveStartDate,
+    entries,
+    entriesTotal,
+    filtered,
+    growEvents,
+    growEventsTotal,
+    recentLaneRawEntries,
+  ]);
+
   // Pure normalized timeline view-model. Drives per-entry tags/warnings and a
   // future-proof empty/limited disclosure. Includes invalid entries so
   // malformed diary rows still surface as "Limited data" instead of vanishing.
@@ -981,7 +1144,7 @@ export default function Timeline() {
         grow_id: activeGrowId ?? null,
         plant_id: e.plant_id,
         tent_id: e.tent_id,
-        stage: e.stage,
+        stage: resolveTimelineDiaryEntryStage(e),
         entry_at: e.entry_at,
         entry_type: (e.details && (e.details.event_type as string | undefined)) ?? "note",
         note: e.note,
@@ -998,7 +1161,7 @@ export default function Timeline() {
   const groupedByStage = useMemo(() => {
     const groups: { stage: string; items: Entry[] }[] = [];
     filtered.forEach((e) => {
-      const key = e.stage || "unknown";
+      const key = resolveTimelineDiaryEntryStage(e) ?? "unknown";
       const last = groups[groups.length - 1];
       if (last && last.stage === key) last.items.push(e);
       else groups.push({ stage: key, items: [e] });
@@ -1166,16 +1329,21 @@ export default function Timeline() {
       )}
 
       {activeGrow && (
-        <div className="mb-5">
-          <h1 className="text-2xl font-display font-bold">{activeGrow.name}</h1>
-          <p className="text-sm text-muted-foreground">
-            {stageLabel(activeGrow.stage)} · day{" "}
-            {Math.max(
-              1,
-              Math.floor((Date.now() - new Date(activeGrow.started_at).getTime()) / 86400000),
-            )}
-          </p>
-        </div>
+        <PageHeader
+          eyebrow={isLogsRoute ? "Grow log" : "Grow timeline"}
+          title={activeGrow.name}
+          description="Trace observations, evidence, and decisions across this grow."
+          icon={<Sprout className="size-5" aria-hidden="true" />}
+          meta={
+            <span className="text-sm text-muted-foreground">
+              {stageLabel(activeGrow.stage)} · day{" "}
+              {Math.max(
+                1,
+                Math.floor((Date.now() - new Date(activeGrow.started_at).getTime()) / 86400000),
+              )}
+            </span>
+          }
+        />
       )}
 
       {/* Stage progression */}
@@ -1192,39 +1360,50 @@ export default function Timeline() {
               {stageTaggedEntryCount} stage-tagged {stageTaggedEntryCount === 1 ? "log" : "logs"}
             </span>
           </div>
-          <ol className="grid grid-cols-6 gap-1.5">
-            {STAGES.map((s, i) => {
-              const count = stageCounts[s.value] || 0;
-              const isCurrent = i === currentStageIdx;
-              const isPast = currentStageIdx >= 0 && i < currentStageIdx;
-              return (
-                <li key={s.value} className="flex flex-col items-center gap-1.5">
-                  <div
-                    className={cn(
-                      "h-7 w-7 rounded-full flex items-center justify-center text-[11px] font-semibold border transition",
-                      isCurrent &&
-                        "bg-primary text-primary-foreground border-primary shadow-sm shadow-primary/30",
-                      isPast && "bg-primary/20 text-primary border-primary/40",
-                      !isCurrent &&
-                        !isPast &&
-                        "bg-secondary/50 text-muted-foreground border-border/50",
-                    )}
+          <div
+            aria-label="Grow stage progression"
+            className="-mx-1 overflow-x-auto px-1 pb-1 scrollbar-thin"
+            data-testid="timeline-stage-progression-scroll"
+            tabIndex={0}
+          >
+            <ol className="grid min-w-[34rem] grid-cols-6 gap-2">
+              {STAGES.map((s, i) => {
+                const count = stageCounts[s.value] || 0;
+                const isCurrent = i === currentStageIdx;
+                const isPast = currentStageIdx >= 0 && i < currentStageIdx;
+                return (
+                  <li
+                    key={s.value}
+                    aria-current={isCurrent ? "step" : undefined}
+                    className="flex flex-col items-center gap-1.5"
                   >
-                    {isPast ? <Check className="h-3.5 w-3.5" /> : i + 1}
-                  </div>
-                  <span
-                    className={cn(
-                      "text-[10px] leading-tight text-center",
-                      isCurrent ? "text-foreground font-medium" : "text-muted-foreground",
-                    )}
-                  >
-                    {s.label}
-                  </span>
-                  <span className="text-[10px] text-muted-foreground">{count}</span>
-                </li>
-              );
-            })}
-          </ol>
+                    <div
+                      className={cn(
+                        "h-7 w-7 rounded-full flex items-center justify-center text-[11px] font-semibold border transition",
+                        isCurrent &&
+                          "bg-primary text-primary-foreground border-primary shadow-sm shadow-primary/30",
+                        isPast && "bg-primary/20 text-primary border-primary/40",
+                        !isCurrent &&
+                          !isPast &&
+                          "bg-secondary/50 text-muted-foreground border-border/50",
+                      )}
+                    >
+                      {isPast ? <Check className="h-3.5 w-3.5" /> : i + 1}
+                    </div>
+                    <span
+                      className={cn(
+                        "text-[10px] leading-tight text-center",
+                        isCurrent ? "text-foreground font-medium" : "text-muted-foreground",
+                      )}
+                    >
+                      {s.label}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">{count}</span>
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
           {growEvents.length > 0 && (
             <p
               className="mt-3 text-[11px] text-muted-foreground"
@@ -1262,7 +1441,7 @@ export default function Timeline() {
             placeholder={TIMELINE_EVIDENCE_SEARCH_PLACEHOLDER}
             aria-label={TIMELINE_EVIDENCE_SEARCH_PLACEHOLDER}
             data-testid="timeline-search-input"
-            className="flex-1 min-w-[12rem] rounded-md border border-border/50 bg-background/60 px-3 py-1.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+            className="flex-1 min-w-[12rem] rounded-md border border-border/50 bg-background/60 px-3 py-1.5 text-sm placeholder:text-muted-foreground focus:outline-hidden focus:ring-2 focus:ring-primary/40"
           />
           {plantOptions.length > 0 && (
             <select
@@ -1324,7 +1503,7 @@ export default function Timeline() {
             Clear filters
           </Button>
         </div>
-        {/* Pro advanced filtering: inclusive date range + next-missing-action jump. */}
+        {/* Date range (all plans) + Pro next-missing-action jump. */}
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
             Date range
@@ -1333,7 +1512,6 @@ export default function Timeline() {
             type="date"
             value={startDateFilter}
             onChange={(e) => setStartDateFilter(e.target.value)}
-            disabled={!advancedTimelineUnlocked}
             aria-label="Filter from date"
             data-testid="timeline-start-date"
             className="rounded-md border border-border/50 bg-background/60 px-2 py-1 text-sm disabled:opacity-50"
@@ -1343,11 +1521,11 @@ export default function Timeline() {
             type="date"
             value={endDateFilter}
             onChange={(e) => setEndDateFilter(e.target.value)}
-            disabled={!advancedTimelineUnlocked}
             aria-label="Filter to date"
             data-testid="timeline-end-date"
             className="rounded-md border border-border/50 bg-background/60 px-2 py-1 text-sm disabled:opacity-50"
           />
+
           <Button
             type="button"
             variant="outline"
@@ -1393,8 +1571,8 @@ export default function Timeline() {
             className="text-[11px] text-muted-foreground"
             data-testid="timeline-advanced-filters-locked"
           >
-            Date-range filtering and the next-missing-action jump are part of Advanced timeline
-            filtering, a Pro feature.{" "}
+            The next-missing-action jump is part of Advanced timeline filtering, a Pro feature.
+            Date-range filtering is available on every plan.{" "}
             <Link to="/pricing" className="text-primary hover:underline">
               See plans
             </Link>
@@ -1735,16 +1913,25 @@ export default function Timeline() {
         <AlertEventsSection events={alertEvents} />
       </div>
 
-      {pageReadView.kind === "ready_empty" ? (
-        <Empty title="No entries yet" desc="Tap the + button to log your first photo and note." />
-      ) : entries.length === 0 ? null : filtered.length === 0 ? (
-        <Empty
-          title={evidenceActive ? TIMELINE_EVIDENCE_EMPTY_TITLE : "No matching entries"}
-          desc={
-            evidenceActive ? TIMELINE_EVIDENCE_EMPTY_DESC : "Try a different stage or event filter."
+      {pageReadView.kind === "ready_empty" || (entries.length > 0 && filtered.length === 0) ? (
+        <TimelineEmptyState
+          view={
+            resolveTimelineEmptyState({
+              totalEntryCount: pageReadView.kind === "ready_empty" ? 0 : entries.length,
+              filteredEntryCount: filtered.length,
+              evidenceFilterActive: evidenceActive,
+              otherFiltersActive: stageFilter !== "all" || eventFilter !== "all" || evidenceActive,
+              context: fastAddContext,
+            }) ?? TIMELINE_EMPTY_STATE_FALLBACK
           }
+          context={fastAddContext}
+          onClearFilters={() => {
+            clearEvidenceFilters();
+            setStageFilter("all");
+            setEventFilter("all");
+          }}
         />
-      ) : (
+      ) : entries.length === 0 ? null : (
         <div className="space-y-5">
           {groupedByStage.map((group, gi) => (
             <section key={`${group.stage}-${gi}`}>
@@ -1761,10 +1948,13 @@ export default function Timeline() {
               <ul className="space-y-3">
                 {group.items.map((e) => {
                   const isHighlighted = diaryEntryMatchesHighlight(e, highlight);
+                  const primaryAnchorId =
+                    buildTimelineEntryAnchorId(e.id) ?? `timeline-entry-${e.id}`;
+                  const linkedGrowEventAnchorId = buildLinkedGrowEventTimelineAnchorId(e.details);
                   return (
                     <li
                       key={e.id}
-                      id={`timeline-entry-${e.id}`}
+                      id={primaryAnchorId}
                       data-testid={isHighlighted ? TIMELINE_HIGHLIGHT_TESTID : "timeline-entry"}
                       data-highlight={isHighlighted ? "action-queue-trace" : undefined}
                       aria-label={isHighlighted ? TIMELINE_HIGHLIGHT_ARIA_LABEL : undefined}
@@ -1772,9 +1962,16 @@ export default function Timeline() {
                       className={cn(
                         "glass rounded-2xl overflow-hidden animate-fade-in",
                         isHighlighted &&
-                          "ring-2 ring-primary ring-offset-2 ring-offset-background focus:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+                          "ring-2 ring-primary ring-offset-2 ring-offset-background focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary",
                       )}
                     >
+                      {linkedGrowEventAnchorId && linkedGrowEventAnchorId !== primaryAnchorId ? (
+                        <span
+                          id={linkedGrowEventAnchorId}
+                          data-timeline-entry-alias-for={primaryAnchorId}
+                          hidden
+                        />
+                      ) : null}
                       {e.photo_url ? (
                         (() => {
                           const idx = findTimelinePhotoIndexById(lightboxItems, e.id);
@@ -1793,7 +1990,7 @@ export default function Timeline() {
                                 }}
                                 aria-label={`Open photo: ${alt}`}
                                 data-testid="timeline-photo-open"
-                                className="block w-full focus:outline-none focus:ring-2 focus:ring-primary/60"
+                                className="block w-full focus:outline-hidden focus:ring-2 focus:ring-primary/60"
                               >
                                 <img
                                   src={e.photo_url}
@@ -1819,7 +2016,7 @@ export default function Timeline() {
                         </div>
                       )}
                       <div
-                        className="p-4 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/40"
+                        className="p-4 cursor-pointer focus:outline-hidden focus:ring-2 focus:ring-primary/40"
                         role="button"
                         tabIndex={0}
                         data-testid="timeline-entry-body"
@@ -1866,22 +2063,17 @@ export default function Timeline() {
                           // render as raw chips — the dedicated badge
                           // below presents them instead.
                           const isReadinessCheckEvent = isAiDoctorReadinessCheckEvent(e);
-                          const HIDDEN = [
-                            "event_type",
-                            "plant_id",
-                            "plant_name",
-                            "tent_id",
-                            "sensor",
-                            "sensor_snapshot",
-                            "remind_at",
-                          ];
-                          const extra = isLearningLoopEvent
-                            ? []
-                            : isReadinessCheckEvent
-                              ? []
-                              : Object.entries(e.details || {}).filter(
-                                  ([k]) => !HIDDEN.includes(k),
-                                );
+                          // What's safe to present from this entry's details
+                          // blob (structured lines vs. last-resort raw chips
+                          // vs. fully suppressed) is centralized in one
+                          // tested module so a future diary writer's new
+                          // internal field can't silently leak here again —
+                          // see timelineDiaryEntryDetailPresentationRules.ts.
+                          const { detailLines, extra } = presentTimelineDiaryEntryDetails(
+                            e.details,
+                            temperatureUnit,
+                            { suppress: isLearningLoopEvent || isReadinessCheckEvent },
+                          );
                           const loopActionId =
                             isLearningLoopEvent && typeof e.details?.action_queue_id === "string"
                               ? (e.details.action_queue_id as string)
@@ -1917,7 +2109,7 @@ export default function Timeline() {
                                 </span>
                                 <span className="inline-flex items-center gap-1 text-primary">
                                   <Sprout className="h-3 w-3" />
-                                  {stageLabel(e.stage)}
+                                  {stageLabel(resolveTimelineDiaryEntryStage(e))}
                                 </span>
                                 {plantName && (
                                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-secondary/60 border border-border/40 text-[11px]">
@@ -1953,6 +2145,26 @@ export default function Timeline() {
                                 />
                               </div>
                               <p className="text-sm whitespace-pre-wrap">{e.note}</p>
+                              {lightingGuideByEntryId.has(e.id) ? (
+                                <div
+                                  onClick={(event) => event.stopPropagation()}
+                                  onKeyDown={(event) => event.stopPropagation()}
+                                >
+                                  <TimelineLightingGuideCard
+                                    view={lightingGuideByEntryId.get(e.id)!}
+                                  />
+                                </div>
+                              ) : null}
+                              {symptomEvidenceByEntryId.has(e.id) ? (
+                                <div
+                                  onClick={(event) => event.stopPropagation()}
+                                  onKeyDown={(event) => event.stopPropagation()}
+                                >
+                                  <SymptomEvidenceChecklistCard
+                                    view={symptomEvidenceByEntryId.get(e.id)!}
+                                  />
+                                </div>
+                              ) : null}
                               {(() => {
                                 // Compact canonical "Action response" card for
                                 // grower-recorded evidence rows. Rendered inside
@@ -1991,7 +2203,7 @@ export default function Timeline() {
                                     <Link
                                       to={actionDetailPath(loopActionId)}
                                       data-testid="timeline-view-original-action"
-                                      className="inline-flex items-center gap-1 text-xs text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                                      className="inline-flex items-center gap-1 text-xs text-primary hover:underline focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
                                       onClick={(ev) => ev.stopPropagation()}
                                     >
                                       <ListChecks className="h-3 w-3" aria-hidden />
@@ -2002,7 +2214,7 @@ export default function Timeline() {
                                     <Link
                                       to={growLearningPath(loopGrowId)}
                                       data-testid="timeline-view-learning-episode"
-                                      className="inline-flex items-center gap-1 text-xs text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                                      className="inline-flex items-center gap-1 text-xs text-primary hover:underline focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
                                       onClick={(ev) => ev.stopPropagation()}
                                     >
                                       View full learning episode
@@ -2030,7 +2242,7 @@ export default function Timeline() {
                                         to={viewLink.href}
                                         data-testid={VIEW_IN_ACTIONS_TESTID}
                                         data-view-in-actions-highlight={viewLink.highlight}
-                                        className="inline-flex items-center gap-1 text-xs text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                                        className="inline-flex items-center gap-1 text-xs text-primary hover:underline focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
                                         onClick={(ev) => ev.stopPropagation()}
                                       >
                                         <ListChecks className="h-3 w-3" aria-hidden />
@@ -2063,7 +2275,7 @@ export default function Timeline() {
                                     snapAgeMs > TIMELINE_SNAPSHOT_STALE_MS;
                                   const vpdClassification = classifyVpdAgainstStage({
                                     value: sensor.vpd ?? null,
-                                    stage: e.stage ?? null,
+                                    stage: resolveTimelineDiaryEntryStage(e),
                                     stale: snapStale,
                                   });
                                   const rawSource =
@@ -2108,6 +2320,24 @@ export default function Timeline() {
                                     </div>
                                   );
                                 })()}
+                              {detailLines.length > 0 && (
+                                <div
+                                  className="mt-2 flex flex-wrap gap-1.5"
+                                  data-testid="timeline-entry-detail-lines"
+                                >
+                                  {/* No `capitalize`: spec labels/values are
+                                      already grower-facing copy. */}
+                                  {detailLines.map((line) => (
+                                    <span
+                                      key={line.key}
+                                      data-testid={`timeline-entry-detail-${line.key}`}
+                                      className="text-[11px] px-2 py-0.5 rounded-full bg-secondary/60 border border-border/40"
+                                    >
+                                      {line.label}: {line.value}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
                               {extra.length > 0 && (
                                 <div className="mt-2 flex flex-wrap gap-1.5">
                                   {extra.map(([k, v]) => (
@@ -2138,22 +2368,25 @@ export default function Timeline() {
                                 };
                                 const src =
                                   typeof details.source === "string" ? details.source : "manual";
-                                const vm = buildEnvironmentCheckDiaryViewModel({
-                                  entryId: e.id,
-                                  occurredAt: String(
-                                    (e as { occurred_at?: string; created_at?: string })
-                                      .occurred_at ??
-                                      (e as { created_at?: string }).created_at ??
-                                      "",
-                                  ),
-                                  kind: kindValue ?? "environment",
-                                  snapshot: {
-                                    source: src,
-                                    tempC: num("temp_c") ?? num("tempC"),
-                                    rhPercent: num("rh_percent") ?? num("humidity"),
-                                    vpdKpa: num("vpd_kpa") ?? num("vpdKpa"),
+                                const vm = buildEnvironmentCheckDiaryViewModel(
+                                  {
+                                    entryId: e.id,
+                                    occurredAt: String(
+                                      (e as { occurred_at?: string; created_at?: string })
+                                        .occurred_at ??
+                                        (e as { created_at?: string }).created_at ??
+                                        "",
+                                    ),
+                                    kind: kindValue ?? "environment",
+                                    snapshot: {
+                                      source: src,
+                                      tempC: num("temp_c") ?? num("tempC"),
+                                      rhPercent: num("rh_percent") ?? num("humidity"),
+                                      vpdKpa: num("vpd_kpa") ?? num("vpdKpa"),
+                                    },
                                   },
-                                });
+                                  temperatureUnit,
+                                );
                                 return (
                                   <>
                                     <EnvironmentCheckTimelineBadge viewModel={vm} />
@@ -2224,7 +2457,7 @@ export default function Timeline() {
                 id: row.id,
                 note: row.note,
                 photo_url: row.photo_url,
-                stage: row.stage,
+                stage: resolveTimelineDiaryEntryStage(row),
                 entry_at: row.entry_at,
                 plant_id: row.plant_id,
                 tent_id: row.tent_id,

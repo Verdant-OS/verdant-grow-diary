@@ -40,7 +40,7 @@ jobs:
             src/test/ecowitt-http-local-bridge.test.ts \
             src/test/ecowitt-windows-fast-path.test.ts
       - name: TypeScript app typecheck
-        run: bunx tsc -p tsconfig.app.json --noEmit
+        run: bunx tsc -p tsconfig.json --noEmit
       - name: Generate fast-path debug artifacts (non-fatal)
         if: always()
         run: |

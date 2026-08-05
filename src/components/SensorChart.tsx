@@ -1,6 +1,16 @@
 import { useMemo, useState } from "react";
 import { Download } from "lucide-react";
-import { ResponsiveContainer, AreaChart, Area, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+} from "recharts";
 import { SensorReading } from "@/mock";
 import { format } from "date-fns";
 import {
@@ -17,6 +27,8 @@ import {
   type SensorChartTimeRange,
 } from "@/lib/sensorChartTimeRange";
 import { buildSensorReadingsCsv, downloadTextFile } from "@/lib/sensorChartExport";
+import { convertCelsiusForDisplay } from "@/lib/temperatureUnitPreference";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 
 interface Props {
   data: SensorReading[];
@@ -45,7 +57,11 @@ export default function SensorChart({
   defaultRange = "all",
 }: Props) {
   const axisMeta = SENSOR_CHART_METRIC_META[metric];
-  const legendLabel = sensorChartLegendLabel(metric);
+  // Stored temperatures are canonical Celsius; the chart plots and labels them
+  // in the grower's saved unit. Threaded explicitly into every formatter so the
+  // axis, tooltip and legend can never disagree with the plotted values.
+  const temperatureUnit = useTemperatureUnitPreference();
+  const legendLabel = sensorChartLegendLabel(metric, temperatureUnit);
   const [range, setRange] = useState<SensorChartTimeRange>(defaultRange);
 
   // Filter + sort ascending (oldest → newest) via shared helpers so the
@@ -60,10 +76,12 @@ export default function SensorChart({
     return filteredData.map((r) => {
       const raw = r[metric as keyof SensorReading] as number | null | undefined;
       const v =
-        metric === "temp" && typeof raw === "number" ? (raw * 9) / 5 + 32 : raw;
+        metric === "temp" && typeof raw === "number"
+          ? convertCelsiusForDisplay(raw, temperatureUnit)
+          : raw;
       return { ts: r.ts, value: v };
     });
-  }, [filteredData, metric]);
+  }, [filteredData, metric, temperatureUnit]);
 
   const handleExport = () => {
     const csv = buildSensorReadingsCsv(filteredData);
@@ -71,8 +89,12 @@ export default function SensorChart({
     downloadTextFile(csv, filename);
   };
 
-  const Comp = (variant === "area" ? AreaChart : LineChart) as React.ComponentType<React.ComponentProps<typeof AreaChart>>;
-  const Series = (variant === "area" ? Area : Line) as React.ComponentType<React.ComponentProps<typeof Area>>;
+  const Comp = (variant === "area" ? AreaChart : LineChart) as React.ComponentType<
+    React.ComponentProps<typeof AreaChart>
+  >;
+  const Series = (variant === "area" ? Area : Line) as React.ComponentType<
+    React.ComponentProps<typeof Area>
+  >;
   const id = `grad-${metric}`;
   return (
     <div className="w-full">
@@ -133,7 +155,10 @@ export default function SensorChart({
         )}
       </div>
       <ResponsiveContainer width="100%" height={height}>
-        <Comp data={chartData} margin={{ top: 8, right: 12, left: SENSOR_CHART_LEFT_MARGIN, bottom: 0 }}>
+        <Comp
+          data={chartData}
+          margin={{ top: 8, right: 12, left: SENSOR_CHART_LEFT_MARGIN, bottom: 0 }}
+        >
           {variant === "area" && (
             <defs>
               <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
@@ -142,21 +167,48 @@ export default function SensorChart({
               </linearGradient>
             </defs>
           )}
-          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} vertical={false} />
-          <XAxis dataKey="ts" tickFormatter={(v) => format(new Date(v), "MMM d")} stroke="hsl(var(--muted-foreground))" fontSize={11} tickMargin={6} minTickGap={32} />
+          <CartesianGrid
+            strokeDasharray="3 3"
+            stroke="hsl(var(--border))"
+            opacity={0.4}
+            vertical={false}
+          />
+          <XAxis
+            dataKey="ts"
+            tickFormatter={(v) => format(new Date(v), "MMM d")}
+            stroke="hsl(var(--muted-foreground))"
+            fontSize={11}
+            tickMargin={6}
+            minTickGap={32}
+          />
           <YAxis
             stroke="hsl(var(--muted-foreground))"
             fontSize={11}
             width={axisMeta.yAxisWidth}
             tickMargin={4}
-            tickFormatter={(v: number) => formatSensorChartYTick(v, metric)}
+            tickFormatter={(v: number) => formatSensorChartYTick(v, metric, temperatureUnit)}
           />
           <Tooltip
-            contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
+            contentStyle={{
+              background: "hsl(var(--popover))",
+              border: "1px solid hsl(var(--border))",
+              borderRadius: 8,
+              fontSize: 12,
+            }}
             labelFormatter={(v) => formatChartTooltipTimestamp(v as string)}
-            formatter={(v: number) => [formatSensorChartTooltipValue(v, metric), legendLabel]}
+            formatter={(v: number) => [
+              formatSensorChartTooltipValue(v, metric, temperatureUnit),
+              legendLabel,
+            ]}
           />
-          <Series type="monotone" dataKey="value" stroke={axisMeta.color} strokeWidth={2} fill={`url(#${id})`} dot={false} />
+          <Series
+            type="monotone"
+            dataKey="value"
+            stroke={axisMeta.color}
+            strokeWidth={2}
+            fill={`url(#${id})`}
+            dot={false}
+          />
         </Comp>
       </ResponsiveContainer>
     </div>

@@ -152,8 +152,7 @@ export interface FeedingFormMapInput {
 }
 
 export type FeedingFormMapResult =
-  | { ok: true; payload: FeedingTypedEventInput }
-  | { ok: false; reason: FeedingFormFailureReason };
+  { ok: true; payload: FeedingTypedEventInput } | { ok: false; reason: FeedingFormFailureReason };
 
 const SECRET_HINT_RE =
   /(secret|token|api[_-]?key|password|service[_-]?role|bearer\s|^eyJ[A-Za-z0-9_-]{8,}\.|^sk_(live|test)_|^sb_|^pk_(live|test)_)/i;

@@ -32,11 +32,7 @@ export type PremiumExportFeature =
   | "post_grow_report";
 
 export type PremiumExportGateState =
-  | "allowed"
-  | "denied"
-  | "verification_failed"
-  | "invalid_request"
-  | "network_error";
+  "allowed" | "denied" | "verification_failed" | "invalid_request" | "network_error";
 
 export interface PremiumExportScope {
   growId?: string | null;
@@ -55,8 +51,7 @@ export interface PremiumExportGateResult {
 }
 
 export const PAYWALL_HEADLINE = "Premium exports are a Pro feature.";
-export const PAYWALL_UPGRADE_COPY =
-  "Upgrade required to export this report.";
+export const PAYWALL_UPGRADE_COPY = "Upgrade required to export this report.";
 export const PREMIUM_EXPORT_PAYWALL_COPY = `${PAYWALL_HEADLINE} ${PAYWALL_UPGRADE_COPY}`;
 
 function classifyDenial(reason: string | null): PremiumExportGateState {
@@ -84,28 +79,20 @@ export async function checkPremiumExportEntitlement(
     // Billing environment is resolved server-side; no client plan or
     // environment claims are sent.
 
-    const { data, error } = await supabase.functions.invoke(
-      "premium-export-entitlement",
-      { body },
-    );
+    const { data, error } = await supabase.functions.invoke("premium-export-entitlement", { body });
     const ok =
-      !error &&
-      data &&
-      typeof data === "object" &&
-      (data as Record<string, unknown>).ok === true;
+      !error && data && typeof data === "object" && (data as Record<string, unknown>).ok === true;
     if (ok) {
       const d = data as Record<string, unknown>;
       return {
         ok: true,
         state: "allowed",
         reason: null,
-        displayPlanId:
-          typeof d.display_plan_id === "string" ? d.display_plan_id : null,
+        displayPlanId: typeof d.display_plan_id === "string" ? d.display_plan_id : null,
       };
     }
     const denial = (data ?? null) as Record<string, unknown> | null;
-    const structuredReason =
-      denial && typeof denial.reason === "string" ? denial.reason : null;
+    const structuredReason = denial && typeof denial.reason === "string" ? denial.reason : null;
     if (structuredReason === null) {
       return {
         ok: false,
@@ -116,9 +103,7 @@ export async function checkPremiumExportEntitlement(
     }
     const reason = structuredReason ?? "upgrade_required";
     const displayPlanId =
-      denial && typeof denial.display_plan_id === "string"
-        ? denial.display_plan_id
-        : null;
+      denial && typeof denial.display_plan_id === "string" ? denial.display_plan_id : null;
     return {
       ok: false,
       state: classifyDenial(reason),

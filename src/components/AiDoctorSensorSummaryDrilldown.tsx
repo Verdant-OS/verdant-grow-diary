@@ -43,9 +43,7 @@ export function AiDoctorSensorSummaryDrilldown(
       className="rounded-md border border-border bg-card p-4 text-sm"
     >
       <header className="mb-3">
-        <h3 className="text-base font-semibold text-foreground">
-          Sensor summary
-        </h3>
+        <h3 className="text-base font-semibold text-foreground">Sensor summary</h3>
         <p className="text-xs text-muted-foreground">
           Read-only. Missing readings are shown as &ldquo;{NO_TRUSTED_VALUE_LABEL}
           &rdquo; — Verdant never invents values.
@@ -69,7 +67,10 @@ export function AiDoctorSensorSummaryDrilldown(
             <div className="text-foreground" data-testid={`ai-doctor-metric-value-${row.metric}`}>
               {row.latestValueDisplay}
             </div>
-            <div className="text-muted-foreground" data-testid={`ai-doctor-metric-source-${row.metric}`}>
+            <div
+              className="text-muted-foreground"
+              data-testid={`ai-doctor-metric-source-${row.metric}`}
+            >
               {row.latestSourceDisplay}
             </div>
             <div
@@ -92,9 +93,7 @@ export function AiDoctorSensorSummaryDrilldown(
         data-source-order={AI_DOCTOR_SOURCE_ORDER.join(",")}
         className="mt-4 border-t border-border pt-3"
       >
-        <h4 className="mb-2 text-sm font-semibold text-foreground">
-          Source breakdown (7d)
-        </h4>
+        <h4 className="mb-2 text-sm font-semibold text-foreground">Source breakdown (7d)</h4>
         <ul className="flex flex-wrap gap-2">
           {sourceRows.map((row) => (
             <li

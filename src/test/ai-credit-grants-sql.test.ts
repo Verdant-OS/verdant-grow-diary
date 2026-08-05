@@ -13,6 +13,7 @@ const MIGRATION = readFileSync(
   resolve(process.cwd(), "supabase/migrations/20260721103000_ai_credit_grants.sql"),
   "utf8",
 );
+const NORMALIZED_MIGRATION = MIGRATION.replace(/\r\n?/g, "\n");
 
 describe("ai_credit_grants ledger table", () => {
   it("is an append-only, per-user table keyed to auth.users with cascade delete", () => {
@@ -41,10 +42,10 @@ describe("ai_credit_grants ledger table", () => {
   });
 
   it("idempotency: one grant and one clawback per Paddle transaction", () => {
-    expect(MIGRATION).toContain(
+    expect(NORMALIZED_MIGRATION).toContain(
       "CREATE UNIQUE INDEX ai_credit_grants_grant_txn_uq\n  ON public.ai_credit_grants(paddle_transaction_id) WHERE kind = 'grant'",
     );
-    expect(MIGRATION).toContain(
+    expect(NORMALIZED_MIGRATION).toContain(
       "CREATE UNIQUE INDEX ai_credit_grants_clawback_txn_uq\n  ON public.ai_credit_grants(paddle_transaction_id) WHERE kind = 'clawback'",
     );
   });

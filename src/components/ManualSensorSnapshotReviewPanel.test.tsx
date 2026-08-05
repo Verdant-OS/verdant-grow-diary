@@ -8,7 +8,9 @@ import type { SensorSnapshotReviewResult } from "@/lib/sensorSnapshotReviewRules
 
 afterEach(() => cleanup());
 
-function baseResult(overrides: Partial<SensorSnapshotReviewResult> = {}): SensorSnapshotReviewResult {
+function baseResult(
+  overrides: Partial<SensorSnapshotReviewResult> = {},
+): SensorSnapshotReviewResult {
   return {
     canSave: true,
     source: "manual",
@@ -51,9 +53,7 @@ describe("ManualSensorSnapshotReviewPanel", () => {
   });
 
   it("uses data-can-save='true' when no blockers and 'false' when blocked", () => {
-    const { rerender } = render(
-      <ManualSensorSnapshotReviewPanel result={baseResult()} />,
-    );
+    const { rerender } = render(<ManualSensorSnapshotReviewPanel result={baseResult()} />);
     expect(
       screen.getByTestId("manual-sensor-snapshot-review-panel").getAttribute("data-can-save"),
     ).toBe("true");

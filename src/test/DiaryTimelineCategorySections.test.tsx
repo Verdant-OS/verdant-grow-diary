@@ -3,7 +3,11 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { DiaryTimelineCategorySections } from "@/components/DiaryTimelineCategorySections";
-import { clearLocalStorageForTest, getLocalStorageItemForTest, setLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
+import {
+  clearLocalStorageForTest,
+  getLocalStorageItemForTest,
+  setLocalStorageItemForTest,
+} from "./helpers/localStorageTestHelper";
 
 interface FakeItem {
   id: string;
@@ -32,9 +36,7 @@ const items: FakeItem[] = [
 
 describe("DiaryTimelineCategorySections — presenter", () => {
   it("renders all seven section headers with counts", () => {
-    render(
-      <DiaryTimelineCategorySections items={items} renderEntry={renderEntry} />,
-    );
+    render(<DiaryTimelineCategorySections items={items} renderEntry={renderEntry} />);
     const labels = [
       "Watering",
       "Feeding",
@@ -45,31 +47,23 @@ describe("DiaryTimelineCategorySections — presenter", () => {
       "Other diary entries",
     ];
     for (const l of labels) {
-      expect(
-        screen.getByRole("button", { name: new RegExp(l, "i") }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: new RegExp(l, "i") })).toBeInTheDocument();
     }
     // counts: 1 each
-    const countNodes = screen.getAllByTestId(
-      "diary-timeline-category-sections-section-count",
-    );
+    const countNodes = screen.getAllByTestId("diary-timeline-category-sections-section-count");
     expect(countNodes).toHaveLength(7);
     for (const n of countNodes) expect(n.textContent).toBe("1");
   });
 
   it("default-expands sections with entries and renders them via renderEntry", () => {
-    render(
-      <DiaryTimelineCategorySections items={items} renderEntry={renderEntry} />,
-    );
+    render(<DiaryTimelineCategorySections items={items} renderEntry={renderEntry} />);
     expect(screen.getByTestId("fake-entry-w1")).toBeInTheDocument();
     expect(screen.getByTestId("fake-entry-p1")).toBeInTheDocument();
     expect(screen.getByTestId("fake-entry-o1")).toBeInTheDocument();
   });
 
   it("collapsing a section flips aria-expanded and hides its items", () => {
-    render(
-      <DiaryTimelineCategorySections items={items} renderEntry={renderEntry} />,
-    );
+    render(<DiaryTimelineCategorySections items={items} renderEntry={renderEntry} />);
     const btn = screen.getByRole("button", { name: /Watering/i });
     expect(btn.getAttribute("aria-expanded")).toBe("true");
     fireEvent.click(btn);
@@ -107,9 +101,7 @@ describe("DiaryTimelineCategorySections — presenter", () => {
   });
 
   it("does not drop entries — every input item rendered exactly once", () => {
-    render(
-      <DiaryTimelineCategorySections items={items} renderEntry={renderEntry} />,
-    );
+    render(<DiaryTimelineCategorySections items={items} renderEntry={renderEntry} />);
     for (const it of items) {
       const nodes = screen.getAllByTestId(`fake-entry-${it.id}`);
       expect(nodes).toHaveLength(1);
@@ -117,9 +109,7 @@ describe("DiaryTimelineCategorySections — presenter", () => {
   });
 
   it("preserves source/trust labels in caller's renderEntry output", () => {
-    render(
-      <DiaryTimelineCategorySections items={items} renderEntry={renderEntry} />,
-    );
+    render(<DiaryTimelineCategorySections items={items} renderEntry={renderEntry} />);
     const photoNode = screen.getByTestId("fake-entry-p1");
     expect(photoNode.getAttribute("data-source")).toBe("photo");
   });
@@ -165,9 +155,7 @@ describe("DiaryTimelineCategorySections — static safety", () => {
   });
   it("component only uses guarded localStorage.getItem / setItem", () => {
     expect(COMPONENT).not.toMatch(/sessionStorage/);
-    expect(COMPONENT).not.toMatch(
-      /localStorage\s*\.\s*(?:removeItem|clear)\(/,
-    );
+    expect(COMPONENT).not.toMatch(/localStorage\s*\.\s*(?:removeItem|clear)\(/);
     // Reads + writes must go through try/catch helpers; check those exist.
     expect(COMPONENT).toMatch(/safeReadStorage/);
     expect(COMPONENT).toMatch(/safeWriteStorage/);
@@ -209,15 +197,11 @@ describe("DiaryTimelineCategorySections — controls + saved state", () => {
   });
 
   it("renders Expand all / Collapse all / Reset sections controls + summary", () => {
-    render(
-      <DiaryTimelineCategorySections items={items} renderEntry={renderEntry} />,
-    );
+    render(<DiaryTimelineCategorySections items={items} renderEntry={renderEntry} />);
     expect(screen.getByRole("button", { name: /Expand all/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Collapse all/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Reset sections/i })).toBeInTheDocument();
-    const summary = screen.getByTestId(
-      "diary-timeline-category-sections-summary",
-    );
+    const summary = screen.getByTestId("diary-timeline-category-sections-summary");
     expect(summary.getAttribute("data-total")).toBe(String(items.length));
     expect(summary.getAttribute("data-non-empty")).toBe("7");
     expect(summary.textContent).toMatch(/7 entries/);
@@ -226,19 +210,13 @@ describe("DiaryTimelineCategorySections — controls + saved state", () => {
   });
 
   it("Collapse all collapses every section, Expand all re-expands every section", () => {
-    render(
-      <DiaryTimelineCategorySections items={items} renderEntry={renderEntry} />,
-    );
+    render(<DiaryTimelineCategorySections items={items} renderEntry={renderEntry} />);
     fireEvent.click(screen.getByRole("button", { name: /Collapse all/i }));
-    for (const btn of screen.getAllByTestId(
-      "diary-timeline-category-sections-section-toggle",
-    )) {
+    for (const btn of screen.getAllByTestId("diary-timeline-category-sections-section-toggle")) {
       expect(btn.getAttribute("aria-expanded")).toBe("false");
     }
     fireEvent.click(screen.getByRole("button", { name: /Expand all/i }));
-    for (const btn of screen.getAllByTestId(
-      "diary-timeline-category-sections-section-toggle",
-    )) {
+    for (const btn of screen.getAllByTestId("diary-timeline-category-sections-section-toggle")) {
       expect(btn.getAttribute("aria-expanded")).toBe("true");
     }
   });
@@ -252,16 +230,12 @@ describe("DiaryTimelineCategorySections — controls + saved state", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: /Expand all/i }));
     fireEvent.click(screen.getByRole("button", { name: /Reset sections/i }));
-    expect(
-      screen
-        .getByRole("button", { name: /Watering/i })
-        .getAttribute("aria-expanded"),
-    ).toBe("true");
-    expect(
-      screen
-        .getByRole("button", { name: /Training/i })
-        .getAttribute("aria-expanded"),
-    ).toBe("false");
+    expect(screen.getByRole("button", { name: /Watering/i }).getAttribute("aria-expanded")).toBe(
+      "true",
+    );
+    expect(screen.getByRole("button", { name: /Training/i }).getAttribute("aria-expanded")).toBe(
+      "false",
+    );
   });
 
   it("persists toggles to localStorage when storageKey is provided", () => {
@@ -282,10 +256,7 @@ describe("DiaryTimelineCategorySections — controls + saved state", () => {
   });
 
   it("reads saved state from localStorage on mount", () => {
-    setLocalStorageItemForTest(
-      STORAGE_KEY,
-      JSON.stringify({ watering: false, photos: false }),
-    );
+    setLocalStorageItemForTest(STORAGE_KEY, JSON.stringify({ watering: false, photos: false }));
     render(
       <DiaryTimelineCategorySections
         items={items}
@@ -293,22 +264,16 @@ describe("DiaryTimelineCategorySections — controls + saved state", () => {
         storageKey={STORAGE_KEY}
       />,
     );
-    expect(
-      screen
-        .getByRole("button", { name: /Watering/i })
-        .getAttribute("aria-expanded"),
-    ).toBe("false");
-    expect(
-      screen
-        .getByRole("button", { name: /Photos/i })
-        .getAttribute("aria-expanded"),
-    ).toBe("false");
+    expect(screen.getByRole("button", { name: /Watering/i }).getAttribute("aria-expanded")).toBe(
+      "false",
+    );
+    expect(screen.getByRole("button", { name: /Photos/i }).getAttribute("aria-expanded")).toBe(
+      "false",
+    );
     // Sections not in saved state keep defaults (Feeding has entry → open).
-    expect(
-      screen
-        .getByRole("button", { name: /Feeding/i })
-        .getAttribute("aria-expanded"),
-    ).toBe("true");
+    expect(screen.getByRole("button", { name: /Feeding/i }).getAttribute("aria-expanded")).toBe(
+      "true",
+    );
   });
 
   it("malformed localStorage value does not crash and falls back to defaults", () => {
@@ -322,11 +287,9 @@ describe("DiaryTimelineCategorySections — controls + saved state", () => {
         />,
       ),
     ).not.toThrow();
-    expect(
-      screen
-        .getByRole("button", { name: /Watering/i })
-        .getAttribute("aria-expanded"),
-    ).toBe("true");
+    expect(screen.getByRole("button", { name: /Watering/i }).getAttribute("aria-expanded")).toBe(
+      "true",
+    );
   });
 
   it("unknown saved keys are ignored", () => {
@@ -342,23 +305,16 @@ describe("DiaryTimelineCategorySections — controls + saved state", () => {
       />,
     );
     // Known key applied; unknown ignored (no crash).
-    expect(
-      screen
-        .getByRole("button", { name: /Watering/i })
-        .getAttribute("aria-expanded"),
-    ).toBe("false");
+    expect(screen.getByRole("button", { name: /Watering/i }).getAttribute("aria-expanded")).toBe(
+      "false",
+    );
   });
 });
 
-
 describe("DiaryTimelineCategorySections — evidence-quality indicators", () => {
   it("renders an overall evidence summary line reflecting current sections", () => {
-    render(
-      <DiaryTimelineCategorySections items={items} renderEntry={renderEntry} />,
-    );
-    const node = screen.getByTestId(
-      "diary-timeline-category-sections-evidence-summary",
-    );
+    render(<DiaryTimelineCategorySections items={items} renderEntry={renderEntry} />);
+    const node = screen.getByTestId("diary-timeline-category-sections-evidence-summary");
     // All seven sections have one entry in this fixture.
     expect(node.getAttribute("data-total-sections")).toBe("7");
     expect(node.getAttribute("data-present-count")).toBe("7");
@@ -367,12 +323,8 @@ describe("DiaryTimelineCategorySections — evidence-quality indicators", () => 
   });
 
   it("evidence summary tracks the filtered view (e.g. zero items → all missing)", () => {
-    render(
-      <DiaryTimelineCategorySections items={[]} renderEntry={renderEntry} />,
-    );
-    const node = screen.getByTestId(
-      "diary-timeline-category-sections-evidence-summary",
-    );
+    render(<DiaryTimelineCategorySections items={[]} renderEntry={renderEntry} />);
+    const node = screen.getByTestId("diary-timeline-category-sections-evidence-summary");
     expect(node.getAttribute("data-present-count")).toBe("0");
     expect(node.getAttribute("data-missing-count")).toBe("7");
     expect(node.textContent).toMatch(/0 of 7/);
@@ -380,9 +332,7 @@ describe("DiaryTimelineCategorySections — evidence-quality indicators", () => 
   });
 
   it("each present section panel renders its own evidence-quality copy", () => {
-    render(
-      <DiaryTimelineCategorySections items={items} renderEntry={renderEntry} />,
-    );
+    render(<DiaryTimelineCategorySections items={items} renderEntry={renderEntry} />);
     const evidenceNodes = screen.getAllByTestId(
       "diary-timeline-category-sections-section-evidence",
     );
@@ -396,45 +346,29 @@ describe("DiaryTimelineCategorySections — evidence-quality indicators", () => 
   });
 
   it("empty section evidence reads 'missing' when expanded, and copy uses 'in this view'", () => {
-    const onlyWatering: FakeItem[] = [
-      { id: "w1", eventType: "watering", label: "Watered 500ml" },
-    ];
-    render(
-      <DiaryTimelineCategorySections
-        items={onlyWatering}
-        renderEntry={renderEntry}
-      />,
-    );
+    const onlyWatering: FakeItem[] = [{ id: "w1", eventType: "watering", label: "Watered 500ml" }];
+    render(<DiaryTimelineCategorySections items={onlyWatering} renderEntry={renderEntry} />);
     // Expand the empty Photos section to read its evidence copy.
     const photosToggle = screen.getByRole("button", { name: /Photos/i });
     fireEvent.click(photosToggle);
     const evidenceNodes = screen.getAllByTestId(
       "diary-timeline-category-sections-section-evidence",
     );
-    const photoEvidence = evidenceNodes.find(
-      (n) => n.getAttribute("data-section-id") === "photos",
-    );
+    const photoEvidence = evidenceNodes.find((n) => n.getAttribute("data-section-id") === "photos");
     expect(photoEvidence).toBeDefined();
     expect(photoEvidence!.getAttribute("data-evidence-status")).toBe("missing");
-    expect(photoEvidence!.textContent).toBe(
-      "No photo entries in this view.",
-    );
+    expect(photoEvidence!.textContent).toBe("No photo entries in this view.");
   });
 
   it("evidence copy never uses diagnostic/aggressive/actionable wording", () => {
-    render(
-      <DiaryTimelineCategorySections items={items} renderEntry={renderEntry} />,
-    );
+    render(<DiaryTimelineCategorySections items={items} renderEntry={renderEntry} />);
     const banned =
       /\b(healthy|ideal|fix|urgent|auto|execute|control|actuate|relay|emergency|critical)\b/i;
-    for (const n of screen.getAllByTestId(
-      "diary-timeline-category-sections-section-evidence",
-    )) {
+    for (const n of screen.getAllByTestId("diary-timeline-category-sections-section-evidence")) {
       expect(n.textContent ?? "").not.toMatch(banned);
     }
     expect(
-      screen.getByTestId("diary-timeline-category-sections-evidence-summary")
-        .textContent ?? "",
+      screen.getByTestId("diary-timeline-category-sections-evidence-summary").textContent ?? "",
     ).not.toMatch(banned);
   });
 });

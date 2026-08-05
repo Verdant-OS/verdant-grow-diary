@@ -27,9 +27,7 @@ import { usePersistEnvironmentAlerts } from "@/hooks/usePersistEnvironmentAlerts
 
 const NOW_ISO = new Date().toISOString();
 
-function snapshotWithRh(
-  metricRefs?: SensorSnapshot["metric_refs"],
-): SensorSnapshot {
+function snapshotWithRh(metricRefs?: SensorSnapshot["metric_refs"]): SensorSnapshot {
   return {
     source: "live",
     ts: NOW_ISO,

@@ -23,8 +23,8 @@ function healthySeedling(): BuildBlueprintOverlayInput {
   };
 }
 
-function renderVm(input: BuildBlueprintOverlayInput) {
-  return render(<ProBlueprintOverlay vm={buildBlueprintOverlayViewModel(input)} />);
+function renderVm(input: BuildBlueprintOverlayInput, tempUnit?: "fahrenheit" | "celsius") {
+  return render(<ProBlueprintOverlay vm={buildBlueprintOverlayViewModel(input, tempUnit)} />);
 }
 
 describe("ProBlueprintOverlay", () => {
@@ -60,13 +60,22 @@ describe("ProBlueprintOverlay", () => {
     );
   });
 
-  it("formats values with units and shows the target band", () => {
-    renderVm(healthySeedling());
+  it("formats values with units and shows the target band (celsius preference)", () => {
+    renderVm(healthySeedling(), "celsius");
     expect(screen.getByTestId("pro-blueprint-overlay-value-tempC").textContent).toContain("25");
     expect(screen.getByTestId("pro-blueprint-overlay-value-tempC").textContent).toContain("°C");
     // seedling temp band 24-26
     expect(screen.getByTestId("pro-blueprint-overlay-row-tempC").textContent).toContain("24");
     expect(screen.getByTestId("pro-blueprint-overlay-row-tempC").textContent).toContain("26");
+  });
+
+  it("formats values with units and shows the target band (fahrenheit default)", () => {
+    renderVm(healthySeedling());
+    expect(screen.getByTestId("pro-blueprint-overlay-value-tempC").textContent).toContain("77");
+    expect(screen.getByTestId("pro-blueprint-overlay-value-tempC").textContent).toContain("°F");
+    // seedling temp band 24-26°C → 75.2-78.8°F
+    expect(screen.getByTestId("pro-blueprint-overlay-row-tempC").textContent).toContain("75.2");
+    expect(screen.getByTestId("pro-blueprint-overlay-row-tempC").textContent).toContain("78.8");
   });
 
   it("shows a nudge on a missing metric and a dash for its value", () => {

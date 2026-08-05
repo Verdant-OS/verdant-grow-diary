@@ -18,7 +18,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 
 import ActionQueue from "@/pages/ActionQueue";
 import ActionDetail from "@/pages/ActionDetail";
@@ -83,11 +83,7 @@ const ROW_WITH_BRIDGE_TOKEN = {
   suggested_change: "Adjust feed strength to 1.2 EC",
 };
 
-let listRows: unknown[] = [
-  ROW_WITH_MAC,
-  ROW_WITH_VENDOR_ID,
-  ROW_WITH_BRIDGE_TOKEN,
-];
+let listRows: unknown[] = [ROW_WITH_MAC, ROW_WITH_VENDOR_ID, ROW_WITH_BRIDGE_TOKEN];
 let detailRow: unknown = ROW_WITH_MAC;
 const insertSpy = vi.fn();
 
@@ -99,8 +95,7 @@ vi.mock("@/integrations/supabase/client", () => {
       limit: () => chain,
       eq: () => {
         const c2: Record<string, unknown> = {
-          maybeSingle: () =>
-            Promise.resolve({ data: detailRow, error: null }),
+          maybeSingle: () => Promise.resolve({ data: detailRow, error: null }),
           then: (resolve: (r: { data: unknown; error: null }) => unknown) =>
             resolve({ data: listRows, error: null }),
         };
@@ -143,9 +138,12 @@ vi.mock("@/integrations/supabase/client", () => {
   };
 });
 
-vi.mock("@/store/auth", () => ({
-  useAuth: () => ({ user: { id: "u1", email: "u@example.com" } }),
-}));
+vi.mock("@/store/auth", () => {
+  const user = { id: "u1", email: "u@example.com" };
+  return {
+    useAuth: () => ({ user }),
+  };
+});
 
 vi.mock("@/store/grows", () => ({
   useGrows: () => ({
@@ -176,15 +174,6 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 // Pure helper tests
 // ---------------------------------------------------------------------------
-
-// Slow-runner guard: these action-detail tests await an async load whose
-// resolution can exceed BOTH testing-library's default 5s findBy timeout
-// AND vitest's default 5s per-test timeout on loaded shared CI runners
-// (observed repeatedly across full-suite batches; passes locally in <3s).
-// Raise the per-test budget for this file and give the async-load awaits
-// a generous findBy timeout beneath it.
-vi.setConfig({ testTimeout: 60_000 });
-const FIND_TIMEOUT = { timeout: 30_000 };
 
 describe("actionQueueRedactionRules — pure helpers", () => {
   it("detects MAC address, vendor id, bridge-token and long hex blob", () => {
@@ -241,14 +230,8 @@ function expectNoDeviceLeakAnywhere(scope: string): void {
   const textLeaks = detectDeviceIdentifierLeaks(text);
   const htmlLeaks = detectDeviceIdentifierLeaks(html);
   if (textLeaks.length || htmlLeaks.length) {
-    const detail = JSON.stringify(
-      { scope, textLeaks, htmlLeaks },
-      null,
-      2,
-    );
-    throw new Error(
-      `Device-identifier leak detected in ${scope}:\n${detail}`,
-    );
+    const detail = JSON.stringify({ scope, textLeaks, htmlLeaks }, null, 2);
+    throw new Error(`Device-identifier leak detected in ${scope}:\n${detail}`);
   }
 }
 
@@ -273,25 +256,19 @@ function renderDetail(actionId: string) {
 describe("ActionQueue list — full-DOM device-identifier scan", () => {
   it("renders rows without leaking MAC / vendor id / bridge token anywhere", async () => {
     renderList();
-    await waitFor(() =>
-      expect(screen.getAllByTestId("action-queue-row").length).toBe(3),
-    );
+    await waitFor(() => expect(screen.getAllByTestId("action-queue-row").length).toBe(3));
     expectNoDeviceLeakAnywhere("ActionQueue list");
   });
 
   it("renders the safe device label exactly when target_device is present", async () => {
     renderList();
-    await waitFor(() =>
-      expect(screen.getAllByTestId("action-queue-row").length).toBe(3),
-    );
+    await waitFor(() => expect(screen.getAllByTestId("action-queue-row").length).toBe(3));
     expect(document.body.textContent ?? "").toContain(SAFE_DEVICE_LABEL);
   });
 
   it("preserves approve/reject affordances (regression for req 6)", async () => {
     renderList();
-    await waitFor(() =>
-      expect(screen.getAllByTestId("action-queue-row").length).toBe(3),
-    );
+    await waitFor(() => expect(screen.getAllByTestId("action-queue-row").length).toBe(3));
     // Buttons exist somewhere on the list surface; we only assert presence
     // so the existing approval flow isn't accidentally removed.
     expect(document.body.textContent ?? "").toMatch(/approve|reject/i);
@@ -299,9 +276,7 @@ describe("ActionQueue list — full-DOM device-identifier scan", () => {
 
   it("introduces no clipboard / download / print surface (Step 0 negative check)", async () => {
     renderList();
-    await waitFor(() =>
-      expect(screen.getAllByTestId("action-queue-row").length).toBe(3),
-    );
+    await waitFor(() => expect(screen.getAllByTestId("action-queue-row").length).toBe(3));
     expect(document.querySelectorAll("a[download]").length).toBe(0);
     expect(document.querySelectorAll("[data-export-action]").length).toBe(0);
     expect(document.querySelectorAll("[data-print-action]").length).toBe(0);
@@ -312,7 +287,7 @@ describe("ActionDetail — full-DOM device-identifier scan", () => {
   it("MAC-bearing row leaks nothing and exposes no clipboard/download/print surface", async () => {
     detailRow = ROW_WITH_MAC;
     renderDetail("aq-mac-1");
-    await screen.findByText("Raise the light by 10 cm", undefined, FIND_TIMEOUT);
+    await screen.findByText("Raise the light by 10 cm");
     expectNoDeviceLeakAnywhere("ActionDetail MAC row");
     // Step 0 negative check, asserted on this same loaded render: each
     // additional ActionDetail mount in this file gets measurably slower on
@@ -326,14 +301,14 @@ describe("ActionDetail — full-DOM device-identifier scan", () => {
   it("vendor-id row does not leak the vendor id anywhere", async () => {
     detailRow = ROW_WITH_VENDOR_ID;
     renderDetail("aq-vendor-1");
-    await screen.findByText("Lower humidity to 55%", undefined, FIND_TIMEOUT);
+    await screen.findByText("Lower humidity to 55%");
     expectNoDeviceLeakAnywhere("ActionDetail vendor row");
   });
 
   it("bridge-token row does not leak the token anywhere", async () => {
     detailRow = ROW_WITH_BRIDGE_TOKEN;
     renderDetail("aq-token-1");
-    await screen.findByText("Adjust feed strength to 1.2 EC", undefined, FIND_TIMEOUT);
+    await screen.findByText("Adjust feed strength to 1.2 EC");
     expectNoDeviceLeakAnywhere("ActionDetail bridge-token row");
   });
 });

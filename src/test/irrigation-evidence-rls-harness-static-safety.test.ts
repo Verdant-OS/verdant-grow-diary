@@ -102,6 +102,17 @@ describe("irrigation evidence RLS harness — service_role boundary", () => {
     const stripped = noComments.replace(/SUPABASE_SERVICE_ROLE_KEY/g, "");
     expect(stripped).not.toMatch(/service[_-]?role/i);
   });
+
+  it("seeds grower-owned fixtures through each authenticated owner", () => {
+    expect(src).toMatch(/async function seedId\(\s+client: SupabaseClient,/);
+    expect(src).not.toMatch(/admin\.from\(table\)\.insert/);
+    expect(src).toContain('seedId(ownerC, "grows"');
+    expect(src).toContain('seedId(ownerC, "tents"');
+    expect(src).toContain('seedId(ownerC, "plants"');
+    expect(src).toContain('seedId(strangerC, "grows"');
+    expect(src).toContain('seedId(strangerC, "tents"');
+    expect(src).toContain('seedId(strangerC, "plants"');
+  });
 });
 
 describe("irrigation evidence RLS harness — no device-control / automation / forbidden writes", () => {
@@ -140,9 +151,7 @@ describe("irrigation evidence RLS harness — no device-control / automation / f
     // those are SECURITY INVOKER and depend on auth.uid(); a service_role JWT
     // cannot honestly prove ACL possession by successful execution. ACL
     // possession is proved in pgTAP instead.
-    expect(src).not.toMatch(
-      /admin\s*\.rpc\(\s*['"]create_(watering|feeding)_event['"]/i,
-    );
+    expect(src).not.toMatch(/admin\s*\.rpc\(\s*['"]create_(watering|feeding)_event['"]/i);
   });
   it("uses a distinct feedingArgs helper that explicitly clears p_water", () => {
     // The RPC rejects a non-null p_water when p_event_type = 'feeding'
@@ -165,15 +174,19 @@ describe("irrigation evidence RLS harness — no device-control / automation / f
     // Helpers must exist and cover the PostgREST/Postgres error codes that
     // can masquerade as denial: 42883, PGRST202, PGRST203, /does not exist/,
     // /schema cache/, /no function matches/.
-    expect(src).toMatch(/isGenuinePermissionDenial\s*=/);
-    expect(src).toMatch(/isMissingFunction\s*=/);
+    // Accept either declaration form (const arrow or function declaration) —
+    // the contract is that the named helpers exist, not how they are bound.
+    expect(src).toMatch(/isGenuinePermissionDenial\s*[=(]/);
+    expect(src).toMatch(/isMissingFunction\s*[=(]/);
     expect(src).toMatch(/42883/);
     expect(src).toMatch(/PGRST202/);
     expect(src).toMatch(/schema cache/i);
     // Every DML denial assertion must combine both helpers so a
     // missing-function error cannot satisfy an RPC/table-denial check.
     const dmlDenials = Array.from(
-      src.matchAll(/authenticated denied (?:INSERT|UPDATE|DELETE|create_[a-z_]+_event)[^\n]*\n\s*([^\n]+)/gi),
+      src.matchAll(
+        /authenticated denied (?:INSERT|UPDATE|DELETE|create_[a-z_]+_event)[^\n]*\n\s*([^\n]+)/gi,
+      ),
     ).map((m) => m[1]);
     expect(dmlDenials.length, "expected denial assertions to exist").toBeGreaterThan(0);
     for (const line of dmlDenials) {
@@ -200,7 +213,6 @@ describe("irrigation evidence RLS harness — no device-control / automation / f
     expect(src).toMatch(/feeding seed exists only in feeding_events/);
   });
 });
-
 
 describe("irrigation evidence RLS harness — disposable + self-cleaning", () => {
   it("only ever creates @verdant.test users", () => {
@@ -251,9 +263,23 @@ describe("irrigation evidence RLS harness — proves the trust boundary matrix",
     expect(src).toMatch(/idempotency_key_conflict/);
     expect(src).toMatch(/pg_advisory_xact_lock/);
     expect(src).toMatch(/pg_catalog\.pg_locks/);
-    expect(src).toMatch(/granted_count/);
-    expect(src).toMatch(/waiting_count/);
-    expect(src).toMatch(/overlapped at the idempotency insert/i);
+    expect(src).toContain("waitForRaceContention(owner.id, parallelReplayKey)");
+    expect(src).toContain("waitForRaceContention(owner.id, parallelConflictKey)");
+    expect(src).toMatch(/hashtextextended\(\$1::text \|\| ':' \|\| \$2::text,\s*0\)/);
+    expect(src).toMatch(/\(classid::bigint << 32\) \| objid::bigint/);
+    expect(src).toMatch(/objsubid = 1/);
+    expect(src).toMatch(/objsubid = 2/);
+    for (const count of [
+      "barrier_granted_count",
+      "barrier_waiting_count",
+      "quicklog_granted_count",
+      "quicklog_waiting_count",
+    ]) {
+      expect(src).toContain(count);
+    }
+    expect(src).toContain("[userId, idempotencyKey]");
+    expect(src).toMatch(/barrierContended \|\| quicklogContended/);
+    expect(src).toMatch(/idempotency serialization\/contention/i);
   });
   it("checks atomicity across the full committed event set", () => {
     for (const table of [
@@ -308,14 +334,19 @@ describe("irrigation evidence CI gate — authoritative and non-production", () 
   });
 
   it("runs the disposable RLS harness against a masked local Supabase stack", () => {
-    expect(workflowCode).toMatch(/supabase start/);
-    expect(workflowCode).toMatch(/supabase db reset --local/);
+    expect(workflowCode).toContain("Prepare immutable migration replay workspace");
+    expect(workflowCode).toContain("node scripts/prepare-local-supabase-replay.mjs");
+    expect(workflowCode).toMatch(/supabase start --workdir "\$SUPABASE_REPLAY_WORKDIR"/);
+    expect(workflowCode).toMatch(/supabase db reset --workdir "\$SUPABASE_REPLAY_WORKDIR" --local/);
+    expect(workflowCode).toMatch(/supabase status --workdir "\$SUPABASE_REPLAY_WORKDIR" -o env/);
     expect(workflowCode).toMatch(/::add-mask::\$\{ANON_KEY\}/);
     expect(workflowCode).toMatch(/::add-mask::\$\{SERVICE_ROLE_KEY\}/);
     expect(workflowCode).toMatch(/::add-mask::\$\{DB_URL\}/);
     expect(workflowCode).toMatch(/SUPABASE_DB_URL=\$\{DB_URL\}/);
     expect(workflowCode).toContain("bun run test:irrigation-evidence-rls:local-lane");
-    expect(workflowCode).toMatch(/if:\s*always\(\)[\s\S]{0,120}supabase stop --no-backup/);
+    expect(workflowCode).toMatch(
+      /if:\s*always\(\)[\s\S]{0,180}supabase stop --workdir "\$SUPABASE_REPLAY_WORKDIR" --no-backup/,
+    );
     expect(workflowCode).not.toMatch(/supabase\s+(link|db push)/);
   });
 
@@ -342,10 +373,13 @@ describe("irrigation evidence CI gate — authoritative and non-production", () 
   it("reruns for all database, irrigation UI, style, and browser-proof dependencies", () => {
     for (const path of [
       '"supabase/migrations/**"',
+      '"config/local-supabase-replay-compatibility.json"',
+      '"config/local-supabase-replay/**"',
+      '"scripts/prepare-local-supabase-replay.mjs"',
       '"src/components/irrigation/**"',
       '"src/components/ui/**"',
       '"src/lib/irrigation/**"',
-      '"src/index.css"',
+      '"src/styles.css"',
       '"e2e/fixtures/irrigation-overflow*"',
       '"tailwind.config.ts"',
       '"vite.config.ts"',

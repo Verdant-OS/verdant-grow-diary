@@ -12,23 +12,10 @@
  *   - Autoflower-sensitive recommendations stay conservative.
  */
 
-export type SensorSourceCategory =
-  | "live"
-  | "manual"
-  | "demo"
-  | "stale"
-  | "invalid"
-  | "imported";
+export type SensorSourceCategory = "live" | "manual" | "demo" | "stale" | "invalid" | "imported";
 
 export type PlantStage =
-  | "seedling"
-  | "veg"
-  | "flower"
-  | "late_flower"
-  | "harvest"
-  | "drying"
-  | "curing"
-  | "unknown";
+  "seedling" | "veg" | "flower" | "late_flower" | "harvest" | "drying" | "curing" | "unknown";
 
 export type RiskLevel = "low" | "medium" | "high" | "critical";
 

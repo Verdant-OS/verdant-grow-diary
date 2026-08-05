@@ -73,8 +73,7 @@ export interface FeedingTypedEventInput {
 }
 
 export type WriteFeedingTypedEventResult =
-  | { ok: true; eventId: string; reused: boolean }
-  | { ok: false; reason: WriteFeedingFailureReason };
+  { ok: true; eventId: string; reused: boolean } | { ok: false; reason: WriteFeedingFailureReason };
 
 export type WriteFeedingFailureReason =
   | "idempotency_key:invalid"

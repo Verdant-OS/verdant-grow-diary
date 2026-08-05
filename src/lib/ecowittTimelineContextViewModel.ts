@@ -109,11 +109,7 @@ export function buildEcowittTimelineContext(
   for (const entry of entries) {
     // Never cross grow boundaries: if both sides declare a grow_id and they
     // disagree, the entry cannot be enriched here.
-    if (
-      growId &&
-      entry.grow_id != null &&
-      entry.grow_id !== growId
-    ) {
+    if (growId && entry.grow_id != null && entry.grow_id !== growId) {
       out.push({
         diaryEntryId: entry.id,
         snapshot: null,
@@ -151,9 +147,7 @@ export function buildEcowittTimelineContext(
       if (rMs == null) continue;
       const delta = Math.abs(rMs - eMs);
       if (delta > windowMs) continue;
-      const isPlantMatch =
-        preferPlantId != null &&
-        (row.plant_id ?? null) === preferPlantId;
+      const isPlantMatch = preferPlantId != null && (row.plant_id ?? null) === preferPlantId;
 
       if (best == null) {
         best = { row, deltaMs: delta };
@@ -192,8 +186,7 @@ export function buildEcowittTimelineContext(
     }
 
     const src = (best.row.source ?? "").trim().toLowerCase();
-    const candidateSource =
-      src === "manual" ? "manual" : src === "demo" ? "demo" : "live";
+    const candidateSource = src === "manual" ? "manual" : src === "demo" ? "demo" : "live";
 
     const candidate: EcowittCandidate = {
       payload: raw,

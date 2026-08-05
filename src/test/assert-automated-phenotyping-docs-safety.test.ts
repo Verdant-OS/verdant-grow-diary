@@ -20,7 +20,6 @@ describe("assert-automated-phenotyping-docs-safety — banned phrases", () => {
   it("real protocol file has no banned-phrase violations", () => {
     const violations = scanText(REAL_TEXT);
     if (violations.length) {
-      // eslint-disable-next-line no-console
       console.error(violations);
     }
     expect(violations).toEqual([]);
@@ -112,9 +111,7 @@ describe("assert-automated-phenotyping-docs-safety — diary template", () => {
 
 describe("assert-automated-phenotyping-docs-safety — filename convention", () => {
   it("FILENAME_RE matches a canonical filename", () => {
-    expect(
-      FILENAME_RE.test("SDxBD_SDxBD-F1-04_flower-wk6_side-view_2026-06-26_01.jpg"),
-    ).toBe(true);
+    expect(FILENAME_RE.test("SDxBD_SDxBD-F1-04_flower-wk6_side-view_2026-06-26_01.jpg")).toBe(true);
   });
 
   it("parseFilename returns structured fields", () => {
@@ -169,9 +166,7 @@ describe("assert-automated-phenotyping-docs-safety — sample output log", () =>
       "| 2025-01-01 | flower-wk6  | side-view      | PlantCV 4.x (manual run) | estimated_height_cm",
     );
     const v = checkSampleOutputLog(broken);
-    expect(
-      v.some((x) => /does not match date in filename/.test(x.message)),
-    ).toBe(true);
+    expect(v.some((x) => /does not match date in filename/.test(x.message))).toBe(true);
   });
 });
 

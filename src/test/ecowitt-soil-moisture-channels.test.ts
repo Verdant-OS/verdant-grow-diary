@@ -34,11 +34,9 @@ function soilReading(rows: ReturnType<typeof normalizeEcowittCloudReadings>["row
 
 describe("EcoWitt soil moisture — cloud normalization channels 1–16", () => {
   it("soilmoisture1=33 → soil_moisture_pct: 33 (live)", () => {
-    const res = normalizeEcowittCloudReadings(
-      { MAC, dateutc: FRESH, soilmoisture1: 33 },
-      mapping,
-      { now: NOW },
-    );
+    const res = normalizeEcowittCloudReadings({ MAC, dateutc: FRESH, soilmoisture1: 33 }, mapping, {
+      now: NOW,
+    });
     const r = soilReading(res.rows);
     expect(r).toBeDefined();
     expect(r!.reading.soil_moisture_pct).toBe(33);
@@ -47,11 +45,9 @@ describe("EcoWitt soil moisture — cloud normalization channels 1–16", () => 
   });
 
   it("soilmoisture9 (>8) maps and preserves channel", () => {
-    const res = normalizeEcowittCloudReadings(
-      { MAC, dateutc: FRESH, soilmoisture9: 42 },
-      mapping,
-      { now: NOW },
-    );
+    const res = normalizeEcowittCloudReadings({ MAC, dateutc: FRESH, soilmoisture9: 42 }, mapping, {
+      now: NOW,
+    });
     const r = soilReading(res.rows);
     expect(r).toBeDefined();
     expect(r!.reading.soil_moisture_pct).toBe(42);
@@ -83,11 +79,9 @@ describe("EcoWitt soil moisture — cloud normalization channels 1–16", () => 
   });
 
   it("soilmoisture1=-1 is invalid / not healthy", () => {
-    const res = normalizeEcowittCloudReadings(
-      { MAC, dateutc: FRESH, soilmoisture1: -1 },
-      mapping,
-      { now: NOW },
-    );
+    const res = normalizeEcowittCloudReadings({ MAC, dateutc: FRESH, soilmoisture1: -1 }, mapping, {
+      now: NOW,
+    });
     const r = soilReading(res.rows);
     expect(r).toBeDefined();
     expect(r!.reading.source).toBe("invalid");
@@ -105,11 +99,9 @@ describe("EcoWitt soil moisture — cloud normalization channels 1–16", () => 
   });
 
   it("soilmoisture1=0 is preserved (value retained, never silently dropped)", () => {
-    const res = normalizeEcowittCloudReadings(
-      { MAC, dateutc: FRESH, soilmoisture1: 0 },
-      mapping,
-      { now: NOW },
-    );
+    const res = normalizeEcowittCloudReadings({ MAC, dateutc: FRESH, soilmoisture1: 0 }, mapping, {
+      now: NOW,
+    });
     const r = soilReading(res.rows);
     expect(r).toBeDefined();
     expect(r!.reading.soil_moisture_pct).toBe(0);
@@ -130,11 +122,9 @@ describe("EcoWitt soil moisture — cloud normalization channels 1–16", () => 
   });
 
   it("payload without soilmoistureN emits no soil_moisture_pct reading", () => {
-    const res = normalizeEcowittCloudReadings(
-      { MAC, dateutc: FRESH, tempf: 72.4 },
-      mapping,
-      { now: NOW },
-    );
+    const res = normalizeEcowittCloudReadings({ MAC, dateutc: FRESH, tempf: 72.4 }, mapping, {
+      now: NOW,
+    });
     expect(soilReading(res.rows)).toBeUndefined();
   });
 
@@ -165,7 +155,9 @@ describe("EcoWitt validation view-model — soil_moisture_pct alias coverage", (
         ...rawPayload,
         metadata: { test_sender: true, transport: "webhook" },
       },
-    } as unknown as Parameters<typeof buildEcowittIngestValidationViewModel>[0]["rows"][number];
+    } as unknown as NonNullable<
+      Parameters<typeof buildEcowittIngestValidationViewModel>[0]["rows"]
+    >[number];
   }
 
   it("soilmoisture1=33 → metric row Accepted", () => {
@@ -243,10 +235,7 @@ describe("static safety scan — soil moisture changes", () => {
       expect(src).not.toMatch(/functions\.invoke\(/);
       expect(src).not.toMatch(/\.from\(["']action_queue["']\)/);
       expect(src).not.toMatch(/\.from\(["']grow_events["']\)/);
-      expect(src).not.toMatch(
-        /turn_on|turn_off|toggleDevice|setOutletState|autopilot/,
-      );
+      expect(src).not.toMatch(/turn_on|turn_off|toggleDevice|setOutletState|autopilot/);
     }
   });
 });
-

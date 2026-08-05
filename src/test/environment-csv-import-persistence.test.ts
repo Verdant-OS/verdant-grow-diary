@@ -134,7 +134,45 @@ describe("environmentCsvImportPersistence — runtime", () => {
       })),
     };
     const res = await persistCsvEnvironmentRows([row()], SCOPE, client);
-    expect(res.error).toBe("boom");
+    expect(res.error).toMatch(/could not be completed/i);
+    expect(res.error).not.toContain("boom");
+    expect(res.partialWrite).toBe(false);
+  });
+
+  it("preserves a safe partial-write receipt when a later batch fails", async () => {
+    let batch = 0;
+    const client = {
+      insertSensorReadings: vi.fn(async (rows: unknown[]) => {
+        batch += 1;
+        if (batch === 2) {
+          return {
+            error: {
+              message: "raw postgres secret relation detail",
+              code: "XX000",
+            },
+            insertedCount: 0,
+          };
+        }
+        return { error: null, insertedCount: rows.length };
+      }),
+    };
+    const rows = [
+      row({ humidity_pct: null, vpd_kpa: null }),
+      row({
+        rowNumber: 2,
+        captured_at: "2026-06-01T10:01:00.000Z",
+        humidity_pct: null,
+        vpd_kpa: null,
+      }),
+    ];
+
+    const res = await persistCsvEnvironmentRows(rows, SCOPE, client, 1);
+
+    expect(res.insertedCount).toBe(1);
+    expect(res.partialWrite).toBe(true);
+    expect(res.error).toMatch(/1 CSV reading was saved/i);
+    expect(res.error).toMatch(/review imported history before retrying/i);
+    expect(res.error).not.toContain("raw postgres");
   });
 });
 

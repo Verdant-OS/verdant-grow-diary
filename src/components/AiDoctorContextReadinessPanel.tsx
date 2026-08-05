@@ -9,13 +9,7 @@
  *  - Preview output is clearly labeled "Preview only — not saved."
  */
 import { useMemo } from "react";
-import {
-  CheckCircle2,
-  AlertTriangle,
-  Info,
-  Database,
-  Beaker,
-} from "lucide-react";
+import { CheckCircle2, AlertTriangle, Info, Database, Beaker } from "lucide-react";
 import {
   buildAiDoctorReadinessView,
   AI_DOCTOR_UNKNOWN_PROVENANCE_COPY,
@@ -54,19 +48,13 @@ export interface AiDoctorContextReadinessPanelProps {
 
 const QUICK_ACTION_COPY = {
   photo: "A recent plant photo helps AI Doctor avoid guessing from logs alone.",
-  watering:
-    "Recent watering context helps separate environment stress from root-zone stress.",
-  feeding:
-    "Recent feeding context helps avoid overcorrecting nutrients from weak evidence.",
-  sensor:
-    "A fresh sensor snapshot grounds the diagnosis in current environment data.",
-  disabled: "Coming soon — no safe entry point yet.",
+  watering: "Recent watering context helps separate environment stress from root-zone stress.",
+  feeding: "Recent feeding context helps avoid overcorrecting nutrients from weak evidence.",
+  sensor: "A fresh sensor snapshot grounds the diagnosis in current environment data.",
+  disabled: "Unavailable from this context — no safe entry point is loaded.",
 } as const;
 
-const STATE_STYLES: Record<
-  AiDoctorReadinessState,
-  { badge: string; icon: JSX.Element }
-> = {
+const STATE_STYLES: Record<AiDoctorReadinessState, { badge: string; icon: JSX.Element }> = {
   ready: {
     badge: "bg-emerald-500/15 text-emerald-300 border-emerald-500/40",
     icon: <CheckCircle2 className="h-4 w-4" aria-hidden="true" />,
@@ -140,13 +128,8 @@ function QuickActionsRow({
   if (items.length === 0) return null;
 
   return (
-    <div
-      data-testid="ai-doctor-context-readiness-panel-quick-actions"
-      className="space-y-1"
-    >
-      <h3 className="text-xs font-medium text-muted-foreground">
-        Next evidence to add
-      </h3>
+    <div data-testid="ai-doctor-context-readiness-panel-quick-actions" className="space-y-1">
+      <h3 className="text-xs font-medium text-muted-foreground">Next evidence to add</h3>
       <ul className="flex flex-wrap gap-1.5">
         {items.map((item) => {
           const disabled = typeof item.handler !== "function";
@@ -168,7 +151,7 @@ function QuickActionsRow({
                 }`}
               >
                 {item.label}
-                {disabled ? " · soon" : ""}
+                {disabled ? " · unavailable" : ""}
               </button>
             </li>
           );
@@ -197,9 +180,7 @@ export default function AiDoctorContextReadinessPanel({
     // not wall-clock. Source-driven gates (csv/demo/stale/invalid/unknown)
     // and value checks still apply.
     const capturedMs =
-      snapshotInput?.captured_at != null
-        ? Date.parse(String(snapshotInput.captured_at))
-        : NaN;
+      snapshotInput?.captured_at != null ? Date.parse(String(snapshotInput.captured_at)) : NaN;
     const nowMs = Number.isFinite(capturedMs) ? capturedMs : Date.now();
     return evaluateManualSensorSnapshotQuality(snapshotInput, { nowMs });
   }, [context]);
@@ -258,8 +239,7 @@ export default function AiDoctorContextReadinessPanel({
 
       <QuickActionsRow flags={view.evidenceFlags} actions={quickActions} />
 
-      {view.evidenceFlags.hasUnknownMedium ||
-      view.evidenceFlags.hasUnknownPotSize ? (
+      {view.evidenceFlags.hasUnknownMedium || view.evidenceFlags.hasUnknownPotSize ? (
         <ul
           data-testid="ai-doctor-context-readiness-panel-profile-provenance"
           className="list-disc pl-4 space-y-0.5 text-[11px] text-muted-foreground"
@@ -277,20 +257,13 @@ export default function AiDoctorContextReadinessPanel({
         </ul>
       ) : null}
 
-
-
-
-
       <dl
         className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs"
         data-testid="ai-doctor-context-readiness-panel-counts"
       >
         <div className="rounded-md border border-border/40 p-2">
           <dt className="text-muted-foreground">Stage</dt>
-          <dd
-            className="font-medium"
-            data-testid="ai-doctor-context-readiness-panel-stage"
-          >
+          <dd className="font-medium" data-testid="ai-doctor-context-readiness-panel-stage">
             {view.plantIdentity.stage ?? "—"}
           </dd>
         </div>
@@ -324,9 +297,7 @@ export default function AiDoctorContextReadinessPanel({
       </dl>
 
       <div>
-        <h3 className="text-xs font-medium text-muted-foreground mb-1">
-          Sensor source labels
-        </h3>
+        <h3 className="text-xs font-medium text-muted-foreground mb-1">Sensor source labels</h3>
         {view.sourceBadges.length === 0 ? (
           <p
             className="text-xs text-muted-foreground"
@@ -359,19 +330,13 @@ export default function AiDoctorContextReadinessPanel({
       </div>
 
       <div data-testid="ai-doctor-context-readiness-panel-current-snapshot-quality">
-        <h3 className="text-xs font-medium text-muted-foreground mb-1">
-          Current reading quality
-        </h3>
+        <h3 className="text-xs font-medium text-muted-foreground mb-1">Current reading quality</h3>
         <ManualSensorSnapshotQualityBadge evaluation={currentSnapshotQuality} />
       </div>
 
-
-
       {view.limitations.length > 0 ? (
         <div>
-          <h3 className="text-xs font-medium text-muted-foreground mb-1">
-            Limitations
-          </h3>
+          <h3 className="text-xs font-medium text-muted-foreground mb-1">Limitations</h3>
           <ul
             className="list-disc pl-4 space-y-0.5 text-xs"
             data-testid="ai-doctor-context-readiness-panel-limitations"
@@ -390,9 +355,7 @@ export default function AiDoctorContextReadinessPanel({
 
       {view.missingInformation.length > 0 ? (
         <div>
-          <h3 className="text-xs font-medium text-muted-foreground mb-1">
-            Missing information
-          </h3>
+          <h3 className="text-xs font-medium text-muted-foreground mb-1">Missing information</h3>
           <ul
             className="list-disc pl-4 space-y-0.5 text-xs"
             data-testid="ai-doctor-context-readiness-panel-missing"
@@ -424,10 +387,7 @@ export default function AiDoctorContextReadinessPanel({
           <span className="text-muted-foreground">Immediate action: </span>
           {view.preview.immediateAction}
         </p>
-        <p
-          className="text-xs"
-          data-testid="ai-doctor-context-readiness-panel-preview-confidence"
-        >
+        <p className="text-xs" data-testid="ai-doctor-context-readiness-panel-preview-confidence">
           <span className="text-muted-foreground">Confidence: </span>
           {view.preview.confidenceBand} ({view.preview.confidence.toFixed(2)})
         </p>
@@ -442,10 +402,7 @@ export default function AiDoctorContextReadinessPanel({
         data-eligible={actionPreview.eligible ? "true" : "false"}
       >
         <div className="flex items-center justify-between gap-2 flex-wrap">
-          <h3
-            id="ai-doctor-action-suggestion-preview-heading"
-            className="text-sm font-semibold"
-          >
+          <h3 id="ai-doctor-action-suggestion-preview-heading" className="text-sm font-semibold">
             {ACTION_SUGGESTION_PREVIEW_LABEL}
           </h3>
           <span
@@ -464,9 +421,8 @@ export default function AiDoctorContextReadinessPanel({
           data-testid="ai-doctor-action-suggestion-preview-sr-status"
         >
           {ACTION_SUGGESTION_PREVIEW_LABEL}:{" "}
-          {ACTION_SUGGESTION_PREVIEW_STATUS_LABELS[actionPreview.status]}.
-          Approval required. No device control. Preview only — no Action
-          Queue item is created.
+          {ACTION_SUGGESTION_PREVIEW_STATUS_LABELS[actionPreview.status]}. Approval required. No
+          device control. Preview only — no Action Queue item is created.
         </p>
 
         {!isUnsafePreviewText(actionPreview.summary) ? (
@@ -494,9 +450,7 @@ export default function AiDoctorContextReadinessPanel({
 
         {actionPreview.missingFields.length > 0 ? (
           <div data-testid="ai-doctor-action-suggestion-preview-missing">
-            <h4 className="text-xs font-medium text-muted-foreground mb-1">
-              Missing context
-            </h4>
+            <h4 className="text-xs font-medium text-muted-foreground mb-1">Missing context</h4>
             <ul className="flex flex-wrap gap-1.5 text-xs">
               {actionPreview.missingFields.map((field) => (
                 <li
@@ -514,9 +468,7 @@ export default function AiDoctorContextReadinessPanel({
 
         {actionPreview.invalidFields.length > 0 ? (
           <div data-testid="ai-doctor-action-suggestion-preview-invalid">
-            <h4 className="text-xs font-medium text-muted-foreground mb-1">
-              Needs review
-            </h4>
+            <h4 className="text-xs font-medium text-muted-foreground mb-1">Needs review</h4>
             <ul className="flex flex-wrap gap-1.5 text-xs">
               {actionPreview.invalidFields.map((field) => (
                 <li
@@ -534,10 +486,7 @@ export default function AiDoctorContextReadinessPanel({
 
         {actionPreview.suggestedActionPreview &&
         !isUnsafePreviewText(actionPreview.suggestedActionPreview) ? (
-          <p
-            className="text-xs"
-            data-testid="ai-doctor-action-suggestion-preview-action"
-          >
+          <p className="text-xs" data-testid="ai-doctor-action-suggestion-preview-action">
             <span className="text-muted-foreground">Cautious next step: </span>
             {actionPreview.suggestedActionPreview}
           </p>
@@ -559,38 +508,6 @@ export default function AiDoctorContextReadinessPanel({
               </li>
             ))}
         </ul>
-
-        {/*
-          Disabled handoff control. Intentionally not wired to any write
-          path: the AI Doctor preview surface is read-only. A safe Action
-          Queue insert path exists for saved AI Doctor sessions, but the
-          readiness preview has neither a saved session nor a structured
-          suggested action. Re-wiring is deferred to a future slice with
-          an explicit grower-confirm modal.
-        */}
-        <div
-          className="flex flex-col gap-1 pt-1"
-          data-testid="ai-doctor-action-suggestion-preview-handoff"
-          data-handoff-enabled="false"
-        >
-          <button
-            type="button"
-            disabled
-            aria-disabled="true"
-            aria-describedby="ai-doctor-action-suggestion-preview-handoff-note"
-            data-testid="ai-doctor-action-suggestion-preview-handoff-button"
-            className="inline-flex w-fit cursor-not-allowed items-center rounded-md border border-border/60 bg-muted/30 px-2 py-1 text-xs text-muted-foreground opacity-60"
-          >
-            Add to Action Queue
-          </button>
-          <p
-            id="ai-doctor-action-suggestion-preview-handoff-note"
-            className="text-[11px] text-muted-foreground"
-            data-testid="ai-doctor-action-suggestion-preview-handoff-note"
-          >
-            Action Queue write path not enabled for AI Doctor previews.
-          </p>
-        </div>
       </section>
     </section>
   );

@@ -29,12 +29,12 @@ const INDEX_HTML_FIXTURE = `<!doctype html><html><head>
 <meta property="og:title" content="t" />
 <meta property="og:description" content="d" />
 <meta property="og:url" content="${VERDANT_SITE_ORIGIN}" />
-<meta property="og:image" content="${VERDANT_SITE_ORIGIN}/brand/verdant-logo.png" />
+<meta property="og:image" content="${VERDANT_SITE_ORIGIN}/brand/verdant-logo-512.png" />
 <meta property="og:image:alt" content="a" />
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content="t" />
 <meta name="twitter:description" content="d" />
-<meta name="twitter:image" content="${VERDANT_SITE_ORIGIN}/brand/verdant-logo.png" />
+<meta name="twitter:image" content="${VERDANT_SITE_ORIGIN}/brand/verdant-logo-512.png" />
 <link rel="canonical" href="${VERDANT_SITE_ORIGIN}" />
 </head><body></body></html>`;
 
@@ -61,9 +61,7 @@ describe("static social documents: twitter:card and image URLs", () => {
     for (const doc of STATIC_PUBLIC_SEO_DOCUMENTS) {
       const html = buildStaticSocialRouteHtml(INDEX_HTML_FIXTURE, doc.metadata);
       const cards = [
-        ...html.matchAll(
-          /<meta\s+name=["']twitter:card["']\s+content=["']([^"']+)["']/gi,
-        ),
+        ...html.matchAll(/<meta\s+name=["']twitter:card["']\s+content=["']([^"']+)["']/gi),
       ].map((m) => m[1]);
       expect(cards, `${doc.path} must declare exactly one twitter:card`).toHaveLength(1);
       expect(cards[0], `${doc.path} twitter:card must be summary_large_image`).toBe(

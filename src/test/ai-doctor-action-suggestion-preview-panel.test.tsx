@@ -66,9 +66,7 @@ describe("AiDoctorContextReadinessPanel — Action Queue suggestion preview", ()
     render(<AiDoctorContextReadinessPanel context={context} />);
     const card = getPreview();
     expect(card.textContent).toContain("Action Queue suggestion preview");
-    const notes = screen.getByTestId(
-      "ai-doctor-action-suggestion-preview-safety-notes",
-    );
+    const notes = screen.getByTestId("ai-doctor-action-suggestion-preview-safety-notes");
     expect(notes.textContent).toMatch(/approval required/i);
     expect(notes.textContent).toMatch(/no device control/i);
     expect(notes.textContent).toMatch(/preview only/i);
@@ -86,9 +84,9 @@ describe("AiDoctorContextReadinessPanel — Action Queue suggestion preview", ()
     const card = getPreview();
     expect(card.getAttribute("data-status")).toBe("eligible");
     expect(card.getAttribute("data-eligible")).toBe("true");
-    expect(
-      screen.getByTestId("ai-doctor-action-suggestion-preview-action").textContent,
-    ).toMatch(/current sensor snapshot|monitor for 24 hours/i);
+    expect(screen.getByTestId("ai-doctor-action-suggestion-preview-action").textContent).toMatch(
+      /current sensor snapshot|monitor for 24 hours/i,
+    );
   });
 
   it("shows needs_current_reading when only CSV imported history is available", () => {
@@ -108,9 +106,7 @@ describe("AiDoctorContextReadinessPanel — Action Queue suggestion preview", ()
   it("never renders approved/queued/executed language in the preview card", () => {
     const context = ctx(
       [{ occurred_at: ago(12 * HOUR), event_type: "watering", source: "manual" }],
-      [
-        { metric: "temperature_c", value: 24, captured_at: ago(HOUR), source: "live" },
-      ],
+      [{ metric: "temperature_c", value: 24, captured_at: ago(HOUR), source: "live" }],
     );
     render(<AiDoctorContextReadinessPanel context={context} />);
     const text = getPreview().textContent ?? "";
@@ -142,9 +138,7 @@ describe("AiDoctorContextReadinessPanel — Action Queue suggestion preview", ()
     expect(sr.textContent).toMatch(/Approval required/i);
     expect(sr.textContent).toMatch(/No device control/i);
     expect(sr.textContent).toMatch(/Preview only/i);
-    const notes = screen.getByTestId(
-      "ai-doctor-action-suggestion-preview-safety-notes",
-    );
+    const notes = screen.getByTestId("ai-doctor-action-suggestion-preview-safety-notes");
     expect(notes.getAttribute("aria-label")).toMatch(/safety posture/i);
   });
 
@@ -158,45 +152,31 @@ describe("AiDoctorContextReadinessPanel — Action Queue suggestion preview", ()
     render(<AiDoctorContextReadinessPanel context={context} />);
     const card = getPreview();
     expect(card.getAttribute("data-status")).toBe("missing_context");
-    expect(
-      screen.getByTestId("ai-doctor-action-suggestion-preview-missing"),
-    ).toBeTruthy();
-    expect(
-      screen.getByTestId("ai-doctor-action-suggestion-preview-missing-stage"),
-    ).toBeTruthy();
+    expect(screen.getByTestId("ai-doctor-action-suggestion-preview-missing")).toBeTruthy();
+    expect(screen.getByTestId("ai-doctor-action-suggestion-preview-missing-stage")).toBeTruthy();
   });
 
   it("renders invalid (Needs review) fields when telemetry is flagged", () => {
     const context = ctx(
       [{ occurred_at: ago(12 * HOUR), event_type: "watering", source: "manual" }],
-      [
-        { metric: "temperature_c", value: 24, captured_at: ago(HOUR), source: "invalid" },
-      ],
+      [{ metric: "temperature_c", value: 24, captured_at: ago(HOUR), source: "invalid" }],
     );
     render(<AiDoctorContextReadinessPanel context={context} />);
     const card = getPreview();
     expect(card.getAttribute("data-status")).toBe("blocked_invalid_data");
-    expect(
-      screen.getByTestId("ai-doctor-action-suggestion-preview-invalid"),
-    ).toBeTruthy();
-    expect(
-      screen.getByTestId("ai-doctor-action-suggestion-preview-invalid-unknown"),
-    ).toBeTruthy();
+    expect(screen.getByTestId("ai-doctor-action-suggestion-preview-invalid")).toBeTruthy();
+    expect(screen.getByTestId("ai-doctor-action-suggestion-preview-invalid-unknown")).toBeTruthy();
   });
 
-  it("renders only the disabled handoff button (no executable action buttons)", () => {
+  it("renders no placeholder handoff or executable action buttons", () => {
     const context = ctx(
       [{ occurred_at: ago(12 * HOUR), event_type: "watering", source: "manual" }],
       [{ metric: "temperature_c", value: 24, captured_at: ago(HOUR), source: "live" }],
     );
     render(<AiDoctorContextReadinessPanel context={context} />);
     const buttons = getPreview().querySelectorAll("button");
-    expect(buttons.length).toBe(1);
-    const btn = buttons[0] as HTMLButtonElement;
-    expect(btn.disabled).toBe(true);
-    expect(btn.getAttribute("aria-disabled")).toBe("true");
-    expect(btn.getAttribute("data-testid")).toBe(
-      "ai-doctor-action-suggestion-preview-handoff-button",
-    );
+    expect(buttons.length).toBe(0);
+    expect(screen.queryByTestId("ai-doctor-action-suggestion-preview-handoff-button")).toBeNull();
+    expect(getPreview()).not.toHaveTextContent("Add to Action Queue");
   });
 });

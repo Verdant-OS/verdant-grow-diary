@@ -17,16 +17,10 @@ export const CANONICAL_BADGE_SOURCES = [
   "stale",
   "invalid",
 ] as const;
-export type CanonicalBadgeSource = typeof CANONICAL_BADGE_SOURCES[number];
+export type CanonicalBadgeSource = (typeof CANONICAL_BADGE_SOURCES)[number];
 
 export type CanonicalBadgeTone =
-  | "live"
-  | "manual"
-  | "csv"
-  | "demo"
-  | "stale"
-  | "invalid"
-  | "unknown";
+  "live" | "manual" | "csv" | "demo" | "stale" | "invalid" | "unknown";
 
 export interface CanonicalSourceBadgeViewModel {
   /** Canonical source label, or "Unknown source" when not canonical. */
@@ -53,7 +47,6 @@ const SOURCE_LABEL: Record<CanonicalBadgeSource, string> = {
 };
 
 import { deriveProviderLabel } from "@/constants/sensorProviderLabels";
-
 
 const UNKNOWN_LABEL = "Unknown source" as const;
 

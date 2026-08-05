@@ -45,6 +45,15 @@ export interface NormalizedDiaryDetails {
     vendor?: string;
   };
   remindAt?: string;
+  /**
+   * Raw declared event-type string carried inside the diary_entries
+   * `details` jsonb (Quick Log companion rows stamp this — the envelope
+   * `event_type` column may be a wrapper like "quick_log" or "note").
+   * Preserved verbatim (lowercased/trimmed) so downstream identity
+   * resolvers can promote a canonical Quick Log type without re-parsing
+   * raw details. Not used by AI context.
+   */
+  declaredEventType?: string;
   /** Unknown but preserved keys (sanitized — no functions, no class instances). */
   extras?: DiaryEntryDetailsExtras;
 }
@@ -106,6 +115,27 @@ const KNOWN_DETAIL_KEYS = new Set([
   "sensorSnapshot",
   "remind_at",
   "remindAt",
+  // Consumed as the row's eventType fallback (diary_entries has no event_type
+  // column; quick-log companions carry the type inside details) — not an extra.
+  "event_type",
+  "eventType",
+]);
+
+/**
+ * Server-validated quicklog_save_event types (the RPC's own allow-list). Only
+ * these may be recovered from details.event_type as the row's eventType —
+ * machine markers (action_followup, quicklog_photo_attachment, …) stay on the
+ * "note" default so raw codes never surface as type badges.
+ */
+const QUICK_LOG_DETAILS_EVENT_TYPES = new Set([
+  "observation",
+  "watering",
+  "feeding",
+  "photo",
+  "environment",
+  "training",
+  "harvest",
+  "cure_check",
 ]);
 
 function isFiniteNumber(v: unknown): v is number {
@@ -228,12 +258,8 @@ function normalizeTds(
   return n;
 }
 
-function normalizeWateringMl(
-  d: Record<string, unknown>,
-  warnings: string[],
-): number | undefined {
-  const mlRaw =
-    d.wateringAmountMl ?? d.watering_amount_ml ?? d.wateringAmount ?? d.watering_amount;
+function normalizeWateringMl(d: Record<string, unknown>, warnings: string[]): number | undefined {
+  const mlRaw = d.wateringAmountMl ?? d.watering_amount_ml ?? d.wateringAmount ?? d.watering_amount;
   const lRaw = d.wateringAmountL ?? d.watering_amount_l;
   if (lRaw != null) {
     const l = coerceFiniteNumber(lRaw);
@@ -286,7 +312,7 @@ function normalizeNutrients(
       const name = nonBlankString(r.name);
       if (!name) continue;
       const amountRaw = r.amount;
-      const amount = amountRaw == null ? undefined : coerceFiniteNumber(amountRaw) ?? undefined;
+      const amount = amountRaw == null ? undefined : (coerceFiniteNumber(amountRaw) ?? undefined);
       if (amountRaw != null && amount == null) {
         warnings.push("nutrients:invalid-amount");
       }
@@ -359,9 +385,13 @@ function collectExtras(d: Record<string, unknown>): DiaryEntryDetailsExtras | un
   for (const [k, v] of Object.entries(d)) {
     if (KNOWN_DETAIL_KEYS.has(k)) continue;
     if (typeof v === "function") continue;
-    if (v && typeof v === "object" && (v as { constructor?: { name?: string } }).constructor?.name &&
-        (v as { constructor: { name: string } }).constructor.name !== "Object" &&
-        !Array.isArray(v)) {
+    if (
+      v &&
+      typeof v === "object" &&
+      (v as { constructor?: { name?: string } }).constructor?.name &&
+      (v as { constructor: { name: string } }).constructor.name !== "Object" &&
+      !Array.isArray(v)
+    ) {
       continue;
     }
     out[k] = v;
@@ -403,8 +433,23 @@ export function normalizeDiaryEntry(
   const plantId = nonBlankString(pickFirst(r.plant_id, r.plantId));
   const tentId = nonBlankString(pickFirst(r.tent_id, r.tentId));
   const stage = nonBlankString(pickFirst(r.stage, r.plant_stage, r.plantStage));
+  // Parse details once, up front: quick-log companion rows carry their type
+  // INSIDE details (diary_entries has no event_type column), so the type
+  // derivation below needs it as a trailing fallback. Top-level keys stay
+  // first in pickFirst, so rows with a real top-level type are unaffected.
+  // The fallback is gated to the server-validated quick-log event allow-list:
+  // machine markers like "action_followup" / "quicklog_photo_attachment" keep
+  // today's "note" default rather than leaking raw codes into type badges.
+  const detailsParsed = safeParseDetails(r.details, warnings);
+  const dv = detailsParsed.value;
+  const detailsEventTypeCandidate = nonBlankString(pickFirst(dv?.event_type, dv?.eventType));
+  const detailsEventType =
+    detailsEventTypeCandidate !== null &&
+    QUICK_LOG_DETAILS_EVENT_TYPES.has(detailsEventTypeCandidate)
+      ? detailsEventTypeCandidate
+      : null;
   const eventTypeRaw = nonBlankString(
-    pickFirst(r.entry_type, r.entryType, r.event_type, r.eventType, r.type),
+    pickFirst(r.entry_type, r.entryType, r.event_type, r.eventType, r.type, detailsEventType),
   );
   const eventType = eventTypeRaw ?? "note";
   if (!eventTypeRaw) warnings.push("event-type:missing");
@@ -433,35 +478,22 @@ export function normalizeDiaryEntry(
     refStarted.epoch != null &&
     createdParsed.epoch >= refStarted.epoch
   ) {
-    dayOfGrow = Math.floor(
-      (createdParsed.epoch - refStarted.epoch) / (24 * 60 * 60 * 1000),
-    );
+    dayOfGrow = Math.floor((createdParsed.epoch - refStarted.epoch) / (24 * 60 * 60 * 1000));
     weekOfGrow = Math.floor(dayOfGrow / 7);
   }
 
   // Details ---------------------------------------------------------------
-  const detailsParsed = safeParseDetails(r.details, warnings);
+  // (detailsParsed was hoisted above the eventType derivation — reuse it here
+  // so details warnings are pushed exactly once.)
   const details: NormalizedDiaryDetails = {};
   if (detailsParsed.value) {
     const d = detailsParsed.value;
     const ph = normalizePh(pickFirst(d.ph, d.pH), "ph", warnings);
     const ec = normalizeEc(pickFirst(d.ec, d.EC), "ec", warnings);
     const tds = normalizeTds(pickFirst(d.tds, d.TDS), "tds", warnings);
-    const runoffPh = normalizePh(
-      pickFirst(d.runoff_ph, d.runoffPh),
-      "runoff-ph",
-      warnings,
-    );
-    const runoffEc = normalizeEc(
-      pickFirst(d.runoff_ec, d.runoffEc),
-      "runoff-ec",
-      warnings,
-    );
-    const runoffTds = normalizeTds(
-      pickFirst(d.runoff_tds, d.runoffTds),
-      "runoff-tds",
-      warnings,
-    );
+    const runoffPh = normalizePh(pickFirst(d.runoff_ph, d.runoffPh), "runoff-ph", warnings);
+    const runoffEc = normalizeEc(pickFirst(d.runoff_ec, d.runoffEc), "runoff-ec", warnings);
+    const runoffTds = normalizeTds(pickFirst(d.runoff_tds, d.runoffTds), "runoff-tds", warnings);
     const wateringAmountMl = normalizeWateringMl(d, warnings);
     const nutrients = normalizeNutrients(d.nutrients, warnings);
     const trainingActions = normalizeStringArray(
@@ -475,10 +507,7 @@ export function normalizeDiaryEntry(
       pickFirst(d.sensor_snapshot, d.sensorSnapshot),
       warnings,
     );
-    const remindAt = normalizeRemindAt(
-      pickFirst(d.remind_at, d.remindAt),
-      warnings,
-    );
+    const remindAt = normalizeRemindAt(pickFirst(d.remind_at, d.remindAt), warnings);
     const extras = collectExtras(d);
 
     if (ph !== undefined) details.ph = ph;
@@ -494,6 +523,11 @@ export function normalizeDiaryEntry(
     if (observations) details.observations = observations;
     if (sensorSnapshot) details.sensorSnapshot = sensorSnapshot;
     if (remindAt) details.remindAt = remindAt;
+    // Preserve the raw declared event-type inside details for downstream
+    // Quick Log identity resolution (envelope event_type may be "quick_log").
+    if (detailsEventTypeCandidate) {
+      details.declaredEventType = detailsEventTypeCandidate.toLowerCase().trim();
+    }
     if (extras) details.extras = extras;
   }
 
@@ -527,9 +561,7 @@ export function normalizeDiaryEntry(
 // Bulk normalization + sort
 // ---------------------------------------------------------------------------
 
-export function normalizeDiaryEntries(
-  input: NormalizeDiaryInput,
-): NormalizedDiaryEntry[] {
+export function normalizeDiaryEntries(input: NormalizeDiaryInput): NormalizedDiaryEntry[] {
   if (!input || !Array.isArray(input.rawEntries)) return [];
   const out: NormalizedDiaryEntry[] = [];
   for (const raw of input.rawEntries) {

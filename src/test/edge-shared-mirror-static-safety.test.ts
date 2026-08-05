@@ -8,7 +8,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join, relative, resolve } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
 
 const ROOT = resolve(__dirname, "..", "..");
 const FUNCTIONS = join(ROOT, "supabase", "functions");
@@ -24,8 +24,7 @@ function walk(dir: string): string[] {
   return out;
 }
 
-const IMPORT_RE =
-  /(?:^|\n)\s*(?:import|export)(?:\s+[\s\S]*?\s+from)?\s*["']([^"']+)["']/g;
+const IMPORT_RE = /(?:^|\n)\s*(?:import|export)(?:\s+[\s\S]*?\s+from)?\s*["']([^"']+)["']/g;
 
 function specifiersOf(src: string): string[] {
   const out: string[] = [];
@@ -35,10 +34,7 @@ function specifiersOf(src: string): string[] {
 
 describe("edge functions: no direct src/lib reach", () => {
   const files = walk(FUNCTIONS).filter(
-    (f) =>
-      f.endsWith(".ts") &&
-      !f.startsWith(MIRROR + require("node:path").sep) &&
-      f !== MIRROR,
+    (f) => f.endsWith(".ts") && !f.startsWith(MIRROR + sep) && f !== MIRROR,
   );
 
   it("finds at least one edge-function .ts file", () => {
@@ -59,4 +55,20 @@ describe("edge functions: no direct src/lib reach", () => {
       expect(bad, `unmirrored imports: ${bad.join(", ")}`).toEqual([]);
     });
   }
+});
+
+describe("edge shared mirror formatting contract", () => {
+  it("keeps canonical and mirrored generated Supabase types out of Prettier", () => {
+    const ignored = readFileSync(join(ROOT, ".prettierignore"), "utf8")
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0 && !line.startsWith("#"));
+
+    expect(ignored).toEqual(
+      expect.arrayContaining([
+        "src/integrations/supabase/types.ts",
+        "supabase/functions/_shared/lib/integrations/supabase/types.ts",
+      ]),
+    );
+  });
 });

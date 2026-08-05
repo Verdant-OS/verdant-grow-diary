@@ -57,11 +57,13 @@ describe("Timeline.tsx — mergeTimelineSources wire-up", () => {
     expect(TIMELINE_SRC).toMatch(/from\(\s*["']grow_events["']\s*\)/);
   });
 
-  it("uses the shared allowlisted root-zone projection for grow_events", () => {
+  it("uses the shared allowlisted root-zone projection and exact count for grow_events", () => {
     expect(TIMELINE_SRC).toMatch(
       /import\s*\{\s*ROOT_ZONE_GROW_EVENT_SELECT\s*\}\s*from\s*["']@\/lib\/rootZoneObservationRules["']/,
     );
-    expect(TIMELINE_SRC).toMatch(/\.select\(ROOT_ZONE_GROW_EVENT_SELECT\)/);
+    expect(TIMELINE_SRC).toMatch(
+      /\.select\(ROOT_ZONE_GROW_EVENT_SELECT,\s*\{\s*count:\s*["']exact["']\s*\}\)/,
+    );
   });
 
   it("applies the active date bounds to the typed grow_events query", () => {

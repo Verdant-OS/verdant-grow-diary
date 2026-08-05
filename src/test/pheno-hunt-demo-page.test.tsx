@@ -4,7 +4,7 @@
  */
 import { afterEach, describe, it, expect, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import PhenoHuntDemo from "@/pages/PhenoHuntDemo";
 import { DEMO_CANDIDATES } from "@/lib/demo/phenoHuntDemoFixture";
 
@@ -24,7 +24,10 @@ function renderPage() {
 describe("PhenoHuntDemo page", () => {
   it("renders the page shell with demo labeling", () => {
     renderPage();
-    expect(screen.getByTestId("pheno-hunt-demo-page")).toBeInTheDocument();
+    expect(screen.getByRole("main")).toBe(screen.getByTestId("pheno-hunt-demo-page"));
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Pheno Hunt (Demo)" }),
+    ).toBeInTheDocument();
     expect(screen.getByTestId("pheno-hunt-demo-banner").textContent).toMatch(/demo/i);
   });
 

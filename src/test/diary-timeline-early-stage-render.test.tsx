@@ -131,9 +131,7 @@ describe("TimelineMemorySection — early-stage rendering", () => {
     const vigor = screen.getByTestId("timeline-diary-early-stage-vigor");
     expect(milestone.textContent).toMatch(/Milestone: Milestone logged/);
     expect(vigor.textContent).toMatch(/Vigor: Vigor noted/);
-    expect(
-      screen.queryByTestId("timeline-diary-early-stage-stage"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("timeline-diary-early-stage-stage")).not.toBeInTheDocument();
 
     const section = screen.getByTestId("timeline-memory-section");
     const html = section.innerHTML;
@@ -153,11 +151,7 @@ describe("TimelineMemorySection — early-stage rendering", () => {
     await waitFor(() =>
       expect(screen.getByTestId("timeline-memory-day-groups")).toBeInTheDocument(),
     );
-    expect(
-      screen.queryByTestId("timeline-diary-early-stage"),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByTestId("timeline-diary-early-stage-milestone"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("timeline-diary-early-stage")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("timeline-diary-early-stage-milestone")).not.toBeInTheDocument();
   });
 });

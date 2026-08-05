@@ -55,8 +55,7 @@ export interface BillingCustomerLinkCaptureBlocked {
 }
 
 export type BillingCustomerLinkCaptureResult =
-  | BillingCustomerLinkCapturePlan
-  | BillingCustomerLinkCaptureBlocked;
+  BillingCustomerLinkCapturePlan | BillingCustomerLinkCaptureBlocked;
 
 const ALLOWED_SOURCES = new Set<BillingCustomerLinkSource>([
   "checkout",
@@ -111,7 +110,7 @@ function parseSource(value: unknown): BillingCustomerLinkSource | null {
   const cleaned = cleanString(value);
   if (!cleaned) return "unknown";
   return ALLOWED_SOURCES.has(cleaned as BillingCustomerLinkSource)
-    ? cleaned as BillingCustomerLinkSource
+    ? (cleaned as BillingCustomerLinkSource)
     : null;
 }
 
@@ -119,7 +118,7 @@ function parseStatus(value: unknown): BillingCustomerLinkStatus | null {
   const cleaned = cleanString(value);
   if (!cleaned) return "linked";
   return ALLOWED_STATUSES.has(cleaned as BillingCustomerLinkStatus)
-    ? cleaned as BillingCustomerLinkStatus
+    ? (cleaned as BillingCustomerLinkStatus)
     : null;
 }
 
@@ -127,7 +126,7 @@ function parseConfidence(value: unknown): BillingCustomerLinkConfidence | null {
   const cleaned = cleanString(value);
   if (!cleaned) return "verified";
   return ALLOWED_CONFIDENCE.has(cleaned as BillingCustomerLinkConfidence)
-    ? cleaned as BillingCustomerLinkConfidence
+    ? (cleaned as BillingCustomerLinkConfidence)
     : null;
 }
 

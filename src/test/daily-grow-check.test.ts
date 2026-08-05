@@ -32,7 +32,7 @@ const ROOT = resolve(__dirname, "../..");
 const read = (p: string) => readFileSync(resolve(ROOT, p), "utf8");
 
 const PAGE = read("src/pages/DailyCheck.tsx");
-const APP = read("src/App.tsx");
+const APP = readAllRouteModuleSources();
 const DASHBOARD = read("src/pages/Dashboard.tsx");
 const PLANT_DETAIL = read("src/pages/PlantDetail.tsx");
 const RULES = read("src/lib/dailyGrowCheckRules.ts");
@@ -141,6 +141,7 @@ describe("dailyGrowCheckRules — summary", () => {
     expect(get("handheld")).toBe("skipped");
     expect(get("alerts")).toBe("reviewed");
     expect(get("tasks")).toBe("not-reviewed");
+    expect(summary.find((row) => row.key === "tasks")?.label).toBe("Pending actions");
   });
   it("missing optional readings do not block completion", () => {
     expect(canCompleteDailyGrowCheck(INITIAL_DAILY_GROW_CHECK_STATE)).toBe(true);
@@ -154,7 +155,7 @@ describe("DailyCheck page — entry points and structure", () => {
     expect(PAGE).toMatch(/Step 3 · Add Manual Sensor Snapshot/);
     expect(PAGE).toMatch(/Step 4 · Quick Log/);
     expect(PAGE).toMatch(/Step 5 · Handheld Readings/);
-    expect(PAGE).toMatch(/Step 6 · Review Alerts & Pending Tasks/);
+    expect(PAGE).toMatch(/Step 6 · Review Alerts & Pending Actions/);
     expect(PAGE).toMatch(/Daily Grow Check/);
     expect(PAGE).toMatch(/Current Tent/);
     expect(PAGE).toMatch(/Current Plant/);
@@ -168,7 +169,7 @@ describe("DailyCheck page — entry points and structure", () => {
     expect(PAGE).toMatch(/PlantAssignedTentActionsPanel/);
   });
   it("registers the /daily-check route", () => {
-    expect(APP).toMatch(/path="\/daily-check"/);
+    expect(extractMountedAppRoutePaths()).toContain("/daily-check");
     expect(APP).toMatch(/DailyCheck/);
   });
   it("Dashboard exposes a Daily Grow Check entry button", () => {
@@ -221,6 +222,10 @@ describe("DailyCheck — static safety audit", () => {
 });
 
 import { buildDailyGrowCheckReviewLinks, formatOutcomeLabel } from "@/lib/dailyGrowCheckRules";
+import {
+  extractMountedAppRoutePaths,
+  readAllRouteModuleSources,
+} from "./helpers/routeManifestSyncHarness";
 
 describe("buildDailyGrowCheckReviewLinks", () => {
   it("includes plant + tent + timeline when both are present", () => {

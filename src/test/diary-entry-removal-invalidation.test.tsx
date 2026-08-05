@@ -7,7 +7,9 @@ import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 const { deleteEq, deleteFn, toastSuccess, toastError } = vi.hoisted(() => {
-  const deleteEq = vi.fn(() => Promise.resolve({ error: null }));
+  const deleteEq = vi.fn((): Promise<{ error: { code: string; message: string } | null }> =>
+    Promise.resolve({ error: null }),
+  );
   const deleteFn = vi.fn(() => ({ eq: deleteEq }));
   return {
     deleteEq,
@@ -100,9 +102,7 @@ describe("useRemoveDiaryEntry — query invalidation", () => {
         plantId: "plant-A",
       });
     });
-    const joined = spy.mock.calls
-      .map((c) => JSON.stringify(c[0]?.queryKey))
-      .join("|");
+    const joined = spy.mock.calls.map((c) => JSON.stringify(c[0]?.queryKey)).join("|");
     expect(joined).toContain("plant-A");
     expect(joined).not.toContain("plant-B");
   });

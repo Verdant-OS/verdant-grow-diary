@@ -41,12 +41,7 @@ describe("EnvironmentStabilityCard — stage-band why context", () => {
   });
 
   it("renders Flower VPD target on a flower card", () => {
-    render(
-      <EnvironmentStabilityCard
-        testId="card"
-        result={baseResult({ stage: "flower" })}
-      />,
-    );
+    render(<EnvironmentStabilityCard testId="card" result={baseResult({ stage: "flower" })} />);
     const node = screen.getByTestId("card-why-context");
     expect(node.textContent).toContain("Flower VPD target: 1.0–1.5 kPa");
     expect(node.getAttribute("data-why-kind")).toBe("stage");
@@ -56,12 +51,7 @@ describe("EnvironmentStabilityCard — stage-band why context", () => {
   });
 
   it("renders Veg VPD target on a veg card", () => {
-    render(
-      <EnvironmentStabilityCard
-        testId="vcard"
-        result={baseResult({ stage: "veg" })}
-      />,
-    );
+    render(<EnvironmentStabilityCard testId="vcard" result={baseResult({ stage: "veg" })} />);
     expect(screen.getByTestId("vcard-why-context").textContent).toContain(
       "Veg VPD target: 0.8–1.2 kPa",
     );
@@ -109,19 +99,12 @@ describe("EnvironmentStabilityCard — stage-band why context", () => {
         result={baseResult({ stage: "flower", sparse: true })}
       />,
     );
-    expect(screen.getByTestId("scard-sparse-warning").textContent).toContain(
-      "Limited data",
-    );
-    expect(screen.getByTestId("scard-why-context").textContent).toContain(
-      "Flower VPD target",
-    );
+    expect(screen.getByTestId("scard-sparse-warning").textContent).toContain("Limited data");
+    expect(screen.getByTestId("scard-why-context").textContent).toContain("Flower VPD target");
   });
 
   it("static safety: no alert writes, queues, service_role, AI Doctor, or device control", () => {
-    const files = [
-      "src/components/EnvironmentStabilityCard.tsx",
-      "src/lib/stabilityWhyContext.ts",
-    ];
+    const files = ["src/components/EnvironmentStabilityCard.tsx", "src/lib/stabilityWhyContext.ts"];
     for (const rel of files) {
       const src = readFileSync(path.resolve(process.cwd(), rel), "utf8");
       expect(src).not.toMatch(/action_queue/i);
@@ -130,7 +113,9 @@ describe("EnvironmentStabilityCard — stage-band why context", () => {
       expect(src).not.toMatch(/from\s+["']@\/integrations\/supabase/);
       expect(src).not.toMatch(/\.from\(\s*["']alerts["']\s*\)/);
       // Block real automation/device-control surfaces (not the prose comment).
-      expect(src).not.toMatch(/setDevicePower|sendMqtt|publishMqtt|home_assistant\.|deviceControl\(/);
+      expect(src).not.toMatch(
+        /setDevicePower|sendMqtt|publishMqtt|home_assistant\.|deviceControl\(/,
+      );
     }
   });
 });

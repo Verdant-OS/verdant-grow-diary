@@ -145,4 +145,3 @@ describe("Friendly, non-enumerating copy", () => {
     );
   });
 });
-

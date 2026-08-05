@@ -5,16 +5,20 @@ import fs from "node:fs";
 import path from "node:path";
 import { APP_ROUTES } from "@/lib/appRouteManifest";
 import { readDesktopGrowerNavigationSource } from "@/test/utils/growerNavigationSource";
+import {
+  extractMountedAppRoutePaths,
+  readAllRouteModuleSources,
+} from "./helpers/routeManifestSyncHarness";
 
-const APP = fs.readFileSync(path.resolve(__dirname, "../App.tsx"), "utf8");
+const APP = readAllRouteModuleSources();
 const SIDEBAR = readDesktopGrowerNavigationSource();
 
 const REMOVED_ROUTES = ["/operator/genetics-import", "/imports/representative-csv"];
 
 describe("Operator XLSX / spreadsheet import routes are gone", () => {
   for (const p of REMOVED_ROUTES) {
-    it(`route ${p} is not declared in App.tsx`, () => {
-      expect(APP).not.toContain(`path="${p}"`);
+    it(`route ${p} is not declared in file routes`, () => {
+      expect(extractMountedAppRoutePaths()).not.toContain(p);
     });
     it(`route ${p} is not present in the route manifest`, () => {
       expect(APP_ROUTES.find((r) => r.path === p)).toBeUndefined();

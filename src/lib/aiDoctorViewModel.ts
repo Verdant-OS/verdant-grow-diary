@@ -50,15 +50,12 @@ export function buildAiDoctorDiagnosisEvidenceAlignmentVM(
   const acceptedCount = envCheckPresent ? ec.acceptedCount : 0;
   const rejectedCount = envCheckPresent ? ec.rejectedCount : 0;
   const notCheckedCount = envCheckPresent ? ec.notCheckedCount : 0;
-  const derivedVpd =
-    envCheckPresent && ec.metrics.some((m) => m.derived && m.key === "vpd_kpa");
+  const derivedVpd = envCheckPresent && ec.metrics.some((m) => m.derived && m.key === "vpd_kpa");
   const checklist = buildEnvironmentCheckChecklist({
     event: compiled.environmentCheckSelection.selected,
     hasLiveSensorContext: liveSensorUsable,
   });
-  const moreDataNeededCount = checklist.items.filter(
-    (i) => i.state === "needed",
-  ).length;
+  const moreDataNeededCount = checklist.items.filter((i) => i.state === "needed").length;
   const alignmentInput: DiagnosisEvidenceAlignmentInput = {
     hasLiveSensor: !!compiled.sensor,
     liveSensorUsable,
@@ -122,9 +119,7 @@ function statusLabel(status: string): string {
   return "Unknown";
 }
 
-function envCheckBlock(
-  ec: AiDoctorEnvironmentCheckResult,
-): AiDoctorEnvironmentCheckBlockVM {
+function envCheckBlock(ec: AiDoctorEnvironmentCheckResult): AiDoctorEnvironmentCheckBlockVM {
   if (ec.kind === "absent") {
     return {
       show: false,
@@ -173,13 +168,10 @@ function envCheckBlock(
   };
 }
 
-export function buildAiDoctorViewModel(
-  input: CompileAiDoctorContextInput,
-): AiDoctorViewModel {
+export function buildAiDoctorViewModel(input: CompileAiDoctorContextInput): AiDoctorViewModel {
   const compiled: CompiledAiDoctorContext = compileAiDoctorContext(input);
   const block = envCheckBlock(compiled.environmentCheck);
-  const sensorUsable =
-    !!compiled.sensor && compiled.sensor.usableMetrics.length > 0;
+  const sensorUsable = !!compiled.sensor && compiled.sensor.usableMetrics.length > 0;
   const envUsable =
     compiled.environmentCheck.present &&
     compiled.environmentCheck.acceptedCount > 0 &&

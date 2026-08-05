@@ -11,8 +11,7 @@ import {
 const CSV =
   "timestamp,temperature,humidity\n2026-06-01T10:00,24.1,100\n2026-06-01T11:00,24.5,100\n";
 
-const TSV =
-  "timestamp\ttemperature\tlux\n2026-06-01T10:00\t24.1\t20000\n";
+const TSV = "timestamp\ttemperature\tlux\n2026-06-01T10:00\t24.1\t20000\n";
 
 const FIXED_NOW = "2026-06-04T12:00:00.000Z";
 

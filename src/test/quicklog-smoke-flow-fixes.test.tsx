@@ -121,15 +121,21 @@ describe("QuickLog named target integrity", () => {
   });
 });
 
-describe("QuickLog watering required field", () => {
-  it("auto-expands details + Watering (ml) is required when event is watering", async () => {
+describe("QuickLog legacy Watering safety fence", () => {
+  it("rejects a crafted legacy Watering prefill even when volume is populated", async () => {
     renderQL({
       open: true,
       onOpenChange: () => {},
       prefill: { plantId: "p2", growId: "g1", eventType: "watering" },
     });
     const input = (await screen.findByTestId("quicklog-watering-ml")) as HTMLInputElement;
-    expect(input.getAttribute("aria-required")).toBe("true");
+    fireEvent.change(input, { target: { value: "500" } });
+    const form = input.closest("form") as HTMLFormElement;
+    expect(form).not.toBeNull();
+    fireEvent.submit(form);
+
+    expect(await screen.findByText(/structured Water form/i)).toBeInTheDocument();
+    expect(rpcMock).not.toHaveBeenCalled();
   });
 
   it("blocking watering save shows inline error and does not call RPC", async () => {

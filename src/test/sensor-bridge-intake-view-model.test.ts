@@ -42,10 +42,9 @@ describe("buildBridgeIntakeStatusViewModel", () => {
   });
 
   it("renders rejected payload with a reason code (no raw data)", () => {
-    const result = validateAndResolveBridgeIntake(
-      basePayload({ captured_at: undefined }),
-      { now: NOW },
-    );
+    const result = validateAndResolveBridgeIntake(basePayload({ captured_at: undefined }), {
+      now: NOW,
+    });
     const vm = buildBridgeIntakeStatusViewModel({ lastResult: result });
     expect(vm.isAccepted).toBe(false);
     expect(vm.severity).toBe("warning");
@@ -54,20 +53,18 @@ describe("buildBridgeIntakeStatusViewModel", () => {
   });
 
   it("renders stale-downgraded reading with watch severity", () => {
-    const result = validateAndResolveBridgeIntake(
-      basePayload({ authenticated: false }),
-      { now: NOW },
-    );
+    const result = validateAndResolveBridgeIntake(basePayload({ authenticated: false }), {
+      now: NOW,
+    });
     const vm = buildBridgeIntakeStatusViewModel({ lastResult: result });
     expect(vm.resolvedSource).toBe("stale");
     expect(vm.severity).toBe("watch");
   });
 
   it("demo intake never reports as live", () => {
-    const result = validateAndResolveBridgeIntake(
-      basePayload({ submitted_source: "demo" }),
-      { now: NOW },
-    );
+    const result = validateAndResolveBridgeIntake(basePayload({ submitted_source: "demo" }), {
+      now: NOW,
+    });
     const vm = buildBridgeIntakeStatusViewModel({ lastResult: result });
     expect(vm.resolvedSource).toBe("demo");
     expect(vm.message).not.toMatch(/live/i);

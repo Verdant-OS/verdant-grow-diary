@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "artifactType": "post_v1_public_route_cohorts",
+  "artifactScope": "Separately approved public routes that are intentionally outside the immutable v1 roadmap identity and allocation baseline.",
+  "cohorts": [
+    {
+      "id": "PV1-SYMPTOM-EVIDENCE-GUIDES",
+      "sourcePullRequest": 627,
+      "rationale": "These public symptom guides connect grower-recorded evidence checks to scannable, cautious reference content without rewriting the immutable v1 roadmap.",
+      "paths": [
+        "/guides/cannabis-burnt-crispy-leaf-tips",
+        "/guides/cannabis-leaf-spots-lesions",
+        "/guides/cannabis-leaf-symptoms",
+        "/guides/cannabis-leaves-turning-yellow"
+      ]
+    }
+  ]
+}

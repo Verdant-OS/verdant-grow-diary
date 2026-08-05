@@ -3,18 +3,13 @@
  * No queries, no writes, no AI. Deterministic input/output only.
  */
 import { describe, expect, it } from "vitest";
-import {
-  buildDiaryFaqLink,
-  detectDiaryFaqTopic,
-} from "@/lib/diaryFaqLinkRules";
+import { buildDiaryFaqLink, detectDiaryFaqTopic } from "@/lib/diaryFaqLinkRules";
 import { CANNABIS_PLANT_CARE_FAQ } from "@/constants/cannabisPlantCareFaq";
 
 describe("detectDiaryFaqTopic", () => {
   it("returns null for empty input", () => {
     expect(detectDiaryFaqTopic({})).toBeNull();
-    expect(
-      detectDiaryFaqTopic({ eventType: null, tags: [], notePreview: "" }),
-    ).toBeNull();
+    expect(detectDiaryFaqTopic({ eventType: null, tags: [], notePreview: "" })).toBeNull();
   });
 
   it("matches yellowing from note text", () => {
@@ -95,9 +90,7 @@ describe("detectDiaryFaqTopic", () => {
   });
 
   it("is case-insensitive and word-bounded", () => {
-    expect(
-      detectDiaryFaqTopic({ notePreview: "YELLOW tips forming." }),
-    ).toBe("yellowing");
+    expect(detectDiaryFaqTopic({ notePreview: "YELLOW tips forming." })).toBe("yellowing");
     // 'watermelon' should not trip the 'water' keyword thanks to word boundary.
     expect(
       detectDiaryFaqTopic({

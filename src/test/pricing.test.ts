@@ -8,14 +8,19 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import {
+  extractMountedAppRoutePaths,
+  readAllRouteModuleSources,
+} from "./helpers/routeManifestSyncHarness";
 
 const root = resolve(__dirname, "..", "..");
 const readSrc = (p: string) => readFileSync(resolve(__dirname, "..", p), "utf8");
 const read = (p: string) => readFileSync(resolve(root, p), "utf8");
 
-const APP = readSrc("App.tsx");
+const APP = readAllRouteModuleSources();
 const PAGE = readSrc("pages/Pricing.tsx");
 const CONSTANTS = readSrc("constants/pricing.ts");
+const UPGRADE_CONFIG = readSrc("config/pricing.ts");
 
 const LANDING = readSrc("pages/Landing.tsx");
 const ANALYTICS = readSrc("lib/pricingAnalytics.ts");
@@ -23,14 +28,16 @@ const SITEMAP = read("public/sitemap.xml");
 
 describe("/pricing route", () => {
   it("is registered as a public route", () => {
-    // Page is code-split (React.lazy dynamic import) rather than eagerly imported.
-    expect(APP).toMatch(/import\(\s*["']\.\/pages\/Pricing["']\s*\)/);
-    expect(APP).toMatch(/path="\/pricing"\s+element=\{<Pricing\s*\/>\}/);
+    // TanStack file routes mount pages via static @/pages imports (not React.lazy).
+    expect(APP).toMatch(/from\s+["']@\/pages\/Pricing["']/);
+    expect(extractMountedAppRoutePaths()).toContain("/pricing");
+    expect(APP).toMatch(/Pricing/);
   });
 
   it("redirects legacy /billing/:plan to canonical /pricing via LegacyBillingRedirect", () => {
-    expect(APP).toMatch(/import\(\s*["']\.\/pages\/LegacyBillingRedirect["']\s*\)/);
-    expect(APP).toMatch(/path="\/billing\/:plan"\s+element=\{<LegacyBillingRedirect\s*\/>\}/);
+    expect(APP).toMatch(/from\s+["']@\/pages\/LegacyBillingRedirect["']/);
+    expect(extractMountedAppRoutePaths()).toContain("/billing/:plan");
+    expect(APP).toMatch(/LegacyBillingRedirect/);
   });
 });
 
@@ -142,6 +149,24 @@ describe("AI credit packs (top-up surface)", () => {
     expect(PAGE).toMatch(/pricing_cta_credit_pack_clicked/);
     expect(ANALYTICS).toMatch(/pricing_cta_credit_pack_clicked/);
   });
+
+  it("describes the live credit packs as available rather than planned", () => {
+    expect(CONSTANTS).toContain("One-time AI credit packs available");
+    expect(CONSTANTS).not.toMatch(/credit packs planned/i);
+  });
+});
+
+describe("Live paid-feature copy", () => {
+  it("describes date-range and post-grow reports as available paid features", () => {
+    expect(UPGRADE_CONFIG).toContain("Date-range diary & post-grow reports");
+    expect(PAGE).toContain("post-grow learning reports");
+    expect(UPGRADE_CONFIG).not.toMatch(/advanced grow reports \(planned\)/i);
+    expect(PAGE).not.toMatch(/early access to advanced grow reports/i);
+  });
+
+  it("does not describe configured checkout as still finalizing", () => {
+    expect(UPGRADE_CONFIG).not.toMatch(/checkout finalizing/i);
+  });
 });
 
 describe("Pricing page imports constants", () => {
@@ -166,15 +191,20 @@ describe("Free vs Pro vs Founder Lifetime comparison", () => {
     }
   });
 
-  it("Pro tier includes backup, exports, priority support", () => {
+  it("Pro tier lists implemented paid capabilities without universal or unimplemented claims", () => {
     for (const item of [
       "Export / backups",
-      "Priority support",
-      "Sensor snapshot history",
-      "Advanced timeline filtering",
+      "Full sensor snapshot history",
+      "Advanced timeline filtering and jump tools",
     ]) {
       expect(CONSTANTS).toContain(item);
     }
+    expect(CONSTANTS).not.toContain("Full Action Queue");
+    expect(CONSTANTS).not.toContain("Priority support");
+    expect(PAGE).not.toContain('title="Approval-required actions"');
+    expect(PAGE).not.toContain("priority support");
+    expect(UPGRADE_CONFIG).not.toContain("Priority support");
+    expect(UPGRADE_CONFIG).not.toContain("priority support");
   });
 
   it("comparison table renders all four columns (Free / Pro / Craft / Founder Lifetime)", () => {
@@ -390,15 +420,18 @@ describe("Safety: no private data on public page", () => {
     }
   });
 
-  it("does not import supabase client or private hooks", () => {
+  it("does not query private grow data or import arbitrary hooks", () => {
     expect(PAGE).not.toMatch(/@\/integrations\/supabase\/client/);
     // Allowed: usePageSeo (SEO <head> only), usePaddleCheckout
     // (auth-state + Paddle overlay; signed-out users bounce to /auth), and
     // useFounderSlotsRemaining (public slot counter via edge function;
-    // fails soft, never grants entitlement). Any other @/hooks import
-    // (dashboard data hooks) remains forbidden.
+    // fails soft, never grants entitlement). useMyEntitlements is the
+    // presentation-only, select-own/RLS billing read needed to avoid selling
+    // an AI credit pack the current plan cannot spend. It renders only a
+    // generic eligibility state; no subscription fields. Any other @/hooks
+    // import (dashboard data hooks) remains forbidden.
     expect(PAGE).not.toMatch(
-      /@\/hooks\/(?!usePageSeo\b|usePaddleCheckout\b|useFounderSlotsRemaining\b)/,
+      /@\/hooks\/(?!usePageSeo\b|usePaddleCheckout\b|useFounderSlotsRemaining\b|useMyEntitlements\b)/,
     );
     // And the checkout hook itself must stay free of private data reads —
     // it may read auth session state, never tables or the supabase client.
@@ -406,6 +439,18 @@ describe("Safety: no private data on public page", () => {
     expect(CHECKOUT_HOOK).not.toMatch(/@\/integrations\/supabase\/client/);
     expect(CHECKOUT_HOOK).not.toMatch(/supabase\s*\.\s*from\(/);
     expect(CHECKOUT_HOOK).not.toMatch(/service_role/);
+    // The entitlement hook may read only the signed-in grower's billing
+    // evidence and verified staff role for presentation. It must never expand
+    // into grow data or use a privileged credential.
+    const entitlementHook = readSrc("hooks/useMyEntitlements.ts");
+    const entitlementTables = [
+      ...entitlementHook.matchAll(/\.from\(\s*["']([^"']+)["']\s*\)/g),
+    ].map((match) => match[1]);
+    expect(new Set(entitlementTables)).toEqual(new Set(["subscriptions", "user_roles"]));
+    expect(entitlementHook).not.toMatch(/service_role/);
+    for (const table of PRIVATE_TABLES) {
+      expect(entitlementHook).not.toMatch(new RegExp(`\\.from\\(["']${table}["']`));
+    }
     // The founder-slots hook may invoke ONLY its public edge function —
     // no table reads, no service_role, no other function invocations.
     const slotsHook = readSrc("hooks/useFounderSlotsRemaining.ts");

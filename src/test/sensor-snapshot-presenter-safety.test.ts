@@ -38,9 +38,7 @@ function read(rel: string): string {
 // Strip line/block comments so test docstrings ("Never renders raw_payload")
 // don't trip the static scan.
 function stripComments(src: string): string {
-  return src
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+  return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
 }
 
 describe("sensor snapshot presenter safety — static scan", () => {
@@ -67,9 +65,7 @@ describe("sensor snapshot presenter safety — static scan", () => {
         "access_token",
         "refresh_token",
       ]) {
-        expect(code, `${file} should not reference ${needle}`).not.toContain(
-          needle,
-        );
+        expect(code, `${file} should not reference ${needle}`).not.toContain(needle);
       }
     });
 
@@ -90,9 +86,7 @@ describe("sensor snapshot presenter safety — static scan", () => {
         "deviceControl",
         "automation",
       ]) {
-        expect(code, `${file} should not contain ${needle}`).not.toContain(
-          needle,
-        );
+        expect(code, `${file} should not contain ${needle}`).not.toContain(needle);
       }
     });
 

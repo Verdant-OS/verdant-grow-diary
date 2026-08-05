@@ -7,7 +7,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync, statSync } from "node:fs";
-import { resolve, join } from "node:path";
+import { resolve, join, sep } from "node:path";
 import {
   CANONICAL_VPD_TARGET_STAGES,
   LEGACY_VPD_STAGES,
@@ -146,9 +146,7 @@ describe("static safety — helper file", () => {
     expect(HELPER_SRC).not.toMatch(/\bfetch\s*\(/);
     expect(HELPER_SRC).not.toMatch(/action_queue/);
     expect(HELPER_SRC).not.toMatch(/saveAlert\(|logAlertEvent\(/);
-    expect(HELPER_SRC).not.toMatch(
-      /execute_device|setpoint_write|device_control|deviceControl/,
-    );
+    expect(HELPER_SRC).not.toMatch(/execute_device|setpoint_write|device_control|deviceControl/);
   });
 });
 
@@ -157,8 +155,12 @@ describe("evaluateVpdAgainstStageTarget — canonical normalization integration"
     const r = evaluateVpdAgainstStageTarget({ vpdKpa: 1.0, stage: "veg" });
     expect(r.classification).toBe("in_band");
     expect(r.target?.stage).toBe("late_veg");
-    expect(evaluateVpdAgainstStageTarget({ vpdKpa: 0.85, stage: "veg" }).classification).toBe("low");
-    expect(evaluateVpdAgainstStageTarget({ vpdKpa: 1.25, stage: "veg" }).classification).toBe("high");
+    expect(evaluateVpdAgainstStageTarget({ vpdKpa: 0.85, stage: "veg" }).classification).toBe(
+      "low",
+    );
+    expect(evaluateVpdAgainstStageTarget({ vpdKpa: 1.25, stage: "veg" }).classification).toBe(
+      "high",
+    );
   });
   it("legacy 'preflower' evaluates against canonical early_flower band (1.0–1.3)", () => {
     const r = evaluateVpdAgainstStageTarget({ vpdKpa: 1.15, stage: "preflower" });
@@ -183,16 +185,7 @@ describe("evaluateVpdAgainstStageTarget — canonical normalization integration"
     }
   });
   it("unknown / null / post-harvest stages never return in_band / healthy", () => {
-    for (const stage of [
-      null,
-      undefined,
-      "",
-      "   ",
-      "mystery",
-      "harvest",
-      "drying",
-      "cure",
-    ]) {
+    for (const stage of [null, undefined, "", "   ", "mystery", "harvest", "drying", "cure"]) {
       for (const vpd of [0.5, 1.0, 1.3, 1.6]) {
         const r = evaluateVpdAgainstStageTarget({ vpdKpa: vpd, stage });
         expect(r.classification).toBe("stage_unknown");
@@ -214,6 +207,12 @@ describe("evaluateVpdAgainstStageTarget — canonical normalization integration"
 });
 
 describe("static guard — no source file outside the helper duplicates the mapping table", () => {
+  const TEST_ROOT = resolve(ROOT, "src/test");
+
+  function isTestFile(file: string): boolean {
+    return file.startsWith(`${TEST_ROOT}${sep}`);
+  }
+
   function walk(dir: string, out: string[] = []): string[] {
     for (const entry of readdirSync(dir)) {
       const p = join(dir, entry);
@@ -241,7 +240,7 @@ describe("static guard — no source file outside the helper duplicates the mapp
     // Tests legitimately exercise both legacy and canonical names; the
     // guard's intent is to prevent runtime/source duplication of the
     // mapping table, not to ban references inside tests.
-    if (file.includes(`${resolve(ROOT, "src/test")}/`)) return true;
+    if (isTestFile(file)) return true;
     return false;
   }
 
@@ -276,7 +275,7 @@ describe("static guard — no source file outside the helper duplicates the mapp
       // Tests legitimately exercise both legacy and canonical names; the
       // guard's intent is to prevent runtime/source duplication, not
       // ban references inside .tsx tests.
-      if (f.includes(`${resolve(ROOT, "src/test")}/`)) continue;
+      if (isTestFile(f)) continue;
       const src = readFileSync(f, "utf8");
       const hit = PAIRS.some(([a, b]) => a.test(src) && b.test(src));
       if (hit) violators.push(f);
@@ -286,10 +285,7 @@ describe("static guard — no source file outside the helper duplicates the mapp
 });
 
 describe("static safety — vpdTargetRules.ts", () => {
-  const RULES_SRC = readFileSync(
-    resolve(ROOT, "src/lib/vpdTargetRules.ts"),
-    "utf8",
-  );
+  const RULES_SRC = readFileSync(resolve(ROOT, "src/lib/vpdTargetRules.ts"), "utf8");
   it("imports the normalization helper", () => {
     expect(RULES_SRC).toMatch(/normalizeToCanonicalVpdTargetStage/);
     expect(RULES_SRC).toMatch(/from\s+["']@\/lib\/vpdStageNormalizationRules["']/);
@@ -301,8 +297,6 @@ describe("static safety — vpdTargetRules.ts", () => {
     expect(RULES_SRC).not.toMatch(/\bfetch\s*\(/);
     expect(RULES_SRC).not.toMatch(/action_queue/);
     expect(RULES_SRC).not.toMatch(/saveAlert\(|logAlertEvent\(/);
-    expect(RULES_SRC).not.toMatch(
-      /execute_device|setpoint_write|device_control|deviceControl/,
-    );
+    expect(RULES_SRC).not.toMatch(/execute_device|setpoint_write|device_control|deviceControl/);
   });
 });

@@ -2,7 +2,7 @@
  * Plant Detail Harvest Watch card tests.
  *
  * Covers the pure Plant Detail adapter, the read-only card renderer, Plant
- * Detail wiring via the existing What's Missing mount point, and safety
+ * Detail wiring via the single page-level mount point, and safety
  * guardrails. Harvest Watch remains advisory-only and does not call AI, write
  * alerts/actions, or control devices.
  */
@@ -33,6 +33,7 @@ const read = (p: string) => readFileSync(resolve(ROOT, p), "utf8");
 const CARD = read("src/components/PlantDetailHarvestWatchCard.tsx");
 const VM = read("src/lib/plantDetailHarvestWatchCardViewModel.ts");
 const WHATS_MISSING = read("src/components/PlantDetailWhatsMissing.tsx");
+const PLANT_DETAIL = read("src/pages/PlantDetail.tsx");
 
 const plant = {
   id: "p1",
@@ -114,9 +115,7 @@ describe("PlantDetailHarvestWatchCard", () => {
         isLoading: false,
       });
 
-      const { container } = render(
-        <PlantDetailHarvestWatchCard plantId="p1" hasPlantPhoto />,
-      );
+      const { container } = render(<PlantDetailHarvestWatchCard plantId="p1" hasPlantPhoto />);
 
       expect(container).toBeEmptyDOMElement();
     },
@@ -129,7 +128,9 @@ describe("PlantDetailHarvestWatchCard", () => {
 });
 
 describe("Plant Detail wiring", () => {
-  it("does not duplicate Harvest Watch inside the What's Missing presenter", () => {
+  it("mounts Harvest Watch once at page level, outside What's Missing", () => {
+    expect(PLANT_DETAIL.match(/<PlantDetailHarvestWatchCard\b/g)).toHaveLength(1);
+    expect(PLANT_DETAIL).toMatch(/PlantDetailHarvestWatchCard[\s\S]{0,180}plantId=\{plant\.id\}/);
     expect(WHATS_MISSING).not.toContain("PlantDetailHarvestWatchCard");
   });
 });
@@ -149,7 +150,9 @@ describe("Harvest Watch card safety", () => {
   });
 
   it("does not call AI, alerts, Action Queue, or device control", () => {
-    expect(ALL).not.toMatch(/openai|ai_doctor_sessions|askDoctor|aiDoctor|model_call|model\.create/i);
+    expect(ALL).not.toMatch(
+      /openai|ai_doctor_sessions|askDoctor|aiDoctor|model_call|model\.create/i,
+    );
     expect(ALL).not.toMatch(/from\(["']alerts["']\)|from\(["']alert_events["']\)/);
     expect(ALL).not.toMatch(/from\(["']action_queue["']\)|actionQueue|queued action/i);
     expect(ALL).not.toMatch(/mqtt|relay\.on|relay\.off|device\.command|smart plug/i);

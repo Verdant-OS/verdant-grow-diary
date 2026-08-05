@@ -192,7 +192,9 @@ describe("stabilize — too many changes trigger calm, non-causal guidance", () 
       recent_major_change_count_48h: 0,
     });
     expect(r.safety_flags).toContain("prefer_low_stress_path");
-    expect(r.what_not_to_do.join(" ")).toMatch(/defoliation|transplant|high-stress|nutrient|equipment/i);
+    expect(r.what_not_to_do.join(" ")).toMatch(
+      /defoliation|transplant|high-stress|nutrient|equipment/i,
+    );
   });
 
   it("a calm, well-evidenced context stays OFF (no false alarm)", () => {
@@ -282,7 +284,9 @@ describe("static safety — recovery-loop surface", () => {
       const src = stripSourceComments(read(rel));
       expect(src).not.toMatch(/\.from\(["'](action_queue|alerts)["']\)/);
       expect(src).not.toMatch(/functions\.invoke/);
-      expect(src).not.toMatch(/mqtt|webhook|\bactuator\b|\brelay\b|device_command|dispatchCommand/i);
+      expect(src).not.toMatch(
+        /mqtt|webhook|\bactuator\b|\brelay\b|device_command|dispatchCommand/i,
+      );
       expect(src).not.toMatch(/\bauto[-_ ]?execute\b|\bautopilot\b/i);
       expect(src).not.toMatch(/openai|anthropic|gemini/i);
     }
@@ -291,7 +295,9 @@ describe("static safety — recovery-loop surface", () => {
   it("guidance copy is conservative and non-causal (never 'definitely', never causal claims)", () => {
     for (const rel of RULE_FILES) {
       const src = read(rel);
-      expect(src).not.toMatch(/\bdefinitely\b|\bguaranteed\b|\bwill fix\b|\bcaused the\b|\bcures?\b/i);
+      expect(src).not.toMatch(
+        /\bdefinitely\b|\bguaranteed\b|\bwill fix\b|\bcaused the\b|\bcures?\b/i,
+      );
     }
   });
 });
@@ -322,7 +328,9 @@ describe("prefocus — status-check CTA opens Quick Log focused on Better/Same/W
 
   it("PlantDetail wires the flag ONLY through the status-check CTA and resets it on close", () => {
     // The missed-log recovery / follow-up CTA sets the focus intent.
-    expect(PLANT_DETAIL).toMatch(/onAddQuickCheck=\{[\s\S]*setQuickLogFocusResponse\(true\)[\s\S]*setQuickLogOpen\(true\)/);
+    expect(PLANT_DETAIL).toMatch(
+      /onAddQuickCheck=\{[\s\S]*setQuickLogFocusResponse\(true\)[\s\S]*setQuickLogOpen\(true\)/,
+    );
     // The sheet receives the flag and clears it on close (so unrelated opens
     // — photo upload, sensor update — never hijack focus to the chips).
     expect(PLANT_DETAIL).toMatch(/focusResponseCheckOnOpen=\{quickLogFocusResponse\}/);

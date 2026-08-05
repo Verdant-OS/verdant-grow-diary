@@ -16,10 +16,7 @@ import {
 } from "@/lib/environmentAlerts";
 import { EMPTY_SNAPSHOT, type SensorSnapshot } from "@/lib/sensorSnapshot";
 import { evaluateSensorQuality } from "@/lib/sensorQuality";
-import {
-  compareSnapshotToTargets,
-  type GrowTargets,
-} from "@/lib/environmentTargetComparison";
+import { compareSnapshotToTargets, type GrowTargets } from "@/lib/environmentTargetComparison";
 
 const NOW = new Date("2026-05-20T12:00:00Z").getTime();
 
@@ -127,9 +124,7 @@ describe("buildEnvironmentAlerts — rules", () => {
     expect(a.map((x) => x.id)).toEqual(b.map((x) => x.id));
     const weights = { critical: 0, warning: 1, watch: 2, info: 3 } as const;
     for (let i = 1; i < a.length; i++) {
-      expect(weights[a[i].severity]).toBeGreaterThanOrEqual(
-        weights[a[i - 1].severity],
-      );
+      expect(weights[a[i].severity]).toBeGreaterThanOrEqual(weights[a[i - 1].severity]);
     }
   });
 
@@ -173,9 +168,7 @@ describe("Environment Alerts — Dashboard integration", () => {
     expect(DASHBOARD).toMatch(/aria-label=["']Environment Alerts["']/);
     // The Environment Alerts section must live before the unscoped fallback.
     const alertsIdx = DASHBOARD.indexOf('aria-label="Environment Alerts"');
-    const fallbackIdx = DASHBOARD.indexOf(
-      "Select a grow to see scoped activity",
-    );
+    const fallbackIdx = DASHBOARD.indexOf("Select a grow to see scoped activity");
     expect(alertsIdx).toBeGreaterThan(-1);
     expect(fallbackIdx).toBeGreaterThan(alertsIdx);
   });
@@ -220,5 +213,4 @@ describe("Environment Alerts — safety constraints", () => {
     expect(block).not.toMatch(/service_role/i);
     expect(block).not.toMatch(/\.insert\s*\(/);
   });
-
 });

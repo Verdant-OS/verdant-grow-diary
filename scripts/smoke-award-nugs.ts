@@ -29,17 +29,12 @@ const ANON_KEY =
   process.env.VITE_SUPABASE_ANON_KEY;
 
 if (!SUPABASE_URL || !SERVICE_KEY || !ANON_KEY) {
-  console.log(
-    "↷ smoke-award-nugs: skipped (missing SUPABASE_URL / SERVICE_ROLE_KEY / ANON_KEY)",
-  );
+  console.log("↷ smoke-award-nugs: skipped (missing SUPABASE_URL / SERVICE_ROLE_KEY / ANON_KEY)");
   process.exit(0);
 }
 
 // Refuse to run against an obvious production host unless explicitly allowed.
-if (
-  !process.env.RLS_SMOKE_ALLOW_PROD &&
-  /verdantgrowdiary\.com|app\.verdant/i.test(SUPABASE_URL)
-) {
+if (!process.env.RLS_SMOKE_ALLOW_PROD && /verdantgrowdiary\.com|app\.verdant/i.test(SUPABASE_URL)) {
   console.error("✗ refusing to run smoke against production URL");
   process.exit(2);
 }
@@ -109,9 +104,7 @@ async function main() {
     process.exit(1);
   }
 
-  console.log(
-    `✓ award_nugs ok — awarded=${row.awarded} new_total=${row.new_total}`,
-  );
+  console.log(`✓ award_nugs ok — awarded=${row.awarded} new_total=${row.new_total}`);
   await teardown();
   process.exit(0);
 }

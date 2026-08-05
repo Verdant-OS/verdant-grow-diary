@@ -7,7 +7,7 @@
  * drives no device. No AI, no Action Queue, no automation.
  */
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams } from "@/lib/react-router-compat";
 import { usePhenoKeepers } from "@/hooks/usePhenoKeepers";
 import { phenoCandidateDisplayLabel } from "@/lib/phenoCandidateIdentity";
 import {
@@ -293,7 +293,11 @@ export default function PhenoKeepersPage() {
   }
 
   return (
-    <main data-testid="pheno-keepers" className="container mx-auto max-w-4xl space-y-6 px-4 py-6">
+    <section
+      aria-label="Pheno hunt keepers"
+      data-testid="pheno-keepers"
+      className="container mx-auto max-w-4xl space-y-6 px-4 py-6"
+    >
       <header className="space-y-1">
         <h1 className="text-2xl font-semibold">
           Keepers &amp; crosses: {ks.hunt?.name ?? "this hunt"}
@@ -317,6 +321,7 @@ export default function PhenoKeepersPage() {
         <div className="flex flex-wrap items-center gap-2">
           <select
             data-testid="keepers-promote-plant"
+            aria-label="Candidate to name as keeper"
             value={promotePlant}
             onChange={(e) => setPromotePlant(e.target.value)}
             className="rounded border border-border bg-background px-2 py-1 text-sm"
@@ -527,6 +532,6 @@ export default function PhenoKeepersPage() {
           <PhenoTimelineEntries entries={timelineEntries} />
         </section>
       )}
-    </main>
+    </section>
   );
 }

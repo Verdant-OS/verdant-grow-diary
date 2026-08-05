@@ -75,7 +75,7 @@ export function calculateAirVpdKpa(input: CalculateAirVpdInput): number | null {
     tempC = fahrenheitToCelsius(input.tempF);
   } else if (input.tempUnit === "F" && isFiniteNumber(input.tempC as unknown)) {
     // defensive: tempUnit override applied to tempC
-    tempC = fahrenheitToCelsius(input.tempC as number);
+    tempC = fahrenheitToCelsius(input.tempC as unknown as number);
   }
 
   if (!isFiniteNumber(tempC)) return null;

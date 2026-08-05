@@ -73,7 +73,6 @@ export default function EnvironmentSummaryPrintCoverPage({
         </div>
       </header>
 
-
       <dl className="print-cover-meta print-cover-section grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
         <dt className="text-muted-foreground">Grower</dt>
         <dd data-testid={`${testId}-grower`}>{grower}</dd>
@@ -93,10 +92,7 @@ export default function EnvironmentSummaryPrintCoverPage({
 
       <div className="print-cover-summary print-cover-section text-xs space-y-1">
         <p className="font-medium">Status counts</p>
-        <ul
-          className="grid grid-cols-2 gap-x-3 gap-y-0.5"
-          data-testid={`${testId}-status-counts`}
-        >
+        <ul className="grid grid-cols-2 gap-x-3 gap-y-0.5" data-testid={`${testId}-status-counts`}>
           <li>Valid: {report.statusCounts.valid}</li>
           <li>Review required: {report.statusCounts.review_required}</li>
           <li>DST-ambiguous: {report.statusCounts.dst_ambiguous}</li>
@@ -107,10 +103,7 @@ export default function EnvironmentSummaryPrintCoverPage({
       {top3.length > 0 ? (
         <div className="print-cover-summary print-cover-section text-xs space-y-1">
           <p className="font-medium">Top issues</p>
-          <ul
-            className="space-y-0.5"
-            data-testid={`${testId}-top-issues`}
-          >
+          <ul className="space-y-0.5" data-testid={`${testId}-top-issues`}>
             {top3.map((i) => (
               <li key={i.ruleId}>
                 {i.label} ×{i.count} ({i.severity})

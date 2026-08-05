@@ -15,6 +15,7 @@
 import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
+import { readWorkflowYamlScalar } from "./helpers/yamlScalarText";
 
 const ROOT = path.resolve(__dirname, "../..");
 const read = (p: string) => fs.readFileSync(path.join(ROOT, p), "utf8").replace(/\r\n?/g, "\n");
@@ -123,29 +124,32 @@ describe("Quick Log Playwright CI surface", () => {
     expect(wf).not.toMatch(/echo\s+["']?\$\{\{\s*secrets\.E2E_TEST_(EMAIL|PASSWORD)\s*\}\}/);
   });
 
-  it("CI workflow uploads exactly the expected artifact paths and excludes storageState", () => {
+  it("CI workflow uploads the exact safe smoke bundle and excludes raw auth/DOM artifacts", () => {
     const wf = read(".github/workflows/quicklog-smoke.yml");
-    // Locate the upload step's path: block, stopping at the next step or EOF.
     const uploadMatch = wf.match(
-      /name:\s*quicklog-smoke-artifacts[\s\S]*?path:\s*\|\n([\s\S]*?)(?=\n\s*-\s*name:|\n[^\s-]|\n\s*$|$)/,
+      /-\s*name:\s*Upload smoke artifacts[\s\S]*?(?=\n {6}- name:|\n*$)/,
     );
-    expect(uploadMatch, "could not locate quicklog-smoke-artifacts path block").toBeTruthy();
-    const pathBlock = uploadMatch![1];
+    expect(uploadMatch, "could not locate the smoke artifact upload step").toBeTruthy();
+    const pathBlock = readWorkflowYamlScalar(uploadMatch![0], "path");
     const paths = pathBlock
       .split("\n")
       .map((l) => l.trim())
-      .filter((l) => (l.length > 0 && !l.startsWith("-")) /* skip nothing */ || l.length > 0)
       .filter((l) => l.length > 0);
     const expected = [
       "e2e/results/quicklog-smoke-report.json",
       "e2e/results/quicklog-smoke-report.txt",
+      "e2e/results/playwright-report.json",
+      "e2e/results/playwright-flake-summary.md",
       "playwright-report/",
-      "test-results/",
     ];
     expect(paths).toEqual(expected);
-    // Must never publish storageState as an artifact.
+    // Must never publish auth state or the raw Playwright test-results tree,
+    // which can contain error-context DOM and authenticated attachments.
     expect(pathBlock).not.toMatch(/e2e\/\.auth/);
     expect(pathBlock).not.toMatch(/user\.json/);
+    expect(pathBlock).not.toMatch(/test-results/);
+    expect(pathBlock).not.toMatch(/error-context\.md/);
+    expect(pathBlock).not.toMatch(/step-logs/);
   });
 
   it("CI workflow skips cleanly on PR without secrets and fails fast on dispatch", () => {
@@ -723,22 +727,27 @@ describe("Quick Log Playwright CI surface", () => {
     expect(block).toContain("REPORT_PARSE_STATUS");
   });
 
-  it("bundled smoke artifact upload remains unchanged (name + paths + retention)", () => {
+  it("bundled smoke artifact keeps the exact safe path set and retention", () => {
     const wf = read(".github/workflows/quicklog-smoke.yml");
     const uploadMatch = wf.match(
-      /name:\s*quicklog-smoke-artifacts[\s\S]*?path:\s*\|\n([\s\S]*?)(?=\n\s*-\s*name:|\n[^\s-]|\n\s*$|$)/,
+      /-\s*name:\s*Upload smoke artifacts[\s\S]*?(?=\n {6}- name:|\n*$)/,
     );
     expect(uploadMatch).toBeTruthy();
-    const paths = uploadMatch![1]
+    expect(uploadMatch![0]).toMatch(
+      /^\s*name:\s*quicklog-smoke-artifacts-\$\{\{\s*env\.ARTIFACT_SUFFIX\s*\}\}\s*$/m,
+    );
+    const paths = readWorkflowYamlScalar(uploadMatch![0], "path")
       .split("\n")
       .map((l) => l.trim())
       .filter((l) => l.length > 0);
     expect(paths).toEqual([
       "e2e/results/quicklog-smoke-report.json",
       "e2e/results/quicklog-smoke-report.txt",
+      "e2e/results/playwright-report.json",
+      "e2e/results/playwright-flake-summary.md",
       "playwright-report/",
-      "test-results/",
     ]);
+    expect(paths).not.toContain("test-results/");
     const bundled = wf.match(/-\s*name:\s*Upload smoke artifacts[\s\S]*?(?=\n {6}- name:)/);
     expect(bundled).toBeTruthy();
     expect(bundled![0]).toMatch(/retention-days:\s*30/);
@@ -753,8 +762,8 @@ describe("Quick Log Playwright CI surface", () => {
     const block = step![0];
     expect(block).toMatch(/id:\s*upload_playwright_report/);
     expect(block).toMatch(/uses:\s*actions\/upload-artifact@[0-9a-f]{40} # v4/);
-    expect(block).toMatch(
-      /if:\s*always\(\)\s*&&\s*steps\.e2e_config\.outputs\.should_run\s*==\s*'true'/,
+    expect(readWorkflowYamlScalar(block, "if")).toMatch(
+      /^always\(\)\s*&&\s*steps\.e2e_config\.outputs\.should_run\s*==\s*'true'/,
     );
     expect(block).toMatch(/name:\s*quicklog-playwright-report/);
     expect(block).toMatch(/path:\s*playwright-report\//);

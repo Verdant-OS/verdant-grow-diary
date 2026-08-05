@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
-import { useInRouterContext, useNavigate } from "react-router-dom";
+import { useInRouterContext, useNavigate } from "@/lib/react-router-compat";
 import {
   buildQuickLogTimelineNavTarget,
   QUICK_LOG_TIMELINE_CTA_LABEL,
@@ -29,6 +29,7 @@ import { useQuickLogV2Save } from "@/hooks/useQuickLogV2Save";
 
 import {
   buildQuickLogV2TargetOptions,
+  isStaleQuickLogV2TargetSelection,
   resolveQuickLogV2Target,
   EMPTY_QUICKLOG_V2_FORM,
   type QuickLogV2FormState,
@@ -103,11 +104,38 @@ import {
   type QuickLogPostSaveSuccess,
 } from "@/lib/quickLogSaveGuardRules";
 import { trackQuickLogSuccess } from "@/lib/quickLogSuccessTelemetry";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
+import {
+  fahrenheitToCelsius,
+  getTemperatureUnitSymbol,
+  type TemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
+
+const PLAIN_TEMP_INPUT = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/;
+
+/**
+ * Convert a grower-typed temperature string (entered in the active
+ * preference unit) into a canonical-°C string. Called EXACTLY ONCE per
+ * save attempt, at the payload-build seam, on the raw typed value — the
+ * built payload (including the locked watering retry submission) already
+ * holds °C and is never re-converted. Blank stays blank and non-numeric
+ * text passes through unchanged so the existing validators keep rejecting
+ * it with their original reasons.
+ */
+function typedTempToCelsiusInput(raw: string, unit: TemperatureUnitPreference): string {
+  if (unit !== "fahrenheit") return raw;
+  const trimmed = raw.trim();
+  if (trimmed === "" || !PLAIN_TEMP_INPUT.test(trimmed)) return raw;
+  const parsed = Number(trimmed);
+  if (!Number.isFinite(parsed)) return raw;
+  return String(Math.round(fahrenheitToCelsius(parsed) * 100) / 100);
+}
 
 interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   defaultTargetKey?: string | null;
+  defaultAction?: QuickLogV2Action;
 }
 
 interface QuickLogVideoMeta {
@@ -117,8 +145,7 @@ interface QuickLogVideoMeta {
 }
 
 type QuickLogAttachmentWriteResult =
-  | { ok: true }
-  | { ok: false; message: string; ambiguous?: boolean };
+  { ok: true } | { ok: false; message: string; ambiguous?: boolean };
 
 interface LockedWateringSubmission {
   payload: WateringTypedEventInput;
@@ -132,7 +159,12 @@ interface LockedWateringSubmission {
 
 const NOTE_LIMIT = 500;
 
-export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }: Props) {
+export default function QuickLogV2Sheet({
+  open,
+  onOpenChange,
+  defaultTargetKey,
+  defaultAction = "note",
+}: Props) {
   const { user } = useAuth();
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
   const libraryInputRef = useRef<HTMLInputElement | null>(null);
@@ -159,6 +191,7 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
     [tentsQ.data],
   );
   const queryClient = useQueryClient();
+  const temperatureUnit = useTemperatureUnitPreference();
   const inRouter = useInRouterContext();
   // `useNavigate` throws when called outside a Router. The sheet is
   // always mounted inside the app's Router in production, but some
@@ -181,17 +214,27 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
   function showTimelineConfirmation(
     message: string,
     scope: {
+      growId: string | null;
       targetType: "plant" | "tent" | null;
       targetId: string | null;
       tentId: string | null;
+      plantId?: string | null;
       growEventId?: string | null;
     },
   ) {
     const nav = buildQuickLogTimelineNavTarget({
+      growId: scope.growId,
       targetType: scope.targetType,
       targetId: scope.targetId,
+      tentId: scope.tentId,
+      plantId: scope.plantId ?? null,
       growEventId: scope.growEventId ?? null,
     });
+    if (!nav) {
+      // Confirmed save without a verified grow cannot enable a Timeline CTA.
+      toast.success(message);
+      return;
+    }
     toast.success(message, {
       action: {
         label: QUICK_LOG_TIMELINE_CTA_LABEL,
@@ -259,6 +302,19 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
   // rapid re-taps during photo capture/upload cannot enqueue a second
   // insert before the first resolves. Reset in try/finally.
   const photoDiaryInFlightRef = useRef(false);
+  // Pattern-A draft-input race guards (temperature unit reactivity): each
+  // pins the ACTIVE temperatureUnit at the moment its paired raw draft
+  // transitions from empty to non-empty, so a live preference flip (e.g.
+  // from another tab) between typing and Save can never silently
+  // reinterpret already-typed digits under the new unit. Cleared back to
+  // null whenever the draft returns to empty, so a fresh field always
+  // tracks the live preference again. One ref per independently-editable
+  // temperature draft — the manual sensor-snapshot Temp field and the
+  // Water/Feed water-temperature fields can each be pinned at different
+  // times, or not at all.
+  const manualTempEntryUnitRef = useRef<TemperatureUnitPreference | null>(null);
+  const wateringTempEntryUnitRef = useRef<TemperatureUnitPreference | null>(null);
+  const feedingTempEntryUnitRef = useRef<TemperatureUnitPreference | null>(null);
 
   const options = useMemo(() => buildQuickLogV2TargetOptions(tents, plants), [tents, plants]);
 
@@ -317,6 +373,7 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
   const contextBlocked = isLoadingContext || hasFetchError || hasNoTargets;
 
   const selectedTargetMissing = !contextBlocked && !form.selectedKey;
+  const selectedTargetStale = isStaleQuickLogV2TargetSelection(resolvedTarget);
   const noteLength = form.note.length;
   const volumeMissing = form.action === "water" && wateringForm.volumeMl.trim() === "";
   const showMaturityEvidence =
@@ -365,9 +422,13 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
       setForm({
         ...EMPTY_QUICKLOG_V2_FORM,
         selectedKey: defaultTargetKey ?? null,
+        action: defaultAction,
       });
+      manualTempEntryUnitRef.current = null;
       setFeedingForm(EMPTY_QUICKLOG_FEEDING_FORM);
+      feedingTempEntryUnitRef.current = null;
       setWateringForm(EMPTY_QUICKLOG_WATERING_FORM);
+      wateringTempEntryUnitRef.current = null;
       setMaturityEvidenceForm(EMPTY_QUICK_LOG_MATURITY_EVIDENCE_FORM);
       setFeedingDefaultsApplied(false);
       setLocalError(null);
@@ -383,7 +444,7 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
       saveIdempotencyKeyRef.current = newQuickLogSaveKey();
       resetPhotoSelection();
     }
-  }, [open, defaultTargetKey]);
+  }, [open, defaultTargetKey, defaultAction]);
 
   // One-shot prefill of the feeding form with last-used defaults. Runs only
   // when the Feed action is active, the form is still pristine, defaults
@@ -421,12 +482,14 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
     // a stale line/products list can't ride along into a note/water save.
     if (prev === "feed") {
       setFeedingForm(EMPTY_QUICKLOG_FEEDING_FORM);
+      feedingTempEntryUnitRef.current = null;
       setFeedingDefaultsApplied(false);
     }
     // Water-only measurements and manual observations never ride along when
     // the grower changes actions. Returning to Water starts a fresh record.
     if (prev === "water") {
       setWateringForm(EMPTY_QUICKLOG_WATERING_FORM);
+      wateringTempEntryUnitRef.current = null;
     }
     // Entering feed → maturity evidence surface hides; clear its draft
     // so stale plant-maturity notes don't get retained under the hood.
@@ -672,7 +735,15 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
         tentId: resolved.tentId ?? null,
         plantId: resolved.plantId ?? null,
         idempotencyKey: saveIdempotencyKeyRef.current,
-        form: feedingForm,
+        // Unit seam: the grower typed water temperature in the preference
+        // unit; canonical °C is produced exactly once, right here.
+        form: {
+          ...feedingForm,
+          waterTempC: typedTempToCelsiusInput(
+            feedingForm.waterTempC,
+            feedingTempEntryUnitRef.current ?? temperatureUnit,
+          ),
+        },
       });
       if (mapped.ok !== true) {
         setLocalError(feedingFormReasonToHelper(mapped.reason));
@@ -695,11 +766,13 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
       saveIdempotencyKeyRef.current = newQuickLogSaveKey();
       setSaveStatus(FEEDING_SAVE_SUCCESS_MESSAGE);
       showTimelineConfirmation(FEEDING_SAVE_SUCCESS_MESSAGE, {
-        // Feed events are currently surfaced in the global typed root-zone
-        // lane, not the scoped grouped timeline. Route to the real anchor.
-        targetType: null,
-        targetId: null,
+        // Feed uses the same canonical grow-scoped Timeline as note/water.
+        // Never drop the verified setup — bare `/timeline` is forbidden.
+        growId: resolved.growId ?? null,
+        targetType: (resolved.targetType as "plant" | "tent") ?? null,
+        targetId: (resolved.targetId as string) ?? null,
         tentId: resolved.tentId ?? null,
+        plantId: resolved.plantId ?? null,
         growEventId,
       });
       applyQuickLogV2Refresh(queryClient, {
@@ -717,6 +790,7 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
       });
       setPostSave({
         growEventId,
+        growId: resolved.growId ?? null,
         targetType: resolved.targetType as "plant" | "tent",
         targetId: resolved.targetId as string,
         tentId: resolved.tentId ?? null,
@@ -753,9 +827,22 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
         plantId: resolved.plantId ?? null,
         idempotencyKey: saveIdempotencyKeyRef.current,
         occurredAt,
-        form: wateringForm,
+        // Unit seam: water temp + manual snapshot temp were typed in the
+        // preference unit; canonical °C is produced exactly once, right
+        // here. The locked retry submission reuses the built payload and
+        // is never re-converted.
+        form: {
+          ...wateringForm,
+          waterTempC: typedTempToCelsiusInput(
+            wateringForm.waterTempC,
+            wateringTempEntryUnitRef.current ?? temperatureUnit,
+          ),
+        },
         note: form.note,
-        temperatureC: form.temperatureC,
+        temperatureC: typedTempToCelsiusInput(
+          form.temperatureC,
+          manualTempEntryUnitRef.current ?? temperatureUnit,
+        ),
         humidityPct: form.humidityPct,
         vpdKpa: form.vpdKpa,
         baseDetails: maturityDetails,
@@ -845,7 +932,12 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
         action: form.action,
         volumeMl: form.volumeMl,
         note: form.note,
-        temperatureC: form.temperatureC,
+        // Unit seam: manual snapshot temp was typed in the preference unit;
+        // canonical °C is produced exactly once, right here.
+        temperatureC: typedTempToCelsiusInput(
+          form.temperatureC,
+          manualTempEntryUnitRef.current ?? temperatureUnit,
+        ),
         humidityPct: form.humidityPct,
         vpdKpa: form.vpdKpa,
         details: maturityDetails,
@@ -984,9 +1076,11 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
       );
     }
     showTimelineConfirmation(successMessage, {
+      growId: resolved.growId ?? null,
       targetType: resolved.targetType as "plant" | "tent",
       targetId: resolved.targetId as string,
       tentId: resolved.tentId ?? null,
+      plantId: resolved.plantId ?? null,
       growEventId: (res as { growEventId?: string | null }).growEventId ?? null,
     });
     applyQuickLogV2Refresh(queryClient, {
@@ -1007,6 +1101,7 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
     resetVideoSelection();
     setPostSave({
       growEventId: (res as { growEventId?: string | null }).growEventId ?? null,
+      growId: resolved.growId ?? null,
       targetType: resolved.targetType as "plant" | "tent",
       targetId: resolved.targetId as string,
       tentId: resolved.tentId ?? null,
@@ -1031,8 +1126,11 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
       ...EMPTY_QUICKLOG_V2_FORM,
       selectedKey: prev.selectedKey,
     }));
+    manualTempEntryUnitRef.current = null;
     setFeedingForm(EMPTY_QUICKLOG_FEEDING_FORM);
+    feedingTempEntryUnitRef.current = null;
     setWateringForm(EMPTY_QUICKLOG_WATERING_FORM);
+    wateringTempEntryUnitRef.current = null;
     setWateringRetryPending(false);
     setWateringSubmissionLocked(false);
     wateringRetrySubmissionRef.current = null;
@@ -1047,10 +1145,14 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
   function handleViewTimeline() {
     if (!postSave) return;
     const nav = buildQuickLogTimelineNavTarget({
-      targetType: postSave.action === "feed" ? null : postSave.targetType,
-      targetId: postSave.action === "feed" ? null : postSave.targetId,
+      growId: postSave.growId,
+      targetType: postSave.targetType,
+      targetId: postSave.targetId,
+      tentId: postSave.tentId,
+      plantId: postSave.targetType === "plant" ? postSave.targetId : null,
       growEventId: postSave.growEventId,
     });
+    if (!nav) return;
     onOpenChange(false);
     navigateToTimeline(nav.href, nav.hash, nav.path);
   }
@@ -1254,11 +1356,19 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
               <QuickLogFeedingForm
                 value={feedingForm}
                 onChange={(next) => {
+                  const prevWaterTempC = feedingForm.waterTempC.trim();
+                  const nextWaterTempC = next.waterTempC.trim();
+                  if (prevWaterTempC === "" && nextWaterTempC !== "") {
+                    feedingTempEntryUnitRef.current = temperatureUnit;
+                  } else if (nextWaterTempC === "") {
+                    feedingTempEntryUnitRef.current = null;
+                  }
                   setFeedingForm(next);
                   setLocalError(null);
                 }}
                 disabled={feedingSaving || wateringSaving || saving || wateringSubmissionLocked}
                 defaultsApplied={feedingDefaultsApplied}
+                entryTemperatureUnit={feedingTempEntryUnitRef.current ?? temperatureUnit}
               />
             </div>
           )}
@@ -1271,9 +1381,17 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
                 disabled={wateringSaving || feedingSaving || saving || wateringSubmissionLocked}
                 onChange={(next) => {
                   if (wateringSubmissionLockedRef.current) return;
+                  const prevWaterTempC = wateringForm.waterTempC.trim();
+                  const nextWaterTempC = next.waterTempC.trim();
+                  if (prevWaterTempC === "" && nextWaterTempC !== "") {
+                    wateringTempEntryUnitRef.current = temperatureUnit;
+                  } else if (nextWaterTempC === "") {
+                    wateringTempEntryUnitRef.current = null;
+                  }
                   setWateringForm(next);
                   setLocalError(null);
                 }}
+                entryTemperatureUnit={wateringTempEntryUnitRef.current ?? temperatureUnit}
               />
               {wateringRetryPending && (
                 <p
@@ -1498,13 +1616,24 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
               </summary>
               <div className="mt-3 grid grid-cols-3 gap-2">
                 <div>
-                  <Label htmlFor="qlv2-temp">Temp (°C)</Label>
+                  <Label htmlFor="qlv2-temp">
+                    Temp (
+                    {getTemperatureUnitSymbol(manualTempEntryUnitRef.current ?? temperatureUnit)})
+                  </Label>
                   <Input
                     id="qlv2-temp"
                     inputMode="decimal"
                     value={form.temperatureC}
                     disabled={wateringSubmissionLocked}
-                    onChange={(e) => setField("temperatureC", e.target.value)}
+                    onChange={(e) => {
+                      const next = e.target.value;
+                      if (form.temperatureC.trim() === "" && next.trim() !== "") {
+                        manualTempEntryUnitRef.current = temperatureUnit;
+                      } else if (next.trim() === "") {
+                        manualTempEntryUnitRef.current = null;
+                      }
+                      setField("temperatureC", next);
+                    }}
                   />
                 </div>
                 <div>
@@ -1596,7 +1725,12 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
                         null)
                       : null,
                     tentName: null,
-                    growName: null,
+                    growName:
+                      postSave.growId && Array.isArray(grows)
+                        ? ((grows as Array<{ id?: string; name?: string }>).find(
+                            (g) => g?.id === postSave.growId,
+                          )?.name ?? null)
+                        : null,
                     action: postSave.action,
                     photoAttached: /photo/i.test(postSave.message),
                   })}
@@ -1606,6 +1740,16 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
                     type="button"
                     className="flex-1"
                     onClick={handleViewTimeline}
+                    disabled={
+                      !buildQuickLogTimelineNavTarget({
+                        growId: postSave.growId,
+                        targetType: postSave.targetType,
+                        targetId: postSave.targetId,
+                        tentId: postSave.tentId,
+                        plantId: postSave.targetType === "plant" ? postSave.targetId : null,
+                        growEventId: postSave.growEventId,
+                      })
+                    }
                     data-testid="quick-log-post-save-view"
                   >
                     {QUICK_LOG_POST_SAVE_VIEW_LABEL}
@@ -1658,7 +1802,8 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
                       feedingSaving ||
                       wateringSaving ||
                       videoChecking ||
-                      (contextBlocked && !wateringRetryPending)
+                      (contextBlocked && !wateringRetryPending) ||
+                      (selectedTargetStale && !wateringRetryPending)
                     }
                     aria-describedby="qlv2-save-helper"
                     data-testid="qlv2-save"

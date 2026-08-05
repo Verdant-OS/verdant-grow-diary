@@ -50,8 +50,7 @@ export function buildQuickLogPhotoGateState(): QuickLogPhotoGateState {
   const activePickerLabels = {
     takePhotoLabel: "Take Photo",
     chooseLibraryLabel: "Choose from Library",
-    pickerHelperText:
-      "Add a new photo or pick one already on your phone. Optional.",
+    pickerHelperText: "Add a new photo or pick one already on your phone. Optional.",
     cameraInputAriaLabel: "Take a new photo with your camera",
     libraryInputAriaLabel: "Choose a photo from your library",
   } as const;

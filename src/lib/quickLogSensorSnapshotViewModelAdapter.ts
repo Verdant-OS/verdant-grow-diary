@@ -18,9 +18,7 @@
 
 import type { SensorSnapshot } from "@/lib/latestSensorSnapshotRules";
 import type { LatestTentSensorSnapshotState } from "@/lib/sensor";
-import type {
-  QuickLogSensorContextInput,
-} from "@/lib/quickLogSensorSnapshotViewModel";
+import type { QuickLogSensorContextInput } from "@/lib/quickLogSensorSnapshotViewModel";
 import type {
   SensorSnapshotInput,
   SensorSnapshotMetricInput,
@@ -61,9 +59,7 @@ function mapSource(
   return null;
 }
 
-function mapMetrics(
-  snapshot: SensorSnapshot,
-): SensorSnapshotMetricInput[] {
+function mapMetrics(snapshot: SensorSnapshot): SensorSnapshotMetricInput[] {
   const out: SensorSnapshotMetricInput[] = [];
   const m = snapshot.metrics;
   if (m.temp_f !== null) {
@@ -108,10 +104,7 @@ export function adaptQuickLogSensorContextInput(
 
   const input: SensorSnapshotInput = {
     source: mappedSource,
-    sourceDetail:
-      typeof snap.source === "string" && snap.source.length > 0
-        ? snap.source
-        : null,
+    sourceDetail: typeof snap.source === "string" && snap.source.length > 0 ? snap.source : null,
     capturedAt: snap.captured_at,
     confidence: snap.confidence ?? null,
     invalid: snap.freshness === "invalid",

@@ -54,6 +54,8 @@ export interface UsePhenoKeepersState {
   decisionsByPlant: Record<string, KeeperDecisionLogEntry[]>;
   error: string | null;
   saving: boolean;
+  /** Retry the hunt, keeper, clone, cross, reversal, and evidence reads. */
+  reload: () => void;
   promoteToKeeper: (sourcePlantId: string, keeperName: string) => Promise<boolean>;
   addKeeperClone: (keeperId: string, cloneLabel: string) => Promise<boolean>;
   /** Record a reversal on a keeper (append-only). */
@@ -262,6 +264,7 @@ export function usePhenoKeepers(huntId: string | null | undefined): UsePhenoKeep
     decisionsByPlant,
     error,
     saving,
+    reload,
     promoteToKeeper,
     addKeeperClone,
     markReversed,

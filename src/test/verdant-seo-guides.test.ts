@@ -10,7 +10,6 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
-  VERDANT_CUSTOMER_GUIDE_PATH,
   VERDANT_CUSTOMER_MODE_GROWER_FAQ,
   VERDANT_GROWER_GUIDE_FAQ,
   VERDANT_GUIDES_BREADCRUMB_ITEMS,
@@ -21,6 +20,10 @@ import {
 } from "@/constants/verdantSeoContent";
 import { VERDANT_FORBIDDEN_PUBLIC_PHRASES } from "@/constants/verdantSeoCopy";
 import {
+  extractMountedAppRoutePaths,
+  readAllRouteModuleSources,
+} from "./helpers/routeManifestSyncHarness";
+import {
   buildBreadcrumbListJsonLd,
   buildFaqPageJsonLd,
   safeJsonLdStringify,
@@ -29,7 +32,7 @@ import {
 const REPO = resolve(__dirname, "../..");
 const read = (rel: string) => readFileSync(resolve(REPO, rel), "utf8");
 
-const APP_TSX = read("src/App.tsx");
+const APP_TSX = readAllRouteModuleSources();
 const GUIDES_INDEX = read("src/pages/GuidesIndex.tsx");
 const GUIDE_PAGE = read("src/pages/GuidePage.tsx");
 const CONTENT_TS = read("src/constants/verdantSeoContent.ts");
@@ -61,6 +64,20 @@ const EXPECTED_SLUGS: ReadonlyArray<string> = [
   "house-and-garden-nutrients-grow-diary",
   "canna-nutrients-grow-diary",
   "bud-rot-prevention-identification",
+  // Nutrient demand cluster: stage requirements, feed frequency, damage control.
+  // Schedule-neutral by design — brand-named nutrient guides above cover
+  // logging, not dosing.
+  "cannabis-nutrient-schedule",
+  // Lighting demand cluster: measured setup and cautious symptom comparison.
+  "cannabis-grow-light-distance-and-schedule",
+  "cannabis-light-stress-light-burn-bleaching-or-heat",
+  // Cultivar comparison cluster: pheno expression showcase.
+  "oreoz-vs-gelonade-comparison",
+  // Evidence-first symptom hub and focused visible-sign guides.
+  "cannabis-leaf-symptoms",
+  "cannabis-leaves-turning-yellow",
+  "cannabis-leaf-spots-lesions",
+  "cannabis-burnt-crispy-leaf-tips",
 ];
 
 describe("Verdant grower guide FAQ (/guides)", () => {
@@ -112,14 +129,14 @@ describe("Verdant grower guide FAQ (/guides)", () => {
   });
 });
 
-describe("Verdant SEO guide pages (20)", () => {
-  it("defines exactly the twenty expected slugs, in order", () => {
+describe("Verdant SEO guide pages (28)", () => {
+  it("defines exactly the twenty-eight expected slugs, in order", () => {
     expect(VERDANT_GUIDE_SLUGS).toEqual(EXPECTED_SLUGS);
   });
 
-  it("registers /guides and /guides/:slug in App.tsx", () => {
-    expect(APP_TSX).toMatch(/path="\/guides"/);
-    expect(APP_TSX).toMatch(/path="\/guides\/:slug"/);
+  it("registers /guides and /guides/:slug in file routes", () => {
+    expect(extractMountedAppRoutePaths()).toContain("/guides");
+    expect(extractMountedAppRoutePaths()).toContain("/guides/:slug");
     expect(APP_TSX).toContain("GuidesIndex");
     expect(APP_TSX).toContain("GuidePage");
   });
@@ -173,6 +190,21 @@ describe("Verdant SEO guide pages (20)", () => {
     for (const phrase of VERDANT_FORBIDDEN_PUBLIC_PHRASES) {
       expect(surface).not.toContain(phrase.toLowerCase());
     }
+  });
+
+  it("makes Action Queue handoff explicitly grower-initiated", () => {
+    const publicContent = JSON.stringify({
+      faq: VERDANT_GROWER_GUIDE_FAQ,
+      guides: VERDANT_SEO_GUIDES,
+    });
+
+    expect(publicContent).toMatch(/only when the grower chooses to add it/i);
+    expect(publicContent).not.toMatch(
+      /drop(?:s|ped)? (?:it|them|actions?) into (?:an |the )?Action Queue/i,
+    );
+    expect(publicContent).not.toMatch(
+      /(?:recommended action stays in|equipment change is grower-approved through|stays with the grower through) (?:an |the )?(?:approval-required )?Action Queue/i,
+    );
   });
 
   it("no guide content markets Verdant as ERP / seed-to-sale / compliance", () => {
@@ -257,24 +289,30 @@ describe("Landing and Pricing OG/Twitter metadata", () => {
 
   it("usePageSeo defaults og:image to an absolute https URL (no broken paths)", () => {
     const hook = read("src/hooks/usePageSeo.ts");
-    // Default is `${SITE_ORIGIN}/brand/verdant-logo.png` — accept template form.
-    expect(hook).toMatch(/\/brand\/verdant-logo\.png/);
+    // Default is `${SITE_ORIGIN}/brand/verdant-logo-512.png` — accept template form.
+    expect(hook).toMatch(/\/brand\/verdant-logo-512\.png/);
     expect(hook).toMatch(/https:\/\/verdantgrowdiary\.com/);
   });
 });
 
-describe("Guide internal links to Customer Guide route", () => {
-  it("Customer Guide path resolves to the real /customer/:shareId route", () => {
-    expect(VERDANT_CUSTOMER_GUIDE_PATH.startsWith("/customer/")).toBe(true);
-    expect(APP_TSX).toMatch(/path="\/customer\/:shareId"/);
+describe("retired Customer Mode share routes stay absent from the public guide funnel", () => {
+  it("does not mount an unbacked Customer Mode share route", () => {
+    expect(extractMountedAppRoutePaths()).not.toContain("/customer");
+    expect(CONTENT_TS).not.toContain('"/customer/guide"');
   });
 
-  it("GuidePage and GuidesIndex link to the Customer Guide route", () => {
-    expect(GUIDE_PAGE).toContain("VERDANT_CUSTOMER_GUIDE_PATH");
-    expect(GUIDES_INDEX).toContain("VERDANT_CUSTOMER_GUIDE_PATH");
+  it("GuidePage scopes the ID-free QR option to the comparison guide only", () => {
+    expect(GUIDE_PAGE).toContain("CustomerComparisonGuideQrOption");
+    expect(GUIDE_PAGE).toContain("OREOZ_GELONADE_GUIDE_SLUG");
+    expect(GUIDE_PAGE).toMatch(
+      /guide\.slug\s*===\s*OREOZ_GELONADE_GUIDE_SLUG\s*&&\s*<CustomerComparisonGuideQrOption/,
+    );
+    expect(GUIDES_INDEX).not.toMatch(/\/customer\//);
+    expect(GUIDE_PAGE).not.toMatch(/Start with the Customer Guide/i);
+    expect(GUIDES_INDEX).not.toMatch(/start with the Customer Guide/i);
   });
 
-  it("guide pages do not link to protected/private app routes", () => {
+  it("generic guide presenters do not hardcode protected/private app routes", () => {
     const surface = [GUIDES_INDEX, GUIDE_PAGE].join("\n");
     for (const priv of [
       'to="/dashboard"',
@@ -294,7 +332,7 @@ describe("Guide internal links to Customer Guide route", () => {
 
 describe("Guides hub metadata (/guides)", () => {
   it("GuidesIndex title/description carry the target keyword phrases", () => {
-    expect(GUIDES_INDEX).toContain("Grower Guides: Grow Diary, VPD & Sensor Truth | Verdant");
+    expect(GUIDES_INDEX).toContain("Grower Guides: Diary, Lighting & Sensor Truth | Verdant");
     expect(GUIDES_INDEX).toMatch(/source-labeled sensor data/i);
     expect(GUIDES_INDEX).toMatch(/path:\s*"\/guides"/);
   });

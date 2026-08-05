@@ -15,9 +15,7 @@ import { AI_DOCTOR_SNAPSHOT_FRESH_MS } from "@/lib/aiDoctorContextRules";
 
 const NOW = Date.parse("2026-06-01T12:00:00.000Z");
 
-function build(
-  overrides: Partial<Parameters<typeof buildAiDoctorReadinessDiaryEntry>[0]> = {},
-) {
+function build(overrides: Partial<Parameters<typeof buildAiDoctorReadinessDiaryEntry>[0]> = {}) {
   return buildAiDoctorReadinessDiaryEntry({
     readiness: "partial",
     latestSnapshotAtIso: null,
@@ -94,9 +92,7 @@ describe("snapshot freshness graded at check time (shared 48h window)", () => {
     if (!res.ok) return;
     expect(res.draft.details.snapshot_freshness).toBe("fresh");
     expect(res.draft.details.snapshot_at).toBe(atCutoff);
-    expect(res.draft.details.snapshot_age_minutes).toBe(
-      AI_DOCTOR_SNAPSHOT_FRESH_MS / 60_000,
-    );
+    expect(res.draft.details.snapshot_age_minutes).toBe(AI_DOCTOR_SNAPSHOT_FRESH_MS / 60_000);
   });
 
   it("one minute past the cutoff is stale, and the note says so", () => {
@@ -143,6 +139,7 @@ describe("note copy per readiness", () => {
     const partial = build();
     if (partial.ok) expect(partial.draft.note).toMatch(/allowed with limited confidence/);
     const insufficient = build({ readiness: "insufficient" });
-    if (insufficient.ok) expect(insufficient.draft.note).toMatch(/blocked \(insufficient context\)/);
+    if (insufficient.ok)
+      expect(insufficient.draft.note).toMatch(/blocked \(insufficient context\)/);
   });
 });

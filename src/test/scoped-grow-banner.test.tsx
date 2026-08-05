@@ -18,7 +18,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import ScopedGrowBanner from "@/components/ScopedGrowBanner";
 
 const ROOT = resolve(__dirname, "../..");
@@ -28,14 +28,11 @@ const TIMELINE = readFileSync(resolve(ROOT, "src/pages/Timeline.tsx"), "utf8");
 const ACTIONQ = readFileSync(resolve(ROOT, "src/pages/ActionQueue.tsx"), "utf8");
 const BANNER = readFileSync(resolve(ROOT, "src/components/ScopedGrowBanner.tsx"), "utf8");
 
-const renderWithRouter = (ui: React.ReactElement) =>
-  render(<MemoryRouter>{ui}</MemoryRouter>);
+const renderWithRouter = (ui: React.ReactElement) => render(<MemoryRouter>{ui}</MemoryRouter>);
 
 describe("ScopedGrowBanner — component", () => {
   it("renders nothing without growId", () => {
-    const { container } = renderWithRouter(
-      <ScopedGrowBanner label="plants" clearHref="/plants" />,
-    );
+    const { container } = renderWithRouter(<ScopedGrowBanner label="plants" clearHref="/plants" />);
     expect(container).toBeEmptyDOMElement();
   });
 
@@ -54,20 +51,13 @@ describe("ScopedGrowBanner — component", () => {
   });
 
   it("falls back to generic copy when growId exists but growName is missing", () => {
-    renderWithRouter(
-      <ScopedGrowBanner growId="grow-x" label="tents" clearHref="/tents" />,
-    );
+    renderWithRouter(<ScopedGrowBanner growId="grow-x" label="tents" clearHref="/tents" />);
     expect(screen.getByText("Showing tents for this grow")).toBeInTheDocument();
   });
 
   it("renders Back to Grow only when backHref is provided", () => {
     const { rerender } = renderWithRouter(
-      <ScopedGrowBanner
-        growId="g1"
-        growName="G1"
-        label="logs"
-        clearHref="/logs"
-      />,
+      <ScopedGrowBanner growId="g1" growName="G1" label="logs" clearHref="/logs" />,
     );
     expect(screen.queryByText("Back to Grow")).toBeNull();
     rerender(
@@ -87,9 +77,7 @@ describe("ScopedGrowBanner — component", () => {
   });
 
   it("always renders Clear grow filter when growId is present", () => {
-    renderWithRouter(
-      <ScopedGrowBanner growId="g1" label="actions" clearHref="/actions" />,
-    );
+    renderWithRouter(<ScopedGrowBanner growId="g1" label="actions" clearHref="/actions" />);
     const clear = screen.getByText("Clear grow filter");
     expect(clear).toBeInTheDocument();
     expect(clear.closest("a")).toHaveAttribute("href", "/actions");
@@ -97,27 +85,37 @@ describe("ScopedGrowBanner — component", () => {
 
   it("source surface is safe", () => {
     expect(BANNER).not.toMatch(/ai-coach|ai_coach/);
-    expect(BANNER).not.toMatch(/mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|webhook|\brelay\b|\bactuator\b|service_role/i);
+    expect(BANNER).not.toMatch(
+      /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|webhook|\brelay\b|\bactuator\b|service_role/i,
+    );
   });
 });
 
 describe("Page wiring — ScopedGrowBanner usage", () => {
   it("Plants uses ScopedGrowBanner with label='plants' and plantsPath() clearHref", () => {
     expect(PLANTS).toMatch(/import\s+ScopedGrowBanner/);
-    expect(PLANTS).toMatch(/<ScopedGrowBanner[\s\S]*?label=\s*["']plants["'][\s\S]*?clearHref=\{plantsPath\(\)\}/);
+    expect(PLANTS).toMatch(
+      /<ScopedGrowBanner[\s\S]*?label=\s*["']plants["'][\s\S]*?clearHref=\{plantsPath\(\)\}/,
+    );
     expect(PLANTS).toMatch(/backHref=\{backHref\}/);
   });
   it("Tents uses ScopedGrowBanner with label='tents' and tentsPath() clearHref", () => {
     expect(TENTS).toMatch(/import\s+ScopedGrowBanner/);
-    expect(TENTS).toMatch(/<ScopedGrowBanner[\s\S]*?label=\s*["']tents["'][\s\S]*?clearHref=\{tentsPath\(\)\}/);
+    expect(TENTS).toMatch(
+      /<ScopedGrowBanner[\s\S]*?label=\s*["']tents["'][\s\S]*?clearHref=\{tentsPath\(\)\}/,
+    );
   });
   it("Timeline uses ScopedGrowBanner with dynamic scopeLabel + clearTo", () => {
     expect(TIMELINE).toMatch(/import\s+ScopedGrowBanner/);
-    expect(TIMELINE).toMatch(/<ScopedGrowBanner[\s\S]*?label=\{scopeLabel\}[\s\S]*?clearHref=\{clearTo\}/);
+    expect(TIMELINE).toMatch(
+      /<ScopedGrowBanner[\s\S]*?label=\{scopeLabel\}[\s\S]*?clearHref=\{clearTo\}/,
+    );
   });
   it("ActionQueue uses ScopedGrowBanner with label='actions' and actionsPath() clearHref", () => {
     expect(ACTIONQ).toMatch(/import\s+ScopedGrowBanner/);
-    expect(ACTIONQ).toMatch(/<ScopedGrowBanner[\s\S]*?label=\s*["']actions["'][\s\S]*?clearHref=\{actionsPath\(\)\}/);
+    expect(ACTIONQ).toMatch(
+      /<ScopedGrowBanner[\s\S]*?label=\s*["']actions["'][\s\S]*?clearHref=\{actionsPath\(\)\}/,
+    );
   });
 
   it("pages consume the shared useScopedGrow hook", () => {
@@ -137,7 +135,9 @@ describe("Page wiring — ScopedGrowBanner usage", () => {
   it("safe surface preserved on all pages", () => {
     for (const src of [PLANTS, TENTS, TIMELINE, ACTIONQ]) {
       expect(src).not.toMatch(/ai-coach|ai_coach/);
-      expect(src).not.toMatch(/mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|webhook|\brelay\b|\bactuator\b|service_role/i);
+      expect(src).not.toMatch(
+        /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|webhook|\brelay\b|\bactuator\b|service_role/i,
+      );
     }
   });
 });

@@ -19,11 +19,24 @@
  *  - Friendly tone — no shaming language.
  */
 
-import { computeVpdKpa, fahrenheitToCelsius } from "./sensorReadingManualEntryRules";
+import { computeVpdKpa } from "./sensorReadingManualEntryRules";
+import {
+  detectTemperatureUnitMismatch,
+  parseTemperatureInput,
+  resolveTemperatureInputUnit,
+  type TemperatureInputUnit,
+} from "@/lib/sensorInputUnitConversion";
 
 export interface ManualSnapshotAdvisorInput {
-  /** Air temperature entered into the °F field. */
+  /** Air temperature entered into the °F field. Ignored when `airTemp` is set. */
   airTempF?: string | number | null;
+  /** Air temperature in the unit named by `airTempUnit`. Preferred when set. */
+  airTemp?: string | number | null;
+  /**
+   * Unit the grower is typing air temperature in. Explicit — the advisor
+   * never infers a unit from magnitude, it only warns about a likely mix-up.
+   */
+  airTempUnit?: TemperatureInputUnit;
   /** Relative humidity %. */
   humidityPct?: string | number | null;
   /** VPD kPa, if grower entered it directly. */
@@ -70,7 +83,17 @@ export function evaluateManualSnapshotAdvisor(
 ): ManualSnapshotAdvisorResult {
   const warnings: string[] = [];
 
-  const airTempF = toFinite(input.airTempF);
+  const hasExplicitTemp =
+    input.airTemp !== undefined &&
+    input.airTemp !== null &&
+    !(typeof input.airTemp === "string" && input.airTemp.trim() === "");
+  const airTempUnit: TemperatureInputUnit = hasExplicitTemp
+    ? resolveTemperatureInputUnit(input.airTempUnit)
+    : "F";
+  const airTemp = parseTemperatureInput(
+    hasExplicitTemp ? input.airTemp : input.airTempF,
+    airTempUnit,
+  );
   const humidity = toFinite(input.humidityPct);
   const vpd = toFinite(input.vpdKpa);
   const co2 = toFinite(input.co2Ppm);
@@ -79,32 +102,28 @@ export function evaluateManualSnapshotAdvisor(
   const ecUs = toFinite(input.soilEcUsCm);
   const ph = toFinite(input.reservoirPh);
 
-  // 1. Temperature likely entered as Celsius into a °F field.
-  //    Anything <= 40 in a tent °F field is almost certainly °C
-  //    (40°F is 4°C — far below any realistic grow-room air temp).
-  if (airTempF !== null && airTempF <= 40) {
-    warnings.push(
-      `Air temp ${airTempF}°F looks like a Celsius value entered into the °F field. ${DOUBLE_CHECK}`,
-    );
+  // 1. Temperature magnitude inconsistent with the unit the grower selected.
+  //    In °F, anything <= 40 is almost certainly °C (40°F is 4°C — far below
+  //    any realistic grow room). In °C, anything >= 45 is almost certainly °F.
+  //    Advisory only: the value is never silently re-interpreted.
+  if (airTemp.enteredValue !== null) {
+    const mismatch = detectTemperatureUnitMismatch(airTemp.enteredValue, airTemp.unit);
+    if (mismatch) warnings.push(mismatch);
   }
 
   // 2. Humidity unusually low or high.
   if (humidity !== null && humidity >= 0 && humidity <= 100) {
     if (humidity < 20) {
-      warnings.push(
-        `Humidity ${humidity}% is unusually low for a grow tent. ${DOUBLE_CHECK}`,
-      );
+      warnings.push(`Humidity ${humidity}% is unusually low for a grow tent. ${DOUBLE_CHECK}`);
     } else if (humidity > 90) {
-      warnings.push(
-        `Humidity ${humidity}% is unusually high for a grow tent. ${DOUBLE_CHECK}`,
-      );
+      warnings.push(`Humidity ${humidity}% is unusually high for a grow tent. ${DOUBLE_CHECK}`);
     }
   }
 
   // 3. VPD: unrealistic when entered; derivation hint when absent.
   let derivedVpdKpa: number | null = null;
   const haveTempRh =
-    airTempF !== null && humidity !== null && humidity >= 0 && humidity <= 100;
+    airTemp.celsius !== null && humidity !== null && humidity >= 0 && humidity <= 100;
   if (vpd !== null) {
     if (vpd <= 0 || vpd > 3) {
       warnings.push(
@@ -112,19 +131,15 @@ export function evaluateManualSnapshotAdvisor(
       );
     }
   } else if (haveTempRh) {
-    derivedVpdKpa = computeVpdKpa(fahrenheitToCelsius(airTempF), humidity);
+    derivedVpdKpa = computeVpdKpa(airTemp.celsius as number, humidity);
   }
 
   // 4. CO2 below 300 ppm or above 2000 ppm.
   if (co2 !== null) {
     if (co2 < 300) {
-      warnings.push(
-        `CO₂ ${co2} ppm is below ambient (~400 ppm). ${DOUBLE_CHECK}`,
-      );
+      warnings.push(`CO₂ ${co2} ppm is below ambient (~400 ppm). ${DOUBLE_CHECK}`);
     } else if (co2 > 2000) {
-      warnings.push(
-        `CO₂ ${co2} ppm is above the safe enrichment ceiling. ${DOUBLE_CHECK}`,
-      );
+      warnings.push(`CO₂ ${co2} ppm is above the safe enrichment ceiling. ${DOUBLE_CHECK}`);
     }
   }
 
@@ -151,9 +166,7 @@ export function evaluateManualSnapshotAdvisor(
 
   // 7. Reservoir pH outside realistic 4.5–7.5 range.
   if (ph !== null && (ph < 4.5 || ph > 7.5)) {
-    warnings.push(
-      `Reservoir pH ${ph} is outside the realistic 4.5–7.5 range. ${DOUBLE_CHECK}`,
-    );
+    warnings.push(`Reservoir pH ${ph} is outside the realistic 4.5–7.5 range. ${DOUBLE_CHECK}`);
   }
 
   return { warnings, derivedVpdKpa };

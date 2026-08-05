@@ -8,11 +8,26 @@ import {
   encodeSensorSourcesParam,
   parseDateRangeParam,
   parseSensorSourcesParam,
+  parseTimelinePlantIdParam,
   sensorSourcesEqual,
+  SENSOR_PLANT_PARAM,
   SENSOR_SOURCES_PARAM,
   SENSOR_RANGE_FROM_PARAM,
   SENSOR_RANGE_TO_PARAM,
 } from "@/lib/sensorSourceUrlRules";
+
+describe("parseTimelinePlantIdParam", () => {
+  it("normalizes an opaque plant id and treats missing/blank values as unscoped", () => {
+    expect(parseTimelinePlantIdParam("  plant-a  ")).toBe("plant-a");
+    expect(parseTimelinePlantIdParam(null)).toBeNull();
+    expect(parseTimelinePlantIdParam(undefined)).toBeNull();
+    expect(parseTimelinePlantIdParam("   ")).toBeNull();
+  });
+
+  it("keeps an unknown id exact so downstream owner-scoped matching fails closed", () => {
+    expect(parseTimelinePlantIdParam("plant-not-authorized")).toBe("plant-not-authorized");
+  });
+});
 
 describe("parseSensorSourcesParam", () => {
   it("returns empty for null / blank / non-string input", () => {
@@ -23,31 +38,26 @@ describe("parseSensorSourcesParam", () => {
   });
 
   it("parses canonical kinds preserving order", () => {
-    expect(parseSensorSourcesParam("live,csv,manual")).toEqual([
-      "live",
-      "csv",
-      "manual",
-    ]);
+    expect(parseSensorSourcesParam("live,csv,manual")).toEqual(["live", "csv", "manual"]);
   });
 
   it("drops unknown tokens silently without crashing", () => {
-    expect(parseSensorSourcesParam("live,foo,bar,csv,xss<script>")).toEqual([
-      "live",
-      "csv",
-    ]);
+    expect(parseSensorSourcesParam("live,foo,bar,csv,xss<script>")).toEqual(["live", "csv"]);
   });
 
   it("normalizes case and de-duplicates", () => {
-    expect(parseSensorSourcesParam("LIVE,live,Manual,manual")).toEqual([
-      "live",
-      "manual",
-    ]);
+    expect(parseSensorSourcesParam("LIVE,live,Manual,manual")).toEqual(["live", "manual"]);
   });
 
   it("recognizes the full canonical set", () => {
-    expect(parseSensorSourcesParam("live,manual,csv,demo,stale,invalid")).toEqual(
-      ["live", "manual", "csv", "demo", "stale", "invalid"],
-    );
+    expect(parseSensorSourcesParam("live,manual,csv,demo,stale,invalid")).toEqual([
+      "live",
+      "manual",
+      "csv",
+      "demo",
+      "stale",
+      "invalid",
+    ]);
   });
 });
 
@@ -101,7 +111,7 @@ describe("buildTimelineFilterUrl", () => {
     expect(url).toContain(`${SENSOR_SOURCES_PARAM}=live%2Ccsv`);
     expect(url).toContain(`${SENSOR_RANGE_FROM_PARAM}=2026-06-01`);
     expect(url).toContain(`${SENSOR_RANGE_TO_PARAM}=2026-06-17`);
-    expect(url).toContain("plantId=p1");
+    expect(url).toContain(`${SENSOR_PLANT_PARAM}=p1`);
   });
 
   it("drops invalid dates rather than emitting them", () => {
@@ -115,8 +125,21 @@ describe("buildTimelineFilterUrl", () => {
   });
 
   it("supports an alternate base path", () => {
+    expect(buildTimelineFilterUrl({ sources: ["live"], base: "/logs" })).toBe(
+      `/logs?${SENSOR_SOURCES_PARAM}=live`,
+    );
+  });
+
+  it("drops a blank plant scope without disturbing source/date filters", () => {
     expect(
-      buildTimelineFilterUrl({ sources: ["live"], base: "/logs" }),
-    ).toBe(`/logs?${SENSOR_SOURCES_PARAM}=live`);
+      buildTimelineFilterUrl({
+        sources: ["live"],
+        from: "2026-06-01",
+        to: "2026-06-17",
+        plantId: "   ",
+      }),
+    ).toBe(
+      `/timeline?${SENSOR_SOURCES_PARAM}=live&${SENSOR_RANGE_FROM_PARAM}=2026-06-01&${SENSOR_RANGE_TO_PARAM}=2026-06-17`,
+    );
   });
 });

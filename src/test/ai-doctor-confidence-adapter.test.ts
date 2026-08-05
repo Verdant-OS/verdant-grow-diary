@@ -217,10 +217,7 @@ describe("calculateAiDoctorConfidence — unit", () => {
 
   it("does not score blank pot size and stays deterministic", async () => {
     const context = {
-      ...buildContext(
-        [liveReading("temperature_c", 24)],
-        [recentEvent("watering")],
-      ),
+      ...buildContext([liveReading("temperature_c", 24)], [recentEvent("watering")]),
       pot_size: "   ",
     } as PlantContextPayload;
     const diagnosis = await diagnose(context, visionGood());
@@ -254,10 +251,7 @@ describe("calculateAiDoctorConfidence — unit", () => {
 
   it("caps score at 30 when only stale/invalid readings exist", async () => {
     const ctx = buildContext(
-      [
-        staleReading("temperature_c", 24),
-        invalidReading("humidity_pct", 200),
-      ],
+      [staleReading("temperature_c", 24), invalidReading("humidity_pct", 200)],
       [],
     );
     const dx = await diagnose(ctx, visionGood());
@@ -358,10 +352,7 @@ describe("calculateAiDoctorConfidence — unit", () => {
 
   it('never returns "high" without the full quartet (trustworthy + events + visual + low missing)', async () => {
     // Same as above but with poor vision — must not be "high".
-    const ctx = buildContext(
-      [liveReading("temperature_c", 24)],
-      [recentEvent("watering")],
-    );
+    const ctx = buildContext([liveReading("temperature_c", 24)], [recentEvent("watering")]);
     const dx = await diagnose(ctx, visionPoor());
     const trimmed: Phase1DiagnosisResult = {
       ...dx,
@@ -417,10 +408,7 @@ describe("calculateAiDoctorConfidence — golden cases", () => {
         sensorReadings: golden.sensorReadings,
         now,
       });
-      const dx = await generateMultimodalDiagnosisPhase1(
-        golden.visionData,
-        ctx,
-      );
+      const dx = await generateMultimodalDiagnosisPhase1(golden.visionData, ctx);
       const a = calculateAiDoctorConfidence({
         diagnosis: dx,
         context: ctx,
@@ -454,9 +442,7 @@ describe("calculateAiDoctorConfidence — golden cases", () => {
         "poor_visual_quality",
         "avoid_overdiagnosis",
       ];
-      expect(a.safety_flags.some((f) => expectedAnyFlag.includes(f))).toBe(
-        true,
-      );
+      expect(a.safety_flags.some((f) => expectedAnyFlag.includes(f))).toBe(true);
 
       // No demo/csv described as live
       expect(a.explanation.toLowerCase()).not.toMatch(

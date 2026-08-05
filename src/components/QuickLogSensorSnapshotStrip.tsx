@@ -20,6 +20,7 @@ import {
   buildQuickLogStripFromTentState,
   type QuickLogSnapshotStripStatus,
 } from "@/lib/quickLogSnapshotStripAdapter";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 import SnapshotTrustBadge from "@/components/SnapshotTrustBadge";
 import { buildQuickLogSensorSnapshotViewModel } from "@/lib/quickLogSensorSnapshotViewModel";
 import { adaptQuickLogSensorContextInput } from "@/lib/quickLogSensorSnapshotViewModelAdapter";
@@ -28,7 +29,6 @@ import {
   hasCorrectableOriginalIds,
   type ManualCorrectionMetric,
 } from "@/lib/manualSensorCorrectionContext";
-
 
 interface Props {
   growId?: string | null | undefined;
@@ -88,7 +88,10 @@ const PILL_ARIA: Record<QuickLogSnapshotStripStatus, string> = {
 // label as the canonical badge, we suppress the pill text instead —
 // never the badge. The dedupe comparison is case-insensitive and
 // trim-normalized but does not change user-facing copy.
-function shouldRenderTrustBadge(_status: QuickLogSnapshotStripStatus, _trustLabel: string): boolean {
+function shouldRenderTrustBadge(
+  _status: QuickLogSnapshotStripStatus,
+  _trustLabel: string,
+): boolean {
   // Always render the canonical trust badge. See isPillRedundantWithBadge
   // for the inverse decision used to hide the duplicate pill label.
   return true;
@@ -111,11 +114,20 @@ export default function QuickLogSensorSnapshotStrip({
   manualValues,
 }: Props) {
   const state = useLatestTentSensorSnapshot(tentId ?? null);
+  // Read-only reference display (Pattern B, not a grower-typed draft): the
+  // strip's Temp metric must always reflect the CURRENT live preference,
+  // recomputed on every render — never frozen at mount. Codex round-6
+  // finding: this call previously omitted the unit entirely, so the strip
+  // always rendered the tent snapshot's temperature hardcoded as °C even
+  // when the grower's active preference (and every other Temp field in
+  // this same dialog) was Fahrenheit.
+  const temperatureUnit = useTemperatureUnitPreference();
   const view = buildQuickLogStripFromTentState({
     status: state.status,
     snapshot: state.snapshot,
     hasTent: !!tentId,
     attached,
+    temperatureUnit,
   });
 
   // Additive: derive a single consistent freshness/empty advisory line
@@ -129,12 +141,8 @@ export default function QuickLogSensorSnapshotStrip({
     }),
   );
   const advisory =
-    vm.display && vm.display.freshness === "fresh" ? null : vm.warning ?? vm.emptyCopy;
-  const advisoryKind = vm.display
-    ? vm.display.freshness
-    : vm.emptyCopy
-      ? "missing"
-      : null;
+    vm.display && vm.display.freshness === "fresh" ? null : (vm.warning ?? vm.emptyCopy);
+  const advisoryKind = vm.display ? vm.display.freshness : vm.emptyCopy ? "missing" : null;
   const showTrustBadge = shouldRenderTrustBadge(view.status, view.trustBadge.label);
   const pillIsRedundant = isPillRedundantWithBadge(view.status, view.trustBadge.label);
 
@@ -145,9 +153,7 @@ export default function QuickLogSensorSnapshotStrip({
   // tentId is missing, when IDs contain no real UUIDs, or when no
   // capturedAt is supplied.
   const correctionHref =
-    tentId &&
-    manualCapturedAt &&
-    hasCorrectableOriginalIds(manualReadingIds)
+    tentId && manualCapturedAt && hasCorrectableOriginalIds(manualReadingIds)
       ? `/sensors${encodeManualCorrectionHash({
           tentId,
           originalCapturedAt: manualCapturedAt,
@@ -155,8 +161,6 @@ export default function QuickLogSensorSnapshotStrip({
           originalValues: manualValues ?? {},
         })}`
       : null;
-
-
 
   return (
     <section
@@ -203,8 +207,6 @@ export default function QuickLogSensorSnapshotStrip({
           </span>
 
           {showTrustBadge && <SnapshotTrustBadge view={view.trustBadge} showProvider={false} />}
-
-
         </div>
       </div>
 
@@ -235,7 +237,10 @@ export default function QuickLogSensorSnapshotStrip({
             </span>
           )}
           {view.metrics.map((m) => (
-            <span key={m.label} data-testid={`quicklog-sensor-snapshot-metric-${m.label.toLowerCase()}`}>
+            <span
+              key={m.label}
+              data-testid={`quicklog-sensor-snapshot-metric-${m.label.toLowerCase()}`}
+            >
               <span className="text-muted-foreground/70">{m.label}</span>{" "}
               <span className="text-foreground">{m.value}</span>
             </span>
@@ -243,14 +248,13 @@ export default function QuickLogSensorSnapshotStrip({
         </div>
       )}
 
-
       {view.action.kind !== "none" && (
         <a
           href={view.action.href}
           data-testid="quicklog-sensor-snapshot-action"
           data-action-kind={view.action.kind}
           aria-label={`${view.action.label} — opens sensors page`}
-          className="inline-flex items-center text-[12px] font-medium text-primary hover:underline rounded-sm focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          className="inline-flex items-center text-[12px] font-medium text-primary hover:underline rounded-sm focus:outline-hidden focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
           {view.action.label}
         </a>
@@ -260,7 +264,7 @@ export default function QuickLogSensorSnapshotStrip({
           href={correctionHref}
           data-testid="quicklog-sensor-snapshot-correct-action"
           aria-label="Correct manual reading — opens sensors page"
-          className="inline-flex items-center gap-1 text-[12px] font-medium text-primary hover:underline rounded-sm focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          className="inline-flex items-center gap-1 text-[12px] font-medium text-primary hover:underline rounded-sm focus:outline-hidden focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
           <History className="h-3 w-3" aria-hidden />
           Correct manual reading

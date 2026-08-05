@@ -43,9 +43,7 @@ describe("leads migration", () => {
   });
 
   it("enables row level security on leads", () => {
-    expect(migrationContents).toMatch(
-      /ALTER TABLE\s+public\.leads\s+ENABLE ROW LEVEL SECURITY/i,
-    );
+    expect(migrationContents).toMatch(/ALTER TABLE\s+public\.leads\s+ENABLE ROW LEVEL SECURITY/i);
   });
 
   it("allows public/anon to INSERT leads", () => {
@@ -56,9 +54,8 @@ describe("leads migration", () => {
 
   it("does not expose a public UPDATE/DELETE policy on leads", () => {
     // Only operator SELECT and operator UPDATE policies are allowed.
-    const leadsPolicyBlocks = migrationContents.match(
-      /CREATE POLICY[^;]*ON\s+public\.leads[^;]*;/gi,
-    ) ?? [];
+    const leadsPolicyBlocks =
+      migrationContents.match(/CREATE POLICY[^;]*ON\s+public\.leads[^;]*;/gi) ?? [];
     for (const p of leadsPolicyBlocks) {
       if (/FOR\s+DELETE/i.test(p)) {
         throw new Error("Unexpected DELETE policy on leads: " + p);
@@ -118,7 +115,6 @@ describe("LeadCaptureForm", () => {
     expect(FORM).not.toMatch(/setPhone|phoneNumber/);
     expect(FORM).not.toMatch(/sms_opt_in|smsOptIn/i);
   });
-
 
   it("does not use service_role or external-control strings", () => {
     expect(FORM).not.toMatch(/service_role/);

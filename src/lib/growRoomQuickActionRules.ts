@@ -13,13 +13,10 @@
  *  - Never produces an executable device command surface.
  */
 
+import { buildQuickLogV2OpenIntent, type QuickLogV2OpenIntent } from "@/lib/quickLogV2OpenIntent";
+
 export type QuickActionKind =
-  | "quick_log"
-  | "watering"
-  | "feeding"
-  | "photo"
-  | "daily_check"
-  | "view_tent";
+  "quick_log" | "watering" | "feeding" | "photo" | "daily_check" | "view_tent";
 
 export interface QuickActionPlantLite {
   id: string;
@@ -48,6 +45,8 @@ export interface QuickActionLink {
   label: string;
   /** When defined → open QuickLog with this prefill. */
   quickLogPrefill?: QuickLogPrefillPayload;
+  /** Structured Water handoff. Never coexists with legacy prefill. */
+  quickLogV2Intent?: QuickLogV2OpenIntent;
   /** When defined → navigate to this route instead of opening QuickLog. */
   href?: string;
 }
@@ -81,9 +80,7 @@ export function getPrimaryPlantForTent(
 }
 
 /** A plant-scoped quick action is safe to open only when a real plant id is selected. */
-export function canOpenPlantScopedAction(
-  plant: QuickActionPlantLite | null | undefined,
-): boolean {
+export function canOpenPlantScopedAction(plant: QuickActionPlantLite | null | undefined): boolean {
   return !!plant && !plant.is_archived && typeof plant.id === "string" && plant.id.length > 0;
 }
 
@@ -104,6 +101,11 @@ export function buildGrowRoomQuickActionLinks(
     growId: tent.grow_id ?? null,
     plantId: safePlantId,
   };
+  const wateringIntent = buildQuickLogV2OpenIntent({
+    plantId: safePlantId,
+    tentId: tent.id,
+    action: "water",
+  });
 
   return [
     {
@@ -114,7 +116,7 @@ export function buildGrowRoomQuickActionLinks(
     {
       kind: "watering",
       label: "Log Watering",
-      quickLogPrefill: { ...base, eventType: "watering" },
+      ...(wateringIntent ? { quickLogV2Intent: wateringIntent } : {}),
     },
     {
       kind: "feeding",

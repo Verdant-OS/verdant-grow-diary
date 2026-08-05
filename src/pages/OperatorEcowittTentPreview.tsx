@@ -8,10 +8,7 @@
  * NO AI calls, NO device control.
  */
 import { useMemo, useState } from "react";
-import {
-  EcowittTentKey,
-  SUPPORTED_TENT_KEYS,
-} from "@/lib/ecowittTentNormalizerRouter";
+import { EcowittTentKey, SUPPORTED_TENT_KEYS } from "@/lib/ecowittTentNormalizerRouter";
 import { buildEcowittLocalEvidencePreviewViewModel } from "@/lib/ecowittLocalEvidenceViewModel";
 import {
   ECOWITT_PREVIEW_SAMPLES,
@@ -122,10 +119,7 @@ export default function OperatorEcowittTentPreview() {
     [snapshot, dryRunOptions],
   );
 
-  const fieldMap = useMemo(
-    () => buildEcowittIngestDryRunFieldMap(snapshot),
-    [snapshot],
-  );
+  const fieldMap = useMemo(() => buildEcowittIngestDryRunFieldMap(snapshot), [snapshot]);
 
   const statusExplanation = useMemo(
     () => buildEcowittDryRunStatusExplanation(snapshot, dryRun),
@@ -192,10 +186,8 @@ export default function OperatorEcowittTentPreview() {
     setCopyState("unavailable");
   };
 
-
-
   return (
-    <main
+    <div
       className="mx-auto max-w-3xl p-4 sm:p-6 space-y-6 pb-32"
       data-testid="ecowitt-tent-preview"
     >
@@ -371,9 +363,7 @@ export default function OperatorEcowittTentPreview() {
                   data-selected={selected ? "true" : "false"}
                   aria-pressed={selected}
                   className={`w-full min-h-12 rounded-md border p-3 text-left text-sm transition ${
-                    selected
-                      ? "border-primary bg-primary/10"
-                      : "bg-background hover:bg-muted"
+                    selected ? "border-primary bg-primary/10" : "bg-background hover:bg-muted"
                   }`}
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
@@ -441,9 +431,9 @@ export default function OperatorEcowittTentPreview() {
           {diaryPreview.title}
         </div>
         <div className="text-xs text-muted-foreground">
-          Tent: <span data-testid="diary-preview-tent">{diaryPreview.tent_label}</span> ·
-          Provider: <span data-testid="diary-preview-provider">{diaryPreview.provider}</span> ·
-          Captured: <span data-testid="diary-preview-captured-at">{diaryPreview.captured_at ?? "—"}</span> ·
+          Tent: <span data-testid="diary-preview-tent">{diaryPreview.tent_label}</span> · Provider:{" "}
+          <span data-testid="diary-preview-provider">{diaryPreview.provider}</span> · Captured:{" "}
+          <span data-testid="diary-preview-captured-at">{diaryPreview.captured_at ?? "—"}</span> ·
           Source: <span data-testid="diary-preview-source">{diaryPreview.source_label}</span>
         </div>
         {diaryPreview.metrics_summary.length > 0 && (
@@ -453,9 +443,7 @@ export default function OperatorEcowittTentPreview() {
             ))}
           </ul>
         )}
-        <div className="text-xs">
-          Root-zone confidence: {diaryPreview.root_zone_confidence}
-        </div>
+        <div className="text-xs">Root-zone confidence: {diaryPreview.root_zone_confidence}</div>
         {diaryPreview.warnings.length > 0 && (
           <ul
             className="list-disc pl-5 text-xs text-destructive"
@@ -509,8 +497,8 @@ export default function OperatorEcowittTentPreview() {
         <div className="text-xs text-muted-foreground">
           Selected tent: <span data-testid="dry-run-tent">{preview.tent_label}</span> · Source:{" "}
           <span data-testid="dry-run-source">{preview.source_label}</span> · Captured:{" "}
-          <span data-testid="dry-run-captured-at">{preview.captured_at ?? "—"}</span> ·{" "}
-          Provider: <span data-testid="dry-run-provider">{preview.provider}</span>
+          <span data-testid="dry-run-captured-at">{preview.captured_at ?? "—"}</span> · Provider:{" "}
+          <span data-testid="dry-run-provider">{preview.provider}</span>
         </div>
         <div className="text-xs">
           Can send later:{" "}
@@ -560,21 +548,20 @@ export default function OperatorEcowittTentPreview() {
               </ul>
             </div>
           )}
-          {statusExplanation.state === "pass" &&
-            statusExplanation.pass_reasons.length > 0 && (
-              <div data-testid="status-pass-reasons">
-                <div className="font-semibold uppercase tracking-wide text-primary">
-                  Why this passed
-                </div>
-                <ul className="list-disc pl-5 text-muted-foreground">
-                  {statusExplanation.pass_reasons.map((p) => (
-                    <li key={p.trigger} data-testid={`status-pass-${p.trigger}`}>
-                      <span className="font-mono">{p.trigger}</span> — {p.explanation}
-                    </li>
-                  ))}
-                </ul>
+          {statusExplanation.state === "pass" && statusExplanation.pass_reasons.length > 0 && (
+            <div data-testid="status-pass-reasons">
+              <div className="font-semibold uppercase tracking-wide text-primary">
+                Why this passed
               </div>
-            )}
+              <ul className="list-disc pl-5 text-muted-foreground">
+                {statusExplanation.pass_reasons.map((p) => (
+                  <li key={p.trigger} data-testid={`status-pass-${p.trigger}`}>
+                    <span className="font-mono">{p.trigger}</span> — {p.explanation}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
 
         {/* Legacy compact blocked/warning lists kept for downstream consumers */}
@@ -606,8 +593,8 @@ export default function OperatorEcowittTentPreview() {
           {dryRunPayloadJson}
         </pre>
         <p className="text-xs text-muted-foreground">
-          No private identifiers, credentials, or network details are included in this payload.
-          CSV export is for audit review only. Copy payload copies the local preview JSON only.
+          No private identifiers, credentials, or network details are included in this payload. CSV
+          export is for audit review only. Copy payload copies the local preview JSON only.
         </p>
         <div className="flex flex-wrap gap-2">
           <button
@@ -635,7 +622,10 @@ export default function OperatorEcowittTentPreview() {
             Copy dry-run payload
           </button>
           {copyState === "copied" && (
-            <span data-testid="copy-dry-run-status-copied" className="self-center text-xs text-primary">
+            <span
+              data-testid="copy-dry-run-status-copied"
+              className="self-center text-xs text-primary"
+            >
               Copied to clipboard.
             </span>
           )}
@@ -660,8 +650,8 @@ export default function OperatorEcowittTentPreview() {
           All-tent dry-run export preview
         </h2>
         <p className="text-xs text-muted-foreground">
-          All-tent export uses currently available preview snapshots only. A future real ingest
-          path requires a separate approved phase.
+          All-tent export uses currently available preview snapshots only. A future real ingest path
+          requires a separate approved phase.
         </p>
         <div className="overflow-x-auto">
           <table className="w-full text-xs" data-testid="all-tents-preview-table">
@@ -701,9 +691,7 @@ export default function OperatorEcowittTentPreview() {
                     >
                       {f.can_send_later ? "YES" : "BLOCKED"}
                     </td>
-                    <td className="py-1 pr-2">
-                      {required_ok ? "present" : "missing"}
-                    </td>
+                    <td className="py-1 pr-2">{required_ok ? "present" : "missing"}</td>
                     <td className="py-1 pr-2">{f.payload.source}</td>
                     <td className="py-1 pr-2">{f.payload.captured_at ?? "—"}</td>
                     <td
@@ -828,9 +816,7 @@ export default function OperatorEcowittTentPreview() {
                   </span>
                 </div>
                 <div className="text-muted-foreground">from {row.source_field}</div>
-                {row.note && (
-                  <div className="text-muted-foreground italic">{row.note}</div>
-                )}
+                {row.note && <div className="text-muted-foreground italic">{row.note}</div>}
               </div>
               <div className="flex items-center gap-2">
                 <span className="font-mono">{row.value === null ? "—" : String(row.value)}</span>
@@ -897,6 +883,6 @@ export default function OperatorEcowittTentPreview() {
           ))}
         </nav>
       )}
-    </main>
+    </div>
   );
 }

@@ -57,6 +57,16 @@ function mkRun({
   fs.writeFileSync(path.join(dir, "progress.jsonl"), lines.join("\n") + "\n");
   if (completed) fs.writeFileSync(path.join(dir, "completed"), "now");
   fs.writeFileSync(path.join(dir, "exit-code"), String(exitCode));
+  fs.writeFileSync(
+    path.join(dir, "run-meta"),
+    JSON.stringify({
+      resumeMode: "run",
+      batchResults: [],
+      batchProcessFailed: false,
+      interrupted: false,
+      exit: exitCode,
+    }),
+  );
   return dir;
 }
 
@@ -98,6 +108,122 @@ describe("summarizer", () => {
     });
     const s = summarizeRun(dir);
     expect(s.status).toBe("interrupted");
+  });
+
+  it.each([true, false])(
+    "treats a persisted nonzero exit as failed (completed marker: %s)",
+    (completed) => {
+      const dir = mkRun({
+        files: [{ file: "src/a.test.ts", status: "passed" }],
+        completed,
+        exitCode: 1,
+      });
+      expect(summarizeRun(dir).status).toBe("failed");
+    },
+  );
+
+  it("treats a nonzero child batch in run-meta as failed", () => {
+    const dir = mkRun({
+      files: [{ file: "src/a.test.ts", status: "skipped" }],
+      completed: false,
+      exitCode: 1,
+    });
+    fs.writeFileSync(
+      path.join(dir, "run-meta"),
+      JSON.stringify({
+        batchResults: [
+          { batchIndex: 0, exitCode: 0, signal: null, timedOut: false },
+          { batchIndex: 1, exitCode: 1, signal: null, timedOut: false },
+        ],
+        batchProcessFailed: true,
+        interrupted: false,
+        exit: 1,
+      }),
+    );
+
+    const s = summarizeRun(dir);
+    expect(s.status).toBe("failed");
+    expect(s.failedBatchIndexes).toEqual([1]);
+  });
+
+  it("rejects a failed batch that has no usable batch index", () => {
+    const dir = mkRun({
+      files: [{ file: "src/a.test.ts", status: "passed" }],
+    });
+    fs.writeFileSync(
+      path.join(dir, "run-meta"),
+      JSON.stringify({
+        batchResults: [{ exitCode: 1, signal: null, timedOut: false }],
+        batchProcessFailed: true,
+        interrupted: false,
+        exit: 0,
+      }),
+    );
+
+    const s = summarizeRun(dir);
+    expect(s.status).toBe("invalid");
+    expect(s.batchProcessFailed).toBe(true);
+    expect(s.failedBatchIndexes).toEqual([]);
+    expect(s.corruptArtifacts).toContainEqual({
+      file: "run-meta",
+      reason: "invalid_failed_batch_index",
+    });
+  });
+
+  it("marks a malformed run-meta artifact invalid instead of throwing", () => {
+    const dir = mkRun({
+      files: [{ file: "src/a.test.ts", status: "passed" }],
+    });
+    fs.writeFileSync(path.join(dir, "run-meta"), '{"batchResults":[');
+
+    const s = summarizeRun(dir);
+    expect(s.status).toBe("invalid");
+    expect(s.corruptArtifacts).toContainEqual(
+      expect.objectContaining({ file: "run-meta", reason: "invalid_json" }),
+    );
+  });
+
+  it("rejects a completion marker that predates final metadata", () => {
+    const dir = mkRun({
+      files: [{ file: "src/a.test.ts", status: "passed" }],
+    });
+    fs.rmSync(path.join(dir, "exit-code"));
+    fs.rmSync(path.join(dir, "run-meta"));
+
+    const s = summarizeRun(dir);
+    expect(s.status).toBe("invalid");
+    expect(s.completed).toBe(true);
+    expect(s.finalMetadataValid).toBe(false);
+    expect(s.corruptArtifacts).toContainEqual({
+      file: "final-metadata",
+      reason: "missing_or_inconsistent",
+    });
+  });
+
+  it("allows a terminal retry to supersede an incomplete progress event", () => {
+    const dir = mkRun({
+      files: [{ file: "src/a.test.ts", status: "passed" }],
+    });
+    const progressFile = path.join(dir, "progress.jsonl");
+    const terminal = fs
+      .readFileSync(progressFile, "utf8")
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => JSON.parse(line))
+      .find((event) => event.event === "file");
+    fs.writeFileSync(
+      progressFile,
+      [
+        JSON.stringify({ ...terminal, status: "incomplete" }),
+        JSON.stringify(terminal),
+        JSON.stringify({ event: "batch-end", schema: 1 }),
+      ].join("\n") + "\n",
+    );
+
+    const s = summarizeRun(dir);
+    expect(s.status).toBe("complete");
+    expect(s.conflicts).toEqual([]);
+    expect(s.perFile[0].status).toBe("passed");
   });
 
   it("marks missing files as incomplete rather than passed", () => {
@@ -170,6 +296,33 @@ describe("summarizer", () => {
     });
     expect(agg.status).toBe("invalid");
     expect(agg.missingFiles).toEqual(["src/b.test.ts"]);
+  });
+
+  it("aggregate explains a batch-process-only failure", () => {
+    const shard = {
+      shardIndex: 1,
+      shardTotal: 1,
+      status: "failed",
+      failedBatchIndexes: [0],
+      perFile: [
+        {
+          file: "src/a.test.ts",
+          status: "passed",
+          counts: { passed: 1, failed: 0, skipped: 0, todo: 0 },
+        },
+      ],
+    };
+    const agg = aggregateShards([shard], {
+      manifest: { files: ["src/a.test.ts"] },
+    });
+
+    expect(agg.status).toBe("failed");
+    expect(agg.reasons).toContainEqual({
+      code: "test_failure",
+      source: "batch_process",
+      shardIndex: 1,
+      failedBatchIndexes: [0],
+    });
   });
 
   it("aggregate flags commonConfigFingerprint disagreement (v4)", () => {
@@ -274,6 +427,16 @@ function mkShardRun({
   fs.writeFileSync(path.join(dir, "progress.jsonl"), lines.join("\n") + "\n");
   if (completed) fs.writeFileSync(path.join(dir, "completed"), "now");
   fs.writeFileSync(path.join(dir, "exit-code"), String(exitCode));
+  fs.writeFileSync(
+    path.join(dir, "run-meta"),
+    JSON.stringify({
+      resumeMode: "run",
+      batchResults: [],
+      batchProcessFailed: false,
+      interrupted: false,
+      exit: exitCode,
+    }),
+  );
   return dir;
 }
 

@@ -1,0 +1,246 @@
+/**
+ * quickLogEventIdentityRules — resolve the effective identity (canonical
+ * event type + grower-facing label + optional summary suffix) of a
+ * normalized diary entry, promoting Quick Log companion rows out of
+ * their envelope wrapper.
+ *
+ * Pure, deterministic, null-safe. No React, no I/O, no privileged keys.
+ *
+ * Why this exists:
+ *  - `diary_entries` rows written through the Quick Log RPC carry an
+ *    envelope `event_type` such as `"quick_log"` (or a bare `"note"`),
+ *    while the true action ("watering", "feeding", "photo", …) is
+ *    stamped inside `details.event_type`. Read-path surfaces that only
+ *    looked at the envelope rendered a generic "Note" / "quick_log"
+ *    badge instead of the true action and its structured summary
+ *    (e.g. "Watering · 500 ml").
+ *  - The grouped timeline already resolves this via its typed adapters;
+ *    the Plant Detail recent-activity surfaces did not. This module is
+ *    the single deterministic resolver both surfaces can share.
+ *
+ * Read-only: never emits recommendations, alerts, action-queue items,
+ * or automation. Labels and summaries only.
+ */
+import type { NormalizedDiaryDetails, NormalizedDiaryEntry } from "./diaryEntryRules";
+import { classifyTimelineEntry } from "./timelineEntryClassification";
+
+/**
+ * Envelope event-type strings that indicate a Quick Log wrapper row
+ * whose real action type lives inside `details.declaredEventType`.
+ * Lowercased for comparison.
+ */
+const QUICK_LOG_WRAPPER_ENVELOPES: ReadonlySet<string> = new Set(["quick_log", "note", ""]);
+
+/**
+ * Canonical Quick Log action types the resolver knows how to label and
+ * summarize. Anything else falls through to a title-cased display of
+ * the envelope type or "Note".
+ */
+export const QUICK_LOG_CANONICAL_EVENT_TYPES: ReadonlySet<string> = new Set([
+  "observation",
+  "watering",
+  "feeding",
+  "photo",
+  "environment",
+  "training",
+  "defoliation",
+  "harvest",
+  "cure_check",
+  "sensor_snapshot",
+  "measurement",
+  "symptoms",
+  "pest_disease",
+  "diagnosis",
+  "transplant",
+  "repot",
+  "reminder",
+]);
+
+/**
+ * Sentinel identity for a wrapper row whose declared event type exists but is
+ * not a canonical Quick Log type (legacy imports, retired writers, malformed
+ * rows). Mirrors the `quicklog_save_event` RPC's rejection vocabulary so the
+ * read path and the write seam speak the same name for the same condition.
+ */
+export const INVALID_EVENT_TYPE_IDENTITY = "invalid_event_type" as const;
+
+/**
+ * Neutral grower-facing label for `invalid_event_type` identities. The row is
+ * a log entry of unknown kind — it must never masquerade as a "Note" (the row
+ * is not known to be a note) and never echo the raw invalid type string.
+ */
+export const INVALID_EVENT_TYPE_NEUTRAL_LABEL = "Log entry" as const;
+
+const DISPLAY_LABELS: Record<string, string> = {
+  observation: "Observation",
+  watering: "Watering",
+  feeding: "Feeding",
+  photo: "Photo",
+  environment: "Environment",
+  training: "Training",
+  defoliation: "Defoliation",
+  harvest: "Harvest",
+  cure_check: "Cure check",
+  sensor_snapshot: "Sensor snapshot",
+  measurement: "Measurement",
+  symptoms: "Symptoms",
+  pest_disease: "Pest / disease",
+  diagnosis: "Diagnosis",
+  transplant: "Transplant",
+  repot: "Repot",
+  reminder: "Reminder",
+  note: "Note",
+  quick_log: "Note",
+  // Defensive: a row whose ENVELOPE literally carries the sentinel must also
+  // render neutrally, not title-case into "Invalid Event Type".
+  [INVALID_EVENT_TYPE_IDENTITY]: INVALID_EVENT_TYPE_NEUTRAL_LABEL,
+};
+
+function titleCase(raw: string): string {
+  const t = raw.trim();
+  if (!t) return "Note";
+  return t
+    .split(/[\s_]+/)
+    .map((seg) => (seg ? seg[0].toUpperCase() + seg.slice(1).toLowerCase() : seg))
+    .join(" ");
+}
+
+function normalizeType(v: string | null | undefined): string {
+  if (typeof v !== "string") return "";
+  return v.toLowerCase().trim();
+}
+
+export interface QuickLogEventIdentity {
+  /** Canonical, lowercase event type used for classification/filtering. */
+  effectiveEventType: string;
+  /** Grower-facing label for the badge (title-cased). */
+  displayLabel: string;
+  /**
+   * True when the row was written through Quick Log (envelope was a
+   * wrapper and details carried a canonical action type).
+   */
+  fromQuickLog: boolean;
+  /**
+   * Compact, structured summary derived from the entry's normalized
+   * details (e.g. "500 ml", "pH 6.1 · EC 1.2"). Empty string when no
+   * structured summary is available — never invented.
+   */
+  summarySuffix: string;
+}
+
+function buildSummarySuffix(
+  effectiveType: string,
+  details: NormalizedDiaryDetails | null | undefined,
+): string {
+  if (!details) return "";
+  const parts: string[] = [];
+  switch (effectiveType) {
+    case "watering": {
+      if (typeof details.wateringAmountMl === "number") {
+        parts.push(`${details.wateringAmountMl} ml`);
+      }
+      if (typeof details.ph === "number") parts.push(`pH ${details.ph}`);
+      if (typeof details.runoffPh === "number") {
+        parts.push(`runoff pH ${details.runoffPh}`);
+      }
+      break;
+    }
+    case "feeding": {
+      if (typeof details.ec === "number") parts.push(`EC ${details.ec}`);
+      if (typeof details.tds === "number") parts.push(`TDS ${details.tds}`);
+      if (typeof details.ph === "number") parts.push(`pH ${details.ph}`);
+      if (typeof details.wateringAmountMl === "number") {
+        parts.push(`${details.wateringAmountMl} ml`);
+      }
+      break;
+    }
+    case "measurement":
+    case "sensor_snapshot": {
+      const snap = details.sensorSnapshot;
+      if (snap) {
+        if (typeof snap.temp === "number") parts.push(`${snap.temp}°`);
+        if (typeof snap.rh === "number") parts.push(`${snap.rh}% RH`);
+        if (typeof snap.vpd === "number") parts.push(`VPD ${snap.vpd}`);
+      }
+      if (typeof details.ph === "number") parts.push(`pH ${details.ph}`);
+      if (typeof details.ec === "number") parts.push(`EC ${details.ec}`);
+      break;
+    }
+    default:
+      break;
+  }
+  return parts.join(" · ");
+}
+
+/**
+ * Recognized machine markers that legitimately ride in
+ * `details.event_type` WITHOUT being promotable Quick Log actions. The
+ * default Quick Log photo path stamps "quicklog_photo_attachment"
+ * (see quickLogPhotoDiaryEntry / plantMemoryEpisodeAdapter), and the
+ * normalizer's own contract keeps such markers on the "note" envelope.
+ * They are valid plant history — never `invalid_event_type`.
+ */
+export const RECOGNIZED_DIARY_MACHINE_MARKERS: ReadonlySet<string> = new Set([
+  "quicklog_photo_attachment",
+]);
+
+/**
+ * A declared type is "recognized" when it is a known machine marker or
+ * when the shared timeline classifier resolves it to a real bucket
+ * (e.g. "action_followup" → reminder, "manual_snapshot" → measurement).
+ * Recognized declared types keep the envelope identity instead of being
+ * misrepresented as invalid.
+ */
+function isRecognizedDeclaredMarker(declared: string): boolean {
+  if (RECOGNIZED_DIARY_MACHINE_MARKERS.has(declared)) return true;
+  return classifyTimelineEntry({ eventType: declared, source: null }) !== "notes";
+}
+
+/**
+ * Resolve the effective identity of a normalized diary entry.
+ *
+ * Rules (deterministic, in order):
+ *  1. When the envelope type is a Quick Log wrapper ("quick_log", "note",
+ *     or empty) AND `details.declaredEventType` is a canonical Quick Log
+ *     type, promote the declared type.
+ *  2. When the envelope is a wrapper AND a declared type is present but
+ *     neither canonical NOR a recognized diary marker, the row's true
+ *     kind is unknowable — resolve to the explicit `invalid_event_type`
+ *     identity with a neutral label. It must never masquerade as a
+ *     "Note" and never echo the raw invalid string. Recognized machine
+ *     markers ("quicklog_photo_attachment", "action_followup", …) are
+ *     exempt: they are valid history and keep the envelope identity.
+ *  3. Otherwise the envelope type wins.
+ *  4. The display label is the canonical label for known types, else a
+ *     title-cased fallback ("Note" when unresolvable).
+ *  5. `summarySuffix` is filled only from already-normalized detail
+ *     fields; missing values stay empty — never invented.
+ */
+export function resolveQuickLogEventIdentity(
+  entry: Pick<NormalizedDiaryEntry, "eventType" | "details"> | null | undefined,
+): QuickLogEventIdentity {
+  const envelope = normalizeType(entry?.eventType);
+  const declared = normalizeType(entry?.details?.declaredEventType ?? null);
+  const wrapper = QUICK_LOG_WRAPPER_ENVELOPES.has(envelope);
+  const promote = wrapper && declared !== "" && QUICK_LOG_CANONICAL_EVENT_TYPES.has(declared);
+  if (wrapper && declared !== "" && !promote && !isRecognizedDeclaredMarker(declared)) {
+    // Rule 2: declared-but-unrecognized action. Neutral identity; no
+    // summary is ever built for an unknown kind (nothing to honestly
+    // summarize), and the raw declared string is never displayed.
+    return {
+      effectiveEventType: INVALID_EVENT_TYPE_IDENTITY,
+      displayLabel: INVALID_EVENT_TYPE_NEUTRAL_LABEL,
+      fromQuickLog: true,
+      summarySuffix: "",
+    };
+  }
+  const effective = promote ? declared : envelope || declared || "note";
+  const label = DISPLAY_LABELS[effective] ?? titleCase(effective);
+  const fromQuickLog = promote || (wrapper && envelope === "quick_log") || declared !== "";
+  return {
+    effectiveEventType: effective,
+    displayLabel: label,
+    fromQuickLog,
+    summarySuffix: buildSummarySuffix(effective, entry?.details),
+  };
+}

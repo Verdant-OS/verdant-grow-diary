@@ -47,10 +47,9 @@ describe("summarizeSensorSources", () => {
   });
 
   it("uses fallback when provided (e.g. demo mode)", () => {
-    const r = summarizeSensorSources(
-      [{ source: null, ts: "2025-01-01T00:00:00Z" }],
-      { fallback: "demo" },
-    );
+    const r = summarizeSensorSources([{ source: null, ts: "2025-01-01T00:00:00Z" }], {
+      fallback: "demo",
+    });
     expect(r.counts.demo).toBe(1);
     expect(r.counts.invalid).toBe(0);
   });
@@ -102,10 +101,9 @@ describe("summarizeSensorSources", () => {
   });
 
   it("returns empty when nothing falls inside the range", () => {
-    const r = summarizeSensorSources(
-      [{ source: "live", captured_at: "2025-01-01T00:00:00Z" }],
-      { range: { from: "2025-02-01T00:00:00Z" } },
-    );
+    const r = summarizeSensorSources([{ source: "live", captured_at: "2025-01-01T00:00:00Z" }], {
+      range: { from: "2025-02-01T00:00:00Z" },
+    });
     expect(r.isEmpty).toBe(true);
     expect(r.total).toBe(0);
   });

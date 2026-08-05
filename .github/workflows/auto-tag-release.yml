@@ -18,7 +18,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write   # required to push the tag back to the repo
+  contents: write # required to push the tag back to the repo
 
 concurrency:
   # Serialize per branch so two rapid pushes can't race to tag the
@@ -33,7 +33,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           # Need full tag history to detect existing tags on HEAD and
           # to push new tags back.
@@ -70,7 +70,17 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git tag -a "$TAG" -m "Automated release tag for ${SHORT} on ${GITHUB_REF_NAME}"
+          # Content-identity mapping: production builds may lack git context
+          # (history-less Lovable snapshots stamp commit "unknown" but always
+          # carry a treeHash), so every release tag records the treeHash of
+          # its commit. scripts/resolve-release-provenance.mjs uses these
+          # annotations to map a served treeHash back to the exact commit.
+          # Guarded: a hashing failure must never block tagging.
+          TREE_HASH="$(node scripts/lib/tree-hash.mjs 2>/dev/null || echo unavailable)"
+
+          git tag -a "$TAG" \
+            -m "Automated release tag for ${SHORT} on ${GITHUB_REF_NAME}" \
+            -m "Tree-Hash: ${TREE_HASH}"
           git push origin "$TAG"
 
           echo "Created and pushed tag $TAG for commit $SHORT."
@@ -78,3 +88,4 @@ jobs:
           echo "- Tag: \`$TAG\`" >> "$GITHUB_STEP_SUMMARY"
           echo "- Commit: \`$SHORT\`" >> "$GITHUB_STEP_SUMMARY"
           echo "- Branch: \`${GITHUB_REF_NAME}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Tree-Hash: \`${TREE_HASH}\`" >> "$GITHUB_STEP_SUMMARY"

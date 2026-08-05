@@ -12,20 +12,11 @@
  * are enabled.
  */
 
-export type BackupEncryptionState =
-  | "enabled"
-  | "disabled"
-  | "unknown"
-  | "error"
-  | "demo";
+export type BackupEncryptionState = "enabled" | "disabled" | "unknown" | "error" | "demo";
 
 export type BackupRiskLevel = "healthy" | "warning" | "critical" | "unknown";
 
-export type BackupProvider =
-  | "supabase_storage"
-  | "s3"
-  | "local_export"
-  | "unknown";
+export type BackupProvider = "supabase_storage" | "s3" | "local_export" | "unknown";
 
 export interface BackupEncryptionStatusInput {
   /** Raw configuration state from an operator-trusted source. */
@@ -128,10 +119,8 @@ export function classifyBackupEncryptionStatus(
     case "enabled":
       if (stale) {
         risk = "warning";
-        message =
-          "Backup encryption appeared enabled, but the status check is stale.";
-        nextStep =
-          "Re-run the backup encryption verification to refresh status.";
+        message = "Backup encryption appeared enabled, but the status check is stale.";
+        nextStep = "Re-run the backup encryption verification to refresh status.";
       } else {
         risk = "healthy";
         message = "Backup encryption appears enabled. No secrets exposed.";
@@ -141,16 +130,12 @@ export function classifyBackupEncryptionStatus(
     case "disabled":
       if (productionBackupsEnabled) {
         risk = "critical";
-        message =
-          "Backups appear enabled without confirmed encryption.";
-        nextStep =
-          "Enable provider-side encryption (SSE) before next scheduled backup.";
+        message = "Backups appear enabled without confirmed encryption.";
+        nextStep = "Enable provider-side encryption (SSE) before next scheduled backup.";
       } else {
         risk = "warning";
-        message =
-          "Backup encryption is disabled. Production backups are not enabled.";
-        nextStep =
-          "Enable encryption before turning on production backups.";
+        message = "Backup encryption is disabled. Production backups are not enabled.";
+        nextStep = "Enable encryption before turning on production backups.";
       }
       break;
     case "error":
@@ -158,22 +143,18 @@ export function classifyBackupEncryptionStatus(
       message = sanitizedError
         ? `Backup encryption check failed: ${sanitizedError}`
         : "Backup encryption check failed.";
-      nextStep =
-        "Investigate the failing encryption check. Do not assume healthy.";
+      nextStep = "Investigate the failing encryption check. Do not assume healthy.";
       break;
     case "demo":
       risk = "unknown";
       message = "Demo encryption status only. Not live infrastructure.";
-      nextStep =
-        "Wire a real status source before relying on this panel.";
+      nextStep = "Wire a real status source before relying on this panel.";
       break;
     case "unknown":
     default:
       risk = "warning";
-      message =
-        "Backup encryption status is unknown. Verify storage provider settings.";
-      nextStep =
-        "Confirm provider-side encryption (e.g. Supabase Storage / S3 SSE).";
+      message = "Backup encryption status is unknown. Verify storage provider settings.";
+      nextStep = "Confirm provider-side encryption (e.g. Supabase Storage / S3 SSE).";
       break;
   }
 

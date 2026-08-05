@@ -6,7 +6,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, cleanup, within, fireEvent } from "@testing-library/react";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "@/lib/react-router-compat";
 import type { UsePhenoHuntWorkspaceState } from "@/hooks/usePhenoHuntWorkspace";
 import type { PhenoHuntSummary } from "@/lib/phenoHuntCandidatesService";
 import type { PhenoCandidateInput } from "@/lib/phenoComparisonViewModel";
@@ -48,7 +48,6 @@ vi.mock("@/hooks/usePhenoEvidencePackets", () => ({
     truncated: false,
   }),
 }));
-
 
 const HUNT_ID = "hunt-1";
 
@@ -98,8 +97,10 @@ function mountAt(input: ScenarioInput) {
     // these scenarios exercise.
     totalCandidateCount: (input.candidates ?? []).length,
     loadingMore: false,
+    loadMoreError: null,
     hasMore: false,
     loadNextPage: vi.fn(),
+    reload: vi.fn(),
     filters: {},
     setFilter: vi.fn(),
     resetFilters: vi.fn(),
@@ -107,6 +108,7 @@ function mountAt(input: ScenarioInput) {
     scoresByPlant: input.scoresByPlant ?? {},
     decisionsByPlant: input.decisionsByPlant ?? {},
     roundsByKey: {},
+    roundLoadStates: {},
     decisionHistoryByPlant: {},
     sexByPlant: {},
     reversedPlantIds: new Set<string>(),

@@ -28,10 +28,19 @@ const FILES = [
 ];
 
 const BANNED: ReadonlyArray<[string, RegExp]> = [
-  ["device-control", /\b(actuator|relay|fan_on|light_on_cmd|pump|dosing|dose|valve|switch_on|switch_off|device_control|mqtt_publish|home_assistant|pi_bridge|turn\s+(on|off)|autopilot|automation)\b/i],
-  ["alert/action-queue write", /\.from\(\s*["'`](alerts|action_queue|ai_doctor_sessions)["'`]\s*\)/i],
+  [
+    "device-control",
+    /\b(actuator|relay|fan_on|light_on_cmd|pump|dosing|dose|valve|switch_on|switch_off|device_control|mqtt_publish|home_assistant|pi_bridge|turn\s+(on|off)|autopilot|automation)\b/i,
+  ],
+  [
+    "alert/action-queue write",
+    /\.from\(\s*["'`](alerts|action_queue|ai_doctor_sessions)["'`]\s*\)/i,
+  ],
   ["ai call", /\b(ai_doctor|aiDoctor|openai|anthropic|functions\.invoke)\b/i],
-  ["client service-role / secret", /\b(SUPABASE_SERVICE_ROLE_KEY|service_role|BRIDGE_TOKEN|VITE_SUPABASE_SERVICE)\b/i],
+  [
+    "client service-role / secret",
+    /\b(SUPABASE_SERVICE_ROLE_KEY|service_role|BRIDGE_TOKEN|VITE_SUPABASE_SERVICE)\b/i,
+  ],
   ["fake-live", /\blive\s+(reading|data)\b|\bconnected\s+sensor\b|\bsynced\b/i],
 ];
 

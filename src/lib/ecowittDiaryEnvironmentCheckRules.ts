@@ -11,6 +11,8 @@
  */
 
 import { redactEvidenceValue } from "./ecowittValidationEvidenceRules";
+import { buildTimelineEntryAnchorId } from "./timelineEntryAnchorRules";
+import { timelinePath } from "./routes";
 
 export const DIARY_ENVIRONMENT_CHECK_TITLE = "EcoWitt Environment Check";
 export const DIARY_ENVIRONMENT_CHECK_EVENT_TYPE = "environment_check";
@@ -19,17 +21,19 @@ export const DIARY_ENVIRONMENT_CHECK_FALLBACK_EVENT_TYPE = "environment";
 
 /**
  * Build a safe diary/timeline link for a previously-logged Environment
- * Check event. Uses the existing `/timeline` route plus a captured_at
- * hash anchor — no internal grow_event UUIDs leak into user-facing copy.
+ * Check event. The hash is emitted only when the caller has the saved
+ * grow-event id; Timeline renders a matching alias on the visible diary
+ * companion row. A timestamp is display context, never an identity key.
  */
 export function environmentCheckTimelineHref(
   capturedAt: string | null | undefined,
   growId?: string | null,
+  growEventId?: string | null,
 ): string {
-  const base = growId ? `/timeline?growId=${encodeURIComponent(growId)}` : "/timeline";
-  if (!capturedAt) return base;
-  const anchor = `#ecowitt-environment-check-${encodeURIComponent(capturedAt)}`;
-  return `${base}${anchor}`;
+  void capturedAt;
+  const base = timelinePath(growId);
+  const anchorId = buildTimelineEntryAnchorId(growEventId);
+  return anchorId ? `${base}#${encodeURIComponent(anchorId)}` : base;
 }
 
 export interface AlreadyLoggedEventInfo {
@@ -41,12 +45,13 @@ export interface AlreadyLoggedEventInfo {
 export function buildAlreadyLoggedEventInfo(
   capturedAt: string | null | undefined,
   growId?: string | null,
+  growEventId?: string | null,
 ): AlreadyLoggedEventInfo | null {
   if (!capturedAt) return null;
   return {
     title: DIARY_ENVIRONMENT_CHECK_TITLE,
     capturedAt,
-    href: environmentCheckTimelineHref(capturedAt, growId),
+    href: environmentCheckTimelineHref(capturedAt, growId, growEventId),
   };
 }
 

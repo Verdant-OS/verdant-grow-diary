@@ -7,10 +7,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-const PLANT_DETAIL = readFileSync(
-  resolve(__dirname, "../pages/PlantDetail.tsx"),
-  "utf-8",
-);
+const PLANT_DETAIL = readFileSync(resolve(__dirname, "../pages/PlantDetail.tsx"), "utf-8");
 const HISTORY = readFileSync(
   resolve(__dirname, "../components/PlantDailyGrowCheckHistoryCard.tsx"),
   "utf-8",
@@ -28,10 +25,14 @@ describe("Plant Detail · Daily Grow Check section grouping", () => {
   });
 
   it("places today's status (Consistency) before History inside the section", () => {
-    const consIdx = PLANT_DETAIL.indexOf("PlantDailyGrowCheckConsistencyCard");
-    const histIdx = PLANT_DETAIL.indexOf("PlantDailyGrowCheckHistoryCard\n", 0) >= 0
-      ? PLANT_DETAIL.indexOf("PlantDailyGrowCheckHistoryCard\n")
-      : PLANT_DETAIL.indexOf("PlantDailyGrowCheckHistoryCard");
+    const start = PLANT_DETAIL.indexOf('data-testid="plant-daily-grow-check-section"');
+    const end = PLANT_DETAIL.indexOf("</section>", start);
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+
+    const section = PLANT_DETAIL.slice(start, end);
+    const consIdx = section.indexOf("<PlantDailyGrowCheckConsistencyCard");
+    const histIdx = section.indexOf("<PlantDailyGrowCheckHistoryCard");
     expect(consIdx).toBeGreaterThan(-1);
     expect(histIdx).toBeGreaterThan(-1);
     expect(consIdx).toBeLessThan(histIdx);

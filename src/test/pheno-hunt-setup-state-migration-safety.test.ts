@@ -12,8 +12,7 @@ import { resolve } from "node:path";
 
 const ONBOARDING_MIGRATION =
   "supabase/migrations/20260709230646_99529e76-f6a7-4ef5-9c4b-98be194e6ac9.sql";
-const BACKFILL_MIGRATION =
-  "supabase/migrations/20260710002000_pheno_hunt_setup_backfill.sql";
+const BACKFILL_MIGRATION = "supabase/migrations/20260710002000_pheno_hunt_setup_backfill.sql";
 
 const onboarding = readFileSync(resolve(process.cwd(), ONBOARDING_MIGRATION), "utf8");
 const backfill = readFileSync(resolve(process.cwd(), BACKFILL_MIGRATION), "utf8");

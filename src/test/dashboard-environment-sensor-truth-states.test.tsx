@@ -36,7 +36,7 @@ describe("Environment Snapshot (multi-tent overview) — sensor truth copy", () 
       /to="\/sensors#manual-reading"[\s\S]{0,200}data-testid="dashboard-environment-snapshot-add-manual-reading"/,
     );
     expect(DASHBOARD).toMatch(
-      /to="\/sensors#import-sensor-data"[\s\S]{0,200}data-testid="dashboard-environment-snapshot-import-sensor-data"/,
+      /to="\/sensors#csv-import"[\s\S]{0,200}data-testid="dashboard-environment-snapshot-import-sensor-data"/,
     );
   });
 

@@ -16,13 +16,18 @@ import EnvironmentCsvImportLauncher from "@/components/EnvironmentCsvImportLaunc
 
 const insertSpy = vi.fn();
 let insertError: { message: string; code?: string; details?: string } | null = null;
+let insertFailureCall: number | null = null;
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: () => ({
       insert: (rows: unknown) => {
         insertSpy(rows);
-        return Promise.resolve({ error: insertError });
+        const error =
+          insertFailureCall === insertSpy.mock.calls.length
+            ? { message: "Later batch failed", code: "PGRST500" }
+            : insertError;
+        return Promise.resolve({ error });
       },
     }),
   },
@@ -41,6 +46,7 @@ describe("EnvironmentCsvImportLauncher — mounting", () => {
     trackFunnelEvent.mockReset();
     insertSpy.mockReset();
     insertError = null;
+    insertFailureCall = null;
   });
 
   it("renders calm message when no grow/tent selected (test 1, 6)", () => {
@@ -178,6 +184,45 @@ describe("EnvironmentCsvImportLauncher — mounting", () => {
     expect(insertSpy).toHaveBeenCalled();
     expect(invalidateSpy).not.toHaveBeenCalled();
     expect(trackFunnelEvent).not.toHaveBeenCalledWith("csv_import_completed", expect.anything());
+  });
+
+  it("refreshes cached history after an earlier CSV batch commits and a later batch fails", async () => {
+    insertFailureCall = 2;
+    const qc = new QueryClient();
+    const invalidateSpy = vi.spyOn(qc, "invalidateQueries");
+    const csvImportedListener = vi.fn();
+    window.addEventListener("verdant:csv-imported", csvImportedListener);
+
+    try {
+      render(
+        withQuery(<EnvironmentCsvImportLauncher growId="g1" tentId="t1" testIdPrefix="x" />, qc),
+      );
+      fireEvent.click(screen.getByTestId("x-button"));
+      const input = screen.getByTestId("csv-import-file-input") as HTMLInputElement;
+      const csvRows = Array.from({ length: 251 }, (_, index) => {
+        const capturedAt = new Date(Date.UTC(2026, 5, 1, 10, 0, index)).toISOString();
+        return `${capturedAt},25,50`;
+      });
+      const file = new File(
+        [`Timestamp,Temperature (C),RH (%)\n${csvRows.join("\n")}\n`],
+        "partial.csv",
+        { type: "text/csv" },
+      );
+      Object.defineProperty(input, "files", { value: [file] });
+      fireEvent.change(input);
+      await waitFor(() => expect(screen.queryByTestId("csv-import-preview")).toBeTruthy());
+      fireEvent.click(screen.getByTestId("csv-import-confirm"));
+
+      await waitFor(() => expect(screen.getByTestId("csv-import-error")).toBeTruthy());
+      expect(insertSpy).toHaveBeenCalledTimes(2);
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["grow", "sensors"] });
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["sensor_readings"] });
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["csv-timeline-context"] });
+      expect(csvImportedListener).toHaveBeenCalledTimes(1);
+      expect(trackFunnelEvent).not.toHaveBeenCalledWith("csv_import_completed", expect.anything());
+    } finally {
+      window.removeEventListener("verdant:csv-imported", csvImportedListener);
+    }
   });
 });
 

@@ -21,7 +21,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import ActionDetail from "@/pages/ActionDetail";
 import {
   ACTION_EVIDENCE_MISSING_PANEL_HELP,
@@ -133,15 +133,17 @@ vi.mock("@/integrations/supabase/client", () => {
   };
   return {
     supabase: {
-      from: (table: string) =>
-        table === "action_queue" ? makeActionQueueChain() : makeGeneric(),
+      from: (table: string) => (table === "action_queue" ? makeActionQueueChain() : makeGeneric()),
     },
   };
 });
 
-vi.mock("@/store/auth", () => ({
-  useAuth: () => ({ user: { id: "u1", email: "u@example.com" } }),
-}));
+vi.mock("@/store/auth", () => {
+  const user = { id: "u1", email: "u@example.com" };
+  return {
+    useAuth: () => ({ user }),
+  };
+});
 vi.mock("@/store/grows", () => ({
   useGrows: () => ({
     grows: [{ id: "g1", name: "G1" }],
@@ -152,14 +154,6 @@ vi.mock("@/store/grows", () => ({
 vi.mock("sonner", () => ({
   toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn(), message: vi.fn() },
 }));
-
-// ActionDetail resolves its row through async effects that can exceed
-// testing-library's 1s findBy default AND vitest's 5s per-test timeout on
-// loaded shared CI runners (observed repeatedly across full-suite batches;
-// passes locally in <2s). Raise the per-test budget for this file and give
-// the async-load awaits a generous findBy timeout beneath it.
-vi.setConfig({ testTimeout: 60_000 });
-const FIND_TIMEOUT = { timeout: 30_000 };
 
 beforeEach(() => {
   detailRow = ALERT_ROW;
@@ -187,18 +181,10 @@ describe("ActionDetail evidence/origin panels — alert-derived leakage guards",
     const { container } = renderDetail("aq-leak-1");
 
     // Positive UI present.
-    const quality = await screen.findByTestId(
-      "action-detail-evidence-quality",
-      undefined,
-      FIND_TIMEOUT,
-    );
+    const quality = await screen.findByTestId("action-detail-evidence-quality");
     expect(quality.textContent).toBe(ACTION_EVIDENCE_QUALITY_UNAVAILABLE_LABEL);
 
-    const missingHelp = await screen.findByTestId(
-      "action-detail-evidence-missing-help",
-      undefined,
-      FIND_TIMEOUT,
-    );
+    const missingHelp = await screen.findByTestId("action-detail-evidence-missing-help");
     expect(missingHelp.textContent).toBe(ACTION_EVIDENCE_MISSING_PANEL_HELP);
 
     // No unsafe strings anywhere in the rendered DOM.
@@ -212,15 +198,11 @@ describe("ActionDetail evidence/origin panels — alert-derived leakage guards",
 
     const link = (await screen.findByTestId(
       "action-detail-evidence-review-link",
-      undefined,
-      FIND_TIMEOUT,
     )) as HTMLAnchorElement;
 
     expect(link.tagName).toBe("A");
     expect(link.textContent).toBe(ACTION_EVIDENCE_REVIEW_LINK_LABEL);
-    expect(link.getAttribute("aria-label")).toBe(
-      ACTION_EVIDENCE_REVIEW_LINK_ARIA_LABEL,
-    );
+    expect(link.getAttribute("aria-label")).toBe(ACTION_EVIDENCE_REVIEW_LINK_ARIA_LABEL);
     // Uses the plant-scoped safe route helper.
     expect(link.getAttribute("href")).toBe(plantDetailPath("p1"));
     // Not a submit/approval surface.
@@ -234,26 +216,14 @@ describe("ActionDetail evidence/origin panels — AI Doctor leakage guards", () 
     detailRow = AI_DOCTOR_ROW;
     const { container } = renderDetail("aq-leak-2");
 
-    const origin = await screen.findByTestId(
-      "action-detail-ai-doctor-provenance",
-      undefined,
-      FIND_TIMEOUT,
-    );
+    const origin = await screen.findByTestId("action-detail-ai-doctor-provenance");
     expect(origin.textContent ?? "").toContain("Suggestion origin");
     expect(origin.textContent ?? "").toContain("Grower review required");
 
-    const quality = await screen.findByTestId(
-      "action-detail-evidence-quality",
-      undefined,
-      FIND_TIMEOUT,
-    );
+    const quality = await screen.findByTestId("action-detail-evidence-quality");
     expect(quality.textContent).toBe(ACTION_EVIDENCE_QUALITY_UNAVAILABLE_LABEL);
 
-    const missingHelp = await screen.findByTestId(
-      "action-detail-evidence-missing-help",
-      undefined,
-      FIND_TIMEOUT,
-    );
+    const missingHelp = await screen.findByTestId("action-detail-evidence-missing-help");
     expect(missingHelp.textContent).toBe(ACTION_EVIDENCE_MISSING_PANEL_HELP);
 
     assertNoUnsafeStrings(container.textContent ?? "");
@@ -301,8 +271,6 @@ describe("ActionDetail evidence/origin panels — AI Doctor leakage guards", () 
 
     const link = (await screen.findByTestId(
       "action-detail-evidence-review-link",
-      undefined,
-      FIND_TIMEOUT,
     )) as HTMLAnchorElement;
 
     expect(link.tagName).toBe("A");
@@ -312,10 +280,7 @@ describe("ActionDetail evidence/origin panels — AI Doctor leakage guards", () 
 });
 
 // --- Static safety scans ----------------------------------------------------
-const DETAIL_SRC = readFileSync(
-  resolve(__dirname, "../..", "src/pages/ActionDetail.tsx"),
-  "utf8",
-);
+const DETAIL_SRC = readFileSync(resolve(__dirname, "../..", "src/pages/ActionDetail.tsx"), "utf8");
 
 describe("ActionDetail evidence panels — static safety", () => {
   it("does not reference raw_payload, service_role, or Bearer tokens in source", () => {
@@ -338,8 +303,6 @@ describe("ActionDetail evidence panels — static safety", () => {
   });
 
   it("review-timeline link uses the safe aria-label constant, not free text", () => {
-    expect(DETAIL_SRC).toContain(
-      "aria-label={ACTION_EVIDENCE_REVIEW_LINK_ARIA_LABEL}",
-    );
+    expect(DETAIL_SRC).toContain("aria-label={ACTION_EVIDENCE_REVIEW_LINK_ARIA_LABEL}");
   });
 });

@@ -19,6 +19,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 
 import PlantDetailAiDoctorContextReadinessMount from "@/components/PlantDetailAiDoctorContextReadinessMount";
+import { AI_DOCTOR_UNKNOWN_PROVENANCE_COPY } from "@/lib/aiDoctorReadinessViewModel";
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
@@ -32,11 +33,9 @@ vi.mock("@/integrations/supabase/client", () => ({
     },
   },
 }));
-const fetchSpy = vi
-  .spyOn(globalThis, "fetch" as never)
-  .mockImplementation((() => {
-    throw new Error("fetch not allowed in provenance test");
-  }) as never);
+const fetchSpy = vi.spyOn(globalThis, "fetch" as never).mockImplementation((() => {
+  throw new Error("fetch not allowed in provenance test");
+}) as never);
 
 vi.mock("@/hooks/usePlantRecentActivity", () => ({
   PLANT_RECENT_ACTIVITY_LIMIT: 10,
@@ -71,14 +70,10 @@ describe("PlantDetailAiDoctorContextReadinessMount — medium / pot size provena
         stage="veg"
       />,
     );
-    const medium = screen.getByTestId(
-      "ai-doctor-context-readiness-panel-medium-unavailable",
-    );
-    const pot = screen.getByTestId(
-      "ai-doctor-context-readiness-panel-pot-size-unavailable",
-    );
-    expect(medium.textContent).toMatch(/not available on this plant profile yet/);
-    expect(pot.textContent).toMatch(/not available on this plant profile yet/);
+    const medium = screen.getByTestId("ai-doctor-context-readiness-panel-medium-unavailable");
+    const pot = screen.getByTestId("ai-doctor-context-readiness-panel-pot-size-unavailable");
+    expect(medium.textContent).toContain(AI_DOCTOR_UNKNOWN_PROVENANCE_COPY.medium);
+    expect(pot.textContent).toContain(AI_DOCTOR_UNKNOWN_PROVENANCE_COPY.pot_size);
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
@@ -95,15 +90,9 @@ describe("PlantDetailAiDoctorContextReadinessMount — medium / pot size provena
         potSize="11 L"
       />,
     );
+    expect(screen.queryByTestId("ai-doctor-context-readiness-panel-medium-unavailable")).toBeNull();
     expect(
-      screen.queryByTestId(
-        "ai-doctor-context-readiness-panel-medium-unavailable",
-      ),
-    ).toBeNull();
-    expect(
-      screen.queryByTestId(
-        "ai-doctor-context-readiness-panel-pot-size-unavailable",
-      ),
+      screen.queryByTestId("ai-doctor-context-readiness-panel-pot-size-unavailable"),
     ).toBeNull();
   });
 
@@ -119,11 +108,7 @@ describe("PlantDetailAiDoctorContextReadinessMount — medium / pot size provena
         stage="veg"
       />,
     );
-    expect(
-      screen.getByTestId(
-        "ai-doctor-context-readiness-panel-medium-unavailable",
-      ),
-    ).toBeTruthy();
+    expect(screen.getByTestId("ai-doctor-context-readiness-panel-medium-unavailable")).toBeTruthy();
   });
 
   it("treats blank-only medium / potSize as unknown (no fabrication)", () => {
@@ -139,15 +124,9 @@ describe("PlantDetailAiDoctorContextReadinessMount — medium / pot size provena
         potSize=""
       />,
     );
+    expect(screen.getByTestId("ai-doctor-context-readiness-panel-medium-unavailable")).toBeTruthy();
     expect(
-      screen.getByTestId(
-        "ai-doctor-context-readiness-panel-medium-unavailable",
-      ),
-    ).toBeTruthy();
-    expect(
-      screen.getByTestId(
-        "ai-doctor-context-readiness-panel-pot-size-unavailable",
-      ),
+      screen.getByTestId("ai-doctor-context-readiness-panel-pot-size-unavailable"),
     ).toBeTruthy();
   });
 });

@@ -10,11 +10,22 @@
  */
 import { supabase } from "@/integrations/supabase/client";
 import { phenoDb } from "@/integrations/supabase/phenoTables";
+import { PhenoEvidenceReadError } from "@/lib/phenoEvidenceReadError";
 
 export interface CandidateScoreRow {
   readonly plantId: string;
   readonly traits: Record<string, number>;
   readonly note: string | null;
+}
+
+export interface CandidateScorePlantRef {
+  readonly plantId: string;
+  readonly huntId: string;
+}
+
+export interface CandidateScoreForPlantRow extends CandidateScoreRow {
+  readonly huntId: string;
+  readonly updatedAt: string | null;
 }
 
 export type SaveResult = { ok: true } | { ok: false; error: string };
@@ -61,7 +72,7 @@ export async function listCandidateScoresForHunt(
   // Page-scoped read: fetch only the visible candidates' scores at scale.
   if (plantIds && plantIds.length > 0) query = query.in("plant_id", plantIds as string[]);
   const { data, error } = await query;
-  if (error || !data) return {};
+  if (error || !data) throw new PhenoEvidenceReadError("candidate_scores");
   const map: Record<string, CandidateScoreRow> = {};
   for (const row of data) {
     if (!row.plant_id) continue;
@@ -70,6 +81,81 @@ export async function listCandidateScoresForHunt(
         ? (row.traits as Record<string, number>)
         : {};
     map[row.plant_id] = { plantId: row.plant_id, traits, note: row.note ?? null };
+  }
+  return map;
+}
+
+/**
+ * Load the current score card for a bounded set of exact plant+hunt pairs.
+ *
+ * The diary comparison spans two cultivar labels and may therefore cross
+ * several hunts. We still filter each returned row against the caller's exact
+ * pair after the RLS-scoped query, so a stale score from a plant's previous
+ * hunt can never be presented as current editable evidence.
+ */
+export async function listCandidateScoresForPlants(
+  refs: readonly CandidateScorePlantRef[] | null | undefined,
+): Promise<Record<string, CandidateScoreForPlantRow>> {
+  const uniqueRefs = [
+    ...new Map(
+      (refs ?? [])
+        .map((ref) => ({
+          plantId: typeof ref?.plantId === "string" ? ref.plantId.trim() : "",
+          huntId: typeof ref?.huntId === "string" ? ref.huntId.trim() : "",
+        }))
+        .filter((ref) => ref.plantId && ref.huntId)
+        .map((ref) => [`${ref.plantId}:${ref.huntId}`, ref]),
+    ).values(),
+  ].sort((a, b) => a.plantId.localeCompare(b.plantId) || a.huntId.localeCompare(b.huntId));
+  if (uniqueRefs.length === 0) return {};
+
+  const allowedPairs = new Set(uniqueRefs.map((ref) => `${ref.plantId}:${ref.huntId}`));
+  const rows: Array<{
+    plant_id: string | null;
+    hunt_id: string | null;
+    traits: unknown;
+    note: string | null;
+    updated_at: string | null;
+  }> = [];
+
+  const chunkSize = 100;
+  for (let offset = 0; offset < uniqueRefs.length; offset += chunkSize) {
+    const chunk = uniqueRefs.slice(offset, offset + chunkSize);
+    const plantIds = [...new Set(chunk.map((ref) => ref.plantId))];
+    const huntIds = [...new Set(chunk.map((ref) => ref.huntId))];
+    const { data, error } = await phenoDb
+      .from("pheno_candidate_scores")
+      .select("plant_id, hunt_id, traits, note, updated_at")
+      .in("plant_id", plantIds)
+      .in("hunt_id", huntIds)
+      .order("updated_at", { ascending: false });
+    if (error || !data) throw new PhenoEvidenceReadError("candidate_scores");
+    rows.push(...data);
+  }
+
+  rows.sort(
+    (a, b) =>
+      (b.updated_at ?? "").localeCompare(a.updated_at ?? "") ||
+      (a.plant_id ?? "").localeCompare(b.plant_id ?? "") ||
+      (a.hunt_id ?? "").localeCompare(b.hunt_id ?? ""),
+  );
+
+  const map: Record<string, CandidateScoreForPlantRow> = {};
+  for (const row of rows) {
+    const plantId = row.plant_id?.trim();
+    const huntId = row.hunt_id?.trim();
+    if (!plantId || !huntId || !allowedPairs.has(`${plantId}:${huntId}`) || map[plantId]) continue;
+    const traits =
+      row.traits && typeof row.traits === "object" && !Array.isArray(row.traits)
+        ? (row.traits as Record<string, number>)
+        : {};
+    map[plantId] = {
+      plantId,
+      huntId,
+      traits,
+      note: row.note ?? null,
+      updatedAt: row.updated_at ?? null,
+    };
   }
   return map;
 }

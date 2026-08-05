@@ -134,9 +134,7 @@ describe("reporter — Vitest 3.2.4 callback contract", () => {
       type: "suite",
       filepath: "/repo/src/a.test.ts",
       result: { state: "pass", duration: 5 },
-      tasks: [
-        { type: "test", name: "ok", result: { state: "pass", duration: 1, errors: [] } },
-      ],
+      tasks: [{ type: "test", name: "ok", result: { state: "pass", duration: 1, errors: [] } }],
     };
     r.onTestModuleEnd(fileTask);
     r.onFinished([fileTask], []);
@@ -147,6 +145,125 @@ describe("reporter — Vitest 3.2.4 callback contract", () => {
     const decisions = debug.map((d) => d.decision);
     expect(decisions).toContain("flushed");
     expect(decisions).toContain("deduped");
+  });
+});
+
+describe("reporter — Vitest 3.2.7 TestModule callback contract", () => {
+  it("records method-based TestCollection results before the batch finishes", () => {
+    const dir = scratch();
+    const progress = path.join(dir, "progress.jsonl");
+    const r = new Reporter({
+      progressFile: progress,
+      runId: "r1",
+      shardIndex: 1,
+      shardTotal: 1,
+      batchIndex: 0,
+      repoRoot: "/repo",
+    });
+    const cases = [
+      {
+        type: "test",
+        name: "passes",
+        fullName: "modern module > passes",
+        options: { mode: "run" },
+        result: () => ({ state: "passed", errors: undefined }),
+        diagnostic: () => ({ duration: 2 }),
+      },
+      {
+        type: "test",
+        name: "fails",
+        fullName: "modern module > fails",
+        options: { mode: "run" },
+        result: () => ({ state: "failed", errors: [{ message: "boom" }] }),
+        diagnostic: () => ({ duration: 3 }),
+      },
+      {
+        type: "test",
+        name: "skips",
+        fullName: "modern module > skips",
+        options: { mode: "skip" },
+        result: () => ({ state: "skipped", errors: undefined }),
+        diagnostic: () => ({ duration: 0 }),
+      },
+      {
+        type: "test",
+        name: "todo",
+        fullName: "modern module > todo",
+        options: { mode: "todo" },
+        result: () => ({ state: "skipped", errors: undefined }),
+        diagnostic: () => ({ duration: 0 }),
+      },
+    ];
+
+    r.onTestModuleEnd({
+      type: "module",
+      id: "-1718178837",
+      moduleId: "/repo/src/modern.test.ts",
+      children: {
+        *allTests() {
+          yield* cases;
+        },
+      },
+      state: () => "failed",
+      diagnostic: () => ({ duration: 9 }),
+    });
+    r.onFinished([], []);
+
+    const { files } = readProgress(progress);
+    const event = files.get("src/modern.test.ts");
+    expect(event.status).toBe("failed");
+    expect(event.counts).toEqual({
+      passed: 1,
+      failed: 1,
+      skipped: 1,
+      todo: 1,
+    });
+    expect(event.failedTests).toEqual(["modern module > fails"]);
+    expect(event.firstError).toBe("boom");
+    expect(event.duration).toBe(9);
+  });
+
+  it("defers a pending module until a terminal result is available", () => {
+    const dir = scratch();
+    const progress = path.join(dir, "progress.jsonl");
+    const r = new Reporter({
+      progressFile: progress,
+      runId: "r1",
+      shardIndex: 1,
+      shardTotal: 1,
+      batchIndex: 0,
+      repoRoot: "/repo",
+    });
+    let state = "unknown";
+    const test = {
+      type: "test",
+      name: "eventually passes",
+      fullName: "modern module > eventually passes",
+      options: { mode: "run" },
+      result: () => ({ state }),
+      diagnostic: () => ({ duration: 2 }),
+    };
+    const module = {
+      type: "module",
+      moduleId: "/repo/src/pending.test.ts",
+      children: {
+        *allTests() {
+          yield test;
+        },
+      },
+      state: () => state,
+      diagnostic: () => ({ duration: 2 }),
+    };
+
+    r.onTestModuleEnd(module);
+    expect(readProgress(progress).files.size).toBe(0);
+
+    state = "passed";
+    r.onFinished([module], []);
+
+    const event = readProgress(progress).files.get("src/pending.test.ts");
+    expect(event.status).toBe("passed");
+    expect(event.counts.passed).toBe(1);
   });
 });
 
@@ -225,10 +342,7 @@ describe("reporter — path normalization", () => {
     // produces the same POSIX slug on both platforms.
     const rel = "src/lib/routes.test.ts";
     const abs = path.resolve(process.cwd(), rel);
-    r.onFinished(
-      [{ type: "suite", filepath: abs, result: { state: "pass" }, tasks: [] }],
-      [],
-    );
+    r.onFinished([{ type: "suite", filepath: abs, result: { state: "pass" }, tasks: [] }], []);
     const { files } = readProgress(progress);
     expect([...files.keys()]).toEqual([rel]);
   });

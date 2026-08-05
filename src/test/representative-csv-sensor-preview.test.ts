@@ -47,7 +47,21 @@ function rowText(rows: string[][]): string {
 describe("representativeCsvSensorPreviewRules — normalization", () => {
   it("normalizes a valid representative row", () => {
     const text = rowText([
-      ["2026-05-01 12:00:00", "F1", "R1", "Z1", "S1", "55", "2.5", "22.0", "24.5", "60", "1.2", "900", "650"],
+      [
+        "2026-05-01 12:00:00",
+        "F1",
+        "R1",
+        "Z1",
+        "S1",
+        "55",
+        "2.5",
+        "22.0",
+        "24.5",
+        "60",
+        "1.2",
+        "900",
+        "650",
+      ],
     ]);
     const out = previewRepresentativeCsv(text);
     expect(out.rows).toHaveLength(1);
@@ -66,7 +80,21 @@ describe("representativeCsvSensorPreviewRules — normalization", () => {
 
   it("preserves raw_payload exactly", () => {
     const text = rowText([
-      ["2026-05-01 12:00:00", "F1", "Flower-A", "Zone-3", "Probe-7", "55", "2.5", "22.0", "24.5", "60", "1.2", "900", "650"],
+      [
+        "2026-05-01 12:00:00",
+        "F1",
+        "Flower-A",
+        "Zone-3",
+        "Probe-7",
+        "55",
+        "2.5",
+        "22.0",
+        "24.5",
+        "60",
+        "1.2",
+        "900",
+        "650",
+      ],
     ]);
     const out = previewRepresentativeCsv(text);
     expect(out.rows[0].raw_payload).toEqual({
@@ -88,7 +116,21 @@ describe("representativeCsvSensorPreviewRules — normalization", () => {
 
   it("labels source as csv and data_context as representative_sample, never live", () => {
     const text = rowText([
-      ["2026-05-01 12:00:00", "F1", "R1", "Z1", "S1", "55", "2.5", "22", "24", "60", "1.2", "900", "650"],
+      [
+        "2026-05-01 12:00:00",
+        "F1",
+        "R1",
+        "Z1",
+        "S1",
+        "55",
+        "2.5",
+        "22",
+        "24",
+        "60",
+        "1.2",
+        "900",
+        "650",
+      ],
     ]);
     const out = previewRepresentativeCsv(text);
     const r = out.rows[0];
@@ -172,8 +214,36 @@ describe("representativeCsvSensorPreviewRules — normalization", () => {
 
   it("preserves duplicate timestamps from different sensors without collapsing", () => {
     const text = rowText([
-      ["2026-05-01 12:00:00", "F1", "R1", "Z1", "S1", "55", "2.5", "22", "24", "60", "1.2", "900", "650"],
-      ["2026-05-01 12:00:00", "F1", "R1", "Z1", "S2", "57", "2.6", "22", "24", "61", "1.2", "905", "655"],
+      [
+        "2026-05-01 12:00:00",
+        "F1",
+        "R1",
+        "Z1",
+        "S1",
+        "55",
+        "2.5",
+        "22",
+        "24",
+        "60",
+        "1.2",
+        "900",
+        "650",
+      ],
+      [
+        "2026-05-01 12:00:00",
+        "F1",
+        "R1",
+        "Z1",
+        "S2",
+        "57",
+        "2.6",
+        "22",
+        "24",
+        "61",
+        "1.2",
+        "905",
+        "655",
+      ],
     ]);
     const out = previewRepresentativeCsv(text);
     expect(out.rows).toHaveLength(2);
@@ -183,12 +253,38 @@ describe("representativeCsvSensorPreviewRules — normalization", () => {
   });
 
   it("planRepresentativeColumns + normalizeRepresentativeRow are pure and deterministic", () => {
-    const parsed = parseCsv(rowText([
-      ["2026-05-01 12:00:00", "F1", "R1", "Z1", "S1", "55", "2.5", "22", "24", "60", "1.2", "900", "650"],
-    ]));
+    const parsed = parseCsv(
+      rowText([
+        [
+          "2026-05-01 12:00:00",
+          "F1",
+          "R1",
+          "Z1",
+          "S1",
+          "55",
+          "2.5",
+          "22",
+          "24",
+          "60",
+          "1.2",
+          "900",
+          "650",
+        ],
+      ]),
+    );
     const plan = planRepresentativeColumns(parsed.headers);
-    const a = normalizeRepresentativeRow({ cells: parsed.rows[0], headers: parsed.headers, plan, rowIndex: 0 });
-    const b = normalizeRepresentativeRow({ cells: parsed.rows[0], headers: parsed.headers, plan, rowIndex: 0 });
+    const a = normalizeRepresentativeRow({
+      cells: parsed.rows[0],
+      headers: parsed.headers,
+      plan,
+      rowIndex: 0,
+    });
+    const b = normalizeRepresentativeRow({
+      cells: parsed.rows[0],
+      headers: parsed.headers,
+      plan,
+      rowIndex: 0,
+    });
     expect(a).toEqual(b);
   });
 });
@@ -198,7 +294,10 @@ describe("representativeCsvSensorPreviewRules — static safety scan", () => {
   const page = stripSourceComments(read("src/pages/RepresentativeCsvPreview.tsx"));
   const pageRaw = read("src/pages/RepresentativeCsvPreview.tsx");
 
-  for (const [name, src] of [["helper", helper], ["page", page]] as const) {
+  for (const [name, src] of [
+    ["helper", helper],
+    ["page", page],
+  ] as const) {
     it(`${name}: no DB writes / functions.invoke / service_role`, () => {
       expect(src).not.toMatch(/\.insert\(/);
       expect(src).not.toMatch(/\.upsert\(/);

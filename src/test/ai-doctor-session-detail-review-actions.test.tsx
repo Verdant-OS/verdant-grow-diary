@@ -16,7 +16,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen, waitFor, fireEvent, act } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import AiDoctorSessionDetail from "@/pages/AiDoctorSessionDetail";
 import type { Diagnosis } from "@/lib/aiDoctorDiagnosisRules";
@@ -79,12 +79,18 @@ vi.mock("@/integrations/supabase/client", () => {
   const sessionsBuilder = () => ({
     select: () => ({
       eq: (_col: string, value: string) => ({
-        order: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }),
+        order: () => ({
+          limit: () => {
+            const __c: any = {
+              abortSignal: () => __c,
+              then: (r: any, j?: any) => Promise.resolve({ data: [], error: null }).then(r, j),
+            };
+            return __c;
+          },
+        }),
         maybeSingle: () =>
           Promise.resolve(
-            value === SESSION_ID
-              ? { data: fixture, error: null }
-              : { data: null, error: null },
+            value === SESSION_ID ? { data: fixture, error: null } : { data: null, error: null },
           ),
       }),
     }),
@@ -97,11 +103,25 @@ vi.mock("@/integrations/supabase/client", () => {
     select: () => ({
       in: () => ({
         order: () => ({
-          limit: () => Promise.resolve({ data: reviewEvents, error: null }),
+          limit: () => {
+            const __c: any = {
+              abortSignal: () => __c,
+              then: (r: any, j?: any) =>
+                Promise.resolve({ data: reviewEvents, error: null }).then(r, j),
+            };
+            return __c;
+          },
         }),
       }),
       order: () => ({
-        limit: () => Promise.resolve({ data: reviewEvents, error: null }),
+        limit: () => {
+          const __c: any = {
+            abortSignal: () => __c,
+            then: (r: any, j?: any) =>
+              Promise.resolve({ data: reviewEvents, error: null }).then(r, j),
+          };
+          return __c;
+        },
       }),
     }),
     insert: (payload: Record<string, unknown>) => {
@@ -124,9 +144,7 @@ vi.mock("@/integrations/supabase/client", () => {
   return {
     supabase: {
       from: (table: string) =>
-        table === "ai_doctor_session_reviews"
-          ? reviewsBuilder()
-          : sessionsBuilder(),
+        table === "ai_doctor_session_reviews" ? reviewsBuilder() : sessionsBuilder(),
       rpc: (...args: unknown[]) => {
         forbidden.rpc(...args);
         return Promise.resolve({ data: null, error: null });
@@ -167,10 +185,7 @@ function renderDetail() {
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={[`/doctor/sessions/${SESSION_ID}`]}>
         <Routes>
-          <Route
-            path="/doctor/sessions/:sessionId"
-            element={<AiDoctorSessionDetail />}
-          />
+          <Route path="/doctor/sessions/:sessionId" element={<AiDoctorSessionDetail />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -187,18 +202,10 @@ beforeEach(() => {
 describe("AiDoctorSessionDetail — review-status action controls", () => {
   it("renders all three action buttons + note input", async () => {
     renderDetail();
-    expect(
-      await screen.findByTestId("ai-doctor-session-detail-review-mark-reviewed"),
-    ).toBeTruthy();
-    expect(
-      screen.getByTestId("ai-doctor-session-detail-review-needs-follow-up"),
-    ).toBeTruthy();
-    expect(
-      screen.getByTestId("ai-doctor-session-detail-review-clear"),
-    ).toBeTruthy();
-    expect(
-      screen.getByTestId("ai-doctor-session-detail-review-status-note-input"),
-    ).toBeTruthy();
+    expect(await screen.findByTestId("ai-doctor-session-detail-review-mark-reviewed")).toBeTruthy();
+    expect(screen.getByTestId("ai-doctor-session-detail-review-needs-follow-up")).toBeTruthy();
+    expect(screen.getByTestId("ai-doctor-session-detail-review-clear")).toBeTruthy();
+    expect(screen.getByTestId("ai-doctor-session-detail-review-status-note-input")).toBeTruthy();
   });
 
   it("disables 'Clear review status' when current status is not_reviewed", async () => {
@@ -228,9 +235,7 @@ describe("AiDoctorSessionDetail — review-status action controls", () => {
     ];
     renderDetail();
     await waitFor(() => {
-      const panel = screen.getByTestId(
-        "ai-doctor-session-detail-review-status-panel",
-      );
+      const panel = screen.getByTestId("ai-doctor-session-detail-review-status-panel");
       expect(panel.getAttribute("data-review-status")).toBe("reviewed");
     });
     const markBtn = screen.getByTestId(
@@ -249,9 +254,7 @@ describe("AiDoctorSessionDetail — review-status action controls", () => {
     ];
     renderDetail();
     await waitFor(() => {
-      const panel = screen.getByTestId(
-        "ai-doctor-session-detail-review-status-panel",
-      );
+      const panel = screen.getByTestId("ai-doctor-session-detail-review-status-panel");
       expect(panel.getAttribute("data-review-status")).toBe("needs_follow_up");
     });
     const btn = screen.getByTestId(
@@ -262,9 +265,7 @@ describe("AiDoctorSessionDetail — review-status action controls", () => {
 
   it("clicking 'Mark reviewed' inserts marked_reviewed with no note and no user_id", async () => {
     renderDetail();
-    const btn = await screen.findByTestId(
-      "ai-doctor-session-detail-review-mark-reviewed",
-    );
+    const btn = await screen.findByTestId("ai-doctor-session-detail-review-mark-reviewed");
     await act(async () => {
       fireEvent.click(btn);
     });
@@ -283,9 +284,7 @@ describe("AiDoctorSessionDetail — review-status action controls", () => {
       "ai-doctor-session-detail-review-status-note-input",
     )) as HTMLTextAreaElement;
     fireEvent.change(input, { target: { value: "  watch overnight  " } });
-    const btn = screen.getByTestId(
-      "ai-doctor-session-detail-review-needs-follow-up",
-    );
+    const btn = screen.getByTestId("ai-doctor-session-detail-review-needs-follow-up");
     await act(async () => {
       fireEvent.click(btn);
     });
@@ -306,9 +305,7 @@ describe("AiDoctorSessionDetail — review-status action controls", () => {
       }),
     ];
     renderDetail();
-    const btn = await screen.findByTestId(
-      "ai-doctor-session-detail-review-clear",
-    );
+    const btn = await screen.findByTestId("ai-doctor-session-detail-review-clear");
     await waitFor(() => expect((btn as HTMLButtonElement).disabled).toBe(false));
     await act(async () => {
       fireEvent.click(btn);
@@ -322,9 +319,7 @@ describe("AiDoctorSessionDetail — review-status action controls", () => {
 
   it("event history reflects the new event after a successful insert", async () => {
     renderDetail();
-    const btn = await screen.findByTestId(
-      "ai-doctor-session-detail-review-mark-reviewed",
-    );
+    const btn = await screen.findByTestId("ai-doctor-session-detail-review-mark-reviewed");
     // Arrange the server-truth list to include the new event after insert.
     reviewEvents = [
       event({
@@ -337,9 +332,7 @@ describe("AiDoctorSessionDetail — review-status action controls", () => {
       fireEvent.click(btn);
     });
     await waitFor(() => {
-      const items = screen.getAllByTestId(
-        "ai-doctor-session-detail-review-status-event",
-      );
+      const items = screen.getAllByTestId("ai-doctor-session-detail-review-status-event");
       expect(items.length).toBe(1);
       expect(items[0].getAttribute("data-event-type")).toBe("marked_reviewed");
     });
@@ -348,15 +341,11 @@ describe("AiDoctorSessionDetail — review-status action controls", () => {
   it("surfaces a calm inline error when the insert fails (RLS-denied)", async () => {
     nextInsertError = { message: "new row violates row-level security policy" };
     renderDetail();
-    const btn = await screen.findByTestId(
-      "ai-doctor-session-detail-review-mark-reviewed",
-    );
+    const btn = await screen.findByTestId("ai-doctor-session-detail-review-mark-reviewed");
     await act(async () => {
       fireEvent.click(btn);
     });
-    const err = await screen.findByTestId(
-      "ai-doctor-session-detail-review-error",
-    );
+    const err = await screen.findByTestId("ai-doctor-session-detail-review-error");
     expect(err.textContent ?? "").toMatch(/row-level security/i);
   });
 
@@ -371,22 +360,14 @@ describe("AiDoctorSessionDetail — review-status action controls", () => {
 
   it("preserves caution checklist, review summary, and copy button", async () => {
     renderDetail();
-    expect(
-      await screen.findByTestId("ai-doctor-session-detail-review-followup"),
-    ).toBeTruthy();
-    expect(
-      screen.getByTestId("ai-doctor-session-detail-evidence"),
-    ).toBeTruthy();
-    expect(
-      screen.getByTestId("ai-doctor-session-detail-copy-review-button"),
-    ).toBeTruthy();
+    expect(await screen.findByTestId("ai-doctor-session-detail-review-followup")).toBeTruthy();
+    expect(screen.getByTestId("ai-doctor-session-detail-evidence")).toBeTruthy();
+    expect(screen.getByTestId("ai-doctor-session-detail-copy-review-button")).toBeTruthy();
   });
 
   it("never calls update / upsert / delete / rpc / functions.invoke during clicks", async () => {
     renderDetail();
-    const btn = await screen.findByTestId(
-      "ai-doctor-session-detail-review-mark-reviewed",
-    );
+    const btn = await screen.findByTestId("ai-doctor-session-detail-review-mark-reviewed");
     await act(async () => {
       fireEvent.click(btn);
     });
@@ -401,10 +382,7 @@ describe("AiDoctorSessionDetail — review-status action controls", () => {
 
 // --- Static safety scan ------------------------------------------------------
 const ROOT = resolve(__dirname, "../..");
-const PAGE = readFileSync(
-  resolve(ROOT, "src/pages/AiDoctorSessionDetail.tsx"),
-  "utf8",
-);
+const PAGE = readFileSync(resolve(ROOT, "src/pages/AiDoctorSessionDetail.tsx"), "utf8");
 
 describe("AiDoctorSessionDetail review actions — safety scan", () => {
   it("page does not embed direct write calls (delegates to the mutation hook)", () => {

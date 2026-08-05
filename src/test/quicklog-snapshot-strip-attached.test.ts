@@ -32,6 +32,7 @@ describe("quickLogSnapshotStripAdapter — attach toggle copy contract", () => {
       snapshot: usableSnapshot(),
       attached: true,
       now: NOW,
+      temperatureUnit: "celsius",
     });
     expect(v.status).toBe("usable");
     expect(v.title).toBe("Sensor context ready");
@@ -43,6 +44,7 @@ describe("quickLogSnapshotStripAdapter — attach toggle copy contract", () => {
       snapshot: usableSnapshot(),
       attached: false,
       now: NOW,
+      temperatureUnit: "celsius",
     });
     expect(v.status).toBe("usable");
     expect(v.title).toBe("Sensor snapshot available");
@@ -52,7 +54,11 @@ describe("quickLogSnapshotStripAdapter — attach toggle copy contract", () => {
   });
 
   it("default attached omitted → behaves as attached=true (back-compat)", () => {
-    const v = buildQuickLogSnapshotStrip({ snapshot: usableSnapshot(), now: NOW });
+    const v = buildQuickLogSnapshotStrip({
+      snapshot: usableSnapshot(),
+      now: NOW,
+      temperatureUnit: "celsius",
+    });
     expect(v.description).toBe("This log will include current sensor context.");
   });
 });

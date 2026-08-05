@@ -3,16 +3,19 @@ import { render, screen, fireEvent, within } from "@testing-library/react";
 import PhenoFamilyTree from "@/components/PhenoFamilyTree";
 import { buildPhenoPedigree } from "@/lib/phenoPedigreeViewModel";
 import { buildCloneTreeRows } from "@/lib/phenoCloneTreeViewModel";
-import { DEMO_KEEPERS, DEMO_CROSSES, DEMO_CLONES, DEMO_PHENO_HUNT } from "@/lib/demo/phenoHuntDemoFixture";
+import {
+  DEMO_KEEPERS,
+  DEMO_CROSSES,
+  DEMO_CLONES,
+  DEMO_PHENO_HUNT,
+} from "@/lib/demo/phenoHuntDemoFixture";
 
 const K_GAS = DEMO_PHENO_HUNT.keeperIds.gasRuntz;
 const pedigree = buildPhenoPedigree(DEMO_KEEPERS, DEMO_CROSSES);
 const cloneRowsByKeeperId = { [K_GAS]: buildCloneTreeRows(DEMO_CLONES) };
 
 function renderTree() {
-  return render(
-    <PhenoFamilyTree pedigree={pedigree} cloneRowsByKeeperId={cloneRowsByKeeperId} />,
-  );
+  return render(<PhenoFamilyTree pedigree={pedigree} cloneRowsByKeeperId={cloneRowsByKeeperId} />);
 }
 
 describe("PhenoFamilyTree", () => {
@@ -20,7 +23,9 @@ describe("PhenoFamilyTree", () => {
     renderTree();
     // Keeper names also appear as cross parents, so scope to the keeper cards.
     const gasCard = screen.getByTestId(`pheno-family-keeper-${K_GAS}`);
-    const cakeCard = screen.getByTestId(`pheno-family-keeper-${DEMO_PHENO_HUNT.keeperIds.sherbCake}`);
+    const cakeCard = screen.getByTestId(
+      `pheno-family-keeper-${DEMO_PHENO_HUNT.keeperIds.sherbCake}`,
+    );
     expect(within(gasCard).getByText("Gas Runtz")).toBeInTheDocument();
     expect(within(cakeCard).getByText("Sherb Cake")).toBeInTheDocument();
     expect(screen.getByTestId(`pheno-family-keeper-reversed-${K_GAS}`)).toBeInTheDocument();
@@ -30,7 +35,9 @@ describe("PhenoFamilyTree", () => {
   it("renders crosses with the canonical badges and donor labels", () => {
     renderTree();
     expect(screen.getByTestId("pheno-family-cross-badge-cross-f1")).toHaveTextContent("F1");
-    expect(screen.getByTestId("pheno-family-cross-badge-cross-s1")).toHaveTextContent("S1 / Selfed");
+    expect(screen.getByTestId("pheno-family-cross-badge-cross-s1")).toHaveTextContent(
+      "S1 / Selfed",
+    );
     expect(screen.getByText("Self")).toBeInTheDocument();
     expect(screen.getByText("Open pollination")).toBeInTheDocument();
     // "unknown keeper" appears for both the null-male F1 and the outside-hunt male.

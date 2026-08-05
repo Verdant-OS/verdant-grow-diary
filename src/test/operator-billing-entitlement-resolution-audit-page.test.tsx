@@ -4,7 +4,7 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 
 const rpcMock = vi.fn();
 
@@ -71,10 +71,9 @@ describe("OperatorBillingEntitlementResolutionAudit render", () => {
     await waitFor(() => {
       expect(screen.getByText("Pro Monthly")).toBeInTheDocument();
     });
-    expect(rpcMock).toHaveBeenCalledWith(
-      "billing_entitlement_resolution_operator_audit",
-      { p_limit: 50 },
-    );
+    expect(rpcMock).toHaveBeenCalledWith("billing_entitlement_resolution_operator_audit", {
+      p_limit: 50,
+    });
     expect(screen.getByText("100 / month")).toBeInTheDocument();
     expect(screen.getByText("4")).toBeInTheDocument();
     expect(screen.getByText("Billing Entitlement Resolution")).toBeInTheDocument();
@@ -102,9 +101,7 @@ describe("OperatorBillingEntitlementResolutionAudit render", () => {
 
     renderPage();
 
-    expect(
-      await screen.findByText("No entitlement resolution rows found."),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("No entitlement resolution rows found.")).toBeInTheDocument();
   });
 
   it("renders error state when RPC fails", async () => {
@@ -113,9 +110,7 @@ describe("OperatorBillingEntitlementResolutionAudit render", () => {
     renderPage();
 
     await waitFor(() => {
-      expect(
-        screen.getByText("Entitlement resolution audit unavailable."),
-      ).toBeInTheDocument();
+      expect(screen.getByText("Entitlement resolution audit unavailable.")).toBeInTheDocument();
     });
   });
 });

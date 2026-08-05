@@ -78,21 +78,15 @@ describe("precision + rounding boundaries (default 0 digits)", () => {
   }
 
   it("one-decimal precision is consistent when requested", () => {
-    expect(formatTemperatureDisplay(25.5, { valueUnit: "C", digits: 1 })).toBe(
-      "77.9°F",
-    );
+    expect(formatTemperatureDisplay(25.5, { valueUnit: "C", digits: 1 })).toBe("77.9°F");
     saveTemperatureUnitPreference("celsius");
-    expect(formatTemperatureDisplay(25.5, { valueUnit: "C", digits: 1 })).toBe(
-      "25.5°C",
-    );
+    expect(formatTemperatureDisplay(25.5, { valueUnit: "C", digits: 1 })).toBe("25.5°C");
   });
 });
 
 describe("no double-conversion", () => {
   it("F input + Fahrenheit display is a no-op (no re-conversion)", () => {
-    expect(
-      formatTemperatureDisplay(77, { valueUnit: "F", unit: "fahrenheit" }),
-    ).toBe("77°F");
+    expect(formatTemperatureDisplay(77, { valueUnit: "F", unit: "fahrenheit" })).toBe("77°F");
   });
 
   it("F input + Celsius display converts F→C exactly once", () => {
@@ -106,9 +100,7 @@ describe("no double-conversion", () => {
   });
 
   it("C input + Celsius display is a no-op", () => {
-    expect(
-      formatTemperatureDisplay(25, { valueUnit: "C", unit: "celsius" }),
-    ).toBe("25°C");
+    expect(formatTemperatureDisplay(25, { valueUnit: "C", unit: "celsius" })).toBe("25°C");
   });
 
   it("pure converters are inverses within float epsilon", () => {
@@ -130,24 +122,18 @@ describe("unavailable + ambiguous safety", () => {
   );
 
   it("ambiguous unit → 'Unknown unit' (never guesses)", () => {
-    expect(formatTemperatureDisplay(20, { valueUnit: "unknown" })).toBe(
-      "Unknown unit",
-    );
+    expect(formatTemperatureDisplay(20, { valueUnit: "unknown" })).toBe("Unknown unit");
   });
 
   it("custom unavailable label is respected", () => {
-    expect(
-      formatTemperatureDisplay(null, { unavailableLabel: "—" }),
-    ).toBe("—");
+    expect(formatTemperatureDisplay(null, { unavailableLabel: "—" })).toBe("—");
   });
 });
 
 describe("non-mutation of canonical values", () => {
   it("formatting does not mutate the source object/value", () => {
     const reading = Object.freeze({ tempC: 25.5, captured_at: "x" });
-    expect(() =>
-      formatTemperatureDisplay(reading.tempC, { valueUnit: "C" }),
-    ).not.toThrow();
+    expect(() => formatTemperatureDisplay(reading.tempC, { valueUnit: "C" })).not.toThrow();
     expect(reading.tempC).toBe(25.5);
   });
 });
@@ -188,13 +174,9 @@ describe("Customer Mode / QR guide / environment cards default", () => {
 
   it("switching preference flips display app-wide, not the stored value", () => {
     const canonicalC = 24;
-    expect(formatTemperatureDisplay(canonicalC, { valueUnit: "C" })).toBe(
-      "75°F",
-    );
+    expect(formatTemperatureDisplay(canonicalC, { valueUnit: "C" })).toBe("75°F");
     saveTemperatureUnitPreference("celsius");
-    expect(formatTemperatureDisplay(canonicalC, { valueUnit: "C" })).toBe(
-      "24°C",
-    );
+    expect(formatTemperatureDisplay(canonicalC, { valueUnit: "C" })).toBe("24°C");
     // Canonical input unchanged:
     expect(canonicalC).toBe(24);
   });

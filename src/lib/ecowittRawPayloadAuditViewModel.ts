@@ -102,9 +102,7 @@ function pickAdapterWarnings(raw: unknown): string[] {
   if (!raw || typeof raw !== "object") return [];
   const w = (raw as { adapter_warnings?: unknown }).adapter_warnings;
   if (!Array.isArray(w)) return [];
-  return w
-    .map((v) => (typeof v === "string" ? v : null))
-    .filter((v): v is string => v != null);
+  return w.map((v) => (typeof v === "string" ? v : null)).filter((v): v is string => v != null);
 }
 
 function rowFreshness(

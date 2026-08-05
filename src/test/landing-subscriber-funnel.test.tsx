@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -73,7 +73,7 @@ describe("landing subscriber funnel", () => {
         "/pricing?utm_source=landing_page&utm_medium=owned&utm_campaign=paid_launch",
       );
     }
-    expect(screen.getAllByText("See Pro & Founder plans")).toHaveLength(2);
+    expect(screen.getAllByText("See Pro & Craft plans")).toHaveLength(2);
     for (const testId of ["landing-signup-cta-hero", "landing-signup-cta-final"]) {
       expect(screen.getByTestId(testId)).toHaveAttribute(
         "href",
@@ -150,6 +150,34 @@ describe("landing subscriber funnel", () => {
     expect(screen.getByTestId("public-one-tent-tour-signup-cta")).toHaveAttribute(
       "href",
       "/auth?mode=signup&utm_source=grower_invite&utm_medium=referral&utm_campaign=grower_invite",
+    );
+  });
+
+  it("preserves a protected deep link through every signup entry point", () => {
+    const returnTo = "/plants/plant-123?tentId=tent-1#plant-ai-doctor-review";
+    render(
+      <MemoryRouter initialEntries={[`/welcome?redirectTo=${encodeURIComponent(returnTo)}`]}>
+        <Landing />
+      </MemoryRouter>,
+    );
+
+    const expectedSignupPath =
+      "/auth?mode=signup&redirectTo=%2Fplants%2Fplant-123%3FtentId%3Dtent-1%23plant-ai-doctor-review&utm_source=landing_page&utm_medium=owned&utm_campaign=paid_launch";
+    expect(screen.getByTestId("landing-signup-cta-hero")).toHaveAttribute(
+      "href",
+      expectedSignupPath,
+    );
+    expect(screen.getByTestId("landing-signup-cta-final")).toHaveAttribute(
+      "href",
+      expectedSignupPath,
+    );
+    expect(screen.getByTestId("public-one-tent-tour-signup-cta")).toHaveAttribute(
+      "href",
+      expectedSignupPath,
+    );
+    expect(screen.getByTestId("landing-signin-cta-header")).toHaveAttribute(
+      "href",
+      `/auth?redirectTo=${encodeURIComponent(returnTo)}`,
     );
   });
 

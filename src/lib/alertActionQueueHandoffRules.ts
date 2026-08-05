@@ -114,12 +114,10 @@ export interface RejectionRecord {
 }
 
 export type HandoffResult =
-  | { ok: true; suggestion: ActionSuggestion }
-  | { ok: false; reason: string };
+  { ok: true; suggestion: ActionSuggestion } | { ok: false; reason: string };
 
 export type ApprovalResult =
-  | { ok: true; queuedAction: ApprovedQueuedAction }
-  | { ok: false; reason: string };
+  { ok: true; queuedAction: ApprovedQueuedAction } | { ok: false; reason: string };
 
 export type RejectionResult = { ok: true; record: RejectionRecord } | { ok: false; reason: string };
 
@@ -279,9 +277,7 @@ function adjustRiskForContext(
  */
 export function createActionSuggestion(input: HandoffInput): HandoffResult {
   const { alert, sensorContext, sensorContextId, now } = input;
-  const timelineEvents = normalizeOriginatingTimelineEvents(
-    input.originatingTimelineEvents,
-  );
+  const timelineEvents = normalizeOriginatingTimelineEvents(input.originatingTimelineEvents);
 
   // Validate alert
   if (!alert) return { ok: false, reason: "missing_alert" };

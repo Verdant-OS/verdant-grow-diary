@@ -34,8 +34,14 @@ export interface UseMyEntitlementsResult {
   /** True when the canonical subscription row could not be read. */
   lookupFailed: boolean;
   entitlement: ResolvedEntitlement;
-  /** Bounded refetch — used by CheckoutSuccess to poll after checkout. */
-  refetch: () => Promise<void>;
+  /**
+   * Bounded refetch — used by CheckoutSuccess to poll after checkout.
+   * Resolves to whether the lookup FAILED. A failed lookup still resolves the
+   * entitlement to Free for presentation, so a caller that only awaits
+   * completion would read "we couldn't check" as "you are not entitled";
+   * callers acting on the outcome must consult this instead.
+   */
+  refetch: () => Promise<boolean>;
 }
 
 const FREE_NOW = (): ResolvedEntitlement => resolveEntitlements(null, new Date());
@@ -58,13 +64,18 @@ export function useMyEntitlements(): UseMyEntitlementsResult {
     };
   }, []);
 
-  const doLoad = useCallback(async () => {
+  // Resolves to whether the lookup FAILED, so a caller that acts on the result
+  // (e.g. a manual "re-check my plan") can tell a real Free answer apart from
+  // an unverifiable one. A failed lookup still resolves the entitlement to
+  // Free for presentation, so a caller that merely awaits completion would
+  // otherwise read "we couldn't check" as "you are not entitled".
+  const doLoad = useCallback(async (): Promise<boolean> => {
     if (!user) {
-      if (!mountedRef.current) return;
+      if (!mountedRef.current) return false;
       setEntitlement(FREE_NOW());
       setLookupFailed(false);
       setLoading(false);
-      return;
+      return false;
     }
     setLoading(true);
     setLookupFailed(false);
@@ -107,20 +118,14 @@ export function useMyEntitlements(): UseMyEntitlementsResult {
 
     const now = new Date();
     const isStaff = !rolesRes.error && rolesRes.data != null;
-    const liveRows = liveRes.error
-      ? []
-      : ((liveRes.data ?? []) as LovableSubscriptionRow[]);
+    const liveRows = liveRes.error ? [] : ((liveRes.data ?? []) as LovableSubscriptionRow[]);
     const sandboxRows = sandboxRes.error
       ? []
       : ((sandboxRes.data ?? []) as LovableSubscriptionRow[]);
     const liveRow = pickEntitlingLovableRow(liveRows, "live", now);
-    const sandboxRow = wantsSandbox
-      ? pickEntitlingLovableRow(sandboxRows, "sandbox", now)
-      : null;
-    const liveRowEntitles =
-      liveRow != null && lovableRowEntitles(liveRow, "live", now);
-    const sandboxRowEntitles =
-      sandboxRow != null && lovableRowEntitles(sandboxRow, "sandbox", now);
+    const sandboxRow = wantsSandbox ? pickEntitlingLovableRow(sandboxRows, "sandbox", now) : null;
+    const liveRowEntitles = liveRow != null && lovableRowEntitles(liveRow, "live", now);
+    const sandboxRowEntitles = sandboxRow != null && lovableRowEntitles(sandboxRow, "sandbox", now);
 
     const resolvedEnvironment = liveRowEntitles
       ? "live"
@@ -134,10 +139,9 @@ export function useMyEntitlements(): UseMyEntitlementsResult {
         : liveRow;
     const paidRowProven = liveRowEntitles || sandboxRowEntitles;
     const lookupFailed =
-      !paidRowProven &&
-      (liveRes.error != null || (wantsSandbox && sandboxRes.error != null));
+      !paidRowProven && (liveRes.error != null || (wantsSandbox && sandboxRes.error != null));
 
-    if (!mountedRef.current) return;
+    if (!mountedRef.current) return lookupFailed;
     setLookupFailed(lookupFailed);
     setEntitlement(
       resolveUnionEntitlements({
@@ -149,6 +153,7 @@ export function useMyEntitlements(): UseMyEntitlementsResult {
       }),
     );
     setLoading(false);
+    return lookupFailed;
   }, [user, expectedBillingEnvironment]);
 
   useEffect(() => {

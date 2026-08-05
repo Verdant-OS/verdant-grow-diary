@@ -132,7 +132,10 @@ export interface ColumnPlan {
 }
 
 function norm(h: string): string {
-  return h.toLowerCase().replace(/[\s_]+/g, " ").trim();
+  return h
+    .toLowerCase()
+    .replace(/[\s_]+/g, " ")
+    .trim();
 }
 
 function detectTempUnit(header: string): "F" | "C" {
@@ -228,11 +231,7 @@ export interface NormalizedCsvRow {
 
 export interface SkippedRow {
   rowIndex: number; // 0-based, header excluded
-  reason:
-    | "missing_timestamp"
-    | "invalid_timestamp"
-    | "no_numeric_metrics"
-    | "duplicate";
+  reason: "missing_timestamp" | "invalid_timestamp" | "no_numeric_metrics" | "duplicate";
 }
 
 function fToC(f: number): number {
@@ -253,10 +252,7 @@ export interface NormalizeResult {
  *
  * Returns deterministic output. No side effects.
  */
-export function normalizeAcInfinityRows(
-  parsed: ParsedCsv,
-  plan: ColumnPlan,
-): NormalizeResult {
+export function normalizeAcInfinityRows(parsed: ParsedCsv, plan: ColumnPlan): NormalizeResult {
   const out: NormalizedCsvRow[] = [];
   const skipped: SkippedRow[] = [];
   const unsupported = new Set<string>();
@@ -407,8 +403,7 @@ export function buildCsvInsertRows(args: BuildInsertsArgs): CsvInsertRow[] {
   if (!args.tentId?.trim()) throw new Error("tentId is required");
   const source = csvSourceTagFor(args.sourceApp);
   const label = CSV_SOURCE_LABEL[args.sourceApp];
-  const growIdProvenance =
-    args.growId && args.growId.trim() !== "" ? args.growId : undefined;
+  const growIdProvenance = args.growId && args.growId.trim() !== "" ? args.growId : undefined;
   const out: CsvInsertRow[] = [];
   for (const row of args.rows) {
     for (const r of row.readings) {
@@ -431,7 +426,6 @@ export function buildCsvInsertRows(args: BuildInsertsArgs): CsvInsertRow[] {
   }
   return out;
 }
-
 
 export function isCsvImportSource(source: string | null | undefined): boolean {
   return !!source && source.startsWith("csv_import_");

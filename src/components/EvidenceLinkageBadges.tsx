@@ -111,21 +111,14 @@ export default function EvidenceLinkageBadges({
                 <span className="text-muted-foreground">{ev.type}</span>
               )}
               {labelOverride ? (
-                <span
-                  data-testid={`${testId}-label`}
-                  className="text-[11px] text-foreground"
-                >
+                <span data-testid={`${testId}-label`} className="text-[11px] text-foreground">
                   {labelOverride}
                 </span>
               ) : (
-                <span className="font-mono text-[11px] text-muted-foreground">
-                  {ev.id}
-                </span>
+                <span className="font-mono text-[11px] text-muted-foreground">{ev.id}</span>
               )}
               {occurredAt && (
-                <span className="text-[11px] text-muted-foreground">
-                  {occurredAt}
-                </span>
+                <span className="text-[11px] text-muted-foreground">{occurredAt}</span>
               )}
               {!trusted && (
                 <span

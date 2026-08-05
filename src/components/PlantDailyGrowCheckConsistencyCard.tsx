@@ -6,7 +6,7 @@
  * no health claims based on check frequency.
  */
 import { useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { Activity, ArrowRight, CheckCircle2, Gauge, Info, Sparkles } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -37,10 +37,7 @@ interface Props {
   currentTentId: string | null;
 }
 
-export default function PlantDailyGrowCheckConsistencyCard({
-  plantId,
-  currentTentId,
-}: Props) {
+export default function PlantDailyGrowCheckConsistencyCard({ plantId, currentTentId }: Props) {
   const queryClient = useQueryClient();
   const { data: rawReadings = [] } = useSensorReadings(currentTentId ?? undefined);
   const { data: rawDiary = [] } = useDiaryEntries();
@@ -102,9 +99,12 @@ export default function PlantDailyGrowCheckConsistencyCard({
   const breakdown = buildDailyMethodBreakdown(summary, "oldest-first");
   const ctaHref = `/daily-check?plantId=${plantId}&from=plant-detail`;
   const noteHref = buildDailyCheckEntryHref({ plantId, source: "plant-detail", method: "note" });
-  const sensorHref = buildDailyCheckEntryHref({ plantId, source: "plant-detail", method: "sensor" });
+  const sensorHref = buildDailyCheckEntryHref({
+    plantId,
+    source: "plant-detail",
+    method: "sensor",
+  });
   const showQuickActions = !summary.todayHasActivity;
-
 
   return (
     <Card
@@ -117,7 +117,7 @@ export default function PlantDailyGrowCheckConsistencyCard({
       data-guidance-state={guidance.state}
       className="p-4 space-y-3"
     >
-      <div className="flex items-start justify-between gap-2">
+      <div className="flex min-w-0 flex-col items-stretch gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Activity className="h-4 w-4" />
@@ -127,7 +127,7 @@ export default function PlantDailyGrowCheckConsistencyCard({
         </div>
         {showQuickActions ? (
           <div
-            className="flex flex-wrap gap-2 shrink-0"
+            className="flex min-w-0 w-full flex-wrap gap-2 sm:w-auto sm:shrink-0"
             data-testid="plant-daily-grow-check-quick-actions"
             data-plant-id={plantId}
           >
@@ -179,10 +179,7 @@ export default function PlantDailyGrowCheckConsistencyCard({
           data-testid="plant-daily-grow-check-guidance-headline"
         >
           {guidance.isPositive && (
-            <CheckCircle2
-              className="h-4 w-4 text-emerald-400"
-              aria-hidden="true"
-            />
+            <CheckCircle2 className="h-4 w-4 text-emerald-400" aria-hidden="true" />
           )}
           <span>{guidance.headline}</span>
         </div>
@@ -192,10 +189,7 @@ export default function PlantDailyGrowCheckConsistencyCard({
         >
           {guidance.body}
         </p>
-        <p
-          className="text-sm"
-          data-testid="plant-daily-grow-check-guidance-next-step"
-        >
+        <p className="text-sm" data-testid="plant-daily-grow-check-guidance-next-step">
           {guidance.nextStep}
         </p>
         {methodLabel && (
@@ -210,10 +204,7 @@ export default function PlantDailyGrowCheckConsistencyCard({
 
       {summary.hasAnyActivity && (
         <div className="space-y-1">
-          <div
-            className="text-sm"
-            data-testid="plant-daily-grow-check-consistency-main"
-          >
+          <div className="text-sm" data-testid="plant-daily-grow-check-consistency-main">
             Checked {summary.checkedDays} of last {summary.windowDays} days
           </div>
           <div
@@ -235,10 +226,7 @@ export default function PlantDailyGrowCheckConsistencyCard({
       )}
 
       {!summary.hasAnyActivity && (
-        <div
-          className="sr-only"
-          data-testid="plant-daily-grow-check-consistency-empty"
-        >
+        <div className="sr-only" data-testid="plant-daily-grow-check-consistency-empty">
           No check activity in the last {summary.windowDays} days.
         </div>
       )}
@@ -250,10 +238,7 @@ export default function PlantDailyGrowCheckConsistencyCard({
         data-day-count={breakdown.length}
       >
         <div className="text-xs text-muted-foreground">Last 7 days</div>
-        <ol
-          className="grid grid-cols-7 gap-1"
-          aria-label="Daily Grow Check method, last 7 days"
-        >
+        <ol className="grid grid-cols-7 gap-1" aria-label="Daily Grow Check method, last 7 days">
           {breakdown.map((d) => {
             const label = formatDailyMethodBreakdownLabel(d.method);
             return (

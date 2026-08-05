@@ -1,8 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  validateDryPhaseCheckDetails,
-  getDryPhaseStatusNotes,
-} from "@/lib/dryPhaseCheckRules";
+import { validateDryPhaseCheckDetails, getDryPhaseStatusNotes } from "@/lib/dryPhaseCheckRules";
 
 describe("validateDryPhaseCheckDetails", () => {
   it("accepts empty input as ok", () => {
@@ -18,9 +15,7 @@ describe("validateDryPhaseCheckDetails", () => {
   });
 
   it("rejects non-integer dry_day", () => {
-    expect(validateDryPhaseCheckDetails({ dry_day: 2.5 }).errors.dry_day).toBe(
-      "invalid_integer",
-    );
+    expect(validateDryPhaseCheckDetails({ dry_day: 2.5 }).errors.dry_day).toBe("invalid_integer");
   });
 
   it("rejects RH outside 0..100", () => {
@@ -33,12 +28,12 @@ describe("validateDryPhaseCheckDetails", () => {
   });
 
   it("rejects unrealistic temperature", () => {
-    expect(
-      validateDryPhaseCheckDetails({ ambient_temp_c: -50 }).errors.ambient_temp_c,
-    ).toBe("invalid_range");
-    expect(
-      validateDryPhaseCheckDetails({ ambient_temp_c: 200 }).errors.ambient_temp_c,
-    ).toBe("invalid_range");
+    expect(validateDryPhaseCheckDetails({ ambient_temp_c: -50 }).errors.ambient_temp_c).toBe(
+      "invalid_range",
+    );
+    expect(validateDryPhaseCheckDetails({ ambient_temp_c: 200 }).errors.ambient_temp_c).toBe(
+      "invalid_range",
+    );
   });
 
   it("rejects negative VPD", () => {
@@ -62,8 +57,7 @@ describe("validateDryPhaseCheckDetails", () => {
 
   it("rejects invalid next_check_due", () => {
     expect(
-      validateDryPhaseCheckDetails({ next_check_due: "not-a-date" }).errors
-        .next_check_due,
+      validateDryPhaseCheckDetails({ next_check_due: "not-a-date" }).errors.next_check_due,
     ).toBe("invalid_date");
   });
 });
@@ -90,13 +84,11 @@ describe("getDryPhaseStatusNotes", () => {
       getDryPhaseStatusNotes({ ambient_rh: 90 }).some((n) => n.status === "needs_review"),
     ).toBe(true);
     expect(
-      getDryPhaseStatusNotes({ ambient_temp_c: 5 }).some(
-        (n) => n.status === "needs_review",
-      ),
+      getDryPhaseStatusNotes({ ambient_temp_c: 5 }).some((n) => n.status === "needs_review"),
     ).toBe(true);
-    expect(
-      getDryPhaseStatusNotes({ vpd_kpa: 2.5 }).some((n) => n.status === "needs_review"),
-    ).toBe(true);
+    expect(getDryPhaseStatusNotes({ vpd_kpa: 2.5 }).some((n) => n.status === "needs_review")).toBe(
+      true,
+    );
   });
 
   it("empty value returns single recorded note", () => {

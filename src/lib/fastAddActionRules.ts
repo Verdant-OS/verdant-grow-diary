@@ -15,6 +15,13 @@
  */
 
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "./plantQuickLogPrefillRules";
+import { buildPlantAiDoctorReviewPath } from "./aiDoctorEntryRules";
+import {
+  QUICK_LOG_V2_OPEN_EVENT,
+  buildQuickLogV2OpenIntent,
+  type QuickLogV2OpenIntent,
+} from "./quickLogV2OpenIntent";
+import type { QuickLogActivityId } from "@/constants/quickLogActivityTypes";
 
 export type FastAddActionId =
   | "diary_note"
@@ -39,21 +46,41 @@ export interface FastAddActionDef {
     | "environment"
     | "harvest"
     | null;
+  /**
+   * Canonical activity editor to preselect in the shared Quick Log surface.
+   * This is separate from the legacy diary event type: the editor owns the
+   * supported save route and remains grower-confirmed.
+   */
+  quickLogActivityId: QuickLogActivityId | null;
 }
 
 export const FAST_ADD_ACTIONS: readonly FastAddActionDef[] = [
-  { id: "diary_note", label: "Note", quickLogEventType: "observation" },
-  { id: "photo", label: "Photo", quickLogEventType: "photo" },
-  { id: "watering", label: "Watering", quickLogEventType: "watering" },
-  { id: "feeding", label: "Feeding", quickLogEventType: "feeding" },
-  { id: "environment", label: "Environment", quickLogEventType: "environment" },
-  { id: "training", label: "Training", quickLogEventType: "training" },
-  { id: "diagnosis", label: "Diagnosis", quickLogEventType: null },
-  { id: "harvest", label: "Harvest", quickLogEventType: "harvest" },
+  { id: "diary_note", label: "Note", quickLogEventType: "observation", quickLogActivityId: "note" },
+  { id: "photo", label: "Photo", quickLogEventType: "photo", quickLogActivityId: "photo" },
+  {
+    id: "watering",
+    label: "Watering",
+    quickLogEventType: "watering",
+    quickLogActivityId: "watering",
+  },
+  { id: "feeding", label: "Feeding", quickLogEventType: "feeding", quickLogActivityId: "feeding" },
+  {
+    id: "environment",
+    label: "Environment",
+    quickLogEventType: "environment",
+    quickLogActivityId: "environment_check",
+  },
+  {
+    id: "training",
+    label: "Training",
+    quickLogEventType: "training",
+    quickLogActivityId: "training",
+  },
+  { id: "diagnosis", label: "Diagnosis", quickLogEventType: null, quickLogActivityId: null },
+  { id: "harvest", label: "Harvest", quickLogEventType: "harvest", quickLogActivityId: "harvest" },
 ] as const;
 
-export const FAST_ADD_NO_CONTEXT_COPY =
-  "Select a plant or tent before logging this action.";
+export const FAST_ADD_NO_CONTEXT_COPY = "Select a plant or tent before logging this action.";
 
 export const FAST_ADD_PICKER_CTAS = [
   { id: "choose_plant", label: "Choose plant", to: "/plants" },
@@ -88,6 +115,7 @@ export interface FastAddOpenQuickLogIntent {
     tentName: string | null;
     growId: string | null;
     eventType: NonNullable<FastAddActionDef["quickLogEventType"]>;
+    activityId: NonNullable<FastAddActionDef["quickLogActivityId"]>;
     occurred_at?: string;
     captured_at?: string;
   };
@@ -97,10 +125,16 @@ export interface FastAddNeedsContextIntent {
   message: typeof FAST_ADD_NO_CONTEXT_COPY;
   ctas: typeof FAST_ADD_PICKER_CTAS;
 }
+export interface FastAddOpenQuickLogV2Intent {
+  kind: "open-quicklog-v2";
+  eventName: typeof QUICK_LOG_V2_OPEN_EVENT;
+  detail: QuickLogV2OpenIntent;
+}
 
 export type FastAddIntent =
   | FastAddNavigateIntent
   | FastAddOpenQuickLogIntent
+  | FastAddOpenQuickLogV2Intent
   | FastAddNeedsContextIntent;
 
 function hasContext(ctx: FastAddSelectionContext | null | undefined): boolean {
@@ -145,10 +179,27 @@ export function resolveFastAddIntent(
   }
 
   if (def.id === "diagnosis") {
-    const to = context.plantId
-      ? `/plants/${encodeURIComponent(context.plantId)}#ai-doctor`
-      : "/doctor";
+    const to =
+      buildPlantAiDoctorReviewPath({
+        plantId: context.plantId,
+        tentId: context.tentId,
+      }) ?? "/doctor";
     return { kind: "navigate", to };
+  }
+
+  if (def.id === "watering") {
+    const detail = buildQuickLogV2OpenIntent({
+      plantId: context.plantId,
+      tentId: context.tentId,
+      action: "water",
+    });
+    return detail
+      ? { kind: "open-quicklog-v2", eventName: QUICK_LOG_V2_OPEN_EVENT, detail }
+      : {
+          kind: "needs-context",
+          message: FAST_ADD_NO_CONTEXT_COPY,
+          ctas: FAST_ADD_PICKER_CTAS,
+        };
   }
 
   const defaults = buildFastAddTimestampDefaults(actionId, options.now);
@@ -163,6 +214,7 @@ export function resolveFastAddIntent(
       tentName: context.tentName ?? null,
       growId: context.growId ?? null,
       eventType: def.quickLogEventType!,
+      activityId: def.quickLogActivityId!,
       ...defaults,
     },
   };
@@ -176,7 +228,9 @@ export function resolveFastAddIntent(
  *
  * Rules:
  *  - All logging presets set `occurred_at = now`.
- *  - Environment additionally sets `captured_at = now`.
+ *  - Environment and Training additionally set `captured_at = now` — both
+ *    represent an event happening in the tent at the moment of capture,
+ *    so the two timestamps line up for consistent timeline sorting.
  *  - Diagnosis is navigation-only and returns {}.
  */
 export function buildFastAddTimestampDefaults(
@@ -185,7 +239,7 @@ export function buildFastAddTimestampDefaults(
 ): FastAddTimestampDefaults {
   if (actionId === "diagnosis") return {};
   const iso = now().toISOString();
-  if (actionId === "environment") {
+  if (actionId === "environment" || actionId === "training") {
     return { occurred_at: iso, captured_at: iso };
   }
   return { occurred_at: iso };
@@ -227,4 +281,3 @@ export function deriveSelectionContextFromPathname(
   }
   return null;
 }
-

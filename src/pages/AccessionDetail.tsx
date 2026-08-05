@@ -2,18 +2,16 @@
  * Accession detail — the source-material record with explicit provenance and
  * non-destructive archive. Links onward to lineage trace and screening history.
  */
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link } from "@/lib/react-router-compat";
 import { Dna, Loader2 } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { useAccessions } from "@/hooks/useGeneticsLibrary";
 import { useArchiveAccession } from "@/hooks/useGeneticsMutations";
+import { GeneticsReadUnavailable } from "@/components/genetics/GeneticsReadUnavailable";
 import { UnknownStateChip } from "@/components/genetics/UnknownStateChip";
 import { SaveStateBar } from "@/components/genetics/SaveStateBar";
-import {
-  accessionSourceLabel,
-  knownStateLabel,
-} from "@/lib/genetics/traceabilityTypes";
+import { accessionSourceLabel, knownStateLabel } from "@/lib/genetics/traceabilityTypes";
 import { geneticsTracePath, geneticsHealthHistoryPath } from "@/lib/routes";
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
@@ -37,6 +35,20 @@ export default function AccessionDetail() {
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> Loading…
         </div>
+      </div>
+    );
+  }
+
+  if (accessions.isError) {
+    return (
+      <div className="container max-w-3xl py-6">
+        <GeneticsReadUnavailable
+          testId="accession-unavailable"
+          message="This accession could not be loaded. Its availability is unknown."
+          onRetry={() => {
+            void accessions.refetch();
+          }}
+        />
       </div>
     );
   }
@@ -73,12 +85,30 @@ export default function AccessionDetail() {
         <Field label="Source kind" value={accessionSourceLabel(a.sourceKind)} />
         <Field
           label="Provenance"
-          value={a.knownState === "known" ? "Known" : <UnknownStateChip kind="unknown" label={knownStateLabel(a.knownState)} />}
+          value={
+            a.knownState === "known" ? (
+              "Known"
+            ) : (
+              <UnknownStateChip kind="unknown" label={knownStateLabel(a.knownState)} />
+            )
+          }
         />
-        <Field label="Breeder / source" value={a.sourceParty || <UnknownStateChip kind="unknown" label="Unknown" />} />
-        <Field label="Generation" value={a.generation || <UnknownStateChip kind="unknown" label="Unrecorded" />} />
-        <Field label="Acquired" value={a.acquisitionDate || <UnknownStateChip kind="unknown" label="Unrecorded" />} />
-        <Field label="Status" value={a.archivedAt ? <UnknownStateChip kind="archived" /> : "Active"} />
+        <Field
+          label="Breeder / source"
+          value={a.sourceParty || <UnknownStateChip kind="unknown" label="Unknown" />}
+        />
+        <Field
+          label="Generation"
+          value={a.generation || <UnknownStateChip kind="unknown" label="Unrecorded" />}
+        />
+        <Field
+          label="Acquired"
+          value={a.acquisitionDate || <UnknownStateChip kind="unknown" label="Unrecorded" />}
+        />
+        <Field
+          label="Status"
+          value={a.archivedAt ? <UnknownStateChip kind="archived" /> : "Active"}
+        />
       </dl>
 
       <div className="flex flex-wrap items-center gap-3">

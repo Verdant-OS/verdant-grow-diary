@@ -8,7 +8,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen, waitFor, within } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import Alerts from "@/pages/Alerts";
 import { actionDetailPath, actionQueueAlertContextPath } from "@/lib/routes";
 
@@ -77,7 +77,13 @@ vi.mock("@/integrations/supabase/client", () => {
       eq: () => chain,
       in: () => chain,
       order: () => chain,
-      limit: () => Promise.resolve({ data: rows, error: null }),
+      limit: () => {
+        const __c: any = {
+          abortSignal: () => __c,
+          then: (r: any, j?: any) => Promise.resolve({ data: rows, error: null }).then(r, j),
+        };
+        return __c;
+      },
       then: (resolve: (r: { data: unknown; error: null }) => unknown) =>
         resolve({ data: rows, error: null }),
       insert: (...a: unknown[]) => {
@@ -108,9 +114,7 @@ vi.mock("@/integrations/supabase/client", () => {
 });
 
 vi.mock("@/lib/alerts", async () => {
-  const actual = await vi.importActual<typeof import("@/lib/alerts")>(
-    "@/lib/alerts",
-  );
+  const actual = await vi.importActual<typeof import("@/lib/alerts")>("@/lib/alerts");
   return {
     ...actual,
     listAlerts: vi.fn(async () => ALERTS),
@@ -181,45 +185,35 @@ describe("Alerts Index — Linked action badge", () => {
   it("renders 'Has linked action' on alert with exactly one open linked action", async () => {
     renderPage();
     const li = await rowFor("alert-one");
-    const badge = await waitFor(() =>
-      within(li).getByTestId("alert-row-linked-action"),
-    );
+    const badge = await waitFor(() => within(li).getByTestId("alert-row-linked-action"));
     expect(badge.textContent ?? "").toMatch(/has linked action/i);
   });
 
   it("renders count text on alert with multiple open linked actions", async () => {
     renderPage();
     const li = await rowFor("alert-many");
-    const badge = await waitFor(() =>
-      within(li).getByTestId("alert-row-linked-action"),
-    );
+    const badge = await waitFor(() => within(li).getByTestId("alert-row-linked-action"));
     expect(badge.textContent ?? "").toMatch(/2 linked actions/i);
   });
 
   it("renders no linked-action badge on alerts with no open linked action", async () => {
     renderPage();
     const li = await rowFor("alert-none");
-    await waitFor(() =>
-      expect(screen.getAllByTestId("alert-row-linked-action").length).toBe(2),
-    );
+    await waitFor(() => expect(screen.getAllByTestId("alert-row-linked-action").length).toBe(2));
     expect(within(li).queryByTestId("alert-row-linked-action")).toBeNull();
   });
 
   it("does not count terminal action_queue rows", async () => {
     renderPage();
     const li = await rowFor("alert-many");
-    const badge = await waitFor(() =>
-      within(li).getByTestId("alert-row-linked-action"),
-    );
+    const badge = await waitFor(() => within(li).getByTestId("alert-row-linked-action"));
     expect(badge.textContent ?? "").not.toMatch(/3 linked/i);
   });
 
   it("does not count linked actions for other alerts", async () => {
     renderPage();
     const li = await rowFor("alert-one");
-    const badge = await waitFor(() =>
-      within(li).getByTestId("alert-row-linked-action"),
-    );
+    const badge = await waitFor(() => within(li).getByTestId("alert-row-linked-action"));
     expect(badge.textContent ?? "").toMatch(/^has linked action/i);
   });
 
@@ -238,50 +232,35 @@ describe("Alerts Index — Linked action badge", () => {
     const anchor = (await waitFor(() =>
       within(li).getByTestId("alert-row-linked-action-anchor"),
     )) as HTMLAnchorElement;
-    expect(anchor.getAttribute("href")).toBe(
-      actionQueueAlertContextPath("alert-many"),
-    );
+    expect(anchor.getAttribute("href")).toBe(actionQueueAlertContextPath("alert-many"));
     expect(anchor.getAttribute("href")).toContain("alert=alert-many");
   });
 
   it("encodes the alert id safely in the multi-action query param", () => {
-    expect(actionQueueAlertContextPath("a b/c?d")).toBe(
-      "/actions?alert=a%20b%2Fc%3Fd",
-    );
+    expect(actionQueueAlertContextPath("a b/c?d")).toBe("/actions?alert=a%20b%2Fc%3Fd");
   });
-
 
   it("never renders raw [alert:<id>] tokens", async () => {
     const { container } = renderPage();
-    await waitFor(() =>
-      expect(screen.getAllByTestId("alert-row-linked-action").length).toBe(2),
-    );
+    await waitFor(() => expect(screen.getAllByTestId("alert-row-linked-action").length).toBe(2));
     expect(container.textContent ?? "").not.toContain("[alert:");
   });
 
   it("never renders raw [session:<id>] tokens", async () => {
     const { container } = renderPage();
-    await waitFor(() =>
-      expect(screen.getAllByTestId("alert-row-linked-action").length).toBe(2),
-    );
+    await waitFor(() => expect(screen.getAllByTestId("alert-row-linked-action").length).toBe(2));
     expect(container.textContent ?? "").not.toContain("[session:");
   });
 
   it("never renders target_device copy", async () => {
     const { container } = renderPage();
-    await waitFor(() =>
-      expect(screen.getAllByTestId("alert-row-linked-action").length).toBe(2),
-    );
-    expect((container.textContent ?? "").toLowerCase()).not.toContain(
-      "target_device",
-    );
+    await waitFor(() => expect(screen.getAllByTestId("alert-row-linked-action").length).toBe(2));
+    expect((container.textContent ?? "").toLowerCase()).not.toContain("target_device");
   });
 
   it("link copy does not imply automation, execution, or status transition", async () => {
     renderPage();
-    const anchors = await waitFor(() =>
-      screen.getAllByTestId("alert-row-linked-action-anchor"),
-    );
+    const anchors = await waitFor(() => screen.getAllByTestId("alert-row-linked-action-anchor"));
     for (const anchor of anchors) {
       const lower = (anchor.textContent ?? "").toLowerCase();
       for (const tok of [
@@ -306,10 +285,7 @@ describe("Alerts Index — Linked action badge", () => {
 });
 
 // --- Static safety scans ----------------------------------------------------
-const PAGE_SRC = readFileSync(
-  resolve(__dirname, "../..", "src/pages/Alerts.tsx"),
-  "utf8",
-);
+const PAGE_SRC = readFileSync(resolve(__dirname, "../..", "src/pages/Alerts.tsx"), "utf8");
 const HOOK_SRC = readFileSync(
   resolve(__dirname, "../..", "src/hooks/useAlertsLinkedActionCounts.ts"),
   "utf8",

@@ -6,11 +6,11 @@
  *  - Drawer must never render raw payloads, vendor metadata, tokens,
  *    service_role strings, private keys, internal IDs, or unknown keys.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { render, screen, fireEvent, within } from "@testing-library/react";
+import { render, screen, fireEvent, within, act } from "@testing-library/react";
 import DiaryCalendarSection from "@/components/DiaryCalendarSection";
 import { buildDiaryCalendarViewModel } from "@/lib/diaryCalendarViewModel";
 import {
@@ -23,16 +23,22 @@ import {
   DIARY_CALENDAR_DRAWER_PHOTO_ATTACHED,
   DIARY_CALENDAR_DRAWER_SENSOR_LINKED,
 } from "@/lib/diaryCalendarEventDrawerViewModel";
+import {
+  clearTemperatureUnitPreference,
+  saveTemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+beforeEach(() => {
+  clearTemperatureUnitPreference();
+});
 
 function firstEvent(raw: Parameters<typeof buildDiaryCalendarViewModel>[0]) {
   return buildDiaryCalendarViewModel(raw)[0].events[0];
 }
 
-function openFirstDrawer(
-  rawEntries: Parameters<typeof buildDiaryCalendarViewModel>[0],
-) {
+function openFirstDrawer(rawEntries: Parameters<typeof buildDiaryCalendarViewModel>[0]) {
   render(<DiaryCalendarSection rawEntries={rawEntries} />);
   const btns = screen.getAllByRole("button", {
     name: DIARY_CALENDAR_DRAWER_VIEW_LABEL,
@@ -121,6 +127,38 @@ describe("diaryCalendarEventDrawerViewModel — pure", () => {
     expect(model.measurements.ecPreview?.disclaimer).toMatch(/Not stored/i);
   });
 
+  it("labels water and air temp in the active display unit (fahrenheit)", () => {
+    const ev = firstEvent([
+      {
+        id: "f2",
+        entry_at: "2026-06-10T09:00:00Z",
+        event_type: "feeding",
+        details: {
+          nutrients: "GH 3-2-1",
+          ec: 1.6,
+          ec_unit: "mS/cm",
+          water_temp_c: 22,
+          temp_c: 24,
+        },
+      },
+    ]);
+    const model = buildDiaryCalendarEventDrawerViewModel(
+      ev,
+      { nutrients: "GH 3-2-1", ec: 1.6, ec_unit: "mS/cm", water_temp_c: 22, temp_c: 24 },
+      "fahrenheit",
+    );
+    expect(model.measurements.fields).toContainEqual({
+      label: "Water temp",
+      value: "71.6°F",
+    });
+    expect(model.measurements.fields).toContainEqual({
+      label: "Air temp",
+      value: "75.2°F",
+    });
+    // EC compensation science still runs on canonical Celsius, unaffected.
+    expect(model.measurements.ecPreview).not.toBeNull();
+  });
+
   it("environment-check style fields render safely when present", () => {
     const ev = firstEvent([
       {
@@ -144,9 +182,7 @@ describe("diaryCalendarEventDrawerViewModel — pure", () => {
       ppfd: 600,
     });
     const labels = model.measurements.fields.map((f) => f.label);
-    expect(labels).toEqual(
-      expect.arrayContaining(["Air temp", "Humidity", "VPD", "CO₂", "PPFD"]),
-    );
+    expect(labels).toEqual(expect.arrayContaining(["Air temp", "Humidity", "VPD", "CO₂", "PPFD"]));
   });
 
   it("diagnosis drawer summarizes summary/confidence/severity safely", () => {
@@ -263,9 +299,7 @@ describe("DiaryCalendarSection — event drawer UI", () => {
     expect(within(drawer).getByText("Plant memory")).toBeInTheDocument();
     expect(within(drawer).getByText("Attachments")).toBeInTheDocument();
     expect(within(drawer).getByText("Read-only diary event")).toBeInTheDocument();
-    expect(
-      within(drawer).getByText("Derived previews are not stored"),
-    ).toBeInTheDocument();
+    expect(within(drawer).getByText("Derived previews are not stored")).toBeInTheDocument();
   });
 
   it("closes drawer via accessible close control", () => {
@@ -321,9 +355,7 @@ describe("DiaryCalendarSection — event drawer UI", () => {
       },
     ]);
     const drawer = screen.getByTestId("diary-calendar-event-drawer");
-    expect(
-      within(drawer).getByText("Possible nitrogen deficiency"),
-    ).toBeInTheDocument();
+    expect(within(drawer).getByText("Possible nitrogen deficiency")).toBeInTheDocument();
     expect(within(drawer).getByText("62%")).toBeInTheDocument();
     expect(within(drawer).getByText("Medium")).toBeInTheDocument();
   });
@@ -338,12 +370,40 @@ describe("DiaryCalendarSection — event drawer UI", () => {
       },
     ]);
     const drawer = screen.getByTestId("diary-calendar-event-drawer");
-    expect(
-      within(drawer).getByText(DIARY_CALENDAR_DRAWER_PHOTO_EMPTY),
-    ).toBeInTheDocument();
-    expect(
-      within(drawer).getByText(DIARY_CALENDAR_DRAWER_SENSOR_EMPTY),
-    ).toBeInTheDocument();
+    expect(within(drawer).getByText(DIARY_CALENDAR_DRAWER_PHOTO_EMPTY)).toBeInTheDocument();
+    expect(within(drawer).getByText(DIARY_CALENDAR_DRAWER_SENSOR_EMPTY)).toBeInTheDocument();
+  });
+
+  it("keeps the open drawer's temperature reactive to a live unit-preference change (no stale cache)", () => {
+    saveTemperatureUnitPreference("celsius");
+    openFirstDrawer([
+      {
+        id: "f1",
+        entry_at: "2026-06-10T09:00:00Z",
+        event_type: "feeding",
+        details: {
+          nutrients: "GH 3-2-1",
+          ec: 1.6,
+          ec_unit: "mS/cm",
+          water_temp_c: 22,
+        },
+      },
+    ]);
+    const drawer = screen.getByTestId("diary-calendar-event-drawer");
+    // Opened while the preference was celsius: raw 22°C shown as 22.0°C.
+    expect(within(drawer).getByText("22.0°C")).toBeInTheDocument();
+
+    // Flip the preference (e.g. from another tab) while the drawer stays
+    // open. This dispatches TEMPERATURE_UNIT_CHANGE_EVENT, which the
+    // live-reactive useTemperatureUnitPreference hook picks up.
+    act(() => {
+      saveTemperatureUnitPreference("fahrenheit");
+    });
+
+    // The drawer must re-derive its displayed value from the raw event
+    // (not replay a formatted-at-open-time snapshot) — 22°C -> 71.6°F.
+    expect(within(drawer).getByText("71.6°F")).toBeInTheDocument();
+    expect(within(drawer).queryByText("22.0°C")).not.toBeInTheDocument();
   });
 
   it("drawer never renders raw_payload/service_role/token/private keys/unknown keys", () => {

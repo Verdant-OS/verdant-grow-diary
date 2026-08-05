@@ -12,6 +12,7 @@ import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import { evaluateBootstrapGate } from "../../e2e/lib/fixtureBootstrap";
+import { readWorkflowYamlScalar } from "./helpers/yamlScalarText";
 
 const ROOT = path.resolve(__dirname, "../..");
 const read = (p: string) => fs.readFileSync(path.join(ROOT, p), "utf8").replace(/\r\n?/g, "\n");
@@ -173,10 +174,11 @@ describe("Workflow: bootstrap step + media expansion + summary", () => {
     expect(m![0]).toMatch(/path:\s*playwright-report\//);
   });
 
-  it("traces artifact keeps test-results/**/*.zip", () => {
+  it("traces artifact uploads trace.zip files only", () => {
     const m = wf.match(/name:\s*quicklog-playwright-traces[\s\S]*?(?=\n {6}- name:)/);
     expect(m).toBeTruthy();
-    expect(m![0]).toMatch(/test-results\/\*\*\/\*\.zip/);
+    expect(m![0]).toMatch(/test-results\/\*\*\/trace\.zip/);
+    expect(m![0]).not.toMatch(/test-results\/\*\*\/\*\.zip/);
   });
 
   it("all dedicated upload artifact steps use v4 + retention 30 + warn", () => {
@@ -196,8 +198,8 @@ describe("Workflow: bootstrap step + media expansion + summary", () => {
       );
       expect(block, `${id} retention 30`).toMatch(/retention-days:\s*30/);
       expect(block, `${id} warn`).toMatch(/if-no-files-found:\s*warn/);
-      expect(block, `${id} always() && should_run`).toMatch(
-        /if:\s*always\(\)\s*&&\s*steps\.e2e_config\.outputs\.should_run\s*==\s*'true'/,
+      expect(readWorkflowYamlScalar(block, "if"), `${id} always() && should_run`).toMatch(
+        /^always\(\)\s*&&\s*steps\.e2e_config\.outputs\.should_run\s*==\s*'true'/,
       );
     }
   });

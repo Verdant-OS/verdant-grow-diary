@@ -49,9 +49,7 @@ describe("tentPlantRosterViewModel", () => {
       relationshipKnown: false,
     });
     expect(vm.state).toBe("unknown-relationship");
-    expect(vm.unknownRelationshipCopy).toBe(
-      TENT_PLANT_ROSTER_UNKNOWN_RELATIONSHIP_COPY,
-    );
+    expect(vm.unknownRelationshipCopy).toBe(TENT_PLANT_ROSTER_UNKNOWN_RELATIONSHIP_COPY);
     expect(vm.rows).toEqual([]);
   });
 
@@ -108,9 +106,7 @@ describe("tentPlantRosterViewModel", () => {
       plants: [{ id: "p1", name: "Alpha", stage: "flower", tentId: TENT }],
     });
     expect(vm.rows[0].harvestWatchPublicState).toBeNull();
-    expect(vm.rows[0].harvestWatchFallbackCopy).toBe(
-      TENT_PLANT_ROSTER_HARVEST_WATCH_FALLBACK_COPY,
-    );
+    expect(vm.rows[0].harvestWatchFallbackCopy).toBe(TENT_PLANT_ROSTER_HARVEST_WATCH_FALLBACK_COPY);
   });
 
   it("suppresses Harvest Watch for ineligible and archived plants", () => {
@@ -149,12 +145,8 @@ describe("tentPlantRosterViewModel", () => {
       plants: [{ id: "p1", name: "Alpha", tentId: TENT }],
       tentSensorContextLabel: "Live",
     });
-    expect(vm.sharedEnvironmentCopy).toBe(
-      TENT_PLANT_ROSTER_SHARED_ENVIRONMENT_COPY,
-    );
-    expect(vm.tentSensorContextNote).toBe(
-      TENT_PLANT_ROSTER_TENT_SENSOR_CONTEXT_NOTE,
-    );
+    expect(vm.sharedEnvironmentCopy).toBe(TENT_PLANT_ROSTER_SHARED_ENVIRONMENT_COPY);
+    expect(vm.tentSensorContextNote).toBe(TENT_PLANT_ROSTER_TENT_SENSOR_CONTEXT_NOTE);
     expect(vm.tentSensorContextLabel).toBe("Live");
   });
 
@@ -228,9 +220,7 @@ describe("tentPlantRosterViewModel", () => {
   it("emits empty archived hint when active set is empty but archived exist", () => {
     const vm = buildTentPlantRosterViewModel({
       tentId: TENT,
-      plants: [
-        { id: "p2", name: "Beta", tentId: TENT, isArchived: true },
-      ],
+      plants: [{ id: "p2", name: "Beta", tentId: TENT, isArchived: true }],
     });
     expect(vm.state).toBe("empty");
     expect(vm.archivedHiddenCount).toBe(1);
@@ -268,9 +258,7 @@ describe("tentPlantRosterViewModel", () => {
     const vmHidden = buildTentPlantRosterViewModel({ tentId: TENT, plants });
     expect(vmHidden.activePlantCount).toBe(1);
     expect(vmHidden.archivedPlantCount).toBe(1);
-    expect(vmHidden.headerCountsCopy).toBe(
-      "Active plants: 1 · Archived plants: 1",
-    );
+    expect(vmHidden.headerCountsCopy).toBe("Active plants: 1 · Archived plants: 1");
 
     const vmShown = buildTentPlantRosterViewModel({
       tentId: TENT,
@@ -279,18 +267,13 @@ describe("tentPlantRosterViewModel", () => {
     });
     expect(vmShown.activePlantCount).toBe(1);
     expect(vmShown.archivedPlantCount).toBe(1);
-    expect(vmShown.headerCountsCopy).toBe(
-      "Active plants: 1 · Archived plants: 1",
-    );
+    expect(vmShown.headerCountsCopy).toBe("Active plants: 1 · Archived plants: 1");
   });
 
   it("exposes accessible toggle/help and archived badge help copy", () => {
     const vm = buildTentPlantRosterViewModel({ tentId: TENT, plants: [] });
-    expect(vm.archivedToggleAccessibleLabel).toBe(
-      "Show archived plants in this tent roster",
-    );
+    expect(vm.archivedToggleAccessibleLabel).toBe("Show archived plants in this tent roster");
     expect(vm.archivedToggleHelpCopy).toMatch(/hidden by default/);
     expect(vm.archivedBadgeHelpCopy).toMatch(/completed or inactive/);
   });
 });
-

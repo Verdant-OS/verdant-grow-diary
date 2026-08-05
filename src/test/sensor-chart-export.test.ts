@@ -19,7 +19,7 @@ describe("buildSensorReadingsCsv", () => {
   it("returns header only for empty input", () => {
     const csv = buildSensorReadingsCsv([]);
     expect(csv).toBe(
-      "Timestamp,Temperature (°C),Humidity (%),VPD (kPa),CO₂ (ppm),Soil Moisture (%),PPFD (µmol/m²/s),Source,Status,Captured At",
+      "Timestamp (UTC),Temperature (°C),Humidity (%),VPD (kPa),CO₂ (ppm),Soil Moisture (%),PPFD (µmol/m²/s),Source,Status,Captured At (UTC)",
     );
   });
 
@@ -42,15 +42,34 @@ describe("buildSensorReadingsCsv", () => {
     expect(lines[2]).toMatch(/^2026-06-01 12:00:00,26/);
   });
 
+  it("normalizes offset timestamps to UTC", () => {
+    const r: SensorReading = {
+      ...baseReading,
+      ts: "2026-06-01T12:00:00-05:00",
+      capturedAt: "2026-06-01T12:00:00-05:00",
+    };
+
+    const line = buildSensorReadingsCsv([r]).split("\n")[1];
+
+    expect(line).toMatch(/^2026-06-01 17:00:00,/);
+    expect(line).toMatch(/,2026-06-01 17:00:00$/);
+  });
+
   it("escapes commas in fields", () => {
-    const r: SensorReading = { ...baseReading, source: "live, manual" as unknown as SensorReading["source"] };
+    const r: SensorReading = {
+      ...baseReading,
+      source: "live, manual" as unknown as SensorReading["source"],
+    };
     const csv = buildSensorReadingsCsv([r]);
     const line = csv.split("\n")[1];
     expect(line).toContain('"live, manual"');
   });
 
   it("escapes double quotes in fields", () => {
-    const r: SensorReading = { ...baseReading, status: "needs_\"review" as unknown as SensorReading["status"] };
+    const r: SensorReading = {
+      ...baseReading,
+      status: 'needs_"review' as unknown as SensorReading["status"],
+    };
     const csv = buildSensorReadingsCsv([r]);
     const line = csv.split("\n")[1];
     expect(line).toContain('"needs_""review"');
@@ -63,11 +82,43 @@ describe("buildSensorReadingsCsv", () => {
     expect(line).toMatch(/,$/); // ends with empty field
   });
 
+  it("leaves invalid timestamps empty instead of crashing the export", () => {
+    const r: SensorReading = {
+      ...baseReading,
+      ts: "not-a-timestamp",
+      capturedAt: "also-not-a-timestamp",
+    };
+
+    const line = buildSensorReadingsCsv([r]).split("\n")[1];
+
+    expect(line).toMatch(/^,/);
+    expect(line).toMatch(/,$/);
+  });
+
   it("rounds integers correctly (co2)", () => {
     const r: SensorReading = { ...baseReading, co2: 850 };
     const csv = buildSensorReadingsCsv([r]);
     const line = csv.split("\n")[1];
     expect(line).toContain(",850,");
+  });
+
+  it("keeps compatibility zeroes empty when the source did not observe those metrics", () => {
+    const r: SensorReading = {
+      ...baseReading,
+      temp: 25.56,
+      rh: 56,
+      vpd: 0,
+      co2: 907,
+      soil: 55,
+      ppfd: 800,
+      observedMetrics: ["temp", "rh", "co2", "soil", "ppfd"],
+      source: "manual",
+      status: "usable",
+    };
+
+    const cells = buildSensorReadingsCsv([r]).split("\n")[1].split(",");
+
+    expect(cells.slice(1, 9)).toEqual(["25.56", "56", "", "907", "55", "800", "manual", "usable"]);
   });
 });
 
@@ -79,7 +130,7 @@ describe("downloadTextFile", () => {
     const revokeSpy = vi.fn();
 
     const realAnchor = document.createElement("a");
-    const clickSpy = vi.spyOn(realAnchor, "click");
+    const clickSpy = vi.spyOn(realAnchor, "click").mockImplementation(() => undefined);
     createElementSpy.mockImplementation((tag: string) => {
       if (tag === "a") return realAnchor;
       return document.createElement(tag);

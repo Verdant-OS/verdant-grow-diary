@@ -12,7 +12,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 
@@ -160,9 +160,9 @@ describe("Daily Check sensor path — static safety guarantees", () => {
   });
 
   it("preserves plant/tent context: method=sensor flow gates on tent assignment and never silently picks one", () => {
-    // Sensor focus only runs when plantResolution.plant.tent_id is set.
+    // Sensor focus only runs when the route plant resolves to a compatible tent.
     expect(page).toMatch(/methodHint === "sensor"/);
-    expect(page).toMatch(/plantResolution\.plant\.tent_id/);
+    expect(page).toMatch(/methodHint === "sensor" && routePlant && routeTentId/);
     // The existing `plant-needs-tent` guard handles the no-tent case.
     expect(page).toMatch(/plant-needs-tent|guard/i);
   });

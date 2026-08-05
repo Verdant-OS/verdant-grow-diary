@@ -14,17 +14,17 @@
  * Stage normalization is delegated to `normalizeVpdStage` so all
  * stage-aware environment surfaces agree on stage keys.
  */
+import {
+  celsiusToFahrenheit,
+  loadTemperatureUnitPreference,
+  type TemperatureUnitPreference,
+} from "./temperatureUnitPreference";
 import { normalizeVpdStage, type VpdStage } from "./vpdStageTargetRules";
 
 export type EnvStage = VpdStage;
 
 export type EnvClassification =
-  | "below_target"
-  | "in_target"
-  | "above_target"
-  | "unavailable"
-  | "stage_unknown"
-  | "context_only";
+  "below_target" | "in_target" | "above_target" | "unavailable" | "stage_unknown" | "context_only";
 
 export interface EnvTargetBand {
   stage: EnvStage;
@@ -67,7 +67,10 @@ const STAGE_LABEL: Record<EnvStage, string> = {
   unknown: "Stage unknown",
 };
 
-const TEMP_BANDS: Record<EnvStage, { min: number | null; max: number | null; contextOnly: boolean }> = {
+const TEMP_BANDS: Record<
+  EnvStage,
+  { min: number | null; max: number | null; contextOnly: boolean }
+> = {
   seedling: { min: 22, max: 26, contextOnly: false },
   veg: { min: 22, max: 28, contextOnly: false },
   preflower: { min: 21, max: 27, contextOnly: false },
@@ -77,19 +80,41 @@ const TEMP_BANDS: Record<EnvStage, { min: number | null; max: number | null; con
   unknown: { min: null, max: null, contextOnly: false },
 };
 
-const RH_BANDS: Record<EnvStage, { min: number | null; max: number | null; contextOnly: boolean }> = {
-  seedling: { min: 65, max: 75, contextOnly: false },
-  veg: { min: 55, max: 70, contextOnly: false },
-  preflower: { min: 50, max: 65, contextOnly: false },
-  flower: { min: 40, max: 55, contextOnly: false },
-  late_flower: { min: 35, max: 50, contextOnly: false },
-  harvest: { min: null, max: null, contextOnly: true },
-  unknown: { min: null, max: null, contextOnly: false },
-};
+const RH_BANDS: Record<EnvStage, { min: number | null; max: number | null; contextOnly: boolean }> =
+  {
+    seedling: { min: 65, max: 75, contextOnly: false },
+    veg: { min: 55, max: 70, contextOnly: false },
+    preflower: { min: 50, max: 65, contextOnly: false },
+    flower: { min: 40, max: 55, contextOnly: false },
+    late_flower: { min: 35, max: 50, contextOnly: false },
+    harvest: { min: null, max: null, contextOnly: true },
+    unknown: { min: null, max: null, contextOnly: false },
+  };
 
-export function getTempTargetBand(stage: string | null | undefined | EnvStage): EnvTargetBand {
+/** Round a converted °F display number to 1 decimal (display only). */
+function displayF(celsius: number): number {
+  return Math.round(celsiusToFahrenheit(celsius) * 10) / 10;
+}
+
+/**
+ * Stage-aware temperature target band.
+ *
+ * `band.min`/`band.max` are ALWAYS canonical Celsius (classification math
+ * depends on them). `tempUnit` affects only the grower-facing `helper`
+ * display string; the default follows the saved display preference.
+ */
+export function getTempTargetBand(
+  stage: string | null | undefined | EnvStage,
+  tempUnit: TemperatureUnitPreference = loadTemperatureUnitPreference(),
+): EnvTargetBand {
   const key = normalizeVpdStage(stage);
   const b = TEMP_BANDS[key];
+  const rangeLabel =
+    b.min !== null && b.max !== null
+      ? tempUnit === "fahrenheit"
+        ? `${displayF(b.min)}–${displayF(b.max)}°F`
+        : `${b.min}–${b.max}°C`
+      : null;
   return {
     stage: key,
     min: b.min,
@@ -100,7 +125,7 @@ export function getTempTargetBand(stage: string | null | undefined | EnvStage): 
         ? `Harvest stage has no active temperature target; shown as context only. ${ENV_STAGE_HELPER_TEXT}`
         : key === "unknown"
           ? `Stage unknown — set the grow stage for stage-aware guidance. ${ENV_STAGE_HELPER_TEXT}`
-          : `${STAGE_LABEL[key]} prefers ${b.min}–${b.max}°C. ${ENV_STAGE_HELPER_TEXT}`,
+          : `${STAGE_LABEL[key]} prefers ${rangeLabel}. ${ENV_STAGE_HELPER_TEXT}`,
   };
 }
 
@@ -195,9 +220,20 @@ function classify(
 
 export function classifyTempAgainstStage(
   tempC: number | null | undefined,
-  opts: { stage: string | null | undefined | EnvStage; stale?: boolean },
+  opts: {
+    stage: string | null | undefined | EnvStage;
+    stale?: boolean;
+    /** Display unit for the band's helper copy only; math stays °C. */
+    tempUnit?: TemperatureUnitPreference;
+  },
 ): EnvClassificationResult {
-  return classify(getTempTargetBand(opts.stage), tempC, !!opts.stale, "°C", TEMP_DEADBAND_C);
+  return classify(
+    getTempTargetBand(opts.stage, opts.tempUnit),
+    tempC,
+    !!opts.stale,
+    "°C",
+    TEMP_DEADBAND_C,
+  );
 }
 
 export function classifyRhAgainstStage(

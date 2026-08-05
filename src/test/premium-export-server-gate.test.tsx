@@ -10,10 +10,10 @@
  *  - AiDoctorDiagnosisPanel calls the preflight before downloading and
  *    renders the paywall copy on denial without crashing.
  */
-import { describe, it, expect, vi } from "vitest";
-import { readFileSync } from "node:fs";
+import { beforeEach, describe, it, expect, vi } from "vitest";
+import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { act, render, screen, fireEvent, waitFor } from "@testing-library/react";
 
 import {
   checkPremiumExportEntitlement,
@@ -24,10 +24,7 @@ import {
 
 describe("premium-export-entitlement edge function — server safety", () => {
   const FN = readFileSync(
-    resolve(
-      process.cwd(),
-      "supabase/functions/premium-export-entitlement/index.ts",
-    ),
+    resolve(process.cwd(), "supabase/functions/premium-export-entitlement/index.ts"),
     "utf8",
   );
 
@@ -105,16 +102,24 @@ describe("usePremiumExportServerGate — client hook safety", () => {
 
 // --- hook runtime: fail closed on any non-ok response ----------------------
 
-vi.mock("@/integrations/supabase/client", () => {
-  const supabase: any = {
+const { invokeMock } = vi.hoisted(() => ({
+  invokeMock: vi.fn(),
+}));
+
+vi.mock("@/integrations/supabase/client", () => ({
+  supabase: {
     functions: {
-      invoke: vi.fn(async () => ({
-        data: { ok: false, reason: "upgrade_required" },
-        error: { context: { status: 403 } },
-      })),
+      invoke: invokeMock,
     },
-  };
-  return { supabase };
+  },
+}));
+
+beforeEach(() => {
+  invokeMock.mockReset();
+  invokeMock.mockResolvedValue({
+    data: { ok: false, reason: "upgrade_required" },
+    error: { context: { status: 403 } },
+  });
 });
 
 describe("checkPremiumExportEntitlement — fail-closed runtime", () => {
@@ -153,30 +158,134 @@ function reportInput(): AiDoctorReportInput {
   return {
     generatedAt: "2026-06-08T12:00:00Z",
     summary: "Stable.",
-    perMetric: [],
+    alignment: null,
+    evidenceSummary: {
+      liveSensorUsable: false,
+      envCheckPresent: false,
+      hasRecentDiary: false,
+      hasRecentPhotos: false,
+    },
+    environmentCheck: {
+      show: false,
+      capturedAt: null,
+      statusLabel: "Not captured",
+      metricRows: [],
+    },
     recommendations: [],
     checklist: [],
-    honesty: "Generated from currently available signals.",
-    basis: [],
-  } as unknown as AiDoctorReportInput;
+  };
 }
 
 describe("AiDoctorDiagnosisPanel — premium export server-gate integration", () => {
+  it("keeps the visible preview outside the global print whitelist before authorization", () => {
+    const cssPath = resolve(process.cwd(), "src/index.css");
+    const css = existsSync(cssPath)
+      ? readFileSync(cssPath, "utf8")
+      : readFileSync(resolve(process.cwd(), "src/styles.css"), "utf8");
+    render(<AiDoctorDiagnosisPanel diagnosis={diag()} reportInput={reportInput()} />);
+    fireEvent.click(screen.getByTestId("ai-doctor-diagnosis-preview-report"));
+
+    expect(screen.getByTestId("ai-doctor-diagnosis-preview-body")).not.toHaveAttribute(
+      "data-print-section",
+    );
+    expect(css).toContain('[data-print-section="ai-doctor-report"]');
+  });
+
   it("renders the paywall message and does not crash when the server denies", async () => {
-    render(
-      <AiDoctorDiagnosisPanel
-        diagnosis={diag()}
-        reportInput={reportInput()}
-      />,
-    );
-    fireEvent.click(
-      screen.getByTestId("ai-doctor-diagnosis-download-report"),
-    );
+    render(<AiDoctorDiagnosisPanel diagnosis={diag()} reportInput={reportInput()} />);
+    fireEvent.click(screen.getByTestId("ai-doctor-diagnosis-download-report"));
     await waitFor(() => {
-      const msg = screen.getByTestId(
-        "ai-doctor-diagnosis-package-message",
-      );
+      const msg = screen.getByTestId("ai-doctor-diagnosis-package-message");
       expect(msg.textContent ?? "").toMatch(/Pro feature/);
     });
+  });
+
+  it("does not print the report preview when the server denies", async () => {
+    const originalPrint = window.print;
+    const printSpy = vi.fn();
+    window.print = printSpy as typeof window.print;
+
+    try {
+      render(<AiDoctorDiagnosisPanel diagnosis={diag()} reportInput={reportInput()} />);
+      fireEvent.click(screen.getByTestId("ai-doctor-diagnosis-preview-report"));
+      fireEvent.click(screen.getByTestId("ai-doctor-diagnosis-preview-print"));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("ai-doctor-diagnosis-package-message")).toHaveTextContent(
+          /Pro feature/,
+        );
+      });
+      expect(printSpy).not.toHaveBeenCalled();
+    } finally {
+      window.print = originalPrint;
+    }
+  });
+
+  it("prints the report preview exactly once after the server allows it", async () => {
+    invokeMock.mockResolvedValueOnce({
+      data: { ok: true, display_plan_id: "pro_monthly" },
+      error: null,
+    });
+    const originalPrint = window.print;
+    let printSectionAtCall: string | null = null;
+    const printSpy = vi.fn(() => {
+      printSectionAtCall = screen
+        .getByTestId("ai-doctor-diagnosis-preview-body")
+        .getAttribute("data-print-section");
+    });
+    window.print = printSpy as typeof window.print;
+
+    try {
+      render(<AiDoctorDiagnosisPanel diagnosis={diag()} reportInput={reportInput()} />);
+      fireEvent.click(screen.getByTestId("ai-doctor-diagnosis-preview-report"));
+      fireEvent.click(screen.getByTestId("ai-doctor-diagnosis-preview-print"));
+
+      await waitFor(() => expect(printSpy).toHaveBeenCalledTimes(1));
+      expect(printSectionAtCall).toBe("ai-doctor-report");
+      expect(screen.getByTestId("ai-doctor-diagnosis-preview-body")).not.toHaveAttribute(
+        "data-print-section",
+      );
+      expect(invokeMock).toHaveBeenCalledTimes(1);
+      expect(invokeMock).toHaveBeenCalledWith("premium-export-entitlement", {
+        body: { feature: "ai_doctor_report" },
+      });
+    } finally {
+      window.print = originalPrint;
+    }
+  });
+
+  it("keeps the print target mounted while the entitlement preflight is pending", async () => {
+    let resolveGate:
+      ((value: { data: { ok: true; display_plan_id: string }; error: null }) => void) | null = null;
+    invokeMock.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveGate = resolve;
+      }),
+    );
+    const originalPrint = window.print;
+    const printSpy = vi.fn();
+    window.print = printSpy as typeof window.print;
+
+    try {
+      render(<AiDoctorDiagnosisPanel diagnosis={diag()} reportInput={reportInput()} />);
+      fireEvent.click(screen.getByTestId("ai-doctor-diagnosis-preview-report"));
+      fireEvent.click(screen.getByTestId("ai-doctor-diagnosis-preview-print"));
+
+      const dialog = screen.getByTestId("ai-doctor-diagnosis-preview");
+      const close = screen.getByTestId("ai-doctor-diagnosis-preview-close");
+      await waitFor(() => expect(close).toBeDisabled());
+      fireEvent.click(dialog);
+      expect(screen.getByTestId("ai-doctor-diagnosis-preview-body")).toBeInTheDocument();
+
+      await act(async () => {
+        resolveGate?.({
+          data: { ok: true, display_plan_id: "pro_monthly" },
+          error: null,
+        });
+      });
+      await waitFor(() => expect(printSpy).toHaveBeenCalledTimes(1));
+    } finally {
+      window.print = originalPrint;
+    }
   });
 });

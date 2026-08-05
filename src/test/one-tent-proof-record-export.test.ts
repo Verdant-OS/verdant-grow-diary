@@ -78,7 +78,11 @@ describe("buildOneTentProofRecord", () => {
         restoreDiaryEntryId: "diary-2",
       },
     });
-    expect(r.quickLog).toEqual({ diaryEntryId: "diary-1", actionType: "water", photoAttached: true });
+    expect(r.quickLog).toEqual({
+      diaryEntryId: "diary-1",
+      actionType: "water",
+      photoAttached: true,
+    });
     expect(r.timeline).toEqual({ rowId: "row-1", routeObserved: "/timeline", chipVisible: true });
     expect(r.aiDoctor).toEqual({
       sessionId: "sess-1",
@@ -277,7 +281,9 @@ describe("redactRecordInput", () => {
       nested: { authHeader: "x", inner: { Authorization: "y", keep: "ok" } },
     };
     const clean = redactRecordInput(dirty) as Record<string, any>;
-    expect(JSON.stringify(clean)).not.toMatch(/tok-a|tok-r|sr-key|Bearer abc|bt-1|uuid-1|uuid-2|ak/);
+    expect(JSON.stringify(clean)).not.toMatch(
+      /tok-a|tok-r|sr-key|Bearer abc|bt-1|uuid-1|uuid-2|ak/,
+    );
     expect(clean.nested.inner.keep).toBe("ok");
     for (const name of REDACTED_FIELD_NAMES) {
       expect(JSON.stringify(clean).toLowerCase()).not.toContain(`"${name.toLowerCase()}":`);
@@ -365,9 +371,7 @@ describe("buildProofRecordFilename", () => {
   it("matches verdant-one-tent-proof-record-YYYYMMDD-HHMMSS.json", () => {
     const d = new Date(Date.UTC(2026, 5, 7, 9, 3, 5));
     expect(formatProofRecordTimestamp(d)).toBe("20260607-090305");
-    expect(buildProofRecordFilename(d)).toBe(
-      "verdant-one-tent-proof-record-20260607-090305.json",
-    );
+    expect(buildProofRecordFilename(d)).toBe("verdant-one-tent-proof-record-20260607-090305.json");
     expect(buildProofRecordFilename(d)).toMatch(
       /^verdant-one-tent-proof-record-\d{8}-\d{6}\.json$/,
     );

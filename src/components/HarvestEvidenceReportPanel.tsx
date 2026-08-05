@@ -31,10 +31,16 @@ export default function HarvestEvidenceReportPanel({ report }: Props) {
     >
       <header className="flex flex-col gap-1">
         <h2 className="text-sm font-semibold">Harvest Evidence Report</h2>
-        <p className="text-[11px] text-muted-foreground" data-testid="harvest-evidence-report-caution">
+        <p
+          className="text-[11px] text-muted-foreground"
+          data-testid="harvest-evidence-report-caution"
+        >
           {report.caution}
         </p>
-        <p className="text-[11px] text-muted-foreground" data-testid="harvest-evidence-report-no-actions">
+        <p
+          className="text-[11px] text-muted-foreground"
+          data-testid="harvest-evidence-report-no-actions"
+        >
           {report.noActionsCopy}
         </p>
       </header>
@@ -54,10 +60,7 @@ export default function HarvestEvidenceReportPanel({ report }: Props) {
       </dl>
 
       {report.isEmpty ? (
-        <p
-          className="text-xs text-muted-foreground"
-          data-testid="harvest-evidence-report-empty"
-        >
+        <p className="text-xs text-muted-foreground" data-testid="harvest-evidence-report-empty">
           {report.emptyCopy}
         </p>
       ) : (
@@ -70,16 +73,8 @@ export default function HarvestEvidenceReportPanel({ report }: Props) {
             >
               <header className="flex flex-wrap items-baseline gap-2">
                 <h3 className="text-sm font-medium">{p.plantName}</h3>
-                {p.strain && (
-                  <span className="text-[11px] text-muted-foreground">
-                    {p.strain}
-                  </span>
-                )}
-                {p.stage && (
-                  <span className="text-[11px] text-muted-foreground">
-                    · {p.stage}
-                  </span>
-                )}
+                {p.strain && <span className="text-[11px] text-muted-foreground">{p.strain}</span>}
+                {p.stage && <span className="text-[11px] text-muted-foreground">· {p.stage}</span>}
               </header>
               <ul className="flex flex-col gap-2">
                 {p.windows.map((w) => (
@@ -97,9 +92,7 @@ export default function HarvestEvidenceReportPanel({ report }: Props) {
 function Total({ label, value }: { label: string; value: number }) {
   return (
     <div className="flex flex-col">
-      <dt className="text-[10px] uppercase tracking-wide text-muted-foreground">
-        {label}
-      </dt>
+      <dt className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</dt>
       <dd className="text-sm font-medium">{value}</dd>
     </div>
   );
@@ -144,11 +137,7 @@ function WindowRow({
                 Latest: {c.latestOccurredAtLabel}
               </span>
             )}
-            {c.summary && (
-              <span className="text-[10px] text-muted-foreground">
-                {c.summary}
-              </span>
-            )}
+            {c.summary && <span className="text-[10px] text-muted-foreground">{c.summary}</span>}
           </li>
         ))}
       </ul>

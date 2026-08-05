@@ -39,9 +39,11 @@ function safe(fn, fallback = "unknown") {
 
 const sha = process.env.GITHUB_SHA ?? safe(() => execSync("git rev-parse HEAD").toString().trim());
 const shortSha = sha === "unknown" ? "unknown" : sha.slice(0, 12);
-const ref = process.env.GITHUB_REF_NAME ?? safe(() => execSync("git rev-parse --abbrev-ref HEAD").toString().trim());
+const ref =
+  process.env.GITHUB_REF_NAME ??
+  safe(() => execSync("git rev-parse --abbrev-ref HEAD").toString().trim());
 const actor = process.env.GITHUB_ACTOR ?? "local";
-const trigger = process.env.BUILD_SUMMARY_TRIGGER ?? (process.env.GITHUB_EVENT_NAME ?? "local");
+const trigger = process.env.BUILD_SUMMARY_TRIGGER ?? process.env.GITHUB_EVENT_NAME ?? "local";
 const runUrl =
   process.env.GITHUB_RUN_ID && process.env.GITHUB_SERVER_URL && process.env.GITHUB_REPOSITORY
     ? `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`
@@ -58,7 +60,12 @@ try {
 } catch (err) {
   edgeShared = {
     status: "drift",
-    detail: (err?.stderr?.toString() || err?.stdout?.toString() || err?.message || "drift detected").slice(0, 2000),
+    detail: (
+      err?.stderr?.toString() ||
+      err?.stdout?.toString() ||
+      err?.message ||
+      "drift detected"
+    ).slice(0, 2000),
   };
 }
 
@@ -89,7 +96,9 @@ if (process.env.BUILD_SUMMARY_VALIDATORS) {
         }));
     }
   } catch {
-    validators = [{ name: "BUILD_SUMMARY_VALIDATORS", result: "unknown", detail: "invalid JSON — ignored" }];
+    validators = [
+      { name: "BUILD_SUMMARY_VALIDATORS", result: "unknown", detail: "invalid JSON — ignored" },
+    ];
   }
 }
 
@@ -126,16 +135,13 @@ const summary = {
   },
 };
 
-const overallFail =
-  edgeShared.status === "drift" || validators.some((v) => v.result === "fail");
+const overallFail = edgeShared.status === "drift" || validators.some((v) => v.result === "fail");
 summary.overall = overallFail ? "fail" : "pass";
 
 writeFileSync(join(OUT_DIR, "build-summary.json"), JSON.stringify(summary, null, 2));
 
 const validatorRows = validators.length
-  ? validators
-      .map((v) => `| ${v.name} | \`${v.result}\` | ${v.detail || ""} |`)
-      .join("\n")
+  ? validators.map((v) => `| ${v.name} | \`${v.result}\` | ${v.detail || ""} |`).join("\n")
   : "| _none provided_ | | |";
 
 const md = `# Build summary
@@ -170,6 +176,8 @@ ${validatorRows}
 
 writeFileSync(join(OUT_DIR, "build-summary.md"), md);
 
-console.log(`Build summary written to ${OUT_DIR}/build-summary.{json,md} — overall: ${summary.overall}`);
+console.log(
+  `Build summary written to ${OUT_DIR}/build-summary.{json,md} — overall: ${summary.overall}`,
+);
 // Informational only — never fails the build. Upstream steps own their own gates.
 process.exit(0);

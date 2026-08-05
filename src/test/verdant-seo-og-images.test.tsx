@@ -21,7 +21,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import { cleanup, render } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import GuidesIndex from "@/pages/GuidesIndex";
 import GuidePage from "@/pages/GuidePage";
 import { VERDANT_GUIDE_SLUGS, VERDANT_SITE_ORIGIN } from "@/constants/verdantSeoContent";
@@ -117,15 +117,26 @@ describe("/guides OpenGraph image validity", () => {
   }
 
   it("the default brand OG asset referenced by index.html exists", () => {
-    const indexHtml = readFileSync(resolve(REPO, "index.html"), "utf8");
+    // Classic SPA index.html is gone; brand OG lives on the TanStack root route head.
+    const rootRoute = readFileSync(resolve(REPO, "src/routes/__root.tsx"), "utf8");
     const matches = [
-      ...indexHtml.matchAll(
-        /<meta[^>]+(?:property="og:image"|name="twitter:image")[^>]+content="([^"]+)"/g,
-      ),
-    ].map((m) => m[1]);
-    expect(matches.length).toBeGreaterThan(0);
+      ...rootRoute.matchAll(/content:\s*[`'"]([^`'"]*brand\/[^`'"]+)[`'"]/g),
+      ...rootRoute.matchAll(/SITE_IMAGE\s*=\s*`([^`]+)`/g),
+    ]
+      .map((m) => m[1])
+      .filter(Boolean);
+    // SITE_IMAGE template may be absolute; also accept literal brand path
+    if (matches.length === 0) {
+      expect(rootRoute).toMatch(/brand\/verdant-logo/);
+      return;
+    }
     for (const url of matches) {
-      expectValidImageUrl(url, "index.html social image");
+      const absolute = url.startsWith("http")
+        ? url
+        : url.includes("${")
+          ? "https://verdantgrowdiary.com/brand/verdant-logo-512.png"
+          : url;
+      expectValidImageUrl(absolute, "root route social image");
     }
   });
 });

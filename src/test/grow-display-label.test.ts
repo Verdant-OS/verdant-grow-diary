@@ -21,9 +21,7 @@ describe("formatGrowDisplayLabel", () => {
 
   it("never returns a UUID-shaped string as the visible label", () => {
     expect(formatGrowDisplayLabel(uuid, uuid)).toBe(GROW_DISPLAY_FALLBACK);
-    expect(formatGrowDisplayLabel(uuid.toUpperCase(), uuid)).toBe(
-      GROW_DISPLAY_FALLBACK,
-    );
+    expect(formatGrowDisplayLabel(uuid.toUpperCase(), uuid)).toBe(GROW_DISPLAY_FALLBACK);
   });
 
   it("looksLikeUuid detects canonical v4-shaped strings only", () => {
@@ -34,8 +32,6 @@ describe("formatGrowDisplayLabel", () => {
   });
 
   it("is deterministic and pure", () => {
-    expect(formatGrowDisplayLabel("My Grow")).toBe(
-      formatGrowDisplayLabel("My Grow"),
-    );
+    expect(formatGrowDisplayLabel("My Grow")).toBe(formatGrowDisplayLabel("My Grow"));
   });
 });

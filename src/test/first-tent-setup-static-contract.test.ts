@@ -11,10 +11,7 @@ import { resolve } from "node:path";
 const ROOT = resolve(__dirname, "../..");
 const SENSORS = readFileSync(resolve(ROOT, "src/pages/Sensors.tsx"), "utf8");
 const QUICK_LOG = readFileSync(resolve(ROOT, "src/components/QuickLog.tsx"), "utf8");
-const MANUAL = readFileSync(
-  resolve(ROOT, "src/components/ManualSensorReadingCard.tsx"),
-  "utf8",
-);
+const MANUAL = readFileSync(resolve(ROOT, "src/components/ManualSensorReadingCard.tsx"), "utf8");
 const EMPTY_STATE = readFileSync(
   resolve(ROOT, "src/components/FirstTentSetupEmptyState.tsx"),
   "utf8",
@@ -57,6 +54,6 @@ describe("First-tent setup gate — QuickLog snapshot attachment", () => {
 describe("First-tent setup empty state safety", () => {
   it("never advertises live/demo data and routes the CTA through react-router", () => {
     expect(EMPTY_STATE.toLowerCase()).not.toMatch(/live|demo|fake/);
-    expect(EMPTY_STATE).toMatch(/from\s+["']react-router-dom["']/);
+    expect(EMPTY_STATE).toMatch(/from\s+["']@\/lib\/react-router-compat["']/);
   });
 });

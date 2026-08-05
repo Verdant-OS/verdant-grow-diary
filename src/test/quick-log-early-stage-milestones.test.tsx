@@ -44,7 +44,15 @@ vi.mock("@/integrations/supabase/client", () => ({
       update: () => ({ eq: vi.fn() }),
       select: () => ({
         eq: () => ({
-          order: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }),
+          order: () => ({
+            limit: () => {
+              const __c: any = {
+                abortSignal: () => __c,
+                then: (r: any, j?: any) => Promise.resolve({ data: [], error: null }).then(r, j),
+              };
+              return __c;
+            },
+          }),
         }),
       }),
     }),
@@ -101,12 +109,10 @@ describe("Quick Log · early-stage milestone presets", () => {
     expect(
       within(section).getByTestId("quick-log-early-stage-milestone-cotyledons_open"),
     ).toBeInTheDocument();
-    expect(
-      within(section).getByTestId("quick-log-early-stage-vigor-strong"),
-    ).toBeInTheDocument();
-    expect(
-      within(section).getByTestId("quick-log-early-stage-photo-hint").textContent,
-    ).toMatch(/recommended/i);
+    expect(within(section).getByTestId("quick-log-early-stage-vigor-strong")).toBeInTheDocument();
+    expect(within(section).getByTestId("quick-log-early-stage-photo-hint").textContent).toMatch(
+      /recommended/i,
+    );
   });
 
   it("hides the section by default for veg-stage plants", () => {
@@ -117,16 +123,10 @@ describe("Quick Log · early-stage milestone presets", () => {
 
   it("writes early_stage envelope + note suffix through the existing RPC", async () => {
     renderWithClient(
-      <QuickLog
-        open
-        onOpenChange={vi.fn()}
-        prefill={{ plantId: "plant-1", growId: "grow-1" }}
-      />,
+      <QuickLog open onOpenChange={vi.fn()} prefill={{ plantId: "plant-1", growId: "grow-1" }} />,
     );
     const dialog = screen.getByRole("dialog");
-    fireEvent.click(
-      within(dialog).getByTestId("quick-log-early-stage-milestone-cotyledons_open"),
-    );
+    fireEvent.click(within(dialog).getByTestId("quick-log-early-stage-milestone-cotyledons_open"));
     fireEvent.click(within(dialog).getByTestId("quick-log-early-stage-vigor-strong"));
     fireEvent.change(within(dialog).getByTestId("quick-log-early-stage-notes"), {
       target: { value: "popped soil" },
@@ -159,11 +159,7 @@ describe("Quick Log · early-stage milestone presets", () => {
 
   it("saves vigor-only selection without a milestone", async () => {
     renderWithClient(
-      <QuickLog
-        open
-        onOpenChange={vi.fn()}
-        prefill={{ plantId: "plant-1", growId: "grow-1" }}
-      />,
+      <QuickLog open onOpenChange={vi.fn()} prefill={{ plantId: "plant-1", growId: "grow-1" }} />,
     );
     const dialog = screen.getByRole("dialog");
     fireEvent.click(within(dialog).getByTestId("quick-log-early-stage-vigor-weak"));
@@ -183,10 +179,7 @@ describe("Quick Log · early-stage milestone presets", () => {
 });
 
 describe("Quick Log · early-stage slice safety", () => {
-  const source = readFileSync(
-    resolve(__dirname, "../lib/earlyStageQuickLogRules.ts"),
-    "utf8",
-  );
+  const source = readFileSync(resolve(__dirname, "../lib/earlyStageQuickLogRules.ts"), "utf8");
   it("does not introduce automation, action queue writes, or device control strings", () => {
     expect(source).not.toMatch(/action_queue|approval_required/i);
     expect(source).not.toMatch(/device[_-]?control|relay|pump|fan_on|light_on/i);

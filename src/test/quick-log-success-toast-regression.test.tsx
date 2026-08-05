@@ -41,7 +41,15 @@ vi.mock("@/integrations/supabase/client", () => ({
       update: () => ({ eq: vi.fn() }),
       select: () => ({
         eq: () => ({
-          order: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }),
+          order: () => ({
+            limit: () => {
+              const __c: any = {
+                abortSignal: () => __c,
+                then: (r: any, j?: any) => Promise.resolve({ data: [], error: null }).then(r, j),
+              };
+              return __c;
+            },
+          }),
         }),
       }),
     }),
@@ -112,9 +120,9 @@ const PLANT_NAME = "Verdant Test Plant";
 
 interface SupportedVariant {
   /** prefill.eventType value driving the Quick Log form. */
-  eventType: "observation" | "note" | "watering" | "environment";
+  eventType: "observation" | "note" | "environment";
   /** Word produced by QuickLog.savedVerb for this event type. */
-  verb: "observation" | "log" | "watering" | "environment check";
+  verb: "observation" | "log" | "environment check";
   /** Whether the variant needs a note in the textarea to clear validation. */
   requiresNote: boolean;
   /** Whether the variant needs a watering volume to clear validation. */
@@ -126,9 +134,18 @@ const SUPPORTED_VARIANTS: SupportedVariant[] = [
   // but the EventTypeSelector does not expose a "note" option — growers
   // pick "observation" in the UI. We exercise "observation" + "watering"
   // here; the legacy unified save tests cover the "note" RPC mapping.
-  { eventType: "observation", verb: "observation", requiresNote: true, requiresWateringVolume: false },
-  { eventType: "watering",    verb: "watering",    requiresNote: false, requiresWateringVolume: true },
-  { eventType: "environment", verb: "environment check", requiresNote: true, requiresWateringVolume: false },
+  {
+    eventType: "observation",
+    verb: "observation",
+    requiresNote: true,
+    requiresWateringVolume: false,
+  },
+  {
+    eventType: "environment",
+    verb: "environment check",
+    requiresNote: true,
+    requiresWateringVolume: false,
+  },
 ];
 
 interface UnsupportedVariant {
@@ -138,10 +155,10 @@ interface UnsupportedVariant {
 }
 
 const UNSUPPORTED_VARIANTS: UnsupportedVariant[] = [
-  { eventType: "feeding",     note: "Routed to dedicated feeding form / coming soon in unified path." },
-  { eventType: "training",    note: "Coming soon in unified save path." },
-  { eventType: "diagnosis",   note: "AI Doctor flow, not Quick Log save path." },
-  { eventType: "harvest",     note: "Coming soon in unified save path." },
+  { eventType: "feeding", note: "Routed to the dedicated structured feeding form." },
+  { eventType: "training", note: "Routed to the dedicated structured training form." },
+  { eventType: "diagnosis", note: "AI Doctor flow, not Quick Log save path." },
+  { eventType: "harvest", note: "Coming soon in unified save path." },
 ];
 
 /** Shared toast-format helper — single source of truth, no duplicated strings. */
@@ -230,7 +247,7 @@ describe("Quick Log success toast — Saved {verb} for {plant}", () => {
 // Unsupported variants — must NOT route through the Saved-toast path
 // ---------------------------------------------------------------------------
 
-describe("Quick Log unsupported variants — surface 'coming soon' instead of Saved toast", () => {
+describe("Quick Log unsupported variants — fail closed instead of emitting a Saved toast", () => {
   for (const variant of UNSUPPORTED_VARIANTS) {
     it(`eventType=${variant.eventType} does not emit a Saved-for toast (${variant.note})`, async () => {
       renderWithClient(

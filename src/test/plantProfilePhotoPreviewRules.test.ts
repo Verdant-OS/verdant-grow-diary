@@ -30,12 +30,8 @@ describe("plantProfilePhotoRequiresDecodeProbe", () => {
 
 describe("safePlantProfilePhotoFileName", () => {
   it("strips path separators defensively", () => {
-    expect(safePlantProfilePhotoFileName("/tmp/leaked/path/photo.heic")).toBe(
-      "photo.heic",
-    );
-    expect(safePlantProfilePhotoFileName("C:\\Users\\x\\photo.heic")).toBe(
-      "photo.heic",
-    );
+    expect(safePlantProfilePhotoFileName("/tmp/leaked/path/photo.heic")).toBe("photo.heic");
+    expect(safePlantProfilePhotoFileName("C:\\Users\\x\\photo.heic")).toBe("photo.heic");
   });
   it("falls back to a format-labeled or generic name when empty", () => {
     expect(safePlantProfilePhotoFileName("", "image/heic")).toBe("HEIC photo");

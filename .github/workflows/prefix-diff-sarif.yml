@@ -1,118 +1,318 @@
 name: Prefix Diff — SARIF upload
 
-# Example workflow: runs scripts/diff-money-migration-prefixes.mjs, validates
-# the SARIF output, uploads it to GitHub Code Scanning (so results show up as
-# PR file annotations and in the Security tab), and archives the artifact.
+# Trust lanes:
+#   - Pull requests run only offline file/manifest checks.
+#   - Sandbox DB verification runs only from the trusted base branch through
+#     the verdant-sandbox environment.
+#   - Production DB verification is manual-only from the trusted base branch
+#     through the verdant-production environment.
 #
 # Prereqs (Repo Settings):
-#   - Settings → Code security → Code scanning: enabled (default setup off)
-#   - Settings → Actions → Workflow permissions: "Read and write" OR the
-#     `permissions:` block below (security-events: write) is present.
-#   - Secrets: SUPABASE_DB_URL_SANDBOX and/or SUPABASE_DB_URL_LIVE.
+#   - Settings → Code security → Code scanning: enabled (default setup off).
+#   - Environment secret SUPABASE_DB_URL_SANDBOX in verdant-sandbox.
+#   - Environment secret SUPABASE_DB_URL_LIVE in verdant-production.
 
 on:
   pull_request:
     paths:
       - "supabase/migrations/**"
+      - "scripts/assert-no-unreviewed-money-migrations.mjs"
+      - "scripts/assert-required-money-migrations.mjs"
       - "scripts/diff-money-migration-prefixes.mjs"
+      - "scripts/lib/moneyDatabaseTargetIdentity.mjs"
+      - "scripts/lib/supabaseDatabaseTargetIdentity.mjs"
+      - "scripts/required-money-migrations.mjs"
       - "scripts/validate-sarif.mjs"
+      - "src/test/money-database-target-identity.test.ts"
+      - "src/test/required-money-migrations-workflow-trust-boundary.test.ts"
+      - ".github/workflows/prefix-diff-sarif.yml"
+  push:
+    branches: [verdant-grow-diary]
+    paths:
+      - "supabase/migrations/**"
+      - "scripts/assert-no-unreviewed-money-migrations.mjs"
+      - "scripts/assert-required-money-migrations.mjs"
+      - "scripts/diff-money-migration-prefixes.mjs"
+      - "scripts/lib/moneyDatabaseTargetIdentity.mjs"
+      - "scripts/lib/supabaseDatabaseTargetIdentity.mjs"
+      - "scripts/required-money-migrations.mjs"
+      - "scripts/validate-sarif.mjs"
+      - "src/test/money-database-target-identity.test.ts"
+      - "src/test/required-money-migrations-workflow-trust-boundary.test.ts"
       - ".github/workflows/prefix-diff-sarif.yml"
   workflow_dispatch:
     inputs:
       target_env:
-        description: "Target environment (sandbox | live)"
+        description: "Protected target environment"
         required: true
         default: "sandbox"
         type: choice
-        options: [sandbox, live]
+        options:
+          - sandbox
+          - live
+
+permissions:
+  contents: read
 
 concurrency:
-  group: prefix-diff-sarif-${{ github.ref }}
+  group: prefix-diff-sarif-${{ github.ref }}-${{ inputs.target_env || github.event_name }}
   cancel-in-progress: true
 
 jobs:
-  prefix-diff-sarif:
+  prefix-diff-offline:
+    name: Offline money-migration manifest + SARIF validation
     runs-on: ubuntu-latest
     timeout-minutes: 10
-
-    # Required so upload-sarif can write to the Code Scanning API.
     permissions:
       contents: read
       security-events: write
-      pull-requests: read
-
     env:
-      TARGET_ENV: ${{ inputs.target_env || 'sandbox' }}
-      SUPABASE_DB_URL: ${{ inputs.target_env == 'live' && secrets.SUPABASE_DB_URL_LIVE || secrets.SUPABASE_DB_URL_SANDBOX }}
-      SARIF_PATH: artifacts/prefix-diff.sarif
-      DIFF_JSON_PATH: artifacts/prefix-diff.json
-
+      EXPECTED_JSON_PATH: artifacts/prefix-diff-expected.json
+      SARIF_PATH: artifacts/prefix-diff-expected.sarif
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-
-      - name: Install psql client
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Prepare artifacts dir
         run: mkdir -p artifacts
 
-      # Produce both JSON (for the PR-comment summarizer) and SARIF (for
-      # Code Scanning). Do not fail the job here — we want the SARIF uploaded
-      # even when drift is detected, so annotations render on the PR.
-      - name: Run prefix diff (JSON)
-        id: diff-json
-        continue-on-error: true
+      - name: Assert required migration files
+        run: node scripts/assert-required-money-migrations.mjs
+
+      - name: Assert no unreviewed money-adjacent migrations
+        run: node scripts/assert-no-unreviewed-money-migrations.mjs
+
+      - name: Export expected prefixes without a DB connection
         run: |
           node scripts/diff-money-migration-prefixes.mjs \
-            --json > "${DIFF_JSON_PATH}"
-          echo "exit=$?" >> "$GITHUB_OUTPUT"
+            --expected --json > "${EXPECTED_JSON_PATH}"
 
-      - name: Run prefix diff (SARIF)
-        id: diff-sarif
-        continue-on-error: true
+      - name: Build offline manifest SARIF
+        id: expected-sarif
+        shell: bash
         run: |
+          set +e
           node scripts/diff-money-migration-prefixes.mjs \
-            --sarif --sarif-out="${SARIF_PATH}"
-          echo "exit=$?" >> "$GITHUB_OUTPUT"
+            --expected --sarif --sarif-out="${SARIF_PATH}"
+          status=$?
+          echo "exit=${status}" >> "$GITHUB_OUTPUT"
+          exit 0
 
-      # Structural pre-upload check: catches missing fingerprints, bad
-      # locations, or schema drift before the Code Scanning upload rejects it.
-      - name: Validate SARIF structure
+      - name: Validate offline SARIF structure
         run: node scripts/validate-sarif.mjs "${SARIF_PATH}"
 
-      - name: Upload SARIF to Code Scanning
+      - name: Upload offline SARIF to Code Scanning
         if: hashFiles(env.SARIF_PATH) != ''
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@4187e74d05793876e9989daffde9c3e66b4acd07 # v3
         with:
           sarif_file: ${{ env.SARIF_PATH }}
-          # Category lets multiple SARIF uploads coexist without overwriting
-          # each other's alerts (per-target-env stream).
-          category: prefix-diff-${{ env.TARGET_ENV }}
+          category: prefix-diff-expected
 
-      - name: Archive SARIF + JSON as workflow artifact
+      - name: Archive offline manifest evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: prefix-diff-sarif-${{ env.TARGET_ENV }}
+          name: prefix-diff-offline
+          path: |
+            ${{ env.SARIF_PATH }}
+            ${{ env.EXPECTED_JSON_PATH }}
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Fail on malformed manifest
+        if: steps.expected-sarif.outputs.exit != '0'
+        run: |
+          echo "::error::Offline money-migration manifest validation failed — see Code Scanning and the workflow artifact."
+          exit 1
+
+  prefix-diff-sandbox:
+    name: Prefix diff against SANDBOX
+    needs: prefix-diff-offline
+    if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/verdant-grow-diary') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/verdant-grow-diary' && inputs.target_env == 'sandbox') }}
+    environment: verdant-sandbox
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      security-events: write
+    env:
+      DATABASE_URL: ""
+      DIFF_JSON_PATH: artifacts/prefix-diff-sandbox.json
+      PGDATABASE: ""
+      PGHOST: ""
+      PGPASSWORD: ""
+      PGPORT: ""
+      PGSERVICE: ""
+      PGSERVICEFILE: ""
+      PGUSER: ""
+      SARIF_PATH: artifacts/prefix-diff-sandbox.sarif
+      TARGET_ENV: sandbox
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Preflight — SUPABASE_DB_URL_SANDBOX configured
+        uses: ./.github/actions/require-ci-secret
+        with:
+          secret-name: SUPABASE_DB_URL_SANDBOX
+          secret-value: ${{ secrets.SUPABASE_DB_URL_SANDBOX }}
+          guard-heading: "Money-migration prefix diff — SANDBOX"
+          fix-steps-json: >-
+            ["1. Open **Settings → Environments → verdant-sandbox** in this repository.",
+             "2. Add the `SUPABASE_DB_URL_SANDBOX` environment secret.",
+             "3. Re-run this workflow from `verdant-grow-diary`."]
+
+      - name: Install psql client
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
+
+      - name: Prepare artifacts dir
+        run: mkdir -p artifacts
+
+      - name: Run sandbox prefix diff (JSON)
+        id: diff-json
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL_SANDBOX }}
+        shell: bash
+        run: |
+          set +e
+          node scripts/diff-money-migration-prefixes.mjs \
+            --json > "${DIFF_JSON_PATH}"
+          status=$?
+          echo "exit=${status}" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Run sandbox prefix diff (SARIF)
+        id: diff-sarif
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL_SANDBOX }}
+        shell: bash
+        run: |
+          set +e
+          node scripts/diff-money-migration-prefixes.mjs \
+            --sarif --sarif-out="${SARIF_PATH}"
+          status=$?
+          echo "exit=${status}" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Validate sandbox SARIF structure
+        run: node scripts/validate-sarif.mjs "${SARIF_PATH}"
+
+      - name: Upload sandbox SARIF to Code Scanning
+        if: hashFiles(env.SARIF_PATH) != ''
+        uses: github/codeql-action/upload-sarif@4187e74d05793876e9989daffde9c3e66b4acd07 # v3
+        with:
+          sarif_file: ${{ env.SARIF_PATH }}
+          category: prefix-diff-sandbox
+
+      - name: Archive sandbox SARIF + JSON
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: prefix-diff-sarif-sandbox
           path: |
             ${{ env.SARIF_PATH }}
             ${{ env.DIFF_JSON_PATH }}
           if-no-files-found: warn
           retention-days: 14
 
-      # Optional: fail the check-run when drift or malformed migrations were
-      # found, AFTER the SARIF is uploaded and annotations are visible.
-      - name: Fail on drift
-        if: steps.diff-sarif.outputs.exit != '0'
+      - name: Fail on sandbox drift
+        if: steps.diff-json.outputs.exit != '0' || steps.diff-sarif.outputs.exit != '0'
         run: |
-          echo "::error::prefix-diff reported exit ${{ steps.diff-sarif.outputs.exit }} — see PR file annotations and the Security tab."
+          echo "::error::Sandbox prefix-diff failed (JSON=${{ steps.diff-json.outputs.exit }}, SARIF=${{ steps.diff-sarif.outputs.exit }}) — see Code Scanning and the workflow artifact."
+          exit 1
+
+  prefix-diff-live:
+    name: Prefix diff against LIVE
+    needs: prefix-diff-offline
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/verdant-grow-diary' && inputs.target_env == 'live' }}
+    environment: verdant-production
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      security-events: write
+    env:
+      DATABASE_URL: ""
+      DIFF_JSON_PATH: artifacts/prefix-diff-live.json
+      PGDATABASE: ""
+      PGHOST: ""
+      PGPASSWORD: ""
+      PGPORT: ""
+      PGSERVICE: ""
+      PGSERVICEFILE: ""
+      PGUSER: ""
+      SARIF_PATH: artifacts/prefix-diff-live.sarif
+      TARGET_ENV: live
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Preflight — SUPABASE_DB_URL_LIVE configured
+        uses: ./.github/actions/require-ci-secret
+        with:
+          secret-name: SUPABASE_DB_URL_LIVE
+          secret-value: ${{ secrets.SUPABASE_DB_URL_LIVE }}
+          guard-heading: "Money-migration prefix diff — LIVE"
+          fix-steps-json: >-
+            ["1. Open **Settings → Environments → verdant-production** in this repository.",
+             "2. Add the `SUPABASE_DB_URL_LIVE` environment secret.",
+             "3. Re-run this workflow manually from `verdant-grow-diary`."]
+
+      - name: Install psql client
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
+
+      - name: Prepare artifacts dir
+        run: mkdir -p artifacts
+
+      - name: Run live prefix diff (JSON)
+        id: diff-json
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL_LIVE }}
+        shell: bash
+        run: |
+          set +e
+          node scripts/diff-money-migration-prefixes.mjs \
+            --json > "${DIFF_JSON_PATH}"
+          status=$?
+          echo "exit=${status}" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Run live prefix diff (SARIF)
+        id: diff-sarif
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL_LIVE }}
+        shell: bash
+        run: |
+          set +e
+          node scripts/diff-money-migration-prefixes.mjs \
+            --sarif --sarif-out="${SARIF_PATH}"
+          status=$?
+          echo "exit=${status}" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Validate live SARIF structure
+        run: node scripts/validate-sarif.mjs "${SARIF_PATH}"
+
+      - name: Upload live SARIF to Code Scanning
+        if: hashFiles(env.SARIF_PATH) != ''
+        uses: github/codeql-action/upload-sarif@4187e74d05793876e9989daffde9c3e66b4acd07 # v3
+        with:
+          sarif_file: ${{ env.SARIF_PATH }}
+          category: prefix-diff-live
+
+      - name: Archive live SARIF + JSON
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: prefix-diff-sarif-live
+          path: |
+            ${{ env.SARIF_PATH }}
+            ${{ env.DIFF_JSON_PATH }}
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Fail on live drift
+        if: steps.diff-json.outputs.exit != '0' || steps.diff-sarif.outputs.exit != '0'
+        run: |
+          echo "::error::Live prefix-diff failed (JSON=${{ steps.diff-json.outputs.exit }}, SARIF=${{ steps.diff-sarif.outputs.exit }}) — see Code Scanning and the workflow artifact."
           exit 1

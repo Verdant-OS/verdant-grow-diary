@@ -1,5 +1,5 @@
 import VpdStageMissingBadge from "@/components/VpdStageMissingBadge";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { ArrowRight, Box, Gauge, NotebookPen } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,7 +9,11 @@ import { usePlantTentLatestReadings } from "@/hooks/usePlantTentLatestReadings";
 import { buildPlantTentEnvironmentView } from "@/lib/plantTentEnvironmentRules";
 import { buildRecentSensorSnapshotHistory } from "@/lib/recentSensorSnapshotHistoryRules";
 import { SOURCE_LABEL, formatValue, snapshotFromReadings } from "@/lib/sensorSnapshot";
-import { tempFFromC } from "@/lib/temperatureUnits";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
+import {
+  convertCelsiusForDisplay,
+  getTemperatureUnitSymbol,
+} from "@/lib/temperatureUnitPreference";
 import {
   classifyVpdAgainstStage,
   normalizeVpdStage,
@@ -41,9 +45,11 @@ export default function PlantTentEnvironmentPanel({
   plantStage,
 }: Props) {
   const enabled = !!tentId;
+  const temperatureUnit = useTemperatureUnitPreference();
+  const temperatureUnitSymbol = getTemperatureUnitSymbol(temperatureUnit);
   const { data, isLoading } = usePlantTentLatestReadings(tentId ?? null);
   const rows = enabled ? (data ?? []) : [];
-  const view = buildPlantTentEnvironmentView(rows);
+  const view = buildPlantTentEnvironmentView(rows, undefined, temperatureUnit);
   const recent = buildRecentSensorSnapshotHistory(rows, { limit: 5 });
   const prefill = buildPlantQuickLogPrefill({ plantId, plantName, growId, tentId, tentName });
   const snap = enabled ? snapshotFromReadings(rows) : null;
@@ -163,7 +169,7 @@ export default function PlantTentEnvironmentPanel({
             ) : (
               <ul className="space-y-2">
                 {recent.map((r) => {
-                  const tempF = tempFFromC(r.temp);
+                  const tempDisplay = convertCelsiusForDisplay(r.temp, temperatureUnit);
                   return (
                     <li
                       key={r.ts}
@@ -198,7 +204,9 @@ export default function PlantTentEnvironmentPanel({
                           Stale
                         </span>
                       ) : null}
-                      {tempF !== null ? <span>{formatValue(tempF, "°F", 1)}</span> : null}
+                      {tempDisplay !== null ? (
+                        <span>{formatValue(tempDisplay, temperatureUnitSymbol, 1)}</span>
+                      ) : null}
                       {r.rh !== null ? <span>{formatValue(r.rh, "%", 0)}</span> : null}
                       {r.vpd !== null ? <span>{formatValue(r.vpd, " kPa", 2)}</span> : null}
                       {r.co2 !== null ? <span>{formatValue(r.co2, " ppm", 0)}</span> : null}
@@ -210,12 +218,12 @@ export default function PlantTentEnvironmentPanel({
           </div>
         ) : null}
         {enabled && prefill ? (
-          <div className="mt-4">
+          <div className="mt-4 min-w-0">
             <Button
               type="button"
               variant="outline"
               size="sm"
-              className="gap-1"
+              className="h-auto min-h-11 min-w-0 w-full gap-1 whitespace-normal sm:w-auto sm:min-h-9"
               onClick={openQuickLog}
               data-testid="plant-tent-environment-log-with-context"
             >

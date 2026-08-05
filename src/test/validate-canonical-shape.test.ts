@@ -15,7 +15,9 @@ describe("validateCanonicalHref", () => {
   });
 
   it("rejects protocol-relative hrefs", () => {
-    expect(validateCanonicalHref("//verdantgrowdiary.com/x").join()).toMatch(/protocol-relative|not an absolute/);
+    expect(validateCanonicalHref("//verdantgrowdiary.com/x").join()).toMatch(
+      /protocol-relative|not an absolute/,
+    );
   });
 
   it("rejects http scheme", () => {
@@ -35,7 +37,9 @@ describe("validateCanonicalHref", () => {
   });
 
   it("rejects duplicated slashes in the path", () => {
-    expect(validateCanonicalHref(`${EXPECTED_ORIGIN}//cultivars`).join()).toMatch(/duplicated slashes/);
+    expect(validateCanonicalHref(`${EXPECTED_ORIGIN}//cultivars`).join()).toMatch(
+      /duplicated slashes/,
+    );
     expect(validateCanonicalHref(`${EXPECTED_ORIGIN}/a//b`).join()).toMatch(/duplicated slashes/);
   });
 

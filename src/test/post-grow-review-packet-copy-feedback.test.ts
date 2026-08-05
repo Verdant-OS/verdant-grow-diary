@@ -29,7 +29,9 @@ describe("post-grow review packet copy feedback", () => {
 
   it("announces copy success and clipboard fallback with aria-live status copy", () => {
     expect(REVIEW_PACKET_CARD).toContain("Copied sanitized review packet to clipboard.");
-    expect(REVIEW_PACKET_CARD).toContain("Clipboard not available. Download the sanitized packet instead.");
+    expect(REVIEW_PACKET_CARD).toContain(
+      "Clipboard not available. Download the sanitized packet instead.",
+    );
     expect(REVIEW_PACKET_CARD).toContain('role="status"');
     expect(REVIEW_PACKET_CARD).toContain('aria-live="polite"');
     expect(REVIEW_PACKET_CARD).toContain('data-testid="copy-sanitized-review-packet-status"');

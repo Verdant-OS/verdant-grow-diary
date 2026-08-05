@@ -14,6 +14,7 @@ const MIGRATION = readFileSync(
   ),
   "utf8",
 );
+const NORMALIZED_MIGRATION = MIGRATION.replace(/\r\n?/g, "\n");
 
 describe("ai_credit_grants — non-Paddle grant generalization", () => {
   it("fails closed unless the grant ledger already exists", () => {
@@ -47,7 +48,7 @@ describe("ai_credit_grants — non-Paddle grant generalization", () => {
   });
 
   it("is idempotent per (source, grant_ref) via a partial unique index", () => {
-    expect(MIGRATION).toContain(
+    expect(NORMALIZED_MIGRATION).toContain(
       "CREATE UNIQUE INDEX ai_credit_grants_source_ref_uq\n  ON public.ai_credit_grants(source, grant_ref)\n  WHERE grant_ref IS NOT NULL AND kind = 'grant'",
     );
   });

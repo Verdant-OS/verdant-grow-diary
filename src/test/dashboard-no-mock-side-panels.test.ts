@@ -1,7 +1,7 @@
 /**
- * Dashboard must not render mock fixture rows for the Tasks KPI or
- * the AI Insights side panel. When no real data exists, the Dashboard
- * shows honest empty-state copy instead.
+ * Dashboard must not render mock fixture rows for AI Insights or promote the
+ * retired standalone Tasks surface. When no real insight data exists, the
+ * Dashboard shows honest empty-state copy instead.
  *
  * Static safety scan — read-only.
  */
@@ -36,12 +36,10 @@ describe("Dashboard — no mock side-panel data", () => {
     expect(EXEC).not.toMatch(/aiInsights/);
   });
 
-  it("shows an honest 'No tasks yet' hint when the Tasks KPI is zero", () => {
-    expect(DASH).toMatch(/No tasks yet/);
-  });
-
-  it("does not render fake task fixture rows on the Dashboard", () => {
-    // Tasks live behind the KPI count only; no list rendering of fake tasks.
+  it("does not promote or render the retired standalone Tasks surface", () => {
+    expect(DASH).not.toMatch(/label=["']Due today["']/);
+    expect(DASH).not.toMatch(/No tasks yet/);
+    expect(EXEC).not.toMatch(/const\s+tasks\b/);
     expect(EXEC).not.toMatch(/tasks\.slice\(/);
     expect(EXEC).not.toMatch(/tasks\.map\(/);
   });

@@ -33,7 +33,12 @@ function csvRow(
 
 describe("buildCsvTimelineContext", () => {
   it("links CSV reading inside ±45 min window (test 33)", () => {
-    const entry = { id: "d1", grow_id: GROW_A, tent_id: TENT_A, occurred_at: "2026-06-01T10:00:00Z" };
+    const entry = {
+      id: "d1",
+      grow_id: GROW_A,
+      tent_id: TENT_A,
+      occurred_at: "2026-06-01T10:00:00Z",
+    };
     const rows = [
       csvRow("temperature_c", 25, "2026-06-01T10:20:00Z"),
       csvRow("humidity_pct", 55, "2026-06-01T10:20:00Z"),
@@ -53,7 +58,12 @@ describe("buildCsvTimelineContext", () => {
   });
 
   it("does not link reading outside window (test 34)", () => {
-    const entry = { id: "d1", grow_id: GROW_A, tent_id: TENT_A, occurred_at: "2026-06-01T10:00:00Z" };
+    const entry = {
+      id: "d1",
+      grow_id: GROW_A,
+      tent_id: TENT_A,
+      occurred_at: "2026-06-01T10:00:00Z",
+    };
     const rows = [csvRow("temperature_c", 25, "2026-06-01T12:00:00Z")];
     const out = buildCsvTimelineContext({
       diaryEntries: [entry],
@@ -65,7 +75,12 @@ describe("buildCsvTimelineContext", () => {
   });
 
   it("does not link readings from another tent or grow (test 35)", () => {
-    const entry = { id: "d1", grow_id: GROW_A, tent_id: TENT_A, occurred_at: "2026-06-01T10:00:00Z" };
+    const entry = {
+      id: "d1",
+      grow_id: GROW_A,
+      tent_id: TENT_A,
+      occurred_at: "2026-06-01T10:00:00Z",
+    };
     const rows = [
       csvRow("temperature_c", 25, "2026-06-01T10:10:00Z", TENT_B),
       csvRow("temperature_c", 25, "2026-06-01T10:10:00Z", TENT_A, "other-grow"),
@@ -80,9 +95,21 @@ describe("buildCsvTimelineContext", () => {
   });
 
   it("only attaches CSV-source rows (never live/ecowitt)", () => {
-    const entry = { id: "d1", grow_id: GROW_A, tent_id: TENT_A, occurred_at: "2026-06-01T10:00:00Z" };
+    const entry = {
+      id: "d1",
+      grow_id: GROW_A,
+      tent_id: TENT_A,
+      occurred_at: "2026-06-01T10:00:00Z",
+    };
     const rows = [
-      { tent_id: TENT_A, source: "ecowitt", metric: "temperature_c", value: 22, captured_at: "2026-06-01T10:05:00Z", raw_payload: { grow_id: GROW_A } },
+      {
+        tent_id: TENT_A,
+        source: "ecowitt",
+        metric: "temperature_c",
+        value: 22,
+        captured_at: "2026-06-01T10:05:00Z",
+        raw_payload: { grow_id: GROW_A },
+      },
     ];
     const out = buildCsvTimelineContext({
       diaryEntries: [entry],
@@ -111,9 +138,7 @@ describe("CsvTimelineEnvironmentChip", () => {
       />,
     );
     expect(screen.getByText(CSV_SNAPSHOT_TITLE)).toBeTruthy();
-    expect(screen.getByTestId("csv-timeline-chip-source-d1").textContent).toBe(
-      CSV_SOURCE_LABEL,
-    );
+    expect(screen.getByTestId("csv-timeline-chip-source-d1").textContent).toBe(CSV_SOURCE_LABEL);
     expect(screen.getByText(/Derived VPD/)).toBeTruthy();
   });
 
@@ -136,9 +161,7 @@ describe("CsvTimelineEnvironmentChip", () => {
   });
 
   it("renders nothing when snapshot is null", () => {
-    const { container } = render(
-      <CsvTimelineEnvironmentChip diaryEntryId="d1" snapshot={null} />,
-    );
+    const { container } = render(<CsvTimelineEnvironmentChip diaryEntryId="d1" snapshot={null} />);
     expect(container.firstChild).toBeNull();
   });
 });

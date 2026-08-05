@@ -11,7 +11,7 @@
  * to the UI surface.
  */
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { Button } from "@/components/ui/button";
 import {
   isSessionSuggestionEligibleForActionQueue,
@@ -37,10 +37,8 @@ type LocalState =
   | { kind: "duplicate"; id: string }
   | { kind: "error" };
 
-const HELPER_COPY =
-  "Creates an approval-required Action Queue item for grower review.";
-const ERROR_COPY =
-  "Couldn't add this suggestion. No equipment changes were made.";
+const HELPER_COPY = "Creates an approval-required Action Queue item for grower review.";
+const ERROR_COPY = "Couldn't add this suggestion. No equipment changes were made.";
 const DEFAULT_ACTION_QUEUE_HREF = "/actions";
 
 export function AiDoctorSessionActionQueueButton({
@@ -101,8 +99,7 @@ export function AiDoctorSessionActionQueueButton({
       label = "Add to Action Queue";
   }
 
-  const linkId =
-    state.kind === "inserted" || state.kind === "duplicate" ? state.id : null;
+  const linkId = state.kind === "inserted" || state.kind === "duplicate" ? state.id : null;
 
   return (
     <div

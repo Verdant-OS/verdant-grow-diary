@@ -40,10 +40,7 @@ export interface ActionDrawerInput {
 
 export interface DrawerContextLookups {
   tentsById?: Record<string, { name?: string | null } | undefined>;
-  plantsById?: Record<
-    string,
-    { strain?: string | null; nickname?: string | null } | undefined
-  >;
+  plantsById?: Record<string, { strain?: string | null; nickname?: string | null } | undefined>;
   growsById?: Record<string, { name?: string | null } | undefined>;
 }
 
@@ -68,8 +65,7 @@ export interface ActionDrawerViewModel {
 export const ACTION_DRAWER_SAFETY_REMINDER =
   "Verdant suggests. Grower approves. No equipment is controlled from this action.";
 
-export const ACTION_DRAWER_NO_CONTEXT_HELP =
-  "No related diary context found yet.";
+export const ACTION_DRAWER_NO_CONTEXT_HELP = "No related diary context found yet.";
 
 function tentLabelFor(
   tent_id: string | null | undefined,
@@ -108,9 +104,7 @@ export function buildActionDrawerViewModel(
   lookups: DrawerContextLookups = {},
 ): ActionDrawerViewModel {
   const recommendationText = sanitizeActionCopy(row.suggested_change ?? "");
-  const reasonText = sanitizeActionCopy(
-    stripBackPointerTokens(row.reason ?? ""),
-  );
+  const reasonText = sanitizeActionCopy(stripBackPointerTokens(row.reason ?? ""));
   const titleLabel = recommendationText || formatActionTypeLabel(row.action_type);
   const growLabel = growLabelFor(row.grow_id, lookups);
   const tentLabel = tentLabelFor(row.tent_id, lookups);

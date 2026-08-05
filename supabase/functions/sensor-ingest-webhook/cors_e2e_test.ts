@@ -175,6 +175,50 @@ Deno.test("disallowed origin — OPTIONS still CORS-tagged with canonical origin
   assertEquals(res.headers.get("Access-Control-Allow-Origin"), ORIGIN);
 });
 
+// Regression: Lovable's live EDITOR preview iframe (id-preview--<project
+// uuid>.lovable.app) is a different host than the published
+// verdantgrowdiary-com.lovable.app site and was previously absent from
+// ALLOWED_ORIGINS, so preflight (and therefore the real POST) failed
+// browser-side as an opaque "Failed to fetch" / status 0, with no
+// distinguishing signal on either side. This must echo the PREVIEW origin
+// itself, not the canonical fallback — the prior test proves the fallback
+// path; this one proves the allow-list actually contains this origin.
+const LOVABLE_PREVIEW_ORIGIN =
+  "https://id-preview--66255e7b-892c-4be5-8686-ab1cfc3666db.lovable.app";
+
+Deno.test(
+  "Lovable editor preview origin — OPTIONS is allowed, not the canonical fallback",
+  async () => {
+    const req = new Request(ENDPOINT, {
+      method: "OPTIONS",
+      headers: {
+        origin: LOVABLE_PREVIEW_ORIGIN,
+        "access-control-request-method": "POST",
+        "access-control-request-headers": "authorization, content-type, x-verdant-bridge-token",
+      },
+    });
+    const res = await handleRequest(req);
+    assertEquals(res.status, 204);
+    assertEquals(res.headers.get("Access-Control-Allow-Origin"), LOVABLE_PREVIEW_ORIGIN);
+    assertEquals(res.headers.get("Vary"), "Origin");
+  },
+);
+
+Deno.test(
+  "Lovable editor preview origin — every POST error path stays CORS-tagged to that origin",
+  async () => {
+    const req = new Request(ENDPOINT, {
+      method: "POST",
+      headers: { origin: LOVABLE_PREVIEW_ORIGIN, "content-type": "application/json" },
+      body: JSON.stringify({ tent_id: "t" }),
+    });
+    const res = await handleRequest(req);
+    assertEquals(res.status, 401);
+    assertEquals(res.headers.get("Access-Control-Allow-Origin"), LOVABLE_PREVIEW_ORIGIN);
+    assertStringIncludes(await res.text(), "unauthorized");
+  },
+);
+
 Deno.test({
   name: "idempotency-key — duplicate requests both return CORS + no token leak",
   sanitizeOps: false,

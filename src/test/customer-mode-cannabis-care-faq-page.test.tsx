@@ -12,8 +12,9 @@
  */
 import { describe, it, expect, afterEach } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import CustomerModeCannabisCareFaq from "@/pages/CustomerModeCannabisCareFaq";
+import { CANNABIS_PLANT_CARE_FAQ } from "@/constants/cannabisPlantCareFaq";
 
 function renderAt(path: string) {
   return render(
@@ -51,10 +52,17 @@ describe("CustomerModeCannabisCareFaq", () => {
     );
   });
 
-  it("renders all 5 cannabis plant care FAQ questions", () => {
+  it("renders every cannabis plant care FAQ question from the shared constant", () => {
     renderAt("/customer/share-abc/cannabis-care");
     const questions = screen.getAllByTestId("customer-mode-cannabis-care-faq-item");
-    expect(questions.length).toBe(5);
+    // Derived from the constant rather than hardcoded, so appending a question
+    // (e.g. the nutrient cluster) does not require touching this assertion —
+    // while still proving the page renders ALL of them, none dropped.
+    expect(questions.length).toBe(CANNABIS_PLANT_CARE_FAQ.length);
+    for (const { question } of CANNABIS_PLANT_CARE_FAQ) {
+      expect(screen.getByText(question), question).toBeInTheDocument();
+    }
+    // The original five stay explicitly named as a regression anchor.
     expect(screen.getByText("How often should I water a cannabis plant?")).toBeInTheDocument();
     expect(screen.getByText("What nutrients should I give my cannabis plant?")).toBeInTheDocument();
     expect(screen.getByText("Why are my cannabis leaves turning yellow?")).toBeInTheDocument();

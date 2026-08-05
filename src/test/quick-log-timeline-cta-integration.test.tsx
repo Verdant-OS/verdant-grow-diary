@@ -1,11 +1,10 @@
 /**
- * QuickLogV2Sheet — "View in Timeline" CTA integration coverage.
+ * QuickLogV2Sheet — "View diary" CTA integration coverage.
  *
  * Verifies that the success toast on every Quick Log success path
- * exposes the exact CTA label, that clicking it invokes navigation
- * via the shared helper without re-triggering save, and that the
- * deterministic href is honored for both same-page and cross-page
- * scenarios.
+ * exposes the exact CTA label, that clicking it navigates to the
+ * grow-scoped global Timeline (not Plant/Tent Detail), that feed
+ * retains the verified grow, and that the CTA never re-triggers save.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
@@ -31,9 +30,7 @@ vi.mock("@/integrations/supabase/client", () => ({
 
 vi.mock("@/hooks/use-plants", () => ({
   usePlants: () => ({
-    data: [
-      { id: "plant-1", name: "Plant 1", tent_id: "tent-1", grow_id: "grow-1" },
-    ],
+    data: [{ id: "plant-1", name: "Plant 1", tent_id: "tent-1", grow_id: "grow-1" }],
   }),
 }));
 vi.mock("@/hooks/use-tents", () => ({
@@ -47,6 +44,14 @@ vi.mock("@/hooks/useRecentFeedingsForDefaults", () => ({
 vi.mock("@/store/auth", () => ({
   useAuth: () => ({ user: { id: "user-1" } }),
 }));
+vi.mock("@/store/grows", () => ({
+  useGrows: () => ({
+    grows: [{ id: "grow-1", name: "Grow One", stage: "veg" }],
+    activeGrow: { id: "grow-1", name: "Grow One", stage: "veg" },
+    activeGrowId: "grow-1",
+    setActiveGrowId: vi.fn(),
+  }),
+}));
 
 const toastSuccess = vi.fn();
 const toastError = vi.fn();
@@ -59,9 +64,9 @@ vi.mock("sonner", () => ({
 
 const navigateMock = vi.fn();
 const useNavigateMock = vi.fn(() => navigateMock);
-vi.mock("react-router-dom", async () => {
-  const actual = await vi.importActual<typeof import("react-router-dom")>(
-    "react-router-dom",
+vi.mock("@/lib/react-router-compat", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/react-router-compat")>(
+    "@/lib/react-router-compat",
   );
   return {
     ...actual,
@@ -93,8 +98,7 @@ function getToastAction(): {
   onClick: () => void;
 } {
   const [message, opts] = toastSuccess.mock.calls.at(-1) ?? [];
-  const action = (opts as { action?: { label: string; onClick: () => void } })
-    ?.action;
+  const action = (opts as { action?: { label: string; onClick: () => void } })?.action;
   if (!action) throw new Error("toast.success called without action");
   return { message: String(message), label: action.label, onClick: action.onClick };
 }
@@ -117,8 +121,8 @@ beforeEach(() => {
   insertMock.mockClear();
   document.body.innerHTML = "";
   // jsdom doesn't implement URL.createObjectURL; stub for photo preview.
-  (URL as unknown as { createObjectURL: (f: unknown) => string }).createObjectURL =
-    () => "blob:mock";
+  (URL as unknown as { createObjectURL: (f: unknown) => string }).createObjectURL = () =>
+    "blob:mock";
   // Default to a non-matching pathname so default behavior is cross-page.
   Object.defineProperty(window, "location", {
     writable: true,
@@ -127,7 +131,7 @@ beforeEach(() => {
 });
 
 describe("Quick Log → Timeline CTA (standard save)", () => {
-  it("exposes 'View in Timeline' with deterministic plant href (cross-page)", async () => {
+  it("exposes 'View diary' with grow-scoped Timeline href (not Plant Detail)", async () => {
     rpcMock.mockResolvedValue({
       data: { ok: true, grow_event_id: "ge-42", environment_event_id: null },
       error: null,
@@ -144,13 +148,15 @@ describe("Quick Log → Timeline CTA (standard save)", () => {
     const rpcBefore = rpcMock.mock.calls.length;
     action.onClick();
     expect(navigateMock).toHaveBeenCalledWith(
-      "/plants/plant-1#timeline-entry-ge-42",
+      "/timeline?growId=grow-1&plantId=plant-1&tentId=tent-1#timeline-entry-ge-42",
     );
+    // Must not route to Plant Detail.
+    expect(navigateMock.mock.calls[0][0]).not.toMatch(/^\/plants\//);
     // CTA must not trigger any extra RPC / save.
     expect(rpcMock.mock.calls.length).toBe(rpcBefore);
   });
 
-  it("falls back to #timeline section when growEventId is absent", async () => {
+  it("tent target routes to grow-scoped Timeline without plantId", async () => {
     rpcMock.mockResolvedValue({
       data: { ok: true, grow_event_id: null, environment_event_id: null },
       error: null,
@@ -162,77 +168,36 @@ describe("Quick Log → Timeline CTA (standard save)", () => {
 
     const action = getToastAction();
     action.onClick();
-    expect(navigateMock).toHaveBeenCalledWith("/tents/tent-1#timeline");
+    expect(navigateMock).toHaveBeenCalledWith("/timeline?growId=grow-1&tentId=tent-1");
+    expect(navigateMock.mock.calls[0][0]).not.toMatch(/^\/tents\//);
+    expect(navigateMock.mock.calls[0][0]).not.toContain("#");
   });
 
-  it("same-page click smooth-scrolls to the entry without navigating", async () => {
+  it("post-save panel View diary CTA uses the same grow-scoped route", async () => {
     rpcMock.mockResolvedValue({
-      data: { ok: true, grow_event_id: "ge-7", environment_event_id: null },
+      data: { ok: true, grow_event_id: "ge-panel", environment_event_id: null },
       error: null,
     });
-    Object.defineProperty(window, "location", {
-      writable: true,
-      value: { pathname: "/plants/plant-1", hash: "", assign: vi.fn() },
-    });
-
-    const el = document.createElement("div");
-    el.id = "timeline-entry-ge-7";
-    const scrollSpy = vi.fn();
-    (el as unknown as { scrollIntoView: typeof scrollSpy }).scrollIntoView =
-      scrollSpy;
-    document.body.appendChild(el);
-
     renderSheet("plant:plant-1");
     clickNote();
     clickSave();
-    await waitFor(() => expect(toastSuccess).toHaveBeenCalled());
+    await waitFor(() => screen.getByTestId("qlv2-post-save"));
+
+    const viewBtn = screen.getByTestId("quick-log-post-save-view");
+    expect(viewBtn).not.toBeDisabled();
+    expect(viewBtn.textContent).toMatch(/View diary/i);
 
     const rpcBefore = rpcMock.mock.calls.length;
-    getToastAction().onClick();
-    expect(scrollSpy).toHaveBeenCalledTimes(1);
-    expect(navigateMock).not.toHaveBeenCalled();
+    fireEvent.click(viewBtn);
+    expect(navigateMock).toHaveBeenCalledWith(
+      "/timeline?growId=grow-1&plantId=plant-1&tentId=tent-1#timeline-entry-ge-panel",
+    );
     expect(rpcMock.mock.calls.length).toBe(rpcBefore);
-  });
-
-  it("same-page click falls back to #timeline section when entry absent", async () => {
-    rpcMock.mockResolvedValue({
-      data: { ok: true, grow_event_id: "ge-missing", environment_event_id: null },
-      error: null,
-    });
-    Object.defineProperty(window, "location", {
-      writable: true,
-      value: { pathname: "/plants/plant-1", hash: "", assign: vi.fn() },
-    });
-
-    const section = document.createElement("div");
-    section.id = "timeline";
-    const scrollSpy = vi.fn();
-    (section as unknown as { scrollIntoView: typeof scrollSpy }).scrollIntoView =
-      scrollSpy;
-    document.body.appendChild(section);
-
-    renderSheet("plant:plant-1");
-    clickNote();
-    clickSave();
-    await waitFor(() => expect(toastSuccess).toHaveBeenCalled());
-
-    // Manually drop the entry id from the toast action by simulating a
-    // navigation target with the section anchor: the production code
-    // path uses entry-id; we instead verify the same-page fallback path
-    // by retargeting the existing anchor element to the section id only.
-    // The CTA scrolls to `timeline-entry-ge-missing`, which doesn't
-    // exist; after the retry window fires it sets location.hash.
-    vi.useFakeTimers();
-    getToastAction().onClick();
-    vi.advanceTimersByTime(150);
-    vi.useRealTimers();
-
-    expect(navigateMock).not.toHaveBeenCalled();
   });
 });
 
 describe("Quick Log → Timeline CTA (photo success)", () => {
-  it("'Log and photo saved' exposes the same CTA", async () => {
+  it("'Log and photo saved' exposes the same grow-scoped CTA", async () => {
     rpcMock.mockResolvedValue({
       data: { ok: true, grow_event_id: "ge-photo", environment_event_id: null },
       error: null,
@@ -243,19 +208,14 @@ describe("Quick Log → Timeline CTA (photo success)", () => {
     clickNote();
 
     // Inject a photo file through the hidden library input.
-    const libInput = screen.getByTestId(
-      "qlv2-photo-library-input",
-    ) as HTMLInputElement;
+    const libInput = screen.getByTestId("qlv2-photo-library-input") as HTMLInputElement;
     const file = new File(["x"], "x.jpg", { type: "image/jpeg" });
     Object.defineProperty(libInput, "files", { value: [file] });
     fireEvent.change(libInput);
 
     clickSave();
     await waitFor(() =>
-      expect(toastSuccess).toHaveBeenCalledWith(
-        "Log and photo saved",
-        expect.anything(),
-      ),
+      expect(toastSuccess).toHaveBeenCalledWith("Log and photo saved", expect.anything()),
     );
 
     const action = getToastAction();
@@ -264,7 +224,7 @@ describe("Quick Log → Timeline CTA (photo success)", () => {
     const rpcBefore = rpcMock.mock.calls.length;
     action.onClick();
     expect(navigateMock).toHaveBeenCalledWith(
-      "/plants/plant-1#timeline-entry-ge-photo",
+      "/timeline?growId=grow-1&plantId=plant-1&tentId=tent-1#timeline-entry-ge-photo",
     );
     expect(rpcMock.mock.calls.length).toBe(rpcBefore);
   });

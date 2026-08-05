@@ -14,10 +14,7 @@ const wf = fs.readFileSync(path.join(ROOT, WF_PATH), "utf8");
 const spec = fs.readFileSync(path.join(ROOT, SPEC_PATH), "utf8");
 const redirectSpec = fs.readFileSync(path.join(ROOT, REDIRECT_SPEC_PATH), "utf8");
 const desktopSpec = fs.readFileSync(path.join(ROOT, DESKTOP_SPEC_PATH), "utf8");
-const routeProtectionSpec = fs.readFileSync(
-  path.join(ROOT, ROUTE_PROTECTION_SPEC_PATH),
-  "utf8",
-);
+const routeProtectionSpec = fs.readFileSync(path.join(ROOT, ROUTE_PROTECTION_SPEC_PATH), "utf8");
 const routeProtectionMobileSpec = fs.readFileSync(
   path.join(ROOT, ROUTE_PROTECTION_MOBILE_SPEC_PATH),
   "utf8",
@@ -71,7 +68,9 @@ describe("Auth loading smoke spec — safety", () => {
     expect(spec).toMatch(/page\.route\(\s*\/\\\/auth\\\/v1\\\//);
   });
   it("does not import real credentials or use process.env auth secrets", () => {
-    expect(spec).not.toMatch(/process\.env\.(E2E_TEST_PASSWORD|E2E_TEST_EMAIL|SUPABASE_SERVICE_ROLE)/);
+    expect(spec).not.toMatch(
+      /process\.env\.(E2E_TEST_PASSWORD|E2E_TEST_EMAIL|SUPABASE_SERVICE_ROLE)/,
+    );
     expect(spec).not.toMatch(/service_role/i);
   });
   it("uses a .invalid email so accidental real submissions cannot resolve DNS", () => {
@@ -136,9 +135,7 @@ describe("Auth route-protection spec — safety", () => {
     expect(routeProtectionSpec).toMatch(/page\.route\(\s*\/\\\/rest\\\/v1\\\//);
   });
   it("uses 1280x800 desktop viewport", () => {
-    expect(routeProtectionSpec).toMatch(
-      /viewport:\s*\{\s*width:\s*1280,\s*height:\s*800\s*\}/,
-    );
+    expect(routeProtectionSpec).toMatch(/viewport:\s*\{\s*width:\s*1280,\s*height:\s*800\s*\}/);
   });
   it("uses .invalid email + no real secrets/service_role", () => {
     expect(routeProtectionSpec).toMatch(/@example\.invalid/);
@@ -168,7 +165,9 @@ describe("Auth route-protection spec — safety", () => {
 
 describe("Auth route-protection MOBILE spec — safety", () => {
   it("uses 390x844 mobile viewport with isMobile + hasTouch", () => {
-    expect(routeProtectionMobileSpec).toMatch(/viewport:\s*\{\s*width:\s*390,\s*height:\s*844\s*\}/);
+    expect(routeProtectionMobileSpec).toMatch(
+      /viewport:\s*\{\s*width:\s*390,\s*height:\s*844\s*\}/,
+    );
     expect(routeProtectionMobileSpec).toMatch(/isMobile:\s*true/);
     expect(routeProtectionMobileSpec).toMatch(/hasTouch:\s*true/);
   });

@@ -1,21 +1,22 @@
 /**
  * _shared/unionEntitlementLookup.ts — server-side entitlement helper.
  *
- * Reads ONLY from public.subscriptions (the canonical Lovable Paddle lane).
- * The legacy BYO branch (public.billing_subscriptions) was retired in the
- * 2026-07-16 canonical-lane reconciliation slice; the DB-side gates
- * has_pheno_tracker_entitlement and ai_credit_spend were narrowed in the
- * same migration. Any currently-entitling BYO row was backfilled into
- * public.subscriptions in that migration, so no live entitlement was lost.
+ * Both `loadUnionEntitlement` and the security-sensitive
+ * `loadUnionEntitlementForUser` resolve access only from canonical
+ * public.subscriptions. The latter adds an explicit server-resolved user_id
+ * filter for trusted service clients. Legacy public.billing_subscriptions is
+ * an operator-audit surface and is never an entitlement authority.
  *
- * The export names ("loadUnionEntitlement", "resolveUnionEntitlements",
- * pickStrongestBilling) are retained for call-site stability — they still
- * accept a nullable byoRow so the pure resolver contract is unchanged, but
- * this helper always passes `byoRow: null`.
+ * The shared pure resolver deterministically selects canonical rows without
+ * trusting a client-supplied plan or capability claim.
  *
  * SAFETY:
- *  - Reads only. RLS-protected select-own via the caller's JWT client.
- *  - Never uses service_role.
+ *  - Reads only.
+ *  - `loadUnionEntitlement` relies on select-own RLS via a caller-JWT client.
+ *  - `loadUnionEntitlementForUser` adds an explicit user_id predicate for
+ *    trusted server clients (for example a bridge-token boundary that has
+ *    already resolved the owner). Never use a service client with the
+ *    unscoped helper.
  *  - `expectedBillingEnvironment` is resolved server-side; it is NOT trusted
  *    from request input or inferred from provider fields on the row.
  *  - Environment rule (matches the DB gates): an entitling environment='live'
@@ -30,7 +31,6 @@ import {
   lovableRowEntitles,
   SUBSCRIPTION_ROW_SCAN_LIMIT,
 } from "./lib/lib/entitlements/unionEntitlements.ts";
-import type { BillingSubscriptionRow } from "./lib/lib/entitlements/types.ts";
 import type {
   LovableBillingEnvironment,
   LovableSubscriptionRow,
@@ -118,11 +118,19 @@ const SUBSCRIPTION_COLUMNS =
 // (window rationale documented there). created_at is not unique;
 // paddle_subscription_id is — without the tiebreak, equal timestamps make
 // the window order (and therefore the picked row) nondeterministic.
-function newestSubscriptionRows(supabase: any, environment: LovableBillingEnvironment) {
-  return supabase
+function newestSubscriptionRows(
+  supabase: any,
+  environment: LovableBillingEnvironment,
+  userId: string | null,
+) {
+  let query = supabase
     .from("subscriptions")
     .select(SUBSCRIPTION_COLUMNS)
-    .eq("environment", environment)
+    .eq("environment", environment);
+  if (userId !== null) {
+    query = query.eq("user_id", userId);
+  }
+  return query
     .order("created_at", { ascending: false })
     .order("paddle_subscription_id", { ascending: false })
     .limit(SUBSCRIPTION_ROW_SCAN_LIMIT);
@@ -133,10 +141,11 @@ function rowsOrEmpty(res: { error: unknown; data?: unknown[] | null }): LovableS
   return (res.data ?? []) as LovableSubscriptionRow[];
 }
 
-export async function loadUnionEntitlement(
+async function loadUnionEntitlementScoped(
   supabase: any,
   expectedBillingEnvironment: LovableBillingEnvironment,
   now: Date,
+  userId: string | null,
 ): Promise<{ entitlement: ResolvedEntitlement; lookupFailed: boolean }> {
   // Canonical lane (2026-07-16): read only from public.subscriptions.
   // A live-environment row is written ONLY by the service-role webhook for a
@@ -145,13 +154,13 @@ export async function loadUnionEntitlement(
   // when the server explicitly expects sandbox.
   const wantsSandbox = expectedBillingEnvironment === "sandbox";
   const [lovableLiveRes, lovableSandboxRes] = await Promise.all([
-    newestSubscriptionRows(supabase, "live"),
+    newestSubscriptionRows(supabase, "live", userId),
     wantsSandbox
-      ? newestSubscriptionRows(supabase, "sandbox")
+      ? newestSubscriptionRows(supabase, "sandbox", userId)
       : Promise.resolve({ data: [], error: null }),
   ]);
 
-  const byoRow: BillingSubscriptionRow | null = null;
+  const byoRow = null;
   const liveRow = pickEntitlingLovableRow(rowsOrEmpty(lovableLiveRes), "live", now);
   const liveRowEntitles = liveRow != null && lovableRowEntitles(liveRow, "live", now);
 
@@ -174,8 +183,7 @@ export async function loadUnionEntitlement(
   const sandboxRow = wantsSandbox
     ? pickEntitlingLovableRow(rowsOrEmpty(lovableSandboxRes), "sandbox", now)
     : null;
-  const sandboxRowEntitles =
-    sandboxRow != null && lovableRowEntitles(sandboxRow, "sandbox", now);
+  const sandboxRowEntitles = sandboxRow != null && lovableRowEntitles(sandboxRow, "sandbox", now);
 
   if (wantsSandbox && sandboxRowEntitles) {
     return {
@@ -203,4 +211,44 @@ export async function loadUnionEntitlement(
       now,
     }),
   };
+}
+
+/**
+ * Load the caller's entitlement through select-own RLS. The supplied client
+ * must carry the caller's verified JWT; never pass a service-role client.
+ */
+export function loadUnionEntitlement(
+  supabase: any,
+  expectedBillingEnvironment: LovableBillingEnvironment,
+  now: Date,
+): Promise<{ entitlement: ResolvedEntitlement; lookupFailed: boolean }> {
+  return loadUnionEntitlementScoped(supabase, expectedBillingEnvironment, now, null);
+}
+
+/**
+ * Load one server-resolved user's entitlement with an explicit owner filter.
+ *
+ * This is the only safe variant for trusted service clients. `userId` must
+ * come from a verified server-side authority (for example auth.getClaims or
+ * an authenticated bridge-token row), never from request JSON.
+ */
+export async function loadUnionEntitlementForUser(
+  supabase: any,
+  userId: string,
+  expectedBillingEnvironment: LovableBillingEnvironment,
+  now: Date,
+): Promise<{ entitlement: ResolvedEntitlement; lookupFailed: boolean }> {
+  if (typeof userId !== "string" || userId.trim() === "") {
+    return {
+      lookupFailed: true,
+      entitlement: resolveUnionEntitlements({
+        byoRow: null,
+        lovableRow: null,
+        expectedBillingEnvironment,
+        now,
+      }),
+    };
+  }
+
+  return loadUnionEntitlementScoped(supabase, expectedBillingEnvironment, now, userId);
 }

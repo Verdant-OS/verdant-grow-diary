@@ -9,7 +9,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import RepresentativeCsvPreview from "@/pages/RepresentativeCsvPreview";
-import { clearLocalStorageForTest, setLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
+import {
+  clearLocalStorageForTest,
+  setLocalStorageItemForTest,
+} from "./helpers/localStorageTestHelper";
 
 const CSV_TEXT = "Timestamp,Air_F,RH,EC\n2024-01-01 12:00:00,25,60,1.5";
 
@@ -63,9 +66,7 @@ describe("csv mapping preset UI", () => {
     seedPreset();
     render(<RepresentativeCsvPreview />);
 
-    const fileInput = screen.getByLabelText(
-      "Choose representative CSV sample file",
-    );
+    const fileInput = screen.getByLabelText("Choose representative CSV sample file");
 
     // Mock File.prototype.text so jsdom can resolve it instantly
     const originalText = File.prototype.text;
@@ -76,9 +77,7 @@ describe("csv mapping preset UI", () => {
 
     await waitFor(
       () => {
-        expect(
-          screen.getByText(/Saved preset available — apply\?/),
-        ).toBeInTheDocument();
+        expect(screen.getByText(/Saved preset available — apply\?/)).toBeInTheDocument();
       },
       { timeout: 3000 },
     );
@@ -90,9 +89,7 @@ describe("csv mapping preset UI", () => {
     seedPreset();
     render(<RepresentativeCsvPreview />);
 
-    const fileInput = screen.getByLabelText(
-      "Choose representative CSV sample file",
-    );
+    const fileInput = screen.getByLabelText("Choose representative CSV sample file");
 
     const originalText = File.prototype.text;
     File.prototype.text = vi.fn().mockResolvedValue(CSV_TEXT);
@@ -102,9 +99,7 @@ describe("csv mapping preset UI", () => {
 
     await waitFor(
       () => {
-        expect(
-          screen.getByRole("button", { name: /Apply saved preset/i }),
-        ).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: /Apply saved preset/i })).toBeInTheDocument();
       },
       { timeout: 3000 },
     );
@@ -116,9 +111,7 @@ describe("csv mapping preset UI", () => {
     seedPreset();
     render(<RepresentativeCsvPreview />);
 
-    const fileInput = screen.getByLabelText(
-      "Choose representative CSV sample file",
-    );
+    const fileInput = screen.getByLabelText("Choose representative CSV sample file");
 
     const originalText = File.prototype.text;
     File.prototype.text = vi.fn().mockResolvedValue(CSV_TEXT);
@@ -128,9 +121,7 @@ describe("csv mapping preset UI", () => {
 
     await waitFor(
       () => {
-        expect(
-          screen.getByRole("button", { name: /Apply saved preset/i }),
-        ).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: /Apply saved preset/i })).toBeInTheDocument();
       },
       { timeout: 3000 },
     );

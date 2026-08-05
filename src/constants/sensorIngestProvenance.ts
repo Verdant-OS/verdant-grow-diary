@@ -34,8 +34,7 @@ export const SENSOR_PROVENANCE_TRANSPORTS = [
   "local_bridge",
 ] as const;
 
-export type SensorProvenanceTransport =
-  (typeof SENSOR_PROVENANCE_TRANSPORTS)[number];
+export type SensorProvenanceTransport = (typeof SENSOR_PROVENANCE_TRANSPORTS)[number];
 
 export const SENSOR_PROVENANCE_APPS = [
   "spider_farmer_ggs",
@@ -70,8 +69,7 @@ export const NON_CANONICAL_SOURCE_ALIASES = [
   "unknown",
 ] as const;
 
-export type NonCanonicalSourceAlias =
-  (typeof NON_CANONICAL_SOURCE_ALIASES)[number];
+export type NonCanonicalSourceAlias = (typeof NON_CANONICAL_SOURCE_ALIASES)[number];
 
 export interface SensorIngestProvenanceExample {
   source: CanonicalSensorSource;
@@ -121,21 +119,16 @@ export const SENSOR_PROVENANCE_EXAMPLES: readonly SensorIngestProvenanceExample[
 
 const CANONICAL_SET = new Set<string>(CANONICAL_SENSOR_SOURCES);
 
-export function isCanonicalSensorSource(
-  value: unknown,
-): value is CanonicalSensorSource {
+export function isCanonicalSensorSource(value: unknown): value is CanonicalSensorSource {
   return typeof value === "string" && CANONICAL_SET.has(value);
 }
 
-export function assertCanonicalSensorSource(
-  value: unknown,
-): CanonicalSensorSource | null {
+export function assertCanonicalSensorSource(value: unknown): CanonicalSensorSource | null {
   return isCanonicalSensorSource(value) ? value : null;
 }
 
 export function isNonCanonicalSourceAlias(value: unknown): boolean {
   return (
-    typeof value === "string" &&
-    (NON_CANONICAL_SOURCE_ALIASES as readonly string[]).includes(value)
+    typeof value === "string" && (NON_CANONICAL_SOURCE_ALIASES as readonly string[]).includes(value)
   );
 }

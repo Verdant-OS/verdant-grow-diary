@@ -15,8 +15,27 @@ import { geneticsTraceabilityDb } from "@/integrations/supabase/geneticsTraceabi
 import type { Json } from "@/integrations/supabase/types";
 
 export type MutationResult<T = Record<string, unknown>> =
-  | { ok: true; data: T; reused: boolean }
-  | { ok: false; error: string };
+  { ok: true; data: T; reused: boolean } | { ok: false; error: string };
+
+export type GeneticsReadErrorCode = "authentication_failed" | "read_failed" | "unexpected_response";
+
+export type GeneticsReadResult<T> =
+  { ok: true; data: T } | { ok: false; error: GeneticsReadErrorCode };
+
+export class GeneticsReadError extends Error {
+  readonly code: GeneticsReadErrorCode;
+
+  constructor(code: GeneticsReadErrorCode) {
+    super("Genetics data could not be loaded.");
+    this.name = "GeneticsReadError";
+    this.code = code;
+  }
+}
+
+export function unwrapGeneticsReadResult<T>(result: GeneticsReadResult<T>): T {
+  if (result.ok === false) throw new GeneticsReadError(result.error);
+  return result.data;
+}
 
 function newIdempotencyKey(): string {
   // 32-hex chars — comfortably within the server's 8..200 bound.
@@ -24,9 +43,16 @@ function newIdempotencyKey(): string {
 }
 export { newIdempotencyKey };
 
-async function currentUserId(): Promise<string | null> {
-  const { data } = await supabase.auth.getUser();
-  return data.user?.id ?? null;
+async function currentUserId(): Promise<GeneticsReadResult<string>> {
+  try {
+    const { data, error } = await supabase.auth.getUser();
+    if (error) return { ok: false, error: "authentication_failed" };
+    const userId = data.user?.id;
+    if (!userId) return { ok: false, error: "authentication_failed" };
+    return { ok: true, data: userId };
+  } catch {
+    return { ok: false, error: "authentication_failed" };
+  }
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -99,119 +125,159 @@ export interface QuarantineEpisodeDto {
 // ---------------------------------------------------------------------------
 // Reads
 // ---------------------------------------------------------------------------
-export async function listAccessions(includeArchived = false): Promise<AccessionDto[]> {
-  const uid = await currentUserId();
-  if (!uid) return [];
-  let q = geneticsTraceabilityDb
-    .from("genetics_accessions")
-    .select(
-      "id, source_kind, source_party, cultivar_name, line_name, generation, acquisition_date, known_state, archived_at",
-    )
-    .eq("user_id", uid)
-    .order("created_at", { ascending: false })
-    .limit(2000);
-  if (!includeArchived) q = q.is("archived_at", null);
-  const { data, error } = await q;
-  if (error || !data) return [];
-  return data.map((r) => ({
-    id: r.id,
-    sourceKind: r.source_kind,
-    sourceParty: r.source_party ?? null,
-    cultivarName: r.cultivar_name ?? null,
-    lineName: r.line_name ?? null,
-    generation: r.generation ?? null,
-    acquisitionDate: r.acquisition_date ?? null,
-    knownState: r.known_state,
-    archivedAt: r.archived_at ?? null,
-  }));
+export async function listAccessions(
+  includeArchived = false,
+): Promise<GeneticsReadResult<AccessionDto[]>> {
+  const owner = await currentUserId();
+  if (owner.ok === false) return owner;
+
+  try {
+    let q = geneticsTraceabilityDb
+      .from("genetics_accessions")
+      .select(
+        "id, source_kind, source_party, cultivar_name, line_name, generation, acquisition_date, known_state, archived_at",
+      )
+      .eq("user_id", owner.data)
+      .order("created_at", { ascending: false })
+      .limit(2000);
+    if (!includeArchived) q = q.is("archived_at", null);
+    const { data, error } = await q;
+    if (error) return { ok: false, error: "read_failed" };
+    if (!data) return { ok: false, error: "unexpected_response" };
+    return {
+      ok: true,
+      data: data.map((r) => ({
+        id: r.id,
+        sourceKind: r.source_kind,
+        sourceParty: r.source_party ?? null,
+        cultivarName: r.cultivar_name ?? null,
+        lineName: r.line_name ?? null,
+        generation: r.generation ?? null,
+        acquisitionDate: r.acquisition_date ?? null,
+        knownState: r.known_state,
+        archivedAt: r.archived_at ?? null,
+      })),
+    };
+  } catch {
+    return { ok: false, error: "read_failed" };
+  }
 }
 
-export async function listBatches(): Promise<BatchDto[]> {
-  const uid = await currentUserId();
-  if (!uid) return [];
-  const { data, error } = await geneticsTraceabilityDb
-    .from("propagation_batches")
-    .select(
-      "id, batch_code, name, propagation_method, source_accession_id, mother_plant_id, origin_unknown, initial_quantity, viable_quantity, counts_unknown, status",
-    )
-    .eq("user_id", uid)
-    .order("created_at", { ascending: false })
-    .limit(2000);
-  if (error || !data) return [];
-  return data.map((r) => ({
-    id: r.id,
-    batchCode: r.batch_code,
-    name: r.name ?? null,
-    propagationMethod: r.propagation_method,
-    sourceAccessionId: r.source_accession_id ?? null,
-    motherPlantId: r.mother_plant_id ?? null,
-    originUnknown: r.origin_unknown === true,
-    initialQuantity: r.initial_quantity ?? null,
-    viableQuantity: r.viable_quantity ?? null,
-    countsUnknown: r.counts_unknown === true,
-    status: r.status,
-  }));
+export async function listBatches(): Promise<GeneticsReadResult<BatchDto[]>> {
+  const owner = await currentUserId();
+  if (owner.ok === false) return owner;
+
+  try {
+    const { data, error } = await geneticsTraceabilityDb
+      .from("propagation_batches")
+      .select(
+        "id, batch_code, name, propagation_method, source_accession_id, mother_plant_id, origin_unknown, initial_quantity, viable_quantity, counts_unknown, status",
+      )
+      .eq("user_id", owner.data)
+      .order("created_at", { ascending: false })
+      .limit(2000);
+    if (error) return { ok: false, error: "read_failed" };
+    if (!data) return { ok: false, error: "unexpected_response" };
+    return {
+      ok: true,
+      data: data.map((r) => ({
+        id: r.id,
+        batchCode: r.batch_code,
+        name: r.name ?? null,
+        propagationMethod: r.propagation_method,
+        sourceAccessionId: r.source_accession_id ?? null,
+        motherPlantId: r.mother_plant_id ?? null,
+        originUnknown: r.origin_unknown === true,
+        initialQuantity: r.initial_quantity ?? null,
+        viableQuantity: r.viable_quantity ?? null,
+        countsUnknown: r.counts_unknown === true,
+        status: r.status,
+      })),
+    };
+  } catch {
+    return { ok: false, error: "read_failed" };
+  }
 }
 
 export async function listScreeningForSubject(
   subjectType: string,
   subjectId: string,
-): Promise<ScreeningDto[]> {
-  const uid = await currentUserId();
-  if (!uid || !subjectId) return [];
-  const { data, error } = await geneticsTraceabilityDb
-    .from("genetics_screening_results")
-    .select(
-      "id, subject_type, subject_id, target, result, laboratory, collected_date, result_date, supersedes_id, recorded_at",
-    )
-    .eq("user_id", uid)
-    .eq("subject_type", subjectType)
-    .eq("subject_id", subjectId)
-    .order("collected_date", { ascending: false })
-    .limit(1000);
-  if (error || !data) return [];
-  return data.map((r) => ({
-    id: r.id,
-    subjectType: r.subject_type,
-    subjectId: r.subject_id,
-    target: r.target,
-    result: r.result,
-    laboratory: r.laboratory ?? null,
-    collectedDate: r.collected_date ?? null,
-    resultDate: r.result_date ?? null,
-    supersedesId: r.supersedes_id ?? null,
-    recordedAt: r.recorded_at,
-  }));
+): Promise<GeneticsReadResult<ScreeningDto[]>> {
+  const owner = await currentUserId();
+  if (owner.ok === false) return owner;
+  if (!subjectId) return { ok: true, data: [] };
+
+  try {
+    const { data, error } = await geneticsTraceabilityDb
+      .from("genetics_screening_results")
+      .select(
+        "id, subject_type, subject_id, target, result, laboratory, collected_date, result_date, supersedes_id, recorded_at",
+      )
+      .eq("user_id", owner.data)
+      .eq("subject_type", subjectType)
+      .eq("subject_id", subjectId)
+      .order("collected_date", { ascending: false })
+      .limit(1000);
+    if (error) return { ok: false, error: "read_failed" };
+    if (!data) return { ok: false, error: "unexpected_response" };
+    return {
+      ok: true,
+      data: data.map((r) => ({
+        id: r.id,
+        subjectType: r.subject_type,
+        subjectId: r.subject_id,
+        target: r.target,
+        result: r.result,
+        laboratory: r.laboratory ?? null,
+        collectedDate: r.collected_date ?? null,
+        resultDate: r.result_date ?? null,
+        supersedesId: r.supersedes_id ?? null,
+        recordedAt: r.recorded_at,
+      })),
+    };
+  } catch {
+    return { ok: false, error: "read_failed" };
+  }
 }
 
 export async function listQuarantineForSubject(
   subjectType: string,
   subjectId: string,
-): Promise<QuarantineEpisodeDto[]> {
-  const uid = await currentUserId();
-  if (!uid || !subjectId) return [];
-  const { data, error } = await geneticsTraceabilityDb
-    .from("quarantine_episodes")
-    .select(
-      "id, subject_type, subject_id, target, status, opened_at, reopened_at, closed_at, closure_kind",
-    )
-    .eq("user_id", uid)
-    .eq("subject_type", subjectType)
-    .eq("subject_id", subjectId)
-    .order("opened_at", { ascending: false })
-    .limit(500);
-  if (error || !data) return [];
-  return data.map((r) => ({
-    id: r.id,
-    subjectType: r.subject_type,
-    subjectId: r.subject_id,
-    target: r.target,
-    status: r.status,
-    openedAt: r.opened_at,
-    reopenedAt: r.reopened_at ?? null,
-    closedAt: r.closed_at ?? null,
-    closureKind: r.closure_kind ?? null,
-  }));
+): Promise<GeneticsReadResult<QuarantineEpisodeDto[]>> {
+  const owner = await currentUserId();
+  if (owner.ok === false) return owner;
+  if (!subjectId) return { ok: true, data: [] };
+
+  try {
+    const { data, error } = await geneticsTraceabilityDb
+      .from("quarantine_episodes")
+      .select(
+        "id, subject_type, subject_id, target, status, opened_at, reopened_at, closed_at, closure_kind",
+      )
+      .eq("user_id", owner.data)
+      .eq("subject_type", subjectType)
+      .eq("subject_id", subjectId)
+      .order("opened_at", { ascending: false })
+      .limit(500);
+    if (error) return { ok: false, error: "read_failed" };
+    if (!data) return { ok: false, error: "unexpected_response" };
+    return {
+      ok: true,
+      data: data.map((r) => ({
+        id: r.id,
+        subjectType: r.subject_type,
+        subjectId: r.subject_id,
+        target: r.target,
+        status: r.status,
+        openedAt: r.opened_at,
+        reopenedAt: r.reopened_at ?? null,
+        closedAt: r.closed_at ?? null,
+        closureKind: r.closure_kind ?? null,
+      })),
+    };
+  } catch {
+    return { ok: false, error: "read_failed" };
+  }
 }
 
 export async function resolveTrace(

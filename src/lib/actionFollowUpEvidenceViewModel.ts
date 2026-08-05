@@ -20,8 +20,7 @@ import {
 import type { ActionFollowUpEvidenceRecord } from "@/lib/actionFollowUpEvidenceService";
 
 export const ACTION_FOLLOWUP_CONSERVATIVE_NOTE = "Follow-up recorded.";
-export const ACTION_FOLLOWUP_NO_OBSERVATION_COPY =
-  "No additional observation entered.";
+export const ACTION_FOLLOWUP_NO_OBSERVATION_COPY = "No additional observation entered.";
 export const ACTION_FOLLOWUP_LEGACY_LABEL = "Follow-up";
 
 export type ActionFollowUpOutcomeTone = "positive" | "neutral" | "warning" | "muted";
@@ -66,9 +65,7 @@ export function actionFollowUpOutcomeLabel(outcome: unknown): string | null {
  */
 export function composeActionFollowUpTitle(outcome: unknown): string {
   const label = actionFollowUpOutcomeLabel(outcome);
-  return label
-    ? `${ACTION_FOLLOWUP_LEGACY_LABEL} · ${label}`
-    : ACTION_FOLLOWUP_LEGACY_LABEL;
+  return label ? `${ACTION_FOLLOWUP_LEGACY_LABEL} · ${label}` : ACTION_FOLLOWUP_LEGACY_LABEL;
 }
 
 export function actionFollowUpOutcomeMeta(
@@ -121,15 +118,14 @@ export function buildActionFollowUpEvidenceViewModel(
     note: normalizeNote(record.note),
     observedAtLabel,
     actionLabel:
-      (typeof input.actionLabel === "string" && input.actionLabel.trim().length > 0
+      typeof input.actionLabel === "string" && input.actionLabel.trim().length > 0
         ? input.actionLabel.trim()
-        : "Completed action"),
+        : "Completed action",
     photoReference:
       typeof record.photoReference === "string" && record.photoReference.length > 0
         ? record.photoReference
         : null,
-    hasPhotoEvidence:
-      typeof record.photoReference === "string" && record.photoReference.length > 0,
+    hasPhotoEvidence: typeof record.photoReference === "string" && record.photoReference.length > 0,
     sensorSnapshotId:
       typeof record.sensorSnapshotId === "string" && record.sensorSnapshotId.length > 0
         ? record.sensorSnapshotId

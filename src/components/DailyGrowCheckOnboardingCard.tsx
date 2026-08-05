@@ -3,16 +3,12 @@
  * surfaces the single most useful next setup step for the Daily Grow Check
  * loop. Reuses existing add/edit/move surfaces. No writes here.
  */
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { ArrowRight, ClipboardCheck, HelpCircle, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useTents } from "@/hooks/use-tents";
 import { usePlants } from "@/hooks/use-plants";
 import { useSensorReadings } from "@/hooks/use-sensor-readings";
@@ -54,8 +50,7 @@ export default function DailyGrowCheckOnboardingCard({
   className,
 }: Props) {
   const scopeKey =
-    dismissScope ??
-    `daily-grow-check:${focusedPlantId ?? "_"}:${focusedTentId ?? "_"}`;
+    dismissScope ?? `daily-grow-check:${focusedPlantId ?? "_"}:${focusedTentId ?? "_"}`;
   const { isDismissed, dismiss } = useOnboardingDismissed(scopeKey);
   const { data: tents = [] } = useTents();
   const { data: plants = [] } = usePlants();
@@ -90,9 +85,7 @@ export default function DailyGrowCheckOnboardingCard({
     })),
   });
 
-  const focusedPlant = focusedPlantId
-    ? plants.find((p) => p.id === focusedPlantId)
-    : null;
+  const focusedPlant = focusedPlantId ? plants.find((p) => p.id === focusedPlantId) : null;
 
   const guidance: OnboardingGuidance = deriveDailyGrowCheckOnboarding({
     tentsCount: tents.length,
@@ -115,20 +108,14 @@ export default function DailyGrowCheckOnboardingCard({
       data-testid="daily-grow-check-onboarding-card"
       data-step={guidance.step}
       data-compact={compact ? "1" : "0"}
-      className={[
-        "p-4",
-        compact
-          ? "flex items-center gap-3"
-          : "space-y-3",
-        className ?? "",
-      ].join(" ")}
+      className={["p-4", compact ? "flex items-center gap-3" : "space-y-3", className ?? ""].join(
+        " ",
+      )}
     >
       <div className="min-w-0 flex-1 space-y-1">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <ClipboardCheck className="h-4 w-4" />
-          <span data-testid="daily-grow-check-onboarding-title">
-            {guidance.title}
-          </span>
+          <span data-testid="daily-grow-check-onboarding-title">{guidance.title}</span>
         </div>
         <p
           className="text-sm text-foreground/90 flex flex-wrap items-center gap-1"
@@ -155,14 +142,12 @@ export default function DailyGrowCheckOnboardingCard({
               >
                 <p className="font-medium mb-1">What is a manual snapshot?</p>
                 <p className="text-muted-foreground">
-                  A manual snapshot is a reading you type in yourself —
-                  temperature, humidity, VPD, soil moisture, etc. — captured at
-                  a single moment in time.
+                  A manual snapshot is a reading you type in yourself — temperature, humidity, VPD,
+                  soil moisture, etc. — captured at a single moment in time.
                 </p>
                 <p className="text-muted-foreground mt-2">
-                  It's saved as <strong>manual</strong>, not live sensor data.
-                  Verdant won't poll, stream, or auto-update it. It only
-                  reflects what you observed when you saved it.
+                  It's saved as <strong>manual</strong>, not live sensor data. Verdant won't poll,
+                  stream, or auto-update it. It only reflects what you observed when you saved it.
                 </p>
               </PopoverContent>
             </Popover>

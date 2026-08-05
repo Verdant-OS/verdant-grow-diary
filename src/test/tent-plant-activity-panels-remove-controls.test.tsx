@@ -8,7 +8,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { fireEvent, render as rtlRender, screen, waitFor } from "@testing-library/react";
 import React from "react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 const { deleteEq, deleteFn, toastSuccess, toastError } = vi.hoisted(() => {
@@ -238,9 +238,7 @@ describe("TentPlantActivityPanels — remove behavior", () => {
     );
     fireEvent.click(screen.getByText("Remove photo log"));
     fireEvent.click(screen.getByTestId("diary-entry-remove-confirm"));
-    await waitFor(() =>
-      expect(deleteEq).toHaveBeenCalledWith("id", "photo-1"),
-    );
+    await waitFor(() => expect(deleteEq).toHaveBeenCalledWith("id", "photo-1"));
     expect(toastSuccess).toHaveBeenCalledWith("Photo log removed.");
   });
 });

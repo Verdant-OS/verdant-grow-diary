@@ -9,6 +9,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { PAID_PLAN_IDS, buildPaidPlanAllowlistSourceRegex } from "@/lib/paidPlanAllowlist";
 
 const SRC = readFileSync(
   resolve(process.cwd(), "supabase/functions/get-paddle-price/index.ts"),
@@ -18,16 +19,45 @@ const CONFIG = readFileSync(resolve(process.cwd(), "supabase/config.toml"), "utf
 const stripped = SRC.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
 
 describe("get-paddle-price — paid plan allowlist", () => {
-  it("accepts exactly pro_monthly, pro_annual, founder_lifetime", () => {
-    // Quote-agnostic: prettier normalizes edge functions to double quotes.
+  it("imports PAID_PLAN_ALLOWLIST from the single-source-of-truth module", () => {
+    // Drift guard: the edge function must NOT redeclare its own allowlist.
+    // Anyone re-adding a local `const PAID_PLAN_ALLOWLIST = new Set([...])`
+    // would let plan ids drift again — the exact bug this refactor closes.
     expect(SRC).toMatch(
-      /PAID_PLAN_ALLOWLIST[\s\S]{0,120}["']pro_monthly["'],\s*["']pro_annual["'],\s*["']founder_lifetime["'],/,
+      /from\s+["']@\/lib\/paidPlanAllowlist["']|from\s+["'][^"']*_shared\/lib\/lib\/paidPlanAllowlist(?:\.ts)?["']/,
     );
+    expect(stripped).not.toMatch(/const\s+PAID_PLAN_ALLOWLIST\s*(?::\s*[^=]+)?=\s*new Set\(/);
     expect(SRC).toMatch(/PAID_PLAN_ALLOWLIST\.has\(requested\)/);
-    // Fail-closed branch for anything outside the allowlist.
     expect(SRC).toMatch(/unknown_plan/);
-    // The old permissive snake_case regex is gone.
     expect(stripped).not.toMatch(/\[a-z0-9_\]\{1,64\}/);
+  });
+
+  it("shared PAID_PLAN_IDS contains the exact paid-plan universe in the pinned order", () => {
+    // If this ever changes, the intent must be reviewed here — not silently
+    // in the edge function or a webhook file.
+    expect([...PAID_PLAN_IDS]).toEqual([
+      "pro_monthly",
+      "pro_annual",
+      "craft_monthly",
+      "craft_annual",
+      "founder_lifetime",
+      "credit_pack_50",
+      "credit_pack_150",
+    ]);
+  });
+
+  it("the shared allowlist regex still matches the mirrored source (recurring paid plans)", () => {
+    // Recurring paid plans (excludes founder_lifetime and credit packs) —
+    // the assertion that historically caught Craft's absence.
+    const recurring = ["pro_monthly", "pro_annual", "craft_monthly", "craft_annual"];
+    const mirrorPath = resolve(
+      process.cwd(),
+      "supabase/functions/_shared/lib/lib/paidPlanAllowlist.ts",
+    );
+    const mirrored = readFileSync(mirrorPath, "utf8");
+    expect(mirrored).toMatch(buildPaidPlanAllowlistSourceRegex(recurring));
+    // And the full pinned order round-trips through the builder too.
+    expect(mirrored).toMatch(buildPaidPlanAllowlistSourceRegex());
   });
 });
 
@@ -57,7 +87,6 @@ describe("get-paddle-price — server-controlled environment", () => {
     expect(stripped).not.toMatch(/if \(environment === 'live'\)/);
     expect(SRC).not.toMatch(/live_billing_not_enabled/);
   });
-
 });
 
 describe("get-paddle-price — founder sold-out pre-check (before payment)", () => {

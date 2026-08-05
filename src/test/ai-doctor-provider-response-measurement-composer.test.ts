@@ -110,10 +110,7 @@ describe("attachProviderResponseUsageToAiDoctorPromptMeasurement", () => {
       },
     });
     for (const bad of [null, undefined, 42, "x", true, [], { foo: "bar" }]) {
-      const result = attachProviderResponseUsageToAiDoctorPromptMeasurement(
-        base,
-        bad,
-      );
+      const result = attachProviderResponseUsageToAiDoctorPromptMeasurement(base, bad);
       expect(result.providerReportedTokens).toBeNull();
     }
   });
@@ -128,10 +125,7 @@ describe("attachProviderResponseUsageToAiDoctorPromptMeasurement", () => {
       { usage: { prompt_tokens: 10 } }, // missing completion
     ];
     for (const bad of cases) {
-      const result = attachProviderResponseUsageToAiDoctorPromptMeasurement(
-        base,
-        bad,
-      );
+      const result = attachProviderResponseUsageToAiDoctorPromptMeasurement(base, bad);
       expect(result.providerReportedTokens).toBeNull();
     }
   });
@@ -206,14 +200,8 @@ describe("attachProviderResponseUsageToAiDoctorPromptMeasurement", () => {
     const response = {
       usage: { prompt_tokens: 33, completion_tokens: 11, total_tokens: 44 },
     };
-    const a = attachProviderResponseUsageToAiDoctorPromptMeasurement(
-      base,
-      response,
-    );
-    const b = attachProviderResponseUsageToAiDoctorPromptMeasurement(
-      base,
-      response,
-    );
+    const a = attachProviderResponseUsageToAiDoctorPromptMeasurement(base, response);
+    const b = attachProviderResponseUsageToAiDoctorPromptMeasurement(base, response);
     expect(a).toEqual(b);
     expect(JSON.stringify(a)).toBe(JSON.stringify(b));
   });
@@ -296,7 +284,7 @@ describe("attachProviderResponseUsageToAiDoctorPromptMeasurement", () => {
       "window.",
       "document.",
       "import React",
-      "from \"react",
+      'from "react',
       "console.log",
       "setTimeout",
       "setInterval",
@@ -332,7 +320,9 @@ describe("attachProviderResponseUsageToAiDoctorPromptMeasurement", () => {
       },
       {
         label: "deeply nested usage",
-        input: { a: { b: { c: { usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } } } } },
+        input: {
+          a: { b: { c: { usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } } } },
+        },
       },
     ];
 
@@ -343,10 +333,7 @@ describe("attachProviderResponseUsageToAiDoctorPromptMeasurement", () => {
         });
         const baseSnapshot = JSON.stringify(base);
 
-        const result = attachProviderResponseUsageToAiDoctorPromptMeasurement(
-          base,
-          input,
-        );
+        const result = attachProviderResponseUsageToAiDoctorPromptMeasurement(base, input);
 
         expect(result.providerReportedTokens).toBeNull();
         expect(JSON.stringify(base)).toBe(baseSnapshot);
@@ -375,18 +362,13 @@ describe("attachProviderResponseUsageToAiDoctorPromptMeasurement", () => {
 describe("cost library entrypoint (src/lib/cost)", () => {
   it("re-exports the composer and attaches valid usage end-to-end", async () => {
     const mod = await import("@/lib/cost");
-    expect(typeof mod.attachProviderResponseUsageToAiDoctorPromptMeasurement).toBe(
-      "function",
-    );
+    expect(typeof mod.attachProviderResponseUsageToAiDoctorPromptMeasurement).toBe("function");
 
     const base = makeBaseMeasurement();
-    const result = mod.attachProviderResponseUsageToAiDoctorPromptMeasurement(
-      base,
-      {
-        id: "chatcmpl_entrypoint",
-        usage: { prompt_tokens: 12, completion_tokens: 8, total_tokens: 20 },
-      },
-    );
+    const result = mod.attachProviderResponseUsageToAiDoctorPromptMeasurement(base, {
+      id: "chatcmpl_entrypoint",
+      usage: { prompt_tokens: 12, completion_tokens: 8, total_tokens: 20 },
+    });
 
     expect(result.providerReportedTokens).toEqual({
       promptTokens: 12,
@@ -409,7 +391,7 @@ describe("cost library entrypoint (src/lib/cost)", () => {
       "setTimeout",
       "setInterval",
       "import React",
-      "from \"react",
+      'from "react',
       "supabase/functions",
       "@/integrations/supabase",
     ]) {
@@ -417,4 +399,3 @@ describe("cost library entrypoint (src/lib/cost)", () => {
     }
   });
 });
-

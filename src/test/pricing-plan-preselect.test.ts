@@ -2,10 +2,7 @@
  * Pure unit tests for pricingPlanPreselect helpers.
  */
 import { describe, it, expect } from "vitest";
-import {
-  resolvePricingPlanPreselect,
-  isPreselectPlanId,
-} from "@/lib/pricingPlanPreselect";
+import { resolvePricingPlanPreselect, isPreselectPlanId } from "@/lib/pricingPlanPreselect";
 
 describe("resolvePricingPlanPreselect", () => {
   it("maps canonical plan ids to preselect + billing", () => {
@@ -25,9 +22,7 @@ describe("resolvePricingPlanPreselect", () => {
 
   it("normalizes case", () => {
     expect(resolvePricingPlanPreselect("Pro_Monthly").plan).toBe("pro_monthly");
-    expect(resolvePricingPlanPreselect("FOUNDER_LIFETIME").plan).toBe(
-      "founder_lifetime",
-    );
+    expect(resolvePricingPlanPreselect("FOUNDER_LIFETIME").plan).toBe("founder_lifetime");
   });
 
   it("returns null preselect for unknown / missing / empty input", () => {

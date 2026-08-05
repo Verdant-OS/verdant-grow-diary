@@ -5,9 +5,11 @@
  * so visible copy and FAQPage JSON-LD share a single source of truth.
  * No Supabase, no AI calls, no Action Queue writes, no device control.
  */
-import { useEffect, useRef, useState } from "react";
-import { Link, Navigate, useLocation, useParams } from "react-router-dom";
+import { useEffect, useId, useRef, useState } from "react";
+import { Link, Navigate, useLocation, useParams } from "@/lib/react-router-compat";
 import BrandLogo from "@/components/BrandLogo";
+import CustomerComparisonGuideQrOption from "@/components/customer/CustomerComparisonGuideQrOption";
+import SymptomReferenceTable from "@/components/SymptomReferenceTable";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import {
   Accordion,
@@ -17,7 +19,6 @@ import {
 } from "@/components/ui/accordion";
 import {
   findGuideBySlug,
-  VERDANT_CUSTOMER_GUIDE_PATH,
   VERDANT_GUIDES_BREADCRUMB_ITEMS,
   VERDANT_SEO_GUIDES,
   VERDANT_SITE_ORIGIN,
@@ -26,10 +27,12 @@ import {
   buildArticleJsonLd,
   buildBreadcrumbListJsonLd,
   buildFaqPageJsonLd,
+  buildWebPageJsonLd,
   safeJsonLdStringify,
 } from "@/lib/seoStructuredData";
 import { buildGuideQuickLogStarterHref } from "@/lib/quickLogStarterLinks";
 import { resolveGuideFaqFromHash } from "@/lib/guideFaqHashResolver";
+import { OREOZ_GELONADE_GUIDE_SLUG } from "@/constants/oreozGelonadeExperience";
 
 export default function GuidePage() {
   const { slug } = useParams<{ slug: string }>();
@@ -40,6 +43,7 @@ export default function GuidePage() {
   const [openFaq, setOpenFaq] = useState<string>(initialFaqValue ?? "");
   const [highlightedFaq, setHighlightedFaq] = useState<string | undefined>(initialFaqValue);
   const faqItemRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const evidenceTableInstructionsId = useId();
 
   useEffect(() => {
     const resolved = resolveGuideFaqFromHash(guide, location.hash);
@@ -81,6 +85,12 @@ export default function GuidePage() {
   useEffect(() => {
     if (!guide) return;
     const guideUrl = `${VERDANT_SITE_ORIGIN}/guides/${guide.slug}`;
+    const webpage = buildWebPageJsonLd({
+      title: guide.title,
+      description: guide.description,
+      url: guideUrl,
+      siteUrl: VERDANT_SITE_ORIGIN,
+    });
     const faq = buildFaqPageJsonLd({
       pageUrl: guideUrl,
       questions: guide.faq,
@@ -88,37 +98,42 @@ export default function GuidePage() {
     const crumbs = buildBreadcrumbListJsonLd({
       items: [...VERDANT_GUIDES_BREADCRUMB_ITEMS, { name: guide.h1, url: guideUrl }],
     });
-    // Evergreen guides — use the site's stable publish date so Article
-    // schema validates without inventing per-guide edit timestamps.
-    const article = buildArticleJsonLd({
-      headline: guide.h1,
-      description: guide.description,
-      url: guideUrl,
-      datePublished: "2025-01-01",
-      authorName: "Verdant Grow Diary",
-      publisherName: "Verdant Grow Diary",
-      siteUrl: VERDANT_SITE_ORIGIN,
+    const article = guide.publishedOn
+      ? buildArticleJsonLd({
+          headline: guide.h1,
+          description: guide.description,
+          url: guideUrl,
+          datePublished: guide.publishedOn,
+          dateModified: guide.modifiedOn,
+          image: "https://verdantgrowdiary.com/brand/verdant-logo-512.png",
+          authorName: "Verdant Grow Diary",
+          publisherName: "Verdant Grow Diary",
+          siteUrl: VERDANT_SITE_ORIGIN,
+        })
+      : null;
+    // Clean up the route-local JSON-LD baked into the initial HTML before
+    // React assumes ownership. Otherwise hydration duplicates the same FAQ,
+    // breadcrumb, and article, while later SPA navigation leaves a stale
+    // WebPage identity from the first route in the document head.
+    document
+      .querySelectorAll('script[type="application/ld+json"][data-static-route-ldjson]')
+      .forEach((script) => script.remove());
+
+    const docs: Array<[string, unknown]> = [
+      [`guide-${guide.slug}-webpage`, webpage],
+      [`guide-${guide.slug}-faq`, faq],
+      [`guide-${guide.slug}-breadcrumb`, crumbs],
+    ];
+    if (article) docs.push([`guide-${guide.slug}-article`, article]);
+    const scripts = docs.map(([id, data]) => {
+      const script = document.createElement("script");
+      script.type = "application/ld+json";
+      script.setAttribute("data-page-ldjson", id);
+      script.text = safeJsonLdStringify(data);
+      document.head.appendChild(script);
+      return script;
     });
-    const faqScript = document.createElement("script");
-    faqScript.type = "application/ld+json";
-    faqScript.setAttribute("data-page-ldjson", `guide-${guide.slug}-faq`);
-    faqScript.text = safeJsonLdStringify(faq);
-    document.head.appendChild(faqScript);
-    const crumbScript = document.createElement("script");
-    crumbScript.type = "application/ld+json";
-    crumbScript.setAttribute("data-page-ldjson", `guide-${guide.slug}-breadcrumb`);
-    crumbScript.text = safeJsonLdStringify(crumbs);
-    document.head.appendChild(crumbScript);
-    const articleScript = document.createElement("script");
-    articleScript.type = "application/ld+json";
-    articleScript.setAttribute("data-page-ldjson", `guide-${guide.slug}-article`);
-    articleScript.text = safeJsonLdStringify(article);
-    document.head.appendChild(articleScript);
-    return () => {
-      faqScript.remove();
-      crumbScript.remove();
-      articleScript.remove();
-    };
+    return () => scripts.forEach((script) => script.remove());
   }, [guide]);
 
   if (!guide) {
@@ -157,6 +172,26 @@ export default function GuidePage() {
           {guide.h1}
         </h1>
         <p className="mt-5 text-lg text-muted-foreground">{guide.intro}</p>
+        {(guide.publishedOn || guide.modifiedOn) && (
+          <p
+            data-testid="guide-editorial-provenance"
+            className="mt-4 text-xs text-muted-foreground"
+          >
+            {guide.publishedOn ? (
+              <>
+                Published <time dateTime={guide.publishedOn}>{guide.publishedOn}</time>
+              </>
+            ) : null}
+            {guide.publishedOn && guide.modifiedOn ? " · " : null}
+            {guide.modifiedOn ? (
+              <>
+                Reviewed <time dateTime={guide.modifiedOn}>{guide.modifiedOn}</time>
+              </>
+            ) : null}
+          </p>
+        )}
+
+        {guide.referenceTable && <SymptomReferenceTable table={guide.referenceTable} />}
 
         {guide.cta && (
           <aside
@@ -166,9 +201,7 @@ export default function GuidePage() {
             <h2 className="font-display text-xl md:text-2xl font-semibold text-foreground">
               {guide.cta.heading}
             </h2>
-            <p className="mt-2 text-sm md:text-base text-foreground/85">
-              {guide.cta.description}
-            </p>
+            <p className="mt-2 text-sm md:text-base text-foreground/85">{guide.cta.description}</p>
             {guide.cta.prompts && guide.cta.prompts.length > 0 && (
               <ul className="mt-3 space-y-1 text-sm text-foreground/80 list-disc pl-5">
                 {guide.cta.prompts.map((prompt) => (
@@ -187,7 +220,7 @@ export default function GuidePage() {
           </aside>
         )}
 
-
+        {guide.slug === OREOZ_GELONADE_GUIDE_SLUG && <CustomerComparisonGuideQrOption />}
 
         <div className="mt-10 space-y-8">
           {guide.sections.map((section) => (
@@ -218,8 +251,72 @@ export default function GuidePage() {
               )}
             </section>
           ))}
-
         </div>
+
+        {guide.evidenceTable && (
+          <section className="mt-12" data-testid="guide-evidence-table">
+            <h2 className="font-display text-xl md:text-2xl font-semibold">
+              {guide.evidenceTable.heading}
+            </h2>
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">
+              {guide.evidenceTable.description}
+            </p>
+            <p
+              id={evidenceTableInstructionsId}
+              className="mb-2 text-xs text-muted-foreground sm:sr-only"
+            >
+              Swipe horizontally, or focus this table and use the arrow keys, to compare all
+              evidence states.
+            </p>
+            <div
+              role="region"
+              aria-label={`Scrollable ${guide.evidenceTable.ariaLabel}`}
+              aria-describedby={evidenceTableInstructionsId}
+              tabIndex={0}
+              className="mt-5 max-w-full overflow-x-auto rounded-lg border border-border/70 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <table
+                aria-label={guide.evidenceTable.ariaLabel}
+                className="min-w-[720px] w-full border-collapse text-left text-sm"
+              >
+                <thead className="bg-muted/60 text-foreground">
+                  <tr>
+                    {["Evidence", "Usable", "Conditional", "Untrusted"].map((heading) => (
+                      <th
+                        key={heading}
+                        scope="col"
+                        className="border-b border-border/70 px-4 py-3 font-semibold"
+                      >
+                        {heading}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {guide.evidenceTable.rows.map((row) => (
+                    <tr key={row.evidence} className="align-top odd:bg-background even:bg-muted/20">
+                      <th
+                        scope="row"
+                        className="border-b border-border/50 px-4 py-3 font-medium text-foreground"
+                      >
+                        {row.evidence}
+                      </th>
+                      <td className="border-b border-border/50 px-4 py-3 text-foreground/85">
+                        {row.usable}
+                      </td>
+                      <td className="border-b border-border/50 px-4 py-3 text-foreground/85">
+                        {row.conditional}
+                      </td>
+                      <td className="border-b border-border/50 px-4 py-3 text-foreground/85">
+                        {row.untrusted}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
 
         {guide.faq.length > 0 && (
           <section className="mt-12">
@@ -248,13 +345,15 @@ export default function GuidePage() {
                     key={entry.question}
                     value={value}
                     id={value}
-                    ref={(el) => (faqItemRefs.current[value] = el)}
+                    ref={(el) => {
+                      faqItemRefs.current[value] = el;
+                    }}
                     tabIndex={-1}
                     data-highlighted={isHighlighted ? "true" : undefined}
                     className={
                       isHighlighted
-                        ? "rounded-md ring-2 ring-primary/70 bg-primary/5 motion-safe:transition-colors motion-safe:duration-500 scroll-mt-24 outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                        : "motion-safe:transition-colors motion-safe:duration-500 scroll-mt-24 outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                        ? "rounded-md ring-2 ring-primary/70 bg-primary/5 motion-safe:transition-colors motion-safe:duration-500 scroll-mt-24 outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
+                        : "motion-safe:transition-colors motion-safe:duration-500 scroll-mt-24 outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
                     }
                   >
                     <AccordionTrigger className="text-left px-2">{entry.question}</AccordionTrigger>
@@ -263,6 +362,31 @@ export default function GuidePage() {
                 );
               })}
             </Accordion>
+          </section>
+        )}
+
+        {guide.sources && guide.sources.length > 0 && (
+          <section className="mt-12" data-testid="guide-sources">
+            <h2 className="font-display text-xl md:text-2xl font-semibold">Evidence and scope</h2>
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">
+              These sources support the measurement concepts and study-specific observations in this
+              guide. They do not establish a universal fixture setting or diagnose a plant.
+            </p>
+            <ul className="mt-4 space-y-4">
+              {guide.sources.map((source) => (
+                <li key={source.href} className="rounded-md border border-border/60 p-4">
+                  <a
+                    href={source.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium text-primary underline underline-offset-4 hover:text-primary/80"
+                  >
+                    {source.label}
+                  </a>
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">{source.note}</p>
+                </li>
+              ))}
+            </ul>
           </section>
         )}
 
@@ -299,22 +423,20 @@ export default function GuidePage() {
               Download the Bud Rot prevention checklist (PDF)
             </h2>
             <p className="mt-3 text-sm leading-6 text-muted-foreground">
-              A one-page, grower-approved checklist for late flower: environment
-              targets, a daily walk-through, a weekly Environment Check audit,
-              and what to do if you find rot. Print it and pin it next to the
-              tent, or keep it on your phone.
+              A one-page, grower-approved checklist for late flower: environment targets, a daily
+              walk-through, a weekly Environment Check audit, and what to do if you find rot. Print
+              it and pin it next to the tent, or keep it on your phone.
             </p>
             <a
               href="/verdant-bud-rot-prevention-checklist.pdf"
               download
-              className="mt-4 inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+              className="mt-4 inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
               data-testid="guide-bud-rot-checklist-download-link"
             >
               Download checklist (PDF)
             </a>
             <p className="mt-3 text-xs text-muted-foreground">
-              Verdant suggests; the grower decides. Nothing on this checklist
-              triggers automation.
+              Verdant suggests; the grower decides. Nothing on this checklist triggers automation.
             </p>
           </section>
         )}
@@ -342,15 +464,6 @@ export default function GuidePage() {
                 See how Verdant works
               </Link>
             </li>
-            <li>
-              <Link
-                to={VERDANT_CUSTOMER_GUIDE_PATH}
-                className="underline hover:text-foreground text-muted-foreground"
-              >
-                Start with the Customer Guide
-              </Link>
-            </li>
-
             <li>
               <Link to="/pricing" className="underline hover:text-foreground text-muted-foreground">
                 Compare Free and Pro pricing

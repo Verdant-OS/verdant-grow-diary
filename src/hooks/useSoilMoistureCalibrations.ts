@@ -36,9 +36,9 @@ export function useSoilMoistureCalibrations(args: {
     enabled,
     queryFn: async () => {
       if (!growId || !tentId) return [];
-      // soil_moisture_calibrations is not in the generated Supabase types
-      // (no migration yet). Cast the client to bypass the table-name guard
-      // without introducing a schema change.
+      // The calibration migration exists, but the checked-in generated
+      // Supabase types do not include this table yet. Keep this narrow cast
+      // until production schema parity is confirmed and types are regenerated.
       const client = supabase as unknown as {
         from: (table: string) => {
           select: (cols: string) => {

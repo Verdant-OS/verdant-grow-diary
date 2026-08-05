@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import {
   AlertTriangle,
   ArrowRight,
@@ -21,12 +21,23 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { tempFFromC } from "@/lib/temperatureUnits";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
+import {
+  AIR_TEMP_PLACEHOLDER,
+  celsiusToInputString,
+  convertTemperatureInputString,
+  temperatureInputUnitFromPreference,
+  TEMPERATURE_INPUT_UNITS,
+  TEMPERATURE_UNIT_SYMBOL,
+  toFahrenheitInputString,
+  type TemperatureInputUnit,
+} from "@/lib/sensorInputUnitConversion";
 import {
   buildManualSaveSuccessLine,
   mapManualSaveErrorToUserMessage,
 } from "@/lib/manualSensorSaveConfirmation";
 import { useInsertSensorReading } from "@/hooks/useInsertSensorReading";
+import { useInsertSensorReadings } from "@/hooks/useInsertSensorReadings";
 import {
   buildManualReadingPayloads,
   validateManualEntry,
@@ -98,7 +109,7 @@ interface LastSavedConfirmation {
 }
 
 const EMPTY: ManualEntryInput = {
-  airTempF: "",
+  airTemp: "",
   humidityPct: "",
   vpdKpa: "",
   co2Ppm: "",
@@ -108,13 +119,16 @@ const EMPTY: ManualEntryInput = {
 
 const STANDARD_TARGET_CONTEXT = "manual-reading-standard";
 
-function correctionToPrefill(ctx: ManualCorrectionContext | null | undefined): ManualEntryInput {
-  if (!ctx) return EMPTY;
+function correctionToPrefill(
+  ctx: ManualCorrectionContext | null | undefined,
+  unit: TemperatureInputUnit,
+): ManualEntryInput {
+  if (!ctx) return { ...EMPTY, airTempUnit: unit };
   const v = ctx.originalValues;
-  const out: ManualEntryInput = { ...EMPTY };
+  const out: ManualEntryInput = { ...EMPTY, airTempUnit: unit };
   if (typeof v.temperature_c === "number") {
-    const f = tempFFromC(v.temperature_c);
-    if (f !== null) out.airTempF = String(Math.round(f * 100) / 100);
+    // Stored value is canonical Celsius; render it in the grower's entry unit.
+    out.airTemp = celsiusToInputString(v.temperature_c, unit);
   }
   if (typeof v.humidity_pct === "number") out.humidityPct = String(v.humidity_pct);
   if (typeof v.vpd_kpa === "number") out.vpdKpa = String(v.vpd_kpa);
@@ -132,17 +146,28 @@ export default function ManualSensorReadingCard({
   onSaved,
   correction,
 }: Props) {
+  const temperaturePreference = useTemperatureUnitPreference();
+  // The grower may override the entry unit for this snapshot without changing
+  // their saved display preference. The unit is always explicit and shown next
+  // to the field — it is never inferred from the number typed.
+  const [tempUnitOverride, setTempUnitOverride] = useState<TemperatureInputUnit | null>(null);
+  const airTempUnit: TemperatureInputUnit =
+    tempUnitOverride ?? temperatureInputUnitFromPreference(temperaturePreference);
   const initialTentId = correction?.tentId ?? defaultTentId ?? tents[0]?.id ?? "";
   const correctionIdentity = correction
     ? encodeManualCorrectionHash(correction)
     : STANDARD_TARGET_CONTEXT;
   const [tentId, setTentId] = useState<string>(initialTentId);
-  const [form, setForm] = useState<ManualEntryInput>(() => correctionToPrefill(correction));
+  const [form, setForm] = useState<ManualEntryInput>(() =>
+    correctionToPrefill(correction, airTempUnit),
+  );
   const [devicePreset, setDevicePreset] = useState<string>("none");
   const [deviceCustom, setDeviceCustom] = useState<string>("");
   const [reviewOpen, setReviewOpen] = useState(false);
   const [lastSaved, setLastSaved] = useState<LastSavedConfirmation | null>(null);
   const insert = useInsertSensorReading();
+  const insertBatch = useInsertSensorReadings();
+  const isSaving = insert.isPending || insertBatch.isPending;
   const isCorrection = !!correction;
   const tentIdRef = useRef(tentId);
   const targetContextRef = useRef(`${initialTentId}\n${correctionIdentity}`);
@@ -169,8 +194,42 @@ export default function ManualSensorReadingCard({
   useEffect(() => {
     const nextTentId = correction?.tentId ?? defaultTentId;
     if (!nextTentId) return;
-    changeTentTarget(nextTentId, correctionToPrefill(correction), correctionIdentity);
-  }, [changeTentTarget, correction, correctionIdentity, defaultTentId]);
+    changeTentTarget(nextTentId, correctionToPrefill(correction, airTempUnit), correctionIdentity);
+  }, [airTempUnit, changeTentTarget, correction, correctionIdentity, defaultTentId]);
+
+  // Switching the entry unit re-expresses what the grower already typed
+  // (24 °C becomes 75.2 °F) instead of silently re-reading the same number
+  // in a different unit.
+  const changeAirTempUnit = useCallback((next: TemperatureInputUnit) => {
+    setTempUnitOverride(next);
+    setForm((prev) => {
+      const from = prev.airTempUnit ?? "F";
+      if (from === next) return prev;
+      return {
+        ...prev,
+        airTempUnit: next,
+        airTemp: convertTemperatureInputString(
+          typeof prev.airTemp === "string" ? prev.airTemp : String(prev.airTemp ?? ""),
+          from,
+          next,
+        ),
+      };
+    });
+  }, []);
+
+  useEffect(() => {
+    setForm((prev) => (prev.airTempUnit === airTempUnit ? prev : { ...prev, airTempUnit }));
+  }, [airTempUnit]);
+
+  /**
+   * Fahrenheit bridge for the advisor / snapshot review / derived-VPD
+   * preview, which all speak the legacy °F contract. Converted exactly once
+   * here; nothing downstream re-converts. Empty stays empty.
+   */
+  const airTempFBridge = useMemo(
+    () => toFahrenheitInputString(form.airTemp, form.airTempUnit ?? airTempUnit),
+    [form.airTemp, form.airTempUnit, airTempUnit],
+  );
 
   const devicePresets = useMemo(() => getManualSensorDeviceOptions(), []);
   const deviceNote = useMemo(() => {
@@ -181,7 +240,15 @@ export default function ManualSensorReadingCard({
   }, [devicePreset, deviceCustom, devicePresets]);
 
   const validation = useMemo(() => validateManualEntry(form), [form]);
-  const advisor = useMemo(() => evaluateManualSnapshotAdvisor(form), [form]);
+  const advisor = useMemo(
+    () =>
+      evaluateManualSnapshotAdvisor({
+        ...form,
+        airTemp: form.airTemp,
+        airTempUnit: form.airTempUnit ?? airTempUnit,
+      }),
+    [form, airTempUnit],
+  );
   const snapshotQuality = useMemo(() => {
     // Build a sanitized snapshot from validated metrics only. No raw_payload,
     // no vendor metadata, no tokens, no private IDs. captured_at = now since
@@ -206,7 +273,7 @@ export default function ManualSensorReadingCard({
   // confirming. Blockers here also disable the Confirm button.
   const snapshotReview = useMemo(() => {
     return reviewManualSensorSnapshot({
-      tempF: form.airTempF,
+      tempF: airTempFBridge,
       humidity: form.humidityPct,
       vpdKpa: form.vpdKpa,
       soilWaterContent: form.soilMoisturePct,
@@ -215,7 +282,7 @@ export default function ManualSensorReadingCard({
       capturedAt: new Date().toISOString(),
       tentId: tentId || null,
     });
-  }, [form, tentId]);
+  }, [form, airTempFBridge, tentId]);
 
   // Entered VPD vs air-VPD estimate. Uses only sanitized numeric metrics —
   // never relabels source. If the grower entered a VPD that disagrees with
@@ -295,7 +362,7 @@ export default function ManualSensorReadingCard({
   async function doSave() {
     // Belt-and-suspenders: even though Save buttons are disabled while
     // pending, guard against a second concurrent call from any path.
-    if (insert.isPending || saveInFlightRef.current) return;
+    if (isSaving || saveInFlightRef.current) return;
     saveInFlightRef.current = true;
     const submissionTentId = tentId;
     const submissionTargetContext = targetContextRef.current;
@@ -353,11 +420,10 @@ export default function ManualSensorReadingCard({
           }
         }
       } else {
-        // Standard save: sequential keeps ordering deterministic and
-        // per-row error surfacing simple.
-        for (const p of payloads) {
-          await insert.mutateAsync(p);
-        }
+        // A snapshot is one logical write. The batch helper sends one
+        // multi-row INSERT, so PostgreSQL either commits every metric or
+        // rejects the whole snapshot.
+        await insertBatch.mutateAsync(payloads);
       }
       const createdAt = new Date().toISOString();
       const successLine = buildManualSaveSuccessLine({ metrics: capturedMetrics });
@@ -492,7 +558,7 @@ export default function ManualSensorReadingCard({
                 <Select
                   value={tentId}
                   onValueChange={(nextTentId) => changeTentTarget(nextTentId, EMPTY)}
-                  disabled={isCorrection || insert.isPending}
+                  disabled={isCorrection || isSaving}
                 >
                   <SelectTrigger id="manual-reading-tent" data-testid="manual-reading-tent-select">
                     <SelectValue placeholder="Select tent" />
@@ -565,14 +631,43 @@ export default function ManualSensorReadingCard({
             </div>
 
             <Section title="Air" testId="manual-reading-section-air">
-              <Field
-                id="m-air-temp"
-                label="Air temp"
-                unit="°F"
-                value={form.airTempF as string}
-                onChange={(v) => update("airTempF", v)}
-                placeholder="75"
-              />
+              <div className="space-y-1">
+                <Field
+                  id="m-air-temp"
+                  label="Air temp"
+                  unit={TEMPERATURE_UNIT_SYMBOL[airTempUnit]}
+                  value={form.airTemp as string}
+                  onChange={(v) => update("airTemp", v)}
+                  placeholder={AIR_TEMP_PLACEHOLDER[airTempUnit]}
+                />
+                <div
+                  className="flex items-center gap-1"
+                  role="group"
+                  aria-label="Temperature entry unit"
+                  data-testid="manual-reading-temp-unit-toggle"
+                  data-active-unit={airTempUnit}
+                >
+                  {TEMPERATURE_INPUT_UNITS.map((u) => (
+                    <button
+                      key={u}
+                      type="button"
+                      onClick={() => changeAirTempUnit(u)}
+                      aria-pressed={airTempUnit === u}
+                      data-testid={`manual-reading-temp-unit-${u}`}
+                      className={`min-h-11 min-w-11 rounded-md border px-3 text-xs font-medium transition-colors ${
+                        airTempUnit === u
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border/60 text-muted-foreground hover:bg-secondary/40"
+                      }`}
+                    >
+                      {TEMPERATURE_UNIT_SYMBOL[u]}
+                    </button>
+                  ))}
+                  <span className="ml-1 text-[10px] text-muted-foreground">
+                    Entered in {TEMPERATURE_UNIT_SYMBOL[airTempUnit]} — saved as Celsius.
+                  </span>
+                </div>
+              </div>
               <Field
                 id="m-humidity"
                 label="Humidity"
@@ -635,7 +730,7 @@ export default function ManualSensorReadingCard({
 
             <DerivedVpdStatus
               testId="manual-reading-derived-vpd"
-              airTempF={form.airTempF as string}
+              airTempF={airTempFBridge}
               humidityPct={form.humidityPct as string}
             />
             {advisor.derivedVpdKpa !== null && (
@@ -768,10 +863,10 @@ export default function ManualSensorReadingCard({
                       <Button
                         size="sm"
                         onClick={doSave}
-                        disabled={insert.isPending || hasBlocker}
+                        disabled={isSaving || hasBlocker}
                         data-testid="manual-sensor-review-confirm"
                       >
-                        {insert.isPending ? (
+                        {isSaving ? (
                           <>
                             <Loader2 className="h-4 w-4 animate-spin" />
                             Saving
@@ -846,10 +941,10 @@ export default function ManualSensorReadingCard({
               </p>
               <Button
                 onClick={onSave}
-                disabled={!validation.ok || !tentId || insert.isPending}
+                disabled={!validation.ok || !tentId || isSaving}
                 data-testid="manual-reading-save"
               >
-                {insert.isPending ? (
+                {isSaving ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
                     Saving

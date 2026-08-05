@@ -9,7 +9,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import Glossary from "@/pages/Glossary";
 import { GLOSSARY_TERMS } from "@/constants/glossaryTerms";
@@ -121,9 +121,7 @@ describe("Glossary page", () => {
     // A representative jump link exists.
     expect(screen.getByTestId("glossary-jump-A")).toBeInTheDocument();
     expect(
-      screen.getByText(
-        /Glossary entries are educational reference content/i,
-      ),
+      screen.getByText(/Glossary entries are educational reference content/i),
     ).toBeInTheDocument();
     cleanup();
   });

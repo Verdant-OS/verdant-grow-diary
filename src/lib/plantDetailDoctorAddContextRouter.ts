@@ -24,15 +24,12 @@ import {
   PLANT_QUICKLOG_PREFILL_EVENT,
   type PlantQuickLogPrefill,
 } from "@/lib/plantQuickLogPrefillRules";
+import { buildDailyCheckEntryHref } from "@/lib/dailyCheckPostSubmitRules";
 import { sensorsPath } from "@/lib/routes";
 
 export type AddContextGap = "note" | "sensor" | "photo";
 
-export type AddContextRouteKind =
-  | "quicklog_note"
-  | "quicklog_photo"
-  | "sensor_route"
-  | "none";
+export type AddContextRouteKind = "quicklog_note" | "quicklog_photo" | "sensor_route" | "none";
 
 export interface AddContextRouteDecision {
   kind: AddContextRouteKind;
@@ -67,6 +64,16 @@ export const ADD_CONTEXT_HELPER_COPY =
   "Add a quick note, sensor snapshot, or photo so AI Doctor has better context.";
 
 const QUICKLOG_FALLBACK_LABEL = "Add context first";
+
+function buildTargetPreservingQuickLogRoute(plantId: string | null | undefined): string {
+  const safePlantId = plantId?.trim();
+  if (!safePlantId) return "/daily-check?from=plant-detail&method=note";
+  return buildDailyCheckEntryHref({
+    plantId: safePlantId,
+    source: "plant-detail",
+    method: "note",
+  });
+}
 
 function detectGaps(input: AddContextRouterInput): AddContextGap[] {
   const gaps: AddContextGap[] = [];
@@ -106,8 +113,19 @@ export function buildPlantDetailDoctorAddContextRoute(
       tentId: input.tentId,
       tentName: input.tentName ?? null,
     });
-    // If we can't build a full prefill (e.g., no tent assigned), still
-    // dispatch a minimal event so AppShell can open QuickLog generically.
+    // Never dispatch a generic QuickLog event when identity is incomplete:
+    // the global dialog may otherwise fall back to a different eligible
+    // plant. Daily Check resolves the requested plant from current data and
+    // keeps the grower in control when grow/tent context is missing.
+    if (!prefill) {
+      return {
+        kind: "quicklog_note",
+        label: "Add a quick note",
+        helper: ADD_CONTEXT_HELPER_COPY,
+        gaps,
+        to: buildTargetPreservingQuickLogRoute(input.plantId),
+      };
+    }
     return {
       kind: "quicklog_note",
       label: "Add a quick note",
@@ -115,7 +133,7 @@ export function buildPlantDetailDoctorAddContextRoute(
       gaps,
       quickLogEvent: {
         type: PLANT_QUICKLOG_PREFILL_EVENT,
-        detail: prefill ?? ({} as PlantQuickLogPrefill),
+        detail: prefill,
       },
     };
   }
@@ -138,6 +156,15 @@ export function buildPlantDetailDoctorAddContextRoute(
     tentId: input.tentId,
     tentName: input.tentName ?? null,
   });
+  if (!prefill) {
+    return {
+      kind: "quicklog_photo",
+      label: "Add a photo",
+      helper: ADD_CONTEXT_HELPER_COPY,
+      gaps,
+      to: buildTargetPreservingQuickLogRoute(input.plantId),
+    };
+  }
   return {
     kind: "quicklog_photo",
     label: "Add a photo",
@@ -145,9 +172,7 @@ export function buildPlantDetailDoctorAddContextRoute(
     gaps,
     quickLogEvent: {
       type: PLANT_QUICKLOG_PREFILL_EVENT,
-      detail: prefill
-        ? { ...prefill, suggestPhoto: true as const }
-        : ({ suggestPhoto: true } as PlantQuickLogPrefill & { suggestPhoto: true }),
+      detail: { ...prefill, suggestPhoto: true as const },
     },
   };
 }

@@ -12,7 +12,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { render as rtlRender, screen } from "@testing-library/react";
 import type { ReactElement } from "react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import { sensorSnapshotBadge, toTimelineItem } from "@/lib/growDiaryTimelineRules";
 import { normalizeDiaryEntry } from "@/lib/diaryEntryRules";
 import DiaryEntryBadges from "@/components/DiaryEntryBadges";
@@ -147,7 +147,11 @@ describe("DiaryEntryBadges renders sensor-state badges", () => {
   });
 
   it("missing state / legacy snapshot → no sensor-state badge", () => {
-    render(<DiaryEntryBadges item={makeItem({ sensorSnapshotState: null, tags: ["sensor-snapshot"] })} />);
+    render(
+      <DiaryEntryBadges
+        item={makeItem({ sensorSnapshotState: null, tags: ["sensor-snapshot"] })}
+      />,
+    );
     expect(screen.queryByTestId(/diary-entry-sensor-badge/)).not.toBeInTheDocument();
   });
 

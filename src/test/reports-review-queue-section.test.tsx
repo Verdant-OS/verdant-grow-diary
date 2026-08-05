@@ -6,7 +6,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import ReportsReviewQueueSection from "@/components/ReportsReviewQueueSection";
 import type { ReportsReviewItem } from "@/lib/reportsHubReviewQueue";
 
@@ -46,24 +46,20 @@ describe("ReportsReviewQueueSection", () => {
       },
     ]);
     expect(screen.getByTestId("reports-review-queue")).toBeInTheDocument();
-    expect(
-      screen.getByTestId("reports-review-item-missing_outcome"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByTestId("reports-review-link-missing_outcome").getAttribute("href"),
-    ).toBe("/actions/abc");
-    expect(
-      screen.getByTestId("reports-review-link-open_alerts").getAttribute("href"),
-    ).toBe("/alerts?growId=grow-1");
+    expect(screen.getByTestId("reports-review-item-missing_outcome")).toBeInTheDocument();
+    expect(screen.getByTestId("reports-review-link-missing_outcome").getAttribute("href")).toBe(
+      "/actions/abc",
+    );
+    expect(screen.getByTestId("reports-review-link-open_alerts").getAttribute("href")).toBe(
+      "/alerts?growId=grow-1",
+    );
     // Help tooltip + why-this-is-here line render per item.
-    expect(
-      screen
-        .getByTestId("reports-review-help-missing_outcome")
-        .getAttribute("title"),
-    ).toMatch(/older than 24 hours/i);
-    expect(
-      screen.getByTestId("reports-review-why-open_alerts").textContent,
-    ).toMatch(/latest severity warning/);
+    expect(screen.getByTestId("reports-review-help-missing_outcome").getAttribute("title")).toMatch(
+      /older than 24 hours/i,
+    );
+    expect(screen.getByTestId("reports-review-why-open_alerts").textContent).toMatch(
+      /latest severity warning/,
+    );
   });
 
   it("renders calm empty copy when showEmptyState is true and items are empty", () => {

@@ -16,12 +16,14 @@ import {
 } from "@/lib/fastAddActionRules";
 import { EVENT_TYPE_MAP, EVENT_TYPES } from "@/lib/diary";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
+import { QUICK_LOG_V2_OPEN_EVENT } from "@/lib/quickLogV2OpenIntent";
 
 const FIXED = new Date("2026-06-04T10:00:00.000Z");
 const now = () => FIXED;
 const ctx = { plantId: "p1", tentId: "t1", growId: "g1" } as const;
 
 const PAYLOAD_KEYS = [
+  "activityId",
   "captured_at",
   "eventType",
   "growId",
@@ -39,22 +41,31 @@ describe("Fast Add action → handler wiring", () => {
   });
 
   it.each(
-    FAST_ADD_ACTIONS.filter((a) => a.id !== "diagnosis").map(
-      (a) => [a.id, a.quickLogEventType!] as const,
+    FAST_ADD_ACTIONS.filter((a) => a.id !== "diagnosis" && a.id !== "watering").map(
+      (a) => [a.id, a.quickLogEventType!, a.quickLogActivityId!] as const,
     ),
   )(
-    "%s opens the Quick Log via the existing window event with eventType=%s",
-    (actionId, expectedEventType) => {
+    "%s opens the supported activity editor via the existing window event",
+    (actionId, expectedEventType, expectedActivityId) => {
       const intent = resolveFastAddIntent(actionId, ctx, { now });
       expect(intent.kind).toBe("open-quicklog");
       if (intent.kind !== "open-quicklog") return;
       expect(intent.eventName).toBe(PLANT_QUICKLOG_PREFILL_EVENT);
       expect(intent.prefill.eventType).toBe(expectedEventType);
+      expect(intent.prefill.activityId).toBe(expectedActivityId);
       expect(intent.prefill.plantId).toBe("p1");
       expect(intent.prefill.tentId).toBe("t1");
       expect(intent.prefill.growId).toBe("g1");
     },
   );
+
+  it("watering opens only the closed structured Water intent", () => {
+    const intent = resolveFastAddIntent("watering", ctx, { now });
+    expect(intent.kind).toBe("open-quicklog-v2");
+    if (intent.kind !== "open-quicklog-v2") return;
+    expect(intent.eventName).toBe(QUICK_LOG_V2_OPEN_EVENT);
+    expect(intent.detail).toEqual({ targetKey: "plant:p1", action: "water" });
+  });
 });
 
 describe("Fast Add payload → diary EVENT_TYPES alignment", () => {
@@ -62,27 +73,23 @@ describe("Fast Add payload → diary EVENT_TYPES alignment", () => {
     FAST_ADD_ACTIONS.filter((a) => a.quickLogEventType !== null).map(
       (a) => [a.id, a.quickLogEventType!] as const,
     ),
-  )(
-    "%s payload eventType '%s' is a registered diary EVENT_TYPES value",
-    (_id, eventType) => {
-      expect(EVENT_TYPE_MAP[eventType]).toBeDefined();
-      expect(EVENT_TYPES.some((e) => e.value === eventType)).toBe(true);
-    },
-  );
+  )("%s payload eventType '%s' is a registered diary EVENT_TYPES value", (_id, eventType) => {
+    expect(EVENT_TYPE_MAP[eventType]).toBeDefined();
+    expect(EVENT_TYPES.some((e) => e.value === eventType)).toBe(true);
+  });
 
   it("payload key shape is stable (snapshot to catch silent drift)", () => {
     const intent = resolveFastAddIntent("environment", ctx, { now });
     if (intent.kind !== "open-quicklog") throw new Error("expected open-quicklog");
     const keys = Object.keys(intent.prefill).sort();
-    // Environment is the only action that sets both occurred_at + captured_at.
+    // Environment and Training both set occurred_at + captured_at.
     expect(keys).toEqual([...PAYLOAD_KEYS].sort());
   });
 
-  it("watering payload sets occurred_at only (no captured_at)", () => {
+  it("watering detail carries no legacy prefill or timestamp fields", () => {
     const intent = resolveFastAddIntent("watering", ctx, { now });
-    if (intent.kind !== "open-quicklog") throw new Error("expected open-quicklog");
-    expect(intent.prefill.occurred_at).toBe(FIXED.toISOString());
-    expect(intent.prefill.captured_at).toBeUndefined();
+    if (intent.kind !== "open-quicklog-v2") throw new Error("expected open-quicklog-v2");
+    expect(Object.keys(intent.detail).sort()).toEqual(["action", "targetKey"]);
   });
 });
 

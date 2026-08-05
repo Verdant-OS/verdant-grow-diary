@@ -82,9 +82,7 @@ export function buildVerdantGeneticsXlsxAuditInput(
   } = args;
   if (adapterResult.blocked) return null;
   if (adapterResult.acceptedRowCount <= 0) return null;
-  const mappedSensorGroups = previewVm.detectedGroups.filter(
-    (g) => !!tentIdBySensorGroup[g],
-  );
+  const mappedSensorGroups = previewVm.detectedGroups.filter((g) => !!tentIdBySensorGroup[g]);
   const mappedTentIds = mappedSensorGroups
     .map((g) => tentIdBySensorGroup[g])
     .filter((id): id is string => typeof id === "string" && id.length > 0);
@@ -102,10 +100,7 @@ export function buildVerdantGeneticsXlsxAuditInput(
 }
 
 export interface BuildRegistryCsvAuditInputArgs {
-  sourceAppId: Extract<
-    SensorHistoryImportSourceAppId,
-    "spider_farmer" | "vivosun"
-  >;
+  sourceAppId: Extract<SensorHistoryImportSourceAppId, "spider_farmer" | "vivosun">;
   adapterResult: RegistryAdapterResult;
   tentId: string;
   tentOptions: ReadonlyArray<TentOption>;
@@ -116,14 +111,8 @@ export interface BuildRegistryCsvAuditInputArgs {
 export function buildRegistryCsvAuditInput(
   args: BuildRegistryCsvAuditInputArgs,
 ): RecordSensorHistoryImportAuditInput | null {
-  const {
-    sourceAppId,
-    adapterResult,
-    tentId,
-    tentOptions,
-    insertedRowCount,
-    duplicateRowCount,
-  } = args;
+  const { sourceAppId, adapterResult, tentId, tentOptions, insertedRowCount, duplicateRowCount } =
+    args;
   if (adapterResult.blocked) return null;
   if (adapterResult.acceptedRowCount <= 0) return null;
   const range = dateRangeFromRows(

@@ -16,11 +16,14 @@
 import { describe, it, expect, vi } from "vitest";
 import { render } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 
 vi.mock("@/hooks/useInsertSensorReading", () => ({
   useInsertSensorReading: () => ({ mutateAsync: vi.fn(), isPending: false }),
   validateSensorReadingPayload: () => {},
+}));
+vi.mock("@/hooks/useInsertSensorReadings", () => ({
+  useInsertSensorReadings: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 vi.mock("@/hooks/useInsertManualSnapshotEdit", () => ({
   insertManualSnapshotEdit: vi.fn(),
@@ -86,10 +89,7 @@ describe("manual sensor correction — hash + visible UI safety", () => {
   it("ManualSensorReadingCard in correction mode does not render any UUID in visible text", () => {
     const { container, getByTestId } = render(
       <MemoryRouter>
-        <ManualSensorReadingCard
-          tents={[{ id: TENT, name: "Tent A" }]}
-          correction={CTX}
-        />
+        <ManualSensorReadingCard tents={[{ id: TENT, name: "Tent A" }]} correction={CTX} />
       </MemoryRouter>,
     );
     const banner = getByTestId("manual-reading-correction-banner");
@@ -101,10 +101,7 @@ describe("manual sensor correction — hash + visible UI safety", () => {
   it("ManualSensorReadingCard without correction shows standard header (no banner)", () => {
     const { queryByTestId } = render(
       <MemoryRouter>
-        <ManualSensorReadingCard
-          tents={[{ id: TENT, name: "Tent A" }]}
-          correction={null}
-        />
+        <ManualSensorReadingCard tents={[{ id: TENT, name: "Tent A" }]} correction={null} />
       </MemoryRouter>,
     );
     expect(queryByTestId("manual-reading-correction-banner")).toBeNull();

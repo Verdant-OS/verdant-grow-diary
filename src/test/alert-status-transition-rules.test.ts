@@ -25,8 +25,7 @@ const ACK_CHECK_NEW = (r: RowState) =>
   r.status === "resolved" ||
   r.status === "dismissed";
 
-const RES_CHECK = (r: RowState) =>
-  r.resolved_at === null || r.status === "resolved";
+const RES_CHECK = (r: RowState) => r.resolved_at === null || r.status === "resolved";
 
 function applyPatch<T extends Partial<RowState> & { status: RowState["status"] }>(
   before: RowState,
@@ -89,10 +88,7 @@ describe("alertStatusTransitionRules — patch builders", () => {
       acknowledged_at: null,
       resolved_at: "2026-06-17T10:00:00Z",
     };
-    const after = applyPatch(
-      before,
-      buildAcknowledgeAlertPatch("2026-06-18T00:00:00Z"),
-    );
+    const after = applyPatch(before, buildAcknowledgeAlertPatch("2026-06-18T00:00:00Z"));
     expect(after.status).toBe("acknowledged");
     expect(after.acknowledged_at).toBe("2026-06-18T00:00:00Z");
     expect(after.resolved_at).toBeNull();
@@ -166,32 +162,23 @@ describe("alertStatusTransitionRules — safe error copy", () => {
   });
 
   it("falls back when the error is missing or empty", () => {
-    expect(safeAlertTransitionErrorCopy("acknowledge", null)).toMatch(
-      /Couldn't acknowledge/,
-    );
-    expect(safeAlertTransitionErrorCopy("dismiss", undefined)).toMatch(
-      /Couldn't dismiss/,
-    );
-    expect(safeAlertTransitionErrorCopy("reopen", "")).toMatch(
-      /Couldn't reopen/,
-    );
+    expect(safeAlertTransitionErrorCopy("acknowledge", null)).toMatch(/Couldn't acknowledge/);
+    expect(safeAlertTransitionErrorCopy("dismiss", undefined)).toMatch(/Couldn't dismiss/);
+    expect(safeAlertTransitionErrorCopy("reopen", "")).toMatch(/Couldn't reopen/);
   });
 
   it("masks PGRST / SQLSTATE leakage", () => {
-    expect(
-      safeAlertTransitionErrorCopy("resolve", new Error("PGRST116 something")),
-    ).not.toMatch(/PGRST/);
-    expect(
-      safeAlertTransitionErrorCopy("resolve", new Error("SQLSTATE 23514")),
-    ).not.toMatch(/SQLSTATE/);
+    expect(safeAlertTransitionErrorCopy("resolve", new Error("PGRST116 something"))).not.toMatch(
+      /PGRST/,
+    );
+    expect(safeAlertTransitionErrorCopy("resolve", new Error("SQLSTATE 23514"))).not.toMatch(
+      /SQLSTATE/,
+    );
   });
 });
 
 describe("alertStatusTransitionRules — static safety", () => {
-  const content = readFileSync(
-    resolve(__dirname, "../lib/alertStatusTransitionRules.ts"),
-    "utf8",
-  );
+  const content = readFileSync(resolve(__dirname, "../lib/alertStatusTransitionRules.ts"), "utf8");
   it("does not import Supabase or React", () => {
     expect(content).not.toMatch(/from\s+["']@\/integrations\/supabase/);
     expect(content).not.toMatch(/from\s+["']react["']/);

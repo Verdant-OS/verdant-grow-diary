@@ -27,33 +27,19 @@ import {
   type AlertLike,
 } from "@/lib/alertToActionQueueRules";
 
-
-
 const ROOT = resolve(__dirname, "../..");
 const MANUAL_CARD = readFileSync(
   resolve(ROOT, "src/components/ManualSensorReadingCard.tsx"),
   "utf8",
 );
-const INSERT_HOOK = readFileSync(
-  resolve(ROOT, "src/hooks/useInsertSensorReading.ts"),
-  "utf8",
-);
+const INSERT_HOOK = readFileSync(resolve(ROOT, "src/hooks/useInsertSensorReading.ts"), "utf8");
 const PERSIST_HOOK = readFileSync(
   resolve(ROOT, "src/hooks/usePersistEnvironmentAlerts.ts"),
   "utf8",
 );
-const ENV_ALERTS = readFileSync(
-  resolve(ROOT, "src/lib/environmentAlerts.ts"),
-  "utf8",
-);
-const ENV_PERSIST = readFileSync(
-  resolve(ROOT, "src/lib/environmentAlertPersistence.ts"),
-  "utf8",
-);
-const RULES = readFileSync(
-  resolve(ROOT, "src/lib/alertToActionQueueRules.ts"),
-  "utf8",
-);
+const ENV_ALERTS = readFileSync(resolve(ROOT, "src/lib/environmentAlerts.ts"), "utf8");
+const ENV_PERSIST = readFileSync(resolve(ROOT, "src/lib/environmentAlertPersistence.ts"), "utf8");
+const RULES = readFileSync(resolve(ROOT, "src/lib/alertToActionQueueRules.ts"), "utf8");
 
 const TENT_ID = "11111111-1111-4111-8111-111111111111";
 const GROW_ID = "22222222-2222-4222-8222-222222222222";
@@ -126,7 +112,6 @@ describe("no alert ⇒ no Action Queue handoff is possible", () => {
   });
 });
 
-
 /* ──────────────────────────────────────────────────────────────────────
  * Out-of-range manual reading → eligible draft → single insert → dedupe
  * ────────────────────────────────────────────────────────────────────── */
@@ -142,9 +127,7 @@ describe("out-of-range manual reading → user-initiated single-row handoff", ()
     expect(r.draft.action_type).toBe("advisory");
     expect(r.draft.reason).toContain(`[alert:${a.id}]`);
     // No device command in suggested copy.
-    expect(r.draft.suggested_change).not.toMatch(
-      /turn on|turn off|set fan|set pump|dose|inject/i,
-    );
+    expect(r.draft.suggested_change).not.toMatch(/turn on|turn off|set fan|set pump|dose|inject/i);
   });
 
   it("second click against an existing open row is deduped (no duplicate)", () => {
@@ -163,17 +146,11 @@ describe("out-of-range manual reading → user-initiated single-row handoff", ()
     expect(actionMatchesAlert(existingRow, a)).toBe(true);
 
     // Approved (still open lifecycle) → still considered a duplicate.
-    expect(
-      actionMatchesAlert({ ...existingRow, status: "approved" }, a),
-    ).toBe(true);
+    expect(actionMatchesAlert({ ...existingRow, status: "approved" }, a)).toBe(true);
 
     // Terminal rows do NOT block a new handoff.
-    expect(
-      actionMatchesAlert({ ...existingRow, status: "completed" }, a),
-    ).toBe(false);
-    expect(
-      actionMatchesAlert({ ...existingRow, status: "cancelled" }, a),
-    ).toBe(false);
+    expect(actionMatchesAlert({ ...existingRow, status: "completed" }, a)).toBe(false);
+    expect(actionMatchesAlert({ ...existingRow, status: "cancelled" }, a)).toBe(false);
   });
 
   it("ineligible alert states block the handoff", () => {

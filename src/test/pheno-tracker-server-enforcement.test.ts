@@ -51,9 +51,7 @@ describe("pheno tracker server-side entitlement enforcement", () => {
   it("names RESTRICTIVE pro-required policies for every pheno_* write table", () => {
     for (const t of PHENO_WRITE_TABLES) {
       // Each table is enumerated in the DO block that generates policies.
-      expect(migrations, `${t} listed in policy-generation block`).toContain(
-        `'${t}'`,
-      );
+      expect(migrations, `${t} listed in policy-generation block`).toContain(`'${t}'`);
     }
     // Policy-name pattern and predicate are shared.
     expect(migrations).toContain("_pro_required_insert");
@@ -67,13 +65,7 @@ describe("pheno tracker server-side entitlement enforcement", () => {
 
   it("edge helper returns sanitized error only", () => {
     const helper = readFileSync(
-      join(
-        process.cwd(),
-        "supabase",
-        "functions",
-        "_shared",
-        "assertPhenoTrackerEntitlement.ts",
-      ),
+      join(process.cwd(), "supabase", "functions", "_shared", "assertPhenoTrackerEntitlement.ts"),
       "utf8",
     );
     expect(helper).toContain("pheno_tracker_pro_required");
@@ -85,9 +77,7 @@ describe("pheno tracker server-side entitlement enforcement", () => {
       "SUPABASE_SERVICE_ROLE_KEY",
       "service_role",
     ]) {
-      expect(helper, `helper must not reference ${forbidden}`).not.toContain(
-        forbidden,
-      );
+      expect(helper, `helper must not reference ${forbidden}`).not.toContain(forbidden);
     }
   });
 });

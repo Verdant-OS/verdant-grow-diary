@@ -45,9 +45,7 @@ describe("PlantPhotoView · placeholder + fallback", () => {
 
 describe("PlantPhoto wrapper · delegates to resolver + view", () => {
   it("wraps PlantPhotoView and calls the resolver hook", () => {
-    expect(PLANT_PHOTO).toContain(
-      'import PlantPhotoView from "@/components/PlantPhotoView"',
-    );
+    expect(PLANT_PHOTO).toContain('import PlantPhotoView from "@/components/PlantPhotoView"');
     expect(PLANT_PHOTO).toContain(
       'import { usePlantProfilePhotoSource } from "@/hooks/usePlantProfilePhotoSource"',
     );
@@ -95,10 +93,10 @@ describe("EditPlantDialog · native camera + library flow", () => {
   it("communicates non-destructive replace/clear and does not delete objects here", () => {
     expect(EDIT_DIALOG).not.toMatch(/storage\.from\([^)]*\)\.remove/);
     expect(EDIT_DIALOG).toMatch(
-      /Replacing the profile photo does not delete\s+older diary photos/,
+      /Replacing\s+the profile photo does not delete\s+older diary photos/,
     );
     expect(EDIT_DIALOG).toMatch(
-      /This updates the plant profile photo\. It does not add a\s+timeline log/,
+      /This updates the plant profile photo\.\s+It does not add a\s+timeline log/,
     );
   });
   it("cleans up an orphan upload if the plant row update fails", () => {
@@ -114,9 +112,7 @@ describe("EditPlantDialog · native camera + library flow", () => {
     expect(retireIdx).toBeGreaterThan(errIdx);
   });
   it("uses sanitized partial-success copy that never leaks paths or provider text", () => {
-    expect(EDIT_DIALOG).toMatch(
-      /previous file was left in storage for safety/,
-    );
+    expect(EDIT_DIALOG).toMatch(/previous file was left in storage for safety/);
     expect(EDIT_DIALOG).toMatch(/previous file could not be removed/);
     // Toast strings must not contain durable storage refs or bucket
     // ids. Scoped to the two grower-facing copy lines.
@@ -149,9 +145,10 @@ describe("plantProfilePhotoRules · URL text-input validator (back-compat)", () 
       ok: true,
       kind: "set",
     });
-    expect(
-      normalizePlantProfilePhotoInput("data:image/png;base64,iVBORw0KGgo="),
-    ).toMatchObject({ ok: true, kind: "set" });
+    expect(normalizePlantProfilePhotoInput("data:image/png;base64,iVBORw0KGgo=")).toMatchObject({
+      ok: true,
+      kind: "set",
+    });
   });
   it("rejects unsafe protocols", () => {
     expect(normalizePlantProfilePhotoInput("javascript:alert(1)")).toEqual({

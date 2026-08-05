@@ -16,11 +16,7 @@ describe("tentPlantRosterQuickActions helper", () => {
       tentId: "t1",
       growId: "g1",
     });
-    expect(entries.map((e) => e.kind)).toEqual([
-      "view_diary",
-      "add_quicklog",
-      "view_photos",
-    ]);
+    expect(entries.map((e) => e.kind)).toEqual(["view_diary", "add_quicklog", "view_photos"]);
   });
 
   it("view_diary navigates to Plant Detail with timeline anchor", () => {
@@ -100,15 +96,13 @@ describe("tentPlantRosterQuickActions helper", () => {
       growId: "g1",
     });
     expect(entries.every((e) => e.disabled === true)).toBe(true);
+    expect(entries.every((e) => e.href === null)).toBe(true);
+    expect(entries.some((e) => e.href === "#")).toBe(false);
   });
 
   it("trigger label includes plant name", () => {
-    expect(tentPlantRosterQuickActionsTriggerLabel("Alpha")).toBe(
-      "Open actions for Alpha",
-    );
-    expect(tentPlantRosterQuickActionsTriggerLabel(null)).toBe(
-      "Open actions for this plant",
-    );
+    expect(tentPlantRosterQuickActionsTriggerLabel("Alpha")).toBe("Open actions for Alpha");
+    expect(tentPlantRosterQuickActionsTriggerLabel(null)).toBe("Open actions for this plant");
   });
 
   it("dispatchTentPlantRosterQuickLog emits the existing event with payload", () => {

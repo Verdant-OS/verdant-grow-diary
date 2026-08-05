@@ -21,14 +21,7 @@ describe("EcowittIngestAuditProofPanel", () => {
         created_at: "2025-01-15T11:00:00Z",
       },
     ];
-    render(
-      <EcowittIngestAuditProofPanel
-        tentId={TENT}
-        status="loaded"
-        rows={rows}
-        now={NOW}
-      />,
-    );
+    render(<EcowittIngestAuditProofPanel tentId={TENT} status="loaded" rows={rows} now={NOW} />);
     expect(screen.getByTestId("ecowitt-ingest-audit-proof-panel")).toBeTruthy();
     expect(screen.getByTestId("ecowitt-ingest-audit-proof-received").textContent).toBe("10");
     expect(screen.getByTestId("ecowitt-ingest-audit-proof-inserted").textContent).toBe("7");
@@ -39,42 +32,21 @@ describe("EcowittIngestAuditProofPanel", () => {
   });
 
   it("renders no-audit-rows copy when loaded but empty", () => {
-    render(
-      <EcowittIngestAuditProofPanel
-        tentId={TENT}
-        status="loaded"
-        rows={[]}
-        now={NOW}
-      />,
+    render(<EcowittIngestAuditProofPanel tentId={TENT} status="loaded" rows={[]} now={NOW} />);
+    expect(screen.getByTestId("ecowitt-ingest-audit-proof-detail").textContent).toMatch(
+      /No EcoWitt ingest audit rows found in the current proof window/,
     );
-    expect(
-      screen.getByTestId("ecowitt-ingest-audit-proof-detail").textContent,
-    ).toMatch(/No EcoWitt ingest audit rows found in the current proof window/);
   });
 
   it("renders unavailable copy when blocked", () => {
-    render(
-      <EcowittIngestAuditProofPanel
-        tentId={TENT}
-        status="blocked"
-        rows={[]}
-        now={NOW}
-      />,
+    render(<EcowittIngestAuditProofPanel tentId={TENT} status="blocked" rows={[]} now={NOW} />);
+    expect(screen.getByTestId("ecowitt-ingest-audit-proof-detail").textContent).toMatch(
+      /unavailable with current read permissions/,
     );
-    expect(
-      screen.getByTestId("ecowitt-ingest-audit-proof-detail").textContent,
-    ).toMatch(/unavailable with current read permissions/);
   });
 
   it("renders unavailable copy when tentId missing", () => {
-    render(
-      <EcowittIngestAuditProofPanel
-        tentId={null}
-        status="loaded"
-        rows={[]}
-        now={NOW}
-      />,
-    );
+    render(<EcowittIngestAuditProofPanel tentId={null} status="loaded" rows={[]} now={NOW} />);
     const panel = screen.getByTestId("ecowitt-ingest-audit-proof-panel");
     expect(panel.getAttribute("data-status")).toBe("unavailable");
   });

@@ -7,7 +7,7 @@
  */
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import type { PhenoCandidateInput } from "@/lib/phenoComparisonViewModel";
 import type { UsePhenoHuntCandidatesState } from "@/hooks/usePhenoHuntCandidates";
 
@@ -27,7 +27,6 @@ vi.mock("@/hooks/usePhenoEvidencePackets", () => ({
     truncated: false,
   }),
 }));
-
 
 const HUNT_ID = "hunt-live-1";
 
@@ -94,12 +93,8 @@ describe("PhenoHuntCompare — readiness warning banner", () => {
     const banner = screen.getByTestId("pheno-hunt-compare-readiness-warning");
     expect(banner).toBeVisible();
     expect(banner).toHaveTextContent(/Not comparison-ready yet/i);
-    expect(banner).toHaveTextContent(
-      /missing evidence needed for an honest candidate comparison/i,
-    );
-    expect(
-      screen.getByTestId("pheno-hunt-compare-readiness-warning-missing"),
-    ).toBeVisible();
+    expect(banner).toHaveTextContent(/missing evidence needed for an honest candidate comparison/i);
+    expect(screen.getByTestId("pheno-hunt-compare-readiness-warning-missing")).toBeVisible();
     // Ranking / keeper conclusion language must NOT appear on incomplete surface.
     const body = document.body.textContent ?? "";
     expect(/best candidate is/i.test(body)).toBe(false);
@@ -123,14 +118,9 @@ describe("PhenoHuntCompare — readiness warning banner", () => {
 
   it("comparison-ready hunt does not render the warning banner", () => {
     mount({ candidates: [readyCandidate("p1"), readyCandidate("p2")] });
-    expect(
-      screen.queryByTestId("pheno-hunt-compare-readiness-warning"),
-    ).toBeNull();
+    expect(screen.queryByTestId("pheno-hunt-compare-readiness-warning")).toBeNull();
     // The regular read-only comparison view renders.
-    expect(screen.getByTestId("pheno-comparison-page")).toHaveAttribute(
-      "data-mode",
-      "live",
-    );
+    expect(screen.getByTestId("pheno-comparison-page")).toHaveAttribute("data-mode", "live");
   });
 
   it("banner next-step links point at the workspace, never at /compare", () => {

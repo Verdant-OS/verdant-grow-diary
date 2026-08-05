@@ -9,6 +9,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const SENSORS_SRC = readFileSync(resolve(__dirname, "../pages/Sensors.tsx"), "utf8");
+const DASHBOARD_SRC = readFileSync(resolve(__dirname, "../pages/Dashboard.tsx"), "utf8");
 
 describe("Sensors page — CSV import regression guard", () => {
   it("imports the EnvironmentCsvImportLauncher", () => {
@@ -19,6 +20,15 @@ describe("Sensors page — CSV import regression guard", () => {
     expect(SENSORS_SRC).toMatch(/data-testid="sensors-csv-import-anchor"/);
     expect(SENSORS_SRC).toMatch(/<EnvironmentCsvImportLauncher/);
     expect(SENSORS_SRC).toMatch(/testIdPrefix="sensors-csv-import"/);
+  });
+
+  it("mounts the focusable target named by the Dashboard import CTA", () => {
+    const dashboardHref = DASHBOARD_SRC.match(
+      /to="\/sensors#([^"]+)"[\s\S]{0,300}data-testid="dashboard-environment-snapshot-import-sensor-data"/,
+    );
+
+    expect(dashboardHref?.[1]).toBe("csv-import");
+    expect(SENSORS_SRC).toMatch(/id="csv-import"[\s\S]{0,120}tabIndex=\{-1\}/);
   });
 
   it("passes only the synchronously validated grow and tent through to the launcher", () => {

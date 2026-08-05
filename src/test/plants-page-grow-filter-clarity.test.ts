@@ -41,9 +41,7 @@ describe("Plants page — grow filter clarity", () => {
 
   it("does not use the word 'dropdown' in user-facing copy", () => {
     // Strip block + line comments before scanning, then look for visible copy.
-    const stripped = PLANTS
-      .replace(/\/\*[\s\S]*?\*\//g, "")
-      .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+    const stripped = PLANTS.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
     expect(stripped).not.toMatch(/\bdropdown\b/i);
   });
 });
@@ -112,8 +110,6 @@ describe("Plants page — safety guardrails", () => {
     expect(RULES).not.toMatch(/supabase/i);
     expect(RULES).not.toMatch(/service_role/);
     expect(RULES).not.toMatch(/\.(insert|update|delete|upsert)\s*\(/);
-    expect(RULES).not.toMatch(
-      /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|relay|actuator|webhook/i,
-    );
+    expect(RULES).not.toMatch(/mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|relay|actuator|webhook/i);
   });
 });

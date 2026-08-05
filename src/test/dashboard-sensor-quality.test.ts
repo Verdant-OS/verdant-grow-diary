@@ -91,10 +91,11 @@ describe("evaluateSensorQuality", () => {
     expect(r.suspiciousFields).toContain("rh");
   });
 
-  it("flags missing VPD as watch", () => {
+  it("keeps missing VPD unknown without classifying it as a suspicious reading", () => {
     const r = evaluateSensorQuality(fresh({ temp: 24, rh: 55 }), NOW);
     expect(r.quality).toBe("watch");
-    expect(r.suspiciousFields).toContain("vpd");
+    expect(r.reasons).toContain("VPD is missing from the latest snapshot.");
+    expect(r.suspiciousFields).not.toContain("vpd");
   });
 
   it("flags implausible temperature", () => {

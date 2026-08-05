@@ -140,10 +140,15 @@ function runRegressionOnlyMode({ config, allowlistPath, previousPath, now }) {
     };
   });
   const regressions = perUrl.filter((r) => r.regressed);
-  const status = regressions.length > 0 ? "regression" : "no_regression";
+  const previousAvailable = previous != null;
+  const status = !previousAvailable
+    ? "no_baseline"
+    : regressions.length > 0
+      ? "regression"
+      : "no_regression";
 
-  // Group per-URL outcomes into the six stable buckets (additive; the legacy
-  // status / urls[] / regression_count / exit codes are unchanged).
+  // Group per-URL outcomes into the six stable buckets. Top-level no_baseline
+  // and the per-URL no_baseline group derive from the same availability fact.
   const outcome_groups = groupRegressionOutcomes(
     perUrl.map((r) => ({
       url: r.url,
@@ -155,7 +160,7 @@ function runRegressionOnlyMode({ config, allowlistPath, previousPath, now }) {
         (e) => e.id,
       ),
     })),
-    { previousAvailable: previous != null },
+    { previousAvailable },
   );
 
   const payload = {
@@ -165,7 +170,7 @@ function runRegressionOnlyMode({ config, allowlistPath, previousPath, now }) {
     description: config.description,
     generated_at: new Date().toISOString(),
     previous_source: previousPath,
-    previous_available: previous != null,
+    previous_available: previousAvailable,
     regression_count: regressions.length,
     urls: perUrl,
     outcome_groups,

@@ -164,29 +164,19 @@ describe("parseBillingEntitlementResolutionAuditResponse — safety", () => {
 
 describe("entitlement resolution label helpers", () => {
   it("ai credits per month: free=0, pro/founder=100", () => {
-    expect(formatBillingEntitlementResolutionAiCreditsPerMonth("free")).toBe(
-      "0 / month",
+    expect(formatBillingEntitlementResolutionAiCreditsPerMonth("free")).toBe("0 / month");
+    expect(formatBillingEntitlementResolutionAiCreditsPerMonth("pro_monthly")).toBe("100 / month");
+    expect(formatBillingEntitlementResolutionAiCreditsPerMonth("pro_annual")).toBe("100 / month");
+    expect(formatBillingEntitlementResolutionAiCreditsPerMonth("founder_lifetime")).toBe(
+      "100 / month",
     );
-    expect(
-      formatBillingEntitlementResolutionAiCreditsPerMonth("pro_monthly"),
-    ).toBe("100 / month");
-    expect(
-      formatBillingEntitlementResolutionAiCreditsPerMonth("pro_annual"),
-    ).toBe("100 / month");
-    expect(
-      formatBillingEntitlementResolutionAiCreditsPerMonth("founder_lifetime"),
-    ).toBe("100 / month");
     expect(formatBillingEntitlementResolutionAiCreditsPerMonth(null)).toBe("—");
   });
 
   it("state labels are stable", () => {
     expect(formatBillingEntitlementResolutionState("active")).toBe("Active");
-    expect(formatBillingEntitlementResolutionState("free_fallback")).toBe(
-      "Free fallback",
-    );
-    expect(formatBillingEntitlementResolutionState("expired_fallback")).toBe(
-      "Expired fallback",
-    );
+    expect(formatBillingEntitlementResolutionState("free_fallback")).toBe("Free fallback");
+    expect(formatBillingEntitlementResolutionState("expired_fallback")).toBe("Expired fallback");
     expect(formatBillingEntitlementResolutionState("blocked")).toBe("Blocked");
     expect(formatBillingEntitlementResolutionState("unknown")).toBe("Unknown");
   });

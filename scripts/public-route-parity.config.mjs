@@ -21,9 +21,7 @@
 
 /** Sitemap URLs that legitimately have no STATIC_PUBLIC_SEO_DOCUMENTS entry. */
 export const SITEMAP_ONLY_ROUTES = Object.freeze([
-  "/",         // Homepage served by index.html itself; head baked at build.
-  "/feedback", // Support form; runtime Helmet only.
-  "/contact",  // Support form; runtime Helmet only.
+  "/", // Homepage served by index.html itself; head baked at build.
 ]);
 
 /** STATIC_PUBLIC_SEO_DOCUMENTS paths intentionally excluded from sitemap.xml. */
@@ -33,4 +31,8 @@ export const STATIC_ONLY_ROUTES = Object.freeze([
   "/creator-beta",
   "/pheno-comparison",
   "/pheno-expression-showcase",
+  // Pre-rendered so its canonical is itself rather than the shell's root
+  // canonical (which would mark it a homepage duplicate for non-JS crawlers).
+  // Whether to ADVERTISE it in sitemap.xml is a separate acquisition call.
+  "/docs/mcp-api",
 ]);

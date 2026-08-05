@@ -7,7 +7,10 @@
  * ingest, no schema writes.
  */
 import { useMemo, useState } from "react";
-import { usePhenoSampling } from "@/context/PhenoSamplingContext";
+import {
+  PHENO_SAMPLING_SESSION_ONLY_NOTICE,
+  usePhenoSampling,
+} from "@/context/PhenoSamplingContext";
 import {
   summarizeByCandidate,
   summarizeByTester,
@@ -54,11 +57,17 @@ export default function PhenoSamplingWorkspaceTools({
       data-testid="pheno-sampling-tools"
       className="space-y-6 rounded-lg border border-border bg-card p-4"
     >
-      <header>
-        <h2 className="text-lg font-semibold">Sampling reports</h2>
+      <header className="space-y-2">
+        <h2 className="text-lg font-semibold">Current session sampling summary</h2>
         <p className="text-xs text-muted-foreground">
           Observational summaries of tester feedback. Compare across testers before making
           selections — ash color and oil ring stay observations.
+        </p>
+        <p
+          data-testid="pheno-sampling-tools-session-disclosure"
+          className="rounded border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200"
+        >
+          {PHENO_SAMPLING_SESSION_ONLY_NOTICE}
         </p>
       </header>
 
@@ -156,7 +165,7 @@ export default function PhenoSamplingWorkspaceTools({
               }
               className="rounded border border-border bg-secondary px-2 py-1 text-xs font-medium"
             >
-              Export PDF report
+              Open printable session summary
             </button>
           )}
         </label>
@@ -215,9 +224,9 @@ export default function PhenoSamplingWorkspaceTools({
       {/* 4. History panel */}
       {activeCandidate && (
         <div data-testid="pheno-sampling-history" data-candidate={activeCandidate}>
-          <h3 className="text-sm font-semibold">History — {activeCandidate}</h3>
+          <h3 className="text-sm font-semibold">Current session entries — {activeCandidate}</h3>
           {history.length === 0 ? (
-            <p className="mt-1 text-xs text-muted-foreground">No history yet.</p>
+            <p className="mt-1 text-xs text-muted-foreground">No feedback in this session yet.</p>
           ) : (
             <ol className="mt-2 space-y-2 text-sm">
               {history.map((s) => (

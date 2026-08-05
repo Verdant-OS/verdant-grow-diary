@@ -539,7 +539,7 @@ output:
 
 ```bash
 # 1) Export the sandbox DB URL for this shell session.
-export SUPABASE_DB_URL="postgres://postgres:${SANDBOX_DB_PASSWORD}@db.knkwiiywfkbqznbxwqfh.supabase.co:5432/postgres"
+export SUPABASE_DB_URL="postgres://postgres:${SANDBOX_DB_PASSWORD}@db.bzatgtgjvuojpoxcknaa.supabase.co:5432/postgres"
 export TARGET_ENV=sandbox
 
 # 2) Snapshot expected prefixes offline (no DB call).
@@ -2605,5 +2605,87 @@ Symptoms and fixes unique to the SARIF output path:
 Still stuck? Run the diff CLI with `--json` and share the output — every
 failure mode is annotated with `target_env`, exit code, and the exact
 missing/malformed prefix, which is enough to diagnose without repo access.
+
+
+## Paddle Craft catalog preflight
+
+`scripts/verify-paddle-craft-catalog.ts` and the
+`.github/workflows/paddle-craft-catalog-preflight.yml` workflow guard
+the Craft plan catalog: they fail closed if `craft_monthly` or
+`craft_annual` is missing or inactive in Paddle sandbox or live.
+
+### Local usage
+
+```bash
+bun run verify:paddle-craft-catalog            # both envs
+bun run verify:paddle-craft-catalog:sandbox    # sandbox only
+```
+
+Required environment variables (read scope is sufficient for both):
+
+- `PADDLE_SANDBOX_API_KEY` — Paddle sandbox API key
+- `PADDLE_LIVE_API_KEY` — Paddle live API key
+
+### Exit codes
+
+| Exit | Meaning | CI treatment |
+|------|---------|--------------|
+| `0` | Every required external_id is present and active in the checked env(s). | Pass. |
+| `1` | At least one required id is missing, archived-only, or the Paddle API returned an error (e.g. 4xx/5xx). | Fail. |
+| `2` | Misconfiguration — API key not set for a requested env, or bad flags. | On `pull_request` runs with zero real failures: warn-only (non-blocking) sticky comment. On `schedule` / `workflow_dispatch` runs, or any run with `fail>0`, fails the workflow. |
+
+Exit `2` is **not a pass**. Exit `1` covers Paddle API failures as well
+as missing prices — telling an operator to "create the price" during a
+403 sends them the wrong way, so the sticky PR comment classifies the
+cause (missing / inactive / API error) and picks the remedy accordingly.
+
+### Extending the allowlist
+
+`REQUIRED_PLAN_IDS` in `scripts/verify-paddle-craft-catalog.ts` is derived
+from `PAID_PLAN_IDS` by external-id **prefix**
+(`GUARDED_EXTERNAL_ID_PREFIXES`, currently `craft_` and `credit_pack_`), so
+a new `craft_*` or `credit_pack_*` SKU added to the allowlist is required by
+this preflight automatically — there is no second list to remember.
+
+> ⚠️ A new plan on a **different** prefix (say `studio_monthly`) is still
+> silently uncovered: it matches no guarded prefix, so the preflight would
+> neither require it nor flag it as a coverage gap, and would keep
+> reporting green while that plan's Paddle price went unverified. Add the
+> prefix to `GUARDED_EXTERNAL_ID_PREFIXES` in the same change that
+> introduces the plan.
+
+The script exits `2` if the prefixes ever match nothing in `PAID_PLAN_IDS`
+— a preflight that verifies zero ids reports green forever, which is worse
+than not having one.
+
+**If the new id is a one-time credit pack, also add it to
+`CREDIT_PACK_IDS`** in the same file. `PAID_PLAN_IDS` is the full
+purchasable universe; `SUBSCRIPTION_PLAN_IDS` is derived from it by
+removing the packs, and `payments-webhook`'s `KNOWN_PRICE_IDS` is that
+derived list. A pack left out of `CREDIT_PACK_IDS` would therefore be
+treated as a subscription, and a $9 purchase would write a
+`subscriptions` row and grant plan access. `paidPlanAllowlist.ts`
+throws at import time on any `credit_pack*` id that is missing there,
+so this fails loudly at edge cold start rather than at the till — but
+adding both together avoids the red. Giving the pack a credit amount in
+`CREDIT_PACK_CREDITS` is enforced separately by the typechecker
+(`Record<CreditPackId, number>`).
+
+### Workflow security model
+
+The workflow runs in two jobs so PR-controlled code never executes with
+write scope:
+
+- **verify** (`permissions: contents: read`) checks out and runs the
+  verifier plus the comment renderer, then uploads the log as an
+  artifact. It never holds `pull-requests: write`.
+- **report** (`permissions: pull-requests: write`, no `actions/checkout`)
+  downloads the artifact and posts / updates the sticky PR comment via
+  `actions/github-script`.
+
+Fork PRs skip the report job (their token is read-only and would 403).
+Comment matching keys on both the hidden marker **and** the
+`github-actions[bot]` login, so a forged marker from a human account
+can't wedge future updates.
 
 

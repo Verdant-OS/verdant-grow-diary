@@ -9,7 +9,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -60,15 +60,10 @@ describe("PlantDailyGrowCheckHistoryCard · duplicate CTA suppression", () => {
 });
 
 describe("PlantDetail · passes hideHeaderCta to History card", () => {
-  const PLANT_DETAIL = readFileSync(
-    resolve(__dirname, "../pages/PlantDetail.tsx"),
-    "utf-8",
-  );
+  const PLANT_DETAIL = readFileSync(resolve(__dirname, "../pages/PlantDetail.tsx"), "utf-8");
 
   it("renders the History card with hideHeaderCta alongside the Consistency card", () => {
-    expect(PLANT_DETAIL).toMatch(
-      /PlantDailyGrowCheckHistoryCard[\s\S]*?hideHeaderCta[\s\S]*?\/>/,
-    );
+    expect(PLANT_DETAIL).toMatch(/PlantDailyGrowCheckHistoryCard[\s\S]*?hideHeaderCta[\s\S]*?\/>/);
     expect(PLANT_DETAIL).toContain("PlantDailyGrowCheckConsistencyCard");
   });
 });

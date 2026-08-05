@@ -13,9 +13,7 @@ import {
 describe("aiDoctorReadinessGateViewModel — exact copy + primary action", () => {
   it("insufficient → uses exact copy and 'Add missing context' primary", () => {
     const g = buildAiDoctorReadinessGate({ readiness: "insufficient" });
-    expect(g.message).toBe(
-      "More context needed before AI Doctor should give confident guidance.",
-    );
+    expect(g.message).toBe("More context needed before AI Doctor should give confident guidance.");
     expect(g.message).toBe(AI_DOCTOR_READINESS_GATE_COPY.insufficient);
     expect(g.primary.kind).toBe("focus_anchor");
     expect(g.primary.label).toBe(AI_DOCTOR_READINESS_GATE_ADD_CONTEXT_LABEL);
@@ -29,9 +27,7 @@ describe("aiDoctorReadinessGateViewModel — exact copy + primary action", () =>
       readiness: "partial",
       hasSafeAiDoctorFlow: true,
     });
-    expect(g.message).toBe(
-      "AI Doctor can review this, but confidence may be limited.",
-    );
+    expect(g.message).toBe("AI Doctor can review this, but confidence may be limited.");
     expect(g.primary.kind).toBe("open_ai_doctor");
     expect(g.primary.label).toBe(AI_DOCTOR_READINESS_GATE_REVIEW_LABEL);
     expect(g.primary.anchorId).toBe("plant-doctor");

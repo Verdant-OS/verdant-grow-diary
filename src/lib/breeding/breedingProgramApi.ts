@@ -80,9 +80,7 @@ export async function listBreedingPrograms(): Promise<BreedingProgramSummary[]> 
   return (data ?? []) as BreedingProgramSummary[];
 }
 
-export async function getBreedingProgram(
-  id: string,
-): Promise<{
+export async function getBreedingProgram(id: string): Promise<{
   program: BreedingProgramSummary;
   steps: BreedingStepRecord[];
   evidence: BreedingEvidenceRecord[];
@@ -106,8 +104,7 @@ export async function getBreedingProgram(
   if (evidenceRes.error) throw evidenceRes.error;
 
   const evidence = (evidenceRes.data ?? []).map((row) => {
-    const diary = (row as { diary_entries?: { note?: string; entry_at?: string } })
-      .diary_entries;
+    const diary = (row as { diary_entries?: { note?: string; entry_at?: string } }).diary_entries;
     return {
       id: row.id,
       program_id: row.program_id,
@@ -211,10 +208,7 @@ export async function setStepCriterionMet(
   if (error) throw error;
 }
 
-export async function completeStepAndAdvance(
-  programId: string,
-  stepId: string,
-): Promise<void> {
+export async function completeStepAndAdvance(programId: string, stepId: string): Promise<void> {
   // Mark current step complete.
   const { data: current, error: curErr } = await supabase
     .from("breeding_program_steps")
@@ -268,9 +262,9 @@ export async function attachDiaryEvidence(input: {
   if (error) throw error;
 }
 
-export async function listOwnDiaryEntries(limit = 50): Promise<
-  Array<{ id: string; note: string; entry_at: string; grow_id: string }>
-> {
+export async function listOwnDiaryEntries(
+  limit = 50,
+): Promise<Array<{ id: string; note: string; entry_at: string; grow_id: string }>> {
   const { data, error } = await supabase
     .from("diary_entries")
     .select("id, note, entry_at, grow_id")

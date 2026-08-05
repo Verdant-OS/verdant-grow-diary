@@ -1,7 +1,7 @@
 // Onboarding keyboard / radiogroup / "Change later" behavior.
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   clearLocalStorageForTest,
@@ -9,13 +9,28 @@ import {
 } from "./helpers/localStorageTestHelper";
 
 const navMock = vi.fn();
-vi.mock("react-router-dom", async () => {
-  const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
+vi.mock("@/lib/react-router-compat", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/react-router-compat")>(
+    "@/lib/react-router-compat",
+  );
   return { ...actual, useNavigate: () => navMock };
 });
 
 vi.mock("@/store/auth", () => ({
   useAuth: () => ({ user: { id: "user-1" }, loading: false, signOut: vi.fn() }),
+}));
+
+// Non-empty grows so Start your room hero stays hidden and classic heading copy remains.
+vi.mock("@/store/grows", () => ({
+  useGrows: () => ({
+    grows: [{ id: "g1", name: "Existing" }],
+    loading: false,
+    activeGrowId: "g1",
+    setActiveGrowId: vi.fn(),
+    refresh: vi.fn(),
+    activeGrow: { id: "g1", name: "Existing" },
+    error: null,
+  }),
 }));
 
 import Onboarding from "@/pages/Onboarding";

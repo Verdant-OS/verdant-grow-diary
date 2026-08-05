@@ -26,8 +26,13 @@ function ggsRow(
     metric,
     value,
     source: "live",
+    quality: "ok",
     captured_at: FRESH_TS,
-    raw_payload: { source_app: "spider_farmer_ggs", sensor_id: "GGS-X", payload: { redacted: true } },
+    raw_payload: {
+      source_app: "spider_farmer_ggs",
+      sensor_id: "GGS-X",
+      payload: { redacted: true },
+    },
     ...opts,
   };
 }
@@ -43,11 +48,7 @@ const SNAP_LIVE_READY: GgsSentinelSnapshot = {
 describe("evaluateGgsSentinelReadiness", () => {
   it("PASS_LIVE_SENTINEL_READY when all canonical rows + snapshot present", () => {
     const ev = evaluateGgsSentinelReadiness({
-      rows: [
-        ggsRow("soil_moisture_pct", 42.5),
-        ggsRow("ec", 0.85),
-        ggsRow("soil_temp_c", 22.3),
-      ],
+      rows: [ggsRow("soil_moisture_pct", 42.5), ggsRow("ec", 0.85), ggsRow("soil_temp_c", 22.3)],
       snapshot: SNAP_LIVE_READY,
       now: NOW,
     });
@@ -123,6 +124,50 @@ describe("evaluateGgsSentinelReadiness", () => {
     expect(ev.state).toBe("BLOCKED_SOURCE_NOT_CANONICAL");
   });
 
+  it("BLOCKED_SOURCE_NOT_CANONICAL for any non-live source", () => {
+    const ev = evaluateGgsSentinelReadiness({
+      rows: [
+        ggsRow("soil_moisture_pct", 42),
+        ggsRow("ec", 1, { source: "manual" }),
+        ggsRow("soil_temp_c", 22),
+      ],
+      snapshot: SNAP_LIVE_READY,
+      now: NOW,
+    });
+    expect(ev.state).toBe("BLOCKED_SOURCE_NOT_CANONICAL");
+  });
+
+  it.each(["degraded", "invalid", null, undefined])(
+    "BLOCKED_VALIDATION_ERROR when quality is %s",
+    (quality) => {
+      const ev = evaluateGgsSentinelReadiness({
+        rows: [
+          ggsRow("soil_moisture_pct", 42),
+          ggsRow("ec", 1, { quality }),
+          ggsRow("soil_temp_c", 22),
+        ],
+        snapshot: SNAP_LIVE_READY,
+        now: NOW,
+      });
+      expect(ev.state).toBe("BLOCKED_VALIDATION_ERROR");
+      expect(ev.passed).toBe(false);
+    },
+  );
+
+  it("BLOCKED_STALE_READING when quality is explicitly stale", () => {
+    const ev = evaluateGgsSentinelReadiness({
+      rows: [
+        ggsRow("soil_moisture_pct", 42),
+        ggsRow("ec", 1, { quality: "stale" }),
+        ggsRow("soil_temp_c", 22),
+      ],
+      snapshot: SNAP_LIVE_READY,
+      now: NOW,
+    });
+    expect(ev.state).toBe("BLOCKED_STALE_READING");
+    expect(ev.passed).toBe(false);
+  });
+
   it("BLOCKED_STALE_READING when newest row is older than 15 minutes", () => {
     const ev = evaluateGgsSentinelReadiness({
       rows: [
@@ -138,11 +183,7 @@ describe("evaluateGgsSentinelReadiness", () => {
 
   it("warns (not fails) when snapshot RPC is missing soil_temp", () => {
     const ev = evaluateGgsSentinelReadiness({
-      rows: [
-        ggsRow("soil_moisture_pct", 42),
-        ggsRow("ec", 1),
-        ggsRow("soil_temp_c", 22),
-      ],
+      rows: [ggsRow("soil_moisture_pct", 42), ggsRow("ec", 1), ggsRow("soil_temp_c", 22)],
       snapshot: { ...SNAP_LIVE_READY, soil_temp: null },
       now: NOW,
     });
@@ -154,11 +195,7 @@ describe("evaluateGgsSentinelReadiness", () => {
 
   it("safe summary never leaks raw_payload.payload body", () => {
     const ev = evaluateGgsSentinelReadiness({
-      rows: [
-        ggsRow("soil_moisture_pct", 42),
-        ggsRow("ec", 1),
-        ggsRow("soil_temp_c", 22),
-      ],
+      rows: [ggsRow("soil_moisture_pct", 42), ggsRow("ec", 1), ggsRow("soil_temp_c", 22)],
       snapshot: SNAP_LIVE_READY,
       now: NOW,
     });

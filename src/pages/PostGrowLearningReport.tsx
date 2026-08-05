@@ -6,7 +6,7 @@
  * no device control, and no schema changes.
  */
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "@/lib/react-router-compat";
 import { ArrowLeft, Leaf, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -30,7 +30,7 @@ import {
 import { usePostGrowLearningReportData } from "@/hooks/usePostGrowLearningReportData";
 import { usePlantMemoryEpisodes } from "@/hooks/usePlantMemoryEpisodes";
 import { buildPostGrowLearningLoopSummary } from "@/lib/postGrowLearningLoopSummaryRules";
-import { growDetailPath } from "@/lib/routes";
+import { actionDetailPath, growDetailPath } from "@/lib/routes";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { checkPremiumExportEntitlement } from "@/hooks/usePremiumExportServerGate";
 import PaywallCta from "@/components/PaywallCta";
@@ -45,6 +45,7 @@ function resultMessage(result: unknown, fallback: string): string {
 
 export default function PostGrowLearningReport() {
   const { growId } = useParams<{ growId: string }>();
+  const navigate = useNavigate();
   const { status, report, error, saveLesson, applyLessonToNextGrow } =
     usePostGrowLearningReportData(growId);
   const { state: episodesState } = usePlantMemoryEpisodes({
@@ -69,8 +70,7 @@ export default function PostGrowLearningReport() {
     loading: entitlementLoading,
     lookupFailed: clientLookupFailed,
   } = useMyEntitlements();
-  const clientIsPremium =
-    !clientLookupFailed && canUseCapability(entitlement, "advancedExports");
+  const clientIsPremium = !clientLookupFailed && canUseCapability(entitlement, "advancedExports");
   const [gateStatus, setGateStatus] = useState<"loading" | "allowed" | "denied" | "error">(
     "loading",
   );
@@ -111,8 +111,21 @@ export default function PostGrowLearningReport() {
     setBusy(true);
     const result = await applyLessonToNextGrow(lesson);
     setBusy(false);
-    if (result.ok) toast.success("Added to Action Queue for review");
-    else toast.error(resultMessage(result, "Lesson could not be added to the Action Queue."));
+    if (result.ok) {
+      const actionId = result.actionId;
+      if (actionId) {
+        toast.success("Added to Action Queue for review", {
+          action: {
+            label: "Review",
+            onClick: () => navigate(actionDetailPath(actionId)),
+          },
+        });
+      } else {
+        toast.success("Added to Action Queue for review");
+      }
+    } else {
+      toast.error(resultMessage(result, "Lesson could not be added to the Action Queue."));
+    }
   }
 
   const serverDecided = gateStatus !== "loading";
@@ -138,8 +151,8 @@ export default function PostGrowLearningReport() {
           className="text-sm text-muted-foreground mb-4"
           data-testid="post-grow-report-gate-message"
         >
-          The report entitlement check did not complete. Nothing was generated. Try the check
-          again in a moment.
+          The report entitlement check did not complete. Nothing was generated. Try the check again
+          in a moment.
         </p>
         <Button
           type="button"
@@ -232,11 +245,12 @@ export default function PostGrowLearningReport() {
       </Button>
 
       <div className="glass rounded-3xl p-4 sm:p-6 mb-4 border-primary/20">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <PageHeader
             title="Post-Grow Learning Report"
             description="Plant memory, sensor truth, and lessons for the next run."
             icon={<Leaf className="h-5 w-5" />}
+            className="mb-0 min-w-0 flex-1"
           />
           <ExportSummaryButtons vm={report} learningSummary={learningSummary} />
         </div>

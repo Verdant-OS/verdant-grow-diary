@@ -6,7 +6,8 @@
  *   - Pure (no I/O, no Supabase, no fetch, no console).
  *   - NEVER surfaces the verbatim `raw_payload.payload` body. UI may only
  *     render the safe summary fields exposed below.
- *   - NEVER emits source values other than `"live"`.
+ *   - NEVER emits source values other than `"manual"` for this operator-paste
+ *     acquisition path.
  *   - When the planner refuses, returns a typed refusal — no rows, no commit.
  *   - Adds a single non-domain rule: commit is forbidden unless the operator
  *     has checked the "real device" attestation box.
@@ -36,7 +37,7 @@ export interface GgsRealPayloadPreview {
   /** Age of the reading at preview time, in seconds. Negative = future. */
   ageSeconds: number;
   sensorId: string | null;
-  source: typeof GGS_REAL_PAYLOAD_SOURCE; // "live"
+  source: typeof GGS_REAL_PAYLOAD_SOURCE; // "manual"
   vendor: typeof GGS_REAL_PAYLOAD_SOURCE_APP; // "spider_farmer_ggs"
   metrics: GgsRealPayloadPreviewMetric[];
   /** Warnings surfaced by the normalizer (e.g. "soil_temp_unit_converted"). */
@@ -83,7 +84,9 @@ const METRIC_LABEL: Record<GgsRealPayloadMetric, { label: string; unit: string }
 
 function parsePayload(
   text: string,
-): { ok: true; value: unknown } | { ok: false; reason: "payload_blank" | "payload_unparseable"; details?: string } {
+):
+  | { ok: true; value: unknown }
+  | { ok: false; reason: "payload_blank" | "payload_unparseable"; details?: string } {
   if (typeof text !== "string" || text.trim().length === 0) {
     return { ok: false, reason: "payload_blank" };
   }
@@ -108,6 +111,7 @@ export function buildGgsRealPayloadIngestViewModel(
 
   const planned: GgsRealPayloadCommitInput = buildGgsRealPayloadCommitInput(parsed.value, {
     ...input.context,
+    operatorAttested: input.attested,
     now: input.now ?? input.context.now,
   });
 
@@ -163,9 +167,36 @@ export function buildGgsRealPayloadIngestViewModel(
 }
 
 export type GgsRealPayloadIngestRefusalReason =
-  | GgsRealPayloadRefusalReason
-  | "payload_unparseable"
-  | "payload_blank";
+  GgsRealPayloadRefusalReason | "payload_unparseable" | "payload_blank";
+
+export interface GgsRealPayloadCommitFailureFeedback {
+  title: string;
+  description: string;
+}
+
+export function describeGgsRealPayloadCommitFailure(
+  reason: string,
+): GgsRealPayloadCommitFailureFeedback {
+  if (reason === "commit_not_confirmed") {
+    return {
+      title: "Commit not confirmed",
+      description:
+        "Verdant could not verify a complete new three-reading cohort, so this operation was not marked complete. Review the existing sensor history before retrying.",
+    };
+  }
+  if (reason === "authorization_unavailable") {
+    return {
+      title: "Access check unavailable",
+      description:
+        "Verdant could not verify your operator access right now. Nothing was marked complete. Try again shortly.",
+    };
+  }
+  return {
+    title: "Commit not completed",
+    description:
+      "Verdant could not safely confirm this commit. Nothing was marked complete. Review the payload and try again.",
+  };
+}
 
 /** Human-readable explanation for a refusal reason. UI-only. */
 export function describeRefusal(reason: GgsRealPayloadIngestRefusalReason): string {
@@ -189,14 +220,20 @@ export function describeRefusal(reason: GgsRealPayloadIngestRefusalReason): stri
       return "Provide the physical probe / sensor id.";
     case "captured_at_missing_or_malformed":
       return "Payload is missing a valid timestamp.";
-    case "forbidden_declared_source":
-      return "Payload declares a non-canonical source. Refuse: only physical live readings are allowed.";
+    case "declared_source_not_allowed":
+      return "Payload source declarations are malformed, conflicting, unknown, or synthetic. Operator attestation cannot override them.";
+    case "payload_device_id_missing":
+      return "Payload must include its physical sensor or device id.";
+    case "payload_device_id_mismatch":
+      return "Payload sensor id must exactly match the selected physical probe / sensor id.";
     case "non_finite_value":
       return "Payload contains non-numeric or NaN/Infinity values.";
     case "soil_temp_out_of_range":
       return "Soil temperature is outside the realistic -20°C..80°C range.";
     case "soil_ec_unit_mismatch_suspected":
       return "EC unit looks wrong (µS/cm vs mS/cm). Refusing rather than guessing.";
+    case "incomplete_canonical_readings":
+      return "Payload must include one soil moisture, one EC, and one soil temperature reading.";
     case "no_canonical_readings":
       return "Payload does not contain any soil moisture / EC / soil temperature value.";
     case "normalizer_refused":

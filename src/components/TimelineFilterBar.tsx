@@ -16,12 +16,7 @@ interface Props {
   resetKey: TimelineFilterKey;
 }
 
-export default function TimelineFilterBar({
-  chips,
-  selected,
-  onSelect,
-  resetKey,
-}: Props) {
+export default function TimelineFilterBar({ chips, selected, onSelect, resetKey }: Props) {
   const canReset = selected !== resetKey;
   return (
     <div
@@ -41,7 +36,7 @@ export default function TimelineFilterBar({
           data-count={chip.count}
           onClick={() => onSelect(chip.key)}
           className={cn(
-            "inline-flex items-center gap-1.5 text-xs px-3 py-1 rounded-full border min-h-[32px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            "inline-flex items-center gap-1.5 text-xs px-3 py-1 rounded-full border min-h-[32px] transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring",
             chip.selected
               ? "bg-primary text-primary-foreground border-primary"
               : "bg-secondary/40 text-foreground border-border/40 hover:bg-secondary/60",

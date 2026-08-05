@@ -62,8 +62,32 @@ describe("buildReportsHubSummary", () => {
       outcomeLearning: {
         ...EMPTY_LEARNING_REPORT,
         groups: [
-          { metric: "ph", label: "pH", totals: { total: 3, improved: 2, unchanged: 1, worsened: 0, more_data_needed: 0, unknown: 0 }, needs_more_data: false },
-          { metric: "ec", label: "EC", totals: { total: 4, improved: 1, unchanged: 2, worsened: 1, more_data_needed: 0, unknown: 0 }, needs_more_data: false },
+          {
+            metric: "ph",
+            label: "pH",
+            totals: {
+              total: 3,
+              improved: 2,
+              unchanged: 1,
+              worsened: 0,
+              more_data_needed: 0,
+              unknown: 0,
+            },
+            needs_more_data: false,
+          },
+          {
+            metric: "ec",
+            label: "EC",
+            totals: {
+              total: 4,
+              improved: 1,
+              unchanged: 2,
+              worsened: 1,
+              more_data_needed: 0,
+              unknown: 0,
+            },
+            needs_more_data: false,
+          },
         ],
       },
       alertsOpen: 3,
@@ -106,7 +130,7 @@ describe("buildReportsHubSummary", () => {
     expect(map.recent_outcomes).toBe("/grows/grow-1");
     expect(map.environment_alerts).toBe("/alerts?growId=grow-1");
     expect(map.sensor_context).toBe("/grows/grow-1");
-    expect(map.timeline_activity).toBe("/logs?growId=grow-1");
+    expect(map.timeline_activity).toBe("/timeline?growId=grow-1");
   });
 
   it("copy stays observational", () => {
@@ -118,7 +142,9 @@ describe("buildReportsHubSummary", () => {
 
   it("source surface is safe (no automation / device control / service_role)", () => {
     expect(VM_SRC).not.toMatch(/service_role/);
-    expect(VM_SRC).not.toMatch(/mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|webhook|\brelay\b|\bactuator\b/i);
+    expect(VM_SRC).not.toMatch(
+      /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|webhook|\brelay\b|\bactuator\b/i,
+    );
     expect(VM_SRC).not.toMatch(/\.insert\(|\.update\(|\.delete\(|\.upsert\(|\.rpc\(/);
   });
 });

@@ -9,19 +9,14 @@
  *  - Copy is observational and onboarding-focused. Never claims reports are
  *    "fixed", "guaranteed", "healthy", or "complete".
  */
-import {
-  actionsPath,
-  plantsPath,
-} from "@/lib/routes";
+import { actionsPath, plantsPath } from "@/lib/routes";
 
 export const REPORTS_HUB_ONBOARDING_TITLE = "Start building your grow memory";
 export const REPORTS_HUB_ONBOARDING_SUBTITLE =
   "Add a few details so this hub has something to learn from.";
 
 export type ReportsHubOnboardingCardId =
-  | "add_plant"
-  | "add_sensor_snapshot"
-  | "review_action_outcome";
+  "add_plant" | "add_sensor_snapshot" | "review_action_outcome";
 
 export interface ReportsHubOnboardingCard {
   id: ReportsHubOnboardingCardId;
@@ -46,9 +41,7 @@ export interface ReportsHubOnboarding {
 }
 
 function safeInt(n: unknown): number {
-  return typeof n === "number" && Number.isFinite(n) && n >= 0
-    ? Math.floor(n)
-    : 0;
+  return typeof n === "number" && Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0;
 }
 
 /**
@@ -75,9 +68,7 @@ export function hasMeaningfulReportsData(
   );
 }
 
-export function buildReportsHubOnboarding(
-  input: ReportsHubOnboardingInput,
-): ReportsHubOnboarding {
+export function buildReportsHubOnboarding(input: ReportsHubOnboardingInput): ReportsHubOnboarding {
   const visible = !hasMeaningfulReportsData(input);
   if (!visible) return { visible: false, cards: [] };
 

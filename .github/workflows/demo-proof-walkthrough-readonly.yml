@@ -88,7 +88,7 @@ jobs:
           bunx vitest run proofReportRedactionRules DemoProofWalkthrough demoProofWalkthrough --reporter=verbose 2>&1 | tee e2e/results/demo-proof-vitest.log
 
       - name: TypeScript check
-        run: bunx tsc -p tsconfig.app.json --noEmit
+        run: bunx tsc -p tsconfig.json --noEmit
 
       - name: Run Demo Proof Walkthrough readonly E2E
         run: bun run test:e2e:demo-proof-readonly:ci

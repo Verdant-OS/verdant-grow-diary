@@ -26,12 +26,13 @@ const PLANT_TIMELINE = readFileSync(
   resolve(ROOT, "src/components/PlantRelativeTimelineSection.tsx"),
   "utf8",
 );
-const DIARY_BADGES = readFileSync(
-  resolve(ROOT, "src/components/DiaryEntryBadges.tsx"),
-  "utf8",
-);
+const DIARY_BADGES = readFileSync(resolve(ROOT, "src/components/DiaryEntryBadges.tsx"), "utf8");
 const TIMELINE_RULES = readFileSync(
   resolve(ROOT, "src/lib/relativeTimelineProjectionRules.ts"),
+  "utf8",
+);
+const TIMELINE_DETAIL_PRESENTATION_RULES = readFileSync(
+  resolve(ROOT, "src/lib/timelineDiaryEntryDetailPresentationRules.ts"),
   "utf8",
 );
 
@@ -41,8 +42,13 @@ describe("Grow Timeline · sensor_snapshot wiring", () => {
   });
 
   it("hides both `sensor` and `sensor_snapshot` from the misc extras strip", () => {
-    expect(TIMELINE_PAGE).toMatch(
-      /HIDDEN\s*=\s*\[[^\]]*"sensor"[^\]]*"sensor_snapshot"[^\]]*\]/,
+    // Detail presentation (structured lines + raw-chip fallback, including
+    // the HIDDEN_DIARY_DETAIL_KEYS denylist) is centralized in
+    // timelineDiaryEntryDetailPresentationRules.ts — see
+    // timelineDiaryEntryDetailPresentationRules.test.ts for the unit-level
+    // guarantee that every hidden key never reaches the raw fallback.
+    expect(TIMELINE_DETAIL_PRESENTATION_RULES).toMatch(
+      /HIDDEN_DIARY_DETAIL_KEYS[\s\S]*?=[\s\S]*?new Set\(\[[^\]]*"sensor"[^\]]*"sensor_snapshot"[^\]]*\]/,
     );
   });
 
@@ -119,9 +125,9 @@ describe("classifyRelativeTimelineFilter · fallback contract", () => {
   });
 
   it("photo source wins regardless of event type", () => {
-    expect(
-      classifyRelativeTimelineFilter({ ...base, eventType: "", source: "photo" }),
-    ).toBe("photos");
+    expect(classifyRelativeTimelineFilter({ ...base, eventType: "", source: "photo" })).toBe(
+      "photos",
+    );
   });
 
   it("unknown / null event types fall back to notes", () => {

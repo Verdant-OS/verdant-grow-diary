@@ -1,0 +1,64 @@
+name: Require CI secret
+description: >
+  Preflight that fails fast with a step-named, actionable error when a
+  required GitHub Actions repository secret is unset. Turns opaque
+  downstream failures ("gate failed", "psql: connection refused") into a
+  clear "SECRET_NAME missing" red at the top of the job, with a markdown
+  report suitable for the workflow step summary and PR sticky comments.
+
+  Delegates to scripts/assert-required-ci-secret.mjs (which in turn calls
+  the shared core in scripts/lib/assertRequiredCiSecret.mjs), so the exact
+  same wording, annotations, and exit codes are used everywhere.
+
+inputs:
+  secret-name:
+    description: "Exact repository secret name, e.g. SUPABASE_DB_URL_LIVE."
+    required: true
+  secret-value:
+    description: >
+      Value of the secret, injected explicitly by the caller from its
+      repository-secrets context. Empty or whitespace-only counts as missing.
+      Composite actions cannot read repository secrets themselves, so the
+      caller MUST pass the value in.
+    required: true
+  guard-heading:
+    description: "Optional heading for logs + markdown report."
+    required: false
+    default: ""
+  fix-steps-json:
+    description: >
+      Optional JSON array of strings. Overrides the default numbered fix
+      steps. Example: '["1. …", "2. …"]'.
+    required: false
+    default: ""
+  reason-lines-json:
+    description: >
+      Optional JSON array of strings — free-form paragraph appended after
+      the fix steps to explain why this is a hard failure.
+    required: false
+    default: ""
+  report-path:
+    description: >
+      Optional path to write a markdown report on failure. Wire this into
+      your existing `$GITHUB_STEP_SUMMARY` / sticky-comment steps.
+    required: false
+    default: ""
+  log-prefix:
+    description: "Optional log line prefix. Defaults to `ci-secret-preflight`."
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Preflight — ${{ inputs.secret-name }} configured
+      shell: bash
+      env:
+        SECRET_NAME: ${{ inputs.secret-name }}
+        SECRET_VALUE: ${{ inputs.secret-value }}
+        GUARD_HEADING: ${{ inputs.guard-heading }}
+        FIX_STEPS_JSON: ${{ inputs.fix-steps-json }}
+        REASON_LINES_JSON: ${{ inputs.reason-lines-json }}
+        REPORT_PATH: ${{ inputs.report-path }}
+        LOG_PREFIX: ${{ inputs.log-prefix }}
+      run: node "${{ github.action_path }}/../../../scripts/assert-required-ci-secret.mjs"

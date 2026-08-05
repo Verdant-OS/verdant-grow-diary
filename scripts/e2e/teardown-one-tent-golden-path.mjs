@@ -170,15 +170,6 @@ function buildOps(supabase, userId) {
         .select("id");
       return deletedCount(res, "follow_ups_delete");
     },
-    async deleteActionQueue(growId) {
-      const res = await supabase
-        .from("action_queue")
-        .delete()
-        .eq("user_id", userId)
-        .eq("grow_id", growId)
-        .select("id");
-      return deletedCount(res, "action_queue_delete");
-    },
     async deleteAlerts(growId) {
       const res = await supabase
         .from("alerts")

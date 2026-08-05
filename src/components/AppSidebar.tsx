@@ -1,11 +1,10 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation } from "@/lib/react-router-compat";
 import {
   LayoutDashboard,
   Box,
   Sprout,
   Activity,
   NotebookText,
-  ListChecks,
   Bell,
   Stethoscope,
   Settings,
@@ -22,6 +21,7 @@ import {
   GitFork,
   History,
   PlugZap,
+  Database,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -121,7 +121,6 @@ const growerGroups: NavGroup[] = [
       { to: "/timeline", label: "Timeline", icon: NotebookText },
       { to: "/alerts", label: "Alerts", icon: Bell },
       { to: "/actions", label: "Action Queue", icon: ShieldCheck },
-      { to: "/tasks", label: "Tasks", icon: ListChecks },
     ],
   },
   {
@@ -168,6 +167,7 @@ const operatorGroups: { label: string; items: NavItem[] }[] = [
     label: "Operator Mode",
     items: [
       { to: "/operator/release-readiness", label: "Release Readiness", icon: ClipboardList },
+      { to: "/operator/schema-audit", label: "Schema Audit", icon: Database },
       { to: "/operator/ai-doctor-phase1", label: "AI Doctor Results", icon: Stethoscope },
       { to: "/sensors/ecowitt-audit", label: "EcoWitt Audit", icon: Activity },
       { to: "/guides/cannabis-plant-care", label: "Help/Guides", icon: HelpCircle },
@@ -260,8 +260,11 @@ export default function AppSidebar() {
   };
 
   return (
-    <Sidebar collapsible="icon">
-      <SidebarHeader className="border-b border-sidebar-border px-3 py-3">
+    <Sidebar
+      collapsible="icon"
+      className="border-r border-sidebar-border/70 bg-sidebar/95 backdrop-blur-xl"
+    >
+      <SidebarHeader className="border-b border-sidebar-border/70 px-3 py-4">
         <div className="flex items-center gap-2.5">
           <BrandLogo size="md" />
           {!collapsed && (

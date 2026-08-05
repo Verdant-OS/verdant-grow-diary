@@ -12,10 +12,7 @@ import {
   buildAiCreditLimitNoticeViewModel,
   type AiCreditDenial,
 } from "@/lib/aiCreditLimitNoticeViewModel";
-import {
-  paywallCtaFindBannedWords,
-  paywallCtaViewModelText,
-} from "@/lib/paywallCtaViewModel";
+import { paywallCtaFindBannedWords, paywallCtaViewModelText } from "@/lib/paywallCtaViewModel";
 
 const denial = (plan_id: string | null | undefined): AiCreditDenial => ({
   ok: false,
@@ -46,7 +43,7 @@ describe("aiCreditLimitNoticeViewModel — Coach surface (S3.2)", () => {
     expect(vm.charged).toBe(false);
   });
 
-  it.each(["pro_monthly", "pro_annual", "founder_lifetime"])(
+  it.each(["pro_monthly", "pro_annual", "craft_monthly", "craft_annual", "founder_lifetime"])(
     "%s → Coach wait copy, NO paywallVm",
     (plan) => {
       const vm = buildAiCreditLimitNoticeViewModel({
@@ -85,7 +82,15 @@ describe("aiCreditLimitNoticeViewModel — Coach surface (S3.2)", () => {
   );
 
   it("Coach copy across every branch is free of banned words", () => {
-    for (const plan of ["free", "pro_monthly", "pro_annual", "founder_lifetime", "mystery"]) {
+    for (const plan of [
+      "free",
+      "pro_monthly",
+      "pro_annual",
+      "craft_monthly",
+      "craft_annual",
+      "founder_lifetime",
+      "mystery",
+    ]) {
       const vm = buildAiCreditLimitNoticeViewModel({
         credit: denial(plan),
         currentPlanLabel: "Free",

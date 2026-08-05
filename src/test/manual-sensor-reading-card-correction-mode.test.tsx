@@ -16,7 +16,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, fireEvent, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 
 const insertMutate = vi.fn().mockResolvedValue(undefined);
 const editMutate = vi.fn().mockResolvedValue({ id: "audit-1", changed_at: "now" });
@@ -25,6 +25,10 @@ const returningId = vi.fn();
 vi.mock("@/hooks/useInsertSensorReading", () => ({
   useInsertSensorReading: () => ({ mutateAsync: insertMutate, isPending: false }),
   validateSensorReadingPayload: () => {},
+}));
+
+vi.mock("@/hooks/useInsertSensorReadings", () => ({
+  useInsertSensorReadings: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
 vi.mock("@/hooks/useInsertManualSnapshotEdit", () => ({

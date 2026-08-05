@@ -87,7 +87,6 @@ describe("classifySnapshotTrustBadge", () => {
     expect(v.attachable).toBe(false);
   });
 
-
   it("fresh_non_live preserves source identity (manual/csv/demo)", () => {
     expect(
       classifySnapshotTrustBadge({ resolverStatus: "fresh_non_live", source: "manual" }).badge,

@@ -75,9 +75,7 @@ describe("buildIngestAuditRecord", () => {
     expect(buildIngestAuditRecord({ ...base, capturedAt: "not-a-date" })).toBeNull();
     expect(buildIngestAuditRecord({ ...base, rowsReceived: -1 })).toBeNull();
     expect(buildIngestAuditRecord({ ...base, rowsInserted: 5, rowsReceived: 1 })).toBeNull();
-    expect(
-      buildIngestAuditRecord({ ...(base as any), authKind: "other" }),
-    ).toBeNull();
+    expect(buildIngestAuditRecord({ ...(base as any), authKind: "other" })).toBeNull();
   });
 
   it("drops a malformed bridge_token_id on the bridge path instead of failing", () => {

@@ -11,7 +11,7 @@
  */
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import PhenoComparison from "@/pages/PhenoComparison";
 
 // Safety: assert the page does not import supabase, AI, or write helpers.
@@ -31,10 +31,7 @@ function renderAt(path: string) {
     <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route path="/pheno-comparison" element={<PhenoComparison />} />
-        <Route
-          path="/pheno-hunts/:id/compare"
-          element={<PhenoComparison />}
-        />
+        <Route path="/pheno-hunts/:id/compare" element={<PhenoComparison />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -44,12 +41,8 @@ describe("PhenoComparison page", () => {
   it("renders at /pheno-comparison with read-only badge and demo banner", () => {
     renderAt("/pheno-comparison");
     expect(screen.getByTestId("pheno-comparison-page")).toBeInTheDocument();
-    expect(
-      screen.getByTestId("pheno-comparison-read-only-badge"),
-    ).toHaveTextContent(/read-only/i);
-    expect(
-      screen.getByTestId("pheno-comparison-demo-banner"),
-    ).toHaveTextContent(/demo/i);
+    expect(screen.getByTestId("pheno-comparison-read-only-badge")).toHaveTextContent(/read-only/i);
+    expect(screen.getByTestId("pheno-comparison-demo-banner")).toHaveTextContent(/demo/i);
   });
 
   it("renders at /pheno-hunts/:id/compare", () => {
@@ -59,12 +52,8 @@ describe("PhenoComparison page", () => {
 
   it("renders at least two candidates side-by-side", () => {
     renderAt("/pheno-comparison");
-    expect(
-      screen.getByTestId("pheno-candidate-demo-cand-alpha"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByTestId("pheno-candidate-demo-cand-bravo"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("pheno-candidate-demo-cand-alpha")).toBeInTheDocument();
+    expect(screen.getByTestId("pheno-candidate-demo-cand-bravo")).toBeInTheDocument();
   });
 
   it("flags missing photo, missing sensor snapshot, stale, and invalid readings", () => {
@@ -82,13 +71,9 @@ describe("PhenoComparison page", () => {
     // Charlie has an invalid reading + no diary/photos.
     const charlie = screen.getByTestId("pheno-candidate-demo-cand-charlie");
     expect(within(charlie).getAllByText(/Invalid/i).length).toBeGreaterThan(0);
+    expect(within(charlie).getByTestId("missing-no_diary")).toBeInTheDocument();
     expect(
-      within(charlie).getByTestId("missing-no_diary"),
-    ).toBeInTheDocument();
-    expect(
-      within(charlie).getByTestId(
-        "pheno-candidate-demo-cand-charlie-no-photo",
-      ),
+      within(charlie).getByTestId("pheno-candidate-demo-cand-charlie-no-photo"),
     ).toBeInTheDocument();
   });
 

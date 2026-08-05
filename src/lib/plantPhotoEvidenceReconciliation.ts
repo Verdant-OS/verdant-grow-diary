@@ -76,9 +76,7 @@ function normalizeCount(n: number | null | undefined): number {
   return Math.floor(n);
 }
 
-function normalizeSource(
-  s: PhotoEvidenceDataSource | null | undefined,
-): PhotoEvidenceDataSource {
+function normalizeSource(s: PhotoEvidenceDataSource | null | undefined): PhotoEvidenceDataSource {
   return s === "live" || s === "demo" ? s : "unknown";
 }
 
@@ -144,8 +142,7 @@ export function buildPhotoEvidenceDisplay(
 
   const showSupportingRecordsCta = count > 0;
   const supportingRecordsCtaLabel = "View related activity";
-  const supportingRecordsCtaAriaLabel =
-    "View supporting photo evidence in Recent Activity.";
+  const supportingRecordsCtaAriaLabel = "View supporting photo evidence in Recent Activity.";
 
   return {
     count,

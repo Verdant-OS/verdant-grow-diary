@@ -7,7 +7,7 @@
  *  - Dashboard renders an "Environment Snapshot" section.
  *  - Snapshot section is not labelled "Live" inside the Dashboard page header
  *    (we only call readings live when verified live/fresh, via SensorSourceBadge).
- *  - Dashboard preserves existing links to Sensors, Alerts, Tasks.
+ *  - Dashboard preserves Sensors, Alerts, and Action Queue while retiring Tasks.
  *  - Static safety: no service_role, no fake-live labels, no device-control
  *    strings, no automation/autopilot, no *_executed event naming.
  */
@@ -15,10 +15,15 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { readDesktopGrowerNavigationSource } from "@/test/utils/growerNavigationSource";
+import {
+  extractMountedAppRoutePaths,
+  getRouteAliasRedirectTarget,
+  readAllRouteModuleSources,
+} from "./helpers/routeManifestSyncHarness";
 
 const ROOT = resolve(__dirname, "../..");
 const SIDEBAR = readDesktopGrowerNavigationSource();
-const APP = readFileSync(resolve(ROOT, "src/App.tsx"), "utf8");
+const APP = readAllRouteModuleSources();
 const DASH = readFileSync(resolve(ROOT, "src/pages/Dashboard.tsx"), "utf8");
 
 describe("Dashboard + Live Dashboard consolidation · navigation", () => {
@@ -33,16 +38,16 @@ describe("Dashboard + Live Dashboard consolidation · navigation", () => {
   });
 
   it("Legacy /grow-room route redirects to the main Dashboard", () => {
-    expect(APP).toMatch(
-      /path=["']\/grow-room["']\s+element=\{<Navigate\s+to=["']\/["']\s+replace\s*\/>\}/,
-    );
+    expect(extractMountedAppRoutePaths()).toContain("/grow-room");
+    expect(getRouteAliasRedirectTarget("/grow-room")).toBe("/");
     expect(APP).not.toMatch(/<GrowRoomMode\s*\/?>/);
   });
 
-  it("Existing Alerts / Tasks / Sensors nav links remain", () => {
+  it("keeps Alerts / Action Queue / Sensors and removes standalone Tasks navigation", () => {
     expect(SIDEBAR).toMatch(/\/alerts/);
-    expect(SIDEBAR).toMatch(/\/tasks/);
+    expect(SIDEBAR).toMatch(/\/actions/);
     expect(SIDEBAR).toMatch(/\/sensors/);
+    expect(SIDEBAR).not.toMatch(/\/tasks/);
   });
 });
 

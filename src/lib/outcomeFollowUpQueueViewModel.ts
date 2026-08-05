@@ -7,10 +7,7 @@
  * (overdue → worsened → more-data → decision-missing → closed), with
  * needs_review surfaced in its own category.
  */
-import {
-  comparePlantMemoryEpisodes,
-  type PlantMemoryEpisode,
-} from "@/lib/plantMemoryEpisodeRules";
+import { comparePlantMemoryEpisodes, type PlantMemoryEpisode } from "@/lib/plantMemoryEpisodeRules";
 import {
   EPISODE_CTA_LABELS,
   episodeUncertaintyLine,

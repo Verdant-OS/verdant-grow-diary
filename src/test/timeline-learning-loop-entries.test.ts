@@ -42,8 +42,13 @@ describe("timeline classification — the trio stays together, not generic notes
 describe("Timeline.tsx — no raw id/token leakage for learning-loop rows", () => {
   it("skips the raw detail-chip loop for learning-loop event types", () => {
     expect(TIMELINE_SRC).toContain("isLearningLoopEvent");
-    // The chip loop must be gated so loop rows render [] for `extra`.
-    expect(TIMELINE_SRC).toMatch(/isLearningLoopEvent\s*\?\s*\[\]/);
+    // Detail presentation (structured lines + raw-chip fallback) is
+    // centralized in timelineDiaryEntryDetailPresentationRules.ts, which is
+    // unit-tested directly (suppress: true → empty presentation) in
+    // timelineDiaryEntryDetailPresentationRules.test.ts. This pin only
+    // guards the WIRING: isLearningLoopEvent must still reach that module's
+    // suppress option so loop rows render [] for `extra`.
+    expect(TIMELINE_SRC).toMatch(/suppress:\s*isLearningLoopEvent\s*\|\|\s*isReadinessCheckEvent/);
   });
 
   it("renders friendly back-links via route helpers, never raw ids as text", () => {

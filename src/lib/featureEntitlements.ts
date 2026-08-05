@@ -19,10 +19,7 @@
  *       `supabase/functions/_shared/assertPhenoTrackerEntitlement.ts`.
  */
 
-import type {
-  PlanId,
-  ResolvedEntitlement,
-} from "@/lib/entitlements/types";
+import type { PlanId, ResolvedEntitlement } from "@/lib/entitlements/types";
 
 /**
  * `advanced_timeline_filters` gates the Pro timeline conveniences
@@ -35,6 +32,8 @@ export type FeatureKey = "pheno_tracker" | "advanced_timeline_filters";
 const PRO_PLAN_IDS: ReadonlyArray<PlanId> = [
   "pro_monthly",
   "pro_annual",
+  "craft_monthly",
+  "craft_annual",
   "founder_lifetime",
 ];
 

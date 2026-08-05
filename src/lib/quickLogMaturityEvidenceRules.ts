@@ -106,9 +106,7 @@ function normalizeObservedAt(raw: string | null | undefined): string | null {
   return new Date(time).toISOString();
 }
 
-export function hasQuickLogMaturityEvidence(
-  form: QuickLogMaturityEvidenceFormState,
-): boolean {
+export function hasQuickLogMaturityEvidence(form: QuickLogMaturityEvidenceFormState): boolean {
   return (
     PERCENT_FIELDS.some(([field]) => trim(form[field]) !== "") ||
     NOTE_FIELDS.some(([field]) => trim(form[field]) !== "")

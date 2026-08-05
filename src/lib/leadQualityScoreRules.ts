@@ -6,10 +6,7 @@
  * fields. Unknown/ambiguous data lowers confidence and surfaces warnings.
  */
 import type { LeadRow } from "@/hooks/useLeadsList";
-import {
-  recommendNextAction,
-  type LeadNextActionPriority,
-} from "@/lib/leadNextActionRules";
+import { recommendNextAction, type LeadNextActionPriority } from "@/lib/leadNextActionRules";
 import {
   KNOWN_LEAD_STATUSES as KNOWN_STATUSES,
   isMeaningfulString as isMeaningful,
@@ -74,10 +71,7 @@ function labelFor(grade: LeadQualityGrade): string {
  * Deterministic: same input always yields the same output (no Date.now()
  * unless `now` is supplied; tests pass a fixed `now`).
  */
-export function scoreLeadQuality(
-  lead: LeadRow,
-  now: number = Date.now(),
-): LeadQualityScore {
+export function scoreLeadQuality(lead: LeadRow, now: number = Date.now()): LeadQualityScore {
   const reasons: string[] = [];
   const warnings: string[] = [];
   let score = 0;

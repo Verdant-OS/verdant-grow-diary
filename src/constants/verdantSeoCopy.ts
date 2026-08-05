@@ -74,20 +74,13 @@ export const VERDANT_SEO_LANDING_SECTIONS: ReadonlyArray<SeoSection> = [
   {
     id: "seo-grow-diary",
     heading: "Grow diary app for serious growers",
-    body:
-      "Verdant helps growers log watering, feeding, symptoms, photos, sensor snapshots, and outcomes in one plant timeline. Quick Log is designed to capture the moment before it gets lost — a grow diary app and grow room logbook built for people who track more than notes.",
-    targetPhrases: [
-      "grow diary app",
-      "grow log app",
-      "cannabis grow journal",
-      "grow room logbook",
-    ],
+    body: "Verdant helps growers log watering, feeding, symptoms, photos, sensor snapshots, and outcomes in one plant timeline. Quick Log is designed to capture the moment before it gets lost — a grow diary app and grow room logbook built for people who track more than notes.",
+    targetPhrases: ["grow diary app", "grow log app", "cannabis grow journal", "grow room logbook"],
   },
   {
     id: "seo-vpd-tracker",
     heading: "Grow room VPD tracker with sensor truth",
-    body:
-      "Track temperature, humidity, VPD, CO₂, soil moisture, and other environment readings with clear source labels. Verdant distinguishes live, manual, csv, demo, stale, and invalid data so growers using a grow room VPD tracker or grow tent monitoring app never mistake old or sample readings for current tent truth.",
+    body: "Track temperature, humidity, VPD, CO₂, soil moisture, and other environment readings with clear source labels. Verdant distinguishes live, manual, csv, demo, stale, and invalid data so growers using a grow room VPD tracker or grow tent monitoring app never mistake old or sample readings for current tent truth.",
     targetPhrases: [
       "grow room VPD tracker",
       "VPD tracker for grow room",
@@ -98,8 +91,7 @@ export const VERDANT_SEO_LANDING_SECTIONS: ReadonlyArray<SeoSection> = [
   {
     id: "seo-hardware-neutral",
     heading: "Use the grow gear you already own",
-    body:
-      "Bring in readings without replacing your controller: AC Infinity and Spider Farmer exports import as labeled CSV history, while TrolMaster, EcoWitt, and other gear come in through manual snapshots or read-only integrations where available. Verdant is not another controller — it turns existing grow-room data logging into plant memory.",
+    body: "Bring in readings without replacing your controller: AC Infinity and Spider Farmer exports import as labeled CSV history, while TrolMaster, EcoWitt, and other gear come in through manual snapshots or read-only integrations where available. Verdant is not another controller — it turns existing grow-room data logging into plant memory.",
     targetPhrases: [
       "AC Infinity data logging",
       "Spider Farmer data logging",
@@ -110,8 +102,7 @@ export const VERDANT_SEO_LANDING_SECTIONS: ReadonlyArray<SeoSection> = [
   {
     id: "seo-ai-doctor",
     heading: "AI grow advice that shows its work",
-    body:
-      "AI Doctor uses plant history, recent logs, photos, and sensor context to provide cautious guidance. It cites evidence, shows confidence, names missing information, and tells you what not to do. Verdant is an AI grow doctor and plant symptom tracker that suggests — the grower decides.",
+    body: "AI Doctor uses plant history, recent logs, photos, and sensor context to provide cautious guidance. It cites evidence, shows confidence, names missing information, and tells you what not to do. Verdant is an AI grow doctor and plant symptom tracker that suggests — the grower decides.",
     targetPhrases: [
       "AI grow doctor",
       "cannabis plant diagnosis app",
@@ -122,8 +113,7 @@ export const VERDANT_SEO_LANDING_SECTIONS: ReadonlyArray<SeoSection> = [
   {
     id: "seo-plant-memory",
     heading: "Plant memory across every run",
-    body:
-      "See what changed, how the plant responded, what action was taken, and what should be repeated or avoided next run. Verdant is a cannabis plant tracker and grow room timeline that turns scattered notes and readings into a lasting cultivation record — plant memory across cycles.",
+    body: "See what changed, how the plant responded, what action was taken, and what should be repeated or avoided next run. Verdant is a cannabis plant tracker and grow room timeline that turns scattered notes and readings into a lasting cultivation record — plant memory across cycles.",
     targetPhrases: [
       "plant memory",
       "grow room timeline",

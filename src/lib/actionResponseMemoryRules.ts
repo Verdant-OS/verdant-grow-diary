@@ -58,18 +58,10 @@ export type ActionResponseSensorState = "none" | "available" | "unavailable";
  * trusted, never live, never healthy.
  */
 export type ActionResponseSensorTrustState =
-  | "trusted"
-  | "manual"
-  | "csv"
-  | "demo"
-  | "stale"
-  | "invalid"
-  | "unknown";
+  "trusted" | "manual" | "csv" | "demo" | "stale" | "invalid" | "unknown";
 
 export type ActionResponseLimitation =
-  | "duplicate_response_rows"
-  | "duplicate_conflicting_outcomes"
-  | "sensor_lookup_unavailable";
+  "duplicate_response_rows" | "duplicate_conflicting_outcomes" | "sensor_lookup_unavailable";
 
 export interface ActionResponseMemory {
   /** Opaque stable key for React lists. Never rendered as text. */

@@ -48,12 +48,11 @@ describe("buildPlantProfileContextViewModel", () => {
     expect(vm.potSize.known).toBe(false);
   });
 
-  it("exposes disabled coming-soon actions", () => {
+  it("does not expose placeholder actions", () => {
     const vm = buildPlantProfileContextViewModel({});
-    expect(vm.mediumAction.disabled).toBe(true);
-    expect(vm.mediumAction.label).toMatch(/coming soon/i);
-    expect(vm.potSizeAction.disabled).toBe(true);
-    expect(vm.potSizeAction.label).toMatch(/coming soon/i);
+    expect(vm).not.toHaveProperty("mediumAction");
+    expect(vm).not.toHaveProperty("potSizeAction");
+    expect(JSON.stringify(vm)).not.toMatch(/coming soon/i);
   });
 
   it("normalizes unknown stage and strain copy", () => {

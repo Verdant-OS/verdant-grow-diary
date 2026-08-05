@@ -9,7 +9,9 @@
  *   - REFUSES to fabricate live telemetry. If the payload does not look
  *     like it came from a physical device, this helper returns a typed
  *     refusal — the runner never inserts anything.
- *   - NEVER emits `ggs_live` or `ggs_csv`. Canonical source is `"live"`.
+ *   - NEVER emits `ggs_live` or `ggs_csv`. Because the transport is an
+ *     operator paste, the stored source is `"manual"` even when the payload
+ *     came from a physical device.
  *   - Vendor identity belongs in `raw_payload.source_app` only.
  *   - Tent + captured_at + bridge + device + user context are all
  *     required. Missing anything → refusal.
@@ -25,24 +27,35 @@ import {
   type GgsSoilReadingDraft,
 } from "@/lib/ggsSoilSensorReadingNormalizer";
 
-/** Metrics this helper is allowed to emit. */
-export type GgsRealPayloadMetric = "soil_moisture_pct" | "ec" | "soil_temp_c";
+/** Exactly one row for each metric is required before any commit is allowed. */
+export const GGS_REAL_PAYLOAD_METRICS = ["soil_moisture_pct", "ec", "soil_temp_c"] as const;
+export const GGS_REAL_PAYLOAD_EXPECTED_ROW_COUNT = GGS_REAL_PAYLOAD_METRICS.length;
 
-/** Canonical source value the RPC row will carry. Never `ggs_live`. */
-export const GGS_REAL_PAYLOAD_SOURCE = "live" as const;
+/** Metrics this helper is allowed to emit. */
+export type GgsRealPayloadMetric = (typeof GGS_REAL_PAYLOAD_METRICS)[number];
+
+/**
+ * Canonical acquisition-path source stored by the RPC. The physical-device
+ * claim is preserved separately in the server-authored provenance envelope.
+ */
+export const GGS_REAL_PAYLOAD_SOURCE = "manual" as const;
 
 /** Vendor identity stored under raw_payload.source_app. */
 export const GGS_REAL_PAYLOAD_SOURCE_APP = GGS_SOIL_SENSOR_PROVIDER; // "spider_farmer_ggs"
 
-/** Sources we explicitly refuse, even if the operator tries to pass them. */
-const FORBIDDEN_DECLARED_SOURCES = new Set<string>([
-  "demo",
-  "fixture",
-  "ggs_live",
-  "ggs_csv",
-  "test",
-  "sample",
+/**
+ * Explicit source declarations fail closed. An operator attestation can
+ * confirm provenance for a payload with no declaration, but it can never
+ * override an explicit unknown/synthetic declaration.
+ */
+export const GGS_ALLOWED_REAL_PAYLOAD_DECLARED_SOURCES = new Set<string>([
+  "live",
+  GGS_REAL_PAYLOAD_SOURCE_APP,
 ]);
+
+/** Server-authored provenance stamped on every operator-boundary row. */
+export const GGS_OPERATOR_ATTESTED_PROVENANCE = "operator_attested_real_payload" as const;
+export const GGS_OPERATOR_ATTESTATION_BOUNDARY = "operator-ggs-real-payload-commit" as const;
 
 export interface GgsRealPayloadContext {
   /** Server-resolved owner UUID. Required. */
@@ -57,6 +70,12 @@ export interface GgsRealPayloadContext {
    * idempotency table is keyed on it.
    */
   deviceId: string;
+  /**
+   * Whether the operator checked the real-device attestation for this exact
+   * payload/context tuple. The Edge handler re-establishes this from the
+   * request after auth/role/ownership checks; client previews are not trusted.
+   */
+  operatorAttested?: boolean;
   /** Caller-injected clock for deterministic tests. */
   now?: Date;
 }
@@ -68,7 +87,7 @@ export interface GgsRealPayloadCommitRow {
   metric: GgsRealPayloadMetric;
   value: number;
   captured_at: string;
-  source: typeof GGS_REAL_PAYLOAD_SOURCE; // always "live"
+  source: typeof GGS_REAL_PAYLOAD_SOURCE; // always "manual"
   quality: "ok" | "degraded";
   raw_payload: GgsRealPayloadAuditEnvelope;
 }
@@ -76,7 +95,17 @@ export interface GgsRealPayloadCommitRow {
 export interface GgsRealPayloadAuditEnvelope {
   /** Canonical vendor identity. UI must NEVER render this envelope. */
   source_app: typeof GGS_REAL_PAYLOAD_SOURCE_APP;
-  sensor_id: string | null;
+  /** Physical identity copied only after exact request/payload binding. */
+  sensor_id: string;
+  device_id: string;
+  /** Stable server-derived identity shared by every row from one payload. */
+  cohort_id: string;
+  provenance: typeof GGS_OPERATOR_ATTESTED_PROVENANCE;
+  operator_attestation: {
+    attested: boolean;
+    attested_at: string | null;
+    boundary: typeof GGS_OPERATOR_ATTESTATION_BOUNDARY;
+  };
   captured_at: string;
   /** Per-metric unit annotation, when conversion was applied. */
   original_units?: Record<string, string>;
@@ -92,11 +121,14 @@ export type GgsRealPayloadRefusalReason =
   | "bridge_id_missing"
   | "tent_id_missing"
   | "device_id_missing"
+  | "payload_device_id_missing"
+  | "payload_device_id_mismatch"
   | "captured_at_missing_or_malformed"
-  | "forbidden_declared_source"
+  | "declared_source_not_allowed"
   | "non_finite_value"
   | "soil_temp_out_of_range"
   | "soil_ec_unit_mismatch_suspected"
+  | "incomplete_canonical_readings"
   | "no_canonical_readings"
   | "normalizer_refused";
 
@@ -115,10 +147,7 @@ export type GgsRealPayloadCommitInput =
       details?: string;
     };
 
-function refuse(
-  reason: GgsRealPayloadRefusalReason,
-  details?: string,
-): GgsRealPayloadCommitInput {
+function refuse(reason: GgsRealPayloadRefusalReason, details?: string): GgsRealPayloadCommitInput {
   return { ok: false, reason, details };
 }
 
@@ -126,26 +155,77 @@ function isNonEmptyString(v: unknown): v is string {
   return typeof v === "string" && v.trim().length > 0;
 }
 
-function readDeclaredSource(raw: Record<string, unknown>): string | null {
-  const candidates = [raw.source, raw.declared_source, raw.declaredSource];
-  for (const c of candidates) {
-    if (typeof c === "string" && c.trim().length > 0) return c.trim().toLowerCase();
+type DeclaredSourceValidation = { ok: true; value: string | null } | { ok: false; details: string };
+
+const GGS_REAL_PAYLOAD_SOURCE_DECLARATION_ALIASES = [
+  "source",
+  "declared_source",
+  "declaredSource",
+] as const;
+
+function validateDeclaredSources(raw: Record<string, unknown>): DeclaredSourceValidation {
+  const declarations: Array<{ alias: string; value: string }> = [];
+  for (const alias of GGS_REAL_PAYLOAD_SOURCE_DECLARATION_ALIASES) {
+    if (!Object.prototype.hasOwnProperty.call(raw, alias)) continue;
+    const candidate = raw[alias];
+    if (typeof candidate !== "string" || candidate.trim().length === 0) {
+      return { ok: false, details: `${alias}:malformed` };
+    }
+    const value = candidate.trim().toLowerCase();
+    if (!GGS_ALLOWED_REAL_PAYLOAD_DECLARED_SOURCES.has(value)) {
+      return { ok: false, details: `${alias}:not_allowed` };
+    }
+    declarations.push({ alias, value });
   }
-  return null;
+
+  if (new Set(declarations.map((declaration) => declaration.value)).size > 1) {
+    return { ok: false, details: "conflicting_source_declarations" };
+  }
+  return { ok: true, value: declarations[0]?.value ?? null };
 }
 
-function readSensorId(raw: Record<string, unknown>): string | null {
-  for (const k of ["sensor_id", "sensorId", "probe_id", "probeId", "serial"] as const) {
+function readSensorIds(raw: Record<string, unknown>): string[] {
+  const identities: string[] = [];
+  for (const k of [
+    "sensor_id",
+    "sensorId",
+    "probe_id",
+    "probeId",
+    "serial",
+    "device_id",
+    "deviceId",
+    "ggs_id",
+    "controller_id",
+    "controllerId",
+  ] as const) {
     const v = raw[k];
-    if (typeof v === "string" && v.trim()) return v.trim();
-    if (typeof v === "number" && Number.isFinite(v)) return String(v);
+    if (typeof v === "string" && v.trim()) identities.push(v.trim());
+    if (typeof v === "number" && Number.isFinite(v)) identities.push(String(v));
   }
-  return null;
+  return identities;
 }
 
-function readOriginalUnits(
-  raw: Record<string, unknown>,
-): Record<string, string> | undefined {
+export function buildGgsRealPayloadCohortId(deviceId: string, capturedAt: string): string {
+  return `ggs:${deviceId}:${capturedAt}`;
+}
+
+/**
+ * One physical GGS sample is atomic for Sentinel purposes: exactly one row
+ * for each canonical metric. This stays exported so the Edge handler can
+ * re-assert the invariant at the final trust boundary.
+ */
+export function hasCompleteCanonicalGgsRealPayloadRows(
+  rows: readonly { metric: string }[],
+): boolean {
+  if (!Array.isArray(rows) || rows.length !== GGS_REAL_PAYLOAD_METRICS.length) return false;
+  const metrics = new Set(rows.map((row) => row.metric));
+  return (
+    metrics.size === GGS_REAL_PAYLOAD_METRICS.length &&
+    GGS_REAL_PAYLOAD_METRICS.every((metric) => metrics.has(metric))
+  );
+}
+
+function readOriginalUnits(raw: Record<string, unknown>): Record<string, string> | undefined {
   const v = raw.original_units ?? raw.originalUnits;
   if (!v || typeof v !== "object" || Array.isArray(v)) return undefined;
   const out: Record<string, string> = {};
@@ -177,9 +257,9 @@ export function buildGgsRealPayloadCommitInput(
   }
   const raw = payload as Record<string, unknown>;
 
-  const declared = readDeclaredSource(raw);
-  if (declared && FORBIDDEN_DECLARED_SOURCES.has(declared)) {
-    return refuse("forbidden_declared_source", declared);
+  const declared = validateDeclaredSources(raw);
+  if (declared.ok === false) {
+    return refuse("declared_source_not_allowed", declared.details);
   }
 
   // Run the existing pure normalizer to validate units, ranges, freshness,
@@ -209,21 +289,36 @@ export function buildGgsRealPayloadCommitInput(
   }
 
   const r = draft.readings;
-  if (r.soil_moisture_pct === undefined && r.ec === undefined && r.soil_temp_c === undefined) {
-    return refuse("no_canonical_readings");
-  }
   // Bounds check (defense in depth — DB trigger also enforces -20..80).
   if (typeof r.soil_temp_c === "number" && (r.soil_temp_c < -20 || r.soil_temp_c > 80)) {
     return refuse("soil_temp_out_of_range");
   }
 
-  const sensorId = readSensorId(raw);
+  const sensorIds = readSensorIds(raw);
+  if (sensorIds.length === 0) return refuse("payload_device_id_missing");
+  const sensorId = ctx.deviceId.trim();
+  if (sensorIds.some((identity) => identity !== sensorId)) {
+    return refuse(
+      "payload_device_id_mismatch",
+      "payload sensor identity does not match request deviceId",
+    );
+  }
   const originalUnits = readOriginalUnits(raw);
-  const capturedAt = draft.captured_at;
+  const capturedAt = new Date(draft.captured_at).toISOString();
+  const cohortId = buildGgsRealPayloadCohortId(sensorId, capturedAt);
+  const operatorAttested = ctx.operatorAttested === true;
 
   const envelope: GgsRealPayloadAuditEnvelope = {
     source_app: GGS_REAL_PAYLOAD_SOURCE_APP,
     sensor_id: sensorId,
+    device_id: sensorId,
+    cohort_id: cohortId,
+    provenance: GGS_OPERATOR_ATTESTED_PROVENANCE,
+    operator_attestation: {
+      attested: operatorAttested,
+      attested_at: operatorAttested ? (ctx.now ?? new Date()).toISOString() : null,
+      boundary: GGS_OPERATOR_ATTESTATION_BOUNDARY,
+    },
     captured_at: capturedAt,
     ...(originalUnits ? { original_units: originalUnits } : {}),
     payload: raw,
@@ -232,18 +327,20 @@ export function buildGgsRealPayloadCommitInput(
   const quality: "ok" | "degraded" = draft.status === "accepted" ? "ok" : "degraded";
 
   const rows: GgsRealPayloadCommitRow[] = [];
-  const idKeyPrefix = `ggs:${ctx.deviceId}:${capturedAt}`;
+  const idKeyPrefix = cohortId;
 
-  const orderedMetrics: Array<[GgsRealPayloadMetric, number | undefined]> = [
-    ["soil_moisture_pct", r.soil_moisture_pct],
-    ["ec", r.ec],
-    ["soil_temp_c", r.soil_temp_c],
-  ];
+  const valuesByMetric: Record<GgsRealPayloadMetric, number | undefined> = {
+    soil_moisture_pct: r.soil_moisture_pct,
+    ec: r.ec,
+    soil_temp_c: r.soil_temp_c,
+  };
+  const orderedMetrics: Array<[GgsRealPayloadMetric, number | undefined]> =
+    GGS_REAL_PAYLOAD_METRICS.map((metric) => [metric, valuesByMetric[metric]]);
   for (const [metric, value] of orderedMetrics) {
     if (typeof value !== "number" || !Number.isFinite(value)) continue;
     rows.push({
       idempotency_key: `${idKeyPrefix}:${metric}`,
-      device_id: ctx.deviceId,
+      device_id: sensorId,
       metric,
       value,
       captured_at: capturedAt,
@@ -253,7 +350,9 @@ export function buildGgsRealPayloadCommitInput(
     });
   }
 
-  if (rows.length === 0) return refuse("no_canonical_readings");
+  if (!hasCompleteCanonicalGgsRealPayloadRows(rows)) {
+    return refuse("incomplete_canonical_readings");
+  }
 
   return {
     ok: true,

@@ -65,9 +65,7 @@ function fmtDate(iso: string | null | undefined): string {
   return iso.slice(0, 10);
 }
 
-function buildTentLabelLookup(
-  options: TentOption[],
-): Map<string, string> {
+function buildTentLabelLookup(options: TentOption[]): Map<string, string> {
   const map = new Map<string, string>();
   for (const o of options) {
     map.set(o.id, o.name);
@@ -75,9 +73,7 @@ function buildTentLabelLookup(
   return map;
 }
 
-function uniqueMetricsFromRows(
-  result: VerdantGeneticsXlsxInsertRowsResult,
-): string[] {
+function uniqueMetricsFromRows(result: VerdantGeneticsXlsxInsertRowsResult): string[] {
   const set = new Set<string>();
   for (const r of result.rows) {
     if (r.metric) set.add(r.metric);
@@ -88,32 +84,19 @@ function uniqueMetricsFromRows(
 export function buildVerdantGeneticsXlsxImportEvidenceViewModel(
   input: BuildEvidenceInput,
 ): VerdantGeneticsXlsxImportEvidenceViewModel {
-  const {
-    adapterResult,
-    previewVm,
-    tentIdBySensorGroup,
-    tentOptions,
-    importBatchId,
-  } = input;
+  const { adapterResult, previewVm, tentIdBySensorGroup, tentOptions, importBatchId } = input;
 
   const lookup = buildTentLabelLookup(tentOptions);
-  const mappedGroups: MappedGroupEntry[] = previewVm.detectedGroups.map(
-    (g) => ({
-      sensorGroup: g,
-      tentLabel: lookup.get(tentIdBySensorGroup[g]) ?? null,
-    }),
-  );
+  const mappedGroups: MappedGroupEntry[] = previewVm.detectedGroups.map((g) => ({
+    sensorGroup: g,
+    tentLabel: lookup.get(tentIdBySensorGroup[g]) ?? null,
+  }));
 
-  const rejectionReasons: RejectionReasonEntry[] = Object.entries(
-    adapterResult.rejectionReasons,
-  )
+  const rejectionReasons: RejectionReasonEntry[] = Object.entries(adapterResult.rejectionReasons)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([reason, count]) => ({ reason, count }));
 
-  const metricsImported =
-    adapterResult.rows.length > 0
-      ? uniqueMetricsFromRows(adapterResult)
-      : [];
+  const metricsImported = adapterResult.rows.length > 0 ? uniqueMetricsFromRows(adapterResult) : [];
 
   return {
     acceptedRowCount: adapterResult.acceptedRowCount,

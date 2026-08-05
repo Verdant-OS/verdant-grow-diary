@@ -12,7 +12,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 
 vi.mock("@/hooks/useReportsHubData", () => ({
   useReportsHubData: vi.fn(),
@@ -195,7 +195,7 @@ describe("Reports / Grow Learning Hub", () => {
     const alertsLink = screen.getByTestId("reports-card-link-environment_alerts");
     expect(alertsLink.getAttribute("href")).toBe("/alerts?growId=grow-a");
     const timelineLink = screen.getByTestId("reports-card-link-timeline_activity");
-    expect(timelineLink.getAttribute("href")).toBe("/logs?growId=grow-a");
+    expect(timelineLink.getAttribute("href")).toBe("/timeline?growId=grow-a");
   });
 
   it("respects scoped grow over active grow", () => {

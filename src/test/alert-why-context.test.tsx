@@ -2,7 +2,9 @@
  * Stage-aware "Why this alert?" derivation + presenter tests.
  *
  * Covers:
- *   - Veg temp alert → "Veg target: 22–28°C"
+ *   - Veg temp alert → "Veg target: 71.6–82.4°F" by default (temperature
+ *     display preference, default Fahrenheit) and the legacy
+ *     "Veg target: 22–28°C" under an explicit celsius unit
  *   - Flower VPD alert → "Flower VPD target: 1.0–1.5 kPa"
  *   - Late flower RH alert → "Late flower RH target: 35–50%"
  *   - Unknown / legacy alerts → fallback context copy
@@ -10,17 +12,21 @@
  *   - Static safety: no alert writes / action_queue / service_role /
  *     AI Doctor / automation / device-control strings introduced.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
+import { deriveAlertWhyContext, WHY_PREFIX, type AlertLike } from "@/lib/alertWhyContext";
 import {
-  deriveAlertWhyContext,
-  WHY_PREFIX,
-  type AlertLike,
-} from "@/lib/alertWhyContext";
+  clearTemperatureUnitPreference,
+  saveTemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
 import { AlertWhyContext } from "@/components/AlertWhyContext";
+
+beforeEach(() => {
+  clearTemperatureUnitPreference();
+});
 
 const VEG_TEMP_HIGH: AlertLike = {
   metric: "temp",
@@ -32,8 +38,7 @@ const VEG_TEMP_HIGH: AlertLike = {
 const FLOWER_VPD_HIGH: AlertLike = {
   metric: "vpd",
   title: "VPD above stage range",
-  reason:
-    "VPD is above the flower target range. Observed 1.9 kPa (flower range 1 kPa–1.5 kPa).",
+  reason: "VPD is above the flower target range. Observed 1.9 kPa (flower range 1 kPa–1.5 kPa).",
 };
 
 const LATE_FLOWER_RH_HIGH: AlertLike = {
@@ -46,8 +51,7 @@ const LATE_FLOWER_RH_HIGH: AlertLike = {
 const LEGACY_GENERIC_TEMP: AlertLike = {
   metric: "temp",
   title: "Temperature above default range",
-  reason:
-    "Temperature is above the default safe range. Observed 33°C (default range 18°C–30°C).",
+  reason: "Temperature is above the default safe range. Observed 33°C (default range 18°C–30°C).",
 };
 
 const UNKNOWN_STAGE_ALERT: AlertLike = {
@@ -58,15 +62,37 @@ const UNKNOWN_STAGE_ALERT: AlertLike = {
 };
 
 describe("deriveAlertWhyContext — stage-aware bands", () => {
-  it("1. veg temp alert → 'Veg target: 22–28°C'", () => {
+  it("1. veg temp alert → 'Veg target: 71.6–82.4°F' (default display unit is Fahrenheit)", () => {
     const w = deriveAlertWhyContext(VEG_TEMP_HIGH);
+    expect(w.kind).toBe("stage");
+    expect(w.text).toBe("Veg target: 71.6–82.4°F");
+    if (w.kind === "stage") {
+      expect(w.metric).toBe("temp");
+      expect(w.stage).toBe("veg");
+      expect(w.unit).toBe("°F");
+      expect(w.min).toBe(71.6);
+      expect(w.max).toBe(82.4);
+    }
+  });
+
+  it("1b. explicit celsius unit renders the legacy 'Veg target: 22–28°C'", () => {
+    const w = deriveAlertWhyContext(VEG_TEMP_HIGH, "celsius");
     expect(w.kind).toBe("stage");
     expect(w.text).toBe("Veg target: 22–28°C");
     if (w.kind === "stage") {
       expect(w.metric).toBe("temp");
       expect(w.stage).toBe("veg");
       expect(w.unit).toBe("°C");
+      expect(w.min).toBe(22);
+      expect(w.max).toBe(28);
     }
+  });
+
+  it("1c. saved celsius preference is the default unit (never double-converts)", () => {
+    saveTemperatureUnitPreference("celsius");
+    const w = deriveAlertWhyContext(VEG_TEMP_HIGH);
+    expect(w.kind).toBe("stage");
+    expect(w.text).toBe("Veg target: 22–28°C");
   });
 
   it("2. flower VPD alert → 'Flower VPD target: 1.0–1.5 kPa'", () => {
@@ -94,12 +120,25 @@ describe("deriveAlertWhyContext — stage-aware bands", () => {
 });
 
 describe("AlertWhyContext presenter", () => {
-  it("6. compact variant renders 'Why this alert?' prefix + derived text", () => {
+  it("6. compact variant renders 'Why this alert?' prefix + derived text (°F default)", () => {
     render(<AlertWhyContext alert={VEG_TEMP_HIGH} variant="compact" />);
     const node = screen.getByTestId("alert-why-compact");
     expect(node.textContent).toContain(WHY_PREFIX);
-    expect(node.textContent).toContain("Veg target: 22–28°C");
+    expect(node.textContent).toContain("Veg target: 71.6–82.4°F");
     expect(node.getAttribute("data-kind")).toBe("stage");
+  });
+
+  it("6b. compact variant renders legacy °C copy when preference is celsius", () => {
+    saveTemperatureUnitPreference("celsius");
+    render(<AlertWhyContext alert={VEG_TEMP_HIGH} variant="compact" />);
+    const node = screen.getByTestId("alert-why-compact");
+    expect(node.textContent).toContain("Veg target: 22–28°C");
+    expect(node.textContent).not.toContain("°F");
+  });
+
+  it("6c. detailed temp variant renders the converted range row (°F default)", () => {
+    render(<AlertWhyContext alert={VEG_TEMP_HIGH} variant="detailed" />);
+    expect(screen.getByTestId("alert-why-range").textContent).toBe("71.6–82.4°F");
   });
 
   it("7. detailed variant renders stage + range rows", () => {
@@ -127,14 +166,8 @@ describe("AlertWhyContext presenter", () => {
 // --------------------------------------------------------------------------
 // Static safety contract
 // --------------------------------------------------------------------------
-const HELPER_SRC = readFileSync(
-  resolve(__dirname, "../lib/alertWhyContext.ts"),
-  "utf8",
-);
-const COMP_SRC = readFileSync(
-  resolve(__dirname, "../components/AlertWhyContext.tsx"),
-  "utf8",
-);
+const HELPER_SRC = readFileSync(resolve(__dirname, "../lib/alertWhyContext.ts"), "utf8");
+const COMP_SRC = readFileSync(resolve(__dirname, "../components/AlertWhyContext.tsx"), "utf8");
 
 describe("static safety", () => {
   for (const [name, src] of [

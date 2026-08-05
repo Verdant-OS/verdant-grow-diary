@@ -32,18 +32,35 @@ function block(label: string, regex: RegExp): string {
   return m[0];
 }
 
-const LOADING_BLOCK = block(
-  "loading-state",
-  /if \(loading\) \{[\s\S]*?\n {2}\}/,
-);
-const ERROR_BLOCK = block(
-  "error-state",
-  /if \(loadError\) \{[\s\S]*?\n {2}\}/,
-);
-const NOTFOUND_BLOCK = block(
-  "not-found-state",
-  /if \(notFound \|\| !row\) \{[\s\S]*?\n {2}\}/,
-);
+const LOADING_BLOCK = block("loading-state", /if \(loading\) \{[\s\S]*?\n {2}\}/);
+const ERROR_BLOCK = block("error-state", /if \(loadError\) \{[\s\S]*?\n {2}\}/);
+const NOTFOUND_BLOCK = block("not-found-state", /if \(notFound \|\| !row\) \{[\s\S]*?\n {2}\}/);
+
+// Only two RPC-invocation shapes are legitimate in this codebase (see
+// action-detail-linked-alert.test.tsx for the full writeup):
+//   1. Direct call:       supabase.rpc("name", args)
+//   2. Cast-wrapped call: (supabase.rpc as unknown as (fn: string, args:
+//      unknown) => Promise<...>)("name", args) — used before the RPC's
+//      generated typing lands (see actionQueueRpcAvailability).
+// Anchoring to the call's own first argument (and second argument
+// identifier) rather than "any quote within N characters of supabase.rpc"
+// stops a dynamic/foreign RPC call from being credited with the canonical
+// name or the expected rpcArgs binding (Codex P2).
+const DIRECT_RPC_CALL_PATTERN = /supabase\.rpc\s*\(\s*["']([^"']+)["']\s*(?:,\s*(\w+))?\s*,?\s*\)/g;
+const CAST_RPC_CALL_PATTERN =
+  /supabase\.rpc\s+as\s+unknown\s+as\s*\([\s\S]{0,150}?\)\s*=>\s*[\s\S]{0,150}?\)\s*\(\s*["']([^"']+)["']\s*(?:,\s*(\w+))?\s*,?\s*\)/g;
+
+function resolveRpcCalls(src: string): Array<{ name: string; argsVar?: string }> {
+  const direct = [...src.matchAll(DIRECT_RPC_CALL_PATTERN)].map((m) => ({
+    name: m[1],
+    argsVar: m[2],
+  }));
+  const cast = [...src.matchAll(CAST_RPC_CALL_PATTERN)].map((m) => ({
+    name: m[1],
+    argsVar: m[2],
+  }));
+  return [...direct, ...cast];
+}
 
 describe("ActionDetail — loading state", () => {
   it("renders visible 'Loading action…' copy", () => {
@@ -149,14 +166,21 @@ describe("ActionDetail — state UI safety", () => {
     expect(all).not.toMatch(/autopilot|auto[- ]?execute|auto[- ]?run|executed automatically/i);
   });
 
-  it("page module contains no service_role and no client user_id insert", () => {
+  it("page module contains no service_role and sends no identity to the transition RPC", () => {
     expect(SRC).not.toMatch(/service_role/i);
-    // Audit insert must not pass user_id from the client.
     const m = SRC.match(
-      /\.from\(\s*["']action_queue_events["']\s*\)\s*\.insert\(\s*\{([\s\S]*?)\}\s*\)/,
+      /const\s+rpcArgs\s*=\s*buildActionQueueTransitionRpcArgs\(\s*\{([\s\S]*?)\}\s*\)/,
     );
     expect(m).not.toBeNull();
-    expect(m![1]).not.toMatch(/\buser_id\s*:/);
+    expect(m![1]).not.toMatch(/\buser_id\b|\bgrow_id\b|\bevent_type\b|\bnew_status\b/);
+    const rpcCallSiteCount = (SRC.match(/supabase\.rpc\b/g) ?? []).length;
+    const rpcCalls = resolveRpcCalls(SRC);
+    // Every call site must independently resolve its own first-argument
+    // name and second-argument identifier — a dynamic/foreign call site
+    // would leave this short rather than being credited with the
+    // canonical name or rpcArgs binding.
+    expect(rpcCalls.length).toBe(rpcCallSiteCount);
+    expect(rpcCalls).toEqual([{ name: "action_queue_transition", argsVar: "rpcArgs" }]);
   });
 
   it("page module does not invoke edge functions or AI gateway", () => {

@@ -56,9 +56,33 @@
   </url>
   <url>
     <loc>https://verdantgrowdiary.com/guides</loc>
-    <lastmod>2026-07-03</lastmod>
+    <lastmod>2026-08-01</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://verdantgrowdiary.com/guides/cannabis-leaf-symptoms</loc>
+    <lastmod>2026-08-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://verdantgrowdiary.com/guides/cannabis-leaves-turning-yellow</loc>
+    <lastmod>2026-08-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://verdantgrowdiary.com/guides/cannabis-leaf-spots-lesions</loc>
+    <lastmod>2026-08-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://verdantgrowdiary.com/guides/cannabis-burnt-crispy-leaf-tips</loc>
+    <lastmod>2026-08-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
   </url>
   <url>
     <loc>https://verdantgrowdiary.com/guides/grow-diary-app</loc>
@@ -74,7 +98,7 @@
   </url>
   <url>
     <loc>https://verdantgrowdiary.com/guides/grow-room-vpd-tracker</loc>
-    <lastmod>2026-07-03</lastmod>
+    <lastmod>2026-08-02</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
@@ -92,7 +116,7 @@
   </url>
   <url>
     <loc>https://verdantgrowdiary.com/guides/sensor-truth-grow-room</loc>
-    <lastmod>2026-07-03</lastmod>
+    <lastmod>2026-08-02</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
@@ -110,7 +134,7 @@
   </url>
   <url>
     <loc>https://verdantgrowdiary.com/guides/what-to-log-in-a-grow-journal</loc>
-    <lastmod>2026-07-15</lastmod>
+    <lastmod>2026-07-30</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
@@ -134,7 +158,7 @@
   </url>
   <url>
     <loc>https://verdantgrowdiary.com/guides/daily-grow-log-checklist</loc>
-    <lastmod>2026-07-15</lastmod>
+    <lastmod>2026-07-30</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
@@ -182,9 +206,33 @@
   </url>
   <url>
     <loc>https://verdantgrowdiary.com/guides/cannabis-plant-care</loc>
-    <lastmod>2026-07-15</lastmod>
+    <lastmod>2026-07-30</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://verdantgrowdiary.com/guides/cannabis-nutrient-schedule</loc>
+    <lastmod>2026-07-29</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://verdantgrowdiary.com/guides/cannabis-grow-light-distance-and-schedule</loc>
+    <lastmod>2026-07-30</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://verdantgrowdiary.com/guides/cannabis-light-stress-light-burn-bleaching-or-heat</loc>
+    <lastmod>2026-07-30</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://verdantgrowdiary.com/guides/oreoz-vs-gelonade-comparison</loc>
+    <lastmod>2026-07-30</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
   </url>
   <url>
     <loc>https://verdantgrowdiary.com/terms</loc>
@@ -242,6 +290,48 @@
   </url>
   <url>
     <loc>https://verdantgrowdiary.com/cultivars/blue-cookies</loc>
+    <lastmod>2026-07-16</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://verdantgrowdiary.com/cultivars/sour-diesel</loc>
+    <lastmod>2026-07-16</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://verdantgrowdiary.com/cultivars/og-kush</loc>
+    <lastmod>2026-07-16</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://verdantgrowdiary.com/cultivars/blue-dream</loc>
+    <lastmod>2026-07-16</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://verdantgrowdiary.com/cultivars/gg4</loc>
+    <lastmod>2026-07-16</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://verdantgrowdiary.com/cultivars/lemon-cherry-gelato</loc>
+    <lastmod>2026-07-16</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://verdantgrowdiary.com/cultivars/jack-herer</loc>
+    <lastmod>2026-07-16</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://verdantgrowdiary.com/cultivars/sour-stomper</loc>
     <lastmod>2026-07-16</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>

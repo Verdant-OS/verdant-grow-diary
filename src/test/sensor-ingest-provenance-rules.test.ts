@@ -46,37 +46,47 @@ describe("sensor ingest provenance rules", () => {
   });
 
   it("rejects transport and integration names as source labels", () => {
-    expect(buildSensorIngestProvenancePayload({
-      source: "mqtt",
-      sourceApp: "raspberry_pi_bridge",
-      transport: "mqtt",
-    })).toEqual({ ok: false, reason: "source_not_canonical" });
+    expect(
+      buildSensorIngestProvenancePayload({
+        source: "mqtt",
+        sourceApp: "raspberry_pi_bridge",
+        transport: "mqtt",
+      }),
+    ).toEqual({ ok: false, reason: "source_not_canonical" });
 
-    expect(buildSensorIngestProvenancePayload({
-      source: "api",
-      sourceApp: "spider_farmer_ggs",
-      transport: "api",
-    })).toEqual({ ok: false, reason: "source_not_canonical" });
+    expect(
+      buildSensorIngestProvenancePayload({
+        source: "api",
+        sourceApp: "spider_farmer_ggs",
+        transport: "api",
+      }),
+    ).toEqual({ ok: false, reason: "source_not_canonical" });
 
-    expect(buildSensorIngestProvenancePayload({
-      source: "unknown",
-      sourceApp: "unknown_app",
-      transport: "api",
-    })).toEqual({ ok: false, reason: "source_not_canonical" });
+    expect(
+      buildSensorIngestProvenancePayload({
+        source: "unknown",
+        sourceApp: "unknown_app",
+        transport: "api",
+      }),
+    ).toEqual({ ok: false, reason: "source_not_canonical" });
   });
 
   it("rejects unsupported provenance app and transport values", () => {
-    expect(buildSensorIngestProvenancePayload({
-      source: "live",
-      sourceApp: "not_registered",
-      transport: "mqtt",
-    })).toEqual({ ok: false, reason: "source_app_not_allowed" });
+    expect(
+      buildSensorIngestProvenancePayload({
+        source: "live",
+        sourceApp: "not_registered",
+        transport: "mqtt",
+      }),
+    ).toEqual({ ok: false, reason: "source_app_not_allowed" });
 
-    expect(buildSensorIngestProvenancePayload({
-      source: "live",
-      sourceApp: "raspberry_pi_bridge",
-      transport: "not_registered",
-    })).toEqual({ ok: false, reason: "transport_not_allowed" });
+    expect(
+      buildSensorIngestProvenancePayload({
+        source: "live",
+        sourceApp: "raspberry_pi_bridge",
+        transport: "not_registered",
+      }),
+    ).toEqual({ ok: false, reason: "transport_not_allowed" });
   });
 
   it("strips suspicious optional provenance strings", () => {

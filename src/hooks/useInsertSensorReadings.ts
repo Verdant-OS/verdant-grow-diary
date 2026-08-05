@@ -14,9 +14,7 @@ import {
 
 export const VALID_SENSOR_SOURCES = ["manual", "pi_bridge", "sim"] as const;
 
-export function validateSensorReadingBatch(
-  rows: InsertSensorReadingPayload[],
-): void {
+export function validateSensorReadingBatch(rows: InsertSensorReadingPayload[]): void {
   if (!Array.isArray(rows)) throw new Error("batch payload must be an array");
   if (rows.length === 0) return;
   rows.forEach((row, idx) => {
@@ -47,12 +45,27 @@ export function useInsertSensorReadings(): UseMutationResult<
       validateSensorReadingBatch(rows);
       await insertSensorReadingsBatch(rows);
     },
-    onSuccess: () => {
+    onSuccess: (_data, rows) => {
       qc.invalidateQueries({ queryKey: ["grow", "sensors"] });
       qc.invalidateQueries({ queryKey: ["sensor_readings"] });
       qc.invalidateQueries({ queryKey: ["latest-sensor-snapshot"] });
       qc.invalidateQueries({ queryKey: ["plant-tent-environment"] });
       qc.invalidateQueries({ queryKey: ["environment-trends"] });
+
+      const first = rows[0];
+      const isSingleTentManualSnapshot =
+        first?.source === "manual" &&
+        rows.every((row) => row.source === "manual" && row.tent_id === first.tent_id);
+      if (isSingleTentManualSnapshot && typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("verdant:sensor-reading-created", {
+            detail: {
+              createdAt: first.captured_at ?? first.ts ?? new Date().toISOString(),
+              tentId: first.tent_id,
+            },
+          }),
+        );
+      }
     },
   });
 }

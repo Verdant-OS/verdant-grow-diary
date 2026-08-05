@@ -16,12 +16,7 @@ import {
   type SensorSnapshotSeverity,
 } from "@/lib/sensorSnapshotStatusContract";
 
-export type TimelineSensorTone =
-  | "ok"
-  | "caution"
-  | "danger"
-  | "review"
-  | "empty";
+export type TimelineSensorTone = "ok" | "caution" | "danger" | "review" | "empty";
 
 export interface TimelineSensorSeverity {
   status: SnapshotStatus;

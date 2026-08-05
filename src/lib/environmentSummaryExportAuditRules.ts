@@ -10,15 +10,13 @@
 
 import { assertExportSafe } from "./exportRedactionRules";
 
-
 export const ENVIRONMENT_SUMMARY_EXPORT_AUDIT_STORAGE_KEY =
   "verdant.environmentSummaryExportAudit.v1";
 
 export const ENVIRONMENT_SUMMARY_EXPORT_AUDIT_MAX_EVENTS = 50;
 
 export type EnvironmentSummaryExportAuditEventType =
-  | "full_report_print_opened"
-  | "drilldown_print_opened";
+  "full_report_print_opened" | "drilldown_print_opened";
 
 export interface EnvironmentSummaryExportAuditEvent {
   id: string;
@@ -57,8 +55,7 @@ function getStorage(opts?: EnvironmentSummaryExportAuditOptions): Storage | null
     return opts.storage ?? null;
   }
   try {
-    return typeof globalThis !== "undefined" &&
-      (globalThis as any).localStorage
+    return typeof globalThis !== "undefined" && (globalThis as any).localStorage
       ? ((globalThis as any).localStorage as Storage)
       : null;
   } catch {
@@ -77,8 +74,7 @@ function isAuditEvent(v: unknown): v is EnvironmentSummaryExportAuditEvent {
   const e = v as any;
   return (
     typeof e.id === "string" &&
-    (e.eventType === "full_report_print_opened" ||
-      e.eventType === "drilldown_print_opened") &&
+    (e.eventType === "full_report_print_opened" || e.eventType === "drilldown_print_opened") &&
     typeof e.occurredAt === "string" &&
     e.dateRange &&
     typeof e.dateRange.startDate === "string" &&
@@ -147,9 +143,7 @@ export function recordEnvironmentSummaryExportAuditEvent(
   };
   if (!storage) return evt;
   const existing = readEnvironmentSummaryExportAuditEvents(opts);
-  const next = [...existing, evt].slice(
-    -ENVIRONMENT_SUMMARY_EXPORT_AUDIT_MAX_EVENTS,
-  );
+  const next = [...existing, evt].slice(-ENVIRONMENT_SUMMARY_EXPORT_AUDIT_MAX_EVENTS);
   try {
     const serialized = JSON.stringify(next);
     // Guardrail at the persist boundary — even though events only carry
@@ -158,10 +152,7 @@ export function recordEnvironmentSummaryExportAuditEvent(
     // forbidden key or sensitive value fails loudly instead of being
     // silently written to local storage.
     assertExportSafe(serialized, "environment-summary-export-audit");
-    storage.setItem(
-      ENVIRONMENT_SUMMARY_EXPORT_AUDIT_STORAGE_KEY,
-      serialized,
-    );
+    storage.setItem(ENVIRONMENT_SUMMARY_EXPORT_AUDIT_STORAGE_KEY, serialized);
   } catch {
     // Quota / unavailable / contamination → swallow; in-memory event still returned.
   }

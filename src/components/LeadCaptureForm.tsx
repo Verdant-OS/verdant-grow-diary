@@ -34,23 +34,12 @@ const leadSchema = z.object({
   name: z.string().trim().max(100).optional().or(z.literal("")),
   email: z.string().trim().email("Enter a valid email").max(255),
   company: z.string().trim().max(120).optional().or(z.literal("")),
-  lead_type: z.enum([
-    "beta_user",
-    "hardware_partner",
-    "grower",
-    "investor",
-    "other",
-  ]),
+  lead_type: z.enum(["beta_user", "hardware_partner", "grower", "investor", "other"]),
   message: z.string().trim().max(2000).optional().or(z.literal("")),
 });
 
 export interface LeadCaptureFormProps {
-  defaultLeadType?:
-    | "beta_user"
-    | "hardware_partner"
-    | "grower"
-    | "investor"
-    | "other";
+  defaultLeadType?: "beta_user" | "hardware_partner" | "grower" | "investor" | "other";
 }
 
 export default function LeadCaptureForm({

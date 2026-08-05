@@ -41,42 +41,50 @@ const ALLOW_MARKER = "RELEASE-DOCS-SAFETY: ALLOW";
 export const RULES = [
   {
     name: "no-live-import-claim",
-    pattern: /\b(live import|live csv|csv is live|imported (data|history|telemetry|readings?) (is|are) live|added live import|enabled live import)\b/i,
+    pattern:
+      /\b(live import|live csv|csv is live|imported (data|history|telemetry|readings?) (is|are) live|added live import|enabled live import)\b/i,
     explanation: "Release docs must not claim CSV/imported data is live telemetry.",
   },
   {
     name: "no-import-write-claim",
-    pattern: /\b(enabled|added|shipped) import writes?\b|\bimport writes? (are|is|were|have been) (enabled|shipped|added|turned on)\b|\bwrites? imported (readings?|history|data)\b/i,
+    pattern:
+      /\b(enabled|added|shipped) import writes?\b|\bimport writes? (are|is|were|have been) (enabled|shipped|added|turned on)\b|\bwrites? imported (readings?|history|data)\b/i,
     explanation: "Release docs must not claim import write paths were enabled.",
   },
   {
     name: "no-action-queue-auto-write",
-    pattern: /\b(auto[- ]?(created?|inserted?|written|writes?)|automatically (created?|inserted?|written|writes?)) .{0,80}action[- ]queue\b|\baction[- ]queue (rows?|items?|entries?) (are|is|were|have been) (auto[- ]?|automatically )(created?|inserted?|written)\b/i,
+    pattern:
+      /\b(auto[- ]?(created?|inserted?|written|writes?)|automatically (created?|inserted?|written|writes?)) .{0,80}action[- ]queue\b|\baction[- ]queue (rows?|items?|entries?) (are|is|were|have been) (auto[- ]?|automatically )(created?|inserted?|written)\b/i,
     explanation: "Action Queue rows must remain approval-required; auto-creation is not allowed.",
   },
   {
     name: "no-device-control",
-    pattern: /\b(device control (was|is|has been) (added|enabled|shipped)|device automation added|controls equipment|executes? device commands?|executes? equipment|dispatchActuator|engageAutopilot)\b/i,
+    pattern:
+      /\b(device control (was|is|has been) (added|enabled|shipped)|device automation added|controls equipment|executes? device commands?|executes? equipment|dispatchActuator|engageAutopilot)\b/i,
     explanation: "Device control / equipment execution must not be claimed in release docs.",
   },
   {
     name: "no-automation-shipped",
-    pattern: /\bautomation (was|is|has been) (added|enabled|shipped|turned on)\b|\bshipped automation\b/i,
+    pattern:
+      /\bautomation (was|is|has been) (added|enabled|shipped|turned on)\b|\bshipped automation\b/i,
     explanation: "Blind automation must not be claimed in release docs.",
   },
   {
     name: "no-ai-behavior-change",
-    pattern: /\bai (diagnosis|doctor) behavior (was|is|has been) (changed|updated|modified)\b|\bai now diagnoses\b|\bai automatically diagnoses\b/i,
+    pattern:
+      /\bai (diagnosis|doctor) behavior (was|is|has been) (changed|updated|modified)\b|\bai now diagnoses\b|\bai automatically diagnoses\b/i,
     explanation: "AI diagnosis behavior must not be claimed as changed in docs-only slices.",
   },
   {
     name: "no-schema-change-claim",
-    pattern: /\b(schema|rls|edge function|edge-function) (change|update|migration)s? (was|were|are|have been) (added|shipped|applied)\b/i,
+    pattern:
+      /\b(schema|rls|edge function|edge-function) (change|update|migration)s? (was|were|are|have been) (added|shipped|applied)\b/i,
     explanation: "Schema/RLS/Edge changes must not be claimed in docs-only or test-only slices.",
   },
   {
     name: "no-raw-payload-render",
-    pattern: /\braw[_ ]payloads? (are|is|now) rendered\b|\bexposes? raw[_ ]payloads?\b|\brenders? raw[_ ]payloads?\b/i,
+    pattern:
+      /\braw[_ ]payloads? (are|is|now) rendered\b|\bexposes? raw[_ ]payloads?\b|\brenders? raw[_ ]payloads?\b/i,
     explanation: "Raw payload internals must not be rendered or exposed.",
   },
   {
@@ -97,7 +105,8 @@ export const RULES = [
  * "guards against", "prevents", "prohibits", and similar safe phrasings,
  * tolerating markdown emphasis like **not**.
  */
-export const DENIAL = /\b(do(es)? not|don't|must not|cannot|never|no |without |refus(e|ed|es)|prohibit(s|ed)?|forbid(s|den)?|prevent(s|ed)?|guard(s|ed)? against|not (added|enabled|shipped|changed|written|created|claim|live|render(ed)?|exposed?)|remains? (test|context|docs|approval)-only|approval[- ]required|context[- ]only|test[- ]only|docs[- ]only|not live telemetry)\b/i;
+export const DENIAL =
+  /\b(do(es)? not|don't|must not|cannot|never|no |without |refus(e|ed|es)|prohibit(s|ed)?|forbid(s|den)?|prevent(s|ed)?|guard(s|ed)? against|not (added|enabled|shipped|changed|written|created|claim|live|render(ed)?|exposed?)|remains? (test|context|docs|approval)-only|approval[- ]required|context[- ]only|test[- ]only|docs[- ]only|not live telemetry)\b/i;
 
 const stripEmphasis = (s) => s.replace(/[*_`]/g, "");
 

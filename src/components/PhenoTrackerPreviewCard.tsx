@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { Sprout } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -43,26 +43,19 @@ export default function PhenoTrackerPreviewCard({
 }: PhenoTrackerPreviewCardProps) {
   const testId = rest["data-testid"] ?? "pheno-tracker-preview-card";
   const { entitlement, loading, lookupFailed, refetch } = useMyEntitlements();
-  const entitled =
-    !loading && !lookupFailed && canUseFeature(entitlement, "pheno_tracker");
+  const entitled = !loading && !lookupFailed && canUseFeature(entitlement, "pheno_tracker");
 
   return (
-    <Card
-      data-testid={testId}
-      data-entitled={entitled ? "true" : "false"}
-      className={className}
-    >
+    <Card data-testid={testId} data-entitled={entitled ? "true" : "false"} className={className}>
       <CardHeader>
-        <p className="text-xs uppercase tracking-widest text-primary font-medium">
-          Pro feature
-        </p>
+        <p className="text-xs uppercase tracking-widest text-primary font-medium">Pro feature</p>
         <CardTitle className="mt-1 flex items-center gap-2 font-display text-xl">
           <Sprout className="h-5 w-5 text-primary" aria-hidden="true" />
           Pheno Tracker
         </CardTitle>
         <CardDescription>
-          Track candidate evidence, compare phenos, preserve keeper decisions,
-          and document post-cure results.
+          Track candidate evidence, compare phenos, preserve keeper decisions, and document
+          post-cure results.
         </CardDescription>
       </CardHeader>
       <CardContent>

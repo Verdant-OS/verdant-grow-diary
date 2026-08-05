@@ -117,7 +117,7 @@ export default function PlantDetailAiDoctorContextPanel({
       aria-labelledby="plant-ai-doctor-context-heading"
       data-testid="plant-ai-doctor-context-panel"
       data-readiness={result.readiness}
-      className="glass rounded-2xl p-4 my-3 space-y-3"
+      className="glass my-3 min-w-0 space-y-3 rounded-2xl p-4"
     >
       <header className="flex items-start justify-between gap-2 flex-wrap">
         <div>
@@ -147,7 +147,7 @@ export default function PlantDetailAiDoctorContextPanel({
         </p>
       ) : null}
 
-      <div className="grid grid-cols-2 gap-2 text-xs">
+      <div className="grid min-w-0 grid-cols-1 gap-2 text-xs sm:grid-cols-2">
         <Stat label="Recent events (7d)" value={result.counts.recentEvents} />
         <Stat label="Recent watering/feeding" value={result.counts.recentWateringOrFeeding} />
         <Stat label="Manual snapshots (7d)" value={result.counts.recentManualSnapshots} />
@@ -251,8 +251,10 @@ export default function PlantDetailAiDoctorContextPanel({
 
 function Stat({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-md border border-border/40 bg-background/30 px-2 py-1.5">
-      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
+    <div className="min-w-0 rounded-md border border-border/40 bg-background/30 px-2 py-1.5">
+      <div className="break-words text-[10px] uppercase tracking-wider text-muted-foreground">
+        {label}
+      </div>
       <div className="text-sm font-medium tabular-nums">{value}</div>
     </div>
   );

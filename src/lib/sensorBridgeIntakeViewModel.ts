@@ -13,11 +13,7 @@ import type {
   BridgeIntakeSuspicionCode,
 } from "@/lib/sensorBridgeIntakeRules";
 
-export type BridgeIntakeStatusSeverity =
-  | "info"
-  | "watch"
-  | "warning"
-  | "good";
+export type BridgeIntakeStatusSeverity = "info" | "watch" | "warning" | "good";
 
 export interface BridgeIntakeStatusViewModel {
   label: string;
@@ -43,10 +39,7 @@ const SOURCE_LABELS: Record<BridgeIntakeResolvedSource, string> = {
   invalid: "Invalid reading",
 };
 
-const SOURCE_SEVERITY: Record<
-  BridgeIntakeResolvedSource,
-  BridgeIntakeStatusSeverity
-> = {
+const SOURCE_SEVERITY: Record<BridgeIntakeResolvedSource, BridgeIntakeStatusSeverity> = {
   live: "good",
   manual: "info",
   csv: "info",
@@ -85,10 +78,7 @@ export function buildBridgeIntakeStatusViewModel(
   const label = SOURCE_LABELS[resolved];
   const severity = SOURCE_SEVERITY[resolved];
 
-  const firstFailureReason =
-    !isAccepted
-      ? (last.reasons.find((r) => r !== "ok") ?? null)
-      : null;
+  const firstFailureReason = !isAccepted ? (last.reasons.find((r) => r !== "ok") ?? null) : null;
 
   const message = isAccepted
     ? buildAcceptedMessage(resolved, last.suspicions)

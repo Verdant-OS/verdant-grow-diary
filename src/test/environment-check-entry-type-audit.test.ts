@@ -121,6 +121,71 @@ describe("Environment Check Quick Log — save payload semantics", () => {
     assertNoSecrets(r.payload);
   });
 
+  // Regression: the adapter used to hard-code p_temperature_c / p_humidity_pct /
+  // p_vpd_kpa to null, so quicklog_save_manual never wrote the
+  // environment_events row (its v_has_sensors gate reads exactly these three
+  // params) and legacy env checks lost their structured persistence — the
+  // parity Quick Log v2 already had. (Alert evaluation reads sensor_readings /
+  // diary sensor_snapshot details, not environment_events; that gap is a
+  // separate board item.)
+  it("lifts env-check air metrics into the RPC's first-class sensor params", () => {
+    const r = buildLegacyQuickLogUnifiedPayload({
+      eventType: "environment",
+      idempotencyKey: "quicklog-v2-test-key-env2",
+      noteWithHardware: "midday env check",
+      plantId: "plant-1",
+      plantTentId: "tent-1",
+      details: {},
+      environmentCheck: envelope as unknown as Record<string, unknown>,
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    // 75 °F → 23.89 °C, derived once by buildEnvironmentCheckDetails.
+    expect(r.payload.p_temperature_c).toBe(envelope?.temp_c);
+    expect(r.payload.p_temperature_c).toBeCloseTo(23.89, 2);
+    expect(r.payload.p_humidity_pct).toBe(55);
+    expect(r.payload.p_vpd_kpa).toBe(1.1);
+  });
+
+  it("keeps first-class sensor params null when metrics are absent or malformed", () => {
+    const noteOnly = buildEnvironmentCheckDetails({ note: "smells fine in there" });
+    const r = buildLegacyQuickLogUnifiedPayload({
+      eventType: "environment",
+      idempotencyKey: "quicklog-v2-test-key-env3",
+      noteWithHardware: "note-only env check",
+      plantId: "plant-1",
+      plantTentId: "tent-1",
+      details: {},
+      environmentCheck: {
+        ...(noteOnly as unknown as Record<string, unknown>),
+        temp_c: "not-a-number",
+        humidity_pct: Number.NaN,
+      },
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.payload.p_temperature_c).toBeNull();
+    expect(r.payload.p_humidity_pct).toBeNull();
+    expect(r.payload.p_vpd_kpa).toBeNull();
+  });
+
+  it("never lifts env metrics for non-environment event types", () => {
+    const r = buildLegacyQuickLogUnifiedPayload({
+      eventType: "observation",
+      idempotencyKey: "quicklog-v2-test-key-env4",
+      noteWithHardware: "regular observation",
+      plantId: "plant-1",
+      plantTentId: "tent-1",
+      details: {},
+      environmentCheck: envelope as unknown as Record<string, unknown>,
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.payload.p_temperature_c).toBeNull();
+    expect(r.payload.p_humidity_pct).toBeNull();
+    expect(r.payload.p_vpd_kpa).toBeNull();
+  });
+
   it("rejects empty env-check (no note, no measurements) via missing-note guard", () => {
     const empty = buildEnvironmentCheckDetails({});
     expect(empty).toBeNull();

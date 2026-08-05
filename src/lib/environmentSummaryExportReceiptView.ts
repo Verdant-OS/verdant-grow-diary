@@ -21,15 +21,11 @@ export interface ExportReceiptViewModel {
   sourceLabel: string;
 }
 
-function formatEventTypeLabel(
-  t: EnvironmentSummaryExportAuditEvent["eventType"],
-): string {
+function formatEventTypeLabel(t: EnvironmentSummaryExportAuditEvent["eventType"]): string {
   return t === "drilldown_print_opened" ? "Drilldown PDF" : "Full report PDF";
 }
 
-function formatReportModeLabel(
-  m: EnvironmentSummaryExportAuditEvent["reportMode"],
-): string {
+function formatReportModeLabel(m: EnvironmentSummaryExportAuditEvent["reportMode"]): string {
   return m === "drilldown" ? "Drilldown" : "Full report";
 }
 

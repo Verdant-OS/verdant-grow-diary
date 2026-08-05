@@ -103,7 +103,7 @@ function asStatus(value: unknown): PaddleProcessingAuditStatus {
 function asReason(value: unknown): PaddleProcessingAuditReason | null {
   const candidate = asString(value);
   if (!candidate) return null;
-  return candidate in SAFE_REASON_LABELS ? candidate as PaddleProcessingAuditReason : null;
+  return candidate in SAFE_REASON_LABELS ? (candidate as PaddleProcessingAuditReason) : null;
 }
 
 export function formatPaddleProcessingStatus(status: PaddleProcessingAuditStatus): string {
@@ -153,11 +153,12 @@ export function parsePaddleProcessingAuditResponse(input: unknown): PaddleProces
   return {
     ok,
     reason: topReason,
-    reasonLabel: topReason === "unknown_response"
-      ? "Audit response was not recognized."
-      : topReason
-        ? formatPaddleProcessingReason(topReason)
-        : null,
+    reasonLabel:
+      topReason === "unknown_response"
+        ? "Audit response was not recognized."
+        : topReason
+          ? formatPaddleProcessingReason(topReason)
+          : null,
     generatedAt: asString(input.generated_at),
     limit: asNumber(input.limit),
     counts: {

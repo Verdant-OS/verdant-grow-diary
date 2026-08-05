@@ -49,6 +49,8 @@ describe("post-grow reflection output fixtures", () => {
   it("unsafe automation fixture includes blocked equipment-control wording", () => {
     const output = createUnsafeAutomationPostGrowReflectionOutput();
 
-    expect(output.repeat_next_run.join(" ")).toMatch(/Automatically control|turn on the dehumidifier/i);
+    expect(output.repeat_next_run.join(" ")).toMatch(
+      /Automatically control|turn on the dehumidifier/i,
+    );
   });
 });

@@ -15,6 +15,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
+import { MemoryRouter } from "@/lib/react-router-compat";
 
 import AiDoctorContextReadinessPanel from "@/components/AiDoctorContextReadinessPanel";
 import PlantDetailAiDoctorContextReadinessMount from "@/components/PlantDetailAiDoctorContextReadinessMount";
@@ -40,11 +41,9 @@ vi.mock("@/integrations/supabase/client", () => ({
   },
 }));
 
-const fetchSpy = vi
-  .spyOn(globalThis, "fetch" as never)
-  .mockImplementation((() => {
-    throw new Error("fetch not allowed in readiness regression test");
-  }) as never);
+const fetchSpy = vi.spyOn(globalThis, "fetch" as never).mockImplementation((() => {
+  throw new Error("fetch not allowed in readiness regression test");
+}) as never);
 
 let recentActivityState: { data?: unknown; isLoading: boolean } = {
   data: [],
@@ -98,13 +97,9 @@ describe("AI Doctor Readiness UI — source-quality badge snapshots", () => {
         sensorReadings: [buildReadingForSource(cse.source)],
       });
       render(<AiDoctorContextReadinessPanel context={context} />);
-      const badge = screen.getByTestId(
-        `ai-doctor-context-readiness-panel-source-${cse.source}`,
-      );
+      const badge = screen.getByTestId(`ai-doctor-context-readiness-panel-source-${cse.source}`);
       expect(badge.getAttribute("data-source")).toBe(cse.source);
-      expect(badge.getAttribute("data-trustworthy")).toBe(
-        cse.isTrustworthy ? "true" : "false",
-      );
+      expect(badge.getAttribute("data-trustworthy")).toBe(cse.isTrustworthy ? "true" : "false");
       expect(badge.textContent ?? "").toContain(cse.label);
       expect(badge.textContent ?? "").toMatch(/·\s*1\b/);
 
@@ -129,9 +124,7 @@ describe("AI Doctor Readiness UI — source-quality badge snapshots", () => {
     const csv = screen.getByTestId("ai-doctor-context-readiness-panel-source-csv");
     expect(demo.getAttribute("data-trustworthy")).toBe("false");
     expect(csv.getAttribute("data-trustworthy")).toBe("false");
-    expect(
-      screen.queryByTestId("ai-doctor-context-readiness-panel-source-live"),
-    ).toBeNull();
+    expect(screen.queryByTestId("ai-doctor-context-readiness-panel-source-live")).toBeNull();
   });
 });
 
@@ -188,8 +181,8 @@ describe("AI Doctor Readiness UI — evidence section header ordering", () => {
     });
     render(<AiDoctorContextReadinessPanel context={context} />);
     const panel = screen.getByTestId("ai-doctor-context-readiness-panel");
-    const headers = Array.from(panel.querySelectorAll("h2, h3")).map(
-      (h) => (h.textContent ?? "").trim(),
+    const headers = Array.from(panel.querySelectorAll("h2, h3")).map((h) =>
+      (h.textContent ?? "").trim(),
     );
     expect(headers).toEqual([
       "AI Doctor Context Readiness",
@@ -224,8 +217,8 @@ describe("AI Doctor Readiness UI — evidence section header ordering", () => {
     };
     render(<AiDoctorContextReadinessPanel context={context} openAlertsCount={0} />);
     const panel = screen.getByTestId("ai-doctor-context-readiness-panel");
-    const headers = Array.from(panel.querySelectorAll("h2, h3")).map(
-      (h) => (h.textContent ?? "").trim(),
+    const headers = Array.from(panel.querySelectorAll("h2, h3")).map((h) =>
+      (h.textContent ?? "").trim(),
     );
     // "Next evidence to add" still renders because the Add Sensor Snapshot
     // quick action is always offered (it has no automatic-fulfilment route).
@@ -242,36 +235,21 @@ describe("AI Doctor Readiness UI — evidence section header ordering", () => {
 
   it("counts panel surfaces Stage / Recent logs / Sensor readings (7d) / Open alerts", () => {
     const context = buildReadinessContext({
-      growEvents: [
-        { occurred_at: ago(2 * HOUR), event_type: "watering", source: "manual" },
-      ],
+      growEvents: [{ occurred_at: ago(2 * HOUR), event_type: "watering", source: "manual" }],
       sensorReadings: [buildReadingForSource("manual")],
     });
-    render(
-      <AiDoctorContextReadinessPanel context={context} openAlertsCount={3} />,
-    );
+    render(<AiDoctorContextReadinessPanel context={context} openAlertsCount={3} />);
     const dl = screen.getByTestId("ai-doctor-context-readiness-panel-counts");
-    const dtLabels = Array.from(dl.querySelectorAll("dt")).map(
-      (n) => (n.textContent ?? "").trim(),
-    );
-    expect(dtLabels).toEqual([
-      "Stage",
-      "Recent logs",
-      "Sensor readings (7d)",
-      "Open alerts",
-    ]);
+    const dtLabels = Array.from(dl.querySelectorAll("dt")).map((n) => (n.textContent ?? "").trim());
+    expect(dtLabels).toEqual(["Stage", "Recent logs", "Sensor readings (7d)", "Open alerts"]);
     expect(
-      screen.getByTestId("ai-doctor-context-readiness-panel-count-recent-logs")
-        .textContent,
+      screen.getByTestId("ai-doctor-context-readiness-panel-count-recent-logs").textContent,
     ).toBe("1");
     expect(
-      screen.getByTestId(
-        "ai-doctor-context-readiness-panel-count-sensor-readings",
-      ).textContent,
+      screen.getByTestId("ai-doctor-context-readiness-panel-count-sensor-readings").textContent,
     ).toBe("1");
     expect(
-      screen.getByTestId("ai-doctor-context-readiness-panel-count-open-alerts")
-        .textContent,
+      screen.getByTestId("ai-doctor-context-readiness-panel-count-open-alerts").textContent,
     ).toBe("3");
   });
 });
@@ -315,9 +293,7 @@ describe("AI Doctor Readiness UI — fallback copy", () => {
         plantName="Plant A"
       />,
     );
-    const node = screen.getByTestId(
-      "plant-detail-ai-doctor-context-readiness-mount-empty",
-    );
+    const node = screen.getByTestId("plant-detail-ai-doctor-context-readiness-mount-empty");
     assertSafeFallback(node.textContent ?? "");
     expect(fetchSpy).not.toHaveBeenCalled();
   });
@@ -332,9 +308,7 @@ describe("AI Doctor Readiness UI — fallback copy", () => {
         plantName="Plant A"
       />,
     );
-    const node = screen.getByTestId(
-      "plant-detail-ai-doctor-context-readiness-mount-loading",
-    );
+    const node = screen.getByTestId("plant-detail-ai-doctor-context-readiness-mount-loading");
     const text = (node.textContent ?? "").toLowerCase();
     expect(text).toContain("checking ai doctor context");
     for (const phrase of FALLBACK_FORBIDDEN_PHRASES) {
@@ -361,16 +335,14 @@ describe("AI Doctor Readiness UI — fallback copy", () => {
         plantName="Plant A"
       />,
     );
-    const node = screen.getByTestId(
-      "plant-detail-ai-doctor-context-readiness-mount-fallback",
-    );
+    const node = screen.getByTestId("plant-detail-ai-doctor-context-readiness-mount-fallback");
     assertSafeFallback(node.textContent ?? "");
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 });
 
 // ---------------------------------------------------------------------------
-// Quick-action safety — when the mount wires watering/feeding handlers,
+// Quick-action safety — when the mount wires photo/watering/feeding/sensor handlers,
 // clicking them must only dispatch the navigation-only CustomEvent with a
 // safe `{plantId, growId, tentId}` payload. No write/command semantics.
 // Disabled quick actions must dispatch nothing.
@@ -380,7 +352,6 @@ const QUICK_ACTION_DETAIL_BANNED_KEYS = [
   "command",
   "execute",
   "automation",
-  "action",
   "action_queue",
   "insert",
   "update",
@@ -396,21 +367,18 @@ const QUICK_ACTION_DETAIL_BANNED_KEYS = [
 ] as const;
 
 describe("AI Doctor Readiness UI — quick-action safety (mount)", () => {
-  it("dispatches verdant:open-quicklog CustomEvent with safe identifiers only on Add Watering", () => {
+  it("dispatches the closed typed V2 Water intent with exact plant target on Add Watering", () => {
     recentActivityState = { data: [], isLoading: false };
     manualLogsState = { data: [], isLoading: false };
 
     const localStorageSetSpy = vi.spyOn(Storage.prototype, "setItem");
-    const sessionStorageSetSpy = vi.spyOn(
-      window.sessionStorage.__proto__,
-      "setItem",
-    );
+    const sessionStorageSetSpy = vi.spyOn(window.sessionStorage.__proto__, "setItem");
 
     const events: CustomEvent[] = [];
     const handler = (e: Event) => {
       events.push(e as CustomEvent);
     };
-    window.addEventListener(PLANT_QUICKLOG_PREFILL_EVENT, handler);
+    window.addEventListener("verdant:open-quicklog-v2", handler);
 
     try {
       render(
@@ -428,7 +396,7 @@ describe("AI Doctor Readiness UI — quick-action safety (mount)", () => {
       expect(button.disabled).toBe(false);
       fireEvent.click(button);
     } finally {
-      window.removeEventListener(PLANT_QUICKLOG_PREFILL_EVENT, handler);
+      window.removeEventListener("verdant:open-quicklog-v2", handler);
       localStorageSetSpy.mockRestore();
       sessionStorageSetSpy.mockRestore();
     }
@@ -436,12 +404,12 @@ describe("AI Doctor Readiness UI — quick-action safety (mount)", () => {
     expect(events).toHaveLength(1);
     const evt = events[0];
     expect(evt).toBeInstanceOf(CustomEvent);
-    expect(evt.type).toBe("verdant:open-quicklog");
+    expect(evt.type).toBe("verdant:open-quicklog-v2");
 
     const detail = (evt.detail ?? {}) as Record<string, unknown>;
     const detailKeys = Object.keys(detail).sort();
-    expect(detailKeys).toEqual(["growId", "plantId", "tentId"]);
-    expect(detail).toEqual({ plantId: "p1", growId: "g1", tentId: "t1" });
+    expect(detailKeys).toEqual(["action", "targetKey"]);
+    expect(detail).toEqual({ targetKey: "plant:p1", action: "water" });
 
     // No banned write/command/device tokens anywhere in the payload keys
     // or stringified values.
@@ -456,7 +424,7 @@ describe("AI Doctor Readiness UI — quick-action safety (mount)", () => {
     expect(sessionStorageSetSpy).not.toHaveBeenCalled();
   });
 
-  it("Add Feeding dispatches the same navigation-only event payload shape", () => {
+  it("Add Feeding opens the feeding editor with the exact plant target", () => {
     recentActivityState = { data: [], isLoading: false };
     manualLogsState = { data: [], isLoading: false };
 
@@ -487,11 +455,91 @@ describe("AI Doctor Readiness UI — quick-action safety (mount)", () => {
 
     expect(events).toHaveLength(1);
     expect(events[0].type).toBe("verdant:open-quicklog");
-    expect(events[0].detail).toEqual({
+    expect(events[0].detail).toMatchObject({
       plantId: "p2",
       growId: "g2",
       tentId: "t2",
+      eventType: "feeding",
+      activityId: "feeding",
     });
+  });
+
+  it("Fast Add Photo opens the existing grower-confirmed Quick Log surface", () => {
+    recentActivityState = { data: [], isLoading: false };
+    manualLogsState = { data: [], isLoading: false };
+
+    const events: CustomEvent[] = [];
+    const handler = (event: Event) => events.push(event as CustomEvent);
+    window.addEventListener(PLANT_QUICKLOG_PREFILL_EVENT, handler);
+
+    try {
+      render(
+        <PlantDetailAiDoctorContextReadinessMount
+          plantId="p-photo"
+          growId="g-photo"
+          tentId="t-photo"
+          plantName="Photo Plant"
+        />,
+      );
+      const button = screen.getByTestId(
+        "ai-doctor-context-readiness-panel-quick-action-fast-add-photo",
+      ) as HTMLButtonElement;
+
+      expect(button.disabled).toBe(false);
+      fireEvent.click(button);
+    } finally {
+      window.removeEventListener(PLANT_QUICKLOG_PREFILL_EVENT, handler);
+    }
+
+    expect(events).toHaveLength(1);
+    expect(events[0].detail).toMatchObject({
+      plantId: "p-photo",
+      growId: "g-photo",
+      tentId: "t-photo",
+      eventType: "photo",
+      activityId: "photo",
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("Add Sensor Snapshot opens a source-labeled environment Quick Log draft", () => {
+    recentActivityState = { data: [], isLoading: false };
+    manualLogsState = { data: [], isLoading: false };
+
+    const events: CustomEvent[] = [];
+    const handler = (event: Event) => events.push(event as CustomEvent);
+    window.addEventListener(PLANT_QUICKLOG_PREFILL_EVENT, handler);
+
+    try {
+      render(
+        <PlantDetailAiDoctorContextReadinessMount
+          plantId="p-sensor"
+          growId="g-sensor"
+          tentId="t-sensor"
+          plantName="Sensor Plant"
+        />,
+      );
+      const button = screen.getByTestId(
+        "ai-doctor-context-readiness-panel-quick-action-add-sensor-snapshot",
+      ) as HTMLButtonElement;
+
+      expect(button.disabled).toBe(false);
+      fireEvent.click(button);
+    } finally {
+      window.removeEventListener(PLANT_QUICKLOG_PREFILL_EVENT, handler);
+    }
+
+    expect(events).toHaveLength(1);
+    expect(events[0].detail).toEqual({
+      plantId: "p-sensor",
+      plantName: "Sensor Plant",
+      growId: "g-sensor",
+      tentId: "t-sensor",
+      tentName: null,
+      eventType: "environment",
+      suggestSnapshot: true,
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   it("disabled quick actions dispatch no event and trigger no network call", () => {
@@ -506,12 +554,14 @@ describe("AI Doctor Readiness UI — quick-action safety (mount)", () => {
 
     try {
       render(
-        <PlantDetailAiDoctorContextReadinessMount
-          plantId="p1"
-          growId={null}
-          tentId={null}
-          plantName="Plant A"
-        />,
+        <MemoryRouter>
+          <PlantDetailAiDoctorContextReadinessMount
+            plantId="p1"
+            growId={null}
+            tentId={null}
+            plantName="Plant A"
+          />
+        </MemoryRouter>,
       );
       const button = screen.getByTestId(
         "ai-doctor-context-readiness-panel-quick-action-add-watering",
@@ -526,19 +576,25 @@ describe("AI Doctor Readiness UI — quick-action safety (mount)", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it("renders Add Watering disabled when growId or tentId are missing (no invented routes)", () => {
+  it("renders every contextual quick action unavailable when grow or tent scope is missing", () => {
     render(
-      <PlantDetailAiDoctorContextReadinessMount
-        plantId="p1"
-        growId={null}
-        tentId={null}
-        plantName="Plant A"
-      />,
+      <MemoryRouter>
+        <PlantDetailAiDoctorContextReadinessMount
+          plantId="p1"
+          growId={null}
+          tentId={null}
+          plantName="Plant A"
+        />
+      </MemoryRouter>,
     );
-    const button = screen.getByTestId(
-      "ai-doctor-context-readiness-panel-quick-action-add-watering",
-    ) as HTMLButtonElement;
-    expect(button.disabled).toBe(true);
-    expect(button.getAttribute("data-disabled")).toBe("true");
+    for (const action of ["fast-add-photo", "add-watering", "add-feeding", "add-sensor-snapshot"]) {
+      const button = screen.getByTestId(
+        `ai-doctor-context-readiness-panel-quick-action-${action}`,
+      ) as HTMLButtonElement;
+      expect(button.disabled).toBe(true);
+      expect(button.getAttribute("data-disabled")).toBe("true");
+      expect(button).toHaveTextContent(/unavailable/i);
+      expect(button).not.toHaveTextContent(/soon/i);
+    }
   });
 });

@@ -32,9 +32,7 @@ describe("buildTimelineSensorSnapshotViewModel", () => {
 
   it("renders soil moisture and CO2 only when present", () => {
     const a = buildTimelineSensorSnapshotViewModel({ temp_f: 70 });
-    expect(a.kind === "chips" && a.chips.some((c) => c.metric === "soil_moisture")).toBe(
-      false,
-    );
+    expect(a.kind === "chips" && a.chips.some((c) => c.metric === "soil_moisture")).toBe(false);
     expect(a.kind === "chips" && a.chips.some((c) => c.metric === "co2")).toBe(false);
 
     const b = buildTimelineSensorSnapshotViewModel({

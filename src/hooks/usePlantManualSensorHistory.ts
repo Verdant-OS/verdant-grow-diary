@@ -15,20 +15,14 @@
  */
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import type {
-  LatestManualReading,
-  ManualSensorMetric,
-} from "@/lib/manualSensorFreshnessRules";
+import type { LatestManualReading, ManualSensorMetric } from "@/lib/manualSensorFreshnessRules";
 import { MANUAL_SENSOR_METRICS } from "@/lib/manualSensorFreshnessRules";
 import type { ManualSensorLog } from "@/lib/manualSensorChronologyDeltaRules";
 import { MANUAL_SOURCE } from "@/lib/manualSensorChronologyDeltaRules";
 
 export const PLANT_MANUAL_SENSOR_HISTORY_LIMIT = 30;
 
-export type PlantManualSensorHistory = Record<
-  ManualSensorMetric,
-  LatestManualReading | null
->;
+export type PlantManualSensorHistory = Record<ManualSensorMetric, LatestManualReading | null>;
 
 interface DiaryRow {
   id?: string;
@@ -46,8 +40,7 @@ interface ManualSnapshot {
 
 function readSnapshot(details: unknown): ManualSnapshot | null {
   if (!details || typeof details !== "object") return null;
-  const snap = (details as { manual_sensor_snapshot?: unknown })
-    .manual_sensor_snapshot;
+  const snap = (details as { manual_sensor_snapshot?: unknown }).manual_sensor_snapshot;
   if (!snap || typeof snap !== "object") return null;
   if ((snap as ManualSnapshot).source !== MANUAL_SOURCE) return null;
   return snap as ManualSnapshot;
@@ -86,9 +79,7 @@ export function deriveLatestManualReadings(
  * Only includes rows tagged source='manual'. Order is not normalized here —
  * the delta helper re-sorts deterministically by captured_at.
  */
-export function deriveManualSensorLogs(
-  rows: ReadonlyArray<DiaryRow>,
-): ManualSensorLog[] {
+export function deriveManualSensorLogs(rows: ReadonlyArray<DiaryRow>): ManualSensorLog[] {
   const out: ManualSensorLog[] = [];
   for (const row of rows) {
     const snap = readSnapshot(row.details);
@@ -99,10 +90,7 @@ export function deriveManualSensorLogs(
       source: MANUAL_SOURCE,
       metrics: {
         temp_f: typeof snap.temp_f === "number" ? snap.temp_f : null,
-        humidity_percent:
-          typeof snap.humidity_percent === "number"
-            ? snap.humidity_percent
-            : null,
+        humidity_percent: typeof snap.humidity_percent === "number" ? snap.humidity_percent : null,
         ph: typeof snap.ph === "number" ? snap.ph : null,
         ec: typeof snap.ec === "number" ? snap.ec : null,
       },

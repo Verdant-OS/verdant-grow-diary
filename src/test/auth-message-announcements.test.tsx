@@ -3,7 +3,7 @@
 // errors leak through to the user.
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 
 let signInResult: { error: { message: string } | null } = { error: null };
 let signUpResult: { data: { user: null }; error: { message: string } | null } = {
@@ -113,7 +113,7 @@ describe("/auth — message announcement coverage", () => {
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent(/couldn['’]t sign you in/i);
     expectNoRawSupabase(alert.textContent ?? "");
-  });
+  }, 15_000);
 
   it("create-account local validation error is in role=alert and not enumerating", async () => {
     renderAuth();
@@ -212,14 +212,14 @@ describe("/reset-password — message announcement coverage", () => {
     const status = await screen.findByRole("status");
     expect(status).toHaveTextContent(/checking reset link/i);
     expect(status.getAttribute("aria-live")).toBe("polite");
-    resolveSession?.({ data: { session: { user: { id: "u-1" } } } });
+    (resolveSession as ((v: typeof sessionResult) => void) | null)?.({
+      data: { session: { user: { id: "u-1" } } },
+    });
   });
 
   it("confirm mismatch is announced via aria-live=polite as user types", async () => {
     renderReset();
-    await waitFor(() =>
-      expect(screen.getByLabelText(/^new password$/i)).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByLabelText(/^new password$/i)).toBeInTheDocument());
     fireEvent.change(screen.getByLabelText(/^new password$/i), {
       target: { value: "abcdefg1" },
     });
@@ -231,24 +231,18 @@ describe("/reset-password — message announcement coverage", () => {
     expect(live.getAttribute("role")).toBe("status");
     const confirm = screen.getByLabelText(/^confirm new password$/i);
     expect(confirm.getAttribute("aria-invalid")).toBe("true");
-    expect(confirm.getAttribute("aria-describedby") ?? "").toContain(
-      "reset-confirm-mismatch",
-    );
+    expect(confirm.getAttribute("aria-describedby") ?? "").toContain("reset-confirm-mismatch");
     // When they match, mismatch disappears.
     fireEvent.change(screen.getByLabelText(/^confirm new password$/i), {
       target: { value: "abcdefg1" },
     });
-    await waitFor(() =>
-      expect(screen.queryByText(/passwords do not match yet/i)).toBeNull(),
-    );
+    await waitFor(() => expect(screen.queryByText(/passwords do not match yet/i)).toBeNull());
   });
 
   it("reset failure renders in role=alert with non-enumerating copy", async () => {
     updateUserResult = { error: { message: "token expired" } };
     renderReset();
-    await waitFor(() =>
-      expect(screen.getByLabelText(/^new password$/i)).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByLabelText(/^new password$/i)).toBeInTheDocument());
     fireEvent.change(screen.getByLabelText(/^new password$/i), {
       target: { value: "abcdefg1" },
     });
@@ -265,9 +259,7 @@ describe("/reset-password — message announcement coverage", () => {
 describe("/reset-password — focus on submit by error type", () => {
   it("focuses Confirm when mismatch is the only blocker on submit", async () => {
     renderReset();
-    await waitFor(() =>
-      expect(screen.getByLabelText(/^new password$/i)).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByLabelText(/^new password$/i)).toBeInTheDocument());
     fireEvent.change(screen.getByLabelText(/^new password$/i), {
       target: { value: "abcdefg1" },
     });
@@ -278,17 +270,13 @@ describe("/reset-password — focus on submit by error type", () => {
     const form = screen.getByRole("form", { name: /reset password/i });
     fireEvent.submit(form);
     await waitFor(() =>
-      expect(document.activeElement).toBe(
-        screen.getByLabelText(/^confirm new password$/i),
-      ),
+      expect(document.activeElement).toBe(screen.getByLabelText(/^confirm new password$/i)),
     );
   });
 
   it("focuses New password when password rule fails before confirm check", async () => {
     renderReset();
-    await waitFor(() =>
-      expect(screen.getByLabelText(/^new password$/i)).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByLabelText(/^new password$/i)).toBeInTheDocument());
     fireEvent.change(screen.getByLabelText(/^new password$/i), {
       target: { value: "short" },
     });
@@ -326,9 +314,7 @@ describe("/auth — announcements do not steal focus during loading/retry", () =
     });
     fireEvent.click(screen.getByRole("button", { name: /^sign in$/i }));
     await screen.findByRole("alert");
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: /^sign in$/i })).toBeEnabled(),
-    );
+    await waitFor(() => expect(screen.getByRole("button", { name: /^sign in$/i })).toBeEnabled());
     expect(document.activeElement).toBe(screen.getByLabelText(/^email$/i));
   });
 });

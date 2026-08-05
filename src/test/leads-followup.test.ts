@@ -36,7 +36,9 @@ const HARDWARE = readSrc("pages/HardwareIntegrations.tsx");
 
 describe("leads follow-up migration", () => {
   it("adds status column with default 'new'", () => {
-    expect(migrationContents).toMatch(/ADD COLUMN[\s\S]*?status\s+text\s+NOT NULL\s+DEFAULT\s+'new'/i);
+    expect(migrationContents).toMatch(
+      /ADD COLUMN[\s\S]*?status\s+text\s+NOT NULL\s+DEFAULT\s+'new'/i,
+    );
   });
 
   it("adds operator_notes / contacted_at / follow_up_at / updated_at columns", () => {

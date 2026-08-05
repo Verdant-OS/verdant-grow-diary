@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import GlobalFastAddButton from "../components/GlobalFastAddButton";
@@ -49,14 +49,13 @@ describe("fastAddActionRules", () => {
     }
   });
 
-  it("routes non-diagnosis actions to open the existing Quick Log via event", () => {
+  it("routes Watering only to the exact typed V2 Water event", () => {
     const ctx = { plantId: "p1", tentId: null, growId: "g1" };
     const intent = resolveFastAddIntent("watering", ctx);
-    expect(intent.kind).toBe("open-quicklog");
-    if (intent.kind === "open-quicklog") {
-      expect(intent.prefill.eventType).toBe("watering");
-      expect(intent.prefill.plantId).toBe("p1");
-      expect(intent.eventName).toBe("verdant:open-quicklog");
+    expect(intent.kind).toBe("open-quicklog-v2");
+    if (intent.kind === "open-quicklog-v2") {
+      expect(intent.detail).toEqual({ targetKey: "plant:p1", action: "water" });
+      expect(intent.eventName).toBe("verdant:open-quicklog-v2");
     }
   });
 
@@ -68,7 +67,7 @@ describe("fastAddActionRules", () => {
     });
     expect(intent.kind).toBe("navigate");
     if (intent.kind === "navigate") {
-      expect(intent.to).toMatch(/^\/plants\/p1#ai-doctor$/);
+      expect(intent.to).toBe("/plants/p1#plant-ai-doctor-review");
     }
   });
 
@@ -97,9 +96,7 @@ describe("GlobalFastAddButton", () => {
     renderAt("/plants/p1");
     fireEvent.click(screen.getByTestId("global-fast-add-trigger"));
     for (const a of FAST_ADD_ACTIONS) {
-      expect(
-        screen.getByTestId(`global-fast-add-action-${a.id}`),
-      ).toBeTruthy();
+      expect(screen.getByTestId(`global-fast-add-action-${a.id}`)).toBeTruthy();
     }
   });
 
@@ -120,6 +117,18 @@ describe("GlobalFastAddButton", () => {
     const [eventName, detail] = onDispatchEvent.mock.calls[0];
     expect(eventName).toBe("verdant:open-quicklog");
     expect((detail as { eventType: string }).eventType).toBe("feeding");
+    expect((detail as { activityId: string }).activityId).toBe("feeding");
+  });
+
+  it("dispatches only the typed V2 event for Watering", () => {
+    const onDispatchEvent = vi.fn();
+    renderAt("/plants/p1", { onDispatchEvent });
+    fireEvent.click(screen.getByTestId("global-fast-add-trigger"));
+    fireEvent.click(screen.getByTestId("global-fast-add-action-watering"));
+    expect(onDispatchEvent).toHaveBeenCalledWith("verdant:open-quicklog-v2", {
+      targetKey: "plant:p1",
+      action: "water",
+    });
   });
 
   it("navigates for Diagnosis (no event, no model call)", () => {
@@ -128,16 +137,13 @@ describe("GlobalFastAddButton", () => {
     renderAt("/plants/p1", { onNavigate, onDispatchEvent });
     fireEvent.click(screen.getByTestId("global-fast-add-trigger"));
     fireEvent.click(screen.getByTestId("global-fast-add-action-diagnosis"));
-    expect(onNavigate).toHaveBeenCalledWith("/plants/p1#ai-doctor");
+    expect(onNavigate).toHaveBeenCalledWith("/plants/p1#plant-ai-doctor-review");
     expect(onDispatchEvent).not.toHaveBeenCalled();
   });
 });
 
 describe("GlobalFastAddButton + fastAddActionRules — static safety", () => {
-  const SRC = [
-    "../components/GlobalFastAddButton.tsx",
-    "../lib/fastAddActionRules.ts",
-  ]
+  const SRC = ["../components/GlobalFastAddButton.tsx", "../lib/fastAddActionRules.ts"]
     .map((p) => readFileSync(resolve(__dirname, p), "utf8"))
     .join("\n");
 
@@ -241,8 +247,6 @@ describe("GlobalFastAddButton — mobile tap targets & a11y", () => {
     expect(trigger.getAttribute("aria-haspopup")).toBe("menu");
     fireEvent.click(trigger);
     expect(trigger.getAttribute("aria-expanded")).toBe("true");
-    expect(screen.getByTestId("global-fast-add-menu").getAttribute("role")).toBe(
-      "menu",
-    );
+    expect(screen.getByTestId("global-fast-add-menu").getAttribute("role")).toBe("menu");
   });
 });

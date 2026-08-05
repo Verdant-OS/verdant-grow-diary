@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { AiDoctorPhase1TimelineEvidenceCard } from "@/components/AiDoctorPhase1TimelineEvidenceCard";
@@ -46,12 +46,8 @@ describe("AiDoctorPhase1TimelineEvidenceCard", () => {
     expect(screen.getByText("AI Doctor Phase 1 evidence")).toBeInTheDocument();
     expect(screen.getByText("AI Doctor Phase 1")).toBeInTheDocument();
     expect(screen.getByText("Evidence only")).toBeInTheDocument();
-    expect(
-      screen.getByText("Leaves yellowing on lower nodes."),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/Saved as evidence only\./i),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Leaves yellowing on lower nodes.")).toBeInTheDocument();
+    expect(screen.getByText(/Saved as evidence only\./i)).toBeInTheDocument();
   });
 
   it("renders read-only saved metadata without raw details payload", () => {
@@ -95,9 +91,7 @@ describe("AiDoctorPhase1TimelineEvidenceCard", () => {
       details: { kind: AI_DOCTOR_PHASE1_TIMELINE_KIND, result: null },
     })!;
     renderCard(vm);
-    expect(
-      screen.getByText("Saved evidence (no summary available)."),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Saved evidence (no summary available).")).toBeInTheDocument();
   });
 
   it("does not render approve/send/execute/Action Queue/device-control copy", () => {
@@ -115,10 +109,7 @@ describe("AiDoctorPhase1TimelineEvidenceCard", () => {
 
   it("(static) card source contains no mutation handlers or write APIs", () => {
     const src = readFileSync(
-      resolve(
-        process.cwd(),
-        "src/components/AiDoctorPhase1TimelineEvidenceCard.tsx",
-      ),
+      resolve(process.cwd(), "src/components/AiDoctorPhase1TimelineEvidenceCard.tsx"),
       "utf8",
     );
     const forbidden = [

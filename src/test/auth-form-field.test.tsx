@@ -1,11 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import React from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
-import {
-  AuthInlineMessage,
-  AuthPasswordField,
-  AuthTextField,
-} from "@/components/AuthFormField";
+import { AuthInlineMessage, AuthPasswordField, AuthTextField } from "@/components/AuthFormField";
 
 describe("AuthFormField", () => {
   it("renders a labeled auth text field with accessibility state", () => {
@@ -76,10 +72,7 @@ describe("AuthFormField", () => {
       />,
     );
 
-    expect(screen.getByText("Minimum 8 characters.")).toHaveAttribute(
-      "id",
-      "signup-password-hint",
-    );
+    expect(screen.getByText("Minimum 8 characters.")).toHaveAttribute("id", "signup-password-hint");
     expect(screen.getByLabelText("Password")).toHaveAttribute(
       "aria-describedby",
       "signup-error signup-password-hint",

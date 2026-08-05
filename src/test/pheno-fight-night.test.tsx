@@ -1,5 +1,6 @@
 import { afterEach, describe, it, expect } from "vitest";
 import { cleanup, render, screen, fireEvent, within } from "@testing-library/react";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import PhenoFightNight from "@/components/PhenoFightNight";
 import type { ContenderInput } from "@/lib/phenoContendersViewModel";
 import { DEMO_CANDIDATES } from "@/lib/demo/phenoHuntDemoFixture";
@@ -84,5 +85,30 @@ describe("PhenoFightNight", () => {
     renderFight();
     expect(screen.getByTestId("pheno-fight-caveat").textContent).toMatch(/you make the call/i);
     expect(screen.getByTestId("pheno-fight-caveat").textContent).toMatch(/isn't saved/i);
+  });
+
+  it("makes a real-hunt showcase read-only and sends decisions to the hunt workspace", () => {
+    render(
+      <MemoryRouter>
+        <PhenoFightNight
+          pool={pool}
+          defaultAId={3}
+          defaultBId={7}
+          decisionMode="read-only"
+          workspaceHref="/pheno-hunts/hunt-1/workspace"
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByTestId("pheno-fight-call-a")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("pheno-fight-call-tie")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("pheno-fight-call-b")).not.toBeInTheDocument();
+    expect(screen.getByTestId("pheno-fight-read-only")).toHaveTextContent(
+      /decisions are not saved here/i,
+    );
+    expect(screen.getByRole("link", { name: /open hunt workspace/i })).toHaveAttribute(
+      "href",
+      "/pheno-hunts/hunt-1/workspace",
+    );
   });
 });

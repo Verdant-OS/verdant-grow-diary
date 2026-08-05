@@ -16,14 +16,8 @@
  */
 
 import type { AiDoctorReportInput } from "./aiDoctorReportRules";
-import {
-  redactReportLine,
-  buildPerMetricStatusTable,
-} from "./aiDoctorReportRules";
-import {
-  assertExportHeadersSafe,
-  assertExportSafe,
-} from "./exportRedactionRules";
+import { redactReportLine, buildPerMetricStatusTable } from "./aiDoctorReportRules";
+import { assertExportHeadersSafe, assertExportSafe } from "./exportRedactionRules";
 
 export type CsvCell = string | number | null | undefined;
 
@@ -70,9 +64,7 @@ interface RowFields {
 
 function row(fields: RowFields): string {
   const rec = fields as unknown as Record<string, CsvCell>;
-  return AI_DOCTOR_EVIDENCE_CSV_COLUMNS
-    .map((col) => csvEscape(rec[col] ?? ""))
-    .join(",");
+  return AI_DOCTOR_EVIDENCE_CSV_COLUMNS.map((col) => csvEscape(rec[col] ?? "")).join(",");
 }
 
 export interface AiDoctorEvidenceCsvOutput {
@@ -88,9 +80,7 @@ const HONESTY_GLOBAL =
  * meta → diagnosis → posture → evidence_basis → evidence_summary →
  * recommendation → checklist → env_metric (fixed metric order).
  */
-export function buildAiDoctorEvidenceCsv(
-  input: AiDoctorReportInput,
-): AiDoctorEvidenceCsvOutput {
+export function buildAiDoctorEvidenceCsv(input: AiDoctorReportInput): AiDoctorEvidenceCsvOutput {
   const lines: string[] = [];
   lines.push(AI_DOCTOR_EVIDENCE_CSV_COLUMNS.join(","));
 
@@ -254,10 +244,7 @@ export function buildAiDoctorEvidenceCsv(
   // both routed through the centralized export-redaction helper so a
   // future change that adds a forbidden column or upstream contamination
   // fails loudly instead of shipping silently.
-  assertExportHeadersSafe(
-    AI_DOCTOR_EVIDENCE_CSV_COLUMNS,
-    "ai-doctor-evidence-csv",
-  );
+  assertExportHeadersSafe(AI_DOCTOR_EVIDENCE_CSV_COLUMNS, "ai-doctor-evidence-csv");
   const contents = lines.join("\n") + "\n";
   assertExportSafe(contents, "ai-doctor-evidence-csv");
   return {
@@ -309,9 +296,7 @@ function deriveCitationLabel(metric: string, citationType: string): string {
 }
 
 /** Trigger a client-side download of CSV text as text/csv. */
-export function downloadAiDoctorEvidenceCsv(
-  output: AiDoctorEvidenceCsvOutput,
-): void {
+export function downloadAiDoctorEvidenceCsv(output: AiDoctorEvidenceCsvOutput): void {
   if (typeof document === "undefined" || typeof URL === "undefined") return;
   const blob = new Blob([output.contents], {
     type: "text/csv;charset=utf-8",

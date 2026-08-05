@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { newQuickLogSaveKey } from "@/lib/quickLogIdempotencyKey";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -75,12 +81,15 @@ import {
   clearPublicQuickLogStarterDraft,
   readPublicQuickLogStarterDraft,
 } from "@/lib/publicQuickLogStarterDraftStore";
+import { matchesReviewedPublicStarterDraftRevision } from "@/lib/publicQuickLogHandoffRules";
 import { useLatestTentSensorSnapshot } from "@/lib/sensor";
 import { buildQuickLogStripFromTentState } from "@/lib/quickLogSnapshotStripAdapter";
 import { useQuickLogV2Save } from "@/hooks/useQuickLogV2Save";
 import {
   buildLegacyQuickLogUnifiedPayload,
   isSupportedLegacyEventType,
+  isVerifiedPublicStarterWateringHandoff,
+  ORDINARY_LEGACY_WATERING_BLOCKED_COPY,
   UNSUPPORTED_EVENT_TYPE_COPY,
 } from "@/lib/legacyQuickLogUnifiedSave";
 import {
@@ -102,7 +111,7 @@ import {
   readResponseCheckStatus,
   type ResponseCheckStatus,
 } from "@/lib/tenSecondQuickCheckRules";
-import { plantDetailPath } from "@/lib/routes";
+import { buildQuickLogTimelineNavTarget } from "@/lib/quickLogTimelineNavigationTarget";
 import {
   EARLY_STAGE_MILESTONES,
   EARLY_STAGE_VIGOR_OPTIONS,
@@ -127,6 +136,7 @@ import {
   buildEcCompensationPreview,
   EC_COMPENSATION_PREVIEW_DISCLAIMER,
 } from "@/lib/ecCompensationPreviewViewModel";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 import { buildEnvironmentCheckSensorContext } from "@/lib/environmentCheckSensorContextRules";
 import { buildSensorNormalizationPreviewViewModel } from "@/lib/sensors/sensorNormalizationPreviewViewModel";
 import { SensorNormalizationPreviewPanel } from "@/components/SensorNormalizationPreviewPanel";
@@ -141,6 +151,7 @@ import {
   type HarvestPhotoAngle,
   type HarvestPhotoLighting,
 } from "@/lib/harvestInspectionQuickLogPreviewRules";
+import type { QuickLogActivityId } from "@/constants/quickLogActivityTypes";
 
 export interface QuickLogPrefill {
   plantId?: string | null;
@@ -148,6 +159,12 @@ export interface QuickLogPrefill {
   growId?: string | null;
   tentId?: string | null;
   eventType?: string | null;
+  /**
+   * Shared Quick Log activity to select for a Fast Add handoff. Selection is
+   * presentation only; the canonical activity editor still validates and
+   * requires the grower to save explicitly.
+   */
+  activityId?: QuickLogActivityId | null;
   suggestSnapshot?: boolean | null;
   /**
    * Optional starter note text. Seeded into the Quick Log note field when
@@ -232,6 +249,9 @@ type SavedTarget = {
   name: string;
   tentName: string | null;
   growName: string | null;
+  growId: string | null;
+  tentId: string | null;
+  growEventId: string | null;
   eventType: string;
   savedAt: string;
 };
@@ -286,6 +306,10 @@ export default function QuickLog({
   const activeTents = useMemo(() => tentsQuery.data ?? [], [tentsQuery.data]);
   const queryClient = useQueryClient();
   const { save: saveViaRpc } = useQuickLogV2Save();
+  const verifiedPublicStarterWatering = isVerifiedPublicStarterWateringHandoff(
+    prefill,
+    readPublicQuickLogStarterDraft(),
+  );
 
   const tentSetupRequired =
     shouldRequireFirstTentSetup(activeTents) &&
@@ -304,6 +328,10 @@ export default function QuickLog({
   // (keep any stage the grower already picked).
   const prevPlantIdRef = useRef<string>("");
   const [eventType, setEventType] = useState<string>("observation");
+  // Until the grower deliberately changes activities, treat a prefilled event
+  // as the effective submit event even if its hydration effect has not flushed.
+  // Once touched, stale prefill metadata must never override the current form.
+  const eventTypeUserTouchedRef = useRef(false);
   const [plantId, setPlantId] = useState<string>("");
   const [dismissedBlockedPrefillKey, setDismissedBlockedPrefillKey] = useState<string | null>(null);
   const [snapshot, setSnapshot] = useState(false);
@@ -345,7 +373,31 @@ export default function QuickLog({
   const [envHumidityPct, setEnvHumidityPct] = useState<string>("");
   const [envVpdKpa, setEnvVpdKpa] = useState<string>("");
   const [envWaterTempValue, setEnvWaterTempValue] = useState<string>("");
-  const [envWaterTempUnit, setEnvWaterTempUnit] = useState<EnvironmentCheckWaterTempUnit>("F");
+  // The legacy Environment Check water-temp field is already unit-aware via
+  // an explicit °F/°C selector (conversion happens once inside
+  // environmentCheckQuickLogRules). Seed and reset that selector from the
+  // grower's temperature unit preference instead of hardcoding °F.
+  const temperatureUnitPreference = useTemperatureUnitPreference();
+  const defaultEnvWaterTempUnit: EnvironmentCheckWaterTempUnit =
+    temperatureUnitPreference === "celsius" ? "C" : "F";
+  const [envWaterTempUnit, setEnvWaterTempUnit] =
+    useState<EnvironmentCheckWaterTempUnit>(defaultEnvWaterTempUnit);
+  // Room temperature has no independent unit selector of its own — it
+  // always follows the grower's global display preference directly.
+  const envRoomTempUnit: EnvironmentCheckWaterTempUnit =
+    temperatureUnitPreference === "celsius" ? "C" : "F";
+  // Pins the unit an OPEN, non-empty room-temp draft was typed under, captured
+  // at the first keystroke from empty. `temperatureUnitPreference` above is
+  // live-reactive (cross-tab `storage` + same-tab TEMPERATURE_UNIT_CHANGE_EVENT),
+  // so without this pin a preference flip while the grower has an unsaved digit
+  // in the field would silently reinterpret that digit under the NEW unit at
+  // save time (e.g. a typed "25" meaning 25°C persisted as 25°F instead).
+  // Un-pinned (null) whenever the draft is empty, so an empty field's label/
+  // placeholder still reflects the live preference.
+  const [pinnedEnvRoomTempUnit, setPinnedEnvRoomTempUnit] =
+    useState<EnvironmentCheckWaterTempUnit | null>(null);
+  const effectiveEnvRoomTempUnit: EnvironmentCheckWaterTempUnit =
+    pinnedEnvRoomTempUnit ?? envRoomTempUnit;
   const [envEcMscm, setEnvEcMscm] = useState<string>("");
   const [harvestPhotoAngle, setHarvestPhotoAngle] = useState<HarvestPhotoAngle | "">("");
   const [harvestPhotoLighting, setHarvestPhotoLighting] = useState<HarvestPhotoLighting | "">("");
@@ -423,7 +475,10 @@ export default function QuickLog({
       // flows. Preserve their known grow scope, but never invent a plant.
       setActiveGrowId(prefill.growId);
     }
-    if (prefill?.eventType) setEventType(prefill.eventType);
+    if (prefill?.eventType) {
+      eventTypeUserTouchedRef.current = false;
+      setEventType(prefill.eventType);
+    }
     if (prefill?.suggestSnapshot && prefill.tentId) setSnapshot(true);
     // Seed a starter note only when the grower has not yet typed anything,
     // so we never overwrite in-progress text on re-open.
@@ -569,6 +624,17 @@ export default function QuickLog({
     setInFlightSaveContext(null);
   }, []);
   const isSaveInFlight = useCallback(() => saveInFlightRef.current, []);
+  const consumeReviewedPublicStarterDraft = useCallback(() => {
+    if (
+      matchesReviewedPublicStarterDraftRevision({
+        storedDraft: readPublicQuickLogStarterDraft(),
+        reviewedDraftId: prefill?.publicStarterDraftId,
+        reviewedUpdatedAt: prefill?.publicStarterDraftUpdatedAt,
+      })
+    ) {
+      clearPublicQuickLogStarterDraft();
+    }
+  }, [prefill?.publicStarterDraftId, prefill?.publicStarterDraftUpdatedAt]);
 
   // Slice A2: re-enable stage defaulting ONLY when the grower actively switches
   // from one already-selected plant to a different one — the new target's stage
@@ -611,8 +677,12 @@ export default function QuickLog({
         snapshot: sensorState.snapshot,
         hasTent: !!sensorTentId,
         attached: snapshot,
+        // Read-only reference value (Pattern B) — this memo only drives the
+        // .status auto-attach effects below, but must still stay unit-aware
+        // like every other consumer of this adapter.
+        temperatureUnit: temperatureUnitPreference,
       }),
-    [sensorState.status, sensorState.snapshot, sensorTentId, snapshot],
+    [sensorState.status, sensorState.snapshot, sensorTentId, snapshot, temperatureUnitPreference],
   );
 
   useEffect(() => {
@@ -729,6 +799,7 @@ export default function QuickLog({
     lastFailedSaveSigRef.current = null;
     setNote("");
     setShowMore(false);
+    eventTypeUserTouchedRef.current = false;
     setEventType("observation");
     setPlantId("");
     setDismissedBlockedPrefillKey(null);
@@ -750,10 +821,11 @@ export default function QuickLog({
     setEarlyNotes("");
     setEarlyManuallyOpen(false);
     setEnvRoomTempF("");
+    setPinnedEnvRoomTempUnit(null);
     setEnvHumidityPct("");
     setEnvVpdKpa("");
     setEnvWaterTempValue("");
-    setEnvWaterTempUnit("F");
+    setEnvWaterTempUnit(defaultEnvWaterTempUnit);
     setEnvEcMscm("");
     setHarvestPhotoAngle("");
     setHarvestPhotoLighting("");
@@ -771,6 +843,9 @@ export default function QuickLog({
   function handleEventTypeChange(next: string) {
     if (isMainDraftMutationLocked()) return;
     const plan = planQuickLogActionSwitchReset(eventType, next);
+    // Radix clears a controlled value when an unverified legacy Water option
+    // is filtered out. An empty callback is normalization, not grower intent.
+    if (next.trim().length > 0) eventTypeUserTouchedRef.current = true;
     setEventType(next);
     if (!plan.changed) return;
     if (plan.clearHarvest) {
@@ -785,10 +860,11 @@ export default function QuickLog({
     }
     if (plan.clearEnvironment) {
       setEnvRoomTempF("");
+      setPinnedEnvRoomTempUnit(null);
       setEnvHumidityPct("");
       setEnvVpdKpa("");
       setEnvWaterTempValue("");
-      setEnvWaterTempUnit("F");
+      setEnvWaterTempUnit(defaultEnvWaterTempUnit);
       setEnvEcMscm("");
     }
     if (plan.clearMaturity) {
@@ -829,6 +905,7 @@ export default function QuickLog({
     const keepPlantId = savedTarget?.id ?? plantId;
     setNote("");
     setShowMore(false);
+    eventTypeUserTouchedRef.current = true;
     setEventType("observation");
     setSnapshot(false);
     snapshotUserTouchedRef.current = false;
@@ -844,10 +921,11 @@ export default function QuickLog({
     setEarlyVigor(null);
     setEarlyNotes("");
     setEnvRoomTempF("");
+    setPinnedEnvRoomTempUnit(null);
     setEnvHumidityPct("");
     setEnvVpdKpa("");
     setEnvWaterTempValue("");
-    setEnvWaterTempUnit("F");
+    setEnvWaterTempUnit(defaultEnvWaterTempUnit);
     setEnvEcMscm("");
     setHarvestPhotoAngle("");
     setHarvestPhotoLighting("");
@@ -889,13 +967,17 @@ export default function QuickLog({
   async function runSubmit() {
     setSaveError(null);
 
+    const effectiveEventType = eventTypeUserTouchedRef.current
+      ? eventType
+      : (prefill?.eventType ?? eventType);
+
     if (!user) {
       const message = "Pick a workspace first";
       setSaveError(message);
       toast.error(message);
       return;
     }
-    if (!isSupportedLegacyEventType(eventType)) {
+    if (!isSupportedLegacyEventType(effectiveEventType)) {
       toast.message(UNSUPPORTED_EVENT_TYPE_COPY);
       return;
     }
@@ -912,7 +994,7 @@ export default function QuickLog({
     const saveTarget = Object.freeze({ ...editorTarget.target });
     const saveStage = stage;
     const saveStageWasUserTouched = stageUserTouchedRef.current;
-    const saveEventType = eventType;
+    const saveEventType = effectiveEventType;
     const savePlant = selectedPlant;
     const saveTent = selectedTent;
     const saveGrow = resolvedTargetGrow;
@@ -935,6 +1017,14 @@ export default function QuickLog({
         toast.error(message);
         return;
       }
+    }
+    if (
+      saveEventType === "watering" &&
+      !isVerifiedPublicStarterWateringHandoff(prefill, readPublicQuickLogStarterDraft())
+    ) {
+      setSaveError(ORDINARY_LEGACY_WATERING_BLOCKED_COPY);
+      toast.message(ORDINARY_LEGACY_WATERING_BLOCKED_COPY);
+      return;
     }
 
     setInFlightSaveContext(
@@ -977,6 +1067,7 @@ export default function QuickLog({
       if (saveEventType === "environment") {
         const bandCheck = validateEnvironmentCheckSensorBand({
           roomTempF: envRoomTempF,
+          roomTempUnit: effectiveEnvRoomTempUnit,
           humidityPct: envHumidityPct,
           vpdKpa: envVpdKpa,
         });
@@ -992,6 +1083,7 @@ export default function QuickLog({
         saveEventType === "environment"
           ? buildEnvironmentCheckDetails({
               roomTempF: envRoomTempF,
+              roomTempUnit: effectiveEnvRoomTempUnit,
               humidityPct: envHumidityPct,
               vpdKpa: envVpdKpa,
               waterTempValue: envWaterTempValue,
@@ -1029,6 +1121,7 @@ export default function QuickLog({
         plantId: saveTarget.plantId,
         plantTentId: saveTarget.tentId,
         details,
+        stage: saveStage,
         sensorAttachPayload,
         earlyStage: earlyStageRecord,
         environmentCheck: environmentCheckRecord,
@@ -1116,26 +1209,18 @@ export default function QuickLog({
         name: plantLabel,
         tentName: saveTent.name ?? null,
         growName: saveGrow?.name ?? null,
+        growId: saveTarget.growId ?? null,
+        tentId: saveTarget.tentId ?? null,
+        growEventId: result.growEventId ?? null,
         eventType: saveEventType,
         savedAt: new Date().toISOString(),
       });
       onCreated?.();
-      // Public starter handoff consume-once: the anonymous on-device draft
-      // is cleared ONLY here — after the RPC confirmed the write — and only
-      // when the stored draft is still the exact one the grower reviewed
-      // (id match guards against a newer draft written in another tab).
-      // Failures above return before this line, so a failed save always
-      // retains the draft.
-      if (prefill?.publicStarterDraftId) {
-        const storedStarterDraft = readPublicQuickLogStarterDraft();
-        if (
-          storedStarterDraft &&
-          storedStarterDraft.id === prefill.publicStarterDraftId &&
-          storedStarterDraft.updatedAt === prefill.publicStarterDraftUpdatedAt
-        ) {
-          clearPublicQuickLogStarterDraft();
-        }
-      }
+      // Public starter handoff consume-once: the shared helper clears the
+      // anonymous on-device draft only after either authenticated save path
+      // confirms a write, and only when storage still has the exact revision
+      // the grower reviewed. Failures return before this line and retain it.
+      consumeReviewedPublicStarterDraft();
       setTimeout(() => viewPlantBtnRef.current?.focus(), 0);
       applyQuickLogV2Refresh(queryClient, {
         targetType: "plant",
@@ -1243,12 +1328,12 @@ export default function QuickLog({
             <Sparkles className="h-4 w-4 text-primary" />
             Quick Log
           </DialogTitle>
-          <p
+          <DialogDescription
             data-testid="quick-log-subtitle"
             className="text-[12px] text-muted-foreground leading-snug"
           >
             One target. One truth label. One save.
-          </p>
+          </DialogDescription>
         </DialogHeader>
 
         {/* Shared v1a activity surface — consumes canonical
@@ -1260,12 +1345,29 @@ export default function QuickLog({
           growId={resolvedTarget?.growId ?? null}
           tentId={resolvedTarget?.tentId ?? null}
           plantId={resolvedTarget?.plantId ?? null}
+          externalPersistenceBlockReason={
+            targetQueryPending
+              ? QUICK_LOG_TARGET_BLOCKED_COPY.prefill_target_pending
+              : targetQueryError
+                ? `We couldn't load the ${targetQueryErrorSubject} needed to confirm this Quick Log target.`
+                : editorTargetBlocked && editorTarget.status === "blocked"
+                  ? QUICK_LOG_TARGET_BLOCKED_COPY[editorTarget.reason]
+                  : null
+          }
+          plantStage={(resolvedTargetPlant as { stage?: unknown } | null)?.stage ?? null}
           heading="All activity types"
           testIdPrefix="quick-log-dialog-all-activities"
+          requestedActivityId={prefill?.activityId ?? null}
+          requestedNote={prefill?.activityId ? (prefill.note ?? null) : null}
+          onSaveSuccess={consumeReviewedPublicStarterDraft}
           onSaveStart={beginAllActivitiesSave}
           onSaveEnd={endAllActivitiesSave}
           saveBlocked={saveLocked}
           isSaveBlocked={isSaveInFlight}
+          onBeforeStructuredWaterOpen={() => {
+            onOpenChange(false);
+            reset();
+          }}
         />
 
         <form onSubmit={submit} className="grid gap-4">
@@ -1468,7 +1570,7 @@ export default function QuickLog({
                         type="button"
                         data-testid="quick-log-review-jump-mismatch"
                         onClick={focusPlant}
-                        className="text-[12px] underline text-amber-200 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        className="text-[12px] underline text-amber-200 rounded focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                       >
                         Check target
                       </button>
@@ -1480,7 +1582,7 @@ export default function QuickLog({
                         type="button"
                         data-testid="quick-log-review-jump-snapshot"
                         onClick={focusAttach}
-                        className="text-[12px] underline text-amber-200 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        className="text-[12px] underline text-amber-200 rounded focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                       >
                         Check sensor truth
                       </button>
@@ -1492,7 +1594,7 @@ export default function QuickLog({
                         type="button"
                         data-testid="quick-log-review-jump-watering"
                         onClick={focusWatering}
-                        className="text-[12px] underline text-amber-200 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        className="text-[12px] underline text-amber-200 rounded focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                       >
                         Add Watering (ml)
                       </button>
@@ -1762,7 +1864,7 @@ export default function QuickLog({
                     ref={attachWrapperRef}
                     tabIndex={-1}
                     data-testid="quick-log-snapshot-attach-section"
-                    className={`flex items-center justify-between gap-2 rounded-lg border p-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${attachDisabled ? "border-border/40 opacity-60" : "border-border/60"}`}
+                    className={`flex items-center justify-between gap-2 rounded-lg border p-3 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring ${attachDisabled ? "border-border/40 opacity-60" : "border-border/60"}`}
                   >
                     <span className="text-sm">Attach sensor snapshot</span>
                     <Switch
@@ -1811,6 +1913,7 @@ export default function QuickLog({
                   value={displayedEventType}
                   onValueChange={handleEventTypeChange}
                   disabled={saveLocked}
+                  allowLegacyWatering={verifiedPublicStarterWatering}
                 />
                 <div>
                   <Label className="text-xs">Stage</Label>
@@ -1860,7 +1963,7 @@ export default function QuickLog({
                       setNote((previous) => appendQuickLogObservation(previous, chip.text));
                       setSaveError(null);
                     }}
-                    className="rounded-full border border-border/60 bg-secondary/30 px-2.5 py-1 text-[11px] text-foreground hover:bg-secondary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="rounded-full border border-border/60 bg-secondary/30 px-2.5 py-1 text-[11px] text-foreground hover:bg-secondary/60 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     {chip.label}
                   </button>
@@ -1887,7 +1990,7 @@ export default function QuickLog({
                       aria-label={`Response check: ${status}`}
                       aria-pressed={selectedResponseStatus === status}
                       onClick={() => handleResponseCheck(status)}
-                      className={`rounded-full border px-2.5 py-1 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                      className={`rounded-full border px-2.5 py-1 text-[11px] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring ${
                         selectedResponseStatus === status
                           ? "border-primary/70 bg-primary/10 text-primary"
                           : "border-border/60 bg-secondary/30 text-foreground hover:bg-secondary/60"
@@ -2023,7 +2126,7 @@ export default function QuickLog({
                                 if (isMainDraftMutationLocked()) return;
                                 setEarlyMilestone(selected ? null : m.value);
                               }}
-                              className={`rounded-full border px-2.5 py-1 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                              className={`rounded-full border px-2.5 py-1 text-[11px] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring ${
                                 selected
                                   ? "border-primary bg-primary/15 text-foreground"
                                   : "border-border/60 bg-secondary/30 text-foreground hover:bg-secondary/60"
@@ -2053,7 +2156,7 @@ export default function QuickLog({
                                 if (isMainDraftMutationLocked()) return;
                                 setEarlyVigor(selected ? null : v.value);
                               }}
-                              className={`rounded-full border px-2.5 py-1 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                              className={`rounded-full border px-2.5 py-1 text-[11px] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring ${
                                 selected
                                   ? "border-primary bg-primary/15 text-foreground"
                                   : "border-border/60 bg-secondary/30 text-foreground hover:bg-secondary/60"
@@ -2096,6 +2199,7 @@ export default function QuickLog({
               (() => {
                 const hasMeasurement = hasAnyEnvironmentCheckMeasurement({
                   roomTempF: envRoomTempF,
+                  roomTempUnit: effectiveEnvRoomTempUnit,
                   humidityPct: envHumidityPct,
                   vpdKpa: envVpdKpa,
                   waterTempValue: envWaterTempValue,
@@ -2138,7 +2242,7 @@ export default function QuickLog({
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <Label className="text-xs" htmlFor="quick-log-env-room-temp-f">
-                          Room temperature (°F)
+                          Room temperature ({effectiveEnvRoomTempUnit === "C" ? "°C" : "°F"})
                         </Label>
                         <Input
                           id="quick-log-env-room-temp-f"
@@ -2147,9 +2251,21 @@ export default function QuickLog({
                           value={envRoomTempF}
                           onChange={(e) => {
                             if (restoreLockedDraftValue(e.currentTarget, envRoomTempF)) return;
-                            setEnvRoomTempF(e.target.value);
+                            const nextValue = e.target.value;
+                            // Pin the unit this draft is interpreted under at the
+                            // FIRST keystroke from empty, so a live preference
+                            // change later (cross-tab or same-tab) can never
+                            // silently reinterpret digits the grower already
+                            // typed. Un-pin when the field is cleared back to
+                            // empty so a fresh draft reflects the live unit.
+                            if (nextValue.trim().length > 0 && envRoomTempF.trim().length === 0) {
+                              setPinnedEnvRoomTempUnit(envRoomTempUnit);
+                            } else if (nextValue.trim().length === 0) {
+                              setPinnedEnvRoomTempUnit(null);
+                            }
+                            setEnvRoomTempF(nextValue);
                           }}
-                          placeholder="76"
+                          placeholder={effectiveEnvRoomTempUnit === "C" ? "24" : "76"}
                           autoComplete="off"
                         />
                       </div>
@@ -2288,7 +2404,8 @@ export default function QuickLog({
                       (() => {
                         const normPreviewVm = buildSensorNormalizationPreviewViewModel({
                           payload: {
-                            temperature_f: envRoomTempF || undefined,
+                            [effectiveEnvRoomTempUnit === "C" ? "temperature_c" : "temperature_f"]:
+                              envRoomTempF || undefined,
                             humidity_pct: envHumidityPct || undefined,
                             vpd_kpa: envVpdKpa || undefined,
                             soil_ec_ms_cm: envEcMscm || undefined,
@@ -2684,26 +2801,53 @@ export default function QuickLog({
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <a
-                    ref={viewPlantBtnRef}
-                    href={plantDetailPath(savedTarget.id)}
-                    data-testid="quick-log-view-target-plant"
-                    data-target-plant-id={savedTarget.id}
-                    className="inline-flex items-center justify-center gap-1.5 rounded-md bg-primary px-3 py-2 text-[13px] font-medium text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                    onClick={() => {
-                      if (typeof document !== "undefined") {
-                        (document.activeElement as HTMLElement | null)?.blur?.();
-                      }
-                      // Match the Dialog wrapper's close path: without reset()
-                      // the component (kept mounted in AppShell) reopens showing
-                      // the stale post-save panel instead of a fresh form.
-                      onOpenChange(false);
-                      reset();
-                    }}
-                  >
-                    {QUICK_LOG_POST_SAVE_VIEW_LABEL}
-                    <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-                  </a>
+                  {(() => {
+                    const diaryNav = buildQuickLogTimelineNavTarget({
+                      growId: savedTarget.growId,
+                      targetType: "plant",
+                      targetId: savedTarget.id,
+                      tentId: savedTarget.tentId,
+                      plantId: savedTarget.id,
+                      growEventId: savedTarget.growEventId,
+                    });
+                    if (!diaryNav) {
+                      return (
+                        <Button
+                          type="button"
+                          disabled
+                          data-testid="quick-log-view-target-plant"
+                          data-target-plant-id={savedTarget.id}
+                          className="inline-flex items-center justify-center gap-1.5"
+                        >
+                          {QUICK_LOG_POST_SAVE_VIEW_LABEL}
+                          <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+                        </Button>
+                      );
+                    }
+                    return (
+                      <a
+                        ref={viewPlantBtnRef}
+                        href={diaryNav.href}
+                        data-testid="quick-log-view-target-plant"
+                        data-target-plant-id={savedTarget.id}
+                        data-target-grow-id={savedTarget.growId ?? undefined}
+                        className="inline-flex items-center justify-center gap-1.5 rounded-md bg-primary px-3 py-2 text-[13px] font-medium text-primary-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        onClick={() => {
+                          if (typeof document !== "undefined") {
+                            (document.activeElement as HTMLElement | null)?.blur?.();
+                          }
+                          // Match the Dialog wrapper's close path: without reset()
+                          // the component (kept mounted in AppShell) reopens showing
+                          // the stale post-save panel instead of a fresh form.
+                          onOpenChange(false);
+                          reset();
+                        }}
+                      >
+                        {QUICK_LOG_POST_SAVE_VIEW_LABEL}
+                        <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+                      </a>
+                    );
+                  })()}
                   <Button
                     type="button"
                     variant="outline"

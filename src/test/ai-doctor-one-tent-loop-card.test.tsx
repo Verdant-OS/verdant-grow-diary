@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
 
 const fetchSpy = vi.spyOn(globalThis, "fetch" as never).mockImplementation((() => {
@@ -26,9 +26,9 @@ describe("AI Doctor One-Tent Loop next-step card wiring", () => {
     const card = screen.getByTestId("ai-doctor-one-tent-loop-next-step-card");
     expect(card.getAttribute("data-current-step")).toBe("ai-doctor");
     expect(card.getAttribute("data-next-step")).toBe("alert");
-    expect(
-      screen.getByTestId("ai-doctor-one-tent-loop-next-step-card-cta"),
-    ).toHaveTextContent(/Review alert/i);
+    expect(screen.getByTestId("ai-doctor-one-tent-loop-next-step-card-cta")).toHaveTextContent(
+      /Review alert/i,
+    );
   });
 
   it("renders the Alert helper copy", () => {
@@ -38,9 +38,7 @@ describe("AI Doctor One-Tent Loop next-step card wiring", () => {
         testId="ai-doctor-one-tent-loop-next-step-card"
       />,
     );
-    expect(
-      screen.getByTestId("ai-doctor-one-tent-loop-next-step-card-helper"),
-    ).toHaveTextContent(
+    expect(screen.getByTestId("ai-doctor-one-tent-loop-next-step-card-helper")).toHaveTextContent(
       /Open Alert page to review and plan approval-required actions\./,
     );
   });
@@ -109,7 +107,9 @@ describe("AI Doctor One-Tent Loop next-step card wiring", () => {
   it("AI Doctor source imports the card and includes a cautious context note", async () => {
     const fs = await import("node:fs/promises");
     const src = await fs.readFile("src/pages/AiDoctorSessionsIndex.tsx", "utf8");
-    expect(src).toContain('import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard"');
+    expect(src).toContain(
+      'import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard"',
+    );
     expect(src).toContain('current="ai-doctor"');
     expect(src).toContain("AI Doctor uses available context. Missing context will be shown.");
   });

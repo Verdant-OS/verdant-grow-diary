@@ -10,7 +10,7 @@
  * through saveRunLearningDecision. No automation, no device control.
  */
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "@/lib/react-router-compat";
 import { usePlantMemoryEpisodes } from "@/hooks/usePlantMemoryEpisodes";
 import { saveRunLearningDecision } from "@/lib/plantMemoryEpisodeService";
 import { buildOutcomeFollowUpQueue } from "@/lib/outcomeFollowUpQueueViewModel";
@@ -41,7 +41,8 @@ export function GrowFollowUpReviewSection({
 
   const episodes = state.status === "ok" ? state.episodes : [];
   const viewModel = useMemo(() => buildOutcomeFollowUpQueue(episodes), [episodes]);
-  const status = state.status === "ok" ? "ok" : state.status === "unavailable" ? "unavailable" : "loading";
+  const status =
+    state.status === "ok" ? "ok" : state.status === "unavailable" ? "unavailable" : "loading";
 
   const handleAction = (cta: SafeEpisodeCta, actionQueueId: string) => {
     if (cta === "choose_decision") {

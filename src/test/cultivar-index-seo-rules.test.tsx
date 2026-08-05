@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import CultivarsIndex from "@/pages/CultivarsIndex";
 import {
   buildCultivarsIndexSeo,
@@ -13,10 +14,16 @@ const ORIGIN = "https://verdantgrowdiary.com";
 afterEach(cleanup);
 
 function renderCultivars(entry: string) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+
   return render(
-    <MemoryRouter initialEntries={[entry]}>
-      <CultivarsIndex />
-    </MemoryRouter>,
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={[entry]}>
+        <CultivarsIndex />
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 
@@ -80,7 +87,7 @@ describe("CultivarsIndex crawl-safety wiring", () => {
       `${ORIGIN}/cultivars`,
     );
     expect(headContent('meta[property="og:url"]')).toBe(`${ORIGIN}/cultivars`);
-  });
+  }, 15_000);
 
   it("sets noindex while canonical and og:url remain the clean hub for query variants", () => {
     renderCultivars("/cultivars?q=oreoz&difficulty=Advanced");

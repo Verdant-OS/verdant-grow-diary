@@ -18,7 +18,7 @@ export function isSupportedBreedingEventType(eventType: string): eventType is Br
 export type ActionQueueInsert = Database["public"]["Tables"]["action_queue"]["Insert"];
 
 // action_queue has no `due_at` column; the follow-up due date is carried inside
-// the `suggested_change` JSON instead. The payload is a plain ActionQueueInsert.
+// the plain-text `suggested_change` copy. The payload is an ActionQueueInsert.
 export type BreedingActionQueuePayload = ActionQueueInsert;
 
 function toBreedingEventLike(event: BreedingEvent): BreedingEventLike {

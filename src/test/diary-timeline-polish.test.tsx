@@ -132,10 +132,7 @@ describe("classifyDiaryTimelineSource", () => {
 });
 
 describe("diaryTimelineViewModel — static safety", () => {
-  const SRC = readFileSync(
-    resolve(__dirname, "../lib/diaryTimelineViewModel.ts"),
-    "utf8",
-  );
+  const SRC = readFileSync(resolve(__dirname, "../lib/diaryTimelineViewModel.ts"), "utf8");
   it("contains no Supabase, network, or model wiring", () => {
     expect(SRC).not.toMatch(/service_role/i);
     expect(SRC).not.toMatch(/functions\.invoke/);

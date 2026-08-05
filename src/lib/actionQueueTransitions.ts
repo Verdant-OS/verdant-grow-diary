@@ -16,40 +16,150 @@
  *  - Terminal statuses (completed, rejected, cancelled) cannot be transitioned.
  */
 
-
 export type ActionStatus =
-  | "pending_approval"
-  | "approved"
-  | "rejected"
-  | "simulated"
-  | "completed"
-  | "cancelled";
+  "pending_approval" | "approved" | "rejected" | "simulated" | "completed" | "cancelled";
 
 export type ActionEventType =
-  | "created"
-  | "simulated"
-  | "approved"
-  | "rejected"
-  | "completed"
-  | "cancelled"
-  | "note";
+  "created" | "simulated" | "approved" | "rejected" | "completed" | "cancelled" | "note";
 
-export type TransitionKind =
-  | "approve"
-  | "reject"
-  | "simulate"
-  | "complete"
-  | "cancel";
+export type TransitionKind = "approve" | "reject" | "simulate" | "complete" | "cancel";
+
+export interface ActionQueueTransitionRpcArgs {
+  p_action_queue_id: string;
+  p_transition: TransitionKind;
+  p_expected_status: ActionStatus;
+  p_note: string | null;
+}
+
+export interface ActionQueueTransitionRpcSuccess {
+  ok: true;
+  action_queue_id: string;
+  previous_status: ActionStatus;
+  new_status: ActionStatus;
+  event_id: string;
+  transitioned_at: string;
+  reused: boolean;
+}
+
+export interface ActionQueueTransitionRpcFailure {
+  ok: false;
+  reason: ActionQueueTransitionFailureReason;
+}
+
+export type ActionQueueTransitionRpcResult =
+  ActionQueueTransitionRpcSuccess | ActionQueueTransitionRpcFailure;
+
+const ACTION_STATUS_VALUES: readonly ActionStatus[] = [
+  "pending_approval",
+  "approved",
+  "rejected",
+  "simulated",
+  "completed",
+  "cancelled",
+];
+
+export const ACTION_QUEUE_TRANSITION_FAILURE_REASONS = [
+  "not_authenticated",
+  "invalid_action",
+  "invalid_transition",
+  "illegal_transition",
+  "action_not_found",
+  "status_conflict",
+] as const;
+
+export type ActionQueueTransitionFailureReason =
+  (typeof ACTION_QUEUE_TRANSITION_FAILURE_REASONS)[number];
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const RFC3339_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$/;
+
+function isActionStatus(value: unknown): value is ActionStatus {
+  return typeof value === "string" && ACTION_STATUS_VALUES.includes(value as ActionStatus);
+}
+
+function isTransitionFailureReason(value: unknown): value is ActionQueueTransitionFailureReason {
+  return (
+    typeof value === "string" &&
+    ACTION_QUEUE_TRANSITION_FAILURE_REASONS.includes(value as ActionQueueTransitionFailureReason)
+  );
+}
+
+function isUuid(value: unknown): value is string {
+  return typeof value === "string" && UUID_PATTERN.test(value);
+}
+
+function isRfc3339Timestamp(value: unknown): value is string {
+  return (
+    typeof value === "string" && RFC3339_PATTERN.test(value) && Number.isFinite(Date.parse(value))
+  );
+}
+
+/**
+ * Build the complete public RPC input. Identity, grow lineage, destination
+ * status, event type, and lifecycle timestamps are intentionally absent:
+ * PostgreSQL derives every one from the locked owner row and transition kind.
+ */
+export function buildActionQueueTransitionRpcArgs(args: {
+  actionQueueId: string;
+  transition: TransitionKind;
+  expectedStatus: ActionStatus;
+  note?: string | null;
+}): ActionQueueTransitionRpcArgs {
+  return {
+    p_action_queue_id: args.actionQueueId,
+    p_transition: args.transition,
+    p_expected_status: args.expectedStatus,
+    p_note: normalizeNote(args.note) ?? null,
+  };
+}
+
+/**
+ * Parse the untrusted JSON result returned by PostgREST. Callers must never
+ * update local state or run post-transition bookkeeping unless this returns a
+ * validated success result.
+ */
+export function parseActionQueueTransitionRpcResult(
+  value: unknown,
+  expected: ActionQueueTransitionRpcArgs,
+): ActionQueueTransitionRpcResult | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const row = value as Record<string, unknown>;
+
+  if (row.ok === false) {
+    return isTransitionFailureReason(row.reason) ? { ok: false, reason: row.reason } : null;
+  }
+
+  if (
+    row.ok !== true ||
+    !isUuid(row.action_queue_id) ||
+    !isActionStatus(row.previous_status) ||
+    !isActionStatus(row.new_status) ||
+    !isUuid(row.event_id) ||
+    !isRfc3339Timestamp(row.transitioned_at) ||
+    typeof row.reused !== "boolean" ||
+    row.action_queue_id !== expected.p_action_queue_id ||
+    row.previous_status !== expected.p_expected_status ||
+    row.new_status !== nextStatusFor(expected.p_transition)
+  ) {
+    return null;
+  }
+
+  return {
+    ok: true,
+    action_queue_id: row.action_queue_id,
+    previous_status: row.previous_status,
+    new_status: row.new_status,
+    event_id: row.event_id,
+    transitioned_at: row.transitioned_at,
+    reused: row.reused,
+  };
+}
 
 /**
  * Terminal statuses: no further transitions are allowed from these. The UI
  * must render zero transition buttons and the helpers below all return false.
  */
-export const TERMINAL_STATUSES: readonly ActionStatus[] = [
-  "completed",
-  "rejected",
-  "cancelled",
-];
+export const TERMINAL_STATUSES: readonly ActionStatus[] = ["completed", "rejected", "cancelled"];
 
 export function isTerminalStatus(s: ActionStatus): boolean {
   return TERMINAL_STATUSES.includes(s);
@@ -67,8 +177,7 @@ export const canApprove = (s: ActionStatus): boolean =>
   s === "pending_approval" || s === "simulated";
 export const canSimulate = (s: ActionStatus): boolean => s === "pending_approval";
 export const canReject = (s: ActionStatus): boolean => s === "pending_approval";
-export const canComplete = (s: ActionStatus): boolean =>
-  s === "approved" || s === "simulated";
+export const canComplete = (s: ActionStatus): boolean => s === "approved" || s === "simulated";
 export const canCancel = (s: ActionStatus): boolean =>
   s === "pending_approval" || s === "approved" || s === "simulated";
 
@@ -77,7 +186,6 @@ export const canCancel = (s: ActionStatus): boolean =>
  * the UI to render exactly the right set of buttons. Terminal -> [].
  */
 export function allowedTransitions(s: ActionStatus): TransitionKind[] {
-
   if (isTerminalStatus(s)) return [];
   const out: TransitionKind[] = [];
   if (canApprove(s)) out.push("approve");
@@ -105,10 +213,7 @@ export interface ActionRowPatch {
  * No device-control fields are ever written here.
  */
 
-export function buildTransitionPatch(
-  kind: TransitionKind,
-  now: Date = new Date(),
-): ActionRowPatch {
+export function buildTransitionPatch(kind: TransitionKind, now: Date = new Date()): ActionRowPatch {
   const iso = now.toISOString();
   switch (kind) {
     case "approve":

@@ -187,7 +187,10 @@ describe("mapRecordedPaddleEventToEntitlementDecision", () => {
 
   it("blocks unknown price ids", () => {
     const result = mapRecordedPaddleEventToEntitlementDecision(
-      recorded("subscription.created", subscriptionData({ items: [{ price: { id: "pri_unknown" } }] })),
+      recorded(
+        "subscription.created",
+        subscriptionData({ items: [{ price: { id: "pri_unknown" } }] }),
+      ),
       PRICE_CONFIG,
     );
 
@@ -199,10 +202,7 @@ describe("mapRecordedPaddleEventToEntitlementDecision", () => {
       recorded(
         "subscription.created",
         subscriptionData({
-          items: [
-            { price: { id: "pri_pro_monthly" } },
-            { price: { id: "pri_pro_annual" } },
-          ],
+          items: [{ price: { id: "pri_pro_monthly" } }, { price: { id: "pri_pro_annual" } }],
         }),
       ),
       PRICE_CONFIG,

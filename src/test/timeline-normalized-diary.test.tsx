@@ -10,7 +10,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render as rtlRender, screen } from "@testing-library/react";
 import type { ReactElement } from "react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import DiaryEntryBadges from "@/components/DiaryEntryBadges";
 import { buildGrowDiaryTimeline } from "@/lib/growDiaryTimelineRules";
 
@@ -21,10 +21,11 @@ const render = (ui: ReactElement) => rtlRender(ui, { wrapper: MemoryRouter });
 
 const ROOT = resolve(__dirname, "../..");
 const TIMELINE = readFileSync(resolve(ROOT, "src/pages/Timeline.tsx"), "utf8");
-const BADGES = readFileSync(
-  resolve(ROOT, "src/components/DiaryEntryBadges.tsx"),
+const TIMELINE_EMPTY_STATE_RULES = readFileSync(
+  resolve(ROOT, "src/lib/timelineEmptyStateRules.ts"),
   "utf8",
 );
+const BADGES = readFileSync(resolve(ROOT, "src/components/DiaryEntryBadges.tsx"), "utf8");
 
 const NOW = 1_700_000_000_000;
 const iso = (offset: number) => new Date(NOW + offset).toISOString();
@@ -101,9 +102,7 @@ describe("DiaryEntryBadges presenter", () => {
     const photo = items.find((i) => i.id === "p1")!;
     render(<DiaryEntryBadges item={photo} />);
     expect(screen.getByTestId("diary-entry-tag-photo")).toBeInTheDocument();
-    expect(
-      screen.getByTestId("diary-entry-tag-sensor-snapshot"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("diary-entry-tag-sensor-snapshot")).toBeInTheDocument();
   });
 
   it("shows Limited data warning for malformed entries", () => {
@@ -124,8 +123,7 @@ describe("DiaryEntryBadges presenter", () => {
       filter: { includeInvalid: true },
     });
     for (let i = 1; i < items.length; i += 1) {
-      expect((items[i - 1].timestamp ?? -Infinity) >=
-        (items[i].timestamp ?? -Infinity)).toBe(true);
+      expect((items[i - 1].timestamp ?? -Infinity) >= (items[i].timestamp ?? -Infinity)).toBe(true);
     }
     expect(items[0].id).toBe("w1");
   });
@@ -161,9 +159,7 @@ describe("DiaryEntryBadges presenter", () => {
 describe("Timeline page wiring of normalized diary rules", () => {
   it("imports the timeline rule helper and presenter", () => {
     expect(TIMELINE).toMatch(/from\s+["']@\/lib\/growDiaryTimelineRules["']/);
-    expect(TIMELINE).toMatch(
-      /from\s+["']@\/components\/DiaryEntryBadges["']/,
-    );
+    expect(TIMELINE).toMatch(/from\s+["']@\/components\/DiaryEntryBadges["']/);
     expect(TIMELINE).toMatch(/buildGrowDiaryTimeline\s*\(/);
     expect(TIMELINE).toMatch(/<DiaryEntryBadges\b/);
   });
@@ -173,14 +169,15 @@ describe("Timeline page wiring of normalized diary rules", () => {
   });
 
   it("preserves empty diary state copy", () => {
-    expect(TIMELINE).toMatch(/No entries yet/);
+    // The literal copy now lives in the pure rules module; Timeline renders
+    // it through the shared TimelineEmptyState presenter.
+    expect(TIMELINE).toMatch(/TimelineEmptyState/);
+    expect(TIMELINE_EMPTY_STATE_RULES).toMatch(/No entries yet/);
   });
 
   it("does not introduce service_role or device-control surfaces", () => {
     expect(TIMELINE).not.toMatch(/service_role/);
-    expect(TIMELINE).not.toMatch(
-      /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|relay|actuator/i,
-    );
+    expect(TIMELINE).not.toMatch(/mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|relay|actuator/i);
   });
 
   it("Timeline does not change QuickLog writes", () => {

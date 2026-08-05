@@ -87,6 +87,15 @@ describe("PHENOHUNT documentation defaults — constants", () => {
 });
 
 describe("PhenoDocumentationSections — rendering & persistence", () => {
+  it("discloses before entry that documentation is saved on this device only", () => {
+    render(<PhenoDocumentationSections recordId="cand-device" recordType="candidate" />);
+
+    expect(screen.getByText(/saved on this device only/i)).toBeInTheDocument();
+    expect(screen.getByText(/not saved to your Verdant account/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save on this device" })).toBeInTheDocument();
+    cleanup();
+  });
+
   it("renders every default section title and every listed field label", () => {
     render(<PhenoDocumentationSections recordId="cand-1" recordType="candidate" />);
     for (const title of EXPECTED_SECTION_TITLES) {
@@ -108,11 +117,7 @@ describe("PhenoDocumentationSections — rendering & persistence", () => {
     };
 
     const { unmount } = render(
-      <PhenoDocumentationSections
-        recordId="cand-42"
-        recordType="candidate"
-        storage={storage}
-      />,
+      <PhenoDocumentationSections recordId="cand-42" recordType="candidate" storage={storage} />,
     );
 
     const input = screen.getByTestId(
@@ -120,16 +125,15 @@ describe("PhenoDocumentationSections — rendering & persistence", () => {
     ) as HTMLInputElement;
     fireEvent.change(input, { target: { value: "Banana Cough" } });
     fireEvent.click(screen.getByTestId("pheno-doc-save-candidate-cand-42"));
-    expect(screen.getByTestId("pheno-doc-saved-candidate-cand-42")).toBeInTheDocument();
+    expect(screen.getByTestId("pheno-doc-saved-candidate-cand-42")).toHaveAttribute(
+      "role",
+      "status",
+    );
     unmount();
 
     // Remount: saved value must be present, defaults must NOT overwrite it.
     render(
-      <PhenoDocumentationSections
-        recordId="cand-42"
-        recordType="candidate"
-        storage={storage}
-      />,
+      <PhenoDocumentationSections recordId="cand-42" recordType="candidate" storage={storage} />,
     );
     const reInput = screen.getByTestId(
       "pheno-doc-field-receiver_cultivar-receiver_cultivar_name",
@@ -141,6 +145,62 @@ describe("PhenoDocumentationSections — rendering & persistence", () => {
     ) as HTMLInputElement;
     expect(untouched.value).toBe("");
     cleanup();
+  });
+
+  it("shows a calm failure and never shows saved when device storage rejects the write", () => {
+    const storage = {
+      getItem: () => null,
+      setItem: () => {
+        throw new Error("storage unavailable");
+      },
+    };
+
+    render(
+      <PhenoDocumentationSections
+        recordId="cand-storage-failure"
+        recordType="candidate"
+        storage={storage}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("pheno-doc-save-candidate-cand-storage-failure"));
+
+    expect(
+      screen.getByTestId("pheno-doc-save-failed-candidate-cand-storage-failure"),
+    ).toHaveTextContent(/could not save on this device/i);
+    expect(
+      screen.queryByTestId("pheno-doc-saved-candidate-cand-storage-failure"),
+    ).not.toBeInTheDocument();
+    cleanup();
+  });
+
+  it("shows a calm failure when access to device storage itself is blocked", () => {
+    const ownDescriptor = Object.getOwnPropertyDescriptor(window, "localStorage");
+    Object.defineProperty(window, "localStorage", {
+      configurable: true,
+      get: () => {
+        throw new DOMException("Storage is blocked", "SecurityError");
+      },
+    });
+
+    try {
+      render(<PhenoDocumentationSections recordId="cand-storage-blocked" recordType="candidate" />);
+      fireEvent.click(screen.getByTestId("pheno-doc-save-candidate-cand-storage-blocked"));
+
+      expect(
+        screen.getByTestId("pheno-doc-save-failed-candidate-cand-storage-blocked"),
+      ).toHaveTextContent(/could not save on this device/i);
+      expect(
+        screen.queryByTestId("pheno-doc-saved-candidate-cand-storage-blocked"),
+      ).not.toBeInTheDocument();
+    } finally {
+      cleanup();
+      if (ownDescriptor) {
+        Object.defineProperty(window, "localStorage", ownDescriptor);
+      } else {
+        delete (window as unknown as { localStorage?: Storage }).localStorage;
+      }
+    }
   });
 
   it("renders optional diary reference selector when diaryOptions are provided", () => {
@@ -167,25 +227,23 @@ describe("PHENOHUNT documentation defaults — safety scan", () => {
     "src/constants/phenoDocumentationDefaults.ts",
   ];
   const FORBIDDEN = [
-    "action_queue",
-    "actionQueue",
-    "ai-doctor",
-    "aiDoctor",
-    "openai",
-    "anthropic",
-    "gemini",
-    "sensor_readings",
-    "sensorIngest",
-    "device",
-    "mqtt",
-    "webhook",
-    "service_role",
+    /action_queue/i,
+    /actionQueue/,
+    /ai-doctor/i,
+    /aiDoctor/,
+    /openai|anthropic|gemini/i,
+    /sensor_readings|sensorIngest/i,
+    /device[_-]?control|controlDevice|DeviceCommandClient/i,
+    /executeDevice(?:Action|Command)|sendDeviceCommand|dispatchDeviceCommand/i,
+    /sendCommand|switchRelay|relayCommand|actuator/i,
+    /mqtt|home.?assistant|webhook|service_role/i,
+    /autopilot|auto[- ]?(?:execute|run)|hidden automation/i,
   ];
   for (const f of files) {
     it(`${f} contains no AI / Action Queue / automation / device-control / sensor-ingest code`, () => {
       const src = readFileSync(path.resolve(process.cwd(), f), "utf8");
-      for (const needle of FORBIDDEN) {
-        expect(src.toLowerCase()).not.toContain(needle.toLowerCase());
+      for (const pattern of FORBIDDEN) {
+        expect(src).not.toMatch(pattern);
       }
     });
   }

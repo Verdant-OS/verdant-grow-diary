@@ -36,7 +36,15 @@ vi.mock("@/integrations/supabase/client", () => ({
       update: () => ({ eq: vi.fn() }),
       select: () => ({
         eq: () => ({
-          order: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }),
+          order: () => ({
+            limit: () => {
+              const __c: any = {
+                abortSignal: () => __c,
+                then: (r: any, j?: any) => Promise.resolve({ data: [], error: null }).then(r, j),
+              };
+              return __c;
+            },
+          }),
         }),
       }),
     }),
@@ -90,9 +98,7 @@ describe("QuickLog — harvest inspection preview", () => {
       }),
     );
     const dialog = screen.getByRole("dialog");
-    const panel = within(dialog).getByTestId(
-      "quick-log-harvest-inspection-preview",
-    );
+    const panel = within(dialog).getByTestId("quick-log-harvest-inspection-preview");
     expect(panel).toHaveAttribute("data-preset", "trichome_inspection");
   });
 
@@ -105,13 +111,13 @@ describe("QuickLog — harvest inspection preview", () => {
       source: "hyperlog",
       note: "Hello",
     });
-    expect(
-      screen.queryByTestId("quick-log-harvest-inspection-preview"),
-    ).toBeNull();
+    expect(screen.queryByTestId("quick-log-harvest-inspection-preview")).toBeNull();
   });
 
   it("shows the correct preset label for each preset", () => {
-    const cases: Array<[Parameters<typeof buildHarvestInspectionQuickLogPrefill>[0]["preset"], string]> = [
+    const cases: Array<
+      [Parameters<typeof buildHarvestInspectionQuickLogPrefill>[0]["preset"], string]
+    > = [
       ["trichome_inspection", "Trichome inspection"],
       ["pistil_recession", "Pistil / recession observation"],
       ["bud_maturity", "Bud maturity note"],
@@ -129,9 +135,7 @@ describe("QuickLog — harvest inspection preview", () => {
           />
         </QueryClientProvider>,
       );
-      const labelNode = screen.getByTestId(
-        "quick-log-harvest-inspection-preview-label",
-      );
+      const labelNode = screen.getByTestId("quick-log-harvest-inspection-preview-label");
       expect(labelNode).toHaveTextContent(label);
       unmount();
     }
@@ -143,22 +147,18 @@ describe("QuickLog — harvest inspection preview", () => {
       context: ctx,
     });
     renderQL(prefill);
-    expect(
-      screen.getByTestId("quick-log-harvest-inspection-preview-caution"),
-    ).toHaveTextContent(
+    expect(screen.getByTestId("quick-log-harvest-inspection-preview-caution")).toHaveTextContent(
       "Harvest Watch is evidence-only. The grower decides.",
     );
-    expect(
-      screen.getByTestId("quick-log-harvest-inspection-preview-review"),
-    ).toHaveTextContent(
+    expect(screen.getByTestId("quick-log-harvest-inspection-preview-review")).toHaveTextContent(
       "Review this diary evidence before saving. This does not create an alert, Action Queue item, or harvest instruction.",
     );
-    expect(
-      screen.getByTestId("quick-log-harvest-inspection-preview-note"),
-    ).toHaveTextContent("Trichome inspection note");
-    expect(
-      screen.getByTestId("quick-log-harvest-inspection-preview-grower"),
-    ).toHaveTextContent(/Grower reviews before saving/i);
+    expect(screen.getByTestId("quick-log-harvest-inspection-preview-note")).toHaveTextContent(
+      "Trichome inspection note",
+    );
+    expect(screen.getByTestId("quick-log-harvest-inspection-preview-grower")).toHaveTextContent(
+      /Grower reviews before saving/i,
+    );
   });
 
   it("shows optional Angle + Lighting fields only for close_flower_photo", () => {

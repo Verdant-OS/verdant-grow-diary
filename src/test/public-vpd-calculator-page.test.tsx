@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 
 const mocks = vi.hoisted(() => ({ track: vi.fn() }));
 
@@ -27,13 +27,14 @@ function renderPage() {
 beforeEach(() => mocks.track.mockReset());
 
 afterEach(() => {
+  vi.restoreAllMocks();
   document
     .querySelectorAll('[data-page-ldjson="public-vpd-calculator-faq"]')
     .forEach((node) => node.remove());
   if (originalClipboard) Object.defineProperty(navigator, "clipboard", originalClipboard);
-  else delete (navigator as Navigator & { clipboard?: Clipboard }).clipboard;
+  else delete (navigator as unknown as { clipboard?: Clipboard }).clipboard;
   if (originalShare) Object.defineProperty(navigator, "share", originalShare);
-  else delete (navigator as Navigator & { share?: Navigator["share"] }).share;
+  else delete (navigator as unknown as { share?: Navigator["share"] }).share;
 });
 
 describe("public VPD calculator page", () => {
@@ -42,6 +43,9 @@ describe("public VPD calculator page", () => {
     renderPage();
 
     expect(screen.getAllByText(/Nothing is uploaded or saved/)).toHaveLength(2);
+    expect(
+      screen.getByRole("heading", { level: 2, name: "Calculate from a manual reading" }),
+    ).toBeInTheDocument();
     expect(
       screen.getByText(/Air estimate first · verified leaf VPD for target status/),
     ).toBeInTheDocument();
@@ -78,7 +82,13 @@ describe("public VPD calculator page", () => {
 
     await user.selectOptions(screen.getByLabelText("Plant stage"), "veg");
     expect(screen.getByTestId("public-vpd-blueprint-teaser")).toBeInTheDocument();
-    // Real per-stage SOP bands (the same BlueprintTeaser shipped in-app).
+    // Real per-stage SOP bands (the same BlueprintTeaser shipped in-app),
+    // matching this page's own calculator unit toggle (°F by default).
+    expect(screen.getByTestId("pro-blueprint-teaser-row-tempC").textContent).toMatch(/°F/);
+
+    // Switching the calculator's own unit toggle flips the teaser too —
+    // the two must never disagree on the same page.
+    await user.selectOptions(screen.getByLabelText("Temperature unit"), "C");
     expect(screen.getByTestId("pro-blueprint-teaser-row-tempC").textContent).toMatch(/°C/);
 
     await user.click(screen.getByRole("link", { name: "See Craft & the Pro Blueprint" }));
@@ -107,26 +117,37 @@ describe("public VPD calculator page", () => {
     expect(screen.getByTestId("public-vpd-confidence")).toHaveTextContent("unverified");
   });
 
-  it("unlocks target status after the full VPD evidence checklist", async () => {
-    const user = userEvent.setup();
+  it("unlocks target status after the full VPD evidence checklist", () => {
     renderPage();
 
-    await user.type(screen.getByLabelText("Air temperature"), "77");
-    await user.type(screen.getByLabelText("Relative humidity (current room reading)"), "60");
-    await user.type(screen.getByLabelText("Measured leaf temperature"), "77");
-    await user.selectOptions(screen.getByLabelText("Temperature/RH sensor placement"), "canopy");
-    await user.type(screen.getByLabelText("Temperature reference"), "Traceable reference");
-    await user.type(screen.getByLabelText("Temperature verified date"), "2026-06-01");
-    await user.type(screen.getByLabelText("Calibration RH reference (optional)"), "75");
-    await user.type(screen.getByLabelText("Humidity verified date"), "2026-06-01");
-    await user.click(
+    fireEvent.change(screen.getByLabelText("Air temperature"), { target: { value: "77" } });
+    fireEvent.change(screen.getByLabelText("Relative humidity (current room reading)"), {
+      target: { value: "60" },
+    });
+    fireEvent.change(screen.getByLabelText("Measured leaf temperature"), {
+      target: { value: "77" },
+    });
+    fireEvent.change(screen.getByLabelText("Temperature/RH sensor placement"), {
+      target: { value: "canopy" },
+    });
+    fireEvent.change(screen.getByLabelText("Temperature reference"), {
+      target: { value: "Traceable reference" },
+    });
+    fireEvent.change(screen.getByLabelText("Temperature verified date"), {
+      target: { value: "2026-06-01" },
+    });
+    fireEvent.change(screen.getByLabelText("Calibration RH reference (optional)"), {
+      target: { value: "75" },
+    });
+    fireEvent.change(screen.getByLabelText("Humidity verified date"), {
+      target: { value: "2026-06-01" },
+    });
+    fireEvent.click(
       screen.getByLabelText(/Temperature was checked against that reference at normal room/i),
     );
-    await user.click(
-      screen.getByLabelText(/Leaf temperature was measured now in the same canopy/i),
-    );
-    await user.selectOptions(screen.getByLabelText("Plant stage"), "flower");
-    await user.click(screen.getByRole("button", { name: /Calculate VPD/ }));
+    fireEvent.click(screen.getByLabelText(/Leaf temperature was measured now in the same canopy/i));
+    fireEvent.change(screen.getByLabelText("Plant stage"), { target: { value: "flower" } });
+    fireEvent.click(screen.getByRole("button", { name: /Calculate VPD/ }));
 
     expect(screen.getByTestId("public-vpd-confidence")).toHaveTextContent("verified");
     expect(screen.getByTestId("public-vpd-classification")).toHaveTextContent(
@@ -176,5 +197,85 @@ describe("public VPD calculator page", () => {
     expect(screen.queryByTestId("public-vpd-calculator-result")).toBeNull();
     expect(screen.getByLabelText("Air temperature")).toHaveValue(null);
     expect(mocks.track).toHaveBeenCalledWith("vpd_calculator_reset");
+  });
+
+  it("converts both temperature fields exactly and does not drift over repeated toggles", () => {
+    renderPage();
+
+    fireEvent.change(screen.getByLabelText("Air temperature"), { target: { value: "78" } });
+    fireEvent.change(screen.getByLabelText("Measured leaf temperature"), {
+      target: { value: "73.4" },
+    });
+    const unit = screen.getByLabelText("Temperature unit");
+
+    fireEvent.change(unit, { target: { value: "C" } });
+    expect(screen.getByLabelText("Air temperature")).toHaveValue(25.6);
+    expect(screen.getByLabelText("Measured leaf temperature")).toHaveValue(23);
+
+    fireEvent.change(unit, { target: { value: "F" } });
+    expect(screen.getByLabelText("Air temperature")).toHaveValue(78);
+    expect(screen.getByLabelText("Measured leaf temperature")).toHaveValue(73.4);
+
+    for (let index = 0; index < 20; index += 1) {
+      fireEvent.change(unit, { target: { value: index % 2 === 0 ? "C" : "F" } });
+    }
+    expect(unit).toHaveValue("F");
+    expect(screen.getByLabelText("Air temperature")).toHaveValue(78);
+    expect(screen.getByLabelText("Measured leaf temperature")).toHaveValue(73.4);
+  });
+
+  it("keeps blank temperatures blank and clears canonical field state on reset", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.type(screen.getByLabelText("Air temperature"), "78");
+    await user.selectOptions(screen.getByLabelText("Temperature unit"), "C");
+    expect(screen.getByLabelText("Measured leaf temperature")).toHaveValue(null);
+
+    await user.click(screen.getByRole("button", { name: "Reset" }));
+    expect(screen.getByLabelText("Temperature unit")).toHaveValue("F");
+    expect(screen.getByLabelText("Air temperature")).toHaveValue(null);
+    expect(screen.getByLabelText("Measured leaf temperature")).toHaveValue(null);
+  });
+
+  it("invalidates the result and share state when the unit changes", async () => {
+    const user = userEvent.setup();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "share", { configurable: true, value: undefined });
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+    renderPage();
+
+    await user.type(screen.getByLabelText("Air temperature"), "78");
+    await user.type(screen.getByLabelText(/^Relative humidity/), "60");
+    await user.click(screen.getByRole("button", { name: /Calculate VPD/ }));
+    const initialResult = screen.getByTestId("public-vpd-calculator-result").textContent;
+    await user.click(screen.getByRole("button", { name: /Share calculator/ }));
+    expect(await screen.findByText(/link copied/i)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Temperature unit"), { target: { value: "C" } });
+    expect(screen.queryByTestId("public-vpd-calculator-result")).toBeNull();
+    expect(screen.queryByText(/link copied/i)).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: /Calculate VPD/ }));
+    expect(screen.getByTestId("public-vpd-calculator-result").textContent).toBe(initialResult);
+    expect(screen.queryByText(/link copied/i)).toBeNull();
+  });
+
+  it("keeps a converted out-of-range air temperature invalid", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    fireEvent.change(screen.getByLabelText("Air temperature"), { target: { value: "141" } });
+    await user.type(screen.getByLabelText(/^Relative humidity/), "60");
+    await user.selectOptions(screen.getByLabelText("Temperature unit"), "C");
+    expect(screen.getByLabelText("Air temperature")).toHaveValue(60.6);
+
+    const form = screen.getByRole("button", { name: /Calculate VPD/ }).closest("form");
+    expect(form).toBeTruthy();
+    fireEvent.submit(form!);
+    expect(screen.getByTestId("public-vpd-calculator-result")).toHaveTextContent(
+      "Temperature outside supported range",
+    );
+    expect(screen.queryByRole("link", { name: "Start a free grow memory" })).toBeNull();
   });
 });

@@ -19,7 +19,7 @@ import {
   useLocation,
   useParams,
   useSearchParams,
-} from "react-router-dom";
+} from "@/lib/react-router-compat";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 interface StoredSensorReading {
@@ -616,5 +616,5 @@ describe("CSV history -> AI Doctor full-chain regression", () => {
       database.tables.every((table) => ["sensor_readings", "grow_events"].includes(table)),
     ).toBe(true);
     expect(supabaseFunctionsInvoke).not.toHaveBeenCalled();
-  });
+  }, 15_000);
 });

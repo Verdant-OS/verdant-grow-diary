@@ -27,7 +27,8 @@ function action(
 }
 
 function envRow(
-  overrides: Partial<QuickLogV2EnvironmentRow> & Pick<QuickLogV2EnvironmentRow, "id" | "occurred_at">,
+  overrides: Partial<QuickLogV2EnvironmentRow> &
+    Pick<QuickLogV2EnvironmentRow, "id" | "occurred_at">,
 ): QuickLogV2EnvironmentRow {
   return {
     plant_id: null,
@@ -61,7 +62,9 @@ describe("groupQuickLogTimelineEntries — pairing", () => {
 
   it("groups Note + tent-level env in same tent within window", () => {
     const out = groupQuickLogTimelineEntries({
-      actions: [action({ id: "a1", kind: "note", occurredAt: iso(T0), noteText: "leaves curling" })],
+      actions: [
+        action({ id: "a1", kind: "note", occurredAt: iso(T0), noteText: "leaves curling" }),
+      ],
       environmentRows: [envRow({ id: "e1", occurred_at: iso(T0 - 1500) })],
       scope: { kind: "plant", plantId: PLANT_1, tentId: TENT_A },
     });
@@ -142,10 +145,7 @@ describe("groupQuickLogTimelineEntries — pairing", () => {
       environmentRows: [],
       scope: { kind: "plant", plantId: PLANT_1, tentId: TENT_A },
     });
-    expect(out.map((e) => (e.kind === "action" ? e.action.id : ""))).toEqual([
-      "a2",
-      "a1",
-    ]);
+    expect(out.map((e) => (e.kind === "action" ? e.action.id : ""))).toEqual(["a2", "a1"]);
   });
 
   it("two QuickLog saves in window produce two correctly paired cards", () => {
@@ -224,8 +224,7 @@ describe("groupQuickLogTimelineEntries — pairing", () => {
     if (out[0].kind === "grouped") {
       expect(out[0].environmentCard.severity).not.toBe("ok");
       expect(
-        out[0].environmentCard.errors.length +
-          out[0].environmentCard.warnings.length,
+        out[0].environmentCard.errors.length + out[0].environmentCard.warnings.length,
       ).toBeGreaterThan(0);
     }
   });

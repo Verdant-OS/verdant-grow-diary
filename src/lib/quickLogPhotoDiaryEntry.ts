@@ -28,6 +28,20 @@ export interface QuickLogPhotoDiaryEntryInput {
   noteRaw: string;
   /** The Quick Log action the photo was attached to (e.g. "water"). */
   action: string;
+  /**
+   * Optional sanitized structured detail (e.g. photo subject/caption from the
+   * Quick Log activity spec). Merged into details; the fixed identity keys
+   * (event_type/source/attached_to_action) always win.
+   */
+  extraDetails?: Readonly<Record<string, string>> | null;
+  /**
+   * Diary event type. Defaults to the attachment marker
+   * "quicklog_photo_attachment" (the V2-sheet contract plant-memory episodes
+   * key on). The STANDALONE Photo activity passes "photo" so the read layers
+   * (normalizeDiaryEntry allow-list, Timeline classification) badge the row as
+   * a Photo instead of falling back to Note/Observation.
+   */
+  eventType?: "quicklog_photo_attachment" | "photo";
   /** Injectable clock for deterministic tests. Defaults to `new Date()`. */
   now?: () => Date;
 }
@@ -40,14 +54,13 @@ export interface QuickLogPhotoDiaryEntryRow {
   photo_url: string;
   entry_at: string;
   details: {
-    event_type: "quicklog_photo_attachment";
+    event_type: "quicklog_photo_attachment" | "photo";
     source: "manual";
     attached_to_action: string;
-  };
+  } & Record<string, string>;
 }
 
-export const QUICK_LOG_PHOTO_DIARY_DEFAULT_NOTE =
-  "Photo attached from Quick Log." as const;
+export const QUICK_LOG_PHOTO_DIARY_DEFAULT_NOTE = "Photo attached from Quick Log." as const;
 
 /**
  * Deterministic pure builder. Returns the exact row shape passed to
@@ -67,16 +80,17 @@ export function buildQuickLogPhotoDiaryEntryRow(
     photo_url: input.photoPath,
     entry_at: now.toISOString(),
     details: {
-      event_type: "quicklog_photo_attachment",
+      // Caller-supplied structured detail first; fixed identity keys win so
+      // no extraDetails key can spoof the attachment envelope.
+      ...(input.extraDetails ?? {}),
+      event_type: input.eventType ?? "quicklog_photo_attachment",
       source: "manual",
       attached_to_action: input.action,
     },
   };
 }
 
-export type QuickLogPhotoDiaryEntryResult =
-  | { ok: true }
-  | { ok: false; message: string };
+export type QuickLogPhotoDiaryEntryResult = { ok: true } | { ok: false; message: string };
 
 /**
  * Thin wrapper around the extracted `diary_entries.insert`. The caller
@@ -87,9 +101,7 @@ export async function createQuickLogPhotoDiaryEntry(
   input: QuickLogPhotoDiaryEntryInput,
 ): Promise<QuickLogPhotoDiaryEntryResult> {
   const row = buildQuickLogPhotoDiaryEntryRow(input);
-  const { error } = await supabase
-    .from("diary_entries")
-    .insert(row as never);
+  const { error } = await supabase.from("diary_entries").insert(row as never);
   if (error) {
     return { ok: false, message: `Photo diary entry failed: ${error.message}` };
   }

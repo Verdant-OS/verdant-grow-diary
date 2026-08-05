@@ -40,10 +40,15 @@ describe("GGS Sentinel smoke runner — static safety", () => {
 
   it("panel does not import AI / alerts / Action Queue / device control modules", () => {
     const forbidden = [
-      "ai-doctor", "aiDoctor",
-      "ActionQueue", "action-queue",
-      "alerts/", "deviceControl", "device-control",
-      "quicklog_save_event", "quicklog_save_manual",
+      "ai-doctor",
+      "aiDoctor",
+      "ActionQueue",
+      "action-queue",
+      "alerts/",
+      "deviceControl",
+      "device-control",
+      "quicklog_save_event",
+      "quicklog_save_manual",
     ];
     for (const f of forbidden) {
       expect(PANEL.includes(f), `panel must not import ${f}`).toBe(false);

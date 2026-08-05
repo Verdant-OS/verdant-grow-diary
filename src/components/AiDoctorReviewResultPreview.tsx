@@ -23,10 +23,7 @@ export default function AiDoctorReviewResultPreview({
   className,
   testIdPrefix,
 }: AiDoctorReviewResultPreviewProps) {
-  const view = useMemo(
-    () => buildAiDoctorReviewResultView(result ?? null),
-    [result],
-  );
+  const view = useMemo(() => buildAiDoctorReviewResultView(result ?? null), [result]);
   const tid = (s: string) => (testIdPrefix ? `${testIdPrefix}-${s}` : s);
 
   if (!view.hasResult || view.result == null) {
@@ -76,10 +73,7 @@ export default function AiDoctorReviewResultPreview({
         </span>
       </header>
 
-      <p
-        className="text-sm"
-        data-testid={tid("ai-doctor-review-result-summary")}
-      >
+      <p className="text-sm" data-testid={tid("ai-doctor-review-result-summary")}>
         {r.summary}
       </p>
 
@@ -98,10 +92,7 @@ export default function AiDoctorReviewResultPreview({
         </span>
       </div>
 
-      <div
-        className="text-xs"
-        data-testid={tid("ai-doctor-review-result-likely-issue")}
-      >
+      <div className="text-xs" data-testid={tid("ai-doctor-review-result-likely-issue")}>
         <span className="font-semibold">Likely issue: </span>
         <span className="text-muted-foreground">{r.likely_issue}</span>
       </div>
@@ -134,10 +125,7 @@ export default function AiDoctorReviewResultPreview({
       </div>
 
       {r.possible_causes.length > 0 ? (
-        <div
-          className="text-xs"
-          data-testid={tid("ai-doctor-review-result-possible-causes")}
-        >
+        <div className="text-xs" data-testid={tid("ai-doctor-review-result-possible-causes")}>
           <h3 className="font-semibold mb-1">Possible causes</h3>
           <ul className="list-disc pl-4 space-y-0.5">
             {r.possible_causes.map((c, i) => (
@@ -158,15 +146,11 @@ export default function AiDoctorReviewResultPreview({
         </div>
         <div data-testid={tid("ai-doctor-review-result-follow-up")}>
           <dt className="font-semibold inline">24-hour follow-up: </dt>
-          <dd className="inline text-muted-foreground">
-            {r.twenty_four_hour_follow_up}
-          </dd>
+          <dd className="inline text-muted-foreground">{r.twenty_four_hour_follow_up}</dd>
         </div>
         <div data-testid={tid("ai-doctor-review-result-recovery-plan")}>
           <dt className="font-semibold inline">3-day recovery plan: </dt>
-          <dd className="inline text-muted-foreground">
-            {r.three_day_recovery_plan}
-          </dd>
+          <dd className="inline text-muted-foreground">{r.three_day_recovery_plan}</dd>
         </div>
       </dl>
 

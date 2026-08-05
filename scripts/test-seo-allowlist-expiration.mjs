@@ -42,10 +42,7 @@ const NOW = "2026-07-02T00:00:00Z";
 test("findExpiredEntries returns entries whose expires_on has passed", () => {
   const expired = findExpiredEntries(AL, NOW);
   const ids = expired.map((e) => `${e.section}:${e.id}`).sort();
-  assert.deepEqual(ids, [
-    "allowlisted_issues:expired-legacy",
-    "expected_noindex:expired-noindex",
-  ]);
+  assert.deepEqual(ids, ["allowlisted_issues:expired-legacy", "expected_noindex:expired-noindex"]);
 });
 
 test("findExpiredEntries ignores entries without expires_on", () => {
@@ -84,15 +81,17 @@ test("simulateAllowlistForUrls flags never_allowlisted URLs as never-suppressed"
 });
 
 test("simulateAllowlistForUrls reports which entries would match a URL", () => {
-  const [sim] = simulateAllowlistForUrls(
-    ["https://verdantgrowdiary.com/auth/callback"],
-    AL,
-    NOW,
-  );
+  const [sim] = simulateAllowlistForUrls(["https://verdantgrowdiary.com/auth/callback"], AL, NOW);
   assert.equal(sim.never_allowlisted, false);
   assert.equal(sim.would_be_expected_noindex, true);
-  assert.deepEqual(sim.matched_expected_noindex_entries.map((e) => e.id), ["protected-noindex"]);
-  assert.deepEqual(sim.matched_allowlisted_issue_entries.map((e) => e.id), ["auth-noindex"]);
+  assert.deepEqual(
+    sim.matched_expected_noindex_entries.map((e) => e.id),
+    ["protected-noindex"],
+  );
+  assert.deepEqual(
+    sim.matched_allowlisted_issue_entries.map((e) => e.id),
+    ["auth-noindex"],
+  );
   assert.deepEqual([...sim.would_suppress_issue_types].sort(), ["noindex_detected", "not_indexed"]);
 });
 

@@ -3,7 +3,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 
 vi.mock("@/hooks/usePageSeo", () => ({ usePageSeo: () => undefined }));
 
@@ -64,14 +64,14 @@ describe("BreederBeta · content + a11y", () => {
     const { container } = await renderPage();
     const text = container.textContent ?? "";
     for (const pattern of FORBIDDEN_CLAIMS) {
-      const lines = text.split(/\n|\.|•/).map((l) => l.trim()).filter(Boolean);
+      const lines = text
+        .split(/\n|\.|•/)
+        .map((l) => l.trim())
+        .filter(Boolean);
       for (const line of lines) {
         if (pattern.test(line)) {
           const negated = /does not|never|no\b/i.test(line);
-          expect(
-            negated,
-            `Forbidden claim "${pattern}" in unqualified line: "${line}"`,
-          ).toBe(true);
+          expect(negated, `Forbidden claim "${pattern}" in unqualified line: "${line}"`).toBe(true);
         }
       }
     }
@@ -80,23 +80,22 @@ describe("BreederBeta · content + a11y", () => {
   it("walkthrough section is present and anchored", async () => {
     await renderPage();
     expect(
-      screen.getByRole("heading", { level: 2, name: /watch demo walkthrough/i }),
+      screen.getByRole("heading", { level: 2, name: /read demo walkthrough/i }),
     ).toBeInTheDocument();
-    expect(screen.getByTestId("breeder-beta-walkthrough")).toHaveAttribute(
-      "id",
-      "watch-demo",
+    expect(screen.getByTestId("breeder-beta-walkthrough")).toHaveAttribute("id", "watch-demo");
+    expect(screen.getByTestId("breeder-beta-cta-secondary")).toHaveAttribute("href", "#watch-demo");
+    expect(screen.getByTestId("breeder-beta-walkthrough")).toHaveTextContent(
+      /not a video or a live grow/i,
     );
-    expect(
-      screen.getByTestId("breeder-beta-cta-secondary"),
-    ).toHaveAttribute("href", "#watch-demo");
+    expect(screen.queryByText(/watch demo walkthrough/i)).not.toBeInTheDocument();
   });
 
-  it("primary CTA falls back to a real disabled button when URL is missing", async () => {
+  it("primary CTA falls back to Verdant's working contact form when URL is missing", async () => {
     await renderPage();
-    const disabled = screen.getByTestId("breeder-beta-cta-primary-disabled");
-    expect(disabled.tagName).toBe("BUTTON");
-    expect(disabled).toBeDisabled();
-    expect(disabled).not.toHaveAttribute("href");
+    const cta = screen.getByTestId("breeder-beta-cta-primary");
+    expect(cta.tagName).toBe("A");
+    expect(cta).toHaveAttribute("href", "/contact");
+    expect(cta).not.toHaveAttribute("target");
   });
 
   it("primary CTA is external with target=_blank and rel noopener noreferrer when configured", async () => {

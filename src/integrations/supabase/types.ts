@@ -1014,6 +1014,192 @@ export type Database = {
           },
         ]
       }
+      diary_entry_audit_log: {
+        Row: {
+          action: string
+          actor_id: string | null
+          changed_at: string
+          changed_fields: Json
+          diary_entry_id: string
+          id: string
+          previous_snapshot: Json | null
+          user_id: string
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          changed_at?: string
+          changed_fields?: Json
+          diary_entry_id: string
+          id?: string
+          previous_snapshot?: Json | null
+          user_id: string
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          changed_at?: string
+          changed_fields?: Json
+          diary_entry_id?: string
+          id?: string
+          previous_snapshot?: Json | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      edge_function_metric_events: {
+        Row: {
+          counters: Json | null
+          created_at: string
+          deploy_version: string
+          duration_ms: number | null
+          duration_ms_max_in_window: number | null
+          duration_ms_mean_in_window: number | null
+          event_type: string
+          fn: string
+          id: number
+          idempotency_key: string | null
+          observed_at: string
+          outcome: string | null
+          request_id: string | null
+          requests_in_window: number | null
+          supabase_env: string
+          window_ms: number | null
+        }
+        Insert: {
+          counters?: Json | null
+          created_at?: string
+          deploy_version?: string
+          duration_ms?: number | null
+          duration_ms_max_in_window?: number | null
+          duration_ms_mean_in_window?: number | null
+          event_type: string
+          fn: string
+          id?: number
+          idempotency_key?: string | null
+          observed_at?: string
+          outcome?: string | null
+          request_id?: string | null
+          requests_in_window?: number | null
+          supabase_env?: string
+          window_ms?: number | null
+        }
+        Update: {
+          counters?: Json | null
+          created_at?: string
+          deploy_version?: string
+          duration_ms?: number | null
+          duration_ms_max_in_window?: number | null
+          duration_ms_mean_in_window?: number | null
+          event_type?: string
+          fn?: string
+          id?: number
+          idempotency_key?: string | null
+          observed_at?: string
+          outcome?: string | null
+          request_id?: string | null
+          requests_in_window?: number | null
+          supabase_env?: string
+          window_ms?: number | null
+        }
+        Relationships: []
+      }
+      edge_metrics_alert_dispatches: {
+        Row: {
+          fire_count: number
+          fn: string
+          last_fired_at: string
+          last_requests_in_window: number
+          last_threshold: number
+          last_value: number
+          metric: string
+          updated_at: string
+        }
+        Insert: {
+          fire_count?: number
+          fn: string
+          last_fired_at?: string
+          last_requests_in_window: number
+          last_threshold: number
+          last_value: number
+          metric: string
+          updated_at?: string
+        }
+        Update: {
+          fire_count?: number
+          fn?: string
+          last_fired_at?: string
+          last_requests_in_window?: number
+          last_threshold?: number
+          last_value?: number
+          metric?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      edge_metrics_webhook_attempts: {
+        Row: {
+          attempt: number
+          attempted_at: string
+          created_at: string
+          delay_before_ms: number
+          dispatch_id: string
+          duration_ms: number
+          error: string | null
+          fn: string
+          id: string
+          metric: string
+          ok: boolean
+          outcome: string
+          request_id: string | null
+          requests_in_window: number | null
+          status_code: number | null
+          threshold: number | null
+          transient: boolean
+          value: number | null
+        }
+        Insert: {
+          attempt: number
+          attempted_at?: string
+          created_at?: string
+          delay_before_ms?: number
+          dispatch_id: string
+          duration_ms?: number
+          error?: string | null
+          fn: string
+          id?: string
+          metric: string
+          ok?: boolean
+          outcome: string
+          request_id?: string | null
+          requests_in_window?: number | null
+          status_code?: number | null
+          threshold?: number | null
+          transient?: boolean
+          value?: number | null
+        }
+        Update: {
+          attempt?: number
+          attempted_at?: string
+          created_at?: string
+          delay_before_ms?: number
+          dispatch_id?: string
+          duration_ms?: number
+          error?: string | null
+          fn?: string
+          id?: string
+          metric?: string
+          ok?: boolean
+          outcome?: string
+          request_id?: string | null
+          requests_in_window?: number | null
+          status_code?: number | null
+          threshold?: number | null
+          transient?: boolean
+          value?: number | null
+        }
+        Relationships: []
+      }
       email_send_log: {
         Row: {
           created_at: string
@@ -3167,6 +3353,7 @@ export type Database = {
       plants: {
         Row: {
           candidate_label: string | null
+          candidate_number: number | null
           created_at: string
           grow_id: string | null
           health: string
@@ -3177,6 +3364,7 @@ export type Database = {
           name: string
           pheno_hunt_id: string | null
           photo_url: string | null
+          plant_type: string
           pot_size: string | null
           schema_version: number
           stage: string
@@ -3188,6 +3376,7 @@ export type Database = {
         }
         Insert: {
           candidate_label?: string | null
+          candidate_number?: number | null
           created_at?: string
           grow_id?: string | null
           health?: string
@@ -3198,6 +3387,7 @@ export type Database = {
           name: string
           pheno_hunt_id?: string | null
           photo_url?: string | null
+          plant_type?: string
           pot_size?: string | null
           schema_version?: number
           stage?: string
@@ -3209,6 +3399,7 @@ export type Database = {
         }
         Update: {
           candidate_label?: string | null
+          candidate_number?: number | null
           created_at?: string
           grow_id?: string | null
           health?: string
@@ -3219,6 +3410,7 @@ export type Database = {
           name?: string
           pheno_hunt_id?: string | null
           photo_url?: string | null
+          plant_type?: string
           pot_size?: string | null
           schema_version?: number
           stage?: string
@@ -4277,6 +4469,12 @@ export type Database = {
       }
     }
     Functions: {
+      admin_schema_audit:
+        | { Args: { _migrations: string[]; _tables: string[] }; Returns: Json }
+        | {
+            Args: { _columns?: Json; _migrations: string[]; _tables: string[] }
+            Returns: Json
+          }
       ai_credit_allowance: {
         Args: { p_plan_id: string }
         Returns: {
@@ -4605,6 +4803,17 @@ export type Database = {
         Args: { p_retention_days?: number }
         Returns: Json
       }
+      purge_edge_function_metric_events: {
+        Args: {
+          other_days?: number
+          request_metric_days?: number
+          snapshot_days?: number
+        }
+        Returns: {
+          deleted_count: number
+          event_type: string
+        }[]
+      }
       quicklog_save_event: {
         Args: {
           p_details?: Json
@@ -4630,6 +4839,7 @@ export type Database = {
           p_idempotency_key?: string
           p_note?: string
           p_occurred_at?: string
+          p_stage?: string
           p_target_id: string
           p_target_type: string
           p_temperature_c?: number
@@ -4653,6 +4863,24 @@ export type Database = {
           p_paddle_transaction_id: string
         }
         Returns: Json
+      }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
+      verdant_normalize_search_text: {
+        Args: { p_text: string }
+        Returns: string
+      }
+      verdant_search: {
+        Args: { max_results?: number; q: string }
+        Returns: {
+          entity_type: string
+          id: string
+          label: string
+          match_kind: string
+          rank: number
+          score: number
+          sublabel: string
+        }[]
       }
     }
     Enums: {

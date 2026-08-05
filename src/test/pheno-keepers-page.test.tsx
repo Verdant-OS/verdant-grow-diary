@@ -8,7 +8,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen, fireEvent, within } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import type { UsePhenoKeepersState } from "@/hooks/usePhenoKeepers";
 import { SELF_DONOR_VALUE } from "@/lib/phenoCrossFormViewModel";
 
@@ -49,6 +49,7 @@ function renderAt(state: Partial<UsePhenoKeepersState>) {
     decisionsByPlant: {},
     error: null,
     saving: false,
+    reload: state.reload ?? vi.fn(),
     promoteToKeeper,
     addKeeperClone,
     markReversed,
@@ -79,6 +80,9 @@ describe("PhenoKeepersPage — base flows", () => {
 
   it("promotes a candidate to a named keeper", () => {
     const { promoteToKeeper } = renderAt({});
+    expect(
+      screen.getByRole("combobox", { name: "Candidate to name as keeper" }),
+    ).toBeInTheDocument();
     fireEvent.change(screen.getByTestId("keepers-promote-plant"), { target: { value: "p1" } });
     fireEvent.change(screen.getByTestId("keepers-promote-name"), {
       target: { value: "Gas Keeper" },
@@ -441,9 +445,9 @@ describe("PhenoKeepersPage — stability ledger wiring", () => {
     expect(within(card).getByTestId("pheno-stability-verdict-badge-k1")).toHaveTextContent(
       /Held on re-grow/i,
     );
-    expect(
-      within(card).getByTestId("pheno-stability-axis-k1-nose_loudness"),
-    ).toHaveTextContent(/held/);
+    expect(within(card).getByTestId("pheno-stability-axis-k1-nose_loudness")).toHaveTextContent(
+      /held/,
+    );
   });
 
   it("removing a grow-out saves the reduced set through the hook", () => {
@@ -476,7 +480,10 @@ describe("PhenoKeepersPage — no direct DB writes from JSX", () => {
   });
 
   it("the stability ledger persists ONLY through the hook action (no direct write)", () => {
-    const src = readFileSync(resolve(process.cwd(), "src/components/PhenoStabilityLedger.tsx"), "utf8");
+    const src = readFileSync(
+      resolve(process.cwd(), "src/components/PhenoStabilityLedger.tsx"),
+      "utf8",
+    );
     expect(src).not.toMatch(/supabase/i);
     expect(src).not.toMatch(/\.insert\(|\.update\(|\.delete\(|\.rpc\(/);
     expect(src).not.toMatch(/pheno_keepers/);

@@ -2,7 +2,7 @@
  * Read-only Operator Mode presenter for the signed-in grower's own MCP-backed
  * diary and sensor read models. Data access stays in the companion hook.
  */
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {

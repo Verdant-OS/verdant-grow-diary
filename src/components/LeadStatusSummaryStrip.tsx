@@ -1,8 +1,5 @@
 import { useMemo } from "react";
-import {
-  summarizeLeadStatuses,
-  type LeadStatusSummary,
-} from "@/lib/leadStatusSummaryRules";
+import { summarizeLeadStatuses, type LeadStatusSummary } from "@/lib/leadStatusSummaryRules";
 import type { LeadRow } from "@/hooks/useLeadsList";
 
 export interface LeadStatusSummaryStripProps {
@@ -15,9 +12,7 @@ export interface LeadStatusSummaryStripProps {
  * Performs no I/O and no external communication. Scoped to whichever
  * leads list the caller passes in (typically the current filtered set).
  */
-export default function LeadStatusSummaryStrip({
-  leads,
-}: LeadStatusSummaryStripProps) {
+export default function LeadStatusSummaryStrip({ leads }: LeadStatusSummaryStripProps) {
   const s = useMemo(() => summarizeLeadStatuses(leads), [leads]);
 
   return (
@@ -38,16 +33,10 @@ export default function LeadStatusSummaryStrip({
       <div className="mt-3 grid grid-cols-1 gap-2 text-xs text-muted-foreground sm:grid-cols-3">
         <Metric label="Avg quality" value={`${s.averageQualityScore}/100`} />
         <Metric label="% closed" value={`${s.percentClosed}%`} />
-        <Metric
-          label="% needing action"
-          value={`${s.percentNeedingAction}%`}
-        />
+        <Metric label="% needing action" value={`${s.percentNeedingAction}%`} />
       </div>
       {s.warnings.length > 0 && (
-        <p
-          className="mt-2 text-xs text-destructive"
-          data-testid="lead-status-summary-warnings"
-        >
+        <p className="mt-2 text-xs text-destructive" data-testid="lead-status-summary-warnings">
           {s.warnings.join("; ")}
         </p>
       )}
@@ -58,12 +47,8 @@ export default function LeadStatusSummaryStrip({
 function Cell({ label, value }: { label: string; value: number }) {
   return (
     <div>
-      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
-        {label}
-      </div>
-      <div className="font-display text-xl font-semibold tabular-nums">
-        {value}
-      </div>
+      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className="font-display text-xl font-semibold tabular-nums">{value}</div>
     </div>
   );
 }

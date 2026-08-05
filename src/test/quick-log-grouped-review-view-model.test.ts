@@ -65,9 +65,7 @@ describe("quickLogGroupedReviewViewModel", () => {
     expect(QUICK_LOG_REVIEW_CLOSE_LABEL).toBe("Close details");
     expect(QUICK_LOG_REVIEW_PANEL_TITLE).toBe("Grouped timeline details");
     expect(QUICK_LOG_REVIEW_ACTION_SECTION_TITLE).toBe("QuickLog action");
-    expect(QUICK_LOG_REVIEW_ENVIRONMENT_SECTION_TITLE).toBe(
-      "Manual environment snapshot",
-    );
+    expect(QUICK_LOG_REVIEW_ENVIRONMENT_SECTION_TITLE).toBe("Manual environment snapshot");
     expect(QUICK_LOG_REVIEW_PANEL_TITLE).not.toMatch(/linked/i);
     expect(QUICK_LOG_REVIEW_OPEN_LABEL).not.toMatch(/linked/i);
   });
@@ -84,9 +82,7 @@ describe("quickLogGroupedReviewViewModel", () => {
   });
 
   it("builds an action section with kind label, source Manual, and optional note/volume", () => {
-    const w = buildQuickLogReviewActionSection(
-      grouped("water", { volumeMl: 250 }),
-    );
+    const w = buildQuickLogReviewActionSection(grouped("water", { volumeMl: 250 }));
     expect(w).toEqual({
       kindLabel: "Water",
       occurredAt: "2026-05-01T10:00:00.000Z",
@@ -95,9 +91,7 @@ describe("quickLogGroupedReviewViewModel", () => {
       volumeMl: 250,
     });
 
-    const n = buildQuickLogReviewActionSection(
-      grouped("note", { noteText: "Top dressed." }),
-    );
+    const n = buildQuickLogReviewActionSection(grouped("note", { noteText: "Top dressed." }));
     expect(n).toEqual({
       kindLabel: "Note",
       occurredAt: "2026-05-01T10:00:00.000Z",

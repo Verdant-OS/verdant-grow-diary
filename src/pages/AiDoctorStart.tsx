@@ -7,7 +7,7 @@
  */
 import { useMemo } from "react";
 import { ArrowRight, History, Sprout, Stethoscope } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 
 import EmptyState from "@/components/EmptyState";
 import GrowDataLoadError, { GrowDataLoadingState } from "@/components/GrowDataLoadError";
@@ -81,7 +81,7 @@ export default function AiDoctorStart() {
               <li key={option.id}>
                 <Link
                   to={option.href}
-                  className="group flex h-full items-center justify-between gap-3 rounded-xl border border-border/70 bg-card/45 p-4 transition-colors hover:border-primary/50 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="group flex h-full items-center justify-between gap-3 rounded-xl border border-border/70 bg-card/45 p-4 transition-colors hover:border-primary/50 hover:bg-primary/5 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                   data-testid={`ai-doctor-start-option-${index}`}
                   aria-label={`Review ${option.name} with AI Doctor`}
                 >

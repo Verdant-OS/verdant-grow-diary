@@ -1,11 +1,11 @@
 import { describe, it, expect } from "vitest";
-import {
-  buildAuditReport,
-  deriveSafeDeviceDisplayId,
-} from "@/lib/sensorIngestAuditReportRules";
+import { buildAuditReport, deriveSafeDeviceDisplayId } from "@/lib/sensorIngestAuditReportRules";
 
 describe("sensorIngestAuditReportRules — filters + safe device display id", () => {
-  const baseRow = (i: number, opts: Partial<{ provider: string; capturedAt: string; payload: Record<string, unknown> }>) => ({
+  const baseRow = (
+    i: number,
+    opts: Partial<{ provider: string; capturedAt: string; payload: Record<string, unknown> }>,
+  ) => ({
     id: `r${i}`,
     tent_id: "t",
     captured_at: opts.capturedAt ?? `2026-06-19T12:0${i}:00Z`,
@@ -20,27 +20,19 @@ describe("sensorIngestAuditReportRules — filters + safe device display id", ()
   });
 
   it("derives a safe display id from device_name", () => {
-    expect(
-      deriveSafeDeviceDisplayId({ device_name: "Greenhouse A" }),
-    ).toBe("Greenhouse A");
+    expect(deriveSafeDeviceDisplayId({ device_name: "Greenhouse A" })).toBe("Greenhouse A");
   });
 
   it("rejects MAC-shaped candidates", () => {
-    expect(
-      deriveSafeDeviceDisplayId({ device_name: "AA:BB:CC:DD:EE:FF" }),
-    ).toBeNull();
+    expect(deriveSafeDeviceDisplayId({ device_name: "AA:BB:CC:DD:EE:FF" })).toBeNull();
   });
 
   it("rejects IP-shaped candidates", () => {
-    expect(
-      deriveSafeDeviceDisplayId({ station_name: "192.168.1.42" }),
-    ).toBeNull();
+    expect(deriveSafeDeviceDisplayId({ station_name: "192.168.1.42" })).toBeNull();
   });
 
   it("rejects passkey-like values", () => {
-    expect(
-      deriveSafeDeviceDisplayId({ display_id: "passkey-XYZ" }),
-    ).toBeNull();
+    expect(deriveSafeDeviceDisplayId({ display_id: "passkey-XYZ" })).toBeNull();
   });
 
   it("provider filter narrows rows locally", () => {
@@ -53,9 +45,7 @@ describe("sensorIngestAuditReportRules — filters + safe device display id", ()
       filters: { provider: "ecowitt" },
     });
     expect(r.rows).toHaveLength(2);
-    expect(r.availableProviders).toEqual(
-      expect.arrayContaining(["ecowitt", "home_assistant"]),
-    );
+    expect(r.availableProviders).toEqual(expect.arrayContaining(["ecowitt", "home_assistant"]));
     expect(r.filteredTotal).toBe(2);
   });
 

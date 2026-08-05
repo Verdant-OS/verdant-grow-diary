@@ -41,10 +41,7 @@ const SAFE_BANNED_NEIGHBORS = [
   ["summary", "Outcome remains uncertain after one snapshot."],
   ["likely_issue", "Possible delivery issue with nutrient mix."],
   ["immediate_action", "Add an olive-toned reference photo for comparison."],
-  [
-    "three_day_recovery_plan",
-    "Track plant connectedness to canopy airflow over 3 days.",
-  ],
+  ["three_day_recovery_plan", "Track plant connectedness to canopy airflow over 3 days."],
 ] as const;
 
 const STANDALONE_BANNED = [
@@ -99,8 +96,7 @@ describe("AI Doctor Review Result contract — hardening", () => {
   it("allows advisory device language alongside a separate safe sentence", () => {
     const v = validateAiDoctorReviewResult({
       ...base(),
-      what_not_to_do:
-        "Do not toggle fans automatically. Review the timeline first.",
+      what_not_to_do: "Do not toggle fans automatically. Review the timeline first.",
     });
     expect(v.ok).toBe(true);
   });
@@ -108,8 +104,7 @@ describe("AI Doctor Review Result contract — hardening", () => {
   it("rejects when an imperative device sentence is mixed with advisory copy", () => {
     const v = validateAiDoctorReviewResult({
       ...base(),
-      immediate_action:
-        "Review the timeline first. Turn on the humidifier now.",
+      immediate_action: "Review the timeline first. Turn on the humidifier now.",
     });
     expect(v.ok).toBe(false);
   });

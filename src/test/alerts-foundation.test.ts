@@ -14,6 +14,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
+import {
+  extractMountedAppRoutePaths,
+  readAllRouteModuleSources,
+} from "./helpers/routeManifestSyncHarness";
 
 const ROOT = resolve(__dirname, "../..");
 const MIGRATIONS_DIR = resolve(ROOT, "supabase/migrations");
@@ -33,19 +37,10 @@ const ALERTS_SQL = (() => {
     .join("\n\n");
 })();
 
-const ALERTS_LIB = readFileSync(
-  resolve(__dirname, "../lib/alerts.ts"),
-  "utf8",
-);
-const ALERT_PAGE = readFileSync(
-  resolve(__dirname, "../pages/Alerts.tsx"),
-  "utf8",
-);
-const DASHBOARD = readFileSync(
-  resolve(__dirname, "../pages/Dashboard.tsx"),
-  "utf8",
-);
-const APP_TSX = readFileSync(resolve(__dirname, "../App.tsx"), "utf8");
+const ALERTS_LIB = readFileSync(resolve(__dirname, "../lib/alerts.ts"), "utf8");
+const ALERT_PAGE = readFileSync(resolve(__dirname, "../pages/Alerts.tsx"), "utf8");
+const DASHBOARD = readFileSync(resolve(__dirname, "../pages/Dashboard.tsx"), "utf8");
+const APP_TSX = readAllRouteModuleSources();
 const ROUTES = readFileSync(resolve(__dirname, "../lib/routes.ts"), "utf8");
 
 // ---------------------------------------------------------------------------
@@ -57,9 +52,7 @@ describe("alerts table migration", () => {
   });
 
   it("user_id defaults to auth.uid()", () => {
-    expect(ALERTS_SQL).toMatch(
-      /user_id\s+uuid\s+NOT\s+NULL\s+DEFAULT\s+auth\.uid\(\)/i,
-    );
+    expect(ALERTS_SQL).toMatch(/user_id\s+uuid\s+NOT\s+NULL\s+DEFAULT\s+auth\.uid\(\)/i);
   });
 
   it("grow_id references grows ON DELETE CASCADE", () => {
@@ -79,9 +72,7 @@ describe("alerts table migration", () => {
 
   it("status default is 'open' and source default is 'environment_alerts'", () => {
     expect(ALERTS_SQL).toMatch(/status\s+text\s+NOT\s+NULL\s+DEFAULT\s+'open'/i);
-    expect(ALERTS_SQL).toMatch(
-      /source\s+text\s+NOT\s+NULL\s+DEFAULT\s+'environment_alerts'/i,
-    );
+    expect(ALERTS_SQL).toMatch(/source\s+text\s+NOT\s+NULL\s+DEFAULT\s+'environment_alerts'/i);
   });
 
   it("constrains severity to info/watch/warning/critical", () => {
@@ -109,9 +100,7 @@ describe("alerts table migration", () => {
   });
 
   it("enables Row Level Security on public.alerts", () => {
-    expect(ALERTS_SQL).toMatch(
-      /ALTER\s+TABLE\s+public\.alerts\s+ENABLE\s+ROW\s+LEVEL\s+SECURITY/i,
-    );
+    expect(ALERTS_SQL).toMatch(/ALTER\s+TABLE\s+public\.alerts\s+ENABLE\s+ROW\s+LEVEL\s+SECURITY/i);
   });
 
   it("declares SELECT/INSERT/UPDATE/DELETE policies anchored on auth.uid()", () => {
@@ -136,7 +125,8 @@ describe("alerts table migration", () => {
 // ---------------------------------------------------------------------------
 describe("Alert Center routing", () => {
   it("registers the /alerts route", () => {
-    expect(APP_TSX).toMatch(/path=["']\/alerts["']\s+element=\{<Alerts/);
+    expect(extractMountedAppRoutePaths()).toContain("/alerts");
+    expect(APP_TSX).toMatch(/Alerts/);
   });
 
   it("alertsPath helper accepts a growId and emits ?growId=", () => {
@@ -193,7 +183,9 @@ describe("Dashboard save-alert integration", () => {
     // The nearest preceding token should be `await` (inside an arrow fn), not
     // a bare statement at module/component top-level.
     const before = DASHBOARD.slice(0, idx);
-    expect(/onClick=\{[^}]*$/.test(before) || /=>\s*$/.test(before.trim()) || /await\s+$/.test(before)).toBe(true);
+    expect(
+      /onClick=\{[^}]*$/.test(before) || /=>\s*$/.test(before.trim()) || /await\s+$/.test(before),
+    ).toBe(true);
   });
 
   it("save payload omits user_id", () => {
@@ -275,9 +267,7 @@ describe("status helpers only update status + timestamps", () => {
     await mod.acknowledgeAlert("a1");
     expect(spies.update).toHaveBeenCalledTimes(1);
     const patch = spies.update.mock.calls[0][0] as Record<string, unknown>;
-    expect(Object.keys(patch).sort()).toEqual(
-      ["acknowledged_at", "resolved_at", "status"].sort(),
-    );
+    expect(Object.keys(patch).sort()).toEqual(["acknowledged_at", "resolved_at", "status"].sort());
     expect(patch.status).toBe("acknowledged");
     expect(patch.resolved_at).toBeNull();
   });

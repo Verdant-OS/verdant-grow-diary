@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import DemoProofWalkthrough from "@/pages/DemoProofWalkthrough";
 
 function renderPage() {
@@ -14,9 +14,7 @@ function renderPage() {
 describe("DemoProofWalkthrough — read-only banner", () => {
   it("renders the read-only banner near the top", () => {
     renderPage();
-    const banner = screen.getByTestId(
-      "demo-proof-walkthrough-readonly-banner",
-    );
+    const banner = screen.getByTestId("demo-proof-walkthrough-readonly-banner");
     expect(banner).toBeTruthy();
     const text = banner.textContent ?? "";
     expect(text).toMatch(/Read-only demo walkthrough/i);

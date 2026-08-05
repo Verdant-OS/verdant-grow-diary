@@ -13,7 +13,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 
 import ImportedSensorHistoryPanel from "@/components/ImportedSensorHistoryPanel";
 
@@ -52,7 +52,7 @@ describe("TimelineCsvContextPanel read-only banner copy", () => {
     const src = read("src/components/TimelineCsvContextPanel.tsx");
     expect(src).toContain('data-testid="timeline-csv-context-readonly-banner"');
     expect(src).toMatch(/CSV context is read-only/);
-    expect(src).toMatch(/explicitly labeled csv/);
+    expect(src).toMatch(/explicitly\s+labeled\s+csv/i);
   });
 });
 

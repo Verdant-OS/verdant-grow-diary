@@ -5,12 +5,16 @@
  * never touches supabase.rpc / direct table writes from the component.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import QuickLogV2Sheet from "@/components/QuickLogV2Sheet";
+import {
+  clearTemperatureUnitPreference,
+  saveTemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
 
 const rpcMock = vi.fn();
 const storageRemove = vi.fn().mockResolvedValue({ data: null, error: null });
@@ -99,6 +103,7 @@ function clickSave() {
 }
 
 beforeEach(() => {
+  clearTemperatureUnitPreference();
   rpcMock.mockReset();
   storageRemove.mockReset();
   storageUpload.mockReset();
@@ -115,9 +120,11 @@ describe("QuickLogV2Sheet — structured feeding", () => {
       "utf8",
     );
     expect(source).toMatch(
-      /showTimelineConfirmation\(FEEDING_SAVE_SUCCESS_MESSAGE,[\s\S]*?targetType:\s*null,[\s\S]*?targetId:\s*null,[\s\S]*?growEventId/,
+      /showTimelineConfirmation\(FEEDING_SAVE_SUCCESS_MESSAGE,[\s\S]*?growId:\s*resolved\.growId[\s\S]*?targetType:\s*\(resolved\.targetType[\s\S]*?growEventId/,
     );
-    expect(source).toMatch(/postSave\.action === "feed" \? null : postSave\.targetType/);
+    expect(source).toMatch(
+      /buildQuickLogTimelineNavTarget\(\{[\s\S]*?growId:\s*postSave\.growId[\s\S]*?growEventId:\s*postSave\.growEventId/,
+    );
     const feedingPanel = readFileSync(
       resolve(process.cwd(), "src/components/FeedingHistoryPanel.tsx"),
       "utf8",
@@ -198,6 +205,10 @@ describe("QuickLogV2Sheet — structured feeding", () => {
   });
 
   it("maps optional pH/EC/runoff/water-temp fields into the writer payload", async () => {
+    // Types a raw value expecting celsius passthrough into the writer
+    // payload — pin the display unit explicitly rather than ride whatever
+    // the global default happens to be.
+    saveTemperatureUnitPreference("celsius");
     writeFeedingMock.mockResolvedValue({ ok: true, eventId: "evt-2", reused: false });
     renderSheet("plant:plant-1");
     clickFeed();
@@ -348,5 +359,40 @@ describe("QuickLogV2Sheet — structured feeding", () => {
     expect(onOpenChange).not.toHaveBeenCalledWith(false);
     expect(rpcMock).not.toHaveBeenCalled();
     expect(tableMethods.insert).not.toHaveBeenCalled();
+  });
+
+  it("pins the feeding Water temperature draft to its entry unit through a live preference flip", async () => {
+    saveTemperatureUnitPreference("celsius");
+    writeFeedingMock.mockResolvedValue({ ok: true, eventId: "evt-temp-pin", reused: false });
+    renderSheet("plant:plant-1");
+    clickFeed();
+    fillRequiredFeedingFields();
+    fireEvent.change(screen.getByLabelText("Water (°C)"), { target: { value: "18" } });
+
+    act(() => {
+      saveTemperatureUnitPreference("fahrenheit");
+    });
+
+    clickSave();
+    await waitFor(() => expect(writeFeedingMock).toHaveBeenCalledTimes(1));
+    const payload = writeFeedingMock.mock.calls[0][0];
+    expect(payload.water_temp_c).toBe(18);
+  });
+
+  it("keeps the feeding Water label showing the pinned entry unit, not the live one, through a mid-draft preference flip", async () => {
+    // Codex round-5 finding: the save payload was already correctly pinned
+    // (see the test above), but the visible label still read the live unit.
+    saveTemperatureUnitPreference("celsius");
+    renderSheet("plant:plant-1");
+    clickFeed();
+    fillRequiredFeedingFields();
+    fireEvent.change(screen.getByLabelText("Water (°C)"), { target: { value: "18" } });
+
+    act(() => {
+      saveTemperatureUnitPreference("fahrenheit");
+    });
+
+    expect(screen.getByLabelText("Water (°C)")).toBeTruthy();
+    expect(screen.queryByLabelText("Water (°F)")).toBeNull();
   });
 });

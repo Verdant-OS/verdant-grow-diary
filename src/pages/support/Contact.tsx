@@ -40,18 +40,16 @@ const contactSchema = z.object({
     "hardware_integration",
     "other",
   ]),
-  message: z
-    .string()
-    .trim()
-    .min(1, "Add a short message")
-    .max(8000, "Message is too long"),
+  message: z.string().trim().min(1, "Add a short message").max(8000, "Message is too long"),
   grow_context: z.string().trim().max(500).optional().or(z.literal("")),
 });
 
 type ContactValues = z.infer<typeof contactSchema>;
 
 export default function Contact() {
-  const [submitState, setSubmitState] = useState<"idle" | "submitting" | "success" | "error">("idle");
+  const [submitState, setSubmitState] = useState<"idle" | "submitting" | "success" | "error">(
+    "idle",
+  );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [honeypot, setHoneypot] = useState("");
   const formOpenedAt = useRef<number>(Date.now());
@@ -88,11 +86,7 @@ export default function Contact() {
       return;
     }
 
-    const { data: sessionData } = await supabase.auth.getSession();
-    const userId = sessionData.session?.user?.id ?? null;
-
     const payload = {
-      user_id: userId,
       name: values.name.trim(),
       email: values.email.trim(),
       category: values.category,
@@ -273,7 +267,10 @@ export default function Contact() {
         <PrivacyNote />
 
         {submitState === "error" && errorMessage ? (
-          <div role="alert" className="rounded-lg border border-destructive/60 bg-destructive/10 p-3 text-sm text-destructive">
+          <div
+            role="alert"
+            className="rounded-lg border border-destructive/60 bg-destructive/10 p-3 text-sm text-destructive"
+          >
             {errorMessage}
           </div>
         ) : null}

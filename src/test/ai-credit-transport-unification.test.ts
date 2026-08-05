@@ -21,8 +21,10 @@ describe("ai-coach edge — 200-envelope credit transport", () => {
   it("ai_credit_spend denial returns 200 with { ok:false, reason:'credit_denied', credit }", () => {
     // Only an authoritative denied status reaches the paywall branch, and the
     // denial branch must not return a non-200 status.
-    expect(src).toMatch(
-      /spendObj\.ok\s*!==\s*true\s*&&\s*spendObj\.status\s*!==\s*"denied"[\s\S]{0,500}spendObj\.ok\s*!==\s*true[\s\S]{0,300}return\s+json\(\s*\{\s*ok:\s*false,\s*reason:\s*"credit_denied",\s*credit:\s*spendObj\s*\}\s*,\s*200\s*\)/,
+    const denied = src.indexOf('spendDecision.kind === "denied"');
+    expect(denied).toBeGreaterThan(-1);
+    expect(src.slice(denied, denied + 400)).toContain(
+      'return calmFailure("credit_denied", { credit: spendObj })',
     );
     // Legacy shapes removed.
     expect(src).not.toMatch(
@@ -31,37 +33,69 @@ describe("ai-coach edge — 200-envelope credit transport", () => {
   });
 
   it("keeps refunded and context-conflicting replays out of the credit-denied paywall", () => {
-    expect(src).toMatch(
-      /spendObj\.ok\s*!==\s*true\s*&&\s*spendObj\.status\s*!==\s*"denied"[\s\S]{0,500}return\s+json\(\s*\{\s*ok:\s*false,\s*reason:\s*"invalid"\s*\}\s*,\s*200\s*\)/,
+    const refunded = src.indexOf('spendDecision.kind === "refunded"');
+    const denied = src.indexOf('spendDecision.kind === "denied"');
+    const conflict = src.indexOf('spendDecision.kind === "conflict"');
+    expect(refunded).toBeGreaterThan(-1);
+    expect(denied).toBeGreaterThan(refunded);
+    expect(conflict).toBeGreaterThan(denied);
+    expect(src.slice(refunded, denied)).toContain('return calmFailure("result_recording_failed")');
+    expect(src.slice(conflict, conflict + 250)).toContain('return calmFailure("invalid")');
+  });
+
+  it("returns the same authoritative receipt fields on fresh and cached success", () => {
+    const helper = src.indexOf("function buildAiCreditReceiptContext");
+    const helperEnd = src.indexOf("async function settleResultPersistence", helper);
+    expect(helper).toBeGreaterThan(-1);
+    expect(helperEnd).toBeGreaterThan(helper);
+    const helperBlock = src.slice(helper, helperEnd);
+    for (const field of [
+      "remaining",
+      "scope",
+      "scope_used",
+      "scope_limit",
+      "plan_id",
+      "funded_by",
+      "pack_balance",
+    ]) {
+      expect(helperBlock).toContain(`${field}: spend.${field}`);
+    }
+    expect(src).toContain(
+      "return safeOk(cached.result, buildAiCreditReceiptContext(spendObj, true))",
     );
-    expect(src.indexOf('spendObj.status !== "denied"')).toBeLessThan(
-      src.indexOf('reason: "credit_denied"'),
-    );
+    expect(src).toContain("return safeOk(validated.result, buildAiCreditReceiptContext(spendObj))");
   });
 
   it("upstream provider 402 after refund returns 200 with { ok:false, reason:'upstream_credit_exhausted' }", () => {
-    expect(src).toMatch(
-      /r\.status\s*===\s*402[\s\S]{0,200}refund\(\s*"upstream_402"\s*\)[\s\S]{0,300}return\s+json\(\s*\{\s*ok:\s*false,\s*reason:\s*"upstream_credit_exhausted"\s*\}\s*,\s*200\s*\)/,
-    );
+    const upstream402 = src.indexOf("r.status === 402");
+    const genericFailure = src.indexOf("if (!r.ok)", upstream402);
+    expect(upstream402).toBeGreaterThan(-1);
+    expect(genericFailure).toBeGreaterThan(upstream402);
+    const block = src.slice(upstream402, genericFailure);
+    expect(block).toContain("failureAfterRefund(");
+    expect(block).toContain('"upstream_402"');
+    expect(block).toContain('"upstream_credit_exhausted"');
     // Legacy 402 paywall copy removed.
     expect(src).not.toMatch(/AI credits exhausted\. Add credits/);
   });
 
   it("logs the new HTTP=200 business envelopes", () => {
     expect(src).toMatch(/ai-coach status=credit_denied http=200/);
-    expect(src).toMatch(/ai-coach status=credit_invalid http=200/);
+    expect(src).toMatch(/ai-coach status=idempotency_conflict/);
+    expect(src).toMatch(/ai-coach status=result_pending/);
     expect(src).toMatch(/ai-coach status=upstream_credit_exhausted http=200/);
   });
 
   it("keeps RPCs scoped and uses service role only for server-authoritative credit spending", () => {
     const rpcCalls = [...src.matchAll(/\.rpc\s*\(\s*["'`]([a-zA-Z0-9_]+)["'`]/g)].map((m) => m[1]);
     for (const name of rpcCalls) {
-      expect(["ai_credit_spend", "ai_credit_refund"]).toContain(name);
+      expect(["ai_credit_spend", "ai_credit_refund", "ai_credit_attach_result"]).toContain(name);
     }
     expect(src).not.toMatch(/\baction_queue\b/);
     expect(src).toContain("resolveRequiredServerBillingEnvironment()");
     expect(src).toMatch(/creditSupabase\.rpc\(\s*["']ai_credit_spend["']/);
     expect(src).toMatch(/creditSupabase\.rpc\(\s*["']ai_credit_refund["']/);
+    expect(src).toMatch(/creditSupabase\.rpc\(\s*["']ai_credit_attach_result["']/);
     expect(src).not.toMatch(/creditSupabase\s*\.from\(/);
     expect(src).not.toMatch(/\b(turn on|switch off|toggle the|power the)\b/i);
   });
@@ -81,8 +115,35 @@ describe("ai-doctor-review edge — credit_denied envelope unchanged", () => {
     expect(src).toMatch(/function\s+calmFailure[\s\S]{0,200}status:\s*200/);
   });
 
-  it("returns the server-resolved plan identity with successful credit context", () => {
-    expect(src).toContain("plan_id: spendObj.plan_id");
+  it("returns the immutable server receipt on both fresh and cached success", () => {
+    const helper = src.indexOf("function buildAiCreditReceiptContext");
+    const helperEnd = src.indexOf("function isUuid", helper);
+    expect(helper).toBeGreaterThan(-1);
+    expect(helperEnd).toBeGreaterThan(helper);
+    const helperBlock = src.slice(helper, helperEnd);
+    for (const field of [
+      "remaining",
+      "scope",
+      "scope_used",
+      "scope_limit",
+      "plan_id",
+      "funded_by",
+      "pack_balance",
+    ]) {
+      expect(helperBlock).toContain(`${field}: spend.${field}`);
+    }
+    expect(src).toContain(
+      "return safeOk(cached.result, buildAiCreditReceiptContext(spendObj, true))",
+    );
+    expect(src).toContain("return safeOk(v.result, buildAiCreditReceiptContext(spendObj))");
+  });
+
+  it("refunds an upstream provider 402 and returns the service-degraded envelope", () => {
+    expect(src).toMatch(
+      /upstream\.status\s*===\s*402[\s\S]{0,300}failureAfterRefund\(\s*spendId,\s*"upstream_402",\s*"upstream_credit_exhausted"\s*\)/,
+    );
+    expect(src.indexOf("upstream.status === 402")).toBeLessThan(src.indexOf("if (!upstream.ok)"));
+    expect(src).toContain("ai-doctor-review status=upstream_credit_exhausted");
   });
 });
 
@@ -153,7 +214,7 @@ describe("shared adapter — adaptCreditedAiResponse", () => {
     if (out.ok === false) expect(out.reason).toBe("invalid");
   });
 
-  it.each(["result_pending", "result_recording_failed"] as const)(
+  it.each(["credit_rpc", "result_pending", "result_recording_failed"] as const)(
     "passes the AI Doctor replay outcome %s through without credit/paywall coercion",
     (reason) => {
       expect(adaptCreditedAiResponse({ ok: false, reason })).toEqual({ ok: false, reason });
@@ -184,11 +245,12 @@ describe("shared adapter — adaptCreditedAiResponse", () => {
       "shape",
       "credit_denied",
       "upstream_credit_exhausted",
+      "credit_rpc",
       "result_pending",
       "result_recording_failed",
     ];
     // Compile-time assertion; runtime sanity:
-    expect(accepted.length).toBe(11);
+    expect(accepted.length).toBe(12);
   });
 });
 
@@ -210,6 +272,13 @@ describe("Coach client — credit transport wiring", () => {
 
   it("credit_denied path sets denial state and short-circuits", () => {
     expect(src).toMatch(/outcome\.reason\s*===\s*"credit_denied"[\s\S]{0,200}setCreditDenial\(/);
+  });
+
+  it("merges the authoritative success credit envelope into rendered Coach state", () => {
+    expect(src).toContain("credit?: AiCreditRemainingInput");
+    expect(src).toMatch(
+      /setResult\(\s*d\s*\?\s*\{\s*\.\.\.d,\s*credit:\s*outcome\.credit\s*\}\s*:\s*null\s*\)/,
+    );
   });
 
   it("upstream_credit_exhausted sets a degraded state (no paywall)", () => {

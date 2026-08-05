@@ -122,14 +122,8 @@ export function buildCloudCanaryPreviewViewModel(
     mapped_count: s.mapped_count,
     unmapped_count: s.unmapped_count,
     state: s.mapped_count === 0 ? "zero_mapped_gap" : "normal",
-    suspicious_flag_codes: coerceSuspiciousCodes(
-      s.suspicious_flag_codes,
-      s.fixture_id,
-    ),
-    missing_metric_codes: coerceMissingMetricCodes(
-      s.missing_metric_codes,
-      s.fixture_id,
-    ),
+    suspicious_flag_codes: coerceSuspiciousCodes(s.suspicious_flag_codes, s.fixture_id),
+    missing_metric_codes: coerceMissingMetricCodes(s.missing_metric_codes, s.fixture_id),
   }));
   const is_empty = rows.length === 0;
   const suspicious_aggregate = coerceSuspiciousCodes(
@@ -158,4 +152,3 @@ export {
   ECOWITT_MISSING_METRIC_CODES,
   type EcowittMissingMetricCode,
 } from "@/constants/ecowittMissingMetricCodes";
-

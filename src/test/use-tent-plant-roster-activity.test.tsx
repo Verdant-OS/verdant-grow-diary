@@ -81,10 +81,23 @@ describe("useTentPlantRosterActivity", () => {
 
   it("derives per-plant latest log + photo and does not leak across plants", async () => {
     mocks.diaryByPlant.set("p1", [
-      diaryRow({ id: "a", plant_id: "p1", entry_at: "2026-06-15T10:00:00.000Z", created_at: "2026-06-15T10:00:00.000Z", photo_url: "https://x/y.jpg" }),
+      diaryRow({
+        id: "a",
+        plant_id: "p1",
+        entry_at: "2026-06-15T10:00:00.000Z",
+        created_at: "2026-06-15T10:00:00.000Z",
+        photo_url: "https://x/y.jpg",
+      }),
     ]);
     mocks.diaryByPlant.set("p2", [
-      diaryRow({ id: "b", plant_id: "p2", entry_at: "2026-06-10T10:00:00.000Z", created_at: "2026-06-10T10:00:00.000Z", note: "pistil note", photo_url: null }),
+      diaryRow({
+        id: "b",
+        plant_id: "p2",
+        entry_at: "2026-06-10T10:00:00.000Z",
+        created_at: "2026-06-10T10:00:00.000Z",
+        note: "pistil note",
+        photo_url: null,
+      }),
     ]);
 
     const { result } = renderHook(
@@ -108,9 +121,7 @@ describe("useTentPlantRosterActivity", () => {
   });
 
   it("returns null latest log when no diary rows for that plant", async () => {
-    mocks.diaryByPlant.set("p1", [
-      diaryRow({ id: "a", plant_id: "p1" }),
-    ]);
+    mocks.diaryByPlant.set("p1", [diaryRow({ id: "a", plant_id: "p1" })]);
     const { result } = renderHook(
       () =>
         useTentPlantRosterActivity([
@@ -130,10 +141,7 @@ describe("useTentPlantRosterActivity", () => {
   it("includes a Harvest Watch v0 public state string per plant", async () => {
     mocks.diaryByPlant.set("p1", [diaryRow({ plant_id: "p1" })]);
     const { result } = renderHook(
-      () =>
-        useTentPlantRosterActivity([
-          { id: "p1", name: "Alpha", stage: "flower" },
-        ]),
+      () => useTentPlantRosterActivity([{ id: "p1", name: "Alpha", stage: "flower" }]),
       { wrapper: wrap() },
     );
     await waitFor(() => {

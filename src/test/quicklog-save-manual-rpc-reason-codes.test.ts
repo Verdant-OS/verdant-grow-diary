@@ -16,17 +16,30 @@ const DOC_PATH = resolve(ROOT, "docs/quicklog-rpc-safety.md");
 
 function findRpcSql(): string {
   if (!existsSync(MIG_DIR)) return "";
+  const matches: Array<{ name: string; sql: string }> = [];
   for (const name of readdirSync(MIG_DIR)) {
     const sql = readFileSync(join(MIG_DIR, name), "utf8");
-    if (
-      /CREATE\s+(OR\s+REPLACE\s+)?FUNCTION\s+public\.quicklog_save_manual/i.test(
-        sql,
-      )
-    ) {
-      return sql;
+    if (/CREATE\s+(OR\s+REPLACE\s+)?FUNCTION\s+public\.quicklog_save_manual/i.test(sql)) {
+      matches.push({ name, sql });
     }
   }
-  return "";
+  matches.sort((a, b) => b.name.localeCompare(a.name));
+  const latest = matches[0];
+  if (!latest) return "";
+
+  const wrapperBody =
+    latest.sql.match(
+      /CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+public\.quicklog_save_manual[\s\S]*?AS\s+(\$function\$|\$\$)([\s\S]*?)\1/i,
+    )?.[2] ?? "";
+  if (
+    !/RENAME\s+TO\s+quicklog_save_manual_pre_logged_at/i.test(latest.sql) ||
+    !/quicklog_save_manual_pre_logged_at\s*\(/i.test(wrapperBody)
+  ) {
+    return latest.sql;
+  }
+
+  const delegated = matches.find((candidate) => candidate.name !== latest.name);
+  return `${delegated?.sql ?? ""}\n${latest.sql}`;
 }
 
 const sql = findRpcSql();
@@ -68,8 +81,7 @@ describe("quicklog_save_manual — reason-code doc alignment", () => {
   it("every documented reason code still exists in the RPC", () => {
     const fromSql = new Set(reasonCodesInSql(sql));
     // Pull only codes that appear inside the allow-list section.
-    const allowSection =
-      doc.match(/Allowed safe reason codes[\s\S]+?##\s/)?.[0] ?? "";
+    const allowSection = doc.match(/Allowed safe reason codes[\s\S]+?##\s/)?.[0] ?? "";
     const documented = reasonCodesInDoc(allowSection);
     expect(documented.length).toBeGreaterThan(0);
     for (const code of documented) {
@@ -102,9 +114,7 @@ describe("quicklog_save_manual — reason-code safety", () => {
 
   it("never leaks UUIDs or stack traces", () => {
     for (const c of codes) {
-      expect(c).not.toMatch(
-        /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i,
-      );
+      expect(c).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
       expect(c).not.toMatch(/\bat\s+\w+\s*\(/);
     }
   });

@@ -59,8 +59,8 @@ export default function CsvPreviewHelpPanel() {
         <div>
           <h2 className="text-sm font-semibold">What this preview does</h2>
           <p className="text-muted-foreground">
-            Verdant parses your file locally and shows how it would map into
-            plant memory — without saving, syncing, or contacting a server.
+            Verdant parses your file locally and shows how it would map into plant memory — without
+            saving, syncing, or contacting a server.
           </p>
         </div>
         <Button

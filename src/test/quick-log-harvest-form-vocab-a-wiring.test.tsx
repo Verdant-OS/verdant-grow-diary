@@ -27,13 +27,12 @@ vi.mock("@/integrations/supabase/client", () => ({
 
 function mountForm() {
   return render(
-    <QuickLogAllActivitiesSection growId="g1" tentId="t1" plantId="p1" />,
+    <QuickLogAllActivitiesSection growId="g1" tentId="t1" plantId="p1" plantStage="flower" />,
   );
 }
 function selectHarvest() {
-  fireEvent.click(
-    screen.getByTestId("quick-log-all-activities-picker-harvest"),
-  );
+  fireEvent.click(screen.getByRole("button", { name: "More activity types" }));
+  fireEvent.click(screen.getByTestId("quick-log-all-activities-picker-harvest"));
 }
 
 beforeEach(() => {
@@ -48,18 +47,15 @@ async function saveHarvest(wet: string, dry: string, unit: string) {
   mountForm();
   selectHarvest();
   await screen.findByTestId("quick-log-all-activities-harvest-fields");
-  fireEvent.change(
-    screen.getByTestId("quick-log-all-activities-harvest-wet"),
-    { target: { value: wet } },
-  );
-  fireEvent.change(
-    screen.getByTestId("quick-log-all-activities-harvest-dry"),
-    { target: { value: dry } },
-  );
-  fireEvent.change(
-    screen.getByTestId("quick-log-all-activities-harvest-unit"),
-    { target: { value: unit } },
-  );
+  fireEvent.change(screen.getByTestId("quick-log-all-activities-harvest-wet"), {
+    target: { value: wet },
+  });
+  fireEvent.change(screen.getByTestId("quick-log-all-activities-harvest-dry"), {
+    target: { value: dry },
+  });
+  fireEvent.change(screen.getByTestId("quick-log-all-activities-harvest-unit"), {
+    target: { value: unit },
+  });
   fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
   await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(1));
   return rpcMock.mock.calls[0][1] as Record<string, unknown>;
@@ -69,8 +65,7 @@ describe("QuickLog harvest → Vocab A→B persistence wiring", () => {
   it("2 lb entry sends canonical grams AND original value+unit", async () => {
     const args = await saveHarvest("2", "", "lb");
     expect(args.p_event_type).toBe("harvest");
-    const details = (args.p_details as { harvest: Record<string, unknown> })
-      .harvest;
+    const details = (args.p_details as { harvest: Record<string, unknown> }).harvest;
     expect(details.wetWeight).toBe("2");
     expect(details.weightUnit).toBe("lb");
     expect(details.original_wet_weight).toBe("2");
@@ -83,8 +78,7 @@ describe("QuickLog harvest → Vocab A→B persistence wiring", () => {
 
   it("8 oz entry sends canonical grams AND original unit", async () => {
     const args = await saveHarvest("8", "", "oz");
-    const details = (args.p_details as { harvest: Record<string, unknown> })
-      .harvest;
+    const details = (args.p_details as { harvest: Record<string, unknown> }).harvest;
     expect(details.wet_weight_grams).toBeCloseTo(28.349523125 * 8, 6);
     expect(details.original_wet_weight).toBe("8");
     expect(details.original_weight_unit).toBe("oz");
@@ -94,18 +88,19 @@ describe("QuickLog harvest → Vocab A→B persistence wiring", () => {
     const args = await saveHarvest("120", "22", "g");
     expect(args.p_details).toEqual({
       harvest: { wetWeight: "120", dryWeight: "22", weightUnit: "g" },
+      event_type: "harvest",
     });
   });
 
   it("empty wet/dry with lb unit omits harvest entirely (no fake 0 g)", async () => {
     const args = await saveHarvest("", "", "lb");
-    expect(args.p_details).toBeNull();
+    // No weights → no harvest envelope; only the diary event_type stamp.
+    expect(args.p_details).toEqual({ event_type: "harvest" });
   });
 
   it("dry-only kg entry stamps dry grams, not wet", async () => {
     const args = await saveHarvest("", "0.5", "kg");
-    const details = (args.p_details as { harvest: Record<string, unknown> })
-      .harvest;
+    const details = (args.p_details as { harvest: Record<string, unknown> }).harvest;
     expect(details.dry_weight_grams).toBeCloseTo(500, 6);
     expect(details.original_dry_weight).toBe("0.5");
     expect(details.original_weight_unit).toBe("kg");
@@ -131,9 +126,9 @@ describe("HarvestTimelineCard — original unit + grams display", () => {
         />
       </ul>,
     );
-    expect(
-      screen.getByTestId("harvest-timeline-card-wet-weight"),
-    ).toHaveTextContent("2 lb (907.18 g)");
+    expect(screen.getByTestId("harvest-timeline-card-wet-weight")).toHaveTextContent(
+      "2 lb (907.18 g)",
+    );
   });
 
   it('renders legacy grams-only row unchanged as "120 g"', () => {
@@ -146,9 +141,7 @@ describe("HarvestTimelineCard — original unit + grams display", () => {
         />
       </ul>,
     );
-    expect(
-      screen.getByTestId("harvest-timeline-card-wet-weight"),
-    ).toHaveTextContent(/^120 g$/);
+    expect(screen.getByTestId("harvest-timeline-card-wet-weight")).toHaveTextContent(/^120 g$/);
   });
 
   it("does not invent originals for legacy rows with no original fields", () => {
@@ -163,8 +156,6 @@ describe("HarvestTimelineCard — original unit + grams display", () => {
     );
     // No wet_weight_grams / original_weight_unit persisted → render
     // must NOT append a "(... g)" clause.
-    expect(
-      screen.getByTestId("harvest-timeline-card-wet-weight"),
-    ).toHaveTextContent(/^8 oz$/);
+    expect(screen.getByTestId("harvest-timeline-card-wet-weight")).toHaveTextContent(/^8 oz$/);
   });
 });

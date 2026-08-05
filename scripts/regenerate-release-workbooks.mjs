@@ -17,13 +17,7 @@
  *   0 — regenerate + hash validation passed
  *   1 — any failure
  */
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  rmSync,
-  statSync,
-} from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { dirname, join, resolve, relative, sep } from "node:path";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
@@ -141,9 +135,9 @@ function main() {
 
   const { ok, mismatches, manifest } = validateManifestHashes();
 
-  const regenerated = GENERATED_FILENAMES.filter((n) =>
-    existsSync(join(ARTIFACT_DIR, n)),
-  ).map((n) => `docs/artifacts/${n}`);
+  const regenerated = GENERATED_FILENAMES.filter((n) => existsSync(join(ARTIFACT_DIR, n))).map(
+    (n) => `docs/artifacts/${n}`,
+  );
 
   console.log("");
   console.log(`Release Workbook Regenerate: ${ok ? "PASS" : "FAIL"}`);
@@ -169,9 +163,7 @@ function main() {
     console.error("Hash validation failures:");
     for (const m of mismatches) {
       if (m.reason === "hash mismatch") {
-        console.error(
-          `  ${m.filename}\n    expected: ${m.expected}\n    actual:   ${m.actual}`,
-        );
+        console.error(`  ${m.filename}\n    expected: ${m.expected}\n    actual:   ${m.actual}`);
       } else {
         console.error(`  ${m.filename}: ${m.reason}`);
       }

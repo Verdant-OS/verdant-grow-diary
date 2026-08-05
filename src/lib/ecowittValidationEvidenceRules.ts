@@ -122,9 +122,7 @@ export function buildLatestEvidenceSnapshot(
   };
 }
 
-export function serializeEvidenceForClipboard(
-  snap: EcowittEvidenceSnapshot,
-): string {
+export function serializeEvidenceForClipboard(snap: EcowittEvidenceSnapshot): string {
   return JSON.stringify(snap, null, 2);
 }
 
@@ -140,9 +138,7 @@ export interface EcowittEvidencePreview {
   redaction_notice: string;
 }
 
-export function buildEvidencePreview(
-  snap: EcowittEvidenceSnapshot,
-): EcowittEvidencePreview {
+export function buildEvidencePreview(snap: EcowittEvidenceSnapshot): EcowittEvidencePreview {
   return {
     label: snap.label,
     source: snap.source,

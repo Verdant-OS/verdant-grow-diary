@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 const HARNESS = readFileSync(
   resolve(process.cwd(), "scripts/run-subscriber-interest-rls-harness.ts"),
   "utf8",
-);
+).replace(/\r\n?/g, "\n");
 
 describe("subscriber-interest RLS harness cleanup", () => {
   it("deletes and verifies the trigger-created profile before deleting the auth user", () => {

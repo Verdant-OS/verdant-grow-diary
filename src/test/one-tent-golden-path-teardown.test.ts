@@ -93,11 +93,6 @@ function makeOps(state: FakeState) {
       state.followUps = 0;
       return n;
     }),
-    deleteActionQueue: del("action_queue", () => {
-      const n = state.actionQueue;
-      state.actionQueue = 0;
-      return n;
-    }),
     deleteAlerts: del("alerts", () => {
       const n = state.alerts;
       state.alerts = 0;
@@ -131,6 +126,7 @@ function makeOps(state: FakeState) {
     deleteGrow: del("grows", () => {
       const n = state.growExists ? 1 : 0;
       state.growExists = false;
+      if (!state.survivors?.has("action_queue")) state.actionQueue = 0;
       return n;
     }),
   };
@@ -294,7 +290,6 @@ describe("delete ordering (child before parent)", () => {
     const deletes = ops.calls.filter((c) => c.startsWith("delete:"));
     expect(deletes).toEqual([
       "delete:follow_ups",
-      "delete:action_queue",
       "delete:alerts",
       "delete:quick_logs",
       "delete:sensor_rows",
@@ -305,15 +300,17 @@ describe("delete ordering (child before parent)", () => {
     ]);
   });
 
-  it("action_queue rows are deleted before alerts and before plant/grow parents", async () => {
+  it("action_queue rows are removed only by the final exact-grow cascade", async () => {
     const state = seededState();
     const ops = makeOps(state);
     const discovery = await discoverFixture(ops);
-    await executeTeardown(ops, discovery, { dryRun: false });
+    const result = await executeTeardown(ops, discovery, { dryRun: false });
     const deletes = ops.calls.filter((c) => c.startsWith("delete:"));
-    expect(deletes.indexOf("delete:action_queue")).toBeLessThan(deletes.indexOf("delete:alerts"));
+    expect(deletes).not.toContain("delete:action_queue");
     expect(deletes.indexOf("delete:alerts")).toBeLessThan(deletes.indexOf("delete:plants"));
     expect(deletes.indexOf("delete:plants")).toBeLessThan(deletes.indexOf("delete:grows"));
+    expect(result.counts.action_queue_deleted).toBe(1);
+    expect(state.actionQueue).toBe(0);
   });
 
   it("failed child deletion prevents parent deletion and reports sanitized reason", async () => {
@@ -326,7 +323,7 @@ describe("delete ordering (child before parent)", () => {
     expect(result.reason).toBe("alerts_delete_failed");
     // Nothing after the failed stage was attempted.
     const deletes = ops.calls.filter((c) => c.startsWith("delete:"));
-    expect(deletes).toEqual(["delete:follow_ups", "delete:action_queue", "delete:alerts"]);
+    expect(deletes).toEqual(["delete:follow_ups", "delete:alerts"]);
     // The raw provider error never leaks.
     expect(JSON.stringify(result)).not.toContain("SECRET");
   });
@@ -345,6 +342,18 @@ describe("delete ordering (child before parent)", () => {
     expect(deletes).not.toContain("delete:plants");
     expect(deletes).not.toContain("delete:tents");
     expect(deletes).not.toContain("delete:grows");
+  });
+
+  it("fails closed if action_queue rows survive the grow cascade", async () => {
+    const state = seededState();
+    state.survivors = new Set(["action_queue"]);
+    const ops = makeOps(state);
+    const discovery = await discoverFixture(ops);
+    const result = await executeTeardown(ops, discovery, { dryRun: false });
+
+    expect(result.status).toBe("failed");
+    expect(result.reason).toBe("action_queue_rows_survived_grow_delete");
+    expect(result.counts.action_queue_deleted).toBe(0);
   });
 });
 

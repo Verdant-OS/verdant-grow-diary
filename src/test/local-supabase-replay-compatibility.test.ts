@@ -152,6 +152,17 @@ describe("local Supabase replay compatibility workspace", () => {
     expect(workflow).toContain('REPLAY_WORKDIR="${RUNNER_TEMP}/verdant-supabase-replay"');
   });
 
+  it("keeps security-db-local job failures visible in the run conclusion", () => {
+    // continue-on-error once rewrote a failing job into a run-level "success"
+    // and masked a base red for a full day (run 30940375065). The lane stays
+    // optional via branch protection (not-required), never via masking.
+    const workflow = readFileSync(SECURITY_DB_WORKFLOW, "utf8");
+    const maskingKeys = workflow
+      .split(/\r?\n/)
+      .filter((line) => /^\s*continue-on-error\s*:/.test(line));
+    expect(maskingKeys).toEqual([]);
+  });
+
   it("runs every local Supabase lifecycle command against the disposable workdir", () => {
     const workflow = readFileSync(SECURITY_DB_WORKFLOW, "utf8");
     const lifecycleCommands = workflow

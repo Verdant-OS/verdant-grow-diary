@@ -2,11 +2,11 @@
 
 Three tiers of coverage:
 
-| Tier                              | Required? | Needs local Supabase? | Needs Deno? |
-| --------------------------------- | --------- | --------------------- | ----------- |
-| `test:security-regression`        | ✅ yes    | no                    | no          |
-| `test:paddle-webhook-edge-security` | optional (Deno present) | no          | yes         |
-| `test:security-db-local`          | ❌ no (optional job) | yes        | no          |
+| Tier                                | Required?               | Needs local Supabase? | Needs Deno? |
+| ----------------------------------- | ----------------------- | --------------------- | ----------- |
+| `test:security-regression`          | ✅ yes                  | no                    | no          |
+| `test:paddle-webhook-edge-security` | optional (Deno present) | no                    | yes         |
+| `test:security-db-local`            | ❌ no (optional job)    | yes                   | no          |
 
 ## Tier 1 — `test:security-regression` (required CI, fully offline)
 
@@ -50,9 +50,12 @@ constant and never reads `PADDLE_WEBHOOK_SECRET` from the environment.
 
 Full database-backed harnesses. Wired into
 `.github/workflows/security-db-local.yml` as an **optional** job that
-starts local Supabase, applies migrations, and runs the harnesses. It is
-`continue-on-error: true` and must not be marked required until it is
-stable across multiple PRs.
+starts local Supabase, applies migrations, and runs the harnesses. The job
+is not a required check, so a red run never blocks merges, but it is
+deliberately **not** `continue-on-error`: that flag once rewrote a failing
+job into a run-level "success" and masked a base red for a full day (run
+30940375065). Enabled failures must propagate to the run conclusion. Do not
+mark the check required until it is stable across multiple PRs.
 
 ### Local run
 
@@ -121,7 +124,7 @@ They never fake a pass. Required CI never depends on these variables.
 - `test:pi-ingest-db-security` — proves `pi_ingest_commit_batch` is
   executable by service_role only (anon/authenticated get 42501); that
   full and partial batch replays are rejected per `(user_id,
-  idempotency_key)` without duplicate `sensor_readings`; that a
+idempotency_key)` without duplicate `sensor_readings`; that a
   cross-user tent hard-fails and persists nothing; that one invalid row
   aborts the whole batch atomically; that commits never write `alerts`
   or `action_queue` rows; that the idempotency ledger is owner-scoped
@@ -191,7 +194,6 @@ failed / cancelled), tests requested, artifact name
 (`security-db-local-artifacts`, upload-on-failure only, 14-day
 retention), which sanitized log paths are inside it, and a link to the
 current run. The summary itself contains no secrets, JWTs, or DB URLs.
-
 
 Current status: **implemented and verified end-to-end** (2026-07-09,
 fresh `supabase start` + `db reset` + grant-parity seed): profiles

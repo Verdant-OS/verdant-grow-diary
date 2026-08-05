@@ -184,7 +184,7 @@
           "to": "DO 'BEGIN\n  IF to_regprocedure(''public.admin_schema_audit(text[], text[])'') IS NOT NULL THEN\n    REVOKE EXECUTE ON FUNCTION public.admin_schema_audit(text[], text[]) FROM anon;\n  END IF;\nEND';"
         }
       ],
-      "reason": "Production holds email_queue_dispatch, email_queue_wake, and the legacy two-argument admin_schema_audit created outside committed migrations (20260728103000 drops that audit overload during replay), so a fresh local reset fails these REVOKEs with SQLSTATE 42883 at statement 7; existence-guarded DO blocks skip exactly the three signatures a clean replay verified missing while leaving every hosted revoke intact."
+      "reason": "A fresh local reset fails three of this migration's REVOKEs with SQLSTATE 42883: email_queue_dispatch and email_queue_wake were created in production outside committed migrations, while the legacy two-argument admin_schema_audit was created by committed 20260728084921 but is dropped during replay by 20260728103000 even though production still holds it; existence-guarded DO blocks skip exactly the three signatures a clean replay verified missing while leaving every hosted revoke intact."
     }
   ],
   "compatibility_injections": [

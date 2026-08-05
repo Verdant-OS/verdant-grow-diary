@@ -1,7 +1,8 @@
 name: AI Doctor freshness gate e2e (mocked)
 
 # Non-destructive Playwright boundary proof for the AI Doctor 48h
-# snapshot-freshness gate on Plant Detail's "AI Doctor Context" panel.
+# snapshot-freshness gate on Plant Detail's canonical context and cautious
+# live-review surfaces.
 #
 # SAFETY:
 #  - Mocked/non-destructive only. Every Supabase /auth/v1/** and
@@ -20,43 +21,25 @@ permissions:
 on:
   pull_request:
     branches: [verdant-grow-diary]
-    # TRIGGER POLICY — this list is the gate's blast radius, and getting it
-    # wrong is how the lane broke silently for eleven days.
-    #
-    # The old list named two components by hand and leaned on package.json /
-    # bun.lock as a dependency tripwire. That was backwards on both counts:
-    #
-    #  - It did not include src/pages/PlantDetail.tsx, so a6972773d could
-    #    unmount the surface under test without ever running this lane.
-    #  - The lockfile entries meant the only PRs that DID run it were ones
-    #    touching dependencies — unrelated changes got ambushed by a 15-minute
-    #    browser suite while the actual subject went unguarded.
-    #
-    # Dependency coverage is not lost by dropping the tripwire: `CI` and
-    # `Dependency & Security CI` both run on every PR to this branch with no
-    # path filter at all, and between them already cover install with a frozen
-    # lockfile, audit, typecheck, unit tests, and build. Re-running Playwright
-    # on top of that bought nothing.
-    #
-    # Globs are used deliberately so a newly added AI-Doctor surface or rule is
-    # covered on arrival instead of quietly falling outside a hand-kept list.
     paths:
-      # The lane itself.
       - "e2e/ai-doctor-freshness-gate.spec.ts"
+      - "src/pages/PlantDetail.tsx"
+      - "src/components/PlantDetailAiDoctorContextPanel.tsx"
+      - "src/components/PlantDetailAiDoctorLiveReview.tsx"
+      - "src/lib/aiDoctorContextRules.ts"
+      # Holds AI_DOCTOR_SNAPSHOT_FRESH_HOURS = 48 — the boundary this lane
+      # exists to prove. Without it the window itself could be changed and
+      # the proof would never run.
+      - "src/constants/aiDoctorContextReadiness.ts"
+      - "src/lib/aiDoctorContextViewModel.ts"
+      - "src/lib/aiDoctorReviewEligibilityRules.ts"
+      - "src/hooks/useTimelineMemory.ts"
+      - "src/lib/manualSnapshotDiaryAdapter.ts"
       - "playwright.config.ts"
       - ".github/workflows/ai-doctor-freshness-e2e.yml"
-      # The page that mounts the surface under test, and the disclosure the
-      # spec must open to reach it.
-      - "src/pages/PlantDetail.tsx"
-      - "src/components/PlantDetailDisclosureSection.tsx"
-      # The rendered AI Doctor surfaces on Plant Detail.
-      - "src/components/PlantDetailAiDoctor*.tsx"
-      # The 48h rule and the data it reads.
-      - "src/lib/aiDoctor*.ts"
-      - "src/constants/aiDoctorContextReadiness.ts"
-      - "src/lib/manualSnapshotDiaryAdapter.ts"
-      - "src/hooks/useTimelineMemory.ts"
-      - "src/hooks/useRootZoneObservations.ts"
+      - "package.json"
+      - "bun.lock"
+      - "bun.lockb"
 
 jobs:
   ai-doctor-freshness-e2e:

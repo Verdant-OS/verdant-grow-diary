@@ -23,17 +23,25 @@ const FRESHNESS_E2E_PATH = "e2e/ai-doctor-freshness-gate.spec.ts";
 const FRESHNESS_E2E = readFileSync(resolve(ROOT, FRESHNESS_E2E_PATH), "utf8");
 
 /**
- * Test ids the mocked AI Doctor freshness e2e lane asserts POSITIVELY (must
- * render). Negative assertions in that spec (`toHaveCount(0)`) are excluded on
- * purpose — requiring them to be mountable would invert their meaning.
+ * The test ids the mocked AI Doctor freshness lane needs just to REACH its
+ * subject — precisely the set its shared `openAiDoctorContextPanel` helper
+ * waits on before any scenario runs. If any one of these cannot render, every
+ * scenario in the lane fails identically and for a reason that has nothing to
+ * do with the 48h rule.
+ *
+ * Scoped to the helper on purpose. Scenario-level ids
+ * (`plant-ai-doctor-context-notice`, `-latest-snapshot`) are left out: they are
+ * asserted positively in some scenarios and negatively (`toHaveCount(0)`) in
+ * others, so pinning them here would both misstate them as always-required and
+ * make ordinary edits to a scenario fail a test in a different directory.
  *
  * This list exists because a Playwright lane cannot defend itself. Commit
  * a6972773d unmounted PlantDetailDoctorContextPreview from Plant Detail, which
  * silently orphaned PlantDetailDoctorLaunchDialog and every test id the lane
- * drove. Nothing failed for eleven days, because the lane only triggered on
- * dependency files. The two assertions below close that gap: the ids must be
- * reachable from Plant Detail's real mount graph, and the spec must still use
- * them, so neither side can drift away from the other unnoticed.
+ * drove. Nothing caught it, because the lane only triggered on dependency
+ * files and no PR touched one for eleven days. The two assertions below close
+ * that gap: these ids must be reachable from Plant Detail's real mount graph,
+ * and the spec must still use them, so neither side can drift unnoticed.
  */
 const FRESHNESS_E2E_REQUIRED_TEST_IDS = [
   "plant-detail-disclosure-ai-trigger",
@@ -41,8 +49,6 @@ const FRESHNESS_E2E_REQUIRED_TEST_IDS = [
   "plant-ai-doctor-context-panel",
   "plant-ai-doctor-context-evidence",
   "plant-ai-doctor-context-missing",
-  "plant-ai-doctor-context-notice",
-  "plant-ai-doctor-context-latest-snapshot",
 ] as const;
 
 /** Resolve a `@/…` specifier to a real file under src/. */

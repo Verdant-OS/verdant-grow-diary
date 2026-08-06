@@ -367,10 +367,15 @@ describe("stamper with real git identity (legacy behavior preserved)", () => {
       ["2026-01-01T12:00:00-14:59", "unknown"], // beyond max negative offset
       ["0099-01-01T00:00:00Z", "unknown"], // pre-epoch year — out of domain
       ["1969-12-31T23:59:59Z", "unknown"], // pre-epoch year — out of domain
+      ["1970-01-01T00:00:00Z", "1970-01-01T00:00:00Z"], // epoch itself — valid
+      ["2999-12-31T23:59:59Z", "2999-12-31T23:59:59Z"], // last in-domain instant
+      ["3000-01-01T00:00:00Z", "unknown"], // year-3000 boundary — out of domain
+      ["1970-01-01T00:00:00+14:00", "unknown"], // textual 1970 but pre-epoch INSTANT
+      ["2999-12-31T23:59:59-14:00", "unknown"], // offset pushes instant past 3000
       ["2026-08-04T16:18:29Z", "2026-08-04T16:18:29Z"], // ordinary valid
     ];
     // One sandbox reused across the matrix: each case rewrites the tracked
-    // stamp and re-runs the stamper (8 spawns in one box, not 8 boxes).
+    // stamp and re-runs the stamper (one spawn per case, all in one box).
     const box = makeSandbox();
     git(box, ["init", "-q"]);
     for (const [input, expected] of cases) {

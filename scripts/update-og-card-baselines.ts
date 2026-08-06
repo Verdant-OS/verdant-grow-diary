@@ -17,18 +17,14 @@ import { join, resolve } from "node:path";
 import { Resvg } from "@resvg/resvg-js";
 
 import { OG_CARD_BASELINE_CASES } from "../src/lib/build/ogCardPixelDiff";
-import { buildOgCardSvg, OG_IMAGE_WIDTH } from "../src/lib/build/ogImageCard";
+import { buildOgCardSvg } from "../src/lib/build/ogImageCard";
+import { createOgCardResvgOptions } from "../src/lib/build/ogCardResvgOptions";
 
 const baselineDir = resolve("src/test/fixtures/og-card-baselines");
 mkdirSync(baselineDir, { recursive: true });
 
 for (const testCase of OG_CARD_BASELINE_CASES) {
-  const png = new Resvg(buildOgCardSvg(testCase), {
-    fitTo: { mode: "width", value: OG_IMAGE_WIDTH },
-    font: { loadSystemFonts: true, defaultFontFamily: "sans-serif" },
-  })
-    .render()
-    .asPng();
+  const png = new Resvg(buildOgCardSvg(testCase), createOgCardResvgOptions()).render().asPng();
   const target = join(baselineDir, `${testCase.slug}.png`);
   writeFileSync(target, png);
   console.log(`update-og-card-baselines: wrote ${target} (${png.length} bytes)`);

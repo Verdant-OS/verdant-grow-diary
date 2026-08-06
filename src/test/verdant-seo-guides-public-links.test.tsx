@@ -19,7 +19,8 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "@/lib/react-router-compat";
 import GuidesIndex from "@/pages/GuidesIndex";
 import GuidePage from "@/pages/GuidePage";
@@ -221,29 +222,34 @@ describe("/guides internal links resolve to known routes with one scoped diary h
 // ---------------------------------------------------------------------------
 
 describe("/guides click-through stays on public content", () => {
-  it("clicking a guide card from /guides lands on that guide page", () => {
+  it("clicking a guide card from /guides lands on that guide page", async () => {
+    const user = userEvent.setup();
     const { container } = renderGuides("/guides");
     const firstSlug = VERDANT_GUIDE_SLUGS[0];
     const link = container.querySelector<HTMLAnchorElement>(`a[href="/guides/${firstSlug}"]`);
     expect(link).toBeTruthy();
-    fireEvent.click(link!);
-    expect(screen.getByTestId("guide-page").getAttribute("data-guide-slug")).toBe(firstSlug);
+    await user.click(link!);
+    expect((await screen.findByTestId("guide-page")).getAttribute("data-guide-slug")).toBe(
+      firstSlug,
+    );
   });
 
-  it("clicking 'All guides' from a guide page returns to the /guides hub", () => {
+  it("clicking 'All guides' from a guide page returns to the /guides hub", async () => {
+    const user = userEvent.setup();
     const { container } = renderGuides(`/guides/${VERDANT_GUIDE_SLUGS[0]}`);
     const link = container.querySelector<HTMLAnchorElement>('a[href="/guides"]');
     expect(link).toBeTruthy();
-    fireEvent.click(link!);
-    expect(screen.getByTestId("guides-index-page")).toBeInTheDocument();
+    await user.click(link!);
+    expect(await screen.findByTestId("guides-index-page")).toBeInTheDocument();
   });
 
-  it("clicking /welcome navigates to /welcome — never to /auth", () => {
+  it("clicking /welcome navigates to /welcome — never to /auth", async () => {
+    const user = userEvent.setup();
     const { container } = renderGuides("/guides");
     const link = container.querySelector<HTMLAnchorElement>('a[href="/welcome"]');
     expect(link).toBeTruthy();
-    fireEvent.click(link!);
-    expect(screen.getByTestId("location-probe")).toHaveTextContent("/welcome");
+    await user.click(link!);
+    expect(await screen.findByTestId("location-probe")).toHaveTextContent("/welcome");
   });
 
   for (const path of ALL_GUIDE_PATHS.filter((path) => path !== OREOZ_GELONADE_GUIDE_PATH)) {

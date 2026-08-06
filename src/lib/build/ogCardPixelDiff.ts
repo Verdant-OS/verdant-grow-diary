@@ -2,11 +2,10 @@
  * ogCardPixelDiff — pure pixel comparison helpers for the generated OG cards.
  *
  * Why this is not a naive "bytes must match the baseline" check:
- * `scripts/generate-seo-artifacts.ts` rasterizes the card with resvg using
- * `loadSystemFonts: true`, so the exact glyph raster depends on which sans
- * font the host happens to provide. A byte-for-byte baseline would go red on
- * every machine that is not the one that recorded it — a gate that cries wolf
- * gets disabled, and then real regressions ship.
+ * `scripts/generate-seo-artifacts.ts` rasterizes the card with a bundled font,
+ * but byte-for-byte PNG output may still change across compatible rasterizer
+ * releases or native builds. A useful gate should identify visual regressions
+ * without becoming coupled to PNG encoding details.
  *
  * So the comparison is split into two lanes with different strictness:
  *
@@ -19,7 +18,7 @@
  *      the band that are lighter than the dark card surface. This catches the
  *      failures that matter (text vanished entirely, text overflowed into the
  *      wrong band, a wrapping change doubled the rendered lines) without
- *      asserting glyph identity across font stacks.
+ *      asserting byte-level glyph identity.
  *
  * A mismatch reports which lane failed, so a maintainer can tell a template
  * regression from a font-substitution difference instead of guessing.
@@ -385,7 +384,7 @@ export function compareOgCardPixels(
           `baseline ${(baselineCoverage * 100).toFixed(3)}% (tolerance ±${(
             coverageTolerance * 100
           ).toFixed(0)}%). Either the card's text changed/vanished/overflowed, or this host ` +
-          `renders a very different sans font than the baseline was recorded with.`,
+          `renders materially different text from the pinned-font baseline.`,
       );
     }
     return { name: band.name, baseline: baselineCoverage, candidate: candidateCoverage, ok };

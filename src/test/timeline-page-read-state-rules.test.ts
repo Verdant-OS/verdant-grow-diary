@@ -383,6 +383,7 @@ describe("Timeline read-source helpers", () => {
       "diary_photos",
       "action_queue_events",
       "alert_events",
+      "linked_grow_events",
     ]);
   });
 

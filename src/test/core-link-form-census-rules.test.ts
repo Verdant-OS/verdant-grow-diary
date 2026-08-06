@@ -101,6 +101,11 @@ describe("core link and form census rules", () => {
     // same-document fragment link, not only the pathname.
     expect(CENSUS_SPEC_SOURCE).toMatch(/new URL\(page\.url\(\)\)\.hash/);
     expect(CENSUS_SPEC_SOURCE).toMatch(/link\.classification\.hash/);
+    // The same-page test must use the browser's pre-click pathname (route
+    // specs may carry a query) AND require an unrewritten destination (the
+    // signed-out lane redirects protected targets to /welcome).
+    expect(CENSUS_SPEC_SOURCE).toMatch(/pathBeforeClick/);
+    expect(CENSUS_SPEC_SOURCE).toMatch(/expectedPathname === link\.classification\.pathname/);
   });
 
   it("allows explicit downloads without treating their asset path as an app route", () => {

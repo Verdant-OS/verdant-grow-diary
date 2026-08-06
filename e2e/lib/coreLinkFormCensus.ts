@@ -366,6 +366,13 @@ export type LinkClassification = {
   disposition: LinkDisposition;
   href: string;
   pathname?: string;
+  /**
+   * Fragment WITHOUT the leading "#", when the link carries one. Retained so
+   * the click sweep can tell a same-document fragment link (which changes only
+   * the hash) from a real navigation: asserting the hash-stripped pathname on
+   * such a link is trivially true BEFORE the click and proves nothing.
+   */
+  hash?: string;
   reason?: string;
 };
 
@@ -553,7 +560,8 @@ export function classifyLink(
       reason: "same-origin link does not match the app route manifest",
     };
   }
-  return { disposition: "navigate", href, pathname };
+  const hash = target.hash ? target.hash.replace(/^#/, "") : "";
+  return { disposition: "navigate", href, pathname, ...(hash ? { hash } : {}) };
 }
 
 export type CensusFieldDescriptor = {

@@ -1632,6 +1632,19 @@ async function clickEverySafeInternalHref(
             message: `${link.href} must finish at its manifest-defined destination`,
           })
           .toBe(expectedPathname);
+        // Same-document fragment link: the pathname assertion above is
+        // trivially true BEFORE the click (the grower never leaves the page),
+        // so without this the census would "pass" the link having proved
+        // nothing. Assert the fragment actually landed — that is the whole
+        // behaviour such a link exists for.
+        const expectedHash = link.classification.hash;
+        if (expectedHash && expectedPathname === link.sourcePath) {
+          await expect
+            .poll(() => new URL(page.url()).hash, {
+              message: `${link.href} must move the grower to its in-page anchor`,
+            })
+            .toBe(`#${expectedHash}`);
+        }
         await assertMeaningfulPage(page, expectedPathname);
       }
       clicked.push(link.href);

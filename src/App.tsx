@@ -27,6 +27,7 @@ import AgentIntegrations from "./pages/AgentIntegrations";
 import Timeline from "./pages/Timeline";
 import Grows from "./pages/Grows";
 import GrowDetail from "./pages/GrowDetail";
+import GrowPhenoComparison from "./pages/GrowPhenoComparison";
 import PhenoHuntNew from "./pages/PhenoHuntNew";
 import BreedingLogNew from "./pages/BreedingLogNew";
 import PhenoComparison from "./pages/PhenoComparison";
@@ -170,6 +171,7 @@ const App = () => (
                       <Route path="/grow-lineage" element={<GrowLineageRepair />} />
                       <Route path="/grows" element={<Grows />} />
                       <Route path="/grows/:growId" element={<GrowDetail />} />
+                      <Route path="/grows/:growId/pheno-compare" element={<GrowPhenoComparison />} />
                       <Route path="/pheno-hunts/new" element={<PhenoHuntNew />} />
                       <Route path="/breeding/new" element={<BreedingLogNew />} />
                       <Route path="/reports" element={<Reports />} />

@@ -101,6 +101,11 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/grow-room", access: "redirect", description: "→ /" },
   { path: "/grows", access: "auth" },
   { path: "/grows/:growId", access: "auth" },
+  {
+    path: "/grows/:growId/pheno-compare",
+    access: "auth",
+    description: "Pro-gated real-data Pheno Comparison for the grow's latest hunt.",
+  },
   { path: "/hardware-integrations", access: "public" },
 
   { path: "/ingest-inspector", access: "operator" },

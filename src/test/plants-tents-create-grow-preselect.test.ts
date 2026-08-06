@@ -37,8 +37,11 @@ describe("Plants/Tents — preselect grow on create", () => {
     expect(CREATE_PLANT).toMatch(/payload\.grow_id\s*=\s*defaultGrowId/);
   });
 
-  it("CreatePlantDialog scopes tent options to the preselected grow", () => {
-    expect(CREATE_PLANT).toMatch(/allTents[\s\S]*?\.filter\([\s\S]*?t\.grow_id\s*===\s*defaultGrowId/);
+  it("CreatePlantDialog scopes tent options to the resolved target grow", () => {
+    // targetGrowId = page context first, then the grower's explicit in-dialog
+    // selection (see create-dialog-grow-binding-guard tests).
+    expect(CREATE_PLANT).toMatch(/targetGrowId\s*=\s*defaultGrowId\s*\?\?\s*\(form\.grow_id\s*\|\|\s*undefined\)/);
+    expect(CREATE_PLANT).toMatch(/allTents[\s\S]*?\.filter\([\s\S]*?t\.grow_id\s*===\s*targetGrowId/);
   });
 
   it("CreateTentDialog accepts defaultGrowId and writes grow_id on insert", () => {

@@ -462,6 +462,15 @@ export const PHENO_COMPARISON_CONFIDENCE_CAVEAT: string =
   "Preview confidence is limited — sample data only. Missing, stale, or " +
   "invalid readings are flagged and never shown as healthy.";
 
+/**
+ * Confidence caveat for the REAL (non-sample) comparison. Same honesty posture
+ * as the sample caveat, but never claims "sample data only" — the data is the
+ * grower's own logged evidence.
+ */
+export const PHENO_COMPARISON_REAL_CONFIDENCE_CAVEAT: string =
+  "Confidence reflects the evidence you've logged so far. Missing, stale, or " +
+  "invalid readings are flagged and never shown as healthy.";
+
 // ---------------------------------------------------------------------------
 // Evidence status — a single cautious status chip per candidate. Only a
 // fresh, valid, complete, trustworthy candidate WITH a photo is "present";

@@ -63,37 +63,45 @@ interface CheckResult {
   cause?: FailureCause;
 }
 
-// External-id prefixes this preflight guards. Covers every recurring plan
-// (Pro, Craft, Founder Lifetime) and the one-time AI credit packs — i.e.
-// every entry in PAID_PLAN_IDS. There is no other preflight that verifies
-// the live/sandbox catalog for Pro; a prior version of this comment claimed
-// otherwise and that claim was wrong (see git history for the audit that
-// found it).
+// Every paid SKU this preflight verifies against the live/sandbox catalog:
+// the full, unfiltered PAID_PLAN_IDS allowlist. There is no other preflight
+// that verifies the live/sandbox catalog for Pro; a prior version of this
+// comment claimed otherwise and that claim was wrong (see git history for
+// the audit that found it).
 //
-// Prefix-driven rather than an id list on purpose: a new pro_, craft_,
-// founder_, or credit_pack_ SKU added to PAID_PLAN_IDS is required here
-// automatically, instead of relying on someone remembering to widen a
-// second list. That second list is exactly the shape of the copy that let
-// Craft go missing from the webhook allowlist in the first place.
+// Deliberately NOT filtered by prefix. An earlier version of this fix
+// required only `PAID_PLAN_IDS.filter(isGuardedExternalId)` — ids matching
+// GUARDED_EXTERNAL_ID_PREFIXES below — which reintroduced the exact same
+// drift class one layer down: a PAID_PLAN_IDS entry added under a prefix
+// nobody remembered to add to that second list would be silently
+// unverified while this preflight still reported green (flagged in review
+// on PR #762). Requiring the whole allowlist directly makes that failure
+// mode structurally impossible — there is no second list to fall out of
+// sync with PAID_PLAN_IDS.
+const REQUIRED_PLAN_IDS: readonly string[] = PAID_PLAN_IDS;
+
+// Fail loudly rather than silently guarding nothing if the allowlist is ever
+// emptied. A preflight that checks zero ids reports green forever.
+if (REQUIRED_PLAN_IDS.length === 0) {
+  console.error(
+    "verify-paddle-craft-catalog: PAID_PLAN_IDS is empty — this preflight " +
+      "would verify nothing and pass.",
+  );
+  process.exit(2);
+}
+
+// External-id prefixes recognised by the CATALOG-COVERAGE scan below
+// (discoverActiveCraftExternalIds) — i.e. the naming convention every
+// current paid SKU follows. This is a *separate*, best-effort check in the
+// opposite direction from REQUIRED_PLAN_IDS above: it catches a plan
+// created directly in the Paddle dashboard that matches our naming
+// convention but that no code path has added to PAID_PLAN_IDS yet. It must
+// NOT be used to decide what this preflight requires — see REQUIRED_PLAN_IDS
+// for why that specific reuse was the bug.
 const GUARDED_EXTERNAL_ID_PREFIXES = ["pro_", "craft_", "founder_", "credit_pack_"] as const;
 
 function isGuardedExternalId(id: string): boolean {
   return GUARDED_EXTERNAL_ID_PREFIXES.some((prefix) => id.startsWith(prefix));
-}
-
-// The subset of PAID_PLAN_IDS this preflight guards, derived from the
-// single-source allowlist.
-const REQUIRED_PLAN_IDS = PAID_PLAN_IDS.filter(isGuardedExternalId);
-
-// Fail loudly rather than silently guarding nothing if the prefixes ever stop
-// matching the allowlist (a rename, say). A preflight that checks zero ids
-// reports green forever.
-if (REQUIRED_PLAN_IDS.length === 0) {
-  console.error(
-    "verify-paddle-craft-catalog: GUARDED_EXTERNAL_ID_PREFIXES matched no id in " +
-      "PAID_PLAN_IDS — this preflight would verify nothing and pass.",
-  );
-  process.exit(2);
 }
 
 /**

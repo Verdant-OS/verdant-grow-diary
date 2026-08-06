@@ -160,25 +160,32 @@ function flattenTo(to: CompatTo): string {
   return `${to.pathname ?? ""}${search}${hash}`;
 }
 
-// Mirrors the product shim: TanStack reads the query from `search` and the
-// fragment from `hash`; buildLocation re-splits neither out of `to`, so a '?'
-// or '#' left inside `to` rides into the committed pathname.
-function toTanStackTarget(path: string): {
-  to: string;
-  search?: Record<string, string>;
-  hash?: string;
-} {
+// Mirrors the product shim (see its docblock for why the query stays in
+// `to`: TanStack's default stringifySearch JSON-encodes values).
+/**
+ * Split the FRAGMENT (only) out of a react-router-style path string.
+ *
+ * TanStack reads the fragment from its dedicated `hash` option and never
+ * re-splits one out of `to`, so a '#' left inside `to` rides into the
+ * COMMITTED pathname (`/hunts/55/workspace#notes`). Splitting it is safe:
+ * hashes are forwarded verbatim.
+ *
+ * The QUERY is deliberately left inside `to`, even though it pollutes the
+ * committed pathname the same way. TanStack's default `stringifySearch` is
+ * JSON-based: passing `{ page: "2" }` through the `search` option emits
+ * `?page=%222%22` (quoted so it round-trips as a string, not the number 2).
+ * This app builds and reads raw string params, so routing the query through
+ * `search` silently rewrites every numeric-looking URL — it broke Action
+ * Queue pagination in CI (`expected '"2"' to be '2'`). Splitting the query
+ * correctly requires changing the router's search (de)serializer app-wide,
+ * which is its own slice with its own evidence. See PR #755 discussion.
+ */
+function toTanStackTarget(path: string): { to: string; hash?: string } {
   const hashIndex = path.indexOf("#");
-  const hash = hashIndex === -1 ? undefined : path.slice(hashIndex + 1);
-  const withoutHash = hashIndex === -1 ? path : path.slice(0, hashIndex);
-  const queryIndex = withoutHash.indexOf("?");
-  const pathname = queryIndex === -1 ? withoutHash : withoutHash.slice(0, queryIndex);
-  const query = queryIndex === -1 ? "" : withoutHash.slice(queryIndex + 1);
-  const search = query ? Object.fromEntries(new URLSearchParams(query)) : undefined;
+  if (hashIndex === -1) return { to: path };
   return {
-    to: pathname === "" ? "." : pathname,
-    ...(search ? { search } : {}),
-    ...(hash !== undefined ? { hash } : {}),
+    to: hashIndex === 0 ? "." : path.slice(0, hashIndex),
+    hash: path.slice(hashIndex + 1),
   };
 }
 
@@ -206,7 +213,6 @@ export function useNavigate(): CompatNavigateFunction {
       const target = toTanStackTarget(flattenTo(to));
       void navigate({
         to: target.to,
-        ...(target.search !== undefined ? { search: target.search } : {}),
         ...(target.hash !== undefined ? { hash: target.hash } : {}),
         replace: options?.replace ?? false,
         ...(options?.state !== undefined ? { state: options.state as never } : {}),
@@ -235,7 +241,6 @@ export const Link = forwardRef<HTMLAnchorElement, CompatLinkProps>(function Link
     <TanStackLink
       ref={ref}
       to={target.to as never}
-      {...(target.search !== undefined ? { search: target.search as never } : {})}
       {...(target.hash !== undefined ? { hash: target.hash } : {})}
       replace={replace ?? false}
       {...(state !== undefined ? { state: state as never } : {})}
@@ -336,8 +341,9 @@ export function useSearchParams(): [URLSearchParams, CompatSetSearchParams] {
     const { pathname, hash } = selectCommittedLocation(router.state);
     const normalizedHash = hash ? hash.replace(/^#/, "") : undefined;
     void router.navigate({
-      to: pathname as never,
-      search: (serialized ? Object.fromEntries(new URLSearchParams(serialized)) : {}) as never,
+      // Query stays string-serialized in `to` — TanStack's default
+      // stringifySearch is JSON-based and would emit ?page=%222%22.
+      to: `${pathname}${serialized ? `?${serialized}` : ""}` as never,
       ...(normalizedHash ? { hash: normalizedHash } : {}),
       replace: options?.replace ?? false,
       resetScroll: options?.preventScrollReset !== true,

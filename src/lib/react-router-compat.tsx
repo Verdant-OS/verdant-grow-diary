@@ -131,39 +131,29 @@ function flattenTo(to: CompatTo): string {
 }
 
 /**
- * Split a react-router-style path string into TanStack navigation options.
+ * Split the FRAGMENT (only) out of a react-router-style path string.
  *
- * TanStack reads the query from its `search` option and the fragment from its
- * `hash` option — `buildLocation` re-splits NEITHER out of `to`. It composes
- * the final URL as `pathname + stringifySearch(search) + hash`, so any `?` or
- * `#` left inside `to` rides into the COMMITTED pathname (e.g.
- * `/timeline?growId=x#entry` commits pathname `/timeline?growId=x` with an
- * empty search object). Pages appear to work only because the history layer
- * re-parses the pushed href, but every reader of `location.pathname` /
- * `location.search` sees the polluted state in flight.
+ * TanStack reads the fragment from its dedicated `hash` option and never
+ * re-splits one out of `to`, so a '#' left inside `to` rides into the
+ * COMMITTED pathname (`/hunts/55/workspace#notes`). Splitting it is safe:
+ * hashes are forwarded verbatim.
  *
- * Bare `?a=b` / `#frag` strings target the current route (`.`), matching
- * react-router. Search is parsed flat (`URLSearchParams`); repeated keys keep
- * the last value, which matches every call site in this app.
+ * The QUERY is deliberately left inside `to`, even though it pollutes the
+ * committed pathname the same way. TanStack's default `stringifySearch` is
+ * JSON-based: passing `{ page: "2" }` through the `search` option emits
+ * `?page=%222%22` (quoted so it round-trips as a string, not the number 2).
+ * This app builds and reads raw string params, so routing the query through
+ * `search` silently rewrites every numeric-looking URL — it broke Action
+ * Queue pagination in CI (`expected '"2"' to be '2'`). Splitting the query
+ * correctly requires changing the router's search (de)serializer app-wide,
+ * which is its own slice with its own evidence. See PR #755 discussion.
  */
-function toTanStackTarget(path: string): {
-  to: string;
-  search?: Record<string, string>;
-  hash?: string;
-} {
+function toTanStackTarget(path: string): { to: string; hash?: string } {
   const hashIndex = path.indexOf("#");
-  const hash = hashIndex === -1 ? undefined : path.slice(hashIndex + 1);
-  const withoutHash = hashIndex === -1 ? path : path.slice(0, hashIndex);
-
-  const queryIndex = withoutHash.indexOf("?");
-  const pathname = queryIndex === -1 ? withoutHash : withoutHash.slice(0, queryIndex);
-  const query = queryIndex === -1 ? "" : withoutHash.slice(queryIndex + 1);
-  const search = query ? Object.fromEntries(new URLSearchParams(query)) : undefined;
-
+  if (hashIndex === -1) return { to: path };
   return {
-    to: pathname === "" ? "." : pathname,
-    ...(search ? { search } : {}),
-    ...(hash !== undefined ? { hash } : {}),
+    to: hashIndex === 0 ? "." : path.slice(0, hashIndex),
+    hash: path.slice(hashIndex + 1),
   };
 }
 
@@ -190,7 +180,6 @@ export function useNavigate(): CompatNavigateFunction {
       const target = toTanStackTarget(flattenTo(to));
       void navigate({
         to: target.to,
-        ...(target.search !== undefined ? { search: target.search } : {}),
         ...(target.hash !== undefined ? { hash: target.hash } : {}),
         replace: options?.replace ?? false,
         ...(options?.state !== undefined ? { state: options.state as never } : {}),
@@ -244,7 +233,6 @@ export const Link = forwardRef<HTMLAnchorElement, CompatLinkProps>(function Link
     <TanStackLink
       ref={ref}
       to={target.to as never}
-      {...(target.search !== undefined ? { search: target.search as never } : {})}
       {...(target.hash !== undefined ? { hash: target.hash } : {})}
       replace={replace ?? false}
       {...(state !== undefined ? { state: state as never } : {})}

@@ -207,13 +207,15 @@ describe("react-router-compat fragment handling (real product shim)", () => {
     });
   });
 
-  it("splits a combined query + fragment target into to / search / hash", async () => {
-    // Production shape: symptomEvidenceChecklistRules builds
-    // `/timeline?growId=<id>#timeline-entry-<x>` (timelinePath + anchor) and
-    // hands it to a compat Link. Splitting only the fragment would still
-    // leave `?growId=...` inside `to`, which buildLocation folds into the
-    // pathname with an EMPTY search object — the same polluted committed
-    // state, one layer down.
+  it("combined query + fragment: splits the fragment, deliberately keeps the query in `to`", async () => {
+    // Documents a CONSTRAINT, not an aspiration. Splitting the query into
+    // TanStack's `search` option looks correct (it would stop the query
+    // polluting the committed pathname) but silently rewrites URL encoding:
+    // the default stringifySearch is JSON-based, so { page: "2" } emits
+    // ?page=%222%22 — it broke Action Queue pagination in CI ('expected
+    // '"2"' to be '2''). This app builds and reads raw string params, so
+    // the query stays in `to` until the router's search (de)serializer is
+    // changed app-wide in its own slice.
     const router = buildWorkspaceRouter();
     const navigateSpy = vi.spyOn(router, "navigate");
     render(<RouterProvider router={router} />);
@@ -225,23 +227,22 @@ describe("react-router-compat fragment handling (real product shim)", () => {
         return typeof options?.to === "string" && options.to.startsWith("/hunts");
       });
       expect(calls).toHaveLength(1);
-      const options = calls[0]?.[0] as {
-        to?: string;
-        search?: Record<string, string>;
-        hash?: string;
-      };
-      expect(options.to).toBe("/hunts/55/workspace");
-      expect(options.to).not.toContain("?");
-      expect(options.to).not.toContain("#");
-      expect(options.search).toEqual({ growId: "g-1" });
+      const options = calls[0]?.[0] as { to?: string; search?: unknown; hash?: string };
+      // Fragment IS split out — the fix this file exists for.
       expect(options.hash).toBe("notes");
+      expect(options.to).not.toContain("#");
+      // Query intentionally still rides in `to`; no search object is passed,
+      // so TanStack's JSON stringifier never touches the values.
+      expect(options.to).toBe("/hunts/55/workspace?growId=g-1");
+      expect(options.search).toBeUndefined();
     });
   });
 
-  it("useSearchParams setter changes search, preserves the hash, keeps pathname clean", async () => {
+  it("useSearchParams setter updates the query and preserves the committed hash", async () => {
     // Third fragment path (Copilot #755): starting on a hashed location, the
-    // setter must not fold the new query into `to` and must carry the
-    // grower's current anchor across the update.
+    // setter must carry the grower's current anchor across the update rather
+    // than dropping it. The query stays string-serialized in `to` for the
+    // encoding reason above.
     const router = buildWorkspaceRouter(["/hunts/55/workspace#notes"]);
     render(<RouterProvider router={router} />);
     await screen.findByTestId("workspace-page");
@@ -251,8 +252,8 @@ describe("react-router-compat fragment handling (real product shim)", () => {
     await waitFor(() => {
       expect(router.state.location.searchStr).toContain("view=keepers");
     });
-    expect(router.state.location.pathname).toBe("/hunts/55/workspace");
-    expect(router.state.location.pathname).not.toContain("?");
+    // Raw, unquoted value — proof the JSON stringifier is not in the path.
+    expect(router.state.location.searchStr).not.toContain("%22");
     expect(router.state.location.hash).toBe("notes");
   });
 

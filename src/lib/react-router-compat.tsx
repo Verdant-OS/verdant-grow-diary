@@ -131,6 +131,33 @@ function flattenTo(to: CompatTo): string {
 }
 
 /**
+ * Split the FRAGMENT (only) out of a react-router-style path string.
+ *
+ * TanStack reads the fragment from its dedicated `hash` option and never
+ * re-splits one out of `to`, so a '#' left inside `to` rides into the
+ * COMMITTED pathname (`/hunts/55/workspace#notes`). Splitting it is safe:
+ * hashes are forwarded verbatim.
+ *
+ * The QUERY is deliberately left inside `to`, even though it pollutes the
+ * committed pathname the same way. TanStack's default `stringifySearch` is
+ * JSON-based: passing `{ page: "2" }` through the `search` option emits
+ * `?page=%222%22` (quoted so it round-trips as a string, not the number 2).
+ * This app builds and reads raw string params, so routing the query through
+ * `search` silently rewrites every numeric-looking URL — it broke Action
+ * Queue pagination in CI (`expected '"2"' to be '2'`). Splitting the query
+ * correctly requires changing the router's search (de)serializer app-wide,
+ * which is its own slice with its own evidence. See PR #755 discussion.
+ */
+function toTanStackTarget(path: string): { to: string; hash?: string } {
+  const hashIndex = path.indexOf("#");
+  if (hashIndex === -1) return { to: path };
+  return {
+    to: hashIndex === 0 ? "." : path.slice(0, hashIndex),
+    hash: path.slice(hashIndex + 1),
+  };
+}
+
+/**
  * react-router `useNavigate()`. Supports `navigate("/path", { replace })`,
  * the `{ pathname, search, hash }` object form, and history-delta calls such
  * as `navigate(-1)`.
@@ -150,8 +177,10 @@ export function useNavigate(): CompatNavigateFunction {
         else router.history.forward();
         return;
       }
+      const target = toTanStackTarget(flattenTo(to));
       void navigate({
-        to: flattenTo(to),
+        to: target.to,
+        ...(target.hash !== undefined ? { hash: target.hash } : {}),
         replace: options?.replace ?? false,
         ...(options?.state !== undefined ? { state: options.state as never } : {}),
         resetScroll: options?.preventScrollReset !== true,
@@ -199,10 +228,12 @@ export const Link = forwardRef<HTMLAnchorElement, CompatLinkProps>(function Link
       </a>
     );
   }
+  const target = toTanStackTarget(to);
   return (
     <TanStackLink
       ref={ref}
-      to={to as never}
+      to={target.to as never}
+      {...(target.hash !== undefined ? { hash: target.hash } : {})}
       replace={replace ?? false}
       {...(state !== undefined ? { state: state as never } : {})}
       resetScroll={preventScrollReset !== true}
@@ -333,9 +364,15 @@ export function useSearchParams(): [URLSearchParams, CompatSetSearchParams] {
     // navigation is pending, building the next URL from the in-flight
     // target would move the wrong page's search params.
     const { pathname, hash } = selectCommittedLocation(router.state);
-    const suffix = `${serialized ? `?${serialized}` : ""}${hash ? (hash.startsWith("#") ? hash : `#${hash}`) : ""}`;
+    const normalizedHash = hash ? hash.replace(/^#/, "") : undefined;
+    // Query AND fragment go in TanStack's dedicated options; inside `to` they
+    // would ride into the committed pathname (see toTanStackTarget). The
+    // fragment is carried over so changing a filter does not silently drop
+    // the grower's current anchor.
     void router.navigate({
-      to: `${pathname}${suffix}` as never,
+      to: pathname as never,
+      search: (serialized ? Object.fromEntries(new URLSearchParams(serialized)) : {}) as never,
+      ...(normalizedHash ? { hash: normalizedHash } : {}),
       replace: options?.replace ?? false,
       resetScroll: options?.preventScrollReset !== true,
     } as never);

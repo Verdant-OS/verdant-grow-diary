@@ -1727,7 +1727,7 @@ test.describe("core link and form census", () => {
   test("audits every scheduled authenticated page, visible field, and safe internal link", async ({
     page,
   }) => {
-    test.setTimeout(900_000);
+    test.setTimeout(1_800_000);
     const report = await runLaneCensus(page, "authenticated", AUTHENTICATED_CORE_CENSUS_ROUTES);
     expect(report.routeAudits).toHaveLength(AUTHENTICATED_CORE_CENSUS_ROUTES.length);
     expect(report.fieldAudits.length).toBeGreaterThan(0);

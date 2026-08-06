@@ -766,6 +766,7 @@ export default function DailyCheck() {
                 tentId={tentId || null}
                 tentName={selectedTent?.name ?? null}
                 growId={growId}
+                plantId={selectedPlant?.id ?? null}
               />
               <PlantAssignedTentActionsPanel
                 tentId={tentId || null}

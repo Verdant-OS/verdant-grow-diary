@@ -230,3 +230,25 @@ describe("Existing Plant Detail surfaces remain intact", () => {
     expect(PLANT_DETAIL).toContain("PlantRecentActivityPanel");
   });
 });
+
+describe("Ask AI Doctor row action wiring", () => {
+  it("panel offers the /doctor deep link (navigation-only) behind plant scope", () => {
+    expect(PANEL).toContain("plant-assigned-tent-alert-ask-doctor");
+    expect(PANEL).toMatch(/\/doctor\?plantId=\$\{encodeURIComponent\(plantId\)\}/);
+    // Rendered only when a plant is in scope — tent-only surfaces omit it.
+    expect(PANEL).toMatch(/\{plantId\s*\?\s*\(/);
+  });
+
+  it("PlantDetail passes plantId into the panel", () => {
+    expect(PLANT_DETAIL).toMatch(
+      /PlantAssignedTentAlertsPanel[\s\S]*plantId=\{plant\.id\}/,
+    );
+  });
+
+  it("DailyCheck passes the selected plant, nullable in the tent-only flow", () => {
+    const DAILY = read("src/pages/DailyCheck.tsx");
+    expect(DAILY).toMatch(
+      /PlantAssignedTentAlertsPanel[\s\S]*plantId=\{selectedPlant\?\.id\s*\?\?\s*null\}/,
+    );
+  });
+});

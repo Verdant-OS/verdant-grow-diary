@@ -4,9 +4,22 @@
  * Reads from `public.alerts` via `useAlertsList` (RLS-scoped) and filters in
  * the pure rules layer. No writes. No action_queue handoff from this panel.
  * Recommendations are never invented — only fields already stored render.
+ *
+ * The optional per-row "Ask AI Doctor" action is pure navigation to the
+ * existing /doctor page (the established `?plantId=` deep-link idiom, plus
+ * the alert id so the question can be prefilled there). No AI call is made
+ * and no credits are spent from this panel.
  */
 import { Link } from "react-router-dom";
-import { ArrowRight, Bell, AlertCircle, AlertTriangle, Info, Eye } from "lucide-react";
+import {
+  ArrowRight,
+  Bell,
+  AlertCircle,
+  AlertTriangle,
+  Info,
+  Eye,
+  Sparkles,
+} from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,11 +27,19 @@ import { formatDistanceToNow } from "date-fns";
 import { usePlantAssignedTentAlerts } from "@/hooks/usePlantAssignedTentAlerts";
 import type { PlantAssignedTentAlertRow } from "@/lib/plantAssignedTentAlertRules";
 import { alertsPath } from "@/lib/routes";
+import { trackTentAlertsDoctorCta } from "@/lib/plantTentAlertsDoctorCtaTracking";
 
 interface Props {
   tentId: string | null | undefined;
   tentName?: string | null;
   growId: string | null | undefined;
+  /**
+   * Plant whose detail surface hosts this panel. When present, each alert
+   * row offers an "Ask AI Doctor" navigation link scoped to that plant.
+   * Optional so tent-only surfaces (Daily Check without a selected plant)
+   * simply omit the action.
+   */
+  plantId?: string | null;
 }
 
 function severityClass(sev: PlantAssignedTentAlertRow["severity"]): string {
@@ -48,7 +69,13 @@ function fmt(ts: string | null): string {
   return formatDistanceToNow(new Date(t), { addSuffix: true });
 }
 
-function AlertRowItem({ row }: { row: PlantAssignedTentAlertRow }) {
+function AlertRowItem({
+  row,
+  plantId,
+}: {
+  row: PlantAssignedTentAlertRow;
+  plantId: string | null;
+}) {
   return (
     <li
       className="rounded-lg border bg-card/40 p-3 text-sm"
@@ -74,17 +101,40 @@ function AlertRowItem({ row }: { row: PlantAssignedTentAlertRow }) {
             {row.status}
           </Badge>
         </div>
-        <Button
-          asChild
-          variant="ghost"
-          size="sm"
-          className="h-7 px-2 gap-1"
-          data-testid="plant-assigned-tent-alert-view"
-        >
-          <Link to={`/alerts/${row.id}`}>
-            View Alert <ArrowRight className="h-3.5 w-3.5" />
-          </Link>
-        </Button>
+        <div className="flex items-center gap-1">
+          {plantId ? (
+            <Button
+              asChild
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 gap-1"
+              data-testid="plant-assigned-tent-alert-ask-doctor"
+            >
+              <Link
+                to={`/doctor?plantId=${encodeURIComponent(plantId)}&alertId=${encodeURIComponent(row.id)}`}
+                onClick={() =>
+                  trackTentAlertsDoctorCta({
+                    severity: row.severity,
+                    metric: row.metric,
+                  })
+                }
+              >
+                <Sparkles className="h-3.5 w-3.5" /> Ask AI Doctor
+              </Link>
+            </Button>
+          ) : null}
+          <Button
+            asChild
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 gap-1"
+            data-testid="plant-assigned-tent-alert-view"
+          >
+            <Link to={`/alerts/${row.id}`}>
+              View Alert <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </Button>
+        </div>
       </div>
       <p className="mt-2 font-medium leading-snug">{row.title}</p>
       {row.reason ? (
@@ -102,7 +152,12 @@ function AlertRowItem({ row }: { row: PlantAssignedTentAlertRow }) {
   );
 }
 
-export default function PlantAssignedTentAlertsPanel({ tentId, tentName, growId }: Props) {
+export default function PlantAssignedTentAlertsPanel({
+  tentId,
+  tentName,
+  growId,
+  plantId,
+}: Props) {
   const enabled = !!tentId;
   const { status, rows } = usePlantAssignedTentAlerts(
     tentId ?? null,
@@ -159,7 +214,7 @@ export default function PlantAssignedTentAlertsPanel({ tentId, tentName, growId 
         ) : (
           <ul className="space-y-2" data-testid="plant-assigned-tent-alerts-list">
             {rows.map((r) => (
-              <AlertRowItem key={r.id} row={r} />
+              <AlertRowItem key={r.id} row={r} plantId={plantId ?? null} />
             ))}
           </ul>
         )}

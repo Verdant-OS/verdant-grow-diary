@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import {
   useGrowPlants,
   useGrowSensorReadings,
+  useGrowTents,
   getGrowDataMeta,
 } from "@/hooks/useGrowData";
 import { useDiaryEntries } from "@/hooks/use-diary-entries";
@@ -181,6 +182,10 @@ export default function Coach() {
 
   // --- Real grow context for AI sufficiency evaluation (presenter only) ---
   const { data: ctxPlants = [] } = useGrowPlants(undefined, activeGrowId ?? undefined);
+  // Also used to re-verify alert-derived scope hints at persist time (see
+  // the session persistence below) — a tent/plant relinked to another grow
+  // since the alert was written must not leak stale ids into a session.
+  const { data: ctxTents = [] } = useGrowTents(activeGrowId ?? undefined);
   const { data: ctxSensors = [] } = useGrowSensorReadings(undefined);
   const { data: ctxDiary = [] } = useDiaryEntries();
   const contextSufficiency = useMemo(() => {
@@ -446,8 +451,20 @@ export default function Coach() {
             growId: activeGrowId,
             // Scope hints from the grow-validated source alert when this ask
             // was seeded by one (DB-stored values, never the nav param).
-            tentId: alertContext?.tentId ?? null,
-            plantId: alertContext?.plantId ?? null,
+            // Re-verified at persist time against the ACTIVE grow's current
+            // tents/plants: an alert whose tent or plant was relinked to a
+            // different grow since the alert was written contributes no
+            // stale child ids.
+            tentId:
+              alertContext?.tentId &&
+              ctxTents.some((t) => t.id === alertContext.tentId)
+                ? alertContext.tentId
+                : null,
+            plantId:
+              alertContext?.plantId &&
+              ctxPlants.some((p) => p.id === alertContext.plantId)
+                ? alertContext.plantId
+                : null,
             question: question.trim() || null,
             analysis: d.analysis ?? null,
             diagnosis: sanitized,

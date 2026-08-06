@@ -26,6 +26,7 @@ vi.mock("@/store/grows", () => ({
 }));
 vi.mock("@/hooks/useGrowData", () => ({
   useGrowPlants: () => ({ data: [] }),
+  useGrowTents: () => ({ data: [] }),
   useGrowSensorReadings: () => ({ data: [] }),
   getGrowDataMeta: () => ({ dataSource: "supabase", isDemoData: false }),
 }));

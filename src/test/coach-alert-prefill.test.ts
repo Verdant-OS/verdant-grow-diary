@@ -255,13 +255,18 @@ describe("Coach wiring · alert prefill", () => {
     expect(effect).not.toMatch(/\.insert\(|\.update\(|\.upsert\(|\.delete\(/);
   });
 
-  it("persisted sessions carry the validated alert's DB-stored scope, never the nav param", () => {
+  it("persisted sessions carry the validated alert's DB-stored scope, re-verified against the active grow", () => {
+    // Child ids are membership-checked against the ACTIVE grow's current
+    // tents/plants at persist time — an alert whose tent/plant was
+    // relinked to another grow contributes no stale scope.
     expect(COACH).toMatch(
-      /persistAiDoctorSession\(supabase,\s*\{[\s\S]{0,400}tentId:\s*alertContext\?\.tentId\s*\?\?\s*null,[\s\S]{0,200}plantId:\s*alertContext\?\.plantId\s*\?\?\s*null,/,
+      /persistAiDoctorSession\(supabase,\s*\{[\s\S]{0,900}ctxTents\.some\(\(t\)\s*=>\s*t\.id\s*===\s*alertContext\.tentId\)[\s\S]{0,400}ctxPlants\.some\(\(p\)\s*=>\s*p\.id\s*===\s*alertContext\.plantId\)/,
     );
     // Scope comes only from the fetched AlertRow (row.tent_id / row.plant_id).
     expect(COACH).toMatch(/tentId:\s*row\.tent_id\s*\?\?\s*null/);
     expect(COACH).toMatch(/plantId:\s*row\.plant_id\s*\?\?\s*null/);
+    // The nav param never feeds scope.
+    expect(COACH).not.toMatch(/plantId:\s*searchParams/);
   });
 
   it("Coach still performs exactly one edge invoke and two action_queue inserts", () => {

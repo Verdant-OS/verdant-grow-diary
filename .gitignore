@@ -41,3 +41,6 @@ e2e/.auth/
 
 # Windows / OneDrive per-folder settings artifact
 desktop.ini
+
+# Local MCP plugin runtime state (e.g. healthcare Contracts Analyzer cache)
+.claude/data/

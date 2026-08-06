@@ -220,6 +220,28 @@ function compareMergedEntries(a: MergedTimelineEntry, b: MergedTimelineEntry): n
 // caller can re-attach companion-only details (sensor snapshots,
 // environment_check envelopes, plant_name) to the spine and keep rendering
 // them exactly once.
+//
+// A companion's linked/paired grow_event is not always present in this
+// exact call's `growEvents` array — Timeline's own grow_events read can be
+// date-range- or keyset-bounded independently of the diary_entries read, so
+// a real save's parent can legitimately fall outside the current window (or,
+// for a caller that never fetches grow_events at all, be entirely absent).
+// In that case the diary companion is the ONLY evidence of that save in this
+// read; it must render as its own standalone entry, not vanish. Only a
+// parent that WAS fetched and was excluded by the shared dedupe (deleted,
+// wrong scope) is treated as "known gone" and must not resurrect a second
+// activity.
+//
+// CALLER CONTRACT: `growEvents` must include soft-deleted rows (do not
+// filter `is_deleted` at the query layer before calling this helper).
+// Absence from `growEvents` is this function's ONLY signal that a linked
+// parent was never fetched; if a caller pre-filters deleted rows server-side,
+// a grower-deleted parent becomes indistinguishable from "outside the
+// window" and its companion is wrongly resurrected as a standalone entry.
+// `growEvents`/`diaryEntries` output and `mapGrowEventsToRecentRawEntries`
+// already drop `is_deleted` rows before anything renders, so passing
+// deleted rows through here is safe — they inform this decision without
+// ever reaching the screen.
 
 export interface CollapseQuickLogSaveFanOutResult<
   D extends DiaryEntryRowInput,
@@ -264,6 +286,15 @@ export function collapseQuickLogSaveFanOut<
       .map((row) => row.id)
       .filter((id): id is string => typeof id === "string"),
   );
+  // Every grow_event id present in this call's `growEvents`, regardless of
+  // manual-contract eligibility. Distinguishes "fetched but excluded" (known
+  // gone — do not resurrect) from "never fetched at all" (unknown — keep the
+  // companion standalone rather than silently dropping real evidence).
+  const fetchedGrowEventIds = new Set(
+    input.growEvents
+      .map((row) => (row && typeof row.id === "string" ? row.id : null))
+      .filter((id): id is string => id !== null),
+  );
 
   // Surviving spine rows by (plant, instant) pair — the attachment target for
   // unlinked companions written by quicklog_save_manual. First-in-input wins
@@ -292,11 +323,21 @@ export function collapseQuickLogSaveFanOut<
 
   const diaryEntries: D[] = [];
   const droppedCompanionsBySpineId = new Map<string, D[]>();
-  const attachCompanion = (spineId: string | null, row: D) => {
-    if (!spineId || !survivorSpineIds.has(spineId)) return;
-    const bucket = droppedCompanionsBySpineId.get(spineId);
-    if (bucket) bucket.push(row);
-    else droppedCompanionsBySpineId.set(spineId, [row]);
+  // Resolves a companion against its (possibly absent) target spine:
+  //  - target is a surviving spine → drop the companion, attach its details
+  //  - target was fetched but did not survive (deleted / wrong scope) →
+  //    drop it silently; the shared dedupe already decided it is known gone
+  //  - target was never fetched at all → keep the companion as its own
+  //    standalone entry; it may be the only evidence of that save
+  const resolveCompanion = (spineId: string | null, row: D) => {
+    if (spineId && survivorSpineIds.has(spineId)) {
+      const bucket = droppedCompanionsBySpineId.get(spineId);
+      if (bucket) bucket.push(row);
+      else droppedCompanionsBySpineId.set(spineId, [row]);
+      return;
+    }
+    if (spineId && fetchedGrowEventIds.has(spineId)) return;
+    diaryEntries.push(row);
   };
   for (const row of input.diaryEntries) {
     if (!row || typeof row.id !== "string" || row.id.trim().length === 0) {
@@ -310,9 +351,7 @@ export function collapseQuickLogSaveFanOut<
     const logicalLink = pickLogicalGrowEventLink(row);
     const epochMs = fanOutEpochMs(row.entry_at, row.occurred_at);
     if (logicalLink) {
-      // A linked companion always belongs to its grow_events parent — even a
-      // deleted or out-of-window parent must not resurrect as a second row.
-      attachCompanion(logicalLink, row);
+      resolveCompanion(logicalLink, row);
       continue;
     }
     if (epochMs === null) {
@@ -323,7 +362,7 @@ export function collapseQuickLogSaveFanOut<
     }
     // Unlinked companion sharing the exact (plant, instant) pair with a
     // manual spine row — conservatively the same logical save.
-    attachCompanion(spineIdByPairKey.get(fanOutPairKey(row.plant_id, epochMs)) ?? null, row);
+    resolveCompanion(spineIdByPairKey.get(fanOutPairKey(row.plant_id, epochMs)) ?? null, row);
   }
 
   return { diaryEntries, growEvents, droppedCompanionsBySpineId };

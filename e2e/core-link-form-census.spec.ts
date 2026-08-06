@@ -19,6 +19,7 @@ import {
   type Page,
 } from "@playwright/test";
 import { APP_ROUTES } from "../src/lib/appRouteManifest";
+import { ANALYTICS_CONSENT_STORAGE_KEY } from "../src/lib/analyticsConsent";
 import {
   AUTHENTICATED_CORE_CENSUS_ROUTES,
   PUBLIC_CORE_CENSUS_ROUTES,
@@ -513,6 +514,33 @@ async function seedFakeSession(context: BrowserContext) {
       }
     },
     { appOrigin: APP_ORIGIN, key: SESSION_KEY, user: FAKE_USER },
+  );
+}
+
+/**
+ * Pre-store a "denied" analytics consent decision for the census contexts.
+ *
+ * With no stored decision the consent banner legitimately renders on every
+ * page (fixed to the bottom viewport edge, z-[100]) and intercepts pointer
+ * events over anything beneath it — on the authenticated lane it blocked the
+ * sidebar's lowest links for the entire test budget (926 click retries on
+ * /account/preferences). The census audits app surfaces, not the consent
+ * flow; "denied" keeps the banner away AND guarantees no analytics code can
+ * load (every loader gates on readAnalyticsConsent() === "granted"), which
+ * preserves the lane's hermetic zero-external-fetch contract.
+ */
+async function seedDeniedAnalyticsConsent(context: BrowserContext) {
+  await context.addInitScript(
+    ({ appOrigin, key }) => {
+      if (location.origin !== appOrigin) return;
+      try {
+        localStorage.setItem(key, "denied");
+      } catch {
+        // Sandboxed frames can intentionally deny storage access; they do not
+        // render the app shell and need no consent decision.
+      }
+    },
+    { appOrigin: APP_ORIGIN, key: ANALYTICS_CONSENT_STORAGE_KEY },
   );
 }
 
@@ -1633,6 +1661,7 @@ async function runLaneCensus(
 
   installContextErrorAudit(context, report);
   if (signedIn) await seedFakeSession(context);
+  await seedDeniedAnalyticsConsent(context);
   await installNetworkFence(context, signedIn, network);
 
   for (const route of routes) {

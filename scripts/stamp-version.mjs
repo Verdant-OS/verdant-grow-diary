@@ -134,15 +134,28 @@ if (commitSource === "none") {
         );
         if (!m) return "unknown";
         const [y, mo, d, h, mi, s] = m.slice(1, 7).map(Number);
+        // Reject Date.UTC's legacy 0–99 → 1900s years before the round
+        // trip; precise domain bounds are applied on the INSTANT below.
+        if (y < 100) return "unknown";
         if (h > 23 || mi > 59 || s > 59) return "unknown";
         const off = m[7];
-        if (off !== "Z" && (Number(off.slice(1, 3)) > 14 || Number(off.slice(4, 6)) > 59)) {
-          return "unknown";
+        if (off !== "Z") {
+          const oh = Number(off.slice(1, 3));
+          const om = Number(off.slice(4, 6));
+          // Real-world UTC offsets end at exactly ±14:00 — nonzero minutes
+          // at the ±14 boundary are out of range.
+          if (oh > 14 || om > 59 || (oh === 14 && om > 0)) return "unknown";
         }
         const utc = new Date(Date.UTC(y, mo - 1, d));
-        return utc.getUTCFullYear() === y && utc.getUTCMonth() === mo - 1 && utc.getUTCDate() === d
-          ? v
-          : "unknown";
+        if (utc.getUTCFullYear() !== y || utc.getUTCMonth() !== mo - 1 || utc.getUTCDate() !== d) {
+          return "unknown";
+        }
+        // Domain bound on the represented INSTANT (offset included): build
+        // timestamps cannot predate the epoch nor reach the year 3000 —
+        // textual-year bounds would wrongly admit e.g.
+        // 1970-01-01T00:00:00+14:00, a pre-epoch instant.
+        const instant = Date.parse(v);
+        return instant >= 0 && instant < Date.UTC(3000, 0, 1) ? v : "unknown";
       };
       const refText =
         typeof prior.ref === "string"

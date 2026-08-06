@@ -245,10 +245,12 @@ describe("Ask AI Doctor row action wiring", () => {
     );
   });
 
-  it("DailyCheck passes the selected plant, nullable in the tent-only flow", () => {
+  it("DailyCheck passes plant scope only when the reviewed tent is the plant's own assignment", () => {
+    // The plant-needs-tent flow can show a tent unrelated to the selected
+    // plant; the Ask AI Doctor action must not claim that plant there.
     const DAILY = read("src/pages/DailyCheck.tsx");
     expect(DAILY).toMatch(
-      /PlantAssignedTentAlertsPanel[\s\S]*plantId=\{selectedPlant\?\.id\s*\?\?\s*null\}/,
+      /PlantAssignedTentAlertsPanel[\s\S]*selectedPlant\s*&&\s*selectedPlant\.tent_id\s*===\s*tentId\s*\?\s*selectedPlant\.id\s*:\s*null/,
     );
   });
 });

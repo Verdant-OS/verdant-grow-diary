@@ -127,6 +127,24 @@ describe("appendAlertBackPointerToken", () => {
   it("handles an empty base reason", () => {
     expect(appendAlertBackPointerToken("", "a1")).toBe("[alert:a1]");
   });
+
+  it("spoof guard: strips forged/echoed alert tokens so the trusted id is authoritative", () => {
+    // Extractors return the FIRST match — a forged earlier token must not win.
+    const forged = "Model text [alert:forged-1] more text";
+    const out = appendAlertBackPointerToken(forged, "trusted-1");
+    expect(extractSourceAlertId(out)).toBe("trusted-1");
+    expect(out).not.toContain("forged-1");
+  });
+
+  it("spoof guard: strips forged alert tokens even when no trusted id exists", () => {
+    expect(appendAlertBackPointerToken("Text [alert:forged-1] tail", null)).toBe(
+      "Text tail",
+    );
+    // Malformed/empty tokens are removed too.
+    expect(appendAlertBackPointerToken("Text [alert:] tail", null)).toBe(
+      "Text tail",
+    );
+  });
 });
 
 describe("appendSessionBackPointerToken · dual-token composition", () => {
@@ -149,6 +167,18 @@ describe("appendSessionBackPointerToken · dual-token composition", () => {
   it("no-ops on null/invalid session ids", () => {
     expect(appendSessionBackPointerToken("reason", null)).toBe("reason");
     expect(appendSessionBackPointerToken("reason", "bad id")).toBe("reason");
+  });
+
+  it("spoof guard: forged session tokens are stripped, with or without a trusted id", () => {
+    const out = appendSessionBackPointerToken(
+      "Text [session:forged-1] tail",
+      "trusted-1",
+    );
+    expect(extractSourceAiDoctorSessionId(out)).toBe("trusted-1");
+    expect(out).not.toContain("forged-1");
+    expect(appendSessionBackPointerToken("Text [session:forged-1] tail", null)).toBe(
+      "Text tail",
+    );
   });
 });
 
@@ -175,20 +205,43 @@ describe("Coach wiring · alert prefill", () => {
     // The scope guard rejects alerts from another grow BEFORE any state is
     // set, so context gathering, credit debit, and session persistence all
     // stay on the grow the grower is actually analyzing.
-    expect(COACH).toMatch(/if\s*\(row\.grow_id\s*!==\s*activeGrowId\)\s*return;/);
+    expect(COACH).toMatch(/if\s*\(!row\s*\|\|\s*row\.grow_id\s*!==\s*activeGrowId\)\s*return;/);
     // Guard runs before both setters.
     const effect = COACH.split("normalizeCoachAlertIdParam(alertIdParam)")[1] ?? "";
     const block = effect.slice(0, effect.indexOf("[alertIdParam, activeGrowId]"));
     const guardIdx = block.indexOf("row.grow_id !== activeGrowId");
     expect(guardIdx).toBeGreaterThan(-1);
-    expect(block.indexOf("setAlertContext(")).toBeGreaterThan(guardIdx);
-    expect(block.indexOf("setQuestion(")).toBeGreaterThan(guardIdx);
+    expect(block.indexOf("setAlertContext({")).toBeGreaterThan(guardIdx);
+    expect(block.indexOf("setQuestion(prefill)")).toBeGreaterThan(guardIdx);
   });
 
-  it("never clobbers a question the grower already typed", () => {
+  it("clears any previously bound context at the start of every lookup cycle", () => {
+    // Effect body begins by resetting context, so a changed alert/grow can
+    // never leave stale provenance behind.
     expect(COACH).toMatch(
-      /setQuestion\(\(q\)\s*=>\s*\(q\.trim\(\)\.length\s*>\s*0\s*\?\s*q\s*:\s*prefill\)\)/,
+      /useEffect\(\(\)\s*=>\s*\{\s*\n?\s*setAlertContext\(null\);/,
     );
+  });
+
+  it("accepts prefill + binds context as one decision, never clobbering typed input", () => {
+    // questionRef decides acceptance synchronously; both setters live
+    // behind the same empty-form check.
+    expect(COACH).toMatch(
+      /if\s*\(questionRef\.current\.trim\(\)\.length\s*>\s*0\)\s*return;[\s\S]{0,200}setQuestion\(prefill\);[\s\S]{0,300}setAlertContext\(\{/,
+    );
+    // The textarea keeps the ref in sync with typed input.
+    expect(COACH).toMatch(/questionRef\.current\s*=\s*e\.target\.value;/);
+  });
+
+  it("disables both Ask buttons while the alert lookup is pending (no credit spend on a blank/stale question)", () => {
+    expect(COACH).toMatch(
+      /disabled=\{busy\s*\|\|\s*!photoFile\s*\|\|\s*alertLookupPending\}/,
+    );
+    expect(COACH).toMatch(
+      /disabled=\{busy\s*\|\|\s*!activeGrowId\s*\|\|\s*alertLookupPending\}/,
+    );
+    // Pending always resolves — the lookup clears the flag in finally.
+    expect(COACH).toMatch(/\.finally\(\(\)\s*=>\s*\{\s*\n?\s*if\s*\(!cancelled\)\s*setAlertLookupPending\(false\);/);
   });
 
   it("prefill effect never fires an AI request or write", () => {
@@ -202,13 +255,18 @@ describe("Coach wiring · alert prefill", () => {
     expect(effect).not.toMatch(/\.insert\(|\.update\(|\.upsert\(|\.delete\(/);
   });
 
-  it("persisted sessions carry the validated alert's DB-stored scope, never the nav param", () => {
+  it("persisted sessions carry the validated alert's DB-stored scope, re-verified against the active grow", () => {
+    // Child ids are membership-checked against the ACTIVE grow's current
+    // tents/plants at persist time — an alert whose tent/plant was
+    // relinked to another grow contributes no stale scope.
     expect(COACH).toMatch(
-      /persistAiDoctorSession\(supabase,\s*\{[\s\S]{0,400}tentId:\s*alertContext\?\.tentId\s*\?\?\s*null,[\s\S]{0,200}plantId:\s*alertContext\?\.plantId\s*\?\?\s*null,/,
+      /persistAiDoctorSession\(supabase,\s*\{[\s\S]{0,900}ctxTents\.some\(\(t\)\s*=>\s*t\.id\s*===\s*alertContext\.tentId\)[\s\S]{0,400}ctxPlants\.some\(\(p\)\s*=>\s*p\.id\s*===\s*alertContext\.plantId\)/,
     );
     // Scope comes only from the fetched AlertRow (row.tent_id / row.plant_id).
     expect(COACH).toMatch(/tentId:\s*row\.tent_id\s*\?\?\s*null/);
     expect(COACH).toMatch(/plantId:\s*row\.plant_id\s*\?\?\s*null/);
+    // The nav param never feeds scope.
+    expect(COACH).not.toMatch(/plantId:\s*searchParams/);
   });
 
   it("Coach still performs exactly one edge invoke and two action_queue inserts", () => {
@@ -228,17 +286,36 @@ describe("Coach wiring · [alert:<id>] back-pointer writer", () => {
     expect(COACH).toMatch(
       /reason:\s*appendAlertBackPointerToken\(\s*\n?\s*appendSessionBackPointerToken\(/,
     );
-    // Session token uses the race-safe persisted id; alert token uses the
+    // Session token uses the awaited race-safe id; alert token uses the
     // grow-validated context id.
-    expect(COACH).toMatch(/appendSessionBackPointerToken\([\s\S]{0,300}persistedSessionId,/);
+    expect(COACH).toMatch(/appendSessionBackPointerToken\([\s\S]{0,300}sessionIdForToken,/);
     expect(COACH).toMatch(/appendAlertBackPointerToken\([\s\S]{0,500}alertContext\?\.id\s*\?\?\s*null,/);
   });
 
-  it("the legacy ai_coach insert is untouched (no token, no alertContext)", () => {
+  it("queue clicks await in-flight session persistence instead of racing it", () => {
+    // A fast click after a diagnosis renders must still get the session
+    // token: the retained persistence promise is awaited (seq-guarded),
+    // and persistence failure resolves null (row carries no session token).
+    expect(COACH).toMatch(
+      /let\s+sessionIdForToken:\s*string\s*\|\s*null\s*=\s*persistedSessionId;/,
+    );
+    expect(COACH).toMatch(
+      /pendingPersist\.seq\s*===\s*diagnosisSeqRef\.current/,
+    );
+    expect(COACH).toMatch(
+      /sessionIdForToken\s*=\s*await\s+pendingPersist\.promise\.catch\(\(\)\s*=>\s*null\);/,
+    );
+    // ask() retains the promise and resets it per request.
+    expect(COACH).toMatch(/sessionPersistRef\.current\s*=\s*null;/);
+    expect(COACH).toMatch(/sessionPersistRef\.current\s*=\s*\{\s*\n?\s*seq,/);
+  });
+
+  it("the legacy ai_coach insert spoof-strips model text but fabricates no linkage", () => {
     const coachInsert = COACH.split('source: "ai_coach"')[0] ?? "";
     const lastReason = coachInsert.lastIndexOf("reason:");
     expect(lastReason).toBeGreaterThan(-1);
-    const reasonLine = coachInsert.slice(lastReason, lastReason + 120);
+    const reasonLine = coachInsert.slice(lastReason, lastReason + 160);
+    expect(reasonLine).toContain("stripBackPointerTokens(");
     expect(reasonLine).not.toContain("appendAlertBackPointerToken");
     expect(reasonLine).not.toContain("alertContext");
   });

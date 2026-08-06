@@ -374,13 +374,14 @@ describe("Timeline.tsx — fan-out collapse wire-up", () => {
     expect(TIMELINE_SRC).toMatch(
       /import\s*\{[^}]*findMissingLinkedGrowEventIds[^}]*\}\s*from\s*["']@\/lib\/timelineMergeRules["']/,
     );
+    // The shared resolver helper computes the missing ids itself...
+    expect(TIMELINE_SRC).toMatch(/async function resolveMissingLinkedGrowEventParents/);
     expect(TIMELINE_SRC).toMatch(
       /const missingLinkedGrowEventIds = findMissingLinkedGrowEventIds\(\{\s*diaryEntries\s*:/,
     );
-    expect(TIMELINE_SRC).toMatch(/growEvents:\s*nextGrowEvents,\s*\}\);/);
 
-    // The supplemental fetch itself: exact-id lookup, no is_deleted filter
-    // (an id lookup has no window to fall outside of) and no date bound.
+    // ...and its fetch is an exact-id lookup: no is_deleted filter (an id
+    // lookup has no window to fall outside of) and no date bound.
     const supplementalFetch = TIMELINE_SRC.match(
       /const linkedResult = await supabase[\s\S]*?\.in\(\s*"id",\s*missingLinkedGrowEventIds\s*\)\s*;/,
     );
@@ -388,6 +389,32 @@ describe("Timeline.tsx — fan-out collapse wire-up", () => {
     expect(supplementalFetch![0]).not.toMatch(/is_deleted/);
     expect(supplementalFetch![0]).toMatch(/\.from\(\s*"grow_events"\s*\)/);
     expect(TIMELINE_SRC).toMatch(/setSupplementalLinkedGrowEvents/);
+  });
+
+  it("runs the resolver on the initial load AND on every loadOlder page (Codex round-3 P2)", () => {
+    // Exactly two call sites — the initial load (primary page as the known
+    // set) and loadOlder (primary page plus already-resolved supplemental
+    // rows). A third caller or a removed one should fail this pin loudly.
+    const callSites = TIMELINE_SRC.match(/resolveMissingLinkedGrowEventParents\(\{/g) ?? [];
+    expect(callSites).toHaveLength(2);
+    expect(TIMELINE_SRC).toMatch(/knownGrowEvents:\s*nextGrowEvents,/);
+    expect(TIMELINE_SRC).toMatch(
+      /knownGrowEvents:\s*\[\.\.\.growEvents,\s*\.\.\.supplementalLinkedGrowEvents\],/,
+    );
+  });
+
+  it("clears supplemental state on every fresh core commit and only merges after (Codex round-3 P1)", () => {
+    // Cleared in both fail-closed guards AND unconditionally in the success
+    // commit, so rows resolved for a previous grow/date scope can never
+    // survive into a new one — not while the new lookup is in flight, and
+    // not indefinitely when it fails.
+    const clears = TIMELINE_SRC.match(/setSupplementalLinkedGrowEvents\(\[\]\);/g) ?? [];
+    expect(clears).toHaveLength(3);
+    // Both resolver callbacks merge (functional update, deduped by id)
+    // instead of replacing, so a loadOlder resolution never clobbers the
+    // initial load's rows.
+    const merges = TIMELINE_SRC.match(/setSupplementalLinkedGrowEvents\(\(current\) =>/g) ?? [];
+    expect(merges).toHaveLength(2);
   });
 
   it("feeds the supplemental lookup into the collapse input, not into the primary growEvents", () => {

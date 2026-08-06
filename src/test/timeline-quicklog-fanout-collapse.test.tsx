@@ -14,13 +14,31 @@
  *     row with its watering_events child measurements
  *   - companion-only structure (environment_check envelopes, sensor
  *     snapshots) must keep rendering once on the surviving spine row.
+ *
+ * Two post-merge Codex/Copilot review rounds found real gaps in the first
+ * fix and are covered below:
+ *   round 1 — a linked companion's parent that IS fetched but soft-deleted
+ *     must not resurrect (collapseQuickLogSaveFanOut's own contract);
+ *   round 2 — Timeline's grow_events page is is_deleted-filtered AND
+ *     capped/date-bounded, so a deleted or merely out-of-window parent can
+ *     be absent from the primary page for reasons that have nothing to do
+ *     with is_deleted. A supplemental by-id lookup (findMissingLinkedGrowEventIds
+ *     + a small `.in("id", ...)` fetch) resolves exactly the ids a loaded
+ *     companion references but the primary page doesn't include, and only
+ *     that resolved set feeds collapseQuickLogSaveFanOut — the primary
+ *     `growEvents` state stays untouched for the UI-copy gates and
+ *     evidence-window checks that read it directly.
  */
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { collapseQuickLogSaveFanOut, mergeTimelineSources } from "@/lib/timelineMergeRules";
+import {
+  collapseQuickLogSaveFanOut,
+  findMissingLinkedGrowEventIds,
+  mergeTimelineSources,
+} from "@/lib/timelineMergeRules";
 import {
   mapGrowEventsToRecentRawEntries,
   type GrowEventRowForRecent,
@@ -109,10 +127,17 @@ function manualCompanion(overrides: Partial<DiaryStateRow> = {}): DiaryStateRow 
   };
 }
 
-/** Mirror of the Timeline recentLaneRawEntries memo, using the real helpers. */
+/**
+ * Mirror of the Timeline recentLaneRawEntries memo, using the real helpers.
+ * `growEvents` mirrors the primary, is_deleted-filtered page; the optional
+ * `supplementalGrowEvents` mirrors Timeline's separate by-id lookup for
+ * grow_event ids a loaded diary companion references but the primary page
+ * doesn't include (deleted, or simply outside its own date/limit bound).
+ */
 function buildRecentLane(
   entries: readonly DiaryStateRow[],
   growEvents: readonly GrowEventRowForRecent[],
+  supplementalGrowEvents: readonly GrowEventRowForRecent[] = [],
 ): Array<Record<string, unknown>> {
   const diaryInputs = entries.map((e) => {
     const details = (e.details ?? null) as Record<string, unknown> | null;
@@ -137,9 +162,17 @@ function buildRecentLane(
       linked_grow_event_id,
     };
   });
+  const growEventsForCollapse =
+    supplementalGrowEvents.length === 0
+      ? growEvents
+      : (() => {
+          const seen = new Set(growEvents.map((row) => row.id));
+          const extra = supplementalGrowEvents.filter((row) => !seen.has(row.id));
+          return extra.length > 0 ? [...growEvents, ...extra] : growEvents;
+        })();
   const collapsed = collapseQuickLogSaveFanOut({
     diaryEntries: diaryInputs,
-    growEvents,
+    growEvents: growEventsForCollapse,
   });
   const merged = mergeTimelineSources({
     diaryEntries: collapsed.diaryEntries,
@@ -324,6 +357,55 @@ describe("Timeline.tsx — fan-out collapse wire-up", () => {
   it("re-attaches dropped companion details to the surviving spine row", () => {
     expect(TIMELINE_SRC).toMatch(/droppedCompanionsBySpineId/);
   });
+
+  it("keeps the primary grow_events page is_deleted-filtered (Codex/Copilot review round 2)", () => {
+    // The visible-event page (its 100-row budget and the growEvents.length
+    // UI-copy gates) must never show or be displaced by tombstones. Reverting
+    // this filter was tried and reviewed off in round 1 — deleted-parent
+    // resolution now happens via the supplemental by-id lookup below instead.
+    const growEventsQueryChain = TIMELINE_SRC.match(
+      /let growEventsQuery = supabase[\s\S]*?\.limit\(100\);/,
+    );
+    expect(growEventsQueryChain).not.toBeNull();
+    expect(growEventsQueryChain![0]).toMatch(/\.eq\(\s*"is_deleted",\s*false\s*\)/);
+  });
+
+  it("resolves referenced-but-missing linked grow_event ids via a supplemental by-id lookup", () => {
+    expect(TIMELINE_SRC).toMatch(
+      /import\s*\{[^}]*findMissingLinkedGrowEventIds[^}]*\}\s*from\s*["']@\/lib\/timelineMergeRules["']/,
+    );
+    expect(TIMELINE_SRC).toMatch(
+      /const missingLinkedGrowEventIds = findMissingLinkedGrowEventIds\(\{\s*diaryEntries\s*:/,
+    );
+    expect(TIMELINE_SRC).toMatch(/growEvents:\s*nextGrowEvents,\s*\}\);/);
+
+    // The supplemental fetch itself: exact-id lookup, no is_deleted filter
+    // (an id lookup has no window to fall outside of) and no date bound.
+    const supplementalFetch = TIMELINE_SRC.match(
+      /const linkedResult = await supabase[\s\S]*?\.in\(\s*"id",\s*missingLinkedGrowEventIds\s*\)\s*;/,
+    );
+    expect(supplementalFetch).not.toBeNull();
+    expect(supplementalFetch![0]).not.toMatch(/is_deleted/);
+    expect(supplementalFetch![0]).toMatch(/\.from\(\s*"grow_events"\s*\)/);
+    expect(TIMELINE_SRC).toMatch(/setSupplementalLinkedGrowEvents/);
+  });
+
+  it("feeds the supplemental lookup into the collapse input, not into the primary growEvents", () => {
+    const collapseCall = TIMELINE_SRC.match(/collapseQuickLogSaveFanOut\s*\(\s*\{[\s\S]*?\}\s*\)/);
+    expect(collapseCall).not.toBeNull();
+    expect(collapseCall![0]).toMatch(/growEvents:\s*growEventsForCollapse/);
+    expect(TIMELINE_SRC).toMatch(/const growEventsForCollapse\s*=/);
+  });
+
+  it("keeps the growEvents.length UI-copy gates and evidence-window checks on the plain, filtered growEvents state (Codex/Copilot review round 2)", () => {
+    // Both reviewers flagged that a page containing only tombstones must not
+    // make the UI claim Quick Log activity is visible. Guarded here by
+    // requiring every `growEvents.length` / `growEvents.map` site to read
+    // the plain state, never the supplemental-augmented growEventsForCollapse.
+    const rawGrowEventsSites = TIMELINE_SRC.match(/\bgrowEvents\.(length|map)\b/g) ?? [];
+    expect(rawGrowEventsSites.length).toBeGreaterThan(0);
+    expect(TIMELINE_SRC).not.toMatch(/growEventsForCollapse\.(length|map)\b/);
+  });
 });
 
 describe("recent lane end-to-end (audit #9/#10 regression)", () => {
@@ -399,12 +481,13 @@ describe("recent lane end-to-end (audit #9/#10 regression)", () => {
     expect(rendered.details?.linked_grow_event_id).toBe("ge-symptom-check-parent");
   });
 
-  it("does not resurrect a grower-deleted parent's companion (Codex/Copilot review regression)", () => {
-    // Timeline.tsx's grow_events query deliberately does NOT filter
-    // is_deleted server-side (see the comment above that query) precisely so
-    // this case is distinguishable from the "never fetched" case above: the
-    // deleted parent IS present in this read, so its companion must stay
-    // dropped rather than render as a resurrected standalone activity.
+  it("does not resurrect a grower-deleted parent's companion once it is resolved into the collapse input (Codex/Copilot review round 1)", () => {
+    // Whatever fetch produced this deleted row — Timeline's primary page or
+    // (in production) its supplemental by-id lookup below — the collapse
+    // itself must treat a present-but-deleted parent as known gone, not
+    // "never fetched". This is the pure-function half of the contract;
+    // the "was it actually resolved into the input" half is covered by the
+    // Timeline.tsx wire-up tests and the end-to-end test below.
     const deletedParent = wateringSpine({ id: "ge-deleted-parent", is_deleted: true });
     const companion = manualCompanion({
       id: "de-deleted-parent-companion",
@@ -412,5 +495,90 @@ describe("recent lane end-to-end (audit #9/#10 regression)", () => {
     });
     const lane = buildRecentLane([companion], [deletedParent]);
     expect(lane).toEqual([]);
+  });
+
+  it("resolves a deleted parent that falls outside the primary page's own window via the supplemental lookup (Codex/Copilot review round 2)", () => {
+    // The deeper case both reviewers flagged: Timeline's grow_events page is
+    // is_deleted-filtered AND capped/date-bounded, so a deleted (or merely
+    // out-of-window) parent is absent from the primary fetch for a reason
+    // that has nothing to do with is_deleted — a bare `.eq("is_deleted",
+    // false)` removal doesn't help here. The primary page below is non-empty
+    // (has real, unrelated activity) but genuinely lacks the referenced
+    // parent; only the supplemental by-id lookup resolves it.
+    const unrelatedRealActivity = wateringSpine({ id: "ge-unrelated", occurred_at: T });
+    const outOfWindowDeletedParent = wateringSpine({
+      id: "ge-out-of-window-deleted",
+      occurred_at: "2026-06-01T00:00:00.000Z",
+      is_deleted: true,
+    });
+    const companion = manualCompanion({
+      id: "de-out-of-window-companion",
+      details: {
+        event_type: "observation",
+        linked_grow_event_id: "ge-out-of-window-deleted",
+      },
+    });
+
+    const missing = findMissingLinkedGrowEventIds({
+      diaryEntries: [companion],
+      growEvents: [unrelatedRealActivity],
+    });
+    expect(missing).toEqual(["ge-out-of-window-deleted"]);
+
+    // Without the supplemental resolution, the primary page's absence alone
+    // is indistinguishable from "never fetched" and wrongly resurrects it.
+    const withoutSupplemental = buildRecentLane([companion], [unrelatedRealActivity]);
+    expect(withoutSupplemental.map((e) => (e as { id?: unknown }).id)).toEqual([
+      "ge-unrelated",
+      "de-out-of-window-companion",
+    ]);
+
+    // With the supplemental lookup resolving exactly the missing id, the
+    // deleted parent is now visible to the collapse and correctly known gone.
+    const withSupplemental = buildRecentLane(
+      [companion],
+      [unrelatedRealActivity],
+      [outOfWindowDeletedParent],
+    );
+    expect(withSupplemental.map((e) => (e as { id?: unknown }).id)).toEqual(["ge-unrelated"]);
+  });
+});
+
+describe("findMissingLinkedGrowEventIds (pure)", () => {
+  it("returns linked ids absent from growEvents, deduplicated and sorted", () => {
+    const result = findMissingLinkedGrowEventIds({
+      diaryEntries: [
+        { id: "d1", details: { linked_grow_event_id: "ge-b" } },
+        { id: "d2", details: { linked_grow_event_id: "ge-a" } },
+        { id: "d3", details: { linked_grow_event_id: "ge-b" } },
+        { id: "d4", details: { grow_event_id: "ge-fetched" } },
+      ],
+      growEvents: [{ id: "ge-fetched" }],
+    });
+    expect(result).toEqual(["ge-a", "ge-b"]);
+  });
+
+  it("returns an empty array when nothing is missing or nothing is linked", () => {
+    expect(
+      findMissingLinkedGrowEventIds({
+        diaryEntries: [{ id: "d1", details: {} }],
+        growEvents: [],
+      }),
+    ).toEqual([]);
+    expect(
+      findMissingLinkedGrowEventIds({
+        diaryEntries: [{ id: "d1", details: { linked_grow_event_id: "ge-1" } }],
+        growEvents: [{ id: "ge-1" }],
+      }),
+    ).toEqual([]);
+  });
+
+  it("ignores malformed rows without throwing", () => {
+    expect(
+      findMissingLinkedGrowEventIds({
+        diaryEntries: [null, undefined, { id: "d1", details: null }] as never,
+        growEvents: [null, undefined] as never,
+      }),
+    ).toEqual([]);
   });
 });

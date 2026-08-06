@@ -115,7 +115,11 @@ import {
   type GrowEventRowForRecent,
 } from "@/lib/growEventToDiaryRawEntry";
 import { ROOT_ZONE_GROW_EVENT_SELECT } from "@/lib/rootZoneObservationRules";
-import { collapseQuickLogSaveFanOut, mergeTimelineSources } from "@/lib/timelineMergeRules";
+import {
+  collapseQuickLogSaveFanOut,
+  findMissingLinkedGrowEventIds,
+  mergeTimelineSources,
+} from "@/lib/timelineMergeRules";
 import { buildTimelineLocalDateRangeBounds } from "@/lib/timelineDateRangeRules";
 import {
   deriveTimelineEventTypeOptions,
@@ -347,6 +351,15 @@ export default function Timeline() {
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [growEvents, setGrowEvents] = useState<GrowEventRowForRecent[]>([]);
   const [growEventsTotal, setGrowEventsTotal] = useState<number | null>(null);
+  // Deleted or out-of-page grow_event parents that a loaded diary companion
+  // references (details.linked_grow_event_id). Resolved separately from the
+  // primary `growEvents` page so collapseQuickLogSaveFanOut can tell "known
+  // deleted" apart from "never fetched" without deleted rows ever competing
+  // for the primary page's 100-row budget or the growEvents.length UI-copy
+  // gates below. Never rendered directly — feeds only the recent-lane merge.
+  const [supplementalLinkedGrowEvents, setSupplementalLinkedGrowEvents] = useState<
+    GrowEventRowForRecent[]
+  >([]);
   const [actionEvents, setActionEvents] = useState<ActionQueueEvent[]>([]);
   const [alertEvents, setAlertEvents] = useState<AlertEventRow[]>([]);
 
@@ -505,6 +518,7 @@ export default function Timeline() {
       setEntriesTotal(null);
       setGrowEvents([]);
       setGrowEventsTotal(null);
+      setSupplementalLinkedGrowEvents([]);
       setActionEvents([]);
       setAlertEvents([]);
       setPartialReadSources([]);
@@ -523,6 +537,7 @@ export default function Timeline() {
       setEntriesTotal(null);
       setGrowEvents([]);
       setGrowEventsTotal(null);
+      setSupplementalLinkedGrowEvents([]);
       setActionEvents([]);
       setAlertEvents([]);
       setPartialReadSources([]);
@@ -573,17 +588,17 @@ export default function Timeline() {
       });
       const paths = [...new Set(privatePhotoPathById.values())];
 
-      // Deliberately NOT filtered by is_deleted here: collapseQuickLogSaveFanOut
-      // (below) needs to see a deleted parent's id to know its diary companion
-      // is legitimately gone rather than merely outside this fetch, so it can
-      // tell "known deleted — do not resurrect" apart from "never fetched —
-      // render standalone". Every reader of this `growEvents` array already
-      // filters is_deleted itself (mergeTimelineSources, recentRawEntries
-      // mapping), so a deleted row still never renders.
+      // Filtered by is_deleted here so the visible-event page (its 100-row
+      // budget, and growEvents.length UI-copy gates below) never shows or
+      // gets displaced by tombstones. A diary companion can still reference
+      // a deleted (or merely out-of-window) parent that this bounded page
+      // doesn't include; that gap is closed by the small supplemental
+      // by-id lookup below, not by widening this query.
       let growEventsQuery = supabase
         .from("grow_events")
         .select(ROOT_ZONE_GROW_EVENT_SELECT, { count: "exact" })
         .eq("grow_id", activeGrowId)
+        .eq("is_deleted", false)
         .order("occurred_at", { ascending: false })
         .limit(100);
       if (timelineDateRangeBounds.startIso)
@@ -616,6 +631,49 @@ export default function Timeline() {
       };
 
       const supplementalTasks: Promise<void>[] = [];
+
+      // A loaded diary companion can reference a grow_event parent this
+      // exact page's `growEvents` fetch doesn't include — deleted (filtered
+      // by is_deleted above) or simply outside this page's own date/limit
+      // bound while the independently-bounded diary fetch still includes
+      // the companion. Resolve exactly those referenced-but-missing ids by
+      // id (no is_deleted or date filter — an exact-id lookup has no
+      // window to fall outside of) so collapseQuickLogSaveFanOut can tell
+      // "known gone" apart from "never fetched" instead of guessing from a
+      // primary page that was never meant to be exhaustive.
+      const missingLinkedGrowEventIds = findMissingLinkedGrowEventIds({
+        diaryEntries: coreRows.map((row) => ({
+          id: row.id,
+          details: (row.details ?? null) as Record<string, unknown> | null,
+        })),
+        growEvents: nextGrowEvents,
+      });
+      if (missingLinkedGrowEventIds.length > 0) {
+        supplementalTasks.push(
+          (async () => {
+            try {
+              const linkedResult = await supabase
+                .from("grow_events")
+                .select(ROOT_ZONE_GROW_EVENT_SELECT)
+                .eq("grow_id", activeGrowId)
+                .in("id", missingLinkedGrowEventIds);
+              if (!isCurrentRequest()) return;
+              if (linkedResult.error || !Array.isArray(linkedResult.data)) {
+                markPartial("linked_grow_events");
+                return;
+              }
+              setSupplementalLinkedGrowEvents(
+                linkedResult.data as unknown as GrowEventRowForRecent[],
+              );
+            } catch {
+              markPartial("linked_grow_events");
+            }
+          })(),
+        );
+      } else {
+        setSupplementalLinkedGrowEvents([]);
+      }
+
       if (paths.length > 0) {
         supplementalTasks.push(
           (async () => {
@@ -1030,9 +1088,24 @@ export default function Timeline() {
     // companion). Collapse that write topology before the merge so the
     // calendar, recent lane, and history panels count each save exactly once
     // (live audit #9/#10). Companion-only details are re-attached below.
+    //
+    // Fold in supplementalLinkedGrowEvents (deleted/out-of-page parents a
+    // loaded companion references) so the collapse can tell "known gone"
+    // apart from "never fetched" — see the CALLER CONTRACT on
+    // collapseQuickLogSaveFanOut. `growEvents` itself stays untouched for
+    // every other reader (the UI-copy gates and evidence-window checks
+    // below must reflect only the real, visible page).
+    const growEventsForCollapse =
+      supplementalLinkedGrowEvents.length === 0
+        ? growEvents
+        : (() => {
+            const seen = new Set(growEvents.map((row) => row.id));
+            const extra = supplementalLinkedGrowEvents.filter((row) => !seen.has(row.id));
+            return extra.length > 0 ? [...growEvents, ...extra] : growEvents;
+          })();
     const collapsed = collapseQuickLogSaveFanOut({
       diaryEntries: diaryInputs,
-      growEvents,
+      growEvents: growEventsForCollapse,
     });
     const merged = mergeTimelineSources({
       diaryEntries: collapsed.diaryEntries,
@@ -1073,7 +1146,7 @@ export default function Timeline() {
       }
     }
     return out;
-  }, [entries, growEvents]);
+  }, [entries, growEvents, supplementalLinkedGrowEvents]);
 
   const symptomEvidenceByEntryId = useMemo(() => {
     const result = new Map<string, NonNullable<ReturnType<typeof buildSymptomEvidenceChecklist>>>();

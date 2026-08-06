@@ -165,7 +165,7 @@ function normalizeGrowEventRow(row: GrowEventRowInput): MergedTimelineEntry {
   };
 }
 
-function pickLogicalGrowEventLink(row: DiaryEntryRowInput): string | null {
+export function pickLogicalGrowEventLink(row: DiaryEntryRowInput): string | null {
   const details = row.details ?? null;
   const candidates = [
     row.linked_grow_event_id,
@@ -232,16 +232,31 @@ function compareMergedEntries(a: MergedTimelineEntry, b: MergedTimelineEntry): n
 // wrong scope) is treated as "known gone" and must not resurrect a second
 // activity.
 //
-// CALLER CONTRACT: `growEvents` must include soft-deleted rows (do not
-// filter `is_deleted` at the query layer before calling this helper).
-// Absence from `growEvents` is this function's ONLY signal that a linked
-// parent was never fetched; if a caller pre-filters deleted rows server-side,
-// a grower-deleted parent becomes indistinguishable from "outside the
-// window" and its companion is wrongly resurrected as a standalone entry.
-// `growEvents`/`diaryEntries` output and `mapGrowEventsToRecentRawEntries`
-// already drop `is_deleted` rows before anything renders, so passing
-// deleted rows through here is safe — they inform this decision without
-// ever reaching the screen.
+// CALLER CONTRACT: to correctly resolve every linked/paired companion this
+// function's `growEvents` input must include a row for every grow_event id
+// referenced by `diaryEntries` — deleted or not, and regardless of whichever
+// query page/window/limit the caller's primary fetch used. Absence from
+// `growEvents` is this function's ONLY signal that a parent was never
+// fetched at all; anything short of that full-coverage contract (a bare
+// `.eq("is_deleted", false)` filter, but *also* a page/limit/date-bound that
+// can legitimately exclude a real parent while its companion's own,
+// independently-bounded fetch still includes the companion) makes a known
+// parent indistinguishable from "outside the window", and its companion is
+// wrongly resurrected as a standalone entry. `findMissingLinkedGrowEventIds`
+// (below) tells a caller exactly which ids its primary fetch is missing, so
+// it can resolve them with a small supplemental by-id lookup before calling
+// this function.
+//
+// This function's OWN `growEvents` OUTPUT still contains `is_deleted` rows
+// verbatim — the loop below only removes rows that fail the manual-save
+// dedupe's own contract (same-instant environment siblings, exact
+// duplicates), not deleted ones. Deleted rows never reach the screen only
+// because every downstream consumer filters them independently:
+// `mergeTimelineSources` (`row.is_deleted === true → continue`) and
+// `mapGrowEventsToRecentRawEntries` (`row.is_deleted !== true` in its own
+// filter). A future caller that reads this function's `growEvents` output
+// directly, bypassing both of those, would need to filter `is_deleted`
+// itself before rendering.
 
 export interface CollapseQuickLogSaveFanOutResult<
   D extends DiaryEntryRowInput,
@@ -251,6 +266,33 @@ export interface CollapseQuickLogSaveFanOutResult<
   growEvents: G[];
   /** Companion diary rows removed by the collapse, keyed by surviving spine id. */
   droppedCompanionsBySpineId: Map<string, D[]>;
+}
+
+/**
+ * The grow_event ids `diaryEntries` reference (via `linked_grow_event_id` /
+ * `grow_event_id`) that are absent from the already-fetched `growEvents`.
+ * A caller should resolve these with a small supplemental by-id lookup
+ * (deleted or not, ignoring whatever page/window/limit the primary
+ * `growEvents` fetch used) and fold the result into `growEvents` before
+ * calling `collapseQuickLogSaveFanOut` — see the CALLER CONTRACT above.
+ * Pure; returns a stable-sorted, deduplicated id list.
+ */
+export function findMissingLinkedGrowEventIds<
+  D extends DiaryEntryRowInput,
+  G extends GrowEventRowInput,
+>(input: { diaryEntries: ReadonlyArray<D>; growEvents: ReadonlyArray<G> }): string[] {
+  const fetchedIds = new Set(
+    (input.growEvents ?? [])
+      .map((row) => (row && typeof row.id === "string" ? row.id : null))
+      .filter((id): id is string => id !== null),
+  );
+  const missing = new Set<string>();
+  for (const row of input.diaryEntries ?? []) {
+    if (!row) continue;
+    const link = pickLogicalGrowEventLink(row);
+    if (link && !fetchedIds.has(link)) missing.add(link);
+  }
+  return [...missing].sort();
 }
 
 function fanOutEpochMs(primary: unknown, fallback: unknown): number | null {

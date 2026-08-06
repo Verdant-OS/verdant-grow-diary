@@ -34,6 +34,7 @@ import {
   Routes,
   useLocation,
   useNavigate,
+  useSearchParams,
 } from "../lib/react-router-compat";
 
 /**
@@ -139,6 +140,7 @@ describe("react-router-compat fragment handling (real product shim)", () => {
       mounts.count += 1;
     }, []);
     const nav = useNavigate();
+    const [, setSearchParams] = useSearchParams();
     return (
       <div data-testid="workspace-page">
         <Link to="/hunts/55/workspace#notes" data-testid="fragment-link">
@@ -151,11 +153,25 @@ describe("react-router-compat fragment handling (real product shim)", () => {
         >
           navigate with fragment
         </button>
+        <button
+          type="button"
+          data-testid="combined-nav-button"
+          onClick={() => nav("/hunts/55/workspace?growId=g-1#notes")}
+        >
+          navigate with query and fragment
+        </button>
+        <button
+          type="button"
+          data-testid="set-search-button"
+          onClick={() => setSearchParams({ view: "keepers" })}
+        >
+          set search
+        </button>
       </div>
     );
   }
 
-  function buildWorkspaceRouter() {
+  function buildWorkspaceRouter(entries: string[] = ["/hunts/55/workspace"]) {
     const rootRoute = createRootRoute({ component: () => <Outlet /> });
     const workspaceRoute = createRoute({
       getParentRoute: () => rootRoute,
@@ -164,7 +180,7 @@ describe("react-router-compat fragment handling (real product shim)", () => {
     });
     return createRouter({
       routeTree: rootRoute.addChildren([workspaceRoute]),
-      history: createMemoryHistory({ initialEntries: ["/hunts/55/workspace"] }),
+      history: createMemoryHistory({ initialEntries: entries }),
     });
   }
 
@@ -189,6 +205,55 @@ describe("react-router-compat fragment handling (real product shim)", () => {
       expect(options.to).not.toContain("#");
       expect(options.hash).toBe("notes");
     });
+  });
+
+  it("splits a combined query + fragment target into to / search / hash", async () => {
+    // Production shape: symptomEvidenceChecklistRules builds
+    // `/timeline?growId=<id>#timeline-entry-<x>` (timelinePath + anchor) and
+    // hands it to a compat Link. Splitting only the fragment would still
+    // leave `?growId=...` inside `to`, which buildLocation folds into the
+    // pathname with an EMPTY search object — the same polluted committed
+    // state, one layer down.
+    const router = buildWorkspaceRouter();
+    const navigateSpy = vi.spyOn(router, "navigate");
+    render(<RouterProvider router={router} />);
+    fireEvent.click(await screen.findByTestId("combined-nav-button"));
+
+    await waitFor(() => {
+      const calls = navigateSpy.mock.calls.filter((call) => {
+        const options = call[0] as { to?: string } | undefined;
+        return typeof options?.to === "string" && options.to.startsWith("/hunts");
+      });
+      expect(calls).toHaveLength(1);
+      const options = calls[0]?.[0] as {
+        to?: string;
+        search?: Record<string, string>;
+        hash?: string;
+      };
+      expect(options.to).toBe("/hunts/55/workspace");
+      expect(options.to).not.toContain("?");
+      expect(options.to).not.toContain("#");
+      expect(options.search).toEqual({ growId: "g-1" });
+      expect(options.hash).toBe("notes");
+    });
+  });
+
+  it("useSearchParams setter changes search, preserves the hash, keeps pathname clean", async () => {
+    // Third fragment path (Copilot #755): starting on a hashed location, the
+    // setter must not fold the new query into `to` and must carry the
+    // grower's current anchor across the update.
+    const router = buildWorkspaceRouter(["/hunts/55/workspace#notes"]);
+    render(<RouterProvider router={router} />);
+    await screen.findByTestId("workspace-page");
+
+    fireEvent.click(await screen.findByTestId("set-search-button"));
+
+    await waitFor(() => {
+      expect(router.state.location.searchStr).toContain("view=keepers");
+    });
+    expect(router.state.location.pathname).toBe("/hunts/55/workspace");
+    expect(router.state.location.pathname).not.toContain("?");
+    expect(router.state.location.hash).toBe("notes");
   });
 
   it("clicking a same-page fragment Link commits a clean pathname + hash, no remount, no loop", async () => {

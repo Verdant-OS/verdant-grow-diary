@@ -160,14 +160,25 @@ function flattenTo(to: CompatTo): string {
   return `${to.pathname ?? ""}${search}${hash}`;
 }
 
-// Mirrors the product shim: TanStack reads fragments only from its dedicated
-// `hash` option; a '#' left inside `to` rides into the committed pathname.
-function toTanStackTarget(path: string): { to: string; hash?: string } {
+// Mirrors the product shim: TanStack reads the query from `search` and the
+// fragment from `hash`; buildLocation re-splits neither out of `to`, so a '?'
+// or '#' left inside `to` rides into the committed pathname.
+function toTanStackTarget(path: string): {
+  to: string;
+  search?: Record<string, string>;
+  hash?: string;
+} {
   const hashIndex = path.indexOf("#");
-  if (hashIndex === -1) return { to: path };
+  const hash = hashIndex === -1 ? undefined : path.slice(hashIndex + 1);
+  const withoutHash = hashIndex === -1 ? path : path.slice(0, hashIndex);
+  const queryIndex = withoutHash.indexOf("?");
+  const pathname = queryIndex === -1 ? withoutHash : withoutHash.slice(0, queryIndex);
+  const query = queryIndex === -1 ? "" : withoutHash.slice(queryIndex + 1);
+  const search = query ? Object.fromEntries(new URLSearchParams(query)) : undefined;
   return {
-    to: hashIndex === 0 ? "." : path.slice(0, hashIndex),
-    hash: path.slice(hashIndex + 1),
+    to: pathname === "" ? "." : pathname,
+    ...(search ? { search } : {}),
+    ...(hash !== undefined ? { hash } : {}),
   };
 }
 
@@ -195,6 +206,7 @@ export function useNavigate(): CompatNavigateFunction {
       const target = toTanStackTarget(flattenTo(to));
       void navigate({
         to: target.to,
+        ...(target.search !== undefined ? { search: target.search } : {}),
         ...(target.hash !== undefined ? { hash: target.hash } : {}),
         replace: options?.replace ?? false,
         ...(options?.state !== undefined ? { state: options.state as never } : {}),
@@ -223,6 +235,7 @@ export const Link = forwardRef<HTMLAnchorElement, CompatLinkProps>(function Link
     <TanStackLink
       ref={ref}
       to={target.to as never}
+      {...(target.search !== undefined ? { search: target.search as never } : {})}
       {...(target.hash !== undefined ? { hash: target.hash } : {})}
       replace={replace ?? false}
       {...(state !== undefined ? { state: state as never } : {})}
@@ -323,7 +336,8 @@ export function useSearchParams(): [URLSearchParams, CompatSetSearchParams] {
     const { pathname, hash } = selectCommittedLocation(router.state);
     const normalizedHash = hash ? hash.replace(/^#/, "") : undefined;
     void router.navigate({
-      to: `${pathname}${serialized ? `?${serialized}` : ""}` as never,
+      to: pathname as never,
+      search: (serialized ? Object.fromEntries(new URLSearchParams(serialized)) : {}) as never,
       ...(normalizedHash ? { hash: normalizedHash } : {}),
       replace: options?.replace ?? false,
       resetScroll: options?.preventScrollReset !== true,

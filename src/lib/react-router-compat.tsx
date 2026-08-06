@@ -133,19 +133,37 @@ function flattenTo(to: CompatTo): string {
 /**
  * Split a react-router-style path string into TanStack navigation options.
  *
- * TanStack reads fragments only from the separate `hash` option; a `#` left
- * inside `to` rides into the COMMITTED pathname (`buildLocation` never
- * re-splits it), so `/hunts/55/workspace#notes` pollutes router state — the
- * page "works" only because the history layer happens to re-parse the pushed
- * href at `#` on commit. A bare-fragment string (`#notes`) targets the
- * current route (`.`), matching react-router semantics.
+ * TanStack reads the query from its `search` option and the fragment from its
+ * `hash` option — `buildLocation` re-splits NEITHER out of `to`. It composes
+ * the final URL as `pathname + stringifySearch(search) + hash`, so any `?` or
+ * `#` left inside `to` rides into the COMMITTED pathname (e.g.
+ * `/timeline?growId=x#entry` commits pathname `/timeline?growId=x` with an
+ * empty search object). Pages appear to work only because the history layer
+ * re-parses the pushed href, but every reader of `location.pathname` /
+ * `location.search` sees the polluted state in flight.
+ *
+ * Bare `?a=b` / `#frag` strings target the current route (`.`), matching
+ * react-router. Search is parsed flat (`URLSearchParams`); repeated keys keep
+ * the last value, which matches every call site in this app.
  */
-function toTanStackTarget(path: string): { to: string; hash?: string } {
+function toTanStackTarget(path: string): {
+  to: string;
+  search?: Record<string, string>;
+  hash?: string;
+} {
   const hashIndex = path.indexOf("#");
-  if (hashIndex === -1) return { to: path };
+  const hash = hashIndex === -1 ? undefined : path.slice(hashIndex + 1);
+  const withoutHash = hashIndex === -1 ? path : path.slice(0, hashIndex);
+
+  const queryIndex = withoutHash.indexOf("?");
+  const pathname = queryIndex === -1 ? withoutHash : withoutHash.slice(0, queryIndex);
+  const query = queryIndex === -1 ? "" : withoutHash.slice(queryIndex + 1);
+  const search = query ? Object.fromEntries(new URLSearchParams(query)) : undefined;
+
   return {
-    to: hashIndex === 0 ? "." : path.slice(0, hashIndex),
-    hash: path.slice(hashIndex + 1),
+    to: pathname === "" ? "." : pathname,
+    ...(search ? { search } : {}),
+    ...(hash !== undefined ? { hash } : {}),
   };
 }
 
@@ -172,6 +190,7 @@ export function useNavigate(): CompatNavigateFunction {
       const target = toTanStackTarget(flattenTo(to));
       void navigate({
         to: target.to,
+        ...(target.search !== undefined ? { search: target.search } : {}),
         ...(target.hash !== undefined ? { hash: target.hash } : {}),
         replace: options?.replace ?? false,
         ...(options?.state !== undefined ? { state: options.state as never } : {}),
@@ -225,6 +244,7 @@ export const Link = forwardRef<HTMLAnchorElement, CompatLinkProps>(function Link
     <TanStackLink
       ref={ref}
       to={target.to as never}
+      {...(target.search !== undefined ? { search: target.search as never } : {})}
       {...(target.hash !== undefined ? { hash: target.hash } : {})}
       replace={replace ?? false}
       {...(state !== undefined ? { state: state as never } : {})}
@@ -357,10 +377,13 @@ export function useSearchParams(): [URLSearchParams, CompatSetSearchParams] {
     // target would move the wrong page's search params.
     const { pathname, hash } = selectCommittedLocation(router.state);
     const normalizedHash = hash ? hash.replace(/^#/, "") : undefined;
+    // Query AND fragment go in TanStack's dedicated options; inside `to` they
+    // would ride into the committed pathname (see toTanStackTarget). The
+    // fragment is carried over so changing a filter does not silently drop
+    // the grower's current anchor.
     void router.navigate({
-      to: `${pathname}${serialized ? `?${serialized}` : ""}` as never,
-      // Keep the fragment in TanStack's dedicated option — inside `to` it
-      // would ride into the committed pathname (see toTanStackTarget).
+      to: pathname as never,
+      search: (serialized ? Object.fromEntries(new URLSearchParams(serialized)) : {}) as never,
       ...(normalizedHash ? { hash: normalizedHash } : {}),
       replace: options?.replace ?? false,
       resetScroll: options?.preventScrollReset !== true,

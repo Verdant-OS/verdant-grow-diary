@@ -231,6 +231,17 @@ function compareMergedEntries(a: MergedTimelineEntry, b: MergedTimelineEntry): n
 // parent that WAS fetched and was excluded by the shared dedupe (deleted,
 // wrong scope) is treated as "known gone" and must not resurrect a second
 // activity.
+//
+// CALLER CONTRACT: `growEvents` must include soft-deleted rows (do not
+// filter `is_deleted` at the query layer before calling this helper).
+// Absence from `growEvents` is this function's ONLY signal that a linked
+// parent was never fetched; if a caller pre-filters deleted rows server-side,
+// a grower-deleted parent becomes indistinguishable from "outside the
+// window" and its companion is wrongly resurrected as a standalone entry.
+// `growEvents`/`diaryEntries` output and `mapGrowEventsToRecentRawEntries`
+// already drop `is_deleted` rows before anything renders, so passing
+// deleted rows through here is safe — they inform this decision without
+// ever reaching the screen.
 
 export interface CollapseQuickLogSaveFanOutResult<
   D extends DiaryEntryRowInput,

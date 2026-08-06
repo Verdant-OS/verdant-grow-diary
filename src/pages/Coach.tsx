@@ -25,7 +25,10 @@ import {
   type Diagnosis,
   type DiagnosisSuggestedAction,
 } from "@/lib/aiDoctorDiagnosisRules";
-import { ACTION_QUEUE_SOURCE_VALUES } from "@/lib/actionQueueProvenanceRules";
+import {
+  ACTION_QUEUE_SOURCE_VALUES,
+  stripBackPointerTokens,
+} from "@/lib/actionQueueProvenanceRules";
 import { persistAiDoctorSession } from "@/lib/aiDoctorSessionPersistence";
 import { harmonizeDiagnosisConfidence } from "@/lib/aiDoctorConfidenceRules";
 import { actionsPath } from "@/lib/routes";
@@ -95,6 +98,13 @@ export default function Coach() {
   const [creditDenial, setCreditDenial] = useState<AiCreditDenial | null>(null);
   const [upstreamCreditExhausted, setUpstreamCreditExhausted] = useState(false);
   const diagnosisSeqRef = useRef(0);
+  // Retains the in-flight session-persistence promise (tagged with its ask
+  // sequence) so alert-linked queue clicks can await the session id instead
+  // of racing the fire-and-forget insert.
+  const sessionPersistRef = useRef<{
+    seq: number;
+    promise: Promise<string | null>;
+  } | null>(null);
 
   // --- Optional alert-context prefill (`?alertId=...`) ---
   // Alert surfaces (e.g. the Plant Detail assigned-tent alerts panel) link
@@ -110,6 +120,16 @@ export default function Coach() {
   // into this ask. The validated alert's DB-stored scope (id, tent, plant)
   // is kept so the persisted session and queued suggestions can carry the
   // linkage; the nav param is never trusted for scope.
+  //
+  // Race discipline:
+  //  - Any previously bound context is cleared at the START of each lookup
+  //    (and when the param is absent/invalid), so a changed alert/grow can
+  //    never leave stale provenance behind.
+  //  - Context binds ONLY when the prefill is actually accepted into the
+  //    (still-empty) textarea — one transition, decided via questionRef, so
+  //    typed input never carries another alert's linkage.
+  //  - Ask buttons are disabled while the lookup is pending, so a credit
+  //    can never be spent on a blank/stale question mid-resolution.
   const [searchParams] = useSearchParams();
   const alertIdParam = searchParams.get(COACH_ALERT_ID_PARAM);
   const [alertContext, setAlertContext] = useState<{
@@ -117,28 +137,42 @@ export default function Coach() {
     tentId: string | null;
     plantId: string | null;
   } | null>(null);
+  const [alertLookupPending, setAlertLookupPending] = useState(false);
+  const questionRef = useRef("");
   useEffect(() => {
+    setAlertContext(null);
     const alertId = normalizeCoachAlertIdParam(alertIdParam);
-    if (!alertId || !activeGrowId) return;
+    if (!alertId || !activeGrowId) {
+      setAlertLookupPending(false);
+      return;
+    }
     let cancelled = false;
+    setAlertLookupPending(true);
     void getAlertById(alertId)
       .then((row) => {
-        if (cancelled || !row) return;
-        if (row.grow_id !== activeGrowId) return;
+        if (cancelled) return;
+        if (!row || row.grow_id !== activeGrowId) return;
         const prefill = buildCoachAlertPrefillQuestion({
           title: row.title,
           reason: row.reason,
         });
         if (!prefill) return;
+        // Accept the prefill only into an empty form; bind context in the
+        // same decision so linkage exists iff the prefill was applied.
+        if (questionRef.current.trim().length > 0) return;
+        questionRef.current = prefill;
+        setQuestion(prefill);
         setAlertContext({
           id: row.id,
           tentId: row.tent_id ?? null,
           plantId: row.plant_id ?? null,
         });
-        setQuestion((q) => (q.trim().length > 0 ? q : prefill));
       })
       .catch(() => {
         /* alert unavailable — leave the form untouched */
+      })
+      .finally(() => {
+        if (!cancelled) setAlertLookupPending(false);
       });
     return () => {
       cancelled = true;
@@ -201,7 +235,11 @@ export default function Coach() {
         action_type: "advisory",
         target_metric: "general",
         suggested_change: recommendation,
-        reason: analysis.likely_issue || analysis.summary || "AI Coach recommendation",
+        // Spoof guard: model-derived text could echo a valid-looking
+        // back-pointer token, which read surfaces would treat as linkage.
+        reason: stripBackPointerTokens(
+          analysis.likely_issue || analysis.summary || "AI Coach recommendation",
+        ),
         risk_level: risk,
         source: "ai_coach",
         status: "pending_approval",
@@ -259,6 +297,20 @@ export default function Coach() {
     const key = `${action.title}::${action.detail}`;
     if (doctorQueuedKeys.has(key)) return;
     const risk: "low" | "medium" | "high" = action.priority;
+    // Dual-token linkage: resolve the session id even when the
+    // fire-and-forget persistence hasn't landed yet — a fast queue click
+    // would otherwise race it and the saved-session back-link would never
+    // materialize. Persistence failure resolves null; the row then
+    // honestly carries no session token.
+    let sessionIdForToken: string | null = persistedSessionId;
+    const pendingPersist = sessionPersistRef.current;
+    if (
+      !sessionIdForToken &&
+      pendingPersist &&
+      pendingPersist.seq === diagnosisSeqRef.current
+    ) {
+      sessionIdForToken = await pendingPersist.promise.catch(() => null);
+    }
     const { data: inserted, error } = await supabase
       .from("action_queue")
       .insert({
@@ -279,7 +331,7 @@ export default function Coach() {
               diagnosis.likelyIssue ||
               diagnosis.summary ||
               "AI Doctor suggestion",
-            persistedSessionId,
+            sessionIdForToken,
           ),
           alertContext?.id ?? null,
         ),
@@ -325,6 +377,7 @@ export default function Coach() {
     if (!user) return;
     const seq = ++diagnosisSeqRef.current;
     setBusy(true); setResult(null); setPersistedSessionId(null);
+    sessionPersistRef.current = null;
     setCreditDenial(null); setUpstreamCreditExhausted(false);
     try {
       let photoUrl: string | undefined;
@@ -384,34 +437,42 @@ export default function Coach() {
                 contextSufficiency.confidenceCeiling,
               )
             : null;
-        // Fire-and-forget; we intentionally do not await before clearing busy.
-        void persistAiDoctorSession(supabase, {
-          growId: activeGrowId,
-          // Scope hints from the grow-validated source alert when this ask
-          // was seeded by one (DB-stored values, never the nav param).
-          tentId: alertContext?.tentId ?? null,
-          plantId: alertContext?.plantId ?? null,
-          question: question.trim() || null,
-          analysis: d.analysis ?? null,
-          diagnosis: sanitized,
-          rawConfidence: rawConf,
-          displayedConfidence: harmonized?.displayedConfidence ?? null,
-          contextConfidenceCeiling: contextSufficiency.confidenceCeiling ?? null,
-          contextSufficiency,
-        }).then((res) => {
-          if (res.ok) {
-            // Only apply the persisted id if this diagnosis is still the
-            // most recent one rendered. Prevents an older request's id
-            // from attaching to a newer diagnosis.
-            if (seq === diagnosisSeqRef.current && res.id) {
-              setPersistedSessionId(res.id);
+        // Fire-and-forget for rendering (busy clears without awaiting), but
+        // the promise is retained so an alert-linked queue click can await
+        // the session id instead of racing this insert.
+        sessionPersistRef.current = {
+          seq,
+          promise: persistAiDoctorSession(supabase, {
+            growId: activeGrowId,
+            // Scope hints from the grow-validated source alert when this ask
+            // was seeded by one (DB-stored values, never the nav param).
+            tentId: alertContext?.tentId ?? null,
+            plantId: alertContext?.plantId ?? null,
+            question: question.trim() || null,
+            analysis: d.analysis ?? null,
+            diagnosis: sanitized,
+            rawConfidence: rawConf,
+            displayedConfidence: harmonized?.displayedConfidence ?? null,
+            contextConfidenceCeiling: contextSufficiency.confidenceCeiling ?? null,
+            contextSufficiency,
+          }).then((res) => {
+            if (res.ok) {
+              // Only apply the persisted id if this diagnosis is still the
+              // most recent one rendered. Prevents an older request's id
+              // from attaching to a newer diagnosis.
+              if (seq === diagnosisSeqRef.current && res.id) {
+                setPersistedSessionId(res.id);
+              }
+              return res.id ?? null;
             }
-          } else if ("error" in res) {
-            toast.warning("Couldn't save this AI Doctor session for later review.", {
-              description: res.error,
-            });
-          }
-        });
+            if ("error" in res) {
+              toast.warning("Couldn't save this AI Doctor session for later review.", {
+                description: res.error,
+              });
+            }
+            return null;
+          }),
+        };
       }
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Coach failed");
@@ -526,13 +587,29 @@ export default function Coach() {
         />
 
 
-        <Textarea value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="Optional: ask a question, e.g. 'why are leaves curling?'" rows={2} />
+        <Textarea
+          value={question}
+          onChange={(e) => {
+            questionRef.current = e.target.value;
+            setQuestion(e.target.value);
+          }}
+          placeholder="Optional: ask a question, e.g. 'why are leaves curling?'"
+          rows={2}
+        />
 
         <div className="grid grid-cols-2 gap-2">
-          <Button onClick={() => ask("diagnose")} disabled={busy || !photoFile} className="gradient-leaf text-primary-foreground">
+          <Button
+            onClick={() => ask("diagnose")}
+            disabled={busy || !photoFile || alertLookupPending}
+            className="gradient-leaf text-primary-foreground"
+          >
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Wand2 className="h-4 w-4" />Diagnose photo</>}
           </Button>
-          <Button onClick={() => ask("next_steps")} disabled={busy || !activeGrowId} variant="secondary">
+          <Button
+            onClick={() => ask("next_steps")}
+            disabled={busy || !activeGrowId || alertLookupPending}
+            variant="secondary"
+          >
             What should I do next?
           </Button>
         </div>

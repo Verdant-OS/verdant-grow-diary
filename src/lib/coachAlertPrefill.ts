@@ -53,42 +53,58 @@ export function buildCoachAlertPrefillQuestion(
   return `Open alert: ${title}.${reasonPart} What should I check first?`;
 }
 
+function stripTokensOfKind(reason: string, kind: "alert" | "session"): string {
+  return reason
+    .replace(new RegExp(`\\s*\\[${kind}:[^\\]]*\\]`, "g"), " ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
 /**
- * Append the `[alert:<id>]` back-pointer token to an action_queue reason,
- * using the exact grammar `actionQueueProvenanceRules` extracts and the
- * same inline format the environment-alert writer uses
- * (`alertToActionQueueRules`). No-op when the id is missing/invalid or
- * the token is already present. The token is display-stripped everywhere
- * via `stripBackPointerTokens`, so it never reaches grower-facing copy.
+ * Make the trusted `[alert:<id>]` back-pointer token authoritative on an
+ * action_queue reason, using the exact grammar `actionQueueProvenanceRules`
+ * extracts and the same inline format the environment-alert writer uses
+ * (`alertToActionQueueRules`).
+ *
+ * SPOOF GUARD: the base reason is model-derived text, which could echo or
+ * forge a valid-looking token — and the extractors return the FIRST match,
+ * so a forged earlier token would win. Any pre-existing alert tokens are
+ * therefore ALWAYS stripped (even when no trusted id is available), and
+ * the validated id, when present, is appended as the only alert token.
+ * Tokens are display-stripped everywhere via `stripBackPointerTokens`, so
+ * they never reach grower-facing copy.
  */
 export function appendAlertBackPointerToken(
   reason: string,
   alertId: string | null | undefined,
 ): string {
+  const cleaned = stripTokensOfKind(reason, "alert");
   const id = normalizeCoachAlertIdParam(alertId ?? null);
-  if (!id) return reason;
+  if (!id) return cleaned;
   const token = `[alert:${id}]`;
-  if (reason.includes(token)) return reason;
-  return reason.trim().length > 0 ? `${reason} ${token}` : token;
+  return cleaned.length > 0 ? `${cleaned} ${token}` : token;
 }
 
 /**
- * Same append discipline for the `[session:<id>]` token (byte-identical
- * format to the session-detail writer in aiDoctorSessionToActionQueueRules,
- * which its dedupe keys on). With BOTH tokens on a queued suggestion, every
- * prepared read surface lights up: the Alerts-index linked-action badge,
- * AlertDetail's "View saved AI Doctor session" back-link (which extracts
- * the session id from alert-matched rows), and the session detail's
- * linked-alert section (which extracts the alert id from session-matched
- * rows). Extractors are order-independent.
+ * Same authoritative-append discipline for the `[session:<id>]` token
+ * (byte-identical format to the session-detail writer in
+ * aiDoctorSessionToActionQueueRules, which its dedupe keys on). Existing
+ * session tokens in the model-derived base are always stripped first —
+ * including when no trusted id is available — so read surfaces can never
+ * treat echoed model output as internal linkage metadata. With BOTH tokens
+ * on a queued suggestion, every prepared read surface lights up: the
+ * Alerts-index linked-action badge, AlertDetail's saved-session back-link
+ * (which extracts the session id from alert-matched rows), and the session
+ * detail's linked-alert section (which extracts the alert id from
+ * session-matched rows). Extractors are order-independent.
  */
 export function appendSessionBackPointerToken(
   reason: string,
   sessionId: string | null | undefined,
 ): string {
+  const cleaned = stripTokensOfKind(reason, "session");
   const id = normalizeCoachAlertIdParam(sessionId ?? null);
-  if (!id) return reason;
+  if (!id) return cleaned;
   const token = `[session:${id}]`;
-  if (reason.includes(token)) return reason;
-  return reason.trim().length > 0 ? `${reason} ${token}` : token;
+  return cleaned.length > 0 ? `${cleaned} ${token}` : token;
 }

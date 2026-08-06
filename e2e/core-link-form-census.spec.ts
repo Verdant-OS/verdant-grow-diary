@@ -38,6 +38,10 @@ import {
 
 const MOCKED_PROJECT = "chromium-mocked";
 const APP_ORIGIN = new URL(process.env.E2E_BASE_URL?.trim() || "http://localhost:5173").origin;
+// The exhaustive authenticated lane cold-boots the Vite-served app hundreds of
+// times. Late-lane boots can exceed 15 seconds on hosted runners even when the
+// route renders correctly; keep readiness bounded without dropping assertions.
+const APP_SHELL_READY_TIMEOUT_MS = 30_000;
 const PROJECT_REF = "knkwiiywfkbqznbxwqfh";
 const SESSION_KEY = `sb-${PROJECT_REF}-auth-token`;
 const USER_ID = "99999999-9999-4999-8999-999999999999";
@@ -1503,11 +1507,11 @@ async function assertMeaningfulPage(page: Page, expectedPath: string) {
   await expect(
     page.locator("main").first(),
     `${expectedPath} must finish the app-shell loading state`,
-  ).toBeVisible({ timeout: 15_000 });
+  ).toBeVisible({ timeout: APP_SHELL_READY_TIMEOUT_MS });
   await expect(
     page.getByText("Loading…", { exact: true }),
     `${expectedPath} must not remain on the global loading screen`,
-  ).toHaveCount(0, { timeout: 15_000 });
+  ).toHaveCount(0, { timeout: APP_SHELL_READY_TIMEOUT_MS });
   await expect(page.locator("body")).not.toContainText("Oops! Page not found");
   await expect(page.locator("body")).not.toContainText("Application error");
   await expect(page.locator("body")).not.toContainText("ChunkLoadError");

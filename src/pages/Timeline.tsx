@@ -573,11 +573,17 @@ export default function Timeline() {
       });
       const paths = [...new Set(privatePhotoPathById.values())];
 
+      // Deliberately NOT filtered by is_deleted here: collapseQuickLogSaveFanOut
+      // (below) needs to see a deleted parent's id to know its diary companion
+      // is legitimately gone rather than merely outside this fetch, so it can
+      // tell "known deleted — do not resurrect" apart from "never fetched —
+      // render standalone". Every reader of this `growEvents` array already
+      // filters is_deleted itself (mergeTimelineSources, recentRawEntries
+      // mapping), so a deleted row still never renders.
       let growEventsQuery = supabase
         .from("grow_events")
         .select(ROOT_ZONE_GROW_EVENT_SELECT, { count: "exact" })
         .eq("grow_id", activeGrowId)
-        .eq("is_deleted", false)
         .order("occurred_at", { ascending: false })
         .limit(100);
       if (timelineDateRangeBounds.startIso)

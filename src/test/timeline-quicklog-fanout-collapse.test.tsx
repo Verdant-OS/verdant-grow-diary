@@ -398,4 +398,19 @@ describe("recent lane end-to-end (audit #9/#10 regression)", () => {
     const rendered = lane[0] as { details?: { linked_grow_event_id?: unknown } };
     expect(rendered.details?.linked_grow_event_id).toBe("ge-symptom-check-parent");
   });
+
+  it("does not resurrect a grower-deleted parent's companion (Codex/Copilot review regression)", () => {
+    // Timeline.tsx's grow_events query deliberately does NOT filter
+    // is_deleted server-side (see the comment above that query) precisely so
+    // this case is distinguishable from the "never fetched" case above: the
+    // deleted parent IS present in this read, so its companion must stay
+    // dropped rather than render as a resurrected standalone activity.
+    const deletedParent = wateringSpine({ id: "ge-deleted-parent", is_deleted: true });
+    const companion = manualCompanion({
+      id: "de-deleted-parent-companion",
+      details: { event_type: "observation", linked_grow_event_id: "ge-deleted-parent" },
+    });
+    const lane = buildRecentLane([companion], [deletedParent]);
+    expect(lane).toEqual([]);
+  });
 });

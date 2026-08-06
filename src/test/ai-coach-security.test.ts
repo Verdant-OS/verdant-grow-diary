@@ -27,9 +27,18 @@ describe("ai-coach edge function — security shape", () => {
     expect(CODE).toMatch(/Deno\.env\.get\(\s*["']SUPABASE_ANON_KEY["']\s*\)/);
   });
 
-  it("never references SUPABASE_SERVICE_ROLE_KEY (no RLS bypass)", () => {
-    expect(CODE).not.toMatch(/SERVICE_ROLE/i);
-    expect(CODE).not.toMatch(/service_role/);
+  it("uses a service_role admin client ONLY for the server-only ai_credit_refund RPC (no general RLS bypass)", () => {
+    // Refund runs as service_role because ai_credit_refund is server-only — a
+    // client could otherwise self-refund a successful spend for unlimited free
+    // AI. That admin client is permitted ONLY for the refund RPC; all data
+    // reads/writes stay on the user-scoped `supabase` client (RLS-enforced).
+    const adminMembers = [...CODE.matchAll(/\bsupabaseAdmin\s*\.\s*([a-zA-Z_]+)/g)].map((m) => m[1]);
+    expect(adminMembers.length).toBeGreaterThan(0);
+    expect(adminMembers.every((m) => m === "rpc")).toBe(true);
+    const adminRpcs = [...CODE.matchAll(/\bsupabaseAdmin\s*\.\s*rpc\s*\(\s*["'`]([a-zA-Z0-9_]+)["'`]/g)].map((m) => m[1]);
+    expect(adminRpcs.every((n) => n === "ai_credit_refund")).toBe(true);
+    // The admin client must never be widened to table reads/writes.
+    expect(CODE).not.toMatch(/supabaseAdmin\s*\.\s*from\s*\(/);
   });
 
   it("forwards the caller Authorization header into the Supabase client", () => {

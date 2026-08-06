@@ -107,6 +107,14 @@ BEGIN
   -- Runs before per-user metering. A replay above returns early and is never
   -- counted (it does not consume fresh budget). Idempotency-replays therefore
   -- bypass the ceiling by design; only genuinely new spends are gated.
+  --
+  -- The hard_stop kill switch and the per-user caps below are EXACT. The daily
+  -- global ceiling is deliberately BEST-EFFORT: it is not serialized by a global
+  -- lock (that would serialize the entire AI hot path). Under concurrency the
+  -- realized daily total can overshoot the cap by up to (concurrent_callers-1) *
+  -- weight — an acceptable, generous backstop against runaway spend, not a hard
+  -- quota. Day boundary is pinned to UTC (parity with period_key) regardless of
+  -- session TimeZone.
   SELECT hard_stop, daily_global_weight_cap
     INTO v_breaker_stop, v_breaker_cap
     FROM public.ai_cost_circuit_breaker
@@ -118,7 +126,8 @@ BEGIN
   IF v_breaker_cap IS NOT NULL THEN
     SELECT COALESCE(SUM(weight), 0) INTO v_global_used
       FROM public.ai_credit_spends
-     WHERE weight > 0 AND created_at >= date_trunc('day', now());
+     WHERE weight > 0
+       AND created_at >= date_trunc('day', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC';
     IF v_global_used + v_weight > v_breaker_cap THEN
       RETURN jsonb_build_object('ok', false, 'status', 'denied',
         'reason', 'global_daily_ceiling',

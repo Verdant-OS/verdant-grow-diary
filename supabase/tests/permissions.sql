@@ -104,7 +104,7 @@ DECLARE
     'delete_email',           -- drop queued mail
     'move_to_dlq',            -- divert queued mail
     'email_queue_dispatch',   -- drive the mail pump
-    'allocate_founder_slot'   -- mint Founder Lifetime slots
+    'founder_seats_used'      -- reveal/allocate Founder Lifetime seat count
   ];
   fn TEXT; role_name TEXT; leaked BOOLEAN; svc BOOLEAN; n_defs INT;
 BEGIN

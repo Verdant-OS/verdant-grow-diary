@@ -18,9 +18,16 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   COACH_ALERT_ID_PARAM,
+  appendAlertBackPointerToken,
+  appendSessionBackPointerToken,
   buildCoachAlertPrefillQuestion,
   normalizeCoachAlertIdParam,
 } from "@/lib/coachAlertPrefill";
+import {
+  extractSourceAiDoctorSessionId,
+  extractSourceAlertId,
+  stripBackPointerTokens,
+} from "@/lib/actionQueueProvenanceRules";
 import { paywallCtaHasBannedWords } from "@/lib/paywallCtaViewModel";
 
 const ROOT = resolve(__dirname, "../..");
@@ -98,6 +105,53 @@ describe("buildCoachAlertPrefillQuestion", () => {
   });
 });
 
+describe("appendAlertBackPointerToken", () => {
+  it("appends the token in the exact grammar the extractors parse", () => {
+    const out = appendAlertBackPointerToken("Check intake temps", "alert-1");
+    expect(out).toBe("Check intake temps [alert:alert-1]");
+    expect(extractSourceAlertId(out)).toBe("alert-1");
+  });
+
+  it("is a no-op for missing or invalid ids", () => {
+    expect(appendAlertBackPointerToken("reason", null)).toBe("reason");
+    expect(appendAlertBackPointerToken("reason", undefined)).toBe("reason");
+    expect(appendAlertBackPointerToken("reason", "has space")).toBe("reason");
+    expect(appendAlertBackPointerToken("reason", "a".repeat(65))).toBe("reason");
+  });
+
+  it("is idempotent when the token is already present", () => {
+    const once = appendAlertBackPointerToken("reason", "a1");
+    expect(appendAlertBackPointerToken(once, "a1")).toBe(once);
+  });
+
+  it("handles an empty base reason", () => {
+    expect(appendAlertBackPointerToken("", "a1")).toBe("[alert:a1]");
+  });
+});
+
+describe("appendSessionBackPointerToken · dual-token composition", () => {
+  it("appends the byte-identical [session:<id>] format the session-detail dedupe keys on", () => {
+    const out = appendSessionBackPointerToken("Check intake temps", "sess-1");
+    expect(out).toBe("Check intake temps [session:sess-1]");
+    expect(extractSourceAiDoctorSessionId(out)).toBe("sess-1");
+  });
+
+  it("dual-token rows round-trip through BOTH extractors and strip cleanly", () => {
+    const composed = appendAlertBackPointerToken(
+      appendSessionBackPointerToken("Raise intake fan speed", "sess-1"),
+      "alert-1",
+    );
+    expect(extractSourceAiDoctorSessionId(composed)).toBe("sess-1");
+    expect(extractSourceAlertId(composed)).toBe("alert-1");
+    expect(stripBackPointerTokens(composed)).toBe("Raise intake fan speed");
+  });
+
+  it("no-ops on null/invalid session ids", () => {
+    expect(appendSessionBackPointerToken("reason", null)).toBe("reason");
+    expect(appendSessionBackPointerToken("reason", "bad id")).toBe("reason");
+  });
+});
+
 // ---------- Static pins on Coach.tsx ----------
 describe("Coach wiring · alert prefill", () => {
   it("reads search params and the shared param constant", () => {
@@ -113,8 +167,22 @@ describe("Coach wiring · alert prefill", () => {
     );
     const effect = COACH.split("normalizeCoachAlertIdParam(alertIdParam)")[1] ?? "";
     expect(effect.length).toBeGreaterThan(0);
-    const block = effect.slice(0, effect.indexOf("[alertIdParam]"));
+    const block = effect.slice(0, effect.indexOf("[alertIdParam, activeGrowId]"));
     expect(block).toMatch(/getAlertById\(alertId\)/);
+  });
+
+  it("binds the prefill to the active grow's scope (cross-grow alerts are ignored)", () => {
+    // The scope guard rejects alerts from another grow BEFORE any state is
+    // set, so context gathering, credit debit, and session persistence all
+    // stay on the grow the grower is actually analyzing.
+    expect(COACH).toMatch(/if\s*\(row\.grow_id\s*!==\s*activeGrowId\)\s*return;/);
+    // Guard runs before both setters.
+    const effect = COACH.split("normalizeCoachAlertIdParam(alertIdParam)")[1] ?? "";
+    const block = effect.slice(0, effect.indexOf("[alertIdParam, activeGrowId]"));
+    const guardIdx = block.indexOf("row.grow_id !== activeGrowId");
+    expect(guardIdx).toBeGreaterThan(-1);
+    expect(block.indexOf("setAlertContext(")).toBeGreaterThan(guardIdx);
+    expect(block.indexOf("setQuestion(")).toBeGreaterThan(guardIdx);
   });
 
   it("never clobbers a question the grower already typed", () => {
@@ -126,12 +194,21 @@ describe("Coach wiring · alert prefill", () => {
   it("prefill effect never fires an AI request or write", () => {
     const start = COACH.indexOf("Optional alert-context prefill");
     expect(start).toBeGreaterThan(-1);
-    const end = COACH.indexOf("[alertIdParam]);", start);
+    const end = COACH.indexOf("[alertIdParam, activeGrowId]);", start);
     expect(end).toBeGreaterThan(start);
     const effect = COACH.slice(start, end);
     expect(effect).not.toMatch(/\bask\(/);
     expect(effect).not.toMatch(/functions\.invoke/);
     expect(effect).not.toMatch(/\.insert\(|\.update\(|\.upsert\(|\.delete\(/);
+  });
+
+  it("persisted sessions carry the validated alert's DB-stored scope, never the nav param", () => {
+    expect(COACH).toMatch(
+      /persistAiDoctorSession\(supabase,\s*\{[\s\S]{0,400}tentId:\s*alertContext\?\.tentId\s*\?\?\s*null,[\s\S]{0,200}plantId:\s*alertContext\?\.plantId\s*\?\?\s*null,/,
+    );
+    // Scope comes only from the fetched AlertRow (row.tent_id / row.plant_id).
+    expect(COACH).toMatch(/tentId:\s*row\.tent_id\s*\?\?\s*null/);
+    expect(COACH).toMatch(/plantId:\s*row\.plant_id\s*\?\?\s*null/);
   });
 
   it("Coach still performs exactly one edge invoke and two action_queue inserts", () => {
@@ -140,6 +217,34 @@ describe("Coach wiring · alert prefill", () => {
       (COACH.match(/\.from\(\s*["']action_queue["']\s*\)\s*\.insert\(/g) ?? [])
         .length,
     ).toBe(2);
+  });
+});
+
+describe("Coach wiring · [alert:<id>] back-pointer writer", () => {
+  it("the ai_doctor suggestion insert routes its reason through both token helpers", () => {
+    expect(COACH).toMatch(
+      /source:\s*ACTION_QUEUE_SOURCE_VALUES\.AI_DOCTOR/,
+    );
+    expect(COACH).toMatch(
+      /reason:\s*appendAlertBackPointerToken\(\s*\n?\s*appendSessionBackPointerToken\(/,
+    );
+    // Session token uses the race-safe persisted id; alert token uses the
+    // grow-validated context id.
+    expect(COACH).toMatch(/appendSessionBackPointerToken\([\s\S]{0,300}persistedSessionId,/);
+    expect(COACH).toMatch(/appendAlertBackPointerToken\([\s\S]{0,500}alertContext\?\.id\s*\?\?\s*null,/);
+  });
+
+  it("the legacy ai_coach insert is untouched (no token, no alertContext)", () => {
+    const coachInsert = COACH.split('source: "ai_coach"')[0] ?? "";
+    const lastReason = coachInsert.lastIndexOf("reason:");
+    expect(lastReason).toBeGreaterThan(-1);
+    const reasonLine = coachInsert.slice(lastReason, lastReason + 120);
+    expect(reasonLine).not.toContain("appendAlertBackPointerToken");
+    expect(reasonLine).not.toContain("alertContext");
+  });
+
+  it("no raw token literal in JSX output", () => {
+    expect(COACH).not.toMatch(/>\s*\[alert:/);
   });
 });
 

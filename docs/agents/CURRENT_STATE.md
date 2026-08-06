@@ -92,9 +92,10 @@ GitHub Actions push runs observed 2026-08-05 ~16:05 UTC for deploy commit
 
 The validation evidence in this section is tied to deploy commit `5611b130e81a` and
 must not be carried forward to later commits. The tip has since advanced through
-`acad6cb938e5` (#727), `864eab892` (#725), and `1ae1677645a0` (#729 — the commit the
-Branch topology row above names); push-run evidence for those heads is not recorded
-here. Notably, the full enabled Security DB Local run cited above (`31021835479`)
+`acad6cb938e5` (#727), `864eab892` (#725), `1ae1677645a0` (#729), `1a2df78ac3`
+(#735), `6c78266edb7f` (#737), and further; the Branch topology row above names
+its own verification snapshot and is decoupled from this section's evidence.
+Notably, the full enabled Security DB Local run cited above (`31021835479`)
 executed against `5611b130e81a` and is the replay-repair proof point regardless of
 tip movement.
 
@@ -156,15 +157,20 @@ Out of scope:
    live 2026-08-05**. History: the 15:47:45Z build stamped `commit: "unknown"`
    (history-less Lovable publish sandbox, unborn-HEAD `git init`, no `GITHUB_*`
    env — proven and sandbox-reproduced); production self-healed at 15:52:18Z.
-   Resilience shipped via PR #735 (`1a2df78ac3`) and #737 (`6c78266edb`), then
-   **verified against the next real publish** (22:06:15Z build): production
-   serves real SHA `3f773b680dcc` with `commitSource: "git"` and
+   Resilience shipped via PR #735 (`1a2df78ac3`, merged 17:41Z) with hardening
+   in #737 (`6c78266edb`, merged 22:28:50Z) and follow-ups. **Verified live
+   against the 22:06:15Z publish** — which, per its own commit `3f773b680dcc`,
+   contained #735's stamper but predated #737's merge, so the live evidence
+   attributes to #735's code; #737's hardening (trust-gated cross-era
+   execution, annotation-line anchoring) awaits its first published build.
+   The verification itself: production served `commitSource: "git"` and
    `treeHash: c8fc076f0011…`, and the resolver matched that hash to the exact
    commit via the `v2026.08.05-3f773b680dcc` tag annotation — Lovable's sandbox
-   and the GitHub runner computed identical hashes independently, which also
-   proves the publish pipeline does not mutate hashed inputs (the design's
-   canary). Residual owner-side items (optional): raise the intermittent
-   history-less sandbox with Lovable; retire the stale pre-SSR `vercel.json`.
+   and the GitHub runner computed identical hashes independently, which shows
+   the publish pipeline did not mutate hashed inputs **for that publish**
+   (point-in-time evidence, not a permanent guarantee). Residual owner-side
+   items (optional): raise the intermittent history-less sandbox with Lovable;
+   retire the stale pre-SSR `vercel.json`.
    See the release-provenance runbook below for how to read and resolve stamps.
 
 ---
@@ -185,14 +191,21 @@ git context:
   Release tags created by `auto-tag-release` carry `Tree-Hash:` annotations
   (instant answer); the union scan then recomputes over recent commits
   (`--scan=N` caps it — the scan is slow on loaded Windows machines) and
-  reports every content-identical commit. Candidates whose stamps predate the
-  current hash algorithm are re-hashed by executing their own committed
-  module, gated to ancestors of the protected release branch (`--trust-ref`)
-  in a scrubbed environment — never code from arbitrary refs.
-- **Canary practice:** periodically resolve a healthy stamp
-  (`commitSource: git`) against its own commit; a NO_MATCH there means the
-  publish pipeline started mutating hashed inputs and the hash roots need
-  revisiting. First live run 2026-08-05 22:06Z: PASS (exact match).
+  reports every content-identical commit **within the annotated tags plus the
+  bounded scan window** — a partial-history answer, not exhaustive
+  provenance. Candidates whose stamps predate the current hash algorithm are
+  re-hashed by executing their own committed module, gated to ancestors of
+  the protected release branch (`--trust-ref`) in a scrubbed environment —
+  never code from arbitrary refs.
+- **Canary practice:** periodically take a healthy stamp (`commitSource:
+"git"` or `"github-env"` — both authoritative) and resolve its treeHash
+  **pinned to its own recorded commit**:
+  `node scripts/resolve-release-provenance.mjs --hash=<treeHash>
+--ref=<stamped commit> --scan=1`. Only a NO_MATCH on that pinned scan
+  indicates the publish pipeline mutated hashed inputs; an unpinned default
+  scan can NO_MATCH merely because the commit fell outside the 30-commit
+  window or the default remote ref is absent. First live run 2026-08-05
+  22:06Z: PASS (exact match via tag annotation).
 
 No new content family, automation, device control, schema change, or direct production
 write is approved by this state file.

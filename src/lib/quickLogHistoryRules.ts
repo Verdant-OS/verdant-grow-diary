@@ -38,6 +38,7 @@ export const QUICK_LOG_EVENT_LANES: Record<string, HistoryLane> = {
   // Falls back to the "All recent activity" lane so nothing is hidden.
   transplant: "activity",
   harvest: "activity",
+  breeding: "activity",
   reminder: "activity",
   action_followup: "activity",
   action_outcome: "activity",

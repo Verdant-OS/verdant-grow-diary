@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { Link, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
@@ -61,6 +61,8 @@ import {
   stripBackPointerTokens,
 } from "@/lib/actionQueueProvenanceRules";
 import { buildActionButtonAriaLabel, buildStatusBadgeAriaLabel } from "@/lib/actionQueueRowView";
+
+import { emitBreedingAuditEvent, isBreedingFollowUpAction } from "@/lib/genetics/breedingAuditLog";
 
 import {
   ACTION_FOLLOWUP_EVENT_TYPE,
@@ -179,6 +181,9 @@ export default function ActionDetail() {
   const [noteDraft, setNoteDraft] = useState("");
   const [sourceAlertStatus, setSourceAlertStatus] = useState<string | null>(null);
 
+  // Tracks which actionId has already emitted breeding_suggestion_viewed to prevent double-emit on re-load.
+  const viewedBreedingRef = useRef<string | null>(null);
+
   // Outcome capture state
   const [existingOutcome, setExistingOutcome] = useState<{ status: string } | null>(null);
   const [followupEntryId, setFollowupEntryId] = useState<string | null>(null);
@@ -216,6 +221,19 @@ export default function ActionDetail() {
         return;
       }
       setRow(data as ActionRow);
+      if (isBreedingFollowUpAction((data as ActionRow).action_type) && viewedBreedingRef.current !== actionId) {
+        viewedBreedingRef.current = actionId ?? null;
+        emitBreedingAuditEvent({
+          eventType: "breeding_suggestion_viewed",
+          actionId: (data as ActionRow).id,
+          plantId: (data as ActionRow).plant_id,
+          source: "breeding_v0",
+          status: (data as ActionRow).status,
+          actorId: user?.id ?? null,
+          timestamp: new Date().toISOString(),
+          requiresApproval: true,
+        });
+      }
       const { data: evs } = await supabase
         .from("action_queue_events")
         .select("id,action_queue_id,event_type,previous_status,new_status,note,created_at")
@@ -382,13 +400,13 @@ export default function ActionDetail() {
     event_type: EventType,
     new_status: Status,
     note?: string,
-  ) {
+  ): Promise<boolean> {
     setBusy(true);
     const { error } = await supabase.from("action_queue").update(next).eq("id", current.id);
     if (error) {
       setBusy(false);
       toast.error(error.message);
-      return;
+      return false;
     }
     await logEvent(current, event_type, new_status, note);
     // Follow-up diary entry: ONLY when this transition completes the action.
@@ -402,6 +420,7 @@ export default function ActionDetail() {
     }
     setBusy(false);
     await load();
+    return true;
   }
 
   // SECURITY: never sends user_id (diary_entries.user_id now defaults to auth.uid()).
@@ -465,7 +484,33 @@ export default function ActionDetail() {
       toast.message("Simulated (no device command sent)");
     }
     const patch = buildTransitionPatch(kind);
-    await transition(row, patch, eventTypeFor(kind), nextStatusFor(kind), note);
+    const success = await transition(row, patch, eventTypeFor(kind), nextStatusFor(kind), note);
+    if (success && isBreedingFollowUpAction(row.action_type)) {
+      const now = new Date().toISOString();
+      if (kind === "approve") {
+        emitBreedingAuditEvent({
+          eventType: "breeding_suggestion_approved",
+          actionId: row.id,
+          plantId: row.plant_id,
+          source: "breeding_v0",
+          status: "approved",
+          actorId: user?.id ?? null,
+          timestamp: now,
+          requiresApproval: true,
+        });
+      } else if (kind === "reject" || kind === "cancel") {
+        emitBreedingAuditEvent({
+          eventType: "breeding_suggestion_declined",
+          actionId: row.id,
+          plantId: row.plant_id,
+          source: "breeding_v0",
+          status: nextStatusFor(kind),
+          actorId: user?.id ?? null,
+          timestamp: now,
+          requiresApproval: true,
+        });
+      }
+    }
   }
 
   function cancelDialog() {

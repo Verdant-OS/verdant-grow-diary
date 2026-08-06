@@ -28,6 +28,13 @@ export const SUPPORTED_LEGACY_EVENT_TYPES = [
   "watering",
   "observation",
   "note",
+  "breeding",
+  "reversal_application",
+  "isolation_start",
+  "pollination",
+  "pollen_shed_observed",
+  "stigmas_receptive",
+  "cross_harvest",
 ] as const;
 export type SupportedLegacyEventType =
   (typeof SUPPORTED_LEGACY_EVENT_TYPES)[number];
@@ -135,8 +142,19 @@ export function buildLegacyQuickLogUnifiedPayload(
     };
   }
 
-  // observation / note → RPC `note` action
-  if (!trimStr(note)) {
+  // observation / note / breeding events → RPC `note` action
+  const breedingPrefix = [
+    "reversal_application",
+    "isolation_start",
+    "pollination",
+    "pollen_shed_observed",
+    "stigmas_receptive",
+    "cross_harvest"
+  ].includes(input.eventType) ? `Breeding Event (${input.eventType.replace(/_/g, ' ')}): ` : "";
+
+  const finalNote = breedingPrefix ? `${breedingPrefix}${note}` : note;
+
+  if (!trimStr(finalNote)) {
     return {
       ok: false,
       reason: "note_required",
@@ -150,7 +168,7 @@ export function buildLegacyQuickLogUnifiedPayload(
       p_target_id: input.plantId,
       p_action: "note",
       p_volume_ml: null,
-      p_note: note,
+      p_note: finalNote,
       p_temperature_c: null,
       p_humidity_pct: null,
       p_vpd_kpa: null,

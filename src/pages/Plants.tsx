@@ -13,6 +13,8 @@ import PlantCardActionsMenu from "@/components/PlantCardActionsMenu";
 import InfoPopover, { HELP_COPY } from "@/components/InfoPopover";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
 import { useGrowPlants, useGrowTents, getGrowDataMeta } from "@/hooks/useGrowData";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { useGrows } from "@/store/grows";
@@ -62,6 +64,17 @@ export default function Plants() {
   const plantsMeta = getGrowDataMeta(["grow", "plants", "all", urlGrowId ?? "all"]);
   const tentsMeta = getGrowDataMeta(["grow", "tents", urlGrowId ?? "all"]);
   const [tentFilter, setTentFilter] = useState<string>("all");
+
+  // Fetch breeder traits for visible plants
+  const { data: breederMetadata } = useQuery({
+    queryKey: ["plants-breeder-meta", urlGrowId],
+    queryFn: async () => {
+      const { data } = await supabase.from("plants").select("id, pheno_name, is_keeper");
+      const map = new Map<string, { pheno_name: string | null; is_keeper: boolean }>();
+      data?.forEach(d => map.set(d.id, { pheno_name: d.pheno_name, is_keeper: d.is_keeper }));
+      return map;
+    }
+  });
 
   // Daily Grow Check: derive checked-today per plant using the same rules
   // module Dashboard and Plant Detail use. Read-only; never invents state.
@@ -396,7 +409,15 @@ export default function Plants() {
                       <span className="font-medium text-sm truncate">{p.name}</span>
                       <StageBadge stage={p.stage} />
                     </div>
-                    <p className="text-xs text-muted-foreground">{p.strain}</p>
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs text-muted-foreground">{p.strain}</p>
+                      {breederMetadata?.get(p.id)?.is_keeper && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded border border-amber-500/50 text-amber-500 bg-amber-500/10">⭐ Keeper</span>
+                      )}
+                    </div>
+                    {breederMetadata?.get(p.id)?.pheno_name && (
+                      <p className="text-[10px] text-primary mt-0.5">"{breederMetadata.get(p.id)?.pheno_name}"</p>
+                    )}
                     {isInactive && (
                       <Badge
                         variant="outline"

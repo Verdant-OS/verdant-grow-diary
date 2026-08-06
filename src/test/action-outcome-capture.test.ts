@@ -22,7 +22,8 @@ import {
 import { getEventType, EVENT_TYPES } from "@/lib/diary";
 
 const ROOT = resolve(__dirname, "../..");
-const ACTION_DETAIL = readFileSync(resolve(ROOT, "src/pages/ActionDetail.tsx"), "utf8");
+// Normalize CRLF → LF so indexOf slice markers work on Windows.
+const ACTION_DETAIL = readFileSync(resolve(ROOT, "src/pages/ActionDetail.tsx"), "utf8").replace(/\r\n/g, "\n");
 const RULES = readFileSync(resolve(ROOT, "src/lib/actionOutcomeRules.ts"), "utf8");
 const BADGES = readFileSync(resolve(ROOT, "src/components/DiaryEntryBadges.tsx"), "utf8");
 

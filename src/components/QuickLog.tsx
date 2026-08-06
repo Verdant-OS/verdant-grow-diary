@@ -49,6 +49,7 @@ import {
 
 import { AlertTriangle, Info } from "lucide-react";
 import { toast } from "sonner";
+import { BreedingLogContainer } from "@/components/genetics/BreedingLogContainer";
 
 export interface QuickLogPrefill {
   plantId?: string | null;
@@ -281,6 +282,8 @@ export default function QuickLog({
         return;
       }
 
+      // (Breeding event submissions are now handled inside BreedingLogContainer)
+
       if (activeGrow && stage !== activeGrow.stage) {
         await supabase.from("grows").update({ stage }).eq("id", activeGrowId);
       }
@@ -380,8 +383,20 @@ export default function QuickLog({
             </div>
           </div>
 
-          {/* Plant — full-width row so the validation alert + helper text
-              have room to read on narrow viewports. */}
+          {eventType === "breeding" ? (
+            <BreedingLogContainer
+              activeGrowId={activeGrowId!}
+              plants={scopedPlants}
+              onCreated={() => {
+                onCreated?.();
+                onOpenChange(false);
+              }}
+              onCancel={() => onOpenChange(false)}
+            />
+          ) : (
+            <>
+              {/* Plant — full-width row so the validation alert + helper text
+                  have room to read on narrow viewports. */}
           <div>
             <Label className="text-xs">Plant</Label>
             <Select
@@ -705,14 +720,16 @@ export default function QuickLog({
             />
           )}
 
-          <Button
-            type="submit"
-            disabled={busy || !selectedPlant}
-            data-testid="quick-log-save"
-            className="gradient-leaf text-primary-foreground"
-          >
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save entry"}
-          </Button>
+              <Button
+                type="submit"
+                disabled={busy || !selectedPlant}
+                data-testid="quick-log-save"
+                className="gradient-leaf text-primary-foreground"
+              >
+                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save entry"}
+              </Button>
+            </>
+          )}
         </form>
       </DialogContent>
     </Dialog>

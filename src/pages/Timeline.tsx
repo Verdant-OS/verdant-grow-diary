@@ -4,7 +4,7 @@ import { useGrows } from "@/store/grows";
 import { useAuth } from "@/store/auth";
 import { STAGES, stageLabel } from "@/lib/grow";
 import { format, formatDistanceToNow } from "date-fns";
-import { Sprout, Image as ImageIcon, Loader2, Camera, FileText, FlaskConical, Check, Pencil, Leaf, Gauge, Bell, ListChecks } from "lucide-react";
+import { Sprout, Image as ImageIcon, Loader2, Camera, FileText, FlaskConical, Check, Pencil, Leaf, Gauge, Bell, ListChecks, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link, useLocation } from "react-router-dom";
 
@@ -78,7 +78,7 @@ interface AlertEventRow {
   } | null;
 }
 
-type EventFilter = "all" | "photo" | "note" | "measurement" | "followup";
+type EventFilter = "all" | "photo" | "note" | "measurement" | "followup" | "stress";
 
 function entryKinds(e: Entry): EventFilter[] {
   const kinds: EventFilter[] = ["note"];
@@ -94,6 +94,7 @@ function entryKinds(e: Entry): EventFilter[] {
       ? ((e.details as Record<string, unknown>).event_type as string)
       : null;
   if (eventType === "action_followup") kinds.push("followup");
+  if (eventType === "stress_event") kinds.push("stress");
   return kinds;
 }
 
@@ -201,7 +202,7 @@ export default function Timeline() {
   }, [entries]);
 
   const eventCounts = useMemo(() => {
-    const m = { all: entries.length, photo: 0, note: 0, measurement: 0, followup: 0 };
+    const m = { all: entries.length, photo: 0, note: 0, measurement: 0, followup: 0, stress: 0 };
     entries.forEach((e) => entryKinds(e).forEach((k) => { m[k] = (m[k] || 0) + 1; }));
     return m;
   }, [entries]);
@@ -349,6 +350,7 @@ export default function Timeline() {
           <FilterChip active={eventFilter === "note"} onClick={() => setEventFilter("note")} label="Notes" icon={<FileText className="h-3 w-3" />} count={eventCounts.note} />
           <FilterChip active={eventFilter === "measurement"} onClick={() => setEventFilter("measurement")} label="Measurements" icon={<FlaskConical className="h-3 w-3" />} count={eventCounts.measurement} />
           <FilterChip active={eventFilter === "followup"} onClick={() => setEventFilter("followup")} label="Follow-ups" icon={<Check className="h-3 w-3" />} count={eventCounts.followup} />
+          <FilterChip active={eventFilter === "stress"} onClick={() => setEventFilter("stress")} label="Stress Events" icon={<AlertTriangle className="h-3 w-3" />} count={eventCounts.stress} />
         </div>
       </div>
 

@@ -70,7 +70,7 @@ describe("Auth security docs", () => {
 describe("src/ static safety", () => {
   it("never imports the service role key into src/", () => {
     const offenders = SRC_FILES.filter((f) => {
-      if (/src\/test\//.test(f)) return false; // guard tests assert absence
+      if (f.replace(/\\/g, "/").includes("/src/test/")) return false; // guard tests assert absence
       const body = readFileSync(f, "utf8");
       // Real escalation surface: env access or createClient using service role.
       return (
@@ -85,7 +85,7 @@ describe("src/ static safety", () => {
 
   it("introduces no NEXT_PUBLIC_* env vars in src/", () => {
     const offenders = SRC_FILES.filter((f) => {
-      if (/src\/test\//.test(f)) return false;
+      if (f.replace(/\\/g, "/").includes("/src/test/")) return false;
       return /NEXT_PUBLIC_/.test(readFileSync(f, "utf8"));
     });
     expect(offenders).toEqual([]);

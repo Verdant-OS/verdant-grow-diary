@@ -37,7 +37,9 @@
     "check:gamification-rls": "node scripts/check-gamification-rls.mjs",
     "scan:gamification-direct-inserts": "node scripts/scan-gamification-direct-inserts.mjs",
     "smoke:award-nugs": "bun run scripts/smoke-award-nugs.ts",
-    "test:security-gamification": "node scripts/scan-gamification-direct-inserts.mjs && vitest run src/test/scan-gamification-direct-inserts.test.ts"
+    "test:security-gamification": "node scripts/scan-gamification-direct-inserts.mjs && vitest run src/test/scan-gamification-direct-inserts.test.ts",
+    "supabase:migrations:sync": "node scripts/sync-supabase-migrations-from-integration.mjs",
+    "supabase:migrations:verify-remote": "node scripts/verify-supabase-migrations-complete.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

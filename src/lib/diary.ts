@@ -99,6 +99,12 @@ export const EVENT_TYPES: EventTypeDef[] = [
     tone: "bg-primary/20 text-primary border-primary/40",
   },
   {
+    value: "breeding",
+    label: "Breeding",
+    icon: Sprout,
+    tone: "bg-pink-500/15 text-pink-400 border-pink-500/30",
+  },
+  {
     value: "action_followup",
     label: "Follow-up",
     icon: ClipboardCheck,

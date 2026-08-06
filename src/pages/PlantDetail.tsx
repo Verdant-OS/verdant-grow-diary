@@ -4,6 +4,8 @@ import PageHeader from "@/components/PageHeader";
 import StageBadge from "@/components/StageBadge";
 import EmptyState from "@/components/EmptyState";
 import GrowDataSourceDisclosure from "@/components/GrowDataSourceDisclosure";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
 import PlantDetailDataSourceDisclosure from "@/components/PlantDetailDataSourceDisclosure";
 import AssignTentDialog from "@/components/AssignTentDialog";
 import PlantTentEnvironmentPanel from "@/components/PlantTentEnvironmentPanel";
@@ -12,9 +14,9 @@ import PlantRelativeTimelineSection from "@/components/PlantRelativeTimelineSect
 import ManualSnapshotTimelineSection from "@/components/ManualSnapshotTimelineSection";
 import TimelineMemorySection from "@/components/TimelineMemorySection";
 import QuickLogGroupedTimelineSection from "@/components/QuickLogGroupedTimelineSection";
-import PlantDailyGrowCheckHistoryCard from "@/components/PlantDailyGrowCheckHistoryCard";
-import DailyGrowCheckOnboardingCard from "@/components/DailyGrowCheckOnboardingCard";
 import PlantDailyGrowCheckConsistencyCard from "@/components/PlantDailyGrowCheckConsistencyCard";
+import DailyGrowCheckOnboardingCard from "@/components/DailyGrowCheckOnboardingCard";
+import PlantDailyGrowCheckHistoryCard from "@/components/PlantDailyGrowCheckHistoryCard";
 import PlantRecentMoveCard from "@/components/PlantRecentMoveCard";
 import PlantAssignedTentAlertsPanel from "@/components/PlantAssignedTentAlertsPanel";
 import PlantAssignedTentActionsPanel from "@/components/PlantAssignedTentActionsPanel";
@@ -40,6 +42,8 @@ import { PLANT_DETAIL_SECTION_ANCHORS } from "@/lib/plantDetailSectionAnchors";
 import PlantCardActionsMenu from "@/components/PlantCardActionsMenu";
 import PlantAiDoctorSessionsPanel from "@/components/PlantAiDoctorSessionsPanel";
 import PlantPhoto from "@/components/PlantPhoto";
+import PathogenScreening from "@/components/PathogenScreening";
+import FocusGroupRubric from "@/components/FocusGroupRubric";
 import { Badge } from "@/components/ui/badge";
 import {
   getArchivedPlantLabel,
@@ -61,6 +65,27 @@ export default function PlantDetail() {
   const [quickLogOpen, setQuickLogOpen] = useState(false);
   const { id } = useParams();
   const { data: plant, isLoading, isError, refetch } = useGrowPlant(id);
+  
+  // Breeder Mode Data Fetch
+  const { data: breederData } = useQuery({
+    queryKey: ["breeder", id],
+    enabled: !!id,
+    queryFn: async () => {
+      const [{ data: plantData }, { data: labData }, { data: pcrData }, { data: fgData }] = await Promise.all([
+        supabase.from("plants").select("hunt_id, pheno_name, is_keeper, origin").eq("id", id).single(),
+        supabase.from("lab_tests").select("*").eq("plant_id", id).order("tested_at", { ascending: false }).limit(1),
+        supabase.from("pcr_tests").select("*").eq("plant_id", id).order("tested_at", { ascending: false }),
+        supabase.from("focus_group_scores").select("*").eq("plant_id", id).order("evaluated_at", { ascending: false })
+      ]);
+      return { 
+        plantMeta: plantData, 
+        latestLab: labData?.[0], 
+        pcrTests: pcrData?.map(d => ({ ...d, testedAt: d.tested_at, labName: d.lab_name })) || [], 
+        focusGroupScores: fgData?.map(d => ({ ...d, reviewerName: d.reviewer_name, evaluatedAt: d.evaluated_at, aromaScore: d.aroma_score, flavorScore: d.flavor_score, effectScore: d.effect_score, bagAppealScore: d.bag_appeal_score, ashColorScore: d.ash_color_score })) || [] 
+      };
+    }
+  });
+
   const { data: tent } = useGrowTent(plant?.tentId);
   const plantMeta = getGrowDataMeta(["grow", "plant", id ?? null]);
   const tentMeta = getGrowDataMeta(["grow", "tent", plant?.tentId ?? null]);
@@ -176,6 +201,46 @@ export default function PlantDetail() {
         tentId={plant.tentId ?? null}
         growId={plant.growId ?? null}
       />
+      
+      {breederData?.plantMeta?.origin && (
+        <div className="glass rounded-2xl p-4 mb-4 mt-2 border-primary/20 bg-primary/5">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-primary mb-2 flex items-center gap-1"><FlaskConical className="h-3.5 w-3.5" /> Breeder Intel</h3>
+          <div className="flex flex-wrap gap-4 text-sm">
+            <div>
+              <span className="text-muted-foreground">Origin: </span>
+              <span className="capitalize font-medium">{breederData.plantMeta.origin.replace('_', ' ')}</span>
+            </div>
+            {breederData.plantMeta.pheno_name && (
+              <div>
+                <span className="text-muted-foreground">Phenotype: </span>
+                <span className="font-medium">"{breederData.plantMeta.pheno_name}"</span>
+              </div>
+            )}
+            {breederData.plantMeta.is_keeper && (
+              <div>
+                <Badge variant="outline" className="border-amber-500/50 text-amber-500 bg-amber-500/10">⭐ Hunt Keeper</Badge>
+              </div>
+            )}
+            {breederData.latestLab && (
+              <div className="w-full mt-2 pt-2 border-t border-primary/10">
+                <span className="text-muted-foreground text-xs block mb-1">Latest Lab Test (COA):</span>
+                <div className="flex gap-3 text-xs">
+                  {breederData.latestLab.thc_percent && <span><strong className="text-foreground">{breederData.latestLab.thc_percent}%</strong> THC</span>}
+                  {breederData.latestLab.cbd_percent && <span><strong className="text-foreground">{breederData.latestLab.cbd_percent}%</strong> CBD</span>}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {breederData?.plantMeta?.origin && (
+        <div className="mb-4 grid md:grid-cols-2 gap-4">
+          <PathogenScreening tests={breederData.pcrTests} />
+          <FocusGroupRubric scores={breederData.focusGroupScores} />
+        </div>
+      )}
+
       <PlantDetailQuickActions
         plantId={plant.id}
         plantName={plant.name}

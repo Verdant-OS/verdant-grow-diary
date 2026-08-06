@@ -24,6 +24,9 @@ import Timeline from "./pages/Timeline";
 import Grows from "./pages/Grows";
 import GrowDetail from "./pages/GrowDetail";
 import Reports from "./pages/Reports";
+import Hunts from "./pages/Hunts";
+import Candidates from "./pages/Candidates";
+import LabTests from "./pages/LabTests";
 
 import Coach from "./pages/Coach";
 import AiDoctorSessionDetail from "./pages/AiDoctorSessionDetail";
@@ -112,6 +115,9 @@ const App = () => (
                 <Route path="/grows" element={<Grows />} />
                 <Route path="/grows/:growId" element={<GrowDetail />} />
                 <Route path="/reports" element={<Reports />} />
+                <Route path="/hunts" element={<Hunts />} />
+                <Route path="/hunts/:id" element={<Candidates />} />
+                <Route path="/lab-tests" element={<LabTests />} />
 
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/diagnostics" element={<Diagnostics />} />

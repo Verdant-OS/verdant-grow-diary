@@ -10,7 +10,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 
 const roleState: {
   status: "loading" | "granted" | "denied" | "unauthenticated" | "error";
@@ -44,9 +44,7 @@ describe("ReleaseReadinessOperatorCard", () => {
   it("renders nothing for non-operator users", () => {
     renderCard();
     expect(screen.queryByTestId("release-readiness-operator-card")).toBeNull();
-    expect(document.body.textContent ?? "").not.toContain(
-      RELEASE_READINESS_PATH,
-    );
+    expect(document.body.textContent ?? "").not.toContain(RELEASE_READINESS_PATH);
   });
 
   for (const status of ["loading", "unauthenticated", "error"] as const) {
@@ -54,9 +52,7 @@ describe("ReleaseReadinessOperatorCard", () => {
       roleState.status = status;
       renderCard();
       expect(screen.queryByTestId("release-readiness-operator-card")).toBeNull();
-      expect(document.body.textContent ?? "").not.toContain(
-        RELEASE_READINESS_PATH,
-      );
+      expect(document.body.textContent ?? "").not.toContain(RELEASE_READINESS_PATH);
     });
   }
 
@@ -74,9 +70,7 @@ describe("ReleaseReadinessOperatorCard", () => {
   it("renders no forms or submit buttons (navigation only)", () => {
     roleState.status = "granted";
     renderCard();
-    const submit = document.querySelectorAll(
-      "button[type='submit'], form",
-    );
+    const submit = document.querySelectorAll("button[type='submit'], form");
     expect(submit.length).toBe(0);
   });
 

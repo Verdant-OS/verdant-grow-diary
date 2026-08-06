@@ -6,13 +6,7 @@
  * or any model. Does NOT mutate state. Mounted under RequireOperatorRole.
  */
 import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   RELEASE_READINESS_VIEW_MODEL,
   type ReadinessStatusLabel,
@@ -81,16 +75,10 @@ export default function ReleaseReadiness() {
   const grouped = groupEvidenceReceipts(RELEASE_READINESS_EVIDENCE_RECEIPTS);
 
   return (
-    <div
-      className="container mx-auto max-w-4xl p-6 space-y-6"
-      data-testid="release-readiness-page"
-    >
+    <div className="container mx-auto max-w-4xl p-6 space-y-6" data-testid="release-readiness-page">
       <header className="space-y-2">
         <h1 className="text-2xl font-semibold">Verdant Release Readiness</h1>
-        <p
-          className="text-sm text-muted-foreground"
-          data-testid="release-readiness-source-label"
-        >
+        <p className="text-sm text-muted-foreground" data-testid="release-readiness-source-label">
           {vm.sourceLabel}
         </p>
       </header>
@@ -99,25 +87,19 @@ export default function ReleaseReadiness() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             Executive status
-            <Badge variant={statusVariant(vm.overall.status)}>
-              {vm.overall.status}
-            </Badge>
+            <Badge variant={statusVariant(vm.overall.status)}>{vm.overall.status}</Badge>
           </CardTitle>
           <CardDescription>{vm.overall.summary}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-medium">Demo posture:</span>
-            <Badge variant={statusVariant(vm.demo.status)}>
-              {vm.demo.status}
-            </Badge>
+            <Badge variant={statusVariant(vm.demo.status)}>{vm.demo.status}</Badge>
             <span className="text-muted-foreground">{vm.demo.summary}</span>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-medium">Release posture:</span>
-            <Badge variant={statusVariant(vm.release.status)}>
-              {vm.release.status}
-            </Badge>
+            <Badge variant={statusVariant(vm.release.status)}>{vm.release.status}</Badge>
             <span className="text-muted-foreground">{vm.release.summary}</span>
           </div>
         </CardContent>
@@ -127,8 +109,7 @@ export default function ReleaseReadiness() {
         <CardHeader>
           <CardTitle>Validation checks</CardTitle>
           <CardDescription>
-            Each row reflects a documented receipt or static invariant — not a
-            live CI feed.
+            Each row reflects a documented receipt or static invariant — not a live CI feed.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -180,26 +161,18 @@ export default function ReleaseReadiness() {
         <CardHeader>
           <CardTitle>Manual validation commands</CardTitle>
           <CardDescription>
-            Copy-paste; results must be recorded manually until CI receipts
-            return.
+            Copy-paste; results must be recorded manually until CI receipts return.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <ul className="space-y-3 text-sm">
             {vm.commands.map((c) => (
-              <li
-                key={c.id}
-                data-testid={`release-readiness-command-${c.id}`}
-              >
+              <li key={c.id} data-testid={`release-readiness-command-${c.id}`}>
                 <div className="font-medium">{c.label}</div>
                 <pre className="mt-1 rounded bg-muted px-3 py-2 text-xs overflow-x-auto">
                   <code>{c.command}</code>
                 </pre>
-                {c.note ? (
-                  <div className="text-muted-foreground text-xs mt-1">
-                    {c.note}
-                  </div>
-                ) : null}
+                {c.note ? <div className="text-muted-foreground text-xs mt-1">{c.note}</div> : null}
               </li>
             ))}
           </ul>
@@ -211,17 +184,13 @@ export default function ReleaseReadiness() {
           <CardTitle className="flex items-center gap-2">
             Evidence Receipts
             <Badge
-              variant={
-                evidencePosture.posture === "GO" ? "default" : "destructive"
-              }
+              variant={evidencePosture.posture === "GO" ? "default" : "destructive"}
               data-testid="release-readiness-evidence-posture"
             >
               {evidencePosture.posture}
             </Badge>
           </CardTitle>
-          <CardDescription
-            data-testid="release-readiness-evidence-reason"
-          >
+          <CardDescription data-testid="release-readiness-evidence-reason">
             {evidencePosture.primaryReason}
           </CardDescription>
         </CardHeader>
@@ -280,23 +249,16 @@ export default function ReleaseReadiness() {
                         <Badge variant={receiptStatusVariant(r.status)}>
                           {r.status.toUpperCase()}
                         </Badge>
-                        <Badge
-                          variant="outline"
-                          className="text-[10px] uppercase"
-                        >
+                        <Badge variant="outline" className="text-[10px] uppercase">
                           {r.sourceLabel}
                         </Badge>
                       </div>
-                      <div className="text-muted-foreground mt-1">
-                        {r.summary}
-                      </div>
+                      <div className="text-muted-foreground mt-1">{r.summary}</div>
                       <pre className="mt-1 rounded bg-muted px-3 py-2 text-xs overflow-x-auto">
                         <code>{r.commandOrSource}</code>
                       </pre>
                       {r.notes ? (
-                        <div className="text-xs text-muted-foreground mt-1">
-                          {r.notes}
-                        </div>
+                        <div className="text-xs text-muted-foreground mt-1">{r.notes}</div>
                       ) : null}
                     </li>
                   ))}
@@ -308,7 +270,6 @@ export default function ReleaseReadiness() {
       </Card>
 
       <Card data-testid="release-readiness-safety">
-
         <CardHeader>
           <CardTitle>Safety notes</CardTitle>
         </CardHeader>

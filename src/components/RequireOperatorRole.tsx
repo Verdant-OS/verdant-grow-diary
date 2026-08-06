@@ -15,7 +15,7 @@
  *  - never reads tokens or secrets.
  *  - never logs the user object.
  */
-import { Outlet } from "react-router-dom";
+import { Outlet } from "@/lib/react-router-compat";
 import { ShieldAlert } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useHasRole } from "@/hooks/useHasRole";
@@ -46,9 +46,7 @@ export function RequireOperatorRole() {
             <CardTitle className="flex items-center gap-2 text-base">
               <ShieldAlert className="h-4 w-4" /> Access restricted
             </CardTitle>
-            <CardDescription>
-              This account does not have operator access.
-            </CardDescription>
+            <CardDescription>This account does not have operator access.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2 text-sm text-muted-foreground">
             {email ? (
@@ -60,9 +58,7 @@ export function RequireOperatorRole() {
                 Signed in, but email is unavailable.
               </p>
             )}
-            <p>
-              Use an operator-role account or ask the project owner to grant operator access.
-            </p>
+            <p>Use an operator-role account or ask the project owner to grant operator access.</p>
             <p>No operator data was loaded.</p>
           </CardContent>
         </Card>

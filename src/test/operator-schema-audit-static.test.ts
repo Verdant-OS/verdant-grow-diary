@@ -3,21 +3,24 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { APP_ROUTES } from "@/lib/appRouteManifest";
+import {
+  extractMountedAppRoutePaths,
+  isMountedUnderOperatorLayout,
+  readAllRouteModuleSources,
+} from "./helpers/routeManifestSyncHarness";
 
 const ROOT = resolve(__dirname, "../..");
 const read = (path: string) => readFileSync(resolve(ROOT, path), "utf8");
 
-const APP = read("src/App.tsx");
+const APP = readAllRouteModuleSources();
 const PAGE = read("src/pages/OperatorSchemaAudit.tsx");
 const SIDEBAR = read("src/components/AppSidebar.tsx");
 const MIGRATION = read("supabase/migrations/20260728103000_schema_audit_trust_hardening.sql");
 
 describe("Operator Schema Audit integration", () => {
   it("declares the route as operator-only in both the router and route manifest", () => {
-    expect(APP).toContain('path="/operator/schema-audit"');
-    expect(APP.indexOf('path="/operator/schema-audit"')).toBeGreaterThan(
-      APP.indexOf("<Route element={<RequireOperatorRole />}>"),
-    );
+    expect(extractMountedAppRoutePaths()).toContain("/operator/schema-audit");
+    expect(isMountedUnderOperatorLayout("/operator/schema-audit")).toBe(true);
     expect(APP_ROUTES.find((route) => route.path === "/operator/schema-audit")).toMatchObject({
       access: "operator",
     });

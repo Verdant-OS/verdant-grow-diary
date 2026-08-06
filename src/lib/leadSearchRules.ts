@@ -7,12 +7,7 @@ import type { LeadRow } from "@/hooks/useLeadsList";
 import { parseLeadTime as toTime } from "@/lib/leadFieldUtils";
 
 export type LeadSortOption =
-  | "default"
-  | "newest"
-  | "oldest"
-  | "follow_up_soonest"
-  | "status"
-  | "az";
+  "default" | "newest" | "oldest" | "follow_up_soonest" | "status" | "az";
 
 export const SORT_OPTIONS: ReadonlyArray<{ id: LeadSortOption; label: string }> = [
   { id: "default", label: "Default" },
@@ -48,7 +43,6 @@ export function searchLeads(leads: LeadRow[], query: string): LeadRow[] {
     }),
   );
 }
-
 
 // Stable, predictable status ordering: action-needed first, terminal last.
 const STATUS_ORDER: Record<string, number> = {

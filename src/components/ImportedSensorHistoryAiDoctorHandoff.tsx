@@ -2,7 +2,7 @@
  * Read-only presenter for the explicit imported-history → plant review handoff.
  * It never chooses a plant, invokes AI, opens a paywall, or writes data.
  */
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { Stethoscope } from "lucide-react";
 
 import { Button } from "@/components/ui/button";

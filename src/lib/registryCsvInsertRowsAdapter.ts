@@ -31,12 +31,7 @@ import {
 import { parseCsv } from "@/lib/csvSensorImportRules";
 
 // DB-side metric keys (mirrors validate_sensor_reading allow-list).
-export type AdapterMetric =
-  | "temperature_c"
-  | "humidity_pct"
-  | "vpd_kpa"
-  | "co2_ppm"
-  | "ppfd";
+export type AdapterMetric = "temperature_c" | "humidity_pct" | "vpd_kpa" | "co2_ppm" | "ppfd";
 
 export const ADAPTER_CANONICAL_SOURCE = SENSOR_IMPORT_CANONICAL_SOURCE; // "csv"
 
@@ -77,7 +72,6 @@ export interface RegistryCsvInsertRow {
   };
 }
 
-
 export interface BuildArgs {
   tentId: string;
   growId?: string | null;
@@ -96,9 +90,7 @@ export interface AdapterResult {
   blockedReason: string | null;
 }
 
-const EMPTY_RESULT = (
-  blockedReason: string | null = null,
-): AdapterResult => ({
+const EMPTY_RESULT = (blockedReason: string | null = null): AdapterResult => ({
   rows: [],
   acceptedRowCount: 0,
   rejectedRowCount: 0,
@@ -124,10 +116,7 @@ function parseCapturedAt(raw: string | undefined): string | null {
 }
 
 /** Lower-case header lookup, returns column index or -1. */
-function indexOfHeader(
-  headers: ReadonlyArray<string>,
-  needle: string | null | undefined,
-): number {
+function indexOfHeader(headers: ReadonlyArray<string>, needle: string | null | undefined): number {
   if (!needle) return -1;
   const target = needle.toLowerCase();
   for (let i = 0; i < headers.length; i++) {
@@ -176,13 +165,9 @@ export function buildRegistryCsvInsertRows(args: BuildArgs): AdapterResult {
 
   // Provenance columns by app.
   const deviceSerialIdx =
-    args.sourceApp === "spider_farmer"
-      ? indexOfHeader(headers, "deviceSerialnum")
-      : -1;
-  const roomIdIdx =
-    args.sourceApp === "spider_farmer" ? indexOfHeader(headers, "roomId") : -1;
-  const sensorIdIdx =
-    args.sourceApp === "spider_farmer" ? indexOfHeader(headers, "sensorId") : -1;
+    args.sourceApp === "spider_farmer" ? indexOfHeader(headers, "deviceSerialnum") : -1;
+  const roomIdIdx = args.sourceApp === "spider_farmer" ? indexOfHeader(headers, "roomId") : -1;
+  const sensorIdIdx = args.sourceApp === "spider_farmer" ? indexOfHeader(headers, "sensorId") : -1;
 
   // Vivosun Built-in indices (preserved, never emitted).
   const builtIn =
@@ -264,7 +249,6 @@ export function buildRegistryCsvInsertRows(args: BuildArgs): AdapterResult {
       payloadExtras.grow_id = args.growId;
     }
 
-
     if (deviceSerialIdx >= 0) {
       const v = String(cells[deviceSerialIdx] ?? "").trim();
       if (v) payloadExtras.device_serial = v;
@@ -318,7 +302,6 @@ export function buildRegistryCsvInsertRows(args: BuildArgs): AdapterResult {
       });
     }
   });
-
 
   return {
     rows,

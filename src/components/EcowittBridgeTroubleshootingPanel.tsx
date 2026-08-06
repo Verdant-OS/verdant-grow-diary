@@ -6,7 +6,10 @@ import {
   buildTroubleshootingPanelViewModel,
   TROUBLESHOOTING_STATUS_LABEL,
 } from "@/lib/ecowittBridgeTroubleshootingViewModel";
-import type { TroubleshootingInput, TroubleshootingStatus } from "@/lib/ecowittBridgeTroubleshootingRules";
+import type {
+  TroubleshootingInput,
+  TroubleshootingStatus,
+} from "@/lib/ecowittBridgeTroubleshootingRules";
 import CanonicalSourceLegend from "@/components/CanonicalSourceLegend";
 
 const STATUS_CLASS: Record<TroubleshootingStatus, string> = {
@@ -56,7 +59,10 @@ export default function EcowittBridgeTroubleshootingPanel({
         >
           <p className="text-foreground font-medium">No EcoWitt readings found yet.</p>
           <p>Run the dry-run command first, then send one webhook reading.</p>
-          <p>Check MQTT Explorer for <span className="font-mono">ecowitt/#</span> before posting to Verdant.</p>
+          <p>
+            Check MQTT Explorer for <span className="font-mono">ecowitt/#</span> before posting to
+            Verdant.
+          </p>
           <p>This panel does not start the bridge or verify local MQTT by itself.</p>
         </div>
       )}

@@ -23,7 +23,7 @@
  *    links to the existing setup flow and says the draft will wait.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { NotebookPen, ArrowRight, Sprout } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePlants } from "@/hooks/use-plants";

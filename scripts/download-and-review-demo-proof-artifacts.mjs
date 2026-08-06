@@ -52,18 +52,30 @@ if (sh("gh", ["auth", "status"]).status !== 0) {
 if (!runId) {
   console.log(`Looking up most recent run for: ${WORKFLOW}`);
   const list = sh("gh", [
-    "run", "list", "--workflow", WORKFLOW, "--limit", "10",
-    "--json", "databaseId,status,conclusion,headBranch,displayTitle",
+    "run",
+    "list",
+    "--workflow",
+    WORKFLOW,
+    "--limit",
+    "10",
+    "--json",
+    "databaseId,status,conclusion,headBranch,displayTitle",
   ]);
   if (list.status !== 0) {
-    fail([
-      "Failed to list workflow runs.",
-      list.stderr?.trim() ?? "",
-      "Ensure repo + workflow exist and you have access.",
-    ].join("\n"));
+    fail(
+      [
+        "Failed to list workflow runs.",
+        list.stderr?.trim() ?? "",
+        "Ensure repo + workflow exist and you have access.",
+      ].join("\n"),
+    );
   }
   let runs;
-  try { runs = JSON.parse(list.stdout || "[]"); } catch (e) { fail(`Parse error: ${e.message}`); }
+  try {
+    runs = JSON.parse(list.stdout || "[]");
+  } catch (e) {
+    fail(`Parse error: ${e.message}`);
+  }
   if (!Array.isArray(runs) || runs.length === 0) fail(`No runs found for ${WORKFLOW}.`);
   const completed = runs.find((r) => r.status === "completed");
   const chosen = completed ?? runs[0];
@@ -75,7 +87,9 @@ function downloadAndMaybeExtract(name, dest) {
   if (existsSync(dest)) rmSync(dest, { recursive: true, force: true });
   ensureDir(dest);
   console.log(`Downloading "${name}" -> ${dest}`);
-  const dl = sh("gh", ["run", "download", runId, "--name", name, "--dir", dest], { stdio: "inherit" });
+  const dl = sh("gh", ["run", "download", runId, "--name", name, "--dir", dest], {
+    stdio: "inherit",
+  });
   if (dl.status !== 0) {
     fail(`Failed to download artifact "${name}" from run #${runId}. May be expired/missing.`);
   }
@@ -100,20 +114,24 @@ function runStep(name, scriptArgs) {
 }
 
 const verifyExit = runStep("verify-report", [
-  resolve("scripts/verify-demo-proof-playwright-report.mjs"), REPORT_DEST,
+  resolve("scripts/verify-demo-proof-playwright-report.mjs"),
+  REPORT_DEST,
 ]);
 if (verifyExit !== 0) process.exit(verifyExit);
 
 const treeExit = runStep("tree-report", [
-  resolve("scripts/tree-demo-proof-playwright-report.mjs"), REPORT_DEST,
+  resolve("scripts/tree-demo-proof-playwright-report.mjs"),
+  REPORT_DEST,
 ]);
 if (treeExit !== 0) process.exit(treeExit);
 
 runStep("summarize-results", [
-  resolve("scripts/summarize-demo-proof-playwright-results.mjs"), RESULTS_DEST,
+  resolve("scripts/summarize-demo-proof-playwright-results.mjs"),
+  RESULTS_DEST,
 ]);
 runStep("open-artifacts", [
-  resolve("scripts/open-demo-proof-playwright-artifacts.mjs"), RESULTS_DEST,
+  resolve("scripts/open-demo-proof-playwright-artifacts.mjs"),
+  RESULTS_DEST,
 ]);
 
 if (cleanup || cleanupAll) {

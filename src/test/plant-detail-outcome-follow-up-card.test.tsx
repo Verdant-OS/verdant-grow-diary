@@ -41,10 +41,14 @@ describe("Plant Detail Outcome Follow-up card", () => {
       "needs_follow_up",
     );
     expect(screen.getByText("Follow up on the last change.")).toBeInTheDocument();
-    expect(screen.getByText("How did the plant respond: Better, Same, or Worse?")).toBeInTheDocument();
+    expect(
+      screen.getByText("How did the plant respond: Better, Same, or Worse?"),
+    ).toBeInTheDocument();
     expect(screen.getByText("Last change: Watered 1L")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /add a better same or worse follow-up check/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /add a better same or worse follow-up check/i }),
+    );
     expect(openQuickLog).toHaveBeenCalledTimes(1);
   });
 

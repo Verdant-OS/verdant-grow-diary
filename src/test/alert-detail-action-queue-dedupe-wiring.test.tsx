@@ -10,7 +10,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { act, render, screen, waitFor, fireEvent } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import AlertDetail from "@/pages/AlertDetail";
 
 async function flushAsync(ms = 30) {
@@ -176,9 +176,7 @@ describe("AlertDetail — decideAddButtonState wiring", () => {
     expect(btn).toBeInTheDocument();
     expect(btn).not.toBeDisabled();
     const region = screen.getByTestId("alert-handoff-decision");
-    await waitFor(() =>
-      expect(region.getAttribute("data-decision-state")).toBe("can_add"),
-    );
+    await waitFor(() => expect(region.getAttribute("data-decision-state")).toBe("can_add"));
     expect(region.getAttribute("data-decision-reason")).toBe("ok_can_add");
   });
 
@@ -261,8 +259,6 @@ describe("AlertDetail — sensor source badge wiring", () => {
   it("omits the badge when no sensor source is available (avoids misleading Unknown)", async () => {
     renderDetail();
     await flushAsync();
-    expect(
-      screen.queryByTestId("alert-detail-sensor-source-badge"),
-    ).toBeNull();
+    expect(screen.queryByTestId("alert-detail-sensor-source-badge")).toBeNull();
   });
 });

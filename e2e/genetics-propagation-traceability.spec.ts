@@ -18,6 +18,10 @@ const PROJECT_REF = "knkwiiywfkbqznbxwqfh";
 const SESSION_KEY = `sb-${PROJECT_REF}-auth-token`;
 const MOCKED_PROJECT = "chromium-mocked";
 const PLANT_ID = "33333333-3333-4333-8333-333333333333";
+const CURRENT_AGREEMENTS = [
+  { agreement_type: "terms", version: "2026-07-13" },
+  { agreement_type: "privacy", version: "2026-07-13" },
+];
 
 const FAKE_USER = {
   id: "genetics-browser-user",
@@ -183,7 +187,9 @@ async function mockSupabase(page: Page) {
       ? [ACCESSION]
       : pathname.endsWith("/rest/v1/propagation_batches")
         ? [BATCH]
-        : [];
+        : pathname.endsWith("/rest/v1/user_agreement_acceptances")
+          ? CURRENT_AGREEMENTS
+          : [];
     await route.fulfill({
       status: 200,
       contentType: "application/json",

@@ -17,7 +17,8 @@ import {
 import type { GrowContext, ReflectionConfidence } from "./postGrowReflectionTypes";
 import type { PostGrowReflectionValidationIssue } from "./postGrowReflectionOutputValidator";
 
-export const POST_GROW_REFLECTION_DRY_RUN_HARNESS_VERSION = "post-grow-reflection-dry-run-harness-v1";
+export const POST_GROW_REFLECTION_DRY_RUN_HARNESS_VERSION =
+  "post-grow-reflection-dry-run-harness-v1";
 
 export type PostGrowReflectionDryRunExpectedStatus = "validated" | "rejected";
 
@@ -41,7 +42,7 @@ export interface PostGrowReflectionDryRunScenarioResult {
   failureReason: string | null;
   outputConfidence: ReflectionConfidence | null;
   validationOptions: {
-    sensorCoveragePct: number;
+    sensorCoveragePct: number | null;
     knownGapCount: number;
     minEvidenceReferences: number;
   };

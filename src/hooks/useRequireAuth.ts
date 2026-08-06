@@ -10,7 +10,7 @@
 // - redirects unauthenticated users to /auth
 // See docs/auth-security.md.
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "@/lib/react-router-compat";
 import { supabase } from "@/integrations/supabase/client";
 
 export type RequireAuthStatus = "loading" | "authenticated" | "unauthenticated";

@@ -24,7 +24,8 @@ export const ALLOWED_REDACTION_PLACEHOLDERS = [
   "[REDACTED]",
 ];
 
-const PLACEHOLDER_TOKEN_RE = /(vbt_REDACTED|PASSKEY_REDACTED|MAC_REDACTED|SHOULD_NOT_PERSIST|\[REDACTED\])/;
+const PLACEHOLDER_TOKEN_RE =
+  /(vbt_REDACTED|PASSKEY_REDACTED|MAC_REDACTED|SHOULD_NOT_PERSIST|\[REDACTED\])/;
 
 interface SecretPattern {
   category: string;
@@ -34,7 +35,10 @@ interface SecretPattern {
 const SECRET_IMPORT_PATTERNS: SecretPattern[] = [
   { category: "bridge token (vbt_)", test: (t) => /\bvbt_(?!REDACTED\b)[A-Za-z0-9_-]{6,}/.test(t) },
   { category: "MAC address", test: (t) => /\b[0-9A-Fa-f]{2}(?::[0-9A-Fa-f]{2}){5}\b/.test(t) },
-  { category: "JWT-like (eyJ...)", test: (t) => /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/.test(t) },
+  {
+    category: "JWT-like (eyJ...)",
+    test: (t) => /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/.test(t),
+  },
   { category: "Stripe-like (sk_)", test: (t) => /\bsk_[A-Za-z0-9]{10,}/.test(t) },
   { category: "service_role literal", test: (t) => /service_role/i.test(t) },
   {
@@ -392,7 +396,8 @@ const REPORT_ALLOWED_KEYS: (keyof CanaryReportInput)[] = [
   "log_safety_status",
 ];
 
-const REDACT_KEY_PATTERN = /(passkey|^mac$|_mac$|api_?key|application_?key|token|auth|secret|service_role|user_id|raw_payload|payload|body)/i;
+const REDACT_KEY_PATTERN =
+  /(passkey|^mac$|_mac$|api_?key|application_?key|token|auth|secret|service_role|user_id|raw_payload|payload|body)/i;
 
 function deepRedact(node: unknown): unknown {
   if (node == null) return node;
@@ -492,12 +497,19 @@ export function computeVerdict(args: {
       next_action: "Select a canary tent and run the Pre-POST Validator.",
     });
   } else {
-    const failed = args.preflight.checks.filter((c) => c.status === "fail").map((c) => c.detail || c.label);
+    const failed = args.preflight.checks
+      .filter((c) => c.status === "fail")
+      .map((c) => c.detail || c.label);
     const passed = args.preflight.checks.filter((c) => c.status === "pass").map((c) => c.label);
     push({
       key: "preflight",
       label: "Preflight",
-      status: args.preflight.status === "pass" ? "pass" : args.preflight.status === "fail" ? "fail" : "incomplete",
+      status:
+        args.preflight.status === "pass"
+          ? "pass"
+          : args.preflight.status === "fail"
+            ? "fail"
+            : "incomplete",
       reason: args.preflight.reason,
       evidence_present: passed,
       evidence_missing: args.preflight.status === "fail" ? failed : [],
@@ -566,19 +578,16 @@ export function computeVerdict(args: {
     push({
       key: "posts",
       label: "POSTs",
-      status:
-        respMissing.length > 0
-          ? "incomplete"
-          : respFailed.length === 0
-            ? "pass"
-            : "fail",
+      status: respMissing.length > 0 ? "incomplete" : respFailed.length === 0 ? "pass" : "fail",
       reason:
         respMissing.length > 0
           ? `Missing responses: ${respMissing.join(", ")}.`
           : respFailed.length === 0
             ? "All three POSTs returned 200."
             : `Non-200 responses: ${respFailed.join(", ")}.`,
-      evidence_present: respKeys.filter((k) => !respMissing.includes(k) && !respFailed.includes(k)).map((k) => `${k}=200`),
+      evidence_present: respKeys
+        .filter((k) => !respMissing.includes(k) && !respFailed.includes(k))
+        .map((k) => `${k}=200`),
       evidence_missing: respMissing.map((k) => `responses.${k}`),
       next_action:
         respFailed.length > 0
@@ -609,7 +618,9 @@ export function computeVerdict(args: {
         reason: ok
           ? "4 rows present: temperature_c, humidity, soil_moisture, vpd_kpa."
           : `Mismatch — total=${totalRows}, missing=${missing.join(",") || "none"}, extra=${extra.join(",") || "none"}.`,
-        evidence_present: REQUIRED_MAIN_METRICS.filter((m) => (counts[m] ?? 0) === 1).map((m) => `${m}=1`),
+        evidence_present: REQUIRED_MAIN_METRICS.filter((m) => (counts[m] ?? 0) === 1).map(
+          (m) => `${m}=1`,
+        ),
         evidence_missing: missing.map((m) => `${m}=1`),
         next_action: ok ? undefined : "Re-check ingest mapping and re-run the main canary POST.",
       });
@@ -642,7 +653,9 @@ export function computeVerdict(args: {
         label: "Malformed canary rows (expect 2)",
         status: ok ? "pass" : "fail",
         reason,
-        evidence_present: REQUIRED_MALFORMED_METRICS.filter((k) => (m[k] ?? 0) === 1).map((k) => `${k}=1`),
+        evidence_present: REQUIRED_MALFORMED_METRICS.filter((k) => (m[k] ?? 0) === 1).map(
+          (k) => `${k}=1`,
+        ),
         evidence_missing: hasForbidden.map((k) => `forbidden:${k}`),
         next_action: ok
           ? undefined
@@ -727,7 +740,9 @@ export function computeVerdict(args: {
             ? `ecowitt_dateutc=${eco} for canary rows.`
             : "No timestamp_source counts provided.",
         evidence_present: eco > 0 ? [`ecowitt_dateutc=${eco}`] : [],
-        evidence_missing: onlyServer ? [`server_received_at=${srv} (expected ecowitt_dateutc)`] : [],
+        evidence_missing: onlyServer
+          ? [`server_received_at=${srv} (expected ecowitt_dateutc)`]
+          : [],
         next_action: onlyServer
           ? "Inspect dateutc parsing and clock-sanity bounds in ecowitt-ingest."
           : undefined,
@@ -810,7 +825,13 @@ export function computeVerdict(args: {
     push({
       key: "logs",
       label: "Log Safety",
-      status: logsClean ? (args.logReviewed ? "pass" : "incomplete") : logsLeaked ? "fail" : "incomplete",
+      status: logsClean
+        ? args.logReviewed
+          ? "pass"
+          : "incomplete"
+        : logsLeaked
+          ? "fail"
+          : "incomplete",
       reason: logsClean
         ? args.logReviewed
           ? "Logs reviewed; no secrets found."
@@ -818,7 +839,8 @@ export function computeVerdict(args: {
         : logsLeaked
           ? "Secret found in logs."
           : "Log review not yet completed.",
-      evidence_present: logsClean && args.logReviewed ? ["log_safety_status=clean", "operator_reviewed=true"] : [],
+      evidence_present:
+        logsClean && args.logReviewed ? ["log_safety_status=clean", "operator_reviewed=true"] : [],
       evidence_missing: !args.logReviewed ? ["operator_reviewed=true"] : [],
       next_action: logsLeaked ? "Block live gateway; rotate any exposed secrets." : undefined,
     });
@@ -1005,8 +1027,10 @@ export function buildDrillDown(
     }
     case "secrets": {
       if ((r.leak_scan_count ?? 0) > 0) offending.push(`leak_scan_count=${r.leak_scan_count}`);
-      if ((r.secret_value_leak_count ?? 0) > 0) offending.push(`secret_value_leak_count=${r.secret_value_leak_count}`);
-      if ((r.null_captured_at_count ?? 0) > 0) offending.push(`null_captured_at_count=${r.null_captured_at_count}`);
+      if ((r.secret_value_leak_count ?? 0) > 0)
+        offending.push(`secret_value_leak_count=${r.secret_value_leak_count}`);
+      if ((r.null_captured_at_count ?? 0) > 0)
+        offending.push(`null_captured_at_count=${r.null_captured_at_count}`);
       if (offending.length === 0 && card.status === "incomplete") unavailable = true;
       break;
     }
@@ -1025,7 +1049,9 @@ export function buildDrillDown(
       const v = r.vpd_provenance;
       if (!v) unavailable = true;
       else if (card.status === "fail") {
-        offending.push(`calculated=${v.calculated}; derived_from=${(v.derived_from ?? []).join(",") || "(none)"}`);
+        offending.push(
+          `calculated=${v.calculated}; derived_from=${(v.derived_from ?? []).join(",") || "(none)"}`,
+        );
       }
       break;
     }
@@ -1111,7 +1137,16 @@ function csvEscape(v: unknown): string {
 }
 
 export function buildVerdictCsv(audit: BuiltAuditReport): string {
-  const header = ["category", "status", "evidence_present", "evidence_missing", "next_action", "value", "expected", "verdict"];
+  const header = [
+    "category",
+    "status",
+    "evidence_present",
+    "evidence_missing",
+    "next_action",
+    "value",
+    "expected",
+    "verdict",
+  ];
   const verdict = audit.verdict;
   const rows = audit.cards.map((c) => [
     c.key,
@@ -1193,12 +1228,18 @@ export function buildWorkflowSnapshot(args: {
   };
 }
 
-export function saveWorkflowToLocalStorage(snap: WorkflowSnapshot): { ok: boolean; reason?: string } {
+export function saveWorkflowToLocalStorage(snap: WorkflowSnapshot): {
+  ok: boolean;
+  reason?: string;
+} {
   try {
     const serialized = JSON.stringify(snap);
     const cats = detectSecretCategories(serialized);
     if (cats.length > 0) {
-      return { ok: false, reason: `Refused to save: secret-looking pattern(s) detected: ${cats.join(", ")}` };
+      return {
+        ok: false,
+        reason: `Refused to save: secret-looking pattern(s) detected: ${cats.join(", ")}`,
+      };
     }
     if (typeof localStorage !== "undefined") {
       localStorage.setItem(WORKFLOW_STORAGE_KEY, serialized);
@@ -1233,7 +1274,10 @@ export function clearWorkflowFromLocalStorage(): void {
 // ----- export filename helpers --------------------------------------------
 
 /** Sanitize a single filename piece: lowercase, dashes, strip unsafe chars. */
-export function sanitizeFilenamePart(input: string | null | undefined, fallback = "workflow"): string {
+export function sanitizeFilenamePart(
+  input: string | null | undefined,
+  fallback = "workflow",
+): string {
   const s = (input ?? "").toString().trim().toLowerCase();
   const cleaned = s
     .replace(/[\s_]+/g, "-")
@@ -1259,11 +1303,13 @@ export function localTimestampStamp(now: Date = new Date()): string {
  * Build a default verdict export filename.
  * Pattern: verdant-canary-verdict-{slug}-{YYYY-MM-DD_HHmm}.{ext}
  */
-export function buildVerdictFilename(args: {
-  workflowSlug?: string | null;
-  ext?: "json" | "csv";
-  now?: Date;
-} = {}): string {
+export function buildVerdictFilename(
+  args: {
+    workflowSlug?: string | null;
+    ext?: "json" | "csv";
+    now?: Date;
+  } = {},
+): string {
   const slug = sanitizeFilenamePart(args.workflowSlug ?? "", "workflow");
   const stamp = localTimestampStamp(args.now ?? new Date());
   const ext = args.ext ?? "json";
@@ -1280,7 +1326,10 @@ export interface JsonParseDetail {
 }
 
 /** Convert a 0-based char position into 1-based line/column. */
-export function positionToLineColumn(text: string, position: number): { line: number; column: number } {
+export function positionToLineColumn(
+  text: string,
+  position: number,
+): { line: number; column: number } {
   let line = 1;
   let column = 1;
   const max = Math.min(position, text.length);
@@ -1366,7 +1415,9 @@ export function parseCanaryImport(raw: string): ImportParseResult {
           },
         };
       }
-      const hasKnown = CANARY_TOP_LEVEL_FIELDS.some((k) => k in (parsed as Record<string, unknown>));
+      const hasKnown = CANARY_TOP_LEVEL_FIELDS.some(
+        (k) => k in (parsed as Record<string, unknown>),
+      );
       if (!hasKnown) {
         return {
           ok: false,
@@ -1456,13 +1507,20 @@ export function migrateSnapshotToV1(
   }
   const nowIso = new Date().toISOString();
   const verdict =
-    typeof obj.verdict === "object" || typeof obj.verdict === "string" ? obj.verdict ?? null : null;
-  const cards = Array.isArray(obj.cards) ? obj.cards : Array.isArray(obj.evidence) ? obj.evidence : [];
+    typeof obj.verdict === "object" || typeof obj.verdict === "string"
+      ? (obj.verdict ?? null)
+      : null;
+  const cards = Array.isArray(obj.cards)
+    ? obj.cards
+    : Array.isArray(obj.evidence)
+      ? obj.evidence
+      : [];
   const savedAt = typeof obj.saved_at === "string" ? obj.saved_at : nowIso;
   return {
     schemaVersion: 1,
     workflowId: typeof obj.workflowId === "string" ? obj.workflowId : safeRandomId(),
-    workflowName: typeof obj.workflowName === "string" ? obj.workflowName : "EcoWitt canary workflow",
+    workflowName:
+      typeof obj.workflowName === "string" ? obj.workflowName : "EcoWitt canary workflow",
     createdAt: typeof obj.createdAt === "string" ? obj.createdAt : savedAt,
     updatedAt: nowIso,
     verdict: verdict ?? null,
@@ -1515,7 +1573,10 @@ export function migrateLegacyWorkflowSnapshots(): MigrationOutcome {
 
     // Back up before any destructive write.
     try {
-      localStorage.setItem(WORKFLOW_BACKUP_KEY, JSON.stringify({ at: new Date().toISOString(), backup }));
+      localStorage.setItem(
+        WORKFLOW_BACKUP_KEY,
+        JSON.stringify({ at: new Date().toISOString(), backup }),
+      );
       out.backedUp = true;
     } catch (e) {
       out.errors.push(`backup write: ${String(e)}`);
@@ -1526,7 +1587,11 @@ export function migrateLegacyWorkflowSnapshots(): MigrationOutcome {
     if (currentRaw) {
       try {
         const parsed = JSON.parse(currentRaw);
-        if (parsed && typeof parsed === "object" && (parsed as Record<string, unknown>).schemaVersion === 1) {
+        if (
+          parsed &&
+          typeof parsed === "object" &&
+          (parsed as Record<string, unknown>).schemaVersion === 1
+        ) {
           out.alreadyV1 = true;
         } else {
           const migrated = migrateSnapshotToV1(parsed, { migratedFrom: WORKFLOW_STORAGE_KEY });

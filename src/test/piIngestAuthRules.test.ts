@@ -81,10 +81,9 @@ describe("piIngestAuthRules — happy path", () => {
 
   it("uppercase hex signature is accepted (case-normalized comparison)", async () => {
     const req = await signedReq();
-    const r = await verifyBridgeRequest(
-      { ...req, signature: req.signature!.toUpperCase() },
-      [credential],
-    );
+    const r = await verifyBridgeRequest({ ...req, signature: req.signature!.toUpperCase() }, [
+      credential,
+    ]);
     expect(r.ok).toBe(true);
   });
 
@@ -100,7 +99,7 @@ describe("piIngestAuthRules — rejection branches", () => {
     const req = await signedReq();
     const r = await verifyBridgeRequest({ ...req, bridgeId: "" }, [credential]);
     expect(r.ok).toBe(false);
-    if (r.ok) throw new Error('expected failure');
+    if (r.ok) throw new Error("expected failure");
     expect((r as { code: string }).code).toBe("missing_bridge_id");
   });
 
@@ -108,7 +107,7 @@ describe("piIngestAuthRules — rejection branches", () => {
     const req = await signedReq({ bridgeId: "nope" });
     const r = await verifyBridgeRequest(req, [credential]);
     expect(r.ok).toBe(false);
-    if (r.ok) throw new Error('expected failure');
+    if (r.ok) throw new Error("expected failure");
     expect((r as { code: string }).code).toBe("unknown_bridge_id");
   });
 
@@ -116,7 +115,7 @@ describe("piIngestAuthRules — rejection branches", () => {
     const inactive = { ...credential, isActive: false };
     const r = await verifyBridgeRequest(await signedReq(), [inactive]);
     expect(r.ok).toBe(false);
-    if (r.ok) throw new Error('expected failure');
+    if (r.ok) throw new Error("expected failure");
     expect((r as { code: string }).code).toBe("inactive_credential");
   });
 
@@ -124,7 +123,7 @@ describe("piIngestAuthRules — rejection branches", () => {
     const req = await signedReq();
     const r = await verifyBridgeRequest({ ...req, signature: "" }, [credential]);
     expect(r.ok).toBe(false);
-    if (r.ok) throw new Error('expected failure');
+    if (r.ok) throw new Error("expected failure");
     expect((r as { code: string }).code).toBe("missing_signature");
   });
 
@@ -132,7 +131,7 @@ describe("piIngestAuthRules — rejection branches", () => {
     const req = await signedReq();
     const r = await verifyBridgeRequest({ ...req, timestamp: "" }, [credential]);
     expect(r.ok).toBe(false);
-    if (r.ok) throw new Error('expected failure');
+    if (r.ok) throw new Error("expected failure");
     expect((r as { code: string }).code).toBe("missing_timestamp");
   });
 
@@ -140,7 +139,7 @@ describe("piIngestAuthRules — rejection branches", () => {
     const req = await signedReq({ timestamp: "not-a-date" });
     const r = await verifyBridgeRequest(req, [credential]);
     expect(r.ok).toBe(false);
-    if (r.ok) throw new Error('expected failure');
+    if (r.ok) throw new Error("expected failure");
     expect((r as { code: string }).code).toBe("invalid_timestamp");
   });
 
@@ -149,7 +148,7 @@ describe("piIngestAuthRules — rejection branches", () => {
     const req = await signedReq({ timestamp: old });
     const r = await verifyBridgeRequest(req, [credential]);
     expect(r.ok).toBe(false);
-    if (r.ok) throw new Error('expected failure');
+    if (r.ok) throw new Error("expected failure");
     expect((r as { code: string }).code).toBe("timestamp_too_old");
   });
 
@@ -158,7 +157,7 @@ describe("piIngestAuthRules — rejection branches", () => {
     const req = await signedReq({ timestamp: future });
     const r = await verifyBridgeRequest(req, [credential]);
     expect(r.ok).toBe(false);
-    if (r.ok) throw new Error('expected failure');
+    if (r.ok) throw new Error("expected failure");
     expect((r as { code: string }).code).toBe("timestamp_too_far_future");
   });
 
@@ -166,7 +165,7 @@ describe("piIngestAuthRules — rejection branches", () => {
     const req = await signedReq();
     const r = await verifyBridgeRequest({ ...req, tentId: "" }, [credential]);
     expect(r.ok).toBe(false);
-    if (r.ok) throw new Error('expected failure');
+    if (r.ok) throw new Error("expected failure");
     expect((r as { code: string }).code).toBe("missing_tent_id");
   });
 
@@ -174,18 +173,15 @@ describe("piIngestAuthRules — rejection branches", () => {
     const req = await signedReq({ tentId: OTHER_TENT });
     const r = await verifyBridgeRequest(req, [credential]);
     expect(r.ok).toBe(false);
-    if (r.ok) throw new Error('expected failure');
+    if (r.ok) throw new Error("expected failure");
     expect((r as { code: string }).code).toBe("tent_not_allowed");
   });
 
   it("tampered rawBody rejects (signature stale)", async () => {
     const req = await signedReq();
-    const r = await verifyBridgeRequest(
-      { ...req, rawBody: req.rawBody + " " },
-      [credential],
-    );
+    const r = await verifyBridgeRequest({ ...req, rawBody: req.rawBody + " " }, [credential]);
     expect(r.ok).toBe(false);
-    if (r.ok) throw new Error('expected failure');
+    if (r.ok) throw new Error("expected failure");
     expect((r as { code: string }).code).toBe("invalid_signature");
   });
 
@@ -193,18 +189,15 @@ describe("piIngestAuthRules — rejection branches", () => {
     const req = await signedReq();
     const r = await verifyBridgeRequest({ ...req, method: "PUT" }, [credential]);
     expect(r.ok).toBe(false);
-    if (r.ok) throw new Error('expected failure');
+    if (r.ok) throw new Error("expected failure");
     expect((r as { code: string }).code).toBe("invalid_signature");
   });
 
   it("wrong path rejects", async () => {
     const req = await signedReq();
-    const r = await verifyBridgeRequest(
-      { ...req, path: "/functions/v1/other" },
-      [credential],
-    );
+    const r = await verifyBridgeRequest({ ...req, path: "/functions/v1/other" }, [credential]);
     expect(r.ok).toBe(false);
-    if (r.ok) throw new Error('expected failure');
+    if (r.ok) throw new Error("expected failure");
     expect((r as { code: string }).code).toBe("invalid_signature");
   });
 
@@ -212,7 +205,7 @@ describe("piIngestAuthRules — rejection branches", () => {
     const wrong = { ...credential, secret: "different-secret" };
     const r = await verifyBridgeRequest(await signedReq(), [wrong]);
     expect(r.ok).toBe(false);
-    if (r.ok) throw new Error('expected failure');
+    if (r.ok) throw new Error("expected failure");
     expect((r as { code: string }).code).toBe("invalid_signature");
   });
 });
@@ -257,10 +250,7 @@ describe("piIngestAuthRules — secret hygiene & determinism", () => {
 
 // ------------- Static safety: module surface restrictions -------------
 
-const SRC = readFileSync(
-  resolve(__dirname, "../lib/piIngestAuthRules.ts"),
-  "utf8",
-);
+const SRC = readFileSync(resolve(__dirname, "../lib/piIngestAuthRules.ts"), "utf8");
 
 describe("piIngestAuthRules — static safety", () => {
   it("does not import Supabase, React, or perform I/O", () => {
@@ -274,8 +264,6 @@ describe("piIngestAuthRules — static safety", () => {
   it("does not reference forbidden integration surfaces", () => {
     expect(SRC).not.toMatch(/service_role/);
     expect(SRC).not.toMatch(/action_queue/);
-    expect(SRC).not.toMatch(
-      /\bmqtt\b|home[\s_-]?assistant|automation|device[\s_-]?control/i,
-    );
+    expect(SRC).not.toMatch(/\bmqtt\b|home[\s_-]?assistant|automation|device[\s_-]?control/i);
   });
 });

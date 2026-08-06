@@ -2,14 +2,7 @@
  * QuickLogV2Sheet — photo attachment layout, a11y, and safety tests.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import {
-  render,
-  screen,
-  cleanup,
-  fireEvent,
-  waitFor,
-  act,
-} from "@testing-library/react";
+import { render, screen, cleanup, fireEvent, waitFor, act } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import {
@@ -48,9 +41,7 @@ vi.mock("@/store/auth", () => ({
 
 vi.mock("@/hooks/use-plants", () => ({
   usePlants: () => ({
-    data: [
-      { id: "plant-1", name: "Plant 1", tent_id: "tent-1", grow_id: "grow-1" },
-    ],
+    data: [{ id: "plant-1", name: "Plant 1", tent_id: "tent-1", grow_id: "grow-1" }],
   }),
 }));
 vi.mock("@/hooks/use-tents", () => ({
@@ -71,11 +62,7 @@ function renderSheet() {
   });
   return render(
     <QueryClientProvider client={client}>
-      <QuickLogV2Sheet
-        open={true}
-        onOpenChange={() => {}}
-        defaultTargetKey="plant:plant-1"
-      />
+      <QuickLogV2Sheet open={true} onOpenChange={() => {}} defaultTargetKey="plant:plant-1" />
     </QueryClientProvider>,
   );
 }

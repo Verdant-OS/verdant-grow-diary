@@ -59,11 +59,9 @@ describe("trackTentRosterAction", () => {
   });
 
   it("swallows dispatch errors", () => {
-    const spy = vi
-      .spyOn(window, "dispatchEvent")
-      .mockImplementation(() => {
-        throw new Error("boom");
-      });
+    const spy = vi.spyOn(window, "dispatchEvent").mockImplementation(() => {
+      throw new Error("boom");
+    });
     expect(() =>
       trackTentRosterAction({
         action: "view_diary",
@@ -80,9 +78,7 @@ describe("trackTentRosterAction static safety", () => {
   const path = resolve(__dirname, "../lib/tentPlantRosterActionTracking.ts");
   const raw = readFileSync(path, "utf8");
   // Strip block + line comments so safety regexes do not match doc strings.
-  const content = raw
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+  const content = raw.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
 
   it("does not call fetch / XMLHttpRequest / Supabase", () => {
     expect(content).not.toMatch(/\bfetch\s*\(/);

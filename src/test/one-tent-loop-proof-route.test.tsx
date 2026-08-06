@@ -11,7 +11,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter, Routes, Route } from "react-router-dom";
+import { MemoryRouter, Routes, Route } from "@/lib/react-router-compat";
 import OneTentLoopProof from "@/pages/OneTentLoopProof";
 import { ONE_TENT_LOOP_PROOF_STEP_IDS } from "@/lib/oneTentLoopProofViewModel";
 
@@ -19,10 +19,7 @@ function renderAtRoute(path: string) {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
-        <Route
-          path="/internal/one-tent-loop-proof"
-          element={<OneTentLoopProof />}
-        />
+        <Route path="/internal/one-tent-loop-proof" element={<OneTentLoopProof />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -63,8 +60,7 @@ describe("OneTentLoopProof page", () => {
 
   it("renders the subtitle clarifying what the page does NOT do", () => {
     renderAtRoute("/internal/one-tent-loop-proof");
-    const s =
-      screen.getByTestId("one-tent-loop-proof-subtitle").textContent ?? "";
+    const s = screen.getByTestId("one-tent-loop-proof-subtitle").textContent ?? "";
     const lower = s.toLowerCase();
     expect(lower).toMatch(/does not validate live sensor data/);
     expect(lower).toMatch(/run ai diagnosis/);

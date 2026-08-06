@@ -1,7 +1,7 @@
 // Keyboard-only navigation and focus-order tests for /auth and /reset-password.
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 
 let signInResult: { error: { message: string } | null } = { error: null };
 let updateUserResult: { error: { message: string } | null } = { error: null };
@@ -71,8 +71,7 @@ function renderReset() {
 function getTabOrder(): HTMLElement[] {
   // Include disabled buttons — they still occupy a DOM order slot and we
   // want to assert ordering, not focusability.
-  const selector =
-    'a[href], button, input:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  const selector = 'a[href], button, input:not([disabled]), [tabindex]:not([tabindex="-1"])';
   return Array.from(document.querySelectorAll<HTMLElement>(selector)).filter(
     (el) => !el.hasAttribute("aria-hidden"),
   );
@@ -149,7 +148,7 @@ describe("/auth — keyboard tab order", () => {
     const loading = await screen.findByRole("button", { name: /signing in…/i });
     expect(loading).toBeDisabled();
     expect(loading).toBeVisible();
-    resolveSignIn?.();
+    (resolveSignIn as (() => void) | null)?.();
     await waitFor(() => expect(signInMock).toHaveBeenCalledTimes(1));
   });
 });
@@ -218,9 +217,7 @@ describe("/reset-password — keyboard tab order & focus", () => {
     fireEvent.change(screen.getByLabelText(/^confirm new password$/i), {
       target: { value: "abcdefg1" },
     });
-    await waitFor(() =>
-      expect(screen.queryByText(/passwords do not match yet/i)).toBeNull(),
-    );
+    await waitFor(() => expect(screen.queryByText(/passwords do not match yet/i)).toBeNull());
   });
 
   it("loading disables submit and the loading button stays visible", async () => {
@@ -241,7 +238,7 @@ describe("/reset-password — keyboard tab order & focus", () => {
     const loading = await screen.findByRole("button", { name: /updating password…/i });
     expect(loading).toBeDisabled();
     expect(loading).toBeVisible();
-    resolveUpd?.();
+    (resolveUpd as (() => void) | null)?.();
     await waitFor(() => expect(updateUserMock).toHaveBeenCalledTimes(1));
   });
 });

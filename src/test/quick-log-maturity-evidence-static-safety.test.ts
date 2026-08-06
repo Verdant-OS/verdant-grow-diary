@@ -11,15 +11,13 @@ const NEW_FILES = [
 ];
 
 function withoutComments(source: string): string {
-  return source
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/(^|\s)\/\/.*$/gm, "");
+  return source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|\s)\/\/.*$/gm, "");
 }
 
 function source() {
-  return NEW_FILES.map((path) =>
-    withoutComments(readFileSync(join(ROOT, path), "utf8")),
-  ).join("\n");
+  return NEW_FILES.map((path) => withoutComments(readFileSync(join(ROOT, path), "utf8"))).join(
+    "\n",
+  );
 }
 
 describe("Quick Log maturity evidence static safety", () => {

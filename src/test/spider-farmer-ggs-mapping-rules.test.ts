@@ -103,10 +103,7 @@ describe("normalizeSpiderFarmerGgsPayload — safety / invalid", () => {
     expect(high.readings.humidity).toBeUndefined();
     expect(high.warnings).toContain("humidity_out_of_range");
 
-    const neg = normalizeSpiderFarmerGgsPayload(
-      { captured_at: FRESH, humidity: -5 },
-      { now: NOW },
-    );
+    const neg = normalizeSpiderFarmerGgsPayload({ captured_at: FRESH, humidity: -5 }, { now: NOW });
     expect(neg.warnings).toContain("humidity_out_of_range");
   });
 
@@ -148,10 +145,7 @@ describe("normalizeSpiderFarmerGgsPayload — safety / invalid", () => {
 
 describe("normalizeSpiderFarmerGgsPayload — required regression coverage", () => {
   it("missing captured_at degrades to stale (never live) and never fabricates 'now'", () => {
-    const r = normalizeSpiderFarmerGgsPayload(
-      { temp_f: 75, humidity: 50 },
-      { now: NOW },
-    );
+    const r = normalizeSpiderFarmerGgsPayload({ temp_f: 75, humidity: 50 }, { now: NOW });
     expect(r.source).toBe("stale");
     expect(r.captured_at).toBeNull();
     expect(r.warnings).toContain("captured_at_missing");

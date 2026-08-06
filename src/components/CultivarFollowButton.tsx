@@ -6,7 +6,7 @@
  * and, when the guide version has advanced, get an "updated" badge + mark-seen.
  * No plant linkage; no email (that transport does not exist yet).
  */
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import type { VerdantCultivarProfile } from "@/constants/verdantCultivars";
 import { useAuth } from "@/store/auth";
 import { useCultivarFollow } from "@/hooks/useCultivarFollow";

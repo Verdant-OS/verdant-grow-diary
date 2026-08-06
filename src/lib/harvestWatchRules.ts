@@ -17,10 +17,7 @@
 
 export type HarvestWatchConfidence = "low" | "medium" | "high";
 
-export const HARVEST_WATCH_CONFIDENCE_LABEL: Record<
-  HarvestWatchConfidence,
-  string
-> = {
+export const HARVEST_WATCH_CONFIDENCE_LABEL: Record<HarvestWatchConfidence, string> = {
   low: "Low",
   medium: "Medium",
   high: "High",
@@ -96,10 +93,7 @@ function safeCount(n: number | null | undefined): number {
  * required to hit 4 individually.
  */
 export function evaluateHarvestWatchEvidenceGate(
-  input: Pick<
-    HarvestWatchInput,
-    "photoEvidenceCount" | "usableDrybackWindowCount"
-  >,
+  input: Pick<HarvestWatchInput, "photoEvidenceCount" | "usableDrybackWindowCount">,
 ): EvidenceGateResult {
   const photos = safeCount(input.photoEvidenceCount);
   const dryback = safeCount(input.usableDrybackWindowCount);
@@ -145,10 +139,8 @@ export interface ReadinessScore {
   };
 }
 
-export const READINESS_GATED_COPY =
-  "Not enough evidence yet — add more photos or dryback windows.";
-export const READINESS_MISSING_COMPONENT_COPY =
-  "Missing dryback or days-vs-history confidence.";
+export const READINESS_GATED_COPY = "Not enough evidence yet — add more photos or dryback windows.";
+export const READINESS_MISSING_COMPONENT_COPY = "Missing dryback or days-vs-history confidence.";
 
 /**
  * 50/50 weighted readiness. Trichome is NEVER folded in — it is only an
@@ -175,8 +167,7 @@ export function calculateReadinessScore(input: HarvestWatchInput): ReadinessScor
     };
   }
 
-  const score =
-    components.drybackScore * 0.5 + components.daysVsHistoryScore * 0.5;
+  const score = components.drybackScore * 0.5 + components.daysVsHistoryScore * 0.5;
   // Deterministic 3-decimal rounding to avoid float jitter.
   const rounded = Math.round(score * 1000) / 1000;
   return { score: rounded, gatedReason: null, components };
@@ -206,10 +197,7 @@ const BROAD_FALLBACK_END = 77;
  * - No usable history: low-confidence broad window (8–11 weeks).
  */
 export function predictHarvestWindow(
-  input: Pick<
-    HarvestWatchInput,
-    "daysInFlower" | "expectedHarvestDay" | "priorGrowCount"
-  >,
+  input: Pick<HarvestWatchInput, "daysInFlower" | "expectedHarvestDay" | "priorGrowCount">,
 ): HarvestWindowPrediction {
   const expected =
     typeof input.expectedHarvestDay === "number" &&
@@ -254,10 +242,7 @@ export interface DrybackVisibility {
 export const DRYBACK_LOWER_CONFIDENCE_LABEL = "Lower Confidence";
 
 export function deriveDrybackVisibility(
-  input: Pick<
-    HarvestWatchInput,
-    "irrigationPlantSelectionQuality" | "drybackConfidence"
-  >,
+  input: Pick<HarvestWatchInput, "irrigationPlantSelectionQuality" | "drybackConfidence">,
 ): DrybackVisibility {
   const weak =
     input.irrigationPlantSelectionQuality === "skipped" ||
@@ -299,10 +284,7 @@ export interface PhotoPromptState {
   confidencePenalty: 0 | 0.1 | 0.25;
 }
 
-export function evaluatePhotoPrompt(
-  lastPhotoAt: string | null,
-  now: Date,
-): PhotoPromptState {
+export function evaluatePhotoPrompt(lastPhotoAt: string | null, now: Date): PhotoPromptState {
   const nowMs = now instanceof Date && !Number.isNaN(now.getTime()) ? now.getTime() : NaN;
   let missedDays = 0;
   if (typeof lastPhotoAt === "string" && lastPhotoAt.length > 0 && Number.isFinite(nowMs)) {

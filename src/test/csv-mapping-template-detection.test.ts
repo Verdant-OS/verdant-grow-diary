@@ -1,7 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  detectCsvMappingTemplate,
-} from "@/lib/csvMappingTemplates";
+import { detectCsvMappingTemplate } from "@/lib/csvMappingTemplates";
 
 describe("detectCsvMappingTemplate", () => {
   it("auto-selects thp_export from THP header signature", () => {
@@ -21,12 +19,7 @@ describe("detectCsvMappingTemplate", () => {
   });
 
   it("ignores BOM/case/whitespace differences in headers", () => {
-    const headers = [
-      " Timestamp ",
-      "Temperature(°C)",
-      "HUMIDITY",
-      "VPD",
-    ];
+    const headers = [" Timestamp ", "Temperature(°C)", "HUMIDITY", "VPD"];
     const result = detectCsvMappingTemplate(headers);
     expect(result?.templateId).toBe("thp_export");
   });

@@ -165,9 +165,11 @@ export function validateImageUrl({ distDir, file, tag, url }) {
 
   if (issues.length > 0) return issues;
 
-  // Map https://verdantgrowdiary.com/og/foo.png → dist/og/foo.png
-  const localPath = join(distDir, parsed.pathname);
-  if (!existsSync(localPath)) {
+  // Map https://verdantgrowdiary.com/og/foo.png → dist/og/foo.png (Vite SPA output)
+  // or dist/client/og/foo.png (TanStack Start / Nitro client output).
+  const candidates = [join(distDir, parsed.pathname), join(distDir, "client", parsed.pathname)];
+  const localPath = candidates.find((candidate) => existsSync(candidate));
+  if (!localPath) {
     push(`no file at dist${parsed.pathname} — did the build emit this asset?`);
     return issues;
   }
@@ -189,9 +191,7 @@ export function validateImageUrl({ distDir, file, tag, url }) {
 
   const detectedCt = meta.format === "png" ? "image/png" : "image/jpeg";
   if (detectedCt !== expectedCt) {
-    push(
-      `content-type mismatch: extension says ${expectedCt} but magic bytes are ${detectedCt}`,
-    );
+    push(`content-type mismatch: extension says ${expectedCt} but magic bytes are ${detectedCt}`);
   }
 
   if (meta.width !== EXPECTED_WIDTH || meta.height !== EXPECTED_HEIGHT) {

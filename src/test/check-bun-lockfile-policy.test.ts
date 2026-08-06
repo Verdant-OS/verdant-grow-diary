@@ -177,16 +177,19 @@ describe("evaluatePolicy", () => {
     });
   });
 
-  it.each(["bun.lock", "package-lock.json"])("fails when required %s is missing", (name) => {
+  it.each([["bun.lock"], ["package-lock.json"]])("fails when required %s is missing", (name) => {
     const files = policyFiles();
     delete files[at(name)];
     expect(evaluate(files).errors.join(" ")).toContain(`Required lockfile is missing: ${name}`);
   });
 
-  it.each(FORBIDDEN_LOCKFILES)("fails when forbidden %s exists", (name) => {
-    const files = policyFiles({ extra: { [at(name)]: "x" } });
-    expect(evaluate(files).errors.join(" ")).toContain(`Forbidden lockfile present: ${name}`);
-  });
+  it.each(FORBIDDEN_LOCKFILES.map((name: string) => ({ name })) as Array<{ name: string }>)(
+    "fails when forbidden $name exists",
+    ({ name }) => {
+      const files = policyFiles({ extra: { [at(name)]: "x" } });
+      expect(evaluate(files).errors.join(" ")).toContain(`Forbidden lockfile present: ${name}`);
+    },
+  );
 
   it.each(["^0.24.0", "~0.24.0", "latest", "*"])(
     "fails when @lovable.dev/mcp-js uses %s",
@@ -237,18 +240,18 @@ describe("evaluatePolicy", () => {
   });
 
   it("fails when an exact npm override is not resolved consistently", () => {
-    const manifest = packageJson("0.24.0", { "fast-uri": "3.1.4" });
+    const manifest = packageJson("0.24.0", { "fast-uri": "3.1.5" });
     const stale = packageLock(manifest);
-    stale.packages["node_modules/fast-uri"].version = "3.0.0";
+    stale.packages["node_modules/fast-uri"]!.version = "3.0.0";
     expect(evaluate(policyFiles({ manifest, npmLock: stale })).errors.join(" ")).toContain(
-      "package-lock.json override for fast-uri@3.1.4 is not synchronized",
+      "package-lock.json override for fast-uri@3.1.5 is not synchronized",
     );
   });
 
   it.each([
     ["postcss", "8.5.6"],
     ["postcss", "8.5.18-rc.0"],
-    ["brace-expansion", "1.1.12"],
+    ["brace-expansion", "1.1.17"],
   ])("fails when the npm graph regresses the %s security floor", (packageName, version) => {
     const files = policyFiles();
     const stale = JSON.parse(files[at("package-lock.json")]);
@@ -258,6 +261,30 @@ describe("evaluatePolicy", () => {
       `package-lock.json security floor for ${packageName}`,
     );
   });
+
+  it.each(["2.1.3", "3.0.5", "4.0.1", "5.0.8"])(
+    "fails when brace-expansion regresses to vulnerable release %s",
+    (version) => {
+      const files = policyFiles();
+      const stale = JSON.parse(files[at("package-lock.json")]);
+      stale.packages["node_modules/brace-expansion"].version = version;
+      files[at("package-lock.json")] = JSON.stringify(stale);
+      expect(evaluate(files).errors.join(" ")).toContain(
+        "package-lock.json major-aware security floor for brace-expansion",
+      );
+    },
+  );
+
+  it.each(["1.1.18", "2.1.4", "3.0.6", "5.0.9", "6.0.0"])(
+    "accepts brace-expansion patched boundary %s",
+    (version) => {
+      const files = policyFiles();
+      const current = JSON.parse(files[at("package-lock.json")]);
+      current.packages["node_modules/brace-expansion"].version = version;
+      files[at("package-lock.json")] = JSON.stringify(current);
+      expect(evaluate(files)).toMatchObject({ ok: true, errors: [] });
+    },
+  );
 
   it("fails after the owned transition review date", () => {
     expect(evaluate(policyFiles(), "2026-08-26").errors.join(" ")).toContain(

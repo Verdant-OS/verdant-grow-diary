@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, render, screen, within } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import CultivarPage from "@/pages/CultivarPage";
 import { CULTIVAR_GUIDE_SECTION_KEYS } from "@/constants/verdantCultivars";
 

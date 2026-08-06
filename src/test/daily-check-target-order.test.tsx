@@ -8,7 +8,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { MemoryRouter, useNavigate } from "react-router-dom";
+import { MemoryRouter, useNavigate } from "@/lib/react-router-compat";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const useSensorReadingsMock = vi.hoisted(() =>
@@ -74,7 +74,16 @@ const baseMockPlants = [
     is_archived: false,
   },
 ];
-let mockPlants = baseMockPlants.map((plant) => ({ ...plant }));
+type MockPlantRow = {
+  id: string;
+  name: string;
+  strain: string | null;
+  grow_id: string | null;
+  tent_id: string | null;
+  stage: string;
+  is_archived: boolean;
+};
+let mockPlants: MockPlantRow[] = baseMockPlants.map((plant) => ({ ...plant }));
 
 const baseMockTents = [
   { id: "t1", name: "Default Tent", grow_id: "g1" },

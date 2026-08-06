@@ -30,7 +30,9 @@ describe("GGS Sentinel freshness panel UI", () => {
     const text = panelSource();
 
     expect(text).toContain("export function GgsSentinelFreshnessGuidanceList");
-    expect(text).toContain("<GgsSentinelFreshnessGuidanceList metricFreshness={evaluation.metricFreshness} />");
+    expect(text).toContain(
+      "<GgsSentinelFreshnessGuidanceList metricFreshness={evaluation.metricFreshness} />",
+    );
   });
 
   it("uses a compact one-line metric row that preserves age, status, and next action", () => {

@@ -8,7 +8,7 @@
  * claim to compare this specific cultivar. Reuses the shipped `blueprint`
  * capability gate; no new billing infra.
  */
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import type { VerdantCultivarProfile } from "@/constants/verdantCultivars";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { canUseCapability } from "@/lib/entitlements/capabilityAccess";
@@ -37,10 +37,9 @@ export default function CultivarBlueprintCrossSell({ cultivar }: Props) {
         Score your own plant against pro stage targets
       </h2>
       <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-        Reading up on {cultivar.name}? The Pro Blueprint grades your plant&apos;s
-        live and logged readings green, amber or red against per-stage VPD,
-        temperature, humidity, EC, pH and light bands — over the readings you
-        already have. It scores your plant, not the reference profile.
+        Reading up on {cultivar.name}? The Pro Blueprint grades your plant&apos;s live and logged
+        readings green, amber or red against per-stage VPD, temperature, humidity, EC, pH and light
+        bands — over the readings you already have. It scores your plant, not the reference profile.
       </p>
       {unlocked ? (
         <Link

@@ -60,9 +60,7 @@ function renderVM(input: BuildEvidenceVMInput) {
 describe("AiDoctorEvidencePanel", () => {
   it("renders Environment Check evidence with Test/Local validation badge and captured_at", () => {
     renderVM({
-      environmentCheckEvents: [
-        { occurredAt: "2026-06-08T12:00:00.000Z", noteBody: ACCEPTED_NOTE },
-      ],
+      environmentCheckEvents: [{ occurredAt: "2026-06-08T12:00:00.000Z", noteBody: ACCEPTED_NOTE }],
       environmentCheckTimelineHref: "/timeline#ecowitt-environment-check-2026",
     });
     const envGroup = screen.getByTestId("evidence-group-envCheck");
@@ -70,17 +68,14 @@ describe("AiDoctorEvidencePanel", () => {
     expect(within(envGroup).getAllByText("Test/Local validation").length).toBeGreaterThan(0);
     expect(within(envGroup).queryByText("Live")).toBeNull();
     expect(within(envGroup).getByText("2026-06-08T12:00:00.000Z")).toBeInTheDocument();
-    expect(within(envGroup).getByRole("link", { name: /view ecowitt environment check in timeline/i })).toHaveAttribute(
-      "href",
-      "/timeline#ecowitt-environment-check-2026",
-    );
+    expect(
+      within(envGroup).getByRole("link", { name: /view ecowitt environment check in timeline/i }),
+    ).toHaveAttribute("href", "/timeline#ecowitt-environment-check-2026");
   });
 
   it("renders metric values, statuses, and labels derived VPD as Derived context", () => {
     renderVM({
-      environmentCheckEvents: [
-        { occurredAt: "2026-06-08T12:00:00.000Z", noteBody: ACCEPTED_NOTE },
-      ],
+      environmentCheckEvents: [{ occurredAt: "2026-06-08T12:00:00.000Z", noteBody: ACCEPTED_NOTE }],
     });
     const vpd = screen.getByTestId("evidence-metric-vpd_kpa");
     expect(within(vpd).getByText("Derived context")).toBeInTheDocument();
@@ -92,9 +87,7 @@ describe("AiDoctorEvidencePanel", () => {
 
   it("renders warnings + not-healthy state for rejected/not_checked metrics", () => {
     renderVM({
-      environmentCheckEvents: [
-        { occurredAt: "2026-06-08T12:00:00.000Z", noteBody: REJECTED_NOTE },
-      ],
+      environmentCheckEvents: [{ occurredAt: "2026-06-08T12:00:00.000Z", noteBody: REJECTED_NOTE }],
     });
     const humidity = screen.getByTestId("evidence-metric-humidity_pct");
     expect(within(humidity).getByText("Rejected")).toBeInTheDocument();
@@ -124,13 +117,11 @@ describe("AiDoctorEvidencePanel", () => {
   it("renders env-check-only conservative copy when no live/manual/csv sensors", () => {
     renderVM({
       sensorContext: null,
-      environmentCheckEvents: [
-        { occurredAt: "2026-06-08T12:00:00.000Z", noteBody: ACCEPTED_NOTE },
-      ],
+      environmentCheckEvents: [{ occurredAt: "2026-06-08T12:00:00.000Z", noteBody: ACCEPTED_NOTE }],
     });
-    expect(
-      screen.getByTestId("evidence-conservative-copy").textContent,
-    ).toMatch(/useful context, but it is not live telemetry/i);
+    expect(screen.getByTestId("evidence-conservative-copy").textContent).toMatch(
+      /useful context, but it is not live telemetry/i,
+    );
   });
 
   it("renders live sensor evidence with Live badge", () => {
@@ -147,9 +138,7 @@ describe("AiDoctorEvidencePanel", () => {
   it("does not expose tokens, user_id, service_role, bridge_token, or auth headers", async () => {
     renderVM({
       sensorContext: liveSensor(),
-      environmentCheckEvents: [
-        { occurredAt: "2026-06-08T12:00:00.000Z", noteBody: ACCEPTED_NOTE },
-      ],
+      environmentCheckEvents: [{ occurredAt: "2026-06-08T12:00:00.000Z", noteBody: ACCEPTED_NOTE }],
       environmentCheckTimelineHref: "/timeline",
       diaryLogEvidence: [
         {
@@ -161,7 +150,9 @@ describe("AiDoctorEvidencePanel", () => {
       ],
     });
     const text = document.body.textContent ?? "";
-    expect(text).not.toMatch(/service_role|bridge_token|authorization|bearer\s|jwt|api_key|user_id/i);
+    expect(text).not.toMatch(
+      /service_role|bridge_token|authorization|bearer\s|jwt|api_key|user_id/i,
+    );
   });
 
   it("static safety scan: no writes / functions.invoke / action_queue / device-control", async () => {

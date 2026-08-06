@@ -7,7 +7,7 @@ import { describe, it, expect, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 import type { AiDoctorSessionRow } from "@/hooks/use-ai-doctor-sessions";
@@ -23,7 +23,7 @@ let currentRows: AiDoctorSessionRow[] = [];
 vi.mock("@/integrations/supabase/client", () => {
   const result = () => Promise.resolve({ data: currentRows, error: null });
   const chain: Record<string, unknown> = {};
-  const methods = ["select", "eq", "order", "limit", "range", "not", "gte", "or"];
+  const methods = ["select", "eq", "order", "limit", "range", "not", "gte", "or", "abortSignal"];
   for (const m of methods) chain[m] = () => chain;
   chain.then = (resolve: (v: unknown) => unknown) => result().then(resolve);
   return {
@@ -56,8 +56,8 @@ function makeRow(
     possibleCauses: [],
     immediateAction: "",
     whatNotToDo: [],
-    followUp24h: null,
-    recoveryPlan3d: null,
+    followUp24h: null as never,
+    recoveryPlan3d: null as never,
     riskLevel: "low",
     suggestedActions: [],
     ...diagnosisOverrides,
@@ -99,9 +99,7 @@ describe("formatCautionChecklistDescription", () => {
     expect(formatCautionChecklistDescription([])).toBeNull();
   });
   it("joins items after prefix", () => {
-    expect(formatCautionChecklistDescription(["A.", "B."])).toBe(
-      "Review checklist: A. B.",
-    );
+    expect(formatCautionChecklistDescription(["A.", "B."])).toBe("Review checklist: A. B.");
   });
 });
 
@@ -142,13 +140,9 @@ import CoachAiDoctorHistoryPanel from "@/components/CoachAiDoctorHistoryPanel";
 
 describe("Compact checklist cue rendering", () => {
   it("Sessions index: shows compact cue + Review because text when caution applies", async () => {
-    currentRows = [
-      makeRow("low-conf", {}, { displayed_confidence: 0.3, raw_confidence: 0.3 }),
-    ];
+    currentRows = [makeRow("low-conf", {}, { displayed_confidence: 0.3, raw_confidence: 0.3 })];
     renderWithProviders(<AiDoctorSessionsIndex />);
-    const cue = await screen.findByTestId(
-      "ai-doctor-sessions-index-caution-checklist-summary",
-    );
+    const cue = await screen.findByTestId("ai-doctor-sessions-index-caution-checklist-summary");
     expect(cue.textContent).toBe("Review checklist: 1 check");
     expect(cue.getAttribute("title")).toMatch(/^Review checklist: /);
     expect(cue.getAttribute("aria-label")).toMatch(/^Review checklist: /);
@@ -161,17 +155,13 @@ describe("Compact checklist cue rendering", () => {
     currentRows = [makeRow("healthy")];
     renderWithProviders(<AiDoctorSessionsIndex />);
     await screen.findByTestId("ai-doctor-sessions-index-row");
-    expect(
-      screen.queryByTestId("ai-doctor-sessions-index-caution-checklist-summary"),
-    ).toBeNull();
+    expect(screen.queryByTestId("ai-doctor-sessions-index-caution-checklist-summary")).toBeNull();
   });
 
   it("Plant panel: shows compact cue", async () => {
     currentRows = [makeRow("a", { riskLevel: "high" })];
     renderWithProviders(<PlantAiDoctorSessionsPanel plantId="p1" />);
-    const cue = await screen.findByTestId(
-      "plant-ai-doctor-session-caution-checklist-summary",
-    );
+    const cue = await screen.findByTestId("plant-ai-doctor-session-caution-checklist-summary");
     expect(cue.textContent).toMatch(/^Review checklist: \d+ check/);
     expect(cue.getAttribute("aria-label")).toMatch(/^Review checklist: /);
   });
@@ -179,18 +169,14 @@ describe("Compact checklist cue rendering", () => {
   it("Tent panel: shows compact cue", async () => {
     currentRows = [makeRow("a", { riskLevel: "high" })];
     renderWithProviders(<TentAiDoctorSessionsPanel tentId="t1" />);
-    const cue = await screen.findByTestId(
-      "tent-ai-doctor-session-caution-checklist-summary",
-    );
+    const cue = await screen.findByTestId("tent-ai-doctor-session-caution-checklist-summary");
     expect(cue.textContent).toMatch(/^Review checklist: \d+ check/);
   });
 
   it("Coach panel: shows compact cue", async () => {
     currentRows = [makeRow("a", { riskLevel: "high" })];
     renderWithProviders(<CoachAiDoctorHistoryPanel growId="g1" />);
-    const cue = await screen.findByTestId(
-      "coach-ai-doctor-history-caution-checklist-summary",
-    );
+    const cue = await screen.findByTestId("coach-ai-doctor-history-caution-checklist-summary");
     expect(cue.textContent).toMatch(/^Review checklist: \d+ check/);
   });
 
@@ -198,9 +184,7 @@ describe("Compact checklist cue rendering", () => {
     currentRows = [makeRow("a")];
     renderWithProviders(<PlantAiDoctorSessionsPanel plantId="p1" />);
     await screen.findByTestId("ai-doctor-session-row");
-    expect(
-      screen.queryByTestId("plant-ai-doctor-session-caution-checklist-summary"),
-    ).toBeNull();
+    expect(screen.queryByTestId("plant-ai-doctor-session-caution-checklist-summary")).toBeNull();
   });
 });
 

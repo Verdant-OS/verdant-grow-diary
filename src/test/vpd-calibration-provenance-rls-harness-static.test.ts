@@ -16,6 +16,10 @@ const seedReadingSet = harness.slice(
   harness.indexOf("async function seedReadingSet"),
   harness.indexOf("\nfunction calibrationRow"),
 );
+const withTransportRetry = harness.slice(
+  harness.indexOf("async function withTransportRetry"),
+  harness.indexOf("\nasync function createUser"),
+);
 
 describe("VPD calibration provenance runtime RLS harness contract", () => {
   it("is exposed as an explicit local security lane", () => {
@@ -107,6 +111,50 @@ describe("VPD calibration provenance runtime RLS harness contract", () => {
     expect(harness).toMatch(/!readbackError && count === 0/);
     expect(harness).toContain("unauthorized-row cleanup");
     expect(harness).not.toMatch(/!!error \|\| \(data \?\? \[\]\)\.length === 0/);
+  });
+
+  it("retries only code-less transport failures, loudly and bounded", () => {
+    // A retry may never re-litigate a database verdict: PostgREST and
+    // SQLSTATE rejections always carry an error code and must not retry.
+    expect(harness).toMatch(/return !!error && !error\.code;/);
+    expect(harness).toMatch(/const FIXTURE_TRANSPORT_ATTEMPTS = 3;/);
+    // Pins are scoped to the function body (same technique as the
+    // seedReadingSet slice) so a purely additive edit elsewhere in the
+    // function cannot smuggle in an extra retry of coded errors: the body
+    // must contain exactly the initial attempt plus the guarded loop retry.
+    expect(withTransportRetry).toMatch(
+      /attempt <= FIXTURE_TRANSPORT_ATTEMPTS && isTransportError\(result\.error\)/,
+    );
+    expect(withTransportRetry).toMatch(
+      /console\.error\(\s*` {2}! transport error on "\$\{label\}"/,
+    );
+    expect(withTransportRetry.split("await run()").length - 1).toBe(2);
+    expect(withTransportRetry.split("isTransportError").length - 1).toBe(1);
+    // Deny assertions stay wrapped so a transport hiccup cannot fail them
+    // spuriously, while the readback still decides the verdict.
+    expect(harness).toMatch(/await withTransportRetry\(args\.label, \(\) =>/);
+    expect(harness).toMatch(/await withTransportRetry\(`\$\{args\.label\} readback`, \(\) =>/);
+    // The UPDATE/DELETE immutability checks may not report "denied" when the
+    // client attempt itself died at the transport layer: the attempt error
+    // must be part of each ok-condition, not only the detail string.
+    for (const attemptGuard of [
+      "!isTransportError(updateError) &&",
+      "!isTransportError(deleteError) &&",
+      "!isTransportError(provenanceUpdateError) &&",
+      "!isTransportError(provenanceDeleteError) &&",
+    ]) {
+      expect(harness).toContain(attemptGuard);
+    }
+  });
+
+  it("preserves full error evidence in fixture failures", () => {
+    expect(harness).toMatch(/function errorDetail\(/);
+    expect(harness).toMatch(/`code=\$\{error\.code \?\? "none"\}`/);
+    expect(harness).toContain("no_error_no_row");
+    expect(harness).toContain("stale_calibration_fixture_${errorDetail(staleCalibrationError)}");
+    // The old pattern discarded message/details/hint and made transport
+    // failures indistinguishable from database rejections.
+    expect(harness).not.toContain('?.code ?? "failed"');
   });
 
   it("uses the service role only for fixtures, authoritative readback, and cleanup", () => {

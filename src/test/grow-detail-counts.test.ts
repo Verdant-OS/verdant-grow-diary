@@ -14,7 +14,12 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const ROOT = resolve(__dirname, "../..");
-const PAGE = readFileSync(resolve(ROOT, "src/pages/GrowDetail.tsx"), "utf8") + "\n" + readFileSync(resolve(ROOT, "src/hooks/useGrowDetailData.ts"), "utf8") + "\n" + readFileSync(resolve(ROOT, "src/lib/growStatus.ts"), "utf8");
+const PAGE =
+  readFileSync(resolve(ROOT, "src/pages/GrowDetail.tsx"), "utf8") +
+  "\n" +
+  readFileSync(resolve(ROOT, "src/hooks/useGrowDetailData.ts"), "utf8") +
+  "\n" +
+  readFileSync(resolve(ROOT, "src/lib/growStatus.ts"), "utf8");
 
 describe("GrowDetail — related counts", () => {
   it("counts plants via grow attribution (own grow_id OR the grow's tents)", () => {
@@ -50,11 +55,15 @@ describe("GrowDetail — related counts", () => {
   });
 
   it("pending-actions count filters by status pending_approval", () => {
-    expect(PAGE).toMatch(/countFrom\([\s\S]{0,80}["']action_queue["'][\s\S]{0,200}["']status["'][\s\S]{0,40}["']pending_approval["']/);
+    expect(PAGE).toMatch(
+      /countFrom\([\s\S]{0,80}["']action_queue["'][\s\S]{0,200}["']status["'][\s\S]{0,40}["']pending_approval["']/,
+    );
   });
 
   it("base count query is keyed on grow_id with head:true exact count", () => {
-    expect(PAGE).toMatch(/\.select\(\s*["']id["']\s*,\s*\{\s*count:\s*["']exact["']\s*,\s*head:\s*true\s*\}\s*\)\s*\.eq\(\s*["']grow_id["']\s*,\s*growId/);
+    expect(PAGE).toMatch(
+      /\.select\(\s*["']id["']\s*,\s*\{\s*count:\s*["']exact["']\s*,\s*head:\s*true\s*\}\s*\)\s*\.eq\(\s*["']grow_id["']\s*,\s*growId/,
+    );
   });
 
   it("count failures degrade to 'unavailable' instead of crashing", () => {

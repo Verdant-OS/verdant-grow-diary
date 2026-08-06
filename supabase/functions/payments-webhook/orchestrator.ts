@@ -54,17 +54,16 @@ export type FounderAllocationResult =
  * on paddle_transaction_id).
  */
 export type CreditPackAllocationResult =
-  | { ok: true; reason: "granted" | "idempotent" }
-  | { ok: false; reason: "invalid_input" | string };
+  { ok: true; reason: "granted" | "idempotent" } | { ok: false; reason: "invalid_input" | string };
+
+import type { EventLike } from "./eventProcessor.ts";
 
 export interface ExistingEventRow {
   processing_status: ProcessingStatus;
 }
 
-export interface EventLikeWithId {
+export interface EventLikeWithId extends EventLike {
   eventId?: string;
-  eventType?: string;
-  data?: unknown;
 }
 
 export interface MarkPatch {

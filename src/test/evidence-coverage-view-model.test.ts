@@ -48,11 +48,7 @@ describe("evidenceCoverageViewModel", () => {
 
   it("treats empty/null/missing refs as fallback-only, not invalid", () => {
     const vm = buildEvidenceCoverageViewModel({
-      alerts: [
-        { originating_timeline_events: [] },
-        { originating_timeline_events: null },
-        {},
-      ],
+      alerts: [{ originating_timeline_events: [] }, { originating_timeline_events: null }, {}],
       actions: [],
     });
     expect(vm.alerts.fallbackOnly).toBe(3);
@@ -79,11 +75,7 @@ describe("evidenceCoverageViewModel", () => {
     const vm = buildEvidenceCoverageViewModel({
       alerts: [
         {
-          originating_timeline_events: [
-            { id: "" },
-            { raw_payload: { x: 1 } },
-            validRef,
-          ],
+          originating_timeline_events: [{ id: "" }, { raw_payload: { x: 1 } }, validRef],
         },
       ],
       actions: [],

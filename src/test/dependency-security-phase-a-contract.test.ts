@@ -30,6 +30,16 @@ function isAtLeast(actual: Version, minimum: Version): boolean {
   return true;
 }
 
+function isSafeBraceExpansionVersion(actual: Version): boolean {
+  const [major] = actual;
+  if (major === 1) return isAtLeast(actual, [1, 1, 18]);
+  if (major === 2) return isAtLeast(actual, [2, 1, 4]);
+  if (major === 3) return isAtLeast(actual, [3, 0, 6]);
+  if (major === 4) return false;
+  if (major === 5) return isAtLeast(actual, [5, 0, 9]);
+  return major > 5;
+}
+
 function resolvedVersions(packageName: string): Version[] {
   const escaped = packageName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const matches = bunLock.matchAll(
@@ -78,8 +88,7 @@ describe("dependency security Phase A resolution floors", () => {
   it.each([
     ["vite", [6, 4, 3] as const],
     ["postcss", [8, 5, 18] as const],
-    ["brace-expansion", [1, 1, 16] as const],
-    ["fast-uri", [3, 1, 4] as const],
+    ["fast-uri", [3, 1, 5] as const],
     ["form-data", [4, 0, 6] as const],
     ["js-yaml", [4, 3, 0] as const],
     ["ajv", [6, 15, 0] as const],
@@ -99,6 +108,35 @@ describe("dependency security Phase A resolution floors", () => {
         ).toBe(true);
       }
     }
+  });
+
+  it("keeps every brace-expansion resolution outside the current vulnerable ranges", () => {
+    for (const [lockName, versions] of [
+      ["bun.lock", resolvedVersions("brace-expansion")],
+      ["package-lock.json", npmResolvedVersions("brace-expansion")],
+    ] as const) {
+      expect(versions.length, `brace-expansion must be present in ${lockName}`).toBeGreaterThan(0);
+      for (const version of versions) {
+        expect(
+          isSafeBraceExpansionVersion(version),
+          `${lockName}: brace-expansion@${version.join(".")}`,
+        ).toBe(true);
+      }
+    }
+  });
+
+  it.each([
+    [[1, 1, 17] as const, false],
+    [[1, 1, 18] as const, true],
+    [[2, 1, 3] as const, false],
+    [[2, 1, 4] as const, true],
+    [[3, 0, 5] as const, false],
+    [[3, 0, 6] as const, true],
+    [[4, 0, 1] as const, false],
+    [[5, 0, 8] as const, false],
+    [[5, 0, 9] as const, true],
+  ])("classifies brace-expansion %s safety as %s", (version, expected) => {
+    expect(isSafeBraceExpansionVersion(version)).toBe(expected);
   });
 
   it("does not use a cross-major brace-expansion override", () => {
@@ -121,7 +159,7 @@ describe("dependency security Phase A resolution floors", () => {
 
   it("pins only same-major compatible overrides", () => {
     expect(packageJson.overrides).toMatchObject({
-      "fast-uri": "3.1.4",
+      "fast-uri": "3.1.5",
       "form-data": "4.0.6",
       "js-yaml": "4.3.0",
     });
@@ -137,10 +175,10 @@ describe("dependency security Phase A resolution floors", () => {
         (exception: { package: string; advisoryId: string; severity: string }) =>
           `${exception.package}#${exception.advisoryId}:${exception.severity}`,
       ),
-    ).toEqual(["brace-expansion#1124334:high", "esbuild#1120680:low"]);
+    ).toEqual(["esbuild#1120680:low"]);
   });
 
-  it("does not import either excepted package from production source", () => {
+  it("does not import security-sensitive transitive packages from production source", () => {
     const directImport =
       /(?:from\s+["'](?:brace-expansion|esbuild)["']|import\s*\(\s*["'](?:brace-expansion|esbuild)["']\s*\)|require\s*\(\s*["'](?:brace-expansion|esbuild)["']\s*\))/;
     const offenders = productionSourceFiles(resolve(root, "src"))

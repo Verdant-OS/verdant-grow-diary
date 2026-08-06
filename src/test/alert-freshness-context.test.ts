@@ -19,8 +19,6 @@ function snap(
   overrides: Partial<SensorSnapshot> & { source: SensorSnapshot["source"]; ts: string | null },
 ): SensorSnapshot {
   return {
-    source: overrides.source,
-    ts: overrides.ts,
     temp: null,
     rh: null,
     vpd: null,
@@ -44,14 +42,14 @@ describe("alertFreshnessContext — shared constants", () => {
 
 describe("classifyLatestSnapshotFreshness", () => {
   it("returns unavailable when not loaded", () => {
-    expect(
-      classifyLatestSnapshotFreshness({ status: "loading", snapshot: null, now: NOW }),
-    ).toBe("unavailable");
+    expect(classifyLatestSnapshotFreshness({ status: "loading", snapshot: null, now: NOW })).toBe(
+      "unavailable",
+    );
   });
   it("returns missing when no usable snapshot", () => {
-    expect(
-      classifyLatestSnapshotFreshness({ status: "ok", snapshot: null, now: NOW }),
-    ).toBe("missing");
+    expect(classifyLatestSnapshotFreshness({ status: "ok", snapshot: null, now: NOW })).toBe(
+      "missing",
+    );
     expect(
       classifyLatestSnapshotFreshness({
         status: "ok",
@@ -163,9 +161,7 @@ describe("snapshotAlertsCanPersist", () => {
         }),
       ).toBe(false);
     }
-    expect(
-      snapshotAlertsCanPersist({ status: "loading", snapshot: null, now: NOW }),
-    ).toBe(false);
+    expect(snapshotAlertsCanPersist({ status: "loading", snapshot: null, now: NOW })).toBe(false);
   });
 });
 
@@ -443,12 +439,8 @@ describe("buildLatestSnapshotDetail", () => {
   );
 
   it("returns null while loading/unavailable or when no snapshot", () => {
-    expect(
-      buildLatestSnapshotDetail({ status: "loading", snapshot: null, now: NOW }),
-    ).toBeNull();
-    expect(
-      buildLatestSnapshotDetail({ status: "ok", snapshot: null, now: NOW }),
-    ).toBeNull();
+    expect(buildLatestSnapshotDetail({ status: "loading", snapshot: null, now: NOW })).toBeNull();
+    expect(buildLatestSnapshotDetail({ status: "ok", snapshot: null, now: NOW })).toBeNull();
   });
 
   it("buildAlertsHeaderContext attaches latestDetail mirroring alertsCanPersist", () => {

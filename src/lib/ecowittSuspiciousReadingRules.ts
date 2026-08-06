@@ -89,9 +89,7 @@ function lastStuckRun(
 }
 
 /** Pure suspicious-data evaluator. Caller decides how to render. */
-export function evaluateEcowittSuspicion(
-  input: EcowittSuspicionInput,
-): EcowittSuspicionResult {
+export function evaluateEcowittSuspicion(input: EcowittSuspicionInput): EcowittSuspicionResult {
   const flags: EcowittSuspicionFlag[] = [];
 
   // 1. RH out of [0..100] -> invalid
@@ -104,11 +102,15 @@ export function evaluateEcowittSuspicion(
   }
 
   // 2. Implausible temperature -> invalid
-  if (isFinite(input.temperatureC) && (input.temperatureC < TEMP_C_MIN || input.temperatureC > TEMP_C_MAX)) {
+  if (
+    isFinite(input.temperatureC) &&
+    (input.temperatureC < TEMP_C_MIN || input.temperatureC > TEMP_C_MAX)
+  ) {
     flags.push({
       code: "temperature_implausible_invalid",
       severity: "invalid",
-      message: "Temperature reading is outside a realistic grow-room range and was marked unavailable.",
+      message:
+        "Temperature reading is outside a realistic grow-room range and was marked unavailable.",
     });
   }
 
@@ -117,7 +119,8 @@ export function evaluateEcowittSuspicion(
     flags.push({
       code: "celsius_looking_fahrenheit",
       severity: "suspicious",
-      message: "Temperature looks like a Celsius value but arrived on the Fahrenheit field. Verify gateway units.",
+      message:
+        "Temperature looks like a Celsius value but arrived on the Fahrenheit field. Verify gateway units.",
     });
   }
 
@@ -151,7 +154,8 @@ export function evaluateEcowittSuspicion(
     flags.push({
       code: "impossible_temp_rh_combo",
       severity: "invalid",
-      message: "Temperature and humidity combination is physically implausible; reading marked unavailable.",
+      message:
+        "Temperature and humidity combination is physically implausible; reading marked unavailable.",
     });
   }
 

@@ -6,9 +6,23 @@ import { useQueryClient } from "@tanstack/react-query";
 import type { BreedingEventType } from "@/lib/genetics/breedingTypes";
 import { emitBreedingAuditEvent } from "@/lib/genetics/breedingAuditLog";
 import {
+  callBreedingLogSaveEvent,
+  describeBreedingLogSaveEventReason,
+  BREEDING_LOG_SAVE_EVENT_RPC_NAME,
+} from "@/lib/genetics/breedingLogSaveEventRpc";
+import { MissingAuditRpcError } from "@/lib/rpcAvailability/missingRpcError";
+import { AuditRpcMissingFallback } from "@/components/AuditRpcMissingFallback";
+import {
   resolveBreedingSubmissionAttempt,
   type BreedingSubmissionAttempt,
 } from "@/lib/genetics/breedingSubmissionIdempotencyRules";
+import {
+  resolveBreedingSubmissionKeyDisposition,
+  shouldRetireSubmissionKey,
+  shouldWarnPossibleDuplicate,
+} from "@/lib/genetics/breedingSubmissionRecoveryRules";
+import { logsPath } from "@/lib/routes";
+import { Link } from "@/lib/react-router-compat";
 import { useAuth } from "@/store/auth";
 
 interface Props {
@@ -36,6 +50,13 @@ function normalizeStringDetails(value: unknown): Record<string, string> {
 
 export function BreedingLogContainer({ activeGrowId, plants, onCreated, onCancel }: Props) {
   const [busy, setBusy] = useState(false);
+  const [auditRpcMissing, setAuditRpcMissing] = useState(false);
+  /**
+   * Set when a refusal proved the server already committed this submission.
+   * Persistent on purpose — the toast disappears long before a grower can go
+   * look at their timeline and decide.
+   */
+  const [duplicateRisk, setDuplicateRisk] = useState(false);
   const submissionAttemptRef = useRef<BreedingSubmissionAttempt | null>(null);
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -47,6 +68,9 @@ export function BreedingLogContainer({ activeGrowId, plants, onCreated, onCancel
     requestActionQueueSuggestions: boolean;
   }) => {
     setBusy(true);
+    // Clear first so a warning from an earlier refusal can never outlive the
+    // submission that caused it and attach itself to an unrelated later one.
+    setDuplicateRisk(false);
     try {
       let suggestionsFailed = false;
 
@@ -72,29 +96,41 @@ export function BreedingLogContainer({ activeGrowId, plants, onCreated, onCancel
       );
       submissionAttemptRef.current = attempt;
 
-      const { data: rpcData, error: rpcError } = await supabase.rpc("breeding_log_save_event", {
-        p_idempotency_key: attempt.idempotencyKey,
-        p_grow_id: activeGrowId,
-        p_plant_id: data.plantId,
-        p_event_type: data.subType,
-        p_tent_id: selectedPlant?.tent_id ?? null,
-        p_method: method,
-        p_intensity: intensity,
-        p_details: details,
+      const result = await callBreedingLogSaveEvent({
+        idempotencyKey: attempt.idempotencyKey,
+        growId: activeGrowId,
+        plantId: data.plantId,
+        eventType: data.subType,
+        tentId: selectedPlant?.tent_id ?? null,
+        method,
+        intensity,
+        details,
       });
 
-      if (rpcError) {
-        throw new Error(`Failed to save event: ${rpcError.message}`);
+      if (!result.ok || !result.growEventId) {
+        // Growers get a sentence, not the RPC's internal reason code. The raw
+        // code is kept for diagnostics only.
+        if (result.rawReason && !result.reason) {
+          console.error("[BreedingLogContainer] Unrecognized save reason:", result.rawReason);
+        }
+        // Decide the key's fate BEFORE throwing. Without this the ref survives
+        // the failure, so an unchanged retry re-presents a key the server has
+        // already refused and gets the identical refusal forever.
+        //
+        // Retiring is safe only where the refusal proves nothing committed, or
+        // proves something did and we say so — see breedingSubmissionRecoveryRules.
+        const disposition = resolveBreedingSubmissionKeyDisposition(
+          result.reason ?? result.rawReason,
+        );
+        if (shouldRetireSubmissionKey(disposition)) {
+          submissionAttemptRef.current = null;
+        }
+        if (shouldWarnPossibleDuplicate(disposition)) {
+          setDuplicateRisk(true);
+        }
+        throw new Error(describeBreedingLogSaveEventReason(result.reason ?? result.rawReason));
       }
-      const result = rpcData as {
-        ok?: boolean;
-        grow_event_id?: string;
-        reason?: string;
-      } | null;
-      if (!result?.ok || !result.grow_event_id) {
-        throw new Error(`Failed to save event: ${result?.reason ?? "unknown_error"}`);
-      }
-      const eventId = result.grow_event_id;
+      const eventId = result.growEventId;
       submissionAttemptRef.current = null;
 
       // 2. Suggestions are a separate, explicit grower choice. The event still
@@ -150,11 +186,27 @@ export function BreedingLogContainer({ activeGrowId, plants, onCreated, onCancel
       }
       onCreated();
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Failed to save");
+      if (err instanceof MissingAuditRpcError) {
+        console.error("[BreedingLogContainer] Audit RPC missing:", err.rpcName, err.cause);
+        setAuditRpcMissing(true);
+      } else {
+        toast.error(err instanceof Error ? err.message : "Failed to save");
+      }
     } finally {
       setBusy(false);
     }
   };
+
+  if (auditRpcMissing) {
+    return (
+      <AuditRpcMissingFallback
+        rpcName={BREEDING_LOG_SAVE_EVENT_RPC_NAME}
+        surfaceLabel="Breeding event"
+        onRetry={() => setAuditRpcMissing(false)}
+        onDismiss={onCancel}
+      />
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -163,6 +215,28 @@ export function BreedingLogContainer({ activeGrowId, plants, onCreated, onCancel
         <p className="text-xs text-muted-foreground mb-4">
           Log genetic events. Follow-up suggestions are optional and always require your review.
         </p>
+
+        {duplicateRisk && (
+          <div
+            role="alert"
+            className="mb-4 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3"
+            data-testid="breeding-duplicate-risk"
+          >
+            <p className="text-sm text-foreground">
+              An earlier attempt at this event may already have been saved. Check your timeline
+              before saving again — saving now records a separate event rather than retrying the
+              first one.
+            </p>
+            <Link
+              to={logsPath(activeGrowId)}
+              className="mt-2 inline-block text-sm font-medium underline underline-offset-4"
+              data-testid="breeding-duplicate-risk-link"
+            >
+              Open this grow's timeline
+            </Link>
+          </div>
+        )}
+
         <BreedingEventForm
           plants={plants}
           busy={busy}

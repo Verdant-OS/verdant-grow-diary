@@ -6,7 +6,7 @@
 import { beforeEach, describe, it, expect, vi } from "vitest";
 import { render as rtlRender, screen, fireEvent, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import type { ReactElement } from "react";
 import type { TimelineMemoryItem } from "@/lib/timelineFilterRules";
 
@@ -213,8 +213,10 @@ describe("PlantDetailAiDoctorLiveReview — credit_denied branch", () => {
       "href",
       "/pricing?returnTo=%2Fplants%2Fp1%3FtentId%3Dtent-1%23plant-ai-doctor-review",
     );
-    expect(trackFunnelEvent.mock.calls.filter(([name]) => name === "paywall_viewed")).toHaveLength(
-      1,
+    await waitFor(() =>
+      expect(
+        trackFunnelEvent.mock.calls.filter(([name]) => name === "paywall_viewed"),
+      ).toHaveLength(1),
     );
     expect(trackFunnelEvent).toHaveBeenCalledWith("paywall_viewed", {
       surface: "ai_doctor_limit",

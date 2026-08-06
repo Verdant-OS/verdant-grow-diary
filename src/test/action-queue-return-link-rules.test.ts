@@ -10,9 +10,7 @@ import {
 describe("buildActionsReturnRelativePath", () => {
   it("returns bare /actions when nothing safe is present", () => {
     expect(buildActionsReturnRelativePath(null)).toBe("/actions");
-    expect(buildActionsReturnRelativePath(new URLSearchParams())).toBe(
-      "/actions",
-    );
+    expect(buildActionsReturnRelativePath(new URLSearchParams())).toBe("/actions");
   });
 
   it("preserves only allow-listed keys", () => {
@@ -87,9 +85,7 @@ describe("isSafeActionsReturnPath / parseActionsReturnParam", () => {
   });
 
   it("handles encoded values defensively", () => {
-    expect(parseActionsReturnParam("%2Factions%3Fq%3Dmold")).toBe(
-      "/actions?q=mold",
-    );
+    expect(parseActionsReturnParam("%2Factions%3Fq%3Dmold")).toBe("/actions?q=mold");
   });
 });
 

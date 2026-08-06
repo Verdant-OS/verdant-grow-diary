@@ -13,11 +13,7 @@
  */
 
 export type DailyHistoryKind =
-  | "none"
-  | "manual-only"
-  | "quicklog-only"
-  | "both"
-  | "tent-manual-only";
+  "none" | "manual-only" | "quicklog-only" | "both" | "tent-manual-only";
 
 export interface DailyHistoryManualInput {
   ts: string | null | undefined;

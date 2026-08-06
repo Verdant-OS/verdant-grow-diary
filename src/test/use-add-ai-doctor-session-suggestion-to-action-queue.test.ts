@@ -54,8 +54,7 @@ vi.mock("@/integrations/supabase/client", () => {
   const insertBuilder = (table: string, payload: unknown) => {
     insertCalls.push({ table, payload });
     const promise = Promise.resolve({
-      data:
-        table === "action_queue" && nextInsertResult ? nextInsertResult : null,
+      data: table === "action_queue" && nextInsertResult ? nextInsertResult : null,
       error: nextInsertError,
     });
     // Allow chained .select(...).single()
@@ -202,7 +201,10 @@ describe("useAddAiDoctorSessionSuggestionToActionQueue", () => {
       wrapper: Wrapper,
     });
     await result.current.mutateAsync({ session, action });
-    const payload = insertCalls.find((c) => c.table === "action_queue")!.payload as Record<string, unknown>;
+    const payload = insertCalls.find((c) => c.table === "action_queue")!.payload as Record<
+      string,
+      unknown
+    >;
     expect("user_id" in payload).toBe(false);
   });
 
@@ -212,7 +214,10 @@ describe("useAddAiDoctorSessionSuggestionToActionQueue", () => {
       wrapper: Wrapper,
     });
     await result.current.mutateAsync({ session, action });
-    const payload = insertCalls.find((c) => c.table === "action_queue")!.payload as Record<string, unknown>;
+    const payload = insertCalls.find((c) => c.table === "action_queue")!.payload as Record<
+      string,
+      unknown
+    >;
     expect("target_device" in payload).toBe(false);
   });
 
@@ -298,9 +303,9 @@ describe("useAddAiDoctorSessionSuggestionToActionQueue", () => {
     const { result } = renderHook(() => useAddAiDoctorSessionSuggestionToActionQueue(), {
       wrapper: Wrapper,
     });
-    await expect(
-      result.current.mutateAsync({ session, action }),
-    ).rejects.toMatchObject({ message: /row-level security/ });
+    await expect(result.current.mutateAsync({ session, action })).rejects.toMatchObject({
+      message: /row-level security/,
+    });
     expect(insertCalls.find((c) => c.table === "action_queue_events")).toBeUndefined();
     await waitFor(() => {
       expect(result.current.isError).toBe(true);
@@ -355,7 +360,15 @@ describe("useAddAiDoctorSessionSuggestionToActionQueue — safety scan", () => {
     expect(HOOK_SRC.toLowerCase()).not.toContain("service_role");
   });
   it("does not write to alerts / tasks / sensor_readings / grows / plants / tents", () => {
-    for (const tbl of ["alerts", "tasks", "sensor_readings", "grows", "plants", "tents", "alert_events"]) {
+    for (const tbl of [
+      "alerts",
+      "tasks",
+      "sensor_readings",
+      "grows",
+      "plants",
+      "tents",
+      "alert_events",
+    ]) {
       expect(HOOK_SRC).not.toMatch(new RegExp(`from\\(["']${tbl}["']\\)`));
     }
   });

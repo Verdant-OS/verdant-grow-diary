@@ -47,9 +47,7 @@ describe("parseOptionalNumber", () => {
 
 describe("buildManualSensorSnapshot", () => {
   it("returns null when every field is empty", () => {
-    expect(
-      buildManualSensorSnapshot({ temp: "", humidity: "", ph: "", ec: "" }),
-    ).toBeNull();
+    expect(buildManualSensorSnapshot({ temp: "", humidity: "", ph: "", ec: "" })).toBeNull();
   });
   it("labels source = 'manual' and preserves nulls for empty fields", () => {
     const snap = buildManualSensorSnapshot({ temp: "77.7", humidity: "", ph: "6.2", ec: "" });

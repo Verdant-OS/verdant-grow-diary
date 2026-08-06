@@ -196,15 +196,11 @@ function plural(n: number, one: string, many: string): string {
  * Builds a short helper line for under the merge target picker.
  * Returns "" when nothing notable needs to be disclosed.
  */
-export function formatMergeTargetHelperText(
-  summary: MergeTargetVisibilitySummary,
-): string {
+export function formatMergeTargetHelperText(summary: MergeTargetVisibilitySummary): string {
   const parts: string[] = [];
   const selectable = summary.selectable;
   if (selectable > 0) {
-    parts.push(
-      `Showing ${selectable} same-grow ${plural(selectable, "target", "targets")}.`,
-    );
+    parts.push(`Showing ${selectable} same-grow ${plural(selectable, "target", "targets")}.`);
   }
   if (summary.archivedOrMerged > 0) {
     parts.push(`${summary.archivedOrMerged} archived/merged hidden.`);
@@ -227,8 +223,7 @@ export function formatMergeTargetHelperText(
   return parts.join(" ");
 }
 
-export const MERGE_TARGET_EMPTY_STATE =
-  "No same-grow merge targets available.";
+export const MERGE_TARGET_EMPTY_STATE = "No same-grow merge targets available.";
 
 export const MERGE_TARGET_SOURCE_MISSING_GROW_CONTEXT =
   "This plant is missing grow context. Assign it to a tent in a grow before merging.";

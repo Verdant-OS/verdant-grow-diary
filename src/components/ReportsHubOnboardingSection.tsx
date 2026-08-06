@@ -7,7 +7,7 @@
  *  - Presentational only. No I/O, no writes, no automation.
  *  - Copy is observational. Never claims reports are healthy or complete.
  */
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { ArrowRight, Sparkles } from "lucide-react";
 import {
   REPORTS_HUB_ONBOARDING_SUBTITLE,
@@ -30,12 +30,8 @@ export default function ReportsHubOnboardingSection({ cards }: Props) {
       <header className="flex items-center gap-2 mb-2">
         <Sparkles className="h-4 w-4 text-primary" />
         <div>
-          <h2 className="text-sm font-semibold">
-            {REPORTS_HUB_ONBOARDING_TITLE}
-          </h2>
-          <p className="text-xs text-muted-foreground">
-            {REPORTS_HUB_ONBOARDING_SUBTITLE}
-          </p>
+          <h2 className="text-sm font-semibold">{REPORTS_HUB_ONBOARDING_TITLE}</h2>
+          <p className="text-xs text-muted-foreground">{REPORTS_HUB_ONBOARDING_SUBTITLE}</p>
         </div>
       </header>
       <ul className="grid grid-cols-1 sm:grid-cols-3 gap-2">

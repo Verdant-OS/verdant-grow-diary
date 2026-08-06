@@ -9,7 +9,7 @@ import { describe, it, expect, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 
@@ -96,9 +96,7 @@ describe("AiDoctorSessionsIndex — filtered-empty state", () => {
     fireEvent.change(screen.getByTestId("ai-doctor-sessions-index-filter-risk"), {
       target: { value: "high" },
     });
-    const filteredEmpty = await screen.findByTestId(
-      "ai-doctor-sessions-index-empty-filtered",
-    );
+    const filteredEmpty = await screen.findByTestId("ai-doctor-sessions-index-empty-filtered");
     expect(filteredEmpty.textContent).toMatch(/no sessions match these filters/i);
     expect(screen.queryByTestId("ai-doctor-sessions-index-empty")).toBeNull();
     const clear = screen.getByTestId("ai-doctor-sessions-index-empty-filtered-clear");
@@ -110,8 +108,7 @@ describe("AiDoctorSessionsIndex — filtered-empty state", () => {
 
 describe("AiDoctorSessionsIndex — error state", () => {
   it("renders role='alert' with a Retry button and no internal IDs", async () => {
-    mockRangeImpl = () =>
-      Promise.resolve({ data: null, error: { message: "boom" } });
+    mockRangeImpl = () => Promise.resolve({ data: null, error: { message: "boom" } });
     renderWithProviders(<AiDoctorSessionsIndex />);
     const err = await screen.findByTestId("ai-doctor-sessions-index-error");
     expect(err.getAttribute("role")).toBe("alert");
@@ -136,18 +133,17 @@ describe("AiDoctorSessionsIndex — accessibility & safety (static)", () => {
     expect(PAGE).toMatch(/focus-visible:ring-2/);
   });
   it("retry control has visible focus styles", () => {
-    expect(PAGE).toMatch(
-      /ai-doctor-sessions-index-error-retry[\s\S]{0,300}focus-visible:ring-2/,
-    );
+    expect(PAGE).toMatch(/ai-doctor-sessions-index-error-retry[\s\S]{0,300}focus-visible:ring-2/);
   });
   it("does not contain automation / device-control / AI-execution copy", () => {
     expect(PAGE).not.toMatch(/autopilot/i);
     expect(PAGE).not.toMatch(/\bAI executed\b/i);
-    expect(PAGE).not.toMatch(/turn (on|off) (the )?(fan|light|pump|heater|humidifier|dehumidifier)/i);
+    expect(PAGE).not.toMatch(
+      /turn (on|off) (the )?(fan|light|pump|heater|humidifier|dehumidifier)/i,
+    );
   });
   it("does not import service_role or trust client user_id inserts", () => {
     expect(PAGE).not.toMatch(/service_role/);
     expect(PAGE).not.toMatch(/\.insert\(/);
   });
 });
-

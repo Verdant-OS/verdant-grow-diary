@@ -2,6 +2,11 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  extractMountedAppRoutePaths,
+  isMountedUnderAppShell,
+  readAllRouteModuleSources,
+} from "./helpers/routeManifestSyncHarness";
+import {
   readDesktopGrowerNavigationSource,
   readMobileGrowerNavigationSource,
 } from "@/test/utils/growerNavigationSource";
@@ -10,7 +15,7 @@ function read(path: string): string {
   return readFileSync(resolve(process.cwd(), path), "utf8");
 }
 
-const APP = read("src/App.tsx");
+const APP = readAllRouteModuleSources();
 const MANIFEST = read("src/lib/appRouteManifest.ts");
 const SIDEBAR = readDesktopGrowerNavigationSource();
 const MOBILE = readMobileGrowerNavigationSource();
@@ -18,7 +23,9 @@ const ONBOARDING = read("src/components/OnboardingChecklistCard.tsx");
 
 describe("authenticated grower invite reachability", () => {
   it("mounts /invite only inside the authenticated AppShell route group", () => {
-    expect(APP).toContain('path="/invite" element={<GrowerInvite />}');
+    expect(extractMountedAppRoutePaths()).toContain("/invite");
+    expect(isMountedUnderAppShell("/invite")).toBe(true);
+    expect(APP).toMatch(/GrowerInvite|@\/pages\/GrowerInvite|pages\/GrowerInvite/);
     expect(MANIFEST).toContain('path: "/invite"');
     expect(MANIFEST).toMatch(/path: "\/invite",\s+access: "auth"/);
   });

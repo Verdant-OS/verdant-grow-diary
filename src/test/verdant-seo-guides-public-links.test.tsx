@@ -4,12 +4,13 @@
  * Render-level hardening for the public /guides SEO surface:
  *  - /guides and every /guides/:slug page renders WITHOUT any auth
  *    provider mounted (no sign-in wall, no app shell).
- *  - Every internal link on every guide page resolves to a route the
- *    manifest explicitly marks `public` (or a real public/ static asset).
- *  - No internal link points at a missing route or a protected surface.
+ *  - Every internal link on every guide page resolves to a known route (or
+ *    real public/ static asset).
+ *  - Only the Oreoz/Gelonade guide may link into its explicitly allow-listed
+ *    authenticated diary handoffs.
  *  - Clicking guide-family links keeps the user on public guide content.
- *  - Public guide presenters do not promote the retired, unbacked Customer
- *    Mode share paths.
+ *  - The exact ID-free Customer Mode comparison is public while unbacked
+ *    dynamic share paths remain retired.
  *  - Rendered copy + head metadata carry no device-control/autopilot
  *    promises and no compliance-tool (Metrc/seed-to-sale) positioning.
  *
@@ -19,11 +20,19 @@ import { describe, it, expect, afterEach } from "vitest";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "@/lib/react-router-compat";
 import GuidesIndex from "@/pages/GuidesIndex";
 import GuidePage from "@/pages/GuidePage";
 import { VERDANT_GUIDE_SLUGS } from "@/constants/verdantSeoContent";
 import { APP_ROUTES } from "@/lib/appRouteManifest";
+import {
+  GELONADE_DIARY_PROFILE_PATH,
+  NEXT_DOOR_CUSTOMER_COMPARISON_PATH,
+  OREOZ_DIARY_PROFILE_PATH,
+  OREOZ_GELONADE_DIARY_COMPARISON_PATH,
+  OREOZ_GELONADE_GUIDE_PATH,
+  OREOZ_GELONADE_GUIDE_QUICK_LOG_PATH,
+} from "@/constants/oreozGelonadeExperience";
 
 const REPO = resolve(__dirname, "../..");
 
@@ -67,6 +76,13 @@ const PROTECTED_PREFIXES = [
   "/operator",
   "/actions",
 ];
+
+const ALLOWED_OREOZ_GELONADE_AUTH_LINKS = new Set<string>([
+  OREOZ_GELONADE_GUIDE_QUICK_LOG_PATH,
+  OREOZ_GELONADE_DIARY_COMPARISON_PATH,
+  OREOZ_DIARY_PROFILE_PATH,
+  GELONADE_DIARY_PROFILE_PATH,
+]);
 
 function LocationProbe() {
   const loc = useLocation();
@@ -130,7 +146,7 @@ describe("/guides pages render publicly (no auth mounted)", () => {
 // Internal-link integrity against the route manifest
 // ---------------------------------------------------------------------------
 
-describe("/guides internal links resolve to explicitly-public routes", () => {
+describe("/guides internal links resolve to known routes with one scoped diary handoff", () => {
   for (const path of ALL_GUIDE_PATHS) {
     it(`${path}: every internal link is a known public route or asset`, () => {
       const { container } = renderGuides(path);
@@ -141,9 +157,15 @@ describe("/guides internal links resolve to explicitly-public routes", () => {
         const pathname = pathnameOf(href);
         const entry = manifestEntryFor(pathname);
         if (entry) {
+          if (path === OREOZ_GELONADE_GUIDE_PATH && ALLOWED_OREOZ_GELONADE_AUTH_LINKS.has(href)) {
+            expect(entry.access, `${href} must remain an authenticated diary destination`).toBe(
+              "auth",
+            );
+            continue;
+          }
           expect(
             entry.access,
-            `${path} links to ${href} (manifest access "${entry.access}") — guide pages may only link to explicitly public routes`,
+            `${path} links to ${href} (manifest access "${entry.access}") outside the scoped diary handoff`,
           ).toBe("public");
           continue;
         }
@@ -167,7 +189,13 @@ describe("/guides internal links resolve to explicitly-public routes", () => {
         for (const prefix of PROTECTED_PREFIXES) {
           if (pathname === prefix || pathname.startsWith(`${prefix}/`)) {
             const entry = manifestEntryFor(pathname);
-            expect(entry?.access, `${path} links to protected-prefix route ${href}`).toBe("public");
+            if (path === OREOZ_GELONADE_GUIDE_PATH && ALLOWED_OREOZ_GELONADE_AUTH_LINKS.has(href)) {
+              expect(entry?.access).toBe("auth");
+            } else {
+              expect(entry?.access, `${path} links to protected-prefix route ${href}`).toBe(
+                "public",
+              );
+            }
           }
         }
       }
@@ -218,8 +246,8 @@ describe("/guides click-through stays on public content", () => {
     expect(screen.getByTestId("location-probe")).toHaveTextContent("/welcome");
   });
 
-  for (const path of ALL_GUIDE_PATHS) {
-    it(`${path}: does not render a retired Customer Mode CTA`, () => {
+  for (const path of ALL_GUIDE_PATHS.filter((path) => path !== OREOZ_GELONADE_GUIDE_PATH)) {
+    it(`${path}: does not render a Customer Mode CTA`, () => {
       const { container } = renderGuides(path);
       const customerLinks = [...container.querySelectorAll<HTMLAnchorElement>("a[href]")].filter(
         (link) => pathnameOf(link.getAttribute("href") ?? "").startsWith("/customer/"),
@@ -229,10 +257,26 @@ describe("/guides click-through stays on public content", () => {
     });
   }
 
-  it("preserves real public routes without restoring Customer Mode", () => {
+  it("renders only the exact ID-free Customer Mode comparison link on its source guide", () => {
+    const { container } = renderGuides(OREOZ_GELONADE_GUIDE_PATH);
+    const customerLinks = [...container.querySelectorAll<HTMLAnchorElement>("a[href]")].filter(
+      (link) => pathnameOf(link.getAttribute("href") ?? "").startsWith("/customer/"),
+    );
+    expect(customerLinks.map((link) => link.getAttribute("href"))).toEqual([
+      NEXT_DOOR_CUSTOMER_COMPARISON_PATH,
+    ]);
+  });
+
+  it("preserves real public routes and only the scoped static Customer Mode route", () => {
     expect(manifestEntryFor("/welcome")?.access).toBe("public");
     expect(manifestEntryFor("/pricing")?.access).toBe("public");
-    expect(APP_ROUTES.some((route) => route.path.startsWith("/customer/"))).toBe(false);
+    expect(APP_ROUTES.filter((route) => route.path.startsWith("/customer/"))).toEqual([
+      expect.objectContaining({
+        path: NEXT_DOOR_CUSTOMER_COMPARISON_PATH,
+        access: "public",
+      }),
+    ]);
+    expect(APP_ROUTES.some((route) => route.path.includes(":shareId"))).toBe(false);
   });
 });
 

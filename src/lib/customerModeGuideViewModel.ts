@@ -19,11 +19,7 @@
  */
 
 export type CustomerGuideSectionId =
-  | "brand_intro"
-  | "batch_summary"
-  | "cultivation_highlights"
-  | "care_notes"
-  | "trust_footer";
+  "brand_intro" | "batch_summary" | "cultivation_highlights" | "care_notes" | "trust_footer";
 
 export interface CustomerGuideSection {
   id: CustomerGuideSectionId;
@@ -35,11 +31,7 @@ export interface CustomerGuideSection {
   isPlaceholder: true;
 }
 
-export type CustomerGuideTimelineCategory =
-  | "milestone"
-  | "care"
-  | "harvest"
-  | "note";
+export type CustomerGuideTimelineCategory = "milestone" | "care" | "harvest" | "note";
 
 /**
  * Public-safe customer-facing event shape.

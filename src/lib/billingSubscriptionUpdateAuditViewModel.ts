@@ -10,25 +10,13 @@
  */
 
 export type BillingSubscriptionUpdateAuditStatus =
-  | "created"
-  | "updated"
-  | "noop"
-  | "blocked"
-  | "failed"
-  | "skipped";
+  "created" | "updated" | "noop" | "blocked" | "failed" | "skipped";
 
 export type BillingSubscriptionUpdateAuditPlanId =
-  | "free"
-  | "pro_monthly"
-  | "pro_annual"
-  | "founder_lifetime";
+  "free" | "pro_monthly" | "pro_annual" | "founder_lifetime";
 
 export type BillingSubscriptionUpdateAuditSubscriptionStatus =
-  | "active"
-  | "past_due"
-  | "canceled"
-  | "paused"
-  | "expired";
+  "active" | "past_due" | "canceled" | "paused" | "expired";
 
 export interface BillingSubscriptionUpdateAuditCounts {
   created: number;
@@ -85,7 +73,7 @@ export const BILLING_SUBSCRIPTION_UPDATE_AUDIT_FORBIDDEN_KEYS = [
 ] as const;
 
 export type BillingSubscriptionUpdateAuditForbiddenKey =
-  typeof BILLING_SUBSCRIPTION_UPDATE_AUDIT_FORBIDDEN_KEYS[number];
+  (typeof BILLING_SUBSCRIPTION_UPDATE_AUDIT_FORBIDDEN_KEYS)[number];
 
 export interface BillingSubscriptionUpdateAuditRow {
   createdAt: string | null;
@@ -112,12 +100,8 @@ export type BillingSubscriptionUpdateAuditDisplayRow = BillingSubscriptionUpdate
  * Compile-time guard: any forbidden key appearing on the operator or
  * display row makes this type resolve to `never`, breaking the build.
  */
-type AssertNoForbiddenKeys<T> = Extract<
-  keyof T,
-  BillingSubscriptionUpdateAuditForbiddenKey
-> extends never
-  ? true
-  : never;
+type AssertNoForbiddenKeys<T> =
+  Extract<keyof T, BillingSubscriptionUpdateAuditForbiddenKey> extends never ? true : never;
 
 const _assertSafeOperatorRow: AssertNoForbiddenKeys<BillingSubscriptionUpdateAuditOperatorRow> = true;
 const _assertSafeDisplayRow: AssertNoForbiddenKeys<BillingSubscriptionUpdateAuditDisplayRow> = true;
@@ -161,13 +145,14 @@ const PLAN_LABELS: Record<BillingSubscriptionUpdateAuditPlanId, string> = {
   founder_lifetime: "Founder Lifetime",
 };
 
-const SUBSCRIPTION_STATUS_LABELS: Record<BillingSubscriptionUpdateAuditSubscriptionStatus, string> = {
-  active: "Active",
-  past_due: "Past due",
-  canceled: "Canceled",
-  paused: "Paused",
-  expired: "Expired",
-};
+const SUBSCRIPTION_STATUS_LABELS: Record<BillingSubscriptionUpdateAuditSubscriptionStatus, string> =
+  {
+    active: "Active",
+    past_due: "Past due",
+    canceled: "Canceled",
+    paused: "Paused",
+    expired: "Expired",
+  };
 
 const TOP_REASON_LABELS: Record<string, string> = {
   not_authenticated: "Sign in required before viewing the subscription update audit.",
@@ -281,7 +266,7 @@ export function parseBillingSubscriptionUpdateAuditResponse(
   const ok = input.ok === true;
   const reason = asString(input.reason) ?? (ok ? null : "unknown_response");
   const reasonLabel = reason
-    ? TOP_REASON_LABELS[reason] ?? "Audit reason recorded; label unavailable."
+    ? (TOP_REASON_LABELS[reason] ?? "Audit reason recorded; label unavailable.")
     : null;
 
   const countsRaw = isRecord(input.counts) ? input.counts : {};
@@ -296,39 +281,37 @@ export function parseBillingSubscriptionUpdateAuditResponse(
   };
 
   const rowsRaw = Array.isArray(input.latest) ? input.latest : [];
-  const latest: BillingSubscriptionUpdateAuditDisplayRow[] = rowsRaw
-    .filter(isRecord)
-    .map((row) => {
-      // Explicit allow-list narrowing: we never spread `row`. The
-      // sanitized operator row contains only fields validated above.
-      const operatorRow: BillingSubscriptionUpdateAuditOperatorRow = {
-        created_at: asString(row.created_at),
-        result_status: asStatus(row.result_status),
-        result_reason: asString(row.result_reason),
-        candidate_plan_id: asPlan(row.candidate_plan_id),
-        candidate_status: asSubStatus(row.candidate_status),
-        subscription_status: asSubStatus(row.subscription_status),
-      } satisfies BillingSubscriptionUpdateAuditOperatorRow;
+  const latest: BillingSubscriptionUpdateAuditDisplayRow[] = rowsRaw.filter(isRecord).map((row) => {
+    // Explicit allow-list narrowing: we never spread `row`. The
+    // sanitized operator row contains only fields validated above.
+    const operatorRow: BillingSubscriptionUpdateAuditOperatorRow = {
+      created_at: asString(row.created_at),
+      result_status: asStatus(row.result_status),
+      result_reason: asString(row.result_reason),
+      candidate_plan_id: asPlan(row.candidate_plan_id),
+      candidate_status: asSubStatus(row.candidate_status),
+      subscription_status: asSubStatus(row.subscription_status),
+    } satisfies BillingSubscriptionUpdateAuditOperatorRow;
 
-      const displayRow: BillingSubscriptionUpdateAuditDisplayRow = {
-        createdAt: operatorRow.created_at,
-        resultStatus: operatorRow.result_status,
-        resultStatusLabel: formatBillingSubscriptionUpdateAuditStatus(operatorRow.result_status),
-        resultReason: operatorRow.result_reason,
-        resultReasonLabel: formatBillingSubscriptionUpdateAuditReason(operatorRow.result_reason),
-        candidatePlanId: operatorRow.candidate_plan_id,
-        candidatePlanLabel: formatBillingSubscriptionUpdateAuditPlan(operatorRow.candidate_plan_id),
-        candidateStatus: operatorRow.candidate_status,
-        candidateStatusLabel: formatBillingSubscriptionUpdateAuditSubscriptionStatus(
-          operatorRow.candidate_status,
-        ),
-        subscriptionStatus: operatorRow.subscription_status,
-        subscriptionStatusLabel: formatBillingSubscriptionUpdateAuditSubscriptionStatus(
-          operatorRow.subscription_status,
-        ),
-      } satisfies BillingSubscriptionUpdateAuditDisplayRow;
-      return displayRow;
-    });
+    const displayRow: BillingSubscriptionUpdateAuditDisplayRow = {
+      createdAt: operatorRow.created_at,
+      resultStatus: operatorRow.result_status,
+      resultStatusLabel: formatBillingSubscriptionUpdateAuditStatus(operatorRow.result_status),
+      resultReason: operatorRow.result_reason,
+      resultReasonLabel: formatBillingSubscriptionUpdateAuditReason(operatorRow.result_reason),
+      candidatePlanId: operatorRow.candidate_plan_id,
+      candidatePlanLabel: formatBillingSubscriptionUpdateAuditPlan(operatorRow.candidate_plan_id),
+      candidateStatus: operatorRow.candidate_status,
+      candidateStatusLabel: formatBillingSubscriptionUpdateAuditSubscriptionStatus(
+        operatorRow.candidate_status,
+      ),
+      subscriptionStatus: operatorRow.subscription_status,
+      subscriptionStatusLabel: formatBillingSubscriptionUpdateAuditSubscriptionStatus(
+        operatorRow.subscription_status,
+      ),
+    } satisfies BillingSubscriptionUpdateAuditDisplayRow;
+    return displayRow;
+  });
 
   return {
     ok,

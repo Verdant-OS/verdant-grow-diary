@@ -9,25 +9,15 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import { LinkedActionCountBadge } from "@/components/LinkedActionCountBadge";
-import {
-  actionDetailPath,
-  actionQueueAlertContextPath,
-} from "@/lib/routes";
+import { actionDetailPath, actionQueueAlertContextPath } from "@/lib/routes";
 import type { AlertLinkedActionsSummary } from "@/lib/alertsLinkedActionsViewModel";
 
-function renderBadge(
-  alertId: string,
-  summary: AlertLinkedActionsSummary | undefined,
-) {
+function renderBadge(alertId: string, summary: AlertLinkedActionsSummary | undefined) {
   return render(
     <MemoryRouter>
-      <LinkedActionCountBadge
-        alertId={alertId}
-        summary={summary}
-        testIdPrefix="badge"
-      />
+      <LinkedActionCountBadge alertId={alertId} summary={summary} testIdPrefix="badge" />
     </MemoryRouter>,
   );
 }
@@ -44,21 +34,15 @@ describe("LinkedActionCountBadge — aria-labels", () => {
   it("two-action anchor uses 'View 2 actions linked to this alert'", () => {
     renderBadge("alert-1", { count: 2, singleActionId: null });
     const anchor = screen.getByTestId("badge-linked-action-anchor");
-    expect(anchor.getAttribute("aria-label")).toBe(
-      "View 2 actions linked to this alert",
-    );
+    expect(anchor.getAttribute("aria-label")).toBe("View 2 actions linked to this alert");
     expect(anchor.textContent).toBe("View linked actions");
-    expect(anchor.getAttribute("href")).toBe(
-      actionQueueAlertContextPath("alert-1"),
-    );
+    expect(anchor.getAttribute("href")).toBe(actionQueueAlertContextPath("alert-1"));
   });
 
   it("pluralizes for 3+ actions", () => {
     renderBadge("alert-1", { count: 5, singleActionId: null });
     const anchor = screen.getByTestId("badge-linked-action-anchor");
-    expect(anchor.getAttribute("aria-label")).toBe(
-      "View 5 actions linked to this alert",
-    );
+    expect(anchor.getAttribute("aria-label")).toBe("View 5 actions linked to this alert");
   });
 
   it("renders nothing when there are no linked actions", () => {
@@ -92,9 +76,9 @@ describe("LinkedActionCountBadge — aria-labels", () => {
 
   it("routing hrefs remain unchanged after aria-label additions", () => {
     renderBadge("alert-xyz", { count: 1, singleActionId: "act-xyz" });
-    expect(
-      screen.getByTestId("badge-linked-action-anchor").getAttribute("href"),
-    ).toBe(actionDetailPath("act-xyz"));
+    expect(screen.getByTestId("badge-linked-action-anchor").getAttribute("href")).toBe(
+      actionDetailPath("act-xyz"),
+    );
 
     renderBadge("alert-xyz", { count: 4, singleActionId: null });
     const anchors = screen.getAllByTestId("badge-linked-action-anchor");

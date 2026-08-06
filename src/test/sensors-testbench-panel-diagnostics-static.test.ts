@@ -2,10 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-const PANEL = readFileSync(
-  resolve(__dirname, "../components/SensorsTestbenchPanel.tsx"),
-  "utf8",
-);
+const PANEL = readFileSync(resolve(__dirname, "../components/SensorsTestbenchPanel.tsx"), "utf8");
 
 describe("SensorsTestbenchPanel diagnostics static safety", () => {
   it("renders Supabase URL and ingest URL diagnostics", () => {
@@ -40,10 +37,17 @@ describe("SensorsTestbenchPanel diagnostics static safety", () => {
     expect(PANEL).toMatch(/buildSensorIngestTestPayload/);
   });
 
+  it("never touches web storage or IndexedDB at all (whole-file, not proximity)", () => {
+    // Bridge audit gap G6: the old 40-char proximity regex missed a renamed
+    // reveal variable. The panel has no legitimate storage use, so forbid
+    // every storage API outright.
+    expect(PANEL).not.toMatch(/\blocalStorage\b/);
+    expect(PANEL).not.toMatch(/\bsessionStorage\b/);
+    expect(PANEL).not.toMatch(/\bindexedDB\b/i);
+  });
 
-  it("never persists token plaintext to storage", () => {
-    expect(PANEL).not.toMatch(/localStorage[\s\S]{0,40}reveal/);
-    expect(PANEL).not.toMatch(/sessionStorage[\s\S]{0,40}reveal/);
+  it("never logs from the token-handling panel", () => {
+    expect(PANEL).not.toMatch(/console\.(log|info|warn|error|debug)/);
   });
 
   it("does not contain SERVICE_ROLE in panel source", () => {

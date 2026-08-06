@@ -75,7 +75,10 @@ describe("XLSX sensor history import — duplicate handling", () => {
     const rows = buildRows(10);
     // Mark first 6 rows as already present.
     const existing = new Set(
-      rows.slice(0, 6).map((r) => dedupeKeyOf(r)!).filter(Boolean),
+      rows
+        .slice(0, 6)
+        .map((r) => dedupeKeyOf(r)!)
+        .filter(Boolean),
     );
     const insertedBatches: Row[][] = [];
     const insertBatch = vi.fn(async (batch: Row[]) => {
@@ -127,8 +130,7 @@ describe("XLSX sensor history import — duplicate handling", () => {
       insertBatch: async () => ({
         error: {
           code: "23505",
-          message:
-            'duplicate key value violates unique constraint "sensor_readings_dedupe_uidx"',
+          message: 'duplicate key value violates unique constraint "sensor_readings_dedupe_uidx"',
         } as BatchInsertError,
       }),
     });

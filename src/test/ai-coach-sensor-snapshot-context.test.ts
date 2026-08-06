@@ -204,9 +204,7 @@ describe("ai-coach edge function — static safety + wiring scan", () => {
   });
 
   it("imports and uses the shared buildAiSensorSnapshotContext helper", () => {
-    expect(indexSrc).toContain(
-      'from "../_shared/lib/lib/aiSensorSnapshotContextRules.ts"',
-    );
+    expect(indexSrc).toContain('from "../_shared/lib/lib/aiSensorSnapshotContextRules.ts"');
     expect(indexSrc).toContain("buildAiSensorSnapshotContext(latestSnapshot");
   });
 

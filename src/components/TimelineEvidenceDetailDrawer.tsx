@@ -93,7 +93,7 @@ export default function TimelineEvidenceDetailDrawer({ viewModel, open, onClose 
           onClick={onClose}
           aria-label="Close entry details"
           data-testid="timeline-evidence-drawer-close"
-          className="absolute top-3 right-3 rounded-full p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary/60 focus:outline-none focus:ring-2 focus:ring-primary/60"
+          className="absolute top-3 right-3 rounded-full p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary/60 focus:outline-hidden focus:ring-2 focus:ring-primary/60"
         >
           <X className="h-4 w-4" />
         </button>

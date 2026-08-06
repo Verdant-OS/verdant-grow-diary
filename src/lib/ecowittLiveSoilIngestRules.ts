@@ -33,6 +33,7 @@ import {
   classifyManualMetric,
 } from "@/lib/sensorTruthRules";
 
+import { ECOWITT_LIVE_SOIL_STALE_MS } from "../constants/sensorTiming";
 // ---------------------------------------------------------------------------
 // Contract
 // ---------------------------------------------------------------------------
@@ -42,7 +43,7 @@ export const ECOWITT_LIVE_SOIL_SOURCE = "ecowitt" as const;
 export const ECOWITT_LIVE_SOIL_TRANSPORT = "mqtt" as const;
 
 /** Stale window for live bridge readings. Anything older than this is invalid. */
-export const ECOWITT_LIVE_SOIL_STALE_MS = 15 * 60 * 1000;
+export { ECOWITT_LIVE_SOIL_STALE_MS };
 /** Future-tolerance for sensor clock skew. */
 export const ECOWITT_LIVE_SOIL_FUTURE_MS = 5 * 60 * 1000;
 
@@ -174,10 +175,7 @@ function resolveAirTempF(payload: Record<string, unknown>): number | null {
 }
 
 /** Resolve soil temperature in Fahrenheit for a given channel suffix. */
-function resolveSoilTempF(
-  payload: Record<string, unknown>,
-  channelIdx: number,
-): number | null {
+function resolveSoilTempF(payload: Record<string, unknown>, channelIdx: number): number | null {
   const f = pick(payload, [`soiltemp${channelIdx}f`]);
   if (f !== null) return f;
   const c = pick(payload, [`soiltemp${channelIdx}c`]);
@@ -266,7 +264,11 @@ export function normalizeEcowittLiveSoilPayload(
     now.toISOString();
   // We always have a captured_at (fallback to injected now). But if dateutc
   // was provided AND unparsable, flag malformed and bail.
-  if ("dateutc" in payload && payload["dateutc"] !== null && parseEcowittDateUtc(payload["dateutc"]) === null) {
+  if (
+    "dateutc" in payload &&
+    payload["dateutc"] !== null &&
+    parseEcowittDateUtc(payload["dateutc"]) === null
+  ) {
     return { payloads: [], reasons: ["missing_captured_at"], chips: ["Missing captured_at"] };
   }
 
@@ -355,9 +357,7 @@ export function normalizeEcowittLiveSoilPayload(
   for (const key of soilKeys) {
     const idx = soilChannelIndex(key);
     if (idx === null) continue;
-    const target =
-      input.soilChannelMap?.[key] ??
-      input.soilChannelMap?.[key.toLowerCase()];
+    const target = input.soilChannelMap?.[key] ?? input.soilChannelMap?.[key.toLowerCase()];
 
     const raw = toNum(payload[key]);
     if (raw === null) continue;
@@ -473,9 +473,7 @@ export function parseEcowittSoilChannelMap(raw: unknown): EcowittSoilChannelMap 
  */
 export class EcowittBridgeConfigError extends Error {
   readonly code:
-    | "mixed_tent_channel_map"
-    | "channel_map_tent_mismatch"
-    | "invalid_channel_map_schema";
+    "mixed_tent_channel_map" | "channel_map_tent_mismatch" | "invalid_channel_map_schema";
   /**
    * Optional per-field diagnostic paths that pinpoint the exact offending
    * entries inside `ECOWITT_SOIL_CHANNEL_MAP_JSON` (e.g.
@@ -509,8 +507,7 @@ export const ECOWITT_SOIL_CHANNEL_MAP_SCHEMA_ID =
   "https://verdantgrowdiary.com/schemas/ecowitt-soil-channel-map.schema.json" as const;
 
 const CHANNEL_KEY_RE = /^soilmoisture([1-9]|[1-9][0-9])$/;
-const UUID_RE =
-  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 const ALLOWED_TARGET_KEYS = new Set(["tent_id", "plant_id", "label"]);
 
 export interface EcowittSoilChannelMapSchemaError {
@@ -612,8 +609,8 @@ export function assertEcowittSoilChannelMapJsonEnv(raw: unknown): void {
 
 /** Numeric comparator for soilmoistureN keys so soilmoisture10 > soilmoisture2. */
 function compareChannelKeys(a: string, b: string): number {
-  const na = Number((a.match(CHANNEL_KEY_RE)?.[1] ?? "0"));
-  const nb = Number((b.match(CHANNEL_KEY_RE)?.[1] ?? "0"));
+  const na = Number(a.match(CHANNEL_KEY_RE)?.[1] ?? "0");
+  const nb = Number(b.match(CHANNEL_KEY_RE)?.[1] ?? "0");
   if (na !== nb) return na - nb;
   return a.localeCompare(b);
 }

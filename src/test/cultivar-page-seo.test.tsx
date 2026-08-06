@@ -6,7 +6,7 @@
  */
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import CultivarPage from "@/pages/CultivarPage";
 import { buildCultivarFaqItems } from "@/lib/cultivarDetailSeo";
 import { VERDANT_CULTIVARS } from "@/constants/verdantCultivars";
@@ -25,11 +25,9 @@ function renderPage(slug: string) {
 
 function ldDocs(): Record<string, unknown> {
   const out: Record<string, unknown> = {};
-  document.head
-    .querySelectorAll<HTMLScriptElement>("script[data-page-ldjson]")
-    .forEach((s) => {
-      out[s.getAttribute("data-page-ldjson") ?? ""] = JSON.parse(s.text);
-    });
+  document.head.querySelectorAll<HTMLScriptElement>("script[data-page-ldjson]").forEach((s) => {
+    out[s.getAttribute("data-page-ldjson") ?? ""] = JSON.parse(s.text);
+  });
   return out;
 }
 
@@ -38,9 +36,7 @@ afterEach(cleanup);
 describe("Cultivar detail SEO", () => {
   it("renders a visible FAQ matching the FAQ helper", () => {
     renderPage("og-kush");
-    const expected = buildCultivarFaqItems(
-      VERDANT_CULTIVARS.find((c) => c.slug === "og-kush")!,
-    );
+    const expected = buildCultivarFaqItems(VERDANT_CULTIVARS.find((c) => c.slug === "og-kush")!);
     const rendered = screen.getAllByTestId("cultivar-faq-item");
     expect(rendered.length).toBe(expected.length);
     expect(screen.getByTestId("cultivar-faq")).toHaveTextContent(expected[0].question);

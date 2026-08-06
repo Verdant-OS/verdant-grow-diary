@@ -16,13 +16,7 @@
  * code.
  */
 
-export type DiaryFixtureSource =
-  | "csv"
-  | "manual"
-  | "demo"
-  | "stale"
-  | "invalid"
-  | "import";
+export type DiaryFixtureSource = "csv" | "manual" | "demo" | "stale" | "invalid" | "import";
 
 export interface DiaryFixtureWindow {
   start: string;
@@ -125,14 +119,7 @@ export interface CompiledDoctorContext {
   follow_ups: { in_24_hours: string | null; in_3_days: string | null };
 }
 
-const ALLOWED_SOURCES = new Set<string>([
-  "csv",
-  "manual",
-  "demo",
-  "stale",
-  "invalid",
-  "import",
-]);
+const ALLOWED_SOURCES = new Set<string>(["csv", "manual", "demo", "stale", "invalid", "import"]);
 
 const DEVICE_COMMAND_PATTERNS: RegExp[] = [
   /\bturn[_\s-]?on\b/i,
@@ -168,9 +155,7 @@ function compactAverages(input: DiaryFixtureTentAverages | undefined): DiaryFixt
 
 function isProbeFlagged(status: string, notes: string): boolean {
   const haystack = `${status} ${notes}`.toLowerCase();
-  return /(invalid|unknown|blocked|partial|stale|missing|commission)/.test(
-    haystack,
-  );
+  return /(invalid|unknown|blocked|partial|stale|missing|commission)/.test(haystack);
 }
 
 function containsDeviceCommand(text: string): boolean {
@@ -183,9 +168,7 @@ function containsDeviceCommand(text: string): boolean {
  * an unknown source label is a sensor-truth violation we should not paper
  * over.
  */
-export function compileDoctorContextFromDiaryFixture(
-  fixture: DiaryFixture,
-): CompiledDoctorContext {
+export function compileDoctorContextFromDiaryFixture(fixture: DiaryFixture): CompiledDoctorContext {
   if (!fixture || typeof fixture !== "object") {
     throw new Error("compileDoctorContextFromDiaryFixture: fixture is required");
   }
@@ -260,9 +243,7 @@ export function compileDoctorContextFromDiaryFixture(
   const missingInfo = (fixture.ai_doctor_context?.missing_information ?? [])
     .map((x) => safeString(x))
     .filter(Boolean);
-  const doNot = (fixture.ai_doctor_context?.do_not ?? [])
-    .map((x) => safeString(x))
-    .filter(Boolean);
+  const doNot = (fixture.ai_doctor_context?.do_not ?? []).map((x) => safeString(x)).filter(Boolean);
 
   const source_warning =
     `Historical ${source.toUpperCase()} sensor history — not live telemetry. ` +
@@ -289,9 +270,7 @@ export function compileDoctorContextFromDiaryFixture(
       in_24_hours: fixture.follow_ups?.["24_hour"]
         ? safeString(fixture.follow_ups["24_hour"])
         : null,
-      in_3_days: fixture.follow_ups?.["3_day"]
-        ? safeString(fixture.follow_ups["3_day"])
-        : null,
+      in_3_days: fixture.follow_ups?.["3_day"] ? safeString(fixture.follow_ups["3_day"]) : null,
     },
   };
 }

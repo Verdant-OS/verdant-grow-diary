@@ -95,13 +95,25 @@ const DEFAULT_CASES = [
   { name: "missing snapshot", snap: null },
   { name: "empty snapshot", snap: {} },
   { name: "unknown source label", snap: { source: "unknown", captured_at: FRESH_ISO } },
-  { name: "hostile source (secret-role literal)", snap: { source: "service_role", captured_at: FRESH_ISO } },
-  { name: "stale live snapshot", snap: { source: "live", captured_at: STALE_ISO, confidence: 0.9 } },
+  {
+    name: "hostile source (secret-role literal)",
+    snap: { source: "service_role", captured_at: FRESH_ISO },
+  },
+  {
+    name: "stale live snapshot",
+    snap: { source: "live", captured_at: STALE_ISO, confidence: 0.9 },
+  },
   { name: "very old manual snapshot", snap: { source: "manual", captured_at: OLD_ISO } },
   { name: "demo source", snap: { source: "demo", captured_at: FRESH_ISO } },
   { name: "invalid source", snap: { source: "invalid", captured_at: FRESH_ISO } },
-  { name: "unknown top-level key (readings)", snap: { source: "live", captured_at: FRESH_ISO, readings: { temp_f: "NaN" } } },
-  { name: "unknown top-level key (metrics)", snap: { source: "live", captured_at: FRESH_ISO, metrics: { vpd: "Infinity" } } },
+  {
+    name: "unknown top-level key (readings)",
+    snap: { source: "live", captured_at: FRESH_ISO, readings: { temp_f: "NaN" } },
+  },
+  {
+    name: "unknown top-level key (metrics)",
+    snap: { source: "live", captured_at: FRESH_ISO, metrics: { vpd: "Infinity" } },
+  },
 ];
 
 function baseEvidence(snap) {
@@ -157,7 +169,10 @@ function writeFallbackArtifact(outPath, reason) {
     mkdirSync(dirname(abs), { recursive: true });
     const safeReason = String(reason || "unknown")
       // never leak forbidden substrings, even in the failure message
-      .replace(/service_role|bridge_token|raw_payload|eyJhbGci|sk_live_|SUPABASE_SERVICE_ROLE_KEY/gi, "[redacted]");
+      .replace(
+        /service_role|bridge_token|raw_payload|eyJhbGci|sk_live_|SUPABASE_SERVICE_ROLE_KEY/gi,
+        "[redacted]",
+      );
     const body =
       "# One-Tent Loop Proof — never-healthy artifact (FALLBACK)\n" +
       `# Generated at: ${new Date().toISOString()}\n` +

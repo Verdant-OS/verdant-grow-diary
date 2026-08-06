@@ -7,7 +7,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import Settings from "@/pages/Settings";
 import { FREE_CAPABILITIES } from "@/lib/entitlements/capabilities";
 import { PLAN_CATALOG } from "@/lib/entitlements/planCatalog";
@@ -90,27 +90,33 @@ beforeEach(() => {
 describe("Settings · Subscription staff note", () => {
   it("hides staff note for non-staff free user", () => {
     entitlementState.value = freeEntitlement;
-    render(<MemoryRouter><Settings /></MemoryRouter>);
-    expect(
-      screen.queryByTestId("settings-subscription-staff-note"),
-    ).not.toBeInTheDocument();
+    render(
+      <MemoryRouter>
+        <Settings />
+      </MemoryRouter>,
+    );
+    expect(screen.queryByTestId("settings-subscription-staff-note")).not.toBeInTheDocument();
   });
 
   it("hides staff note for non-staff paid Pro user", () => {
     entitlementState.value = paidProEntitlement;
-    render(<MemoryRouter><Settings /></MemoryRouter>);
-    expect(
-      screen.queryByTestId("settings-subscription-staff-note"),
-    ).not.toBeInTheDocument();
+    render(
+      <MemoryRouter>
+        <Settings />
+      </MemoryRouter>,
+    );
+    expect(screen.queryByTestId("settings-subscription-staff-note")).not.toBeInTheDocument();
   });
 
   it("shows staff note only when entitlement.isStaff === true", () => {
     entitlementState.value = staffEntitlement;
-    render(<MemoryRouter><Settings /></MemoryRouter>);
+    render(
+      <MemoryRouter>
+        <Settings />
+      </MemoryRouter>,
+    );
     const note = screen.getByTestId("settings-subscription-staff-note");
     expect(note).toBeInTheDocument();
-    expect(note).toHaveTextContent(
-      /internal staff.*pro capabilities.*10,000 ai credits\/month/i,
-    );
+    expect(note).toHaveTextContent(/internal staff.*pro capabilities.*10,000 ai credits\/month/i);
   });
 });

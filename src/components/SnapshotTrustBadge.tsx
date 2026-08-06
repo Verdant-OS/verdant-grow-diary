@@ -32,12 +32,7 @@ const VARIANT: Record<
   error: "destructive",
 };
 
-export default function SnapshotTrustBadge({
-  view,
-  input,
-  className,
-  showProvider = true,
-}: Props) {
+export default function SnapshotTrustBadge({ view, input, className, showProvider = true }: Props) {
   const v = view ?? classifySnapshotTrustBadge(input ?? {});
   return (
     <span

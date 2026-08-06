@@ -65,7 +65,9 @@ function StatusPill({ status }: { status: CardStatus }) {
   };
   const v = map[status];
   return (
-    <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium ${v.cls}`}>
+    <span
+      className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium ${v.cls}`}
+    >
       {v.label}
     </span>
   );
@@ -119,7 +121,9 @@ function EvidenceCard({
         <p className="text-muted-foreground">{card.reason}</p>
         {card.evidence_present.length > 0 && (
           <div data-evidence="present">
-            <div className="text-xs font-semibold uppercase tracking-wide text-primary">Evidence present</div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-primary">
+              Evidence present
+            </div>
             <ul className="list-disc pl-5 text-xs text-muted-foreground">
               {card.evidence_present.map((e, i) => (
                 <li key={i}>{e}</li>
@@ -178,7 +182,7 @@ function EvidenceCard({
                             tabIndex={-1}
                             data-evidence-row={i}
                             className={
-                              "font-mono outline-none transition-colors " +
+                              "font-mono outline-hidden transition-colors " +
                               (isHi ? "bg-primary/20 ring-1 ring-primary rounded px-1" : "")
                             }
                           >
@@ -211,23 +215,31 @@ function EvidenceCard({
 
 const REPO_PLACEHOLDER = "<VERDANT_REPO_ROOT>";
 
-const WINDOWS_RUN_COMMAND_TEMPLATES: Array<{ key: string; label: string; build: (root: string) => string; hint: string }> = [
+const WINDOWS_RUN_COMMAND_TEMPLATES: Array<{
+  key: string;
+  label: string;
+  build: (root: string) => string;
+  hint: string;
+}> = [
   {
     key: "recommended",
     label: "Recommended (root launcher)",
-    build: (root) => `cd ${root}\npowershell -NoProfile -ExecutionPolicy Bypass -File .\\Run-EcoWittCanary.ps1`,
+    build: (root) =>
+      `cd ${root}\npowershell -NoProfile -ExecutionPolicy Bypass -File .\\Run-EcoWittCanary.ps1`,
     hint: "Run from the repo root. Works even if PowerShell opens in C:\\WINDOWS\\system32.",
   },
   {
     key: "dryrun",
     label: "Dry-run (no network call)",
-    build: (root) => `cd ${root}\npowershell -NoProfile -ExecutionPolicy Bypass -File .\\Run-EcoWittCanary.ps1 -DryRun`,
+    build: (root) =>
+      `cd ${root}\npowershell -NoProfile -ExecutionPolicy Bypass -File .\\Run-EcoWittCanary.ps1 -DryRun`,
     hint: "Validates inputs and redaction. Sends zero HTTP requests. Safe for demos and CI.",
   },
   {
     key: "outfile",
     label: "Write redacted output to a file",
-    build: (root) => `cd ${root}\npowershell -NoProfile -ExecutionPolicy Bypass -File .\\Run-EcoWittCanary.ps1 -OutFile .\\canary-out.txt`,
+    build: (root) =>
+      `cd ${root}\npowershell -NoProfile -ExecutionPolicy Bypass -File .\\Run-EcoWittCanary.ps1 -OutFile .\\canary-out.txt`,
     hint: "Appends matrix + SQL block. Secrets are never written to disk.",
   },
 ];
@@ -241,7 +253,17 @@ export function buildWindowsCommand(template: (root: string) => string, repoPath
   return template(trimmed.length > 0 ? trimmed : REPO_PLACEHOLDER);
 }
 
-function CopyButton({ text, copied, onCopy, label }: { text: string; copied: boolean; onCopy: () => void; label?: string }) {
+function CopyButton({
+  text,
+  copied,
+  onCopy,
+  label,
+}: {
+  text: string;
+  copied: boolean;
+  onCopy: () => void;
+  label?: string;
+}) {
   return (
     <Button size="sm" variant="outline" onClick={onCopy} data-copied={copied} aria-label={label}>
       {copied ? "Copied" : "Copy"}
@@ -274,12 +296,16 @@ function WindowsRunCommandPanel() {
       <CardHeader>
         <CardTitle className="text-base">Run EcoWitt Canary on Windows</CardTitle>
         <CardDescription>
-          Operator-only. Paste a command into PowerShell from the repo root. Do not paste curl commands into prompts.
+          Operator-only. Paste a command into PowerShell from the repo root. Do not paste curl
+          commands into prompts.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="rounded-md border p-3" data-testid="repo-path-input">
-          <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted-foreground" htmlFor="repo-path">
+          <label
+            className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+            htmlFor="repo-path"
+          >
             Verdant repo path (optional)
           </label>
           <input
@@ -306,9 +332,18 @@ function WindowsRunCommandPanel() {
           const hasPlaceholder = commandContainsPlaceholder(cmd);
           const showWarning = warningKey === row.key;
           return (
-            <div key={row.key} className="rounded-md border p-3" data-cmd-label={row.label} data-cmd-key={row.key}>
-              <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{row.label}</div>
-              <code className="block whitespace-pre rounded bg-muted p-2 font-mono text-xs">{cmd}</code>
+            <div
+              key={row.key}
+              className="rounded-md border p-3"
+              data-cmd-label={row.label}
+              data-cmd-key={row.key}
+            >
+              <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                {row.label}
+              </div>
+              <code className="block whitespace-pre rounded bg-muted p-2 font-mono text-xs">
+                {cmd}
+              </code>
               <div className="mt-2 flex items-center justify-between gap-2">
                 <span className="text-xs text-muted-foreground">{row.hint}</span>
                 <CopyButton
@@ -327,10 +362,15 @@ function WindowsRunCommandPanel() {
                     This command still contains <code>{REPO_PLACEHOLDER}</code>.
                   </div>
                   <div className="mt-1 text-muted-foreground">
-                    Replace it with your actual Verdant repo path before running, or enter it in the field above.
+                    Replace it with your actual Verdant repo path before running, or enter it in the
+                    field above.
                   </div>
                   <div className="mt-2 flex gap-2">
-                    <Button size="sm" variant="outline" onClick={() => attemptCopy(row.key, cmd, true)}>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => attemptCopy(row.key, cmd, true)}
+                    >
                       Copy placeholder command anyway
                     </Button>
                     <Button size="sm" variant="ghost" onClick={() => setWarningKey(null)}>
@@ -344,12 +384,24 @@ function WindowsRunCommandPanel() {
         })}
 
         <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3">
-          <div className="text-xs font-semibold uppercase tracking-wide text-amber-400">Redaction Guarantee</div>
+          <div className="text-xs font-semibold uppercase tracking-wide text-amber-400">
+            Redaction Guarantee
+          </div>
           <ul className="mt-1 list-disc pl-5 text-xs text-muted-foreground">
-            <li>Paste only the requested value at each prompt (e.g. only the <code>vbt_...</code> token).</li>
-            <li>The harness aborts with a clear error if any input contains <code>curl.exe</code> or whitespace.</li>
-            <li>All output redacts bridge token, PASSKEY, and MAC before printing or writing to disk.</li>
-            <li>Never paste a raw cURL command into a PowerShell prompt; only paste the token string.</li>
+            <li>
+              Paste only the requested value at each prompt (e.g. only the <code>vbt_...</code>{" "}
+              token).
+            </li>
+            <li>
+              The harness aborts with a clear error if any input contains <code>curl.exe</code> or
+              whitespace.
+            </li>
+            <li>
+              All output redacts bridge token, PASSKEY, and MAC before printing or writing to disk.
+            </li>
+            <li>
+              Never paste a raw cURL command into a PowerShell prompt; only paste the token string.
+            </li>
           </ul>
         </div>
       </CardContent>
@@ -359,9 +411,17 @@ function WindowsRunCommandPanel() {
 
 const REDACTION_PREVIEW_ROWS: Array<{ label: string; before: string; after: string }> = [
   { label: "Bridge token", before: "vbt_live_9f3c2a1b4d5e6f70 (example)", after: "vbt_REDACTED" },
-  { label: "PASSKEY", before: "A1B2C3D4E5F60718293A4B5C6D7E8F90 (example)", after: "PASSKEY_REDACTED" },
+  {
+    label: "PASSKEY",
+    before: "A1B2C3D4E5F60718293A4B5C6D7E8F90 (example)",
+    after: "PASSKEY_REDACTED",
+  },
   { label: "MAC", before: "XX:XX:XX:XX:XX:XX (example)", after: "MAC_REDACTED" },
-  { label: "API key test field", before: "ak_test_examplevalue (example)", after: "SHOULD_NOT_PERSIST" },
+  {
+    label: "API key test field",
+    before: "ak_test_examplevalue (example)",
+    after: "SHOULD_NOT_PERSIST",
+  },
 ];
 
 function RedactionPreviewPanel() {
@@ -373,7 +433,12 @@ function RedactionPreviewPanel() {
           <CardTitle className="text-base">Preview redacted output</CardTitle>
           <CardDescription>Example only · not a live run · no real secrets shown.</CardDescription>
         </div>
-        <Button size="sm" variant="outline" onClick={() => setOpen((v) => !v)} data-testid="redaction-preview-toggle">
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => setOpen((v) => !v)}
+          data-testid="redaction-preview-toggle"
+        >
           {open ? "Hide preview" : "Show preview"}
         </Button>
       </CardHeader>
@@ -400,8 +465,8 @@ function RedactionPreviewPanel() {
             </table>
           </div>
           <div className="rounded-md border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive">
-            If you see a real token, PASSKEY, MAC, or API key in your output, do not paste it anywhere. Re-run with the
-            latest harness.
+            If you see a real token, PASSKEY, MAC, or API key in your output, do not paste it
+            anywhere. Re-run with the latest harness.
           </div>
         </CardContent>
       )}
@@ -491,9 +556,14 @@ function DryRunGuidancePanel() {
       </CardHeader>
       <CardContent className="space-y-3 text-sm text-muted-foreground">
         <ol className="list-decimal space-y-1 pl-5">
-          <li>Run the dry-run command above. It checks inputs and redaction without sending any HTTP requests.</li>
+          <li>
+            Run the dry-run command above. It checks inputs and redaction without sending any HTTP
+            requests.
+          </li>
           <li>If dry-run passes, you are ready for the live canary.</li>
-          <li>If dry-run fails, click a failure below to jump to the section in the example output.</li>
+          <li>
+            If dry-run fails, click a failure below to jump to the section in the example output.
+          </li>
           <li>For automated CI, use the OutFile mode and import the redacted result below.</li>
         </ol>
 
@@ -503,11 +573,18 @@ function DryRunGuidancePanel() {
           </div>
           <div className="space-y-2">
             {DRY_RUN_SECTIONS.map((s) => (
-              <div key={s.id} id={s.id} data-section-id={s.id} className="rounded border bg-background p-2 transition">
+              <div
+                key={s.id}
+                id={s.id}
+                data-section-id={s.id}
+                className="rounded border bg-background p-2 transition"
+              >
                 <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                   {s.title}
                 </div>
-                <pre className="whitespace-pre font-mono text-[11px] leading-snug text-foreground">{s.body}</pre>
+                <pre className="whitespace-pre font-mono text-[11px] leading-snug text-foreground">
+                  {s.body}
+                </pre>
               </div>
             ))}
           </div>
@@ -517,7 +594,9 @@ function DryRunGuidancePanel() {
           data-testid="dry-run-failure-guide"
           className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-xs"
         >
-          <div className="mb-1 font-semibold text-destructive">Where to look when dry-run fails</div>
+          <div className="mb-1 font-semibold text-destructive">
+            Where to look when dry-run fails
+          </div>
           <ul className="space-y-1">
             {DRY_RUN_FAILURES.map((f) => (
               <li key={f.label}>
@@ -586,7 +665,7 @@ export function CloudCanaryPreviewPanel() {
       window.setTimeout(() => setCopied(false), 1500);
     } catch (e) {
       toast.error("Could not copy JSON to clipboard.");
-      // eslint-disable-next-line no-console
+
       console.warn("[cloud-canary-preview] copy failed", e);
     }
   };
@@ -606,8 +685,8 @@ export function CloudCanaryPreviewPanel() {
           data-testid="cloud-canary-fixture-label"
           className="rounded-md border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-400"
         >
-          <span className="font-semibold">Fixture-only:</span> These are static test payloads. No real EcoWitt device is
-          queried.
+          <span className="font-semibold">Fixture-only:</span> These are static test payloads. No
+          real EcoWitt device is queried.
         </div>
 
         <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
@@ -632,15 +711,21 @@ export function CloudCanaryPreviewPanel() {
             <div className="text-sm font-semibold">{verdict.totals.stale}</div>
           </div>
           <div className="rounded-md border p-2 text-center" data-metric="missing-metric">
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">Missing metric</div>
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">
+              Missing metric
+            </div>
             <div className="text-sm font-semibold">{verdict.any_missing_metric ? "Yes" : "No"}</div>
           </div>
           <div className="rounded-md border p-2 text-center" data-metric="ec-absence">
             <div className="text-xs uppercase tracking-wide text-muted-foreground">EC invented</div>
-            <div className="text-sm font-semibold">{verdict.any_ec_metric_invented ? "Yes" : "No"}</div>
+            <div className="text-sm font-semibold">
+              {verdict.any_ec_metric_invented ? "Yes" : "No"}
+            </div>
           </div>
           <div className="rounded-md border p-2 text-center" data-metric="suspicious-flags">
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">Suspicious flags</div>
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">
+              Suspicious flags
+            </div>
             <div className="text-sm font-semibold">{verdict.suspicious_flag_codes.length}</div>
           </div>
         </div>
@@ -668,7 +753,10 @@ export function CloudCanaryPreviewPanel() {
               <thead className="bg-muted text-muted-foreground">
                 <tr>
                   <th className="px-2 py-1 text-left font-semibold">Fixture</th>
-                  <th className="px-2 py-1 text-right font-semibold" title="Mapped rows classified as fresh by the normalizer">
+                  <th
+                    className="px-2 py-1 text-right font-semibold"
+                    title="Mapped rows classified as fresh by the normalizer"
+                  >
                     Fresh
                   </th>
                   <th className="px-2 py-1 text-right font-semibold">Stale-class</th>
@@ -677,10 +765,16 @@ export function CloudCanaryPreviewPanel() {
                   <th className="px-2 py-1 text-right font-semibold border-l-2 border-l-foreground/30">
                     Unmapped (separate)
                   </th>
-                  <th className="px-2 py-1 text-left font-semibold border-l" title="Closed-vocabulary data-classification codes from the normalizer">
+                  <th
+                    className="px-2 py-1 text-left font-semibold border-l"
+                    title="Closed-vocabulary data-classification codes from the normalizer"
+                  >
                     Suspicious codes
                   </th>
-                  <th className="px-2 py-1 text-left font-semibold border-l" title="Closed-vocabulary missing-metric codes from the normalizer">
+                  <th
+                    className="px-2 py-1 text-left font-semibold border-l"
+                    title="Closed-vocabulary missing-metric codes from the normalizer"
+                  >
                     Missing-metric codes
                   </th>
                 </tr>
@@ -690,9 +784,7 @@ export function CloudCanaryPreviewPanel() {
                   <tr
                     key={row.fixture_name}
                     className={
-                      row.state === "zero_mapped_gap"
-                        ? "border-t bg-amber-500/10"
-                        : "border-t"
+                      row.state === "zero_mapped_gap" ? "border-t bg-amber-500/10" : "border-t"
                     }
                     data-testid={`cloud-canary-row-${row.fixture_name}`}
                     data-fixture-name={row.fixture_name}
@@ -708,7 +800,10 @@ export function CloudCanaryPreviewPanel() {
                     <td className="px-2 py-1 text-right tabular-nums" data-col="invalid">
                       {row.invalid_count}
                     </td>
-                    <td className="px-2 py-1 text-right tabular-nums border-l font-semibold" data-col="mapped">
+                    <td
+                      className="px-2 py-1 text-right tabular-nums border-l font-semibold"
+                      data-col="mapped"
+                    >
                       {row.mapped_count}
                     </td>
                     <td
@@ -768,8 +863,8 @@ export function CloudCanaryPreviewPanel() {
                 data-testid="cloud-canary-zero-mapped-warning"
                 className="border-t border-amber-500/40 bg-amber-500/10 px-2 py-2 text-[11px] text-amber-300"
               >
-                <span className="font-semibold">Mapping gap:</span>{" "}
-                Readings present but none mapped to a tent — check mapping config.
+                <span className="font-semibold">Mapping gap:</span> Readings present but none mapped
+                to a tent — check mapping config.
               </div>
             )}
           </div>
@@ -787,10 +882,7 @@ export function CloudCanaryPreviewPanel() {
 
         {previewVm.state === "populated" && (
           <>
-            <div
-              data-testid="cloud-canary-export-preview"
-              className="space-y-2"
-            >
+            <div data-testid="cloud-canary-export-preview" className="space-y-2">
               <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
                 Fixture/sample canary export preview · exact bytes that will download
               </div>
@@ -890,7 +982,6 @@ export function CloudCanaryPreviewPanel() {
             </div>
           </>
         )}
-
       </CardContent>
     </Card>
   );
@@ -906,8 +997,9 @@ function RedactionWarningBanner() {
       <div>
         <div className="font-medium text-destructive">Secrets are redacted automatically</div>
         <div className="text-muted-foreground">
-          The harness replaces bridge tokens, PASSKEYs, and MACs with placeholders before printing or saving. If you see
-          a real secret in any output, treat it as a leak and abort immediately.
+          The harness replaces bridge tokens, PASSKEYs, and MACs with placeholders before printing
+          or saving. If you see a real secret in any output, treat it as a leak and abort
+          immediately.
         </div>
       </div>
     </div>
@@ -920,8 +1012,11 @@ function NoBrowserPostsNotice() {
       className="rounded-md border border-border bg-muted/40 p-3 text-xs text-muted-foreground"
       data-testid="no-browser-posts-notice"
     >
-      <span className="font-medium text-foreground">For security, Verdant does not run EcoWitt canary POSTs from the browser.</span>{" "}
-      Run the local harness on Windows, then import the redacted output here. No bridge tokens, PASSKEYs, or MACs are ever entered into this page.
+      <span className="font-medium text-foreground">
+        For security, Verdant does not run EcoWitt canary POSTs from the browser.
+      </span>{" "}
+      Run the local harness on Windows, then import the redacted output here. No bridge tokens,
+      PASSKEYs, or MACs are ever entered into this page.
     </div>
   );
 }
@@ -944,7 +1039,9 @@ function StageDot({ status }: { status: WorkflowStageStatus }) {
     pending: "•",
   };
   return (
-    <span className={`inline-flex h-6 w-6 items-center justify-center rounded-full border text-xs font-semibold ${cls[status]}`}>
+    <span
+      className={`inline-flex h-6 w-6 items-center justify-center rounded-full border text-xs font-semibold ${cls[status]}`}
+    >
       {label[status]}
     </span>
   );
@@ -967,7 +1064,11 @@ function CanaryWorkflowStatusBar({
         : "incomplete"
     : "active";
   const runStatus: WorkflowStageStatus = preflight?.status === "pass" ? "active" : "pending";
-  const importStatus: WorkflowStageStatus = reportLoaded ? "pass" : preflight?.status === "pass" ? "active" : "pending";
+  const importStatus: WorkflowStageStatus = reportLoaded
+    ? "pass"
+    : preflight?.status === "pass"
+      ? "active"
+      : "pending";
   const verdictStatus: WorkflowStageStatus = !reportLoaded
     ? "pending"
     : verdict.verdict === "go"
@@ -977,9 +1078,19 @@ function CanaryWorkflowStatusBar({
         : "incomplete";
 
   const stages: Array<{ key: string; label: string; hint: string; status: WorkflowStageStatus }> = [
-    { key: "preflight", label: "Preflight", hint: "Tent + EcoWitt mapping", status: preflightStatus },
+    {
+      key: "preflight",
+      label: "Preflight",
+      hint: "Tent + EcoWitt mapping",
+      status: preflightStatus,
+    },
     { key: "run", label: "Run harness", hint: "Local PowerShell only", status: runStatus },
-    { key: "import", label: "Import output", hint: "Redacted paste / OutFile", status: importStatus },
+    {
+      key: "import",
+      label: "Import output",
+      hint: "Redacted paste / OutFile",
+      status: importStatus,
+    },
     { key: "verdict", label: "Verdict", hint: "GO / NO-GO / INCOMPLETE", status: verdictStatus },
   ];
 
@@ -987,15 +1098,24 @@ function CanaryWorkflowStatusBar({
     <Card data-testid="canary-workflow-status-bar">
       <CardHeader className="pb-2">
         <CardTitle className="text-base">Canary Workflow</CardTitle>
-        <CardDescription>Self-contained UI workflow · no browser POSTs · no Supabase writes.</CardDescription>
+        <CardDescription>
+          Self-contained UI workflow · no browser POSTs · no Supabase writes.
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <ol className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4">
           {stages.map((s, i) => (
-            <li key={s.key} className="flex items-center gap-3 rounded-md border p-2" data-stage={s.key} data-status={s.status}>
+            <li
+              key={s.key}
+              className="flex items-center gap-3 rounded-md border p-2"
+              data-stage={s.key}
+              data-status={s.status}
+            >
               <StageDot status={s.status} />
               <div className="min-w-0">
-                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Step {i + 1}</div>
+                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Step {i + 1}
+                </div>
                 <div className="text-sm font-medium">{s.label}</div>
                 <div className="truncate text-xs text-muted-foreground">{s.hint}</div>
               </div>
@@ -1024,7 +1144,8 @@ function ResultsDashboard({
   onCopyJson: () => void;
   copyDisabled: boolean;
 }) {
-  const verdictLabel = verdict.verdict === "go" ? "GO" : verdict.verdict === "no_go" ? "NO-GO" : "INCOMPLETE";
+  const verdictLabel =
+    verdict.verdict === "go" ? "GO" : verdict.verdict === "no_go" ? "NO-GO" : "INCOMPLETE";
   const verdictCls =
     verdict.verdict === "go"
       ? "bg-primary/15 text-primary border-primary/40"
@@ -1034,7 +1155,9 @@ function ResultsDashboard({
 
   const passCount = verdict.cards.filter((c) => c.status === "pass").length;
   const failCount = verdict.cards.filter((c) => c.status === "fail").length;
-  const incompleteCount = verdict.cards.filter((c) => c.status === "incomplete" || c.status === "unknown").length;
+  const incompleteCount = verdict.cards.filter(
+    (c) => c.status === "incomplete" || c.status === "unknown",
+  ).length;
 
   const mainRows = report?.main_row_counts
     ? Object.values(report.main_row_counts).reduce((a, b) => a + (b ?? 0), 0)
@@ -1075,14 +1198,20 @@ function ResultsDashboard({
           </div>
           <div className="rounded-md border p-2 text-center" data-metric="main-rows">
             <div className="text-xs uppercase tracking-wide text-muted-foreground">Main rows</div>
-            <div className="text-sm font-semibold">{mainRows ?? "—"} <span className="text-xs text-muted-foreground">/ 4</span></div>
+            <div className="text-sm font-semibold">
+              {mainRows ?? "—"} <span className="text-xs text-muted-foreground">/ 4</span>
+            </div>
           </div>
           <div className="rounded-md border p-2 text-center" data-metric="malformed-rows">
             <div className="text-xs uppercase tracking-wide text-muted-foreground">Malformed</div>
-            <div className="text-sm font-semibold">{malformedRows ?? "—"} <span className="text-xs text-muted-foreground">/ 2</span></div>
+            <div className="text-sm font-semibold">
+              {malformedRows ?? "—"} <span className="text-xs text-muted-foreground">/ 2</span>
+            </div>
           </div>
           <div className="rounded-md border p-2 text-center" data-metric="channel-9">
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">Ch 9 / leaks</div>
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">
+              Ch 9 / leaks
+            </div>
             <div className="text-sm font-semibold">
               {ch9 ?? "—"} / {leaks ?? "—"}
             </div>
@@ -1090,9 +1219,15 @@ function ResultsDashboard({
         </div>
 
         <div className="flex flex-wrap gap-2 text-xs">
-          <span className="rounded-md border bg-primary/10 px-2 py-0.5 text-primary">{passCount} pass</span>
-          <span className="rounded-md border bg-destructive/10 px-2 py-0.5 text-destructive">{failCount} fail</span>
-          <span className="rounded-md border bg-muted px-2 py-0.5 text-muted-foreground">{incompleteCount} incomplete</span>
+          <span className="rounded-md border bg-primary/10 px-2 py-0.5 text-primary">
+            {passCount} pass
+          </span>
+          <span className="rounded-md border bg-destructive/10 px-2 py-0.5 text-destructive">
+            {failCount} fail
+          </span>
+          <span className="rounded-md border bg-muted px-2 py-0.5 text-muted-foreground">
+            {incompleteCount} incomplete
+          </span>
         </div>
 
         {verdict.reasons.length > 0 && (
@@ -1104,7 +1239,12 @@ function ResultsDashboard({
         )}
 
         <div className="flex flex-wrap gap-2" data-testid="dashboard-exports">
-          <Button size="sm" variant="outline" onClick={onDownloadJson} data-testid="download-verdict-json">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={onDownloadJson}
+            data-testid="download-verdict-json"
+          >
             Download Verdict JSON
           </Button>
           <Button
@@ -1116,7 +1256,12 @@ function ResultsDashboard({
           >
             Copy JSON
           </Button>
-          <Button size="sm" variant="outline" onClick={onDownloadCsv} data-testid="download-verdict-csv">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={onDownloadCsv}
+            data-testid="download-verdict-csv"
+          >
             Download Verdict CSV
           </Button>
         </div>
@@ -1213,7 +1358,10 @@ export default function OperatorEcowittCanary() {
       return;
     }
     if (file.size > 5_000_000) {
-      setImportError({ kind: "unsupported", message: "File is too large (>5 MB). Trim to canary output only." });
+      setImportError({
+        kind: "unsupported",
+        message: "File is too large (>5 MB). Trim to canary output only.",
+      });
       return;
     }
     const reader = new FileReader();
@@ -1243,8 +1391,6 @@ export default function OperatorEcowittCanary() {
     setImportError(null);
     setSaveNotice("Cleared import.");
   };
-
-
 
   // Read-only tent fetch for preflight (RLS-enforced).
   const tentQ = useQuery({
@@ -1297,7 +1443,11 @@ export default function OperatorEcowittCanary() {
   };
 
   const downloadRedactedAudit = () =>
-    downloadBlob(JSON.stringify(builtAudit, null, 2), `ecowitt-canary-audit-${Date.now()}.json`, "application/json");
+    downloadBlob(
+      JSON.stringify(builtAudit, null, 2),
+      `ecowitt-canary-audit-${Date.now()}.json`,
+      "application/json",
+    );
 
   const workflowSlug = useMemo(() => {
     const tentName = tentQ.data?.name ?? "";
@@ -1334,7 +1484,7 @@ export default function OperatorEcowittCanary() {
       toast.success("Redacted JSON copied.");
     } catch (e) {
       toast.error("Could not copy JSON to clipboard.");
-      // eslint-disable-next-line no-console
+
       console.warn("[operator-ecowitt] copy JSON failed", e);
     }
   };
@@ -1381,13 +1531,16 @@ export default function OperatorEcowittCanary() {
     setSaveNotice("Cleared saved workflow.");
   };
 
-
   return (
-    <div className="container mx-auto max-w-5xl space-y-6 p-4 md:p-6" data-testid="operator-ecowitt-canary">
+    <div
+      className="container mx-auto max-w-5xl space-y-6 p-4 md:p-6"
+      data-testid="operator-ecowitt-canary"
+    >
       <header className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">EcoWitt Canary Audit</h1>
         <p className="text-sm text-muted-foreground">
-          Operator Mode · Read-only diagnostics · Endpoint: <code className="font-mono">{ENDPOINT_PATH}</code>
+          Operator Mode · Read-only diagnostics · Endpoint:{" "}
+          <code className="font-mono">{ENDPOINT_PATH}</code>
         </p>
       </header>
 
@@ -1442,14 +1595,21 @@ export default function OperatorEcowittCanary() {
             <div className="text-sm">
               <div className="font-medium">Saved EcoWitt canary workflow found</div>
               <div className="text-xs text-muted-foreground">
-                Saved {savedWorkflow.saved_at} · verdict {savedWorkflow.verdict.toUpperCase()} · {savedWorkflow.counts.pass} pass / {savedWorkflow.counts.fail} fail / {savedWorkflow.counts.incomplete} incomplete
+                Saved {savedWorkflow.saved_at} · verdict {savedWorkflow.verdict.toUpperCase()} ·{" "}
+                {savedWorkflow.counts.pass} pass / {savedWorkflow.counts.fail} fail /{" "}
+                {savedWorkflow.counts.incomplete} incomplete
               </div>
             </div>
             <div className="flex gap-2">
               <Button size="sm" onClick={restoreSavedWorkflow} data-testid="restore-saved-workflow">
                 Restore
               </Button>
-              <Button size="sm" variant="outline" onClick={clearSavedWorkflow} data-testid="clear-saved-workflow">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={clearSavedWorkflow}
+                data-testid="clear-saved-workflow"
+              >
                 Clear saved workflow
               </Button>
             </div>
@@ -1501,17 +1661,28 @@ export default function OperatorEcowittCanary() {
                 </option>
               ))}
             </select>
-            <Button onClick={runPreflight} disabled={!authAvailable || !selectedTentId || tentQ.isLoading}>
+            <Button
+              onClick={runPreflight}
+              disabled={!authAvailable || !selectedTentId || tentQ.isLoading}
+            >
               Run Pre-POST Validator
             </Button>
-            {tentQ.isLoading && <span className="text-xs text-muted-foreground">Loading tent…</span>}
+            {tentQ.isLoading && (
+              <span className="text-xs text-muted-foreground">Loading tent…</span>
+            )}
           </div>
 
           {preflight && (
             <div className="space-y-2 rounded-md border p-3">
               <div className="flex items-center gap-2">
                 <StatusPill
-                  status={preflight.status === "pass" ? "pass" : preflight.status === "fail" ? "fail" : "incomplete"}
+                  status={
+                    preflight.status === "pass"
+                      ? "pass"
+                      : preflight.status === "fail"
+                        ? "fail"
+                        : "incomplete"
+                  }
                 />
                 <span className="text-sm">{preflight.reason}</span>
               </div>
@@ -1536,7 +1707,8 @@ export default function OperatorEcowittCanary() {
         <CardHeader>
           <CardTitle>Import canary output</CardTitle>
           <CardDescription>
-            Upload a redacted <code>.txt</code> / <code>.json</code> harness output, or paste it below. Browser POSTs are never made from this page.
+            Upload a redacted <code>.txt</code> / <code>.json</code> harness output, or paste it
+            below. Browser POSTs are never made from this page.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -1692,11 +1864,16 @@ export default function OperatorEcowittCanary() {
           <CardTitle>
             Verdict:{" "}
             <span data-testid="canary-verdict">
-              {verdict.verdict === "go" ? "GO" : verdict.verdict === "no_go" ? "NO-GO" : "INCOMPLETE"}
+              {verdict.verdict === "go"
+                ? "GO"
+                : verdict.verdict === "no_go"
+                  ? "NO-GO"
+                  : "INCOMPLETE"}
             </span>
           </CardTitle>
           <CardDescription>
-            Read-only diagnostics · no device control · no automation · no alerts · no Action Queue writes.
+            Read-only diagnostics · no device control · no automation · no alerts · no Action Queue
+            writes.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">

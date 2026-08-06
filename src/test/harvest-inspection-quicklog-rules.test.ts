@@ -25,14 +25,9 @@ import {
 import type { PlantRecentActivityRow } from "@/lib/plantRecentActivityRules";
 
 const ROOT = resolve(__dirname, "../..");
-const RULES_SRC = readFileSync(
-  resolve(ROOT, "src/lib/harvestInspectionQuickLogRules.ts"),
-  "utf8",
-);
+const RULES_SRC = readFileSync(resolve(ROOT, "src/lib/harvestInspectionQuickLogRules.ts"), "utf8");
 
-function checklist(
-  missing: HarvestEvidenceKey[],
-): HarvestEvidenceChecklistItem[] {
+function checklist(missing: HarvestEvidenceKey[]): HarvestEvidenceChecklistItem[] {
   const all: HarvestEvidenceKey[] = [
     "trichome_inspection",
     "pistil_observation",
@@ -64,19 +59,13 @@ describe("pickHarvestInspectionPreset", () => {
     );
   });
   it("missing pistil → pistil_recession", () => {
-    expect(pickHarvestInspectionPreset(checklist(["pistil_observation"]))).toBe(
-      "pistil_recession",
-    );
+    expect(pickHarvestInspectionPreset(checklist(["pistil_observation"]))).toBe("pistil_recession");
   });
   it("missing bud maturity → bud_maturity", () => {
-    expect(pickHarvestInspectionPreset(checklist(["bud_maturity_note"]))).toBe(
-      "bud_maturity",
-    );
+    expect(pickHarvestInspectionPreset(checklist(["bud_maturity_note"]))).toBe("bud_maturity");
   });
   it("missing recent photo → close_flower_photo", () => {
-    expect(pickHarvestInspectionPreset(checklist(["recent_photos"]))).toBe(
-      "close_flower_photo",
-    );
+    expect(pickHarvestInspectionPreset(checklist(["recent_photos"]))).toBe("close_flower_photo");
   });
   it("priority is trichome → pistil → bud → photo", () => {
     expect(
@@ -210,9 +199,7 @@ describe("Harvest Watch round-trip recognition", () => {
       daysInFlower: null,
       expectedHarvestDay: null,
     });
-    expect(items.find((i) => i.key === "trichome_inspection")!.status).toBe(
-      "present",
-    );
+    expect(items.find((i) => i.key === "trichome_inspection")!.status).toBe("present");
   });
 
   it("pistil preset note marks pistil checklist Present", () => {
@@ -226,9 +213,7 @@ describe("Harvest Watch round-trip recognition", () => {
       daysInFlower: null,
       expectedHarvestDay: null,
     });
-    expect(items.find((i) => i.key === "pistil_observation")!.status).toBe(
-      "present",
-    );
+    expect(items.find((i) => i.key === "pistil_observation")!.status).toBe("present");
   });
 
   it("bud maturity preset note marks bud maturity checklist Present", () => {
@@ -242,9 +227,7 @@ describe("Harvest Watch round-trip recognition", () => {
       daysInFlower: null,
       expectedHarvestDay: null,
     });
-    expect(items.find((i) => i.key === "bud_maturity_note")!.status).toBe(
-      "present",
-    );
+    expect(items.find((i) => i.key === "bud_maturity_note")!.status).toBe("present");
   });
 
   it("close flower photo preset note + photo counts as recent_photos but NOT trichome", () => {
@@ -258,13 +241,9 @@ describe("Harvest Watch round-trip recognition", () => {
       daysInFlower: null,
       expectedHarvestDay: null,
     });
-    expect(items.find((i) => i.key === "recent_photos")!.status).toBe(
-      "limited",
-    );
+    expect(items.find((i) => i.key === "recent_photos")!.status).toBe("limited");
     // The phrase "Close flower photo" must not be misread as trichome evidence.
-    expect(items.find((i) => i.key === "trichome_inspection")!.status).toBe(
-      "missing",
-    );
+    expect(items.find((i) => i.key === "trichome_inspection")!.status).toBe("missing");
   });
 
   it("a bare photo with non-inspection note does not mark trichome Present", () => {
@@ -274,9 +253,7 @@ describe("Harvest Watch round-trip recognition", () => {
       daysInFlower: null,
       expectedHarvestDay: null,
     });
-    expect(items.find((i) => i.key === "trichome_inspection")!.status).toBe(
-      "missing",
-    );
+    expect(items.find((i) => i.key === "trichome_inspection")!.status).toBe("missing");
   });
 });
 

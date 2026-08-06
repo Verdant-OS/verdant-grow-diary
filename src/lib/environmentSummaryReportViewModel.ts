@@ -13,8 +13,6 @@ import type {
 import type { GreenhouseSource } from "./greenhouseLightRules";
 import { buildEnvironmentSummaryReportUrl } from "./environmentSummaryNavigationRules";
 
-
-
 export type RuleSeverity = "info" | "watch" | "warning" | "critical";
 
 export interface EnvironmentSummaryReportInput {
@@ -25,7 +23,6 @@ export interface EnvironmentSummaryReportInput {
   /** Optional rule id to focus the drilldown on. */
   selectedIssueId?: string | null;
 }
-
 
 export interface EnvironmentSummaryMetricCoverage {
   metricKey: string;
@@ -45,7 +42,6 @@ export interface EnvironmentSummaryTopIssue {
   drilldownUrl: string;
   drilldownLabel: string;
 }
-
 
 export interface EnvironmentSummaryReportViewModel {
   isPremiumReport: true;
@@ -112,14 +108,13 @@ export function buildEnvironmentSummaryReportViewModel(
     sourceCounts[c.sourceLabel] = (sourceCounts[c.sourceLabel] ?? 0) + 1;
 
     for (const m of c.snapshotSummary) {
-      const cur =
-        metricMap.get(m.metricKey) ?? {
-          metricKey: m.metricKey,
-          label: m.label,
-          sampleCount: 0,
-          invalidCount: 0,
-          reviewRequiredCount: 0,
-        };
+      const cur = metricMap.get(m.metricKey) ?? {
+        metricKey: m.metricKey,
+        label: m.label,
+        sampleCount: 0,
+        invalidCount: 0,
+        reviewRequiredCount: 0,
+      };
       cur.sampleCount += 1;
       if (m.status === "invalid") cur.invalidCount += 1;
       if (m.status === "review_required" || m.status === "dst_ambiguous")
@@ -191,11 +186,14 @@ export function buildEnvironmentSummaryReportViewModel(
   const totalChecks = checks.length;
   const emptyState = totalChecks === 0 ? "No environment checks in this date range." : null;
 
-
   const summaryBullets: string[] = [];
   if (totalChecks > 0) {
-    summaryBullets.push(`${totalChecks} environment check${totalChecks === 1 ? "" : "s"} in range.`);
-    summaryBullets.push(`${statusCounts.valid} valid, ${statusCounts.review_required} review-required, ${statusCounts.dst_ambiguous} DST-ambiguous, ${statusCounts.invalid} invalid.`);
+    summaryBullets.push(
+      `${totalChecks} environment check${totalChecks === 1 ? "" : "s"} in range.`,
+    );
+    summaryBullets.push(
+      `${statusCounts.valid} valid, ${statusCounts.review_required} review-required, ${statusCounts.dst_ambiguous} DST-ambiguous, ${statusCounts.invalid} invalid.`,
+    );
   }
 
   return {

@@ -36,11 +36,7 @@ describe("One-Tent Loop · source-honesty fences", () => {
   });
 
   it("demo, stale, and invalid snapshots must be flagged non-healthy", () => {
-    const sources: GoldenSensorSnapshot["source"][] = [
-      "demo",
-      "stale",
-      "invalid",
-    ];
+    const sources: GoldenSensorSnapshot["source"][] = ["demo", "stale", "invalid"];
     for (const src of sources) {
       const s: GoldenSensorSnapshot = { ...ONE_TENT_GOLDEN_SNAPSHOT, source: src };
       // Any presenter that classified these as healthy would violate
@@ -61,12 +57,7 @@ describe("One-Tent Loop · Action Queue fences", () => {
       initiated_by: "grower",
     };
     const flat = JSON.stringify(sampleItem);
-    for (const forbidden of [
-      "device_command",
-      "execute_payload",
-      "run_command",
-      "device_exec",
-    ]) {
+    for (const forbidden of ["device_command", "execute_payload", "run_command", "device_exec"]) {
       expect(flat).not.toMatch(new RegExp(forbidden, "i"));
     }
   });
@@ -87,9 +78,7 @@ describe("One-Tent Loop · cross-user isolation", () => {
   it("cross-user IDs are distinct and detectable", () => {
     expect(ONE_TENT_GOLDEN_USER_ID).not.toBe(ONE_TENT_OTHER_USER_ID);
     expect(ONE_TENT_OTHER_USER_SNAPSHOT.user_id).toBe(ONE_TENT_OTHER_USER_ID);
-    expect(ONE_TENT_OTHER_USER_SNAPSHOT.user_id).not.toBe(
-      ONE_TENT_GOLDEN_SNAPSHOT.user_id,
-    );
+    expect(ONE_TENT_OTHER_USER_SNAPSHOT.user_id).not.toBe(ONE_TENT_GOLDEN_SNAPSHOT.user_id);
   });
 
   it("filtering by owning user drops other-user rows", () => {

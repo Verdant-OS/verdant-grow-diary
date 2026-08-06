@@ -17,7 +17,9 @@ const COACH = readFileSync(resolve(ROOT, "src/pages/Coach.tsx"), "utf8");
 
 describe("Coach — persisted AI Doctor session id threading", () => {
   it("declares persistedSessionId state and a diagnosis sequence ref", () => {
-    expect(COACH).toMatch(/const\s+\[persistedSessionId,\s*setPersistedSessionId\]\s*=\s*useState<string\s*\|\s*null>\(null\)/);
+    expect(COACH).toMatch(
+      /const\s+\[persistedSessionId,\s*setPersistedSessionId\]\s*=\s*useState<string\s*\|\s*null>\(null\)/,
+    );
     expect(COACH).toMatch(/const\s+diagnosisSeqRef\s*=\s*useRef\(0\)/);
   });
 
@@ -41,8 +43,7 @@ describe("Coach — persisted AI Doctor session id threading", () => {
   });
 
   it("preserves the soft-warning toast on persistence failure and does NOT set a fake session id", () => {
-    const thenBlock =
-      COACH.split("persistAiDoctorSession(supabase,")[1]?.split("});")[0] ?? "";
+    const thenBlock = COACH.split("persistAiDoctorSession(supabase,")[1]?.split("});")[0] ?? "";
     expect(thenBlock).toMatch(/toast\.warning\(/);
     // The only setter call lives behind the res.ok branch.
     const setterMatches = thenBlock.match(/setPersistedSessionId\(/g) ?? [];
@@ -65,8 +66,7 @@ describe("Coach — persisted AI Doctor session id threading", () => {
   it("does not introduce new action_queue write paths for the threading", () => {
     // Existing inserts: action_queue (Add to Action Queue) + action_queue_events.
     // No new write surface should appear around persistedSessionId.
-    const aqInserts =
-      COACH.match(/\.from\(\s*["']action_queue["']\s*\)\s*\.insert\(/g) ?? [];
+    const aqInserts = COACH.match(/\.from\(\s*["']action_queue["']\s*\)\s*\.insert\(/g) ?? [];
     expect(aqInserts.length).toBe(2);
   });
 

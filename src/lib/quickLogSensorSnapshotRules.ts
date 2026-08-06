@@ -43,7 +43,6 @@ export interface QuickLogSensorRowLike {
 const MANUAL_SOURCES = new Set(["manual", "manual_snapshot", "csv", "imported", "import"]);
 const UNTRUSTED_SOURCES = new Set(["demo", "sim", "fixture", "demo_fixture", "mock"]);
 
-
 function normalizeSource(raw: unknown): string | null {
   if (raw === null || raw === undefined) return null;
   const s = String(raw).trim().toLowerCase();
@@ -123,5 +122,3 @@ export function shouldEmbedSnapshot(
   const s = (state ?? "").trim().toLowerCase();
   return s === "live" || s === "manual";
 }
-
-

@@ -40,13 +40,22 @@ export interface TimelineEvidenceFilterInput {
    */
   sensorSources?: ReadonlyArray<TimelineSensorSourceKind> | null;
   /**
-   * Inclusive ISO date bounds (YYYY-MM-DD) compared against the UTC day
-   * of `entry_at` (its ISO date slice). Malformed values are ignored as
-   * "no constraint"; rows without a parseable `entry_at` are hidden while
-   * a bound is active, because their day is unknowable — never guessed.
+   * Inclusive ISO date bounds (YYYY-MM-DD) compared against the day of
+   * `entry_at` in `timeZone` below. Malformed values are ignored as "no
+   * constraint"; rows without a parseable `entry_at` are hidden while a
+   * bound is active, because their day is unknowable — never guessed.
    */
   startDate?: string | null;
   endDate?: string | null;
+  /**
+   * IANA zone `startDate`/`endDate` are interpreted in. Defaults to
+   * `"UTC"` when omitted, so existing callers that never supply a zone
+   * keep their exact prior behavior. Pass the viewer's own zone (e.g.
+   * from `Intl.DateTimeFormat().resolvedOptions().timeZone`) to agree
+   * with a local-day query boundary built upstream — see
+   * `timelineDateRangeRules.ts`.
+   */
+  timeZone?: string | null;
 }
 
 const TIMELINE_FILTER_STALE_MS = 30 * 60 * 1000;
@@ -95,12 +104,34 @@ export function isTimelineDateFilterValue(value: string | null | undefined): val
   return typeof value === "string" && ISO_DATE_RE.test(value);
 }
 
-/** The UTC day (YYYY-MM-DD) of an `entry_at` ISO timestamp, or null. */
-function rowUtcDay(row: TimelineEvidenceRow): string | null {
+/**
+ * The calendar day (YYYY-MM-DD) of an `entry_at` ISO timestamp in
+ * `timeZone`, or null when unparseable. Uses `Intl.DateTimeFormat` with an
+ * explicitly supplied zone rather than the runtime's ambient timezone, so
+ * the result depends only on the two inputs — never on where the process
+ * happens to run.
+ */
+function rowLocalDay(row: TimelineEvidenceRow, timeZone: string): string | null {
   const at = row.entry_at;
   if (typeof at !== "string" || at.length < 10) return null;
-  const day = at.slice(0, 10);
-  return ISO_DATE_RE.test(day) ? day : null;
+  const parsed = new Date(at);
+  if (!Number.isFinite(parsed.getTime())) return null;
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(parsed);
+    const year = parts.find((p) => p.type === "year")?.value;
+    const month = parts.find((p) => p.type === "month")?.value;
+    const day = parts.find((p) => p.type === "day")?.value;
+    if (!year || !month || !day) return null;
+    const result = `${year}-${month}-${day}`;
+    return ISO_DATE_RE.test(result) ? result : null;
+  } catch {
+    return null;
+  }
 }
 
 function normalize(v: unknown): string {
@@ -164,7 +195,9 @@ export function timelineEvidenceRowMatches(
   const start = isTimelineDateFilterValue(input.startDate) ? input.startDate : null;
   const end = isTimelineDateFilterValue(input.endDate) ? input.endDate : null;
   if (start !== null || end !== null) {
-    const day = rowUtcDay(row);
+    const timeZone =
+      typeof input.timeZone === "string" && input.timeZone.trim() !== "" ? input.timeZone : "UTC";
+    const day = rowLocalDay(row, timeZone);
     if (day === null) return false;
     if (start !== null && day < start) return false;
     if (end !== null && day > end) return false;
@@ -199,20 +232,69 @@ export interface TimelineEvidenceFilterOption {
 }
 
 /**
+ * Build an id → name lookup from raw `plants`/`tents` directory rows.
+ *
+ * The caller is expected to load the directory WITHOUT an `is_archived`
+ * filter: archived/merged rows still carry their names, and the whole
+ * point of the lookup is that archived-plant diary history keeps its
+ * real labels. Returns `null` (lookup unavailable) when `rows` is not
+ * an array, so callers can tell a failed read from an empty directory.
+ * Malformed rows are skipped; the first name seen for an id wins. Pure.
+ */
+export function buildTimelineNameLookup(rows: unknown): ReadonlyMap<string, string> | null {
+  if (!Array.isArray(rows)) return null;
+  const m = new Map<string, string>();
+  for (const row of rows) {
+    if (!row || typeof row !== "object") continue;
+    const { id, name } = row as { id?: unknown; name?: unknown };
+    if (typeof id !== "string" || id.trim() === "") continue;
+    if (typeof name !== "string" || name.trim() === "") continue;
+    if (!m.has(id.trim())) m.set(id.trim(), name.trim());
+  }
+  return m;
+}
+
+/**
+ * Resolve one option label. Order: directory name (current truth,
+ * includes archived/merged rows) → row-embedded snapshot name →
+ * neutral fragment fallback.
+ *
+ * The fallback never asserts an archival state: an id absent from a
+ * loaded directory is NOT necessarily archived — archived rows resolve
+ * normally, while hard-deleted tents (deleteTent preserves logs) and
+ * entities created after the directory snapshot both come through here.
+ */
+function resolveOptionLabel(
+  id: string,
+  noun: "Plant" | "Tent",
+  nameById: ReadonlyMap<string, string> | null | undefined,
+  snapshotName: unknown,
+): string {
+  const directoryName = nameById?.get(id);
+  if (typeof directoryName === "string" && directoryName.trim() !== "") {
+    return directoryName.trim();
+  }
+  if (typeof snapshotName === "string" && snapshotName.trim() !== "") {
+    return snapshotName.trim();
+  }
+  return `${noun} ${id.slice(0, 6)}`;
+}
+
+/**
  * Derive a deterministic, sorted list of distinct plant filter options
- * from the rows. Label falls back to a short id slice when no name is
- * present in `details.plant_name`. Pure.
+ * from the rows. Names resolve via the optional directory lookup (which
+ * should include archived/merged plants), then `details.plant_name`,
+ * then a fragment fallback. Pure.
  */
 export function deriveTimelinePlantOptions(
   rows: ReadonlyArray<TimelineEvidenceRow>,
+  nameById?: ReadonlyMap<string, string> | null,
 ): TimelineEvidenceFilterOption[] {
   const m = new Map<string, { label: string; count: number }>();
   for (const r of rows) {
     const id = typeof r.plant_id === "string" ? r.plant_id.trim() : "";
     if (id === "") continue;
-    const name = (r.details ?? {})["plant_name"];
-    const label =
-      typeof name === "string" && name.trim() !== "" ? name.trim() : `Plant ${id.slice(0, 6)}`;
+    const label = resolveOptionLabel(id, "Plant", nameById, (r.details ?? {})["plant_name"]);
     const cur = m.get(id);
     if (cur) cur.count += 1;
     else m.set(id, { label, count: 1 });
@@ -223,8 +305,9 @@ export function deriveTimelinePlantOptions(
 }
 
 /**
- * Derive distinct tent options from the rows. Label uses a short id
- * slice when no name lookup is provided. Pure.
+ * Derive distinct tent options from the rows. Names resolve via the
+ * optional directory lookup (which should include archived tents), with
+ * a fragment fallback when no lookup resolves the id. Pure.
  */
 export function deriveTimelineTentOptions(
   rows: ReadonlyArray<TimelineEvidenceRow>,
@@ -234,9 +317,7 @@ export function deriveTimelineTentOptions(
   for (const r of rows) {
     const id = typeof r.tent_id === "string" ? r.tent_id.trim() : "";
     if (id === "") continue;
-    const name = nameById?.get(id);
-    const label =
-      typeof name === "string" && name.trim() !== "" ? name.trim() : `Tent ${id.slice(0, 6)}`;
+    const label = resolveOptionLabel(id, "Tent", nameById, null);
     const cur = m.get(id);
     if (cur) cur.count += 1;
     else m.set(id, { label, count: 1 });

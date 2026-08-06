@@ -42,10 +42,7 @@ export function useLeadCommandCenterLayout() {
     [layout],
   );
 
-  const ordered = useMemo(
-    () => [...layout.sections].sort((a, b) => a.order - b.order),
-    [layout],
-  );
+  const ordered = useMemo(() => [...layout.sections].sort((a, b) => a.order - b.order), [layout]);
 
   return { layout, ordered, toggle, isCollapsed };
 }

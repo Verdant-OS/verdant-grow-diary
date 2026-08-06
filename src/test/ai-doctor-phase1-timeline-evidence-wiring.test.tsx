@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -96,14 +96,10 @@ describe("QuickLog timeline → AI Doctor Phase 1 evidence wiring", () => {
   it("renders the styled evidence card for an AI Doctor Phase 1 entry", () => {
     entriesRef.current = [aiEvidenceEntry];
     renderSection();
-    const card = screen.getByTestId(
-      "ai-doctor-phase1-timeline-evidence-card",
-    );
+    const card = screen.getByTestId("ai-doctor-phase1-timeline-evidence-card");
     expect(within(card).getByText("AI Doctor Phase 1 evidence")).toBeInTheDocument();
     expect(within(card).getByText("Evidence only")).toBeInTheDocument();
-    expect(
-      within(card).getByText("Leaves yellowing on lower nodes."),
-    ).toBeInTheDocument();
+    expect(within(card).getByText("Leaves yellowing on lower nodes.")).toBeInTheDocument();
     expect(
       within(card).getByTestId("ai-doctor-phase1-timeline-evidence-card-metadata"),
     ).toHaveTextContent("Saved date:");
@@ -118,20 +114,16 @@ describe("QuickLog timeline → AI Doctor Phase 1 evidence wiring", () => {
   it("renders a normal note entry with the existing generic UI (no evidence card)", () => {
     entriesRef.current = [normalNoteEntry];
     renderSection();
-    expect(
-      screen.queryByTestId("ai-doctor-phase1-timeline-evidence-card"),
-    ).toBeNull();
-    expect(
-      screen.getByTestId("quick-log-grouped-action-note"),
-    ).toHaveTextContent("Just a normal grower note.");
+    expect(screen.queryByTestId("ai-doctor-phase1-timeline-evidence-card")).toBeNull();
+    expect(screen.getByTestId("quick-log-grouped-action-note")).toHaveTextContent(
+      "Just a normal grower note.",
+    );
   });
 
   it("filters the timeline to saved AI Doctor evidence entries", () => {
     entriesRef.current = [normalNoteEntry, aiEvidenceEntry];
     renderSection();
-    fireEvent.click(
-      screen.getByTestId("quick-log-grouped-timeline-filter-ai-doctor-evidence"),
-    );
+    fireEvent.click(screen.getByTestId("quick-log-grouped-timeline-filter-ai-doctor-evidence"));
     expect(screen.getByTestId("ai-doctor-phase1-timeline-evidence-card")).toBeInTheDocument();
     expect(screen.queryByText("Just a normal grower note.")).toBeNull();
   });
@@ -139,12 +131,8 @@ describe("QuickLog timeline → AI Doctor Phase 1 evidence wiring", () => {
   it("shows an AI Doctor evidence empty state with a results link", () => {
     entriesRef.current = [normalNoteEntry];
     renderSection();
-    fireEvent.click(
-      screen.getByTestId("quick-log-grouped-timeline-filter-ai-doctor-evidence"),
-    );
-    expect(
-      screen.getByTestId("quick-log-grouped-timeline-ai-evidence-empty"),
-    ).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("quick-log-grouped-timeline-filter-ai-doctor-evidence"));
+    expect(screen.getByTestId("quick-log-grouped-timeline-ai-evidence-empty")).toBeInTheDocument();
     const link = screen.getByTestId(
       "quick-log-grouped-timeline-ai-evidence-results-link",
     ) as HTMLAnchorElement;
@@ -158,21 +146,13 @@ describe("QuickLog timeline → AI Doctor Phase 1 evidence wiring", () => {
     entriesRef.current = [aiEvidenceEntry, normalNoteEntry];
     renderSection();
     const list = screen.getByTestId("quick-log-grouped-timeline-list");
-    const items = Array.from(
-      list.querySelectorAll<HTMLLIElement>(":scope > li"),
-    );
+    const items = Array.from(list.querySelectorAll<HTMLLIElement>(":scope > li"));
     expect(items).toHaveLength(2);
     expect(
       within(items[0]).getByTestId("ai-doctor-phase1-timeline-evidence-card"),
     ).toBeInTheDocument();
-    expect(
-      within(items[1]).queryByTestId(
-        "ai-doctor-phase1-timeline-evidence-card",
-      ),
-    ).toBeNull();
-    expect(
-      screen.getAllByTestId("ai-doctor-phase1-timeline-evidence-card"),
-    ).toHaveLength(1);
+    expect(within(items[1]).queryByTestId("ai-doctor-phase1-timeline-evidence-card")).toBeNull();
+    expect(screen.getAllByTestId("ai-doctor-phase1-timeline-evidence-card")).toHaveLength(1);
   });
 
   it("falls back to normal note rendering when details are malformed", () => {
@@ -189,9 +169,7 @@ describe("QuickLog timeline → AI Doctor Phase 1 evidence wiring", () => {
       },
     ];
     renderSection();
-    expect(
-      screen.queryByTestId("ai-doctor-phase1-timeline-evidence-card"),
-    ).toBeNull();
+    expect(screen.queryByTestId("ai-doctor-phase1-timeline-evidence-card")).toBeNull();
     expect(screen.getByTestId("quick-log-grouped-action-note")).toBeInTheDocument();
   });
 
@@ -200,9 +178,7 @@ describe("QuickLog timeline → AI Doctor Phase 1 evidence wiring", () => {
       resolve(process.cwd(), "src/hooks/useQuickLogGroupedTimeline.ts"),
       "utf8",
     );
-    const src = raw
-      .replace(/\/\*[\s\S]*?\*\//g, "")
-      .replace(/(^|\s)\/\/[^\n]*/g, "");
+    const src = raw.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|\s)\/\/[^\n]*/g, "");
     const forbidden = [
       ".insert(",
       ".update(",

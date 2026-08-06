@@ -107,10 +107,7 @@ function parseTime(value: unknown): number | null {
 }
 
 function snapshotTime(snap: PhotoContextCandidateSnapshot): number | null {
-  return (
-    parseTime(snap.capturedAtIso) ??
-    parseTime(snap.captured_at)
-  );
+  return parseTime(snap.capturedAtIso) ?? parseTime(snap.captured_at);
 }
 
 /**

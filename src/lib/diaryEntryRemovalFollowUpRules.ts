@@ -15,12 +15,9 @@
  */
 
 export const FOLLOW_UP_BUTTON_LABEL = "Add to correct plant";
-export const FOLLOW_UP_HELPER_COPY =
-  "Open Quick Log and choose the correct plant for this entry.";
-export const FOLLOW_UP_ACCESSIBLE_LABEL =
-  "Add corrected Quick Log to the correct plant";
-export const FOLLOW_UP_NOTE_PREFILL =
-  "Re-entering log after removing it from the wrong plant.";
+export const FOLLOW_UP_HELPER_COPY = "Open Quick Log and choose the correct plant for this entry.";
+export const FOLLOW_UP_ACCESSIBLE_LABEL = "Add corrected Quick Log to the correct plant";
+export const FOLLOW_UP_NOTE_PREFILL = "Re-entering log after removing it from the wrong plant.";
 
 /** Event name reused from the existing Quick Log handoff. */
 export const CORRECTED_QUICKLOG_EVENT = "verdant:open-quicklog" as const;
@@ -91,12 +88,9 @@ export function dispatchCorrectedQuickLogHandoff(
   target?: DispatchTarget | null,
 ): CorrectedQuickLogHandoffPayload {
   const payload = buildCorrectedQuickLogHandoff(context);
-  const resolved =
-    target ?? (typeof window !== "undefined" ? (window as DispatchTarget) : null);
+  const resolved = target ?? (typeof window !== "undefined" ? (window as DispatchTarget) : null);
   if (resolved && typeof CustomEvent !== "undefined") {
-    resolved.dispatchEvent(
-      new CustomEvent(CORRECTED_QUICKLOG_EVENT, { detail: payload }),
-    );
+    resolved.dispatchEvent(new CustomEvent(CORRECTED_QUICKLOG_EVENT, { detail: payload }));
   }
   return payload;
 }

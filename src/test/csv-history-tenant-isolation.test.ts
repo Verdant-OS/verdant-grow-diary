@@ -189,8 +189,7 @@ describe("CSV history duplicate-key operator copy", () => {
       vendorLabel: "Spider Farmer / THP Data",
       error: {
         code: "23505",
-        message:
-          'duplicate key value violates unique constraint "sensor_readings_dedupe_uidx"',
+        message: 'duplicate key value violates unique constraint "sensor_readings_dedupe_uidx"',
         details: null,
         hint: null,
       },
@@ -237,14 +236,10 @@ describe("CSV history import surfaces — static tenant-safety scan", () => {
     "src/lib/sensorHistoryImportReplayGuard.ts",
   ];
   const stripComments = (s: string) =>
-    s
-      .replace(/\/\*[\s\S]*?\*\//g, "")
-      .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+    s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
 
   describe.each(FILES)("%s", (rel) => {
-    const code = stripComments(
-      readFileSync(resolve(process.cwd(), rel), "utf8"),
-    );
+    const code = stripComments(readFileSync(resolve(process.cwd(), rel), "utf8"));
     it("never promotes CSV rows to source = 'live'", () => {
       expect(code).not.toMatch(/source:\s*["']live["']/);
     });

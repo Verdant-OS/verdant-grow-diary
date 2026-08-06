@@ -10,13 +10,22 @@
 // - Never submits a form, invokes AI, uploads a file, changes billing, writes
 //   Action Queue state, ingests sensor data, or controls a device.
 // - Exercises Claude-finished surfaces without reviving superseded branches.
-import { expect, test, type BrowserContext, type Locator, type Page } from "@playwright/test";
+import {
+  expect,
+  test,
+  type BrowserContext,
+  type ElementHandle,
+  type Locator,
+  type Page,
+} from "@playwright/test";
 import { APP_ROUTES } from "../src/lib/appRouteManifest";
+import { ANALYTICS_CONSENT_STORAGE_KEY } from "../src/lib/analyticsConsent";
 import {
   AUTHENTICATED_CORE_CENSUS_ROUTES,
   PUBLIC_CORE_CENSUS_ROUTES,
   classifyLink,
   expectedCensusNavigationPath,
+  fallbackSelectExerciseFailureIsFatal,
   isReadOnlyEdgeFunction,
   isReadOnlyRpc,
   isSafelyFillableFieldType,
@@ -508,6 +517,33 @@ async function seedFakeSession(context: BrowserContext) {
   );
 }
 
+/**
+ * Pre-store a "denied" analytics consent decision for the census contexts.
+ *
+ * With no stored decision the consent banner legitimately renders on every
+ * page (fixed to the bottom viewport edge, z-[100]) and intercepts pointer
+ * events over anything beneath it — on the authenticated lane it blocked the
+ * sidebar's lowest links for the entire test budget (926 click retries on
+ * /account/preferences). The census audits app surfaces, not the consent
+ * flow; "denied" keeps the banner away AND guarantees no analytics code can
+ * load (every loader gates on readAnalyticsConsent() === "granted"), which
+ * preserves the lane's hermetic zero-external-fetch contract.
+ */
+async function seedDeniedAnalyticsConsent(context: BrowserContext) {
+  await context.addInitScript(
+    ({ appOrigin, key }) => {
+      if (location.origin !== appOrigin) return;
+      try {
+        localStorage.setItem(key, "denied");
+      } catch {
+        // Sandboxed frames can intentionally deny storage access; they do not
+        // render the app shell and need no consent decision.
+      }
+    },
+    { appOrigin: APP_ORIGIN, key: ANALYTICS_CONSENT_STORAGE_KEY },
+  );
+}
+
 async function installNetworkFence(
   context: BrowserContext,
   signedIn: boolean,
@@ -692,7 +728,9 @@ function normalizeText(value: string | null | undefined): string {
   return (value ?? "").replace(/\s+/g, " ").trim();
 }
 
-async function accessibleNameForControl(locator: Locator): Promise<string> {
+async function accessibleNameForControl(
+  locator: Locator | ElementHandle<SVGElement | HTMLElement>,
+): Promise<string> {
   return locator.evaluate((element) => {
     const htmlElement = element as HTMLElement;
     const ariaLabel = htmlElement.getAttribute("aria-label")?.trim();
@@ -742,7 +780,9 @@ async function accessibleNameForControl(locator: Locator): Promise<string> {
   });
 }
 
-async function controlType(locator: Locator): Promise<string> {
+async function controlType(
+  locator: Locator | ElementHandle<SVGElement | HTMLElement>,
+): Promise<string> {
   return locator.evaluate((element) => {
     if (element instanceof HTMLInputElement) return element.type || "text";
     if (element instanceof HTMLTextAreaElement) return "textarea";
@@ -751,7 +791,79 @@ async function controlType(locator: Locator): Promise<string> {
   });
 }
 
-async function isVisuallyHiddenImplementationControl(locator: Locator): Promise<boolean> {
+// Fill a control and verify the value actually PERSISTED on a connected
+// node — a resolving fill() is not persistence: a controlled handler can
+// asynchronously normalize, reject, or revert the value afterwards.
+async function fillAndVerify(
+  target: Locator | ElementHandle<SVGElement | HTMLElement>,
+  value: string,
+): Promise<boolean> {
+  const filled = await target
+    .fill(value, { timeout: 5_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!filled) return false;
+  const matchedOnce = await expect
+    .poll(
+      () =>
+        target.evaluate((element) =>
+          element.isConnected ? ((element as HTMLInputElement).value ?? null) : null,
+        ),
+      { timeout: 5_000 },
+    )
+    .toBe(value)
+    .then(() => true)
+    .catch(() => false);
+  if (!matchedOnce) return false;
+  // A first matching sample is not stability — a controlled handler can
+  // accept the value synchronously and normalize or revert it a beat later.
+  // Re-sample after a settle interval and require the value to have held.
+  await new Promise((resolve) => setTimeout(resolve, 250));
+  return await target
+    .evaluate(
+      (element, expected) =>
+        element.isConnected && ((element as HTMLInputElement).value ?? null) === expected,
+      value,
+    )
+    .catch(() => false);
+}
+
+// Select analog of fillAndVerify: dispatch, poll the connected value, then
+// settle re-sample — a first matching sample is not stability.
+async function selectAndVerify(
+  target: Locator | ElementHandle<SVGElement | HTMLElement>,
+  value: string,
+): Promise<boolean> {
+  const selected = await target
+    .selectOption(value, { timeout: 5_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!selected) return false;
+  const matchedOnce = await expect
+    .poll(
+      () =>
+        target.evaluate((element) =>
+          element.isConnected ? (element as HTMLSelectElement).value : null,
+        ),
+      { timeout: 5_000 },
+    )
+    .toBe(value)
+    .then(() => true)
+    .catch(() => false);
+  if (!matchedOnce) return false;
+  await new Promise((resolve) => setTimeout(resolve, 250));
+  return await target
+    .evaluate(
+      (element, expected) =>
+        element.isConnected && (element as HTMLSelectElement).value === expected,
+      value,
+    )
+    .catch(() => false);
+}
+
+async function isVisuallyHiddenImplementationControl(
+  locator: Locator | ElementHandle<SVGElement | HTMLElement>,
+): Promise<boolean> {
   return locator.evaluate((element) => {
     const htmlElement = element as HTMLElement;
     if (htmlElement.getAttribute("aria-hidden") === "true") return true;
@@ -770,20 +882,135 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
     "input:not([type='hidden']), textarea, select, [contenteditable='true']",
   );
   const audits: FieldAudit[] = [];
+  const reauditedIndexes = new Set<number>();
 
   for (let index = 0; index < (await controls.count()); index += 1) {
     const control = controls.nth(index);
-    if (!(await control.isVisible())) continue;
-    if (await isVisuallyHiddenImplementationControl(control)) continue;
+    // Pin the node FIRST — before even the visibility gates — so every
+    // per-control read below (visibility, name, type, actionability,
+    // exercise) describes this one element: any read through the live nth()
+    // query can straddle a reorder onto a sibling.
+    const pinnedControl = await control.elementHandle({ timeout: 1_000 }).catch(() => null);
+    // Every skip driven by the pinned node's state must first ask whether the
+    // live index still holds that node: a visible replacement that displaced
+    // a hidden, detached, or unpinnable predecessor deserves its own audit
+    // pass, bounded to one revisit per index.
+    const liveIndexHoldsPinnedNode = async (): Promise<boolean> =>
+      pinnedControl
+        ? await control
+            .evaluate((element, pinned) => element === pinned, pinnedControl, { timeout: 1_000 })
+            .catch(() => false)
+        : false;
+    const reauditIndexOnce = (): void => {
+      if (!reauditedIndexes.has(index)) {
+        reauditedIndexes.add(index);
+        index -= 1;
+      }
+    };
+    if (!pinnedControl) {
+      reauditIndexOnce();
+      continue;
+    }
+    if (!(await pinnedControl.isVisible().catch(() => false))) {
+      if (!(await liveIndexHoldsPinnedNode())) reauditIndexOnce();
+      continue;
+    }
+    if (await isVisuallyHiddenImplementationControl(pinnedControl)) {
+      if (!(await liveIndexHoldsPinnedNode())) reauditIndexOnce();
+      continue;
+    }
 
-    const name = normalizeText(await accessibleNameForControl(control));
-    const type = await controlType(control);
+    let name = normalizeText(await accessibleNameForControl(pinnedControl).catch(() => ""));
+    let nameRequiredSettling = false;
+    if (name === "") {
+      nameRequiredSettling = true;
+      // A sibling control's exercise can re-render the page mid-read,
+      // transiently reading as unnamed. Re-read THIS pinned element briefly
+      // before judging; a genuinely unnamed control stays empty throughout.
+      for (let attempt = 0; name === "" && pinnedControl && attempt < 5; attempt += 1) {
+        await page.waitForTimeout(250);
+        name = normalizeText(await accessibleNameForControl(pinnedControl).catch(() => ""));
+      }
+      if (name === "") {
+        // A pinned node that is still connected and visible after the whole
+        // settle window is a genuinely unnamed control and must fail below;
+        // one that stayed hidden has nothing left to audit. A node that
+        // DETACHED may have a live replacement at this index, so the index is
+        // re-audited once — an unnamed replacement must not slip through
+        // unaudited just because its predecessor churned away.
+        const pinnedState = pinnedControl
+          ? await pinnedControl
+              .evaluate((element) => ({
+                connected: element.isConnected,
+                visible:
+                  element.getBoundingClientRect().width > 0 &&
+                  element.getBoundingClientRect().height > 0 &&
+                  getComputedStyle(element).visibility !== "hidden",
+              }))
+              .catch(() => ({ connected: false, visible: false }))
+          : { connected: false, visible: false };
+        if (!(pinnedState.connected && pinnedState.visible)) {
+          // Re-audit once if the live index no longer resolves to the pinned
+          // node — whether it detached or a visible replacement displaced a
+          // connected-but-hidden predecessor — so an unnamed replacement
+          // cannot escape the census. An index still holding the pinned
+          // (hidden or gone) node has nothing else to audit.
+          const indexStillPinnedNode = await control
+            .evaluate((element, pinned) => pinned !== null && element === pinned, pinnedControl, {
+              timeout: 1_000,
+            })
+            .catch(() => false);
+          if (!indexStillPinnedNode && !reauditedIndexes.has(index)) {
+            reauditedIndexes.add(index);
+            index -= 1;
+          }
+          continue;
+        }
+      }
+    }
+    // A control that gained its name during the settle window may have been
+    // hidden by the same transition — a still-hidden pinned node is skipped
+    // (and a displaced index re-audited), never exercised into a fatal
+    // actionability timeout.
+    if (nameRequiredSettling && name !== "") {
+      const pinnedStillVisible = await pinnedControl
+        .evaluate(
+          (element) =>
+            element.isConnected &&
+            element.getBoundingClientRect().width > 0 &&
+            element.getBoundingClientRect().height > 0 &&
+            getComputedStyle(element).visibility !== "hidden",
+        )
+        .catch(() => false);
+      if (!pinnedStillVisible) {
+        if (!(await liveIndexHoldsPinnedNode())) reauditIndexOnce();
+        continue;
+      }
+    }
+    const type = await controlType(pinnedControl ?? control);
     expect(name, `${route.path} has a visible ${type} field without a user-facing name`).not.toBe(
       "",
     );
 
-    const disabled = await control.isDisabled().catch(() => false);
-    const editable = await control.isEditable().catch(() => false);
+    // The audited identity is the pinned node. If a reorder moved the live
+    // index off it, every later check and action would describe a DIFFERENT
+    // control under this name and type — re-audit the index once instead of
+    // misattributing.
+    if (!(await liveIndexHoldsPinnedNode())) {
+      reauditIndexOnce();
+      continue;
+    }
+
+    // An actionability read that fails (the pinned node detached mid-read)
+    // must not be coerced into a "read-only" classification — the failure is
+    // preserved as null and triggers the bounded index re-audit so a visible
+    // replacement gets audited instead.
+    const disabled = await pinnedControl.isDisabled().catch(() => null);
+    const editable = await pinnedControl.isEditable().catch(() => null);
+    if (disabled === null || editable === null) {
+      reauditIndexOnce();
+      continue;
+    }
     if (
       route.fieldPolicy === "audit-only" ||
       disabled ||
@@ -811,10 +1038,51 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
       const namedControl = page.getByRole("combobox", { name, exact: true });
       const hasStableNamedControl = (await namedControl.count()) === 1;
       const stableControl = hasStableNamedControl ? namedControl : control;
-      const selectSnapshot = await stableControl.evaluate((element) => {
+      // EVERY select exercises through the pinned node — named ones too. An
+      // accessible name can migrate to a different combobox when the value it
+      // derives from changes (observed on the pheno comparison axis selects:
+      // selecting "vigor" moved the name to the sibling still holding
+      // "nose_loudness", failing a name-resolved verification). The named
+      // locator is kept ONLY for restoration, where re-resolution across
+      // re-renders is exactly what cleanup wants.
+      if (!pinnedControl) {
+        audits.push({
+          route: route.path,
+          name,
+          type,
+          exercised: false,
+          reason: "could not pin the control before exercising it",
+        });
+        continue;
+      }
+      const snapshotTarget = pinnedControl;
+      const selectSnapshot = await snapshotTarget.evaluate((element) => {
         const select = element as HTMLSelectElement;
         return {
           currentValue: select.value,
+          // :disabled captures effective disablement — a direct attribute or
+          // an ancestor <fieldset disabled> — matching what Playwright's
+          // actionability checks actually honor. Visibility mirrors
+          // Playwright's definition: a non-empty box without visibility
+          // hidden.
+          controlDisabled: select.matches(":disabled"),
+          controlVisible:
+            select.getBoundingClientRect().width > 0 &&
+            select.getBoundingClientRect().height > 0 &&
+            getComputedStyle(select).visibility !== "hidden",
+          // Positive-evidence-only hit check: pointer-events none on the
+          // control, or a FOREIGN element at its center (an overlay), marks
+          // it blocked; a null hit (off-viewport) proves nothing and counts
+          // as unobstructed so strictness is not weakened below the fold.
+          controlReceivesEvents: (() => {
+            if (getComputedStyle(select).pointerEvents === "none") return false;
+            const rect = select.getBoundingClientRect();
+            const hit = document.elementFromPoint(
+              rect.left + rect.width / 2,
+              rect.top + rect.height / 2,
+            );
+            return hit === null || hit === select || select.contains(hit) || hit.contains(select);
+          })(),
           options: Array.from(select.options, (option) => ({
             value: option.value,
             disabled: option.disabled,
@@ -833,42 +1101,346 @@ async function auditAndExerciseFields(page: Page, route: CoreCensusRoute): Promi
         });
         continue;
       }
-      await stableControl.selectOption(alternative, { timeout: 5_000 });
-      await expect(stableControl).toHaveValue(alternative, { timeout: 5_000 });
+      let selectionDispatched = false;
+      try {
+        // The pinned handle IS the element under audit: acting through it
+        // makes exercise and identity atomic, so neither an index reorder nor
+        // an accessible-name migration can route the action or its
+        // verification to a look-alike sibling.
+        await snapshotTarget.selectOption(alternative, { timeout: 5_000 });
+        selectionDispatched = true;
+        // A retained handle can read a DETACHED node's stale value, which
+        // would equal the alternative and record a false exercise — only a
+        // connected node's value counts; detachment yields null and routes
+        // through the catch verdict as post-dispatch churn.
+        await expect
+          .poll(
+            () =>
+              snapshotTarget.evaluate((element) =>
+                element.isConnected ? (element as HTMLSelectElement).value : null,
+              ),
+            { timeout: 5_000 },
+          )
+          .toBe(alternative);
+      } catch (error) {
+        // Only proven stability stays fatal. Re-read the pinned node and let
+        // the pure decision helper judge: the same node still attached and
+        // showing the snapshotted state — control disabled flag and full
+        // option state alike — means a broken onChange, not churn. A node
+        // that detached (evaluate rejects) or was never pinned cannot prove
+        // anything.
+        const liveState = await snapshotTarget
+          .evaluate((element) => {
+            const select = element as HTMLSelectElement;
+            return {
+              // A retained handle can still evaluate a DETACHED node with its
+              // state intact ("Element is not attached to the DOM" from the
+              // action, unchanged options here) — only a connected node can
+              // prove the failure was not a re-render replacing it.
+              connected: select.isConnected,
+              disabled: select.matches(":disabled"),
+              visible:
+                select.getBoundingClientRect().width > 0 &&
+                select.getBoundingClientRect().height > 0 &&
+                getComputedStyle(select).visibility !== "hidden",
+              receivesEvents: (() => {
+                if (getComputedStyle(select).pointerEvents === "none") return false;
+                const rect = select.getBoundingClientRect();
+                const hit = document.elementFromPoint(
+                  rect.left + rect.width / 2,
+                  rect.top + rect.height / 2,
+                );
+                return (
+                  hit === null || hit === select || select.contains(hit) || hit.contains(select)
+                );
+              })(),
+              options: Array.from(select.options, (option) => ({
+                value: option.value,
+                disabled: option.disabled,
+              })),
+            };
+          })
+          .catch(() => undefined);
+        if (
+          fallbackSelectExerciseFailureIsFatal(
+            {
+              disabled: selectSnapshot.controlDisabled,
+              visible: selectSnapshot.controlVisible,
+              receivesEvents: selectSnapshot.controlReceivesEvents,
+              options: selectSnapshot.options,
+            },
+            liveState,
+            liveState?.connected ?? false,
+          )
+        ) {
+          throw error;
+        }
+        // A dispatched alternative must not keep mutating filters and derived
+        // page state for the rest of the route's audit. Restore a live
+        // replacement that still reflects the dispatched alternative — the
+        // logical-replacement guard from the fill path — and fail if that
+        // state cannot be restored; a vanished selection owes nothing.
+        if (selectionDispatched) {
+          // Replacement identity needs more than the current value — selects
+          // share common values ("all"), so a shifted unrelated sibling could
+          // collide. The logical replacement must also carry the snapshotted
+          // option list.
+          const liveHoldsAlternative = await control
+            .evaluate(
+              (element, expected) => {
+                const select = element as HTMLSelectElement;
+                return (
+                  select.isConnected &&
+                  select.value === expected.alternative &&
+                  select.options.length === expected.options.length &&
+                  Array.from(select.options).every(
+                    (option, optionIndex) =>
+                      option.value === expected.options[optionIndex].value &&
+                      option.disabled === expected.options[optionIndex].disabled,
+                  )
+                );
+              },
+              { alternative, options: selectSnapshot.options },
+              { timeout: 1_000 },
+            )
+            .catch(() => false);
+          if (liveHoldsAlternative) {
+            const selectionRestored = await selectAndVerify(control, original);
+            expect(
+              selectionRestored,
+              `${route.path} select "${name}" kept the census alternative and could not be restored`,
+            ).toBe(true);
+          }
+        }
+        // Distinct reasons keep the census report honest about WHEN the churn
+        // hit: after a dispatched selection, the page reacting with a
+        // re-render is evidence the control is live (a handler that throws
+        // instead is caught by the lane's pageErrors fence); before dispatch
+        // it is plain locator churn.
+        audits.push({
+          route: route.path,
+          name,
+          type,
+          exercised: false,
+          reason: selectionDispatched
+            ? "re-rendered in response to selection before value verification"
+            : "re-rendered mid-exercise without a unique accessible-name locator",
+        });
+        // Whatever displaced the pinned select at this index is unaudited
+        // surface — give it the bounded re-audit pass, pre- or post-dispatch
+        // alike.
+        if (!(await liveIndexHoldsPinnedNode())) {
+          reauditIndexOnce();
+        }
+        continue;
+      }
 
-      // A controlled filter can re-render the page and change the live nth()
-      // locator during both verification and cleanup. Reacquire a uniquely
-      // named control across renders, and restore only when the original option
-      // still exists; cleanup must never turn a successfully exercised field
-      // into a test-wide timeout.
-      if (hasStableNamedControl) {
-        const originalStillExists = await stableControl
-          .locator("option")
-          .evaluateAll(
-            (options, expected) =>
-              options.some((option) => (option as HTMLOptionElement).value === expected),
-            original,
-          );
-        if (originalStillExists) {
-          await stableControl.selectOption(original, { timeout: 5_000 }).catch(() => undefined);
+      // Restore through the pinned node — the exercised element itself. The
+      // named locator is not identity-safe for restoration either: the same
+      // name migration that broke name-resolved exercise would restore a
+      // sibling while the exercised select kept the alternative. The named
+      // locator remains only as a detachment fallback, guarded by the
+      // logical-replacement check (it must hold the dispatched alternative).
+      // Cleanup stays best-effort: it must never turn a successfully
+      // exercised field into a test-wide timeout.
+      const pinnedHoldsOriginalOption = await snapshotTarget
+        .evaluate(
+          (element, expected) =>
+            element.isConnected &&
+            Array.from((element as HTMLSelectElement).options).some(
+              (option) => option.value === expected,
+            ),
+          original,
+        )
+        .catch(() => false);
+      let selectRestored: boolean;
+      if (pinnedHoldsOriginalOption) {
+        selectRestored = await selectAndVerify(snapshotTarget, original);
+      } else {
+        const namedHoldsAlternative = hasStableNamedControl
+          ? await stableControl
+              .evaluate(
+                (element, expected) => (element as HTMLSelectElement).value === expected,
+                alternative,
+                { timeout: 1_000 },
+              )
+              .catch(() => false)
+          : false;
+        if (namedHoldsAlternative) {
+          selectRestored = await selectAndVerify(stableControl, original);
+        } else {
+          // Success-then-remount without a usable named fallback: a live
+          // replacement at the index that carries the snapshotted option
+          // list AND still holds the dispatched alternative is the logical
+          // replacement (same guard as the catch path) and gets restored; a
+          // vanished selection owes nothing. Either way the displaced index
+          // gets its bounded re-audit.
+          const liveReplacementHoldsAlternative = await control
+            .evaluate(
+              (element, expected) => {
+                const select = element as HTMLSelectElement;
+                return (
+                  select.isConnected &&
+                  select.value === expected.alternative &&
+                  select.options.length === expected.options.length &&
+                  Array.from(select.options).every(
+                    (option, optionIndex) =>
+                      option.value === expected.options[optionIndex].value &&
+                      option.disabled === expected.options[optionIndex].disabled,
+                  )
+                );
+              },
+              { alternative, options: selectSnapshot.options },
+              { timeout: 1_000 },
+            )
+            .catch(() => false);
+          selectRestored = liveReplacementHoldsAlternative
+            ? await selectAndVerify(control, original)
+            : true;
+          if (!(await liveIndexHoldsPinnedNode())) reauditIndexOnce();
         }
       }
-      audits.push({ route: route.path, name, type, exercised: true });
+      // A non-persisting restore is ANNOTATED, not fatal: action-selects
+      // legitimately consume a selection without round-tripping (observed on
+      // the AI Doctor "Saved views" applier, whose placeholder never
+      // returns). The annotation keeps the report honest, and the link
+      // phase's full-reload navigation plus its revisit retry bound the
+      // mutated-state risk.
+      audits.push({
+        route: route.path,
+        name,
+        type,
+        exercised: true,
+        ...(selectRestored
+          ? {}
+          : { reason: "exercised; original value did not persist after restore" }),
+      });
       continue;
     }
 
-    const original = await control.inputValue().catch(() => "");
+    // The fill exercise goes through the same pinned node the name and type
+    // describe, so a transient sibling can never absorb the fill and get the
+    // original recorded as exercised. Verification stays STRICT — a value
+    // that does not stick fails the census; only the resolution is pinned.
+    const fillTarget = pinnedControl ?? control;
+    const original = await fillTarget.inputValue().catch(() => "");
     const field = {
       type,
       accessibleName: name,
-      min: await control.getAttribute("min"),
-      max: await control.getAttribute("max"),
-      step: await control.getAttribute("step"),
+      min: await fillTarget.getAttribute("min"),
+      max: await fillTarget.getAttribute("max"),
+      step: await fillTarget.getAttribute("step"),
     };
     const placeholder = placeholderValueForField(field);
-    await control.fill(placeholder);
-    await expect(control).toHaveValue(placeholder);
-    await control.fill(original);
+    let fillDispatched = false;
+    try {
+      await fillTarget.fill(placeholder, { timeout: 5_000 });
+      fillDispatched = true;
+      await expect
+        .poll(
+          () =>
+            fillTarget.evaluate((element) =>
+              element.isConnected ? ((element as HTMLInputElement).value ?? null) : null,
+            ),
+          { timeout: 5_000 },
+        )
+        .toBe(placeholder);
+    } catch (error) {
+      // Strictness is identity-scoped: a CONNECTED pinned node that failed to
+      // take or keep the value is a real defect and still fails the census. A
+      // node the page REPLACED mid-exercise (a controlled input remounting in
+      // response to the fill) is churn, tagged by phase — the old live-locator
+      // assertion silently passed on the replacement, which is exactly the
+      // misattribution this path no longer allows.
+      const pinnedStillConnected = pinnedControl
+        ? await pinnedControl.evaluate((element) => element.isConnected).catch(() => false)
+        : true;
+      if (pinnedStillConnected) throw error;
+      // Cleanup is identity-AGNOSTIC by design: the replacement input holds
+      // the dispatched placeholder, and page content derived from it (e.g.
+      // the timeline's diary-range link embeds its date values) must return
+      // to its original shape before the link phase collects hrefs. Restoring
+      // through the live locator is cleanup, not audit — exactly what the
+      // pre-pinning code did. But cleanup is only owed when a fill actually
+      // DISPATCHED: a pre-dispatch detachment changed nothing, and writing
+      // the old value into whatever now holds the index would corrupt it.
+      if (fillDispatched) {
+        // The live node is only the LOGICAL replacement if it still holds
+        // the dispatched placeholder — a removal that shifted an unrelated
+        // sibling into the index must not be overwritten with the old
+        // field's value. A vanished placeholder owes no cleanup.
+        const liveHoldsPlaceholder = await control
+          .evaluate(
+            (element, expected) =>
+              element.isConnected && ((element as HTMLInputElement).value ?? null) === expected,
+            placeholder,
+            { timeout: 1_000 },
+          )
+          .catch(() => false);
+        if (liveHoldsPlaceholder) {
+          const restoredReplacement = await fillAndVerify(control, original);
+          expect(
+            restoredReplacement,
+            `${route.path} field "${name}" remounted after a fill and its replacement could not be restored`,
+          ).toBe(true);
+        }
+      }
+      audits.push({
+        route: route.path,
+        name,
+        type,
+        exercised: false,
+        reason: fillDispatched
+          ? "re-rendered in response to a fill before value verification"
+          : "re-rendered before the fill could be dispatched",
+      });
+      // Whatever displaced the pinned input at this index is unaudited
+      // surface — give it the bounded re-audit pass, pre- or post-dispatch
+      // alike.
+      if (!(await liveIndexHoldsPinnedNode())) {
+        reauditIndexOnce();
+      }
+      continue;
+    }
+    // Restore prefers the pinned handle while it remains connected — a
+    // reorder without detachment must not restore a sibling and leave the
+    // audited field at the placeholder. The live-locator fallback runs ONLY
+    // after confirmed detachment (a remount whose replacement holds the
+    // dispatched placeholder), and an unrestorable field is FATAL: a field
+    // that accepted the placeholder but cannot return to its original value
+    // is a product defect, and silently leaving placeholder-derived state
+    // would corrupt every later field and link audit.
+    let restored = await fillAndVerify(fillTarget, original);
+    if (!restored) {
+      const pinnedGone = pinnedControl
+        ? !(await pinnedControl.evaluate((element) => element.isConnected).catch(() => false))
+        : true;
+      if (pinnedGone) {
+        // Same logical-replacement guard as the downgrade path: only a live
+        // node still holding the dispatched placeholder is restored; a
+        // shifted unrelated sibling is left untouched, nothing is owed for a
+        // vanished placeholder, and the displaced index gets its bounded
+        // re-audit.
+        const liveHoldsPlaceholder = await control
+          .evaluate(
+            (element, expected) =>
+              element.isConnected && ((element as HTMLInputElement).value ?? null) === expected,
+            placeholder,
+            { timeout: 1_000 },
+          )
+          .catch(() => false);
+        if (liveHoldsPlaceholder) {
+          restored = await fillAndVerify(control, original);
+        } else {
+          restored = true;
+          if (!(await liveIndexHoldsPinnedNode())) reauditIndexOnce();
+        }
+      }
+    }
+    expect(
+      restored,
+      `${route.path} field "${name}" accepted the census placeholder but could not be restored`,
+    ).toBe(true);
     audits.push({ route: route.path, name, type, exercised: true });
   }
 
@@ -1013,6 +1585,19 @@ async function clickEverySafeInternalHref(
       await page.goto(link.sourcePath, { waitUntil: "domcontentloaded" });
       await assertMeaningfulPage(page, link.sourcePath);
       const anchor = page.locator(visibleLinkByHrefSelector(link.href)).first();
+      // A data-dependent link can render on one visit and miss on the next
+      // while its page's queries settle (observed: the dashboard's grow link
+      // when the mocked grow list resolves empty on a revisit). One full
+      // reload gives the data a second chance; a link that is still missing
+      // afterwards fails the census exactly as before.
+      const anchorVisibleOnFirstRender = await anchor
+        .waitFor({ state: "visible", timeout: 10_000 })
+        .then(() => true)
+        .catch(() => false);
+      if (!anchorVisibleOnFirstRender) {
+        await page.goto(link.sourcePath, { waitUntil: "domcontentloaded" });
+        await assertMeaningfulPage(page, link.sourcePath);
+      }
       await expect(anchor, `${link.href} must remain visible on ${link.sourcePath}`).toBeVisible({
         timeout: 10_000,
       });
@@ -1076,6 +1661,7 @@ async function runLaneCensus(
 
   installContextErrorAudit(context, report);
   if (signedIn) await seedFakeSession(context);
+  await seedDeniedAnalyticsConsent(context);
   await installNetworkFence(context, signedIn, network);
 
   for (const route of routes) {

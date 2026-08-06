@@ -20,10 +20,11 @@ import {
 } from "@/hooks/useEcowittLatestSnapshot";
 import { ECOWITT_DERIVED_VPD_LABEL } from "@/lib/ecowittReadingViewModel";
 import SensorSourceProvenanceBadge from "@/components/SensorSourceProvenanceBadge";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
+import { fahrenheitToCelsius, getTemperatureUnitSymbol } from "@/lib/temperatureUnitPreference";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 
-export interface EcowittLatestSnapshotCardProps
-  extends UseEcowittLatestSnapshotInput {
+export interface EcowittLatestSnapshotCardProps extends UseEcowittLatestSnapshotInput {
   /** Card heading; defaults to "Latest EcoWitt Reading". */
   title?: string;
   /** Tent name to display in the card header. */
@@ -56,24 +57,29 @@ function readPayloadMetadata(rawPayload: unknown): {
   const obj = rawPayload as Record<string, unknown>;
   return {
     testSender: obj.test_sender === true,
-    transport:
-      typeof obj.transport === "string" && obj.transport.length > 0
-        ? obj.transport
-        : null,
+    transport: typeof obj.transport === "string" && obj.transport.length > 0 ? obj.transport : null,
   };
 }
 
-export function EcowittLatestSnapshotCard(
-  props: EcowittLatestSnapshotCardProps,
-) {
-  const {
-    title = "Latest EcoWitt Reading",
-    tentName,
-    ...input
-  } = props;
+export function EcowittLatestSnapshotCard(props: EcowittLatestSnapshotCardProps) {
+  const { title = "Latest EcoWitt Reading", tentName, ...input } = props;
   const { status, viewModel, errorMessage } = useEcowittLatestSnapshot(input);
 
   const meta = readPayloadMetadata(viewModel?.snapshot?.rawPayload ?? null);
+
+  // Read-only card, but it must still honor the saved °F/°C preference.
+  // `temp_f` is already Fahrenheit, so converting to °C is a one-way step —
+  // never re-convert. Value and symbol are derived together so they cannot
+  // disagree. Fahrenheit stays byte-identical to the previous output.
+  const temperatureUnit = useTemperatureUnitPreference();
+  const temperatureSymbol = getTemperatureUnitSymbol(temperatureUnit);
+  const displayedTempF = viewModel?.metrics.temp_f;
+  const displayedTemp =
+    temperatureUnit === "celsius" &&
+    typeof displayedTempF === "number" &&
+    Number.isFinite(displayedTempF)
+      ? fahrenheitToCelsius(displayedTempF)
+      : displayedTempF;
 
   return (
     <section
@@ -85,10 +91,7 @@ export function EcowittLatestSnapshotCard(
         <div>
           <h3 className="text-sm font-semibold">{title}</h3>
           {tentName ? (
-            <p
-              data-testid="ecowitt-tent-name"
-              className="text-xs text-muted-foreground"
-            >
+            <p data-testid="ecowitt-tent-name" className="text-xs text-muted-foreground">
               {tentName}
             </p>
           ) : null}
@@ -121,10 +124,7 @@ export function EcowittLatestSnapshotCard(
       </header>
 
       {meta.transport ? (
-        <p
-          data-testid="ecowitt-transport"
-          className="mb-2 text-[11px] text-muted-foreground"
-        >
+        <p data-testid="ecowitt-transport" className="mb-2 text-[11px] text-muted-foreground">
           Transport: {meta.transport}
         </p>
       ) : null}
@@ -140,20 +140,14 @@ export function EcowittLatestSnapshotCard(
       ) : null}
 
       {status === "error" ? (
-        <p
-          data-testid="ecowitt-snapshot-error"
-          className="text-sm text-destructive"
-          role="alert"
-        >
+        <p data-testid="ecowitt-snapshot-error" className="text-sm text-destructive" role="alert">
           {errorMessage}
         </p>
       ) : null}
 
       {status === "ok" && viewModel && !viewModel.hasReading ? (
         <div data-testid="ecowitt-snapshot-empty">
-          <p className="text-sm text-muted-foreground">
-            {viewModel.emptyStateMessage}
-          </p>
+          <p className="text-sm text-muted-foreground">{viewModel.emptyStateMessage}</p>
         </div>
       ) : null}
 
@@ -173,7 +167,7 @@ export function EcowittLatestSnapshotCard(
             <div>
               <dt className="text-muted-foreground">Air temperature</dt>
               <dd data-testid="ecowitt-metric-temp_f">
-                {formatNumber(viewModel.metrics.temp_f)} °F
+                {formatNumber(displayedTemp)} {temperatureSymbol}
               </dd>
             </div>
             <div>
@@ -199,18 +193,12 @@ export function EcowittLatestSnapshotCard(
               </div>
             ) : null}
             <div>
-              <dt className="text-muted-foreground">
-                {ECOWITT_DERIVED_VPD_LABEL}
-              </dt>
+              <dt className="text-muted-foreground">{ECOWITT_DERIVED_VPD_LABEL}</dt>
               <dd data-testid="ecowitt-metric-vpd_kpa">
                 {viewModel.invalid ||
-                (viewModel.metrics.vpd_kpa == null &&
-                  viewModel.derivedVpdKpa == null)
+                (viewModel.metrics.vpd_kpa == null && viewModel.derivedVpdKpa == null)
                   ? "Unavailable"
-                  : `${formatNumber(
-                      viewModel.metrics.vpd_kpa ?? viewModel.derivedVpdKpa,
-                      2,
-                    )} kPa`}
+                  : `${formatNumber(viewModel.metrics.vpd_kpa ?? viewModel.derivedVpdKpa, 2)} kPa`}
               </dd>
             </div>
           </dl>
@@ -220,10 +208,7 @@ export function EcowittLatestSnapshotCard(
               Captured {formatCapturedAt(viewModel.snapshot?.capturedAt ?? null)}
             </span>
             {viewModel.freshness ? (
-              <span
-                data-testid="ecowitt-snapshot-freshness"
-                className="capitalize"
-              >
+              <span data-testid="ecowitt-snapshot-freshness" className="capitalize">
                 {viewModel.freshness}
               </span>
             ) : null}
@@ -236,8 +221,7 @@ export function EcowittLatestSnapshotCard(
             >
               {viewModel.snapshot.suspicion.map((flag, i) => (
                 <li key={`${flag.code}-${i}`}>
-                  <span className="font-medium">[{flag.severity}]</span>{" "}
-                  {flag.message}
+                  <span className="font-medium">[{flag.severity}]</span> {flag.message}
                 </li>
               ))}
             </ul>

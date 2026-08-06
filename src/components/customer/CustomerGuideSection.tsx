@@ -8,9 +8,7 @@ export interface CustomerGuideSectionProps {
   section: CustomerGuideSection;
 }
 
-export default function CustomerGuideSectionView({
-  section,
-}: CustomerGuideSectionProps) {
+export default function CustomerGuideSectionView({ section }: CustomerGuideSectionProps) {
   return (
     <section
       data-testid={`customer-guide-section-${section.id}`}
@@ -24,9 +22,7 @@ export default function CustomerGuideSectionView({
       >
         {section.title}
       </h2>
-      <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
-        {section.body}
-      </p>
+      <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{section.body}</p>
       {section.isPlaceholder ? (
         <p
           data-testid={`customer-guide-section-${section.id}-placeholder-label`}

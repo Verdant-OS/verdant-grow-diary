@@ -21,9 +21,7 @@ import { getActionQueueSourceLabel } from "@/lib/actionQueueProvenanceRules";
  *
  * Pure / deterministic / display-only. No business-logic changes.
  */
-export function sanitizeActionCopy(
-  text: string | null | undefined,
-): string {
+export function sanitizeActionCopy(text: string | null | undefined): string {
   if (text == null) return "";
   const s = String(text);
   if (!s) return "";
@@ -32,10 +30,7 @@ export function sanitizeActionCopy(
   // itself with a calm human phrase. Collapse any double-spaces left
   // behind.
   return s
-    .replace(
-      /LATEST_SENSOR_SNAPSHOT\s*\[[^\]]*\]\s*:?/g,
-      "the latest sensor snapshot",
-    )
+    .replace(/LATEST_SENSOR_SNAPSHOT\s*\[[^\]]*\]\s*:?/g, "the latest sensor snapshot")
     .replace(/LATEST_SENSOR_SNAPSHOT/g, "the latest sensor snapshot")
     .replace(/ {2,}/g, " ")
     .trim();
@@ -106,12 +101,7 @@ export function buildActionRowAriaLabel(input: ActionRowAriaInput): string {
  * `TransitionKind` in actionQueueTransitions.ts but kept local so this
  * pure presentation helper has zero domain coupling.
  */
-export type StatusControlKind =
-  | "approve"
-  | "reject"
-  | "simulate"
-  | "complete"
-  | "cancel";
+export type StatusControlKind = "approve" | "reject" | "simulate" | "complete" | "cancel";
 
 const STATUS_CONTROL_VERB: Record<StatusControlKind, string> = {
   approve: "Approve action",

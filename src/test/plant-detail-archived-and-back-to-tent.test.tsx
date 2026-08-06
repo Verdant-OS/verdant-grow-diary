@@ -8,7 +8,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, act } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import {
@@ -116,9 +116,7 @@ describe("derivePlantDetailBlockedStateView", () => {
   });
 
   it("returns null for plain loading so the skeleton can render", () => {
-    expect(
-      derivePlantDetailBlockedStateView({ loadState: "loading" }),
-    ).toBeNull();
+    expect(derivePlantDetailBlockedStateView({ loadState: "loading" })).toBeNull();
   });
 
   it("surfaces an archived state — never not-found — when the plant is archived", () => {
@@ -198,10 +196,7 @@ describe("PlantDetail blocked-state integration", () => {
     expect(screen.queryByText(/plant not found/i)).toBeNull();
     const tentLink = screen.getByTestId("plant-detail-back-to-tent");
     expect(tentLink).toHaveAttribute("href", "/tents/tent-7");
-    expect(screen.getByTestId("plant-detail-back-to-plants")).toHaveAttribute(
-      "href",
-      "/plants",
-    );
+    expect(screen.getByTestId("plant-detail-back-to-plants")).toHaveAttribute("href", "/plants");
   });
 
   it("falls back to Back to plants only when an archived plant has no tent", () => {

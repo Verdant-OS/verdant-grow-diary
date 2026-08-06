@@ -3,7 +3,7 @@
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import { VERDANT_CULTIVARS } from "@/constants/verdantCultivars";
 
 let entitlement: { isActive: boolean; capabilities: { blueprint: boolean } };

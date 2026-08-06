@@ -1,10 +1,22 @@
 import { useEffect, useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Loader2, Plus, Trash2, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { STAGES } from "@/lib/grow";
@@ -59,9 +71,12 @@ export default function EntryEditDialog({ entry, open, onOpenChange, onSaved, on
     setNote(entry.note || "");
     setStage(entry.stage || "veg");
     const d = entry.details || {};
-    const inferred = typeof d.event_type === "string" && d.event_type
-      ? d.event_type
-      : entry.photo_url ? "photo" : "observation";
+    const inferred =
+      typeof d.event_type === "string" && d.event_type
+        ? d.event_type
+        : entry.photo_url
+          ? "photo"
+          : "observation";
     setEventType(inferred);
     setRows(
       Object.entries(d)
@@ -82,7 +97,10 @@ export default function EntryEditDialog({ entry, open, onOpenChange, onSaved, on
 
   async function save() {
     if (!entry) return;
-    if (!note.trim()) { toast.error("Note can't be empty"); return; }
+    if (!note.trim()) {
+      toast.error("Note can't be empty");
+      return;
+    }
     setBusy(true);
     const details: Record<string, string> = {};
     if (eventType) details.event_type = eventType;
@@ -94,7 +112,10 @@ export default function EntryEditDialog({ entry, open, onOpenChange, onSaved, on
     const patch = { note: note.trim(), stage, details };
     const { error } = await supabase.from("diary_entries").update(patch).eq("id", entry.id);
     setBusy(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
     toast.success("Entry updated");
     onSaved?.({ id: entry.id, ...patch });
     onOpenChange(false);
@@ -106,7 +127,10 @@ export default function EntryEditDialog({ entry, open, onOpenChange, onSaved, on
     setDeleting(true);
     const { error } = await supabase.from("diary_entries").delete().eq("id", entry.id);
     setDeleting(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
     toast.success("Entry deleted");
     onDeleted?.(entry.id);
     onOpenChange(false);
@@ -127,18 +151,30 @@ export default function EntryEditDialog({ entry, open, onOpenChange, onSaved, on
             <div>
               <Label className="text-xs">Stage</Label>
               <Select value={stage} onValueChange={setStage}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
-                  {STAGES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                  {STAGES.map((s) => (
+                    <SelectItem key={s.value} value={s.value}>
+                      {s.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
             <div>
               <Label className="text-xs">Event type</Label>
               <Select value={eventType} onValueChange={setEventType}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
-                  {EVENT_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                  {EVENT_TYPES.map((t) => (
+                    <SelectItem key={t.value} value={t.value}>
+                      {t.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -152,12 +188,20 @@ export default function EntryEditDialog({ entry, open, onOpenChange, onSaved, on
           <div>
             <div className="flex items-center justify-between mb-2">
               <Label>Details</Label>
-              <Button type="button" variant="ghost" size="sm" onClick={() => addRow()} className="h-7 px-2 text-xs">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => addRow()}
+                className="h-7 px-2 text-xs"
+              >
                 <Plus className="h-3 w-3" /> Add
               </Button>
             </div>
             {rows.length === 0 && (
-              <p className="text-xs text-muted-foreground mb-2">No details yet. Add measurements or actions below.</p>
+              <p className="text-xs text-muted-foreground mb-2">
+                No details yet. Add measurements or actions below.
+              </p>
             )}
             <div className="space-y-2">
               {rows.map((r, i) => (
@@ -212,13 +256,35 @@ export default function EntryEditDialog({ entry, open, onOpenChange, onSaved, on
         </div>
 
         <DialogFooter className="gap-2 sm:justify-between">
-          <Button type="button" variant="ghost" onClick={remove} disabled={deleting || busy} className="text-destructive hover:text-destructive">
-            {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={remove}
+            disabled={deleting || busy}
+            className="text-destructive hover:text-destructive"
+          >
+            {deleting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Trash2 className="h-4 w-4" />
+            )}
             Delete
           </Button>
           <div className="flex gap-2">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
-            <Button type="button" onClick={save} disabled={busy} className="gradient-leaf text-primary-foreground">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={busy}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={save}
+              disabled={busy}
+              className="gradient-leaf text-primary-foreground"
+            >
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
             </Button>
           </div>

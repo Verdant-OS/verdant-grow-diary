@@ -10,7 +10,7 @@
  * "Needs operator confirmation".
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { useQueryClient } from "@tanstack/react-query";
 import PageHeader from "@/components/PageHeader";
 import { ClipboardCheck, RefreshCw, Printer, Copy } from "lucide-react";
@@ -52,21 +52,18 @@ import {
   PROOF_REPORT_REDACTION_NOTICE,
 } from "@/lib/proofReportRedactionRules";
 
-
 export default function OneTentLiveProof() {
   const { grows, activeGrowId } = useGrows();
   const [growId, setGrowId] = useState<string | "">(activeGrowId ?? "");
   const effectiveGrowId = growId || activeGrowId || grows[0]?.id || "";
   const { data: tents = [] } = useGrowTents(effectiveGrowId || undefined);
   const [tentId, setTentId] = useState<string | "">("");
-  const effectiveTentId = tentId || (tents.length === 1 ? tents[0]?.id ?? "" : "");
+  const effectiveTentId = tentId || (tents.length === 1 ? (tents[0]?.id ?? "") : "");
 
   const selectedGrow = grows.find((g) => g.id === effectiveGrowId) ?? null;
   const selectedTent = tents.find((t) => t.id === effectiveTentId) ?? null;
 
-  const tentIds = effectiveTentId
-    ? [effectiveTentId]
-    : tents.map((t) => t.id);
+  const tentIds = effectiveTentId ? [effectiveTentId] : tents.map((t) => t.id);
   const snapshot = useLatestSensorSnapshot(effectiveGrowId, tentIds);
   const { alerts, reload: reloadAlerts } = useAlertsList({
     growId: effectiveGrowId || null,
@@ -79,9 +76,7 @@ export default function OneTentLiveProof() {
   const [refreshing, setRefreshing] = useState(false);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
   const REFRESH_SECTIONS = ["snapshots", "alerts", "actions", "timeline"] as const;
-  const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "error">(
-    "idle",
-  );
+  const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "error">("idle");
 
   const actionStatus = useOneTentLiveProofActionStatus(alertIds, refreshNonce);
   const timelineFollowup = useOneTentLiveProofTimelineFollowup(
@@ -123,12 +118,8 @@ export default function OneTentLiveProof() {
     () =>
       buildOneTentLiveProofViewModel(
         {
-          grow: selectedGrow
-            ? { id: selectedGrow.id, name: selectedGrow.name ?? null }
-            : null,
-          tent: selectedTent
-            ? { id: selectedTent.id, name: selectedTent.name ?? null }
-            : null,
+          grow: selectedGrow ? { id: selectedGrow.id, name: selectedGrow.name ?? null } : null,
+          tent: selectedTent ? { id: selectedTent.id, name: selectedTent.name ?? null } : null,
         },
         {
           snapshot: snapshot.status === "ok" ? snapshot.snapshot : null,
@@ -159,10 +150,7 @@ export default function OneTentLiveProof() {
   // sensor_readings + RLS-safe ingest-audit proof from sensor_ingest_audit_log.
   // Both queries are narrow and existing — no new write surface, no schema
   // changes, no Edge/RPC/auth changes.
-  const { data: tentSensorRows = [] } = useSensorReadings(
-    effectiveTentId || undefined,
-    60,
-  );
+  const { data: tentSensorRows = [] } = useSensorReadings(effectiveTentId || undefined, 60);
   const auditProofQuery = useEcowittIngestAuditProofRows({
     tentId: effectiveTentId || null,
     enabled: Boolean(effectiveTentId),
@@ -170,10 +158,10 @@ export default function OneTentLiveProof() {
   const sensorProofVM = useMemo(() => {
     const now = lastRefreshedAt ?? new Date();
     const liveVM = effectiveTentId
-      ? buildEcowittLiveProofViewModel(
-          tentSensorRows as unknown as readonly EcowittProofRow[],
-          { tentId: effectiveTentId, now },
-        )
+      ? buildEcowittLiveProofViewModel(tentSensorRows as unknown as readonly EcowittProofRow[], {
+          tentId: effectiveTentId,
+          now,
+        })
       : null;
     const auditVM = effectiveTentId
       ? buildEcowittIngestAuditProof(auditProofQuery.rows, {
@@ -221,14 +209,6 @@ export default function OneTentLiveProof() {
     };
   }, [vm, lastRefreshedAt, sensorProofVM]);
 
-
-
-
-
-
-
-
-
   return (
     <div className="space-y-4">
       <PageHeader
@@ -236,20 +216,16 @@ export default function OneTentLiveProof() {
         description="Manual Snapshot → Alert → Action Queue → Completed Follow-up → Timeline"
         icon={<ClipboardCheck className="h-5 w-5" />}
       />
-      <p
-        className="text-xs text-muted-foreground"
-        data-testid="one-tent-live-proof-description"
-      >
-        Use this guided path to prove Verdant's core operating loop with a
-        real/manual tent reading. Verdant does not fake live data, auto-create
-        actions, or control equipment.
+      <p className="text-xs text-muted-foreground" data-testid="one-tent-live-proof-description">
+        Use this guided path to prove Verdant's core operating loop with a real/manual tent reading.
+        Verdant does not fake live data, auto-create actions, or control equipment.
       </p>
       <p
         className="text-[11px] text-muted-foreground"
         data-testid="one-tent-live-proof-readonly-note"
       >
-        This page only reads proof status. It does not create alerts, create
-        actions, complete actions, or control equipment.
+        This page only reads proof status. It does not create alerts, create actions, complete
+        actions, or control equipment.
       </p>
 
       <ul
@@ -287,18 +263,10 @@ export default function OneTentLiveProof() {
         </ol>
       </section>
 
-
-
-      <section
-        className="glass rounded-2xl p-3 space-y-2"
-        aria-label="Proof context selector"
-      >
+      <section className="glass rounded-2xl p-3 space-y-2" aria-label="Proof context selector">
         <p className="text-xs font-medium">Context</p>
         {grows.length === 0 ? (
-          <p
-            className="text-xs text-muted-foreground"
-            data-testid="one-tent-live-proof-empty"
-          >
+          <p className="text-xs text-muted-foreground" data-testid="one-tent-live-proof-empty">
             Create or select a grow/tent/plant to run the proof.
           </p>
         ) : (
@@ -392,8 +360,8 @@ export default function OneTentLiveProof() {
           </span>
         ) : (
           <span className="text-[11px] text-muted-foreground">
-            Use after saving a snapshot, adding an alert to Action Queue,
-            completing an action, or checking Timeline.
+            Use after saving a snapshot, adding an alert to Action Queue, completing an action, or
+            checking Timeline.
           </span>
         )}
       </div>
@@ -442,10 +410,7 @@ export default function OneTentLiveProof() {
           onClick={async () => {
             try {
               const text = report.markdown;
-              if (
-                typeof navigator !== "undefined" &&
-                navigator.clipboard?.writeText
-              ) {
+              if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
                 await navigator.clipboard.writeText(text);
                 setCopyStatus("copied");
               } else {
@@ -473,16 +438,14 @@ export default function OneTentLiveProof() {
         {PROOF_REPORT_REDACTION_NOTICE.join(" ")}
       </p>
 
-
       <OneTentLiveProofReport report={report} />
 
       <p
         className="text-[11px] text-muted-foreground"
         data-testid="one-tent-live-proof-honesty-note"
       >
-        Verdant will not mark steps complete unless real app state supports
-        them. Steps that cannot be safely inferred show "Needs operator
-        confirmation".
+        Verdant will not mark steps complete unless real app state supports them. Steps that cannot
+        be safely inferred show "Needs operator confirmation".
       </p>
     </div>
   );

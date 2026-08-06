@@ -53,17 +53,11 @@ describe("sanitizeHarvestWeightUnit", () => {
 describe("buildHarvestDetailsPayload", () => {
   it("returns null when all inputs are empty or invalid", () => {
     expect(buildHarvestDetailsPayload(null)).toBeNull();
-    expect(
-      buildHarvestDetailsPayload({ wetWeight: "", dryWeight: "" }),
-    ).toBeNull();
-    expect(
-      buildHarvestDetailsPayload({ wetWeight: "-1", dryWeight: "abc" }),
-    ).toBeNull();
+    expect(buildHarvestDetailsPayload({ wetWeight: "", dryWeight: "" })).toBeNull();
+    expect(buildHarvestDetailsPayload({ wetWeight: "-1", dryWeight: "abc" })).toBeNull();
   });
   it("omits weightUnit when no weight is entered", () => {
-    expect(
-      buildHarvestDetailsPayload({ weightUnit: "g" }),
-    ).toBeNull();
+    expect(buildHarvestDetailsPayload({ weightUnit: "g" })).toBeNull();
   });
   it("preserves entered wet weight and unit", () => {
     expect(
@@ -146,9 +140,7 @@ describe("validateHarvestWeightInput", () => {
 describe("formatHarvestSavedBreakdownDetail", () => {
   it("returns null when no valid weight is entered", () => {
     expect(formatHarvestSavedBreakdownDetail(null)).toBeNull();
-    expect(
-      formatHarvestSavedBreakdownDetail({ wetWeight: "", dryWeight: "" }),
-    ).toBeNull();
+    expect(formatHarvestSavedBreakdownDetail({ wetWeight: "", dryWeight: "" })).toBeNull();
     expect(
       formatHarvestSavedBreakdownDetail({
         wetWeight: "-1",
@@ -181,9 +173,7 @@ describe("formatHarvestSavedBreakdownDetail", () => {
     ).toBe("wet 120 g, dry 32 g");
   });
   it("omits unit when unit missing", () => {
-    expect(
-      formatHarvestSavedBreakdownDetail({ wetWeight: "120" }),
-    ).toBe("wet 120");
+    expect(formatHarvestSavedBreakdownDetail({ wetWeight: "120" })).toBe("wet 120");
   });
   it("never contains the word yield", () => {
     const out = formatHarvestSavedBreakdownDetail({

@@ -61,9 +61,7 @@ describe("DailyCheck Quick Log header alignment", () => {
   });
 
   it("preserves safety copy around what a check means and source labeling", () => {
-    expect(SRC).toMatch(
-      /Logging a check does not mean the plant is healthy/,
-    );
+    expect(SRC).toMatch(/Logging a check does not mean the plant is healthy/);
     expect(SRC).toMatch(/Saved as <strong>manual<\/strong>, not live sensor data/);
   });
 });

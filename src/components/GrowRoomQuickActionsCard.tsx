@@ -6,7 +6,7 @@
  * context as the event detail. It does NOT perform any writes, device
  * control, or automation, and never looks up additional context.
  */
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import {
   ArrowRight,
   ClipboardCheck,
@@ -46,13 +46,11 @@ interface Props {
 
 // Visible focus ring tuned for keyboard + mobile tap-and-hold.
 const FOCUS_CLASSES =
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+  "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
 function dispatchQuickLog(payload: GrowRoomQuickLogEventPayload | null) {
   if (typeof window === "undefined") return;
-  window.dispatchEvent(
-    new CustomEvent(PLANT_QUICKLOG_PREFILL_EVENT, { detail: payload }),
-  );
+  window.dispatchEvent(new CustomEvent(PLANT_QUICKLOG_PREFILL_EVENT, { detail: payload }));
 }
 
 function ariaLabelFor(entry: GrowRoomLauncherEntry): string {
@@ -79,11 +77,7 @@ function renderButton(entry: GrowRoomLauncherEntry) {
 
   if (entry.disabled) {
     return (
-      <div
-        key={entry.kind}
-        data-testid={`${entry.testId}-disabled`}
-        className="space-y-1"
-      >
+      <div key={entry.kind} data-testid={`${entry.testId}-disabled`} className="space-y-1">
         <Button
           type="button"
           variant="outline"
@@ -154,8 +148,8 @@ export default function GrowRoomQuickActionsCard({
       <div>
         <h2 className="text-base font-semibold">Grow Room Mode</h2>
         <p className="text-xs text-muted-foreground">
-          Quick links to the actions you reach most in the grow room. Verdant
-          never executes equipment changes.
+          Quick links to the actions you reach most in the grow room. Verdant never executes
+          equipment changes.
         </p>
       </div>
       <div

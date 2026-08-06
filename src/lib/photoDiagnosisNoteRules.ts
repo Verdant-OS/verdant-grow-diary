@@ -81,8 +81,7 @@ export interface PhotoDiagnosisDiaryDraft {
 }
 
 export type PhotoDiagnosisDraftResult =
-  | { ok: true; draft: PhotoDiagnosisDiaryDraft }
-  | { ok: false; reason: string };
+  { ok: true; draft: PhotoDiagnosisDiaryDraft } | { ok: false; reason: string };
 
 /** The normalized latest-review record returned by the read-only projectors. */
 export interface PhotoDiagnosisLatestReview {

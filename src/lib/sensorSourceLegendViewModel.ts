@@ -8,14 +8,7 @@
  */
 
 export type SensorLegendKind =
-  | "live"
-  | "manual"
-  | "csv"
-  | "demo"
-  | "derived"
-  | "stale"
-  | "invalid"
-  | "not_connected";
+  "live" | "manual" | "csv" | "demo" | "derived" | "stale" | "invalid" | "not_connected";
 
 export interface SensorLegendEntry {
   kind: SensorLegendKind;

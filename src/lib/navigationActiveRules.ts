@@ -18,15 +18,10 @@ function matchesPath(pathname: string, target: string, end = false): boolean {
  * visually aligned. Exclusions win before normal prefix matching so a
  * privileged child route cannot also present its grower parent as active.
  */
-export function isNavigationItemActive(
-  pathname: string,
-  item: NavigationActiveRule,
-): boolean {
+export function isNavigationItemActive(pathname: string, item: NavigationActiveRule): boolean {
   if (item.excludedPaths?.some((path) => matchesPath(pathname, path))) {
     return false;
   }
 
-  return [item.to, ...(item.aliases ?? [])].some((path) =>
-    matchesPath(pathname, path, item.end),
-  );
+  return [item.to, ...(item.aliases ?? [])].some((path) => matchesPath(pathname, path, item.end));
 }

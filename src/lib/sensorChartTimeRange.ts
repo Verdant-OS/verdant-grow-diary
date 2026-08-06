@@ -57,9 +57,7 @@ export function filterTimeSeriesByRange<T>(
  * shape (e.g. "May 31, 2026, 1:44 PM"). Returns "Unknown time" for
  * invalid input so tooltips never render NaN or raw ISO strings.
  */
-export function formatChartTooltipTimestamp(
-  ts: string | number | Date | null | undefined,
-): string {
+export function formatChartTooltipTimestamp(ts: string | number | Date | null | undefined): string {
   if (ts === null || ts === undefined || ts === "") return "Unknown time";
   const d = ts instanceof Date ? ts : new Date(ts);
   if (!(d instanceof Date) || Number.isNaN(d.getTime())) return "Unknown time";

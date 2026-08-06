@@ -26,7 +26,7 @@ export interface CultivationCalendarMonthGridProps {
   projectedReviews?: readonly CultivationCalendarProjectedReviewBlock[] | null;
   /** The current manually logged grow stage, shown in the badge and legend only. */
   activeStage?: string | null;
-  /** Injectable instant for UTC today highlighting. Defaults to the current instant. */
+  /** Injectable instant for the local-day today highlight. Defaults to the current instant. */
   now?: Date | string | null;
   /** Opens the existing detail view for a logged fact only. */
   onOpenEvent?: (event: DiaryCalendarEvent) => void;
@@ -221,7 +221,7 @@ export default function CultivationCalendarMonthGrid({
       </p>
 
       <div
-        className="mt-4 overflow-x-auto overscroll-x-contain focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        className="mt-4 overflow-x-auto overscroll-x-contain focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
         data-testid="cultivation-calendar-horizontal-scroll"
         role="region"
         tabIndex={0}
@@ -299,7 +299,7 @@ export default function CultivationCalendarMonthGrid({
                             if (sourceEvent) onOpenEvent?.(sourceEvent);
                           }}
                           className={cn(
-                            "block w-full rounded-md px-1.5 py-1 text-left text-[10px] font-medium leading-tight transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-default",
+                            "block w-full rounded-md px-1.5 py-1 text-left text-[10px] font-medium leading-tight transition focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-default",
                             palette?.blockClassName ?? NEUTRAL_FACT_BLOCK_CLASS,
                           )}
                           data-testid="cultivation-calendar-fact-block"

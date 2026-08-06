@@ -40,7 +40,11 @@ const plants = [
   { id: "p5", name: "Auto #5", strain: "Blue Dream Auto #5", tent_id: "t1", grow_id: "g1" },
 ];
 
-function plantT(id: string, tentId: string | null, growId: string | null): ResolvedQuickLogV2Target {
+function plantT(
+  id: string,
+  tentId: string | null,
+  growId: string | null,
+): ResolvedQuickLogV2Target {
   return { ok: true, targetType: "plant", targetId: id, plantId: id, tentId, growId };
 }
 function tentT(id: string, growId: string | null): ResolvedQuickLogV2Target {
@@ -53,7 +57,12 @@ function values(panel: ReturnType<typeof buildQuickLogTargetPanel>) {
 
 describe("QuickLog target panel — combination regression", () => {
   it("Grow + Tent + Plant + Strain — all four distinct labels present", () => {
-    const p = buildQuickLogTargetPanel({ resolved: plantT("p1", "t1", "g1"), plants, tents, grows });
+    const p = buildQuickLogTargetPanel({
+      resolved: plantT("p1", "t1", "g1"),
+      plants,
+      tents,
+      grows,
+    });
     expect(p.fields.map((f) => f.label)).toEqual(["Grow", "Tent", "Plant", "Strain"]);
     expect(values(p)).toEqual({
       Grow: "Summer Run 2026",
@@ -64,7 +73,12 @@ describe("QuickLog target panel — combination regression", () => {
   });
 
   it("Grow + Plant + Strain, no tent — warning row, other fields intact", () => {
-    const p = buildQuickLogTargetPanel({ resolved: plantT("p2", null, "g1"), plants, tents, grows });
+    const p = buildQuickLogTargetPanel({
+      resolved: plantT("p2", null, "g1"),
+      plants,
+      tents,
+      grows,
+    });
     const map = values(p);
     expect(map.Tent).toBe(QUICK_LOG_TARGET_NO_TENT_LABEL);
     expect(map.Grow).toBe("Summer Run 2026");
@@ -85,7 +99,12 @@ describe("QuickLog target panel — combination regression", () => {
   });
 
   it("Plant whose name resembles a grow label — plant renders in Plant, grow in Grow", () => {
-    const p = buildQuickLogTargetPanel({ resolved: plantT("p4", "t1", "g1"), plants, tents, grows });
+    const p = buildQuickLogTargetPanel({
+      resolved: plantT("p4", "t1", "g1"),
+      plants,
+      tents,
+      grows,
+    });
     const map = values(p);
     expect(map.Plant).toBe("Summer Run");
     expect(map.Grow).toBe("Summer Run 2026");
@@ -96,7 +115,12 @@ describe("QuickLog target panel — combination regression", () => {
   });
 
   it("Strain text that resembles a plant name — strain stays in Strain, plant stays in Plant", () => {
-    const p = buildQuickLogTargetPanel({ resolved: plantT("p5", "t1", "g1"), plants, tents, grows });
+    const p = buildQuickLogTargetPanel({
+      resolved: plantT("p5", "t1", "g1"),
+      plants,
+      tents,
+      grows,
+    });
     const map = values(p);
     expect(map.Plant).toBe("Auto #5");
     expect(map.Strain).toBe("Blue Dream Auto #5");
@@ -105,7 +129,12 @@ describe("QuickLog target panel — combination regression", () => {
   });
 
   it("Missing strain renders neutral 'No strain recorded' — not the plant name, not empty", () => {
-    const p = buildQuickLogTargetPanel({ resolved: plantT("p3", "t1", "g1"), plants, tents, grows });
+    const p = buildQuickLogTargetPanel({
+      resolved: plantT("p3", "t1", "g1"),
+      plants,
+      tents,
+      grows,
+    });
     const map = values(p);
     expect(map.Strain).toBe(QUICK_LOG_TARGET_NO_STRAIN_LABEL);
     const strain = p.fields.find((f) => f.label === "Strain")!;

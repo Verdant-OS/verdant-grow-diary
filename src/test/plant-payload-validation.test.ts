@@ -3,10 +3,12 @@ import {
   validatePlantInsertPayload,
   validatePlantRowResponse,
   filterValidPlantRows,
+  PlantInsertPayloadSchema,
 } from "@/lib/plantPayloadValidation";
 
 const UUID_A = "11111111-1111-1111-1111-111111111111";
 const UUID_B = "22222222-2222-2222-2222-222222222222";
+const UUID_G = "33333333-3333-4333-8333-333333333333";
 
 describe("validatePlantInsertPayload", () => {
   const base = {
@@ -16,12 +18,33 @@ describe("validatePlantInsertPayload", () => {
     stage: "seedling",
     health: "healthy",
     plant_type: "unknown",
+    grow_id: UUID_G,
   };
 
-  it("accepts a canonical payload", () => {
+  it("accepts a canonical payload with required grow_id", () => {
     const r = validatePlantInsertPayload(base);
     expect(r.ok).toBe(true);
     expect(r.value?.plant_type).toBe("unknown");
+    expect(r.value?.grow_id).toBe(UUID_G);
+  });
+
+  it("rejects missing grow_id for client create", () => {
+    const { grow_id: _g, ...rest } = base;
+    const r = validatePlantInsertPayload(rest);
+    expect(r.ok).toBe(false);
+    expect(r.errors.join()).toMatch(/grow_id/i);
+  });
+
+  it("rejects invalid grow_id", () => {
+    const r = validatePlantInsertPayload({ ...base, grow_id: "not-a-uuid" });
+    expect(r.ok).toBe(false);
+    expect(r.errors.join()).toMatch(/grow_id/i);
+  });
+
+  it("schema requires grow_id (not optional)", () => {
+    const shape = PlantInsertPayloadSchema.shape.grow_id;
+    // Zod optional wrappers expose isOptional(); required UUID field is not optional.
+    expect((shape as { isOptional?: () => boolean }).isOptional?.() ?? false).toBe(false);
   });
 
   it("rejects a missing name", () => {
@@ -51,6 +74,12 @@ describe("validatePlantInsertPayload", () => {
   it("rejects a non-uuid user_id", () => {
     expect(validatePlantInsertPayload({ ...base, user_id: "not-uuid" }).ok).toBe(false);
   });
+
+  it("allows optional tent_id", () => {
+    const r = validatePlantInsertPayload({ ...base, tent_id: UUID_B });
+    expect(r.ok).toBe(true);
+    expect(r.value?.tent_id).toBe(UUID_B);
+  });
 });
 
 describe("validatePlantRowResponse", () => {
@@ -74,6 +103,16 @@ describe("validatePlantRowResponse", () => {
     const r = validatePlantRowResponse({ id: UUID_A, name: "P", plant_type: "autoflower" });
     expect(r.ok).toBe(true);
     expect(r.value?.plant_type).toBe("autoflower");
+  });
+
+  it("still accepts legacy null grow links on read", () => {
+    const r = validatePlantRowResponse({
+      id: UUID_A,
+      name: "Legacy",
+      plant_type: "unknown",
+      grow_id: null,
+    });
+    expect(r.ok).toBe(true);
   });
 });
 

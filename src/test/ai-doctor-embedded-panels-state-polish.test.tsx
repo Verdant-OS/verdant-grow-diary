@@ -10,7 +10,7 @@ import { describe, it, expect, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 
@@ -161,10 +161,13 @@ describe("Embedded panels — accessible link names and focus styles (static)", 
     ["Plant", PLANT_SRC],
     ["Tent", TENT_SRC],
     ["Coach", COACH_SRC],
-  ] as const)("%s view-session link uses 'Open AI Doctor session' aria-label + focus ring", (_n, src) => {
-    expect(src).toMatch(/aria-label=\{`Open AI Doctor session/);
-    expect(src).toMatch(/focus-visible:ring-2/);
-  });
+  ] as const)(
+    "%s view-session link uses 'Open AI Doctor session' aria-label + focus ring",
+    (_n, src) => {
+      expect(src).toMatch(/aria-label=\{`Open AI Doctor session/);
+      expect(src).toMatch(/focus-visible:ring-2/);
+    },
+  );
 });
 
 describe("Embedded panels — caution framing preserved (static)", () => {
@@ -172,16 +175,19 @@ describe("Embedded panels — caution framing preserved (static)", () => {
     ["Plant", PLANT_SRC],
     ["Tent", TENT_SRC],
     ["Coach", COACH_SRC],
-  ] as const)("%s still renders caution indicator + reason via buildSessionRowCautionIndicator", (_n, src) => {
-    expect(src).toMatch(/buildSessionRowCautionIndicator/);
-    expect(src).toMatch(/caution-indicator/);
-    expect(src).toMatch(/caution-reason/);
-    expect(src).toMatch(/ShieldAlert/);
-    // No certainty / automation language
-    expect(src).not.toMatch(/autopilot/i);
-    expect(src).not.toMatch(/\bAI executed\b/i);
-    expect(src).not.toMatch(/guaranteed/i);
-  });
+  ] as const)(
+    "%s still renders caution indicator + reason via buildSessionRowCautionIndicator",
+    (_n, src) => {
+      expect(src).toMatch(/buildSessionRowCautionIndicator/);
+      expect(src).toMatch(/caution-indicator/);
+      expect(src).toMatch(/caution-reason/);
+      expect(src).toMatch(/ShieldAlert/);
+      // No certainty / automation language
+      expect(src).not.toMatch(/autopilot/i);
+      expect(src).not.toMatch(/\bAI executed\b/i);
+      expect(src).not.toMatch(/guaranteed/i);
+    },
+  );
 });
 
 describe("Embedded panels — token/ID safety (static)", () => {
@@ -228,7 +234,9 @@ describe("Embedded panels — static safety scan", () => {
 
   it.each(sources)("%s has no automation / device-control copy", (_n, src) => {
     expect(src).not.toMatch(/autopilot/i);
-    expect(src).not.toMatch(/turn (on|off) (the )?(fan|light|pump|heater|humidifier|dehumidifier)/i);
+    expect(src).not.toMatch(
+      /turn (on|off) (the )?(fan|light|pump|heater|humidifier|dehumidifier)/i,
+    );
     expect(src).not.toMatch(/\bAI executed\b/i);
   });
 });

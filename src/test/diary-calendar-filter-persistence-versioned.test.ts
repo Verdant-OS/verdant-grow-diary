@@ -8,7 +8,11 @@
  *  - Storage unavailable / throwing -> swallowed, null.
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { clearLocalStorageForTest, getLocalStorageItemForTest, setLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
+import {
+  clearLocalStorageForTest,
+  getLocalStorageItemForTest,
+  setLocalStorageItemForTest,
+} from "./helpers/localStorageTestHelper";
 import {
   DIARY_CALENDAR_FILTER_STORAGE_KEY,
   DIARY_CALENDAR_FILTER_PERSIST_VERSION,
@@ -42,10 +46,7 @@ describe("diaryCalendarFilterPersistence — versioned envelope", () => {
   });
 
   it("reads legacy raw-string values and migrates them on next write", () => {
-    setLocalStorageItemForTest(
-      DIARY_CALENDAR_FILTER_STORAGE_KEY,
-      "environment",
-    );
+    setLocalStorageItemForTest(DIARY_CALENDAR_FILTER_STORAGE_KEY, "environment");
     expect(readPersistedDiaryCalendarFilter()).toBe("environment");
     writePersistedDiaryCalendarFilter("environment");
     const raw = getLocalStorageItemForTest(DIARY_CALENDAR_FILTER_STORAGE_KEY);
@@ -56,25 +57,15 @@ describe("diaryCalendarFilterPersistence — versioned envelope", () => {
   });
 
   it("rejects invalid raw-string values and clears storage", () => {
-    setLocalStorageItemForTest(
-      DIARY_CALENDAR_FILTER_STORAGE_KEY,
-      "bogus-filter",
-    );
+    setLocalStorageItemForTest(DIARY_CALENDAR_FILTER_STORAGE_KEY, "bogus-filter");
     expect(readPersistedDiaryCalendarFilter()).toBeNull();
-    expect(
-      getLocalStorageItemForTest(DIARY_CALENDAR_FILTER_STORAGE_KEY),
-    ).toBeNull();
+    expect(getLocalStorageItemForTest(DIARY_CALENDAR_FILTER_STORAGE_KEY)).toBeNull();
   });
 
   it("rejects corrupt JSON and clears storage", () => {
-    setLocalStorageItemForTest(
-      DIARY_CALENDAR_FILTER_STORAGE_KEY,
-      "{not-json",
-    );
+    setLocalStorageItemForTest(DIARY_CALENDAR_FILTER_STORAGE_KEY, "{not-json");
     expect(readPersistedDiaryCalendarFilter()).toBeNull();
-    expect(
-      getLocalStorageItemForTest(DIARY_CALENDAR_FILTER_STORAGE_KEY),
-    ).toBeNull();
+    expect(getLocalStorageItemForTest(DIARY_CALENDAR_FILTER_STORAGE_KEY)).toBeNull();
   });
 
   it("rejects unknown version envelopes and clears storage", () => {
@@ -83,9 +74,7 @@ describe("diaryCalendarFilterPersistence — versioned envelope", () => {
       JSON.stringify({ version: 99, value: "environment" }),
     );
     expect(readPersistedDiaryCalendarFilter()).toBeNull();
-    expect(
-      getLocalStorageItemForTest(DIARY_CALENDAR_FILTER_STORAGE_KEY),
-    ).toBeNull();
+    expect(getLocalStorageItemForTest(DIARY_CALENDAR_FILTER_STORAGE_KEY)).toBeNull();
   });
 
   it("rejects envelope with invalid filter value and clears storage", () => {
@@ -94,28 +83,22 @@ describe("diaryCalendarFilterPersistence — versioned envelope", () => {
       JSON.stringify({ version: 1, value: "nope" }),
     );
     expect(readPersistedDiaryCalendarFilter()).toBeNull();
-    expect(
-      getLocalStorageItemForTest(DIARY_CALENDAR_FILTER_STORAGE_KEY),
-    ).toBeNull();
+    expect(getLocalStorageItemForTest(DIARY_CALENDAR_FILTER_STORAGE_KEY)).toBeNull();
   });
 
   it("swallows localStorage errors on read", () => {
-    const spy = vi
-      .spyOn(Storage.prototype, "getItem")
-      .mockImplementation(() => {
-        throw new Error("denied");
-      });
+    const spy = vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new Error("denied");
+    });
     expect(() => readPersistedDiaryCalendarFilter()).not.toThrow();
     expect(readPersistedDiaryCalendarFilter()).toBeNull();
     spy.mockRestore();
   });
 
   it("swallows localStorage errors on write", () => {
-    const spy = vi
-      .spyOn(Storage.prototype, "setItem")
-      .mockImplementation(() => {
-        throw new Error("quota");
-      });
+    const spy = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("quota");
+    });
     expect(() => writePersistedDiaryCalendarFilter("watering")).not.toThrow();
     spy.mockRestore();
   });

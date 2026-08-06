@@ -82,9 +82,7 @@ export function useQuickLogActivitySave() {
   const [error, setError] = useState<QuickLogActivitySaveReason | null>(null);
 
   const save = useCallback(
-    async (
-      input: QuickLogActivitySaveInput,
-    ): Promise<QuickLogActivitySaveResult> => {
+    async (input: QuickLogActivitySaveInput): Promise<QuickLogActivitySaveResult> => {
       const def = QUICK_LOG_ACTIVITY_DEFINITIONS[input.activityId];
       if (!def) {
         setError("unsupported_activity");
@@ -144,9 +142,7 @@ export function useQuickLogActivitySave() {
               p_humidity_pct: null,
               p_vpd_kpa: null,
               p_occurred_at: null,
-              ...(Object.keys(manualDetails).length > 0
-                ? { p_details: manualDetails }
-                : {}),
+              ...(Object.keys(manualDetails).length > 0 ? { p_details: manualDetails } : {}),
               p_idempotency_key: manualIdempotencyKey,
             } as unknown as Record<string, unknown>,
           );
@@ -215,10 +211,7 @@ export function useQuickLogActivitySave() {
           if (!r.ok || !r.grow_event_id) {
             // Stale backend fence: v1b client but validator/allow-list
             // does not accept harvest yet. Never fake-save as observation.
-            if (
-              input.activityId === "harvest" &&
-              r.reason === "invalid_event_type"
-            ) {
+            if (input.activityId === "harvest" && r.reason === "invalid_event_type") {
               setError("harvest_backend_unavailable");
               return {
                 ok: false,

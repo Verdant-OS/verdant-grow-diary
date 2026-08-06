@@ -118,9 +118,7 @@ export function importRunnerReport(rawJson: string): ImportResult {
     .map((r) => r as IngestRejectionReason);
 
   const metricKeysRaw = Array.isArray(p.metric_keys) ? p.metric_keys : [];
-  const metricKeys = metricKeysRaw.filter(
-    (k): k is string => typeof k === "string",
-  );
+  const metricKeys = metricKeysRaw.filter((k): k is string => typeof k === "string");
 
   const attempt: LocalIngestAttempt = {
     importedAt: new Date().toISOString(),
@@ -190,9 +188,7 @@ export function summarizeAttempts(
     summary.lastTransport = latest.transport;
     summary.lastTopic = latest.topic;
     summary.lastMetricKeys = latest.metricKeys;
-    summary.lastProvider = latest.transport?.includes("ecowitt")
-      ? "ecowitt"
-      : latest.transport;
+    summary.lastProvider = latest.transport?.includes("ecowitt") ? "ecowitt" : latest.transport;
   }
 
   return summary;
@@ -211,11 +207,7 @@ export function readAttemptsFromStorage(
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
     return parsed.filter((a): a is LocalIngestAttempt => {
-      return (
-        a &&
-        typeof a === "object" &&
-        VALID_STATUSES.has((a as LocalIngestAttempt).status)
-      );
+      return a && typeof a === "object" && VALID_STATUSES.has((a as LocalIngestAttempt).status);
     });
   } catch {
     return [];

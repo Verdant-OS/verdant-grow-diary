@@ -45,9 +45,7 @@ function isForbidden(req: Request): boolean {
   return false;
 }
 
-test("Demo Proof Walkthrough triggers no write-capable network calls on load", async ({
-  page,
-}) => {
+test("Demo Proof Walkthrough triggers no write-capable network calls on load", async ({ page }) => {
   const violations: Array<{ method: string; url: string }> = [];
 
   page.on("request", (req) => {
@@ -64,12 +62,8 @@ test("Demo Proof Walkthrough triggers no write-capable network calls on load", a
   await page.waitForTimeout(1500);
 
   // Walkthrough surface is present and read-only.
-  await expect(
-    page.getByTestId("demo-proof-walkthrough-page"),
-  ).toBeVisible();
-  await expect(
-    page.getByTestId("demo-proof-walkthrough-readonly-banner"),
-  ).toBeVisible();
+  await expect(page.getByTestId("demo-proof-walkthrough-page")).toBeVisible();
+  await expect(page.getByTestId("demo-proof-walkthrough-readonly-banner")).toBeVisible();
   // Navigation links exist (don't click them — that would leave the page).
   const stepLinks = page.locator(
     '[data-testid^="demo-proof-walkthrough-step-"][data-testid$="-link"]',

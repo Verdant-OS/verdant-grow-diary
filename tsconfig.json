@@ -1,15 +1,43 @@
 {
-  "files": [],
-  "references": [{ "path": "./tsconfig.app.json" }, { "path": "./tsconfig.node.json" }],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "vite.config.ts", "eslint.config.js"],
   "compilerOptions": {
+    "target": "ES2022",
+    "jsx": "react-jsx",
+    "module": "ESNext",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["vite/client"],
+
+    "moduleResolution": "Bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": false,
+    "noEmit": true,
+
+    "skipLibCheck": true,
+    "strict": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    // TanStack Router hard-requires `strictNullChecks` (kept on via `strict`).
+    // These three extra-strict flags were NOT part of the pre-migration
+    // tsconfig and are not required by the framework; enabling them over a
+    // ~1,700-file codebase would mean thousands of mechanical rewrites in one
+    // migration turn. Left off deliberately so the migration does not smuggle
+    // in an unrelated type-hygiene program.
+    // `noImplicitAny` was OFF in the pre-migration tsconfig. ~160 of the hits
+    // are vitest contract tests destructuring untyped `scripts/*.mjs` tooling
+    // exports, which have no declarations to infer from. Every implicit-any in
+    // application code (src/components, src/lib, src/hooks, supabase/functions)
+    // was annotated during the migration instead; re-enabling this flag is a
+    // tracked follow-up against the test tree, not migration work.
+    "noImplicitAny": false,
+    "noPropertyAccessFromIndexSignature": false,
+    "noUncheckedIndexedAccess": false,
+    "exactOptionalPropertyTypes": false,
+    "noUncheckedSideEffectImports": true,
     "paths": {
       "@/*": ["./src/*"]
-    },
-    "noImplicitAny": false,
-    "noUnusedParameters": false,
-    "skipLibCheck": true,
-    "allowJs": true,
-    "noUnusedLocals": false,
-    "strictNullChecks": false
+    }
   }
 }

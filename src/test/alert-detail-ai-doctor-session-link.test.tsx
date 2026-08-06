@@ -11,7 +11,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import AlertDetail from "@/pages/AlertDetail";
 import { aiDoctorSessionDetailPath } from "@/lib/routes";
 
@@ -102,8 +102,7 @@ vi.mock("@/integrations/supabase/client", () => {
   };
   return {
     supabase: {
-      from: (table: string) =>
-        table === "action_queue" ? makeActionQueueChain() : makeGeneric(),
+      from: (table: string) => (table === "action_queue" ? makeActionQueueChain() : makeGeneric()),
     },
   };
 });
@@ -170,12 +169,8 @@ describe("AlertDetail — View saved AI Doctor session link", () => {
     renderDetail();
     await screen.findByText("VPD too high");
     await new Promise((r) => setTimeout(r, 30));
-    expect(
-      screen.queryByTestId("alert-detail-ai-doctor-saved-session-link"),
-    ).toBeNull();
-    expect(
-      screen.queryByTestId("alert-detail-ai-doctor-review-section"),
-    ).toBeNull();
+    expect(screen.queryByTestId("alert-detail-ai-doctor-saved-session-link")).toBeNull();
+    expect(screen.queryByTestId("alert-detail-ai-doctor-review-section")).toBeNull();
   });
 
   it("ignores non-AI-Doctor linked actions", async () => {
@@ -190,9 +185,7 @@ describe("AlertDetail — View saved AI Doctor session link", () => {
     renderDetail();
     await screen.findByText("VPD too high");
     await new Promise((r) => setTimeout(r, 30));
-    expect(
-      screen.queryByTestId("alert-detail-ai-doctor-saved-session-link"),
-    ).toBeNull();
+    expect(screen.queryByTestId("alert-detail-ai-doctor-saved-session-link")).toBeNull();
   });
 
   it("does not leak raw [session:<id>] or [alert:<id>] tokens, or target_device", async () => {
@@ -222,9 +215,7 @@ describe("AlertDetail — View saved AI Doctor session link", () => {
       },
     ];
     renderDetail();
-    const link = await screen.findByTestId(
-      "alert-detail-ai-doctor-saved-session-link",
-    );
+    const link = await screen.findByTestId("alert-detail-ai-doctor-saved-session-link");
     const lower = (link.textContent ?? "").toLowerCase();
     for (const tok of [
       "auto-execute",
@@ -257,9 +248,7 @@ describe("AlertDetail — View saved AI Doctor session link", () => {
     renderDetail();
     await screen.findByText("VPD too high");
     await waitFor(() => {
-      expect(
-        document.querySelector('[aria-label="Related Action Queue Items"]'),
-      ).not.toBeNull();
+      expect(document.querySelector('[aria-label="Related Action Queue Items"]')).not.toBeNull();
     });
   });
 });
@@ -281,12 +270,8 @@ describe("AlertDetail AI Doctor back-link — static safety", () => {
     const lower = ALERT_DETAIL_SRC.toLowerCase();
     expect(lower).not.toContain("functions.invoke");
     expect(lower).not.toContain("service_role");
-    expect(lower).not.toMatch(
-      /from\(["']action_queue["'][\s\S]{0,200}?\.upsert\(/,
-    );
-    expect(lower).not.toMatch(
-      /from\(["']action_queue["'][\s\S]{0,200}?\.delete\(/,
-    );
+    expect(lower).not.toMatch(/from\(["']action_queue["'][\s\S]{0,200}?\.upsert\(/);
+    expect(lower).not.toMatch(/from\(["']action_queue["'][\s\S]{0,200}?\.delete\(/);
     expect(lower).not.toMatch(/\.rpc\(/);
   });
 

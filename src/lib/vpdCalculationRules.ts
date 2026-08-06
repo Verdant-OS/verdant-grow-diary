@@ -75,9 +75,7 @@ export function deriveVpd(input: VpdInput): VpdState {
     return { kind: "invalid", reason: "invalid_humidity" };
   }
   const tempC =
-    temperatureUnit === "F"
-      ? fahrenheitToCelsius(temperature as number)
-      : (temperature as number);
+    temperatureUnit === "F" ? fahrenheitToCelsius(temperature as number) : (temperature as number);
   if (tempC < -40 || tempC > 80) {
     return { kind: "invalid", reason: "invalid_temperature" };
   }

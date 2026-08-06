@@ -14,30 +14,30 @@
  *  - Returns { url } only; never the customer id, subscription id, or
  *    portal session id itself.
  */
-import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
-import { createClient } from 'npm:@supabase/supabase-js@2';
-import { getPaddleClient, type PaddleEnv } from '../_shared/paddle.ts';
+import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { createClient } from "npm:@supabase/supabase-js@2";
+import { getPaddleClient, type PaddleEnv } from "../_shared/paddle.ts";
 
 function json(status: number, body: Record<string, unknown>): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 }
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
-  if (req.method !== 'POST') return json(405, { error: 'method_not_allowed' });
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  if (req.method !== "POST") return json(405, { error: "method_not_allowed" });
 
   try {
-    const authHeader = req.headers.get('Authorization') ?? '';
-    if (!authHeader.startsWith('Bearer ')) return json(401, { error: 'auth_required' });
+    const authHeader = req.headers.get("Authorization") ?? "";
+    if (!authHeader.startsWith("Bearer ")) return json(401, { error: "auth_required" });
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     if (!supabaseUrl || !anonKey || !serviceRoleKey) {
-      return json(503, { error: 'unavailable' });
+      return json(503, { error: "unavailable" });
     }
 
     const authed = createClient(supabaseUrl, anonKey, {
@@ -45,7 +45,7 @@ Deno.serve(async (req) => {
       auth: { persistSession: false },
     });
     const { data: userData, error: userError } = await authed.auth.getUser();
-    if (userError || !userData?.user) return json(401, { error: 'auth_required' });
+    if (userError || !userData?.user) return json(401, { error: "auth_required" });
     const uid = userData.user.id;
 
     const admin = createClient(supabaseUrl, serviceRoleKey, {
@@ -56,13 +56,13 @@ Deno.serve(async (req) => {
     // surface for one-off purchases). Return the environment column verbatim
     // so we route to the matching sandbox/live gateway credentials.
     const { data: rows, error: subError } = await admin
-      .from('subscriptions')
-      .select('paddle_subscription_id, paddle_customer_id, environment, status')
-      .eq('user_id', uid)
-      .not('paddle_subscription_id', 'like', 'lifetime_%')
-      .order('created_at', { ascending: false })
+      .from("subscriptions")
+      .select("paddle_subscription_id, paddle_customer_id, environment, status")
+      .eq("user_id", uid)
+      .not("paddle_subscription_id", "like", "lifetime_%")
+      .order("created_at", { ascending: false })
       .limit(1);
-    if (subError) return json(503, { error: 'unavailable' });
+    if (subError) return json(503, { error: "unavailable" });
     const sub = (rows ?? [])[0] as
       | {
           paddle_subscription_id: string;
@@ -78,35 +78,33 @@ Deno.serve(async (req) => {
       // recognised by the `lifetime_%` pseudo-subscription id shape
       // written by the webhook's record_lifetime path.
       const { data: lifetimeRows } = await admin
-        .from('subscriptions')
-        .select('paddle_subscription_id')
-        .eq('user_id', uid)
-        .like('paddle_subscription_id', 'lifetime_%')
+        .from("subscriptions")
+        .select("paddle_subscription_id")
+        .eq("user_id", uid)
+        .like("paddle_subscription_id", "lifetime_%")
         .limit(1);
       if ((lifetimeRows ?? []).length > 0) {
-        return json(404, { error: 'lifetime_only' });
+        return json(404, { error: "lifetime_only" });
       }
-      return json(404, { error: 'no_subscription' });
+      return json(404, { error: "no_subscription" });
     }
-
 
     const paddle = getPaddleClient(sub.environment);
     let portal: { urls?: { general?: { overview?: string } } };
     try {
-      portal = (await paddle.customerPortalSessions.create(
-        sub.paddle_customer_id,
-        [sub.paddle_subscription_id],
-      )) as { urls?: { general?: { overview?: string } } };
+      portal = (await paddle.customerPortalSessions.create(sub.paddle_customer_id, [
+        sub.paddle_subscription_id,
+      ])) as { urls?: { general?: { overview?: string } } };
     } catch (e) {
-      console.error('portal_create_failed', String(e));
-      return json(502, { error: 'portal_create_failed' });
+      console.error("portal_create_failed", String(e));
+      return json(502, { error: "portal_create_failed" });
     }
     const url = portal.urls?.general?.overview;
-    if (!url) return json(502, { error: 'portal_create_failed' });
+    if (!url) return json(502, { error: "portal_create_failed" });
 
     return json(200, { url });
   } catch (e) {
-    console.error('paddle-portal-session error', String(e));
-    return json(503, { error: 'unavailable' });
+    console.error("paddle-portal-session error", String(e));
+    return json(503, { error: "unavailable" });
   }
 });

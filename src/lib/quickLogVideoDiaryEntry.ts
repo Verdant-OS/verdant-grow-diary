@@ -47,8 +47,7 @@ export interface QuickLogVideoDiaryEntryRow {
   };
 }
 
-export const QUICK_LOG_VIDEO_DIARY_DEFAULT_NOTE =
-  "Video attached from Quick Log." as const;
+export const QUICK_LOG_VIDEO_DIARY_DEFAULT_NOTE = "Video attached from Quick Log." as const;
 
 export function buildQuickLogVideoDiaryEntryRow(
   input: QuickLogVideoDiaryEntryInput,
@@ -78,17 +77,13 @@ export function buildQuickLogVideoDiaryEntryRow(
   };
 }
 
-export type QuickLogVideoDiaryEntryResult =
-  | { ok: true }
-  | { ok: false; message: string };
+export type QuickLogVideoDiaryEntryResult = { ok: true } | { ok: false; message: string };
 
 export async function createQuickLogVideoDiaryEntry(
   input: QuickLogVideoDiaryEntryInput,
 ): Promise<QuickLogVideoDiaryEntryResult> {
   const row = buildQuickLogVideoDiaryEntryRow(input);
-  const { error } = await supabase
-    .from("diary_entries")
-    .insert(row as never);
+  const { error } = await supabase.from("diary_entries").insert(row as never);
   if (error) {
     return { ok: false, message: `Video diary entry failed: ${error.message}` };
   }

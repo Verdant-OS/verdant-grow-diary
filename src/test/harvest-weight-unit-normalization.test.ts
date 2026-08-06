@@ -112,7 +112,7 @@ describe("formatGramsForDisplay", () => {
   it("strips trailing zeros", () => {
     expect(formatGramsForDisplay(1000)).toBe("1000");
     expect(formatGramsForDisplay(1000.1)).toBe("1000.1");
-    expect(formatGramsForDisplay(1000.10)).toBe("1000.1");
+    expect(formatGramsForDisplay(1000.1)).toBe("1000.1");
   });
   it("rounds to 2 decimals", () => {
     expect(formatGramsForDisplay(56.69904625)).toBe("56.7");

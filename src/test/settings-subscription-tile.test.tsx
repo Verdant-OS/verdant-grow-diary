@@ -11,7 +11,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 
 const entitlementMock = vi.hoisted(() => ({
   loading: false as boolean,
@@ -43,7 +43,6 @@ const cancelNoticeMock = vi.hoisted(() => ({
 vi.mock("@/hooks/usePaddleCancelNotice", () => ({
   usePaddleCancelNotice: () => cancelNoticeMock,
 }));
-
 
 vi.mock("@/store/auth", () => ({
   useAuth: () => ({ user: { id: "u1", email: "u@example.com" }, signOut: vi.fn() }),
@@ -227,4 +226,3 @@ describe("Settings — Subscription tile", () => {
     expect(document.body.textContent).toMatch(/one-time purchase/i);
   });
 });
-

@@ -6,7 +6,7 @@
  * so visible copy and FAQPage JSON-LD cannot drift.
  */
 import { useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import BrandLogo from "@/components/BrandLogo";
 import DiaryFaqLinkStatsPanel from "@/components/DiaryFaqLinkStatsPanel";
 import { usePageSeo } from "@/hooks/usePageSeo";
@@ -28,12 +28,17 @@ import {
 } from "@/lib/seoStructuredData";
 
 const PAGE_URL = "https://verdantgrowdiary.com/guides";
+const FEATURED_GUIDE_SLUGS = new Set([
+  "cannabis-leaf-symptoms",
+  "cannabis-grow-light-distance-and-schedule",
+  "cannabis-light-stress-light-burn-bleaching-or-heat",
+]);
 
 export default function GuidesIndex() {
   usePageSeo({
-    title: "Grower Guides: Grow Diary, VPD & Sensor Truth | Verdant",
+    title: "Grower Guides: Diary, Lighting & Sensor Truth | Verdant",
     description:
-      "Practical grower guides for using plant timelines, source-labeled sensor data, VPD context, and cautious AI to make better cultivation decisions.",
+      "Practical grower guides for plant timelines, grow-light distance, PPFD, DLI, source-labeled sensor data, VPD context, and cautious troubleshooting.",
     path: "/guides",
   });
 
@@ -96,6 +101,51 @@ export default function GuidesIndex() {
         <h2 className="font-display text-2xl font-semibold mb-6">Start here</h2>
         <div className="mb-6 rounded-xl border border-primary/30 bg-primary/5 p-5">
           <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary">
+            Evidence-first symptom checks
+          </p>
+          <h3 className="mt-2 font-display text-xl font-semibold">
+            Record the visible sign before naming a cause
+          </h3>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            Compare yellowing, spots or lesions, and burnt or crispy tips against the plant's
+            environment, watering, feeding, and lighting history. One photo is not a diagnosis.
+          </p>
+          <Link
+            to="/guides/cannabis-leaf-symptoms"
+            className="mt-4 inline-flex text-sm font-semibold text-primary hover:underline"
+          >
+            Open the cannabis symptom hub
+          </Link>
+        </div>
+        <div className="mb-6 rounded-xl border border-primary/30 bg-primary/5 p-5">
+          <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary">
+            Indoor lighting decisions
+          </p>
+          <h3 className="mt-2 font-display text-xl font-semibold">
+            Measure the light, then compare the plant response
+          </h3>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            Start with distance, PPFD, DLI, and schedule. If exposed growth changes, use the
+            troubleshooting flow to compare excess light, bleaching, heat, and look-alikes without
+            treating one photo as a diagnosis.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm font-semibold">
+            <Link
+              to="/guides/cannabis-grow-light-distance-and-schedule"
+              className="text-primary hover:underline"
+            >
+              Grow-light distance and schedule
+            </Link>
+            <Link
+              to="/guides/cannabis-light-stress-light-burn-bleaching-or-heat"
+              className="text-primary hover:underline"
+            >
+              Light-stress troubleshooting
+            </Link>
+          </div>
+        </div>
+        <div className="mb-6 rounded-xl border border-primary/30 bg-primary/5 p-5">
+          <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary">
             Free grow-room tool
           </p>
           <h3 className="mt-2 font-display text-xl font-semibold">
@@ -113,7 +163,7 @@ export default function GuidesIndex() {
           </Link>
         </div>
         <ul className="space-y-4">
-          {VERDANT_SEO_GUIDES.map((g) => (
+          {VERDANT_SEO_GUIDES.filter((g) => !FEATURED_GUIDE_SLUGS.has(g.slug)).map((g) => (
             <li
               key={g.slug}
               className="rounded-lg border border-border/60 p-4 hover:border-primary/40 transition-colors"

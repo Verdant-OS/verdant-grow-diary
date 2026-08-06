@@ -15,14 +15,9 @@
  * `scripts/sync-edge-shared.mjs`.
  */
 
+import { DEFAULT_AI_COACH_STALE_THRESHOLD_MS } from "../constants/sensorTiming";
 export type AiCoachSnapshotSource =
-  | "live"
-  | "manual"
-  | "csv"
-  | "demo"
-  | "stale"
-  | "invalid"
-  | "unknown";
+  "live" | "manual" | "csv" | "demo" | "stale" | "invalid" | "unknown";
 
 export type AiCoachSnapshotTrust = "low" | "medium" | "high";
 
@@ -44,7 +39,7 @@ export interface AiCoachSensorSnapshotContext {
   missingInformationHints: string[];
 }
 
-export const DEFAULT_AI_COACH_STALE_THRESHOLD_MS = 30 * 60 * 1000;
+export { DEFAULT_AI_COACH_STALE_THRESHOLD_MS };
 
 const KNOWN_SOURCES: ReadonlySet<AiCoachSnapshotSource> = new Set([
   "live",
@@ -116,8 +111,7 @@ function parseCapturedAt(snap: Record<string, unknown>): {
   ms: number | null;
   missing: boolean;
 } {
-  const raw =
-    snap.captured_at ?? snap.capturedAt ?? snap.timestamp ?? snap.ts ?? snap.time;
+  const raw = snap.captured_at ?? snap.capturedAt ?? snap.timestamp ?? snap.ts ?? snap.time;
   if (raw === undefined || raw === null) return { iso: null, ms: null, missing: true };
   if (typeof raw === "string" && raw.trim() === "") {
     return { iso: null, ms: null, missing: true };
@@ -160,8 +154,7 @@ export function buildAiCoachSensorSnapshotContext(
 
   if (!isPlainObject(snapshot)) {
     return {
-      line:
-        "LATEST_SENSOR_SNAPSHOT [source=invalid, stale=false, trust=low]: values omitted; snapshot payload was not a structured object.",
+      line: "LATEST_SENSOR_SNAPSHOT [source=invalid, stale=false, trust=low]: values omitted; snapshot payload was not a structured object.",
       source: "invalid",
       stale: false,
       trust: "low",
@@ -206,22 +199,17 @@ export function buildAiCoachSensorSnapshotContext(
     case "demo": {
       trust = "low";
       includesValues = false;
-      safetyNotes.push(
-        "Demo data is synthetic and MUST NOT be treated as real grow evidence.",
-      );
+      safetyNotes.push("Demo data is synthetic and MUST NOT be treated as real grow evidence.");
       missingInformationHints.push(
         "Real or manual current sensor readings are needed before drawing environmental conclusions.",
       );
-      valuesSummary =
-        "values omitted; demo data is not trusted for diagnosis";
+      valuesSummary = "values omitted; demo data is not trusted for diagnosis";
       break;
     }
     case "invalid": {
       trust = "low";
       includesValues = false;
-      safetyNotes.push(
-        "Sensor telemetry was flagged invalid; do not rely on these values.",
-      );
+      safetyNotes.push("Sensor telemetry was flagged invalid; do not rely on these values.");
       missingInformationHints.push(
         "A valid sensor snapshot (manual or live) is needed before environmental diagnosis.",
       );

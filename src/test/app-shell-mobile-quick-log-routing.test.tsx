@@ -1,6 +1,13 @@
 import type { ReactNode } from "react";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { Link, MemoryRouter, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import {
+  Link,
+  MemoryRouter,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+} from "@/lib/react-router-compat";
 import { describe, expect, it, vi } from "vitest";
 
 const TENT_ID = "30000000-0000-4000-8000-000000000001";
@@ -39,8 +46,29 @@ vi.mock("@/components/SubscriptionPastDueBanner", () => ({
 vi.mock("@/components/GlobalSearchDialog", () => ({ default: () => null }));
 vi.mock("@/components/LegalFooterLinks", () => ({ default: () => null }));
 vi.mock("@/components/QuickLog", () => ({
-  default: ({ open }: { open: boolean }) =>
-    open ? <div data-testid="legacy-quick-log">Legacy Quick Log</div> : null,
+  default: ({
+    open,
+    prefill,
+  }: {
+    open: boolean;
+    prefill?: {
+      eventType?: string | null;
+      note?: string | null;
+      source?: string | null;
+      suppressPlantDefault?: boolean | null;
+    } | null;
+  }) =>
+    open ? (
+      <div
+        data-testid="legacy-quick-log"
+        data-event-type={prefill?.eventType ?? ""}
+        data-source={prefill?.source ?? ""}
+        data-suppress-plant-default={String(prefill?.suppressPlantDefault ?? false)}
+      >
+        Legacy Quick Log
+        {prefill?.note ? <span data-testid="legacy-quick-log-note">{prefill.note}</span> : null}
+      </div>
+    ) : null,
 }));
 vi.mock("@/components/QuickLogV2Sheet", () => ({
   default: ({
@@ -100,9 +128,7 @@ function TestContent() {
       <Link to="/daily-check?plantId=plant-b&growId=grow-1">Open plant B</Link>
       <button
         type="button"
-        onClick={() =>
-          navigate("/daily-check?plantId=plant-c&growId=grow-1", { replace: true })
-        }
+        onClick={() => navigate("/daily-check?plantId=plant-c&growId=grow-1", { replace: true })}
       >
         Replace with plant C
       </button>
@@ -230,21 +256,10 @@ describe("AppShell mobile Quick Log routing", () => {
         }),
       );
     const expectFreshClosedState = async () => {
-      await waitFor(() =>
-        expect(screen.queryByTestId("scoped-quick-log")).not.toBeInTheDocument(),
-      );
-      expect(screen.getByTestId("scoped-quick-log-state")).toHaveAttribute(
-        "data-open",
-        "false",
-      );
-      expect(screen.getByTestId("scoped-quick-log-state")).toHaveAttribute(
-        "data-target-key",
-        "",
-      );
-      expect(screen.getByTestId("scoped-quick-log-state")).toHaveAttribute(
-        "data-action",
-        "note",
-      );
+      await waitFor(() => expect(screen.queryByTestId("scoped-quick-log")).not.toBeInTheDocument());
+      expect(screen.getByTestId("scoped-quick-log-state")).toHaveAttribute("data-open", "false");
+      expect(screen.getByTestId("scoped-quick-log-state")).toHaveAttribute("data-target-key", "");
+      expect(screen.getByTestId("scoped-quick-log-state")).toHaveAttribute("data-action", "note");
     };
 
     openWater("plant-a");
@@ -321,6 +336,21 @@ describe("AppShell mobile Quick Log routing", () => {
     await waitFor(() => expect(screen.getByTestId("legacy-quick-log")).toBeInTheDocument());
     await waitFor(() => expect(screen.getByTestId("current-search").textContent).toBe(""));
     expect(screen.queryByTestId("scoped-quick-log")).not.toBeInTheDocument();
+  });
+
+  it("opens and consumes the comparison-guide phenotype prompt without selecting a plant", async () => {
+    renderAt("/dashboard?open=quick-log&type=observation&prompt=oreoz-vs-gelonade&utm=guide");
+
+    const dialog = await screen.findByTestId("legacy-quick-log");
+    expect(dialog).toHaveAttribute("data-event-type", "observation");
+    expect(dialog).toHaveAttribute("data-source", "oreoz-vs-gelonade-guide");
+    expect(dialog).toHaveAttribute("data-suppress-plant-default", "true");
+    expect(screen.getByTestId("legacy-quick-log-note")).toHaveTextContent(
+      /phenotypic observation/i,
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("current-search")).toHaveTextContent("?utm=guide"),
+    );
   });
 
   it("does not open Quick Log for an unrecognized query value", () => {

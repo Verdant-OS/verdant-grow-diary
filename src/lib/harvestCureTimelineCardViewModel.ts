@@ -149,9 +149,7 @@ export interface HarvestCardInput {
   sensor?: TimelineSensorSnapshotInput | null;
 }
 
-export function buildHarvestCardViewModel(
-  input: HarvestCardInput,
-): HarvestCardViewModel {
+export function buildHarvestCardViewModel(input: HarvestCardInput): HarvestCardViewModel {
   const d = input.details ?? {};
   return {
     kind: "harvest",
@@ -191,9 +189,7 @@ export interface CureCheckCardInput {
   sensor?: TimelineSensorSnapshotInput | null;
 }
 
-export function buildCureCheckCardViewModel(
-  input: CureCheckCardInput,
-): CureCheckCardViewModel {
+export function buildCureCheckCardViewModel(input: CureCheckCardInput): CureCheckCardViewModel {
   const d = input.details ?? {};
   const cautionState = cureCheckCautionState(d.mold_check);
   const hasAirflow =
@@ -216,8 +212,6 @@ export function buildCureCheckCardViewModel(
     sensor: buildSensorCardViewModel(input.sensor),
     cautionState,
     cautionCopy: cureCheckCautionCopy(cautionState),
-    airflow: hasAirflow
-      ? buildGroveBagAirflowViewModel(d.airflow_observation)
-      : undefined,
+    airflow: hasAirflow ? buildGroveBagAirflowViewModel(d.airflow_observation) : undefined,
   };
 }

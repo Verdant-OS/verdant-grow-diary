@@ -62,9 +62,7 @@ export interface CanonicalIngestPreview {
   soil_channel: string | null;
 }
 
-export function toCanonicalIngestPreview(
-  p: CanonicalWebhookPayload,
-): CanonicalIngestPreview {
+export function toCanonicalIngestPreview(p: CanonicalWebhookPayload): CanonicalIngestPreview {
   return {
     source: "live",
     provider: ECOWITT_LIVE_SOIL_PROVIDER,
@@ -115,9 +113,7 @@ export function runEcowittDryRun(opts: DryRunOptions): DryRunOutput {
   });
   const sanitized = result.payloads.map((p) => ({
     ...p,
-    raw_payload: redactRawPayloadForOutbound(
-      (p.raw_payload ?? {}) as Record<string, unknown>,
-    ),
+    raw_payload: redactRawPayloadForOutbound((p.raw_payload ?? {}) as Record<string, unknown>),
   }));
   const canonicalPreviews = sanitized.map(toCanonicalIngestPreview);
   return {
@@ -158,7 +154,7 @@ const CSV_COLUMNS = [
 
 function fToC(f: number | undefined): number | "" {
   return typeof f === "number" && Number.isFinite(f)
-    ? Math.round(((f - 32) * 5) / 9 * 100) / 100
+    ? Math.round((((f - 32) * 5) / 9) * 100) / 100
     : "";
 }
 
@@ -181,8 +177,7 @@ export function buildDryRunCsv(out: DryRunOutput): string {
     const cells = CSV_COLUMNS.map((c) => {
       if (c === "accepted") return "false";
       if (c === "reason") return csvEscape(reason);
-      if (c === "raw_payload_redacted")
-        return csvEscape(out.redactedRawPreview);
+      if (c === "raw_payload_redacted") return csvEscape(out.redactedRawPreview);
       return "";
     });
     rows.push(cells.join(","));
@@ -222,9 +217,7 @@ export function writeDryRunCsv(path: string, out: DryRunOutput): void {
     try {
       mkdirSync(dir, { recursive: true });
     } catch (e) {
-      throw new Error(
-        `csv_out parent folder cannot be created: ${dir} (${(e as Error).message})`,
-      );
+      throw new Error(`csv_out parent folder cannot be created: ${dir} (${(e as Error).message})`);
     }
   }
   const csv = buildDryRunCsv(out);
@@ -279,9 +272,7 @@ async function main(): Promise<void> {
   }
   let raw: string;
   try {
-    raw = args.fixturePath
-      ? readFileSync(args.fixturePath, "utf8")
-      : await readStdin();
+    raw = args.fixturePath ? readFileSync(args.fixturePath, "utf8") : await readStdin();
   } catch (e) {
     console.error("read_failed:", (e as Error).message);
     process.exit(2);
@@ -306,9 +297,7 @@ async function main(): Promise<void> {
     payload: clean,
     defaultTentId: process.env.VERDANT_TENT_ID ?? null,
     defaultPlantId: process.env.VERDANT_PLANT_ID ?? null,
-    channelMap: parseEcowittSoilChannelMap(
-      process.env.ECOWITT_SOIL_CHANNEL_MAP_JSON,
-    ),
+    channelMap: parseEcowittSoilChannelMap(process.env.ECOWITT_SOIL_CHANNEL_MAP_JSON),
     now:
       typeof clean.dateutc === "string"
         ? new Date(`${(clean.dateutc as string).replace(" ", "T")}Z`)
@@ -328,7 +317,7 @@ async function main(): Promise<void> {
   // provider:"ecowitt", transport:"mqtt"). The bridge's internal webhook
   // payload (vendor lineage `source:"ecowitt"`) is intentionally NOT
   // surfaced here — operators only need to verify the canonical shape.
-  // eslint-disable-next-line no-console
+
   console.log(
     JSON.stringify(
       {

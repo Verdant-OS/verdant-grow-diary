@@ -11,7 +11,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import React from "react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import { render, screen, within } from "@testing-library/react";
 
 const useRecentMock = vi.fn();
@@ -21,9 +21,7 @@ vi.mock("@/hooks/usePlantRecentActivity", () => ({
 
 import PlantRecentActivityPanel from "@/components/PlantRecentActivityPanel";
 import PlantDetailRecentActivityRecap from "@/components/PlantDetailRecentActivityRecap";
-import {
-  INVALID_EVENT_TYPE_NEUTRAL_LABEL,
-} from "@/lib/quickLogEventIdentityRules";
+import { INVALID_EVENT_TYPE_NEUTRAL_LABEL } from "@/lib/quickLogEventIdentityRules";
 
 const PLANT_ID = "11111111-1111-4111-8111-111111111111";
 

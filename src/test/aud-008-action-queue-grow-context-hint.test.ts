@@ -112,8 +112,6 @@ describe("AUD-008 buildActionQueueGrowContextHint", () => {
       scopedGrowName: "Sour Diesel Auto",
       grows,
     };
-    expect(buildActionQueueGrowContextHint(opts)).toEqual(
-      buildActionQueueGrowContextHint(opts),
-    );
+    expect(buildActionQueueGrowContextHint(opts)).toEqual(buildActionQueueGrowContextHint(opts));
   });
 });

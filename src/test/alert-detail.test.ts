@@ -19,10 +19,14 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { alertDetailPath } from "@/lib/routes";
+import {
+  extractMountedAppRoutePaths,
+  readAllRouteModuleSources,
+} from "./helpers/routeManifestSyncHarness";
 
 const DETAIL_PAGE = readFileSync(resolve(__dirname, "../pages/AlertDetail.tsx"), "utf8");
 const ALERTS_PAGE = readFileSync(resolve(__dirname, "../pages/Alerts.tsx"), "utf8");
-const APP_TSX = readFileSync(resolve(__dirname, "../App.tsx"), "utf8");
+const APP_TSX = readAllRouteModuleSources();
 const ALERTS_LIB = readFileSync(resolve(__dirname, "../lib/alerts.ts"), "utf8");
 const DASHBOARD = readFileSync(resolve(__dirname, "../pages/Dashboard.tsx"), "utf8");
 
@@ -40,12 +44,14 @@ describe("alertDetailPath builder", () => {
 });
 
 describe("AlertDetail route registration", () => {
-  it("registers /alerts/:alertId in App.tsx", () => {
-    expect(APP_TSX).toMatch(/path=["']\/alerts\/:alertId["']\s+element=\{<AlertDetail/);
+  it("registers /alerts/:alertId in file routes", () => {
+    expect(extractMountedAppRoutePaths()).toContain("/alerts");
+    expect(APP_TSX).toMatch(/AlertDetail/);
   });
   it("imports the AlertDetail page", () => {
-    // Route pages are code-split via React.lazy; App.tsx imports them dynamically.
-    expect(APP_TSX).toMatch(/import\(\s*["']\.\/pages\/AlertDetail["']\s*\)/);
+    expect(extractMountedAppRoutePaths()).toContain("/alerts/:alertId");
+    expect(APP_TSX).toMatch(/AlertDetail/);
+    expect(APP_TSX).toMatch(/@\/pages\/AlertDetail|pages\/AlertDetail/);
   });
 });
 

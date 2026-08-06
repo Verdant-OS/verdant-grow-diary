@@ -25,7 +25,7 @@ import {
   HelpCircle,
   Plus,
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 
 import {
   buildPlantDetailAiDoctorReadiness,

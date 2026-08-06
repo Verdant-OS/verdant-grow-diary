@@ -31,11 +31,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-type AttemptOutcome =
-  | "delivered"
-  | "transient_failure"
-  | "permanent_failure"
-  | "exhausted";
+type AttemptOutcome = "delivered" | "transient_failure" | "permanent_failure" | "exhausted";
 
 export interface DrilldownDispatch {
   fn: string;
@@ -122,10 +118,7 @@ export default function EdgeAlertsBreachDrilldownDialog({
   formatRelative,
 }: Props) {
   const orderedAttempts = useMemo(
-    () =>
-      [...attempts].sort(
-        (a, b) => Date.parse(b.attempted_at) - Date.parse(a.attempted_at),
-      ),
+    () => [...attempts].sort((a, b) => Date.parse(b.attempted_at) - Date.parse(a.attempted_at)),
     [attempts],
   );
 
@@ -153,8 +146,8 @@ export default function EdgeAlertsBreachDrilldownDialog({
             <Badge variant="outline">{metric ? metricLabel(metric) : "—"}</Badge>
           </DialogTitle>
           <DialogDescription>
-            Full breach payload, cooldown logic, and webhook retry history for this
-            function/metric pair.
+            Full breach payload, cooldown logic, and webhook retry history for this function/metric
+            pair.
           </DialogDescription>
         </DialogHeader>
 
@@ -177,9 +170,7 @@ export default function EdgeAlertsBreachDrilldownDialog({
                     {formatValue(dispatch.metric, dispatch.last_threshold ?? undefined)}
                   </dd>
                   <dt className="text-muted-foreground">Requests in window</dt>
-                  <dd className="tabular-nums">
-                    {dispatch.last_requests_in_window ?? "—"}
-                  </dd>
+                  <dd className="tabular-nums">{dispatch.last_requests_in_window ?? "—"}</dd>
                   <dt className="text-muted-foreground">Last fired</dt>
                   <dd className="tabular-nums" title={formatAbsolute(dispatch.last_fired_at)}>
                     {formatRelative(dispatch.last_fired_at, now)} ·{" "}
@@ -194,8 +185,8 @@ export default function EdgeAlertsBreachDrilldownDialog({
                 </dl>
               ) : (
                 <p className="text-xs text-muted-foreground">
-                  No persisted dispatch row for this pair yet. It has not fired since the
-                  cooldown table began recording.
+                  No persisted dispatch row for this pair yet. It has not fired since the cooldown
+                  table began recording.
                 </p>
               )}
             </section>

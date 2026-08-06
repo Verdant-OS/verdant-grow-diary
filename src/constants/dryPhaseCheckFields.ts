@@ -13,12 +13,7 @@
 export const DRY_PHASE_CHECK_EVENT_TYPE = "dry_phase_check" as const;
 export type DryPhaseCheckEventType = typeof DRY_PHASE_CHECK_EVENT_TYPE;
 
-export const DRY_STEM_SNAP_STATUSES = [
-  "bends",
-  "partial_snap",
-  "clean_snap",
-  "unknown",
-] as const;
+export const DRY_STEM_SNAP_STATUSES = ["bends", "partial_snap", "clean_snap", "unknown"] as const;
 export type DryStemSnapStatus = (typeof DRY_STEM_SNAP_STATUSES)[number];
 
 export const DRY_BUD_FEEL_VALUES = [
@@ -45,8 +40,7 @@ export const DRY_VPD_MIN_KPA = 0;
 export const DRY_VPD_MAX_KPA = 5;
 export const DRY_DAY_MAX = 60;
 
-export const DRY_PHASE_RECORDED_NOTE =
-  "Dry phase observation recorded as grow memory.";
+export const DRY_PHASE_RECORDED_NOTE = "Dry phase observation recorded as grow memory.";
 export const DRY_PHASE_MOLD_CONCERN_NOTE =
   "Observed concern — grower decision required. Inspect closely and document next observation.";
 export const DRY_PHASE_STRONG_AIRFLOW_NOTE =

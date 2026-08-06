@@ -22,9 +22,7 @@ const SRC = readFileSync(resolve("src/components/QuickLog.tsx"), "utf8");
 
 describe("QuickLog Dialog Sensor Truth Context v1 — copy wiring", () => {
   it("imports the shared manualSensorTruthCopy constants", () => {
-    expect(SRC).toMatch(
-      /from\s+"@\/constants\/manualSensorTruthCopy"/,
-    );
+    expect(SRC).toMatch(/from\s+"@\/constants\/manualSensorTruthCopy"/);
     expect(SRC).toContain("MANUAL_SENSOR_TRUTH_TITLE");
     expect(SRC).toContain("MANUAL_SENSOR_TRUTH_LINES");
     expect(SRC).toContain("MANUAL_SENSOR_TRUTH_MISSING_READINGS_LINE");
@@ -64,15 +62,11 @@ describe("QuickLog Dialog Sensor Truth Context v1 — constants safety", () => {
 
   it("manual-truth lines never call manual data live", () => {
     expect(MANUAL_SENSOR_TRUTH_SOURCE_LINE).toMatch(/not live sensor data/i);
-    expect(MANUAL_SENSOR_TRUTH_NOT_DEVICE_CONTROL_LINE).toMatch(
-      /not live device control/i,
-    );
+    expect(MANUAL_SENSOR_TRUTH_NOT_DEVICE_CONTROL_LINE).toMatch(/not live device control/i);
   });
 
   it("manual-truth lines never imply diagnosis from one reading", () => {
-    expect(MANUAL_SENSOR_TRUTH_NOT_DIAGNOSIS_LINE).toMatch(
-      /not a plant-health diagnosis/i,
-    );
+    expect(MANUAL_SENSOR_TRUTH_NOT_DIAGNOSIS_LINE).toMatch(/not a plant-health diagnosis/i);
   });
 
   it("missing-readings line keeps unknown ≠ healthy", () => {

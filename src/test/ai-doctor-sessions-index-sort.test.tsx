@@ -8,7 +8,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen, fireEvent, within } from "@testing-library/react";
-import { MemoryRouter, useLocation } from "react-router-dom";
+import { MemoryRouter, useLocation } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 import type { AiDoctorSessionRow } from "@/hooks/use-ai-doctor-sessions";
@@ -33,7 +33,7 @@ let currentRows: AiDoctorSessionRow[] = [];
 vi.mock("@/integrations/supabase/client", () => {
   const result = () => Promise.resolve({ data: currentRows, error: null });
   const chain: Record<string, unknown> = {};
-  const methods = ["select", "eq", "order", "limit", "range", "not", "gte", "or"];
+  const methods = ["select", "eq", "order", "limit", "range", "not", "gte", "or", "abortSignal"];
   for (const m of methods) chain[m] = () => chain;
   chain.then = (resolve: (v: unknown) => unknown) => result().then(resolve);
   return { supabase: { from: () => chain } };
@@ -54,8 +54,8 @@ function makeRow(
     possibleCauses: [],
     immediateAction: "",
     whatNotToDo: [],
-    followUp24h: null,
-    recoveryPlan3d: null,
+    followUp24h: null as never,
+    recoveryPlan3d: null as never,
     riskLevel: "low",
     suggestedActions: [],
     ...diag,
@@ -78,11 +78,7 @@ function makeRow(
 
 const oldHealthy = makeRow("old-healthy", "2026-01-01T00:00:00Z");
 const newHealthy = makeRow("new-healthy", "2026-05-01T00:00:00Z");
-const newHighRisk = makeRow(
-  "new-hr",
-  "2026-05-02T00:00:00Z",
-  { riskLevel: "high" },
-);
+const newHighRisk = makeRow("new-hr", "2026-05-02T00:00:00Z", { riskLevel: "high" });
 const oldHighLowConf = makeRow(
   "old-high",
   "2026-01-02T00:00:00Z",
@@ -159,10 +155,7 @@ describe("applyClientSideSort", () => {
     const a = makeRow("a", "2026-05-01T00:00:00Z");
     const b = makeRow("b", "2026-05-02T00:00:00Z");
     // Both healthy, identical except date.
-    expect(applyClientSideSort([a, b], "review-priority").map((r) => r.id)).toEqual([
-      "b",
-      "a",
-    ]);
+    expect(applyClientSideSort([a, b], "review-priority").map((r) => r.id)).toEqual(["b", "a"]);
   });
   it("does not mutate the input array", () => {
     const input = [...ALL];
@@ -232,9 +225,7 @@ describe("AiDoctorSessionsIndex — sort UI", () => {
     renderPage();
     await screen.findByTestId("ai-doctor-sessions-index-list");
     expect(rowIds()).toEqual(["new-healthy", "old-healthy"]);
-    const sel = screen.getByTestId(
-      "ai-doctor-sessions-index-filter-sort",
-    ) as HTMLSelectElement;
+    const sel = screen.getByTestId("ai-doctor-sessions-index-filter-sort") as HTMLSelectElement;
     expect(sel.value).toBe("newest");
   });
 
@@ -242,16 +233,13 @@ describe("AiDoctorSessionsIndex — sort UI", () => {
     currentRows = [oldHealthy, newHealthy];
     renderPage();
     await screen.findByTestId("ai-doctor-sessions-index-list");
-    fireEvent.change(
-      screen.getByTestId("ai-doctor-sessions-index-filter-sort"),
-      { target: { value: "oldest" } },
-    );
+    fireEvent.change(screen.getByTestId("ai-doctor-sessions-index-filter-sort"), {
+      target: { value: "oldest" },
+    });
     expect(
-      (
-        await screen.findByTestId(
-          "ai-doctor-sessions-index-filter-sort",
-        )
-      ).getAttribute("data-testid"),
+      (await screen.findByTestId("ai-doctor-sessions-index-filter-sort")).getAttribute(
+        "data-testid",
+      ),
     ).toBeTruthy();
     expect(rowIds()).toEqual(["old-healthy", "new-healthy"]);
     const search = screen.getByTestId("probe-search").textContent ?? "";
@@ -262,13 +250,10 @@ describe("AiDoctorSessionsIndex — sort UI", () => {
     currentRows = [...ALL];
     renderPage();
     await screen.findByTestId("ai-doctor-sessions-index-list");
-    fireEvent.click(
-      screen.getByTestId("ai-doctor-sessions-index-needs-attention-preset"),
-    );
-    fireEvent.change(
-      screen.getByTestId("ai-doctor-sessions-index-filter-sort"),
-      { target: { value: "review-priority" } },
-    );
+    fireEvent.click(screen.getByTestId("ai-doctor-sessions-index-needs-attention-preset"));
+    fireEvent.change(screen.getByTestId("ai-doctor-sessions-index-filter-sort"), {
+      target: { value: "review-priority" },
+    });
     // Preset keeps only caution+checklist rows: old-high, new-uk.
     // Preset keeps caution+checklist rows: old-high, new-hr, new-uk.
     // Review-priority sort: high-risk (old-high low conf, new-hr high conf)
@@ -280,14 +265,12 @@ describe("AiDoctorSessionsIndex — sort UI", () => {
     currentRows = [...ALL];
     renderPage();
     await screen.findByTestId("ai-doctor-sessions-index-list");
-    fireEvent.change(
-      screen.getByTestId("ai-doctor-sessions-saved-views-select"),
-      { target: { value: BUILTIN_SAVED_VIEW_NEEDS_ATTENTION_ID } },
-    );
-    fireEvent.change(
-      screen.getByTestId("ai-doctor-sessions-index-filter-sort"),
-      { target: { value: "highest-risk" } },
-    );
+    fireEvent.change(screen.getByTestId("ai-doctor-sessions-saved-views-select"), {
+      target: { value: BUILTIN_SAVED_VIEW_NEEDS_ATTENTION_ID },
+    });
+    fireEvent.change(screen.getByTestId("ai-doctor-sessions-index-filter-sort"), {
+      target: { value: "highest-risk" },
+    });
     // Built-in keeps caution+checklist rows (old-high, new-hr, new-uk);
     // highest-risk: high(old-high, new-hr) > medium(new-uk). Within high,
     // newest-first tie-break puts new-hr before old-high.
@@ -326,10 +309,7 @@ describe("Static safety scan — sort slice", () => {
     "src/lib/aiDoctorSessionsIndexFilters.ts",
     "src/lib/aiDoctorSessionsSavedViewsRules.ts",
   ].map((p) => readFileSync(resolve(ROOT, p), "utf8"));
-  const TSX = readFileSync(
-    resolve(ROOT, "src/pages/AiDoctorSessionsIndex.tsx"),
-    "utf8",
-  );
+  const TSX = readFileSync(resolve(ROOT, "src/pages/AiDoctorSessionsIndex.tsx"), "utf8");
   const ALL_SRC = FILES.join("\n");
 
   it("no DB writes", () => {

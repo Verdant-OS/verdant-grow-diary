@@ -67,6 +67,14 @@ describe("presentTimelineDiaryEntryDetails", () => {
     expect(result.extra).toEqual([]);
   });
 
+  it("keeps the guided Symptom Check stage out of raw chips for its dedicated card", () => {
+    const result = presentTimelineDiaryEntryDetails(
+      { event_type: "observation", observation_stage: "flower" },
+      "fahrenheit",
+    );
+    expect(result.extra).toEqual([]);
+  });
+
   it("drops any null-valued key from the raw fallback outright", () => {
     const result = presentTimelineDiaryEntryDetails(
       {

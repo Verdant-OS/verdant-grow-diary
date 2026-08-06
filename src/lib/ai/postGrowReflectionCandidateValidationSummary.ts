@@ -52,14 +52,20 @@ function confidence(result: PostGrowReflectionCandidatePasteResult): string {
 }
 
 function envelopeSource(result: PostGrowReflectionCandidatePasteResult): string {
-  if ((result.status === "validated" || result.status === "validation_failed") && result.envelopeMetadata) {
+  if (
+    (result.status === "validated" || result.status === "validation_failed") &&
+    result.envelopeMetadata
+  ) {
     return result.envelopeMetadata.sourceLabel;
   }
   return "not available";
 }
 
 function envelopeFormat(result: PostGrowReflectionCandidatePasteResult): string {
-  if ((result.status === "validated" || result.status === "validation_failed") && result.envelopeMetadata) {
+  if (
+    (result.status === "validated" || result.status === "validation_failed") &&
+    result.envelopeMetadata
+  ) {
     return result.envelopeMetadata.candidateFormat;
   }
   return "not available";
@@ -103,7 +109,6 @@ export function buildPostGrowReflectionCandidateValidationSummary(
       { label: "Envelope format", value: envelopeFormat(result) },
       { label: "Persistence", value: "Not saved" },
     ],
-    note:
-      "Summary excludes raw pasted JSON, candidate body text, credentials, private metadata, and device/action targets.",
+    note: "Summary excludes raw pasted JSON, candidate body text, credentials, private metadata, and device/action targets.",
   };
 }

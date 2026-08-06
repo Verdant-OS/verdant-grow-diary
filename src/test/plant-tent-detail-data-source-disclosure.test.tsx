@@ -49,9 +49,7 @@ describe("PlantDetail disclosure behavior", () => {
       />,
     );
     expect(
-      screen
-        .getByTestId("plant-detail-data-source-disclosure-badge")
-        .getAttribute("data-label"),
+      screen.getByTestId("plant-detail-data-source-disclosure-badge").getAttribute("data-label"),
     ).toBe("Mixed");
   });
 
@@ -65,9 +63,7 @@ describe("PlantDetail disclosure behavior", () => {
       />,
     );
     expect(
-      screen
-        .getByTestId("plant-detail-data-source-disclosure-badge")
-        .getAttribute("data-label"),
+      screen.getByTestId("plant-detail-data-source-disclosure-badge").getAttribute("data-label"),
     ).not.toBe("Live");
   });
 
@@ -81,9 +77,7 @@ describe("PlantDetail disclosure behavior", () => {
       />,
     );
     expect(
-      screen
-        .getByTestId("plant-detail-data-source-disclosure-badge")
-        .getAttribute("data-label"),
+      screen.getByTestId("plant-detail-data-source-disclosure-badge").getAttribute("data-label"),
     ).toBe("Unavailable");
   });
 });
@@ -99,9 +93,7 @@ describe("TentDetail disclosure behavior", () => {
       />,
     );
     expect(
-      screen
-        .getByTestId("tent-detail-data-source-disclosure-badge")
-        .getAttribute("data-label"),
+      screen.getByTestId("tent-detail-data-source-disclosure-badge").getAttribute("data-label"),
     ).toBe("Demo");
   });
 
@@ -115,9 +107,7 @@ describe("TentDetail disclosure behavior", () => {
       />,
     );
     expect(
-      screen
-        .getByTestId("tent-detail-data-source-disclosure-badge")
-        .getAttribute("data-label"),
+      screen.getByTestId("tent-detail-data-source-disclosure-badge").getAttribute("data-label"),
     ).toBe("Mixed");
   });
 
@@ -148,9 +138,7 @@ describe("TentDetail disclosure behavior", () => {
       />,
     );
     expect(
-      screen
-        .getByTestId("tent-detail-data-source-disclosure-badge")
-        .getAttribute("data-label"),
+      screen.getByTestId("tent-detail-data-source-disclosure-badge").getAttribute("data-label"),
     ).not.toBe("Live");
   });
 
@@ -164,18 +152,14 @@ describe("TentDetail disclosure behavior", () => {
       />,
     );
     expect(
-      screen
-        .getByTestId("tent-detail-data-source-disclosure-badge")
-        .getAttribute("data-label"),
+      screen.getByTestId("tent-detail-data-source-disclosure-badge").getAttribute("data-label"),
     ).toBe("Unavailable");
   });
 });
 
 describe("PlantDetail page wiring", () => {
   it("imports and renders GrowDataSourceDisclosure", () => {
-    expect(PLANT_DETAIL).toMatch(
-      /from\s+["']@\/components\/GrowDataSourceDisclosure["']/,
-    );
+    expect(PLANT_DETAIL).toMatch(/from\s+["']@\/components\/GrowDataSourceDisclosure["']/);
     expect(PLANT_DETAIL).toMatch(/<GrowDataSourceDisclosure/);
   });
 
@@ -199,14 +183,11 @@ describe("PlantDetail page wiring", () => {
       /relay|actuator|setpoint|mqtt\.connect|mqttSubscribe|mqttPublish|deviceControl/i,
     );
   });
-
 });
 
 describe("TentDetail page wiring", () => {
   it("imports and renders GrowDataSourceDisclosure", () => {
-    expect(TENT_DETAIL).toMatch(
-      /from\s+["']@\/components\/GrowDataSourceDisclosure["']/,
-    );
+    expect(TENT_DETAIL).toMatch(/from\s+["']@\/components\/GrowDataSourceDisclosure["']/);
     expect(TENT_DETAIL).toMatch(/<GrowDataSourceDisclosure/);
   });
 
@@ -234,5 +215,4 @@ describe("TentDetail page wiring", () => {
       /relay|actuator|setpoint|mqtt\.connect|mqttSubscribe|mqttPublish|deviceControl/i,
     );
   });
-
 });

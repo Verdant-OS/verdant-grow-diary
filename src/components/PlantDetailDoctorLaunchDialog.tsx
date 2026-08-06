@@ -21,7 +21,7 @@
  * storage paths, or provenance markers are rendered.
  */
 import { useMemo, useState, useCallback, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import {
   Stethoscope,
   ArrowRight,

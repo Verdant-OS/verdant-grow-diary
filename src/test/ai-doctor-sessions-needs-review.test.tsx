@@ -16,19 +16,34 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { clearLocalStorageForTest, setLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
+import {
+  clearLocalStorageForTest,
+  setLocalStorageItemForTest,
+} from "./helpers/localStorageTestHelper";
 
 // --- supabase mock with capturing spies for filter chain ---
 const rangeSpy = vi.fn(() => Promise.resolve({ data: [], error: null }));
 const orderSpy = vi.fn(() => ({ range: rangeSpy }));
-const gteSpy = vi.fn(function (this: unknown) { return chain; });
-const notSpy = vi.fn(function (this: unknown) { return chain; });
-const eqSpy = vi.fn(function (this: unknown) { return chain; });
-const orSpy = vi.fn(function (this: unknown) { return chain; });
+const gteSpy = vi.fn(function (this: unknown) {
+  return chain;
+});
+const notSpy = vi.fn(function (this: unknown) {
+  return chain;
+});
+const eqSpy = vi.fn(function (this: unknown) {
+  return chain;
+});
+const orSpy = vi.fn(function (this: unknown) {
+  return chain;
+});
 const chain: any = {
-  eq: eqSpy, not: notSpy, gte: gteSpy, or: orSpy, order: orderSpy,
+  eq: eqSpy,
+  not: notSpy,
+  gte: gteSpy,
+  or: orSpy,
+  order: orderSpy,
 };
 const selectSpy = vi.fn(() => chain);
 
@@ -61,7 +76,11 @@ beforeEach(() => {
   notSpy.mockClear();
   gteSpy.mockClear();
   orSpy.mockClear();
-  try { clearLocalStorageForTest(); } catch { /* noop */ }
+  try {
+    clearLocalStorageForTest();
+  } catch {
+    /* noop */
+  }
 });
 
 function LocationProbe() {
@@ -98,9 +117,9 @@ const flush = () => new Promise((r) => setTimeout(r, 0));
 
 describe("sessionNeedsReview — pure rule", () => {
   it("returns true for high-risk sessions with no actions", () => {
-    expect(
-      sessionNeedsReview({ diagnosis: { riskLevel: "high" }, suggested_actions: [] }),
-    ).toBe(true);
+    expect(sessionNeedsReview({ diagnosis: { riskLevel: "high" }, suggested_actions: [] })).toBe(
+      true,
+    );
   });
   it("returns true for critical-risk sessions with no actions", () => {
     expect(
@@ -116,12 +135,12 @@ describe("sessionNeedsReview — pure rule", () => {
     ).toBe(true);
   });
   it("returns false for low/medium risk sessions with no actions", () => {
-    expect(
-      sessionNeedsReview({ diagnosis: { riskLevel: "low" }, suggested_actions: [] }),
-    ).toBe(false);
-    expect(
-      sessionNeedsReview({ diagnosis: { riskLevel: "medium" }, suggested_actions: [] }),
-    ).toBe(false);
+    expect(sessionNeedsReview({ diagnosis: { riskLevel: "low" }, suggested_actions: [] })).toBe(
+      false,
+    );
+    expect(sessionNeedsReview({ diagnosis: { riskLevel: "medium" }, suggested_actions: [] })).toBe(
+      false,
+    );
   });
   it("is null-safe on missing/invalid fields", () => {
     expect(sessionNeedsReview(null)).toBe(false);
@@ -160,12 +179,12 @@ describe("needsReview URL helpers", () => {
     expect(serializeFilters(DEFAULT_FILTERS)).toEqual({});
   });
   it("serializer includes active needs-review value", () => {
-    expect(
-      serializeFilters({ ...DEFAULT_FILTERS, needsReview: "yes" }),
-    ).toEqual({ needsReview: "yes" });
-    expect(
-      serializeFilters({ ...DEFAULT_FILTERS, needsReview: "no" }),
-    ).toEqual({ needsReview: "no" });
+    expect(serializeFilters({ ...DEFAULT_FILTERS, needsReview: "yes" })).toEqual({
+      needsReview: "yes",
+    });
+    expect(serializeFilters({ ...DEFAULT_FILTERS, needsReview: "no" })).toEqual({
+      needsReview: "no",
+    });
   });
 });
 
@@ -175,17 +194,18 @@ describe("AiDoctorSessionsIndex — needs review UI", () => {
   it("renders the needs-review control with default 'all'", async () => {
     renderAt("/doctor/sessions");
     await screen.findByTestId("ai-doctor-sessions-index-page");
-    const sel = screen.getByTestId("ai-doctor-sessions-index-filter-needs-review") as HTMLSelectElement;
+    const sel = screen.getByTestId(
+      "ai-doctor-sessions-index-filter-needs-review",
+    ) as HTMLSelectElement;
     expect(sel.value).toBe("all");
   });
 
   it("changing needs-review clears ?page= and writes the new param", async () => {
     renderAt("/doctor/sessions?page=3");
     await screen.findByTestId("ai-doctor-sessions-index-page");
-    fireEvent.change(
-      screen.getByTestId("ai-doctor-sessions-index-filter-needs-review"),
-      { target: { value: "yes" } },
-    );
+    fireEvent.change(screen.getByTestId("ai-doctor-sessions-index-filter-needs-review"), {
+      target: { value: "yes" },
+    });
     const search = screen.getByTestId("location-search").textContent ?? "";
     expect(search).toContain("needsReview=yes");
     expect(search).not.toContain("page=");

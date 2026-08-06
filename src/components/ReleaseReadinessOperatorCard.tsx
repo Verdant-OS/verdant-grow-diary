@@ -11,15 +11,9 @@
  *  - no IDs, role rows, RPC names, or tokens rendered.
  *  - explicitly labels the destination as static / manual (not a live CI feed).
  */
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { ClipboardList } from "lucide-react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useHasRole } from "@/hooks/useHasRole";
 
@@ -36,9 +30,8 @@ export default function ReleaseReadinessOperatorCard() {
           <ClipboardList className="h-4 w-4" /> Release Readiness
         </CardTitle>
         <CardDescription>
-          Review current validation status, blockers, and manual proof
-          commands. Static / manual snapshot — updated by hand from documented
-          receipts.
+          Review current validation status, blockers, and manual proof commands. Static / manual
+          snapshot — updated by hand from documented receipts.
         </CardDescription>
       </CardHeader>
       <CardContent>

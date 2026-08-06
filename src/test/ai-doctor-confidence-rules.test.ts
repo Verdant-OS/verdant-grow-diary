@@ -38,9 +38,7 @@ describe("aiDoctorConfidenceRules", () => {
     expect(harmonizeDiagnosisConfidence(1.5, "high").displayedConfidence).toBe(1);
     expect(harmonizeDiagnosisConfidence(-1, "high").displayedConfidence).toBe(0);
     expect(harmonizeDiagnosisConfidence(NaN, "high").displayedConfidence).toBe(0);
-    expect(
-      harmonizeDiagnosisConfidence("nope" as unknown, "medium").displayedConfidence,
-    ).toBe(0);
+    expect(harmonizeDiagnosisConfidence("nope" as unknown, "medium").displayedConfidence).toBe(0);
   });
 
   it("defaults to high ceiling when ceiling is missing or invalid", () => {

@@ -24,21 +24,15 @@ import {
   type NormalizedCsvRow,
   type SupportedMetric,
 } from "@/lib/csvSensorImportRules";
-import {
-  summarizeImportPreview,
-  type CanonicalMetric,
-} from "@/lib/sensorImportSourceApps";
+import { summarizeImportPreview, type CanonicalMetric } from "@/lib/sensorImportSourceApps";
 import { PREVIEW_PERSISTENCE_ENABLED } from "@/lib/sensorImportPreviewCopy";
 
 const ROOT = resolve(__dirname, "../..");
-const read = (rel: string) =>
-  readFileSync(resolve(ROOT, "fixtures/sensor-csv", rel), "utf8");
+const read = (rel: string) => readFileSync(resolve(ROOT, "fixtures/sensor-csv", rel), "utf8");
 
 const SPIDER_FULL = read("spider_farmer_primary_full_20260612214443.csv");
 const VIVOSUN = read("vivosun_growhub_veg_tent_202606121323.csv");
-const SPIDER_SENSOR_ONLY = read(
-  "spider_farmer_sensor_only_20260612214453.csv",
-);
+const SPIDER_SENSOR_ONLY = read("spider_farmer_sensor_only_20260612214453.csv");
 
 // Mirrors the live `validate_sensor_reading` allow-list. Kept in this file
 // so the gap is visible at review time. Bump this only when the DB trigger
@@ -93,19 +87,13 @@ describe("audit: registry canonical metrics vs writer/DB shape", () => {
     expect(REGISTRY_METRICS).toContain("temp_f");
     expect(SUPPORTED_METRICS as readonly string[]).not.toContain("temp_f");
     expect(DB_METRIC_ALLOW_LIST as readonly string[]).not.toContain("temp_f");
-    expect(DB_METRIC_ALLOW_LIST as readonly string[]).toContain(
-      "temperature_c",
-    );
+    expect(DB_METRIC_ALLOW_LIST as readonly string[]).toContain("temperature_c");
   });
 
   it("registry uses ppfd_umol_m2_s; writer rejects it, DB uses ppfd", () => {
     expect(REGISTRY_METRICS).toContain("ppfd_umol_m2_s");
-    expect(SUPPORTED_METRICS as readonly string[]).not.toContain(
-      "ppfd_umol_m2_s",
-    );
-    expect(DB_METRIC_ALLOW_LIST as readonly string[]).not.toContain(
-      "ppfd_umol_m2_s",
-    );
+    expect(SUPPORTED_METRICS as readonly string[]).not.toContain("ppfd_umol_m2_s");
+    expect(DB_METRIC_ALLOW_LIST as readonly string[]).not.toContain("ppfd_umol_m2_s");
     expect(DB_METRIC_ALLOW_LIST as readonly string[]).toContain("ppfd");
   });
 
@@ -122,9 +110,7 @@ describe("audit: writer output preserves required provenance", () => {
   const fakeRows: NormalizedCsvRow[] = [
     {
       captured_at: "2026-05-26T14:00:00.000Z",
-      readings: [
-        { captured_at: "2026-05-26T14:00:00.000Z", metric: "humidity_pct", value: 50 },
-      ],
+      readings: [{ captured_at: "2026-05-26T14:00:00.000Z", metric: "humidity_pct", value: 50 }],
     },
   ];
 
@@ -180,9 +166,7 @@ describe("audit: registry → writer transformation gaps", () => {
       (SUPPORTED_METRICS as readonly string[]).includes(m),
     );
     // Only humidity_pct, vpd_kpa, co2_ppm overlap directly today.
-    expect(overlap).toEqual(
-      expect.arrayContaining(["humidity_pct", "vpd_kpa", "co2_ppm"]),
-    );
+    expect(overlap).toEqual(expect.arrayContaining(["humidity_pct", "vpd_kpa", "co2_ppm"]));
     // Temperature is mapped as temp_f → writer needs adapter to temperature_c.
     expect(p.mappedMetrics).toContain("temp_f");
     expect(overlap).not.toContain("temp_f");
@@ -194,9 +178,7 @@ describe("audit: registry → writer transformation gaps", () => {
   it("Vivosun preview suffers the same temp_f / ppfd_umol_m2_s gaps", () => {
     const p = summarizeImportPreview(VIVOSUN);
     expect(p.mappedMetrics).toContain("temp_f");
-    expect((SUPPORTED_METRICS as readonly string[]).includes("temp_f")).toBe(
-      false,
-    );
+    expect((SUPPORTED_METRICS as readonly string[]).includes("temp_f")).toBe(false);
   });
 
   it("Sensor-only Spider Farmer export yields zero accepted rows (no insert rows possible)", () => {

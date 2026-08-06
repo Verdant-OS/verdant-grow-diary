@@ -1,8 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  normalizeText,
-  expectNormalizedTextToContain,
-} from "./normalizeText";
+import { normalizeText, expectNormalizedTextToContain } from "./normalizeText";
 
 describe("normalizeText", () => {
   it("collapses newlines, tabs, and runs of spaces to a single space", () => {
@@ -34,8 +31,6 @@ describe("expectNormalizedTextToContain", () => {
   });
 
   it("throws when phrase is genuinely missing", () => {
-    expect(() =>
-      expectNormalizedTextToContain("hello world", "goodbye world"),
-    ).toThrow();
+    expect(() => expectNormalizedTextToContain("hello world", "goodbye world")).toThrow();
   });
 });

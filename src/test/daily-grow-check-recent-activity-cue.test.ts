@@ -41,7 +41,9 @@ describe("getDailyGrowCheckRecentActivityCue", () => {
     });
     expect(cue.shouldShow).toBe(true);
     expect(cue.label).toBe(RECENT_ACTIVITY_CUE_LABEL);
-    expect(cue.detail).toMatch(new RegExp(`^${RECENT_ACTIVITY_CUE_DETAIL_PREFIX} \\d{1,2}:\\d{2} (AM|PM)$`));
+    expect(cue.detail).toMatch(
+      new RegExp(`^${RECENT_ACTIVITY_CUE_DETAIL_PREFIX} \\d{1,2}:\\d{2} (AM|PM)$`),
+    );
   });
 
   it("omits detail when latestAt is missing or invalid", () => {
@@ -49,8 +51,7 @@ describe("getDailyGrowCheckRecentActivityCue", () => {
       getDailyGrowCheckRecentActivityCue({ todayHasActivity: true, latestAt: null }).detail,
     ).toBeNull();
     expect(
-      getDailyGrowCheckRecentActivityCue({ todayHasActivity: true, latestAt: "not-a-date" })
-        .detail,
+      getDailyGrowCheckRecentActivityCue({ todayHasActivity: true, latestAt: "not-a-date" }).detail,
     ).toBeNull();
   });
 
@@ -60,7 +61,15 @@ describe("getDailyGrowCheckRecentActivityCue", () => {
       latestAt: new Date().toISOString(),
     });
     const text = `${cue.label} ${cue.detail ?? ""}`.toLowerCase();
-    for (const banned of ["healthy", "perfect", "complete", "completed", "success", "successful", "great job"]) {
+    for (const banned of [
+      "healthy",
+      "perfect",
+      "complete",
+      "completed",
+      "success",
+      "successful",
+      "great job",
+    ]) {
       expect(text).not.toContain(banned);
     }
   });

@@ -13,19 +13,10 @@
  *    source of truth for source-label display.
  */
 import type { SensorReadingSource } from "@/mock";
-import {
-  resolveSensorSourceLabel,
-  type ResolvedSourceLabel,
-} from "@/lib/sensorSourceLabelRules";
+import { resolveSensorSourceLabel, type ResolvedSourceLabel } from "@/lib/sensorSourceLabelRules";
 import { tempFFromC } from "@/lib/temperatureUnits";
 
-export type TimelineSensorChipMetric =
-  | "temp_f"
-  | "temp_c"
-  | "rh"
-  | "vpd"
-  | "soil_moisture"
-  | "co2";
+export type TimelineSensorChipMetric = "temp_f" | "temp_c" | "rh" | "vpd" | "soil_moisture" | "co2";
 
 export interface TimelineSensorChip {
   metric: TimelineSensorChipMetric;
@@ -167,8 +158,7 @@ export function buildTimelineSensorSnapshotViewModel(
   } else if (isFiniteNumber(tempGeneric)) {
     const v = roundTo(tempGeneric, 1);
     const unit = options.preferUnit === "C" ? "°C" : "°F";
-    const metric: TimelineSensorChipMetric =
-      options.preferUnit === "C" ? "temp_c" : "temp_f";
+    const metric: TimelineSensorChipMetric = options.preferUnit === "C" ? "temp_c" : "temp_f";
     chips.push({ metric, label: "Temp", value: v, unit, display: `${v}${unit}` });
   }
 

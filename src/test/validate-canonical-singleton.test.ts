@@ -29,9 +29,7 @@ describe("validate-canonical-singleton", () => {
 
   it("skips the SPA fallback when no canonical is present", () => {
     const html = wrap(`<title>x</title>`);
-    expect(
-      validateDocument({ file: "index.html", html, isSpaFallback: true }),
-    ).toEqual([]);
+    expect(validateDocument({ file: "index.html", html, isSpaFallback: true })).toEqual([]);
   });
 
   it("flags a document declaring two canonical tags", () => {

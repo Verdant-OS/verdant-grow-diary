@@ -102,9 +102,7 @@ function kindLabel(title) {
 }
 
 function relInMirror(fileRel) {
-  return fileRel.startsWith(MIRROR_REL + "/")
-    ? fileRel.slice(MIRROR_REL.length + 1)
-    : null;
+  return fileRel.startsWith(MIRROR_REL + "/") ? fileRel.slice(MIRROR_REL.length + 1) : null;
 }
 
 const rows = findings.map((f) => {
@@ -150,12 +148,20 @@ const body = rows.length
       const msg = r.message.replace(/\|/g, "\\|");
       return `| \`${r.file}\` | ${r.kind} | ${exp} | ${act} | ${msg} |`;
     })
-  : [
-      "| _(no parseable findings — see raw checker output below)_ | — | — | — | — |",
-    ];
+  : ["| _(no parseable findings — see raw checker output below)_ | — | — | — | — |"];
 
 const rawStderr = stderr.trim()
-  ? ["", "<details><summary>Raw checker output</summary>", "", "```", stderr.trimEnd(), "```", "", "</details>", ""]
+  ? [
+      "",
+      "<details><summary>Raw checker output</summary>",
+      "",
+      "```",
+      stderr.trimEnd(),
+      "```",
+      "",
+      "</details>",
+      "",
+    ]
   : [];
 
 const fullHashes = rows.length
@@ -165,10 +171,7 @@ const fullHashes = rows.length
       "",
       "| File | Expected | Actual |",
       "| --- | --- | --- |",
-      ...rows.map(
-        (r) =>
-          `| \`${r.file}\` | \`${r.expected ?? "—"}\` | \`${r.actual ?? "—"}\` |`,
-      ),
+      ...rows.map((r) => `| \`${r.file}\` | \`${r.expected ?? "—"}\` | \`${r.actual ?? "—"}\` |`),
       "",
     ]
   : [];

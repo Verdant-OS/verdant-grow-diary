@@ -10,9 +10,7 @@
  */
 import { AlertTriangle } from "lucide-react";
 
-import {
-  COMPARABILITY_REASON_MESSAGES,
-} from "@/lib/phenoContendersViewModel";
+import { COMPARABILITY_REASON_MESSAGES } from "@/lib/phenoContendersViewModel";
 import type { ComparabilityReason } from "@/lib/plantTypeRules";
 
 export default function PhenoComparabilityBanner({
@@ -37,9 +35,8 @@ export default function PhenoComparabilityBanner({
         ))}
       </ul>
       <p className="mt-1.5 text-xs opacity-90">
-        Trait notes stay visible to organize the pack. Ranks, score bars, and
-        leads markers are hidden — sorting these against each other wouldn&rsquo;t
-        be honest.
+        Trait notes stay visible to organize the pack. Ranks, score bars, and leads markers are
+        hidden — sorting these against each other wouldn&rsquo;t be honest.
       </p>
     </div>
   );

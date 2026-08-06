@@ -31,8 +31,7 @@ describe("localStorage test helper — setup order", () => {
 
   it("globalThis.localStorage exists before this test body runs", () => {
     // jsdom mirrors window.localStorage onto globalThis as `localStorage`.
-    const ls = (globalThis as unknown as { localStorage?: Storage })
-      .localStorage;
+    const ls = (globalThis as unknown as { localStorage?: Storage }).localStorage;
     expect(ls).toBeDefined();
     expect(typeof ls!.getItem).toBe("function");
   });
@@ -46,9 +45,7 @@ describe("localStorage test helper — setup order", () => {
   it("removeLocalStorageItemForTest clears a single key", () => {
     setLocalStorageItemForTest("verdant.helper-proof.removable", "x");
     removeLocalStorageItemForTest("verdant.helper-proof.removable");
-    expect(getLocalStorageItemForTest("verdant.helper-proof.removable")).toBe(
-      null,
-    );
+    expect(getLocalStorageItemForTest("verdant.helper-proof.removable")).toBe(null);
   });
 
   it("clearLocalStorageForTest empties storage", () => {

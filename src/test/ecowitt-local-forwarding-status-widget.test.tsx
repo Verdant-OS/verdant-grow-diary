@@ -57,7 +57,12 @@ const ERROR_REPORT = {
   last_retry_error: null,
   max_retry_attempts: 2,
   recommended_next_step: "Confirm the forwarded payload includes tent_id …",
-  latest_metrics: { source: "live", vendor: "ecowitt_windows_testbench", metrics: {}, captured_at: null },
+  latest_metrics: {
+    source: "live",
+    vendor: "ecowitt_windows_testbench",
+    metrics: {},
+    captured_at: null,
+  },
   malformed_line_count: 0,
 };
 
@@ -105,9 +110,7 @@ describe("EcowittLocalForwardingStatusWidget", () => {
       ).toHaveTextContent("400");
     });
     expect(
-      screen.getByTestId(
-        "ecowitt-local-forwarding-row-last_forward_response_classification",
-      ),
+      screen.getByTestId("ecowitt-local-forwarding-row-last_forward_response_classification"),
     ).toHaveTextContent("payload_shape_mismatch");
     expect(screen.getByTestId("ecowitt-local-forwarding-row-retry_count")).toHaveTextContent(
       "2 / max 2",
@@ -118,10 +121,7 @@ describe("EcowittLocalForwardingStatusWidget", () => {
     mockFetchOnce({ "*": READY_STATUS });
     render(<EcowittLocalForwardingStatusWidget />);
     const link = await screen.findByTestId("ecowitt-local-forwarding-report-link");
-    expect(link).toHaveAttribute(
-      "href",
-      "http://localhost:8787/debug/forwarding-error-report",
-    );
+    expect(link).toHaveAttribute("href", "http://localhost:8787/debug/forwarding-error-report");
   });
 
   it("copy button writes allow-listed sanitized report with top-level header + safety + bridge_status + latest_metrics", async () => {
@@ -280,18 +280,19 @@ describe("EcowittLocalForwardingStatusWidget", () => {
     const banner = await screen.findByTestId("ecowitt-local-forwarding-banner");
     expect(banner).toHaveTextContent("EcoWitt ingest needs attention");
     expect(screen.getByTestId("ecowitt-local-forwarding-banner-status")).toHaveTextContent("400");
-    expect(
-      screen.getByTestId("ecowitt-local-forwarding-banner-classification"),
-    ).toHaveTextContent("storage_insert_failed");
-    expect(
-      screen.getByTestId("ecowitt-local-forwarding-banner-reason"),
-    ).toHaveTextContent("insert_source_constraint_failed");
-    expect(
-      screen.getByTestId("ecowitt-local-forwarding-banner-next-step"),
-    ).toHaveTextContent(/remapped to stored source "live"/i);
-    expect(
-      screen.getByTestId("ecowitt-local-forwarding-banner-report-link"),
-    ).toHaveAttribute("href", "http://localhost:8787/debug/forwarding-error-report");
+    expect(screen.getByTestId("ecowitt-local-forwarding-banner-classification")).toHaveTextContent(
+      "storage_insert_failed",
+    );
+    expect(screen.getByTestId("ecowitt-local-forwarding-banner-reason")).toHaveTextContent(
+      "insert_source_constraint_failed",
+    );
+    expect(screen.getByTestId("ecowitt-local-forwarding-banner-next-step")).toHaveTextContent(
+      /remapped to stored source "live"/i,
+    );
+    expect(screen.getByTestId("ecowitt-local-forwarding-banner-report-link")).toHaveAttribute(
+      "href",
+      "http://localhost:8787/debug/forwarding-error-report",
+    );
   });
 
   it("banner is hidden when forwarding succeeded (no failures)", async () => {
@@ -327,8 +328,7 @@ describe("EcowittLocalForwardingStatusWidget", () => {
       ...FAILED_STATUS,
       last_forward_response_reason:
         "insert_failed vbt_LEAKEDTOKENABCDEFGHIJ Authorization: Bearer eyJabcdefghij.eyJabcdefghij.signatureabc PASSKEY=SECRET",
-      recommended_next_step:
-        "Bearer vbt_REALTOKENMUSTNOTLEAK in PASSKEY: DEVICESECRET",
+      recommended_next_step: "Bearer vbt_REALTOKENMUSTNOTLEAK in PASSKEY: DEVICESECRET",
     };
     mockFetchOnce({ "http://localhost:8787/debug/forwarding-status": leakyStatus });
     render(<EcowittLocalForwardingStatusWidget />);

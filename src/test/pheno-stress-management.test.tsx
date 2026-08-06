@@ -14,14 +14,10 @@ import { describe, expect, it, vi } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import DiaryStressObservationsSection from "@/components/DiaryStressObservationsSection";
 import PhenoStressObservationsList from "@/components/PhenoStressObservationsList";
-import {
-  filterAndSortStressObservations,
-} from "@/lib/pheno/phenoStressFilterSort";
+import { filterAndSortStressObservations } from "@/lib/pheno/phenoStressFilterSort";
 import type { PhenoStressObservationRow } from "@/lib/pheno/phenoStressObservationsApi";
 
-function makeRow(
-  overrides: Partial<PhenoStressObservationRow> = {},
-): PhenoStressObservationRow {
+function makeRow(overrides: Partial<PhenoStressObservationRow> = {}): PhenoStressObservationRow {
   return {
     id: overrides.id ?? "obs-1",
     userId: "u1",
@@ -77,44 +73,41 @@ describe("filterAndSortStressObservations", () => {
   ];
 
   it("filters by status / intensity / recommendation", () => {
+    expect(filterAndSortStressObservations(rows, { status: "observed" }).map((r) => r.id)).toEqual([
+      "2",
+      "3",
+    ]);
+    expect(filterAndSortStressObservations(rows, { intensity: "high" }).map((r) => r.id)).toEqual([
+      "1",
+    ]);
     expect(
-      filterAndSortStressObservations(rows, { status: "observed" }).map((r) => r.id),
-    ).toEqual(["2", "3"]);
-    expect(
-      filterAndSortStressObservations(rows, { intensity: "high" }).map((r) => r.id),
-    ).toEqual(["1"]);
-    expect(
-      filterAndSortStressObservations(rows, { recommendation: "keep" }).map(
-        (r) => r.id,
-      ),
+      filterAndSortStressObservations(rows, { recommendation: "keep" }).map((r) => r.id),
     ).toEqual(["3"]);
   });
 
   it("sorts by newest, oldest, intensity, recommendation, and candidate", () => {
-    expect(
-      filterAndSortStressObservations(rows, { sortBy: "newest" }).map((r) => r.id),
-    ).toEqual(["2", "3", "1"]);
-    expect(
-      filterAndSortStressObservations(rows, { sortBy: "oldest" }).map((r) => r.id),
-    ).toEqual(["1", "3", "2"]);
+    expect(filterAndSortStressObservations(rows, { sortBy: "newest" }).map((r) => r.id)).toEqual([
+      "2",
+      "3",
+      "1",
+    ]);
+    expect(filterAndSortStressObservations(rows, { sortBy: "oldest" }).map((r) => r.id)).toEqual([
+      "1",
+      "3",
+      "2",
+    ]);
     // intensity high → moderate → low
-    expect(
-      filterAndSortStressObservations(rows, { sortBy: "intensity" }).map(
-        (r) => r.id,
-      ),
-    ).toEqual(["1", "2", "3"]);
+    expect(filterAndSortStressObservations(rows, { sortBy: "intensity" }).map((r) => r.id)).toEqual(
+      ["1", "2", "3"],
+    );
     // recommendation keep → watch → reject
     expect(
-      filterAndSortStressObservations(rows, { sortBy: "recommendation" }).map(
-        (r) => r.id,
-      ),
+      filterAndSortStressObservations(rows, { sortBy: "recommendation" }).map((r) => r.id),
     ).toEqual(["3", "2", "1"]);
     // candidate ID a → b → c
-    expect(
-      filterAndSortStressObservations(rows, { sortBy: "candidate" }).map(
-        (r) => r.id,
-      ),
-    ).toEqual(["2", "1", "3"]);
+    expect(filterAndSortStressObservations(rows, { sortBy: "candidate" }).map((r) => r.id)).toEqual(
+      ["2", "1", "3"],
+    );
   });
 });
 
@@ -159,15 +152,9 @@ describe("DiaryStressObservationsSection", () => {
   });
 
   it("filters out rows that don't match the diary entry or its plant", () => {
-    const rows = [
-      makeRow({ id: "other", linkedDiaryEntryId: "diary-other", plantId: "plant-z" }),
-    ];
+    const rows = [makeRow({ id: "other", linkedDiaryEntryId: "diary-other", plantId: "plant-z" })];
     const { container } = render(
-      <DiaryStressObservationsSection
-        diaryEntryId="diary-1"
-        plantId="plant-a"
-        preloaded={rows}
-      />,
+      <DiaryStressObservationsSection diaryEntryId="diary-1" plantId="plant-a" preloaded={rows} />,
     );
     expect(container.firstChild).toBeNull();
     cleanup();
@@ -286,13 +273,7 @@ describe("PhenoStressObservationsList — edit & delete", () => {
   });
 
   it("applies filter and sort controls to the visible rows", () => {
-    render(
-      <PhenoStressObservationsList
-        rows={baseRows}
-        onUpdate={vi.fn()}
-        onDelete={vi.fn()}
-      />,
-    );
+    render(<PhenoStressObservationsList rows={baseRows} onUpdate={vi.fn()} onDelete={vi.fn()} />);
     // default newest first: row-2 (2026-06-02) then row-1
     const initial = screen.getAllByTestId(/^stress-row-/);
     expect(initial.map((el) => el.getAttribute("data-testid"))).toEqual([

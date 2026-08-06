@@ -30,10 +30,7 @@ export type PiIngestCommitBatchRpcArgs = {
 };
 
 export type PiIngestCommitBatchClient = {
-  rpc: (
-    fn: string,
-    args: PiIngestCommitBatchRpcArgs,
-  ) => Promise<PiIngestCommitBatchResponse>;
+  rpc: (fn: string, args: PiIngestCommitBatchRpcArgs) => Promise<PiIngestCommitBatchResponse>;
 };
 
 export type PiIngestCommitBatchSensorDraft = {
@@ -69,9 +66,7 @@ export type PiIngestCommitBatchInput = {
   rows: ReadonlyArray<PiIngestCommitBatchRow>;
 };
 
-export type PiIngestCommitBatchFailureReason =
-  | "missing_input"
-  | "commit_failed";
+export type PiIngestCommitBatchFailureReason = "missing_input" | "commit_failed";
 
 export type PiIngestCommitBatchResult =
   | { ok: true; inserted: number; rejected: number }
@@ -86,9 +81,7 @@ const FAILURE_MESSAGES: Record<PiIngestCommitBatchFailureReason, string> = {
   commit_failed: "pi-ingest commit failed",
 };
 
-function failure(
-  reason: PiIngestCommitBatchFailureReason,
-): PiIngestCommitBatchResult {
+function failure(reason: PiIngestCommitBatchFailureReason): PiIngestCommitBatchResult {
   return { ok: false, reason, message: FAILURE_MESSAGES[reason] };
 }
 

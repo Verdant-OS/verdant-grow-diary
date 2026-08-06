@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { Settings as SettingsIcon } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -617,7 +617,18 @@ export default function Settings() {
           </Button>
         </Tile>
 
+        <Tile name="Analytics consent" state="available">
+          <p className="text-sm text-muted-foreground mb-3">
+            See whether analytics is currently on for this browser, and grant or revoke it at
+            any time. Your grow data is never sent to analytics.
+          </p>
+          <Button asChild size="sm" data-testid="analytics-consent-settings-link">
+            <Link to="/settings/analytics">Open analytics consent</Link>
+          </Button>
+        </Tile>
+
         <DeleteAccountTile />
+
       </div>
     </div>
   );

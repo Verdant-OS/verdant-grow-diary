@@ -204,11 +204,7 @@ export interface GeneticsTraceabilityDatabase {
       >;
       // Idempotency ledger is written only by SECURITY DEFINER RPCs; never
       // insert/update it from the client.
-      genetics_mutation_idempotency: Tbl<
-        GeneticsMutationIdempotencyRow,
-        "created_at",
-        never
-      >;
+      genetics_mutation_idempotency: Tbl<GeneticsMutationIdempotencyRow, "created_at", never>;
       propagation_batches: Tbl<
         PropagationBatchRow,
         | "id"

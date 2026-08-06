@@ -11,10 +11,14 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import {
+  extractMountedAppRoutePaths,
+  readAllRouteModuleSources,
+} from "./helpers/routeManifestSyncHarness";
 
 const ROOT = resolve(__dirname, "../..");
 const DETAIL = readFileSync(resolve(ROOT, "src/pages/ActionDetail.tsx"), "utf8");
-const APP = readFileSync(resolve(ROOT, "src/App.tsx"), "utf8");
+const APP = readAllRouteModuleSources();
 
 describe("ActionDetail — quick context links", () => {
   it("links Tent ID to /tents/:id when tent_id exists", () => {
@@ -33,7 +37,7 @@ describe("ActionDetail — quick context links", () => {
     expect(DETAIL).toMatch(
       /<IdField\s+label="Grow"\s+id=\{row\.grow_id\}\s+to=\{growDetailPath\(row\.grow_id\)\}/,
     );
-    expect(APP).toMatch(/path="\/grows\/:growId"/);
+    expect(extractMountedAppRoutePaths()).toContain("/grows/:growId");
   });
 
   it("IdField renders a Link only when 'to' is provided, plain span otherwise", () => {

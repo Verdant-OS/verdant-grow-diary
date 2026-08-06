@@ -6,11 +6,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronDown } from "lucide-react";
 import type {
   AiDoctorEvidencePanelVM,
@@ -36,44 +32,30 @@ function MetricRowView({ row }: { row: EvidenceMetricRow }) {
       <Badge variant="secondary" aria-label={`Context: ${row.contextLabel}`}>
         {row.contextLabel}
       </Badge>
-      <span className="text-muted-foreground">
-        value:&nbsp;{row.displayValue ?? "—"}
-      </span>
+      <span className="text-muted-foreground">value:&nbsp;{row.displayValue ?? "—"}</span>
       {row.notHealthy ? (
         <span className="text-amber-600" role="note">
           not healthy
         </span>
       ) : null}
-      {row.reason ? (
-        <span className="text-muted-foreground">— {row.reason}</span>
-      ) : null}
+      {row.reason ? <span className="text-muted-foreground">— {row.reason}</span> : null}
     </li>
   );
 }
 
 function EvidenceItemView({ item }: { item: EvidenceItem }) {
   return (
-    <li
-      className="rounded border p-2 space-y-1"
-      data-testid={`evidence-item-${item.id}`}
-    >
+    <li className="rounded border p-2 space-y-1" data-testid={`evidence-item-${item.id}`}>
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-medium text-sm">{item.title}</span>
-        <Badge aria-label={`Source: ${item.sourceLabel}`}>
-          {item.sourceLabel}
-        </Badge>
+        <Badge aria-label={`Source: ${item.sourceLabel}`}>{item.sourceLabel}</Badge>
         {item.capturedAt ? (
-          <time
-            className="text-xs text-muted-foreground"
-            dateTime={item.capturedAt}
-          >
+          <time className="text-xs text-muted-foreground" dateTime={item.capturedAt}>
             {item.capturedAt}
           </time>
         ) : null}
       </div>
-      {item.summary ? (
-        <p className="text-xs text-muted-foreground">{item.summary}</p>
-      ) : null}
+      {item.summary ? <p className="text-xs text-muted-foreground">{item.summary}</p> : null}
       {item.metricRows.length > 0 ? (
         <ul className="space-y-1 pl-1">
           {item.metricRows.map((row) => (
@@ -88,9 +70,7 @@ function EvidenceItemView({ item }: { item: EvidenceItem }) {
           ))}
         </ul>
       ) : null}
-      {item.cautionCopy ? (
-        <p className="text-xs text-amber-700">{item.cautionCopy}</p>
-      ) : null}
+      {item.cautionCopy ? <p className="text-xs text-amber-700">{item.cautionCopy}</p> : null}
       {item.timelineHref ? (
         <a
           href={item.timelineHref}
@@ -117,10 +97,7 @@ function GroupView({ group }: { group: EvidenceGroupVM }) {
       </CollapsibleTrigger>
       <CollapsibleContent className="pt-2">
         {group.isEmpty ? (
-          <p
-            className="text-xs text-muted-foreground"
-            data-testid={`evidence-empty-${group.key}`}
-          >
+          <p className="text-xs text-muted-foreground" data-testid={`evidence-empty-${group.key}`}>
             {group.emptyCopy}
           </p>
         ) : (
@@ -169,9 +146,7 @@ export function AiDoctorEvidencePanel({ vm }: Props) {
           className="rounded border p-2 space-y-1"
         >
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-sm font-semibold">
-              {vm.latestEnvironmentCheck.title}
-            </h3>
+            <h3 className="text-sm font-semibold">{vm.latestEnvironmentCheck.title}</h3>
             <Badge aria-label={`Source: ${vm.latestEnvironmentCheck.sourceLabel}`}>
               {vm.latestEnvironmentCheck.sourceLabel}
             </Badge>
@@ -196,16 +171,14 @@ export function AiDoctorEvidencePanel({ vm }: Props) {
               </time>
             ) : null}
           </div>
-          <p className="text-xs text-muted-foreground">
-            {vm.latestEnvironmentCheck.eventTitle}
-          </p>
+          <p className="text-xs text-muted-foreground">{vm.latestEnvironmentCheck.eventTitle}</p>
           <ul className="space-y-1">
             {vm.latestEnvironmentCheck.metricRows.map((row) => (
               <li
                 key={row.key}
                 id={`evidence-envcheck-${safeSlug(row.key)}`}
                 tabIndex={-1}
-                className="flex flex-wrap items-center gap-2 text-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                className="flex flex-wrap items-center gap-2 text-xs focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
                 data-testid={`latest-env-check-row-${row.key}`}
               >
                 <span className="font-medium">{row.label}</span>
@@ -215,25 +188,18 @@ export function AiDoctorEvidencePanel({ vm }: Props) {
                 <Badge variant="secondary" aria-label={`Context: ${row.contextLabel}`}>
                   {row.contextLabel}
                 </Badge>
-                <span className="text-muted-foreground">
-                  value:&nbsp;{row.displayValue ?? "—"}
-                </span>
+                <span className="text-muted-foreground">value:&nbsp;{row.displayValue ?? "—"}</span>
                 {row.notHealthy ? (
                   <span className="text-amber-600" role="note">
                     not healthy
                   </span>
                 ) : null}
-                {row.reason ? (
-                  <span className="text-muted-foreground">— {row.reason}</span>
-                ) : null}
+                {row.reason ? <span className="text-muted-foreground">— {row.reason}</span> : null}
               </li>
             ))}
           </ul>
           {vm.latestEnvironmentCheck.cautionCopy ? (
-            <p
-              className="text-xs text-amber-700"
-              data-testid="latest-env-check-caution"
-            >
+            <p className="text-xs text-amber-700" data-testid="latest-env-check-caution">
               {vm.latestEnvironmentCheck.cautionCopy}
             </p>
           ) : null}
@@ -255,9 +221,7 @@ export function AiDoctorEvidencePanel({ vm }: Props) {
             data-testid="more-data-needed-section"
             className="rounded border p-2 space-y-1"
           >
-            <h3 className="text-sm font-semibold">
-              {vm.moreDataNeeded.title}
-            </h3>
+            <h3 className="text-sm font-semibold">{vm.moreDataNeeded.title}</h3>
             <ul className="space-y-1 text-xs">
               {vm.moreDataNeeded.items.map((i) => (
                 <li
@@ -272,17 +236,12 @@ export function AiDoctorEvidencePanel({ vm }: Props) {
                     {i.state === "complete" ? "Complete" : "Needed"}
                   </Badge>
                   <span>{i.label}</span>
-                  {i.reason ? (
-                    <span className="text-muted-foreground">— {i.reason}</span>
-                  ) : null}
+                  {i.reason ? <span className="text-muted-foreground">— {i.reason}</span> : null}
                 </li>
               ))}
             </ul>
             {vm.moreDataNeeded.cautionCopy ? (
-              <p
-                className="text-xs text-amber-700"
-                data-testid="more-data-needed-caution"
-              >
+              <p className="text-xs text-amber-700" data-testid="more-data-needed-caution">
                 {vm.moreDataNeeded.cautionCopy}
               </p>
             ) : null}
@@ -302,13 +261,11 @@ export function AiDoctorEvidencePanel({ vm }: Props) {
             aria-label="Missing context"
             data-testid="evidence-missing-section"
             tabIndex={-1}
-            className="space-y-1 border-t pt-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            className="space-y-1 border-t pt-2 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
           >
             <h4 className="text-sm font-semibold">{missingGroup.title}</h4>
             {vm.missing.length === 0 ? (
-              <p className="text-xs text-muted-foreground">
-                {missingGroup.emptyCopy}
-              </p>
+              <p className="text-xs text-muted-foreground">{missingGroup.emptyCopy}</p>
             ) : (
               <ul className="space-y-1 text-xs">
                 {vm.missing.map((m) => (
@@ -317,7 +274,7 @@ export function AiDoctorEvidencePanel({ vm }: Props) {
                     id={`evidence-missing-${safeSlug(m.code)}`}
                     tabIndex={-1}
                     data-testid={`evidence-missing-${m.code}`}
-                    className="flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    className="flex items-center gap-2 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
                   >
                     <Badge variant="outline" aria-label="Missing">
                       Missing

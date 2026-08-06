@@ -19,6 +19,10 @@ import { alertsPath, alertDetailPath, actionQueueAlertContextPath } from "@/lib/
 import { buildPlantQuickStatusView } from "@/lib/plantQuickStatusRules";
 import { APP_ROUTES } from "@/lib/appRouteManifest";
 import {
+  extractMountedAppRoutePaths,
+  readAllRouteModuleSources,
+} from "./helpers/routeManifestSyncHarness";
+import {
   scanForLeakedTerms,
   DEFAULT_FORBIDDEN_LEAK_TERMS,
   DEFAULT_ALLOWED_LEAK_IDENTIFIERS,
@@ -27,7 +31,7 @@ import {
 const ROOT = resolve(__dirname, "../..");
 const read = (p: string) => readFileSync(resolve(ROOT, p), "utf8");
 
-const APP = read("src/App.tsx");
+const APP = readAllRouteModuleSources();
 const ALERTS = read("src/pages/Alerts.tsx");
 
 vi.mock("@/components/AlertsAutoPersistForGrow", () => ({ default: () => null }));
@@ -61,9 +65,10 @@ describe("Alerts route — quick link contract", () => {
     expect(v.alertsLink.href).toBe("/alerts?growId=grow-1");
   });
 
-  it("Alerts route is registered in App.tsx", () => {
-    expect(APP).toMatch(/path="\/alerts"\s+element=\{<Alerts\s*\/>\}/);
-    expect(APP).toMatch(/import\(\s*["']\.\/pages\/Alerts["']\s*\)/);
+  it("Alerts route is registered in file routes", () => {
+    expect(extractMountedAppRoutePaths()).toContain("/alerts");
+    expect(APP).toMatch(/Alerts/);
+    expect(APP).toMatch(/@\/pages\/Alerts|pages\/Alerts/);
   });
 
   it("Alerts route reads grow context from the URL (scoped grow hook)", () => {
@@ -172,11 +177,11 @@ describe("Alerts route — quick-link targets resolve to manifest entries", () =
     expect(offenders).toEqual([]);
   });
 
-  it("alert quick-link manifest paths are mounted in App.tsx", () => {
-    // App.tsx mounts the same path literal we resolve to. Catches the case
+  it("alert quick-link manifest paths are mounted in file routes", () => {
+    // File routes mount the same path literal we resolve to. Catches the case
     // where a manifest entry is correct but the route was un-mounted.
     const offenders = QUICK_LINKS.filter(
-      (l) => !APP.includes(`path="${toManifestPattern(l.href)}"`),
+      (l) => !extractMountedAppRoutePaths().includes(toManifestPattern(l.href)),
     );
     expect(offenders).toEqual([]);
   });

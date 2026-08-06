@@ -9,7 +9,7 @@
  * no calendar / notification / email / scheduling, no edge function invokes.
  */
 import { useCallback } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { AlertTriangle, ArrowDownToLine, Bell, Clock, ListTodo, Sprout } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -268,7 +268,7 @@ export default function PlantQuickStatusStrip({
             data-testid="plant-quick-status-alerts-link"
             to={view.alertsLink.href ?? "#"}
             aria-label={view.alertsLink.ariaLabel}
-            className="inline-flex items-center gap-1 text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+            className="inline-flex items-center gap-1 text-primary underline-offset-4 hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
           >
             {view.alertsLink.label}
           </Link>
@@ -299,7 +299,7 @@ export default function PlantQuickStatusStrip({
             data-testid="plant-quick-status-actions-link"
             to={view.actionsLink.href ?? "#"}
             aria-label={view.actionsLink.ariaLabel}
-            className="inline-flex items-center gap-1 text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+            className="inline-flex items-center gap-1 text-primary underline-offset-4 hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
           >
             {view.actionsLink.label}
           </Link>
@@ -332,7 +332,7 @@ export default function PlantQuickStatusStrip({
             data-testid="plant-quick-status-view-latest"
             aria-label={view.viewLatestEntry.ariaLabel}
             onClick={handleViewLatest}
-            className="inline-flex items-center gap-1 text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+            className="inline-flex items-center gap-1 text-primary underline-offset-4 hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
           >
             <ArrowDownToLine className="h-3.5 w-3.5" aria-hidden />
             {view.viewLatestEntry.label}

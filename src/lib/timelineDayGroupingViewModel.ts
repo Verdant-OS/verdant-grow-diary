@@ -100,21 +100,23 @@ export function buildTimelineDayGroups(
     groups.get(key)!.push(item);
   }
 
-  return orderedKeys.map((key) => {
-    const dayItems = groups.get(key)!;
-    let label: string;
-    if (isToday(key, nowMs)) {
-      label = "Today";
-    } else if (isYesterday(key, nowMs)) {
-      label = "Yesterday";
-    } else {
-      label = formatDateLabel(key, options.locale);
-    }
-    return {
-      dayKey: key,
-      label,
-      count: dayItems.length,
-      items: dayItems,
-    };
-  }).sort((a, b) => (a.dayKey < b.dayKey ? 1 : a.dayKey > b.dayKey ? -1 : 0));
+  return orderedKeys
+    .map((key) => {
+      const dayItems = groups.get(key)!;
+      let label: string;
+      if (isToday(key, nowMs)) {
+        label = "Today";
+      } else if (isYesterday(key, nowMs)) {
+        label = "Yesterday";
+      } else {
+        label = formatDateLabel(key, options.locale);
+      }
+      return {
+        dayKey: key,
+        label,
+        count: dayItems.length,
+        items: dayItems,
+      };
+    })
+    .sort((a, b) => (a.dayKey < b.dayKey ? 1 : a.dayKey > b.dayKey ? -1 : 0));
 }

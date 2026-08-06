@@ -14,15 +14,16 @@ import {
   type BridgeTokenRow,
   bridgeTokenStatus,
   clampTtlDays,
+  extractBridgeFailureCode,
   formatIngestCount,
+  mintFailureDescription,
+  revokeFailureDescription,
   sanitizeTokenName,
 } from "@/lib/bridgeTokenRules";
 
 /** Calm, non-leaking error copy for the metadata-only token list. */
-export const BRIDGE_TOKEN_LOAD_FAILED_TITLE =
-  "Bridge token status unavailable";
-export const BRIDGE_TOKEN_LOAD_FAILED_BODY =
-  "Token secrets were not loaded.";
+export const BRIDGE_TOKEN_LOAD_FAILED_TITLE = "Bridge token status unavailable";
+export const BRIDGE_TOKEN_LOAD_FAILED_BODY = "Token secrets were not loaded.";
 
 /**
  * Tent-scoped presenter for issuing bridge tokens to headless ESP32 / Pi /
@@ -53,7 +54,9 @@ export default function TentBridgeTokensCard({ tentId }: { tentId: string }) {
     }
     const { data, error } = await supabase
       .from("bridge_tokens")
-      .select("id, name, token_prefix, expires_at, last_used_at, first_used_at, ingest_count, revoked_at, created_at")
+      .select(
+        "id, name, token_prefix, expires_at, last_used_at, first_used_at, ingest_count, revoked_at, created_at",
+      )
       .eq("tent_id", tentId)
       .order("created_at", { ascending: false });
     if (error) {
@@ -83,9 +86,12 @@ export default function TentBridgeTokensCard({ tentId }: { tentId: string }) {
     });
     setBusy(false);
     if (error || !data?.ok) {
+      // Fixed calm copy only — server/transport error text is never
+      // rendered verbatim (bridge audit gap G6). Non-2xx responses carry
+      // the reason code on error.context, not data.
       toast({
         title: "Mint failed",
-        description: (error?.message ?? data?.error ?? "Unknown error"),
+        description: mintFailureDescription(extractBridgeFailureCode(error, data)),
         variant: "destructive",
       });
       return;
@@ -96,9 +102,15 @@ export default function TentBridgeTokensCard({ tentId }: { tentId: string }) {
 
   async function revoke(id: string) {
     if (!confirm("Revoke this token? Any device using it will stop ingesting.")) return;
-    const { error, data } = await supabase.functions.invoke("revoke-bridge-token", { body: { id } });
+    const { error, data } = await supabase.functions.invoke("revoke-bridge-token", {
+      body: { id },
+    });
     if (error || !data?.ok) {
-      toast({ title: "Revoke failed", description: error?.message ?? "Unknown error", variant: "destructive" });
+      toast({
+        title: "Revoke failed",
+        description: revokeFailureDescription(extractBridgeFailureCode(error, data)),
+        variant: "destructive",
+      });
       return;
     }
     await load();
@@ -107,7 +119,10 @@ export default function TentBridgeTokensCard({ tentId }: { tentId: string }) {
   async function copyReveal() {
     if (!reveal) return;
     await navigator.clipboard.writeText(reveal);
-    toast({ title: "Token copied", description: "Paste it into your device config now — it won't be shown again." });
+    toast({
+      title: "Token copied",
+      description: "Paste it into your device config now — it won't be shown again.",
+    });
   }
 
   return (
@@ -117,17 +132,16 @@ export default function TentBridgeTokensCard({ tentId }: { tentId: string }) {
         <h2 className="font-display font-semibold">Bridge tokens</h2>
       </div>
       <p className="text-sm text-muted-foreground mb-3">
-        Mint a tent-scoped, expiring API token for long-running headless clients —
-        Raspberry Pi, ESP32, Node-RED, Home Assistant. Tokens are read-only sensor
-        ingest, never device control. Prefer bridge tokens over your session token
-        for anything that runs longer than a browser tab.
+        Mint a tent-scoped, expiring API token for long-running headless clients — Raspberry Pi,
+        ESP32, Node-RED, Home Assistant. Tokens are read-only sensor ingest, never device control.
+        Prefer bridge tokens over your session token for anything that runs longer than a browser
+        tab.
       </p>
       <p className="text-xs text-muted-foreground mb-3" data-testid="bridge-token-security-helper">
-        <strong className="text-foreground">Shown once.</strong> Copy the token now
-        and store it somewhere secure (your device config, a password manager, or a
-        secrets vault). We never store the plaintext — if you lose it, mint a new
-        one. If a token is ever exposed in logs, chats, screenshots, or git, revoke
-        it immediately below.
+        <strong className="text-foreground">Shown once.</strong> Copy the token now and store it
+        somewhere secure (your device config, a password manager, or a secrets vault). We never
+        store the plaintext — if you lose it, mint a new one. If a token is ever exposed in logs,
+        chats, screenshots, or git, revoke it immediately below.
       </p>
 
       <div className="flex flex-col sm:flex-row gap-2 mb-3">
@@ -155,9 +169,7 @@ export default function TentBridgeTokensCard({ tentId }: { tentId: string }) {
 
       {reveal && (
         <div className="rounded-lg border border-primary/40 bg-primary/5 p-3 mb-3" role="alert">
-          <div className="text-xs font-medium mb-1">
-            Your new token — shown once, copy now
-          </div>
+          <div className="text-xs font-medium mb-1">Your new token — shown once, copy now</div>
           <div className="flex items-center gap-2">
             <code className="text-xs break-all flex-1 select-all">{reveal}</code>
             <Button size="sm" variant="outline" onClick={copyReveal}>
@@ -167,9 +179,12 @@ export default function TentBridgeTokensCard({ tentId }: { tentId: string }) {
               Dismiss
             </Button>
           </div>
-          <p className="text-[11px] text-muted-foreground mt-2" data-testid="bridge-token-reveal-helper">
-            Store this somewhere secure right now. We can't show it again. Revoke
-            below if it ever leaks.
+          <p
+            className="text-[11px] text-muted-foreground mt-2"
+            data-testid="bridge-token-reveal-helper"
+          >
+            Store this somewhere secure right now. We can't show it again. Revoke below if it ever
+            leaks.
           </p>
         </div>
       )}
@@ -225,7 +240,12 @@ export default function TentBridgeTokensCard({ tentId }: { tentId: string }) {
                 <div className="flex items-center gap-2 shrink-0">
                   <Badge variant={status === "active" ? "default" : "secondary"}>{status}</Badge>
                   {status === "active" && (
-                    <Button size="sm" variant="ghost" onClick={() => revoke(t.id)} aria-label="Revoke token">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => revoke(t.id)}
+                      aria-label="Revoke token"
+                    >
                       <Trash2 className="size-3" />
                     </Button>
                   )}

@@ -129,9 +129,7 @@ describe("buildEnvironmentCheckDetails — happy path", () => {
     });
     expect(env?.note).toBe("raw_payload service_role bearer abc");
     // Note is a free-text field; envelope keys must NOT contain those names.
-    expect(Object.keys(env!).join(",")).not.toMatch(
-      /raw_payload|service_role|token/,
-    );
+    expect(Object.keys(env!).join(",")).not.toMatch(/raw_payload|service_role|token/);
   });
 });
 
@@ -140,14 +138,10 @@ describe("hasAnyEnvironmentCheckMeasurement", () => {
     expect(hasAnyEnvironmentCheckMeasurement({})).toBe(false);
   });
   it("is true when any measurement is present (ignoring note)", () => {
-    expect(
-      hasAnyEnvironmentCheckMeasurement({ humidityPct: "55" }),
-    ).toBe(true);
+    expect(hasAnyEnvironmentCheckMeasurement({ humidityPct: "55" })).toBe(true);
   });
   it("is false when only a note is present", () => {
-    expect(
-      hasAnyEnvironmentCheckMeasurement({ note: "tent is calm" } as never),
-    ).toBe(false);
+    expect(hasAnyEnvironmentCheckMeasurement({ note: "tent is calm" } as never)).toBe(false);
   });
 });
 
@@ -156,9 +150,7 @@ describe("resolvePreviewWaterTempC", () => {
     expect(resolvePreviewWaterTempC({ waterTempValue: "20" })).toBeNull();
   });
   it("returns Celsius directly when unit=C", () => {
-    expect(
-      resolvePreviewWaterTempC({ waterTempValue: "20", waterTempUnit: "C" }),
-    ).toBe(20);
+    expect(resolvePreviewWaterTempC({ waterTempValue: "20", waterTempUnit: "C" })).toBe(20);
   });
   it("converts Fahrenheit to Celsius when unit=F", () => {
     const c = resolvePreviewWaterTempC({
@@ -168,9 +160,7 @@ describe("resolvePreviewWaterTempC", () => {
     expect(c).toBeCloseTo(20, 5);
   });
   it("returns null for out-of-range temperatures", () => {
-    expect(
-      resolvePreviewWaterTempC({ waterTempValue: "999", waterTempUnit: "F" }),
-    ).toBeNull();
+    expect(resolvePreviewWaterTempC({ waterTempValue: "999", waterTempUnit: "F" })).toBeNull();
   });
 });
 
@@ -255,11 +245,9 @@ describe("validateEnvironmentCheckSensorBand — canonical band, blocking (match
   });
 
   it("validates a Celsius room temp directly, not as if it were Fahrenheit", () => {
-    expect(
-      validateEnvironmentCheckSensorBand({ roomTempF: "24", roomTempUnit: "C" }).ok,
-    ).toBe(true);
-    expect(reason({ roomTempF: "70", roomTempUnit: "C" })).toBe(
-      "temperature_out_of_range",
+    expect(validateEnvironmentCheckSensorBand({ roomTempF: "24", roomTempUnit: "C" }).ok).toBe(
+      true,
     );
+    expect(reason({ roomTempF: "70", roomTempUnit: "C" })).toBe("temperature_out_of_range");
   });
 });

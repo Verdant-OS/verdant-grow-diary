@@ -203,7 +203,7 @@ export class HarnessLog {
 export interface ManifestToolLike {
   name: string;
   inputSchema?: {
-    properties?: Record<string, Record<string, unknown>>;
+    properties?: Record<string, Record<string, unknown> | undefined>;
     required?: string[];
   };
 }
@@ -232,7 +232,9 @@ export function derivePaginationFilterParams(tool: ManifestToolLike): DerivedPar
   const props = tool.inputSchema?.properties ?? {};
   const required = new Set(tool.inputSchema?.required ?? []);
   const out: DerivedParam[] = [];
-  for (const [name, schema] of Object.entries(props)) {
+  for (const [name, rawSchema] of Object.entries(props)) {
+    if (!rawSchema) continue;
+    const schema = rawSchema;
     const base = { name, required: required.has(name), schema };
     if (name === "limit" && schema.type === "integer") {
       out.push({ ...base, kind: "pagination-limit" });

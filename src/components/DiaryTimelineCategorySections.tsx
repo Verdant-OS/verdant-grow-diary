@@ -87,10 +87,7 @@ export function DiaryTimelineCategorySections<
   storageKey,
 }: DiaryTimelineCategorySectionsProps<T>) {
   const sections = useMemo(() => buildDiaryTimelineSections(items), [items]);
-  const summary = useMemo(
-    () => buildDiaryTimelineSectionSummary(sections),
-    [sections],
-  );
+  const summary = useMemo(() => buildDiaryTimelineSectionSummary(sections), [sections]);
   const evidenceSummary = useMemo(
     () => buildDiaryTimelineEvidenceQualitySummary(sections),
     [sections],
@@ -98,19 +95,15 @@ export function DiaryTimelineCategorySections<
 
   // Load saved state on mount (or fall back to defaults). Saved state
   // only overrides known section IDs; malformed storage is ignored.
-  const [expanded, setExpanded] = useState<DiaryTimelineSectionExpandedState>(
-    () => {
-      const saved = parseDiaryTimelineSectionState(safeReadStorage(storageKey));
-      return mergeSavedDiaryTimelineSectionState(sections, saved);
-    },
-  );
+  const [expanded, setExpanded] = useState<DiaryTimelineSectionExpandedState>(() => {
+    const saved = parseDiaryTimelineSectionState(safeReadStorage(storageKey));
+    return mergeSavedDiaryTimelineSectionState(sections, saved);
+  });
 
   // When the set of sections changes (e.g. filter applied), keep the
   // user's saved choices but ensure every known id has a default.
   useEffect(() => {
-    setExpanded((prev) =>
-      mergeSavedDiaryTimelineSectionState(sections, prev),
-    );
+    setExpanded((prev) => mergeSavedDiaryTimelineSectionState(sections, prev));
     // sections identity changes when items change — safe to depend on.
   }, [sections]);
 
@@ -143,20 +136,13 @@ export function DiaryTimelineCategorySections<
   }
 
   return (
-    <section
-      aria-label={ariaLabel}
-      data-testid={testIdPrefix}
-      className="space-y-2"
-    >
-      <div
-        className="flex flex-wrap items-center gap-2"
-        data-testid={`${testIdPrefix}-controls`}
-      >
+    <section aria-label={ariaLabel} data-testid={testIdPrefix} className="space-y-2">
+      <div className="flex flex-wrap items-center gap-2" data-testid={`${testIdPrefix}-controls`}>
         <button
           type="button"
           onClick={() => setAll(true)}
           data-testid={`${testIdPrefix}-expand-all`}
-          className="text-xs rounded-md border border-border/50 bg-secondary/30 px-2 py-1 text-foreground hover:bg-secondary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+          className="text-xs rounded-md border border-border/50 bg-secondary/30 px-2 py-1 text-foreground hover:bg-secondary/50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
         >
           Expand all
         </button>
@@ -164,7 +150,7 @@ export function DiaryTimelineCategorySections<
           type="button"
           onClick={() => setAll(false)}
           data-testid={`${testIdPrefix}-collapse-all`}
-          className="text-xs rounded-md border border-border/50 bg-secondary/30 px-2 py-1 text-foreground hover:bg-secondary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+          className="text-xs rounded-md border border-border/50 bg-secondary/30 px-2 py-1 text-foreground hover:bg-secondary/50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
         >
           Collapse all
         </button>
@@ -172,7 +158,7 @@ export function DiaryTimelineCategorySections<
           type="button"
           onClick={reset}
           data-testid={`${testIdPrefix}-reset`}
-          className="text-xs rounded-md border border-border/40 bg-transparent px-2 py-1 text-muted-foreground hover:bg-secondary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+          className="text-xs rounded-md border border-border/40 bg-transparent px-2 py-1 text-muted-foreground hover:bg-secondary/30 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
         >
           Reset sections
         </button>
@@ -214,13 +200,11 @@ export function DiaryTimelineCategorySections<
               type="button"
               aria-expanded={isOpen}
               aria-controls={panelId}
-              aria-label={`${section.label} (${section.count}) — ${
-                isOpen ? "collapse" : "expand"
-              }`}
+              aria-label={`${section.label} (${section.count}) — ${isOpen ? "collapse" : "expand"}`}
               onClick={() => toggle(section.id)}
               data-testid={`${testIdPrefix}-section-toggle`}
               data-section-id={section.id}
-              className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 rounded-lg"
+              className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm font-medium text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 rounded-lg"
             >
               <span className="flex items-center gap-2">
                 <span>{section.label}</span>

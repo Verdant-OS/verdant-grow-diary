@@ -80,9 +80,7 @@ function check(name: string, ok: boolean, detail?: string) {
 
 async function deleteByEmail(email: string) {
   const { data } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 });
-  const prior = data?.users?.find(
-    (u) => u.email?.toLowerCase() === email.toLowerCase(),
-  );
+  const prior = data?.users?.find((u) => u.email?.toLowerCase() === email.toLowerCase());
   if (prior) await admin.auth.admin.deleteUser(prior.id);
 }
 
@@ -103,9 +101,7 @@ async function ensureNoStaffRow(userId: string) {
 }
 
 async function seedStaffRow(userId: string) {
-  const { error } = await admin
-    .from("user_roles")
-    .insert({ user_id: userId, role: "staff" });
+  const { error } = await admin.from("user_roles").insert({ user_id: userId, role: "staff" });
   if (error) throw new Error(`seedStaffRow: ${error.message}`);
   seededRoleUserIds.push(userId);
 }
@@ -188,10 +184,7 @@ async function main() {
       .select("role")
       .eq("user_id", attackerId)
       .eq("role", "staff");
-    check(
-      "no `staff` row exists for attacker after attempt",
-      (data?.length ?? 0) === 0,
-    );
+    check("no `staff` row exists for attacker after attempt", (data?.length ?? 0) === 0);
   }
 
   // ------------------------------------------------------------------
@@ -302,9 +295,7 @@ async function main() {
 
   // 7. Anon INSERT on user_roles must be denied.
   {
-    const { error } = await anon
-      .from("user_roles")
-      .insert({ user_id: attackerId, role: "staff" });
+    const { error } = await anon.from("user_roles").insert({ user_id: attackerId, role: "staff" });
     check(
       "anon INSERT into user_roles is denied",
       !!error,

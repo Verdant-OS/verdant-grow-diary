@@ -119,8 +119,7 @@ describe("sensor-ingest-webhook E2E insert contract — EcoWitt", () => {
     const rows = buildInsertRowsForEcoWitt();
     for (const r of rows) {
       const meta = (r.raw_payload as Record<string, unknown>).metadata as
-        | Record<string, unknown>
-        | undefined;
+        Record<string, unknown> | undefined;
       expect(meta).toBeDefined();
       expect(meta?.transport_source).toBe("ecowitt");
       expect(meta?.verdant_source).toBe("live");

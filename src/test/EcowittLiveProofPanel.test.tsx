@@ -34,18 +34,13 @@ describe("<EcowittLiveProofPanel />", () => {
     render(
       <EcowittLiveProofPanel
         tentId="t-1"
-        rows={[
-          row({ id: "a" }),
-          row({ id: "b", metric: "rh", value: 100 }),
-        ]}
+        rows={[row({ id: "a" }), row({ id: "b", metric: "rh", value: 100 })]}
         now={NOW}
       />,
     );
     expect(screen.getByTestId("ecowitt-live-proof-accepted").textContent).toBe("1");
     expect(screen.getByTestId("ecowitt-live-proof-rejected").textContent).toBe("1");
-    expect(
-      screen.getByText(/in the current\s+proof window \(last 24 hours\)/i),
-    ).toBeTruthy();
+    expect(screen.getByText(/in the current\s+proof window \(last 24 hours\)/i)).toBeTruthy();
     expect(screen.getByTestId("ecowitt-live-proof-window-label").textContent).toMatch(
       /last 24 hours/,
     );
@@ -65,9 +60,7 @@ describe("<EcowittLiveProofPanel />", () => {
   });
 
   it("does not render raw payload values or secrets", () => {
-    const { container } = render(
-      <EcowittLiveProofPanel tentId="t-1" rows={[row({})]} now={NOW} />,
-    );
+    const { container } = render(<EcowittLiveProofPanel tentId="t-1" rows={[row({})]} now={NOW} />);
     const text = container.textContent ?? "";
     expect(text).not.toMatch(/PASSKEY/);
     expect(text).not.toMatch(/raw_payload/);

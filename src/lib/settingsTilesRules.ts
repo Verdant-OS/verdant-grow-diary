@@ -29,8 +29,7 @@ export function describeSettingsTile(state: SettingsTileState): SettingsTileBadg
       return {
         label: "Coming soon",
         variant: "secondary",
-        helper:
-          "Planned for a future release. Showing default values — changes are not saved yet.",
+        helper: "Planned for a future release. Showing default values — changes are not saved yet.",
       };
     case "disabled":
       return {

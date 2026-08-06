@@ -27,8 +27,10 @@ jobs:
     name: test:security-db-local
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    # Optional: never blocks the merge queue.
-    continue-on-error: true
+    # Not a required check, so a red run never blocks the merge queue.
+    # Deliberately NOT continue-on-error: that flag rewrote a failing job
+    # into a run-level "success" and masked a real base red for a full day
+    # (run 30940375065, deploy head ef1173798). Failures must stay visible.
     env:
       ENABLED: ${{ (github.event_name == 'workflow_dispatch' && inputs.run_db_security == true) || vars.ENABLE_DB_SECURITY_LANE == 'true' }}
     steps:
@@ -149,6 +151,17 @@ jobs:
           set -o pipefail
           bun run test:ai-doctor-sessions-rls 2>&1 | tee ai-doctor-sessions-rls.log
 
+      - name: Bridge tokens RLS + revocation integrity (strict)
+        if: env.ENABLED == 'true'
+        id: bridge-tokens-db
+        env:
+          # Strict mode: unreachable DB, replay failure, or any skipped test
+          # is a hard FAIL — skipping never counts as proof in this lane.
+          BRIDGE_TOKENS_DB_SECURITY_REQUIRED: "1"
+        run: |
+          set -o pipefail
+          bun run test:bridge-tokens-db-security 2>&1 | tee bridge-tokens-db.log
+
       - name: Aggregate DB security lane
         if: env.ENABLED == 'true'
         id: aggregate
@@ -172,6 +185,7 @@ jobs:
             subscriber-interest-db.log
             public-support-forms-db.log
             ai-doctor-sessions-rls.log
+            bridge-tokens-db.log
             security-db-local.log
             test-results/**
             artifacts/security-db/**
@@ -209,6 +223,7 @@ jobs:
               echo "- subscriber interest RLS (\`test:subscriber-interest-db-security\`)"
               echo "- public support forms RLS (\`test:public-support-forms-db-security\`)"
               echo "- AI Doctor sessions RLS (\`test:ai-doctor-sessions-rls\`)"
+              echo "- bridge tokens RLS + revocation integrity, strict zero-skip mode (\`test:bridge-tokens-db-security\`)"
               echo "- VPD calibration provenance RLS (via aggregate lane)"
               echo "- aggregate lane (\`test:security-db-local\`)"
               echo ""

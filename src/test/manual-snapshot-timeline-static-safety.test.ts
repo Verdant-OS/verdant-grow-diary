@@ -16,7 +16,10 @@ const read = (p: string) => stripSourceComments(readFileSync(resolve(ROOT, p), "
 
 const TARGETS = [
   { name: "ManualSnapshotTimelineCard", path: "src/components/ManualSnapshotTimelineCard.tsx" },
-  { name: "ManualSnapshotTimelineSection", path: "src/components/ManualSnapshotTimelineSection.tsx" },
+  {
+    name: "ManualSnapshotTimelineSection",
+    path: "src/components/ManualSnapshotTimelineSection.tsx",
+  },
   { name: "useManualSnapshotTimelineCards", path: "src/hooks/useManualSnapshotTimelineCards.ts" },
   { name: "manualSnapshotDiaryAdapter", path: "src/lib/manualSnapshotDiaryAdapter.ts" },
   { name: "manualSnapshotTimelineMerge", path: "src/lib/manualSnapshotTimelineMerge.ts" },

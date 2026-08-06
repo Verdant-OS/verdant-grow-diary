@@ -1,0 +1,395 @@
+{
+  "schema_version": 1,
+  "scope": "LIGHTING_LAUNCH_MEASUREMENT",
+  "generated_at": "2026-08-02T05:19:48.245Z",
+  "generated_at_chicago": "2026-08-02T00:19:48.245-05:00",
+  "generated_at_semantics": "EVIDENCE_SNAPSHOT_CAPTURE_TIME",
+  "artifact_revision": {
+    "revised_at": "2026-08-02T08:07:28.792Z",
+    "revision_scope": "POST_DEPLOY_ANALYTICS_RECHECK_PROVENANCE_CORRECTION_ONLY",
+    "production_or_analytics_reverification_performed": false
+  },
+  "timezone": "America/Chicago",
+  "artifact_semantics": "POINT_IN_TIME_EVIDENCE_SNAPSHOT",
+  "operating_mode": "MODE_A_ACCESS_BLOCKED_READINESS_WORK",
+  "verdict": "NOT READY — ANALYTICS INSTRUMENTATION DEFECT FOUND",
+  "status_vocabulary": [
+    "PASS",
+    "FAIL",
+    "BLOCKED",
+    "NO_BASELINE",
+    "NO_DATA",
+    "NOT_MEASURED",
+    "SKIPPED",
+    "NOT_APPLICABLE"
+  ],
+  "status_vocabulary_scope": "Every object member named exactly status uses status_vocabulary. Lifecycle detail is carried in lifecycle_state; domain-specific *_status fields document their own value sets.",
+  "event_classification_vocabulary": [
+    "IMPLEMENTED_AND_VERIFIED",
+    "IMPLEMENTED_NOT_VERIFIED",
+    "MISSING",
+    "NOT_APPLICABLE",
+    "BLOCKED_BY_ACCESS"
+  ],
+  "production_status": "PASS",
+  "analytics_identity_status": "FAIL",
+  "technical_seo_status": "PASS",
+  "ga4_access_status": "BLOCKED",
+  "gsc_access_status": "BLOCKED",
+  "day_0_status": "UNSET",
+  "four_week_clock_status": "NOT_STARTED",
+  "run_context": {
+    "repository": "Verdant-OS/verdant-grow-diary",
+    "audit_branch": "codex/seo-readiness-evidence-20260802",
+    "audit_head": "913f1b9deb0934d5ce76491cbc945816f4581b73",
+    "pre_recheck_audit_head": "c794e4c6ff0debb6ae2a83566b2a73f690a96393",
+    "audit_head_is_descendant_of_deploy_branch_head": true,
+    "deploy_branch": "verdant-grow-diary",
+    "deploy_branch_head": "a20776993bd606f07977674934864b888a407e1c",
+    "audited_release_head": "a20776993bd606f07977674934864b888a407e1c",
+    "audited_release_equals_deploy_branch_head": true,
+    "working_tree_status": "CLEAN_AT_AUDIT_START"
+  },
+  "production": {
+    "host": "https://verdantgrowdiary.com",
+    "observed_at": "2026-08-02T02:53:25.627Z",
+    "version_url": "https://verdantgrowdiary.com/version.json",
+    "manifest_commit": "a20776993bd606f07977674934864b888a407e1c",
+    "build_time": "2026-08-02T01:28:54.548Z",
+    "matches_deploy_branch_head": true,
+    "manifest_is_ancestor_of_deploy_branch_head": true,
+    "source_delta_since_manifest": "NONE_DEPLOY_MATCHES_PRODUCTION",
+    "production_publish_required": false,
+    "release_content_match": "PASS",
+    "release_content_scope": "LIGHTING_GUIDES_ONLY",
+    "full_deploy_branch_parity": "CURRENT",
+    "sitemap_url_count": 51,
+    "robots_declares_production_sitemap": true,
+    "robots_protects_app_prefixes": true,
+    "endpoints": [
+      {
+        "path": "/version.json",
+        "http_status": 200
+      },
+      {
+        "path": "/guides/cannabis-grow-light-distance-and-schedule",
+        "http_status": 200,
+        "sitemap_occurrences": 1
+      },
+      {
+        "path": "/guides/cannabis-light-stress-light-burn-bleaching-or-heat",
+        "http_status": 200,
+        "sitemap_occurrences": 1
+      },
+      {
+        "path": "/sitemap.xml",
+        "http_status": 200
+      },
+      {
+        "path": "/robots.txt",
+        "http_status": 200
+      }
+    ]
+  },
+  "release_evidence": {
+    "lighting_pull_request": "https://github.com/Verdant-OS/verdant-grow-diary/pull/595",
+    "lighting_status": "LIVE",
+    "analytics_repair_pull_request": "https://github.com/Verdant-OS/verdant-grow-diary/pull/597",
+    "analytics_repair_status": "LIVE",
+    "structured_data_repair_pull_request": "https://github.com/Verdant-OS/verdant-grow-diary/pull/624",
+    "structured_data_repair_status": "LIVE"
+  },
+  "analytics_identity": {
+    "last_full_verified_at": "2026-08-02T02:08:43.179Z",
+    "last_targeted_recheck_at": "2026-08-02T05:19:48.245Z",
+    "verification_method": "INTERCEPTED_BROWSER_COLLECTION_REQUESTS",
+    "test_events_transmitted": false,
+    "test_events_transmitted_scope": "COMPLETED_NINE_STATE_FULL_MATRIX_ONLY",
+    "stream_identity_status": "PASS",
+    "stream_identity_evidence": "OWNER_CONFIRMED_VALUES_MATCH_DEPLOYED_PRODUCTION_TAG",
+    "stream": {
+      "name": "Verdant Grow Diary",
+      "url": "https://verdantgrowdiary.com",
+      "stream_id": "15065867361",
+      "measurement_id": "G-MCXQ9GVS5H"
+    },
+    "property_id": null,
+    "guide_page_identity": "PASS",
+    "route_specific_titles": "PASS",
+    "duplicate_page_views": "FAIL",
+    "explicit_spa_page_view_identity": "PASS",
+    "automatic_history_page_views": "FAIL_OWNER_REVIEW_REQUIRED",
+    "protected_id_masking": "PASS",
+    "verification_counts": {
+      "navigation_actions": 9,
+      "exact_explicit_page_views": 9,
+      "automatic_page_views_without_explicit_page_path": 5,
+      "verification_events_transmitted": 0
+    },
+    "targeted_post_deploy_recheck": {
+      "scope": "DIRECT_DEEP_LINK_AND_CROSS_GUIDE_CLIENT_NAVIGATION",
+      "production_manifest_commit": "a20776993bd606f07977674934864b888a407e1c",
+      "recorded_in_commit": "913f1b9deb0934d5ce76491cbc945816f4581b73",
+      "interceptor_host_coverage": [
+        "analytics.google.com",
+        "google-analytics.com",
+        "stats.g.doubleclick.net"
+      ],
+      "collection_requests_fulfilled_locally": 5,
+      "escaped_collection_requests": 0,
+      "navigation_actions": 2,
+      "exact_explicit_page_views": 2,
+      "automatic_page_views_without_explicit_page_path": 1,
+      "verification_events_transmitted": 0,
+      "evidence_scope": "TARGETED_POST_DEPLOY_P0_RECHECK_NOT_A_FULL_MATRIX_REPLACEMENT",
+      "excluded_exploratory_probe": "A preceding exploratory browser probe omitted analytics.google.com from its interception matcher and is excluded from evidence; its transmission status is not asserted."
+    },
+    "evidence": "docs/seo/lighting-launch-verification.md"
+  },
+  "measurement_contract": {
+    "guide_cta_clicks": {
+      "classification": "MISSING",
+      "measurement_status": "NOT_MEASURED",
+      "reason": "MISSING_NOT_IMPLEMENTED",
+      "event_name": null,
+      "destination": "/quick-log",
+      "public_guide_slugs": [
+        "cannabis-grow-light-distance-and-schedule",
+        "cannabis-light-stress-light-burn-bleaching-or-heat"
+      ],
+      "not_inferred_from": [
+        "destination_page_view",
+        "quick_log_saved",
+        "signup",
+        "checkout"
+      ],
+      "day_0_blocking": false,
+      "evidence": "docs/v0-loop-event-map.md"
+    }
+  },
+  "technical_seo": {
+    "last_http_verified_at": "2026-08-02T02:07:12.279Z",
+    "lighting_pages": "PASS",
+    "direct_load_indexability": "PASS",
+    "route_runtime_structured_data": "PASS",
+    "local_route_runtime_structured_data": "NOT_APPLICABLE",
+    "production_navigation_states_verified": 8,
+    "robots": "PASS",
+    "sitemap": "PASS",
+    "protected_route_exclusion": "PASS",
+    "evidence": "docs/seo/lighting-launch-verification.md"
+  },
+  "reporting_access_configuration": {
+    "observed_at": "2026-08-02T02:08:43.179Z",
+    "audit_method": "GITHUB_SECRET_NAME_LISTING_AND_CURRENT_DEPLOY_WORKFLOW",
+    "configured_scopes_checked": [
+      "repository",
+      "environment:verdant-production",
+      "environment:verdant-sandbox",
+      "environment:copilot"
+    ],
+    "configured_ga4_repository_or_environment_secret_names_found": [],
+    "configured_gsc_repository_or_environment_secret_names_found": [],
+    "expected_gsc_names_referenced_by_workflow": [
+      "GSC_CLIENT_ID",
+      "GSC_CLIENT_SECRET",
+      "GSC_REFRESH_TOKEN",
+      "GSC_SITE_URL"
+    ],
+    "local_gsc_token_path": ".seo/gsc-token.local.json",
+    "local_gsc_token_available": false,
+    "credential_values_included": false
+  },
+  "ga4": {
+    "status": "BLOCKED",
+    "reason": "AUTHENTICATED_ACCESS_UNAVAILABLE",
+    "baseline_status": "BLOCKED",
+    "collection_contract_status": "FAIL",
+    "stream_identity_status": "PASS",
+    "property_identity_status": "BLOCKED",
+    "stream": {
+      "name": "Verdant Grow Diary",
+      "url": "https://verdantgrowdiary.com",
+      "stream_id": "15065867361",
+      "measurement_id": "G-MCXQ9GVS5H"
+    },
+    "property_id": null,
+    "authenticated_reporting_available": false,
+    "metrics": null
+  },
+  "gsc": {
+    "status": "BLOCKED",
+    "reason": "AUTHENTICATED_ACCESS_UNAVAILABLE",
+    "baseline_status": "BLOCKED",
+    "authenticated_reporting_available": false,
+    "local_oauth_token_available": false,
+    "latest_workflow_run": "https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30727208474",
+    "latest_workflow_status": "PASS",
+    "operation_status": "SKIPPED",
+    "access_status": "BLOCKED",
+    "execution_status": "SKIPPED",
+    "oauth_configured": false,
+    "urls_evaluated": 51,
+    "api_attempts": 0,
+    "metrics": null
+  },
+  "monitoring_evidence": {
+    "workflow_status": "PASS",
+    "workflow_run_url": "https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30727208474",
+    "workflow_artifact_name": "seo-monitoring-reports",
+    "workflow_artifact_id": 8826754533,
+    "workflow_artifact_archive_url": "https://api.github.com/repos/Verdant-OS/verdant-grow-diary/actions/artifacts/8826754533/zip",
+    "workflow_head": "a20776993bd606f07977674934864b888a407e1c",
+    "workflow_artifact_created_at": "2026-08-02T01:32:13Z",
+    "urls_evaluated": 51,
+    "gsc_access_status": "BLOCKED",
+    "gsc_execution_status": "SKIPPED",
+    "gsc_api_attempts": 0,
+    "repository_summary_scope": "HISTORICAL_DRY_RUN",
+    "repository_summary_is_current": false
+  },
+  "measurement": {
+    "day_0_at_utc": null,
+    "day_0_at_chicago": null,
+    "measurement_start_at": null,
+    "week_1_at": null,
+    "week_2_at": null,
+    "week_3_at": null,
+    "week_4_at": null
+  },
+  "open_blockers": [
+    {
+      "id": "GA4_AUTHENTICATED_ACCESS",
+      "status": "BLOCKED",
+      "owner": "OWNER",
+      "reason": "AUTHENTICATED_ACCESS_UNAVAILABLE",
+      "required_action": "Confirm the GA4 property identity and provide owner-approved read-only reporting access. The production stream identity is already owner-confirmed."
+    },
+    {
+      "id": "GA4_ENHANCED_MEASUREMENT_HISTORY_PAGE_VIEWS",
+      "status": "BLOCKED",
+      "owner": "OWNER",
+      "reason": "AUTOMATIC_PAGE_VIEWS_OBSERVED_ALONGSIDE_EXPLICIT_SPA_EVENTS",
+      "required_action": "In the existing production stream, disable the Enhanced Measurement advanced option for page changes based on browser history events, retain Verdant's explicit SPA page_view emitter, and authorize a controlled re-verification."
+    },
+    {
+      "id": "GSC_AUTHENTICATED_ACCESS",
+      "status": "BLOCKED",
+      "owner": "OWNER",
+      "reason": "AUTHENTICATED_ACCESS_UNAVAILABLE",
+      "required_action": "Complete Search Console property verification, sitemap confirmation, and owner-approved read-only access in the owner checklist."
+    }
+  ],
+  "measurement_gaps": [
+    {
+      "id": "LIGHTING_GUIDE_CTA_ATTRIBUTION",
+      "priority": "P2",
+      "status": "NOT_MEASURED",
+      "classification": "MISSING",
+      "reason_code": "MISSING_NOT_IMPLEMENTED",
+      "event_name": null,
+      "destination": "/quick-log",
+      "reason": "Both lighting-guide CTAs are plain GuidePage links; no guide-specific CTA-click event is emitted.",
+      "day_0_blocking": false
+    }
+  ],
+  "verified_defects": [
+    {
+      "id": "SEO_MONITORING_STALE_TERMINAL_SUMMARY",
+      "priority": "P3",
+      "status": "PASS",
+      "lifecycle_state": "FIXED_AND_POST_MERGE_VERIFIED",
+      "pull_request": "https://github.com/Verdant-OS/verdant-grow-diary/pull/615",
+      "merge_commit": "9d3a56e1707a2bb666628b52178c0c59cbfd2f18",
+      "verification_run": "https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30658003581"
+    },
+    {
+      "id": "GSC_REGRESSION_NO_BASELINE_SEMANTICS",
+      "priority": "P3",
+      "status": "PASS",
+      "lifecycle_state": "FIXED_AND_POST_MERGE_VERIFIED",
+      "pull_request": "https://github.com/Verdant-OS/verdant-grow-diary/pull/618",
+      "merge_commit": "d9bf8e71f76e155be728a02297c6d46e6d78975c",
+      "verification_run": "https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30670976735"
+    },
+    {
+      "id": "LIGHTING_DUPLICATE_HYDRATED_JSON_LD",
+      "priority": "P1",
+      "status": "PASS",
+      "lifecycle_state": "FIXED_AND_PRODUCTION_VERIFIED",
+      "pull_request": "https://github.com/Verdant-OS/verdant-grow-diary/pull/624",
+      "merge_commit": "b62aac5d4b0e9296bfdbee4c46e03fc35f350c0c",
+      "evidence": "Production commit a2077699 contains the repair. Eight rendered direct, cross-guide, history, refresh, repeat, and new-tab states each exposed one current WebPage, FAQPage, BreadcrumbList, and Article identity with zero duplicate or stale route objects."
+    },
+    {
+      "id": "GA4_ENHANCED_MEASUREMENT_DUPLICATE_PAGE_VIEWS",
+      "priority": "P0",
+      "status": "FAIL",
+      "lifecycle_state": "VERIFIED_UNFIXED_OWNER_ACTION_REQUIRED",
+      "evidence": "The completed nine-state matrix observed nine exact explicit SPA page_view events plus five tag-generated page_view events without the explicit page_path on SPA/history transitions. A post-deploy two-state recheck on a2077699 observed two exact explicit events plus one automatic event without the explicit path; all five collection requests in that corrected recheck were fulfilled locally."
+    },
+    {
+      "id": "STALE_SEO_READINESS_EVIDENCE",
+      "priority": "P3",
+      "status": "PASS",
+      "lifecycle_state": "FIXED_AND_LOCAL_VERIFIED",
+      "evidence": "The prior artifacts named an older production fingerprint and older collection counts. This bounded slice aligns the human and machine-readable handoff with a2077699 production proof and the completed intercepted collection matrix without changing runtime code."
+    },
+    {
+      "id": "READINESS_ARTIFACT_PROVENANCE",
+      "priority": "P3",
+      "status": "PASS",
+      "lifecycle_state": "FIXED_AND_LOCAL_VERIFIED",
+      "evidence": "The recheck-bearing audit head 913f1b9deb0934d5ce76491cbc945816f4581b73 is distinct from the audited production release a20776993bd606f07977674934864b888a407e1c. Its pre-recheck audit-start head was c794e4c6ff0debb6ae2a83566b2a73f690a96393. The current monitoring workflow is distinct from the historical checked-in dry-run summary."
+    }
+  ],
+  "current_slice": {
+    "priority": "P2",
+    "id": "LIGHTING_GUIDE_CTA_ATTRIBUTION_CONTRACT",
+    "status": "NOT_MEASURED",
+    "lifecycle_state": "DOCUMENTED_MISSING_NO_EVENT_ADDED",
+    "evidence": "The two lighting-guide CTAs resolve to /quick-log without a guide-specific click event. Their event classification is MISSING and their metric readiness status is NOT_MEASURED, so downstream activity is not used as attribution."
+  },
+  "next_slice": {
+    "priority": "P0",
+    "id": "GA4_ENHANCED_MEASUREMENT_HISTORY_PAGE_VIEWS",
+    "status": "BLOCKED",
+    "lifecycle_state": "BLOCKED_BY_OWNER_ACCESS"
+  },
+  "monitoring_repair": {
+    "status": "PASS",
+    "lifecycle_state": "MERGED_AND_POST_MERGE_VERIFIED",
+    "pull_request": "https://github.com/Verdant-OS/verdant-grow-diary/pull/615",
+    "merge_commit": "9d3a56e1707a2bb666628b52178c0c59cbfd2f18",
+    "post_merge_workflow": {
+      "url": "https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30658003581",
+      "status": "PASS",
+      "operation_status": "SKIPPED",
+      "gsc_access_status": "BLOCKED",
+      "gsc_execution_status": "SKIPPED",
+      "oauth_configured": false,
+      "urls_evaluated": 51,
+      "gsc_api_attempts": 0
+    },
+    "production_publish_required": false,
+    "production_publish_reason": "PR #624 is already live in production; this bounded slice changes readiness evidence only and does not require a runtime publish for the lighting measurement scope."
+  },
+  "artifact_paths": {
+    "readiness_status": "artifacts/seo/seo-readiness-status.json",
+    "launch_verification": "docs/seo/lighting-launch-verification.md",
+    "launch_baseline": "artifacts/seo/lighting-launch-baseline.json",
+    "measurement_plan": "docs/seo/lighting-four-week-measurement-plan.md",
+    "owner_setup_checklist": "docs/seo/analytics-owner-setup-checklist.md",
+    "internal_link_map": "docs/seo/internal-link-map.md",
+    "measurement_contract": "docs/v0-loop-event-map.md",
+    "current_monitoring_evidence": "docs/seo/lighting-launch-verification.md",
+    "historical_monitoring_summary_json": "artifacts/seo/seo-job-summary.json",
+    "historical_monitoring_summary_markdown": "artifacts/seo/seo-job-summary.md"
+  },
+  "privacy": {
+    "credentials_included": false,
+    "private_routes_included": false,
+    "private_ids_included": false,
+    "unavailable_metrics_are_null": true
+  }
+}

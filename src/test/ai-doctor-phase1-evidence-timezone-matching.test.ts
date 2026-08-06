@@ -32,9 +32,7 @@ function noteAction(occurredAt: string): QuickLogActionEvent {
 
 describe("AI Doctor Phase 1 evidence timezone matching", () => {
   it("matches diary entry_at and action occurredAt across equivalent timezone offsets", () => {
-    const index = buildAiDoctorPhase1EvidenceIndex([
-      diaryRow("2026-06-19T08:00:00-04:00"),
-    ]);
+    const index = buildAiDoctorPhase1EvidenceIndex([diaryRow("2026-06-19T08:00:00-04:00")]);
 
     const [attached] = attachAiDoctorPhase1EvidenceToActionEvents(
       [noteAction("2026-06-19T12:00:00.000Z")],
@@ -42,15 +40,11 @@ describe("AI Doctor Phase 1 evidence timezone matching", () => {
     );
 
     expect(attached.aiDoctorPhase1Evidence?.diaryEntryId).toBe("diary-1");
-    expect(attached.aiDoctorPhase1Evidence?.entryAt).toBe(
-      "2026-06-19T12:00:00.000Z",
-    );
+    expect(attached.aiDoctorPhase1Evidence?.entryAt).toBe("2026-06-19T12:00:00.000Z");
   });
 
   it("does not attach when offset timestamps represent different instants", () => {
-    const index = buildAiDoctorPhase1EvidenceIndex([
-      diaryRow("2026-06-19T09:00:00-04:00"),
-    ]);
+    const index = buildAiDoctorPhase1EvidenceIndex([diaryRow("2026-06-19T09:00:00-04:00")]);
 
     const [attached] = attachAiDoctorPhase1EvidenceToActionEvents(
       [noteAction("2026-06-19T12:00:00.000Z")],

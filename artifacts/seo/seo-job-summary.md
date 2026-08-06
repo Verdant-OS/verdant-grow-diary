@@ -1,9 +1,17 @@
 ## Verdant SEO Monitoring — Job Summary
 
 - **Mode:** dry-run
-- **Status:** PASS
+- **Operation status:** PASS
+- **GSC access status:** NOT_APPLICABLE
+- **GSC execution status:** SKIPPED
+- **GSC token refresh status:** SKIPPED
+- **GSC inspections:** 0 succeeded / 0 failed / 0 attempted
 - **Allowlist:** `/dev-server/config/seo-allowlist.json`
 - **URLs evaluated:** 2
+- **Workflow run:** (not in GitHub Actions)
+- **OAuth configured:** n/a
+- **GSC skipped:** yes
+- **Previous baseline found:** no (NO_BASELINE)
 - **Allowlisted suppressions:** 1
 - **Expected-noindex suppressions:** 0
 - **Never-allowlist matches:** 1
@@ -20,6 +28,7 @@ _No previous run available — baseline established._
 None.
 
 ### Stable artifact links
+Stable relative paths inside the uploaded `seo-monitoring-reports` artifact bundle:
 - `artifacts/seo/seo-job-summary.md`
 - `artifacts/seo/seo-job-summary.json`
 - `artifacts/seo/seo-allowlist-suppressions.json`

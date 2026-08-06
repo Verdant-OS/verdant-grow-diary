@@ -9,7 +9,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 
 interface ReadingFixture {
   tent_id: string;
@@ -57,15 +57,27 @@ vi.mock("@/integrations/supabase/client", () => ({
         mockState.selectCalls.push({ table, columns });
         const ordered = {
           order: () => ordered,
-          limit: () =>
-            Promise.resolve({
-              data: table === "sensor_readings" ? mockState.readingRows : [],
-              error: null,
-            }),
+          limit: () => {
+            const __c: any = {
+              abortSignal: () => __c,
+              then: (r: any, j?: any) =>
+                Promise.resolve({
+                  data: table === "sensor_readings" ? mockState.readingRows : [],
+                  error: null,
+                }).then(r, j),
+            };
+            return __c;
+          },
         };
         return {
           in: () => ordered,
-          limit: () => Promise.resolve({ data: [], error: null }),
+          limit: () => {
+            const __c: any = {
+              abortSignal: () => __c,
+              then: (r: any, j?: any) => Promise.resolve({ data: [], error: null }).then(r, j),
+            };
+            return __c;
+          },
         };
       },
     }),

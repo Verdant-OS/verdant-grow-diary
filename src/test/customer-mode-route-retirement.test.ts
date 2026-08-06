@@ -1,25 +1,30 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { matchRoutes } from "react-router-dom";
+import { matchRoutes } from "@/lib/react-router-compat";
 import { APP_ROUTES } from "@/lib/appRouteManifest";
+import {
+  extractMountedAppRoutePaths,
+  readAllRouteModuleSources,
+} from "./helpers/routeManifestSyncHarness";
 
 const ROOT = resolve(__dirname, "../..");
 const read = (path: string) => readFileSync(resolve(ROOT, path), "utf8");
 
-const APP = read("src/App.tsx");
+const APP = readAllRouteModuleSources();
 const SEO_CONTENT = read("src/constants/verdantSeoContent.ts");
 const MOBILE_ROUTE_SPEC = read("e2e/auth-route-protection-mobile.spec.ts");
 
 const RETIRED_CUSTOMER_ROUTES = ["/customer/:shareId", "/customer/:shareId/cannabis-care"] as const;
+const STATIC_CUSTOMER_GUIDE = "/customer/guide/oreoz-vs-gelonade-comparison";
 
-describe("retired unbacked Customer Mode routes", () => {
+describe("retired unbacked Customer Mode share routes", () => {
   it("does not load or mount the dormant Customer Mode pages", () => {
     expect(APP).not.toMatch(/import\(\s*["']\.\/pages\/CustomerModeGuide["']\s*\)/);
     expect(APP).not.toMatch(/import\(\s*["']\.\/pages\/CustomerModeCannabisCareFaq["']\s*\)/);
 
     for (const path of RETIRED_CUSTOMER_ROUTES) {
-      expect(APP).not.toContain(`path="${path}"`);
+      expect(extractMountedAppRoutePaths()).not.toContain(path);
     }
   });
 
@@ -30,10 +35,23 @@ describe("retired unbacked Customer Mode routes", () => {
     }
   });
 
+  it("allows only the exact ID-free comparison guide as a public customer route", () => {
+    expect(extractMountedAppRoutePaths()).toContain(STATIC_CUSTOMER_GUIDE);
+    expect(APP_ROUTES.find((route) => route.path === STATIC_CUSTOMER_GUIDE)).toMatchObject({
+      access: "public",
+    });
+    expect(MOBILE_ROUTE_SPEC).toContain(`"${STATIC_CUSTOMER_GUIDE}"`);
+
+    const customerRoutes = APP_ROUTES.filter((route) => route.path.startsWith("/customer/"));
+    expect(customerRoutes.map((route) => route.path)).toEqual([STATIC_CUSTOMER_GUIDE]);
+    expect(customerRoutes.some((route) => route.path.includes(":shareId"))).toBe(false);
+  });
+
   it.each(["/customer/invented-share", "/customer/invented-share/cannabis-care"])(
     "%s reaches the catch-all Not Found route",
     (path) => {
-      expect(APP).toContain('<Route path="*" element={<NotFound />} />');
+      expect(extractMountedAppRoutePaths()).toContain("*");
+      expect(APP).toMatch(/NotFound|@\/pages\/NotFound|pages\/NotFound/);
 
       const matches = matchRoutes(
         APP_ROUTES.map((route) => ({

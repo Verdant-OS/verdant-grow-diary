@@ -53,12 +53,8 @@ describe("buildManualSaveSuccessLine", () => {
 
 describe("mapManualSaveErrorToUserMessage", () => {
   it("returns a generic message for empty/unknown errors", () => {
-    expect(mapManualSaveErrorToUserMessage(undefined)).toMatch(
-      /could not be saved/i,
-    );
-    expect(mapManualSaveErrorToUserMessage(new Error(""))).toMatch(
-      /could not be saved/i,
-    );
+    expect(mapManualSaveErrorToUserMessage(undefined)).toMatch(/could not be saved/i);
+    expect(mapManualSaveErrorToUserMessage(new Error(""))).toMatch(/could not be saved/i);
   });
 
   it("redacts secret-shaped error text", () => {

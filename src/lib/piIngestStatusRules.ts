@@ -48,9 +48,7 @@ export function computePiIngestStatus(
 ): PiIngestStatusSummary {
   const recentWindow = opts.recentWindowMs ?? PI_INGEST_RECENT_WINDOW_MS;
   // Only consider pi_bridge rows defensively.
-  const piRows = readings.filter(
-    (r) => (r.source ?? null) === PI_INGEST_SOURCE,
-  );
+  const piRows = readings.filter((r) => (r.source ?? null) === PI_INGEST_SOURCE);
 
   if (piRows.length === 0) {
     return {
@@ -63,20 +61,14 @@ export function computePiIngestStatus(
     };
   }
 
-  const sorted = [...piRows].sort(
-    (a, b) => toDate(b.ts).getTime() - toDate(a.ts).getTime(),
-  );
+  const sorted = [...piRows].sort((a, b) => toDate(b.ts).getTime() - toDate(a.ts).getTime());
   const latest = sorted[0];
   const latestAt = toDate(latest.ts);
   const latestTentId = latest.tent_id ?? null;
 
   const nowMs = now.getTime();
-  const count24h = piRows.filter(
-    (r) => nowMs - toDate(r.ts).getTime() <= PI_INGEST_24H_MS,
-  ).length;
-  const count7d = piRows.filter(
-    (r) => nowMs - toDate(r.ts).getTime() <= PI_INGEST_7D_MS,
-  ).length;
+  const count24h = piRows.filter((r) => nowMs - toDate(r.ts).getTime() <= PI_INGEST_24H_MS).length;
+  const count7d = piRows.filter((r) => nowMs - toDate(r.ts).getTime() <= PI_INGEST_7D_MS).length;
 
   // Latest metrics: distinct metric names from the most recent batch
   // (same timestamp as latest, then top 5 distinct from sorted list).
@@ -87,8 +79,7 @@ export function computePiIngestStatus(
   }
 
   const ageMs = nowMs - latestAt.getTime();
-  const health: PiIngestHealth =
-    ageMs <= recentWindow ? "recently_active" : "stale";
+  const health: PiIngestHealth = ageMs <= recentWindow ? "recently_active" : "stale";
 
   return {
     health,

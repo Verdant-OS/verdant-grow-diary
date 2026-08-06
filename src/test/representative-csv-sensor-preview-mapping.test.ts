@@ -165,7 +165,20 @@ describe("representative csv preview — explicit mapping", () => {
 
   it("preserves Facility/Room/Zone but never infers Verdant IDs", () => {
     const text = customRowText([
-      ["2026-05-01 12:00:00", "P1", "Flower-A", "Zone-3", "24", "22", "60", "1.2", "900", "650", "55", "2.5"],
+      [
+        "2026-05-01 12:00:00",
+        "P1",
+        "Flower-A",
+        "Zone-3",
+        "24",
+        "22",
+        "60",
+        "1.2",
+        "900",
+        "650",
+        "55",
+        "2.5",
+      ],
     ]);
     const result = previewRepresentativeCsv(text, { mapping: mappingForCustom() });
     const row = result.rows[0];
@@ -178,7 +191,20 @@ describe("representative csv preview — explicit mapping", () => {
 
   it("preserves raw_payload exactly", () => {
     const text = customRowText([
-      ["2026-05-01 12:00:00", "P1", "Flower-A", "Zone-3", "76.1", "70.0", "60", "1.2", "900", "650", "55", "2500"],
+      [
+        "2026-05-01 12:00:00",
+        "P1",
+        "Flower-A",
+        "Zone-3",
+        "76.1",
+        "70.0",
+        "60",
+        "1.2",
+        "900",
+        "650",
+        "55",
+        "2500",
+      ],
     ]);
     const result = previewRepresentativeCsv(text, {
       mapping: mappingForCustom({
@@ -253,7 +279,10 @@ describe("representative csv preview — static safety scan (mapping page)", () 
   const page = stripSourceComments(read("src/pages/RepresentativeCsvPreview.tsx"));
   const pageRaw = read("src/pages/RepresentativeCsvPreview.tsx");
 
-  for (const [name, src] of [["helper", helper], ["page", page]] as const) {
+  for (const [name, src] of [
+    ["helper", helper],
+    ["page", page],
+  ] as const) {
     it(`${name}: no sensor_readings insert/update/upsert/delete/rpc`, () => {
       expect(src).not.toMatch(/\.insert\(/);
       expect(src).not.toMatch(/\.upsert\(/);

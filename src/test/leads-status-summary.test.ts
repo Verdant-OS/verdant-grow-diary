@@ -114,14 +114,9 @@ describe("summarizeLeadStatuses — averages and safety", () => {
       }),
     ];
     const expected =
-      (scoreLeadQuality(leads[0], NOW).score +
-        scoreLeadQuality(leads[1], NOW).score) /
-      2;
+      (scoreLeadQuality(leads[0], NOW).score + scoreLeadQuality(leads[1], NOW).score) / 2;
     const s = summarizeLeadStatuses(leads, NOW);
-    expect(s.averageQualityScore).toBeCloseTo(
-      Math.round(expected * 10) / 10,
-      5,
-    );
+    expect(s.averageQualityScore).toBeCloseTo(Math.round(expected * 10) / 10, 5);
   });
 
   it("empty input returns a zero-safe summary with no divide-by-zero", () => {
@@ -158,9 +153,7 @@ describe("summarizeLeadStatuses — determinism and compatibility", () => {
       }),
       lead({ id: "c", status: "closed" }),
     ];
-    expect(summarizeLeadStatuses(leads, NOW)).toEqual(
-      summarizeLeadStatuses(leads, NOW),
-    );
+    expect(summarizeLeadStatuses(leads, NOW)).toEqual(summarizeLeadStatuses(leads, NOW));
   });
 
   it("agrees with recommendNextAction classifications per lead", () => {

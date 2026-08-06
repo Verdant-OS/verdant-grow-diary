@@ -1,10 +1,13 @@
 name: Security regression
 
+# NOTE: `verdant-grow-diary` is this repo's default branch. A `main`-only
+# filter means the workflow never runs (that is how a red secret scan sat
+# unnoticed on the default branch — see zero-defect board).
 on:
   pull_request:
-    branches: [main]
+    branches: [main, verdant-grow-diary]
   push:
-    branches: [main]
+    branches: [main, verdant-grow-diary]
   merge_group:
 
 jobs:
@@ -33,6 +36,8 @@ jobs:
         run: bun run check:supabase-security
       - name: Static client/published secret scan
         run: bun run test:security-static
+      - name: Bridge sensor-ingest trust-chain evidence
+        run: bun run test:bridge-sensor-ingest-evidence
       - name: Gamification direct-insert RLS scan
         run: bun run test:security-gamification
       - name: sensor_readings tent ownership RLS test

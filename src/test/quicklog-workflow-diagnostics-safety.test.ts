@@ -93,6 +93,7 @@ describe("Quick Log workflow diagnostic safety", () => {
 
   it("keeps real-auth Playwright tracing off", () => {
     const config = read("playwright.config.ts");
-    expect(config).toContain('process.env.E2E_TEST_EMAIL ? "off" : "on-first-retry"');
+    expect(config).toMatch(/TRACE_MODE|E2E_TEST_EMAIL/);
+    expect(config).toMatch(/trace:\s*TRACE_MODE|trace:\s*process\.env\.E2E_TEST_EMAIL/);
   });
 });

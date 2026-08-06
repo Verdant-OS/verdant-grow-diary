@@ -152,6 +152,22 @@ describe("local Supabase replay compatibility workspace", () => {
     expect(workflow).toContain('REPLAY_WORKDIR="${RUNNER_TEMP}/verdant-supabase-replay"');
   });
 
+  it("keeps security-db-local job failures visible in the run conclusion", () => {
+    // continue-on-error once rewrote a failing job into a run-level "success"
+    // and masked a base red for a full day (run 30940375065). The lane stays
+    // optional via branch protection (not-required), never via masking.
+    const workflow = readFileSync(SECURITY_DB_WORKFLOW, "utf8");
+    // Strip YAML comments (a `#` at line start or after whitespace), then
+    // reject the token anywhere in what remains. Every valid key spelling —
+    // plain, quoted, or inside a flow mapping — must contain this token in
+    // non-comment text, so none can slip past while comments stay legal.
+    const uncommented = workflow
+      .split(/\r?\n/)
+      .map((line) => line.replace(/(^|\s)#.*$/, "$1"))
+      .join("\n");
+    expect(uncommented).not.toContain("continue-on-error");
+  });
+
   it("runs every local Supabase lifecycle command against the disposable workdir", () => {
     const workflow = readFileSync(SECURITY_DB_WORKFLOW, "utf8");
     const lifecycleCommands = workflow
@@ -243,7 +259,7 @@ describe("local Supabase replay compatibility workspace", () => {
     expect(report).toMatchObject({
       mode: "verify_only",
       compatibility_entry_count: 18,
-      compatibility_patch_count: 2,
+      compatibility_patch_count: 3,
       compatibility_injection_count: 1,
       source_migrations_unchanged: true,
     });

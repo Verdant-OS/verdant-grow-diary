@@ -451,34 +451,37 @@ async function parseBody(req: Request): Promise<ParsedBody> {
   }
   const s = sim as Record<string, unknown>;
   const fn = typeof s.fn === "string" ? s.fn.trim() : "";
-  const metric = typeof s.metric === "string" ? (s.metric as Breach["metric"]) : ("" as Breach["metric"]);
+  const metric =
+    typeof s.metric === "string" ? (s.metric as Breach["metric"]) : ("" as Breach["metric"]);
   if (!fn || fn.length > 128) return { dryRun, error: "invalid_fn" };
   if (!ALLOWED_METRICS.has(metric)) return { dryRun, error: "invalid_metric" };
   const value = typeof s.value === "number" && Number.isFinite(s.value) ? s.value : undefined;
-  const requests = typeof s.requests_in_window === "number" && Number.isFinite(s.requests_in_window)
-    ? s.requests_in_window
-    : undefined;
+  const requests =
+    typeof s.requests_in_window === "number" && Number.isFinite(s.requests_in_window)
+      ? s.requests_in_window
+      : undefined;
   return { dryRun, simulate: { fn, metric, value, requests_in_window: requests } };
 }
 
 function buildSimulatedBreach(spec: SimulateSpec, t: Thresholds): Breach {
-  const defaults: Record<Breach["metric"], { value: number; threshold: number; requests: number }> = {
-    rpc_error_count: {
-      value: Math.max(t.rpcErrorCount, 1),
-      threshold: t.rpcErrorCount,
-      requests: Math.max(t.minRequests, t.rpcErrorCount),
-    },
-    rpc_error_rate: {
-      value: Math.min(1, Math.max(t.rpcErrorRate, 0.01)),
-      threshold: t.rpcErrorRate,
-      requests: Math.max(t.minRequests, 10),
-    },
-    startup_import_failed: {
-      value: Math.max(t.startupFailureCount, 1),
-      threshold: t.startupFailureCount,
-      requests: 1,
-    },
-  };
+  const defaults: Record<Breach["metric"], { value: number; threshold: number; requests: number }> =
+    {
+      rpc_error_count: {
+        value: Math.max(t.rpcErrorCount, 1),
+        threshold: t.rpcErrorCount,
+        requests: Math.max(t.minRequests, t.rpcErrorCount),
+      },
+      rpc_error_rate: {
+        value: Math.min(1, Math.max(t.rpcErrorRate, 0.01)),
+        threshold: t.rpcErrorRate,
+        requests: Math.max(t.minRequests, 10),
+      },
+      startup_import_failed: {
+        value: Math.max(t.startupFailureCount, 1),
+        threshold: t.startupFailureCount,
+        requests: 1,
+      },
+    };
   const d = defaults[spec.metric];
   return {
     fn: spec.fn,

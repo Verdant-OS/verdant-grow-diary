@@ -23,6 +23,7 @@ import {
   type EnvironmentCheckTimelineRawEntry,
 } from "@/lib/environmentCheckTimelineViewModel";
 import { TRAINING_INTENSITIES, TRAINING_TECHNIQUES } from "@/lib/quickLogTypedEventPayloadRules";
+import { repairDiaryNoteSentenceSpacing } from "@/lib/diaryNoteFormatting";
 import {
   celsiusToFahrenheit,
   loadTemperatureUnitPreference,
@@ -30,11 +31,7 @@ import {
 } from "@/lib/temperatureUnitPreference";
 
 export type DiaryCalendarEventKind =
-  | "watering"
-  | "feeding"
-  | "training"
-  | "diagnosis"
-  | "environment";
+  "watering" | "feeding" | "training" | "diagnosis" | "environment";
 
 const ALLOWED_KINDS: ReadonlySet<string> = new Set([
   "watering",
@@ -230,7 +227,9 @@ const NOTE_MAX = 140;
 
 function safeNote(value: unknown): string | null {
   if (typeof value !== "string") return null;
-  const trimmed = value.trim();
+  // Display-only repair of glued sentences in stored notes
+  // ("Watered today.Full watering to runoff") — the row itself stays as-is.
+  const trimmed = repairDiaryNoteSentenceSpacing(value).trim();
   if (!trimmed) return null;
   return trimmed.length > NOTE_MAX ? `${trimmed.slice(0, NOTE_MAX - 1)}…` : trimmed;
 }

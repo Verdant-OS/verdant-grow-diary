@@ -61,12 +61,9 @@ export function buildPiIngestInsertPlan(
   pipelineSuccessResult: PiIngestPipelineResult,
 ): PiIngestInsertPlan {
   if (!isSuccess(pipelineSuccessResult)) {
-    throw new Error(
-      "buildPiIngestInsertPlan requires a successful PiIngestPipelineResult",
-    );
+    throw new Error("buildPiIngestInsertPlan requires a successful PiIngestPipelineResult");
   }
-  const { readingDrafts, idempotencyKeys, ownerUserId, bridgeId, tentId } =
-    pipelineSuccessResult;
+  const { readingDrafts, idempotencyKeys, ownerUserId, bridgeId, tentId } = pipelineSuccessResult;
   if (readingDrafts.length !== idempotencyKeys.length) {
     throw new Error(
       `insert-plan length mismatch: ${readingDrafts.length} drafts vs ${idempotencyKeys.length} keys`,

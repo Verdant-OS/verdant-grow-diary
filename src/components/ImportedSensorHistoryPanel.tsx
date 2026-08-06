@@ -15,7 +15,7 @@
  *   - No writes. No automation. No alerts. No Action Queue.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation } from "@/lib/react-router-compat";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import ImportedSensorHistoryAiDoctorHandoff from "@/components/ImportedSensorHistoryAiDoctorHandoff";

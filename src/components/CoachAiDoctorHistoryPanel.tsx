@@ -6,14 +6,11 @@
  * No writes. No AI re-run. No queue actions.
  */
 import { Stethoscope, ShieldAlert, Info } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  useGrowAiDoctorSessions,
-  type AiDoctorSessionRow,
-} from "@/hooks/use-ai-doctor-sessions";
+import { useGrowAiDoctorSessions, type AiDoctorSessionRow } from "@/hooks/use-ai-doctor-sessions";
 import {
   buildSessionRowCautionIndicator,
   isSessionLimitedContext,
@@ -45,7 +42,6 @@ function HistoryRow({ row }: { row: AiDoctorSessionRow }) {
   const actionCount = Array.isArray(row.suggested_actions) ? row.suggested_actions.length : 0;
   const caution = buildSessionRowCautionIndicator(row);
   const limitedContext = isSessionLimitedContext(row);
-
 
   return (
     <li
@@ -136,10 +132,7 @@ function HistoryRow({ row }: { row: AiDoctorSessionRow }) {
       </div>
 
       {d?.likelyIssue ? (
-        <p
-          className="font-medium leading-snug"
-          data-testid="coach-ai-doctor-history-likely-issue"
-        >
+        <p className="font-medium leading-snug" data-testid="coach-ai-doctor-history-likely-issue">
           {d.likelyIssue}
         </p>
       ) : null}
@@ -152,7 +145,7 @@ function HistoryRow({ row }: { row: AiDoctorSessionRow }) {
         ) : null}
         <Link
           to={`/doctor/sessions/${row.id}`}
-          className="text-primary underline rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="text-primary underline rounded focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
           data-testid="coach-ai-doctor-history-view-link"
           aria-label={`Open AI Doctor session${d?.likelyIssue ? `: ${d.likelyIssue}` : row.created_at ? ` from ${fmtDate(row.created_at)}` : ""}`}
         >
@@ -188,7 +181,7 @@ export default function CoachAiDoctorHistoryPanel({ growId }: Props) {
         </p>
         <Link
           to="/doctor/sessions"
-          className="text-[11px] text-primary underline pt-0.5 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="text-[11px] text-primary underline pt-0.5 rounded focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
           data-testid="coach-ai-doctor-history-view-all-link"
         >
           View all sessions
@@ -196,10 +189,7 @@ export default function CoachAiDoctorHistoryPanel({ growId }: Props) {
       </CardHeader>
       <CardContent className="text-sm">
         {!enabled ? (
-          <p
-            className="text-muted-foreground"
-            data-testid="coach-ai-doctor-history-empty-no-grow"
-          >
+          <p className="text-muted-foreground" data-testid="coach-ai-doctor-history-empty-no-grow">
             Pick a grow to see saved AI Doctor sessions.
           </p>
         ) : isLoading ? (
@@ -225,10 +215,12 @@ export default function CoachAiDoctorHistoryPanel({ growId }: Props) {
             </p>
             <button
               type="button"
-              onClick={() => { void refetch(); }}
+              onClick={() => {
+                void refetch();
+              }}
               disabled={isRefetching}
               data-testid="coach-ai-doctor-history-error-retry"
-              className="inline-flex items-center rounded border bg-background px-2 py-1 text-xs hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+              className="inline-flex items-center rounded border bg-background px-2 py-1 text-xs hover:bg-accent focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
             >
               {isRefetching ? "Retrying…" : "Retry"}
             </button>
@@ -238,9 +230,7 @@ export default function CoachAiDoctorHistoryPanel({ growId }: Props) {
             className="rounded-lg border bg-muted/20 p-3 text-sm space-y-1"
             data-testid="coach-ai-doctor-history-empty"
           >
-            <p className="font-medium text-foreground">
-              No AI Doctor sessions yet.
-            </p>
+            <p className="font-medium text-foreground">No AI Doctor sessions yet.</p>
             <p className="text-xs text-muted-foreground">
               Saved diagnosis snapshots will appear here for you to review before acting.
             </p>

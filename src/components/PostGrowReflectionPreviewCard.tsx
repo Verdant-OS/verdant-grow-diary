@@ -66,7 +66,9 @@ export function PostGrowReflectionPreviewCard({ viewModel }: Props) {
               <div className="text-xs font-medium uppercase text-muted-foreground">
                 Validation options
               </div>
-              <p className="mt-1 text-xs text-muted-foreground">{viewModel.validationOptions.label}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {viewModel.validationOptions.label}
+              </p>
             </div>
           </div>
         )}

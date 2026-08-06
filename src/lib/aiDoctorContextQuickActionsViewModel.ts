@@ -32,8 +32,7 @@ export interface AiDoctorContextQuickActionEventTarget {
 }
 
 export type AiDoctorContextQuickActionTarget =
-  | AiDoctorContextQuickActionLinkTarget
-  | AiDoctorContextQuickActionEventTarget;
+  AiDoctorContextQuickActionLinkTarget | AiDoctorContextQuickActionEventTarget;
 
 export interface AiDoctorContextQuickLogEventPayload {
   plantId: string;

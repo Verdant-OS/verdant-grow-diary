@@ -8,7 +8,7 @@
  * any) posture. The route `kind` is validated against the supported subject-kind
  * union and fails closed for anything else.
  */
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link } from "@/lib/react-router-compat";
 import { ShieldAlert, Loader2, AlertTriangle } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -17,7 +17,11 @@ import { EvidenceStatePill } from "@/components/genetics/EvidenceStatePill";
 import { UnknownStateChip } from "@/components/genetics/UnknownStateChip";
 import { computeEvidence, scopedNegativeCopy } from "@/lib/genetics/screeningEvidenceRules";
 import { geneticsTracePath } from "@/lib/routes";
-import { isSubjectType, traceNodeKindLabel, type SubjectType } from "@/lib/genetics/traceabilityTypes";
+import {
+  isSubjectType,
+  traceNodeKindLabel,
+  type SubjectType,
+} from "@/lib/genetics/traceabilityTypes";
 
 const RESULT_TONE: Record<string, string> = {
   positive: "text-red-300",
@@ -26,7 +30,15 @@ const RESULT_TONE: Record<string, string> = {
   not_tested: "text-white/45",
 };
 
-function UnavailableState({ label, onRetry, testId }: { label: string; onRetry: () => void; testId: string }) {
+function UnavailableState({
+  label,
+  onRetry,
+  testId,
+}: {
+  label: string;
+  onRetry: () => void;
+  testId: string;
+}) {
   return (
     <div
       data-testid={testId}
@@ -115,9 +127,13 @@ export default function ScreeningQuarantineHistory() {
               <EvidenceStatePill
                 state={evidence.state}
                 // Only assert quarantine status when its read succeeded.
-                openQuarantine={quarantine.isSuccess && quarantineRows.some((q) => q.status === "open")}
+                openQuarantine={
+                  quarantine.isSuccess && quarantineRows.some((q) => q.status === "open")
+                }
               />
-              {quarantine.isError ? <UnknownStateChip kind="unknown" label="Quarantine status unavailable" /> : null}
+              {quarantine.isError ? (
+                <UnknownStateChip kind="unknown" label="Quarantine status unavailable" />
+              ) : null}
             </>
           ) : null}
         </div>
@@ -148,7 +164,9 @@ export default function ScreeningQuarantineHistory() {
                 className="rounded-md border border-white/[0.06] bg-[#0f0f0f] p-3 flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center sm:justify-between"
               >
                 <div className="min-w-0">
-                  <span className="block truncate text-sm font-medium text-white/85">{r.target}</span>
+                  <span className="block truncate text-sm font-medium text-white/85">
+                    {r.target}
+                  </span>
                   <span className="text-xs text-white/40 break-words">
                     {r.result === "negative" && r.collectedDate
                       ? scopedNegativeCopy(r.target, r.collectedDate)
@@ -156,7 +174,9 @@ export default function ScreeningQuarantineHistory() {
                     {r.laboratory ? ` · ${r.laboratory}` : ""}
                   </span>
                 </div>
-                <span className={`shrink-0 text-xs font-medium ${RESULT_TONE[r.result] ?? "text-white/50"}`}>
+                <span
+                  className={`shrink-0 text-xs font-medium ${RESULT_TONE[r.result] ?? "text-white/50"}`}
+                >
                   {r.result}
                 </span>
               </li>
@@ -197,7 +217,9 @@ export default function ScreeningQuarantineHistory() {
                   <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[11px] text-white/60">
                     {q.status}
                   </span>
-                  {q.closureKind === "override" ? <UnknownStateChip kind="unknown" label="Override" /> : null}
+                  {q.closureKind === "override" ? (
+                    <UnknownStateChip kind="unknown" label="Override" />
+                  ) : null}
                 </span>
               </li>
             ))}

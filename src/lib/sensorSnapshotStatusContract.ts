@@ -16,16 +16,12 @@
  *  - Presenter-safe labels. No IDs, payloads, tokens, or secrets.
  */
 
+import { DEFAULT_STALE_WINDOW_MS } from "../constants/sensorTiming";
 // ============================================================================
 // Canonical contract (new spec)
 // ============================================================================
 
-export type SnapshotStatus =
-  | "usable"
-  | "stale"
-  | "invalid"
-  | "needs_review"
-  | "no_data";
+export type SnapshotStatus = "usable" | "stale" | "invalid" | "needs_review" | "no_data";
 
 export type SnapshotReason =
   | "fresh_accepted"
@@ -48,7 +44,7 @@ export interface Classification {
 
 // --- Stale-window config ----------------------------------------------------
 
-export const DEFAULT_STALE_WINDOW_MS = 24 * 60 * 60 * 1000;
+export { DEFAULT_STALE_WINDOW_MS };
 
 /**
  * Per-source overrides. Empty by default. Future source adapters can
@@ -95,10 +91,7 @@ function parseDate(v: string | Date | null | undefined): Date | null {
   return Number.isFinite(d.getTime()) ? d : null;
 }
 
-function buildClassification(
-  status: SnapshotStatus,
-  reason: SnapshotReason,
-): Classification {
+function buildClassification(status: SnapshotStatus, reason: SnapshotReason): Classification {
   return {
     status,
     reason,
@@ -142,9 +135,7 @@ export function classifyAuditRow(
     return buildClassification("invalid", reason);
   }
 
-  const rejected = Number(
-    row.rowsRejected !== undefined ? row.rowsRejected : received - accepted,
-  );
+  const rejected = Number(row.rowsRejected !== undefined ? row.rowsRejected : received - accepted);
   if (Number.isFinite(rejected) && rejected > 0) {
     return buildClassification("needs_review", "partial_accept");
   }
@@ -199,9 +190,8 @@ export interface SensorSnapshotStatusResult {
 }
 
 export const DEFAULT_SENSOR_SNAPSHOT_STALE_WINDOW_MS = DEFAULT_STALE_WINDOW_MS;
-export const SENSOR_SNAPSHOT_STALE_WINDOW_OVERRIDES_MS: Readonly<
-  Record<string, number>
-> = Object.freeze({});
+export const SENSOR_SNAPSHOT_STALE_WINDOW_OVERRIDES_MS: Readonly<Record<string, number>> =
+  Object.freeze({});
 
 export interface ResolveStaleWindowArgs {
   source?: string | null;
@@ -209,9 +199,7 @@ export interface ResolveStaleWindowArgs {
   defaultMs?: number;
 }
 
-export function resolveSensorSnapshotStaleWindowMs(
-  args: ResolveStaleWindowArgs = {},
-): number {
+export function resolveSensorSnapshotStaleWindowMs(args: ResolveStaleWindowArgs = {}): number {
   const def = args.defaultMs ?? DEFAULT_STALE_WINDOW_MS;
   const overrides = args.overrides ?? SENSOR_SNAPSHOT_STALE_WINDOW_OVERRIDES_MS;
   const src = (args.source ?? "").toString().trim().toLowerCase();
@@ -256,8 +244,7 @@ export function classifySensorSnapshotStatus(
   }
   const now = input.now ?? new Date();
   const staleMs =
-    input.staleWindowMs ??
-    resolveSensorSnapshotStaleWindowMs({ source: input.source });
+    input.staleWindowMs ?? resolveSensorSnapshotStaleWindowMs({ source: input.source });
   if (now.getTime() - captured.getTime() > staleMs) {
     return { status: "stale", reasonCode: "stale_timestamp" };
   }
@@ -315,12 +302,7 @@ export function classificationFromStatusResult(
   return buildClassification(result.status, reason);
 }
 
-export type SensorSnapshotSeverity =
-  | "ok"
-  | "warning"
-  | "danger"
-  | "unknown"
-  | "empty";
+export type SensorSnapshotSeverity = "ok" | "warning" | "danger" | "unknown" | "empty";
 
 export function mapSensorSnapshotStatusToSeverity(
   status: SensorSnapshotStatus,

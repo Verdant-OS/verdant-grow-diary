@@ -26,7 +26,9 @@ describe("Plants — grow filter", () => {
   });
   it("no ai-coach / device-control / service_role", () => {
     expect(PLANTS).not.toMatch(/ai-coach|ai_coach/);
-    expect(PLANTS).not.toMatch(/mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|webhook|\brelay\b|\bactuator\b|service_role/i);
+    expect(PLANTS).not.toMatch(
+      /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|webhook|\brelay\b|\bactuator\b|service_role/i,
+    );
   });
 });
 
@@ -45,7 +47,9 @@ describe("Tents — grow filter", () => {
   });
   it("no ai-coach / device-control / service_role", () => {
     expect(TENTS).not.toMatch(/ai-coach|ai_coach/);
-    expect(TENTS).not.toMatch(/mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|webhook|\brelay\b|\bactuator\b|service_role/i);
+    expect(TENTS).not.toMatch(
+      /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|webhook|\brelay\b|\bactuator\b|service_role/i,
+    );
   });
 });
 
@@ -69,10 +73,14 @@ const REPO = _rfs(resolve(ROOT, "src/lib/growRepo.ts"), "utf8");
 describe("growRepo — query-level grow filtering", () => {
   it("fetchTents adds .eq('grow_id', growId) when growId provided", () => {
     expect(REPO).toMatch(/fetchTents\(growId\?:\s*string\)/);
-    expect(REPO).toMatch(/if\s*\(\s*growId\s*\)\s*q\s*=\s*q\.eq\(\s*["']grow_id["']\s*,\s*growId\s*\)/);
+    expect(REPO).toMatch(
+      /if\s*\(\s*growId\s*\)\s*q\s*=\s*q\.eq\(\s*["']grow_id["']\s*,\s*growId\s*\)/,
+    );
   });
   it("fetchPlants adds .eq('grow_id', growId) when growId provided", () => {
     expect(REPO).toMatch(/fetchPlants\(\s*tentId\?:\s*string,\s*growId\?:\s*string/);
-    expect(REPO).toMatch(/if\s*\(\s*growId\s*\)\s*q\s*=\s*q\.eq\(\s*["']grow_id["']\s*,\s*growId\s*\)/);
+    expect(REPO).toMatch(
+      /if\s*\(\s*growId\s*\)\s*q\s*=\s*q\.eq\(\s*["']grow_id["']\s*,\s*growId\s*\)/,
+    );
   });
 });

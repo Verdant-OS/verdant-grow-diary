@@ -15,7 +15,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 
 import DashboardZeroTentEmptyState from "@/components/DashboardZeroTentEmptyState";
 import { stripSourceComments } from "./utils/stripSourceComments";

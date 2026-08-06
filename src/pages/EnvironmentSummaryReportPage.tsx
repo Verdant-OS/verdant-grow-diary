@@ -8,7 +8,7 @@
  * network, no Supabase, no analytics SDK.
  */
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams } from "@/lib/react-router-compat";
 import PageHeader from "@/components/PageHeader";
 import EmptyState from "@/components/EmptyState";
 import { Button } from "@/components/ui/button";
@@ -75,12 +75,9 @@ export default function EnvironmentSummaryReportPage() {
   const [startDate, setStartDate] = useState(startParam ?? defaults.startDate);
   const [endDate, setEndDate] = useState(endParam ?? defaults.endDate);
   const [printMode, setPrintMode] = useState<PrintMode>("full_report");
-  const [pendingPrintMode, setPendingPrintMode] = useState<PrintMode | null>(
-    null,
-  );
+  const [pendingPrintMode, setPendingPrintMode] = useState<PrintMode | null>(null);
   const [exportHistoryRefreshKey, setExportHistoryRefreshKey] = useState(0);
   const temperatureUnit = useTemperatureUnitPreference();
-
 
   useEffect(() => {
     if (startParam) setStartDate(startParam);
@@ -92,8 +89,7 @@ export default function EnvironmentSummaryReportPage() {
     loading: entitlementLoading,
     lookupFailed: clientLookupFailed,
   } = useMyEntitlements();
-  const clientIsPremium =
-    !clientLookupFailed && canUseCapability(entitlement, "advancedExports");
+  const clientIsPremium = !clientLookupFailed && canUseCapability(entitlement, "advancedExports");
   // Authoritative gate. The client hint above is presentation-only.
   const serverGate = useEnvironmentSummaryReportServerGate();
 
@@ -129,8 +125,7 @@ export default function EnvironmentSummaryReportPage() {
   );
 
   const selectedIssue =
-    (issueParam && report.topIssues.find((i) => i.ruleId === issueParam)) ||
-    null;
+    (issueParam && report.topIssues.find((i) => i.ruleId === issueParam)) || null;
 
   const relatedChecks = useMemo(() => {
     if (!selectedIssue) return [];
@@ -258,13 +253,8 @@ export default function EnvironmentSummaryReportPage() {
     setParams(next, { replace: true });
   };
 
-
   const drilldownPdfFilename = selectedIssue
-    ? buildEnvironmentSummaryDrilldownPrintFilename(
-        startDate,
-        endDate,
-        selectedIssue.ruleId,
-      )
+    ? buildEnvironmentSummaryDrilldownPrintFilename(startDate, endDate, selectedIssue.ruleId)
     : null;
 
   // ----- Server-authoritative gate -----
@@ -275,12 +265,11 @@ export default function EnvironmentSummaryReportPage() {
     serverGate.status === "allowed" ||
     serverGate.status === "denied" ||
     serverGate.status === "error";
-  const showLocked =
-    serverDecided
-      ? serverGate.status !== "allowed"
-      // While the server is still deciding, fall back to the (non-authoritative)
+  const showLocked = serverDecided
+    ? serverGate.status !== "allowed"
+    : // While the server is still deciding, fall back to the (non-authoritative)
       // client hint to avoid a flash of report content for free users.
-      : !entitlementLoading && !clientLookupFailed && !clientIsPremium;
+      !entitlementLoading && !clientLookupFailed && !clientIsPremium;
 
   if (serverGate.status === "error") {
     return (
@@ -294,10 +283,7 @@ export default function EnvironmentSummaryReportPage() {
           description="Premium report — aggregated greenhouse rule results over a date range."
           icon={<FileBarChart className="h-5 w-5" />}
         />
-        <p
-          className="text-sm text-muted-foreground"
-          data-testid="env-report-server-gate-message"
-        >
+        <p className="text-sm text-muted-foreground" data-testid="env-report-server-gate-message">
           We couldn't verify your plan right now. Nothing was generated. Try the check again in a
           moment.
         </p>
@@ -340,10 +326,7 @@ export default function EnvironmentSummaryReportPage() {
           description="Premium report — aggregated greenhouse rule results over a date range."
           icon={<FileBarChart className="h-5 w-5" />}
         />
-        <p
-          className="text-sm text-muted-foreground"
-          data-testid="env-report-server-gate-message"
-        >
+        <p className="text-sm text-muted-foreground" data-testid="env-report-server-gate-message">
           {lockedMessage}
         </p>
         <PaywallCta vm={vm} data-testid="env-report-paywall" />
@@ -440,10 +423,7 @@ export default function EnvironmentSummaryReportPage() {
           Apply
         </Button>
         {!rangeValid && (
-          <p
-            data-testid="env-report-range-error"
-            className="text-xs text-amber-300"
-          >
+          <p data-testid="env-report-range-error" className="text-xs text-amber-300">
             Start date must be on or before end date.
           </p>
         )}
@@ -491,9 +471,7 @@ export default function EnvironmentSummaryReportPage() {
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <p className="text-xs text-muted-foreground">
-                  {selectedIssue.drilldownLabel}
-                </p>
+                <p className="text-xs text-muted-foreground">{selectedIssue.drilldownLabel}</p>
                 <span
                   className="print-page-indicator print-only text-[10px] uppercase tracking-wider text-muted-foreground"
                   data-testid="env-report-drilldown-page-indicator"
@@ -514,18 +492,12 @@ export default function EnvironmentSummaryReportPage() {
             </div>
 
             <div data-print-issue-card="selected">
-              <EnvironmentIssueDrilldown
-                issue={selectedIssue}
-                relatedChecks={relatedChecks}
-              />
+              <EnvironmentIssueDrilldown issue={selectedIssue} relatedChecks={relatedChecks} />
             </div>
           </div>
         )}
 
-        <p
-          className="text-[11px] text-muted-foreground"
-          data-testid="env-report-safety-footer"
-        >
+        <p className="text-[11px] text-muted-foreground" data-testid="env-report-safety-footer">
           {PRINT_SAFETY_FOOTER}
         </p>
       </div>
@@ -534,8 +506,6 @@ export default function EnvironmentSummaryReportPage() {
         events={exportHistoryEvents}
         onReopen={handleReopenFromHistory}
       />
-
-
 
       <EnvironmentSummaryPrePrintModal
         open={pendingPrintMode !== null}
@@ -547,9 +517,7 @@ export default function EnvironmentSummaryReportPage() {
         generatedAtLabel={printMeta.generatedAtLabel}
         selectedIssueLabel={selectedIssue?.label ?? null}
         selectedIssueRuleId={selectedIssue?.ruleId ?? null}
-        relatedCheckCount={
-          pendingPrintMode === "drilldown" ? relatedChecks.length : undefined
-        }
+        relatedCheckCount={pendingPrintMode === "drilldown" ? relatedChecks.length : undefined}
         onConfirm={handleConfirmPrint}
       />
     </div>

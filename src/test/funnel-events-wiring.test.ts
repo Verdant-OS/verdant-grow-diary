@@ -32,6 +32,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { relative, resolve } from "node:path";
 import { FUNNEL_PARAM_KEYS } from "@/lib/funnelAnalytics";
+import { readAllRouteModuleSources } from "./helpers/routeManifestSyncHarness";
 
 const ROOT = resolve(__dirname, "../..");
 const read = (p: string) => readFileSync(resolve(ROOT, p), "utf8");
@@ -417,7 +418,7 @@ describe("ordering and safety constraints at the seams", () => {
     expect(track).toBeGreaterThan(markerGate);
     expect(consume).toBeGreaterThan(track);
 
-    const app = read("src/App.tsx");
+    const app = readAllRouteModuleSources();
     const shell = read("src/components/AppShell.tsx");
     expect(app).not.toContain("useCheckoutReturnCompletionTracking");
     expect(shell).toMatch(/const \{ status: authStatus \} = useRequireAuth\(signedOutRedirect\)/);

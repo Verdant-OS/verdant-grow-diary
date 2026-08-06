@@ -43,9 +43,7 @@ export function navigateToEvidenceTarget(
   if (!doc) return { ok: false, mode: "none", resolvedId: null };
 
   const safeId = typeof targetId === "string" && targetId.length > 0 ? targetId : null;
-  let el: HTMLElement | null = safeId
-    ? (doc.getElementById(safeId) as HTMLElement | null)
-    : null;
+  let el: HTMLElement | null = safeId ? (doc.getElementById(safeId) as HTMLElement | null) : null;
   let mode: "exact" | "fallback" | "none" = "none";
   if (el) {
     mode = "exact";

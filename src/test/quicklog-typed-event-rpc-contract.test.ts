@@ -12,9 +12,7 @@ type Functions = Database["public"]["Functions"];
 // generated types with the expected argument shape and return type.
 describe("typed event RPC contract", () => {
   it("create_watering_event exists in generated Supabase Functions map", () => {
-    type HasWatering = "create_watering_event" extends keyof Functions
-      ? true
-      : false;
+    type HasWatering = "create_watering_event" extends keyof Functions ? true : false;
     const present: HasWatering = true;
     expect(present).toBe(true);
   });
@@ -60,9 +58,7 @@ describe("typed event RPC contract", () => {
     const obs: HasObs = false;
     const training: HasTraining = false;
     const env: HasEnv = false;
-    expect([feeding, photo, obs, training, env]).toEqual([
-      true, false, false, false, false,
-    ]);
+    expect([feeding, photo, obs, training, env]).toEqual([true, false, false, false, false]);
   });
 });
 

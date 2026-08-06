@@ -98,7 +98,11 @@ export interface BreedingObjectiveTargetEvaluation {
   readonly met: boolean | null;
 }
 
-function compare(comparator: BreedingObjectiveComparator, actual: number, threshold: number): boolean {
+function compare(
+  comparator: BreedingObjectiveComparator,
+  actual: number,
+  threshold: number,
+): boolean {
   return comparator === "gte" ? actual >= threshold : actual <= threshold;
 }
 
@@ -218,7 +222,9 @@ export function summarizeHuntObjectiveCoverage(
 export function availableObjectiveAxes(
   existingTargets: readonly BreedingObjectiveTarget[],
 ): readonly PhenoTraitAxis[] {
-  const used = new Set((Array.isArray(existingTargets) ? existingTargets : []).map((t) => t.axisKey));
+  const used = new Set(
+    (Array.isArray(existingTargets) ? existingTargets : []).map((t) => t.axisKey),
+  );
   return LOUD_TRAIT_AXES.filter((a) => !used.has(a.key));
 }
 

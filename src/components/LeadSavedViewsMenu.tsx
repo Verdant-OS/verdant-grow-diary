@@ -27,13 +27,7 @@ interface Props {
   onDelete: (id: string) => void;
 }
 
-export default function LeadSavedViewsMenu({
-  views,
-  onApply,
-  onSave,
-  onRename,
-  onDelete,
-}: Props) {
+export default function LeadSavedViewsMenu({ views, onApply, onSave, onRename, onDelete }: Props) {
   const [saveOpen, setSaveOpen] = useState(false);
   const [name, setName] = useState("");
   const [renameTarget, setRenameTarget] = useState<LeadSavedView | null>(null);
@@ -155,10 +149,7 @@ export default function LeadSavedViewsMenu({
         </DialogContent>
       </Dialog>
 
-      <Dialog
-        open={renameTarget !== null}
-        onOpenChange={(o) => !o && setRenameTarget(null)}
-      >
+      <Dialog open={renameTarget !== null} onOpenChange={(o) => !o && setRenameTarget(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Rename saved view</DialogTitle>

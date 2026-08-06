@@ -45,25 +45,20 @@ describe("ManualSnapshotTimelineCard edited chip", () => {
     expect(chip.textContent ?? "").toMatch(/Edited\s+/);
     expect(chip.textContent ?? "").toMatch(/2 fields/);
     // Source badge stays MANUAL.
-    expect(
-      getByTestId("manual-snapshot-timeline-card-source").textContent ?? "",
-    ).toMatch(/manual/i);
+    expect(getByTestId("manual-snapshot-timeline-card-source").textContent ?? "").toMatch(
+      /manual/i,
+    );
     // Captured prefix stays visible.
-    expect(
-      getByTestId("manual-snapshot-timeline-card-captured-at").textContent ?? "",
-    ).toMatch(/^Captured:/);
+    expect(getByTestId("manual-snapshot-timeline-card-captured-at").textContent ?? "").toMatch(
+      /^Captured:/,
+    );
   });
 
   it("does not render the chip when editSummary is undefined or count = 0", () => {
-    const { queryByTestId, rerender } = render(
-      <ManualSnapshotTimelineCard card={CARD} />,
-    );
+    const { queryByTestId, rerender } = render(<ManualSnapshotTimelineCard card={CARD} />);
     expect(queryByTestId("manual-snapshot-timeline-card-edited-chip")).toBeNull();
     rerender(
-      <ManualSnapshotTimelineCard
-        card={CARD}
-        editSummary={{ count: 0, lastChangedAt: null }}
-      />,
+      <ManualSnapshotTimelineCard card={CARD} editSummary={{ count: 0, lastChangedAt: null }} />,
     );
     expect(queryByTestId("manual-snapshot-timeline-card-edited-chip")).toBeNull();
   });

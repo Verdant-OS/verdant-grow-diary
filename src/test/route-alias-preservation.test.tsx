@@ -1,13 +1,19 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "@/lib/react-router-compat";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import RouteAliasRedirect from "@/components/RouteAliasRedirect";
 import { buildLegacyStrainSlugAliasTarget, buildRouteAliasTarget } from "@/lib/routeAliasRules";
+import {
+  extractMountedAppRoutePaths,
+  getRouteAliasRedirectTarget,
+  readAllRouteModuleSources,
+  readRouteModuleSourceForPath,
+} from "./helpers/routeManifestSyncHarness";
 
 const ROOT = resolve(__dirname, "../..");
-const APP = readFileSync(resolve(ROOT, "src/App.tsx"), "utf8");
+const APP = readAllRouteModuleSources();
 
 function LocationProbe() {
   const location = useLocation();
@@ -178,37 +184,36 @@ describe("stateful alias wiring", () => {
     { path: "/terms-of-service", to: "/terms" },
     { path: "/privacy-policy", to: "/privacy" },
   ])("routes $path through the query-preserving alias", ({ path, to }) => {
-    const escapedPath = path.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const escapedTarget = to.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
-    expect(APP).toMatch(
-      new RegExp(
-        `path="${escapedPath}"\\s+element=\\{<RouteAliasRedirect\\s+to="${escapedTarget}"\\s*\\/>\\}`,
-      ),
-    );
+    expect(extractMountedAppRoutePaths()).toContain(path);
+    expect(getRouteAliasRedirectTarget(path)).toBe(to);
   });
 
   it("routes login, signup, and register through the shared context-preserving alias", () => {
-    expect(APP).toMatch(/path="\/login"\s+element=\{<RouteAliasRedirect\s+to="\/auth"\s*\/>\}/);
-    expect(APP).toMatch(
-      /path="\/signup"\s+element=\{<RouteAliasRedirect\s+to="\/auth\?mode=signup"\s*\/>\}/,
-    );
-    expect(APP).toMatch(
-      /path="\/register"\s+element=\{<RouteAliasRedirect\s+to="\/auth\?mode=signup"\s*\/>\}/,
-    );
+    expect(extractMountedAppRoutePaths()).toContain("/login");
+    expect(getRouteAliasRedirectTarget("/login")).toBe("/auth");
+    expect(getRouteAliasRedirectTarget("/signup")).toBe("/auth?mode=signup");
+    expect(getRouteAliasRedirectTarget("/register")).toBe("/auth?mode=signup");
   });
 
   it("routes grow-room, tasks, and action-queue through the query-preserving alias", () => {
-    expect(APP).toMatch(/path="\/grow-room"\s+element=\{<RouteAliasRedirect\s+to="\/"\s*\/>\}/);
-    expect(APP).toMatch(/path="\/tasks"\s+element=\{<RouteAliasRedirect\s+to="\/actions"\s*\/>\}/);
-    expect(APP).toMatch(
-      /path="\/action-queue"\s+element=\{<RouteAliasRedirect\s+to="\/actions"\s*\/>\}/,
-    );
+    expect(extractMountedAppRoutePaths()).toContain("/grow-room");
+    expect(getRouteAliasRedirectTarget("/grow-room")).toBe("/");
+    expect(extractMountedAppRoutePaths()).toContain("/tasks");
+    expect(getRouteAliasRedirectTarget("/tasks")).toBe("/actions");
+    expect(extractMountedAppRoutePaths()).toContain("/action-queue");
+    expect(getRouteAliasRedirectTarget("/action-queue")).toBe("/actions");
   });
 
   it("routes a dynamic legacy strain slug through the encoded preserving helper", () => {
-    expect(APP).toMatch(
-      /buildLegacyStrainSlugAliasTarget\(\s*slug,\s*location\.search,\s*location\.hash,?\s*\)/,
+    expect(extractMountedAppRoutePaths()).toContain("/strains/:slug");
+    const mod = readRouteModuleSourceForPath("/strains/:slug") ?? "";
+    expect(mod).toMatch(/LegacyStrainSlugRedirect/);
+    const helper = readFileSync(
+      resolve(ROOT, "src/components/LegacyStrainSlugRedirect.tsx"),
+      "utf8",
+    );
+    expect(helper).toMatch(
+      /buildLegacyStrainSlugAliasTarget\(\s*slug\s*\?\?\s*""\s*,\s*location\.search,\s*location\.hash\s*\)/,
     );
   });
 });

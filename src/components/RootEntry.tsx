@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { useAuth } from "@/store/auth";
 import { resolveRootEntrySurface } from "@/lib/rootEntryRules";
 
@@ -25,16 +25,32 @@ function RootEntryLoader() {
  */
 export default function RootEntry() {
   const { user, loading } = useAuth();
-  const surface = resolveRootEntrySurface({
-    authLoading: loading,
-    hasAuthenticatedUser: Boolean(user),
-  });
+  // The server always renders the "loading" surface (no session on the SSR
+  // pass). A returning grower's cached session can resolve before React's
+  // first client render, which would otherwise commit `landing`/`dashboard`
+  // against server HTML that says `loading`. Staying on the loading surface
+  // until after hydration keeps the first client pass byte-identical to SSR;
+  // the real surface commits on the next render.
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
 
-  if (surface === "loading") return <RootEntryLoader />;
+  const surface = hydrated
+    ? resolveRootEntrySurface({
+        authLoading: loading,
+        hasAuthenticatedUser: Boolean(user),
+      })
+    : "loading";
 
+  // The Suspense boundary is rendered unconditionally so the server ("loading")
+  // and first client pass (session may already be cached) produce the same tree
+  // shape — a conditional boundary here caused a hydration mismatch at `/`.
   return (
     <Suspense fallback={<RootEntryLoader />}>
-      {surface === "landing" ? (
+      {surface === "loading" ? (
+        <RootEntryLoader />
+      ) : surface === "landing" ? (
         <Landing canonicalPath="/" />
       ) : (
         <AppShell>

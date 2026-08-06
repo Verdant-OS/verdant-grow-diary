@@ -48,8 +48,20 @@ function firstPresent(names: string[]): string | null {
 }
 
 function finish(status: Status, lines: string[]): never {
-  console.log(["Pheno paid-smoke — hydration verify", "----------------------------------", ...lines, `Result: ${status}`].join("\n"));
-  const exit = status === "HYDRATED" || status === "SEEDABLE" || status === "SKIPPED" ? 0 : status === "BLOCKED" ? 2 : 1;
+  console.log(
+    [
+      "Pheno paid-smoke — hydration verify",
+      "----------------------------------",
+      ...lines,
+      `Result: ${status}`,
+    ].join("\n"),
+  );
+  const exit =
+    status === "HYDRATED" || status === "SEEDABLE" || status === "SKIPPED"
+      ? 0
+      : status === "BLOCKED"
+        ? 2
+        : 1;
   process.exit(exit);
 }
 
@@ -95,21 +107,28 @@ export interface VerifyOutcome {
 
 /** Pure verifier: runs rows through the real adapter + readiness code. */
 export function verifyComparisonReadyRows(huntId: string, rows: VerifyRows): VerifyOutcome {
-  const scoreByPlantId: Record<string, { traits: Record<string, number> | null; note: string | null }> = {};
+  const scoreByPlantId: Record<
+    string,
+    { traits: Record<string, number> | null; note: string | null }
+  > = {};
   for (const r of rows.scores) {
     if (!r.plant_id || scoreByPlantId[r.plant_id]) continue;
-    const traits = r.traits && typeof r.traits === "object" && !Array.isArray(r.traits)
-      ? (r.traits as Record<string, number>)
-      : null;
+    const traits =
+      r.traits && typeof r.traits === "object" && !Array.isArray(r.traits)
+        ? (r.traits as Record<string, number>)
+        : null;
     scoreByPlantId[r.plant_id] = { traits, note: typeof r.note === "string" ? r.note : null };
   }
-  const smokeTestByPlantId: Record<string, {
-    flavorDescriptors: string[] | null;
-    effectDescriptors: string[] | null;
-    smoothness: number | null;
-    potencyImpression: number | null;
-    verdict: string | null;
-  }> = {};
+  const smokeTestByPlantId: Record<
+    string,
+    {
+      flavorDescriptors: string[] | null;
+      effectDescriptors: string[] | null;
+      smoothness: number | null;
+      potencyImpression: number | null;
+      verdict: string | null;
+    }
+  > = {};
   for (const r of rows.smoke) {
     if (!r.plant_id || smokeTestByPlantId[r.plant_id]) continue;
     smokeTestByPlantId[r.plant_id] = {
@@ -125,13 +144,16 @@ export function verifyComparisonReadyRows(huntId: string, rows: VerifyRows): Ver
     };
   }
   const LAB_RANK: Record<string, number> = { coa: 3, estimate: 2, unspecified: 1 };
-  const labResultByPlantId: Record<string, {
-    thcPct: number | null;
-    cbdPct: number | null;
-    totalCannabinoidsPct: number | null;
-    dominantTerpenes: ReadonlyArray<{ name: string; pct: number | null }> | null;
-    source: "coa" | "estimate" | "unspecified";
-  }> = {};
+  const labResultByPlantId: Record<
+    string,
+    {
+      thcPct: number | null;
+      cbdPct: number | null;
+      totalCannabinoidsPct: number | null;
+      dominantTerpenes: ReadonlyArray<{ name: string; pct: number | null }> | null;
+      source: "coa" | "estimate" | "unspecified";
+    }
+  > = {};
   for (const r of rows.labs) {
     if (!r.plant_id) continue;
     const source: "coa" | "estimate" | "unspecified" =
@@ -140,12 +162,15 @@ export function verifyComparisonReadyRows(huntId: string, rows: VerifyRows): Ver
     if (existing && LAB_RANK[existing.source] >= LAB_RANK[source]) continue;
     const terps = Array.isArray(r.dominant_terpenes)
       ? (r.dominant_terpenes
-          .filter((t: unknown): t is { name: string; pct?: unknown } =>
-            !!t && typeof t === "object" && typeof (t as { name?: unknown }).name === "string")
+          .filter(
+            (t: unknown): t is { name: string; pct?: unknown } =>
+              !!t && typeof t === "object" && typeof (t as { name?: unknown }).name === "string",
+          )
           .map((t) => ({
             name: (t as { name: string }).name,
-            pct: typeof (t as { pct?: unknown }).pct === "number" ? ((t as { pct: number }).pct) : null,
-          }))) as ReadonlyArray<{ name: string; pct: number | null }>
+            pct:
+              typeof (t as { pct?: unknown }).pct === "number" ? (t as { pct: number }).pct : null,
+          })) as ReadonlyArray<{ name: string; pct: number | null }>)
       : null;
     labResultByPlantId[r.plant_id] = {
       thcPct: r.thc_pct,
@@ -223,7 +248,11 @@ async function main() {
   }
   // Refuse hosted hosts.
   let host = "";
-  try { host = new URL(supabaseUrl!).host.toLowerCase(); } catch { /* noop */ }
+  try {
+    host = new URL(supabaseUrl!).host.toLowerCase();
+  } catch {
+    /* noop */
+  }
   if (HOSTED_MARKERS.some((m) => host.endsWith(m))) {
     lines.push(`  FAIL  refused hosted Supabase host`);
     finish("FAIL", lines);
@@ -241,7 +270,10 @@ async function main() {
     .select("id, name, candidate_label, strain, stage, grow_id, tent_id, photo_url, is_archived")
     .eq("pheno_hunt_id", huntId!)
     .eq("is_archived", false);
-  if (plantsError) { lines.push("  FAIL  could not load plants"); finish("FAIL", lines); }
+  if (plantsError) {
+    lines.push("  FAIL  could not load plants");
+    finish("FAIL", lines);
+  }
   const plants = (plantRows ?? []) as VerifyRows["plants"];
   const plantIds = plants.map((p) => p.id);
   if (plantIds.length === 0) {
@@ -250,13 +282,23 @@ async function main() {
   }
 
   const [scoresRes, smokeRes, labsRes] = await Promise.all([
-    db.from("pheno_candidate_scores").select("plant_id, traits, note").eq("hunt_id", huntId!).in("plant_id", plantIds),
-    db.from("pheno_smoke_tests")
-      .select("plant_id, flavor_descriptors, effect_descriptors, smoothness, potency_impression, verdict")
-      .eq("hunt_id", huntId!).in("plant_id", plantIds),
-    db.from("pheno_lab_results")
+    db
+      .from("pheno_candidate_scores")
+      .select("plant_id, traits, note")
+      .eq("hunt_id", huntId!)
+      .in("plant_id", plantIds),
+    db
+      .from("pheno_smoke_tests")
+      .select(
+        "plant_id, flavor_descriptors, effect_descriptors, smoothness, potency_impression, verdict",
+      )
+      .eq("hunt_id", huntId!)
+      .in("plant_id", plantIds),
+    db
+      .from("pheno_lab_results")
       .select("plant_id, source, thc_pct, cbd_pct, total_cannabinoids_pct, dominant_terpenes")
-      .eq("hunt_id", huntId!).in("plant_id", plantIds),
+      .eq("hunt_id", huntId!)
+      .in("plant_id", plantIds),
   ]);
   if (scoresRes.error || smokeRes.error || labsRes.error) {
     lines.push("  FAIL  could not load evidence tables");
@@ -270,7 +312,9 @@ async function main() {
     labs: (labsRes.data ?? []) as VerifyRows["labs"],
   });
 
-  lines.push(`  candidates=${outcome.candidateCount} withExpression=${outcome.candidatesWithExpression} readiness=${outcome.readiness}`);
+  lines.push(
+    `  candidates=${outcome.candidateCount} withExpression=${outcome.candidatesWithExpression} readiness=${outcome.readiness}`,
+  );
   if (outcome.status === "BLOCKED") {
     lines.push(`  BLOCKED  ${outcome.reason ?? "adapter/readiness rejected fixture"}`);
     finish("BLOCKED", lines);
@@ -283,9 +327,13 @@ async function main() {
 const isDirect = (() => {
   try {
     const argv1 = process.argv[1] ?? "";
-    return argv1.endsWith("verify-pheno-paid-smoke-fixtures.ts")
-      || argv1.endsWith("verify-pheno-paid-smoke-fixtures");
-  } catch { return false; }
+    return (
+      argv1.endsWith("verify-pheno-paid-smoke-fixtures.ts") ||
+      argv1.endsWith("verify-pheno-paid-smoke-fixtures")
+    );
+  } catch {
+    return false;
+  }
 })();
 if (isDirect) {
   main().catch((e) => {

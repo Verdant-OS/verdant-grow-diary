@@ -7,6 +7,7 @@ import { useMutation, useQueryClient, type UseMutationResult } from "@tanstack/r
 import type { TablesInsert } from "@/integrations/supabase/types";
 import { insertSensorReading } from "@/lib/growRepo";
 import { isUuid } from "@/lib/isUuid";
+import { validateSensorReadingRange } from "@/lib/sensorReadingRangeValidation";
 
 export type InsertSensorReadingPayload = TablesInsert<"sensor_readings">;
 
@@ -16,6 +17,10 @@ const VALID_METRICS = [
   "vpd_kpa",
   "co2_ppm",
   "soil_moisture_pct",
+  "soil_temp_c",
+  "soil_ec_mscm",
+  "reservoir_ph",
+  "reservoir_ec_mscm",
   "ppfd",
 ] as const;
 
@@ -27,15 +32,25 @@ export function validateSensorReadingPayload(p: InsertSensorReadingPayload): voi
   if (p.user_id !== undefined && !p.user_id) throw new Error("user_id required");
   if (!p.tent_id) throw new Error("tent_id required");
   if (!isUuid(p.tent_id)) {
-    throw new Error(
-      "Select a real tent before saving a manual sensor reading.",
-    );
+    throw new Error("Select a real tent before saving a manual sensor reading.");
   }
   if (!(VALID_METRICS as readonly string[]).includes(p.metric)) {
     throw new Error(`invalid metric: ${p.metric}`);
   }
   const v = Number(p.value);
   if (!Number.isFinite(v)) throw new Error("value must be a finite number");
+
+  // Strong per-metric range + timestamp sanity. Blocking issues throw so bad
+  // data can't reach the DB (and later be interpreted as healthy).
+  const range = validateSensorReadingRange({
+    metric: p.metric,
+    value: v,
+    ts: (p as { ts?: string | number | Date | null }).ts ?? null,
+  });
+  if (!range.ok) {
+    const blocking = range.issues.filter((i) => i.severity === "block");
+    throw new Error(blocking.map((i) => i.message).join(" "));
+  }
 }
 
 export function useInsertSensorReading(): UseMutationResult<

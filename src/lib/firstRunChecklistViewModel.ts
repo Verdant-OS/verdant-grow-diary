@@ -23,11 +23,7 @@
  */
 
 export type FirstRunStepKey =
-  | "create_grow"
-  | "add_tent"
-  | "add_plant"
-  | "first_quick_log"
-  | "first_sensor_snapshot";
+  "create_grow" | "add_tent" | "add_plant" | "first_quick_log" | "first_sensor_snapshot";
 
 export interface FirstRunStep {
   key: FirstRunStepKey;
@@ -78,22 +74,15 @@ export const FIRST_RUN_ROUTES = {
   first_sensor_snapshot: "/sensors",
 } as const;
 
-export const FIRST_RUN_INTRO =
-  "Five short steps to close your first One-Tent Loop in Verdant.";
+export const FIRST_RUN_INTRO = "Five short steps to close your first One-Tent Loop in Verdant.";
 
-export const FIRST_RUN_SAFETY_NOTE =
-  "Sensor snapshots can be manual first — no hardware required.";
+export const FIRST_RUN_SAFETY_NOTE = "Sensor snapshots can be manual first — no hardware required.";
 
-export const FIRST_RUN_COMPLETED_HEADLINE =
-  "Your One-Tent Loop is set up — Verdant is listening.";
+export const FIRST_RUN_COMPLETED_HEADLINE = "Your One-Tent Loop is set up — Verdant is listening.";
 
-export const FIRST_RUN_DISMISS_STORAGE_KEY =
-  "verdant:first-run-checklist-dismissed";
+export const FIRST_RUN_DISMISS_STORAGE_KEY = "verdant:first-run-checklist-dismissed";
 
-function resolveState(
-  complete: boolean,
-  countersAvailable: boolean,
-): FirstRunStep["state"] {
+function resolveState(complete: boolean, countersAvailable: boolean): FirstRunStep["state"] {
   if (complete) return "complete";
   return countersAvailable ? "incomplete" : "recommended";
 }
@@ -105,18 +94,15 @@ export function buildFirstRunChecklistViewModel(
   const tentCount = input.tentCount ?? 0;
   const plantCount = input.plantCount ?? 0;
 
-  const quickLogAvailable =
-    input.quickLogCount !== null && input.quickLogCount !== undefined;
+  const quickLogAvailable = input.quickLogCount !== null && input.quickLogCount !== undefined;
   const sensorAvailable =
-    input.sensorSnapshotCount !== null &&
-    input.sensorSnapshotCount !== undefined;
+    input.sensorSnapshotCount !== null && input.sensorSnapshotCount !== undefined;
 
   const hasGrow = growCount > 0;
   const hasTent = tentCount > 0;
   const hasPlant = plantCount > 0;
   const hasQuickLog = quickLogAvailable && (input.quickLogCount ?? 0) > 0;
-  const hasSensorSnapshot =
-    sensorAvailable && (input.sensorSnapshotCount ?? 0) > 0;
+  const hasSensorSnapshot = sensorAvailable && (input.sensorSnapshotCount ?? 0) > 0;
 
   const steps: FirstRunStep[] = [
     {
@@ -173,17 +159,14 @@ export function buildFirstRunChecklistViewModel(
   const completeCount = steps.filter((s) => s.state === "complete").length;
   const totalCount = steps.length;
   const requiredSteps = steps.filter((s) => s.required);
-  const requiredCompleteCount = requiredSteps.filter(
-    (s) => s.state === "complete",
-  ).length;
+  const requiredCompleteCount = requiredSteps.filter((s) => s.state === "complete").length;
   const requiredTotalCount = requiredSteps.length;
   const isFullyActivated = completeCount === totalCount;
 
   const isDismissed = !!input.isDismissed;
   // Zero-grow override: never hide critical setup if the grower has no grow.
   const zeroGrowOverride = growCount === 0;
-  const isVisible =
-    !isFullyActivated && (zeroGrowOverride || !isDismissed);
+  const isVisible = !isFullyActivated && (zeroGrowOverride || !isDismissed);
   const showRestoreCta = !isFullyActivated && isDismissed && !zeroGrowOverride;
 
   return {

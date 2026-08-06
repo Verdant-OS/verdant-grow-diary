@@ -72,9 +72,9 @@ describe("composeHyperLogNote", () => {
   });
 
   it("composes a defoliate note", () => {
-    expect(
-      composeHyperLogNote("defoliate", { ...EMPTY, defoliateIntensity: "light" }),
-    ).toBe("Defoliated — light");
+    expect(composeHyperLogNote("defoliate", { ...EMPTY, defoliateIntensity: "light" })).toBe(
+      "Defoliated — light",
+    );
   });
 
   it("returns empty for a blank free-form note", () => {

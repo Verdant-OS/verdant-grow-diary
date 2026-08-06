@@ -13,7 +13,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 
 const trackPricingEventMock = vi.fn();
 const trackFunnelEventMock = vi.fn();
@@ -21,9 +21,8 @@ const openCheckoutMock = vi.fn(async () => {});
 const dismissBlockedMock = vi.fn();
 
 vi.mock("@/lib/pricingAnalytics", async () => {
-  const actual = await vi.importActual<typeof import("@/lib/pricingAnalytics")>(
-    "@/lib/pricingAnalytics",
-  );
+  const actual =
+    await vi.importActual<typeof import("@/lib/pricingAnalytics")>("@/lib/pricingAnalytics");
   return {
     ...actual,
     trackPricingEvent: (...args: unknown[]) => trackPricingEventMock(...args),
@@ -31,9 +30,8 @@ vi.mock("@/lib/pricingAnalytics", async () => {
 });
 
 vi.mock("@/lib/funnelAnalytics", async () => {
-  const actual = await vi.importActual<typeof import("@/lib/funnelAnalytics")>(
-    "@/lib/funnelAnalytics",
-  );
+  const actual =
+    await vi.importActual<typeof import("@/lib/funnelAnalytics")>("@/lib/funnelAnalytics");
   return {
     ...actual,
     trackFunnelEvent: (...args: unknown[]) => trackFunnelEventMock(...args),
@@ -130,14 +128,13 @@ describe("Pricing recovery analytics", () => {
 
     fireEvent.click(screen.getByTestId("pricing-checkout-retry"));
 
-    expect(trackPricingEventMock).toHaveBeenCalledWith(
-      "pricing_checkout_recovery_retry",
-      { plan: "pro_annual", source: "recovery_panel" },
-    );
-    expect(trackFunnelEventMock).toHaveBeenCalledWith(
-      "checkout_recovery_retry",
-      { plan: "pro_annual" },
-    );
+    expect(trackPricingEventMock).toHaveBeenCalledWith("pricing_checkout_recovery_retry", {
+      plan: "pro_annual",
+      source: "recovery_panel",
+    });
+    expect(trackFunnelEventMock).toHaveBeenCalledWith("checkout_recovery_retry", {
+      plan: "pro_annual",
+    });
     expect(dismissBlockedMock).toHaveBeenCalledTimes(1);
     expect(openCheckoutMock).toHaveBeenCalledWith({ priceId: "pro_annual" });
   });
@@ -154,10 +151,9 @@ describe("Pricing recovery analytics", () => {
       "pricing_checkout_recovery_choose_another_plan",
       { plan: "craft_annual", source: "recovery_panel" },
     );
-    expect(trackFunnelEventMock).toHaveBeenCalledWith(
-      "checkout_recovery_choose_another_plan",
-      { plan: "craft_annual" },
-    );
+    expect(trackFunnelEventMock).toHaveBeenCalledWith("checkout_recovery_choose_another_plan", {
+      plan: "craft_annual",
+    });
     expect(dismissBlockedMock).toHaveBeenCalledTimes(1);
     expect(openCheckoutMock).not.toHaveBeenCalled();
   });
@@ -170,14 +166,13 @@ describe("Pricing recovery analytics", () => {
 
     fireEvent.click(screen.getByTestId("pricing-checkout-dismiss"));
 
-    expect(trackPricingEventMock).toHaveBeenCalledWith(
-      "pricing_checkout_recovery_dismissed",
-      { plan: "craft_annual", source: "recovery_panel" },
-    );
-    expect(trackFunnelEventMock).toHaveBeenCalledWith(
-      "checkout_recovery_dismissed",
-      { plan: "craft_annual" },
-    );
+    expect(trackPricingEventMock).toHaveBeenCalledWith("pricing_checkout_recovery_dismissed", {
+      plan: "craft_annual",
+      source: "recovery_panel",
+    });
+    expect(trackFunnelEventMock).toHaveBeenCalledWith("checkout_recovery_dismissed", {
+      plan: "craft_annual",
+    });
     expect(dismissBlockedMock).toHaveBeenCalledTimes(1);
     expect(openCheckoutMock).not.toHaveBeenCalled();
   });

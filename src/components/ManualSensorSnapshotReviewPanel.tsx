@@ -10,6 +10,8 @@ import type {
   SensorSnapshotReviewResult,
   SensorSnapshotNormalizedPreview,
 } from "@/lib/sensorSnapshotReviewRules";
+import { fahrenheitToCelsius, getTemperatureUnitSymbol } from "@/lib/temperatureUnitPreference";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 
 interface Props {
   result: SensorSnapshotReviewResult;
@@ -48,6 +50,11 @@ function findingRole(severity: SensorSnapshotReviewFinding["severity"]): string 
 export default function ManualSensorSnapshotReviewPanel({ result }: Props) {
   const { source, confidence, findings, normalizedPreview, canSave } = result;
 
+  // Review runs inside the entry flow, so it must speak the same unit the
+  // air-temp field does.
+  const temperatureUnit = useTemperatureUnitPreference();
+  const temperatureSymbol = getTemperatureUnitSymbol(temperatureUnit);
+
   // Clean state: no blockers, no findings at all → render a compact panel
   // that keeps the mandatory review gate but reduces visual friction for
   // valid manual readings. Never uses "healthy" or "live" language.
@@ -67,17 +74,12 @@ export default function ManualSensorSnapshotReviewPanel({ result }: Props) {
     >
       <CardHeader className="space-y-2">
         <div className="flex flex-wrap items-center gap-2">
-          <h2 className="text-base font-semibold leading-none tracking-tight">
-            Snapshot review
-          </h2>
+          <h2 className="text-base font-semibold leading-none tracking-tight">Snapshot review</h2>
           <Badge variant="outline" data-testid="snapshot-source-chip">
             {source}
           </Badge>
           {!isClean && (
-            <Badge
-              variant={confidenceVariant(confidence)}
-              data-testid="snapshot-confidence-chip"
-            >
+            <Badge variant={confidenceVariant(confidence)} data-testid="snapshot-confidence-chip">
               {confidence} data confidence
             </Badge>
           )}
@@ -85,36 +87,23 @@ export default function ManualSensorSnapshotReviewPanel({ result }: Props) {
         {normalizedPreview.capturedAt ? (
           <p className="text-xs text-muted-foreground">
             Captured at{" "}
-            <span data-testid="snapshot-captured-at">
-              {normalizedPreview.capturedAt}
-            </span>
+            <span data-testid="snapshot-captured-at">{normalizedPreview.capturedAt}</span>
           </p>
         ) : null}
       </CardHeader>
       <CardContent className="space-y-4">
         {isClean ? (
-          <p
-            className="text-sm font-medium"
-            data-testid="snapshot-ready-status"
-          >
+          <p className="text-sm font-medium" data-testid="snapshot-ready-status">
             Ready — this will save as manual data.
           </p>
         ) : (
           <>
-            <p
-              className="text-sm font-medium"
-              data-testid="snapshot-ready-status"
-            >
-              {canSave
-                ? "Ready to save this manual snapshot."
-                : "Fix blockers before saving."}
+            <p className="text-sm font-medium" data-testid="snapshot-ready-status">
+              {canSave ? "Ready to save this manual snapshot." : "Fix blockers before saving."}
             </p>
 
             {findings.length > 0 && (
-              <ul
-                className="space-y-2"
-                data-testid="snapshot-findings"
-              >
+              <ul className="space-y-2" data-testid="snapshot-findings">
                 {findings.map((f) => (
                   <li
                     key={f.key}
@@ -137,15 +126,30 @@ export default function ManualSensorSnapshotReviewPanel({ result }: Props) {
                   className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm"
                   data-testid="snapshot-normalized-preview"
                 >
-                  {presentPreview.map(({ key, label, unit }) => (
-                    <div key={key} className="contents">
-                      <dt className="text-muted-foreground">{label}</dt>
-                      <dd data-testid={`snapshot-preview-${key}`}>
-                        {String(normalizedPreview[key])}
-                        {unit ? ` ${unit}` : ""}
-                      </dd>
-                    </div>
-                  ))}
+                  {presentPreview.map(({ key, label, unit }) => {
+                    // `tempF` is genuinely Fahrenheit here. Show it in the
+                    // grower's saved unit so this pre-save review cannot
+                    // contradict the °C/°F the entry field just used. Value and
+                    // suffix are derived together, so they cannot disagree.
+                    const isTemp = key === "tempF";
+                    const rendered =
+                      isTemp && temperatureUnit === "celsius"
+                        ? String(
+                            Math.round(fahrenheitToCelsius(Number(normalizedPreview[key])) * 10) /
+                              10,
+                          )
+                        : String(normalizedPreview[key]);
+                    const renderedUnit = isTemp ? temperatureSymbol : unit;
+                    return (
+                      <div key={key} className="contents">
+                        <dt className="text-muted-foreground">{label}</dt>
+                        <dd data-testid={`snapshot-preview-${key}`}>
+                          {rendered}
+                          {renderedUnit ? ` ${renderedUnit}` : ""}
+                        </dd>
+                      </div>
+                    );
+                  })}
                 </dl>
               </div>
             )}

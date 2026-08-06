@@ -8,7 +8,7 @@
  */
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { resolveEntitlements } from "@/lib/entitlements";
 
@@ -80,9 +80,7 @@ vi.mock("@/integrations/supabase/client", () => {
     {
       get(target: any, prop) {
         if (prop in target) return target[prop];
-        throw new Error(
-          `Supabase access not allowed in premium gate test: ${String(prop)}`,
-        );
+        throw new Error(`Supabase access not allowed in premium gate test: ${String(prop)}`);
       },
     },
   );
@@ -97,10 +95,7 @@ function renderPage() {
     <QueryClientProvider client={qc}>
       <MemoryRouter initialEntries={["/diary/environment-summary"]}>
         <Routes>
-          <Route
-            path="/diary/environment-summary"
-            element={<EnvironmentSummaryReportPage />}
-          />
+          <Route path="/diary/environment-summary" element={<EnvironmentSummaryReportPage />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -131,9 +126,7 @@ describe("EnvironmentSummaryReportPage — premium gate", () => {
   it("premium user sees the report and Download PDF button once server gate allows", async () => {
     entitlementMock.current = "pro";
     renderPage();
-    expect(
-      await screen.findByTestId("environment-summary-report-page"),
-    ).toBeTruthy();
+    expect(await screen.findByTestId("environment-summary-report-page")).toBeTruthy();
     expect(screen.getByTestId("env-report-range-controls")).toBeTruthy();
     expect(screen.getByTestId("env-report-print-section")).toBeTruthy();
     expect(screen.getByTestId("env-report-download-pdf")).toBeTruthy();

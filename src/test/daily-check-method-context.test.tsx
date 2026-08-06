@@ -14,7 +14,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import {
@@ -54,9 +54,7 @@ describe("shared rules — today's check method", () => {
   it("method = note when only QuickLog today", () => {
     const s = buildDailyGrowCheckConsistency(
       baseConsistency({
-        diaryEntries: [
-          { entry_at: localIso(2026, 4, 24, 10), id: "d1", plant_id: PLANT },
-        ],
+        diaryEntries: [{ entry_at: localIso(2026, 4, 24, 10), id: "d1", plant_id: PLANT }],
       }),
     );
     expect(s.todayMethod).toBe("note");
@@ -66,40 +64,28 @@ describe("shared rules — today's check method", () => {
   it("method = sensor-snapshot when only current-tent manual snapshot today", () => {
     const s = buildDailyGrowCheckConsistency(
       baseConsistency({
-        manualReadings: [
-          { ts: localIso(2026, 4, 24, 10), id: "m1", tent_id: TENT },
-        ],
+        manualReadings: [{ ts: localIso(2026, 4, 24, 10), id: "m1", tent_id: TENT }],
       }),
     );
     expect(s.todayMethod).toBe("sensor-snapshot");
-    expect(formatTodayCheckMethodLabel(s.todayMethod)).toBe(
-      "Checked by sensor snapshot",
-    );
+    expect(formatTodayCheckMethodLabel(s.todayMethod)).toBe("Checked by sensor snapshot");
   });
 
   it("method = both when both QuickLog and snapshot today", () => {
     const s = buildDailyGrowCheckConsistency(
       baseConsistency({
-        diaryEntries: [
-          { entry_at: localIso(2026, 4, 24, 10), id: "d1", plant_id: PLANT },
-        ],
-        manualReadings: [
-          { ts: localIso(2026, 4, 24, 11), id: "m1", tent_id: TENT },
-        ],
+        diaryEntries: [{ entry_at: localIso(2026, 4, 24, 10), id: "d1", plant_id: PLANT }],
+        manualReadings: [{ ts: localIso(2026, 4, 24, 11), id: "m1", tent_id: TENT }],
       }),
     );
     expect(s.todayMethod).toBe("both");
-    expect(formatTodayCheckMethodLabel(s.todayMethod)).toBe(
-      "Checked by note + sensor snapshot",
-    );
+    expect(formatTodayCheckMethodLabel(s.todayMethod)).toBe("Checked by note + sensor snapshot");
   });
 
   it("manual snapshot from a different tent does not count for the plant", () => {
     const s = buildDailyGrowCheckConsistency(
       baseConsistency({
-        manualReadings: [
-          { ts: localIso(2026, 4, 24, 10), id: "m1", tent_id: "other-tent" },
-        ],
+        manualReadings: [{ ts: localIso(2026, 4, 24, 10), id: "m1", tent_id: "other-tent" }],
       }),
     );
     expect(s.todayMethod).toBe("none");
@@ -118,9 +104,7 @@ describe("dashboard panel rules — method exposed per row", () => {
       ],
       tents: [{ id: TENT, name: "Tent A" }],
       manualReadings: [],
-      diaryEntries: [
-        { entry_at: localIso(2026, 4, 24, 10), id: "d1", plant_id: PLANT },
-      ],
+      diaryEntries: [{ entry_at: localIso(2026, 4, 24, 10), id: "d1", plant_id: PLANT }],
     });
     const byId = new Map(panel.rows.map((r) => [r.plantId, r]));
     expect(byId.get(PLANT)?.todayMethod).toBe("note");
@@ -141,9 +125,7 @@ describe("dashboard panel rules — method exposed per row", () => {
       ],
       tents: [{ id: TENT, name: "Tent A" }],
       manualReadings: [],
-      diaryEntries: [
-        { entry_at: localIso(2026, 4, 24, 10), id: "d1", plant_id: PLANT },
-      ],
+      diaryEntries: [{ entry_at: localIso(2026, 4, 24, 10), id: "d1", plant_id: PLANT }],
     });
     // Unchecked Blueberry should come before checked Mango.
     expect(panel.rows[0].plantId).toBe("plant-2");
@@ -167,7 +149,13 @@ vi.mock("@/hooks/useGrowData", () => ({
 vi.mock("@/hooks/use-sensor-readings", () => ({
   useSensorReadings: () => ({
     data: [
-      { id: "m1", ts: localIso(2026, 4, 24, 10), created_at: localIso(2026, 4, 24, 10), tent_id: TENT, source: "manual" },
+      {
+        id: "m1",
+        ts: localIso(2026, 4, 24, 10),
+        created_at: localIso(2026, 4, 24, 10),
+        tent_id: TENT,
+        source: "manual",
+      },
     ],
   }),
 }));
@@ -175,7 +163,13 @@ vi.mock("@/hooks/use-sensor-readings", () => ({
 vi.mock("@/hooks/use-diary-entries", () => ({
   useDiaryEntries: () => ({
     data: [
-      { id: "d1", entry_at: localIso(2026, 4, 24, 9), created_at: localIso(2026, 4, 24, 9), plant_id: PLANT, tent_id: TENT },
+      {
+        id: "d1",
+        entry_at: localIso(2026, 4, 24, 9),
+        created_at: localIso(2026, 4, 24, 9),
+        plant_id: PLANT,
+        tent_id: TENT,
+      },
     ],
   }),
 }));
@@ -205,9 +199,8 @@ beforeEach(() => {
 
 describe("dashboard panel UI — shows method context for checked plants", () => {
   it("renders 'Checked by note + sensor snapshot' for plant with both today", async () => {
-    const { default: DashboardDailyGrowCheckPanel } = await import(
-      "@/components/DashboardDailyGrowCheckPanel"
-    );
+    const { default: DashboardDailyGrowCheckPanel } =
+      await import("@/components/DashboardDailyGrowCheckPanel");
     renderWithProviders(<DashboardDailyGrowCheckPanel scopedGrowId={null} />);
     const rows = screen.getAllByTestId("dashboard-daily-grow-check-panel-row");
     const mangoRow = rows.find((r) => r.getAttribute("data-plant-id") === PLANT)!;
@@ -216,9 +209,8 @@ describe("dashboard panel UI — shows method context for checked plants", () =>
   });
 
   it("Blueberry shares the tent so it's also checked-today (tent-level snapshot)", async () => {
-    const { default: DashboardDailyGrowCheckPanel } = await import(
-      "@/components/DashboardDailyGrowCheckPanel"
-    );
+    const { default: DashboardDailyGrowCheckPanel } =
+      await import("@/components/DashboardDailyGrowCheckPanel");
     renderWithProviders(<DashboardDailyGrowCheckPanel scopedGrowId={null} />);
     const rows = screen.getAllByTestId("dashboard-daily-grow-check-panel-row");
     const blueberry = rows.find((r) => r.getAttribute("data-plant-id") === "plant-2")!;
@@ -228,16 +220,13 @@ describe("dashboard panel UI — shows method context for checked plants", () =>
     const actions = screen.queryAllByTestId("dashboard-daily-grow-check-panel-row-actions");
     // No unchecked rows → no quick-actions rendered.
     expect(actions).toHaveLength(0);
-
   });
-
 });
 
 describe("plant detail card UI — shows method context for today", () => {
   it("renders method label when checked today", async () => {
-    const { default: PlantDailyGrowCheckConsistencyCard } = await import(
-      "@/components/PlantDailyGrowCheckConsistencyCard"
-    );
+    const { default: PlantDailyGrowCheckConsistencyCard } =
+      await import("@/components/PlantDailyGrowCheckConsistencyCard");
     renderWithProviders(
       <PlantDailyGrowCheckConsistencyCard plantId={PLANT} currentTentId={TENT} />,
     );
@@ -267,23 +256,22 @@ describe("safety — no forbidden wording or unsafe surfaces", () => {
   it.each(files)("%s — no forbidden wording (perfect / completed / guaranteed healthy)", (rel) => {
     const txt = readSrc(rel).toLowerCase();
     // Strip jsdoc/line comments so contract docs don't trigger.
-    const stripped = txt
-      .replace(/\/\*[\s\S]*?\*\//g, "")
-      .replace(/^\s*\/\/.*$/gm, "");
+    const stripped = txt.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
     expect(stripped).not.toMatch(/\bperfect\b/);
     expect(stripped).not.toMatch(/\bguaranteed healthy\b/);
     expect(stripped).not.toMatch(/grow completed/);
   });
 
-  it.each(files)("%s — no new persistence / RPC / sensor ingestion / action_queue / automation / service_role", (rel) => {
-    const txt = readSrc(rel);
-    const stripped = txt
-      .replace(/\/\*[\s\S]*?\*\//g, "")
-      .replace(/^\s*\/\/.*$/gm, "");
-    expect(stripped).not.toMatch(/service_role/);
-    expect(stripped).not.toMatch(/\.rpc\(/);
-    expect(stripped).not.toMatch(/sensor_readings.*\.insert\(/);
-    expect(stripped).not.toMatch(/action_queue.*\.insert\(/);
-    expect(stripped).not.toMatch(/device_control/);
-  });
+  it.each(files)(
+    "%s — no new persistence / RPC / sensor ingestion / action_queue / automation / service_role",
+    (rel) => {
+      const txt = readSrc(rel);
+      const stripped = txt.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+      expect(stripped).not.toMatch(/service_role/);
+      expect(stripped).not.toMatch(/\.rpc\(/);
+      expect(stripped).not.toMatch(/sensor_readings.*\.insert\(/);
+      expect(stripped).not.toMatch(/action_queue.*\.insert\(/);
+      expect(stripped).not.toMatch(/device_control/);
+    },
+  );
 });

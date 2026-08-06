@@ -25,7 +25,10 @@ const FORBIDDEN_PATTERNS: Array<[RegExp, string]> = [
   // Device control / automation execution language. The rules module is
   // allowed to *name* these patterns in its block list, so we look for verbs
   // that imply execution rather than mere naming.
-  [/turn(On|Off)Device|controlDevice|executeDeviceCommand|dispatchActuator|engageAutopilot|startAutomation/i, "device control execution"],
+  [
+    /turn(On|Off)Device|controlDevice|executeDeviceCommand|dispatchActuator|engageAutopilot|startAutomation/i,
+    "device control execution",
+  ],
 ];
 
 describe("csv import planning — static safety scanner", () => {
@@ -33,10 +36,7 @@ describe("csv import planning — static safety scanner", () => {
     it(`${rel} contains no forbidden write/IO patterns`, () => {
       const src = readFileSync(resolve(process.cwd(), rel), "utf8");
       for (const [pat, label] of FORBIDDEN_PATTERNS) {
-        expect(
-          pat.test(src),
-          `${rel} unexpectedly matched ${label} via ${pat}`,
-        ).toBe(false);
+        expect(pat.test(src), `${rel} unexpectedly matched ${label} via ${pat}`).toBe(false);
       }
     });
   }

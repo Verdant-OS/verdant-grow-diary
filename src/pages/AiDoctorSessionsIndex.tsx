@@ -11,7 +11,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "@/lib/react-router-compat";
 import {
   Stethoscope,
   Link2,
@@ -297,7 +297,7 @@ function IndexRow({
         </div>
         <Link
           to={`/doctor/sessions/${row.id}`}
-          className="inline-flex w-fit shrink-0 rounded text-primary underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="inline-flex w-fit shrink-0 rounded text-primary underline underline-offset-4 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
           data-testid="ai-doctor-sessions-index-view-link"
           aria-label={`View AI Doctor session${d?.likelyIssue ? `: ${d.likelyIssue}` : row.created_at ? ` from ${fmtDate(row.created_at)}` : ""}`}
         >
@@ -841,7 +841,7 @@ export default function AiDoctorSessionsIndex() {
                   </Button>
                   <button
                     type="button"
-                    className="inline-flex items-center rounded-full border bg-muted px-2 py-0.5 text-[11px] text-muted-foreground hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                    className="inline-flex items-center rounded-full border bg-muted px-2 py-0.5 text-[11px] text-muted-foreground hover:bg-accent hover:text-accent-foreground focus:outline-hidden focus:ring-2 focus:ring-ring"
                     data-testid="ai-doctor-sessions-index-needs-follow-up-visible-chip"
                     title="Show built-in Needs follow-up view · visible count only"
                     aria-label={formatNeedsFollowUpVisibleLabel(needsFollowUpVisible)}
@@ -1185,7 +1185,7 @@ export default function AiDoctorSessionsIndex() {
                     }}
                     disabled={isRefetching}
                     data-testid="ai-doctor-sessions-index-error-retry"
-                    className="focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                    className="focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-hidden"
                   >
                     {isRefetching ? "Retrying…" : "Retry"}
                   </Button>
@@ -1205,7 +1205,7 @@ export default function AiDoctorSessionsIndex() {
                       size="sm"
                       onClick={clearFilters}
                       data-testid="ai-doctor-sessions-index-empty-filtered-clear"
-                      className="focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                      className="focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-hidden"
                     >
                       Clear filters
                     </Button>

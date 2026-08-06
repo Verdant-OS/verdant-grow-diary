@@ -68,6 +68,13 @@ describe("buildWateringHistory", () => {
     expect(buildWateringHistory(normalize([]))).toEqual([]);
   });
 
+  it("repairs glued sentences in the note preview (audit #11 display artifact)", () => {
+    const rows = buildWateringHistory(
+      normalize([{ ...validWatering, note: "Watered today.Full watering to runoff" }]),
+    );
+    expect(rows[0].notePreview).toBe("Watered today. Full watering to runoff");
+  });
+
   it("non-watering entries are excluded", () => {
     const notes = {
       ...validWatering,

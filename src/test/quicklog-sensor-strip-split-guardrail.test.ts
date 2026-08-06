@@ -57,9 +57,7 @@ describe("QuickLog publish-slice split guardrail", () => {
     ];
     // Find every localStorage call site and inspect the surrounding 120 chars
     // for forbidden keywords.
-    const sites = [
-      ...scrubbed.matchAll(/localStorage\.(getItem|setItem|removeItem)\s*\([^)]*\)/g),
-    ];
+    const sites = [...scrubbed.matchAll(/localStorage\.(getItem|setItem|removeItem)\s*\([^)]*\)/g)];
     expect(sites.length).toBeGreaterThan(0);
     for (const m of sites) {
       const start = Math.max(0, (m.index ?? 0) - 120);
@@ -89,5 +87,4 @@ describe("QuickLog publish-slice split guardrail", () => {
     expect(QL).not.toMatch(/\.rpc\(/);
     expect(QL).not.toMatch(/live updating/i);
   });
-
 });

@@ -21,7 +21,7 @@ export interface PostGrowReflectionAdapterRequest {
   prompt: string;
   validationOptions: Required<PostGrowReflectionValidationOptions>;
   metadata: {
-    sensorCoveragePct: number;
+    sensorCoveragePct: number | null;
     knownGapCount: number;
     eventCount: number;
     sourceTags: string[];
@@ -94,7 +94,10 @@ export function adaptPostGrowReflectionCandidate(input: {
   const request = buildPostGrowReflectionAdapterRequest(input.context, {
     minEvidenceReferences: input.minEvidenceReferences,
   });
-  const validation = validatePostGrowReflectionOutput(input.candidate.rawOutput, request.validationOptions);
+  const validation = validatePostGrowReflectionOutput(
+    input.candidate.rawOutput,
+    request.validationOptions,
+  );
 
   if (!validation.ok) {
     return {

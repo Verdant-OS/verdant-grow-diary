@@ -11,7 +11,7 @@
  * the App.tsx level, so this component never re-checks entitlement.
  */
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { AlertCircle, ArrowUpRight, Loader2, Sprout } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import PageHeader from "@/components/PageHeader";

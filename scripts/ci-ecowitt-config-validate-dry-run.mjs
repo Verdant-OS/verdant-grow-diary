@@ -13,13 +13,7 @@
  * never echoes tent UUIDs or bridge tokens beyond checking for their absence.
  */
 import { spawnSync } from "node:child_process";
-import {
-  readFileSync,
-  readdirSync,
-  existsSync,
-  mkdtempSync,
-  rmSync,
-} from "node:fs";
+import { readFileSync, readdirSync, existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -50,11 +44,11 @@ function runDryRun(env, extraArgs = []) {
     HOME: process.env.HOME ?? "",
     ...env,
   };
-  const r = spawnSync(
-    "bun",
-    ["run", BRIDGE, "config", "validate", "--dry-run", ...extraArgs],
-    { encoding: "utf8", env: cleanEnv, timeout: 20_000 },
-  );
+  const r = spawnSync("bun", ["run", BRIDGE, "config", "validate", "--dry-run", ...extraArgs], {
+    encoding: "utf8",
+    env: cleanEnv,
+    timeout: 20_000,
+  });
   return { status: r.status, stdout: r.stdout ?? "", stderr: r.stderr ?? "" };
 }
 
@@ -63,7 +57,11 @@ function jsonLines(text) {
   for (const line of text.split(/\r?\n/)) {
     const t = line.trim();
     if (!t.startsWith("{")) continue;
-    try { out.push(JSON.parse(t)); } catch { /* ignore */ }
+    try {
+      out.push(JSON.parse(t));
+    } catch {
+      /* ignore */
+    }
   }
   return out;
 }
@@ -84,7 +82,9 @@ function collectSecrets(env) {
       const u = new URL(env.VERDANT_INGEST_URL);
       // Path is the sensitive part (project ref lives in the host too).
       if (u.pathname && u.pathname !== "/") secrets.add(u.pathname);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
   return [...secrets];
 }
@@ -126,15 +126,10 @@ for (const file of files) {
   check("stdout has config_ok", !!ok);
   check("stdout has config_effective", !!eff);
   check("effective envelope marked dry_run:true", eff?.dry_run === true);
-  check(
-    "no stderr config_error",
-    !r.stderr.includes('"event":"config_error"'),
-  );
+  check("no stderr config_error", !r.stderr.includes('"event":"config_error"'));
   check(
     "no mqtt import / network attempt",
-    !/ECONNREFUSED|mqtt_connected|Cannot find module 'mqtt'/i.test(
-      r.stdout + r.stderr,
-    ),
+    !/ECONNREFUSED|mqtt_connected|Cannot find module 'mqtt'/i.test(r.stdout + r.stderr),
   );
 
   // Redaction invariant: no raw secret from the env may appear in output.
@@ -175,7 +170,11 @@ console.log(`\n[dry-run --out] round-trip on ${files[0]}`);
       const fileText = readFileSync(outPath, "utf8");
       check("file ends with newline", fileText.endsWith("\n"));
       let parsed = null;
-      try { parsed = JSON.parse(fileText.trim()); } catch { /* handled below */ }
+      try {
+        parsed = JSON.parse(fileText.trim());
+      } catch {
+        /* handled below */
+      }
       check("file is valid JSON", parsed !== null);
       check(
         "file matches stdout config_effective envelope exactly",
@@ -203,11 +202,11 @@ console.log("\n[--out without --dry-run] rejects with out_flag_requires_dry_run"
   const outPath = join(tmp, "should-not-be-written.json");
   try {
     const cleanEnv = { PATH: process.env.PATH ?? "", HOME: process.env.HOME ?? "", ...env };
-    const r = spawnSync(
-      "bun",
-      ["run", BRIDGE, "config", "validate", `--out=${outPath}`],
-      { encoding: "utf8", env: cleanEnv, timeout: 20_000 },
-    );
+    const r = spawnSync("bun", ["run", BRIDGE, "config", "validate", `--out=${outPath}`], {
+      encoding: "utf8",
+      env: cleanEnv,
+      timeout: 20_000,
+    });
     const errLine = (r.stderr ?? "")
       .split(/\r?\n/)
       .filter((l) => l.trim().startsWith("{"))

@@ -27,9 +27,8 @@ const PAGE = readSrc("pages/Leads.tsx") + "\n" + readLeadDetailDrawerBundle();
 const HOOK = readSrc("hooks/useLeadsList.ts");
 const EVENTS_HOOK = readSrc("hooks/useLeadEvents.ts");
 
-const leadEventsPolicies = (
-  migrationContents.match(/CREATE POLICY[^;]*ON\s+public\.lead_events[^;]*;/gi) ?? []
-);
+const leadEventsPolicies =
+  migrationContents.match(/CREATE POLICY[^;]*ON\s+public\.lead_events[^;]*;/gi) ?? [];
 
 describe("lead_events migration", () => {
   it("creates the public.lead_events table", () => {
@@ -115,9 +114,7 @@ describe("status-change trigger captures old_status and new_status", () => {
 
   it("inserts into lead_events with OLD.status and NEW.status on change", () => {
     const fn =
-      migrationContents.match(
-        /FUNCTION\s+public\.log_lead_status_change[\s\S]*?\$\$;/i,
-      )?.[0] ?? "";
+      migrationContents.match(/FUNCTION\s+public\.log_lead_status_change[\s\S]*?\$\$;/i)?.[0] ?? "";
     expect(fn).toMatch(/INSERT\s+INTO\s+public\.lead_events/i);
     expect(fn).toMatch(/OLD\.status/);
     expect(fn).toMatch(/NEW\.status/);
@@ -169,8 +166,7 @@ describe("updateLead enforces immutable submission fields", () => {
     expect(HOOK).toMatch(/"contacted_at"/);
     expect(HOOK).toMatch(/"follow_up_at"/);
     // Submission fields must not appear in the allow-list literal.
-    const allowBlock =
-      HOOK.match(/const ALLOWED\s*=\s*\[[\s\S]*?\]\s+as const;/)?.[0] ?? "";
+    const allowBlock = HOOK.match(/const ALLOWED\s*=\s*\[[\s\S]*?\]\s+as const;/)?.[0] ?? "";
     for (const forbidden of [
       "email",
       "name",

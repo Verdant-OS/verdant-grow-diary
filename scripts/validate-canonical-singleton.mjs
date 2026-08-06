@@ -79,9 +79,7 @@ export function validateDocument({ file, html, distDir, isSpaFallback = false })
   }
 
   if (tags.length > 1) {
-    push(
-      `document declares ${tags.length} <link rel="canonical"> tags; exactly one is required`,
-    );
+    push(`document declares ${tags.length} <link rel="canonical"> tags; exactly one is required`);
     return issues;
   }
 

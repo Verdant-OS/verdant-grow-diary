@@ -13,20 +13,14 @@ import {
 
 describe("AI_DOCTOR_PHASE1_FOCUS_VISIBLE_LINK_CLASSES", () => {
   it("includes the expected focus-visible ring tokens", () => {
-    expect(AI_DOCTOR_PHASE1_FOCUS_VISIBLE_LINK_CLASSES).toMatch(
-      /\bfocus-visible:outline-none\b/,
-    );
-    expect(AI_DOCTOR_PHASE1_FOCUS_VISIBLE_LINK_CLASSES).toMatch(
-      /\bfocus-visible:ring-2\b/,
-    );
-    expect(AI_DOCTOR_PHASE1_FOCUS_VISIBLE_LINK_CLASSES).toMatch(
-      /\bfocus-visible:ring-offset-2\b/,
-    );
+    expect(AI_DOCTOR_PHASE1_FOCUS_VISIBLE_LINK_CLASSES).toMatch(/\bfocus-visible:outline-hidden\b/);
+    expect(AI_DOCTOR_PHASE1_FOCUS_VISIBLE_LINK_CLASSES).toMatch(/\bfocus-visible:ring-2\b/);
+    expect(AI_DOCTOR_PHASE1_FOCUS_VISIBLE_LINK_CLASSES).toMatch(/\bfocus-visible:ring-offset-2\b/);
   });
 
   it("never hides outlines without a focus replacement", () => {
     expect(AI_DOCTOR_PHASE1_FOCUS_VISIBLE_LINK_CLASSES).not.toMatch(
-      /\boutline-none\b(?!.*focus-visible:ring)/,
+      /\boutline-hidden\b(?!.*focus-visible:ring)/,
     );
   });
 });
@@ -41,9 +35,7 @@ describe("AI_DOCTOR_PHASE1_SKIP_LINK_CLASSES", () => {
   it("uses sr-only with focus-visible override and shared focus ring", () => {
     expect(AI_DOCTOR_PHASE1_SKIP_LINK_CLASSES).toMatch(/\bsr-only\b/);
     expect(AI_DOCTOR_PHASE1_SKIP_LINK_CLASSES).toMatch(/\bfocus:not-sr-only\b/);
-    expect(AI_DOCTOR_PHASE1_SKIP_LINK_CLASSES).toMatch(
-      /\bfocus-visible:ring-2\b/,
-    );
+    expect(AI_DOCTOR_PHASE1_SKIP_LINK_CLASSES).toMatch(/\bfocus-visible:ring-2\b/);
   });
 });
 
@@ -61,17 +53,12 @@ describe("aiDoctorPhase1InteractiveClassName", () => {
   });
 
   it("ignores empty/whitespace extras safely", () => {
-    expect(aiDoctorPhase1InteractiveClassName("   ")).toBe(
-      aiDoctorPhase1InteractiveClassName(),
-    );
+    expect(aiDoctorPhase1InteractiveClassName("   ")).toBe(aiDoctorPhase1InteractiveClassName());
   });
 });
 
 describe("static safety — aiDoctorPhase1A11yClassNames", () => {
-  const SRC = readFileSync(
-    resolve(__dirname, "../lib/aiDoctorPhase1A11yClassNames.ts"),
-    "utf8",
-  );
+  const SRC = readFileSync(resolve(__dirname, "../lib/aiDoctorPhase1A11yClassNames.ts"), "utf8");
 
   it("no Supabase/fetch/model/write/device-control surface", () => {
     expect(SRC).not.toMatch(/from\s+["']@\/integrations\/supabase/);

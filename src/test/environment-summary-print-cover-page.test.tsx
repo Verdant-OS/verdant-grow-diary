@@ -31,25 +31,21 @@ describe("EnvironmentSummaryPrintCoverPage", () => {
       />,
     );
     expect(screen.getByText("Environment Summary Report")).toBeTruthy();
-    expect(
-      screen.getByTestId("env-report-print-cover-page-grower").textContent,
-    ).toBe("Grower not specified");
-    expect(
-      screen.getByTestId("env-report-print-cover-page-greenhouse").textContent,
-    ).toBe("Greenhouse not specified");
-    expect(
-      screen.getByTestId("env-report-print-cover-page-range").textContent,
-    ).toBe("2026-06-01 — 2026-06-07");
-    expect(
-      screen.getByTestId("env-report-print-cover-page-generated").textContent,
-    ).toBe("2026-06-08T12:00:00.000Z");
-    const topIssues = screen.getByTestId(
-      "env-report-print-cover-page-top-issues",
+    expect(screen.getByTestId("env-report-print-cover-page-grower").textContent).toBe(
+      "Grower not specified",
     );
+    expect(screen.getByTestId("env-report-print-cover-page-greenhouse").textContent).toBe(
+      "Greenhouse not specified",
+    );
+    expect(screen.getByTestId("env-report-print-cover-page-range").textContent).toBe(
+      "2026-06-01 — 2026-06-07",
+    );
+    expect(screen.getByTestId("env-report-print-cover-page-generated").textContent).toBe(
+      "2026-06-08T12:00:00.000Z",
+    );
+    const topIssues = screen.getByTestId("env-report-print-cover-page-top-issues");
     expect(topIssues.textContent).toMatch(/source/i);
-    const safety = screen.getByTestId(
-      "env-report-print-cover-page-safety",
-    );
+    const safety = screen.getByTestId("env-report-print-cover-page-safety");
     expect(safety.textContent ?? "").toMatch(/Read-only/);
     expect(safety.textContent ?? "").toMatch(/no device control/i);
   });
@@ -64,12 +60,8 @@ describe("EnvironmentSummaryPrintCoverPage", () => {
         report={buildReport()}
       />,
     );
-    expect(
-      screen.getByTestId("env-report-print-cover-page-grower").textContent,
-    ).toBe("Ada");
-    expect(
-      screen.getByTestId("env-report-print-cover-page-greenhouse").textContent,
-    ).toBe("Tent A");
+    expect(screen.getByTestId("env-report-print-cover-page-grower").textContent).toBe("Ada");
+    expect(screen.getByTestId("env-report-print-cover-page-greenhouse").textContent).toBe("Tent A");
   });
 
   it("shows selected issue label in drilldown mode", () => {
@@ -82,9 +74,9 @@ describe("EnvironmentSummaryPrintCoverPage", () => {
         selectedIssueLabel="Source review required"
       />,
     );
-    expect(
-      screen.getByTestId("env-report-print-cover-page-issue").textContent,
-    ).toBe("Source review required");
+    expect(screen.getByTestId("env-report-print-cover-page-issue").textContent).toBe(
+      "Source review required",
+    );
   });
 
   it("applies print typography classes for cover title/subtitle/meta/safety", () => {

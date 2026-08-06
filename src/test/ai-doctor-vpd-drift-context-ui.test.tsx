@@ -23,9 +23,7 @@ import {
 import AiDoctorVpdDriftSection from "@/components/AiDoctorVpdDriftSection";
 import type { AiDoctorVpdDriftContext } from "@/lib/vpdDriftRules";
 
-function ctx(
-  overrides: Partial<AiDoctorVpdDriftContext> = {},
-): AiDoctorVpdDriftContext {
+function ctx(overrides: Partial<AiDoctorVpdDriftContext> = {}): AiDoctorVpdDriftContext {
   return {
     classification: "in_band",
     ewmaKpa: 1.05,
@@ -41,9 +39,7 @@ function ctx(
 
 describe("buildAiDoctorVpdDriftSectionViewModel", () => {
   it("returns invisible view-model when vpdDrift is missing", () => {
-    expect(buildAiDoctorVpdDriftSectionViewModel(undefined).visible).toBe(
-      false,
-    );
+    expect(buildAiDoctorVpdDriftSectionViewModel(undefined).visible).toBe(false);
     expect(buildAiDoctorVpdDriftSectionViewModel(null).visible).toBe(false);
   });
 
@@ -114,10 +110,7 @@ describe("buildAiDoctorVpdDriftSectionViewModel", () => {
         "dehumidif",
         "humidifier",
       ]) {
-        expect(
-          blob.includes(banned),
-          `unexpected term "${banned}" in: ${blob}`,
-        ).toBe(false);
+        expect(blob.includes(banned), `unexpected term "${banned}" in: ${blob}`).toBe(false);
       }
     }
   });
@@ -155,9 +148,7 @@ describe("AiDoctorVpdDriftSection (UI)", () => {
 
   it("shows current kPa and target band when available", () => {
     render(<AiDoctorVpdDriftSection vpdDrift={ctx()} />);
-    expect(screen.getByTestId("ai-doctor-vpd-drift-section-current")).toHaveTextContent(
-      "1.05 kPa",
-    );
+    expect(screen.getByTestId("ai-doctor-vpd-drift-section-current")).toHaveTextContent("1.05 kPa");
     expect(screen.getByTestId("ai-doctor-vpd-drift-section-band")).toHaveTextContent(
       "0.80–1.20 kPa",
     );
@@ -165,9 +156,7 @@ describe("AiDoctorVpdDriftSection (UI)", () => {
 
   it("shows insufficient-data copy when classification is insufficient", () => {
     render(
-      <AiDoctorVpdDriftSection
-        vpdDrift={ctx({ classification: "insufficient", ewmaKpa: null })}
-      />,
+      <AiDoctorVpdDriftSection vpdDrift={ctx({ classification: "insufficient", ewmaKpa: null })} />,
     );
     expect(screen.getByTestId("ai-doctor-vpd-drift-section-primary")).toHaveTextContent(
       VPD_DRIFT_INSUFFICIENT_COPY,
@@ -206,14 +195,8 @@ describe("AiDoctorVpdDriftSection (UI)", () => {
 });
 
 describe("Static safety — VPD Drift context UI", () => {
-  const VIEW_MODEL_PATH = path.resolve(
-    __dirname,
-    "../lib/aiDoctorVpdDriftContextViewModel.ts",
-  );
-  const SECTION_PATH = path.resolve(
-    __dirname,
-    "../components/AiDoctorVpdDriftSection.tsx",
-  );
+  const VIEW_MODEL_PATH = path.resolve(__dirname, "../lib/aiDoctorVpdDriftContextViewModel.ts");
+  const SECTION_PATH = path.resolve(__dirname, "../components/AiDoctorVpdDriftSection.tsx");
   const VM_SRC = fs.readFileSync(VIEW_MODEL_PATH, "utf-8");
   const UI_SRC = fs.readFileSync(SECTION_PATH, "utf-8");
 
@@ -229,17 +212,13 @@ describe("Static safety — VPD Drift context UI", () => {
 
   it("view-model has no I/O or automation strings", () => {
     for (const [name, re] of BANNED) {
-      expect(re.test(VM_SRC), `view-model contains banned term: ${name}`).toBe(
-        false,
-      );
+      expect(re.test(VM_SRC), `view-model contains banned term: ${name}`).toBe(false);
     }
   });
 
   it("presenter has no I/O or automation strings", () => {
     for (const [name, re] of BANNED) {
-      expect(re.test(UI_SRC), `presenter contains banned term: ${name}`).toBe(
-        false,
-      );
+      expect(re.test(UI_SRC), `presenter contains banned term: ${name}`).toBe(false);
     }
   });
 

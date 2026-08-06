@@ -19,10 +19,7 @@ export const VERDANT_GENETICS_SOURCE_TAG = "csv" as const;
 export const VERDANT_GENETICS_SOURCE_APP = "verdant_genetics_xlsx" as const;
 
 export type VerdantGeneticsMetric =
-  | "temperature_c"
-  | "humidity_pct"
-  | "vpd_kpa"
-  | "soil_moisture_pct";
+  "temperature_c" | "humidity_pct" | "vpd_kpa" | "soil_moisture_pct";
 
 export type VerdantGeneticsSuspiciousKind =
   | "humidity_stuck_zero"
@@ -170,9 +167,7 @@ export function parseVerdantGeneticsXlsx(grid: CellGrid): VerdantGeneticsParseRe
         sensor_group: group,
         original_metric_label: label,
         reason:
-          mapping.preserveOnly === "battery"
-            ? "battery_preserved_in_raw"
-            : "ad_preserved_in_raw",
+          mapping.preserveOnly === "battery" ? "battery_preserved_in_raw" : "ad_preserved_in_raw",
       });
       columns.push({
         index: c,
@@ -287,8 +282,7 @@ export function parseVerdantGeneticsXlsx(grid: CellGrid): VerdantGeneticsParseRe
       };
 
       if (col.metric === "temperature_c") {
-        const tempC =
-          col.unit === "F" ? (numeric - 32) * (5 / 9) : numeric;
+        const tempC = col.unit === "F" ? (numeric - 32) * (5 / 9) : numeric;
         if (!Number.isFinite(tempC) || tempC < -20 || tempC > 70) {
           suspicious.push({
             kind: "impossible_temperature",
@@ -447,9 +441,7 @@ export function parseVerdantGeneticsXlsx(grid: CellGrid): VerdantGeneticsParseRe
 
   const sortedTs = isoTimestamps.slice().sort();
   const dateRange =
-    sortedTs.length > 0
-      ? { start: sortedTs[0], end: sortedTs[sortedTs.length - 1] }
-      : null;
+    sortedTs.length > 0 ? { start: sortedTs[0], end: sortedTs[sortedTs.length - 1] } : null;
 
   return {
     rows,
@@ -514,9 +506,7 @@ function toIsoTimestamp(v: unknown): string | null {
   const s = String(v).trim();
   if (!s) return null;
   // Accept "YYYY-MM-DD HH:mm[:ss]" as UTC, plus ISO-with-Z, plus "YYYY/MM/DD".
-  const m = s.match(
-    /^(\d{4})[-/](\d{1,2})[-/](\d{1,2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?Z?$/,
-  );
+  const m = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?Z?$/);
   if (m) {
     const [, y, mo, d, h, mi, se] = m;
     const dt = Date.UTC(
@@ -554,10 +544,11 @@ function classifyMetric(label: string): MetricClassification {
     return { metric: "humidity_pct", unit: "%", preserveOnly: null };
   }
   if (/temp/.test(k) && !/set.?point|target/.test(k)) {
-    const unit: "F" | "C" =
-      /°?f\b|fahrenheit|temp_f|\(f\)/.test(k) ? "F"
-      : /°?c\b|celsius|temp_c|\(c\)/.test(k) ? "C"
-      : "F"; // Verdant Genetics export defaults to Fahrenheit
+    const unit: "F" | "C" = /°?f\b|fahrenheit|temp_f|\(f\)/.test(k)
+      ? "F"
+      : /°?c\b|celsius|temp_c|\(c\)/.test(k)
+        ? "C"
+        : "F"; // Verdant Genetics export defaults to Fahrenheit
     return { metric: "temperature_c", unit, preserveOnly: null };
   }
   return { metric: null, unit: null, preserveOnly: null };

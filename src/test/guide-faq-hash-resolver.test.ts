@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  resolveGuideFaqFromHash,
-  slugifyFaqQuestion,
-} from "@/lib/guideFaqHashResolver";
+import { resolveGuideFaqFromHash, slugifyFaqQuestion } from "@/lib/guideFaqHashResolver";
 import { findGuideBySlug } from "@/constants/verdantSeoContent";
 
 const cannabis = findGuideBySlug("cannabis-plant-care");
@@ -57,8 +54,6 @@ describe("slugifyFaqQuestion", () => {
     expect(slugifyFaqQuestion("Why are my leaves turning yellow?")).toBe(
       "why-are-my-leaves-turning-yellow",
     );
-    expect(slugifyFaqQuestion("  Multiple   spaces & symbols!! ")).toBe(
-      "multiple-spaces-symbols",
-    );
+    expect(slugifyFaqQuestion("  Multiple   spaces & symbols!! ")).toBe("multiple-spaces-symbols");
   });
 });

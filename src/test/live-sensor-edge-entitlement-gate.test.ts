@@ -63,9 +63,7 @@ function fakeClient(state: FakeState) {
         },
         then(resolve: (result: { data: unknown[] | null; error: unknown }) => void) {
           const environment = filters.find(({ column }) => column === "environment")?.value as
-            | "live"
-            | "sandbox"
-            | undefined;
+            "live" | "sandbox" | undefined;
           const error = (environment && state.errorByEnvironment?.[environment]) ?? state.error;
           if (error) {
             resolve({ data: null, error });

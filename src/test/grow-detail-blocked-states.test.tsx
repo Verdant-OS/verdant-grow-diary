@@ -6,7 +6,7 @@
  */
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 
 const refetch = vi.fn();
 
@@ -23,9 +23,15 @@ vi.mock("@/hooks/useGrowDetailData", () => {
       ...mockState,
       growId: "g1",
       counts: {
-        plants: 0, tents: 0, diary: 0,
-        actionsPending: 0, actionsTotal: 0, auditEvents: 0,
-        alertsOpen: 0, alertsCritical: 0, alertsWarning: 0,
+        plants: 0,
+        tents: 0,
+        diary: 0,
+        actionsPending: 0,
+        actionsTotal: 0,
+        auditEvents: 0,
+        alertsOpen: 0,
+        alertsCritical: 0,
+        alertsWarning: 0,
       },
       recent: { status: "ok", items: [] },
       status: {

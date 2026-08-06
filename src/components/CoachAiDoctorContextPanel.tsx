@@ -60,10 +60,7 @@ export interface CoachAiDoctorContextPanelProps {
   className?: string;
 }
 
-const READINESS_STYLES: Record<
-  AiDoctorContextReadiness,
-  { badge: string; icon: JSX.Element }
-> = {
+const READINESS_STYLES: Record<AiDoctorContextReadiness, { badge: string; icon: JSX.Element }> = {
   strong: {
     badge: "bg-emerald-500/15 text-emerald-300 border-emerald-500/40",
     icon: <CheckCircle2 className="h-4 w-4" aria-hidden="true" />,
@@ -86,8 +83,7 @@ function classifyEntry(
   if (t === "feeding") return "feeding";
   if (t === "photo") return "photos";
   if (t === "note") return "notes";
-  if (t === "manual_sensor_snapshot" || t === "sensor_snapshot")
-    return "manual_sensor_snapshot";
+  if (t === "manual_sensor_snapshot" || t === "sensor_snapshot") return "manual_sensor_snapshot";
   return "other";
 }
 
@@ -107,9 +103,7 @@ function resolveActivePlant(
 ): { plant: AiDoctorContextPlantSource | null; ambiguous: boolean } {
   const list = Array.isArray(plants) ? plants : [];
   if (selectedPlantId) {
-    const match = list.find(
-      (p) => p && typeof p.id === "string" && p.id === selectedPlantId,
-    );
+    const match = list.find((p) => p && typeof p.id === "string" && p.id === selectedPlantId);
     if (match) return { plant: match, ambiguous: false };
   }
   if (list.length === 1) return { plant: list[0] ?? null, ambiguous: false };
@@ -118,8 +112,7 @@ function resolveActivePlant(
   return { plant: null, ambiguous: false };
 }
 
-export const COACH_AI_DOCTOR_CONTEXT_AMBIGUOUS_COPY =
-  "Select a plant to review AI Doctor context.";
+export const COACH_AI_DOCTOR_CONTEXT_AMBIGUOUS_COPY = "Select a plant to review AI Doctor context.";
 
 export default function CoachAiDoctorContextPanel({
   plant,
@@ -172,10 +165,7 @@ export default function CoachAiDoctorContextPanel({
         data-ambiguous="true"
         className={`glass rounded-2xl p-4 space-y-2 ${className ?? ""}`}
       >
-        <h2
-          id="coach-ai-doctor-context-heading"
-          className="text-base font-semibold tracking-tight"
-        >
+        <h2 id="coach-ai-doctor-context-heading" className="text-base font-semibold tracking-tight">
           AI Doctor Context
         </h2>
         <p
@@ -207,9 +197,8 @@ export default function CoachAiDoctorContextPanel({
             AI Doctor Context
           </h2>
           <p className="text-xs text-muted-foreground">
-            A read-only summary of the context Verdant has available before
-            you ask for guidance. This panel does not run AI or claim a
-            diagnosis.
+            A read-only summary of the context Verdant has available before you ask for guidance.
+            This panel does not run AI or claim a diagnosis.
           </p>
         </div>
         <span
@@ -222,10 +211,7 @@ export default function CoachAiDoctorContextPanel({
       </header>
 
       {result.readiness !== "strong" ? (
-        <p
-          className="text-xs text-muted-foreground"
-          data-testid="coach-ai-doctor-context-notice"
-        >
+        <p className="text-xs text-muted-foreground" data-testid="coach-ai-doctor-context-notice">
           More context would improve confidence. {AI_DOCTOR_INSUFFICIENT_NOTICE}
         </p>
       ) : null}
@@ -234,9 +220,7 @@ export default function CoachAiDoctorContextPanel({
         <div data-testid="coach-ai-doctor-context-evidence">
           <div className="text-xs font-medium mb-1">Evidence available</div>
           {result.evidence.length === 0 ? (
-            <p className="text-xs text-muted-foreground">
-              No supporting context yet.
-            </p>
+            <p className="text-xs text-muted-foreground">No supporting context yet.</p>
           ) : (
             <ul className="space-y-0.5 text-xs">
               {result.evidence.map((code) => (
@@ -260,9 +244,7 @@ export default function CoachAiDoctorContextPanel({
         <div data-testid="coach-ai-doctor-context-missing">
           <div className="text-xs font-medium mb-1">Missing information</div>
           {result.missing.length === 0 ? (
-            <p className="text-xs text-muted-foreground">
-              Nothing critical missing.
-            </p>
+            <p className="text-xs text-muted-foreground">Nothing critical missing.</p>
           ) : (
             <ul className="space-y-0.5 text-xs">
               {result.missing.map((code) => (
@@ -301,10 +283,7 @@ export default function CoachAiDoctorContextPanel({
         </p>
       ) : null}
 
-      <p
-        className="text-xs"
-        data-testid="coach-ai-doctor-context-safe-next-step"
-      >
+      <p className="text-xs" data-testid="coach-ai-doctor-context-safe-next-step">
         <span className="font-medium">Safe next step: </span>
         <span className="text-muted-foreground">{result.safeNextStep}</span>
       </p>

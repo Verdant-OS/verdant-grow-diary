@@ -28,37 +28,41 @@ describe("evaluateEarlyStageVisibility", () => {
   });
 
   it("hides when stage is veg/flower/etc.", () => {
-    for (const stage of ["veg", "vegetative", "flower", "flowering", "flush", "harvest", "drying"]) {
+    for (const stage of [
+      "veg",
+      "vegetative",
+      "flower",
+      "flowering",
+      "flush",
+      "harvest",
+      "drying",
+    ]) {
       expect(evaluateEarlyStageVisibility({ stage, now: NOW })).toBe("hidden");
     }
   });
 
   it("suggests when stage unknown but plant is young (within window)", () => {
     const plantCreatedAt = new Date(NOW.getTime() - 10 * 86_400_000).toISOString();
-    expect(
-      evaluateEarlyStageVisibility({ stage: null, plantCreatedAt, now: NOW }),
-    ).toBe("suggested");
+    expect(evaluateEarlyStageVisibility({ stage: null, plantCreatedAt, now: NOW })).toBe(
+      "suggested",
+    );
   });
 
   it("hides when stage unknown and plant is old", () => {
     const plantCreatedAt = new Date(NOW.getTime() - 60 * 86_400_000).toISOString();
-    expect(
-      evaluateEarlyStageVisibility({ stage: null, plantCreatedAt, now: NOW }),
-    ).toBe("hidden");
+    expect(evaluateEarlyStageVisibility({ stage: null, plantCreatedAt, now: NOW })).toBe("hidden");
   });
 
   it("hides when nothing is known", () => {
     expect(evaluateEarlyStageVisibility({ now: NOW })).toBe("hidden");
-    expect(
-      evaluateEarlyStageVisibility({ plantCreatedAt: "not-a-date", now: NOW }),
-    ).toBe("hidden");
+    expect(evaluateEarlyStageVisibility({ plantCreatedAt: "not-a-date", now: NOW })).toBe("hidden");
   });
 
   it("never crashes on negative ages or future dates", () => {
     const future = new Date(NOW.getTime() + 10 * 86_400_000).toISOString();
-    expect(
-      evaluateEarlyStageVisibility({ stage: null, plantCreatedAt: future, now: NOW }),
-    ).toBe("hidden");
+    expect(evaluateEarlyStageVisibility({ stage: null, plantCreatedAt: future, now: NOW })).toBe(
+      "hidden",
+    );
   });
 });
 
@@ -146,10 +150,7 @@ describe("milestone / vigor option lists", () => {
 });
 
 describe("safety boundary — pure module", () => {
-  const source = readFileSync(
-    resolve(__dirname, "../lib/earlyStageQuickLogRules.ts"),
-    "utf8",
-  );
+  const source = readFileSync(resolve(__dirname, "../lib/earlyStageQuickLogRules.ts"), "utf8");
   it("imports no Supabase, Action Queue, AI, or device-control surfaces", () => {
     const importLines = source
       .split("\n")
@@ -160,6 +161,8 @@ describe("safety boundary — pure module", () => {
     expect(source).not.toMatch(/from\s+["'][^"']*action[_-]?queue[^"']*["']/i);
     expect(source).not.toMatch(/from\s+["'][^"']*ai-gateway[^"']*["']/i);
     expect(source).not.toMatch(/from\s+["'][^"']*(openai|anthropic)[^"']*["']/i);
-    expect(source).not.toMatch(/from\s+["'][^"']*(home[_-]?assistant|mqtt|device[_-]?control)[^"']*["']/i);
+    expect(source).not.toMatch(
+      /from\s+["'][^"']*(home[_-]?assistant|mqtt|device[_-]?control)[^"']*["']/i,
+    );
   });
 });

@@ -7,13 +7,16 @@ import { describe, expect, it, afterEach, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import {
   buildActionResponseMemories,
   isActionResponseCandidateDetails,
   selectRecentPlantActionResponse,
 } from "../lib/actionResponseMemoryRules";
-import { buildActionResponseMemoryCardViewModel, toActionFollowUpEvidenceViewModel } from "../lib/actionResponseMemoryViewModel";
+import {
+  buildActionResponseMemoryCardViewModel,
+  toActionFollowUpEvidenceViewModel,
+} from "../lib/actionResponseMemoryViewModel";
 import { stripSourceComments } from "./utils/stripSourceComments";
 
 afterEach(() => {
@@ -151,7 +154,13 @@ describe("5. surfaces agree on outcome and evidence state", () => {
   it("Action Detail adapter and shared card view model agree for the same memory", () => {
     const memory = buildActionResponseMemories({
       responseRows: [
-        { ...RESPONSE_ROW, details: { ...RESPONSE_ROW.details, photo_reference: "storage://diary-photos/u/g/plant-profiles/p/x.jpg" } },
+        {
+          ...RESPONSE_ROW,
+          details: {
+            ...RESPONSE_ROW.details,
+            photo_reference: "storage://diary-photos/u/g/plant-profiles/p/x.jpg",
+          },
+        },
       ],
       actions: [ACTION_ROW],
       sensorRows: [],
@@ -172,9 +181,8 @@ describe("6-7. Plant Detail component behavior (loading/empty/failure states)", 
       useActionResponseMemory: () => ({ state, reload: () => {} }),
     }));
     vi.doMock("@/store/auth", () => ({ useAuth: () => ({ user: { id: "u1" } }) }));
-    const { default: PlantDetailRecentActionResponse } = await import(
-      "../components/PlantDetailRecentActionResponse"
-    );
+    const { default: PlantDetailRecentActionResponse } =
+      await import("../components/PlantDetailRecentActionResponse");
     return render(
       <MemoryRouter>
         <PlantDetailRecentActionResponse growId="grow-1" plantId="plant-1" />
@@ -184,7 +192,12 @@ describe("6-7. Plant Detail component behavior (loading/empty/failure states)", 
 
   it("renders the card for an exact-plant memory with evidence intact", async () => {
     const memories = buildActionResponseMemories({
-      responseRows: [{ ...RESPONSE_ROW, details: { ...RESPONSE_ROW.details, photo_reference: "https://bad/signed?token=1" } }],
+      responseRows: [
+        {
+          ...RESPONSE_ROW,
+          details: { ...RESPONSE_ROW.details, photo_reference: "https://bad/signed?token=1" },
+        },
+      ],
       actions: [ACTION_ROW],
       sensorRows: [],
     });

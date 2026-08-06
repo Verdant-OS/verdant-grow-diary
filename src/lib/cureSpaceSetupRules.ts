@@ -45,11 +45,7 @@ import {
 } from "@/constants/cureSpaceSetupFields";
 
 export type CureSpaceFieldError =
-  | "invalid_number"
-  | "negative_not_allowed"
-  | "invalid_range"
-  | "invalid_integer"
-  | "invalid_date";
+  "invalid_number" | "negative_not_allowed" | "invalid_range" | "invalid_integer" | "invalid_date";
 
 export interface CureSpaceSetupDetailsInput {
   tent_or_space_label?: string | null;
@@ -102,24 +98,11 @@ export interface CureSpaceSetupDetailsValidation {
     packs_per_bag?: number;
     buffer_install_date?: string;
     setup_note?: string;
-    sensor_snapshot_source?:
-      | "live"
-      | "manual"
-      | "csv"
-      | "demo"
-      | "stale"
-      | "invalid";
+    sensor_snapshot_source?: "live" | "manual" | "csv" | "demo" | "stale" | "invalid";
   };
 }
 
-const SENSOR_SOURCES = [
-  "live",
-  "manual",
-  "csv",
-  "demo",
-  "stale",
-  "invalid",
-] as const;
+const SENSOR_SOURCES = ["live", "manual", "csv", "demo", "stale", "invalid"] as const;
 type SensorSource = (typeof SENSOR_SOURCES)[number];
 
 function trimOrUndef(v: string | null | undefined): string | undefined {
@@ -137,8 +120,16 @@ function enumOrUndef<T extends string>(
   return (allowed as readonly string[]).includes(t) ? (t as T) : undefined;
 }
 
-interface NumOk { ok: true; value: number | undefined; error?: undefined }
-interface NumErr { ok: false; value?: undefined; error: CureSpaceFieldError }
+interface NumOk {
+  ok: true;
+  value: number | undefined;
+  error?: undefined;
+}
+interface NumErr {
+  ok: false;
+  value?: undefined;
+  error: CureSpaceFieldError;
+}
 type NumResult = NumOk | NumErr;
 
 function coerceNumber(v: number | string | null | undefined): NumResult {
@@ -237,12 +228,43 @@ export function validateCureSpaceSetupDetails(
   const mesh = coerceBoolean(i.mesh_filter_present);
   if (mesh !== undefined) value.mesh_filter_present = mesh;
 
-  validateNonNegBounded("usable_curing_volume_m3", i.usable_curing_volume_m3, CURE_SPACE_VOLUME_MAX_M3, errors, value);
+  validateNonNegBounded(
+    "usable_curing_volume_m3",
+    i.usable_curing_volume_m3,
+    CURE_SPACE_VOLUME_MAX_M3,
+    errors,
+    value,
+  );
   validateNonNegBounded("bag_count", i.bag_count, CURE_SPACE_BAG_COUNT_MAX, errors, value, true);
-  validateNonNegBounded("packs_per_bag", i.packs_per_bag, CURE_SPACE_PACKS_PER_BAG_MAX, errors, value, true);
-  validateNonNegBounded("intake_effective_area_cm2", i.intake_effective_area_cm2, CURE_SPACE_OPEN_AREA_MAX_CM2, errors, value);
-  validateNonNegBounded("exhaust_effective_area_cm2", i.exhaust_effective_area_cm2, CURE_SPACE_OPEN_AREA_MAX_CM2, errors, value);
-  validateNonNegBounded("total_effective_open_area_cm2", i.total_effective_open_area_cm2, CURE_SPACE_OPEN_AREA_MAX_CM2, errors, value);
+  validateNonNegBounded(
+    "packs_per_bag",
+    i.packs_per_bag,
+    CURE_SPACE_PACKS_PER_BAG_MAX,
+    errors,
+    value,
+    true,
+  );
+  validateNonNegBounded(
+    "intake_effective_area_cm2",
+    i.intake_effective_area_cm2,
+    CURE_SPACE_OPEN_AREA_MAX_CM2,
+    errors,
+    value,
+  );
+  validateNonNegBounded(
+    "exhaust_effective_area_cm2",
+    i.exhaust_effective_area_cm2,
+    CURE_SPACE_OPEN_AREA_MAX_CM2,
+    errors,
+    value,
+  );
+  validateNonNegBounded(
+    "total_effective_open_area_cm2",
+    i.total_effective_open_area_cm2,
+    CURE_SPACE_OPEN_AREA_MAX_CM2,
+    errors,
+    value,
+  );
 
   // Floor pct: bounded 0..100
   {
@@ -266,8 +288,22 @@ export function validateCureSpaceSetupDetails(
     }
   }
 
-  validateBoundedTemp("bottom_sensor_temp_c", i.bottom_sensor_temp_c, CURE_SPACE_TEMP_MIN_C, CURE_SPACE_TEMP_MAX_C, errors, value);
-  validateBoundedTemp("top_sensor_temp_c", i.top_sensor_temp_c, CURE_SPACE_TEMP_MIN_C, CURE_SPACE_TEMP_MAX_C, errors, value);
+  validateBoundedTemp(
+    "bottom_sensor_temp_c",
+    i.bottom_sensor_temp_c,
+    CURE_SPACE_TEMP_MIN_C,
+    CURE_SPACE_TEMP_MAX_C,
+    errors,
+    value,
+  );
+  validateBoundedTemp(
+    "top_sensor_temp_c",
+    i.top_sensor_temp_c,
+    CURE_SPACE_TEMP_MIN_C,
+    CURE_SPACE_TEMP_MAX_C,
+    errors,
+    value,
+  );
 
   // Stack delta T: negative/zero/positive allowed within realistic bounds.
   {

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "@/lib/react-router-compat";
 import { AlertTriangle, Check, Eye, EyeOff, Minus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -114,7 +114,7 @@ export default function ResetPassword() {
             <h1
               ref={headingRef}
               tabIndex={-1}
-              className="text-3xl font-display font-bold focus-visible:outline-none"
+              className="text-3xl font-display font-bold focus-visible:outline-hidden"
             >
               Reset password
             </h1>
@@ -154,7 +154,7 @@ export default function ResetPassword() {
                 </Button>
                 <Link
                   to="/auth"
-                  className="text-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                  className="text-sm text-muted-foreground hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring rounded"
                 >
                   Back to sign in
                 </Link>
@@ -165,7 +165,7 @@ export default function ResetPassword() {
               <p className="text-sm">Password updated. Redirecting to sign in…</p>
               <Link
                 to="/auth"
-                className="text-sm text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                className="text-sm text-primary underline-offset-4 hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring rounded"
               >
                 Back to sign in
               </Link>
@@ -289,7 +289,7 @@ export default function ResetPassword() {
               </Button>
               <Link
                 to="/auth"
-                className="text-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                className="text-sm text-muted-foreground hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring rounded"
               >
                 Back to sign in
               </Link>

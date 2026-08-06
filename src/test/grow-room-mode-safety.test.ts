@@ -12,18 +12,23 @@ import { describe, it, expect } from "vitest";
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { readDesktopGrowerNavigationSource } from "@/test/utils/growerNavigationSource";
+import {
+  extractMountedAppRoutePaths,
+  getRouteAliasRedirectTarget,
+  readAllRouteModuleSources,
+} from "./helpers/routeManifestSyncHarness";
 
 const ROOT = resolve(__dirname, "../..");
 const PAGE = resolve(ROOT, "src/pages/GrowRoomMode.tsx");
 const RULES = resolve(ROOT, "src/lib/growRoomModeRules.ts");
-const APP = resolve(ROOT, "src/App.tsx");
+const APP = readAllRouteModuleSources();
 const SIDEBAR_PATH = resolve(ROOT, "src/components/AppSidebar.tsx");
 
 const page = readFileSync(PAGE, "utf8");
 const rules = readFileSync(RULES, "utf8");
 
 describe("Grow-Room Mode · file presence", () => {
-  it.each([PAGE, RULES, APP, SIDEBAR_PATH])("exists: %s", (p) => {
+  it.each([PAGE, RULES, SIDEBAR_PATH])("exists: %s", (p) => {
     expect(existsSync(p)).toBe(true);
   });
 });
@@ -99,14 +104,12 @@ describe("Grow-Room Mode · business logic lives outside JSX", () => {
 });
 
 describe("Grow-Room Mode · route + nav wiring", () => {
-  const app = readFileSync(APP, "utf8");
+  const app = APP;
   const sidebar = readDesktopGrowerNavigationSource();
 
   it("App redirects the legacy /grow-room route to the main Dashboard", () => {
-    expect(app).toMatch(/path=["']\/grow-room["']/);
-    expect(app).toMatch(
-      /path=["']\/grow-room["']\s+element=\{<RouteAliasRedirect\s+to=["']\/["']\s*\/>\}/,
-    );
+    expect(extractMountedAppRoutePaths()).toContain("/grow-room");
+    expect(getRouteAliasRedirectTarget("/grow-room")).toBe("/");
     expect(app).not.toMatch(/<GrowRoomMode\s*\/?>/);
   });
 

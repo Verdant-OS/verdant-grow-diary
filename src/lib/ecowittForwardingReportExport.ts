@@ -15,10 +15,7 @@
  *   - No write_action — this report describes the local bridge only.
  */
 
-import {
-  sanitizeReportText,
-  type LocalForwardingStatus,
-} from "@/lib/ecowittLocalForwardingStatus";
+import { sanitizeReportText, type LocalForwardingStatus } from "@/lib/ecowittLocalForwardingStatus";
 
 /** Metric keys allowed in the latest_metrics.metrics payload. */
 export const ALLOWED_METRIC_KEYS = [
@@ -147,14 +144,10 @@ export function buildSanitizedForwardingReport(
     forwarding_enabled: status.forwarding_enabled === true,
     forwarding_ready: status.forwarding_ready === true,
     last_forward_status:
-      typeof status.last_forward_status === "number"
-        ? status.last_forward_status
-        : null,
+      typeof status.last_forward_status === "number" ? status.last_forward_status : null,
     last_forward_error: safeString(status.last_forward_error),
     last_forward_response_error: safeString(status.last_forward_response_error),
-    last_forward_response_classification: safeString(
-      status.last_forward_response_classification,
-    ),
+    last_forward_response_classification: safeString(status.last_forward_response_classification),
     last_forward_response_reason: safeString(status.last_forward_response_reason),
     retry_count: safeNumber(status.retry_count),
     max_retry_attempts: safeNumber(status.max_retry_attempts),
@@ -162,8 +155,7 @@ export function buildSanitizedForwardingReport(
     malformed_line_count: safeNumber(
       errorReport?.malformed_line_count ?? status.malformed_line_count,
     ),
-    generated_at:
-      safeString(errorReport?.generated_at) ?? safeString(status.generated_at),
+    generated_at: safeString(errorReport?.generated_at) ?? safeString(status.generated_at),
     recommended_next_step: recommended,
   };
 
@@ -183,8 +175,6 @@ export function buildSanitizedForwardingReport(
 }
 
 /** Convenience: JSON-stringify with stable indentation for clipboard writes. */
-export function serializeSanitizedForwardingReport(
-  report: SanitizedForwardingReport,
-): string {
+export function serializeSanitizedForwardingReport(report: SanitizedForwardingReport): string {
   return JSON.stringify(report, null, 2);
 }

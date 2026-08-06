@@ -39,9 +39,7 @@ describe("pi-ingest-readings Edge Function skeleton — fail-closed behavior", (
     );
   });
   it("returns method_not_allowed (via shared builder)", () => {
-    expect(SRC).toMatch(
-      /(method_not_allowed|buildMethodNotAllowedResponseBody)/,
-    );
+    expect(SRC).toMatch(/(method_not_allowed|buildMethodNotAllowedResponseBody)/);
   });
   it("returns a fail-closed status (503 or 501) for failure paths", () => {
     expect(SRC).toMatch(/(status:\s*(503|501)|jsonResponse\s*\(\s*(503|501))/);
@@ -55,7 +53,6 @@ describe("pi-ingest-readings Edge Function skeleton — fail-closed behavior", (
     expect(SRC).toMatch(/rejected\s*:/);
   });
 });
-
 
 describe("pi-ingest-readings Edge Function — forbidden surfaces (post-auth)", () => {
   // service_role + createClient are now permitted in index.ts only.

@@ -33,10 +33,7 @@ export type HarvestWatchV0ReadinessState =
   | "past_expected_window"
   | "unknown";
 
-export const HARVEST_WATCH_V0_STATE_LABEL: Record<
-  HarvestWatchV0ReadinessState,
-  string
-> = {
+export const HARVEST_WATCH_V0_STATE_LABEL: Record<HarvestWatchV0ReadinessState, string> = {
   not_enough_evidence: "Not enough evidence",
   too_early_to_call: "Too early to call",
   watch_window: "Approaching watch window",
@@ -51,22 +48,15 @@ export const HARVEST_WATCH_V0_STATE_LABEL: Record<
  * instruction phrasing is enforced by the harvest-watch-card-evidence-rules
  * and plant-detail-harvest-watch-accessibility tests.
  */
-export const HARVEST_WATCH_V0_STATE_CAUTION: Record<
-  HarvestWatchV0ReadinessState,
-  string
-> = {
-  not_enough_evidence:
-    "Not enough harvest evidence yet. Add a trichome or flower inspection note.",
-  too_early_to_call:
-    "Too early to call. Keep logging plant response and flower development.",
+export const HARVEST_WATCH_V0_STATE_CAUTION: Record<HarvestWatchV0ReadinessState, string> = {
+  not_enough_evidence: "Not enough harvest evidence yet. Add a trichome or flower inspection note.",
+  too_early_to_call: "Too early to call. Keep logging plant response and flower development.",
   watch_window:
     "Approaching manual review window. Inspect trichomes, pistils, and recent plant response.",
-  ready_for_manual_review:
-    "Evidence supports a manual harvest review. The grower decides.",
+  ready_for_manual_review: "Evidence supports a manual harvest review. The grower decides.",
   past_expected_window:
     "Past expected window based on available dates. Re-check trichomes, pistils, and plant condition before deciding.",
-  unknown:
-    "Harvest Watch cannot determine a review state from the available information.",
+  unknown: "Harvest Watch cannot determine a review state from the available information.",
 };
 
 /** Universal evidence-only caution surfaced under the card title. */
@@ -74,8 +64,7 @@ export const HARVEST_WATCH_V0_UNIVERSAL_CAUTION =
   "Harvest Watch is evidence-only. Confirm with direct plant inspection before making harvest decisions.";
 
 /** Surfaced next to the evidence checklist when one is rendered. */
-export const HARVEST_WATCH_V0_CHECKLIST_CAUTION =
-  "Evidence checklist — not a harvest instruction.";
+export const HARVEST_WATCH_V0_CHECKLIST_CAUTION = "Evidence checklist — not a harvest instruction.";
 
 export interface MapV0ReadinessInput {
   row: HarvestWatchRowViewModel;
@@ -110,21 +99,12 @@ export interface MapV0ReadinessInput {
  * A single recent photo on its own can NEVER produce ready_for_manual_review
  * — strong inspection notes are the only path.
  */
-export function mapToV0ReadinessState(
-  input: MapV0ReadinessInput,
-): HarvestWatchV0ReadinessState {
-  const {
-    row,
-    photoEvidenceCount,
-    daysInFlower,
-    expectedHarvestDay,
-    strongEvidenceCount,
-  } = input;
+export function mapToV0ReadinessState(input: MapV0ReadinessInput): HarvestWatchV0ReadinessState {
+  const { row, photoEvidenceCount, daysInFlower, expectedHarvestDay, strongEvidenceCount } = input;
   const trend = row.trend;
   const windowStart = row.harvestWindow?.startDay ?? null;
   const windowEnd = row.harvestWindow?.endDay ?? null;
-  const hasDateAnchor =
-    typeof daysInFlower === "number" && Number.isFinite(daysInFlower);
+  const hasDateAnchor = typeof daysInFlower === "number" && Number.isFinite(daysInFlower);
   const hasExpectedDay =
     typeof expectedHarvestDay === "number" &&
     Number.isFinite(expectedHarvestDay) &&
@@ -221,8 +201,7 @@ const STRONG_MISSING_REASON: Record<HarvestEvidenceKey, string> = {
   trichome_inspection: "Missing — add a trichome inspection note.",
   pistil_observation: "Missing — add pistil color or recession notes.",
   bud_maturity_note: "Missing — add bud maturity observations.",
-  window_evidence:
-    "Missing — flower start date or expected harvest day not yet logged.",
+  window_evidence: "Missing — flower start date or expected harvest day not yet logged.",
   recent_photos: "Missing — add close-up flower photos.",
 };
 
@@ -251,9 +230,7 @@ export function buildEvidenceChecklist(input: {
   const hasPistil = notes.some((n) => PISTIL_RE.test(n));
   const hasBud = notes.some((n) => BUD_RE.test(n));
 
-  const hasDays =
-    typeof input.daysInFlower === "number" &&
-    Number.isFinite(input.daysInFlower);
+  const hasDays = typeof input.daysInFlower === "number" && Number.isFinite(input.daysInFlower);
   const hasExpected =
     typeof input.expectedHarvestDay === "number" &&
     Number.isFinite(input.expectedHarvestDay) &&
@@ -269,10 +246,7 @@ export function buildEvidenceChecklist(input: {
   else if (input.photoEvidenceCount === 1) photosStatus = "limited";
   else photosStatus = "missing";
 
-  const strong = (
-    key: HarvestEvidenceKey,
-    isPresent: boolean,
-  ): HarvestEvidenceChecklistItem => ({
+  const strong = (key: HarvestEvidenceKey, isPresent: boolean): HarvestEvidenceChecklistItem => ({
     key,
     label: EVIDENCE_LABELS[key],
     present: isPresent,
@@ -280,10 +254,7 @@ export function buildEvidenceChecklist(input: {
     reason: isPresent ? STRONG_PRESENT_REASON[key] : STRONG_MISSING_REASON[key],
   });
 
-  const reasonFor = (
-    key: HarvestEvidenceKey,
-    status: HarvestEvidenceStatus,
-  ): string => {
+  const reasonFor = (key: HarvestEvidenceKey, status: HarvestEvidenceStatus): string => {
     if (status === "present") return STRONG_PRESENT_REASON[key];
     if (status === "missing") return STRONG_MISSING_REASON[key];
     if (key === "recent_photos") {
@@ -408,8 +379,7 @@ export function groupHarvestRecentItems(
     {
       key: "notes",
       label: "Harvest-related notes",
-      emptyCopy:
-        "No harvest-related notes yet. Add a trichome, pistil, or bud maturity note.",
+      emptyCopy: "No harvest-related notes yet. Add a trichome, pistil, or bud maturity note.",
       items: noteItems,
     },
     {
@@ -481,9 +451,7 @@ const PREFILL: Record<NextInspectionKind, { label: string; notePrefill: string }
 export function pickNextInspection(
   checklist: readonly HarvestEvidenceChecklistItem[],
 ): NextInspectionPrefill {
-  const missing = new Set(
-    checklist.filter((c) => !c.present).map((c) => c.key),
-  );
+  const missing = new Set(checklist.filter((c) => !c.present).map((c) => c.key));
 
   let kind: NextInspectionKind;
   if (missing.has("trichome_inspection")) kind = "trichome_inspection";

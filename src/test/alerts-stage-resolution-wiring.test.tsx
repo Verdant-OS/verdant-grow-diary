@@ -65,35 +65,23 @@ beforeEach(() => {
 describe("AlertsContextHeaderForGrow — resolved stage in header copy", () => {
   it("audit repro: stale seedling grow row + veg tent renders Veg targets", () => {
     mockTents(["veg"]);
-    render(
-      <AlertsContextHeaderForGrow growId="g1" growName="Grow A" stage="seedling" />,
-    );
-    expect(screen.getByTestId("alerts-context-header-stage").textContent).toContain(
-      "Veg",
-    );
-    expect(screen.getByTestId("alerts-context-header-stage").textContent).not.toContain(
-      "Seedling",
-    );
+    render(<AlertsContextHeaderForGrow growId="g1" growName="Grow A" stage="seedling" />);
+    expect(screen.getByTestId("alerts-context-header-stage").textContent).toContain("Veg");
+    expect(screen.getByTestId("alerts-context-header-stage").textContent).not.toContain("Seedling");
   });
 
   it("mirror case: veg grow row + lagging seedling tent still renders Veg targets", () => {
     mockTents(["seedling"]);
-    render(
-      <AlertsContextHeaderForGrow growId="g1" growName="Grow A" stage="veg" />,
-    );
-    expect(screen.getByTestId("alerts-context-header-stage").textContent).toContain(
-      "Veg",
-    );
+    render(<AlertsContextHeaderForGrow growId="g1" growName="Grow A" stage="veg" />);
+    expect(screen.getByTestId("alerts-context-header-stage").textContent).toContain("Veg");
   });
 
   it("keeps the honest no-stage state when neither field is a known stage", () => {
     mockTents([null]);
-    render(
-      <AlertsContextHeaderForGrow growId="g1" growName="Grow A" stage={null} />,
+    render(<AlertsContextHeaderForGrow growId="g1" growName="Grow A" stage={null} />);
+    expect(screen.getByTestId("alerts-context-header-stage-missing").textContent).toContain(
+      "No active stage target set",
     );
-    expect(
-      screen.getByTestId("alerts-context-header-stage-missing").textContent,
-    ).toContain("No active stage target set");
   });
 });
 

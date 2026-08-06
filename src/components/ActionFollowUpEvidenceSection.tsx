@@ -15,10 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { CircleCheckBig } from "lucide-react";
 import { useAuth } from "@/store/auth";
-import {
-  ACTION_FOLLOWUP_EVENT_TYPE,
-  followupMatchesAction,
-} from "@/lib/actionFollowupRules";
+import { ACTION_FOLLOWUP_EVENT_TYPE, followupMatchesAction } from "@/lib/actionFollowupRules";
 import {
   evaluateActionFollowUpEligibility,
   type ActionFollowUpDraft,
@@ -140,9 +137,7 @@ function projectRow(row: {
 }): ActionFollowUpEvidenceRecord | null {
   if (!row.id || !row.grow_id) return null;
   const d =
-    row.details && typeof row.details === "object"
-      ? (row.details as Record<string, unknown>)
-      : {};
+    row.details && typeof row.details === "object" ? (row.details as Record<string, unknown>) : {};
   const outcome = (d.outcome as ActionFollowUpEvidenceRecord["outcome"]) ?? "unclear";
   return {
     diaryEntryId: row.id,
@@ -168,7 +163,12 @@ function pickPrimary(
 ): (typeof rows)[number] | null {
   const matched = rows.filter((r) =>
     followupMatchesAction(
-      { details: (r as { details?: unknown }).details as { event_type?: unknown; action_queue_id?: unknown } | null },
+      {
+        details: (r as { details?: unknown }).details as {
+          event_type?: unknown;
+          action_queue_id?: unknown;
+        } | null,
+      },
       actionId,
     ),
   );
@@ -289,8 +289,7 @@ export default function ActionFollowUpEvidenceSection({
         growId: action.growId,
         tentId: action.tentId,
         plantId: action.plantId,
-        existingFollowUpCount:
-          query.status === "ready" && query.existing ? 1 : 0,
+        existingFollowUpCount: query.status === "ready" && query.existing ? 1 : 0,
         currentUserOwnsAction: true,
       }),
     [action, query],
@@ -377,8 +376,7 @@ export default function ActionFollowUpEvidenceSection({
   const ineligibleCopy = useMemo(() => {
     if (eligibility.eligible === true) return "";
     const reason: string = eligibility.reason;
-    if (reason === "action_not_completed")
-      return "Complete this action to record a follow-up.";
+    if (reason === "action_not_completed") return "Complete this action to record a follow-up.";
     return "Follow-up isn't available for this action.";
   }, [eligibility]);
 
@@ -408,11 +406,7 @@ export default function ActionFollowUpEvidenceSection({
           <p role="alert" className="text-sm text-red-500">
             We couldn't check the follow-up status. Try again.
           </p>
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={() => setReloadNonce((n) => n + 1)}
-          >
+          <Button size="sm" variant="secondary" onClick={() => setReloadNonce((n) => n + 1)}>
             Retry
           </Button>
         </div>
@@ -426,9 +420,7 @@ export default function ActionFollowUpEvidenceSection({
               <ActionFollowUpExistingPhotoEvidence reference={viewModel.photoReference} />
             ) : null
           }
-          historicalNote={
-            isCanonicalResponse ? ACTION_RESPONSE_MEMORY_HISTORICAL_COPY : null
-          }
+          historicalNote={isCanonicalResponse ? ACTION_RESPONSE_MEMORY_HISTORICAL_COPY : null}
         />
       )}
 
@@ -467,20 +459,17 @@ export default function ActionFollowUpEvidenceSection({
                 }
               />
             ) : (
-            <Button
-              size="sm"
-              variant="secondary"
-              data-testid="action-followup-add-btn"
-              onClick={() => setShowForm(true)}
-            >
-              Add follow-up
-            </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                data-testid="action-followup-add-btn"
+                onClick={() => setShowForm(true)}
+              >
+                Add follow-up
+              </Button>
             )
           ) : (
-            <p
-              className="text-xs text-muted-foreground"
-              data-testid="action-followup-ineligible"
-            >
+            <p className="text-xs text-muted-foreground" data-testid="action-followup-ineligible">
               {ineligibleCopy}
             </p>
           )}

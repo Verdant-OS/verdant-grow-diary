@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { readAllRouteModuleSources } from "./helpers/routeManifestSyncHarness";
 
 const ROOT = resolve(__dirname, "../..");
 const read = (path: string) => readFileSync(resolve(ROOT, path), "utf8");
 
-const APP = read("src/App.tsx");
+const APP = readAllRouteModuleSources();
 const PAGE = read("src/pages/PostGrowLearningReport.tsx");
 const CARDS = read("src/components/PostGrowLearningReportCards.tsx");
 const HOOK = read("src/hooks/usePostGrowLearningReportData.ts");
@@ -15,7 +16,8 @@ const RULES = read("src/lib/postGrowLearningReportRules.ts");
 describe("Post-Grow Learning Report route wiring", () => {
   it("mounts the on-demand report route", () => {
     expect(APP).toContain("PostGrowLearningReport");
-    expect(APP).toContain("/reports/post-grow/:growId");
+    // File route: reports.post-grow.$growId.tsx (classic :growId param)
+    expect(APP).toMatch(/reports\.post-grow\.\$growId|post-grow\/\$growId|\/reports\/post-grow\/:growId/);
   });
 
   it("links only completed/archive-stage grows from GrowDetail", () => {
@@ -73,7 +75,7 @@ describe("Post-Grow Learning Report safety", () => {
       (match) => match[1].trim(),
     );
     // "create/alter policy" targets RLS SQL specifically — the bare token
-    // "policy" now legitimately appears in App.tsx via the public legal
+    // "policy" now legitimately appears in file routes via the public legal
     // routes (/privacy-policy alias, PrivacyPolicy/RefundPolicy pages).
     expect(all).not.toMatch(
       /create table|alter table|create policy|alter policy|drop policy|service_role|functions\.invoke|ai_doctor|openai/i,

@@ -157,8 +157,7 @@ describe("buildLeadDetailViewModel", () => {
 
 describe("safety contracts preserved by the drawer refactor", () => {
   it("updateLead allow-list still excludes original submission fields", () => {
-    const allowBlock =
-      HOOK.match(/const ALLOWED\s*=\s*\[[\s\S]*?\]\s+as const;/)?.[0] ?? "";
+    const allowBlock = HOOK.match(/const ALLOWED\s*=\s*\[[\s\S]*?\]\s+as const;/)?.[0] ?? "";
     for (const f of ["email", "name", "company", "role", "lead_type", "source", "message"]) {
       expect(allowBlock).not.toMatch(new RegExp(`"${f}"`));
     }

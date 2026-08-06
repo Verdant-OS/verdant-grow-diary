@@ -10,10 +10,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 
-const CHECKLIST_PATH = resolve(
-  process.cwd(),
-  "docs/v0-sentinel-stop-ship-checklist.md",
-);
+const CHECKLIST_PATH = resolve(process.cwd(), "docs/v0-sentinel-stop-ship-checklist.md");
 
 const REQUIRED_STOP_SHIP_PHRASES: readonly string[] = [
   "Auth loading smoke is red",
@@ -47,16 +44,11 @@ describe("V0 Sentinel stop-ship checklist", () => {
     expect(existsSync(CHECKLIST_PATH)).toBe(true);
   });
 
-  const body = existsSync(CHECKLIST_PATH)
-    ? readFileSync(CHECKLIST_PATH, "utf8")
-    : "";
+  const body = existsSync(CHECKLIST_PATH) ? readFileSync(CHECKLIST_PATH, "utf8") : "";
 
-  it.each(REQUIRED_STOP_SHIP_PHRASES)(
-    "documents stop-ship rule containing %j",
-    (phrase) => {
-      expect(body).toContain(phrase);
-    },
-  );
+  it.each(REQUIRED_STOP_SHIP_PHRASES)("documents stop-ship rule containing %j", (phrase) => {
+    expect(body).toContain(phrase);
+  });
 
   it("lists every allowed sensor source label", () => {
     for (const label of REQUIRED_SOURCE_LABELS) {
@@ -64,12 +56,9 @@ describe("V0 Sentinel stop-ship checklist", () => {
     }
   });
 
-  it.each(REQUIRED_COMMANDS)(
-    "references required local command containing %j",
-    (cmd) => {
-      expect(body).toContain(cmd);
-    },
-  );
+  it.each(REQUIRED_COMMANDS)("references required local command containing %j", (cmd) => {
+    expect(body).toContain(cmd);
+  });
 
   it("never says invalid/stale telemetry is healthy", () => {
     // Defensive: the checklist itself must not contradict its own rule.

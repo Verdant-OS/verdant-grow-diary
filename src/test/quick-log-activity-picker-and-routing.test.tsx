@@ -30,9 +30,7 @@ describe("QuickLogActivityPicker", () => {
   it("renders every supported activity label after expanding additional types", () => {
     const onSelect = vi.fn();
     render(<QuickLogActivityPicker plantStage="flower" onSelect={onSelect} />);
-    fireEvent.click(
-      screen.getByRole("button", { name: "More activity types" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "More activity types" }));
     for (const def of Object.values(QUICK_LOG_ACTIVITY_DEFINITIONS)) {
       expect(screen.getByText(def.label)).toBeInTheDocument();
     }
@@ -40,17 +38,13 @@ describe("QuickLogActivityPicker", () => {
 
   it("renders Harvest as enabled for Flower with safety copy denying readiness/yield", () => {
     render(<QuickLogActivityPicker plantStage="flower" onSelect={vi.fn()} />);
-    fireEvent.click(
-      screen.getByRole("button", { name: "More activity types" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "More activity types" }));
     const harvest = screen.getByTestId("quick-log-activity-harvest");
     expect(harvest).not.toBeDisabled();
-    expect(
-      screen.queryByTestId("quick-log-activity-harvest-disabled-reason"),
-    ).toBeNull();
-    expect(
-      screen.getByTestId("quick-log-activity-harvest-safety"),
-    ).toHaveTextContent(/does not claim harvest readiness or final yield/i);
+    expect(screen.queryByTestId("quick-log-activity-harvest-disabled-reason")).toBeNull();
+    expect(screen.getByTestId("quick-log-activity-harvest-safety")).toHaveTextContent(
+      /does not claim harvest readiness or final yield/i,
+    );
   });
 
   it("calls onSelect for enabled activities including eligible Harvest", () => {
@@ -60,9 +54,7 @@ describe("QuickLogActivityPicker", () => {
     expect(onSelect).toHaveBeenCalledTimes(1);
     expect(onSelect.mock.calls[0][0].id).toBe("feeding");
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "More activity types" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "More activity types" }));
     fireEvent.click(screen.getByTestId("quick-log-activity-harvest"));
     expect(onSelect).toHaveBeenCalledTimes(2);
     expect(onSelect.mock.calls[1][0].id).toBe("harvest");
@@ -70,21 +62,19 @@ describe("QuickLogActivityPicker", () => {
 
   it("uses safety copy from shared definitions (no diagnosis/recommendation)", () => {
     render(<QuickLogActivityPicker onSelect={vi.fn()} />);
-    fireEvent.click(
-      screen.getByRole("button", { name: "More activity types" }),
+    fireEvent.click(screen.getByRole("button", { name: "More activity types" }));
+    expect(screen.getByTestId("quick-log-activity-feeding-safety")).toHaveTextContent(
+      /not a nutrient recommendation/i,
     );
-    expect(
-      screen.getByTestId("quick-log-activity-feeding-safety"),
-    ).toHaveTextContent(/not a nutrient recommendation/i);
-    expect(
-      screen.getByTestId("quick-log-activity-training-safety"),
-    ).toHaveTextContent(/does not mean the plant was safe to train/i);
-    expect(
-      screen.getByTestId("quick-log-activity-defoliation-safety"),
-    ).toHaveTextContent(/does not diagnose recovery or plant stress/i);
-    expect(
-      screen.getByTestId("quick-log-activity-issue_observation-safety"),
-    ).toHaveTextContent(/not a diagnosis by itself/i);
+    expect(screen.getByTestId("quick-log-activity-training-safety")).toHaveTextContent(
+      /does not mean the plant was safe to train/i,
+    );
+    expect(screen.getByTestId("quick-log-activity-defoliation-safety")).toHaveTextContent(
+      /does not diagnose recovery or plant stress/i,
+    );
+    expect(screen.getByTestId("quick-log-activity-issue_observation-safety")).toHaveTextContent(
+      /not a diagnosis by itself/i,
+    );
     expect(
       screen.getByTestId("quick-log-activity-manual_sensor_snapshot-safety"),
     ).toHaveTextContent(/manual, not live sensor data/i);
@@ -253,9 +243,7 @@ describe("useQuickLogActivitySave — routing", () => {
     });
     expect(res.ok).toBe(false);
     expect(res.reason).toBe("harvest_backend_unavailable");
-    expect(res.disabledReason).toBe(
-      QUICK_LOG_HARVEST_BACKEND_UNAVAILABLE_REASON,
-    );
+    expect(res.disabledReason).toBe(QUICK_LOG_HARVEST_BACKEND_UNAVAILABLE_REASON);
     expect(listener).not.toHaveBeenCalled();
     window.removeEventListener("verdant:entry-created", listener);
   });

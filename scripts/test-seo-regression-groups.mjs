@@ -179,7 +179,7 @@ test("verifier emits outcome_groups.unresolved_expired_allowlist and exits 4 on 
     const out = JSON.parse(
       readFileSync(join(dir, "artifacts/seo/gsc-last-finding-verification.json"), "utf8"),
     );
-    // Backward-compatible legacy fields unchanged.
+    // Top-level status and regression count agree with the outcome group.
     assert.equal(out.status, "regression");
     assert.equal(out.regression_count, 1);
     // New additive grouping.
@@ -212,10 +212,16 @@ test("verifier with no previous baseline groups as no_baseline and exits 0", () 
     const out = JSON.parse(
       readFileSync(join(dir, "artifacts/seo/gsc-last-finding-verification.json"), "utf8"),
     );
-    assert.equal(out.status, "no_regression");
+    assert.equal(out.status, "no_baseline");
     assert.equal(out.previous_available, false);
+    assert.equal(out.regression_count, 0);
     assert.equal(out.outcome_groups.no_baseline.count, 1);
+    assert.deepEqual(out.outcome_groups.no_baseline.example_urls, CONFIG.affected_urls);
     assert.equal(out.outcome_groups.unresolved_expired_allowlist.count, 0);
+    const md = readFileSync(join(dir, "artifacts/seo/gsc-last-finding-verification.md"), "utf8");
+    assert.match(md, /Status: \*\*no_baseline\*\*/);
+    assert.match(md, /`NO_BASELINE`/);
+    assert.match(r.stdout, /Regression-only check: no_baseline/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

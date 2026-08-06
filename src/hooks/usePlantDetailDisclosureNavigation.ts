@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "@/lib/react-router-compat";
 
 import {
   resolvePlantDetailDisclosureTarget,
@@ -131,17 +131,18 @@ export function usePlantDetailDisclosureNavigation({
     (targetValue, preferredTarget, options) => {
       const target = resolvePlantDetailDisclosureTarget(targetValue);
       if (!target) return;
-      if (target.group) {
+      const revealGroup = target.group;
+      if (revealGroup) {
         setDisclosureState((current) => {
           const scopeMatches = current.plantId === plantId && current.routeHash === location.hash;
           const currentGroups = scopeMatches
             ? current.openGroups
             : openStateFor(resolvePlantDetailDisclosureTarget(location.hash)?.group ?? null);
-          if (scopeMatches && currentGroups[target.group]) return current;
+          if (scopeMatches && currentGroups[revealGroup]) return current;
           return {
             plantId,
             routeHash: location.hash,
-            openGroups: { ...currentGroups, [target.group]: true },
+            openGroups: { ...currentGroups, [revealGroup]: true },
           };
         });
       }
@@ -181,15 +182,16 @@ export function usePlantDetailDisclosureNavigation({
     const handleHashChange = () => {
       const target = resolvePlantDetailDisclosureTarget(window.location.hash);
       if (!target) return;
-      if (target.group) {
+      const hashGroup = target.group;
+      if (hashGroup) {
         setDisclosureState((current) => {
           const currentGroups =
             current.plantId === plantId ? current.openGroups : openStateFor(null);
-          if (current.plantId === plantId && currentGroups[target.group]) return current;
+          if (current.plantId === plantId && currentGroups[hashGroup]) return current;
           return {
             plantId,
             routeHash: location.hash,
-            openGroups: { ...currentGroups, [target.group]: true },
+            openGroups: { ...currentGroups, [hashGroup]: true },
           };
         });
       }

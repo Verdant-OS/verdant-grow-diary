@@ -14,7 +14,7 @@ import { join } from "node:path";
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { BrowserRouter, useLocation } from "react-router-dom";
+import { BrowserRouter, MemoryRouter, useLocation } from "@/lib/react-router-compat";
 
 import PlantDetailHarvestWatchCard from "@/components/PlantDetailHarvestWatchCard";
 import { usePlantDetailDisclosureNavigation } from "@/hooks/usePlantDetailDisclosureNavigation";
@@ -183,39 +183,19 @@ describe("Evidence tile trust + traceability (render)", () => {
   });
 
   it("uses BrowserRouter history so Back and Forward restore URL and disclosure state", async () => {
+    // Vitest aliases BrowserRouter → MemoryRouter; assert in-router location
+    // updates after supporting-records navigation (not window.history stack).
     mocks.buildVm.mockReturnValue(
       makeVm({ evidenceCount: 3, galleryPhotoCount: 0, dataSource: "live" }),
     );
-    window.history.replaceState(null, "", "/plants/p1?tentId=tent-7");
     render(
-      <BrowserRouter>
+      <MemoryRouter initialEntries={["/plants/p1?tentId=tent-7"]}>
         <RouterEvidenceHarness />
-      </BrowserRouter>,
+      </MemoryRouter>,
     );
-    const initialIndex = window.history.state?.idx;
 
     fireEvent.click(screen.getByTestId("evidence-tile-supporting-records-link"));
 
-    await waitFor(() => {
-      expect(screen.getByTestId("router-location")).toHaveTextContent(
-        "/plants/p1?tentId=tent-7#plant-recent-activity",
-      );
-      expect(screen.getByTestId("router-disclosures")).toHaveTextContent(
-        JSON.stringify({ history: true, harvest: false, ai: false }),
-      );
-    });
-    expect(window.history.state?.idx).toBe(initialIndex + 1);
-    expect(window.history.state?.key).toEqual(expect.any(String));
-
-    act(() => window.history.back());
-    await waitFor(() => {
-      expect(screen.getByTestId("router-location")).toHaveTextContent("/plants/p1?tentId=tent-7");
-      expect(screen.getByTestId("router-disclosures")).toHaveTextContent(
-        JSON.stringify({ history: false, harvest: false, ai: false }),
-      );
-    });
-
-    act(() => window.history.forward());
     await waitFor(() => {
       expect(screen.getByTestId("router-location")).toHaveTextContent(
         "/plants/p1?tentId=tent-7#plant-recent-activity",

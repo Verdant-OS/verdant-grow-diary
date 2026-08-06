@@ -7,9 +7,14 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen, waitFor, within } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 
 import ActionQueue from "@/pages/ActionQueue";
+import {
+  extractMountedAppRoutePaths,
+  getRouteAliasRedirectTarget,
+  readAllRouteModuleSources,
+} from "./helpers/routeManifestSyncHarness";
 import {
   buildActionRowAriaLabel,
   formatActionTypeLabel,
@@ -100,10 +105,8 @@ vi.mock("@/integrations/supabase/client", () => {
         in: () => makeThenableResult(),
         order: () => makeThenableResult(),
         limit: () => makeThenableResult(),
-        then: (
-          onFulfilled: (r: { data: unknown; error: unknown }) => unknown,
-          onRejected?: (e: unknown) => unknown,
-        ) => resolveActionQuery().then(onFulfilled, onRejected),
+        then: (onFulfilled: (r: unknown) => unknown, onRejected?: (e: unknown) => unknown) =>
+          resolveActionQuery().then((value) => onFulfilled(value), onRejected),
         catch: (onRejected: (e: unknown) => unknown) => resolveActionQuery().catch(onRejected),
       };
       return result;
@@ -251,7 +254,7 @@ describe("Action Queue route — row accessibility", () => {
 const ROOT = resolve(__dirname, "../..");
 const PAGE = readFileSync(resolve(ROOT, "src/pages/ActionQueue.tsx"), "utf8");
 const VIEW = readFileSync(resolve(ROOT, "src/lib/actionQueueRowView.ts"), "utf8");
-const APP = readFileSync(resolve(ROOT, "src/App.tsx"), "utf8");
+const APP = readAllRouteModuleSources();
 
 describe("Action Queue polish — static safety + contract preservation", () => {
   it("polish helper has no I/O or privileged access", () => {
@@ -285,9 +288,9 @@ describe("Action Queue polish — static safety + contract preservation", () => 
   });
 
   it("preserves /actions route registration and legacy /action-queue redirect", () => {
-    expect(APP).toMatch(/path="\/actions"\s+element=\{<ActionQueue\s*\/>\}/);
-    expect(APP).toMatch(
-      /path="\/action-queue"\s+element=\{<RouteAliasRedirect\s+to="\/actions"\s*\/>\}/,
-    );
+    expect(extractMountedAppRoutePaths()).toContain("/actions");
+    expect(extractMountedAppRoutePaths()).toContain("/action-queue");
+    expect(APP).toMatch(/ActionQueue|@\/pages\/ActionQueue|pages\/ActionQueue/);
+    expect(getRouteAliasRedirectTarget("/action-queue")).toBe("/actions");
   });
 });

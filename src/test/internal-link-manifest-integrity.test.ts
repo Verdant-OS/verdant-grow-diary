@@ -76,6 +76,7 @@ function walkProductionSourceFiles(root: string): string[] {
       }
     } else if (
       entry.isFile() &&
+      entry.name !== "react-router-compat.tsx" &&
       /\.(?:ts|tsx)$/.test(entry.name) &&
       !/\.(?:test|spec)\.(?:ts|tsx)$/.test(entry.name)
     ) {

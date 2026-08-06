@@ -43,11 +43,9 @@ if (ghCheck.error || ghCheck.status !== 0) {
 const ghAuth = sh("gh", ["auth", "status"]);
 if (ghAuth.status !== 0) {
   fail(
-    [
-      "GitHub CLI is not authenticated.",
-      "Run: gh auth login",
-      ghAuth.stderr?.trim() ?? "",
-    ].join("\n"),
+    ["GitHub CLI is not authenticated.", "Run: gh auth login", ghAuth.stderr?.trim() ?? ""].join(
+      "\n",
+    ),
   );
 }
 
@@ -111,7 +109,7 @@ if (dl.status !== 0) {
       `Failed to download artifact "${ARTIFACT_NAME}" from run #${chosen.databaseId}.`,
       "Possible reasons: artifact expired, not produced, or different name.",
       "List artifacts with:",
-      `  gh run view ${chosen.databaseId} --log` ,
+      `  gh run view ${chosen.databaseId} --log`,
     ].join("\n"),
   );
 }

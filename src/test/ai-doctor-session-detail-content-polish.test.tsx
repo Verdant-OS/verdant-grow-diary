@@ -12,8 +12,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { render, screen, within, waitFor } from "@testing-library/react";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import AiDoctorSessionDetail from "@/pages/AiDoctorSessionDetail";
 import type { Diagnosis } from "@/lib/aiDoctorDiagnosisRules";
@@ -63,7 +63,15 @@ vi.mock("@/integrations/supabase/client", () => {
   const sessionsBuilder = () => ({
     select: () => ({
       eq: (_col: string, value: string) => ({
-        order: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }),
+        order: () => ({
+          limit: () => {
+            const __c: any = {
+              abortSignal: () => __c,
+              then: (r: any, j?: any) => Promise.resolve({ data: [], error: null }).then(r, j),
+            };
+            return __c;
+          },
+        }),
         maybeSingle: () =>
           Promise.resolve(
             value === currentFixture.id
@@ -77,9 +85,25 @@ vi.mock("@/integrations/supabase/client", () => {
   const reviewsBuilder = () => ({
     select: () => ({
       in: () => ({
-        order: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }),
+        order: () => ({
+          limit: () => {
+            const __c: any = {
+              abortSignal: () => __c,
+              then: (r: any, j?: any) => Promise.resolve({ data: [], error: null }).then(r, j),
+            };
+            return __c;
+          },
+        }),
       }),
-      order: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }),
+      order: () => ({
+        limit: () => {
+          const __c: any = {
+            abortSignal: () => __c,
+            then: (r: any, j?: any) => Promise.resolve({ data: [], error: null }).then(r, j),
+          };
+          return __c;
+        },
+      }),
     }),
     insert: () => Promise.resolve({ data: null, error: null }),
   });
@@ -94,10 +118,7 @@ vi.mock("@/integrations/supabase/client", () => {
       limit: () =>
         linkedDelayMs > 0
           ? new Promise((r) =>
-              setTimeout(
-                () => r({ data: linkedRows, error: null }),
-                linkedDelayMs,
-              ),
+              setTimeout(() => r({ data: linkedRows, error: null }), linkedDelayMs),
             )
           : Promise.resolve({ data: linkedRows, error: null }),
     };
@@ -139,10 +160,7 @@ function renderDetail() {
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={[`/doctor/sessions/${SESSION_ID}`]}>
         <Routes>
-          <Route
-            path="/doctor/sessions/:sessionId"
-            element={<AiDoctorSessionDetail />}
-          />
+          <Route path="/doctor/sessions/:sessionId" element={<AiDoctorSessionDetail />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -163,25 +181,18 @@ describe("AiDoctorSessionDetail — loading skeletons", () => {
     expect(loading.getAttribute("aria-live")).toBe("polite");
     expect(loading.getAttribute("aria-busy")).toBe("true");
     expect(loading.textContent).toMatch(/loading ai doctor session/i);
-    expect(
-      screen.getByTestId("ai-doctor-session-detail-loading-skeleton"),
-    ).toBeTruthy();
+    // Skeleton is nested under the loading region; wait so it is not raced away.
+    await waitFor(() => {
+      expect(within(loading).getByTestId("ai-doctor-session-detail-loading-skeleton")).toBeTruthy();
+    });
   });
 
   it("does not render summary, linked actions, not-found or error copy while loading", () => {
     renderDetail();
-    expect(
-      screen.queryByTestId("ai-doctor-session-detail-session-summary"),
-    ).toBeNull();
-    expect(
-      screen.queryByTestId("ai-doctor-session-detail-linked-action-queue"),
-    ).toBeNull();
-    expect(
-      screen.queryByTestId("ai-doctor-session-detail-linked-action-queue-empty"),
-    ).toBeNull();
-    expect(
-      screen.queryByTestId("ai-doctor-session-detail-not-found"),
-    ).toBeNull();
+    expect(screen.queryByTestId("ai-doctor-session-detail-session-summary")).toBeNull();
+    expect(screen.queryByTestId("ai-doctor-session-detail-linked-action-queue")).toBeNull();
+    expect(screen.queryByTestId("ai-doctor-session-detail-linked-action-queue-empty")).toBeNull();
+    expect(screen.queryByTestId("ai-doctor-session-detail-not-found")).toBeNull();
     expect(screen.queryByTestId("ai-doctor-session-detail-error")).toBeNull();
   });
 });
@@ -189,25 +200,17 @@ describe("AiDoctorSessionDetail — loading skeletons", () => {
 describe("AiDoctorSessionDetail — session summary panel", () => {
   it("renders summary panel with safe fields from existing session data", async () => {
     renderDetail();
-    const panel = await screen.findByTestId(
-      "ai-doctor-session-detail-session-summary",
-    );
+    const panel = await screen.findByTestId("ai-doctor-session-detail-session-summary");
     expect(panel.textContent).toMatch(/Session summary/);
-    expect(
-      screen.getByTestId("ai-doctor-session-summary-risk").textContent,
-    ).toMatch(/medium/i);
-    expect(
-      screen.getByTestId("ai-doctor-session-summary-confidence").textContent,
-    ).toMatch(/70%/);
-    expect(
-      screen.getByTestId("ai-doctor-session-summary-context").textContent,
-    ).toMatch(/plant/i);
-    expect(
-      screen.getByTestId("ai-doctor-session-summary-diagnosis").textContent,
-    ).toMatch(/mild tip curl/i);
-    expect(
-      screen.getByTestId("ai-doctor-session-summary-review-note").textContent,
-    ).toMatch(/review this snapshot before acting/i);
+    expect(screen.getByTestId("ai-doctor-session-summary-risk").textContent).toMatch(/medium/i);
+    expect(screen.getByTestId("ai-doctor-session-summary-confidence").textContent).toMatch(/70%/);
+    expect(screen.getByTestId("ai-doctor-session-summary-context").textContent).toMatch(/plant/i);
+    expect(screen.getByTestId("ai-doctor-session-summary-diagnosis").textContent).toMatch(
+      /mild tip curl/i,
+    );
+    expect(screen.getByTestId("ai-doctor-session-summary-review-note").textContent).toMatch(
+      /review this snapshot before acting/i,
+    );
   });
 
   it("renders calm fallback when diagnosis summary is missing — no fabricated content", async () => {
@@ -217,16 +220,14 @@ describe("AiDoctorSessionDetail — session summary panel", () => {
     };
     renderDetail();
     await screen.findByTestId("ai-doctor-session-detail-session-summary");
-    expect(
-      screen.getByTestId("ai-doctor-session-summary-diagnosis-empty").textContent,
-    ).toMatch(/no diagnosis summary saved/i);
+    expect(screen.getByTestId("ai-doctor-session-summary-diagnosis-empty").textContent).toMatch(
+      /no diagnosis summary saved/i,
+    );
   });
 
   it("never leaks raw plant/tent/grow ids or [session:]/[alert:] tokens", async () => {
     renderDetail();
-    const panel = await screen.findByTestId(
-      "ai-doctor-session-detail-session-summary",
-    );
+    const panel = await screen.findByTestId("ai-doctor-session-detail-session-summary");
     const text = panel.textContent ?? "";
     expect(text).not.toContain("plant-1");
     expect(text).not.toContain("tent-1");
@@ -258,13 +259,9 @@ describe("AiDoctorSessionDetail — linked Action Queue states", () => {
   it("renders a calm empty state when no linked actions exist", async () => {
     linkedRows = [];
     renderDetail();
-    const empty = await screen.findByTestId(
-      "ai-doctor-session-detail-linked-action-queue-empty",
-    );
+    const empty = await screen.findByTestId("ai-doctor-session-detail-linked-action-queue-empty");
     expect(empty.textContent).toMatch(/no approval-required action has been queued/i);
-    expect(
-      screen.queryByTestId("ai-doctor-session-detail-linked-action-queue"),
-    ).toBeNull();
+    expect(screen.queryByTestId("ai-doctor-session-detail-linked-action-queue")).toBeNull();
   });
 
   it("linked action primary link has descriptive aria-label and focus-visible styles", async () => {
@@ -317,9 +314,7 @@ describe("AiDoctorSessionDetail — linked Action Queue states", () => {
       expect(li.className).toMatch(/focus-visible:ring/);
     }
     await waitFor(() => {
-      const empty = screen.queryByTestId(
-        "ai-doctor-session-detail-linked-action-queue-empty",
-      );
+      const empty = screen.queryByTestId("ai-doctor-session-detail-linked-action-queue-empty");
       expect(empty).toBeNull();
     });
   });
@@ -327,10 +322,7 @@ describe("AiDoctorSessionDetail — linked Action Queue states", () => {
 
 // --- Static safety scan ------------------------------------------------------
 const ROOT = resolve(__dirname, "../..");
-const PAGE = readFileSync(
-  resolve(ROOT, "src/pages/AiDoctorSessionDetail.tsx"),
-  "utf8",
-);
+const PAGE = readFileSync(resolve(ROOT, "src/pages/AiDoctorSessionDetail.tsx"), "utf8");
 
 describe("AiDoctorSessionDetail content polish — static safety", () => {
   it("no service_role, no writes, no functions.invoke", () => {

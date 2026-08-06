@@ -138,10 +138,7 @@ describe("aiDoctorConfidenceEdgeClient", () => {
   });
 
   it("source file contains no service_role or bridge token strings", () => {
-    const src = readFileSync(
-      resolve(__dirname, "../lib/aiDoctorConfidenceEdgeClient.ts"),
-      "utf8",
-    );
+    const src = readFileSync(resolve(__dirname, "../lib/aiDoctorConfidenceEdgeClient.ts"), "utf8");
     expect(src).not.toMatch(/service_role/i);
     expect(src).not.toMatch(/bridge[_-]?token/i);
     expect(src).not.toMatch(/SUPABASE_SERVICE_ROLE_KEY/);

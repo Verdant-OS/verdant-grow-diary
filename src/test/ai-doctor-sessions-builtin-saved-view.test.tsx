@@ -8,12 +8,16 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen, fireEvent, within } from "@testing-library/react";
-import { MemoryRouter, useLocation } from "react-router-dom";
+import { MemoryRouter, useLocation } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 import type { AiDoctorSessionRow } from "@/hooks/use-ai-doctor-sessions";
 import type { Diagnosis } from "@/lib/aiDoctorDiagnosisRules";
-import { getLocalStorageItemForTest, removeLocalStorageItemForTest, setLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
+import {
+  getLocalStorageItemForTest,
+  removeLocalStorageItemForTest,
+  setLocalStorageItemForTest,
+} from "./helpers/localStorageTestHelper";
 import {
   addSavedView,
   BUILTIN_SAVED_VIEWS,
@@ -29,10 +33,7 @@ import {
   SAVED_VIEWS_STORAGE_KEY,
   type SavedView,
 } from "@/lib/aiDoctorSessionsSavedViewsRules";
-import {
-  applyNeedsAttentionPreset,
-  DEFAULT_FILTERS,
-} from "@/lib/aiDoctorSessionsIndexFilters";
+import { applyNeedsAttentionPreset, DEFAULT_FILTERS } from "@/lib/aiDoctorSessionsIndexFilters";
 import AiDoctorSessionsIndex from "@/pages/AiDoctorSessionsIndex";
 
 let currentRows: AiDoctorSessionRow[] = [];
@@ -40,7 +41,7 @@ let currentRows: AiDoctorSessionRow[] = [];
 vi.mock("@/integrations/supabase/client", () => {
   const result = () => Promise.resolve({ data: currentRows, error: null });
   const chain: Record<string, unknown> = {};
-  const methods = ["select", "eq", "order", "limit", "range", "not", "gte", "or"];
+  const methods = ["select", "eq", "order", "limit", "range", "not", "gte", "or", "abortSignal"];
   for (const m of methods) chain[m] = () => chain;
   chain.then = (resolve: (v: unknown) => unknown) => result().then(resolve);
   return { supabase: { from: () => chain } };
@@ -60,8 +61,8 @@ function makeRow(
     possibleCauses: [],
     immediateAction: "",
     whatNotToDo: [],
-    followUp24h: null,
-    recoveryPlan3d: null,
+    followUp24h: null as never,
+    recoveryPlan3d: null as never,
     riskLevel: "low",
     suggestedActions: [],
     ...diag,
@@ -120,13 +121,11 @@ describe("built-in saved view helpers", () => {
 
   it("matchingBuiltInSavedViewId detects preset filter state", () => {
     expect(matchingBuiltInSavedViewId(DEFAULT_FILTERS, 0)).toBeNull();
-    expect(
-      matchingBuiltInSavedViewId(applyNeedsAttentionPreset(DEFAULT_FILTERS), 0),
-    ).toBe(BUILTIN_SAVED_VIEW_NEEDS_ATTENTION_ID);
+    expect(matchingBuiltInSavedViewId(applyNeedsAttentionPreset(DEFAULT_FILTERS), 0)).toBe(
+      BUILTIN_SAVED_VIEW_NEEDS_ATTENTION_ID,
+    );
     // Different page disqualifies match (saved view sigs include page).
-    expect(
-      matchingBuiltInSavedViewId(applyNeedsAttentionPreset(DEFAULT_FILTERS), 2),
-    ).toBeNull();
+    expect(matchingBuiltInSavedViewId(applyNeedsAttentionPreset(DEFAULT_FILTERS), 2)).toBeNull();
   });
 
   it("addSavedView rejects duplicate of built-in label or signature", () => {
@@ -159,19 +158,20 @@ describe("built-in saved view is never persisted", () => {
   });
 
   it("readSavedViews returns only persisted (user) views", () => {
+    const data = new Map<string, string>();
     const storage = {
-      _data: new Map<string, string>(),
+      _data: data,
       getItem(k: string) {
-        return this._data.get(k) ?? null;
+        return data.get(k) ?? null;
       },
       setItem(k: string, v: string) {
-        this._data.set(k, v);
+        data.set(k, v);
       },
       removeItem(k: string) {
-        this._data.delete(k);
+        data.delete(k);
       },
       clear() {
-        this._data.clear();
+        data.clear();
       },
       key() {
         return null;
@@ -245,27 +245,21 @@ describe("AiDoctorSessionsIndex — built-in saved view UI", () => {
     currentRows = [healthyRow("a")];
     renderPage();
     await screen.findByTestId("ai-doctor-sessions-index-list");
-    const select = screen.getByTestId(
-      "ai-doctor-sessions-saved-views-select",
-    ) as HTMLSelectElement;
+    const select = screen.getByTestId("ai-doctor-sessions-saved-views-select") as HTMLSelectElement;
     const opts = Array.from(select.options).map((o) => o.value);
     expect(opts).toContain(BUILTIN_SAVED_VIEW_NEEDS_ATTENTION_ID);
-    const builtinOpts = screen.getAllByTestId(
-      "ai-doctor-sessions-saved-views-builtin-option",
-    );
+    const builtinOpts = screen.getAllByTestId("ai-doctor-sessions-saved-views-builtin-option");
     expect(builtinOpts.length).toBeGreaterThanOrEqual(1);
-    expect(
-      builtinOpts.some((o) => (o.textContent ?? "").includes("Needs my attention")),
-    ).toBe(true);
+    expect(builtinOpts.some((o) => (o.textContent ?? "").includes("Needs my attention"))).toBe(
+      true,
+    );
   });
 
   it("selecting the built-in applies caution=yes + hasChecklist=yes and updates URL", async () => {
     currentRows = [lowConfRow("a")];
     renderPage();
     await screen.findByTestId("ai-doctor-sessions-index-list");
-    const select = screen.getByTestId(
-      "ai-doctor-sessions-saved-views-select",
-    ) as HTMLSelectElement;
+    const select = screen.getByTestId("ai-doctor-sessions-saved-views-select") as HTMLSelectElement;
     fireEvent.change(select, {
       target: { value: BUILTIN_SAVED_VIEW_NEEDS_ATTENTION_ID },
     });
@@ -286,9 +280,7 @@ describe("AiDoctorSessionsIndex — built-in saved view UI", () => {
     currentRows = [lowConfRow("a")];
     renderPage();
     await screen.findByTestId("ai-doctor-sessions-index-list");
-    fireEvent.click(
-      screen.getByTestId("ai-doctor-sessions-index-needs-attention-preset"),
-    );
+    fireEvent.click(screen.getByTestId("ai-doctor-sessions-index-needs-attention-preset"));
     const select = (await screen.findByTestId(
       "ai-doctor-sessions-saved-views-select",
     )) as HTMLSelectElement;
@@ -299,23 +291,18 @@ describe("AiDoctorSessionsIndex — built-in saved view UI", () => {
     currentRows = [lowConfRow("a")];
     renderPage();
     await screen.findByTestId("ai-doctor-sessions-index-list");
-    fireEvent.change(
-      screen.getByTestId("ai-doctor-sessions-saved-views-select"),
-      { target: { value: BUILTIN_SAVED_VIEW_NEEDS_ATTENTION_ID } },
-    );
+    fireEvent.change(screen.getByTestId("ai-doctor-sessions-saved-views-select"), {
+      target: { value: BUILTIN_SAVED_VIEW_NEEDS_ATTENTION_ID },
+    });
     await screen.findByTestId("ai-doctor-sessions-index-needs-attention-badge");
-    expect(
-      screen.queryByTestId("ai-doctor-sessions-saved-views-delete"),
-    ).toBeNull();
+    expect(screen.queryByTestId("ai-doctor-sessions-saved-views-delete")).toBeNull();
   });
 
   it("clearing filters deselects the built-in view", async () => {
     currentRows = [lowConfRow("a")];
     renderPage();
     await screen.findByTestId("ai-doctor-sessions-index-list");
-    fireEvent.click(
-      screen.getByTestId("ai-doctor-sessions-index-needs-attention-preset"),
-    );
+    fireEvent.click(screen.getByTestId("ai-doctor-sessions-index-needs-attention-preset"));
     await screen.findByTestId("ai-doctor-sessions-index-needs-attention-badge");
     fireEvent.click(screen.getByTestId("ai-doctor-sessions-index-clear-filters"));
     const select = (await screen.findByTestId(
@@ -328,10 +315,9 @@ describe("AiDoctorSessionsIndex — built-in saved view UI", () => {
     currentRows = [lowConfRow("a")];
     renderPage();
     await screen.findByTestId("ai-doctor-sessions-index-list");
-    fireEvent.change(
-      screen.getByTestId("ai-doctor-sessions-saved-views-select"),
-      { target: { value: BUILTIN_SAVED_VIEW_NEEDS_ATTENTION_ID } },
-    );
+    fireEvent.change(screen.getByTestId("ai-doctor-sessions-saved-views-select"), {
+      target: { value: BUILTIN_SAVED_VIEW_NEEDS_ATTENTION_ID },
+    });
     await screen.findByTestId("ai-doctor-sessions-index-needs-attention-badge");
     const raw = getLocalStorageItemForTest(SAVED_VIEWS_STORAGE_KEY) ?? "[]";
     const persisted = parseSavedViews(raw);
@@ -349,16 +335,11 @@ describe("AiDoctorSessionsIndex — built-in saved view UI", () => {
         createdAt: "2026-01-01T00:00:00.000Z",
       },
     ];
-    setLocalStorageItemForTest(
-      SAVED_VIEWS_STORAGE_KEY,
-      JSON.stringify(user),
-    );
+    setLocalStorageItemForTest(SAVED_VIEWS_STORAGE_KEY, JSON.stringify(user));
     currentRows = [healthyRow("a")];
     renderPage();
     await screen.findByTestId("ai-doctor-sessions-index-list");
-    const select = screen.getByTestId(
-      "ai-doctor-sessions-saved-views-select",
-    ) as HTMLSelectElement;
+    const select = screen.getByTestId("ai-doctor-sessions-saved-views-select") as HTMLSelectElement;
     const labels = Array.from(select.options).map((o) => o.textContent ?? "");
     expect(labels.some((l) => l.includes("Needs my attention"))).toBe(true);
     expect(labels.some((l) => l.includes("Critical only"))).toBe(true);
@@ -372,10 +353,7 @@ describe("Static safety scan — built-in saved view slice", () => {
     "src/lib/aiDoctorSessionsSavedViewsRules.ts",
     "src/lib/aiDoctorSessionsIndexFilters.ts",
   ].map((p) => readFileSync(resolve(ROOT, p), "utf8"));
-  const TSX = readFileSync(
-    resolve(ROOT, "src/pages/AiDoctorSessionsIndex.tsx"),
-    "utf8",
-  );
+  const TSX = readFileSync(resolve(ROOT, "src/pages/AiDoctorSessionsIndex.tsx"), "utf8");
   const ALL = FILES.join("\n");
 
   it("no DB writes for the built-in view", () => {

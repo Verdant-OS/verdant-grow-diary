@@ -17,7 +17,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { removeLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
 import { render, screen, waitFor, fireEvent, act, cleanup } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import AiDoctorSessionDetail from "@/pages/AiDoctorSessionDetail";
 import AiDoctorSessionsIndex from "@/pages/AiDoctorSessionsIndex";
@@ -46,8 +46,8 @@ const fixtureDiagnosis: Diagnosis = {
   possibleCauses: [],
   immediateAction: "",
   whatNotToDo: [],
-  followUp24h: null,
-  recoveryPlan3d: null,
+  followUp24h: null as never,
+  recoveryPlan3d: null as never,
   riskLevel: "medium",
   suggestedActions: [],
 };
@@ -98,7 +98,7 @@ vi.mock("@/integrations/supabase/client", () => {
   function reviewsChain() {
     let current = reviewRows;
     const chain: Record<string, unknown> = {};
-    const passthrough = ["select", "order", "limit", "range", "not", "gte", "or"];
+    const passthrough = ["select", "order", "limit", "range", "not", "gte", "or", "abortSignal"];
     for (const m of passthrough) chain[m] = () => chain;
     chain.in = (_col: string, values: unknown) => {
       if (Array.isArray(values)) {
@@ -144,14 +144,30 @@ vi.mock("@/integrations/supabase/client", () => {
 
   function sessionsChain() {
     const chain: Record<string, unknown> = {};
-    const passthrough = ["select", "order", "limit", "range", "not", "gte", "or", "in"];
+    const passthrough = [
+      "select",
+      "order",
+      "limit",
+      "range",
+      "not",
+      "gte",
+      "or",
+      "in",
+      "abortSignal",
+    ];
     for (const m of passthrough) chain[m] = () => chain;
     chain.eq = (col: string, value: string) => {
       if (col === "id") {
         const match = sessionRows.find((r) => r.id === value) ?? null;
         return {
           order: () => ({
-            limit: () => Promise.resolve({ data: [], error: null }),
+            limit: () => {
+              const c: any = {
+                abortSignal: () => c,
+                then: (r: any) => Promise.resolve({ data: [], error: null }).then(r),
+              };
+              return c;
+            },
           }),
           maybeSingle: () => Promise.resolve({ data: match, error: null }),
         };

@@ -19,9 +19,7 @@ import {
   isHarvestInspectionPrefill,
   normalizeHarvestPhotoComparison,
 } from "@/lib/harvestInspectionQuickLogPreviewRules";
-import {
-  buildHarvestInspectionQuickLogPrefill,
-} from "@/lib/harvestInspectionQuickLogRules";
+import { buildHarvestInspectionQuickLogPrefill } from "@/lib/harvestInspectionQuickLogRules";
 
 const ctx = { plantId: "p1", plantName: "Plant", growId: null, tentId: null };
 
@@ -68,9 +66,7 @@ describe("detectHarvestInspectionPreset", () => {
   });
 
   it("returns null when source is not harvest-watch-inspection", () => {
-    expect(
-      detectHarvestInspectionPreset({ source: "hyperlog", note: "Trichome" }),
-    ).toBe(null);
+    expect(detectHarvestInspectionPreset({ source: "hyperlog", note: "Trichome" })).toBe(null);
   });
 
   it("ignores invalid preset values", () => {
@@ -86,9 +82,9 @@ describe("detectHarvestInspectionPreset", () => {
 describe("buildHarvestInspectionPreviewViewModel", () => {
   it("does not show for normal prefills", () => {
     expect(buildHarvestInspectionPreviewViewModel(null).show).toBe(false);
-    expect(
-      buildHarvestInspectionPreviewViewModel({ source: "hyperlog", note: "x" }).show,
-    ).toBe(false);
+    expect(buildHarvestInspectionPreviewViewModel({ source: "hyperlog", note: "x" }).show).toBe(
+      false,
+    );
   });
 
   it("returns mandated caution + review copy for harvest prefills", () => {
@@ -118,16 +114,12 @@ describe("buildHarvestInspectionPreviewViewModel", () => {
       expect(vm.preset).toBe(preset);
       expect(vm.presetLabel).toBe(HARVEST_INSPECTION_PREVIEW_LABEL[preset]);
     }
-    expect(HARVEST_INSPECTION_PREVIEW_LABEL.trichome_inspection).toBe(
-      "Trichome inspection",
-    );
+    expect(HARVEST_INSPECTION_PREVIEW_LABEL.trichome_inspection).toBe("Trichome inspection");
     expect(HARVEST_INSPECTION_PREVIEW_LABEL.pistil_recession).toBe(
       "Pistil / recession observation",
     );
     expect(HARVEST_INSPECTION_PREVIEW_LABEL.bud_maturity).toBe("Bud maturity note");
-    expect(HARVEST_INSPECTION_PREVIEW_LABEL.close_flower_photo).toBe(
-      "Close flower photo",
-    );
+    expect(HARVEST_INSPECTION_PREVIEW_LABEL.close_flower_photo).toBe("Close flower photo");
   });
 
   it("surfaces the prefilled note verbatim", () => {
@@ -141,11 +133,7 @@ describe("buildHarvestInspectionPreviewViewModel", () => {
   });
 
   it("only flags showPhotoComparison for close_flower_photo", () => {
-    for (const preset of [
-      "trichome_inspection",
-      "pistil_recession",
-      "bud_maturity",
-    ] as const) {
+    for (const preset of ["trichome_inspection", "pistil_recession", "bud_maturity"] as const) {
       const p = buildHarvestInspectionQuickLogPrefill({ preset, context: ctx });
       expect(buildHarvestInspectionPreviewViewModel(p).showPhotoComparison).toBe(false);
     }
@@ -176,15 +164,16 @@ describe("photo comparison options + normalization", () => {
   });
 
   it("normalizes valid inputs and drops invalid ones", () => {
-    expect(
-      normalizeHarvestPhotoComparison({ angle: "top", lighting: "natural" }),
-    ).toEqual({ angle: "top", lighting: "natural" });
+    expect(normalizeHarvestPhotoComparison({ angle: "top", lighting: "natural" })).toEqual({
+      angle: "top",
+      lighting: "natural",
+    });
     expect(normalizeHarvestPhotoComparison({ angle: "nope" })).toBe(null);
     expect(normalizeHarvestPhotoComparison(null)).toBe(null);
     expect(normalizeHarvestPhotoComparison({})).toBe(null);
-    expect(
-      normalizeHarvestPhotoComparison({ angle: "side", lighting: "x" }),
-    ).toEqual({ angle: "side" });
+    expect(normalizeHarvestPhotoComparison({ angle: "side", lighting: "x" })).toEqual({
+      angle: "side",
+    });
   });
 });
 

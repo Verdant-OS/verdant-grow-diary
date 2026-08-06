@@ -57,9 +57,7 @@ describe("Action Queue follow-up rules — eligibility", () => {
     [null],
     [undefined],
   ])("rejects status=%s", (status) => {
-    expect(
-      isActionEligibleForFollowup(completed({ status: status as string | null })),
-    ).toBe(false);
+    expect(isActionEligibleForFollowup(completed({ status: status as string | null }))).toBe(false);
   });
 
   it("rejects missing id / grow_id", () => {
@@ -87,9 +85,7 @@ describe("Action Queue follow-up rules — draft builder", () => {
 
   it("rejects non-completed / missing-context inputs", () => {
     expect(buildActionFollowupDiaryDraft(null).ok).toBe(false);
-    expect(
-      buildActionFollowupDiaryDraft(completed({ status: "pending_approval" })).ok,
-    ).toBe(false);
+    expect(buildActionFollowupDiaryDraft(completed({ status: "pending_approval" })).ok).toBe(false);
     expect(buildActionFollowupDiaryDraft(completed({ id: null })).ok).toBe(false);
     expect(buildActionFollowupDiaryDraft(completed({ grow_id: null })).ok).toBe(false);
   });
@@ -198,16 +194,11 @@ describe("Action Queue follow-up rules — idempotency matcher", () => {
 });
 
 function stripComments(src: string): string {
-  return src
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/(^|[^:])\/\/.*$/gm, "$1");
+  return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
 }
 
 describe("Action Queue follow-up rules — static safety of helper module", () => {
-  const raw = fs.readFileSync(
-    path.resolve(__dirname, "../lib/actionFollowupRules.ts"),
-    "utf8",
-  );
+  const raw = fs.readFileSync(path.resolve(__dirname, "../lib/actionFollowupRules.ts"), "utf8");
   const src = stripComments(raw);
 
   it("contains no DB / RPC / network / secret references", () => {

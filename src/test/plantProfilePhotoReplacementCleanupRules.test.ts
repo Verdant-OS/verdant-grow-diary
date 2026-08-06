@@ -56,24 +56,28 @@ describe("evaluatePreviousPhotoCleanup — ineligible cases", () => {
     });
   });
   it("wrong bucket → wrong_bucket", () => {
-    expect(
-      ev(`storage://other-bucket/${USER}/g/plant-profiles/${PLANT}/x.jpg`),
-    ).toEqual({ eligible: false, reason: "wrong_bucket" });
+    expect(ev(`storage://other-bucket/${USER}/g/plant-profiles/${PLANT}/x.jpg`)).toEqual({
+      eligible: false,
+      reason: "wrong_bucket",
+    });
   });
   it("wrong owner → wrong_owner", () => {
-    expect(
-      ev(`storage://diary-photos/someone-else/g/plant-profiles/${PLANT}/x.jpg`),
-    ).toEqual({ eligible: false, reason: "wrong_owner" });
+    expect(ev(`storage://diary-photos/someone-else/g/plant-profiles/${PLANT}/x.jpg`)).toEqual({
+      eligible: false,
+      reason: "wrong_owner",
+    });
   });
   it("wrong plant subfolder → wrong_plant_path", () => {
-    expect(
-      ev(`storage://diary-photos/${USER}/g/not-plant-profiles/${PLANT}/x.jpg`),
-    ).toEqual({ eligible: false, reason: "wrong_plant_path" });
+    expect(ev(`storage://diary-photos/${USER}/g/not-plant-profiles/${PLANT}/x.jpg`)).toEqual({
+      eligible: false,
+      reason: "wrong_plant_path",
+    });
   });
   it("wrong plant id → wrong_plant_path", () => {
-    expect(
-      ev(`storage://diary-photos/${USER}/g/plant-profiles/other-plant/x.jpg`),
-    ).toEqual({ eligible: false, reason: "wrong_plant_path" });
+    expect(ev(`storage://diary-photos/${USER}/g/plant-profiles/other-plant/x.jpg`)).toEqual({
+      eligible: false,
+      reason: "wrong_plant_path",
+    });
   });
   it("invalid new reference (not storage://) → malformed_reference", () => {
     expect(ev(OLD_OK, "https://cdn/x.jpg")).toEqual({

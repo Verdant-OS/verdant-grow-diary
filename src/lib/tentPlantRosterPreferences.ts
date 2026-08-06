@@ -36,9 +36,7 @@ export function tentPlantRosterIncludeArchivedKey(
   return id ? `${KEY_PREFIX}${id}` : null;
 }
 
-export function readTentPlantRosterIncludeArchived(
-  tentId: string | null | undefined,
-): boolean {
+export function readTentPlantRosterIncludeArchived(tentId: string | null | undefined): boolean {
   const key = tentPlantRosterIncludeArchivedKey(tentId);
   if (!key) return false;
   const storage = getStorage();

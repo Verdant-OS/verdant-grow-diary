@@ -25,10 +25,7 @@ import type { OriginatingTimelineEventRef } from "@/lib/originatingTimelineEvent
  * Returns `[]` for null/missing/invalid input.
  */
 export function forwardAlertRefsToActionQueue(
-  alertRow:
-    | { originating_timeline_events?: unknown }
-    | null
-    | undefined,
+  alertRow: { originating_timeline_events?: unknown } | null | undefined,
 ): OriginatingTimelineEventRef[] {
   return adaptOriginatingTimelineEventsFromRow(alertRow);
 }
@@ -38,8 +35,6 @@ export function forwardAlertRefsToActionQueue(
  * Accepts a raw column-shaped array (unknown JSON) and returns the sanitized
  * deterministic list. Returns `[]` for null/missing/invalid input.
  */
-export function forwardInMemoryRefs(
-  raw: unknown,
-): OriginatingTimelineEventRef[] {
+export function forwardInMemoryRefs(raw: unknown): OriginatingTimelineEventRef[] {
   return adaptOriginatingTimelineEventsColumn(raw);
 }

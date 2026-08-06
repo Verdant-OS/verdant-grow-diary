@@ -24,13 +24,7 @@ import { plantDetailPath } from "@/lib/routes";
 import { isHarvestWatchEligible } from "@/lib/harvestWatchEligibilityRules";
 
 export type TentPlantRosterStage =
-  | "seedling"
-  | "veg"
-  | "flower"
-  | "flush"
-  | "harvest"
-  | "cure"
-  | null;
+  "seedling" | "veg" | "flower" | "flush" | "harvest" | "cure" | null;
 
 export interface TentPlantRosterPlantInput {
   id: string;
@@ -83,10 +77,7 @@ export interface TentPlantRosterRow {
   plantDetailHref: string;
 }
 
-export type TentPlantRosterState =
-  | "loaded"
-  | "empty"
-  | "unknown-relationship";
+export type TentPlantRosterState = "loaded" | "empty" | "unknown-relationship";
 
 export interface TentPlantRosterViewModel {
   state: TentPlantRosterState;
@@ -122,15 +113,12 @@ export interface TentPlantRosterViewModel {
   archivedBadgeHelpCopy: string;
 }
 
-
 export const TENT_PLANT_ROSTER_SHARED_ENVIRONMENT_COPY =
   "Tent environment is shared. Plant response is tracked per plant.";
 
-export const TENT_PLANT_ROSTER_TENT_SENSOR_CONTEXT_NOTE =
-  "Tent-level sensor context";
+export const TENT_PLANT_ROSTER_TENT_SENSOR_CONTEXT_NOTE = "Tent-level sensor context";
 
-export const TENT_PLANT_ROSTER_EMPTY_COPY =
-  "No plants assigned to this tent yet.";
+export const TENT_PLANT_ROSTER_EMPTY_COPY = "No plants assigned to this tent yet.";
 
 export const TENT_PLANT_ROSTER_UNKNOWN_RELATIONSHIP_COPY =
   "Plant-to-tent relationship is unavailable.";
@@ -138,8 +126,7 @@ export const TENT_PLANT_ROSTER_UNKNOWN_RELATIONSHIP_COPY =
 export const TENT_PLANT_ROSTER_HARVEST_WATCH_FALLBACK_COPY =
   "Harvest Watch available on Plant Detail";
 
-export const TENT_PLANT_ROSTER_ARCHIVED_TOGGLE_LABEL =
-  "Show archived plants";
+export const TENT_PLANT_ROSTER_ARCHIVED_TOGGLE_LABEL = "Show archived plants";
 
 export const TENT_PLANT_ROSTER_ARCHIVED_TOGGLE_ACCESSIBLE_LABEL =
   "Show archived plants in this tent roster";
@@ -155,10 +142,7 @@ export const TENT_PLANT_ROSTER_ARCHIVED_BADGE_HELP_COPY =
 export const TENT_PLANT_ROSTER_EMPTY_ARCHIVED_HINT_COPY =
   "Archived plants can be shown using the toggle above.";
 
-export function formatTentPlantRosterHeaderCounts(
-  active: number,
-  archived: number,
-): string {
+export function formatTentPlantRosterHeaderCounts(active: number, archived: number): string {
   return `Active plants: ${active} · Archived plants: ${archived}`;
 }
 
@@ -203,8 +187,7 @@ interface CommonCopy {
 
 const COMMON_COPY: CommonCopy = {
   archivedToggleLabel: TENT_PLANT_ROSTER_ARCHIVED_TOGGLE_LABEL,
-  archivedToggleAccessibleLabel:
-    TENT_PLANT_ROSTER_ARCHIVED_TOGGLE_ACCESSIBLE_LABEL,
+  archivedToggleAccessibleLabel: TENT_PLANT_ROSTER_ARCHIVED_TOGGLE_ACCESSIBLE_LABEL,
   archivedToggleHelpCopy: TENT_PLANT_ROSTER_ARCHIVED_TOGGLE_HELP_COPY,
   archivedRowLabel: TENT_PLANT_ROSTER_ARCHIVED_ROW_LABEL,
   archivedBadgeHelpCopy: TENT_PLANT_ROSTER_ARCHIVED_BADGE_HELP_COPY,
@@ -285,10 +268,7 @@ export function buildTentPlantRosterViewModel(
 
   const sensorLabel = normalizeString(input.tentSensorContextLabel);
   const archivedHiddenCount = includeArchived ? 0 : archivedPlantCount;
-  const headerCountsCopy = formatTentPlantRosterHeaderCounts(
-    activePlantCount,
-    archivedPlantCount,
-  );
+  const headerCountsCopy = formatTentPlantRosterHeaderCounts(activePlantCount, archivedPlantCount);
 
   if (rows.length === 0) {
     return {
@@ -306,9 +286,7 @@ export function buildTentPlantRosterViewModel(
       archivedPlantCount,
       headerCountsCopy,
       emptyArchivedHintCopy:
-        archivedHiddenCount > 0
-          ? TENT_PLANT_ROSTER_EMPTY_ARCHIVED_HINT_COPY
-          : null,
+        archivedHiddenCount > 0 ? TENT_PLANT_ROSTER_EMPTY_ARCHIVED_HINT_COPY : null,
       ...COMMON_COPY,
     };
   }
@@ -331,4 +309,3 @@ export function buildTentPlantRosterViewModel(
     ...COMMON_COPY,
   };
 }
-

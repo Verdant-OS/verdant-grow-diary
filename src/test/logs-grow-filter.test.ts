@@ -5,18 +5,25 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import {
+  extractMountedAppRoutePaths,
+  getRouteAliasRedirectTarget,
+  readAllRouteModuleSources,
+} from "./helpers/routeManifestSyncHarness";
 
 const ROOT = resolve(__dirname, "../..");
 const TIMELINE = readFileSync(resolve(ROOT, "src/pages/Timeline.tsx"), "utf8");
 const GROW_DETAIL = readFileSync(resolve(ROOT, "src/pages/GrowDetail.tsx"), "utf8");
-const APP = readFileSync(resolve(ROOT, "src/App.tsx"), "utf8");
+const APP = readAllRouteModuleSources();
 
 describe("Logs — grow filter (/logs?growId=…)", () => {
   it("/logs redirects to /timeline, which renders Timeline", () => {
     // /logs is a legacy alias; the shared redirect preserves growId/hash
     // while forwarding to the canonical /timeline route.
-    expect(APP).toMatch(/path="\/logs"\s+element=\{<RouteAliasRedirect\s+to="\/timeline"\s*\/>\}/);
-    expect(APP).toMatch(/path="\/timeline"\s+element=\{<Timeline\s*\/>\}/);
+    expect(extractMountedAppRoutePaths()).toContain("/logs");
+    expect(getRouteAliasRedirectTarget("/logs")).toBe("/timeline");
+    expect(extractMountedAppRoutePaths()).toContain("/timeline");
+    expect(APP).toMatch(/Timeline/);
   });
 
   it("reads growId via shared useScopedGrow hook", () => {

@@ -49,7 +49,15 @@ const mocks = vi.hoisted(() => {
     delete: () => ({ eq: deleteMock }),
     select: () => ({
       eq: () => ({
-        order: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }),
+        order: () => ({
+          limit: () => {
+            const __c: any = {
+              abortSignal: () => __c,
+              then: (r: any, j?: any) => Promise.resolve({ data: [], error: null }).then(r, j),
+            };
+            return __c;
+          },
+        }),
       }),
     }),
   }));
@@ -92,7 +100,6 @@ vi.mock("@/integrations/supabase/client", () => ({
   },
 }));
 
-
 vi.mock("@/store/auth", () => ({ useAuth: () => ({ user: { id: "user-1" } }) }));
 vi.mock("@/store/grows", () => ({
   useGrows: () => ({
@@ -104,9 +111,7 @@ vi.mock("@/store/grows", () => ({
 }));
 vi.mock("@/hooks/use-plants", () => ({
   usePlants: () => ({
-    data: [
-      { id: "plant-1", name: "Verdant Test Plant", tent_id: "tent-1", grow_id: "grow-1" },
-    ],
+    data: [{ id: "plant-1", name: "Verdant Test Plant", tent_id: "tent-1", grow_id: "grow-1" }],
   }),
 }));
 vi.mock("sonner", () => ({
@@ -150,7 +155,6 @@ function assertNoWriteSideEffects() {
   // since they back every .from(...).{insert,upsert,update,delete}.
 }
 
-
 beforeEach(() => {
   saveMock.mockReset();
   insertMock.mockReset();
@@ -181,9 +185,9 @@ describe("CSV normalization preview — no-write guard", () => {
     expect(
       screen.getByTestId("sensor-normalization-preview-panel").getAttribute("data-writes-enabled"),
     ).toBe("false");
-    expect(
-      screen.getByTestId("csv-normalization-preview-section-disclaimer"),
-    ).toHaveTextContent(/Preview only — no sensor readings will be saved\./);
+    expect(screen.getByTestId("csv-normalization-preview-section-disclaimer")).toHaveTextContent(
+      /Preview only — no sensor readings will be saved\./,
+    );
   });
 
   it("uses canonical CSV source/identity/transport badges", () => {
@@ -256,9 +260,9 @@ describe("Quick Log Environment Check preview — no-write guard", () => {
     expect(labels.some((l) => l.includes("Transport: manual"))).toBe(true);
 
     const slot = h.getPreviewSlot()!;
-    expect(
-      within(slot).getByTestId("sensor-normalization-preview-disclaimer").textContent,
-    ).toMatch(/Preview only/i);
+    expect(within(slot).getByTestId("sensor-normalization-preview-disclaimer").textContent).toMatch(
+      /Preview only/i,
+    );
   });
 
   it("preview render alone does not call save or any Supabase write helpers", () => {
@@ -325,10 +329,7 @@ describe("Sensor normalization preview — static safety scan", () => {
   }
 
   it("src/components/QuickLog.tsx contains no normalized long-form persistence", () => {
-    const src = readFileSync(
-      resolve(process.cwd(), "src/components/QuickLog.tsx"),
-      "utf8",
-    );
+    const src = readFileSync(resolve(process.cwd(), "src/components/QuickLog.tsx"), "utf8");
     for (const p of QUICK_LOG_FORBIDDEN) {
       expect(p.test(src), `unexpected match in QuickLog.tsx: ${p}`).toBe(false);
     }

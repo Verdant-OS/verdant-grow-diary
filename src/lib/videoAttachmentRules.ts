@@ -21,11 +21,7 @@ export const ALLOWED_VIDEO_MIME_TYPES: readonly string[] = [
 ];
 
 export type VideoAttachmentRejectionReason =
-  | "empty"
-  | "mime_not_allowed"
-  | "size_exceeded"
-  | "duration_exceeded"
-  | "unreadable";
+  "empty" | "mime_not_allowed" | "size_exceeded" | "duration_exceeded" | "unreadable";
 
 export interface VideoAttachmentMetadataOk {
   ok: true;
@@ -40,9 +36,7 @@ export interface VideoAttachmentMetadataError {
   message: string;
 }
 
-export type VideoAttachmentMetadata =
-  | VideoAttachmentMetadataOk
-  | VideoAttachmentMetadataError;
+export type VideoAttachmentMetadata = VideoAttachmentMetadataOk | VideoAttachmentMetadataError;
 
 export function isAllowedVideoMime(mime: string | null | undefined): boolean {
   if (!mime) return false;
@@ -54,9 +48,7 @@ export function isWithinVideoSizeCap(bytes: number | null | undefined): boolean 
   return bytes <= VIDEO_MAX_SIZE_BYTES;
 }
 
-export function isWithinVideoDurationCap(
-  durationS: number | null | undefined,
-): boolean {
+export function isWithinVideoDurationCap(durationS: number | null | undefined): boolean {
   if (typeof durationS !== "number" || !Number.isFinite(durationS) || durationS <= 0) {
     return false;
   }

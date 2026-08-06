@@ -57,9 +57,7 @@ describe("quickLogTimelineDiaryDetailsMerge", () => {
   });
 
   it("ignores diary rows with invalid entry_at", () => {
-    const idx = buildAiDoctorPhase1EvidenceIndex([
-      { ...aiDiary, entry_at: "not-a-date" },
-    ]);
+    const idx = buildAiDoctorPhase1EvidenceIndex([{ ...aiDiary, entry_at: "not-a-date" }]);
     expect(idx.size).toBe(0);
   });
 
@@ -116,10 +114,7 @@ describe("quickLogTimelineDiaryDetailsMerge", () => {
   });
 
   it("returns same actions when index is empty (no over-attachment)", () => {
-    const out = attachAiDoctorPhase1EvidenceToActionEvents(
-      [baseNote("a", ISO)],
-      new Map(),
-    );
+    const out = attachAiDoctorPhase1EvidenceToActionEvents([baseNote("a", ISO)], new Map());
     expect(out[0].aiDoctorPhase1Evidence).toBeUndefined();
   });
 });

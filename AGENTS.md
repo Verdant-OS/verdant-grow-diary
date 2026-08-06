@@ -1,4 +1,18 @@
-# Verdant Codex Instructions
+# Verdant Agent Constitution
+
+**Sentinel-Version: 2026-08-01.7**
+
+This is Verdant's universal Sentinel Code. Every agent inherits these durable product,
+engineering, data, safety, and release rules. Platform-specific bootstraps live at the
+repository root; detailed responsibilities live in `docs/agents/roles/`.
+
+Operational facts that change — active branch and PR, production status, blockers,
+validation evidence, approved slice, and agent assignments — belong in
+`docs/agents/CURRENT_STATE.md`, not in this constitution.
+
+> **Naming note:** `ggsSentinel*` modules and
+> `docs/v0-sentinel-stop-ship-checklist.md` refer to the GGS sensor smoke runner. They
+> are unrelated to this agent-governance Sentinel Code.
 
 ## Product Context
 
@@ -36,8 +50,12 @@ Automation last.
 Default workflow:
 
 ```text
-Build -> Audit -> Fix -> Test -> Publish
+Build -> Audit -> Fix -> Test -> Publish -> Measure
 ```
+
+A merge is not a deployment. Green CI is not proof of indexing. A public estimate is not
+authenticated analytics. An unverified sensor value is not healthy live data. When an
+outcome cannot be measured, report the blocker instead of claiming success.
 
 Use small, scoped changes. Avoid broad rewrites.
 
@@ -492,3 +510,153 @@ Prefer:
 - Exact pass/fail counts.
 
 Every change should make Verdant more trustworthy.
+
+---
+
+# Agent Role Routing
+
+Before using tools beyond read-only context acquisition or changing files, identify your
+assigned role and read its file.
+
+- Codex must read `docs/agents/roles/codex.md`.
+- Grok must read `docs/agents/roles/grok.md`.
+- Claude must read `docs/agents/roles/claude.md`.
+- Gemini must read `docs/agents/roles/gemini.md`.
+- Security reviewer must read `docs/agents/roles/security.md`.
+- Council Chair must read `docs/agents/roles/council-chair.md`.
+
+Do not adopt another agent's responsibilities unless Cheek explicitly reassigns them.
+
+Use `docs/agents/HANDOFF_PROTOCOL.md` for cross-role work. The default sequence is:
+
+```text
+Research -> Architecture -> Build -> Security Review -> QA Audit -> Council -> Cheek approval
+```
+
+The current task may require only a scoped subset of those roles. Do not create parallel
+implementations of the same slice.
+
+The only action permitted before the gate below is read-only acquisition of
+`AGENTS.md`, `docs/agents/CURRENT_STATE.md`, and the assigned role file so the
+acknowledgment can be truthful. Listing files solely to locate those three documents, or
+using a platform context-discovery command such as `grok inspect`, is also permitted.
+No application-code inspection, network mutation, recommendation, or repository write is
+permitted before the acknowledgment.
+
+MANDATORY STARTUP GATE
+
+Before analysis, research, commands, edits, writes, outreach, deployment,
+or recommendations, return:
+
+```text
+SENTINEL_ACK
+agent:
+assigned_role:
+sentinel_version:
+files_read:
+current_task:
+scope:
+out_of_scope:
+conflicts_found:
+data_access_status:
+write_permission:
+```
+
+If a required file is missing or conflicting, return:
+
+```text
+STATUS: BLOCKED — AGENT CONTEXT INCOMPLETE
+```
+
+Do not continue until the context issue is resolved.
+
+## Status Vocabulary
+
+Use these values literally. Never turn a blocked or unmeasured verification into a pass.
+
+| Status           | Meaning                                                              |
+| ---------------- | -------------------------------------------------------------------- |
+| `PASS`           | Direct evidence verified the check                                   |
+| `FAIL`           | Direct evidence verified a defect                                    |
+| `BLOCKED`        | Access, permission, credential, or dependency prevented verification |
+| `NO_BASELINE`    | No earlier measurement exists for comparison                         |
+| `NO_DATA`        | The authorized source was reachable but returned no data             |
+| `NOT_MEASURED`   | The metric was not measured; this is never a perfect score           |
+| `SKIPPED`        | The check was intentionally not run; report its reason separately   |
+| `NOT_APPLICABLE` | The check does not apply to this target                              |
+
+Never invent search volume, traffic, keyword difficulty, CPC, domain rating, backlink
+counts, conversion rates, audience sizes, sensor health, or deployment/indexing outcomes.
+Record the authorized source and provenance for every material measurement.
+
+---
+
+## Cursor Cloud specific instructions
+
+Durable, non-obvious notes for running this app in a Cursor Cloud VM. Full, verified
+runbook lives in `.claude/skills/run-verdant-grow-diary/SKILL.md` — read it for details;
+this section only captures the gotchas that are easy to get wrong. Two independent
+Cursor Cloud sessions have reported on this environment; where they disagreed, both
+observations are kept below rather than one silently overwriting the other, since VM
+snapshots can differ.
+
+- **Stack & authoritative run guide.** React + Vite + TypeScript SPA (port **8080**)
+  backed by a **hosted** Supabase project — no local Supabase stack is needed to run the
+  app. The public anon key and URL are committed in `.env`. The authoritative
+  run/build/test guide is `.claude/skills/run-verdant-grow-diary/SKILL.md`; `README.md`
+  has the overview. Read the skill before driving the app — do not duplicate its commands
+  here.
+- **Package manager — check `node_modules` first; don't blindly retry installs.** Repo
+  scripts run under **`bun`** in both observed snapshots. Per
+  `.claude/skills/run-verdant-grow-diary/SKILL.md`: if `node_modules` already exists
+  (managed environments pre-provision it), use it as-is — do not reinstall. If it's
+  absent, do **not** reach for `bun install --frozen-lockfile` first; go straight to the
+  SKILL's verified npm public-registry-override bootstrap. Install behavior has differed
+  across sessions, which is why the SKILL doesn't recommend trying bun first:
+  - One session found `bun install --frozen-lockfile` worked fine against the public
+    registry, and the VM startup script already ran it — no reinstall needed unless a
+    run failed on a missing/updated package. `bun` was symlinked at `/usr/local/bin/bun`
+    there, resolving in non-login shells.
+  - A different session found `bun install` **failed**: `bun.lock` pinned ~137 tarball
+    URLs on a private Lovable registry mirror (`*.pkg.dev/lovable-core-prod`) that
+    `403`s outside the Lovable sandbox, and no registry override could rewrite bun's
+    locked URLs. That session's startup script installed via an **npm public-registry
+    override** instead, and `bun` itself was a pre-baked system dependency under
+    `~/.bun` (`BUN_INSTALL` on `PATH` via `~/.bashrc`), not reinstalled by the update
+    script.
+  - Don't assume either session's behavior carries over to a new one — check
+    `node_modules` first, and if an install is actually needed, prefer the SKILL's
+    verified bootstrap over guessing.
+- **Dev server.** `bun run dev -- --host 127.0.0.1 --port 8080`, then browse
+  `http://127.0.0.1:8080`. Bind IPv4 (**`127.0.0.1`, not `localhost`**) and **port 8080,
+  not 5173** explicitly — Vite's default host `::` is unreliable in this container.
+  Signed-out `/` renders the public landing directly through `RootEntry`; signed-in growers
+  retain Dashboard inside the authenticated `AppShell`. An HTTP 200 on `/` therefore
+  represents the rendered public landing, not merely the SPA shell.
+- **Lint / typecheck / test / build.** `bun run lint` (expect 0 errors, many
+  pre-existing warnings), `bun run typecheck`, `bun run build` (its postbuild step runs
+  the SEO/JSON-LD validators). Unit path is `bunx vitest run <files>` — the full suite
+  is very large, prefer targeted files or the `test:full:shard*` scripts.
+- **Browser / e2e.** Playwright chromium installs to `~/.cache/ms-playwright` (baked
+  into the snapshot in one session); `.claude/skills/run-verdant-grow-diary/driver.mjs`
+  falls back to bundled chromium automatically either way — run
+  `bunx playwright install chromium` if a browser is ever missing after a dependency
+  bump. For mocked UI flows use `--project=chromium-mocked` **with an explicit spec
+  filter** and set `E2E_BASE_URL=http://127.0.0.1:8080` to reuse the already-running dev
+  server — without it, some specs spawn their own server on 5173 (port conflicts) or can
+  hit real Supabase. A couple of mocked specs are known-flaky (e.g. a timing/viewport
+  assertion in `auth-loading`); treat only _new_ failures in specs you touched as
+  signal.
+- **Authenticated flows need real credentials.** The core One-Tent Loop authenticated
+  e2e (`bun run e2e:one-tent:ui`) emits a `blocked` receipt and skips without a seeded
+  session JSON / real Supabase login — that's expected, not a setup failure.
+- **Credential-free smoke surfaces.** Public interactive routes render real
+  functionality without login and are good smoke targets: `/` (public landing),
+  `/quick-log` (Quick Log
+  starter — saves a draft locally), `/tools/vpd-calculator`, `/pheno-comparison`,
+  `/welcome`, and `/internal/demo-proof-walkthrough`.
+- **Governance edit gate.** If you change **any** governance file (`AGENTS.md`,
+  `CLAUDE.md`, `GEMINI.md`, `.grok/rules/**`, `docs/agents/**`) you must bump
+  `Sentinel-Version` in **all** of them in the same commit — the
+  `sentinel-version-parity` CI gate enforces both PARITY (all versions equal) and BUMP
+  (changed content requires a new version).

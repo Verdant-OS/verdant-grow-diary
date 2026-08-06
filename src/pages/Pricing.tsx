@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useLocation, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "@/lib/react-router-compat";
 import { resolvePricingPlanPreselect } from "@/lib/pricingPlanPreselect";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import {
@@ -320,7 +320,7 @@ export default function Pricing() {
   usePageSeo({
     title: "Pricing — Free, Pro & Craft | Verdant Grow Diary",
     description:
-      "Free grow diary forever. Pro adds multi-tent support, full sensor history, advanced timeline tools and advanced exports. Craft adds the live Pro Blueprint that scores every reading against your per-stage SOP.",
+      "Free grow diary forever. Pro adds multi-tent support, full sensor history and advanced exports. Craft adds the live Pro Blueprint.",
     path: "/pricing",
   });
 

@@ -23,10 +23,7 @@
  */
 import { describe, it, expect } from "vitest";
 
-import {
-  snapshotFromReadings,
-  type SensorReadingLike,
-} from "@/lib/sensorSnapshot";
+import { snapshotFromReadings, type SensorReadingLike } from "@/lib/sensorSnapshot";
 import { compareSnapshotToTargets } from "@/lib/environmentTargetComparison";
 import { buildEnvironmentAlerts } from "@/lib/environmentAlerts";
 import {
@@ -123,16 +120,12 @@ describe("One-Tent Loop E2E smoke", () => {
 
   // --- Step 3: persistability fences ---------------------------------------
   it("manual+good snapshot is persistable", () => {
-    expect(
-      isSnapshotPersistable({ snapshot, quality: "good", now: NOW_MS }),
-    ).toBe(true);
+    expect(isSnapshotPersistable({ snapshot, quality: "good", now: NOW_MS })).toBe(true);
   });
 
   it("demo data is NEVER persistable (no fake live data)", () => {
     const demoSnap = { ...snapshot!, source: "sim" as const };
-    expect(
-      isSnapshotPersistable({ snapshot: demoSnap, quality: "good", now: NOW_MS }),
-    ).toBe(false);
+    expect(isSnapshotPersistable({ snapshot: demoSnap, quality: "good", now: NOW_MS })).toBe(false);
     expect(
       isSnapshotPersistable({
         snapshot,
@@ -247,17 +240,12 @@ describe("One-Tent Loop E2E smoke", () => {
   });
 
   // --- Step 5: grower completes the action ---------------------------------
-  const completionPatch = buildTransitionPatch(
-    "complete",
-    new Date(NOW_MS + 60 * 60_000),
-  );
+  const completionPatch = buildTransitionPatch("complete", new Date(NOW_MS + 60 * 60_000));
 
   it("completion transition writes only status + completed_at (no device fields)", () => {
     expect(completionPatch.status).toBe("completed");
     expect(completionPatch.completed_at).toBeTruthy();
-    expect(Object.keys(completionPatch).sort()).toEqual(
-      ["completed_at", "status"].sort(),
-    );
+    expect(Object.keys(completionPatch).sort()).toEqual(["completed_at", "status"].sort());
     const blob = JSON.stringify(completionPatch).toLowerCase();
     for (const tok of ["device", "relay", "mqtt", "actuator", "turn on", "turn off"]) {
       expect(blob).not.toContain(tok);

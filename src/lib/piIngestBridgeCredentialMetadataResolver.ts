@@ -46,11 +46,7 @@ function isNonEmptyString(v: unknown): v is string {
 function isValidRow(row: unknown): row is PiIngestBridgeCredentialSafeRow {
   if (!row || typeof row !== "object") return false;
   const r = row as Record<string, unknown>;
-  if (
-    !isNonEmptyString(r.id) ||
-    !isNonEmptyString(r.user_id) ||
-    !isNonEmptyString(r.bridge_id)
-  ) {
+  if (!isNonEmptyString(r.id) || !isNonEmptyString(r.user_id) || !isNonEmptyString(r.bridge_id)) {
     return false;
   }
   if (typeof r.is_active !== "boolean") return false;
@@ -75,9 +71,7 @@ function isValidRow(row: unknown): row is PiIngestBridgeCredentialSafeRow {
   return true;
 }
 
-function mapRow(
-  row: PiIngestBridgeCredentialSafeRow,
-): BridgeCredentialMetadata {
+function mapRow(row: PiIngestBridgeCredentialSafeRow): BridgeCredentialMetadata {
   return {
     id: row.id,
     userId: row.user_id,

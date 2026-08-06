@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "@/lib/react-router-compat";
 import { ArrowLeft, ArrowRight, Loader2, Sprout } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -93,10 +93,7 @@ export default function PhenoHuntNew() {
       // own grow_id matches OR it lives in one of the grow's tents, so
       // orphan-attributed plants (tent in grow, plant.grow_id null) still
       // appear as candidates. Tent ids are fetched first for the OR filter.
-      const { data: tentRows } = await supabase
-        .from("tents")
-        .select("id")
-        .eq("grow_id", growId);
+      const { data: tentRows } = await supabase.from("tents").select("id").eq("grow_id", growId);
       if (cancelled) return;
       const tentIds = ((tentRows ?? []) as { id?: string | null }[])
         .map((t) => t.id ?? "")

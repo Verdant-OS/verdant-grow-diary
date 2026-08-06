@@ -17,10 +17,8 @@ export interface EnvironmentIssueDrilldownProps {
 }
 
 function copyFor(checkStatus: string): string | null {
-  if (checkStatus === "dst_ambiguous")
-    return "DST-ambiguous window — review before acting.";
-  if (checkStatus === "invalid")
-    return "Invalid environment data — do not use for decisions.";
+  if (checkStatus === "dst_ambiguous") return "DST-ambiguous window — review before acting.";
+  if (checkStatus === "invalid") return "Invalid environment data — do not use for decisions.";
   return null;
 }
 
@@ -56,19 +54,14 @@ export default function EnvironmentIssueDrilldown({
       </header>
 
       {relatedChecks.length === 0 ? (
-        <p
-          data-testid="env-issue-drilldown-empty"
-          className="text-xs text-muted-foreground"
-        >
+        <p data-testid="env-issue-drilldown-empty" className="text-xs text-muted-foreground">
           No related Environment Checks found for this issue.
         </p>
       ) : (
         <ul data-testid="env-issue-drilldown-list" className="space-y-2">
           {relatedChecks.map((c) => {
             const reviewCopy = copyFor(c.status);
-            const annotation = c.ruleAnnotations.find(
-              (a) => a.ruleId === issue.ruleId,
-            );
+            const annotation = c.ruleAnnotations.find((a) => a.ruleId === issue.ruleId);
             return (
               <li
                 key={c.entryId}
@@ -77,9 +70,7 @@ export default function EnvironmentIssueDrilldown({
                 className="rounded-lg border border-border/40 bg-card/40 p-2 text-xs space-y-1"
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className="font-medium">
-                    {formatSnapshotTimestamp(c.occurredAt)}
-                  </span>
+                  <span className="font-medium">{formatSnapshotTimestamp(c.occurredAt)}</span>
                   <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
                     {c.statusLabel}
                   </span>
@@ -97,9 +88,7 @@ export default function EnvironmentIssueDrilldown({
                     </span>
                   ))}
                 </div>
-                {annotation && (
-                  <p className="text-[11px] text-amber-300">{annotation.message}</p>
-                )}
+                {annotation && <p className="text-[11px] text-amber-300">{annotation.message}</p>}
                 {reviewCopy && (
                   <p
                     data-testid={`env-issue-drilldown-warning-${c.entryId}`}

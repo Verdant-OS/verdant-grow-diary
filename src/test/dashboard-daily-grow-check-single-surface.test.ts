@@ -16,10 +16,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-const dashboardSrc = readFileSync(
-  resolve(process.cwd(), "src/pages/Dashboard.tsx"),
-  "utf8",
-);
+const dashboardSrc = readFileSync(resolve(process.cwd(), "src/pages/Dashboard.tsx"), "utf8");
 
 describe("Dashboard · single daily grow-check surface", () => {
   it("does not import or render DailyGrowCheckOnboardingCard", () => {
@@ -45,9 +42,8 @@ describe("Dashboard · single daily grow-check surface", () => {
     expect(dashboardSrc).toMatch(/\/daily-check/);
     // The PageHeader actions block must not present "Daily Grow Check" as
     // a competing primary CTA label alongside Quick Log.
-    const headerActions = dashboardSrc.match(
-      /dashboard-daily-grow-check-entry[\s\S]{0,400}<\/Button>/,
-    )?.[0] ?? "";
+    const headerActions =
+      dashboardSrc.match(/dashboard-daily-grow-check-entry[\s\S]{0,400}<\/Button>/)?.[0] ?? "";
     expect(headerActions).not.toMatch(/>Daily Grow Check</);
   });
 

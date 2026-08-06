@@ -13,7 +13,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import ActionQueue from "@/pages/ActionQueue";
 import {
   RETRY_TRACE_EXPLAIN_PRIMARY,
@@ -130,9 +130,7 @@ describe("Integrated — Action Queue URL restore + jump + pagination", () => {
 
   it("renders 'Jump to highlighted trace' for a valid highlight token", async () => {
     renderAt("/actions?highlight=action-queue:aq-1:approved");
-    const jump = await waitFor(() =>
-      screen.getByTestId("action-queue-jump-to-highlighted-trace"),
-    );
+    const jump = await waitFor(() => screen.getByTestId("action-queue-jump-to-highlighted-trace"));
     expect(jump.getAttribute("href")).toContain("/timeline?highlight=");
     expect(jump.textContent ?? "").toMatch(/Jump to highlighted trace/i);
     // No raw UUIDs in visible label.
@@ -144,25 +142,18 @@ describe("Integrated — Action Queue URL restore + jump + pagination", () => {
     await waitFor(() =>
       expect(screen.getAllByTestId("action-queue-row").length).toBeGreaterThan(0),
     );
-    expect(
-      screen.queryByTestId("action-queue-jump-to-highlighted-trace"),
-    ).toBeNull();
+    expect(screen.queryByTestId("action-queue-jump-to-highlighted-trace")).toBeNull();
   });
-
 
   it("jump link includes a safe actionsReturn round-trip when /actions has state", async () => {
     renderAt(
       "/actions?highlight=action-queue:aq-1:approved&q=mold&status=pending&page=2&pageSize=10",
     );
-    const jump = await waitFor(() =>
-      screen.getByTestId("action-queue-jump-to-highlighted-trace"),
-    );
+    const jump = await waitFor(() => screen.getByTestId("action-queue-jump-to-highlighted-trace"));
     const href = jump.getAttribute("href") ?? "";
     expect(href).toContain("/timeline?");
     const url = new URL(`http://x${href}`);
-    expect(url.searchParams.get("highlight")).toBe(
-      "action-queue:aq-1:approved",
-    );
+    expect(url.searchParams.get("highlight")).toBe("action-queue:aq-1:approved");
     const ret = url.searchParams.get("actionsReturn") ?? "";
     expect(ret).toContain("/actions?");
     expect(ret).toContain("q=mold");
@@ -176,9 +167,7 @@ describe("Integrated — Action Queue URL restore + jump + pagination", () => {
 
   it("jump link omits actionsReturn when /actions carries only the highlight", async () => {
     renderAt("/actions?highlight=action-queue:aq-1:approved");
-    const jump = await waitFor(() =>
-      screen.getByTestId("action-queue-jump-to-highlighted-trace"),
-    );
+    const jump = await waitFor(() => screen.getByTestId("action-queue-jump-to-highlighted-trace"));
     const url = new URL(`http://x${jump.getAttribute("href") ?? ""}`);
     expect(url.searchParams.get("actionsReturn")).toBeNull();
   });
@@ -186,9 +175,7 @@ describe("Integrated — Action Queue URL restore + jump + pagination", () => {
 
 describe("Integrated — retry trace failure copy is wired in", () => {
   it("exposes the trace-specific explain strings as constants", () => {
-    expect(RETRY_TRACE_EXPLAIN_PRIMARY).toBe(
-      "Status was saved, but the diary trace did not save.",
-    );
+    expect(RETRY_TRACE_EXPLAIN_PRIMARY).toBe("Status was saved, but the diary trace did not save.");
     expect(RETRY_TRACE_EXPLAIN_SECONDARY).toBe(
       "Retry only repairs the diary trace. It will not approve/reject again.",
     );
@@ -207,11 +194,7 @@ describe("Integrated — timeline highlight matching by idempotency_key", () => 
     };
     expect(diaryEntryMatchesHighlight(entry, highlight)).toBe(true);
     // documented testid + aria are the contract used by Timeline.tsx.
-    expect(TIMELINE_HIGHLIGHT_TESTID).toBe(
-      "timeline-highlighted-action-queue-trace",
-    );
-    expect(TIMELINE_HIGHLIGHT_ARIA_LABEL).toBe(
-      "Highlighted Action Queue diary trace",
-    );
+    expect(TIMELINE_HIGHLIGHT_TESTID).toBe("timeline-highlighted-action-queue-trace");
+    expect(TIMELINE_HIGHLIGHT_ARIA_LABEL).toBe("Highlighted Action Queue diary trace");
   });
 });

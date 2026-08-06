@@ -38,9 +38,7 @@ function lead(p: Partial<LeadRow> & { id: string }): LeadRow {
     company: p.company ?? null,
     role: p.role ?? null,
     // Preserve explicitly-passed null/empty so tests can simulate missing values.
-    lead_type: ("lead_type" in p
-      ? p.lead_type
-      : "beta_user") as unknown as string,
+    lead_type: ("lead_type" in p ? p.lead_type : "beta_user") as unknown as string,
     source: ("source" in p ? p.source : "landing") as unknown as string,
     message: p.message ?? null,
     status: p.status ?? "new",
@@ -49,7 +47,6 @@ function lead(p: Partial<LeadRow> & { id: string }): LeadRow {
     follow_up_at: p.follow_up_at ?? null,
   } as LeadRow;
 }
-
 
 const SAMPLE: LeadRow[] = [
   lead({ id: "1", source: "landing", lead_type: "beta_user", status: "new" }),
@@ -137,10 +134,58 @@ describe("groupByLeadType", () => {
 describe("sortStats — deterministic ordering", () => {
   it("sorts by total desc, then closed desc, then key A-Z", () => {
     const rows = sortStats([
-      { key: "z", total: 1, new: 0, contacted: 0, follow_up: 0, closed: 0, spam: 0, needs_action: 0, contacted_rate: 0, closed_rate: 0, spam_rate: 0 },
-      { key: "a", total: 3, new: 0, contacted: 0, follow_up: 0, closed: 2, spam: 0, needs_action: 0, contacted_rate: 0, closed_rate: 0, spam_rate: 0 },
-      { key: "b", total: 3, new: 0, contacted: 0, follow_up: 0, closed: 1, spam: 0, needs_action: 0, contacted_rate: 0, closed_rate: 0, spam_rate: 0 },
-      { key: "c", total: 3, new: 0, contacted: 0, follow_up: 0, closed: 2, spam: 0, needs_action: 0, contacted_rate: 0, closed_rate: 0, spam_rate: 0 },
+      {
+        key: "z",
+        total: 1,
+        new: 0,
+        contacted: 0,
+        follow_up: 0,
+        closed: 0,
+        spam: 0,
+        needs_action: 0,
+        contacted_rate: 0,
+        closed_rate: 0,
+        spam_rate: 0,
+      },
+      {
+        key: "a",
+        total: 3,
+        new: 0,
+        contacted: 0,
+        follow_up: 0,
+        closed: 2,
+        spam: 0,
+        needs_action: 0,
+        contacted_rate: 0,
+        closed_rate: 0,
+        spam_rate: 0,
+      },
+      {
+        key: "b",
+        total: 3,
+        new: 0,
+        contacted: 0,
+        follow_up: 0,
+        closed: 1,
+        spam: 0,
+        needs_action: 0,
+        contacted_rate: 0,
+        closed_rate: 0,
+        spam_rate: 0,
+      },
+      {
+        key: "c",
+        total: 3,
+        new: 0,
+        contacted: 0,
+        follow_up: 0,
+        closed: 2,
+        spam: 0,
+        needs_action: 0,
+        contacted_rate: 0,
+        closed_rate: 0,
+        spam_rate: 0,
+      },
     ]);
     expect(rows.map((r) => r.key)).toEqual(["a", "c", "b", "z"]);
     // repeatable
@@ -192,10 +237,7 @@ describe("analytics on filtered/searched results", () => {
 describe("/leads page renders analytics UI", () => {
   const root = resolve(__dirname, "..", "..");
   const PAGE = readFileSync(resolve(root, "src/pages/Leads.tsx"), "utf8");
-  const PANEL = readFileSync(
-    resolve(root, "src/components/LeadAnalyticsPanel.tsx"),
-    "utf8",
-  );
+  const PANEL = readFileSync(resolve(root, "src/components/LeadAnalyticsPanel.tsx"), "utf8");
 
   it("/leads imports and renders the analytics panel", () => {
     expect(PAGE).toMatch(/LeadAnalyticsPanel/);
@@ -251,10 +293,11 @@ describe("no new RLS policies for analytics PR", () => {
     const files = readdirSync(dir)
       .filter((f) => f.endsWith(".sql"))
       .sort();
-    const all = files
-      .map((f) => readFileSync(resolve(dir, f), "utf8"))
-      .join("\n")
-      .match(/CREATE POLICY[^;]*ON\s+public\.leads[^;]*;/gi) ?? [];
+    const all =
+      files
+        .map((f) => readFileSync(resolve(dir, f), "utf8"))
+        .join("\n")
+        .match(/CREATE POLICY[^;]*ON\s+public\.leads[^;]*;/gi) ?? [];
     expect(all.length).toBeGreaterThan(0);
     for (const p of all) expect(p).not.toMatch(/service_role/i);
   });

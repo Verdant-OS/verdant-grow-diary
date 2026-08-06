@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { buildGrowerInviteShareData } from "@/lib/growerInviteRules";
 import { trackPricingEvent } from "@/lib/pricingAnalytics";
+import { getClipboardWriteText, getNativeShare } from "@/lib/webShareCapabilities";
 
 type ShareStatus = "idle" | "copied" | "manual";
 
@@ -13,8 +14,8 @@ export default function GrowerInviteShareCard() {
   const shareData = buildGrowerInviteShareData();
 
   async function shareVerdant() {
-    const nativeShare = navigator.share?.bind(navigator);
-    const clipboard = navigator.clipboard?.writeText?.bind(navigator.clipboard);
+    const nativeShare = getNativeShare();
+    const clipboard = getClipboardWriteText();
     const source = nativeShare ? "native_share" : "copy_link";
 
     trackPricingEvent("grower_invite_share_clicked", { source });

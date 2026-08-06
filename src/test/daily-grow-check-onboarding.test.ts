@@ -143,12 +143,7 @@ describe("deriveDailyGrowCheckOnboarding · pure rules", () => {
   });
 
   it("only CTAs point to existing in-app flows (no new routes)", () => {
-    const allowedExact = new Set([
-      "/grows",
-      "/tents",
-      "/plants",
-      "/daily-check",
-    ]);
+    const allowedExact = new Set(["/grows", "/tents", "/plants", "/daily-check"]);
     const inputs: Array<Parameters<typeof deriveDailyGrowCheckOnboarding>[0]> = [
       { ...READY_INPUT, hasActiveGrow: false },
       { ...READY_INPUT, tentsCount: 0 },

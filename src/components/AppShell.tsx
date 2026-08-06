@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import LegalFooterLinks from "@/components/LegalFooterLinks";
-import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Outlet, useLocation, useNavigate } from "@/lib/react-router-compat";
 import { Bell, LogOut, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { useAuth } from "@/store/auth";
+import { useHydrated } from "@/hooks/useHydrated";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { buildSignedOutRedirect } from "@/lib/authRedirectRules";
 import { useAlertsList } from "@/hooks/useAlertsList";
@@ -21,6 +22,7 @@ import { SubscriptionPastDueBanner } from "./SubscriptionPastDueBanner";
 import GlobalSearchDialog from "./GlobalSearchDialog";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 import { readQuickLogStartEventType } from "@/lib/globalSearchQuickLogFallbackRules";
+import { readGuidePhenoQuickLogPrefill } from "@/lib/guidePhenoQuickLogHandoffRules";
 import { isEmailVerificationPending } from "@/lib/emailVerificationRules";
 import { resolveMobileQuickLogTarget } from "@/lib/quickLogRouteTargetRules";
 import { consumeQuickLogStartIntent } from "@/lib/startScreenPreferences";
@@ -34,6 +36,7 @@ import {
 
 export default function AppShell({ children }: { children?: ReactNode }) {
   const { user, loading } = useAuth();
+  const hydrated = useHydrated();
   const location = useLocation();
   const previousNavigationKeyRef = useRef(location.key);
   // Protected-route boundary: re-validate session against the auth server.
@@ -133,14 +136,16 @@ export default function AppShell({ children }: { children?: ReactNode }) {
   // query intent. Consume it only after AppShell is mounted, open the existing
   // Quick Log dialog, then remove the marker so refresh/back does not reopen it.
   useEffect(() => {
-    // Read the preset BEFORE consuming: consumeQuickLogStartIntent strips the
-    // companion type marker along with the intent itself.
+    // Read the closed guide prompt and activity preset BEFORE consuming:
+    // consumeQuickLogStartIntent strips both companion markers.
+    const guidePrefill = readGuidePhenoQuickLogPrefill(location.search);
     const startEventType = readQuickLogStartEventType(location.search);
     const nextSearch = consumeQuickLogStartIntent(location.search);
     if (nextSearch === null) return;
-    // Seed only the activity. No plant is invented — the grower still selects
-    // one, exactly as a context-free launcher has always required.
-    setPrefill(startEventType ? { eventType: startEventType } : null);
+    // A guide may seed a static draft prompt as well as the activity. No plant
+    // or private context is encoded in the URL — the grower still selects the
+    // target, reviews the note, and saves explicitly.
+    setPrefill(guidePrefill ?? (startEventType ? { eventType: startEventType } : null));
     setOpenLog(true);
     nav(
       {
@@ -170,7 +175,12 @@ export default function AppShell({ children }: { children?: ReactNode }) {
     setStructuredOpenIntent(null);
   }, [location.key]);
 
-  if (loading)
+  // SSR/hydration contract (same rule as /auth): the server always renders
+  // this loading state (no session exists server-side), so the client's
+  // hydration render must too — even when the sessionStorage restore resolves
+  // before this lazy route subtree hydrates. Without the `hydrated` gate that
+  // race makes React discard the SSR tree and regenerate client-side.
+  if (!hydrated || loading)
     return (
       <div className="min-h-screen flex items-center justify-center text-muted-foreground">
         Loading…
@@ -190,7 +200,7 @@ export default function AppShell({ children }: { children?: ReactNode }) {
         />
         <a
           href="#main-content"
-          className="fixed left-3 top-3 z-[100] -translate-y-24 rounded-xl border border-primary/30 bg-background px-4 py-2 text-sm font-semibold text-foreground shadow-elevated transition-transform focus:translate-y-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          className="fixed left-3 top-3 z-[100] -translate-y-24 rounded-xl border border-primary/30 bg-background px-4 py-2 text-sm font-semibold text-foreground shadow-elevated transition-transform focus:translate-y-0 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         >
           Skip to main content
         </a>

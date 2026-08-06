@@ -146,8 +146,6 @@ function toSafeId(value: unknown): string | null {
   return /^[A-Za-z0-9_.:-]{1,128}$/.test(trimmed) ? trimmed : null;
 }
 
-export function isQuickLogSnapshotAttachable(
-  vm: QuickLogSensorSnapshotViewModel,
-): boolean {
+export function isQuickLogSnapshotAttachable(vm: QuickLogSensorSnapshotViewModel): boolean {
   return vm.isAttachable && vm.attachment !== null;
 }

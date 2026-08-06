@@ -187,8 +187,7 @@ async function discoverActiveCraftExternalIds(
   // We page defensively — Paddle caps per_page at 200 and returns a cursor
   // in `meta.pagination.next` when more rows exist.
   const collected: string[] = [];
-  let url: string | null =
-    `${PADDLE_API_BASE[env]}/prices?status=active&per_page=200`;
+  let url: string | null = `${PADDLE_API_BASE[env]}/prices?status=active&per_page=200`;
   let guard = 0;
   while (url && guard < 20) {
     guard += 1;
@@ -388,9 +387,7 @@ function finalize(
       summary: { pass, fail, skip },
       missingByEnv,
       exitCode: code,
-      keyUnset: results.some(
-        (r) => r.status === "skip" && /_API_KEY not set$/.test(r.detail),
-      ),
+      keyUnset: results.some((r) => r.status === "skip" && /_API_KEY not set$/.test(r.detail)),
       generatedAt: new Date().toISOString(),
     };
     try {

@@ -37,7 +37,7 @@ export interface PostGrowReflectionCandidatePasteLabel {
 }
 
 export interface PostGrowReflectionCandidatePasteValidationOptions {
-  sensorCoveragePct: number;
+  sensorCoveragePct: number | null;
   knownGapCount: number;
   minEvidenceReferences: number;
   label: string;

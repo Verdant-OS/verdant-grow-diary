@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
 
 const fetchSpy = vi.spyOn(globalThis, "fetch" as never).mockImplementation((() => {
@@ -52,9 +52,7 @@ describe("GrowDetail One-Tent Loop next-step card wiring", () => {
         testId="grow-detail-one-tent-loop-next-step-card"
       />,
     );
-    const cta = screen.getByTestId(
-      "grow-detail-one-tent-loop-next-step-card-cta",
-    );
+    const cta = screen.getByTestId("grow-detail-one-tent-loop-next-step-card-cta");
     expect(cta).toHaveTextContent(/Open tent/i);
     expect(cta.getAttribute("href")).toBe("/tents/t1");
   });
@@ -71,17 +69,12 @@ describe("GrowDetail One-Tent Loop next-step card wiring", () => {
       screen.getByTestId("grow-detail-one-tent-loop-next-step-card-disabled"),
     ).toHaveTextContent(/Next step unavailable until this record is selected\./);
     // Regression guard: no CTA href anywhere pointing back to /grows/.
-    expect(
-      screen.queryByTestId("grow-detail-one-tent-loop-next-step-card-cta"),
-    ).toBeNull();
+    expect(screen.queryByTestId("grow-detail-one-tent-loop-next-step-card-cta")).toBeNull();
   });
 
   it("renders the safe disabled state when no ids are provided", () => {
     renderCard(
-      <OneTentLoopNextStepCard
-        current="grow"
-        testId="grow-detail-one-tent-loop-next-step-card"
-      />,
+      <OneTentLoopNextStepCard current="grow" testId="grow-detail-one-tent-loop-next-step-card" />,
     );
     expect(
       screen.getByTestId("grow-detail-one-tent-loop-next-step-card-disabled"),

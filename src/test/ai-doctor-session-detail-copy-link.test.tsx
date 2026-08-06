@@ -5,7 +5,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 import AiDoctorSessionDetail, {
@@ -36,7 +36,15 @@ vi.mock("@/integrations/supabase/client", () => ({
     from: () => ({
       select: () => ({
         eq: () => ({
-          order: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }),
+          order: () => ({
+            limit: () => {
+              const __c: any = {
+                abortSignal: () => __c,
+                then: (r: any, j?: any) => Promise.resolve({ data: [], error: null }).then(r, j),
+              };
+              return __c;
+            },
+          }),
           maybeSingle: () => Promise.resolve({ data: currentRow, error: null }),
         }),
       }),
@@ -84,9 +92,7 @@ describe("AiDoctorSessionDetail — Copy link button", () => {
 
   it("renders the copy link button", async () => {
     renderRoute(<AiDoctorSessionDetail />);
-    expect(
-      await screen.findByTestId("ai-doctor-session-detail-copy-link-button"),
-    ).toBeTruthy();
+    expect(await screen.findByTestId("ai-doctor-session-detail-copy-link-button")).toBeTruthy();
   });
 
   it("uses Clipboard API and copies canonical URL without unrelated params", async () => {
@@ -104,9 +110,7 @@ describe("AiDoctorSessionDetail — Copy link button", () => {
     const copied = writeText.mock.calls[0][0] as string;
     expect(copied).toMatch(/\/doctor\/sessions\/sess-link$/);
     expect(copied).not.toMatch(/foo=bar|utm_source/);
-    expect(
-      await screen.findByTestId("ai-doctor-session-detail-copy-link-success"),
-    ).toBeTruthy();
+    expect(await screen.findByTestId("ai-doctor-session-detail-copy-link-success")).toBeTruthy();
   });
 
   it("falls back to execCommand when clipboard is unavailable", async () => {
@@ -122,9 +126,7 @@ describe("AiDoctorSessionDetail — Copy link button", () => {
     await waitFor(() => {
       expect(execSpy).toHaveBeenCalledWith("copy");
     });
-    expect(
-      await screen.findByTestId("ai-doctor-session-detail-copy-link-success"),
-    ).toBeTruthy();
+    expect(await screen.findByTestId("ai-doctor-session-detail-copy-link-success")).toBeTruthy();
   });
 
   it("shows error state when copy fails", async () => {
@@ -132,15 +134,11 @@ describe("AiDoctorSessionDetail — Copy link button", () => {
       configurable: true,
       value: { writeText: vi.fn().mockRejectedValue(new Error("denied")) },
     });
-    (document as unknown as { execCommand: unknown }).execCommand = vi
-      .fn()
-      .mockReturnValue(false);
+    (document as unknown as { execCommand: unknown }).execCommand = vi.fn().mockReturnValue(false);
     renderRoute(<AiDoctorSessionDetail />);
     const btn = await screen.findByTestId("ai-doctor-session-detail-copy-link-button");
     fireEvent.click(btn);
-    expect(
-      await screen.findByTestId("ai-doctor-session-detail-copy-link-error"),
-    ).toBeTruthy();
+    expect(await screen.findByTestId("ai-doctor-session-detail-copy-link-error")).toBeTruthy();
   });
 });
 

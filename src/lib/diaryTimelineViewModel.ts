@@ -20,8 +20,7 @@ import { composeActionFollowUpTitle } from "@/lib/actionFollowUpEvidenceViewMode
 export const DIARY_TIMELINE_EMPTY_TITLE = "No plant history yet.";
 export const DIARY_TIMELINE_EMPTY_HINT =
   "Use Quick Log to log your first note, watering, photo, or environment check.";
-export const DIARY_TIMELINE_FILTERED_EMPTY_COPY =
-  "No entries match these filters.";
+export const DIARY_TIMELINE_FILTERED_EMPTY_COPY = "No entries match these filters.";
 
 export type { DiaryTimelineActionStyle };
 
@@ -35,13 +34,7 @@ export function getDiaryTimelineActionView(
   return getDiaryTimelineActionStyle(kind);
 }
 
-export type DiaryTimelineSourceTag =
-  | "live"
-  | "manual"
-  | "csv"
-  | "demo"
-  | "stale"
-  | "invalid";
+export type DiaryTimelineSourceTag = "live" | "manual" | "csv" | "demo" | "stale" | "invalid";
 
 export interface DiaryTimelineSortable {
   id: string;

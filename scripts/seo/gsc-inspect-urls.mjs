@@ -10,7 +10,7 @@
  * Flags:
  *   --urls a,b,c            Explicit URL list
  *   --sitemap <url>         Pull URLs from a sitemap.xml
- *   --max <n>               Max URLs to inspect (default 15, hard cap 50)
+ *   --max <n>               Max URLs to inspect (default 100, hard cap 100)
  *   --allow <a,b,c>         Ad-hoc URLs allowed to be non-indexable
  *   --expected-noindex      Treat every URL as expected-non-indexable
  *   --allowlist <path>      Tracked allowlist (default: config/seo-allowlist.json)
@@ -50,6 +50,7 @@ import {
   renderUrlDecisionTraceMarkdown,
   githubRunContext,
 } from "./seoDiff.mjs";
+import { createGscRunObservation, deriveGscStatuses } from "./gscRunStatus.mjs";
 
 /**
  * Best-effort read of the verifier's artifact so the runner's job summary can
@@ -69,7 +70,7 @@ function readVerifierSummary() {
     const j = JSON.parse(readFileSync(p, "utf8"));
     const isRegression = j?.mode === "fail-only-previously-resolved-expired";
     return {
-      last_finding_status: typeof j?.status === "string" ? j.status : null,
+      last_finding_status: !isRegression && typeof j?.status === "string" ? j.status : null,
       regression_status: isRegression && typeof j?.status === "string" ? j.status : null,
       regression_outcome_groups: isRegression ? (j?.outcome_groups ?? null) : null,
     };
@@ -101,6 +102,9 @@ function toUrlClassifications(simulated) {
 
 const ARTIFACT_DIR = resolve(process.cwd(), "artifacts/seo");
 const DEFAULT_PREVIOUS_DIR = resolve(process.cwd(), "artifacts/seo/previous");
+const HARD_CAP = 100;
+const DEFAULT_MAX_URLS = HARD_CAP;
+let observedGscRun = createGscRunObservation();
 const DEFAULT_URLS = [
   "https://verdantgrowdiary.com/",
   "https://verdantgrowdiary.com/welcome",
@@ -108,7 +112,6 @@ const DEFAULT_URLS = [
   "https://verdantgrowdiary.com/hardware-integrations",
   "https://verdantgrowdiary.com/guides/cronk-nutrients-grow-diary",
 ];
-const HARD_CAP = 50;
 
 // List of stable artifact paths that both the JSON summary and the
 // markdown summary point at. Keeping these in one place means the
@@ -134,7 +137,7 @@ function parseArgs(argv) {
   const out = {
     urls: null,
     sitemap: null,
-    max: 15,
+    max: DEFAULT_MAX_URLS,
     allow: [],
     expectedNoindex: false,
     allowlistPath: DEFAULT_ALLOWLIST_PATH,
@@ -154,7 +157,8 @@ function parseArgs(argv) {
         .map((s) => s.trim())
         .filter(Boolean);
     else if (a === "--sitemap") out.sitemap = argv[++i];
-    else if (a === "--max") out.max = Math.min(HARD_CAP, Math.max(1, Number(argv[++i]) || 15));
+    else if (a === "--max")
+      out.max = Math.min(HARD_CAP, Math.max(1, Number(argv[++i]) || DEFAULT_MAX_URLS));
     else if (a === "--allow")
       out.allow = argv[++i]
         .split(",")
@@ -199,6 +203,7 @@ function buildJobSummaryData({
   notes,
   oauthConfigured = null,
   gscSkipped = null,
+  gscObservation = null,
 }) {
   const counts = simulated
     ? {
@@ -211,15 +216,29 @@ function buildJobSummaryData({
     : null;
   const run = githubRunContext();
   const verification = readVerifierSummary();
+  const observation = gscObservation
+    ? createGscRunObservation(gscObservation)
+    : createGscRunObservation({
+        oauthConfigured,
+        explicitlySkipped: gscSkipped === true,
+      });
+  const gsc = deriveGscStatuses(observation);
   return {
     generated_at: new Date().toISOString(),
     mode,
     status,
+    status_scope: "OPERATION",
     allowlist_source: allowlistSource,
     urls_evaluated: urls?.length ?? 0,
     workflow_run_url: run.run_url,
-    oauth_configured: oauthConfigured,
-    gsc_skipped: gscSkipped,
+    oauth_configured: observation.oauthConfigured,
+    gsc_skipped: gsc.skipped,
+    gsc_access_status: gsc.access,
+    gsc_execution_status: gsc.execution,
+    gsc_token_refresh_status: gsc.tokenRefresh,
+    gsc_inspection_attempted: gsc.inspectionAttempted,
+    gsc_inspection_succeeded: gsc.inspectionSucceeded,
+    gsc_inspection_failed: gsc.inspectionFailed,
     previous_baseline_found: diff ? diff.previous_available : null,
     diff_comparison_ran: diff != null,
     simulated_classification_counts: counts,
@@ -259,6 +278,7 @@ function buildJobSummary({
   notes,
   oauthConfigured = null,
   gscSkipped = null,
+  gscObservation = null,
 }) {
   const data = buildJobSummaryData({
     mode,
@@ -273,12 +293,17 @@ function buildJobSummary({
     notes,
     oauthConfigured,
     gscSkipped,
+    gscObservation,
   });
   const lines = [
     "## Verdant SEO Monitoring — Job Summary",
     "",
     `- **Mode:** ${mode}`,
-    `- **Status:** ${status}`,
+    `- **Operation status:** ${status}`,
+    `- **GSC access status:** ${data.gsc_access_status}`,
+    `- **GSC execution status:** ${data.gsc_execution_status}`,
+    `- **GSC token refresh status:** ${data.gsc_token_refresh_status}`,
+    `- **GSC inspections:** ${data.gsc_inspection_succeeded} succeeded / ${data.gsc_inspection_failed} failed / ${data.gsc_inspection_attempted} attempted`,
     `- **Allowlist:** ${allowlistSource ? "`" + allowlistSource + "`" : "(none)"}`,
     `- **URLs evaluated:** ${urls?.length ?? 0}`,
     data.workflow_run_url
@@ -651,6 +676,7 @@ function toInspectionMarkdown(results, allowlistSource) {
 }
 
 async function main() {
+  observedGscRun = createGscRunObservation();
   const args = parseArgs(process.argv.slice(2));
   mkdirSync(ARTIFACT_DIR, { recursive: true });
 
@@ -668,6 +694,17 @@ async function main() {
         allowlistSource: allowlist._source,
         expired: [],
         notes: ["Allowlist structural validation failed — see stderr."],
+      });
+      emitJobSummary({
+        mode: "invalid-allowlist",
+        status: "FAIL",
+        allowlistSource: allowlist._source,
+        urls: [],
+        simulated: null,
+        expired: [],
+        notes: ["Allowlist structural validation failed — see stderr."],
+        oauthConfigured: null,
+        gscSkipped: true,
       });
       process.exit(2);
     }
@@ -715,6 +752,7 @@ async function main() {
       simulated: null,
       expired,
       notes: ["No URLs were evaluated in --list-expired-entries mode."],
+      gscSkipped: true,
     });
     for (const e of expired) console.log(`${e.section}[${e.id}] expired ${e.expires_on}`);
     process.exit(args.failOnExpired && expired.length > 0 ? 3 : 0);
@@ -757,7 +795,7 @@ async function main() {
       diff,
       notes: ["Dry-run — no GSC API calls."],
       oauthConfigured: null,
-      gscSkipped: false,
+      gscSkipped: true,
     });
     console.log(
       `Dry-run: ${urls.length} URL(s); ${wouldSuppress} would have issues suppressed; ${expired.length} expired allowlist entr${expired.length === 1 ? "y" : "ies"}.`,
@@ -789,12 +827,15 @@ async function main() {
       simulated: null,
       expired,
       notes: ["Live inspection blocked: allowlist has expired entries."],
+      gscSkipped: true,
     });
     process.exit(3);
   }
 
   const creds = loadGscCredentials();
+  observedGscRun.oauthConfigured = creds.ok;
   if (!creds.ok) {
+    observedGscRun.explicitlySkipped = true;
     const skipPayload = {
       status: "skipped",
       reason: "GSC OAuth not configured",
@@ -826,37 +867,43 @@ async function main() {
       notes: [
         "GSC OAuth not configured — live inspection skipped. Missing env vars are logged but not shown here.",
       ],
-      oauthConfigured: false,
-      gscSkipped: true,
+      gscObservation: observedGscRun,
     });
     console.log("GSC OAuth not configured — skipping (missing: " + creds.missing.join(", ") + ")");
     process.exit(0);
   }
 
   const adhocAllow = new Set(args.allow);
+  observedGscRun.tokenRefreshAttempted = true;
   const accessToken = await getAccessToken(creds);
+  observedGscRun.tokenRefreshSucceeded = true;
   const results = [];
   for (const url of urls) {
+    observedGscRun.inspectionAttempted += 1;
+    let raw;
     try {
-      const raw = await inspectUrl({ accessToken, siteUrl: creds.siteUrl, inspectionUrl: url });
-      const summary = summarizeInspection(url, raw);
-      const trackedNoindex = isExpectedNoindex(url, allowlist);
-      const isNever = isNeverAllowlisted(url, allowlist);
-      const expectedIndexable = isNever
-        ? true
-        : !(args.expectedNoindex || adhocAllow.has(url) || trackedNoindex);
-      const raw_issues = classifyIssues(summary, { expectedIndexable });
-      const { kept, suppressed } = isNever
-        ? { kept: raw_issues, suppressed: [] }
-        : applyAllowlist(url, raw_issues, allowlist);
-      results.push({ summary, issues: kept, suppressed });
+      raw = await inspectUrl({ accessToken, siteUrl: creds.siteUrl, inspectionUrl: url });
+      observedGscRun.inspectionSucceeded += 1;
     } catch (e) {
+      observedGscRun.inspectionFailed += 1;
       results.push({
         summary: { url, verdict: "ERROR" },
         issues: [{ code: "inspection_error", message: `${url}: ${e.message}` }],
         suppressed: [],
       });
+      continue;
     }
+    const summary = summarizeInspection(url, raw);
+    const trackedNoindex = isExpectedNoindex(url, allowlist);
+    const isNever = isNeverAllowlisted(url, allowlist);
+    const expectedIndexable = isNever
+      ? true
+      : !(args.expectedNoindex || adhocAllow.has(url) || trackedNoindex);
+    const raw_issues = classifyIssues(summary, { expectedIndexable });
+    const { kept, suppressed } = isNever
+      ? { kept: raw_issues, suppressed: [] }
+      : applyAllowlist(url, raw_issues, allowlist);
+    results.push({ summary, issues: kept, suppressed });
   }
 
   const failing = results.flatMap((r) => r.issues);
@@ -900,8 +947,7 @@ async function main() {
     failing: failing.length,
     diff,
     notes: [],
-    oauthConfigured: true,
-    gscSkipped: false,
+    gscObservation: observedGscRun,
   });
   console.log(
     `Inspected ${results.length} URL(s); ${failing.length} critical, ${suppressed.length} suppressed by allowlist.`,
@@ -911,5 +957,20 @@ async function main() {
 
 main().catch((e) => {
   console.error(e.message || e);
+  observedGscRun.runnerFailed = true;
+  try {
+    emitJobSummary({
+      mode: "runner-error",
+      status: "FAIL",
+      allowlistSource: null,
+      urls: [],
+      simulated: null,
+      expired: [],
+      notes: ["SEO monitoring runner failed before a complete result; see stderr."],
+      gscObservation: observedGscRun,
+    });
+  } catch {
+    console.error("SEO monitoring runner also failed to write its terminal job summary.");
+  }
   process.exit(1);
 });

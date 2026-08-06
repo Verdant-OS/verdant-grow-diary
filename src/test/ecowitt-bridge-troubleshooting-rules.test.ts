@@ -50,7 +50,12 @@ describe("ecowittBridgeTroubleshootingRules", () => {
   it("never returns token VALUES in any check detail", () => {
     const secret = "supersecret_token_value_ABCDEFGH12345678";
     const r = buildTroubleshootingReport({
-      env: { tentIdConfigured: true, bridgeTokenStatus: "present", sendModeRequested: true, ingestUrlConfigured: true },
+      env: {
+        tentIdConfigured: true,
+        bridgeTokenStatus: "present",
+        sendModeRequested: true,
+        ingestUrlConfigured: true,
+      },
       lastReading: null,
       now: FRESH_NOW,
     });

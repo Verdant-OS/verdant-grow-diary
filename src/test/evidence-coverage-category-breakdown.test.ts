@@ -30,7 +30,13 @@ describe("evidenceCoverageViewModel — category breakdown", () => {
     const actionLabels = vm.actionsByCategory.map((r) => r.label).sort();
     expect(actionLabels).toEqual(["adjust_vpd", "check_runoff"]);
     const vpd = vm.alertsByCategory.find((r) => r.label === "vpd")!;
-    expect(vpd).toMatchObject({ total: 2, linked: 1, fallbackOnly: 1, invalidRefs: 0, linkedPct: 50 });
+    expect(vpd).toMatchObject({
+      total: 2,
+      linked: 1,
+      fallbackOnly: 1,
+      invalidRefs: 0,
+      linkedPct: 50,
+    });
   });
 
   it("maps missing/empty/non-string category to Uncategorized", () => {
@@ -65,9 +71,7 @@ describe("evidenceCoverageViewModel — category breakdown", () => {
 
   it("counts non-empty malformed refs as invalid + fallbackOnly", () => {
     const vm = buildEvidenceCoverageViewModel({
-      alerts: [
-        { metric: "vpd", originating_timeline_events: [{ raw_payload: {} }] },
-      ],
+      alerts: [{ metric: "vpd", originating_timeline_events: [{ raw_payload: {} }] }],
       actions: [],
     });
     expect(vm.alertsByCategory[0].invalidRefs).toBe(1);

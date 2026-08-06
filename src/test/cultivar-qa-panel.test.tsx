@@ -3,7 +3,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import { VERDANT_CULTIVARS } from "@/constants/verdantCultivars";
 
 // isActive and effectivePlanId are decoupled on purpose: the free tier resolves

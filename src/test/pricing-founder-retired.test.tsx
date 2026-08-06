@@ -12,7 +12,7 @@
  * where Founder has silently vanished.
  */
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({ openCheckout: vi.fn() }));
@@ -79,7 +79,8 @@ describe("Founder Lifetime retired from /pricing", () => {
       const graph = (p["@graph"] ?? p.itemListElement ?? []) as unknown[];
       const list = Array.isArray(graph) ? graph : [];
       return list.filter(
-        (n) => typeof n === "object" && n !== null && (n as { "@type"?: string })["@type"] === "Product",
+        (n) =>
+          typeof n === "object" && n !== null && (n as { "@type"?: string })["@type"] === "Product",
       );
     });
     // Non-triviality: the page must still describe SOME product, or this

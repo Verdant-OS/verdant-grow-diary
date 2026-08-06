@@ -53,7 +53,11 @@ const LOCAL_SCHEMAS: Array<{
     optional: true,
   },
   { key: "verdant.quickLog.lastTarget.v1", label: "Quick Log last target", optional: true },
-  { key: "verdant.quickLogHandoff.notNow.v1", label: "Quick Log handoff dismissal", optional: true },
+  {
+    key: "verdant.quickLogHandoff.notNow.v1",
+    label: "Quick Log handoff dismissal",
+    optional: true,
+  },
   {
     key: "verdant.operator.sensor-ingest-audit.v1",
     label: "Sensor ingest audit (operator)",
@@ -300,11 +304,13 @@ export function LocalDataHealthPanel() {
   const [drawerKeys, setDrawerKeys] = useState<string[] | null>(null);
   const [backups, setBackups] = useState<BackupSnapshot[]>(() => listBackups());
 
-
   const run = useCallback(async () => {
     setRunning(true);
     try {
-      const local: CheckResult[] = [checkStorageAvailability(), ...LOCAL_SCHEMAS.map(checkLocalSchema)];
+      const local: CheckResult[] = [
+        checkStorageAvailability(),
+        ...LOCAL_SCHEMAS.map(checkLocalSchema),
+      ];
       let diary: CheckResult[] = [];
       try {
         diary = await checkDiaryAccess();
@@ -336,7 +342,10 @@ export function LocalDataHealthPanel() {
   const fixableKeys = Array.from(
     new Set(
       checks
-        .filter((c) => (c.status === "fail" || c.status === "warn") && c.meta && LOCAL_SCHEMA_KEYS.has(c.meta))
+        .filter(
+          (c) =>
+            (c.status === "fail" || c.status === "warn") && c.meta && LOCAL_SCHEMA_KEYS.has(c.meta),
+        )
         .map((c) => c.meta as string),
     ),
   );
@@ -410,7 +419,6 @@ export function LocalDataHealthPanel() {
     setFixNotice(`Backup ${id.slice(0, 8)} deleted.`);
   }, []);
 
-
   return (
     <>
       <Card>
@@ -427,8 +435,8 @@ export function LocalDataHealthPanel() {
           </div>
           <p className="text-xs text-muted-foreground">
             Verifies known Verdant localStorage schemas and — when signed in — that your grows,
-            plants, and diary entries are reachable via the RLS-scoped client. Stored draft
-            contents are never printed.
+            plants, and diary entries are reachable via the RLS-scoped client. Stored draft contents
+            are never printed.
           </p>
         </CardHeader>
         <CardContent className="text-sm space-y-3">
@@ -463,7 +471,9 @@ export function LocalDataHealthPanel() {
           </p>
 
           {fixNotice && (
-            <div className="rounded-md border border-border bg-muted/40 p-2 text-xs">{fixNotice}</div>
+            <div className="rounded-md border border-border bg-muted/40 p-2 text-xs">
+              {fixNotice}
+            </div>
           )}
 
           {failed.length > 0 && (
@@ -519,7 +529,6 @@ export function LocalDataHealthPanel() {
     </>
   );
 }
-
 
 // ---------------------------------------------------------------------------
 // Remediation checklist
@@ -611,9 +620,7 @@ interface RemediationChecklistProps {
 }
 
 function RemediationChecklist({ checks, onReviewKey, running }: RemediationChecklistProps) {
-  const steps = checks
-    .map(buildRemediation)
-    .filter((s): s is RemediationStep => s !== null);
+  const steps = checks.map(buildRemediation).filter((s): s is RemediationStep => s !== null);
 
   const failCount = steps.filter((s) => s.severity === "fail").length;
   const warnCount = steps.filter((s) => s.severity === "warn").length;
@@ -626,9 +633,7 @@ function RemediationChecklist({ checks, onReviewKey, running }: RemediationCheck
           <Badge variant="outline">Next actions</Badge>
           {failCount > 0 && <Badge variant="destructive">{failCount} to fix</Badge>}
           {failCount === 0 && warnCount > 0 && (
-            <Badge variant="secondary">
-              {warnCount} advisory
-            </Badge>
+            <Badge variant="secondary">{warnCount} advisory</Badge>
           )}
         </div>
         <p className="text-xs text-muted-foreground">
@@ -1041,7 +1046,10 @@ function readBackupStore(): BackupSnapshot[] {
     if (!Array.isArray(parsed)) return [];
     return parsed.filter(
       (b): b is BackupSnapshot =>
-        b && typeof b.id === "string" && Array.isArray(b.entries) && typeof b.createdAt === "string",
+        b &&
+        typeof b.id === "string" &&
+        Array.isArray(b.entries) &&
+        typeof b.createdAt === "string",
     );
   } catch {
     return [];
@@ -1142,8 +1150,8 @@ function BackupsPanel({ backups, onRestore, onDelete, running }: BackupsPanelPro
         </div>
         <p className="text-xs text-muted-foreground">
           Every “Fix issues” action snapshots the affected localStorage keys first. Restore
-          reinstates the exact prior values on this device and re-runs the checks. Snapshot
-          contents are never displayed. Only the last {BACKUP_MAX} snapshots are retained.
+          reinstates the exact prior values on this device and re-runs the checks. Snapshot contents
+          are never displayed. Only the last {BACKUP_MAX} snapshots are retained.
         </p>
       </CardHeader>
       <CardContent className="text-sm">
@@ -1187,8 +1195,7 @@ function BackupsPanel({ backups, onRestore, onDelete, running }: BackupsPanelPro
                     </div>
                   </div>
                   <p className="text-[11px] text-muted-foreground mt-1">
-                    {b.entries.length} key{b.entries.length === 1 ? "" : "s"} · {totalBytes} B
-                    total
+                    {b.entries.length} key{b.entries.length === 1 ? "" : "s"} · {totalBytes} B total
                   </p>
                   <ul className="mt-1 space-y-0.5">
                     {b.entries.map((e) => (
@@ -1211,4 +1218,3 @@ function BackupsPanel({ backups, onRestore, onDelete, running }: BackupsPanelPro
 }
 
 export default LocalDataHealthPanel;
-

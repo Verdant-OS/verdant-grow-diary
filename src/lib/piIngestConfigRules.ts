@@ -40,8 +40,7 @@ export interface PiIngestConfigIssue {
 }
 
 export type PiIngestConfigValidationResult =
-  | { ok: true; config: PiIngestConfig }
-  | { ok: false; issues: readonly PiIngestConfigIssue[] };
+  { ok: true; config: PiIngestConfig } | { ok: false; issues: readonly PiIngestConfigIssue[] };
 
 // ----------------------------- Defaults -----------------------------
 

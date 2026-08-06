@@ -101,7 +101,7 @@ describe("Landing page renders the polished positioning", () => {
     expect(LANDING).toMatch(/to=\{signInPath\}/);
     expect(LANDING).toMatch(/const signInPath = returnTo \? [\s\S]{0,80}: "\/auth"/);
     expect(LANDING).toMatch(/href="#loop"/);
-    // /demo is not primary-marketed here; App.tsx redirects it to /welcome.
+    // /demo is not primary-marketed here; File routes redirect it to /welcome.
     expect(LANDING).not.toMatch(/to="\/demo"/);
     expect(LANDING).not.toMatch(/href="\/demo"/);
   });

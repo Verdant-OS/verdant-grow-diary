@@ -34,9 +34,7 @@ describe("buildQuickLogV2RefreshQueryKeys — AI Doctor + tent scoping", () => {
         tentId: "tent-2",
       }),
     );
-    expect(out).toContain(
-      JSON.stringify(["quick_log_grouped_timeline", "tent-2"]),
-    );
+    expect(out).toContain(JSON.stringify(["quick_log_grouped_timeline", "tent-2"]));
     expect(out).toContain(JSON.stringify(["tent_recent_activity", "tent-2"]));
   });
 
@@ -66,9 +64,7 @@ describe("buildQuickLogV2RefreshQueryKeys — AI Doctor + tent scoping", () => {
         tentId: "tent-77",
       }),
     );
-    expect(out).toContain(
-      JSON.stringify(["quick_log_grouped_timeline", "tent-77"]),
-    );
+    expect(out).toContain(JSON.stringify(["quick_log_grouped_timeline", "tent-77"]));
     expect(out).toContain(JSON.stringify(["tent_recent_activity", "tent-77"]));
     // Tent-scoped readiness/context are emitted; conditional apply layer
     // skips them if no tent-scoped readiness query is mounted.
@@ -90,10 +86,7 @@ describe("buildQuickLogV2RefreshQueryKeys — AI Doctor + tent scoping", () => {
 });
 
 describe("quickLogV2RefreshRules — static safety", () => {
-  const file = readFileSync(
-    join(process.cwd(), "src/lib/quickLogV2RefreshRules.ts"),
-    "utf8",
-  );
+  const file = readFileSync(join(process.cwd(), "src/lib/quickLogV2RefreshRules.ts"), "utf8");
 
   it("performs no I/O, schema, RPC, or write operations", () => {
     expect(file).not.toMatch(/from\s+["']@\/integrations\/supabase/);

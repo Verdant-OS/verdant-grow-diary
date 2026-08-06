@@ -72,12 +72,10 @@ export function buildApprovalQueueViewItems(
   const plants = lookups.plantsById ?? {};
 
   return items.map((a) => {
-    const tentName =
-      a.tent_id && tents[a.tent_id]?.name ? tents[a.tent_id]!.name : null;
+    const tentName = a.tent_id && tents[a.tent_id]?.name ? tents[a.tent_id]!.name : null;
     const plantLabel =
       a.plant_id && plants[a.plant_id] ? formatPlantLabel(plants[a.plant_id]) : null;
-    const source =
-      typeof a.source === "string" && a.source.trim() ? a.source.trim() : null;
+    const source = typeof a.source === "string" && a.source.trim() ? a.source.trim() : null;
 
     return {
       id: a.id,
@@ -107,8 +105,7 @@ export const SAFE_BY_DESIGN_COPY = {
   readOnly: "Read-Only",
   approvalRequired: "Approval Required",
   /** Long-form explainer rendered near recommendations. */
-  explainer:
-    "Verdant suggests. Grower approves. No device control is executed from this screen.",
+  explainer: "Verdant suggests. Grower approves. No device control is executed from this screen.",
 } as const;
 
 /** Honest empty-state copy. */

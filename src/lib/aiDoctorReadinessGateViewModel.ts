@@ -13,28 +13,22 @@
 import type { AiDoctorContextReadiness } from "@/lib/aiDoctorContextRules";
 
 /** Exact, non-negotiable gate copy. Source of truth for the panel. */
-export const AI_DOCTOR_READINESS_GATE_COPY: Record<
-  AiDoctorContextReadiness,
-  string
-> = Object.freeze({
-  insufficient:
-    "More context needed before AI Doctor should give confident guidance.",
-  partial: "AI Doctor can review this, but confidence may be limited.",
-  strong: "Ready for a cautious AI Doctor review.",
-});
+export const AI_DOCTOR_READINESS_GATE_COPY: Record<AiDoctorContextReadiness, string> =
+  Object.freeze({
+    insufficient: "More context needed before AI Doctor should give confident guidance.",
+    partial: "AI Doctor can review this, but confidence may be limited.",
+    strong: "Ready for a cautious AI Doctor review.",
+  });
 
 export const AI_DOCTOR_READINESS_GATE_ADD_CONTEXT_LABEL = "Add missing context";
-export const AI_DOCTOR_READINESS_GATE_REVIEW_LABEL =
-  "Open cautious AI Doctor review";
+export const AI_DOCTOR_READINESS_GATE_REVIEW_LABEL = "Open cautious AI Doctor review";
 
 /**
  * Primary action descriptor. UI decides how to render; logic stays here.
  *  - `focus_anchor` → scroll/focus an in-page anchor (no writes, no routing).
  *  - `open_ai_doctor` → invoke an existing AI Doctor flow if a safe one is wired.
  */
-export type AiDoctorReadinessGatePrimaryActionKind =
-  | "focus_anchor"
-  | "open_ai_doctor";
+export type AiDoctorReadinessGatePrimaryActionKind = "focus_anchor" | "open_ai_doctor";
 
 export interface AiDoctorReadinessGatePrimaryAction {
   kind: AiDoctorReadinessGatePrimaryActionKind;
@@ -133,17 +127,13 @@ export const AI_DOCTOR_READINESS_BLOCKING_CODES = Object.freeze([
   "recent-manual-sensor-snapshot",
 ] as const);
 
-export type AiDoctorReadinessBlockingCode =
-  (typeof AI_DOCTOR_READINESS_BLOCKING_CODES)[number];
+export type AiDoctorReadinessBlockingCode = (typeof AI_DOCTOR_READINESS_BLOCKING_CODES)[number];
 
-const BLOCKING_LABEL: Record<AiDoctorReadinessBlockingCode, string> =
-  Object.freeze({
-    "plant-profile": "a plant profile",
-    "recent-timeline-activity":
-      "a recent note, watering, feeding, or photo (last 7 days)",
-    "recent-manual-sensor-snapshot":
-      "a recent manual sensor snapshot (last 7 days)",
-  });
+const BLOCKING_LABEL: Record<AiDoctorReadinessBlockingCode, string> = Object.freeze({
+  "plant-profile": "a plant profile",
+  "recent-timeline-activity": "a recent note, watering, feeding, or photo (last 7 days)",
+  "recent-manual-sensor-snapshot": "a recent manual sensor snapshot (last 7 days)",
+});
 
 export interface AiDoctorReadinessBlockedExplanation {
   /** Ordered blocking category codes that are actually missing. */
@@ -173,8 +163,9 @@ export function buildAiDoctorReadinessBlockedExplanation(
     return { blockingCodes: [], blockingLabels: [], sentence: "" };
   }
   const missingSet = new Set(args.missing);
-  const codes: AiDoctorReadinessBlockingCode[] =
-    AI_DOCTOR_READINESS_BLOCKING_CODES.filter((c) => missingSet.has(c));
+  const codes: AiDoctorReadinessBlockingCode[] = AI_DOCTOR_READINESS_BLOCKING_CODES.filter((c) =>
+    missingSet.has(c),
+  );
   const labels = codes.map((c) => BLOCKING_LABEL[c]);
 
   const label = args.nextActionLabel.trim();

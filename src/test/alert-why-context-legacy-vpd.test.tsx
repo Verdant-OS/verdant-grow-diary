@@ -11,10 +11,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen } from "@testing-library/react";
 
-import {
-  deriveAlertWhyContext,
-  type AlertLike,
-} from "@/lib/alertWhyContext";
+import { deriveAlertWhyContext, type AlertLike } from "@/lib/alertWhyContext";
 import { AlertWhyContext } from "@/components/AlertWhyContext";
 
 const LEGACY_VPD_FLOWER: AlertLike = {
@@ -104,9 +101,7 @@ describe("legacy VPD alerts — stage-aware why-context fallback", () => {
     const root = screen.getByTestId("alert-why-detailed");
     expect(root.getAttribute("data-kind")).toBe("stage");
     expect(screen.getByTestId("alert-why-stage").textContent).toBe("Flower");
-    expect(screen.getByTestId("alert-why-range").textContent).toBe(
-      "1.0–1.5 kPa",
-    );
+    expect(screen.getByTestId("alert-why-range").textContent).toBe("1.0–1.5 kPa");
   });
 
   it("detailed presenter on legacy harvest VPD → renders context-only text without range rows", () => {
@@ -121,10 +116,7 @@ describe("legacy VPD alerts — stage-aware why-context fallback", () => {
 });
 
 describe("static safety — legacy VPD fallback", () => {
-  const src = readFileSync(
-    resolve(__dirname, "../lib/alertWhyContext.ts"),
-    "utf8",
-  );
+  const src = readFileSync(resolve(__dirname, "../lib/alertWhyContext.ts"), "utf8");
   it("alertWhyContext.ts: no alert writes / queue / service_role / AI Doctor / automation / device control", () => {
     expect(src).not.toMatch(/action_queue/);
     expect(src).not.toMatch(/service_role/);

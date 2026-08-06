@@ -34,23 +34,17 @@ export default function SensorTruthHelp({
         Sensor truth
       </h3>
       <p data-testid="sensor-truth-help-body" className="text-muted-foreground">
-        Verdant labels where each reading came from so you know how much to
-        trust it. <strong className="text-foreground">Ecowitt</strong> readings
-        come from your connected Ecowitt hardware.{" "}
-        <strong className="text-foreground">Manual</strong> readings were
-        entered by you. <strong className="text-foreground">CSV</strong>{" "}
-        readings came from an import.{" "}
-        <strong className="text-foreground">Stale</strong> means the reading is
-        old. <strong className="text-foreground">Unknown</strong> means Verdant
-        cannot verify the source or time.
+        Verdant labels where each reading came from so you know how much to trust it.{" "}
+        <strong className="text-foreground">Ecowitt</strong> readings come from your connected
+        Ecowitt hardware. <strong className="text-foreground">Manual</strong> readings were entered
+        by you. <strong className="text-foreground">CSV</strong> readings came from an import.{" "}
+        <strong className="text-foreground">Stale</strong> means the reading is old.{" "}
+        <strong className="text-foreground">Unknown</strong> means Verdant cannot verify the source
+        or time.
       </p>
-      <p
-        data-testid="sensor-truth-help-captured-at"
-        className="mt-3 text-muted-foreground"
-      >
-        <strong className="text-foreground">captured_at</strong> is when the
-        sensor reading was actually taken. It may be different from when you
-        logged an event.
+      <p data-testid="sensor-truth-help-captured-at" className="mt-3 text-muted-foreground">
+        <strong className="text-foreground">captured_at</strong> is when the sensor reading was
+        actually taken. It may be different from when you logged an event.
       </p>
     </section>
   );

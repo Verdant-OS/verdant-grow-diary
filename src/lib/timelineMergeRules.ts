@@ -26,6 +26,8 @@
  *     are passed through as `null` when missing.
  */
 
+import { dedupeMergedManualGrowActivityRows } from "@/lib/connectedOneTentActivationRules";
+
 // ---------------------------------------------------------------------------
 // Input row shapes (loose by design — accept upstream variations)
 // ---------------------------------------------------------------------------
@@ -163,7 +165,7 @@ function normalizeGrowEventRow(row: GrowEventRowInput): MergedTimelineEntry {
   };
 }
 
-function pickLogicalGrowEventLink(row: DiaryEntryRowInput): string | null {
+export function pickLogicalGrowEventLink(row: DiaryEntryRowInput): string | null {
   const details = row.details ?? null;
   const candidates = [
     row.linked_grow_event_id,
@@ -198,6 +200,214 @@ function compareMergedEntries(a: MergedTimelineEntry, b: MergedTimelineEntry): n
   if (a.source_id < b.source_id) return -1;
   if (a.source_id > b.source_id) return 1;
   return 0;
+}
+
+// ---------------------------------------------------------------------------
+// Quick Log save fan-out collapse
+// ---------------------------------------------------------------------------
+//
+// One confirmed Quick Log save can persist up to three rows: a manual
+// watering/observation `grow_events` spine row, a same-instant sibling
+// `environment` grow_event when sensor values are present, and a
+// `diary_entries` companion when structured details exist. Readers that feed
+// all three into `mergeTimelineSources` render one save as two or three
+// activities (live audit #9/#10). This helper applies the shared manual-save
+// dedupe (`dedupeMergedManualGrowActivityRows`) to the raw source arrays
+// while keeping rows that are outside that contract (non-manual grow events,
+// rows without a parsable timestamp) flowing through untouched.
+//
+// Dropped companions are returned keyed by their surviving spine row so the
+// caller can re-attach companion-only details (sensor snapshots,
+// environment_check envelopes, plant_name) to the spine and keep rendering
+// them exactly once.
+//
+// A companion's linked/paired grow_event is not always present in this
+// exact call's `growEvents` array — Timeline's own grow_events read can be
+// date-range- or keyset-bounded independently of the diary_entries read, so
+// a real save's parent can legitimately fall outside the current window (or,
+// for a caller that never fetches grow_events at all, be entirely absent).
+// In that case the diary companion is the ONLY evidence of that save in this
+// read; it must render as its own standalone entry, not vanish. Only a
+// parent that WAS fetched and was excluded by the shared dedupe (deleted,
+// wrong scope) is treated as "known gone" and must not resurrect a second
+// activity.
+//
+// CALLER CONTRACT: to correctly resolve every linked/paired companion this
+// function's `growEvents` input must include a row for every grow_event id
+// referenced by `diaryEntries` — deleted or not, and regardless of whichever
+// query page/window/limit the caller's primary fetch used. Absence from
+// `growEvents` is this function's ONLY signal that a parent was never
+// fetched at all; anything short of that full-coverage contract (a bare
+// `.eq("is_deleted", false)` filter, but *also* a page/limit/date-bound that
+// can legitimately exclude a real parent while its companion's own,
+// independently-bounded fetch still includes the companion) makes a known
+// parent indistinguishable from "outside the window", and its companion is
+// wrongly resurrected as a standalone entry. `findMissingLinkedGrowEventIds`
+// (below) tells a caller exactly which ids its primary fetch is missing, so
+// it can resolve them with a small supplemental by-id lookup before calling
+// this function.
+//
+// This function's OWN `growEvents` OUTPUT still contains `is_deleted` rows
+// verbatim — the loop below only removes rows that fail the manual-save
+// dedupe's own contract (same-instant environment siblings, exact
+// duplicates), not deleted ones. Deleted rows never reach the screen only
+// because every downstream consumer filters them independently:
+// `mergeTimelineSources` (`row.is_deleted === true → continue`) and
+// `mapGrowEventsToRecentRawEntries` (`row.is_deleted !== true` in its own
+// filter). A future caller that reads this function's `growEvents` output
+// directly, bypassing both of those, would need to filter `is_deleted`
+// itself before rendering.
+
+export interface CollapseQuickLogSaveFanOutResult<
+  D extends DiaryEntryRowInput,
+  G extends GrowEventRowInput,
+> {
+  diaryEntries: D[];
+  growEvents: G[];
+  /** Companion diary rows removed by the collapse, keyed by surviving spine id. */
+  droppedCompanionsBySpineId: Map<string, D[]>;
+}
+
+/**
+ * The grow_event ids `diaryEntries` reference (via `linked_grow_event_id` /
+ * `grow_event_id`) that are absent from the already-fetched `growEvents`.
+ * A caller should resolve these with a small supplemental by-id lookup
+ * (deleted or not, ignoring whatever page/window/limit the primary
+ * `growEvents` fetch used) and fold the result into `growEvents` before
+ * calling `collapseQuickLogSaveFanOut` — see the CALLER CONTRACT above.
+ * Pure; returns a stable-sorted, deduplicated id list.
+ */
+export function findMissingLinkedGrowEventIds<
+  D extends DiaryEntryRowInput,
+  G extends GrowEventRowInput,
+>(input: { diaryEntries: ReadonlyArray<D>; growEvents: ReadonlyArray<G> }): string[] {
+  const fetchedIds = new Set(
+    (input.growEvents ?? [])
+      .map((row) => (row && typeof row.id === "string" ? row.id : null))
+      .filter((id): id is string => id !== null),
+  );
+  const missing = new Set<string>();
+  for (const row of input.diaryEntries ?? []) {
+    if (!row) continue;
+    const link = pickLogicalGrowEventLink(row);
+    if (link && !fetchedIds.has(link)) missing.add(link);
+  }
+  return [...missing].sort();
+}
+
+function fanOutEpochMs(primary: unknown, fallback: unknown): number | null {
+  for (const value of [primary, fallback]) {
+    if (typeof value !== "string" || value.trim().length === 0) continue;
+    const epoch = Date.parse(value);
+    if (Number.isFinite(epoch)) return epoch;
+  }
+  return null;
+}
+
+function fanOutPairKey(plantId: unknown, epochMs: number): string {
+  const plant = typeof plantId === "string" && plantId.trim().length > 0 ? plantId.trim() : "";
+  return `${plant}|${epochMs}`;
+}
+
+export function collapseQuickLogSaveFanOut<
+  D extends DiaryEntryRowInput,
+  G extends GrowEventRowInput,
+>(input: {
+  diaryEntries: ReadonlyArray<D>;
+  growEvents: ReadonlyArray<G>;
+}): CollapseQuickLogSaveFanOutResult<D, G> {
+  const survivors = dedupeMergedManualGrowActivityRows({
+    diaryEntries: input.diaryEntries,
+    growEvents: input.growEvents,
+  });
+  const survivorSpineIds = new Set(
+    survivors.growEvents.map((row) => row.id).filter((id): id is string => typeof id === "string"),
+  );
+  const survivorDiaryIds = new Set(
+    survivors.diaryEntries
+      .map((row) => row.id)
+      .filter((id): id is string => typeof id === "string"),
+  );
+  // Every grow_event id present in this call's `growEvents`, regardless of
+  // manual-contract eligibility. Distinguishes "fetched but excluded" (known
+  // gone — do not resurrect) from "never fetched at all" (unknown — keep the
+  // companion standalone rather than silently dropping real evidence).
+  const fetchedGrowEventIds = new Set(
+    input.growEvents
+      .map((row) => (row && typeof row.id === "string" ? row.id : null))
+      .filter((id): id is string => id !== null),
+  );
+
+  // Surviving spine rows by (plant, instant) pair — the attachment target for
+  // unlinked companions written by quicklog_save_manual. First-in-input wins
+  // so attachment stays deterministic.
+  const spineIdByPairKey = new Map<string, string>();
+  const growEvents: G[] = [];
+  for (const row of input.growEvents) {
+    if (!row || typeof row.id !== "string" || row.id.trim().length === 0) {
+      continue;
+    }
+    const epochMs = fanOutEpochMs(row.occurred_at, row.entry_at);
+    const inManualContract = row.source === "manual" && row.is_deleted !== true && epochMs !== null;
+    if (inManualContract && !survivorSpineIds.has(row.id)) {
+      // The only manual, timestamped, non-deleted rows the shared dedupe
+      // removes are same-instant environment siblings of a watering /
+      // observation spine (and exact id duplicates). One sensor-carrying
+      // save must count once.
+      continue;
+    }
+    if (inManualContract && epochMs !== null) {
+      const key = fanOutPairKey(row.plant_id, epochMs);
+      if (!spineIdByPairKey.has(key)) spineIdByPairKey.set(key, row.id);
+    }
+    growEvents.push(row);
+  }
+
+  const diaryEntries: D[] = [];
+  const droppedCompanionsBySpineId = new Map<string, D[]>();
+  // Resolves a companion against its (possibly absent) target spine:
+  //  - target is a surviving spine → drop the companion, attach its details
+  //  - target was fetched but did not survive (deleted / wrong scope) →
+  //    drop it silently; the shared dedupe already decided it is known gone
+  //  - target was never fetched at all → keep the companion as its own
+  //    standalone entry; it may be the only evidence of that save
+  const resolveCompanion = (spineId: string | null, row: D) => {
+    if (spineId && survivorSpineIds.has(spineId)) {
+      const bucket = droppedCompanionsBySpineId.get(spineId);
+      if (bucket) bucket.push(row);
+      else droppedCompanionsBySpineId.set(spineId, [row]);
+      return;
+    }
+    if (spineId && fetchedGrowEventIds.has(spineId)) return;
+    diaryEntries.push(row);
+  };
+  for (const row of input.diaryEntries) {
+    if (!row || typeof row.id !== "string" || row.id.trim().length === 0) {
+      diaryEntries.push(row);
+      continue;
+    }
+    if (survivorDiaryIds.has(row.id)) {
+      diaryEntries.push(row);
+      continue;
+    }
+    const logicalLink = pickLogicalGrowEventLink(row);
+    const epochMs = fanOutEpochMs(row.entry_at, row.occurred_at);
+    if (logicalLink) {
+      resolveCompanion(logicalLink, row);
+      continue;
+    }
+    if (epochMs === null) {
+      // Untimestamped rows fall outside the pair contract; the merge sorts
+      // them last rather than hiding them.
+      diaryEntries.push(row);
+      continue;
+    }
+    // Unlinked companion sharing the exact (plant, instant) pair with a
+    // manual spine row — conservatively the same logical save.
+    resolveCompanion(spineIdByPairKey.get(fanOutPairKey(row.plant_id, epochMs)) ?? null, row);
+  }
+
+  return { diaryEntries, growEvents, droppedCompanionsBySpineId };
 }
 
 // ---------------------------------------------------------------------------

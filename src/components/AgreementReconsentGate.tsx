@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation } from "@/lib/react-router-compat";
 import { useAuth } from "@/store/auth";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -177,9 +177,7 @@ export function AgreementReconsentGate() {
         <DialogHeader>
           <div className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-primary" aria-hidden />
-            <DialogTitle>
-              {anyPrior ? "Updated agreements" : "Accept our agreements"}
-            </DialogTitle>
+            <DialogTitle>{anyPrior ? "Updated agreements" : "Accept our agreements"}</DialogTitle>
           </div>
           <DialogDescription>
             {anyPrior

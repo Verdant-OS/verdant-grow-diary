@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "@/lib/react-router-compat";
 import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 import { readCheckoutReturnNavigationSurface } from "@/lib/checkoutReturnTo";
 

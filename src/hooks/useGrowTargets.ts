@@ -21,8 +21,6 @@ type InnerState =
 
 export type TargetsState = InnerState & { reload: () => void };
 
-
-
 const COLUMN_TO_METRIC: Record<string, MetricKey> = {
   temp: "temp",
   rh: "rh",
@@ -39,9 +37,7 @@ function toFinite(v: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-export function normalizeTargetsRow(
-  row: Record<string, unknown> | null,
-): GrowTargets | null {
+export function normalizeTargetsRow(row: Record<string, unknown> | null): GrowTargets | null {
   if (!row) return null;
   const out: GrowTargets = {};
   for (const [col, metric] of Object.entries(COLUMN_TO_METRIC)) {
@@ -54,9 +50,7 @@ export function normalizeTargetsRow(
   return Object.keys(out).length > 0 ? out : null;
 }
 
-export function useGrowTargets(
-  growId: string | null | undefined,
-): TargetsState {
+export function useGrowTargets(growId: string | null | undefined): TargetsState {
   const { user } = useAuth();
   const [state, setState] = useState<InnerState>({
     status: "idle",
@@ -93,7 +87,6 @@ export function useGrowTargets(
   }, [load]);
 
   return { ...state, reload: load };
-
 }
 
 export default useGrowTargets;

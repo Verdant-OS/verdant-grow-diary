@@ -9,7 +9,7 @@
  *    action_queue writes, no diary writes.
  *  - Copy is calm; nothing here implies AI confidence is strong.
  */
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { Button } from "@/components/ui/button";
 import type {
   AiDoctorContextQuickAction,
@@ -25,9 +25,7 @@ export interface AiDoctorContextQuickActionsProps {
 
 function dispatchEvent(target: AiDoctorContextQuickActionEventTarget): void {
   if (typeof window === "undefined") return;
-  window.dispatchEvent(
-    new CustomEvent(target.eventName, { detail: target.payload }),
-  );
+  window.dispatchEvent(new CustomEvent(target.eventName, { detail: target.payload }));
 }
 
 export default function AiDoctorContextQuickActions({
@@ -40,14 +38,12 @@ export default function AiDoctorContextQuickActions({
     ? `${testIdPrefix}-quick-actions`
     : "ai-doctor-context-quick-actions";
   return (
-    <div
-      data-testid={containerTestId}
-      className={`flex flex-wrap gap-2 ${className ?? ""}`}
-    >
+    <div data-testid={containerTestId} className={`flex flex-wrap gap-2 ${className ?? ""}`}>
       {actions.map((action) => {
-        const aria = action.disabled && action.disabledReason
-          ? `${action.label} (unavailable: ${action.disabledReason})`
-          : action.label;
+        const aria =
+          action.disabled && action.disabledReason
+            ? `${action.label} (unavailable: ${action.disabledReason})`
+            : action.label;
         if (action.target.kind === "link") {
           if (action.disabled) {
             return (

@@ -57,9 +57,7 @@ describe("quickLogTimelineAuditViewModel", () => {
     expect(QUICK_LOG_AUDIT_EXPAND_LABEL).not.toMatch(/linked/i);
     expect(QUICK_LOG_AUDIT_COLLAPSE_LABEL).not.toMatch(/linked/i);
     expect(QUICK_LOG_AUDIT_ACTION_SUBCARD_TITLE).toBe("Action event");
-    expect(QUICK_LOG_AUDIT_ENVIRONMENT_SUBCARD_TITLE).toBe(
-      "Manual environment snapshot",
-    );
+    expect(QUICK_LOG_AUDIT_ENVIRONMENT_SUBCARD_TITLE).toBe("Manual environment snapshot");
   });
 
   it("auditToggleLabel toggles deterministically", () => {

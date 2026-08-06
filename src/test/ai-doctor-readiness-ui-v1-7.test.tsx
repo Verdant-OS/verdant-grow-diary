@@ -19,7 +19,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 
 import AiDoctorContextReadinessPanel from "@/components/AiDoctorContextReadinessPanel";
 import AiDoctorContextQuickActions from "@/components/AiDoctorContextQuickActions";
@@ -44,11 +44,9 @@ vi.mock("@/integrations/supabase/client", () => ({
   },
 }));
 
-const fetchSpy = vi
-  .spyOn(globalThis, "fetch" as never)
-  .mockImplementation((() => {
-    throw new Error("fetch not allowed in v1.7 test");
-  }) as never);
+const fetchSpy = vi.spyOn(globalThis, "fetch" as never).mockImplementation((() => {
+  throw new Error("fetch not allowed in v1.7 test");
+}) as never);
 
 const storageSetSpy = vi.spyOn(Storage.prototype, "setItem");
 
@@ -86,30 +84,20 @@ const BANNED_DISABLED_COPY = [
 function assertCalm(text: string, label: string): void {
   const lc = text.toLowerCase();
   for (const banned of BANNED_DISABLED_COPY) {
-    expect(
-      lc.includes(banned),
-      `${label} must not contain "${banned}" — got: ${text}`,
-    ).toBe(false);
+    expect(lc.includes(banned), `${label} must not contain "${banned}" — got: ${text}`).toBe(false);
   }
 }
 
 function headersInPanel(): string[] {
   const panel = screen.getByTestId("ai-doctor-context-readiness-panel");
-  return Array.from(panel.querySelectorAll("h2, h3")).map(
-    (h) => (h.textContent ?? "").trim(),
-  );
+  return Array.from(panel.querySelectorAll("h2, h3")).map((h) => (h.textContent ?? "").trim());
 }
 
 function sourceBadgesInPanel(): string[] {
-  const list = screen.queryByTestId(
-    "ai-doctor-context-readiness-panel-sources",
-  );
+  const list = screen.queryByTestId("ai-doctor-context-readiness-panel-sources");
   if (!list) return [];
   return Array.from(list.querySelectorAll("li")).map(
-    (li) =>
-      `${li.getAttribute("data-source")}|${li.getAttribute(
-        "data-trustworthy",
-      )}`,
+    (li) => `${li.getAttribute("data-source")}|${li.getAttribute("data-trustworthy")}`,
   );
 }
 
@@ -152,10 +140,7 @@ describe("v1.7 — disabled quick-action explanations", () => {
     document.addEventListener("submit", calls);
     try {
       render(
-        <AiDoctorContextReadinessPanel
-          context={buildReadinessContext()}
-          openAlertsCount={0}
-        />,
+        <AiDoctorContextReadinessPanel context={buildReadinessContext()} openAlertsCount={0} />,
       );
       const btn = screen.getByTestId(
         "ai-doctor-context-readiness-panel-quick-action-fast-add-photo",
@@ -225,7 +210,6 @@ describe("v1.7 — deterministic section/header ordering for partial context", (
     );
   }
 
-
   const cases: Array<{
     name: string;
     sensors: ReadonlyArray<Record<string, unknown>>;
@@ -233,17 +217,11 @@ describe("v1.7 — deterministic section/header ordering for partial context", (
   }> = [
     {
       name: "live + manual only",
-      sensors: [
-        buildReadingForSource("live"),
-        buildReadingForSource("manual"),
-      ],
+      sensors: [buildReadingForSource("live"), buildReadingForSource("manual")],
     },
     {
       name: "invalid/stale only",
-      sensors: [
-        buildReadingForSource("invalid"),
-        buildReadingForSource("stale"),
-      ],
+      sensors: [buildReadingForSource("invalid"), buildReadingForSource("stale")],
     },
     {
       name: "demo only",
@@ -260,9 +238,7 @@ describe("v1.7 — deterministic section/header ordering for partial context", (
     {
       name: "photos only",
       sensors: [],
-      grow: [
-        { occurred_at: ago(HOUR), event_type: "photo", source: "manual" },
-      ],
+      grow: [{ occurred_at: ago(HOUR), event_type: "photo", source: "manual" }],
     },
     {
       name: "sensors only, no diary/logs",
@@ -307,9 +283,9 @@ describe("v1.7 — deterministic section/header ordering for partial context", (
       '[data-testid="ai-doctor-context-readiness-panel-sources"]',
     );
     expect(sourceList).toBeTruthy();
-    const trustVals = Array.from(
-      sourceList!.querySelectorAll("li"),
-    ).map((li) => li.getAttribute("data-trustworthy"));
+    const trustVals = Array.from(sourceList!.querySelectorAll("li")).map((li) =>
+      li.getAttribute("data-trustworthy"),
+    );
     expect(trustVals.every((v) => v === "false")).toBe(true);
   });
 });
@@ -332,24 +308,13 @@ describe("v1.7 — keyboard focus + interaction regressions", () => {
         quickActions={{ onFastAddPhoto, onAddWatering, onAddFeeding }}
       />,
     );
-    const row = screen.getByTestId(
-      "ai-doctor-context-readiness-panel-quick-actions",
-    );
-    const buttons = Array.from(
-      row.querySelectorAll("button"),
-    ) as HTMLButtonElement[];
-    const enabledIds = buttons
-      .filter((b) => !b.disabled)
-      .map((b) => b.dataset.quickAction ?? "");
-    expect(enabledIds).toEqual([
-      "fast-add-photo",
-      "add-watering",
-      "add-feeding",
-    ]);
+    const row = screen.getByTestId("ai-doctor-context-readiness-panel-quick-actions");
+    const buttons = Array.from(row.querySelectorAll("button")) as HTMLButtonElement[];
+    const enabledIds = buttons.filter((b) => !b.disabled).map((b) => b.dataset.quickAction ?? "");
+    expect(enabledIds).toEqual(["fast-add-photo", "add-watering", "add-feeding"]);
     // Every interactive control has a non-empty accessible name.
     for (const b of buttons) {
-      const name =
-        (b.textContent ?? "").trim() || (b.getAttribute("aria-label") ?? "");
+      const name = (b.textContent ?? "").trim() || (b.getAttribute("aria-label") ?? "");
       expect(name.length).toBeGreaterThan(0);
     }
     // Tab through the document and capture focus stops landing on our buttons.

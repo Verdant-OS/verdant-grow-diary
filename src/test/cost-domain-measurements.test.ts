@@ -6,10 +6,7 @@ import {
   detectCrossDomainViolations,
   isTokenRiskEvent,
 } from "@/lib/cost/costDomains";
-import {
-  COST_THRESHOLDS,
-  thresholdsAreAllTbd,
-} from "@/lib/cost/costThresholds";
+import { COST_THRESHOLDS, thresholdsAreAllTbd } from "@/lib/cost/costThresholds";
 
 describe("cost-domain separation", () => {
   it("DB refresh measurement rejects token fields", () => {
@@ -34,9 +31,7 @@ describe("cost-domain separation", () => {
       rawHistoryFallback: "summary_stale",
     });
     const keys = violations.map((v) => v.offendingKey).sort();
-    expect(keys).toEqual(
-      ["providerName", "rawHistoryFallback", "summaryByteSize"].sort(),
-    );
+    expect(keys).toEqual(["providerName", "rawHistoryFallback", "summaryByteSize"].sort());
   });
 
   it("AI prompt measurement rejects DB refresh fields", () => {

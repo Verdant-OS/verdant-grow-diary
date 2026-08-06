@@ -2,10 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-const PANEL = readFileSync(
-  resolve(__dirname, "../components/SensorsTestbenchPanel.tsx"),
-  "utf8",
-);
+const PANEL = readFileSync(resolve(__dirname, "../components/SensorsTestbenchPanel.tsx"), "utf8");
 
 describe("SensorsTestbenchPanel static safety", () => {
   it("does not reference service_role keys or env", () => {
@@ -19,13 +16,23 @@ describe("SensorsTestbenchPanel static safety", () => {
   });
 
   it("does not label testbench data as live/healthy/connected sensor", () => {
-    // The "Live connected sensor" string only appears in the live branch,
-    // gated on indicator === "live". Testbench branch must use the
-    // testbench label.
-    const testbenchBranch = PANEL.match(/indicator === "testbench"[\s\S]*?indicator === "live"/);
+    // The receiving badge is gated on indicator === "receiving"; the
+    // testbench branch must use the testbench label.
+    const testbenchBranch = PANEL.match(
+      /indicator === "testbench"[\s\S]*?indicator === "receiving"/,
+    );
     expect(testbenchBranch).toBeTruthy();
     expect(testbenchBranch?.[0]).toContain("EcoWitt testbench");
     expect(testbenchBranch?.[0]).not.toMatch(/Live connected/);
+  });
+
+  it("never renders the word live on any transport badge (#584)", () => {
+    // Transport freshness must not borrow the strict taxonomy's vocabulary:
+    // no badge copy may claim "live"; the receiving badge says unverified.
+    const badgeFn = PANEL.match(/function indicatorBadge[\s\S]*?\n\}/);
+    expect(badgeFn).toBeTruthy();
+    expect(badgeFn?.[0]).not.toMatch(/Live\b/);
+    expect(badgeFn?.[0]).toContain("Receiving data — unverified source");
   });
 
   it("uses bridge token Bearer auth for the test send", () => {

@@ -32,9 +32,7 @@ const REQUIRED_ROLE_CREDS = [
   ["Pro", "E2E_PHENO_PRO_EMAIL", "E2E_PHENO_PRO_PASSWORD"],
   ["Canceled", "E2E_PHENO_CANCELED_EMAIL", "E2E_PHENO_CANCELED_PASSWORD"],
 ];
-const OPTIONAL_ROLE_CREDS = [
-  ["Founder", "E2E_PHENO_FOUNDER_EMAIL", "E2E_PHENO_FOUNDER_PASSWORD"],
-];
+const OPTIONAL_ROLE_CREDS = [["Founder", "E2E_PHENO_FOUNDER_EMAIL", "E2E_PHENO_FOUNDER_PASSWORD"]];
 
 function present(name) {
   const v = process.env[name];
@@ -50,8 +48,13 @@ const summary = {
   playwright: "pending",
 };
 
-function log(line) { console.log(line); }
-function header(title) { log(""); log(`── ${title} ──────────────────────────────`); }
+function log(line) {
+  console.log(line);
+}
+function header(title) {
+  log("");
+  log(`── ${title} ──────────────────────────────`);
+}
 
 function run(cmd, args, extraEnv = {}) {
   const res = spawnSync(cmd, args, {
@@ -85,7 +88,11 @@ for (const [label, e, p] of OPTIONAL_ROLE_CREDS) {
 // Reject hosted host early.
 if (present("SUPABASE_URL")) {
   let host = "";
-  try { host = new URL(process.env.SUPABASE_URL).host.toLowerCase(); } catch { /* noop */ }
+  try {
+    host = new URL(process.env.SUPABASE_URL).host.toLowerCase();
+  } catch {
+    /* noop */
+  }
   if (HOSTED_MARKERS.some((m) => host.endsWith(m))) {
     log(`  FAIL  SUPABASE_URL host looks like production — refused`);
     summary.preflight = "FAIL (hosted host refused)";
@@ -102,24 +109,32 @@ summary.preflight = "PRESENT";
 
 // Run preflight script for its full report.
 const pfCode = run("node", ["scripts/e2e/check-pheno-paid-smoke-env.mjs"]);
-if (pfCode !== 0) { summary.preflight = "FAIL"; finish(1, "FAIL"); }
+if (pfCode !== 0) {
+  summary.preflight = "FAIL";
+  finish(1, "FAIL");
+}
 
 // ── Stage 2: seed ─────────────────────────────────────────────────────────
 header("Stage 2 — seed fixtures");
 const seedCode = run("node", ["scripts/e2e/seed-pheno-paid-smoke-fixtures.mjs"]);
-if (seedCode !== 0) { summary.seed = "FAIL"; finish(1, "FAIL"); }
+if (seedCode !== 0) {
+  summary.seed = "FAIL";
+  finish(1, "FAIL");
+}
 summary.seed = "OK";
 
 // ── Stage 3: load generated fixture env ───────────────────────────────────
 header("Stage 3 — load generated fixture env");
 if (!fs.existsSync(FIXTURE_ENV_PATH)) {
   log("  FAIL  fixture env file was not created by the seeder");
-  summary.fixtureEnv = "FAIL"; finish(1, "FAIL");
+  summary.fixtureEnv = "FAIL";
+  finish(1, "FAIL");
 }
 const gitignore = fs.existsSync("e2e/.gitignore") ? fs.readFileSync("e2e/.gitignore", "utf8") : "";
 if (!/\.fixtures\/?/.test(gitignore)) {
   log("  FAIL  e2e/.fixtures/ is not gitignored — refusing to load");
-  summary.fixtureEnv = "FAIL"; finish(1, "FAIL");
+  summary.fixtureEnv = "FAIL";
+  finish(1, "FAIL");
 }
 const fixtureVars = {};
 for (const raw of fs.readFileSync(FIXTURE_ENV_PATH, "utf8").split(/\r?\n/)) {
@@ -128,13 +143,18 @@ for (const raw of fs.readFileSync(FIXTURE_ENV_PATH, "utf8").split(/\r?\n/)) {
   const eq = line.indexOf("=");
   if (eq === -1) continue;
   const name = line.slice(0, eq).trim();
-  const value = line.slice(eq + 1).trim().replace(/^"(.*)"$/, "$1");
+  const value = line
+    .slice(eq + 1)
+    .trim()
+    .replace(/^"(.*)"$/, "$1");
   if (name) fixtureVars[name] = value;
 }
 // Apply to this process for downstream children (do NOT echo values).
 for (const [k, v] of Object.entries(fixtureVars)) process.env[k] = v;
 const fixtureNames = Object.keys(fixtureVars).sort();
-log(`  PRESENT  ${fixtureNames.length} fixture variable(s) loaded (names only): ${fixtureNames.join(", ")}`);
+log(
+  `  PRESENT  ${fixtureNames.length} fixture variable(s) loaded (names only): ${fixtureNames.join(", ")}`,
+);
 summary.fixtureEnv = "OK";
 
 // ── Stage 4: post-seed hydration verify ───────────────────────────────────
@@ -147,19 +167,28 @@ if (verifyCode === 2) {
   summary.hydration = "BLOCKED";
   finish(2, "BLOCKED");
 }
-if (verifyCode !== 0) { summary.hydration = "FAIL"; finish(1, "FAIL"); }
+if (verifyCode !== 0) {
+  summary.hydration = "FAIL";
+  finish(1, "FAIL");
+}
 summary.hydration = "HYDRATED";
 
 // ── Stage 5: sessions ─────────────────────────────────────────────────────
 header("Stage 5 — create role sessions");
 const sessCode = run("node", ["scripts/e2e/create-pheno-paid-smoke-sessions.mjs"]);
-if (sessCode !== 0) { summary.sessions = "FAIL"; finish(1, "FAIL"); }
+if (sessCode !== 0) {
+  summary.sessions = "FAIL";
+  finish(1, "FAIL");
+}
 summary.sessions = "OK";
 
 // ── Stage 6: Playwright ──────────────────────────────────────────────────
 header("Stage 6 — Playwright paid-user smoke");
 const pwCode = run("bunx", ["playwright", "test", "e2e/pheno-tracker-paid-user-smoke.spec.ts"]);
-if (pwCode !== 0) { summary.playwright = "FAIL"; finish(1, "FAIL"); }
+if (pwCode !== 0) {
+  summary.playwright = "FAIL";
+  finish(1, "FAIL");
+}
 summary.playwright = "PASS";
 
 finish(0, "PASS");

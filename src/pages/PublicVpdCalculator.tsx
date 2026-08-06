@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { ArrowRight, Calculator, Gauge, RotateCcw, Share2, ShieldCheck } from "lucide-react";
 
 import BrandLogo from "@/components/BrandLogo";
@@ -36,6 +36,7 @@ import { cn } from "@/lib/utils";
 import type { TempUnit } from "@/lib/vpdRules";
 import type { VpdClassification, VpdStage } from "@/lib/vpdStageTargetRules";
 import type { VpdSensorPlacement } from "@/lib/vpdMeasurementTrustStatusRules";
+import { getClipboardWriteText, getNativeShare } from "@/lib/webShareCapabilities";
 
 const SIGNUP_PATH = buildAttributedSignupPath({ source: "vpd_calculator" });
 const PRICING_PATH = buildAttributedPricingPath({ source: "vpd_calculator" });
@@ -189,8 +190,8 @@ export default function PublicVpdCalculator() {
 
   async function shareCalculator() {
     const shareData = buildPublicVpdShareData();
-    const nativeShare = navigator.share?.bind(navigator);
-    const clipboard = navigator.clipboard?.writeText?.bind(navigator.clipboard);
+    const nativeShare = getNativeShare();
+    const clipboard = getClipboardWriteText();
     const source = nativeShare ? "native_share" : "copy_link";
     trackPricingEvent("vpd_calculator_share_clicked", { source });
 

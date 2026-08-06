@@ -14,6 +14,10 @@ import { describe, it, expect } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
+  extractMountedAppRoutePaths,
+  readAllRouteModuleSources,
+} from "./helpers/routeManifestSyncHarness";
+import {
   readDesktopGrowerNavigationSource,
   readMobileGrowerNavigationSource,
 } from "@/test/utils/growerNavigationSource";
@@ -24,7 +28,7 @@ const read = (p: string) =>
 
 const TENT_DETAIL = read("src/pages/TentDetail.tsx");
 const DIALOG = read("src/components/AddExistingPlantDialog.tsx");
-const APP = read("src/App.tsx");
+const APP = readAllRouteModuleSources();
 const SIDEBAR = readDesktopGrowerNavigationSource();
 const MOBILE_NAV = readMobileGrowerNavigationSource();
 
@@ -129,8 +133,8 @@ describe("AddExistingPlantDialog · query + write semantics", () => {
 });
 
 describe("Cameras removal · navigation + route", () => {
-  it("App.tsx no longer registers a /cameras route", () => {
-    expect(APP).not.toMatch(/path=["']\/cameras["']/);
+  it("file routes no longer register a /cameras route", () => {
+    expect(extractMountedAppRoutePaths()).not.toContain("/cameras");
     expect(APP).not.toMatch(/import\s+Cameras\s+from/);
   });
 
@@ -156,7 +160,7 @@ describe("Cameras removal · navigation + route", () => {
 
   it("core Grow Operation routes remain intact", () => {
     for (const path of ["/tents", "/plants", "/alerts", "/actions", "/doctor", "/logs"]) {
-      expect(APP).toContain(`path="${path}"`);
+      expect(extractMountedAppRoutePaths()).toContain(path);
     }
   });
 });

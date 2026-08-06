@@ -1,5 +1,5 @@
-import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
-import { createClient } from 'npm:@supabase/supabase-js@2';
+import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 /**
  * checkout-status — signed-in read-only endpoint used by CheckoutSuccess to
@@ -25,27 +25,27 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 function json(status: number, body: Record<string, unknown>): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 }
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
   }
-  if (req.method !== 'GET' && req.method !== 'POST') {
-    return json(405, { error: 'method_not_allowed' });
+  if (req.method !== "GET" && req.method !== "POST") {
+    return json(405, { error: "method_not_allowed" });
   }
   try {
-    const authHeader = req.headers.get('Authorization') ?? '';
-    if (!authHeader.startsWith('Bearer ')) {
-      return json(401, { error: 'auth_required' });
+    const authHeader = req.headers.get("Authorization") ?? "";
+    if (!authHeader.startsWith("Bearer ")) {
+      return json(401, { error: "auth_required" });
     }
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     if (!supabaseUrl || !anonKey || !serviceRoleKey) {
-      return json(503, { error: 'status_unavailable' });
+      return json(503, { error: "status_unavailable" });
     }
     const authed = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
@@ -53,7 +53,7 @@ Deno.serve(async (req) => {
     });
     const { data: userData, error: userError } = await authed.auth.getUser();
     if (userError || !userData?.user) {
-      return json(401, { error: 'auth_required' });
+      return json(401, { error: "auth_required" });
     }
     const uid = userData.user.id;
 
@@ -62,20 +62,20 @@ Deno.serve(async (req) => {
       auth: { persistSession: false },
     });
     const { data, error } = await admin
-      .from('lovable_paddle_events')
-      .select('processing_status, event_type, updated_at, created_at')
-      .eq('user_id', uid)
-      .order('created_at', { ascending: false })
+      .from("lovable_paddle_events")
+      .select("processing_status, event_type, updated_at, created_at")
+      .eq("user_id", uid)
+      .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
     if (error) {
-      return json(503, { error: 'status_unavailable' });
+      return json(503, { error: "status_unavailable" });
     }
     if (!data) {
-      return json(200, { status: 'none' });
+      return json(200, { status: "none" });
     }
     return json(200, {
-      status: (data as { processing_status?: string }).processing_status ?? 'unknown',
+      status: (data as { processing_status?: string }).processing_status ?? "unknown",
       event_type: (data as { event_type?: string }).event_type ?? null,
       updated_at:
         (data as { updated_at?: string }).updated_at ??
@@ -83,6 +83,6 @@ Deno.serve(async (req) => {
         null,
     });
   } catch {
-    return json(503, { error: 'status_unavailable' });
+    return json(503, { error: "status_unavailable" });
   }
 });

@@ -180,9 +180,24 @@ describe("projectLatestReviewState", () => {
 describe("projectLatestReviewStateBySession", () => {
   it("groups events by session_id", () => {
     const map = projectLatestReviewStateBySession([
-      ev({ id: "a1", session_id: SESSION_A, event_type: "marked_reviewed", created_at: "2026-05-01T10:00:00Z" }),
-      ev({ id: "a2", session_id: SESSION_A, event_type: "needs_follow_up", created_at: "2026-05-01T11:00:00Z" }),
-      ev({ id: "b1", session_id: SESSION_B, event_type: "marked_reviewed", created_at: "2026-05-01T09:00:00Z" }),
+      ev({
+        id: "a1",
+        session_id: SESSION_A,
+        event_type: "marked_reviewed",
+        created_at: "2026-05-01T10:00:00Z",
+      }),
+      ev({
+        id: "a2",
+        session_id: SESSION_A,
+        event_type: "needs_follow_up",
+        created_at: "2026-05-01T11:00:00Z",
+      }),
+      ev({
+        id: "b1",
+        session_id: SESSION_B,
+        event_type: "marked_reviewed",
+        created_at: "2026-05-01T09:00:00Z",
+      }),
     ]);
     expect(map.size).toBe(2);
     expect(map.get(SESSION_A)?.status).toBe("needs_follow_up");
@@ -200,7 +215,12 @@ describe("projectLatestReviewStateBySession", () => {
   it("sessions with only malformed events are omitted", () => {
     const map = projectLatestReviewStateBySession([
       { id: "bad", session_id: SESSION_A } as unknown,
-      ev({ id: "b1", session_id: SESSION_B, event_type: "marked_reviewed", created_at: "2026-05-01T10:00:00Z" }),
+      ev({
+        id: "b1",
+        session_id: SESSION_B,
+        event_type: "marked_reviewed",
+        created_at: "2026-05-01T10:00:00Z",
+      }),
     ]);
     expect(map.has(SESSION_A)).toBe(false);
     expect(map.get(SESSION_B)?.status).toBe("reviewed");

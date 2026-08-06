@@ -2,10 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-const PANEL = readFileSync(
-  resolve(__dirname, "../components/SensorsTestbenchPanel.tsx"),
-  "utf8",
-);
+const PANEL = readFileSync(resolve(__dirname, "../components/SensorsTestbenchPanel.tsx"), "utf8");
 
 describe("SensorsTestbenchPanel export/history/copy static safety", () => {
   it("wires diagnostics JSON/text/curl/PowerShell copy + download buttons", () => {
@@ -44,7 +41,9 @@ describe("SensorsTestbenchPanel export/history/copy static safety", () => {
   });
 
   it("does not console.log token, curl, PS snippet, history, or export", () => {
-    expect(PANEL).not.toMatch(/console\.(log|info|warn|error)\([^)]*(reveal|powershell|curl|cmd|history|export|payload)/i);
+    expect(PANEL).not.toMatch(
+      /console\.(log|info|warn|error)\([^)]*(reveal|powershell|curl|cmd|history|export|payload)/i,
+    );
   });
 
   it("uses safeCopy fallback for clipboard", () => {
@@ -57,6 +56,8 @@ describe("SensorsTestbenchPanel export/history/copy static safety", () => {
   });
 
   it("test history and last payload are reset on tent change", () => {
-    expect(PANEL).toMatch(/setHistory\(\[\]\)[\s\S]{0,200}setLastPayload\(null\)[\s\S]{0,200}\}, \[tentId\]\)/);
+    expect(PANEL).toMatch(
+      /setHistory\(\[\]\)[\s\S]{0,200}setLastPayload\(null\)[\s\S]{0,200}\}, \[tentId\]\)/,
+    );
   });
 });

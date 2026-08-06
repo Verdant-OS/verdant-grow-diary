@@ -295,6 +295,10 @@ test.describe("Mobile auth loading/disabled smoke (mocked)", () => {
     page,
   }) => {
     await page.goto("/auth");
+    // The sign-in form is client-rendered after hydration (the server renders
+    // the loading state); wait until it is on screen so the walk measures
+    // focus order, not hydration timing.
+    await expect(page.getByLabel(/^email$/i)).toBeVisible();
     // Walk focus from the top using keyboard Tab. Don't assert exact order
     // (browser/OS focus quirks); assert every key control is reachable.
     const reachable: string[] = [];

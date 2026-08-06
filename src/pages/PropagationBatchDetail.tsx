@@ -2,7 +2,7 @@
  * Propagation batch detail — operational batch record plus multi-plant
  * assignment. Counts and origin stay explicit; unknown is shown as unknown.
  */
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link } from "@/lib/react-router-compat";
 import { Boxes, Loader2 } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";

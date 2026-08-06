@@ -85,11 +85,15 @@ describe("packet-loop slice — Quick Log bridge stays single-path", () => {
     expect(quickLog).toMatch(
       /phenoEvidenceContext\.status !== "ready" \|\| !phenoEvidenceContext\.context\) return;/,
     );
-    expect(quickLog).toMatch(/coverage\.goals\.some\(\(g\) => g\.id === goal\);\s*if \(!configured\) return;/);
+    expect(quickLog).toMatch(
+      /coverage\.goals\.some\(\(g\) => g\.id === goal\);\s*if \(!configured\) return;/,
+    );
   });
 
   it("save-time revalidation against live configured goals is intact", () => {
-    expect(quickLog).toMatch(/coverage\.goals\.some\(\s*\(goal\) => goal\.id === selectedPhenoEvidenceGoal/);
+    expect(quickLog).toMatch(
+      /coverage\.goals\.some\(\s*\(goal\) => goal\.id === selectedPhenoEvidenceGoal/,
+    );
   });
 
   it("the coverage presenter dispatches the EXISTING prefill event, no new modal/route", () => {

@@ -14,9 +14,9 @@ import PlantManualSensorFreshnessCard from "@/components/PlantManualSensorFreshn
 import type { PlantManualSensorHistory } from "@/hooks/usePlantManualSensorHistory";
 
 vi.mock("@/hooks/usePlantManualSensorHistory", async () => {
-  const actual = await vi.importActual<
-    typeof import("@/hooks/usePlantManualSensorHistory")
-  >("@/hooks/usePlantManualSensorHistory");
+  const actual = await vi.importActual<typeof import("@/hooks/usePlantManualSensorHistory")>(
+    "@/hooks/usePlantManualSensorHistory",
+  );
   return {
     ...actual,
     usePlantManualSensorHistory: vi.fn(),
@@ -46,8 +46,7 @@ function setHistory(data: PlantManualSensorHistory | undefined, isLoading = fals
   mocked.mockReturnValue({ data, isLoading });
 }
 
-const hoursAgo = (h: number) =>
-  new Date(Date.now() - h * 3_600_000).toISOString();
+const hoursAgo = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString();
 
 describe("PlantManualSensorFreshnessCard CTA", () => {
   it("renders 'Add first snapshot' and invokes onUpdate when all metrics missing", () => {
@@ -81,9 +80,7 @@ describe("PlantManualSensorFreshnessCard CTA", () => {
       ec: { value: 1.4, loggedAt: hoursAgo(1) },
     });
     renderCard();
-    expect(
-      screen.queryByTestId("plant-manual-sensor-freshness-update"),
-    ).toBeNull();
+    expect(screen.queryByTestId("plant-manual-sensor-freshness-update")).toBeNull();
   });
 
   it("does not nag when fresh + missing are mixed", () => {
@@ -94,9 +91,7 @@ describe("PlantManualSensorFreshnessCard CTA", () => {
       ec: null,
     });
     renderCard();
-    expect(
-      screen.queryByTestId("plant-manual-sensor-freshness-update"),
-    ).toBeNull();
+    expect(screen.queryByTestId("plant-manual-sensor-freshness-update")).toBeNull();
   });
 
   it("uses gentle, plant-memory framing (no scary/alert words)", () => {
@@ -135,14 +130,10 @@ describe("PlantManualSensorFreshnessCard CTA", () => {
     });
     renderCard();
     // Logged metric has the stamp...
-    expect(
-      screen.queryByTestId("plant-manual-sensor-freshness-temp_f-last-log"),
-    ).not.toBeNull();
+    expect(screen.queryByTestId("plant-manual-sensor-freshness-temp_f-last-log")).not.toBeNull();
     // ...but missing metrics do not invent one.
     for (const m of ["humidity_percent", "ph", "ec"]) {
-      expect(
-        screen.queryByTestId(`plant-manual-sensor-freshness-${m}-last-log`),
-      ).toBeNull();
+      expect(screen.queryByTestId(`plant-manual-sensor-freshness-${m}-last-log`)).toBeNull();
     }
   });
 });

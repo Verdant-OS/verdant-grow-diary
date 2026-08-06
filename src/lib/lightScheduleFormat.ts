@@ -16,9 +16,7 @@ export interface LightScheduleParts {
  * Parse "12/12", "18/6", "20/4", "24/0" style strings. Returns null
  * when the input is missing or malformed (never invents values).
  */
-export function parseLightSchedule(
-  schedule: string | null | undefined,
-): LightScheduleParts | null {
+export function parseLightSchedule(schedule: string | null | undefined): LightScheduleParts | null {
   if (!schedule || typeof schedule !== "string") return null;
   const m = schedule.trim().match(/^(\d{1,2})\s*\/\s*(\d{1,2})$/);
   if (!m) return null;
@@ -34,9 +32,7 @@ export function parseLightSchedule(
  * Format a schedule string as "<on>/<off> (light/dark)". Returns
  * "Schedule unknown" for missing/malformed input — never a raw value.
  */
-export function formatLightSchedule(
-  schedule: string | null | undefined,
-): string {
+export function formatLightSchedule(schedule: string | null | undefined): string {
   const parts = parseLightSchedule(schedule);
   if (!parts) return "Schedule unknown";
   return `${parts.onHours}/${parts.offHours} (light/dark)`;

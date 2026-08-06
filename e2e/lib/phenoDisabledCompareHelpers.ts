@@ -12,8 +12,7 @@ import { expect, type Page, type Locator, type Request } from "@playwright/test"
 export const REASON_MISSING_EVIDENCE = "Missing evidence";
 export const REASON_PENDING_HARVEST = "Pending until harvest";
 export const REASON_PENDING_CURE = "Pending until cure";
-export const REASON_GENERIC_HELP =
-  "Add the missing evidence before comparing candidates.";
+export const REASON_GENERIC_HELP = "Add the missing evidence before comparing candidates.";
 
 /**
  * Forbidden verdict/keeper/ranking copy that must NEVER appear anywhere in
@@ -66,21 +65,17 @@ export const FORBIDDEN_COMPARISON_COPY: readonly RegExp[] = [
  */
 export async function getVisibleAndHiddenBodyText(page: Page): Promise<string> {
   return await page.evaluate(() => {
-    const walker = document.createTreeWalker(
-      document.body,
-      NodeFilter.SHOW_TEXT,
-      {
-        acceptNode(node: Node) {
-          const parent = (node as Text).parentElement;
-          if (!parent) return NodeFilter.FILTER_REJECT;
-          const tag = parent.tagName;
-          if (tag === "SCRIPT" || tag === "STYLE" || tag === "NOSCRIPT") {
-            return NodeFilter.FILTER_REJECT;
-          }
-          return NodeFilter.FILTER_ACCEPT;
-        },
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+      acceptNode(node: Node) {
+        const parent = (node as Text).parentElement;
+        if (!parent) return NodeFilter.FILTER_REJECT;
+        const tag = parent.tagName;
+        if (tag === "SCRIPT" || tag === "STYLE" || tag === "NOSCRIPT") {
+          return NodeFilter.FILTER_REJECT;
+        }
+        return NodeFilter.FILTER_ACCEPT;
       },
-    );
+    });
     const chunks: string[] = [];
     let n: Node | null = walker.nextNode();
     while (n) {
@@ -113,9 +108,7 @@ export async function expandVisibleDisclosureControls(page: Page): Promise<void>
   }
 
   // aria-expanded="false" triggers (accordions, tabs, disclosures).
-  const collapsed = await page
-    .locator('[aria-expanded="false"]:not([disabled])')
-    .all();
+  const collapsed = await page.locator('[aria-expanded="false"]:not([disabled])').all();
   for (const c of collapsed) {
     // Skip anything that looks like a destructive/mutating control.
     const label = (await c.getAttribute("aria-label"))?.toLowerCase() ?? "";
@@ -151,10 +144,7 @@ export async function assertNoForbiddenComparisonCopy(
   await expandVisibleDisclosureControls(page);
   const text = await getVisibleAndHiddenBodyText(page);
   for (const pat of FORBIDDEN_COMPARISON_COPY) {
-    expect(
-      pat.test(text),
-      `${scope} contains forbidden comparison copy ${pat}`,
-    ).toBe(false);
+    expect(pat.test(text), `${scope} contains forbidden comparison copy ${pat}`).toBe(false);
   }
 }
 

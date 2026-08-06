@@ -9,9 +9,13 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
+import {
+  extractMountedAppRoutePaths,
+  readAllRouteModuleSources,
+} from "./helpers/routeManifestSyncHarness";
 import { resolve } from "node:path";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "@/lib/react-router-compat";
 import LegacyBillingRedirect from "@/pages/LegacyBillingRedirect";
 import { APP_ROUTES } from "@/lib/appRouteManifest";
 
@@ -79,9 +83,7 @@ describe("LegacyBillingRedirect — router-level canonical proof", () => {
 
   it("/billing/founder-lifetime → /pricing?plan=founder_lifetime (founder preselected, billing untouched)", () => {
     renderAt("/billing/founder-lifetime");
-    expect(screen.getByTestId("probe-search").textContent).toBe(
-      "?plan=founder_lifetime",
-    );
+    expect(screen.getByTestId("probe-search").textContent).toBe("?plan=founder_lifetime");
     const main = document.querySelector("main");
     expect(main?.getAttribute("data-preselected-plan")).toBe("founder_lifetime");
     // Founder is one-time — billing toggle stays at page default (annual).
@@ -122,17 +124,12 @@ describe("LegacyBillingRedirect — router-level canonical proof", () => {
   });
 
   it("drops an unsafe external returnTo silently", () => {
-    renderAt(
-      "/billing/pro-monthly?returnTo=" +
-        encodeURIComponent("https://evil.example/steal"),
-    );
+    renderAt("/billing/pro-monthly?returnTo=" + encodeURIComponent("https://evil.example/steal"));
     expect(screen.getByTestId("probe-search").textContent).toBe("?plan=pro_monthly");
   });
 
   it("drops javascript: returnTo silently", () => {
-    renderAt(
-      "/billing/pro-monthly?returnTo=" + encodeURIComponent("javascript:alert(1)"),
-    );
+    renderAt("/billing/pro-monthly?returnTo=" + encodeURIComponent("javascript:alert(1)"));
     expect(screen.getByTestId("probe-search").textContent).toBe("?plan=pro_monthly");
   });
 
@@ -154,18 +151,18 @@ describe("LegacyBillingRedirect — router-level canonical proof", () => {
 
 // -------- Static router-manifest guarantees ----------------------------
 
-const APP_SRC = readFileSync(resolve(__dirname, "..", "App.tsx"), "utf8");
+const APP_SRC = readAllRouteModuleSources();
+const MOUNTED = extractMountedAppRoutePaths();
 
-describe("App.tsx and manifest convergence", () => {
-  it("App.tsx has no BillingPlaceholder import or route element", () => {
+describe("billing route and manifest convergence", () => {
+  it("routes have no BillingPlaceholder import or route element", () => {
     expect(APP_SRC).not.toMatch(/BillingPlaceholder/);
   });
 
-  it("App.tsx mounts /billing/:plan only as LegacyBillingRedirect", () => {
-    const matches =
-      APP_SRC.match(/path="\/billing\/:plan"\s+element=\{<([A-Za-z0-9_]+)/g) ?? [];
-    expect(matches.length).toBe(1);
-    expect(matches[0]).toContain("LegacyBillingRedirect");
+  it("mounts /billing/:plan only as LegacyBillingRedirect", () => {
+    expect(MOUNTED).toContain("/billing/:plan");
+    expect(APP_SRC).toMatch(/LegacyBillingRedirect/);
+    expect(APP_SRC).toMatch(/createFileRoute\(\s*["']\/billing\/\$plan["']/);
   });
 
   it("route manifest marks /billing/:plan as a redirect to /pricing", () => {

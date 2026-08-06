@@ -52,10 +52,7 @@ describe("Ecowitt source — captured_at + raw payload truth", () => {
   });
 
   it("never invents captured_at from server time without explicit opt-in", () => {
-    const r = adaptEcoWittPayloadToBridgeInput(
-      { temp1f: 72 },
-      { tentId: TENT },
-    );
+    const r = adaptEcoWittPayloadToBridgeInput({ temp1f: 72 }, { tentId: TENT });
     expect(r.input.captured_at).toBeNull();
     expect(r.metadata.server_received_at_used).toBe(false);
     expect(r.warnings).toContain("captured_at_missing");
@@ -73,10 +70,7 @@ describe("Ecowitt source — never upgraded to fake 'live'", () => {
 });
 
 describe("Ecowitt source — adapter is documented Ecowitt-first surface", () => {
-  const ADAPTER = readFileSync(
-    resolve(__dirname, "..", "lib/ecowittPayloadAdapter.ts"),
-    "utf8",
-  );
+  const ADAPTER = readFileSync(resolve(__dirname, "..", "lib/ecowittPayloadAdapter.ts"), "utf8");
 
   it("does not import the Supabase client or write directly", () => {
     expect(ADAPTER).not.toMatch(/@\/integrations\/supabase/);
@@ -92,10 +86,7 @@ describe("Ecowitt source — adapter is documented Ecowitt-first surface", () =>
 });
 
 describe("Landing positions Ecowitt-first hardware support", () => {
-  const LANDING = readFileSync(
-    resolve(__dirname, "..", "pages/Landing.tsx"),
-    "utf8",
-  );
+  const LANDING = readFileSync(resolve(__dirname, "..", "pages/Landing.tsx"), "utf8");
   it("mentions hardware-neutral / hardware integrations path", () => {
     expect(LANDING).toMatch(/[Hh]ardware/);
   });

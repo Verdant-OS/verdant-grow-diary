@@ -49,10 +49,29 @@ const mapping: HaMqttMappingFile = {
     { entity_id: "sensor.temp_out_b", metric: "air_temp_f", expected_unit: "°F", tent_id: TENT },
     { entity_id: "sensor.temp_out_c", metric: "air_temp_f", expected_unit: "°C", tent_id: TENT },
     { entity_id: "sensor.rh_out", metric: "humidity_pct", expected_unit: "%", tent_id: TENT },
-    { entity_id: "sensor.rh_other_tent", metric: "humidity_pct", expected_unit: "%", tent_id: OTHER_TENT },
+    {
+      entity_id: "sensor.rh_other_tent",
+      metric: "humidity_pct",
+      expected_unit: "%",
+      tent_id: OTHER_TENT,
+    },
     { entity_id: "sensor.co2", metric: "co2_ppm", expected_unit: "ppm", tent_id: TENT },
-    { entity_id: "sensor.soil_plant_a", metric: "soil_moisture_pct", expected_unit: "%", tent_id: TENT, plant_id: PLANT_A, channel: "pot" },
-    { entity_id: "sensor.soil_plant_b", metric: "soil_moisture_pct", expected_unit: "%", tent_id: TENT, plant_id: PLANT_B, channel: "pot" },
+    {
+      entity_id: "sensor.soil_plant_a",
+      metric: "soil_moisture_pct",
+      expected_unit: "%",
+      tent_id: TENT,
+      plant_id: PLANT_A,
+      channel: "pot",
+    },
+    {
+      entity_id: "sensor.soil_plant_b",
+      metric: "soil_moisture_pct",
+      expected_unit: "%",
+      tent_id: TENT,
+      plant_id: PLANT_B,
+      channel: "pot",
+    },
   ],
 };
 
@@ -115,10 +134,32 @@ const ssMapping: HaMqttMappingFile = {
   upstream_mode: "ha_core_ecowitt_push",
   statestream_topic_prefix: SS_FIXTURE.prefix,
   entities: [
-    { entity_id: "sensor.flower_tent_temperature", metric: "air_temp_f", expected_unit: "°F", tent_id: TENT },
-    { entity_id: "sensor.flower_tent_temperature_c", metric: "air_temp_f", expected_unit: "°C", tent_id: TENT },
-    { entity_id: "sensor.flower_tent_soil_1", metric: "soil_moisture_pct", expected_unit: "%", tent_id: TENT, channel: "soil_1" },
-    { entity_id: "sensor.flower_tent_soil_2", metric: "soil_moisture_pct", expected_unit: "%", tent_id: TENT, channel: "soil_2" },
+    {
+      entity_id: "sensor.flower_tent_temperature",
+      metric: "air_temp_f",
+      expected_unit: "°F",
+      tent_id: TENT,
+    },
+    {
+      entity_id: "sensor.flower_tent_temperature_c",
+      metric: "air_temp_f",
+      expected_unit: "°C",
+      tent_id: TENT,
+    },
+    {
+      entity_id: "sensor.flower_tent_soil_1",
+      metric: "soil_moisture_pct",
+      expected_unit: "%",
+      tent_id: TENT,
+      channel: "soil_1",
+    },
+    {
+      entity_id: "sensor.flower_tent_soil_2",
+      metric: "soil_moisture_pct",
+      expected_unit: "%",
+      tent_id: TENT,
+      channel: "soil_2",
+    },
   ],
 };
 
@@ -179,7 +220,7 @@ describe("homeAssistantEcowittMqttAdapter — HA JSON envelope", () => {
   });
 
   it("3. JSON-serialized state string parses correctly", () => {
-    const r = parseHaJsonMessage(jsonArgs({ state: "\"72.4\"" }));
+    const r = parseHaJsonMessage(jsonArgs({ state: '"72.4"' }));
     expect(r.ok).toBe(true);
     expect(r.readings[0].value).toBeCloseTo(72.4, 2);
   });
@@ -301,7 +342,10 @@ describe("homeAssistantEcowittMqttAdapter — VPD pairing", () => {
   });
 
   it("15. temp/RH outside pairing window does not derive VPD", () => {
-    const rhLater = { ...rhOk(), captured_at: new Date(Date.parse(LIVE_ISO) + HA_VPD_PAIRING_WINDOW_MS + 1000).toISOString() };
+    const rhLater = {
+      ...rhOk(),
+      captured_at: new Date(Date.parse(LIVE_ISO) + HA_VPD_PAIRING_WINDOW_MS + 1000).toISOString(),
+    };
     const out = deriveVpdIfPaired({ temp: tempOk(), rh: rhLater });
     expect("reason" in out && out.reason).toBe("vpd_pairing_window_missed");
   });
@@ -580,15 +624,13 @@ describe("homeAssistantEcowittMqttAdapter — statestream separate-topic wire fo
       );
       return parseHaStatestreamMessage({ assembled: assembled!, mapping: ssMapping, now: NOW });
     };
-    const quoted = run("\"78.6\"");
+    const quoted = run('"78.6"');
     const bare = run("78.6");
     expect(quoted.ok).toBe(true);
     expect(quoted.readings[0].value).toBeCloseTo(78.6, 2);
     // Identical normalized output; only the raw wire echo may differ
     // (quoted vs bare original payload is preserved for audit).
-    expect(JSON.stringify(comparableResult(quoted))).toBe(
-      JSON.stringify(comparableResult(bare)),
-    );
+    expect(JSON.stringify(comparableResult(quoted))).toBe(JSON.stringify(comparableResult(bare)));
     expect(quoted.readings[0].idempotency_key).toBe(bare.readings[0].idempotency_key);
   });
 
@@ -708,7 +750,7 @@ describe("homeAssistantEcowittMqttAdapter — statestream separate-topic wire fo
 
   it("37. drops control-shaped statestream entities", () => {
     const asm = new HaStatestreamAssembler(SS_FIXTURE.prefix);
-    asm.consume(part(`${SS_FIXTURE.prefix}/switch/exhaust_fan/state`, "\"on\""));
+    asm.consume(part(`${SS_FIXTURE.prefix}/switch/exhaust_fan/state`, '"on"'));
     const m = asm.consume(
       part(`${SS_FIXTURE.prefix}/switch/exhaust_fan/last_updated`, `"${LIVE_ISO}"`),
     );

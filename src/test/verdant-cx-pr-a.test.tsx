@@ -15,7 +15,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import GuidePage from "@/pages/GuidePage";
 import HardwareIntegrations from "@/pages/HardwareIntegrations";
 import HowAiDoctorWorks, {

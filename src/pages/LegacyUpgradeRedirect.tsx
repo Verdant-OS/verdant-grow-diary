@@ -3,7 +3,7 @@
  * `/pricing` is the only public plan and checkout surface.
  */
 
-import { Navigate, useSearchParams } from "react-router-dom";
+import { Navigate, useSearchParams } from "@/lib/react-router-compat";
 
 import { buildLegacyUpgradeRedirect } from "@/lib/legacyCheckoutRedirect";
 

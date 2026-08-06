@@ -4,7 +4,7 @@
  */
 import { beforeEach, describe, it, expect, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 
 const EMPTY_ALERTS: never[] = [];
 const TENT_ID = "tent-1";
@@ -57,7 +57,13 @@ vi.mock("@/integrations/supabase/client", () => ({
         const query = {
           in: () => query,
           order: () => query,
-          limit: () => Promise.resolve({ data: [], error: null }),
+          limit: () => {
+            const __c: any = {
+              abortSignal: () => __c,
+              then: (r: any, j?: any) => Promise.resolve({ data: [], error: null }).then(r, j),
+            };
+            return __c;
+          },
         };
         return query;
       },
@@ -85,9 +91,7 @@ describe("GrowRoomMode page render smoke", () => {
   });
 
   it("dispatches one exact typed Water intent without opening legacy Quick Log", async () => {
-    tentRows = [
-      { id: TENT_ID, name: "Tent One", grow_id: "grow-1", stage: "veg" },
-    ];
+    tentRows = [{ id: TENT_ID, name: "Tent One", grow_id: "grow-1", stage: "veg" }];
     plantRows = [
       {
         id: PLANT_ID,

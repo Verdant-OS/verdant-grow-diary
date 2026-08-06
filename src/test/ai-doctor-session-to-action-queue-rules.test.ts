@@ -39,15 +39,22 @@ describe("aiDoctorSessionToActionQueueRules — eligibility", () => {
 
   it("rejects when approvalRequired is missing or false", () => {
     expect(
-      isSessionSuggestionEligibleForActionQueue(baseSession, { ...baseAction, approvalRequired: false as unknown as true }),
+      isSessionSuggestionEligibleForActionQueue(baseSession, {
+        ...baseAction,
+        approvalRequired: false as unknown as true,
+      }),
     ).toBe(false);
     const { approvalRequired: _omit, ...noFlag } = baseAction;
     expect(isSessionSuggestionEligibleForActionQueue(baseSession, noFlag)).toBe(false);
   });
 
   it("rejects empty title or detail", () => {
-    expect(isSessionSuggestionEligibleForActionQueue(baseSession, { ...baseAction, title: "  " })).toBe(false);
-    expect(isSessionSuggestionEligibleForActionQueue(baseSession, { ...baseAction, detail: "" })).toBe(false);
+    expect(
+      isSessionSuggestionEligibleForActionQueue(baseSession, { ...baseAction, title: "  " }),
+    ).toBe(false);
+    expect(
+      isSessionSuggestionEligibleForActionQueue(baseSession, { ...baseAction, detail: "" }),
+    ).toBe(false);
   });
 
   it("rejects device-control language", () => {
@@ -98,7 +105,10 @@ describe("aiDoctorSessionToActionQueueRules — buildActionQueueDraftFromAiDocto
   });
 
   it("rejects null/empty grow_id", () => {
-    const r = buildActionQueueDraftFromAiDoctorSession({ ...baseSession, grow_id: null }, baseAction);
+    const r = buildActionQueueDraftFromAiDoctorSession(
+      { ...baseSession, grow_id: null },
+      baseAction,
+    );
     expect(r.ok).toBe(false);
     expect((r as { ok: false; reason: string }).reason).toBe("missing_grow_id");
   });
@@ -121,10 +131,16 @@ describe("aiDoctorSessionToActionQueueRules — buildActionQueueDraftFromAiDocto
   });
 
   it("rejects empty title and empty detail", () => {
-    const rTitle = buildActionQueueDraftFromAiDoctorSession(baseSession, { ...baseAction, title: " " });
+    const rTitle = buildActionQueueDraftFromAiDoctorSession(baseSession, {
+      ...baseAction,
+      title: " ",
+    });
     expect(rTitle.ok).toBe(false);
     expect((rTitle as { ok: false; reason: string }).reason).toBe("missing_title");
-    const rDetail = buildActionQueueDraftFromAiDoctorSession(baseSession, { ...baseAction, detail: "" });
+    const rDetail = buildActionQueueDraftFromAiDoctorSession(baseSession, {
+      ...baseAction,
+      detail: "",
+    });
     expect(rDetail.ok).toBe(false);
     expect((rDetail as { ok: false; reason: string }).reason).toBe("missing_detail");
   });

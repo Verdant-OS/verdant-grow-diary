@@ -13,7 +13,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import CheckoutSuccess from "@/pages/CheckoutSuccess";
 import { CHECKOUT_STARTED_STORAGE_KEY, markCheckoutStarted } from "@/lib/checkoutContextRules";
 import type { ResolvedEntitlement } from "@/lib/entitlements";
@@ -125,6 +125,7 @@ describe("CheckoutSuccess truth copy", () => {
       title: "Confirming your Verdant access | Verdant Grow Diary",
       description: "Paid Verdant access is confirmed server-side by the billing webhook.",
       path: "/checkout/success",
+      noindex: true,
     });
   });
 
@@ -187,6 +188,7 @@ describe("CheckoutSuccess truth copy", () => {
       title: "Your Verdant plan is active | Verdant Grow Diary",
       description: "Paid Verdant access is confirmed server-side by the billing webhook.",
       path: "/checkout/success",
+      noindex: true,
     });
   });
 

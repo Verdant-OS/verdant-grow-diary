@@ -21,13 +21,13 @@ interface State {
 }
 
 export default class RootErrorBoundary extends Component<Props, State> {
-  state: State = { hasError: false };
+  override state: State = { hasError: false };
 
   static getDerivedStateFromError(): State {
     return { hasError: true };
   }
 
-  componentDidCatch(error: Error, info: ErrorInfo): void {
+  override componentDidCatch(error: Error, info: ErrorInfo): void {
     // Surface for local debugging and any console-based monitoring. Best-effort
     // analytics exception ping if gtag is already present; no network client is
     // imported here on purpose.
@@ -42,7 +42,7 @@ export default class RootErrorBoundary extends Component<Props, State> {
     window.location.reload();
   };
 
-  render(): ReactNode {
+  override render(): ReactNode {
     if (!this.state.hasError) return this.props.children;
 
     return (

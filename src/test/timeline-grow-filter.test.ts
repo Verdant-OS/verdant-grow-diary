@@ -4,11 +4,15 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import {
+  extractMountedAppRoutePaths,
+  readAllRouteModuleSources,
+} from "./helpers/routeManifestSyncHarness";
 
 const ROOT = resolve(__dirname, "../..");
 const TIMELINE = readFileSync(resolve(ROOT, "src/pages/Timeline.tsx"), "utf8");
 const GROW_DETAIL = readFileSync(resolve(ROOT, "src/pages/GrowDetail.tsx"), "utf8");
-const APP = readFileSync(resolve(ROOT, "src/App.tsx"), "utf8");
+const APP = readAllRouteModuleSources();
 
 describe("Timeline — grow filter", () => {
   it("resolves URL growId via the shared useScopedGrow hook", () => {
@@ -46,7 +50,9 @@ describe("Timeline — grow filter", () => {
   });
 
   it("introduces no device-control or service_role surface", () => {
-    expect(TIMELINE).not.toMatch(/mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|webhook|\brelay\b|\bactuator\b|service_role/i);
+    expect(TIMELINE).not.toMatch(
+      /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|webhook|\brelay\b|\bactuator\b|service_role/i,
+    );
   });
 
   it("does not call ai-coach", () => {
@@ -56,7 +62,8 @@ describe("Timeline — grow filter", () => {
 
 describe("Timeline route", () => {
   it("registers /timeline route", () => {
-    expect(APP).toMatch(/path=\s*["']\/timeline["']\s*element=\{<Timeline/);
+    expect(extractMountedAppRoutePaths()).toContain("/timeline");
+    expect(APP).toMatch(/Timeline/);
   });
 });
 

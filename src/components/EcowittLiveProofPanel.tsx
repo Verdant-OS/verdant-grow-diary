@@ -34,9 +34,7 @@ function toneClass(tone: EcowittLiveProofViewModel["tone"]): string {
   }
 }
 
-export function EcowittLiveProofPanel(
-  props: EcowittLiveProofPanelProps,
-): JSX.Element {
+export function EcowittLiveProofPanel(props: EcowittLiveProofPanelProps): JSX.Element {
   const vm = buildEcowittLiveProofViewModel(props.rows, {
     tentId: props.tentId,
     now: props.now,
@@ -61,10 +59,7 @@ export function EcowittLiveProofPanel(
       </header>
 
       {vm.detail ? (
-        <p
-          className="mt-2 text-xs text-muted-foreground"
-          data-testid="ecowitt-live-proof-detail"
-        >
+        <p className="mt-2 text-xs text-muted-foreground" data-testid="ecowitt-live-proof-detail">
           {vm.detail}
         </p>
       ) : null}
@@ -72,33 +67,24 @@ export function EcowittLiveProofPanel(
       <dl className="mt-3 grid grid-cols-2 gap-3 text-xs">
         <div>
           <dt className="text-muted-foreground">Accepted</dt>
-          <dd
-            className="font-mono text-base"
-            data-testid="ecowitt-live-proof-accepted"
-          >
+          <dd className="font-mono text-base" data-testid="ecowitt-live-proof-accepted">
             {vm.acceptedCount}
           </dd>
         </div>
         <div>
           <dt className="text-muted-foreground">Rejected</dt>
-          <dd
-            className="font-mono text-base"
-            data-testid="ecowitt-live-proof-rejected"
-          >
+          <dd className="font-mono text-base" data-testid="ecowitt-live-proof-rejected">
             {vm.rejectedCount}
           </dd>
         </div>
       </dl>
       <p className="mt-2 text-[11px] text-muted-foreground">
-        {vm.acceptedCount} accepted / {vm.rejectedCount} rejected in the current
-        proof window ({vm.windowLabel}).
+        {vm.acceptedCount} accepted / {vm.rejectedCount} rejected in the current proof window (
+        {vm.windowLabel}).
       </p>
 
       {vm.candidateMetricLabels.length > 0 ? (
-        <ul
-          className="mt-3 flex flex-wrap gap-1.5"
-          data-testid="ecowitt-live-proof-metric-labels"
-        >
+        <ul className="mt-3 flex flex-wrap gap-1.5" data-testid="ecowitt-live-proof-metric-labels">
           {vm.candidateMetricLabels.map((label) => (
             <li
               key={label}

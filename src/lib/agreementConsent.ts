@@ -39,11 +39,12 @@ export function computeAgreementGaps(
       const hasCurrent = matches.some((r) => r.version === agreement.version);
       if (hasCurrent) return null;
       // "Previously accepted" = any prior version, deterministic ordering.
-      const previous = matches
-        .map((r) => r.version)
-        .filter((v) => typeof v === "string" && v !== agreement.version)
-        .sort()
-        .pop() ?? null;
+      const previous =
+        matches
+          .map((r) => r.version)
+          .filter((v) => typeof v === "string" && v !== agreement.version)
+          .sort()
+          .pop() ?? null;
       return { agreement, previouslyAcceptedVersion: previous } satisfies AgreementGap;
     })
     .filter((g): g is AgreementGap => g !== null);

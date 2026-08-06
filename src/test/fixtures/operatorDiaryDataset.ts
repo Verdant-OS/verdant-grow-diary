@@ -9,12 +9,7 @@
 import type { ProofSourceLabel } from "@/lib/oneTentProofRecordExportRules";
 
 export type OperatorEntryKind =
-  | "watering"
-  | "feeding"
-  | "observation"
-  | "photo"
-  | "sensor_snapshot"
-  | "action_outcome";
+  "watering" | "feeding" | "observation" | "photo" | "sensor_snapshot" | "action_outcome";
 
 export interface OperatorDiaryEntry {
   id: string;

@@ -86,21 +86,18 @@ describe("classifyQuickLogSnapshotSource", () => {
 
   it("missing/unparseable ts → state=invalid", () => {
     expect(
-      classifyQuickLogSnapshotSource(
-        { source: "live", ts: "not-a-date", value: 1 },
-        NOW,
-      ).state,
+      classifyQuickLogSnapshotSource({ source: "live", ts: "not-a-date", value: 1 }, NOW).state,
     ).toBe("invalid");
-    expect(
-      classifyQuickLogSnapshotSource({ source: "live", ts: null, value: 1 }, NOW).state,
-    ).toBe("invalid");
+    expect(classifyQuickLogSnapshotSource({ source: "live", ts: null, value: 1 }, NOW).state).toBe(
+      "invalid",
+    );
   });
 
   it("demo/sim/fixture sources → state=invalid (never silently live)", () => {
     for (const source of ["demo", "sim", "fixture", "demo_fixture", "mock"]) {
-      expect(
-        classifyQuickLogSnapshotSource({ source, ts: FRESH_TS, value: 1 }, NOW).state,
-      ).toBe("invalid");
+      expect(classifyQuickLogSnapshotSource({ source, ts: FRESH_TS, value: 1 }, NOW).state).toBe(
+        "invalid",
+      );
     }
   });
 
@@ -124,9 +121,10 @@ describe("classifyQuickLogSnapshotSource", () => {
   });
 
   it("missing value (undefined) is tolerated when ts + source are valid", () => {
-    expect(
-      classifyQuickLogSnapshotSource({ source: "live", ts: FRESH_TS }, NOW),
-    ).toEqual({ source: "live", state: "live" });
+    expect(classifyQuickLogSnapshotSource({ source: "live", ts: FRESH_TS }, NOW)).toEqual({
+      source: "live",
+      state: "live",
+    });
   });
 });
 

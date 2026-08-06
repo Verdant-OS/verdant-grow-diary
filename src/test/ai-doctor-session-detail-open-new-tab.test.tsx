@@ -5,7 +5,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 import AiDoctorSessionDetail, {
@@ -36,7 +36,15 @@ vi.mock("@/integrations/supabase/client", () => ({
     from: () => ({
       select: () => ({
         eq: () => ({
-          order: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }),
+          order: () => ({
+            limit: () => {
+              const __c: any = {
+                abortSignal: () => __c,
+                then: (r: any, j?: any) => Promise.resolve({ data: [], error: null }).then(r, j),
+              };
+              return __c;
+            },
+          }),
           maybeSingle: () => Promise.resolve({ data: currentRow, error: null }),
         }),
       }),
@@ -66,9 +74,7 @@ describe("AiDoctorSessionDetail — Open in new tab link", () => {
 
   it("renders the Open in new tab link", async () => {
     renderRoute(<AiDoctorSessionDetail />);
-    expect(
-      await screen.findByTestId("ai-doctor-session-detail-open-new-tab-link"),
-    ).toBeTruthy();
+    expect(await screen.findByTestId("ai-doctor-session-detail-open-new-tab-link")).toBeTruthy();
   });
 
   it("has href pointing to canonical session URL", async () => {

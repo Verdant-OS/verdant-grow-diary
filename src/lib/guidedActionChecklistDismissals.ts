@@ -66,9 +66,7 @@ export function readActiveDismissals(now: number = Date.now()): string[] {
 }
 
 export function dismissItem(id: string, now: number = Date.now()): string[] {
-  const raw = readRaw().filter(
-    (e) => e.id !== id && now - e.dismissedAt < DISMISS_TTL_MS,
-  );
+  const raw = readRaw().filter((e) => e.id !== id && now - e.dismissedAt < DISMISS_TTL_MS);
   raw.push({ id, dismissedAt: now });
   writeRaw(raw);
   return raw.map((e) => e.id);

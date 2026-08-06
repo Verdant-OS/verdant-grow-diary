@@ -27,7 +27,11 @@ const plants = [
   { id: "p3", name: "Summer Run 2026", strain: "Zkittlez", tent_id: "t1", grow_id: "g1" }, // name equals grow name
 ];
 
-function plantTarget(plantId: string, tentId: string | null, growId: string | null): ResolvedQuickLogV2Target {
+function plantTarget(
+  plantId: string,
+  tentId: string | null,
+  growId: string | null,
+): ResolvedQuickLogV2Target {
   return { ok: true, targetType: "plant", targetId: plantId, plantId, tentId, growId };
 }
 function tentTarget(tentId: string, growId: string | null): ResolvedQuickLogV2Target {
@@ -48,7 +52,9 @@ describe("buildQuickLogTargetPanel — resolution + visibility", () => {
 
   it("hides when resolved is null/undefined", () => {
     expect(buildQuickLogTargetPanel({ resolved: null, plants, tents, grows }).visible).toBe(false);
-    expect(buildQuickLogTargetPanel({ resolved: undefined, plants, tents, grows }).visible).toBe(false);
+    expect(buildQuickLogTargetPanel({ resolved: undefined, plants, tents, grows }).visible).toBe(
+      false,
+    );
   });
 });
 

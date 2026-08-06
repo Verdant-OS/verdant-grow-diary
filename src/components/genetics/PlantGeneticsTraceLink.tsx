@@ -9,7 +9,7 @@
  * Example:
  *   <PlantGeneticsTraceLink plantId={plant.id} />
  */
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { GitBranch, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";

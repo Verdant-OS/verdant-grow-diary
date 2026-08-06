@@ -12,7 +12,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { resolveEntitlements } from "@/lib/entitlements";
 import { getLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
@@ -85,9 +85,7 @@ vi.mock("@/integrations/supabase/client", () => {
     {
       get(_t, prop: string) {
         supabaseCalls.count += 1;
-        if (
-          ["insert", "update", "delete", "upsert", "rpc"].includes(prop)
-        ) {
+        if (["insert", "update", "delete", "upsert", "rpc"].includes(prop)) {
           throw new Error(`Forbidden Supabase write: ${prop}`);
         }
         if (prop === "functions") {
@@ -112,10 +110,7 @@ function renderAt(path: string) {
     <QueryClientProvider client={qc}>
       <MemoryRouter initialEntries={[path]}>
         <Routes>
-          <Route
-            path="/diary/environment-summary"
-            element={<EnvironmentSummaryReportPage />}
-          />
+          <Route path="/diary/environment-summary" element={<EnvironmentSummaryReportPage />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -136,22 +131,16 @@ describe("EnvironmentSummaryReportPage — drilldown print action", () => {
 
   it("drilldown print button is hidden for non-premium users", () => {
     planMock.current = "free";
-    renderAt(
-      "/diary/environment-summary?start=2026-06-01&end=2026-06-07&issue=source.review",
-    );
+    renderAt("/diary/environment-summary?start=2026-06-01&end=2026-06-07&issue=source.review");
     expect(screen.queryByTestId("env-report-download-drilldown-pdf")).toBeNull();
     expect(screen.queryByTestId("env-report-download-pdf")).toBeNull();
   });
 
   it("drilldown print button appears for premium with active issue and has a deterministic filename", () => {
     planMock.current = "pro";
-    renderAt(
-      "/diary/environment-summary?start=2026-06-01&end=2026-06-07&issue=source.review",
-    );
+    renderAt("/diary/environment-summary?start=2026-06-01&end=2026-06-07&issue=source.review");
     const btn = screen.getByTestId("env-report-download-drilldown-pdf");
-    expect(btn.getAttribute("aria-label")).toBe(
-      "Download current environment issue drilldown PDF",
-    );
+    expect(btn.getAttribute("aria-label")).toBe("Download current environment issue drilldown PDF");
     expect(btn.getAttribute("data-filename")).toBe(
       "verdant-environment-drilldown-2026-06-01-to-2026-06-07-source.review.pdf",
     );
@@ -159,17 +148,11 @@ describe("EnvironmentSummaryReportPage — drilldown print action", () => {
 
   it("clicking drilldown print opens modal; confirm records audit + calls window.print", () => {
     planMock.current = "pro";
-    const printSpy = vi
-      .spyOn(window, "print")
-      .mockImplementation(() => undefined);
-    const fetchSpy = vi
-      .spyOn(globalThis, "fetch" as any)
-      .mockImplementation((() => {
-        throw new Error("fetch not allowed");
-      }) as any);
-    renderAt(
-      "/diary/environment-summary?start=2026-06-01&end=2026-06-07&issue=source.review",
-    );
+    const printSpy = vi.spyOn(window, "print").mockImplementation(() => undefined);
+    const fetchSpy = vi.spyOn(globalThis, "fetch" as any).mockImplementation((() => {
+      throw new Error("fetch not allowed");
+    }) as any);
+    renderAt("/diary/environment-summary?start=2026-06-01&end=2026-06-07&issue=source.review");
     const before = supabaseCalls.count;
     fireEvent.click(screen.getByTestId("env-report-download-drilldown-pdf"));
     expect(screen.getByTestId("env-report-pre-print-modal")).toBeTruthy();
@@ -185,20 +168,16 @@ describe("EnvironmentSummaryReportPage — drilldown print action", () => {
     expect(events[0].reportMode).toBe("drilldown");
     expect(events[0].issueRuleId).toBe("source.review");
     expect(events[0].source).toBe("local_only");
-    expect(
-      typeof getLocalStorageItemForTest(
-        ENVIRONMENT_SUMMARY_EXPORT_AUDIT_STORAGE_KEY,
-      ),
-    ).toBe("string");
+    expect(typeof getLocalStorageItemForTest(ENVIRONMENT_SUMMARY_EXPORT_AUDIT_STORAGE_KEY)).toBe(
+      "string",
+    );
     printSpy.mockRestore();
     fetchSpy.mockRestore();
   });
 
   it("drilldown print mode toggles data-print-mode='drilldown' on the print section after confirm", () => {
     planMock.current = "pro";
-    const printSpy = vi
-      .spyOn(window, "print")
-      .mockImplementation(() => undefined);
+    const printSpy = vi.spyOn(window, "print").mockImplementation(() => undefined);
     const { container } = renderAt(
       "/diary/environment-summary?start=2026-06-01&end=2026-06-07&issue=source.review",
     );
@@ -208,9 +187,7 @@ describe("EnvironmentSummaryReportPage — drilldown print action", () => {
       '[data-print-section="environment-summary-report"]',
     ) as HTMLElement;
     expect(section.getAttribute("data-print-mode")).toBe("drilldown");
-    expect(
-      container.querySelector("[data-print-full-report-only]"),
-    ).toBeTruthy();
+    expect(container.querySelector("[data-print-full-report-only]")).toBeTruthy();
     printSpy.mockRestore();
   });
 });

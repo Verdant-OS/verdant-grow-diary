@@ -12,7 +12,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { cleanup, render, screen, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import { axe } from "vitest-axe";
 import { AgreementReconsentGate } from "@/components/AgreementReconsentGate";
 
@@ -51,7 +51,9 @@ vi.mock("@/store/auth", () => ({
 async function renderGate() {
   const utils = render(
     <MemoryRouter initialEntries={["/dashboard"]}>
-      <button data-testid="outside-control" type="button">Outside</button>
+      <button data-testid="outside-control" type="button">
+        Outside
+      </button>
       <AgreementReconsentGate />
     </MemoryRouter>,
   );
@@ -63,7 +65,12 @@ function getDialogFocusables(dialog: HTMLElement): HTMLElement[] {
   const sel =
     'button:not([disabled]), [role="checkbox"]:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])';
   return Array.from(dialog.querySelectorAll<HTMLElement>(sel)).filter(
-    (el) => el.offsetParent !== null || el.getClientRects().length > 0 || el.tagName === "BUTTON" || el.getAttribute("role") === "checkbox" || el.tagName === "A",
+    (el) =>
+      el.offsetParent !== null ||
+      el.getClientRects().length > 0 ||
+      el.tagName === "BUTTON" ||
+      el.getAttribute("role") === "checkbox" ||
+      el.tagName === "A",
   );
 }
 
@@ -102,9 +109,7 @@ describe("AgreementReconsentGate accessibility", () => {
     const allCalls = [...errSpy.mock.calls, ...warnSpy.mock.calls].map((args) =>
       args.map((a) => (typeof a === "string" ? a : "")).join(" "),
     );
-    expect(
-      allCalls.some((m) => m.includes("DialogContent` requires a `DialogTitle")),
-    ).toBe(false);
+    expect(allCalls.some((m) => m.includes("DialogContent` requires a `DialogTitle"))).toBe(false);
 
     errSpy.mockRestore();
     warnSpy.mockRestore();
@@ -244,7 +249,9 @@ describe("AgreementReconsentGate accessibility", () => {
     fireEvent.click(accept);
     await waitFor(() => expect(upsertSpy).toHaveBeenCalledTimes(1));
 
-    const [rows] = upsertSpy.mock.calls[0] as [Array<{ user_id: string; agreement_type: string; version: string }>];
+    const [rows] = upsertSpy.mock.calls[0] as [
+      Array<{ user_id: string; agreement_type: string; version: string }>,
+    ];
     expect(rows.every((r) => r.user_id === "u1")).toBe(true);
     expect(rows.map((r) => r.agreement_type).sort()).toEqual(["privacy", "terms"]);
   });

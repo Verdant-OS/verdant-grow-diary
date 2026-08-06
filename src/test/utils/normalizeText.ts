@@ -10,7 +10,9 @@ import { expect } from "vitest";
 
 /** Collapse all whitespace runs to single spaces and trim. */
 export function normalizeText(value: string | null | undefined): string {
-  return String(value ?? "").replace(/\s+/g, " ").trim();
+  return String(value ?? "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 /**

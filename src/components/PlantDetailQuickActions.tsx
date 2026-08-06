@@ -6,7 +6,7 @@
  * anchor. Read-only — no diary writes, no readings, no diagnoses, no
  * alerts,
  */
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { Activity, Camera, ListOrdered, MessageSquare, NotebookPen, Scissors } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -29,7 +29,7 @@ const ICON: Record<PlantDetailQuickActionKind, typeof NotebookPen> = {
 };
 
 const FOCUS_CLASSES =
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+  "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
 interface Props {
   plantId: string | null | undefined;

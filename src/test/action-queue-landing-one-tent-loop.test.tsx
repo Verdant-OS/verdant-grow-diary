@@ -7,7 +7,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import ActionQueue from "@/pages/ActionQueue";
 
 const insertSpy = vi.fn();
@@ -97,27 +97,22 @@ function renderPage() {
 
 // UUID v4-ish shape used as a defensive guard against accidental
 // internal-ID leakage into visible copy.
-const UUID_RE =
-  /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 
 describe("ActionQueue — One-Tent Loop landing polish", () => {
   it("renders the Approval-required Action Queue framing title", async () => {
     renderPage();
     await waitFor(() =>
-      expect(
-        screen.getByTestId("one-tent-loop-action-queue-landing-title"),
-      ).toBeTruthy(),
+      expect(screen.getByTestId("one-tent-loop-action-queue-landing-title")).toBeTruthy(),
     );
-    expect(
-      screen.getByTestId("one-tent-loop-action-queue-landing-title").textContent,
-    ).toBe("Approval-required Action Queue");
+    expect(screen.getByTestId("one-tent-loop-action-queue-landing-title").textContent).toBe(
+      "Approval-required Action Queue",
+    );
   });
 
   it("renders the cautious 'review before taking anything' subtitle", async () => {
     renderPage();
-    const sub = await screen.findByTestId(
-      "one-tent-loop-action-queue-landing-subtitle",
-    );
+    const sub = await screen.findByTestId("one-tent-loop-action-queue-landing-subtitle");
     expect(sub.textContent).toBe(
       "Review suggested actions before taking anything into the grow room.",
     );
@@ -125,9 +120,7 @@ describe("ActionQueue — One-Tent Loop landing polish", () => {
 
   it("renders the 'Verdant suggests. Grower approves.' note", async () => {
     renderPage();
-    const note = await screen.findByTestId(
-      "one-tent-loop-action-queue-landing-note",
-    );
+    const note = await screen.findByTestId("one-tent-loop-action-queue-landing-note");
     expect(note.textContent).toBe("Verdant suggests. Grower approves.");
   });
 
@@ -154,9 +147,7 @@ describe("ActionQueue — One-Tent Loop landing polish", () => {
 
   it("framing copy contains no device-control / automation wording", async () => {
     renderPage();
-    const banner = await screen.findByTestId(
-      "one-tent-loop-action-queue-landing",
-    );
+    const banner = await screen.findByTestId("one-tent-loop-action-queue-landing");
     const text = (banner.textContent ?? "").toLowerCase();
     for (const forbidden of [
       "auto-approve",
@@ -176,9 +167,7 @@ describe("ActionQueue — One-Tent Loop landing polish", () => {
 
   it("framing copy contains no fake-live or 'healthy' implication", async () => {
     renderPage();
-    const banner = await screen.findByTestId(
-      "one-tent-loop-action-queue-landing",
-    );
+    const banner = await screen.findByTestId("one-tent-loop-action-queue-landing");
     const text = (banner.textContent ?? "").toLowerCase();
     expect(text).not.toContain("live readings");
     expect(text).not.toContain("everything is healthy");
@@ -187,9 +176,7 @@ describe("ActionQueue — One-Tent Loop landing polish", () => {
 
   it("framing copy does not surface internal UUID-shaped ids", async () => {
     renderPage();
-    const banner = await screen.findByTestId(
-      "one-tent-loop-action-queue-landing",
-    );
+    const banner = await screen.findByTestId("one-tent-loop-action-queue-landing");
     expect(UUID_RE.test(banner.textContent ?? "")).toBe(false);
   });
 });

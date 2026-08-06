@@ -1,5 +1,5 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import { afterEach, describe, expect, it } from "vitest";
 
 import AiDoctorReviewAnchorRestorer from "@/components/AiDoctorReviewAnchorRestorer";

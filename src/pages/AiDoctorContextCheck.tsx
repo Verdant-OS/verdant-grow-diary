@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import {
   ArrowRight,
   CheckCircle2,
@@ -28,6 +28,7 @@ import {
 import { trackPricingEvent } from "@/lib/pricingAnalytics";
 import { buildAttributedSignupPath } from "@/lib/signupAcquisitionRules";
 import { cn } from "@/lib/utils";
+import { getClipboardWriteText, getNativeShare } from "@/lib/webShareCapabilities";
 
 const PRICING_PATH = buildAiDoctorContextPricingPath();
 const SIGNUP_PATH = buildAttributedSignupPath({ source: "context_check" });
@@ -93,8 +94,8 @@ export default function AiDoctorContextCheck() {
 
   async function shareCheck() {
     const shareData = buildAiDoctorContextShareData();
-    const nativeShare = navigator.share?.bind(navigator);
-    const clipboard = navigator.clipboard?.writeText?.bind(navigator.clipboard);
+    const nativeShare = getNativeShare();
+    const clipboard = getClipboardWriteText();
     const source = nativeShare ? "native_share" : "copy_link";
     trackPricingEvent("context_check_share_clicked", { source });
 

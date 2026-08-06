@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
-import { useInRouterContext, useNavigate } from "react-router-dom";
+import { useInRouterContext, useNavigate } from "@/lib/react-router-compat";
 import {
   buildQuickLogTimelineNavTarget,
   QUICK_LOG_TIMELINE_CTA_LABEL,
@@ -145,8 +145,7 @@ interface QuickLogVideoMeta {
 }
 
 type QuickLogAttachmentWriteResult =
-  | { ok: true }
-  | { ok: false; message: string; ambiguous?: boolean };
+  { ok: true } | { ok: false; message: string; ambiguous?: boolean };
 
 interface LockedWateringSubmission {
   payload: WateringTypedEventInput;
@@ -215,17 +214,27 @@ export default function QuickLogV2Sheet({
   function showTimelineConfirmation(
     message: string,
     scope: {
+      growId: string | null;
       targetType: "plant" | "tent" | null;
       targetId: string | null;
       tentId: string | null;
+      plantId?: string | null;
       growEventId?: string | null;
     },
   ) {
     const nav = buildQuickLogTimelineNavTarget({
+      growId: scope.growId,
       targetType: scope.targetType,
       targetId: scope.targetId,
+      tentId: scope.tentId,
+      plantId: scope.plantId ?? null,
       growEventId: scope.growEventId ?? null,
     });
+    if (!nav) {
+      // Confirmed save without a verified grow cannot enable a Timeline CTA.
+      toast.success(message);
+      return;
+    }
     toast.success(message, {
       action: {
         label: QUICK_LOG_TIMELINE_CTA_LABEL,
@@ -757,11 +766,13 @@ export default function QuickLogV2Sheet({
       saveIdempotencyKeyRef.current = newQuickLogSaveKey();
       setSaveStatus(FEEDING_SAVE_SUCCESS_MESSAGE);
       showTimelineConfirmation(FEEDING_SAVE_SUCCESS_MESSAGE, {
-        // Feed events are currently surfaced in the global typed root-zone
-        // lane, not the scoped grouped timeline. Route to the real anchor.
-        targetType: null,
-        targetId: null,
+        // Feed uses the same canonical grow-scoped Timeline as note/water.
+        // Never drop the verified setup — bare `/timeline` is forbidden.
+        growId: resolved.growId ?? null,
+        targetType: (resolved.targetType as "plant" | "tent") ?? null,
+        targetId: (resolved.targetId as string) ?? null,
         tentId: resolved.tentId ?? null,
+        plantId: resolved.plantId ?? null,
         growEventId,
       });
       applyQuickLogV2Refresh(queryClient, {
@@ -779,6 +790,7 @@ export default function QuickLogV2Sheet({
       });
       setPostSave({
         growEventId,
+        growId: resolved.growId ?? null,
         targetType: resolved.targetType as "plant" | "tent",
         targetId: resolved.targetId as string,
         tentId: resolved.tentId ?? null,
@@ -1064,9 +1076,11 @@ export default function QuickLogV2Sheet({
       );
     }
     showTimelineConfirmation(successMessage, {
+      growId: resolved.growId ?? null,
       targetType: resolved.targetType as "plant" | "tent",
       targetId: resolved.targetId as string,
       tentId: resolved.tentId ?? null,
+      plantId: resolved.plantId ?? null,
       growEventId: (res as { growEventId?: string | null }).growEventId ?? null,
     });
     applyQuickLogV2Refresh(queryClient, {
@@ -1087,6 +1101,7 @@ export default function QuickLogV2Sheet({
     resetVideoSelection();
     setPostSave({
       growEventId: (res as { growEventId?: string | null }).growEventId ?? null,
+      growId: resolved.growId ?? null,
       targetType: resolved.targetType as "plant" | "tent",
       targetId: resolved.targetId as string,
       tentId: resolved.tentId ?? null,
@@ -1130,10 +1145,14 @@ export default function QuickLogV2Sheet({
   function handleViewTimeline() {
     if (!postSave) return;
     const nav = buildQuickLogTimelineNavTarget({
-      targetType: postSave.action === "feed" ? null : postSave.targetType,
-      targetId: postSave.action === "feed" ? null : postSave.targetId,
+      growId: postSave.growId,
+      targetType: postSave.targetType,
+      targetId: postSave.targetId,
+      tentId: postSave.tentId,
+      plantId: postSave.targetType === "plant" ? postSave.targetId : null,
       growEventId: postSave.growEventId,
     });
+    if (!nav) return;
     onOpenChange(false);
     navigateToTimeline(nav.href, nav.hash, nav.path);
   }
@@ -1598,7 +1617,8 @@ export default function QuickLogV2Sheet({
               <div className="mt-3 grid grid-cols-3 gap-2">
                 <div>
                   <Label htmlFor="qlv2-temp">
-                    Temp ({getTemperatureUnitSymbol(manualTempEntryUnitRef.current ?? temperatureUnit)})
+                    Temp (
+                    {getTemperatureUnitSymbol(manualTempEntryUnitRef.current ?? temperatureUnit)})
                   </Label>
                   <Input
                     id="qlv2-temp"
@@ -1705,7 +1725,12 @@ export default function QuickLogV2Sheet({
                         null)
                       : null,
                     tentName: null,
-                    growName: null,
+                    growName:
+                      postSave.growId && Array.isArray(grows)
+                        ? ((grows as Array<{ id?: string; name?: string }>).find(
+                            (g) => g?.id === postSave.growId,
+                          )?.name ?? null)
+                        : null,
                     action: postSave.action,
                     photoAttached: /photo/i.test(postSave.message),
                   })}
@@ -1715,6 +1740,16 @@ export default function QuickLogV2Sheet({
                     type="button"
                     className="flex-1"
                     onClick={handleViewTimeline}
+                    disabled={
+                      !buildQuickLogTimelineNavTarget({
+                        growId: postSave.growId,
+                        targetType: postSave.targetType,
+                        targetId: postSave.targetId,
+                        tentId: postSave.tentId,
+                        plantId: postSave.targetType === "plant" ? postSave.targetId : null,
+                        growEventId: postSave.growEventId,
+                      })
+                    }
                     data-testid="quick-log-post-save-view"
                   >
                     {QUICK_LOG_POST_SAVE_VIEW_LABEL}

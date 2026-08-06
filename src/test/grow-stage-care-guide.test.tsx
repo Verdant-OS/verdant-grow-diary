@@ -9,7 +9,7 @@
  */
 import { describe, it, expect, afterEach } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "@/lib/react-router-compat";
 import GrowStageCareGuide from "@/pages/GrowStageCareGuide";
 import GuidesIndex from "@/pages/GuidesIndex";
 import { APP_ROUTES } from "@/lib/appRouteManifest";

@@ -53,9 +53,7 @@ describe("formatActionTargetLabel — safe target_device fallback", () => {
   it("falls back to a manual-review label when neither is set", () => {
     expect(formatActionTargetLabel(null, null)).toBe("Manual review target");
     expect(formatActionTargetLabel("", "")).toBe("Manual review target");
-    expect(formatActionTargetLabel(undefined, undefined)).toBe(
-      "Manual review target",
-    );
+    expect(formatActionTargetLabel(undefined, undefined)).toBe("Manual review target");
   });
 });
 
@@ -67,18 +65,12 @@ describe("formatEnvironmentAlertLabel — safe environment alert labels", () => 
   });
 
   it("renders 'Environment alert' for unknown / malformed inputs (never raw enum)", () => {
-    expect(formatEnvironmentAlertLabel("mystery_signal")).toBe(
-      ENVIRONMENT_ALERT_FALLBACK_LABEL,
-    );
+    expect(formatEnvironmentAlertLabel("mystery_signal")).toBe(ENVIRONMENT_ALERT_FALLBACK_LABEL);
     expect(formatEnvironmentAlertLabel("")).toBe(ENVIRONMENT_ALERT_FALLBACK_LABEL);
     expect(formatEnvironmentAlertLabel(null)).toBe(ENVIRONMENT_ALERT_FALLBACK_LABEL);
-    expect(formatEnvironmentAlertLabel(undefined)).toBe(
-      ENVIRONMENT_ALERT_FALLBACK_LABEL,
-    );
+    expect(formatEnvironmentAlertLabel(undefined)).toBe(ENVIRONMENT_ALERT_FALLBACK_LABEL);
     // never echoes the raw token back
-    expect(formatEnvironmentAlertLabel("mystery_signal")).not.toMatch(
-      /mystery_signal/,
-    );
+    expect(formatEnvironmentAlertLabel("mystery_signal")).not.toMatch(/mystery_signal/);
   });
 });
 
@@ -108,14 +100,8 @@ describe("ACTION_EVIDENCE_QUALITY_NOT_AVAILABLE — neutral evidence chip copy",
 // and that no raw payload / token / service_role / internal id leaks alongside it.
 // ---------------------------------------------------------------------------
 const ROOT = resolve(__dirname, "../..");
-const ACTION_QUEUE_SRC = readFileSync(
-  resolve(ROOT, "src/pages/ActionQueue.tsx"),
-  "utf8",
-);
-const ACTION_DETAIL_SRC = readFileSync(
-  resolve(ROOT, "src/pages/ActionDetail.tsx"),
-  "utf8",
-);
+const ACTION_QUEUE_SRC = readFileSync(resolve(ROOT, "src/pages/ActionQueue.tsx"), "utf8");
+const ACTION_DETAIL_SRC = readFileSync(resolve(ROOT, "src/pages/ActionDetail.tsx"), "utf8");
 
 describe("Action Queue / Action Detail — wired polish", () => {
   it("Action Queue row uses formatActionTargetLabel instead of the raw target_device fallback", () => {
@@ -141,7 +127,6 @@ describe("Action Queue / Action Detail — wired polish", () => {
       "Evidence quality: not available from this action record",
     );
   });
-
 
   it("polished surfaces never reference raw_payload / service_role / secrets", () => {
     for (const src of [ACTION_QUEUE_SRC, ACTION_DETAIL_SRC]) {

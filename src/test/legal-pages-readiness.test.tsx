@@ -13,11 +13,16 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter, Navigate, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Navigate, Route, Routes } from "@/lib/react-router-compat";
 import TermsOfService from "@/pages/TermsOfService";
 import PrivacyPolicy from "@/pages/PrivacyPolicy";
 import RefundPolicy from "@/pages/RefundPolicy";
 import { VERDANT_FORBIDDEN_PUBLIC_PHRASES } from "@/constants/verdantSeoCopy";
+import {
+  extractMountedAppRoutePaths,
+  getRouteAliasRedirectTarget,
+  readAllRouteModuleSources,
+} from "./helpers/routeManifestSyncHarness";
 
 const ROOT = resolve(__dirname, "../..");
 const read = (p: string) => readFileSync(resolve(ROOT, p), "utf8");
@@ -27,7 +32,7 @@ const PRIVACY_SRC = read("src/pages/PrivacyPolicy.tsx");
 const REFUND_SRC = read("src/pages/RefundPolicy.tsx");
 const SHELL_SRC = read("src/pages/legal/LegalPageShell.tsx");
 const FOOTER_SRC = read("src/components/LegalFooterLinks.tsx");
-const APP_SRC = read("src/App.tsx");
+const APP_SRC = readAllRouteModuleSources();
 const SITEMAP = read("public/sitemap.xml");
 const ROBOTS = read("public/robots.txt");
 const NEW_FILES = [
@@ -177,25 +182,22 @@ describe("redirect aliases", () => {
     });
   }
 
-  it("App.tsx wires all four aliases through location-preserving redirects", () => {
+  it("File routes wire all four aliases through location-preserving redirects", () => {
     for (const [alias, canonical] of [
       ["/terms-of-service", "/terms"],
       ["/privacy-policy", "/privacy"],
       ["/refunds", "/refund"],
       ["/refund-policy", "/refund"],
     ] as const) {
-      expect(APP_SRC).toMatch(
-        new RegExp(
-          `path="${alias}"\\s+element=\\{<RouteAliasRedirect\\s+to="${canonical}"\\s*/>\\}`,
-        ),
-      );
+      expect(extractMountedAppRoutePaths()).toContain(alias);
+      expect(getRouteAliasRedirectTarget(alias)).toBe(canonical);
     }
   });
 
-  it("App.tsx mounts /terms /privacy /refund as public routes", () => {
-    expect(APP_SRC).toMatch(/path="\/terms" element=\{<Terms/);
-    expect(APP_SRC).toMatch(/path="\/privacy" element=\{<Privacy/);
-    expect(APP_SRC).toMatch(/path="\/refund" element=\{<Refund/);
+  it("File routes mount /terms /privacy /refund as public routes", () => {
+    expect(extractMountedAppRoutePaths()).toContain("/terms");
+    expect(extractMountedAppRoutePaths()).toContain("/privacy");
+    expect(extractMountedAppRoutePaths()).toContain("/refund");
   });
 });
 

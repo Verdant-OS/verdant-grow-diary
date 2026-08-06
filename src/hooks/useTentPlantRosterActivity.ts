@@ -68,10 +68,7 @@ export function useTentPlantRosterActivity(
   plants: ReadonlyArray<TentPlantRosterActivityPlant> | null | undefined,
 ): UseTentPlantRosterActivityResult {
   // Stable, de-duplicated id list so the hook count stays stable per render.
-  const safePlants = useMemo(
-    () => (Array.isArray(plants) ? plants : []),
-    [plants],
-  );
+  const safePlants = useMemo(() => (Array.isArray(plants) ? plants : []), [plants]);
   const ids = useMemo(
     () =>
       Array.from(
@@ -86,11 +83,7 @@ export function useTentPlantRosterActivity(
 
   const results = useQueries({
     queries: ids.map((plantId) => ({
-      queryKey: [
-        "tent_plant_roster_activity",
-        plantId,
-        TENT_PLANT_ROSTER_ACTIVITY_LIMIT,
-      ],
+      queryKey: ["tent_plant_roster_activity", plantId, TENT_PLANT_ROSTER_ACTIVITY_LIMIT],
       queryFn: async () => {
         const { data, error } = await supabase
           .from("diary_entries")
@@ -121,16 +114,14 @@ export function useTentPlantRosterActivity(
       });
 
       // Per-plant only. Generic tent-level activity is never mixed in.
-      const latestLogRow =
-        rows.find((r) => typeof r.occurredAt === "string") ?? null;
+      const latestLogRow = rows.find((r) => typeof r.occurredAt === "string") ?? null;
       const latestLogAt = latestLogRow?.occurredAt ?? null;
       const latestLogEntryId =
         latestLogRow && typeof latestLogRow.id === "string" && latestLogRow.id
           ? latestLogRow.id
           : null;
       const latestPhotoRow =
-        rows.find((r) => r.hasPhoto === true && typeof r.id === "string") ??
-        null;
+        rows.find((r) => r.hasPhoto === true && typeof r.id === "string") ?? null;
       const hasRecentPhoto = !!latestPhotoRow;
       const latestPhotoEntryId = latestPhotoRow?.id ?? null;
       const latestPhotoAt =

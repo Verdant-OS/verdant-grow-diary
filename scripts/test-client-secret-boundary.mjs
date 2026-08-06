@@ -69,19 +69,11 @@ t("scrub helper removes comments and strings", () => {
 });
 
 t("scan roots are narrow and intentional", () => {
-  assert.deepEqual([...SCAN_ROOTS].sort(), [
-    "src/components",
-    "src/hooks",
-    "src/lib",
-    "src/pages",
-  ]);
+  assert.deepEqual([...SCAN_ROOTS].sort(), ["src/components", "src/hooks", "src/lib", "src/pages"]);
 });
 
 t("blocked terms are exact", () => {
-  assert.deepEqual([...BLOCKED_TERMS].sort(), [
-    "SUPABASE_SERVICE_ROLE_KEY",
-    "service_role",
-  ]);
+  assert.deepEqual([...BLOCKED_TERMS].sort(), ["SUPABASE_SERVICE_ROLE_KEY", "service_role"]);
 });
 
 t("exact-path exceptions are a Set (not a glob)", () => {
@@ -92,8 +84,7 @@ t("real repo scan passes", () => {
   const violations = scanClientSecretBoundary(process.cwd());
   if (violations.length > 0) {
     throw new Error(
-      "violations: " +
-        violations.map((v) => `${v.file}:${v.hits.join(",")}`).join("; "),
+      "violations: " + violations.map((v) => `${v.file}:${v.hits.join(",")}`).join("; "),
     );
   }
 });

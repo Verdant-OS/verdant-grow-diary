@@ -2,23 +2,10 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-const FIXTURE_PATH = resolve(
-  __dirname,
-  "../../fixtures/diary/2026-06-13-multi-tent-baseline.json",
-);
-const DOC_PATH = resolve(
-  __dirname,
-  "../../docs/diary/2026-06-13-multi-tent-baseline.md",
-);
+const FIXTURE_PATH = resolve(__dirname, "../../fixtures/diary/2026-06-13-multi-tent-baseline.json");
+const DOC_PATH = resolve(__dirname, "../../docs/diary/2026-06-13-multi-tent-baseline.md");
 
-const ALLOWED_NON_LIVE_SOURCES = new Set([
-  "csv",
-  "manual",
-  "demo",
-  "stale",
-  "invalid",
-  "import",
-]);
+const ALLOWED_NON_LIVE_SOURCES = new Set(["csv", "manual", "demo", "stale", "invalid", "import"]);
 
 const DEVICE_COMMAND_PATTERNS = [
   /\bturn[_\s-]?on\b/i,
@@ -112,10 +99,9 @@ describe("diary baseline fixture safety", () => {
     const strings = collectStrings(fixture);
     for (const s of strings) {
       for (const pattern of DEVICE_COMMAND_PATTERNS) {
-        expect(
-          pattern.test(s),
-          `device-command-like phrase matched ${pattern} in: ${s}`,
-        ).toBe(false);
+        expect(pattern.test(s), `device-command-like phrase matched ${pattern} in: ${s}`).toBe(
+          false,
+        );
       }
     }
   });

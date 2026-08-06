@@ -3,8 +3,8 @@
 // from `localStorage` to `sessionStorage` as part of the Vite Supabase auth
 // hardening slice. See docs/auth-security.md for rationale and tradeoffs.
 // Do not regenerate this file without re-applying that single line change.
-import { createClient } from '@supabase/supabase-js';
-import type { Database } from './types';
+import { createClient } from "@supabase/supabase-js";
+import type { Database } from "./types";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -14,8 +14,9 @@ const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
-    storage: sessionStorage,
-    persistSession: true,
-    autoRefreshToken: true,
-  }
+    // SSR/prerender safety: `sessionStorage` does not exist on the server.
+    storage: typeof window !== "undefined" ? window.sessionStorage : undefined,
+    persistSession: typeof window !== "undefined",
+    autoRefreshToken: typeof window !== "undefined",
+  },
 });

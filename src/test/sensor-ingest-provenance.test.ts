@@ -11,14 +11,7 @@ import { SENSOR_SOURCE_KINDS } from "@/constants/sensorSourceLabels";
 
 describe("sensor ingest provenance safety", () => {
   it("keeps canonical sensor sources aligned with UI source labels", () => {
-    expect(CANONICAL_SENSOR_SOURCES).toEqual([
-      "live",
-      "manual",
-      "csv",
-      "demo",
-      "stale",
-      "invalid",
-    ]);
+    expect(CANONICAL_SENSOR_SOURCES).toEqual(["live", "manual", "csv", "demo", "stale", "invalid"]);
     expect(CANONICAL_SENSOR_SOURCES).toEqual(SENSOR_SOURCE_KINDS);
   });
 

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import CoachAiDoctorContextPanel, {
   COACH_AI_DOCTOR_CONTEXT_AMBIGUOUS_COPY,
 } from "@/components/CoachAiDoctorContextPanel";
@@ -46,7 +46,9 @@ describe("CoachAiDoctorContextPanel — plant selection ambiguity", () => {
       growId: "g1",
     });
     expect(screen.queryByTestId("coach-ai-doctor-context-ambiguous-notice")).toBeNull();
-    expect(screen.getByTestId("coach-ai-doctor-context-panel").getAttribute("data-ambiguous")).toBeNull();
+    expect(
+      screen.getByTestId("coach-ai-doctor-context-panel").getAttribute("data-ambiguous"),
+    ).toBeNull();
   });
 
   it("uses the single plant when only one is available", () => {
@@ -125,11 +127,14 @@ describe("CoachAiDoctorContextPanel — quick actions", () => {
       diaryEntries: [{ entry_type: "watering", entry_at: ago(HOUR) }],
       growId: "g1",
     });
-    expect(screen.getByTestId("coach-ai-doctor-context-no-warning").textContent)
-      .toContain("No warning context found.");
+    expect(screen.getByTestId("coach-ai-doctor-context-no-warning").textContent).toContain(
+      "No warning context found.",
+    );
     expect(screen.queryByText(/warning/i)).toBeTruthy();
     // No quick-action button is labeled around warnings.
-    const buttons = Array.from(document.querySelectorAll("[data-testid^=\"ai-doctor-context-quick-action-\"]"));
+    const buttons = Array.from(
+      document.querySelectorAll('[data-testid^="ai-doctor-context-quick-action-"]'),
+    );
     for (const b of buttons) {
       expect((b as HTMLElement).getAttribute("data-testid")).not.toMatch(/warning/);
     }

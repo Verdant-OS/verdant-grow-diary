@@ -21,10 +21,31 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import {
   EMPTY_SNAPSHOT,
+  isStale,
   type SensorSnapshot,
   snapshotFromDiary,
+  snapshotFromEnvironmentCheck,
   snapshotFromReadings,
 } from "@/lib/sensorSnapshot";
+
+/**
+ * A stale sensor snapshot must not suppress fresher grower evidence (Codex
+ * review, PR #601): once a sensor stops reporting, a newly logged manual
+ * snapshot or Environment Check is the latest environment truth and must be
+ * able to reach alert persistence. Deterministic tie-break: the sensor
+ * snapshot wins unless the diary evidence is strictly newer.
+ */
+function preferNewer(
+  staleSensor: SensorSnapshot | null,
+  diaryEvidence: SensorSnapshot,
+): SensorSnapshot {
+  if (!staleSensor?.ts || !diaryEvidence.ts) return diaryEvidence;
+  const sensorAt = Date.parse(staleSensor.ts);
+  const diaryAt = Date.parse(diaryEvidence.ts);
+  if (!Number.isFinite(sensorAt)) return diaryEvidence;
+  if (!Number.isFinite(diaryAt)) return staleSensor;
+  return diaryAt > sensorAt ? diaryEvidence : staleSensor;
+}
 import { selectDashboardSensorEvidenceRows } from "@/lib/dashboardSensorEvidenceRules";
 
 export type SnapshotState =
@@ -45,6 +66,10 @@ export function useLatestSensorSnapshot(
     enabled: !!user && !!growId,
     queryFn: async () => {
       try {
+        // Fresh sensor rows win unconditionally; a stale sensor snapshot is
+        // kept only as a candidate that strictly-newer diary evidence may
+        // replace (see preferNewer).
+        let staleSensorCandidate: SensorSnapshot | null = null;
         // 1) Prefer live sensor_readings if any tents are scoped.
         if (tentIds.length > 0) {
           const { data, error } = await supabase
@@ -68,30 +93,46 @@ export function useLatestSensorSnapshot(
                 raw_payload: (r as { raw_payload?: unknown }).raw_payload,
               })),
             );
-            if (snap) return snap;
+            if (snap && !isStale(snap.ts)) return snap;
+            staleSensorCandidate = snap;
           }
         }
         // 2) Fall back to latest diary_entries.details.sensor_snapshot.
+        // `enabled` already gates on growId; re-narrow for the query builder.
+        if (!growId) return staleSensorCandidate ?? EMPTY_SNAPSHOT;
         const { data: diaryRows, error: diaryErr } = await supabase
           .from("diary_entries")
-          .select("entry_at,details")
+          .select("entry_at,details,tent_id")
           .eq("grow_id", growId)
           .order("entry_at", { ascending: false })
           .limit(20);
         if (diaryErr) throw diaryErr;
         for (const row of diaryRows ?? []) {
           const details = (row.details ?? null) as Record<string, unknown> | null;
-          const snap =
-            details && typeof details === "object"
-              ? snapshotFromDiary(
-                  row.entry_at,
-                  details.sensor_snapshot as Record<string, unknown> | undefined,
-                )
-              : null;
-          if (snap) return snap;
+          if (!details || typeof details !== "object") continue;
+          const snap = snapshotFromDiary(
+            row.entry_at,
+            details.sensor_snapshot as Record<string, unknown> | undefined,
+          );
+          if (snap) return preferNewer(staleSensorCandidate, snap);
+          // #596: a Quick Log Environment Check is grower-entered manual
+          // evidence; within the same row a full sensor_snapshot blob wins,
+          // and rows are already newest-first. When the view is scoped to
+          // tents, only rows attributed to one of those tents count — a
+          // null/foreign tent_id must not surface as this tent's evidence
+          // (Codex review, PR #601).
+          const envScopeOk =
+            tentIds.length === 0 || (row.tent_id != null && tentIds.includes(row.tent_id));
+          if (!envScopeOk) continue;
+          const envSnap = snapshotFromEnvironmentCheck(
+            row.entry_at,
+            details.environment_check as Record<string, unknown> | undefined,
+          );
+          if (envSnap) return preferNewer(staleSensorCandidate, envSnap);
         }
-        // 3) Nothing available.
-        return EMPTY_SNAPSHOT;
+        // 3) Nothing newer in the diary: a stale sensor snapshot is still the
+        // latest evidence (rendered with its stale badge), else nothing.
+        return staleSensorCandidate ?? EMPTY_SNAPSHOT;
       } catch {
         throw new Error("unavailable");
       }

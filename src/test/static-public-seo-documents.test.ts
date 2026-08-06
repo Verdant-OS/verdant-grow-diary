@@ -6,10 +6,15 @@ import { VERDANT_CULTIVAR_SLUGS } from "@/constants/verdantCultivars";
 import { VERDANT_GUIDE_SLUGS } from "@/constants/verdantSeoContent";
 import {
   STATIC_PUBLIC_ALIAS_DOCUMENTS,
+  STATIC_PUBLIC_NOINDEX_DOCUMENTS,
   STATIC_PUBLIC_OUTPUT_DOCUMENTS,
   STATIC_PUBLIC_SEO_DOCUMENTS,
   VERDANT_SITE_ORIGIN,
 } from "@/lib/build/staticPublicSeoDocuments";
+import {
+  NEXT_DOOR_CUSTOMER_COMPARISON_PATH,
+  OREOZ_GELONADE_CUSTOMER_SEO,
+} from "@/constants/oreozGelonadeExperience";
 
 const ROOT = resolve(process.cwd());
 const VERCEL = JSON.parse(readFileSync(resolve(ROOT, "vercel.json"), "utf8")) as {
@@ -73,6 +78,31 @@ describe("static public SEO documents", () => {
     }
   });
 
+  it("emits the ID-free Customer Mode guide as noindex and keeps it out of acquisition docs", () => {
+    expect(STATIC_PUBLIC_NOINDEX_DOCUMENTS).toEqual([
+      expect.objectContaining({
+        path: NEXT_DOOR_CUSTOMER_COMPARISON_PATH,
+        fileName: "customer/guide/oreoz-vs-gelonade-comparison/index.html",
+        metadata: expect.objectContaining({
+          title: OREOZ_GELONADE_CUSTOMER_SEO.title,
+          description: OREOZ_GELONADE_CUSTOMER_SEO.description,
+          url: `${VERDANT_SITE_ORIGIN}${NEXT_DOOR_CUSTOMER_COMPARISON_PATH}`,
+          robots: "noindex, follow",
+        }),
+      }),
+    ]);
+    expect(
+      STATIC_PUBLIC_SEO_DOCUMENTS.some(
+        (document) => document.path === NEXT_DOOR_CUSTOMER_COMPARISON_PATH,
+      ),
+    ).toBe(false);
+    expect(
+      STATIC_PUBLIC_OUTPUT_DOCUMENTS.some(
+        (document) => document.path === NEXT_DOOR_CUSTOMER_COMPARISON_PATH,
+      ),
+    ).toBe(true);
+  });
+
   it("keeps every emitted filesystem path unique and query-free", () => {
     const paths = STATIC_PUBLIC_OUTPUT_DOCUMENTS.map((document) => document.path);
     const fileNames = STATIC_PUBLIC_OUTPUT_DOCUMENTS.map((document) => document.fileName);
@@ -133,6 +163,35 @@ describe("static public SEO documents", () => {
         url: document.metadata.url,
       });
     }
+  });
+
+  it("keeps rich page schema available in the static crawler documents", () => {
+    const byPath = new Map(
+      STATIC_PUBLIC_SEO_DOCUMENTS.map((document) => [document.path, document]),
+    );
+    const typesAt = (path: string) =>
+      (byPath.get(path)?.metadata.jsonLd ?? []).flatMap((block) => {
+        if (typeof block !== "object" || block === null || !("@type" in block)) return [];
+        const type = (block as { "@type"?: unknown })["@type"];
+        return typeof type === "string" ? [type] : [];
+      });
+
+    expect(typesAt("/guides")).toEqual(
+      expect.arrayContaining(["WebPage", "FAQPage", "BreadcrumbList"]),
+    );
+    expect(typesAt("/guides/what-to-log-in-a-grow-journal")).toEqual(
+      expect.arrayContaining(["WebPage", "FAQPage", "BreadcrumbList"]),
+    );
+    expect(typesAt("/guides/what-to-log-in-a-grow-journal")).not.toContain("Article");
+    expect(typesAt("/guides/cannabis-grow-light-distance-and-schedule")).toEqual(
+      expect.arrayContaining(["WebPage", "FAQPage", "BreadcrumbList", "Article"]),
+    );
+    expect(typesAt("/cultivars/oreoz")).toEqual(
+      expect.arrayContaining(["WebPage", "CollectionPage", "FAQPage", "BreadcrumbList", "Article"]),
+    );
+    expect(typesAt("/quick-log")).toEqual(
+      expect.arrayContaining(["WebPage", "SoftwareApplication", "FAQPage"]),
+    );
   });
 
   it("uses directory-local documents that filesystem-first hosts serve before the SPA fallback", () => {

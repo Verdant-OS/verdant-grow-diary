@@ -15,7 +15,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { act, render } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -72,10 +72,7 @@ describe("refreshDailyCheckQueries · pure rules", () => {
   });
 
   it("never references write-only or automation surfaces", () => {
-    const src = readFileSync(
-      resolve(__dirname, "../lib/dailyCheckRefreshRules.ts"),
-      "utf8",
-    );
+    const src = readFileSync(resolve(__dirname, "../lib/dailyCheckRefreshRules.ts"), "utf8");
     expect(src).not.toMatch(/service_role|action_queue|automation|mqtt|relay|rpc\(/i);
     expect(src).not.toMatch(/\.insert\(|\.update\(|\.delete\(/);
   });
@@ -122,9 +119,7 @@ describe("DashboardDailyGrowCheckPanel · entry-created refresh", () => {
   });
 
   it("removes its listener on unmount (no leak, no cross-grow refresh)", () => {
-    const { unmount } = render(
-      wrap(<DashboardDailyGrowCheckPanel scopedGrowId="grow-a" />, qc),
-    );
+    const { unmount } = render(wrap(<DashboardDailyGrowCheckPanel scopedGrowId="grow-a" />, qc));
     unmount();
     invalidateSpy.mockClear();
     act(() => {
@@ -148,15 +143,7 @@ describe("PlantDailyGrowCheckConsistencyCard · entry-created refresh", () => {
   });
 
   it("invalidates diary_entries + sensor_readings on verdant:entry-created", () => {
-    render(
-      wrap(
-        <PlantDailyGrowCheckConsistencyCard
-          plantId="p-1"
-          currentTentId="t-1"
-        />,
-        qc,
-      ),
-    );
+    render(wrap(<PlantDailyGrowCheckConsistencyCard plantId="p-1" currentTentId="t-1" />, qc));
     invalidateSpy.mockClear();
 
     act(() => {
@@ -170,13 +157,7 @@ describe("PlantDailyGrowCheckConsistencyCard · entry-created refresh", () => {
 
   it("removes its listener on unmount", () => {
     const { unmount } = render(
-      wrap(
-        <PlantDailyGrowCheckConsistencyCard
-          plantId="p-1"
-          currentTentId={null}
-        />,
-        qc,
-      ),
+      wrap(<PlantDailyGrowCheckConsistencyCard plantId="p-1" currentTentId={null} />, qc),
     );
     unmount();
     invalidateSpy.mockClear();

@@ -9,10 +9,7 @@
  * stable across snapshots for the same rule.
  */
 import { describe, it, expect } from "vitest";
-import {
-  derivedAlertKey,
-  persistedAlertKey,
-} from "@/lib/environmentAlertPersistence";
+import { derivedAlertKey, persistedAlertKey } from "@/lib/environmentAlertPersistence";
 import type { EnvironmentAlert } from "@/lib/environmentAlerts";
 
 function mkDefaultThresholdAlert(reason: string): EnvironmentAlert {

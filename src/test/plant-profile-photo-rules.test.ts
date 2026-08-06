@@ -15,21 +15,15 @@ import { describe, it, expect } from "vitest";
 import { normalizePlantProfilePhotoInput } from "@/lib/plantProfilePhotoRules";
 
 describe("normalizePlantProfilePhotoInput — clear cases", () => {
-  it.each(["", "   ", "\n\t  "])(
-    "blank input %p → clear / null",
-    (raw) => {
-      const out = normalizePlantProfilePhotoInput(raw);
-      expect(out).toEqual({ ok: true, kind: "clear", photo_url: null });
-    },
-  );
+  it.each(["", "   ", "\n\t  "])("blank input %p → clear / null", (raw) => {
+    const out = normalizePlantProfilePhotoInput(raw);
+    expect(out).toEqual({ ok: true, kind: "clear", photo_url: null });
+  });
 
-  it.each([null, undefined, 42, {}, [], true])(
-    "non-string input %p → clear / null",
-    (raw) => {
-      const out = normalizePlantProfilePhotoInput(raw);
-      expect(out).toEqual({ ok: true, kind: "clear", photo_url: null });
-    },
-  );
+  it.each([null, undefined, 42, {}, [], true])("non-string input %p → clear / null", (raw) => {
+    const out = normalizePlantProfilePhotoInput(raw);
+    expect(out).toEqual({ ok: true, kind: "clear", photo_url: null });
+  });
 });
 
 describe("normalizePlantProfilePhotoInput — set cases", () => {
@@ -81,9 +75,7 @@ describe("normalizePlantProfilePhotoInput — reject unsafe / invalid", () => {
   });
 
   it("oversized string → too-long", () => {
-    const out = normalizePlantProfilePhotoInput(
-      "https://x.test/" + "a".repeat(3000),
-    );
+    const out = normalizePlantProfilePhotoInput("https://x.test/" + "a".repeat(3000));
     expect(out).toEqual({ ok: false, reason: "too-long" });
   });
 });

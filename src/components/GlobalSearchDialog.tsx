@@ -12,7 +12,7 @@
  * notice and never presents "no matches" as a verified empty conclusion.
  */
 import { useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "@/lib/react-router-compat";
 import { Command as CommandPrimitive } from "cmdk";
 import {
   AlertTriangle,
@@ -114,6 +114,11 @@ function routeFor(row: GlobalSearchResult): string {
 const INITIAL_VISIBLE = 10;
 const PAGE_SIZE = 10;
 
+/** Content signature for result rows — prefer over array identity in effect deps. */
+function resultsContentKey(rows: readonly GlobalSearchResult[]): string {
+  return `${rows.length}:${rows.map((r) => `${r.entity_type}:${r.id}`).join(",")}`;
+}
+
 export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -205,22 +210,33 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
     [results, enabledTypes],
   );
 
-  // Reset pagination whenever the query, filters, or new results arrive.
+  // Reset pagination whenever the query, filters, or result *contents* change.
+  // Depend on length + id signature — not `results` array identity — so a
+  // referentially-new empty array from a render-scoped mock cannot re-fire this
+  // effect forever.
+  const resultsSyncKey = resultsContentKey(results);
   useEffect(() => {
     setVisibleCount(INITIAL_VISIBLE);
-  }, [query, results, enabledTypes]);
+  }, [query, resultsSyncKey, enabledTypes]);
 
   const visibleResults = useMemo(
     () => filteredResults.slice(0, visibleCount),
     [filteredResults, visibleCount],
   );
 
+  // Content keys (not array / object identity) so unstable empty `results: []`
+  // from mocks or accidental fresh arrays cannot re-fire preview sync forever.
+  const visibleSyncKey = resultsContentKey(visibleResults);
+  const lastSelectedKey = lastSelected ? `${lastSelected.entity_type}:${lastSelected.id}` : "";
+
   // Keep the preview panel in sync: prefer the last-selected row (if still
   // visible), otherwise keep the current selection, otherwise fall back to the
   // first visible result. Clear when nothing is visible.
   useEffect(() => {
     if (visibleResults.length === 0) {
-      setPreviewRow(null);
+      // Functional bail when already null — setPreviewRow(null) is not always
+      // enough to stop a max-update-depth loop under jsdom + unstable deps.
+      setPreviewRow((prev) => (prev == null ? prev : null));
       return;
     }
     setPreviewRow((prev) => {
@@ -238,7 +254,9 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
       }
       return visibleResults[0];
     });
-  }, [visibleResults, lastSelected]);
+    // visibleResults / lastSelected are read inside; content keys gate re-runs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- content keys
+  }, [visibleSyncKey, lastSelectedKey]);
 
   // Persist the row the user is previewing so reopening the palette restores
   // it. Only writes when the preview is a real row the user is actively
@@ -247,7 +265,15 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
     if (!previewRow) return;
     const entry = { entity_type: previewRow.entity_type, id: previewRow.id };
     writeGlobalSearchLastSelected(entry);
-    setLastSelected({ ...entry, ts: Date.now() });
+    // Bail when only the timestamp would change — a fresh `{...entry, ts}` every
+    // time re-triggers the preview-sync effect (depends on lastSelected) and can
+    // spin a render loop under unstable result identities.
+    setLastSelected((prev) => {
+      if (prev && prev.id === entry.id && prev.entity_type === entry.entity_type) {
+        return prev;
+      }
+      return { ...entry, ts: Date.now() };
+    });
   }, [previewRow]);
 
   const grouped = useMemo(() => {
@@ -405,7 +431,7 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
                 aria-label="Clear search (Esc)"
                 title="Clear search (Esc)"
                 data-testid="global-search-clear"
-                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-sm p-1 text-muted-foreground opacity-70 transition hover:bg-muted hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-sm p-1 text-muted-foreground opacity-70 transition hover:bg-muted hover:opacity-100 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <X className="h-4 w-4" aria-hidden="true" />
               </button>
@@ -438,7 +464,7 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
                 <button
                   type="button"
                   onClick={resetFilters}
-                  className="rounded-sm px-1.5 py-0.5 text-[11px] font-medium text-primary hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="rounded-sm px-1.5 py-0.5 text-[11px] font-medium text-primary hover:bg-primary/10 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                   data-testid="global-search-filters-reset"
                 >
                   Show all
@@ -464,7 +490,7 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
                       onClick={() => toggleType(t)}
                       disabled={isDisabled}
                       className={cn(
-                        "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                        "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium transition focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring",
                         isOn
                           ? "border-primary/40 bg-primary/10 text-foreground hover:bg-primary/20"
                           : "border-border bg-background text-muted-foreground line-through opacity-70 hover:opacity-100",

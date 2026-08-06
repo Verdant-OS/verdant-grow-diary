@@ -23,13 +23,8 @@ function healthySeedling(): BuildBlueprintOverlayInput {
   };
 }
 
-function renderVm(
-  input: BuildBlueprintOverlayInput,
-  tempUnit?: "fahrenheit" | "celsius",
-) {
-  return render(
-    <ProBlueprintOverlay vm={buildBlueprintOverlayViewModel(input, tempUnit)} />,
-  );
+function renderVm(input: BuildBlueprintOverlayInput, tempUnit?: "fahrenheit" | "celsius") {
+  return render(<ProBlueprintOverlay vm={buildBlueprintOverlayViewModel(input, tempUnit)} />);
 }
 
 describe("ProBlueprintOverlay", () => {

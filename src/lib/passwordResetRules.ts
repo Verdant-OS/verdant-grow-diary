@@ -33,8 +33,7 @@ export const PASSWORD_REQUIREMENTS_HELPER_COPY =
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export type EmailValidation =
-  | { ok: true; email: string }
-  | { ok: false; reason: "empty" | "invalid"; message: string };
+  { ok: true; email: string } | { ok: false; reason: "empty" | "invalid"; message: string };
 
 export function validateResetEmail(raw: string | null | undefined): EmailValidation {
   const email = (raw ?? "").trim();
@@ -49,7 +48,11 @@ export function validateResetEmail(raw: string | null | undefined): EmailValidat
 
 export type NewPasswordValidation =
   | { ok: true; password: string }
-  | { ok: false; reason: "too_short" | "mismatch" | "empty" | "missing_letter" | "missing_number"; message: string };
+  | {
+      ok: false;
+      reason: "too_short" | "mismatch" | "empty" | "missing_letter" | "missing_number";
+      message: string;
+    };
 
 export function validateNewPassword(
   password: string | null | undefined,
@@ -89,11 +92,7 @@ export function buildResetRedirectUrl(origin: string): string {
 // Local-only password requirement statuses. We deliberately do NOT claim
 // "strong", "secure", "server approved", "guaranteed", or "breached password
 // checked" anywhere in this module — those checks do not exist here.
-export type PasswordRequirementKey =
-  | "minLength"
-  | "hasLetter"
-  | "hasNumber"
-  | "matchesConfirm";
+export type PasswordRequirementKey = "minLength" | "hasLetter" | "hasNumber" | "matchesConfirm";
 
 export interface PasswordRequirement {
   key: PasswordRequirementKey;

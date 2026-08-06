@@ -141,9 +141,7 @@ export function comparePathCodePoints(a, b) {
   return a < b ? -1 : 1;
 }
 
-const uniqSort = (arr) =>
-  Array.from(new Set(arr ?? [])).sort(comparePathCodePoints);
-
+const uniqSort = (arr) => Array.from(new Set(arr ?? [])).sort(comparePathCodePoints);
 
 /**
  * @typedef {Object} CanonicalCleanupReport
@@ -185,16 +183,11 @@ export function toCanonicalCleanupReport({
   const mode = internal.mode === "execute" ? "execute" : "dry_run";
   const scanComplete = internal.scan_complete === true;
 
-  const invalid_path = pathBuckets
-    ? pathBuckets.invalid_path
-    : internal.invalid_path;
+  const invalid_path = pathBuckets ? pathBuckets.invalid_path : internal.invalid_path;
   const non_profile_photo = pathBuckets ? pathBuckets.non_profile_photo : 0;
 
   const dryRun = mode === "dry_run";
-  const attempted =
-    dryRun || !scanComplete
-      ? 0
-      : internal.deleted + (failedPaths?.length ?? 0);
+  const attempted = dryRun || !scanComplete ? 0 : internal.deleted + (failedPaths?.length ?? 0);
 
   const failures = (internal.scan_errors ?? []).map((raw) => {
     const s = String(raw ?? "");
@@ -225,7 +218,7 @@ export function toCanonicalCleanupReport({
 
     deletion_attempted: attempted,
     deleted: dryRun || !scanComplete ? 0 : internal.deleted,
-    failed: dryRun || !scanComplete ? 0 : failedPaths?.length ?? 0,
+    failed: dryRun || !scanComplete ? 0 : (failedPaths?.length ?? 0),
   };
 
   return {
@@ -239,9 +232,7 @@ export function toCanonicalCleanupReport({
     owner_filter: internal.owner_filter ?? null,
     counts,
     eligible_paths: uniqSort(internal.candidate_paths),
-    protected_by_final_recheck: uniqSort(
-      internal.protected_by_final_recheck_paths,
-    ),
+    protected_by_final_recheck: uniqSort(internal.protected_by_final_recheck_paths),
     deleted_paths: dryRun || !scanComplete ? [] : uniqSort(internal.deleted_paths),
     failed_paths: dryRun || !scanComplete ? [] : uniqSort(failedPaths),
     malformed_references: uniqSort(referenceStats.malformed_values),
@@ -303,16 +294,12 @@ export function renderCleanupSummary(report) {
 
   if (report.eligible_paths.length > 0) {
     lines.push("");
-    lines.push(
-      `Eligible orphan preview (up to ${MAX_PATHS_PREVIEW}):`,
-    );
+    lines.push(`Eligible orphan preview (up to ${MAX_PATHS_PREVIEW}):`);
     for (const p of report.eligible_paths.slice(0, MAX_PATHS_PREVIEW)) {
       lines.push(`  - ${p}`);
     }
     if (report.eligible_paths.length > MAX_PATHS_PREVIEW) {
-      lines.push(
-        `  … ${report.eligible_paths.length - MAX_PATHS_PREVIEW} more (see JSON report)`,
-      );
+      lines.push(`  … ${report.eligible_paths.length - MAX_PATHS_PREVIEW} more (see JSON report)`);
     }
   }
 
@@ -380,4 +367,3 @@ export function renderCleanupMachineSummary(report) {
 export function serializeCanonicalReport(report) {
   return `${JSON.stringify(report, null, 2)}\n`;
 }
-

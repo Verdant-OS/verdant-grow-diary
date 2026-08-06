@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import { AiDoctorPhase1LoadingState } from "@/components/AiDoctorPhase1LoadingState";
 import OperatorAiDoctorPhase1, {
   OPERATOR_AI_DOCTOR_PHASE1_ROUTE,
@@ -41,15 +41,15 @@ describe("AiDoctorPhase1LoadingState — pure presenter", () => {
   it("renders title, body, and read-only safety copy", () => {
     render(<AiDoctorPhase1LoadingState />);
     expect(screen.getByTestId("ai-doctor-phase1-loading-state")).toBeTruthy();
-    expect(
-      screen.getByTestId("ai-doctor-phase1-loading-title").textContent,
-    ).toContain("Preparing AI Doctor context");
-    expect(
-      screen.getByTestId("ai-doctor-phase1-loading-body").textContent,
-    ).toContain("Reviewing plant logs");
-    expect(
-      screen.getByTestId("ai-doctor-phase1-loading-safety").textContent,
-    ).toMatch(/Read-only review\. Nothing is being saved/i);
+    expect(screen.getByTestId("ai-doctor-phase1-loading-title").textContent).toContain(
+      "Preparing AI Doctor context",
+    );
+    expect(screen.getByTestId("ai-doctor-phase1-loading-body").textContent).toContain(
+      "Reviewing plant logs",
+    );
+    expect(screen.getByTestId("ai-doctor-phase1-loading-safety").textContent).toMatch(
+      /Read-only review\. Nothing is being saved/i,
+    );
   });
 
   it("renders all skeleton block placeholders", () => {
@@ -192,12 +192,8 @@ describe("AiDoctorPhase1LoadingState — premium shimmer", () => {
 
   it("loading copy remains readable without relying on animation alone", () => {
     render(<AiDoctorPhase1LoadingState />);
-    expect(
-      screen.getByTestId("ai-doctor-phase1-loading-title").textContent,
-    ).toBeTruthy();
-    expect(
-      screen.getByTestId("ai-doctor-phase1-loading-body").textContent,
-    ).toBeTruthy();
+    expect(screen.getByTestId("ai-doctor-phase1-loading-title").textContent).toBeTruthy();
+    expect(screen.getByTestId("ai-doctor-phase1-loading-body").textContent).toBeTruthy();
   });
 });
 
@@ -226,9 +222,7 @@ describe("AiDoctorPhase1LoadingState — reduced motion + non-animated fallback"
     const root = screen.getByTestId("ai-doctor-phase1-loading-state");
     expect(root.getAttribute("role")).toBe("status");
     expect(root.getAttribute("aria-busy")).toBe("true");
-    expect(
-      screen.getByTestId("ai-doctor-phase1-loading-title").textContent,
-    ).toBeTruthy();
+    expect(screen.getByTestId("ai-doctor-phase1-loading-title").textContent).toBeTruthy();
   });
 });
 

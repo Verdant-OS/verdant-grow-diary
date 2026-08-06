@@ -90,7 +90,9 @@ describe("Quick Log Typed Payloads v1 migration — static safety", () => {
   });
 
   it("reapplies EXECUTE grants (authenticated required; anon/service_role preserved if present)", () => {
-    expect(SQL).toMatch(/GRANT EXECUTE ON FUNCTION public\.quicklog_save_event[^;]*TO[^;]*authenticated/);
+    expect(SQL).toMatch(
+      /GRANT EXECUTE ON FUNCTION public\.quicklog_save_event[^;]*TO[^;]*authenticated/,
+    );
   });
 
   it("does not grant on subtype tables directly", () => {

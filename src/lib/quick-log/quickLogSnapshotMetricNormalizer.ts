@@ -36,8 +36,7 @@ export const QUICK_LOG_CANONICAL_METRICS = [
   "ppfd",
 ] as const;
 
-export type QuickLogCanonicalMetric =
-  (typeof QUICK_LOG_CANONICAL_METRICS)[number];
+export type QuickLogCanonicalMetric = (typeof QUICK_LOG_CANONICAL_METRICS)[number];
 
 /**
  * Canonical metric map type reused by Quick Log v1 read paths
@@ -53,9 +52,7 @@ export type CanonicalQuickLogSensorSnapshotMetrics = {
  * Legacy → canonical mapping. Mirrors `sensor_readings.metric` values that
  * were embedded in earlier Quick Log companion snapshots.
  */
-export const QUICK_LOG_LEGACY_TO_CANONICAL: Readonly<
-  Record<string, QuickLogCanonicalMetric>
-> = {
+export const QUICK_LOG_LEGACY_TO_CANONICAL: Readonly<Record<string, QuickLogCanonicalMetric>> = {
   temperature_c: "temperature",
   humidity_pct: "humidity",
   vpd_kpa: "vpd",

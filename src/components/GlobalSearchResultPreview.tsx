@@ -7,15 +7,21 @@
  * No queries, no writes, no navigation — the parent dialog owns selection and
  * routing. Content comes entirely from the already-fetched result row.
  */
-import { Check, Copy, Dna, ExternalLink, Leaf, SquareArrowOutUpRight, Sprout, Tent } from "lucide-react";
+import {
+  Check,
+  Copy,
+  Dna,
+  ExternalLink,
+  Leaf,
+  SquareArrowOutUpRight,
+  Sprout,
+  Tent,
+} from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type {
-  GlobalSearchEntityType,
-  GlobalSearchResult,
-} from "@/hooks/useGlobalSearch";
+import type { GlobalSearchEntityType, GlobalSearchResult } from "@/hooks/useGlobalSearch";
 
 const TYPE_LABELS: Record<GlobalSearchEntityType, string> = {
   grow: "Grow",
@@ -236,7 +242,6 @@ export default function GlobalSearchResultPreview({
             {copied ? "Copied" : "Copy link"}
           </Button>
         </div>
-
       </div>
     </aside>
   );

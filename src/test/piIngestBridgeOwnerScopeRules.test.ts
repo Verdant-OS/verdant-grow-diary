@@ -4,9 +4,7 @@ import { resolve } from "node:path";
 import { evaluateBridgeOwnerScope } from "@/lib/piIngestBridgeOwnerScopeRules";
 import type { BridgeCredentialMetadata } from "@/lib/piIngestBridgeCredentialMetadataResolver";
 
-function cred(
-  overrides: Partial<BridgeCredentialMetadata> = {},
-): BridgeCredentialMetadata {
+function cred(overrides: Partial<BridgeCredentialMetadata> = {}): BridgeCredentialMetadata {
   return {
     id: "id-1",
     userId: "user-1",
@@ -92,9 +90,10 @@ describe("evaluateBridgeOwnerScope — rejections", () => {
 
 describe("evaluateBridgeOwnerScope — precedence", () => {
   it("unknown_bridge beats every other reason", () => {
-    expect(
-      evaluateBridgeOwnerScope({ credential: null, tentOwnerUserId: null }),
-    ).toEqual({ ok: false, reason: "unknown_bridge" });
+    expect(evaluateBridgeOwnerScope({ credential: null, tentOwnerUserId: null })).toEqual({
+      ok: false,
+      reason: "unknown_bridge",
+    });
   });
 
   it("inactive beats missing_tent_owner and owner_mismatch", () => {
@@ -141,10 +140,7 @@ describe("evaluateBridgeOwnerScope — defensive input", () => {
 });
 
 describe("evaluateBridgeOwnerScope — static safety", () => {
-  const RAW = readFileSync(
-    resolve(__dirname, "../lib/piIngestBridgeOwnerScopeRules.ts"),
-    "utf8",
-  );
+  const RAW = readFileSync(resolve(__dirname, "../lib/piIngestBridgeOwnerScopeRules.ts"), "utf8");
   const SRC = RAW.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
 
   it.each([

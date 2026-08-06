@@ -4,11 +4,10 @@
 import type { ReactElement } from "react";
 import { describe, it, expect } from "vitest";
 import { render as rtlRender, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import SensorSourceSummaryWidget from "@/components/SensorSourceSummaryWidget";
 
-const render = (ui: ReactElement) =>
-  rtlRender(<MemoryRouter>{ui}</MemoryRouter>);
+const render = (ui: ReactElement) => rtlRender(<MemoryRouter>{ui}</MemoryRouter>);
 
 describe("SensorSourceSummaryWidget", () => {
   it("renders empty state when no readings", () => {

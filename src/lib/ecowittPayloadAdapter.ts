@@ -44,9 +44,7 @@ export type EcoWittAdapterWarningCode =
   | "device_state_field_ignored"
   | "vendor_credential_field_suppressed";
 
-export type EcoWittAdapterReasonCode =
-  | "payload_not_object"
-  | "no_readings_mapped";
+export type EcoWittAdapterReasonCode = "payload_not_object" | "no_readings_mapped";
 
 export interface EcoWittAdapterMetadata {
   vendor: "ecowitt";
@@ -357,8 +355,7 @@ export function adaptEcoWittPayloadToBridgeInput(
   }
 
   // 4. Timestamp.
-  const payloadDate =
-    parseEcoWittDate(lower["dateutc"]) ?? parseEcoWittDate(lower["date"]);
+  const payloadDate = parseEcoWittDate(lower["dateutc"]) ?? parseEcoWittDate(lower["date"]);
   let capturedAt: string | null = payloadDate;
   let serverFallbackUsed = false;
   if (!capturedAt) {

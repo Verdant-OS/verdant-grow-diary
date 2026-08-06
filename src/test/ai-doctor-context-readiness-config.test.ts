@@ -15,44 +15,26 @@ import {
 describe("aiDoctorContextReadiness config", () => {
   it("defaults to a 7-day recent event window", () => {
     expect(AI_DOCTOR_RECENT_EVENT_WINDOW_DAYS).toBe(7);
-    expect(AI_DOCTOR_CONTEXT_READINESS_CONFIG.recentEventWindowMs).toBe(
-      7 * 24 * 60 * 60 * 1000,
-    );
+    expect(AI_DOCTOR_CONTEXT_READINESS_CONFIG.recentEventWindowMs).toBe(7 * 24 * 60 * 60 * 1000);
   });
 
   it("defaults to 48 hours of snapshot freshness", () => {
     expect(AI_DOCTOR_SNAPSHOT_FRESH_HOURS).toBe(48);
-    expect(AI_DOCTOR_CONTEXT_READINESS_CONFIG.snapshotFreshMs).toBe(
-      48 * 60 * 60 * 1000,
-    );
+    expect(AI_DOCTOR_CONTEXT_READINESS_CONFIG.snapshotFreshMs).toBe(48 * 60 * 60 * 1000);
   });
 
   it("rules library re-exports the shared thresholds", () => {
-    expect(AI_DOCTOR_RECENT_WINDOW_MS).toBe(
-      AI_DOCTOR_CONTEXT_READINESS_CONFIG.recentEventWindowMs,
-    );
-    expect(AI_DOCTOR_SNAPSHOT_FRESH_MS).toBe(
-      AI_DOCTOR_CONTEXT_READINESS_CONFIG.snapshotFreshMs,
-    );
+    expect(AI_DOCTOR_RECENT_WINDOW_MS).toBe(AI_DOCTOR_CONTEXT_READINESS_CONFIG.recentEventWindowMs);
+    expect(AI_DOCTOR_SNAPSHOT_FRESH_MS).toBe(AI_DOCTOR_CONTEXT_READINESS_CONFIG.snapshotFreshMs);
   });
 
   it("exposes tooltip copy for each readiness item", () => {
-    for (const code of [
-      "stage",
-      "strain",
-      "medium",
-      "plant-photo",
-      "recent-warnings",
-    ]) {
+    for (const code of ["stage", "strain", "medium", "plant-photo", "recent-warnings"]) {
       expect(typeof AI_DOCTOR_CONTEXT_TOOLTIPS[code]).toBe("string");
       expect(AI_DOCTOR_CONTEXT_TOOLTIPS[code].length).toBeGreaterThan(0);
     }
-    expect(AI_DOCTOR_CONTEXT_MISSING_TOOLTIPS["recent-warnings"]).toMatch(
-      /No recent warnings/i,
-    );
-    expect(AI_DOCTOR_CONTEXT_MISSING_TOOLTIPS["plant-photo"]).toMatch(
-      /No recent plant photo/i,
-    );
+    expect(AI_DOCTOR_CONTEXT_MISSING_TOOLTIPS["recent-warnings"]).toMatch(/No recent warnings/i);
+    expect(AI_DOCTOR_CONTEXT_MISSING_TOOLTIPS["plant-photo"]).toMatch(/No recent plant photo/i);
   });
 });
 
@@ -116,8 +98,6 @@ describe("evaluateAiDoctorContext respects config overrides", () => {
       now: NOW,
       config: { recentEventWindowMs: 2 * 24 * HOUR, snapshotFreshMs: 24 * HOUR },
     };
-    expect(evaluateAiDoctorContext(input)).toEqual(
-      evaluateAiDoctorContext(input),
-    );
+    expect(evaluateAiDoctorContext(input)).toEqual(evaluateAiDoctorContext(input));
   });
 });

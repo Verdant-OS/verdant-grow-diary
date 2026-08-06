@@ -52,7 +52,12 @@ describe("TimelineMemorySection day grouping", () => {
   it("renders day group headers with labels", () => {
     const now = new Date();
     const todayIso = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 10).toISOString();
-    const twoDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 2, 14).toISOString();
+    const twoDaysAgo = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate() - 2,
+      14,
+    ).toISOString();
     stubItems([
       makeDiaryItem({ key: "a", occurredAt: todayIso }),
       makeDiaryItem({ key: "b", occurredAt: twoDaysAgo }),
@@ -164,9 +169,7 @@ describe("TimelineMemorySection day grouping", () => {
   });
 
   it("missing stage does not invent copy", () => {
-    stubItems([
-      makeDiaryItem({ key: "a", occurredAt: localIso(2026, 6, 5, 10) }),
-    ]);
+    stubItems([makeDiaryItem({ key: "a", occurredAt: localIso(2026, 6, 5, 10) })]);
     render(<TimelineMemorySection scope="plant" plantId="p1" />);
     expect(screen.queryByTestId("timeline-diary-stage-chip")).not.toBeInTheDocument();
   });

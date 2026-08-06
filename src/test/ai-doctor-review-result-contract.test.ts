@@ -60,10 +60,7 @@ describe("validateAiDoctorReviewResult", () => {
   it("rejects arrays that exceed the cap", () => {
     const v = validateAiDoctorReviewResult({
       ...valid(),
-      evidence: Array.from(
-        { length: AI_DOCTOR_REVIEW_ARRAY_CAP + 1 },
-        (_, i) => `e${i}`,
-      ),
+      evidence: Array.from({ length: AI_DOCTOR_REVIEW_ARRAY_CAP + 1 }, (_, i) => `e${i}`),
     });
     expect(v.ok).toBe(false);
   });

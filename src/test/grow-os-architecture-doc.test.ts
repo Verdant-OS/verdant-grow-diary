@@ -54,9 +54,7 @@ describe("docs/grow-os-architecture.md — contract", () => {
   });
 
   it("states empty real Supabase results must produce empty states", () => {
-    expect(DOC).toMatch(
-      /empty real Supabase results\s+must produce empty states/i,
-    );
+    expect(DOC).toMatch(/empty real Supabase results\s+must produce empty states/i);
   });
 
   it("states AI confidence must be limited when context is missing or demo-backed", () => {

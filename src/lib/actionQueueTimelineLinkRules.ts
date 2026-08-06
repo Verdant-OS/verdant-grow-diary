@@ -84,8 +84,7 @@ export function buildActionDiaryTraceLink(
 }
 
 export const JUMP_TO_HIGHLIGHTED_TRACE_LABEL = "Jump to highlighted trace";
-export const JUMP_TO_HIGHLIGHTED_TRACE_TESTID =
-  "action-queue-jump-to-highlighted-trace";
+export const JUMP_TO_HIGHLIGHTED_TRACE_TESTID = "action-queue-jump-to-highlighted-trace";
 
 /**
  * Build a safe "Jump to highlighted trace" link directly from the raw

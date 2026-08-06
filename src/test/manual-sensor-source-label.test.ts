@@ -30,9 +30,7 @@ describe("normalizeManualSourceNote", () => {
     expect(normalizeManualSourceNote("   ")).toBeNull();
     expect(normalizeManualSourceNote(null)).toBeNull();
     expect(normalizeManualSourceNote(undefined)).toBeNull();
-    expect(normalizeManualSourceNote("  EcoWitt   WH45  Monitor ")).toBe(
-      "EcoWitt WH45 Monitor",
-    );
+    expect(normalizeManualSourceNote("  EcoWitt   WH45  Monitor ")).toBe("EcoWitt WH45 Monitor");
   });
 
   it("strips control characters and unsafe punctuation", () => {
@@ -105,9 +103,7 @@ describe("formatSensorSourceLabel", () => {
     expect(formatSensorSourceLabel({ source: "diary" })).toBe("Diary snapshot");
     expect(formatSensorSourceLabel({ source: "unavailable" })).toBe("Unavailable");
     // A device note on a non-manual row must not change the label.
-    expect(
-      formatSensorSourceLabel({ source: "live", deviceNote: "spoof" }),
-    ).toBe("Live sensor");
+    expect(formatSensorSourceLabel({ source: "live", deviceNote: "spoof" })).toBe("Live sensor");
   });
 
   it("device options are non-empty and stable", () => {

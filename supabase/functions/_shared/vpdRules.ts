@@ -27,9 +27,7 @@ export interface CalculateAirVpdInput {
   rhPercent: number | null | undefined;
 }
 
-export function calculateAirVpdKpa(
-  input: CalculateAirVpdInput,
-): number | null {
+export function calculateAirVpdKpa(input: CalculateAirVpdInput): number | null {
   if (!input) return null;
   const { rhPercent } = input;
 

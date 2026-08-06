@@ -23,13 +23,9 @@ function evt(
 
 describe("EnvironmentSummaryExportHistoryPanel", () => {
   it("renders empty state when no events", () => {
-    render(
-      <EnvironmentSummaryExportHistoryPanel events={[]} onReopen={() => {}} />,
-    );
+    render(<EnvironmentSummaryExportHistoryPanel events={[]} onReopen={() => {}} />);
     expect(screen.getByTestId("env-report-export-history-empty")).toBeTruthy();
-    expect(
-      screen.getByTestId("env-report-export-history-count").textContent,
-    ).toBe("(0)");
+    expect(screen.getByTestId("env-report-export-history-count").textContent).toBe("(0)");
   });
 
   it("renders most-recent events first and respects limit", () => {
@@ -38,13 +34,7 @@ describe("EnvironmentSummaryExportHistoryPanel", () => {
       evt({ id: "e2", occurredAt: "2026-06-02T00:00:00.000Z" }),
       evt({ id: "e3", occurredAt: "2026-06-03T00:00:00.000Z" }),
     ];
-    render(
-      <EnvironmentSummaryExportHistoryPanel
-        events={events}
-        limit={2}
-        onReopen={() => {}}
-      />,
-    );
+    render(<EnvironmentSummaryExportHistoryPanel events={events} limit={2} onReopen={() => {}} />);
     const items = screen.getAllByTestId("env-report-export-history-item");
     expect(items).toHaveLength(2);
     expect(items[0].getAttribute("data-event-id")).toBe("e3");
@@ -54,10 +44,7 @@ describe("EnvironmentSummaryExportHistoryPanel", () => {
   it("calls onReopen with date range and clears issue for full report", () => {
     const onReopen = vi.fn();
     render(
-      <EnvironmentSummaryExportHistoryPanel
-        events={[evt({ id: "e1" })]}
-        onReopen={onReopen}
-      />,
+      <EnvironmentSummaryExportHistoryPanel events={[evt({ id: "e1" })]} onReopen={onReopen} />,
     );
     fireEvent.click(screen.getByTestId("env-report-export-history-reopen"));
     expect(onReopen).toHaveBeenCalledWith({
@@ -93,14 +80,9 @@ describe("EnvironmentSummaryExportHistoryPanel", () => {
 
   it("is hidden from print output via print-hidden class", () => {
     const { container } = render(
-      <EnvironmentSummaryExportHistoryPanel
-        events={[evt({ id: "e1" })]}
-        onReopen={() => {}}
-      />,
+      <EnvironmentSummaryExportHistoryPanel events={[evt({ id: "e1" })]} onReopen={() => {}} />,
     );
-    const root = container.querySelector(
-      '[data-testid="env-report-export-history"]',
-    );
+    const root = container.querySelector('[data-testid="env-report-export-history"]');
     expect(root?.className).toMatch(/print-hidden/);
   });
 

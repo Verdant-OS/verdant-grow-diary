@@ -11,7 +11,7 @@
  *  - Cancel never inserts.
  */
 import { useCallback, useRef, useState } from "react";
-import { Link, useInRouterContext } from "react-router-dom";
+import { Link, useInRouterContext } from "@/lib/react-router-compat";
 import {
   Dialog,
   DialogContent,

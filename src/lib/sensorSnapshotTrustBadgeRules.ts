@@ -18,14 +18,7 @@
 import { deriveProviderLabel } from "@/constants/sensorProviderLabels";
 import type { SensorSnapshotStatus as StrictSnapshotStatus } from "@/lib/latestSensorSnapshotRules";
 
-export type SnapshotTrustBadge =
-  | "live"
-  | "stale"
-  | "invalid"
-  | "manual"
-  | "demo"
-  | "csv"
-  | "none";
+export type SnapshotTrustBadge = "live" | "stale" | "invalid" | "manual" | "demo" | "csv" | "none";
 
 export interface SnapshotTrustBadgeView {
   badge: SnapshotTrustBadge;
@@ -89,15 +82,12 @@ const ATTACHABLE: Record<SnapshotTrustBadge, boolean> = {
   none: false,
 };
 
-
 /**
  * Classify a snapshot's trust badge. Resolver status (when present)
  * dominates: only `fresh_live` ever resolves to Live. Provider/vendor
  * identity strings are rendered as the provider chip and never as a trust label.
  */
-export function classifySnapshotTrustBadge(
-  input: SnapshotTrustInput,
-): SnapshotTrustBadgeView {
+export function classifySnapshotTrustBadge(input: SnapshotTrustInput): SnapshotTrustBadgeView {
   const src = (input.source ?? "").toString().trim().toLowerCase();
   const providerLabel = deriveProviderLabel(input.source ?? null);
 
@@ -151,8 +141,6 @@ export function classifySnapshotTrustBadge(
   }
 }
 
-
-
 function mapNonLiveSource(src: string): SnapshotTrustBadge {
   switch (src) {
     case "manual":
@@ -168,10 +156,7 @@ function mapNonLiveSource(src: string): SnapshotTrustBadge {
   }
 }
 
-function view(
-  badge: SnapshotTrustBadge,
-  providerLabel: string | null,
-): SnapshotTrustBadgeView {
+function view(badge: SnapshotTrustBadge, providerLabel: string | null): SnapshotTrustBadgeView {
   return {
     badge,
     label: LABEL[badge],

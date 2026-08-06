@@ -52,27 +52,23 @@ describe("EvidenceLinkageBadges — deterministic ordering", () => {
   it("presenter renders badge items in the adapter's order", () => {
     const events = adaptOriginatingTimelineEventsColumn(UNSORTED_VALID_REFS);
     const { container } = render(<EvidenceLinkageBadges events={events} />);
-    const items = container.querySelectorAll(
-      '[data-testid="evidence-linkage-badges-item"]',
-    );
+    const items = container.querySelectorAll('[data-testid="evidence-linkage-badges-item"]');
     expect(items.length).toBe(EXPECTED_ORDER.length);
-    const renderedIds = Array.from(items).map((el) =>
-      el.getAttribute("data-event-id"),
-    );
+    const renderedIds = Array.from(items).map((el) => el.getAttribute("data-event-id"));
     expect(renderedIds).toEqual(EXPECTED_ORDER);
   });
 
   it("rendering twice with the same input produces the same DOM order", () => {
     const events = adaptOriginatingTimelineEventsColumn(UNSORTED_VALID_REFS);
     const first = render(<EvidenceLinkageBadges events={events} />);
-    const firstIds = Array.from(
-      first.container.querySelectorAll('[data-event-id]'),
-    ).map((el) => el.getAttribute("data-event-id"));
+    const firstIds = Array.from(first.container.querySelectorAll("[data-event-id]")).map((el) =>
+      el.getAttribute("data-event-id"),
+    );
     cleanup();
     const second = render(<EvidenceLinkageBadges events={events} />);
-    const secondIds = Array.from(
-      second.container.querySelectorAll('[data-event-id]'),
-    ).map((el) => el.getAttribute("data-event-id"));
+    const secondIds = Array.from(second.container.querySelectorAll("[data-event-id]")).map((el) =>
+      el.getAttribute("data-event-id"),
+    );
     expect(secondIds).toEqual(firstIds);
   });
 });
@@ -88,7 +84,12 @@ describe("EvidenceLinkageBadges — mixed valid + malformed input", () => {
     { id: 123, source: "manual" },
     { noId: true, source: "manual" },
     { id: "valid-1", kind: "grow_event", source: "manual", occurred_at: "2026-06-01T10:00:00Z" },
-    { id: "valid-2", kind: "sensor_snapshot", source: "made-up-source", occurred_at: "2026-06-02T10:00:00Z" },
+    {
+      id: "valid-2",
+      kind: "sensor_snapshot",
+      source: "made-up-source",
+      occurred_at: "2026-06-02T10:00:00Z",
+    },
     { id: "valid-1", kind: "diary_entry", source: "csv", occurred_at: "2026-06-03T10:00:00Z" }, // dup id
   ];
 
@@ -109,29 +110,21 @@ describe("EvidenceLinkageBadges — mixed valid + malformed input", () => {
         fallbackCopy={ALERT_REVIEW_EVIDENCE_NOT_LINKED_COPY}
       />,
     );
-    const items = container.querySelectorAll(
-      '[data-testid="evidence-linkage-badges-item"]',
-    );
+    const items = container.querySelectorAll('[data-testid="evidence-linkage-badges-item"]');
     expect(items.length).toBe(2);
-    expect(
-      container.querySelector('[data-testid="evidence-linkage-badges-empty"]'),
-    ).toBeNull();
+    expect(container.querySelector('[data-testid="evidence-linkage-badges-empty"]')).toBeNull();
     expect(queryByText(ALERT_REVIEW_EVIDENCE_NOT_LINKED_COPY)).toBeNull();
   });
 
   it("unknown source ref renders the 'Unknown source' label and caution copy", () => {
     const events = adaptOriginatingTimelineEventsColumn(MIXED_INPUT);
     const { container } = render(<EvidenceLinkageBadges events={events} />);
-    const unknownItem = container.querySelector(
-      '[data-event-id="valid-2"]',
-    ) as HTMLElement | null;
+    const unknownItem = container.querySelector('[data-event-id="valid-2"]') as HTMLElement | null;
     expect(unknownItem).not.toBeNull();
     expect(unknownItem?.getAttribute("data-source")).toBe("unknown");
     expect(unknownItem?.getAttribute("data-trusted")).toBe("false");
     expect(within(unknownItem!).getByText(/Unknown source/i)).toBeTruthy();
-    expect(
-      within(unknownItem!).getByTestId("evidence-linkage-badges-caution"),
-    ).toBeTruthy();
+    expect(within(unknownItem!).getByTestId("evidence-linkage-badges-caution")).toBeTruthy();
   });
 });
 
@@ -157,10 +150,7 @@ describe("EvidenceLinkageBadges — secret-like field rejection", () => {
     const cleanInput = [
       { id: "clean", kind: "grow_event", source: "manual", occurred_at: "2026-06-01T10:00:00Z" },
     ];
-    const events = adaptOriginatingTimelineEventsColumn([
-      ...leakyInput,
-      ...cleanInput,
-    ]);
+    const events = adaptOriginatingTimelineEventsColumn([...leakyInput, ...cleanInput]);
     expect(events.map((e) => e.id)).toEqual(["clean"]);
 
     const { container } = render(<EvidenceLinkageBadges events={events} />);
@@ -194,9 +184,7 @@ describe("EvidenceLinkageBadges — source label honesty", () => {
     expect(events.length).toBe(SOURCES.length);
     const { container } = render(<EvidenceLinkageBadges events={events} />);
     for (const src of SOURCES) {
-      const item = container.querySelector(
-        `[data-event-id="src-${src}"]`,
-      ) as HTMLElement | null;
+      const item = container.querySelector(`[data-event-id="src-${src}"]`) as HTMLElement | null;
       expect(item, `missing item for ${src}`).not.toBeNull();
       expect(item?.getAttribute("data-source")).toBe(src);
       const label = originatingTimelineEventLabel(src);
@@ -215,12 +203,8 @@ describe("EvidenceLinkageBadges — source label honesty", () => {
     const { container } = render(<EvidenceLinkageBadges events={events} />);
 
     // The badge label span uses data-testid="evidence-linkage-badges-source".
-    const liveBadges = container.querySelectorAll(
-      '[data-testid="evidence-linkage-badges-source"]',
-    );
-    const liveLabelHits = Array.from(liveBadges).filter(
-      (el) => el.textContent?.trim() === "Live",
-    );
+    const liveBadges = container.querySelectorAll('[data-testid="evidence-linkage-badges-source"]');
+    const liveLabelHits = Array.from(liveBadges).filter((el) => el.textContent?.trim() === "Live");
     expect(liveLabelHits.length).toBe(1);
 
     const liveOwner = liveLabelHits[0]?.closest("[data-event-id]");
@@ -241,24 +225,15 @@ describe("EvidenceLinkageBadges — source label honesty", () => {
       const events = adaptOriginatingTimelineEventsColumn([
         { id: `only-${src}`, kind: "grow_event", source: src },
       ]);
-      const { container, unmount } = render(
-        <EvidenceLinkageBadges events={events} />,
-      );
-      const badge = container.querySelector(
-        '[data-testid="evidence-linkage-badges-source"]',
-      );
+      const { container, unmount } = render(<EvidenceLinkageBadges events={events} />);
+      const badge = container.querySelector('[data-testid="evidence-linkage-badges-source"]');
       expect(badge?.textContent?.trim()).not.toBe("Live");
       unmount();
     }
   });
 
   it("demo/stale/invalid/unknown render with data-trusted='false'", () => {
-    const UNTRUSTED: OriginatingTimelineEventSource[] = [
-      "demo",
-      "stale",
-      "invalid",
-      "unknown",
-    ];
+    const UNTRUSTED: OriginatingTimelineEventSource[] = ["demo", "stale", "invalid", "unknown"];
     const input = UNTRUSTED.map((src) => ({
       id: `u-${src}`,
       kind: "grow_event",

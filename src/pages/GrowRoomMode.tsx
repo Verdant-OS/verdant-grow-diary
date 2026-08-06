@@ -14,7 +14,7 @@
  */
 import VpdStageMissingBadge from "@/components/VpdStageMissingBadge";
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import {
   AlertTriangle,
   ArrowRight,
@@ -44,6 +44,11 @@ import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { actionsPath, alertsPath, tentDetailPath, tentsPath } from "@/lib/routes";
 
 import { EMPTY_SNAPSHOT, snapshotFromReadings, type SensorSnapshot } from "@/lib/sensorSnapshot";
+import {
+  formatTemperatureDisplay,
+  type TemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 import {
   buildGrowRoomTentCards,
   DATA_HEALTH_LABEL,
@@ -88,13 +93,19 @@ function fmt(v: number | null, unit: string) {
   return v === null || Number.isNaN(v) ? "—" : `${v}${unit}`;
 }
 
-function snapshotSummary(s: SensorSnapshot | null) {
+function snapshotSummary(s: SensorSnapshot | null, unit?: TemperatureUnitPreference) {
   if (!s) return "No snapshot";
-  // Temperature stored in Celsius, displayed in Fahrenheit (Verdant convention).
-  const tempF =
-    s.temp === null || !Number.isFinite(s.temp) ? "—" : `${((s.temp * 9) / 5 + 32).toFixed(1)}°F`;
+  // Stored in Celsius; rendered in the grower's saved °F/°C preference. The
+  // unit is passed in (not read here) so this stays pure and the caller's
+  // useTemperatureUnitPreference subscription drives re-render on change.
+  const temp = formatTemperatureDisplay(s.temp, {
+    valueUnit: "C",
+    digits: 1,
+    unavailableLabel: "—",
+    unit,
+  });
   return [
-    `Temp ${tempF}`,
+    `Temp ${temp}`,
     `RH ${fmt(s.rh, "%")}`,
     `VPD ${s.vpd === null ? "—" : `${s.vpd.toFixed(2)} kPa`}`,
   ].join(" · ");
@@ -114,6 +125,8 @@ export default function GrowRoomMode() {
   const { data: plants = [] } = usePlants();
   const { alerts } = useAlertsList({});
   const { urlGrowId } = useScopedGrow();
+  // Read-only surface, but it must still honor the saved °F/°C preference.
+  const temperatureUnit = useTemperatureUnitPreference();
   const [quickLogPrefill, setQuickLogPrefill] = useState<QuickLogPrefill | null>(null);
   const [quickLogOpen, setQuickLogOpen] = useState(false);
 
@@ -168,9 +181,12 @@ export default function GrowRoomMode() {
           for (const [tid, rows] of grouped.entries()) {
             // snapshotFromReadings handles its own ordering / freshness rules.
             // Cast: snapshotFromReadings expects the broader reading row shape.
-            byTent[tid] = snapshotFromReadings(
+            const snapshot = snapshotFromReadings(
               rows as unknown as Parameters<typeof snapshotFromReadings>[0],
             );
+            // No derivable snapshot for this tent ⇒ leave it absent rather
+            // than publishing an empty one the UI could read as healthy.
+            if (snapshot) byTent[tid] = snapshot;
           }
         }
 
@@ -342,7 +358,9 @@ export default function GrowRoomMode() {
                   </Badge>
                 </div>
 
-                <div className="text-sm text-foreground/90">{snapshotSummary(card.snapshot)}</div>
+                <div className="text-sm text-foreground/90">
+                  {snapshotSummary(card.snapshot, temperatureUnit)}
+                </div>
 
                 {vpdClassification.classification !== "unavailable" && (
                   <p

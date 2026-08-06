@@ -55,18 +55,14 @@ describe("AiDoctorPhase1SaveEvidenceButton", () => {
   });
 
   it("renders save control with evidence-only copy", () => {
-    render(
-      <AiDoctorPhase1SaveEvidenceButton identity={identity} result={result} />,
+    render(<AiDoctorPhase1SaveEvidenceButton identity={identity} result={result} />);
+    expect(screen.getByTestId("ai-doctor-phase1-save-evidence-button")).toHaveTextContent(
+      "Save to timeline",
     );
-    expect(
-      screen.getByTestId("ai-doctor-phase1-save-evidence-button"),
-    ).toHaveTextContent("Save to timeline");
     expect(
       screen.getByText(/Saves this AI Doctor result as plant evidence only/i),
     ).toBeInTheDocument();
-    expect(
-      screen.getByText(/No Action Queue item is created/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/No Action Queue item is created/i)).toBeInTheDocument();
   });
 
   it("calls quicklog_save_manual exactly once on click and shows saved state", async () => {
@@ -74,16 +70,10 @@ describe("AiDoctorPhase1SaveEvidenceButton", () => {
       data: { ok: true, grow_event_id: "ev1" },
       error: null,
     });
-    render(
-      <AiDoctorPhase1SaveEvidenceButton identity={identity} result={result} />,
-    );
-    fireEvent.click(
-      screen.getByTestId("ai-doctor-phase1-save-evidence-button"),
-    );
+    render(<AiDoctorPhase1SaveEvidenceButton identity={identity} result={result} />);
+    fireEvent.click(screen.getByTestId("ai-doctor-phase1-save-evidence-button"));
     await waitFor(() =>
-      expect(
-        screen.getByTestId("ai-doctor-phase1-save-evidence-status-saved"),
-      ).toBeInTheDocument(),
+      expect(screen.getByTestId("ai-doctor-phase1-save-evidence-status-saved")).toBeInTheDocument(),
     );
     expect(rpcMock).toHaveBeenCalledTimes(1);
     expect(rpcMock.mock.calls[0][0]).toBe("quicklog_save_manual");
@@ -98,15 +88,11 @@ describe("AiDoctorPhase1SaveEvidenceButton", () => {
       data: { ok: true, grow_event_id: "ev1" },
       error: null,
     });
-    render(
-      <AiDoctorPhase1SaveEvidenceButton identity={identity} result={result} />,
-    );
+    render(<AiDoctorPhase1SaveEvidenceButton identity={identity} result={result} />);
     const btn = screen.getByTestId("ai-doctor-phase1-save-evidence-button");
     fireEvent.click(btn);
     await waitFor(() =>
-      expect(
-        screen.getByTestId("ai-doctor-phase1-save-evidence-status-saved"),
-      ).toBeInTheDocument(),
+      expect(screen.getByTestId("ai-doctor-phase1-save-evidence-status-saved")).toBeInTheDocument(),
     );
     // Button is disabled after save, so clicking has no effect.
     expect(btn).toBeDisabled();
@@ -119,23 +105,15 @@ describe("AiDoctorPhase1SaveEvidenceButton", () => {
       data: { ok: false, reason: "save_failed" },
       error: null,
     });
-    render(
-      <AiDoctorPhase1SaveEvidenceButton identity={identity} result={result} />,
-    );
-    fireEvent.click(
-      screen.getByTestId("ai-doctor-phase1-save-evidence-button"),
-    );
+    render(<AiDoctorPhase1SaveEvidenceButton identity={identity} result={result} />);
+    fireEvent.click(screen.getByTestId("ai-doctor-phase1-save-evidence-button"));
     await waitFor(() =>
-      expect(
-        screen.getByTestId("ai-doctor-phase1-save-evidence-status-error"),
-      ).toBeInTheDocument(),
+      expect(screen.getByTestId("ai-doctor-phase1-save-evidence-status-error")).toBeInTheDocument(),
     );
   });
 
   it("never has approve/execute/send-to-device CTAs", () => {
-    render(
-      <AiDoctorPhase1SaveEvidenceButton identity={identity} result={result} />,
-    );
+    render(<AiDoctorPhase1SaveEvidenceButton identity={identity} result={result} />);
     const btn = screen.getByTestId("ai-doctor-phase1-save-evidence-button");
     expect(btn.textContent).not.toMatch(/approve|execute|send to device/i);
   });

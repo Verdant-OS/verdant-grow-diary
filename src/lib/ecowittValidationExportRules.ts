@@ -70,9 +70,7 @@ export interface BuildExportInput {
 
 const EXPORT_MAX = 10;
 
-export function buildEcowittValidationExport(
-  input: BuildExportInput,
-): EcowittExportPayload {
+export function buildEcowittValidationExport(input: BuildExportInput): EcowittExportPayload {
   const attempts = input.attempts.slice(0, EXPORT_MAX).map((a) => ({
     captured_at: a.capturedAt,
     age_label: a.ageLabel,
@@ -88,9 +86,7 @@ export function buildEcowittValidationExport(
       value: m.value,
       reason: m.reason,
     })),
-    reasons: a.metrics
-      .map((m) => m.reason)
-      .filter((r) => typeof r === "string" && r.length > 0),
+    reasons: a.metrics.map((m) => m.reason).filter((r) => typeof r === "string" && r.length > 0),
     redacted_raw_payload: redactEvidenceValue(a.rawPayload),
   }));
   return {
@@ -169,23 +165,19 @@ export interface EcowittExportPreview {
 export const EXPORT_REDACTION_NOTICE =
   "Tokens, bridge tokens, authorization/bearer/JWT, service_role, signatures, api keys, raw user_id, and internal IDs are redacted before export. Test/local data only — never sent.";
 
-export function buildExportPreview(
-  payload: EcowittExportPayload,
-): EcowittExportPreview {
+export function buildExportPreview(payload: EcowittExportPayload): EcowittExportPreview {
   const captured = payload.attempts
     .map((a) => a.captured_at)
     .filter((x): x is string => typeof x === "string" && x.length > 0)
     .sort();
   const metricLabels = new Set<string>();
-  for (const a of payload.attempts)
-    for (const m of a.metrics) metricLabels.add(m.label);
+  for (const a of payload.attempts) for (const m of a.metrics) metricLabels.add(m.label);
   return {
     label: payload.label,
     source_label: payload.source_label,
     tent: payload.tent,
     attempt_count: payload.attempts.length,
-    latest_captured_at:
-      captured.length > 0 ? captured[captured.length - 1] : null,
+    latest_captured_at: captured.length > 0 ? captured[captured.length - 1] : null,
     earliest_captured_at: captured.length > 0 ? captured[0] : null,
     metric_labels: Array.from(metricLabels),
     redaction_notice: EXPORT_REDACTION_NOTICE,

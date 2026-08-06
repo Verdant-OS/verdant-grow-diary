@@ -23,7 +23,7 @@ describe("sanitizedDbError helper", () => {
 
   it("passes on generic sanitized RLS errors", () => {
     shouldPass({
-      message: "new row violates row-level security policy for table \"profiles\"",
+      message: 'new row violates row-level security policy for table "profiles"',
       code: "42501",
     });
     shouldPass({
@@ -66,8 +66,7 @@ describe("sanitizedDbError helper", () => {
 
   it("fails on stack traces and SQL function bodies", () => {
     shouldFail({
-      message:
-        "error at /home/runner/work/app/src/lib/entitlements.ts:42:11 while resolving",
+      message: "error at /home/runner/work/app/src/lib/entitlements.ts:42:11 while resolving",
     });
     shouldFail({
       details:

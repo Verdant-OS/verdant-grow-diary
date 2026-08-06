@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "@/lib/react-router-compat";
 import { Button } from "@/components/ui/button";
 import {
   Accordion,

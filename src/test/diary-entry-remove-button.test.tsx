@@ -7,7 +7,9 @@ import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 const { deleteEq, deleteFn, toastSuccess, toastError } = vi.hoisted(() => {
-  const deleteEq = vi.fn(() => Promise.resolve({ error: null }));
+  const deleteEq = vi.fn((): Promise<{ error: { code: string; message: string } | null }> =>
+    Promise.resolve({ error: null }),
+  );
   const deleteFn = vi.fn(() => ({ eq: deleteEq }));
   return {
     deleteEq,
@@ -29,9 +31,7 @@ const VIEWER = { currentUserId: "user-1" };
 
 function render(ui: React.ReactElement) {
   const client = new QueryClient();
-  return rtlRender(
-    React.createElement(QueryClientProvider, { client }, ui),
-  );
+  return rtlRender(React.createElement(QueryClientProvider, { client }, ui));
 }
 
 beforeEach(() => {
@@ -66,10 +66,7 @@ describe("DiaryEntryRemoveButton — visibility", () => {
 
   it("does NOT render for sensor readings", () => {
     const { container } = render(
-      <DiaryEntryRemoveButton
-        entry={{ id: "s1", kind: "sensor_reading" }}
-        viewer={VIEWER}
-      />,
+      <DiaryEntryRemoveButton entry={{ id: "s1", kind: "sensor_reading" }} viewer={VIEWER} />,
     );
     expect(container.firstChild).toBeNull();
   });
@@ -97,12 +94,7 @@ describe("DiaryEntryRemoveButton — visibility", () => {
 
 describe("DiaryEntryRemoveButton — confirmation + mutation", () => {
   it("opens confirmation dialog with required copy", () => {
-    render(
-      <DiaryEntryRemoveButton
-        entry={{ id: "e1", kind: "diary" }}
-        viewer={VIEWER}
-      />,
-    );
+    render(<DiaryEntryRemoveButton entry={{ id: "e1", kind: "diary" }} viewer={VIEWER} />);
     fireEvent.click(screen.getByTestId("diary-entry-remove-button"));
     expect(screen.getByText("Remove this log?")).toBeTruthy();
     expect(
@@ -121,19 +113,12 @@ describe("DiaryEntryRemoveButton — confirmation + mutation", () => {
     );
     fireEvent.click(screen.getByTestId("diary-entry-remove-button"));
     expect(
-      screen.getByText(
-        /The photo log will no longer appear in this plant's timeline\./,
-      ),
+      screen.getByText(/The photo log will no longer appear in this plant's timeline\./),
     ).toBeTruthy();
   });
 
   it("Cancel does NOT call the mutation", () => {
-    render(
-      <DiaryEntryRemoveButton
-        entry={{ id: "e1", kind: "diary" }}
-        viewer={VIEWER}
-      />,
-    );
+    render(<DiaryEntryRemoveButton entry={{ id: "e1", kind: "diary" }} viewer={VIEWER} />);
     fireEvent.click(screen.getByTestId("diary-entry-remove-button"));
     fireEvent.click(screen.getByTestId("diary-entry-remove-cancel"));
     expect(deleteFn).not.toHaveBeenCalled();
@@ -166,9 +151,7 @@ describe("DiaryEntryRemoveButton — confirmation + mutation", () => {
     );
     fireEvent.click(screen.getByTestId("diary-entry-remove-button"));
     fireEvent.click(screen.getByTestId("diary-entry-remove-confirm"));
-    await waitFor(() =>
-      expect(toastSuccess).toHaveBeenCalledWith("Photo log removed."),
-    );
+    await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith("Photo log removed."));
   });
 
   it("Error path shows generic toast and does not invoke onRemoved", async () => {
@@ -186,9 +169,7 @@ describe("DiaryEntryRemoveButton — confirmation + mutation", () => {
     fireEvent.click(screen.getByTestId("diary-entry-remove-button"));
     fireEvent.click(screen.getByTestId("diary-entry-remove-confirm"));
     await waitFor(() =>
-      expect(toastError).toHaveBeenCalledWith(
-        "Couldn't remove this log. Please try again.",
-      ),
+      expect(toastError).toHaveBeenCalledWith("Couldn't remove this log. Please try again."),
     );
     expect(onRemoved).not.toHaveBeenCalled();
     // Toast never echoes raw DB details

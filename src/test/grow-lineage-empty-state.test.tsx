@@ -7,7 +7,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 
 const { MOCK_USER } = vi.hoisted(() => ({ MOCK_USER: { id: "user-1" } }));
 vi.mock("@/store/auth", () => ({
@@ -50,8 +50,7 @@ describe("GrowLineageRepair — empty state", () => {
     );
     const empty = await waitFor(() => screen.getByTestId("grow-lineage-empty-state"));
     expect(empty.textContent).toMatch(/No lineage repairs needed/i);
-    const firstStep = screen.getByTestId("grow-lineage-empty-state-first-step")
-      .textContent ?? "";
+    const firstStep = screen.getByTestId("grow-lineage-empty-state-first-step").textContent ?? "";
     expect(firstStep).toMatch(/Harvest Archive/);
     expect(firstStep).toMatch(/approval/i);
   });

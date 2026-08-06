@@ -99,11 +99,7 @@ function requireRole(caller: Caller, role: AppRole, scope: string): void {
   }
 }
 
-function requireOwnership(
-  caller: Caller,
-  resourceUserId: string,
-  scope: string,
-): void {
+function requireOwnership(caller: Caller, resourceUserId: string, scope: string): void {
   if (caller.userId !== resourceUserId && !hasRole(caller, "operator")) {
     throw new PermissionError("forbidden", scope, "not owner and not operator");
   }
@@ -123,10 +119,7 @@ export function listGrowsForCaller(_caller: Caller): Promise<GrowRow[]> {
   return _fetchGrowRows();
 }
 
-export async function getGrowForCaller(
-  caller: Caller,
-  id: string,
-): Promise<GrowRow | null> {
+export async function getGrowForCaller(caller: Caller, id: string): Promise<GrowRow | null> {
   const row = await _fetchGrowRow(id);
   if (!row) return null;
   if (!canAccessRow(caller, row)) {
@@ -202,10 +195,7 @@ export async function deleteDiaryEntryForCaller(
 }
 
 /* ---------- Harvests ---------- */
-export function listHarvestsForCaller(
-  _caller: Caller,
-  growId?: string,
-): Promise<HarvestRow[]> {
+export function listHarvestsForCaller(_caller: Caller, growId?: string): Promise<HarvestRow[]> {
   return _fetchHarvestRows(growId);
 }
 

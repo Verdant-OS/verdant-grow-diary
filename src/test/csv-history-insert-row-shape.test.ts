@@ -27,7 +27,6 @@ const SPIDER_FIXTURE = readFileSync(
   "utf8",
 );
 
-
 // Allow-list mirrors public.sensor_readings.Insert in
 // src/integrations/supabase/types.ts.
 const ALLOWED_INSERT_KEYS = new Set([
@@ -90,10 +89,7 @@ describe("CSV history insert rows — sensor_readings schema shape", () => {
 
   it("AC Infinity legacy rows stay within the allowed insert keys", () => {
     const parsed = parseCsv(
-      [
-        "Timestamp,Temperature (°F),Humidity (%)",
-        "2026-05-26 14:00:00,77,50",
-      ].join("\n"),
+      ["Timestamp,Temperature (°F),Humidity (%)", "2026-05-26 14:00:00,77,50"].join("\n"),
     );
     const normalized = normalizeAcInfinityRows(parsed, planColumns(parsed.headers));
     const rows = buildCsvInsertRows({
@@ -149,8 +145,7 @@ describe("CSV history insert rows — sensor_readings schema shape", () => {
       batchSize: 500,
       insertBatch: async () => ({
         error: {
-          message:
-            "Could not find the 'grow_id' column of 'sensor_readings' in the schema cache",
+          message: "Could not find the 'grow_id' column of 'sensor_readings' in the schema cache",
           code: "PGRST204",
         },
       }),
@@ -160,17 +155,12 @@ describe("CSV history insert rows — sensor_readings schema shape", () => {
     expect(batchResult.partialWrite).toBe(false);
     expect(batchResult.diagnostic).toContain("PGRST204");
     expect(batchResult.diagnostic).toContain("grow_id");
-    expect(batchResult.diagnostic).not.toMatch(
-      /earlier batches may already have been written/,
-    );
+    expect(batchResult.diagnostic).not.toMatch(/earlier batches may already have been written/);
   });
 });
 
 describe("CSV history insert row builders — static safety surface", () => {
-  const FILES = [
-    "src/lib/registryCsvInsertRowsAdapter.ts",
-    "src/lib/csvSensorImportRules.ts",
-  ];
+  const FILES = ["src/lib/registryCsvInsertRowsAdapter.ts", "src/lib/csvSensorImportRules.ts"];
   const stripComments = (s: string) =>
     s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
   for (const rel of FILES) {
@@ -196,4 +186,3 @@ describe("CSV history insert row builders — static safety surface", () => {
     });
   }
 });
-

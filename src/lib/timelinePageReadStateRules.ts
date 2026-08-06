@@ -14,6 +14,7 @@ export const TIMELINE_SUPPLEMENTAL_READ_SOURCES = [
   "diary_photos",
   "action_queue_events",
   "alert_events",
+  "linked_grow_events",
 ] as const;
 
 export type TimelineCoreReadSource = (typeof TIMELINE_CORE_READ_SOURCES)[number];

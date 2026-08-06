@@ -18,7 +18,7 @@ describe("ecowitt v0 live ingest contract doc", () => {
     }
   });
 
-  it("documents source=\"live\" rule and raw_payload lineage", () => {
+  it('documents source="live" rule and raw_payload lineage', () => {
     expect(doc).toContain('source="live"');
     expect(doc).toContain("raw_payload");
     expect(lower).toContain("vendor");

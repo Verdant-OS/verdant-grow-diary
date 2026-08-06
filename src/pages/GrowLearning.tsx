@@ -8,7 +8,7 @@
  *  - No effectiveness score, no "best intervention" ranking, no automatic
  *    repeat/avoid promotion.
  */
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link } from "@/lib/react-router-compat";
 import { GraduationCap } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import { usePlantMemoryEpisodes } from "@/hooks/usePlantMemoryEpisodes";
@@ -52,13 +52,17 @@ export default function GrowLearning() {
           Loading learning review…
         </p>
       ) : state.status === "unavailable" ? (
-        <p role="status" className="text-sm text-muted-foreground" data-testid="grow-learning-unavailable">
+        <p
+          role="status"
+          className="text-sm text-muted-foreground"
+          data-testid="grow-learning-unavailable"
+        >
           The learning review is unavailable right now. Try again shortly.
         </p>
       ) : state.episodes.length === 0 ? (
         <p className="text-sm text-muted-foreground" data-testid="grow-learning-empty">
-          No completed actions yet for this grow. Once you complete an action from the Action
-          Queue, it will appear here for follow-up and review.
+          No completed actions yet for this grow. Once you complete an action from the Action Queue,
+          it will appear here for follow-up and review.
         </p>
       ) : (
         <div className="space-y-6">

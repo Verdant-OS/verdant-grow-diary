@@ -7,7 +7,7 @@ import { describe, it, expect, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen, within } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 const rows = [
@@ -18,39 +18,53 @@ const rows = [
     suggested_actions: [],
     displayed_confidence: 0.8,
     raw_confidence: 0.8,
-    grow_id: null, plant_id: null, tent_id: null,
+    grow_id: null,
+    plant_id: null,
+    tent_id: null,
   },
   {
     id: "s-critical",
     created_at: "2025-01-01T00:00:00Z",
     diagnosis: { riskLevel: "critical", summary: "x", likelyIssue: "y" },
     suggested_actions: [],
-    displayed_confidence: 0.8, raw_confidence: 0.8,
-    grow_id: null, plant_id: null, tent_id: null,
+    displayed_confidence: 0.8,
+    raw_confidence: 0.8,
+    grow_id: null,
+    plant_id: null,
+    tent_id: null,
   },
   {
     id: "s-low-with-actions",
     created_at: "2025-01-01T00:00:00Z",
     diagnosis: { riskLevel: "low", summary: "x", likelyIssue: "y" },
     suggested_actions: [{ title: "Check soil" }],
-    displayed_confidence: 0.8, raw_confidence: 0.8,
-    grow_id: null, plant_id: null, tent_id: null,
+    displayed_confidence: 0.8,
+    raw_confidence: 0.8,
+    grow_id: null,
+    plant_id: null,
+    tent_id: null,
   },
   {
     id: "s-low-clean",
     created_at: "2025-01-01T00:00:00Z",
     diagnosis: { riskLevel: "low", summary: "x", likelyIssue: "y" },
     suggested_actions: [],
-    displayed_confidence: 0.8, raw_confidence: 0.8,
-    grow_id: null, plant_id: null, tent_id: null,
+    displayed_confidence: 0.8,
+    raw_confidence: 0.8,
+    grow_id: null,
+    plant_id: null,
+    tent_id: null,
   },
   {
     id: "s-null-diag",
     created_at: "2025-01-01T00:00:00Z",
     diagnosis: null,
     suggested_actions: [],
-    displayed_confidence: null, raw_confidence: null,
-    grow_id: null, plant_id: null, tent_id: null,
+    displayed_confidence: null,
+    raw_confidence: null,
+    grow_id: null,
+    plant_id: null,
+    tent_id: null,
   },
 ];
 
@@ -100,21 +114,15 @@ describe("Per-row Needs review badge", () => {
       "ai-doctor-sessions-index-needs-review-badge",
     );
     expect(badge.textContent).toBe("Needs review");
-    expect(badge.getAttribute("title")).toBe(
-      "High risk or suggested actions present.",
-    );
-    expect(badge.getAttribute("aria-label")).toBe(
-      "High risk or suggested actions present.",
-    );
+    expect(badge.getAttribute("title")).toBe("High risk or suggested actions present.");
+    expect(badge.getAttribute("aria-label")).toBe("High risk or suggested actions present.");
   });
 
   it("renders badge for critical risk", async () => {
     renderAt("/doctor/sessions");
     await screen.findByTestId("ai-doctor-sessions-index-page");
     expect(
-      within(rowFor("s-critical")).getByTestId(
-        "ai-doctor-sessions-index-needs-review-badge",
-      ),
+      within(rowFor("s-critical")).getByTestId("ai-doctor-sessions-index-needs-review-badge"),
     ).toBeTruthy();
   });
 
@@ -132,9 +140,7 @@ describe("Per-row Needs review badge", () => {
     renderAt("/doctor/sessions");
     await screen.findByTestId("ai-doctor-sessions-index-page");
     expect(
-      within(rowFor("s-low-clean")).queryByTestId(
-        "ai-doctor-sessions-index-needs-review-badge",
-      ),
+      within(rowFor("s-low-clean")).queryByTestId("ai-doctor-sessions-index-needs-review-badge"),
     ).toBeNull();
   });
 
@@ -142,9 +148,7 @@ describe("Per-row Needs review badge", () => {
     renderAt("/doctor/sessions");
     await screen.findByTestId("ai-doctor-sessions-index-page");
     expect(
-      within(rowFor("s-null-diag")).queryByTestId(
-        "ai-doctor-sessions-index-needs-review-badge",
-      ),
+      within(rowFor("s-null-diag")).queryByTestId("ai-doctor-sessions-index-needs-review-badge"),
     ).toBeNull();
   });
 
@@ -152,9 +156,7 @@ describe("Per-row Needs review badge", () => {
     renderAt("/doctor/sessions?needsReview=all");
     await screen.findByTestId("ai-doctor-sessions-index-page");
     expect(
-      within(rowFor("s-high")).getByTestId(
-        "ai-doctor-sessions-index-needs-review-badge",
-      ),
+      within(rowFor("s-high")).getByTestId("ai-doctor-sessions-index-needs-review-badge"),
     ).toBeTruthy();
   });
 
@@ -162,18 +164,13 @@ describe("Per-row Needs review badge", () => {
     renderAt("/doctor/sessions?needsReview=yes");
     await screen.findByTestId("ai-doctor-sessions-index-page");
     expect(
-      within(rowFor("s-critical")).getByTestId(
-        "ai-doctor-sessions-index-needs-review-badge",
-      ),
+      within(rowFor("s-critical")).getByTestId("ai-doctor-sessions-index-needs-review-badge"),
     ).toBeTruthy();
   });
 });
 
 describe("Static safety — Needs review badge feature", () => {
-  const page = readFileSync(
-    resolve(process.cwd(), "src/pages/AiDoctorSessionsIndex.tsx"),
-    "utf8",
-  );
+  const page = readFileSync(resolve(process.cwd(), "src/pages/AiDoctorSessionsIndex.tsx"), "utf8");
   it("page does not contain mutation / AI / automation strings", () => {
     expect(page).not.toMatch(/\.insert\(/);
     expect(page).not.toMatch(/\.update\(/);

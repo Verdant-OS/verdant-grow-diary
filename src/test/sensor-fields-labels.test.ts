@@ -1,8 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  SENSOR_FIELD_LABELS,
-  formatSensorFieldLabel,
-} from "@/constants/sensorFields";
+import { SENSOR_FIELD_LABELS, formatSensorFieldLabel } from "@/constants/sensorFields";
 
 describe("sensorFields labels", () => {
   it("maps known snake_case keys to human labels", () => {

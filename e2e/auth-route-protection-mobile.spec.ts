@@ -38,6 +38,7 @@ const PROTECTED_TABLES = [
 const PROTECTED_MOBILE_ROUTES: string[] = [
   // operator
   "/diagnostics",
+  "/diagnostics-seo-artifacts",
   "/ingest-inspector",
   "/operator/ai-doctor-phase1",
   "/operator/billing-entitlement-resolution",
@@ -51,6 +52,7 @@ const PROTECTED_MOBILE_ROUTES: string[] = [
   "/operator/edge-alerts",
   "/operator/edge-metrics",
   "/demo/one-tent-live-proof",
+  "/operator/mode",
   "/operator/one-tent-live-proof",
   "/operator/one-tent-loop-smoke-test",
   "/operator/one-tent-proof-record",
@@ -93,6 +95,9 @@ const PUBLIC_MOBILE_ROUTES: string[] = [
   "/guides",
   "/guides/:slug",
   "/guides/grow-stage-care-guide",
+  // Exact ID-free Customer Mode guide: static/noindex and must make no
+  // private-table requests. Dynamic /customer/:shareId remains retired.
+  "/customer/guide/oreoz-vs-gelonade-comparison",
   "/cultivars",
   // Template entry satisfies the manifest coverage guard; ":slug" resolves
   // to the unknown-slug redirect, so also exercise a real detail page.

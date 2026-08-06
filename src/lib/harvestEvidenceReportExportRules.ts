@@ -22,26 +22,18 @@ function pad2(n: number): string {
 
 export function formatIsoDateOnly(d: Date): string {
   if (!(d instanceof Date) || !Number.isFinite(d.getTime())) return "unknown";
-  return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(
-    d.getUTCDate(),
-  )}`;
+  return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`;
 }
 
-export function buildHarvestEvidenceReportExportFilename(
-  now: Date = new Date(),
-): string {
+export function buildHarvestEvidenceReportExportFilename(now: Date = new Date()): string {
   return `verdant-harvest-evidence-report-${formatIsoDateOnly(now)}.pdf`;
 }
 
-export function buildHarvestEvidenceReportExportTitle(
-  now: Date = new Date(),
-): string {
+export function buildHarvestEvidenceReportExportTitle(now: Date = new Date()): string {
   return `Verdant — Harvest Evidence Report — ${formatIsoDateOnly(now)}`;
 }
 
-export function buildHarvestEvidenceReportGeneratedAtLabel(
-  now: Date = new Date(),
-): string {
+export function buildHarvestEvidenceReportGeneratedAtLabel(now: Date = new Date()): string {
   if (!(now instanceof Date) || !Number.isFinite(now.getTime())) {
     return "unknown";
   }

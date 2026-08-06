@@ -7,7 +7,7 @@
  * to 5 latest photos for the current plant. Mobile-friendly horizontal
  * strip. No uploads or writes.
  */
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { Image as ImageIcon, Upload, AlertCircle, ClipboardCheck } from "lucide-react";
 
 import { useDiaryEntries } from "@/hooks/use-diary-entries";
@@ -67,7 +67,6 @@ export default function PlantDetailPhotoStrip({
     isResolvingPrivatePhotos,
     hasPrivatePhotoError,
   } = useDiaryPhotoDisplayRows(rawDiary as ReadonlyArray<DiaryPhotoDisplayRow> | null | undefined);
-
 
   const latestReviewsByPhotoId = useMemo(
     () => projectLatestPhotoDiagnosisReviewsByPhoto(rawDiary),
@@ -206,7 +205,6 @@ export default function PlantDetailPhotoStrip({
             Add a photo to start building visual plant memory.
           </p>
         </div>
-
       ) : (
         <ul
           data-testid="plant-detail-photo-strip-list"

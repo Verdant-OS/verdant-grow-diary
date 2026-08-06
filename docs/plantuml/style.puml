@@ -1,0 +1,189 @@
+' =============================================================================
+' Verdant PlantUML shared style
+' -----------------------------------------------------------------------------
+' Include resolution: PlantUML resolves relative !include paths from the
+' DIAGRAM SOURCE FILE's directory — never from wherever the plantuml
+' process was launched.
+'   diagram in docs/plantuml/examples/  ->  !include ../style.puml
+'   diagram in docs/plantuml/           ->  !include style.puml
+'
+' Semantic colors belong to OUTCOMES, never to agents/roles:
+'   stop-ship  red    — a Security FAIL result, do not merge
+'   hold       amber  — a HOLD / CHANGES_REQUESTED result
+'   merge      green  — a Cheek APPROVE & merge result
+'   packet     blue   — an approval packet / process input artifact
+'   human      purple — Cheek / human authority (the one identity color)
+'   neutral    slate  — default boxes, arrows, and EVERY agent participant
+'
+' Docs-only asset. Does not affect app runtime CSS or Mermaid charts.
+' Prefer Mermaid in GitHub-rendered agent docs when no render step exists.
+' =============================================================================
+
+!theme plain
+
+skinparam shadowing false
+skinparam handwritten false
+skinparam monochrome false
+skinparam backgroundColor #FAFBFC
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 12
+skinparam defaultFontColor #1B2838
+skinparam roundCorner 8
+skinparam Padding 4
+skinparam ArrowColor #546E7A
+skinparam ArrowFontColor #37474F
+skinparam ArrowFontSize 11
+
+' --- Notes / title -----------------------------------------------------------
+skinparam note {
+  BackgroundColor #E3F2FD
+  BorderColor #1565C0
+  FontColor #0D47A1
+  FontSize 11
+}
+skinparam titleFontSize 15
+skinparam titleFontColor #0D47A1
+skinparam titleBorderRoundCorner 4
+
+' --- Sequence ----------------------------------------------------------------
+skinparam sequence {
+  ArrowColor #1565C0
+  ArrowFontColor #0D47A1
+  ArrowFontSize 11
+  ActorBorderColor #37474F
+  ActorBackgroundColor #ECEFF1
+  LifeLineBorderColor #90A4AE
+  LifeLineBackgroundColor #FAFBFC
+  ParticipantBackgroundColor #E3F2FD
+  ParticipantBorderColor #1565C0
+  ParticipantFontColor #0D47A1
+  ParticipantFontSize 12
+  BoxBackgroundColor #FFF8E1
+  BoxBorderColor #F9A825
+  GroupBackgroundColor #F5F5F5
+  GroupBorderColor #78909C
+  GroupHeaderFontColor #37474F
+  DividerBackgroundColor #ECEFF1
+  DividerBorderColor #90A4AE
+}
+
+' Outcome stereotypes for sequence elements. Apply them to RESULT artifacts
+' (notes, packets, decision boxes) — never as a permanent agent color.
+' Color alone must not carry status: pair every use with the literal
+' outcome word (FAIL, PASS, HOLD, CHANGES_REQUESTED, APPROVE).
+skinparam participant<<stop>> {
+  BackgroundColor #FFCDD2
+  BorderColor #C62828
+  FontColor #B71C1C
+}
+' Hold text is #8A2C00 (contrast-tested ~7:1 on #FFE0B2 at 12px); the
+' brighter #E65100 fails 4.5:1 for normal text and is border-only.
+skinparam participant<<hold>> {
+  BackgroundColor #FFE0B2
+  BorderColor #EF6C00
+  FontColor #8A2C00
+}
+skinparam participant<<ok>> {
+  BackgroundColor #C8E6C9
+  BorderColor #2E7D32
+  FontColor #1B5E20
+}
+skinparam participant<<packet>> {
+  BackgroundColor #BBDEFB
+  BorderColor #1565C0
+  FontColor #0D47A1
+}
+' Cheek renders as an actor in sequence diagrams and occasionally as a
+' participant box — style BOTH element types so <<human>> works either way.
+skinparam participant<<human>> {
+  BackgroundColor #F3E5F5
+  BorderColor #6A1B9A
+  FontColor #4A148C
+}
+skinparam actor<<human>> {
+  BackgroundColor #F3E5F5
+  BorderColor #6A1B9A
+  FontColor #4A148C
+}
+
+' --- Activity ----------------------------------------------------------------
+skinparam activity {
+  BackgroundColor #E8F5E9
+  BorderColor #2E7D32
+  FontColor #1B5E20
+  FontSize 12
+  DiamondBackgroundColor #FFF8E1
+  DiamondBorderColor #F9A825
+  DiamondFontColor #8A2C00
+  StartColor #2E7D32
+  EndColor #424242
+  ArrowColor #546E7A
+  BarColor #90A4AE
+}
+
+' --- Class / component -------------------------------------------------------
+skinparam class {
+  BackgroundColor #E8EAF6
+  BorderColor #3949AB
+  FontColor #1A237E
+  AttributeFontColor #283593
+  ArrowColor #3949AB
+  FontSize 12
+}
+skinparam class<<entity>> {
+  BackgroundColor #E0F2F1
+  BorderColor #00695C
+  FontColor #004D40
+}
+skinparam class<<edge>> {
+  BackgroundColor #FFF3E0
+  BorderColor #EF6C00
+  FontColor #8A2C00
+}
+skinparam class<<unsafe>> {
+  BackgroundColor #FFCDD2
+  BorderColor #C62828
+  FontColor #B71C1C
+}
+
+skinparam package {
+  BackgroundColor #ECEFF1
+  BorderColor #546E7A
+  FontColor #37474F
+}
+
+skinparam component {
+  BackgroundColor #E3F2FD
+  BorderColor #1565C0
+  FontColor #0D47A1
+}
+skinparam component<<edge>> {
+  BackgroundColor #FFF3E0
+  BorderColor #EF6C00
+  FontColor #8A2C00
+}
+
+skinparam database {
+  BackgroundColor #E0F7FA
+  BorderColor #00838F
+  FontColor #006064
+}
+
+' --- State -------------------------------------------------------------------
+skinparam state {
+  BackgroundColor #E8F5E9
+  BorderColor #2E7D32
+  FontColor #1B5E20
+  ArrowColor #546E7A
+  StartColor #2E7D32
+  EndColor #424242
+}
+
+' --- Legend helper (optional; copy into diagrams) ----------------------------
+' legend right
+'   |= Color |= Meaning |
+'   | <#FFCDD2> | stop-ship / Security FAIL |
+'   | <#FFE0B2> | hold / changes requested |
+'   | <#C8E6C9> | merge / approve |
+'   | <#BBDEFB> | packet / process input |
+' endlegend

@@ -63,22 +63,20 @@ describe("SensorSnapshotCard edit history", () => {
       },
     ];
     const { getByTestId } = render(
-      <SensorSnapshotCard
-        snapshot={MANUAL_SNAP}
-        classifyOptions={{ now }}
-        edits={edits}
-      />,
+      <SensorSnapshotCard snapshot={MANUAL_SNAP} classifyOptions={{ now }} edits={edits} />,
     );
     const entry = getByTestId("sensor-snapshot-card-edit-history-entry");
     expect(entry.getAttribute("data-source-before")).toBe("manual");
     expect(entry.getAttribute("data-source-after")).toBe("manual");
-    expect(getByTestId("sensor-snapshot-card-edit-history-entry-source").textContent ?? "")
-      .toMatch(/manual\s*→\s*manual/i);
+    expect(getByTestId("sensor-snapshot-card-edit-history-entry-source").textContent ?? "").toMatch(
+      /manual\s*→\s*manual/i,
+    );
     const temp = getByTestId("sensor-snapshot-card-edit-history-field-temperature_c");
     expect(temp.textContent ?? "").toMatch(/24\s*→\s*25/);
     const hum = getByTestId("sensor-snapshot-card-edit-history-field-humidity_pct");
     expect(hum.textContent ?? "").toMatch(/55\s*→\s*58/);
-    expect(getByTestId("sensor-snapshot-card-edit-history-entry-reason").textContent ?? "")
-      .toMatch(/Recalibrated hygrometer/);
+    expect(getByTestId("sensor-snapshot-card-edit-history-entry-reason").textContent ?? "").toMatch(
+      /Recalibrated hygrometer/,
+    );
   });
 });

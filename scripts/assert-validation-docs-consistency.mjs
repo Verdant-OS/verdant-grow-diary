@@ -56,20 +56,18 @@ for (const name of PKG_SCRIPTS) {
 if (!docs.includes(ECOWITT_PARITY)) {
   fail(`docs/test-validation-notes.md missing exact ecowitt parity command:\n  ${ECOWITT_PARITY}`);
 }
-if (
-  !pkg.scripts ||
-  pkg.scripts["test:ecowitt-bridge:ci"] !== ECOWITT_PARITY
-) {
-  fail(`package.json#test:ecowitt-bridge:ci must equal the exact ecowitt parity command:\n  ${ECOWITT_PARITY}`);
+if (!pkg.scripts || pkg.scripts["test:ecowitt-bridge:ci"] !== ECOWITT_PARITY) {
+  fail(
+    `package.json#test:ecowitt-bridge:ci must equal the exact ecowitt parity command:\n  ${ECOWITT_PARITY}`,
+  );
 }
 if (!ci.includes(ECOWITT_PARITY)) {
-  fail(`.github/workflows/ci.yml missing exact ecowitt parity command (single-line form):\n  ${ECOWITT_PARITY}`);
+  fail(
+    `.github/workflows/ci.yml missing exact ecowitt parity command (single-line form):\n  ${ECOWITT_PARITY}`,
+  );
 }
 
-const localArtifactScript = readFileSync(
-  "scripts/run-ecowitt-bridge-ci-validation.mjs",
-  "utf8",
-);
+const localArtifactScript = readFileSync("scripts/run-ecowitt-bridge-ci-validation.mjs", "utf8");
 if (!localArtifactScript.includes(ECOWITT_PARITY)) {
   fail("scripts/run-ecowitt-bridge-ci-validation.mjs missing exact ecowitt parity command string.");
 }

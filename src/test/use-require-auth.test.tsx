@@ -2,7 +2,7 @@
 // unauthenticated, reports authenticated otherwise.
 import { describe, it, expect, vi } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import type { ReactNode } from "react";
 
 const getUserMock = vi.fn();
@@ -10,18 +10,16 @@ vi.mock("@/integrations/supabase/client", () => ({
   supabase: { auth: { getUser: () => getUserMock() } },
 }));
 const navMock = vi.fn();
-vi.mock("react-router-dom", async () => {
-  const actual = await vi.importActual<typeof import("react-router-dom")>(
-    "react-router-dom",
+vi.mock("@/lib/react-router-compat", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/react-router-compat")>(
+    "@/lib/react-router-compat",
   );
   return { ...actual, useNavigate: () => navMock };
 });
 
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 
-const wrapper = ({ children }: { children: ReactNode }) => (
-  <MemoryRouter>{children}</MemoryRouter>
-);
+const wrapper = ({ children }: { children: ReactNode }) => <MemoryRouter>{children}</MemoryRouter>;
 
 describe("useRequireAuth", () => {
   it("redirects unauthenticated user to /auth", async () => {

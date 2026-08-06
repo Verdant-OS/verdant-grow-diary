@@ -55,10 +55,7 @@ function quickLogNote(at: number, key = `note-${at}`): TimelineMemoryItem {
   };
 }
 
-function quickLogWatering(
-  at: number,
-  key = `water-${at}`,
-): TimelineMemoryItem {
+function quickLogWatering(at: number, key = `water-${at}`): TimelineMemoryItem {
   return {
     kind: "diary",
     key,
@@ -229,8 +226,7 @@ describe("AI Doctor context panels — static safety", () => {
   const root = process.cwd();
   const stripComments = (s: string): string =>
     s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
-  const load = (rel: string): string =>
-    stripComments(readFileSync(join(root, rel), "utf8"));
+  const load = (rel: string): string => stripComments(readFileSync(join(root, rel), "utf8"));
 
   const COACH = "src/components/CoachAiDoctorContextPanel.tsx";
   const PLANT_DETAIL = "src/components/PlantDetailAiDoctorContextPanel.tsx";
@@ -246,12 +242,8 @@ describe("AI Doctor context panels — static safety", () => {
       expect(src, name).toMatch(/labelMissing/);
       // No inline `{ "recent-manual-sensor-snapshot": "…" }`-style maps
       // duplicating the readiness vocabulary inside the presenter.
-      expect(src, name).not.toMatch(
-        /["']recent-manual-sensor-snapshot["']\s*:\s*["']/,
-      );
-      expect(src, name).not.toMatch(
-        /["']recent-watering-or-feeding["']\s*:\s*["']/,
-      );
+      expect(src, name).not.toMatch(/["']recent-manual-sensor-snapshot["']\s*:\s*["']/);
+      expect(src, name).not.toMatch(/["']recent-watering-or-feeding["']\s*:\s*["']/);
     }
   });
 

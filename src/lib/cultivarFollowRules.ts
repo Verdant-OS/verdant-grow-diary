@@ -61,6 +61,5 @@ export function countUpdatedFollows(
   follows: readonly CultivarFollowRow[],
   currentVersionBySlug: Readonly<Record<string, number>>,
 ): number {
-  return summarizeFollowedUpdates(follows, currentVersionBySlug).filter((r) => r.hasUpdate)
-    .length;
+  return summarizeFollowedUpdates(follows, currentVersionBySlug).filter((r) => r.hasUpdate).length;
 }

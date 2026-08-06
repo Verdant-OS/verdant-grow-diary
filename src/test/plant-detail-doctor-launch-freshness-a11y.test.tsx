@@ -15,7 +15,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import React from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import { axe } from "vitest-axe";
 
 vi.setConfig({ testTimeout: 30_000 });
@@ -117,9 +117,7 @@ describe("Doctor launch dialog — freshness a11y", () => {
     renderDialog();
     await openDialog();
 
-    const staleBox = screen.getByTestId(
-      "plant-detail-doctor-launch-snapshot-stale-explanation",
-    );
+    const staleBox = screen.getByTestId("plant-detail-doctor-launch-snapshot-stale-explanation");
     expect(staleBox.getAttribute("role")).toBe("status");
     expect(staleBox.getAttribute("aria-live")).toBe("polite");
     // Locale-independent: assert the machine-readable instants, and the

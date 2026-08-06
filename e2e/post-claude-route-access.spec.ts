@@ -168,10 +168,7 @@ test.describe("post-Claude route and operator-access closure", () => {
     await page.getByRole("button", { name: FAKE_TENT.name }).click();
     await expect(page.getByTestId("sensors-operator-diagnostics")).toBeVisible();
     const auditLink = page.getByRole("link", { name: "EcoWitt Audit" });
-    await expect(auditLink).toHaveAttribute(
-      "href",
-      "/sensors/ecowitt-audit",
-    );
+    await expect(auditLink).toHaveAttribute("href", "/sensors/ecowitt-audit");
     await expect.poll(() => auditReads).toBeGreaterThan(0);
 
     await auditLink.click();

@@ -89,17 +89,12 @@ describe("profiles gamification write-protection (regression for profiles.tier f
       "provider_customer_id",
       "SUPABASE_SERVICE_ROLE_KEY",
     ]) {
-      expect(body, `trigger must not mention ${forbidden}`).not.toContain(
-        forbidden,
-      );
+      expect(body, `trigger must not mention ${forbidden}`).not.toContain(forbidden);
     }
   });
 
   it("billing entitlement hook does not read profiles.tier", () => {
-    const hook = readFileSync(
-      join(SRC_DIR, "hooks", "useMyEntitlements.ts"),
-      "utf8",
-    );
+    const hook = readFileSync(join(SRC_DIR, "hooks", "useMyEntitlements.ts"), "utf8");
     expect(hook).not.toMatch(/\.from\(\s*["']profiles["']/);
     expect(hook).not.toMatch(/profiles\.tier/);
   });

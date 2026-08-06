@@ -84,6 +84,18 @@ describe("buildDiaryCalendarViewModel", () => {
     expect(ev.noteSnippet && ev.noteSnippet.length).toBeLessThanOrEqual(140);
   });
 
+  it("repairs glued sentences in the note snippet (audit #11 display artifact)", () => {
+    const groups = buildDiaryCalendarViewModel([
+      {
+        id: "glued",
+        entry_at: "2026-06-10T09:00:00Z",
+        event_type: "watering",
+        note: "Watered today.Full watering to runoff",
+      },
+    ]);
+    expect(groups[0].events[0].noteSnippet).toBe("Watered today. Full watering to runoff");
+  });
+
   it("carries only the four explicit manual color stages and leaves other stages neutral", () => {
     const groups = buildDiaryCalendarViewModel([
       {

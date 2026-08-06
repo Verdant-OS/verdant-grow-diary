@@ -46,10 +46,7 @@ function formatAge(ms: number): string {
 export function buildAiDoctorSnapshotFreshnessStatus(
   args: BuildAiDoctorSnapshotFreshnessStatusArgs,
 ): AiDoctorSnapshotFreshnessStatus {
-  const now =
-    typeof args.now === "number" && Number.isFinite(args.now)
-      ? args.now
-      : Date.now();
+  const now = typeof args.now === "number" && Number.isFinite(args.now) ? args.now : Date.now();
   const freshMs =
     typeof args.snapshotFreshMs === "number" &&
     Number.isFinite(args.snapshotFreshMs) &&
@@ -65,8 +62,7 @@ export function buildAiDoctorSnapshotFreshnessStatus(
       snapshotAtIso: null,
       ageMinutes: null,
       label: "No snapshot",
-      description:
-        `No manual sensor snapshot on file. Add one to reach the ${hoursCutoff}h freshness window.`,
+      description: `No manual sensor snapshot on file. Add one to reach the ${hoursCutoff}h freshness window.`,
     };
   }
   const t = Date.parse(iso);
@@ -76,8 +72,7 @@ export function buildAiDoctorSnapshotFreshnessStatus(
       snapshotAtIso: iso,
       ageMinutes: null,
       label: "No snapshot",
-      description:
-        `No manual sensor snapshot on file. Add one to reach the ${hoursCutoff}h freshness window.`,
+      description: `No manual sensor snapshot on file. Add one to reach the ${hoursCutoff}h freshness window.`,
     };
   }
   const ageMs = now - t;
@@ -90,8 +85,7 @@ export function buildAiDoctorSnapshotFreshnessStatus(
       snapshotAtIso: iso,
       ageMinutes,
       label: `Fresh · ${ageText}`,
-      description:
-        `Latest manual sensor snapshot is ${ageText} — inside the ${hoursCutoff}h freshness window.`,
+      description: `Latest manual sensor snapshot is ${ageText} — inside the ${hoursCutoff}h freshness window.`,
     };
   }
   return {
@@ -99,7 +93,6 @@ export function buildAiDoctorSnapshotFreshnessStatus(
     snapshotAtIso: iso,
     ageMinutes,
     label: `Stale · ${ageText}`,
-    description:
-      `Latest manual sensor snapshot is ${ageText} — older than the ${hoursCutoff}h freshness cutoff.`,
+    description: `Latest manual sensor snapshot is ${ageText} — older than the ${hoursCutoff}h freshness cutoff.`,
   };
 }

@@ -100,9 +100,7 @@ function lastPhotoAge(now: Date, lastPhotoAt: string | null): number | null {
   return Math.floor(ms / (24 * 60 * 60 * 1000));
 }
 
-export function buildHarvestWatchRowViewModel(
-  input: HarvestWatchInput,
-): HarvestWatchRowViewModel {
+export function buildHarvestWatchRowViewModel(input: HarvestWatchInput): HarvestWatchRowViewModel {
   const readiness = calculateReadinessScore(input);
   const dryback = deriveDrybackVisibility(input);
   const predictedHarvestWindow = predictHarvestWindow(input);
@@ -118,10 +116,7 @@ export function buildHarvestWatchRowViewModel(
       };
   const photoPrompt = evaluatePhotoPrompt(input.lastPhotoAt, input.now);
   const trichome = deriveTrichomePlaceholder(input.trichome ?? null);
-  const daysVsHistory = computeDaysVsHistory(
-    input.daysInFlower,
-    input.expectedHarvestDay,
-  );
+  const daysVsHistory = computeDaysVsHistory(input.daysInFlower, input.expectedHarvestDay);
   const ageDays = lastPhotoAge(input.now, input.lastPhotoAt);
 
   // Confidence label reflects the weakest of the row's primary signals.
@@ -130,10 +125,7 @@ export function buildHarvestWatchRowViewModel(
     medium: 1,
     high: 2,
   };
-  const candidates: HarvestWatchConfidence[] = [
-    dryback.confidence,
-    harvestWindow.confidence,
-  ];
+  const candidates: HarvestWatchConfidence[] = [dryback.confidence, harvestWindow.confidence];
   const weakest = candidates.reduce<HarvestWatchConfidence>(
     (acc, c) => (confidenceRank[c] < confidenceRank[acc] ? c : acc),
     "high",

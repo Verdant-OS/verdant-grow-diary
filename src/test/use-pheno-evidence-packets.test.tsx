@@ -5,9 +5,9 @@ import type { ReactNode } from "react";
 
 const loadMock = vi.fn();
 vi.mock("@/lib/phenoEvidenceReceiptService", async () => {
-  const actual = await vi.importActual<
-    typeof import("@/lib/phenoEvidenceReceiptService")
-  >("@/lib/phenoEvidenceReceiptService");
+  const actual = await vi.importActual<typeof import("@/lib/phenoEvidenceReceiptService")>(
+    "@/lib/phenoEvidenceReceiptService",
+  );
   return { ...actual, loadPhenoEvidenceReceiptRows: (...a: unknown[]) => loadMock(...a) };
 });
 
@@ -76,7 +76,11 @@ describe("usePhenoEvidencePackets", () => {
     );
     await waitFor(() => expect(result.current.status).toBe("ready"));
     expect(loadMock).toHaveBeenCalledTimes(1);
-    expect(loadMock).toHaveBeenCalledWith({ huntId: "hunt-1", plantIds: ["p1", "p2"] });
+    expect(loadMock).toHaveBeenCalledWith({
+      huntId: "hunt-1",
+      plantIds: ["p1", "p2"],
+      signal: expect.any(AbortSignal),
+    });
     expect(result.current.packets.get("p1")!.recordedGoalCount).toBe(1);
     expect(result.current.packets.get("p2")!.recordedGoalCount).toBe(0);
     expect(result.current.truncated).toBe(false);
@@ -96,7 +100,11 @@ describe("usePhenoEvidencePackets", () => {
     await waitFor(() => expect(result.current.status).toBe("ready"));
     rerender({ ids: ["p1", "p2"] });
     await waitFor(() => expect(loadMock).toHaveBeenCalledTimes(2));
-    expect(loadMock).toHaveBeenLastCalledWith({ huntId: "hunt-1", plantIds: ["p1", "p2"] });
+    expect(loadMock).toHaveBeenLastCalledWith({
+      huntId: "hunt-1",
+      plantIds: ["p1", "p2"],
+      signal: expect.any(AbortSignal),
+    });
   });
 
   it("same id-set in a different order reuses the cached batch (no refetch)", async () => {
@@ -142,8 +150,7 @@ describe("usePhenoEvidencePackets", () => {
       rowCapHit: true,
     });
     const { result } = renderHook(
-      () =>
-        usePhenoEvidencePackets({ huntId: "hunt-1", plantIds: ["p1"], configuredGoals: GOALS }),
+      () => usePhenoEvidencePackets({ huntId: "hunt-1", plantIds: ["p1"], configuredGoals: GOALS }),
       { wrapper },
     );
     await waitFor(() => expect(result.current.status).toBe("ready"));
@@ -195,14 +202,11 @@ describe("usePhenoEvidencePackets", () => {
   it("query key lives under the pheno_evidence_receipts family that Quick Log saves invalidate", async () => {
     loadMock.mockResolvedValue({ ok: true, rows: [], plantIds: ["p1"], truncated: false });
     const { result } = renderHook(
-      () =>
-        usePhenoEvidencePackets({ huntId: "hunt-1", plantIds: ["p1"], configuredGoals: GOALS }),
+      () => usePhenoEvidencePackets({ huntId: "hunt-1", plantIds: ["p1"], configuredGoals: GOALS }),
       { wrapper },
     );
     await waitFor(() => expect(result.current.status).toBe("ready"));
-    const cached = client
-      .getQueryCache()
-      .findAll({ queryKey: ["pheno_evidence_receipts"] });
+    const cached = client.getQueryCache().findAll({ queryKey: ["pheno_evidence_receipts"] });
     expect(cached.length).toBe(1);
     // And the Quick Log v2 refresh plan invalidates exactly that prefix.
     const keys = buildQuickLogV2RefreshQueryKeys({
@@ -216,8 +220,7 @@ describe("usePhenoEvidencePackets", () => {
   it("invalidating the family refetches the packets (save → refresh loop)", async () => {
     loadMock.mockResolvedValue({ ok: true, rows: [], plantIds: ["p1"], truncated: false });
     const { result } = renderHook(
-      () =>
-        usePhenoEvidencePackets({ huntId: "hunt-1", plantIds: ["p1"], configuredGoals: GOALS }),
+      () => usePhenoEvidencePackets({ huntId: "hunt-1", plantIds: ["p1"], configuredGoals: GOALS }),
       { wrapper },
     );
     await waitFor(() => expect(result.current.status).toBe("ready"));

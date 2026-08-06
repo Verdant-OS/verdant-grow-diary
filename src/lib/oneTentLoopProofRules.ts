@@ -61,12 +61,7 @@ export interface EvidenceRef {
 }
 
 export type EvidenceProvenance =
-  | "direct"
-  | "inferred"
-  | "missing"
-  | "stale"
-  | "invalid"
-  | "demo_only";
+  "direct" | "inferred" | "missing" | "stale" | "invalid" | "demo_only";
 
 export interface MissingEvidenceDrilldown {
   /** Plain, user-facing "what is missing". Never raw IDs / payloads / secrets. */

@@ -1,4 +1,4 @@
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams } from "@/lib/react-router-compat";
 import { useGrows } from "@/store/grows";
 import { growDetailPath } from "@/lib/routes";
 import type { Grow } from "@/store/grows";
@@ -27,7 +27,7 @@ export function useScopedGrow(): {
   const [searchParams] = useSearchParams();
   const { grows } = useGrows();
   const urlGrowId = searchParams.get("growId");
-  const scopedGrow = urlGrowId ? grows.find((g) => g.id === urlGrowId) ?? null : null;
+  const scopedGrow = urlGrowId ? (grows.find((g) => g.id === urlGrowId) ?? null) : null;
   return {
     urlGrowId,
     scopedGrow,

@@ -134,7 +134,7 @@ describe("AI Doctor freshness — fuzz: extreme numeric `now` never explodes", (
 
 describe("AI Doctor freshness — property: classification follows sign(age - freshMs)", () => {
   it("500 random snapshot offsets: fresh iff age<=FRESH, stale iff age>FRESH (strict >)", () => {
-    const rand = mulberry32(0xC0FFEE);
+    const rand = mulberry32(0xc0ffee);
     // Symmetric range spans ~ ±10 days around the 48h cutoff.
     const SPAN_MS = 10 * 24 * 3_600_000;
     for (let i = 0; i < 500; i++) {
@@ -183,7 +183,7 @@ describe("AI Doctor freshness — property: classification follows sign(age - fr
   });
 
   it("determinism: same inputs always produce the same result across 100 replays", () => {
-    const rand = mulberry32(0xBADF00D);
+    const rand = mulberry32(0xbadf00d);
     for (let i = 0; i < 100; i++) {
       const ageMs = Math.floor(rand() * FRESH * 3);
       const snapIso = new Date(NOW - ageMs).toISOString();

@@ -317,15 +317,33 @@ test.describe("Public Quick Log → first diary entry activation loop (mocked)",
     expect(world.rpcCalls).toBe(1);
     await expect.poll(async () => storedDraftRaw(page), { timeout: 5_000 }).toBeNull();
 
-    // Close the dialog and verify the REAL Timeline surface shows the entry.
-    await page.getByTestId("quick-log-post-save-close").click();
-    await page.goto(`/timeline?growId=${GROW_ID}`);
+    // Click the REAL post-save "View diary" CTA (not a hand-built URL).
+    const viewCta = page.getByTestId("quick-log-view-target-plant");
+    await expect(viewCta).toBeVisible();
+    const href = await viewCta.getAttribute("href");
+    expect(href, "CTA must carry the verified grow").toContain(`growId=${GROW_ID}`);
+    expect(href, "CTA must not open Plant Detail").not.toMatch(/^\/plants\//);
+    expect(href, "CTA must not open Tent Detail").not.toMatch(/^\/tents\//);
+    expect(href, "CTA must include the saved event anchor").toContain(
+      `#timeline-entry-${GROW_EVENT_ID}`,
+    );
+
+    await viewCta.click();
     await acceptReconsentGateIfShown(page);
+    await expect(page).toHaveURL(new RegExp(`/timeline\\?growId=${GROW_ID}`));
     await expect(
       page.getByTestId("timeline-entry").filter({ hasText: NOTE_TEXT }).first(),
     ).toBeVisible();
 
-    expect(world.rpcCalls, "still exactly one write after navigation").toBe(1);
+    // Reload the deep link: same setup + entry must remain visible.
+    await page.reload();
+    await acceptReconsentGateIfShown(page);
+    await expect(page).toHaveURL(new RegExp(`growId=${GROW_ID}`));
+    await expect(
+      page.getByTestId("timeline-entry").filter({ hasText: NOTE_TEXT }).first(),
+    ).toBeVisible();
+
+    expect(world.rpcCalls, "still exactly one write after navigation/reload").toBe(1);
     expect(traffic.forbidden, "forbidden AI/function requests").toEqual([]);
     expect(traffic.pageErrors, "uncaught page errors").toEqual([]);
   });

@@ -4,8 +4,15 @@
  * `buildDashboardSensorHealthSummary` view-model. No data fetching, no
  * writes, no AI calls, no device control.
  */
-import { Link } from "react-router-dom";
-import { AlertCircle, AlertTriangle, CheckCircle2, HelpCircle, Loader2, ShieldCheck } from "lucide-react";
+import { Link } from "@/lib/react-router-compat";
+import {
+  AlertCircle,
+  AlertTriangle,
+  CheckCircle2,
+  HelpCircle,
+  Loader2,
+  ShieldCheck,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   SENSOR_HEALTH_EMPTY_ALERTS_COPY,
@@ -97,10 +104,7 @@ export default function DashboardSensorHealthSummary({
             Source: {summary.sourceLabel}
           </span>
           {summary.suspiciousFields.length > 0 && (
-            <span
-              className="text-xs text-muted-foreground"
-              data-testid="sensor-health-suspicious"
-            >
+            <span className="text-xs text-muted-foreground" data-testid="sensor-health-suspicious">
               Suspicious: {summary.suspiciousFields.join(", ")}
             </span>
           )}

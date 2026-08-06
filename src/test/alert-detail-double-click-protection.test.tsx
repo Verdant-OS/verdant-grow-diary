@@ -12,7 +12,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { act, render, screen, waitFor, fireEvent } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import AlertDetail from "@/pages/AlertDetail";
 
 const BASE_ALERT = {
@@ -160,14 +160,10 @@ describe("AlertDetail — fast double-click duplicate protection (E2E)", () => {
 
     // Decision region lands on already_exists.
     const region = await screen.findByTestId("alert-handoff-decision");
-    await waitFor(() =>
-      expect(region.getAttribute("data-decision-state")).toBe("already_exists"),
-    );
+    await waitFor(() => expect(region.getAttribute("data-decision-state")).toBe("already_exists"));
 
     // After landing, a third click cannot create a duplicate insert.
-    const queuedLink = await screen.findByTestId(
-      "alert-handoff-already-queued-link",
-    );
+    const queuedLink = await screen.findByTestId("alert-handoff-already-queued-link");
     expect(queuedLink.textContent?.toLowerCase()).toContain("already queued");
     expect(actionQueueInserts()).toHaveLength(1);
 

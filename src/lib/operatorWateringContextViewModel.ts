@@ -59,13 +59,7 @@ export interface OperatorWateringContextOptions {
 
 export interface OperatorWateringMetricRow {
   key:
-    | "volume_ml"
-    | "input_ph"
-    | "input_ec"
-    | "runoff_ml"
-    | "runoff_ph"
-    | "runoff_ec"
-    | "water_temp";
+    "volume_ml" | "input_ph" | "input_ec" | "runoff_ml" | "runoff_ph" | "runoff_ec" | "water_temp";
   label: string;
   valueLabel: string;
 }

@@ -59,9 +59,7 @@ export const FORBIDDEN_EXPORT_KEYS: ReadonlyArray<string> = [
   "user_id",
 ];
 
-const FORBIDDEN_LOWER = new Set(
-  FORBIDDEN_EXPORT_KEYS.map((k) => k.toLowerCase()),
-);
+const FORBIDDEN_LOWER = new Set(FORBIDDEN_EXPORT_KEYS.map((k) => k.toLowerCase()));
 
 export function isForbiddenExportKey(key: string): boolean {
   return FORBIDDEN_LOWER.has(key.toLowerCase());
@@ -137,11 +135,7 @@ export const ENVIRONMENT_SUMMARY_EXPORT_ALLOWLIST: ReadonlyArray<string> = [
   "tent_label",
 ];
 
-export type ExportKind =
-  | "sensor_snapshot"
-  | "timeline"
-  | "action_queue"
-  | "environment_summary";
+export type ExportKind = "sensor_snapshot" | "timeline" | "action_queue" | "environment_summary";
 
 const ALLOWLISTS: Record<ExportKind, ReadonlyArray<string>> = {
   sensor_snapshot: SENSOR_SNAPSHOT_EXPORT_ALLOWLIST,
@@ -229,9 +223,7 @@ export function sanitizeExportRows<T extends Record<string, unknown>>(
  * Return any forbidden keys present in a CSV header list. Used by export
  * builders to assert their own headers before serializing.
  */
-export function findForbiddenHeaders(
-  headers: ReadonlyArray<string>,
-): string[] {
+export function findForbiddenHeaders(headers: ReadonlyArray<string>): string[] {
   return headers.filter((h) => isForbiddenExportKey(h));
 }
 
@@ -275,10 +267,7 @@ export function assertExportSafe(text: string, label: string): void {
  * so a future maintainer adding e.g. "target_device" to a column array
  * fails immediately, not at runtime when a user clicks Export.
  */
-export function assertExportHeadersSafe(
-  headers: ReadonlyArray<string>,
-  label: string,
-): void {
+export function assertExportHeadersSafe(headers: ReadonlyArray<string>, label: string): void {
   const offenders = findForbiddenHeaders(headers);
   if (offenders.length > 0) {
     throw new Error(

@@ -127,14 +127,7 @@ function summarizeSources(
     const kind = normalizeReportSensorSource(row?.source);
     counts.set(kind, (counts.get(kind) ?? 0) + 1);
   }
-  const order: TimelineSensorSourceKind[] = [
-    "live",
-    "manual",
-    "csv",
-    "demo",
-    "stale",
-    "invalid",
-  ];
+  const order: TimelineSensorSourceKind[] = ["live", "manual", "csv", "demo", "stale", "invalid"];
   return order
     .filter((k) => (counts.get(k) ?? 0) > 0)
     .map((kind) => ({
@@ -235,9 +228,10 @@ export function buildPostGrowReportPdfModel(
     growName,
     dateRangeLabel,
     scopeLabel,
-    generatedAtLabel: now instanceof Date && Number.isFinite(now.getTime())
-      ? now.toISOString().replace(/\.\d{3}Z$/, "Z")
-      : "unknown",
+    generatedAtLabel:
+      now instanceof Date && Number.isFinite(now.getTime())
+        ? now.toISOString().replace(/\.\d{3}Z$/, "Z")
+        : "unknown",
     executiveSummary,
     completenessLabel: `${vm.dataCompleteness.label} (${vm.dataCompleteness.score}%)`,
     completenessMissing,

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { buildFounderShareData } from "@/lib/founderShareRules";
 import { trackPricingEvent } from "@/lib/pricingAnalytics";
+import { getClipboardWriteText, getNativeShare } from "@/lib/webShareCapabilities";
 
 type ShareStatus = "idle" | "copied" | "manual";
 
@@ -13,8 +14,8 @@ export default function FounderShareCard() {
   const shareData = buildFounderShareData();
 
   async function shareFounderPage() {
-    const nativeShare = navigator.share?.bind(navigator);
-    const clipboard = navigator.clipboard?.writeText?.bind(navigator.clipboard);
+    const nativeShare = getNativeShare();
+    const clipboard = getClipboardWriteText();
     trackPricingEvent("founder_share_clicked", {
       source: nativeShare ? "native_share" : "copy_link",
     });

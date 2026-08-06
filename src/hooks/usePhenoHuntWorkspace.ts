@@ -67,7 +67,7 @@ import {
 } from "@/lib/phenoLabResultsService";
 import { PhenoEvidenceReadError } from "@/lib/phenoEvidenceReadError";
 import type { PhenoKeeperDecision } from "@/lib/phenoKeeperDecisionModel";
-import type { PhenoSexObservation } from "@/lib/phenoSexObservationModel";
+import { DEFAULT_SEX_OBSERVATION, type PhenoSexObservation } from "@/lib/phenoSexObservationModel";
 
 export type WorkspaceStatus = "idle" | "loading" | "ok" | "error";
 export type PhenoRoundLoadStatus = "idle" | "loading" | "ready" | "error";
@@ -608,6 +608,18 @@ export function usePhenoHuntWorkspace(
         existingSex.sex === sex &&
         (existingSex.note?.trim() || null) === normalizedNote
       ) {
+        return true;
+      }
+      // Honest-data rule (F14): the card's Save button fires score, decision,
+      // and sex together, so the FIRST save of a card whose sex select was
+      // never touched arrives here as the "unknown" default. Appending that
+      // row would fabricate a "Sex recorded: Unknown" timeline event the
+      // grower never created. Skip the append when no prior observation
+      // exists, the incoming value is the untouched default, and no note was
+      // written (a note is grower-authored evidence and is always kept).
+      // Deliberately changing a REAL prior value back to "unknown" still
+      // appends via the normal path below.
+      if (!existingSex && sex === DEFAULT_SEX_OBSERVATION && normalizedNote === null) {
         return true;
       }
       setSaving(plantId);

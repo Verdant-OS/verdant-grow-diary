@@ -92,10 +92,7 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
 export function handleEcoWittRealIngestRequest(
   input: HandleEcoWittRealIngestRequestInput,
 ): EcoWittRealIngestEndpointResponse {
-  const auth = validateEcoWittBridgeAuthorization(
-    input.authorizationHeader,
-    input.expectedToken,
-  );
+  const auth = validateEcoWittBridgeAuthorization(input.authorizationHeader, input.expectedToken);
   const authResp = authToEndpoint(auth);
   if (authResp) return authResp;
 
@@ -125,9 +122,7 @@ export function handleEcoWittRealIngestRequest(
 
   const redactedPreview =
     result.redacted_payload ??
-    redactEcoWittRawPayload(
-      (input.payload as { raw_payload?: unknown }).raw_payload ?? null,
-    );
+    redactEcoWittRawPayload((input.payload as { raw_payload?: unknown }).raw_payload ?? null);
 
   if (!result.accepted) {
     return envelope("rejected_candidate", 422, {

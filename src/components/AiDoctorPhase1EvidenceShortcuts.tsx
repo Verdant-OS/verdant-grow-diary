@@ -10,7 +10,7 @@
  * calm "no recent diary evidence" copy instead.
  */
 import * as React from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { plantDetailPath } from "@/lib/routes";
 import { AI_DOCTOR_PHASE1_FOCUS_VISIBLE_LINK_CLASSES } from "@/lib/aiDoctorPhase1A11yClassNames";
 
@@ -94,10 +94,7 @@ export function AiDoctorPhase1EvidenceShortcuts(
         className="rounded-md border border-border bg-card p-3 text-xs"
       >
         <div className="font-medium text-foreground">Recent diary evidence</div>
-        <p
-          data-testid="ai-doctor-phase1-diary-shortcuts-empty"
-          className="text-muted-foreground"
-        >
+        <p data-testid="ai-doctor-phase1-diary-shortcuts-empty" className="text-muted-foreground">
           No recent diary evidence available yet.
         </p>
       </section>

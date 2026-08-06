@@ -6,12 +6,7 @@
  * regenerated, only this file needs auditing.
  */
 import { supabase } from "@/integrations/supabase/client";
-import type {
-  Tables,
-  TablesInsert,
-  TablesUpdate,
-  Enums,
-} from "@/integrations/supabase/types";
+import type { Tables, TablesInsert, TablesUpdate, Enums } from "@/integrations/supabase/types";
 
 /* ------------------------------------------------------------------ */
 //  Row types — what comes back from SELECT *
@@ -98,44 +93,25 @@ export async function fetchGrowRows(): Promise<GrowRow[]> {
 
 export async function fetchGrowRow(id: string): Promise<GrowRow | null> {
   if (!id) return null;
-  const { data, error } = await supabase
-    .from("grows")
-    .select("*")
-    .eq("id", id)
-    .maybeSingle();
+  const { data, error } = await supabase.from("grows").select("*").eq("id", id).maybeSingle();
   if (error) fail("fetchGrowRow", error);
   return (data as GrowRow | null) ?? null;
 }
 
 export async function insertGrowRow(row: GrowInsert): Promise<GrowRow> {
-  const { data, error } = await supabase
-    .from("grows")
-    .insert(row)
-    .select()
-    .single();
+  const { data, error } = await supabase.from("grows").insert(row).select().single();
   if (error) fail("insertGrowRow", error);
   return data as GrowRow;
 }
 
-export async function updateGrowRow(
-  id: string,
-  patch: GrowUpdate,
-): Promise<GrowRow> {
-  const { data, error } = await supabase
-    .from("grows")
-    .update(patch)
-    .eq("id", id)
-    .select()
-    .single();
+export async function updateGrowRow(id: string, patch: GrowUpdate): Promise<GrowRow> {
+  const { data, error } = await supabase.from("grows").update(patch).eq("id", id).select().single();
   if (error) fail("updateGrowRow", error);
   return data as GrowRow;
 }
 
 export async function archiveGrow(id: string): Promise<void> {
-  const { error } = await supabase
-    .from("grows")
-    .update({ is_archived: true })
-    .eq("id", id);
+  const { error } = await supabase.from("grows").update({ is_archived: true }).eq("id", id);
   if (error) fail("archiveGrow", error);
 }
 
@@ -151,11 +127,7 @@ export async function fetchDiaryEntryRows(growId?: string): Promise<DiaryEntryRo
 }
 
 export async function insertDiaryEntryRow(row: DiaryEntryInsert): Promise<DiaryEntryRow> {
-  const { data, error } = await supabase
-    .from("diary_entries")
-    .insert(row)
-    .select()
-    .single();
+  const { data, error } = await supabase.from("diary_entries").insert(row).select().single();
   if (error) fail("insertDiaryEntryRow", error);
   return data as DiaryEntryRow;
 }
@@ -191,11 +163,7 @@ export async function fetchHarvestRows(growId?: string): Promise<HarvestRow[]> {
 }
 
 export async function insertHarvestRow(row: HarvestInsert): Promise<HarvestRow> {
-  const { data, error } = await supabase
-    .from("harvests")
-    .insert(row)
-    .select()
-    .single();
+  const { data, error } = await supabase.from("harvests").insert(row).select().single();
   if (error) fail("insertHarvestRow", error);
   return data as HarvestRow;
 }
@@ -215,11 +183,7 @@ export async function fetchProfileRow(userId: string): Promise<ProfileRow | null
 }
 
 export async function upsertProfileRow(row: ProfileInsert): Promise<ProfileRow> {
-  const { data, error } = await supabase
-    .from("profiles")
-    .upsert(row)
-    .select()
-    .single();
+  const { data, error } = await supabase.from("profiles").upsert(row).select().single();
   if (error) fail("upsertProfileRow", error);
   return data as ProfileRow;
 }
@@ -229,20 +193,13 @@ export async function upsertProfileRow(row: ProfileInsert): Promise<ProfileRow> 
 /* ------------------------------------------------------------------ */
 export async function fetchUserRoles(userId: string): Promise<AppRole[]> {
   if (!userId) return [];
-  const { data, error } = await supabase
-    .from("user_roles")
-    .select("role")
-    .eq("user_id", userId);
+  const { data, error } = await supabase.from("user_roles").select("role").eq("user_id", userId);
   if (error) fail("fetchUserRoles", error);
   return ((data as { role: AppRole }[]) ?? []).map((r) => r.role);
 }
 
 export async function assignRole(row: UserRoleInsert): Promise<UserRoleRow> {
-  const { data, error } = await supabase
-    .from("user_roles")
-    .insert(row)
-    .select()
-    .single();
+  const { data, error } = await supabase.from("user_roles").insert(row).select().single();
   if (error) fail("assignRole", error);
   return data as UserRoleRow;
 }

@@ -82,9 +82,7 @@ const HIDDEN: QuickLogTargetPanel = { visible: false, scope: "none", fields: [] 
  * target is unresolved or missing, returns a hidden panel so the
  * presenter can simply short-circuit.
  */
-export function buildQuickLogTargetPanel(
-  input: QuickLogTargetPanelInput,
-): QuickLogTargetPanel {
+export function buildQuickLogTargetPanel(input: QuickLogTargetPanelInput): QuickLogTargetPanel {
   const resolved = input.resolved;
   if (!resolved || !resolved.ok || !resolved.targetType) return HIDDEN;
 
@@ -101,10 +99,10 @@ export function buildQuickLogTargetPanel(
     // plant row keeps the plant name — the presenter shows both,
     // clearly labeled.
     const tentId = resolved.tentId ?? plant?.tent_id ?? null;
-    const tent = tentId ? tents.find((t) => t?.id === tentId) ?? null : null;
+    const tent = tentId ? (tents.find((t) => t?.id === tentId) ?? null) : null;
     const tentName = trimOrNull(tent?.name);
     const growId = resolved.growId ?? plant?.grow_id ?? tent?.grow_id ?? null;
-    const grow = growId ? grows.find((g) => g?.id === growId) ?? null : null;
+    const grow = growId ? (grows.find((g) => g?.id === growId) ?? null) : null;
     const growName = trimOrNull(grow?.name ?? null);
 
     return {
@@ -123,7 +121,7 @@ export function buildQuickLogTargetPanel(
   const tent = tents.find((t) => t?.id === resolved.targetId) ?? null;
   const tentName = trimOrNull(tent?.name) ?? "Unnamed tent";
   const growId = resolved.growId ?? tent?.grow_id ?? null;
-  const grow = growId ? grows.find((g) => g?.id === growId) ?? null : null;
+  const grow = growId ? (grows.find((g) => g?.id === growId) ?? null) : null;
   const growName = trimOrNull(grow?.name ?? null);
 
   return {

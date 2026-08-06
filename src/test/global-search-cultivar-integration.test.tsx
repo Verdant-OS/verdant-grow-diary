@@ -7,14 +7,8 @@
  * auto-linking plants.strain to a cultivar.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
-import { MemoryRouter, useLocation } from "react-router-dom";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter, useLocation } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import GlobalSearchDialog from "@/components/GlobalSearchDialog";
@@ -124,9 +118,7 @@ describe("searchCultivarReferences (public bundled cultivars)", () => {
     const rows = searchCultivarReferences(VERDANT_CULTIVARS, "diesel");
     expect(rows.every((r) => r.entity_type === "cultivar")).toBe(true);
     // id is the public slug, never a private plant uuid.
-    expect(rows.every((r) => VERDANT_CULTIVARS.some((c) => c.slug === r.id))).toBe(
-      true,
-    );
+    expect(rows.every((r) => VERDANT_CULTIVARS.some((c) => c.slug === r.id))).toBe(true);
   });
 
   it("returns nothing for an empty query", () => {
@@ -139,12 +131,44 @@ describe("searchCultivarReferences (public bundled cultivars)", () => {
 // ============================================================================
 describe("mergeGlobalSearchResults", () => {
   const priv: PrivateSearchRow[] = [
-    { entity_type: "grow", id: "g1", label: "Alpha Grow", sublabel: "flower", match_kind: "exact", rank: 0, score: 1 },
-    { entity_type: "plant", id: "p1", label: "Beta Plant", sublabel: "OG", match_kind: "exact", rank: 0, score: 0.9 },
-    { entity_type: "grow", id: "g2", label: "Zeta Grow", sublabel: "veg", match_kind: "prefix", rank: 1, score: 0.8 },
+    {
+      entity_type: "grow",
+      id: "g1",
+      label: "Alpha Grow",
+      sublabel: "flower",
+      match_kind: "exact",
+      rank: 0,
+      score: 1,
+    },
+    {
+      entity_type: "plant",
+      id: "p1",
+      label: "Beta Plant",
+      sublabel: "OG",
+      match_kind: "exact",
+      rank: 0,
+      score: 0.9,
+    },
+    {
+      entity_type: "grow",
+      id: "g2",
+      label: "Zeta Grow",
+      sublabel: "veg",
+      match_kind: "prefix",
+      rank: 1,
+      score: 0.8,
+    },
   ];
   const cult: GlobalSearchResult[] = [
-    { entity_type: "cultivar", id: "gg4", label: "Original Glue (GG4)", sublabel: "GG Strains LLC", match_kind: "exact", rank: 0, score: 1 },
+    {
+      entity_type: "cultivar",
+      id: "gg4",
+      label: "Original Glue (GG4)",
+      sublabel: "GG Strains LLC",
+      match_kind: "exact",
+      rank: 0,
+      score: 1,
+    },
   ];
 
   it("preserves private RPC ordering within each entity group", () => {
@@ -154,9 +178,7 @@ describe("mergeGlobalSearchResults", () => {
   });
 
   it("is deterministic across calls", () => {
-    expect(mergeGlobalSearchResults(priv, cult)).toEqual(
-      mergeGlobalSearchResults(priv, cult),
-    );
+    expect(mergeGlobalSearchResults(priv, cult)).toEqual(mergeGlobalSearchResults(priv, cult));
   });
 
   it("dedupes by entity_type + id", () => {
@@ -178,46 +200,67 @@ describe("mergeGlobalSearchResults", () => {
 describe("GlobalSearchDialog integration", () => {
   it("shows an exact grow from the RPC and navigates to its detail route", async () => {
     privateOk([
-      { entity_type: "grow", id: "grow-123", label: "Tent A Summer", sublabel: "flower", match_kind: "exact", rank: 0, score: 1 },
+      {
+        entity_type: "grow",
+        id: "grow-123",
+        label: "Tent A Summer",
+        sublabel: "flower",
+        match_kind: "exact",
+        rank: 0,
+        score: 1,
+      },
     ]);
     renderDialog();
     type("Tent A Summer");
     const item = await screen.findByTestId("global-search-item-grow-grow-123");
     fireEvent.click(item);
     await waitFor(() =>
-      expect(screen.getByTestId("location")).toHaveTextContent(
-        growDetailPath("grow-123"),
-      ),
+      expect(screen.getByTestId("location")).toHaveTextContent(growDetailPath("grow-123")),
     );
   });
 
   it("shows an exact tent and navigates to its detail route", async () => {
     privateOk([
-      { entity_type: "tent", id: "tent-9", label: "4x4 Flower", sublabel: "AC Infinity", match_kind: "exact", rank: 0, score: 1 },
+      {
+        entity_type: "tent",
+        id: "tent-9",
+        label: "4x4 Flower",
+        sublabel: "AC Infinity",
+        match_kind: "exact",
+        rank: 0,
+        score: 1,
+      },
     ]);
     renderDialog();
     type("4x4 Flower");
     fireEvent.click(await screen.findByTestId("global-search-item-tent-tent-9"));
     await waitFor(() =>
-      expect(screen.getByTestId("location")).toHaveTextContent(
-        tentDetailPath("tent-9"),
-      ),
+      expect(screen.getByTestId("location")).toHaveTextContent(tentDetailPath("tent-9")),
     );
   });
 
   it("shows a plant matched by strain (owner-scoped via RPC) and navigates", async () => {
     privateOk([
-      { entity_type: "plant", id: "plant-7", label: "Plant 7", sublabel: "Blue Dream", match_kind: "fuzzy", rank: 2, score: 0.3 },
+      {
+        entity_type: "plant",
+        id: "plant-7",
+        label: "Plant 7",
+        sublabel: "Blue Dream",
+        match_kind: "fuzzy",
+        rank: 2,
+        score: 0.3,
+      },
     ]);
     renderDialog();
     type("Blue Dream");
     fireEvent.click(await screen.findByTestId("global-search-item-plant-plant-7"));
     // Private plant results come from the owner-scoped RPC only.
-    expect(rpcSpy).toHaveBeenCalledWith("verdant_search", expect.objectContaining({ q: "Blue Dream" }));
+    expect(rpcSpy).toHaveBeenCalledWith(
+      "verdant_search",
+      expect.objectContaining({ q: "Blue Dream" }),
+    );
     await waitFor(() =>
-      expect(screen.getByTestId("location")).toHaveTextContent(
-        plantDetailPath("plant-7"),
-      ),
+      expect(screen.getByTestId("location")).toHaveTextContent(plantDetailPath("plant-7")),
     );
   });
 
@@ -246,14 +289,20 @@ describe("GlobalSearchDialog integration", () => {
     renderDialog();
     type("Sour Diesel");
     await screen.findByTestId("global-search-item-cultivar-sour-diesel");
-    expect(
-      screen.queryByTestId("global-search-item-plant-sour-diesel"),
-    ).toBeNull();
+    expect(screen.queryByTestId("global-search-item-plant-sour-diesel")).toBeNull();
   });
 
   it("renders a distinct Cultivars group after the private groups", async () => {
     privateOk([
-      { entity_type: "grow", id: "grow-x", label: "OG Room", sublabel: "flower", match_kind: "fuzzy", rank: 2, score: 0.3 },
+      {
+        entity_type: "grow",
+        id: "grow-x",
+        label: "OG Room",
+        sublabel: "flower",
+        match_kind: "fuzzy",
+        rank: 2,
+        score: 0.3,
+      },
     ]);
     renderDialog();
     type("OG");
@@ -263,8 +312,7 @@ describe("GlobalSearchDialog integration", () => {
     // Distinct group headings, cultivars after private groups in the DOM.
     expect(grows).toBeInTheDocument();
     expect(
-      grows.compareDocumentPosition(cultivars) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
+      grows.compareDocumentPosition(cultivars) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
   });
 
@@ -282,9 +330,7 @@ describe("GlobalSearchDialog integration", () => {
     privateOk([]);
     renderDialog();
     type("zzzzznotarealthing");
-    await waitFor(() =>
-      expect(screen.getByText(/no matches/i)).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByText(/no matches/i)).toBeInTheDocument());
     expect(screen.queryByTestId("global-search-error")).toBeNull();
   });
 });

@@ -41,15 +41,17 @@ export default function SafeByDesignNotice({
       <div className="leading-snug">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 font-medium">
           <span>{SAFE_BY_DESIGN_COPY.badge}</span>
-          <span aria-hidden className="opacity-50">·</span>
+          <span aria-hidden className="opacity-50">
+            ·
+          </span>
           <span>{SAFE_BY_DESIGN_COPY.readOnly}</span>
-          <span aria-hidden className="opacity-50">·</span>
+          <span aria-hidden className="opacity-50">
+            ·
+          </span>
           <span>{SAFE_BY_DESIGN_COPY.approvalRequired}</span>
         </div>
         {compact ? null : (
-          <p className="mt-0.5 text-muted-foreground">
-            {SAFE_BY_DESIGN_COPY.explainer}
-          </p>
+          <p className="mt-0.5 text-muted-foreground">{SAFE_BY_DESIGN_COPY.explainer}</p>
         )}
       </div>
     </div>

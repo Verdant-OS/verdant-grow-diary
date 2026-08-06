@@ -62,9 +62,7 @@ describe("ecowitt v0 golden fixtures", () => {
     expect(body).not.toContain("service_role");
     expect(body).not.toMatch(/Authorization/i);
     expect(body).not.toMatch(/vbt_[A-Za-z0-9]{6,}/);
-    expect(body).not.toMatch(
-      /eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/,
-    );
+    expect(body).not.toMatch(/eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/);
   });
 
   it("assertNoForbiddenRenderStrings catches PASSKEY etc", () => {

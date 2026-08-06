@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
 
 const fetchSpy = vi.spyOn(globalThis, "fetch" as never).mockImplementation((() => {
@@ -65,9 +65,7 @@ describe("TentDetail One-Tent Loop next-step card wiring", () => {
         testId="tent-detail-one-tent-loop-next-step-card"
       />,
     );
-    const cta = screen.getByTestId(
-      "tent-detail-one-tent-loop-next-step-card-cta",
-    );
+    const cta = screen.getByTestId("tent-detail-one-tent-loop-next-step-card-cta");
     expect(cta).toHaveTextContent(/Open plant/i);
   });
 
@@ -129,9 +127,7 @@ describe("TentDetail One-Tent Loop next-step card wiring", () => {
         testId="tent-detail-one-tent-loop-next-step-card"
       />,
     );
-    const cta = screen.getByTestId(
-      "tent-detail-one-tent-loop-next-step-card-cta",
-    );
+    const cta = screen.getByTestId("tent-detail-one-tent-loop-next-step-card-cta");
     expect(cta).toHaveTextContent(/Open plant/i);
   });
 
@@ -150,9 +146,7 @@ describe("TentDetail One-Tent Loop next-step card wiring", () => {
   it("ensures Tent Detail no-plants empty-state copy is defined as a literal", async () => {
     const fs = await import("node:fs/promises");
     const src = await fs.readFile("src/pages/TentDetail.tsx", "utf8");
-    expect(src).toContain(
-      "Add or open a plant to continue the One-Tent Loop.",
-    );
+    expect(src).toContain("Add or open a plant to continue the One-Tent Loop.");
   });
 
   it("Tent Detail source does not introduce AI/Supabase write or device-control calls in this slice", async () => {

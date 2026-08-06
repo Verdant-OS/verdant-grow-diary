@@ -25,14 +25,9 @@
  */
 import { isDiagnosticSensorProvenanceRow } from "@/lib/sensorProvenanceFenceRules";
 
+import { DEFAULT_AI_SENSOR_STALE_THRESHOLD_MS } from "../constants/sensorTiming";
 export type AiSensorSnapshotSource =
-  | "live"
-  | "manual"
-  | "csv"
-  | "demo"
-  | "stale"
-  | "invalid"
-  | "unknown";
+  "live" | "manual" | "csv" | "demo" | "stale" | "invalid" | "unknown";
 
 export type AiSensorSnapshotTrust = "low" | "medium" | "high";
 
@@ -66,7 +61,7 @@ export interface AiSensorSnapshotsContext {
   omittedSnapshotCount: number;
 }
 
-export const DEFAULT_AI_SENSOR_STALE_THRESHOLD_MS = 30 * 60 * 1000;
+export { DEFAULT_AI_SENSOR_STALE_THRESHOLD_MS };
 
 const KNOWN_SOURCES: ReadonlySet<AiSensorSnapshotSource> = new Set([
   "live",
@@ -121,9 +116,7 @@ function normalizeSource(raw: string | undefined): AiSensorSnapshotSource {
 }
 
 type CapturedAt =
-  | { kind: "ok"; ms: number; iso: string }
-  | { kind: "missing" }
-  | { kind: "invalid" };
+  { kind: "ok"; ms: number; iso: string } | { kind: "missing" } | { kind: "invalid" };
 
 function parseCapturedAt(snap: Record<string, unknown>): CapturedAt {
   const raw = snap.captured_at ?? snap.capturedAt ?? snap.timestamp ?? snap.ts ?? snap.time;

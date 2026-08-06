@@ -11,7 +11,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams } from "@/lib/react-router-compat";
 import { supabase } from "@/integrations/supabase/client";
 import { useTents } from "@/hooks/use-tents";
 import { useQuickLogV2Save } from "@/hooks/useQuickLogV2Save";
@@ -161,14 +161,15 @@ export default function EcowittIngestAudit() {
   );
 
   const handleLogEnvironmentCheck = async (draft: DiaryEnvironmentCheckDraft) => {
-    if (!draft.eligible || !draft.rpcPayload.p_target_id) {
+    const targetId = draft.rpcPayload.p_target_id;
+    if (!draft.eligible || !targetId) {
       return { ok: false };
     }
     const existing = mergedLoggedEvents.find((event) => event.capturedAt === draft.occurredAt);
     if (existing) {
       return { ok: true, growEventId: existing.growEventId };
     }
-    const result = await saveQuickLog(draft.rpcPayload);
+    const result = await saveQuickLog({ ...draft.rpcPayload, p_target_id: targetId });
     if (!result.ok) {
       return { ok: false };
     }

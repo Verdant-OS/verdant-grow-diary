@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import { resolveEntitlements } from "@/lib/entitlements/resolveEntitlements";
 
 const mode = vi.hoisted(() => ({ current: "free" as "free" | "pro" }));
@@ -15,13 +15,24 @@ vi.mock("@/hooks/useMyEntitlements", () => ({
     const row =
       mode.current === "pro"
         ? {
-            id: "r", user_id: "u", plan_id: "pro_monthly", status: "active",
-            provider: "paddle", provider_customer_id: null, provider_subscription_id: null,
-            current_period_end: "2027-01-01Z", cancel_at_period_end: false,
-            founder_number: null, created_at: "", updated_at: "",
+            id: "r",
+            user_id: "u",
+            plan_id: "pro_monthly",
+            status: "active",
+            provider: "paddle",
+            provider_customer_id: null,
+            provider_subscription_id: null,
+            current_period_end: "2027-01-01Z",
+            cancel_at_period_end: false,
+            founder_number: null,
+            created_at: "",
+            updated_at: "",
           }
         : null;
-    return { loading: false, entitlement: resolveEntitlements(row as any, new Date("2026-08-01Z")) };
+    return {
+      loading: false,
+      entitlement: resolveEntitlements(row as any, new Date("2026-08-01Z")),
+    };
   },
 }));
 
@@ -44,11 +55,19 @@ function renderAt(path: string) {
       <Routes>
         <Route
           path="/pheno-hunts/:id/workspace"
-          element={<PhenoTrackerUpgradeGate><StubWorkspace /></PhenoTrackerUpgradeGate>}
+          element={
+            <PhenoTrackerUpgradeGate>
+              <StubWorkspace />
+            </PhenoTrackerUpgradeGate>
+          }
         />
         <Route
           path="/pheno-hunts/:id/keepers"
-          element={<PhenoTrackerUpgradeGate><StubKeepers /></PhenoTrackerUpgradeGate>}
+          element={
+            <PhenoTrackerUpgradeGate>
+              <StubKeepers />
+            </PhenoTrackerUpgradeGate>
+          }
         />
       </Routes>
     </MemoryRouter>,

@@ -60,6 +60,16 @@ ignores its own prohibited-wording list.
 - "automated cull decision" <!-- automated-phenotyping-docs-safety:allow -->
 - "automated release decision" <!-- automated-phenotyping-docs-safety:allow -->
 - Legacy class names: `Healthy` <!-- automated-phenotyping-docs-safety:allow -->, `Healthy_Leaf` <!-- automated-phenotyping-docs-safety:allow -->, `Stressed` <!-- automated-phenotyping-docs-safety:allow -->, `Stressed_Leaf` <!-- automated-phenotyping-docs-safety:allow -->, `Nutrient_Deficiency` <!-- automated-phenotyping-docs-safety:allow -->, `Pest_Damage` <!-- automated-phenotyping-docs-safety:allow -->, `Diseased` <!-- automated-phenotyping-docs-safety:allow -->, `Disease_Detected` <!-- automated-phenotyping-docs-safety:allow -->
+- "health indicators" <!-- automated-phenotyping-docs-safety:allow -->
+- "health scoring" <!-- automated-phenotyping-docs-safety:allow -->
+- "nutrient deficiency" <!-- automated-phenotyping-docs-safety:allow -->
+- "nutrient deficiencies" <!-- automated-phenotyping-docs-safety:allow -->
+- "healthier green" <!-- automated-phenotyping-docs-safety:allow -->
+- "healthy green" <!-- automated-phenotyping-docs-safety:allow -->
+- "genetic diversity tracking" <!-- automated-phenotyping-docs-safety:allow -->
+- "objective health score" <!-- automated-phenotyping-docs-safety:allow -->
+- "diagnosed from color" <!-- automated-phenotyping-docs-safety:allow -->
+- "harvest ready" <!-- automated-phenotyping-docs-safety:allow -->
 
 ---
 
@@ -72,12 +82,12 @@ names. Legacy class names must not be used in Verdant-facing records
 (see the annotated "Avoid wording" block in Section 1 for the full
 forbidden list).
 
-| Label                  | Meaning                                                                   |
-| ---------------------- | ------------------------------------------------------------------------- |
-| `No visible concern`   | Nothing notable in the image. Not a guarantee of plant health.            |
-| `Visible concern`      | Something notable is visible. A human should review the plant in person.  |
-| `Uncertain`            | The tool cannot confidently classify the region.                          |
-| `Needs human review`   | Flagged for breeder attention regardless of confidence.                   |
+| Label                | Meaning                                                                  |
+| -------------------- | ------------------------------------------------------------------------ |
+| `No visible concern` | Nothing notable in the image. Not a guarantee of plant health.           |
+| `Visible concern`    | Something notable is visible. A human should review the plant in person. |
+| `Uncertain`          | The tool cannot confidently classify the region.                         |
+| `Needs human review` | Flagged for breeder attention regardless of confidence.                  |
 
 ### 2.2 Trichome labels (kept from Roboflow guidance)
 
@@ -158,27 +168,27 @@ Example: `P-0142_2026-06-27_macro_01.jpg`
 Maintain this log per plant evaluation event. It is a manual workbook
 sheet in this slice — no app surface writes to it.
 
-| Column                  | Description                                                                                  |
-| ----------------------- | -------------------------------------------------------------------------------------------- |
-| Pheno ID                | Stable identifier for the phenotype evaluation row.                                          |
-| Plant ID                | Verdant plant identifier.                                                                    |
-| Project / Line          | Breeding project or line name.                                                               |
-| Generation              | e.g. F1, F2, BC1.                                                                            |
-| Photo ID / File Name    | Filename per Section 3.4.                                                                    |
-| Photo Date              | Date the photo was captured (YYYY-MM-DD).                                                    |
-| Stage                   | Grow stage at photo time (veg, flower week N, late flower, etc.).                            |
-| View Type               | `side`, `top`, or `macro`.                                                                   |
-| Tool / Method           | e.g. Roboflow model + version, PlantCV script + version, manual measurement.                 |
-| Metric Name             | e.g. canopy_area_px, trichome_amber_pct, leaf_count.                                         |
-| Automated Value         | The raw value the tool produced.                                                             |
-| Unit                    | px, pct, count, ratio, etc.                                                                  |
-| Confidence              | `High`, `Medium`, `Low`, `Unknown`.                                                          |
+| Column                  | Description                                                                                    |
+| ----------------------- | ---------------------------------------------------------------------------------------------- |
+| Pheno ID                | Stable identifier for the phenotype evaluation row.                                            |
+| Plant ID                | Verdant plant identifier.                                                                      |
+| Project / Line          | Breeding project or line name.                                                                 |
+| Generation              | e.g. F1, F2, BC1.                                                                              |
+| Photo ID / File Name    | Filename per Section 3.4.                                                                      |
+| Photo Date              | Date the photo was captured (YYYY-MM-DD).                                                      |
+| Stage                   | Grow stage at photo time (veg, flower week N, late flower, etc.).                              |
+| View Type               | `side`, `top`, or `macro`.                                                                     |
+| Tool / Method           | e.g. Roboflow model + version, PlantCV script + version, manual measurement.                   |
+| Metric Name             | e.g. canopy_area_px, trichome_amber_pct, leaf_count.                                           |
+| Automated Value         | The raw value the tool produced.                                                               |
+| Unit                    | px, pct, count, ratio, etc.                                                                    |
+| Confidence              | `High`, `Medium`, `Low`, `Unknown`.                                                            |
 | Source Type             | `external_tool`, `manual_image_measurement`, `derived_from_photo`, `manual_import`, `unknown`. |
-| Human Review Status     | `pending`, `reviewed`, `rejected`, `needs_more_photos`.                                      |
-| Human Final Score       | The breeder's manual score. Required to consider the row complete.                           |
-| Notes                   | Free-text breeder notes.                                                                     |
-| Verdant Diary Reference | Diary entry ID this output was logged against (when applicable).                             |
-| Action Queue Draft      | Grower-review-only draft text (optional). Not an actual Action Queue item.                   |
+| Human Review Status     | `pending`, `reviewed`, `rejected`, `needs_more_photos`.                                        |
+| Human Final Score       | The breeder's manual score. Required to consider the row complete.                             |
+| Notes                   | Free-text breeder notes.                                                                       |
+| Verdant Diary Reference | Diary entry ID this output was logged against (when applicable).                               |
+| Action Queue Draft      | Grower-review-only draft text (optional). Not an actual Action Queue item.                     |
 
 ### Required provenance fields per row
 
@@ -289,7 +299,6 @@ Rules:
 - A color-space value alone never justifies a keeper, cull, harvest, or
   release decision. It requires human review and corroborating
   in-person observation.
-
 
 ---
 
@@ -402,71 +411,71 @@ Rules:
 
 `SDxBD_SDxBD-F1-04_flower-wk6_side-view_2026-06-26_01.jpg`
 
-| Field      | Value                                                       |
-| ---------- | ----------------------------------------------------------- |
-| Photo ID   | `SDxBD_SDxBD-F1-04_flower-wk6_side-view_2026-06-26_01`      |
-| photo_date | 2026-06-26                                                  |
-| Project    | SDxBD                                                       |
-| Pheno ID   | SDxBD-F1-04                                                 |
-| Stage      | flower-wk6                                                  |
-| View Type  | side-view                                                   |
-| Sequence   | 01                                                          |
+| Field      | Value                                                  |
+| ---------- | ------------------------------------------------------ |
+| Photo ID   | `SDxBD_SDxBD-F1-04_flower-wk6_side-view_2026-06-26_01` |
+| photo_date | 2026-06-26                                             |
+| Project    | SDxBD                                                  |
+| Pheno ID   | SDxBD-F1-04                                            |
+| Stage      | flower-wk6                                             |
+| View Type  | side-view                                              |
+| Sequence   | 01                                                     |
 
 **Example 2 — Top canopy**
 
 `SDxBD_SDxBD-F1-04_flower-wk6_top-canopy_2026-06-26_01.jpg`
 
-| Field      | Value                                                       |
-| ---------- | ----------------------------------------------------------- |
-| Photo ID   | `SDxBD_SDxBD-F1-04_flower-wk6_top-canopy_2026-06-26_01`     |
-| photo_date | 2026-06-26                                                  |
-| Project    | SDxBD                                                       |
-| Pheno ID   | SDxBD-F1-04                                                 |
-| Stage      | flower-wk6                                                  |
-| View Type  | top-canopy                                                  |
-| Sequence   | 01                                                          |
+| Field      | Value                                                   |
+| ---------- | ------------------------------------------------------- |
+| Photo ID   | `SDxBD_SDxBD-F1-04_flower-wk6_top-canopy_2026-06-26_01` |
+| photo_date | 2026-06-26                                              |
+| Project    | SDxBD                                                   |
+| Pheno ID   | SDxBD-F1-04                                             |
+| Stage      | flower-wk6                                              |
+| View Type  | top-canopy                                              |
+| Sequence   | 01                                                      |
 
 **Example 3 — Macro / trichome**
 
 `SDxBD_SDxBD-F1-04_flower-wk6_macro-trichome_2026-06-26_01.jpg`
 
-| Field      | Value                                                        |
-| ---------- | ------------------------------------------------------------ |
-| Photo ID   | `SDxBD_SDxBD-F1-04_flower-wk6_macro-trichome_2026-06-26_01`  |
-| photo_date | 2026-06-26                                                   |
-| Project    | SDxBD                                                        |
-| Pheno ID   | SDxBD-F1-04                                                  |
-| Stage      | flower-wk6                                                   |
-| View Type  | macro-trichome                                               |
-| Sequence   | 01                                                           |
+| Field      | Value                                                       |
+| ---------- | ----------------------------------------------------------- |
+| Photo ID   | `SDxBD_SDxBD-F1-04_flower-wk6_macro-trichome_2026-06-26_01` |
+| photo_date | 2026-06-26                                                  |
+| Project    | SDxBD                                                       |
+| Pheno ID   | SDxBD-F1-04                                                 |
+| Stage      | flower-wk6                                                  |
+| View Type  | macro-trichome                                              |
+| Sequence   | 01                                                          |
 
 **Example 4 — Mother plant**
 
 `SourD_SD-P1-Mother-01_veg-wk12_side-view_2026-06-26_01.jpg`
 
-| Field      | Value                                                  |
-| ---------- | ------------------------------------------------------ |
+| Field      | Value                                                    |
+| ---------- | -------------------------------------------------------- |
 | Photo ID   | `SourD_SD-P1-Mother-01_veg-wk12_side-view_2026-06-26_01` |
-| photo_date | 2026-06-26                                             |
-| Project    | SourD                                                  |
-| Pheno ID   | SD-P1-Mother-01                                        |
-| Stage      | veg-wk12                                               |
-| View Type  | side-view                                              |
-| Sequence   | 01                                                     |
+| photo_date | 2026-06-26                                               |
+| Project    | SourD                                                    |
+| Pheno ID   | SD-P1-Mother-01                                          |
+| Stage      | veg-wk12                                                 |
+| View Type  | side-view                                                |
+| Sequence   | 01                                                       |
 
 **Example 5 — Retake photo**
 
 `SDxBD_SDxBD-F1-04_flower-wk6_macro-trichome-retake_2026-06-26_02.jpg`
 
-| Field      | Value                                                                 |
-| ---------- | --------------------------------------------------------------------- |
-| Photo ID   | `SDxBD_SDxBD-F1-04_flower-wk6_macro-trichome-retake_2026-06-26_02`    |
-| photo_date | 2026-06-26                                                            |
-| Project    | SDxBD                                                                 |
-| Pheno ID   | SDxBD-F1-04                                                           |
-| Stage      | flower-wk6                                                            |
-| View Type  | macro-trichome-retake                                                 |
-| Sequence   | 02                                                                    |
+| Field      | Value                                                              |
+| ---------- | ------------------------------------------------------------------ |
+| Photo ID   | `SDxBD_SDxBD-F1-04_flower-wk6_macro-trichome-retake_2026-06-26_02` |
+| photo_date | 2026-06-26                                                         |
+| Project    | SDxBD                                                              |
+| Pheno ID   | SDxBD-F1-04                                                        |
+| Stage      | flower-wk6                                                         |
+| View Type  | macro-trichome-retake                                              |
+| Sequence   | 02                                                                 |
 
 ---
 
@@ -531,12 +540,12 @@ The rows below are illustrative dummy values. They show how to populate
 the log safely. Human Final Score is left blank when review is pending
 or when confidence is too low to influence scoring.
 
-| Pheno ID    | Plant ID | Project / Line | Generation | Photo ID / File Name                                              | Photo Date | Stage       | View Type      | Tool / Method            | Metric Name              | Automated Value | Unit  | Confidence | Source Type   | Human Review Status              | Human Final Score | Notes                                                  | Verdant Diary Reference | Action Queue Draft                          |
-| ----------- | -------- | -------------- | ---------- | ----------------------------------------------------------------- | ---------- | ----------- | -------------- | ------------------------ | ------------------------ | --------------- | ----- | ---------- | ------------- | -------------------------------- | ----------------- | ------------------------------------------------------ | ----------------------- | ------------------------------------------- |
-| SDxBD-F1-04 | P-0142   | SDxBD          | F1         | SDxBD_SDxBD-F1-04_flower-wk6_side-view_2026-06-26_01              | 2026-06-26 | flower-wk6  | side-view      | PlantCV 4.x (manual run) | estimated_height_cm      | 82              | cm    | Medium     | derived_from_photo | Accepted as Supporting Evidence | 80                | Reference marker visible; pixels-to-cm calibrated.     | DIARY-9821              | (none)                                      |
-| SDxBD-F1-04 | P-0142   | SDxBD          | F1         | SDxBD_SDxBD-F1-04_flower-wk6_macro-trichome_2026-06-26_01         | 2026-06-26 | flower-wk6  | macro-trichome | Roboflow trichome v0.3   | trichome_cloudy_percent  | 62              | pct   | Low        | external_tool | Needs human review               |                   | Low confidence; do not use for harvest call.           | DIARY-9822              | Grower-review-only: schedule re-check in 48h |
-| SDxBD-F1-04 | P-0142   | SDxBD          | F1         | SDxBD_SDxBD-F1-04_flower-wk6_macro-trichome-retake_2026-06-26_02  | 2026-06-26 | flower-wk6  | macro-trichome | Roboflow trichome v0.3   | visible_concern_flag     | Uncertain       | label | Low        | external_tool | Retake Photo                     |                   | Out of focus; capture replacement macro shot.          | DIARY-9823              | (none)                                      |
-| SDxBD-F1-04 | P-0142   | SDxBD          | F1         | SDxBD_SDxBD-F1-04_flower-wk6_side-view_2026-06-26_01              | 2026-06-26 | flower-wk6  | side-view      | PlantCV 4.x (manual run) | node_count_estimate      | 14              | nodes | Medium     | derived_from_photo | Accepted as Supporting Evidence | 14                | Matches manual node count from diary.                  | DIARY-9821              | (none)                                      |
+| Pheno ID    | Plant ID | Project / Line | Generation | Photo ID / File Name                                             | Photo Date | Stage      | View Type      | Tool / Method            | Metric Name             | Automated Value | Unit  | Confidence | Source Type        | Human Review Status             | Human Final Score | Notes                                              | Verdant Diary Reference | Action Queue Draft                           |
+| ----------- | -------- | -------------- | ---------- | ---------------------------------------------------------------- | ---------- | ---------- | -------------- | ------------------------ | ----------------------- | --------------- | ----- | ---------- | ------------------ | ------------------------------- | ----------------- | -------------------------------------------------- | ----------------------- | -------------------------------------------- |
+| SDxBD-F1-04 | P-0142   | SDxBD          | F1         | SDxBD_SDxBD-F1-04_flower-wk6_side-view_2026-06-26_01             | 2026-06-26 | flower-wk6 | side-view      | PlantCV 4.x (manual run) | estimated_height_cm     | 82              | cm    | Medium     | derived_from_photo | Accepted as Supporting Evidence | 80                | Reference marker visible; pixels-to-cm calibrated. | DIARY-9821              | (none)                                       |
+| SDxBD-F1-04 | P-0142   | SDxBD          | F1         | SDxBD_SDxBD-F1-04_flower-wk6_macro-trichome_2026-06-26_01        | 2026-06-26 | flower-wk6 | macro-trichome | Roboflow trichome v0.3   | trichome_cloudy_percent | 62              | pct   | Low        | external_tool      | Needs human review              |                   | Low confidence; do not use for harvest call.       | DIARY-9822              | Grower-review-only: schedule re-check in 48h |
+| SDxBD-F1-04 | P-0142   | SDxBD          | F1         | SDxBD_SDxBD-F1-04_flower-wk6_macro-trichome-retake_2026-06-26_02 | 2026-06-26 | flower-wk6 | macro-trichome | Roboflow trichome v0.3   | visible_concern_flag    | Uncertain       | label | Low        | external_tool      | Retake Photo                    |                   | Out of focus; capture replacement macro shot.      | DIARY-9823              | (none)                                       |
+| SDxBD-F1-04 | P-0142   | SDxBD          | F1         | SDxBD_SDxBD-F1-04_flower-wk6_side-view_2026-06-26_01             | 2026-06-26 | flower-wk6 | side-view      | PlantCV 4.x (manual run) | node_count_estimate     | 14              | nodes | Medium     | derived_from_photo | Accepted as Supporting Evidence | 14                | Matches manual node count from diary.              | DIARY-9821              | (none)                                       |
 
 Rules reflected in the sample:
 
@@ -557,4 +566,3 @@ If the static scanner (`scripts/assert-automated-phenotyping-docs-safety.mjs`)
 is also being removed, delete that script, its test
 (`src/test/assert-automated-phenotyping-docs-safety.test.ts`), and the
 `docs:assert-automated-phenotyping-safety` package script.
-

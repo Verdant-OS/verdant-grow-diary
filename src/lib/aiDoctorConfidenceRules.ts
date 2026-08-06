@@ -16,18 +16,14 @@ import type { AiContextConfidenceCeiling } from "@/lib/aiContextSufficiencyRules
 import { LOW_CONFIDENCE_THRESHOLD } from "@/lib/aiDoctorDiagnosisRules";
 
 /** Numeric caps applied to `diagnosis.confidence` for each ceiling bucket. */
-export const CONFIDENCE_CEILING_CAPS: Record<
-  AiContextConfidenceCeiling,
-  number
-> = {
+export const CONFIDENCE_CEILING_CAPS: Record<AiContextConfidenceCeiling, number> = {
   high: 1,
   medium: 0.6,
   low: 0.3,
 };
 
 /** Copy shown when the harmonized confidence is below the raw confidence. */
-export const CONFIDENCE_LIMITED_COPY =
-  "Confidence limited by missing or sparse grow context.";
+export const CONFIDENCE_LIMITED_COPY = "Confidence limited by missing or sparse grow context.";
 
 export interface HarmonizedConfidence {
   /** Raw model confidence, clamped to [0,1]. Internal use / debugging only. */
@@ -60,9 +56,7 @@ export function harmonizeDiagnosisConfidence(
 ): HarmonizedConfidence {
   const raw = clamp01(rawConfidence);
   const c: AiContextConfidenceCeiling =
-    ceiling === "high" || ceiling === "medium" || ceiling === "low"
-      ? ceiling
-      : "high";
+    ceiling === "high" || ceiling === "medium" || ceiling === "low" ? ceiling : "high";
   const cap = CONFIDENCE_CEILING_CAPS[c];
   const displayed = Math.min(raw, cap);
   const wasCapped = displayed < raw;

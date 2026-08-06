@@ -66,7 +66,7 @@ export default function BrandLogo({ size = "md", showText = false, className }: 
         width={px}
         height={px}
         loading={isHero ? "eager" : "lazy"}
-        {...(isHero ? ({ fetchpriority: "high" } as Record<string, string>) : {})}
+        {...(isHero ? ({ fetchPriority: "high" } as { fetchPriority: "high" }) : {})}
         decoding="async"
         className="rounded-full shrink-0 select-none"
         style={{ width: px, height: px }}

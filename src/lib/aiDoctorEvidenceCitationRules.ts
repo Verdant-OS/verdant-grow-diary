@@ -117,8 +117,7 @@ export function resolveEvidenceCitation(
           kind: "env_metric_derived",
           healthy: false,
           targetId: `evidence-envcheck-${safeSlug(metricKey)}`,
-          ariaLabel:
-            "Derived VPD context from local Environment Check, not raw telemetry.",
+          ariaLabel: "Derived VPD context from local Environment Check, not raw telemetry.",
         };
       }
       if (avail.statusLabel === "Accepted") {
@@ -156,8 +155,7 @@ export function resolveEvidenceCitation(
         kind: "diary_photo_missing",
         healthy: false,
         targetId: "evidence-missing-diary-photos",
-        ariaLabel:
-          "No recent diary or photo evidence is available. Needs more data.",
+        ariaLabel: "No recent diary or photo evidence is available. Needs more data.",
       };
     }
   }
@@ -217,18 +215,12 @@ const KIND_LABELS: Record<CitationKind, string> = {
 };
 
 const SOURCE_HONESTY_BY_KIND: Record<CitationKind, string> = {
-  env_metric:
-    "Local Test/Local validation evidence — not live telemetry.",
-  env_metric_derived:
-    "Derived VPD context only — not a raw sensor reading.",
-  env_metric_weak:
-    "Local Test/Local validation evidence — not healthy and not live.",
-  missing_metric:
-    "Metric is not present in the latest Environment Check.",
-  diary_photo_missing:
-    "No recent diary or photo evidence is available.",
-  none:
-    "No direct evidence supports this recommendation yet.",
+  env_metric: "Local Test/Local validation evidence — not live telemetry.",
+  env_metric_derived: "Derived VPD context only — not a raw sensor reading.",
+  env_metric_weak: "Local Test/Local validation evidence — not healthy and not live.",
+  missing_metric: "Metric is not present in the latest Environment Check.",
+  diary_photo_missing: "No recent diary or photo evidence is available.",
+  none: "No direct evidence supports this recommendation yet.",
 };
 
 function findMetricKeyFromCitation(c: EvidenceCitation): string | null {

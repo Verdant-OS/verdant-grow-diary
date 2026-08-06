@@ -8,11 +8,8 @@
  * calls AI, or touches device control.
  */
 import { HelpCircle } from "lucide-react";
-import { Link } from "react-router-dom";
-import {
-  buildDiaryFaqLink,
-  type DiaryFaqLinkInput,
-} from "@/lib/diaryFaqLinkRules";
+import { Link } from "@/lib/react-router-compat";
+import { buildDiaryFaqLink, type DiaryFaqLinkInput } from "@/lib/diaryFaqLinkRules";
 import { recordDiaryFaqLinkClick } from "@/lib/diaryFaqLinkClickTracker";
 import { cn } from "@/lib/utils";
 
@@ -21,10 +18,7 @@ export interface DiaryEntryFaqLinkProps {
   className?: string;
 }
 
-export default function DiaryEntryFaqLink({
-  item,
-  className,
-}: DiaryEntryFaqLinkProps) {
+export default function DiaryEntryFaqLink({ item, className }: DiaryEntryFaqLinkProps) {
   const link = buildDiaryFaqLink(item);
   if (!link) return null;
   return (

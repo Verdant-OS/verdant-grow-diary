@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { Check, ShieldCheck } from "lucide-react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "@/lib/react-router-compat";
 
 import BrandLogo from "@/components/BrandLogo";
 import FounderShareCard from "@/components/FounderShareCard";
@@ -244,15 +244,12 @@ export default function Founder() {
       </div>
 
       <section aria-labelledby="founders-wall-heading" className="mx-auto max-w-4xl px-6 pb-16">
-        <h2
-          id="founders-wall-heading"
-          className="font-display text-2xl font-semibold text-center"
-        >
+        <h2 id="founders-wall-heading" className="font-display text-2xl font-semibold text-center">
           The Founders Wall
         </h2>
         <p className="mx-auto mt-3 max-w-2xl text-center text-sm text-muted-foreground">
-          Verified Founders who chose to appear publicly. Founders may stay hidden
-          or show only a number; nothing here is auto-populated.
+          Verified Founders who chose to appear publicly. Founders may stay hidden or show only a
+          number; nothing here is auto-populated.
         </p>
         <div className="mt-6">
           <FoundersWall />
@@ -261,7 +258,6 @@ export default function Founder() {
           <FounderOwnerPrefsForm />
         </div>
       </section>
-
 
       <section className="border-t border-border/50 px-6 py-16 text-center">
         <div className="mx-auto max-w-3xl">

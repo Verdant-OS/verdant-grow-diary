@@ -46,9 +46,10 @@ describe("normalizeIngestPayload — live VPD derivation", () => {
     expect(v.tent_id).toBe(TENT);
     expect(v.ts).toBe(TS);
     expect((v.raw_payload as { calculated?: boolean }).calculated).toBe(true);
-    expect(
-      (v.raw_payload as { derived_from?: string[] }).derived_from,
-    ).toEqual(["temperature_c", "humidity_pct"]);
+    expect((v.raw_payload as { derived_from?: string[] }).derived_from).toEqual([
+      "temperature_c",
+      "humidity_pct",
+    ]);
   });
 
   it("converts Fahrenheit temperature to Celsius before VPD derivation", () => {
@@ -89,9 +90,7 @@ describe("normalizeIngestPayload — live VPD derivation", () => {
       tent_id: TENT,
       source: "pi_bridge",
       captured_at: TS,
-      readings: [
-        { metric: "temperature_c", value: 25, unit: "temperature_c" },
-      ],
+      readings: [{ metric: "temperature_c", value: 25, unit: "temperature_c" }],
     });
     expect(r.rows.find((x) => x.metric === "vpd_kpa")).toBeUndefined();
   });

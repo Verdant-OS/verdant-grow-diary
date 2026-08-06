@@ -5,7 +5,7 @@
  * labeled sample/reference data only. No private grow reads or writes.
  */
 import { useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "@/lib/react-router-compat";
 import { Search } from "lucide-react";
 import BrandLogo from "@/components/BrandLogo";
 import GlobalSearchDialog from "@/components/GlobalSearchDialog";
@@ -63,11 +63,7 @@ export default function CultivarsIndex() {
     DIFFICULTY_OPTIONS,
     "all",
   );
-  const lifeCycle = validOption(
-    searchParams.get("lifeCycle") ?? "all",
-    LIFE_CYCLE_OPTIONS,
-    "all",
-  );
+  const lifeCycle = validOption(searchParams.get("lifeCycle") ?? "all", LIFE_CYCLE_OPTIONS, "all");
   const verificationStatus = validOption(
     searchParams.get("verification") ?? "all",
     VERIFICATION_OPTIONS,
@@ -149,7 +145,7 @@ export default function CultivarsIndex() {
             type="button"
             onClick={() => setSearchOpen(true)}
             data-testid="cultivars-index-open-search"
-            className="flex min-h-[44px] w-full items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-left text-sm text-muted-foreground outline-none transition-colors hover:border-primary/40 hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary/60"
+            className="flex min-h-[44px] w-full items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-left text-sm text-muted-foreground outline-hidden transition-colors hover:border-primary/40 hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary/60"
           >
             <Search className="h-4 w-4 shrink-0" aria-hidden="true" />
             <span className="flex-1 truncate">
@@ -180,14 +176,17 @@ export default function CultivarsIndex() {
           onSubmit={(event) => event.preventDefault()}
         >
           <div>
-            <label htmlFor="cultivar-difficulty" className="mb-1 block text-xs uppercase tracking-wide text-muted-foreground">
+            <label
+              htmlFor="cultivar-difficulty"
+              className="mb-1 block text-xs uppercase tracking-wide text-muted-foreground"
+            >
               Difficulty
             </label>
             <select
               id="cultivar-difficulty"
               value={difficulty}
               onChange={(event) => updateParam("difficulty", event.target.value)}
-              className="min-h-[44px] w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+              className="min-h-[44px] w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-hidden focus-visible:ring-2 focus-visible:ring-primary/60"
             >
               {DIFFICULTY_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -198,14 +197,17 @@ export default function CultivarsIndex() {
           </div>
 
           <div>
-            <label htmlFor="cultivar-life-cycle" className="mb-1 block text-xs uppercase tracking-wide text-muted-foreground">
+            <label
+              htmlFor="cultivar-life-cycle"
+              className="mb-1 block text-xs uppercase tracking-wide text-muted-foreground"
+            >
               Life cycle
             </label>
             <select
               id="cultivar-life-cycle"
               value={lifeCycle}
               onChange={(event) => updateParam("lifeCycle", event.target.value)}
-              className="min-h-[44px] w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+              className="min-h-[44px] w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-hidden focus-visible:ring-2 focus-visible:ring-primary/60"
             >
               {LIFE_CYCLE_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -216,14 +218,17 @@ export default function CultivarsIndex() {
           </div>
 
           <div>
-            <label htmlFor="cultivar-verification" className="mb-1 block text-xs uppercase tracking-wide text-muted-foreground">
+            <label
+              htmlFor="cultivar-verification"
+              className="mb-1 block text-xs uppercase tracking-wide text-muted-foreground"
+            >
               Evidence state
             </label>
             <select
               id="cultivar-verification"
               value={verificationStatus}
               onChange={(event) => updateParam("verification", event.target.value)}
-              className="min-h-[44px] w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+              className="min-h-[44px] w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-hidden focus-visible:ring-2 focus-visible:ring-primary/60"
             >
               {VERIFICATION_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -268,7 +273,7 @@ export default function CultivarsIndex() {
               <li key={cultivar.slug} className="h-full">
                 <Link
                   to={`/cultivars/${cultivar.slug}`}
-                  className="flex h-full flex-col rounded-xl border border-border/60 bg-card/30 p-5 transition-colors hover:border-primary/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+                  className="flex h-full flex-col rounded-xl border border-border/60 bg-card/30 p-5 transition-colors hover:border-primary/45 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary/60"
                 >
                   <div className="flex flex-wrap gap-2 text-[11px] uppercase tracking-wide text-muted-foreground">
                     <span className="rounded-full border border-border/70 px-2 py-0.5">
@@ -286,8 +291,12 @@ export default function CultivarsIndex() {
                     {cultivar.breeder ? `${cultivar.breeder} · ` : "Breeder/source varies · "}
                     {cultivar.flowerWeeks}
                   </p>
-                  <p className="mt-3 line-clamp-4 text-sm text-muted-foreground">{cultivar.intro}</p>
-                  <p className="mt-auto pt-5 text-xs text-primary/90">Open source and guide evidence →</p>
+                  <p className="mt-3 line-clamp-4 text-sm text-muted-foreground">
+                    {cultivar.intro}
+                  </p>
+                  <p className="mt-auto pt-5 text-xs text-primary/90">
+                    Open source and guide evidence →
+                  </p>
                 </Link>
               </li>
             ))}

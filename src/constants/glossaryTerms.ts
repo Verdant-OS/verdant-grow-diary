@@ -167,15 +167,13 @@ const RAW: readonly GlossaryTerm[] = [
   {
     term: "Quantitative Trait Locus (QTL)",
     category: "Genetics",
-    definition:
-      "A region of the genome statistically linked to variation in a quantitative trait.",
+    definition: "A region of the genome statistically linked to variation in a quantitative trait.",
     seeAlso: ["Quantitative Genetics", "Recombination"],
   },
   {
     term: "Receiver",
     category: "Breeding",
-    definition:
-      "In a cross, the female plant that receives pollen and produces the seeds.",
+    definition: "In a cross, the female plant that receives pollen and produces the seeds.",
     seeAlso: ["Reciprocal Cross", "Selfing"],
   },
   {
@@ -395,8 +393,7 @@ const RAW: readonly GlossaryTerm[] = [
   {
     term: "Testa",
     category: "Plant Anatomy",
-    definition:
-      "The outer protective seed coat.",
+    definition: "The outer protective seed coat.",
     seeAlso: ["Scarification"],
   },
   {

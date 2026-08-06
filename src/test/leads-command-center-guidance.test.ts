@@ -5,15 +5,12 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import {
-  evaluateCommandCenterGuidance,
-} from "@/lib/leadCommandCenterGuidanceRules";
+import { evaluateCommandCenterGuidance } from "@/lib/leadCommandCenterGuidanceRules";
 import { summarizeLeadStatuses } from "@/lib/leadStatusSummaryRules";
 import { evaluatePipelineHealth } from "@/lib/leadPipelineHealthRules";
 import type { LeadRow } from "@/hooks/useLeadsList";
 
-const readSrc = (p: string) =>
-  readFileSync(resolve(__dirname, "..", p), "utf8");
+const readSrc = (p: string) => readFileSync(resolve(__dirname, "..", p), "utf8");
 const RULES = readSrc("lib/leadCommandCenterGuidanceRules.ts");
 const COMPONENT = readSrc("components/LeadCommandCenterGuidance.tsx");
 const PAGE = readSrc("pages/Leads.tsx");
@@ -88,9 +85,7 @@ describe("evaluateCommandCenterGuidance", () => {
     );
     const r = evaluateCommandCenterGuidance(leads, NOW);
     expect(r.state).toBe("needs_attention");
-    expect(
-      r.items.some((i) => i.id === "many_need_first_contact"),
-    ).toBe(true);
+    expect(r.items.some((i) => i.id === "many_need_first_contact")).toBe(true);
   });
 
   it("unknown source guidance fires when >30% missing source", () => {
@@ -186,11 +181,6 @@ describe("evaluateCommandCenterGuidance", () => {
   });
 
   it("invalid/missing input arrays do not throw", () => {
-    expect(() =>
-      evaluateCommandCenterGuidance(
-        null as unknown as LeadRow[],
-        NOW,
-      ),
-    ).not.toThrow();
+    expect(() => evaluateCommandCenterGuidance(null as unknown as LeadRow[], NOW)).not.toThrow();
   });
 });

@@ -39,51 +39,33 @@ beforeEach(() => {
 
 describe("ActionQueueDetailDrawer", () => {
   it("renders safe explanation fields when open", () => {
-    render(
-      <ActionQueueDetailDrawer
-        open
-        onOpenChange={() => {}}
-        row={ROW}
-        lookups={LOOKUPS}
-      />,
+    render(<ActionQueueDetailDrawer open onOpenChange={() => {}} row={ROW} lookups={LOOKUPS} />);
+    expect(screen.getByTestId("action-queue-detail-drawer-title").textContent).toBe(
+      "Lower humidity to 55%",
     );
-    expect(
-      screen.getByTestId("action-queue-detail-drawer-title").textContent,
-    ).toBe("Lower humidity to 55%");
-    expect(
-      screen.getByTestId("action-queue-detail-drawer-status").textContent,
-    ).toBe("Pending review");
-    expect(
-      screen.getByTestId("action-queue-detail-drawer-risk").textContent,
-    ).toBe("Medium risk");
-    expect(
-      screen.getByTestId("action-queue-detail-drawer-source").textContent,
-    ).toContain("AI Doctor");
-    expect(
-      screen.getByTestId("action-queue-detail-drawer-target").textContent,
-    ).toBe("humidity_pct");
-    expect(
-      screen.getByTestId("action-queue-detail-drawer-grow").textContent,
-    ).toContain("Greenhouse A");
-    expect(
-      screen.getByTestId("action-queue-detail-drawer-tent").textContent,
-    ).toContain("Tent One");
-    expect(
-      screen.getByTestId("action-queue-detail-drawer-plant").textContent,
-    ).toContain("Bertha");
-    expect(
-      screen.getByTestId("action-queue-detail-drawer-safety-reminder").textContent,
-    ).toContain("Verdant suggests. Grower approves.");
+    expect(screen.getByTestId("action-queue-detail-drawer-status").textContent).toBe(
+      "Pending review",
+    );
+    expect(screen.getByTestId("action-queue-detail-drawer-risk").textContent).toBe("Medium risk");
+    expect(screen.getByTestId("action-queue-detail-drawer-source").textContent).toContain(
+      "AI Doctor",
+    );
+    expect(screen.getByTestId("action-queue-detail-drawer-target").textContent).toBe(
+      "humidity_pct",
+    );
+    expect(screen.getByTestId("action-queue-detail-drawer-grow").textContent).toContain(
+      "Greenhouse A",
+    );
+    expect(screen.getByTestId("action-queue-detail-drawer-tent").textContent).toContain("Tent One");
+    expect(screen.getByTestId("action-queue-detail-drawer-plant").textContent).toContain("Bertha");
+    expect(screen.getByTestId("action-queue-detail-drawer-safety-reminder").textContent).toContain(
+      "Verdant suggests. Grower approves.",
+    );
   });
 
   it("hides raw back-pointer tokens and internal IDs in visible copy", () => {
     const { baseElement } = render(
-      <ActionQueueDetailDrawer
-        open
-        onOpenChange={() => {}}
-        row={ROW}
-        lookups={LOOKUPS}
-      />,
+      <ActionQueueDetailDrawer open onOpenChange={() => {}} row={ROW} lookups={LOOKUPS} />,
     );
     const text = baseElement.textContent ?? "";
     expect(text).not.toContain("[alert:");
@@ -92,9 +74,7 @@ describe("ActionQueueDetailDrawer", () => {
     expect(text).not.toContain("sess-1");
     expect(text).not.toContain("aq-1");
     // Reason text is shown after sanitization.
-    expect(
-      screen.getByTestId("action-queue-detail-drawer-reason").textContent,
-    ).toBe("Mold risk.");
+    expect(screen.getByTestId("action-queue-detail-drawer-reason").textContent).toBe("Mold risk.");
   });
 
   it("shows calm 'no related diary context' message when lookups are empty", () => {
@@ -105,9 +85,9 @@ describe("ActionQueueDetailDrawer", () => {
         row={{ ...ROW, grow_id: null, tent_id: null, plant_id: null }}
       />,
     );
-    expect(
-      screen.getByTestId("action-queue-detail-drawer-no-context").textContent,
-    ).toBe("No related diary context found yet.");
+    expect(screen.getByTestId("action-queue-detail-drawer-no-context").textContent).toBe(
+      "No related diary context found yet.",
+    );
   });
 
   it("does NOT call any callbacks or fetch on render", () => {
@@ -129,14 +109,7 @@ describe("ActionQueueDetailDrawer", () => {
 
   it("Approve button fires exactly once per click", () => {
     const approve = vi.fn();
-    render(
-      <ActionQueueDetailDrawer
-        open
-        onOpenChange={() => {}}
-        row={ROW}
-        onApprove={approve}
-      />,
-    );
+    render(<ActionQueueDetailDrawer open onOpenChange={() => {}} row={ROW} onApprove={approve} />);
     fireEvent.click(screen.getByTestId("action-queue-detail-drawer-approve"));
     expect(approve).toHaveBeenCalledTimes(1);
     expect(approve).toHaveBeenCalledWith(ROW);
@@ -144,47 +117,24 @@ describe("ActionQueueDetailDrawer", () => {
 
   it("Reject button fires exactly once per click", () => {
     const reject = vi.fn();
-    render(
-      <ActionQueueDetailDrawer
-        open
-        onOpenChange={() => {}}
-        row={ROW}
-        onReject={reject}
-      />,
-    );
+    render(<ActionQueueDetailDrawer open onOpenChange={() => {}} row={ROW} onReject={reject} />);
     fireEvent.click(screen.getByTestId("action-queue-detail-drawer-reject"));
     expect(reject).toHaveBeenCalledTimes(1);
   });
 
   it("disables Approve and Reject buttons while busy", () => {
-    render(
-      <ActionQueueDetailDrawer
-        open
-        onOpenChange={() => {}}
-        row={ROW}
-        busy
-      />,
+    render(<ActionQueueDetailDrawer open onOpenChange={() => {}} row={ROW} busy />);
+    expect(screen.getByTestId("action-queue-detail-drawer-approve").hasAttribute("disabled")).toBe(
+      true,
     );
-    expect(
-      screen
-        .getByTestId("action-queue-detail-drawer-approve")
-        .hasAttribute("disabled"),
-    ).toBe(true);
-    expect(
-      screen
-        .getByTestId("action-queue-detail-drawer-reject")
-        .hasAttribute("disabled"),
-    ).toBe(true);
+    expect(screen.getByTestId("action-queue-detail-drawer-reject").hasAttribute("disabled")).toBe(
+      true,
+    );
   });
 
   it("contains no automation / device-control wording", () => {
     const { baseElement } = render(
-      <ActionQueueDetailDrawer
-        open
-        onOpenChange={() => {}}
-        row={ROW}
-        lookups={LOOKUPS}
-      />,
+      <ActionQueueDetailDrawer open onOpenChange={() => {}} row={ROW} lookups={LOOKUPS} />,
     );
     const text = (baseElement.textContent ?? "").toLowerCase();
     for (const forbidden of [

@@ -14,6 +14,10 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import {
+  extractMountedAppRoutePaths,
+  readAllRouteModuleSources,
+} from "./helpers/routeManifestSyncHarness";
+import {
   PI_INGEST_DISCLOSURE_LINES,
   PI_INGEST_HEALTH_LABEL,
   PI_INGEST_SOURCE,
@@ -27,11 +31,10 @@ const read = (rel: string) => readFileSync(resolve(ROOT, rel), "utf8");
 const PAGE = read("src/pages/PiIngestStatus.tsx");
 const HOOK = read("src/hooks/usePiIngestStatus.ts");
 const RULES = read("src/lib/piIngestStatusRules.ts");
-const APP = read("src/App.tsx");
+const APP = readAllRouteModuleSources();
 
 const NOW = new Date("2026-05-23T12:00:00Z");
-const minutesAgo = (m: number) =>
-  new Date(NOW.getTime() - m * 60 * 1000).toISOString();
+const minutesAgo = (m: number) => new Date(NOW.getTime() - m * 60 * 1000).toISOString();
 
 describe("computePiIngestStatus — pure rules", () => {
   it("reports no_data when no pi_bridge readings exist", () => {
@@ -153,7 +156,7 @@ describe("PiIngestStatus page — read-only & safety contract", () => {
     expect(HOOK).toMatch(/\.eq\(["']source["'],\s*PI_INGEST_SOURCE\)/);
   });
 
-  it("is wired as a route in App.tsx", () => {
+  it("is wired as a route in file routes", () => {
     expect(APP).toContain("PiIngestStatus");
     expect(APP).toContain("/pi-ingest-status");
   });

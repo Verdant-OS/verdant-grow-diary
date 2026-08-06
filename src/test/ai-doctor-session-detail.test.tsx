@@ -5,7 +5,7 @@ import { describe, it, expect, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 import AiDoctorSessionDetail from "@/pages/AiDoctorSessionDetail";
@@ -13,6 +13,7 @@ import PlantAiDoctorSessionsPanel from "@/components/PlantAiDoctorSessionsPanel"
 import TentAiDoctorSessionsPanel from "@/components/TentAiDoctorSessionsPanel";
 import type { Diagnosis } from "@/lib/aiDoctorDiagnosisRules";
 import type { AiDoctorSessionRow } from "@/hooks/use-ai-doctor-sessions";
+import { readAllRouteModuleSources } from "./helpers/routeManifestSyncHarness";
 
 // Default supabase mock — no rows. Individual tests below re-mock the module.
 vi.mock("@/integrations/supabase/client", () => {
@@ -57,20 +58,40 @@ vi.mock("@/integrations/supabase/client", () => {
       from: () => ({
         select: () => ({
           eq: (_col: string, value: string) => ({
-            order: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }),
+            order: () => ({
+              limit: () => {
+                const __c: any = {
+                  abortSignal: () => __c,
+                  then: (r: any, j?: any) => Promise.resolve({ data: [], error: null }).then(r, j),
+                };
+                return __c;
+              },
+            }),
             maybeSingle: () =>
               Promise.resolve(
-                value === "sess-1"
-                  ? { data: fixture, error: null }
-                  : { data: null, error: null },
+                value === "sess-1" ? { data: fixture, error: null } : { data: null, error: null },
               ),
           }),
           in: () => ({
             order: () => ({
-              limit: () => Promise.resolve({ data: [], error: null }),
+              limit: () => {
+                const c: any = {
+                  abortSignal: () => c,
+                  then: (r: any) => Promise.resolve({ data: [], error: null }).then(r),
+                };
+                return c;
+              },
             }),
           }),
-          order: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }),
+          order: () => ({
+            limit: () => {
+              const __c: any = {
+                abortSignal: () => __c,
+                then: (r: any, j?: any) => Promise.resolve({ data: [], error: null }).then(r, j),
+              };
+              return __c;
+            },
+          }),
         }),
       }),
     },
@@ -110,12 +131,16 @@ const PAGE = read("src/pages/AiDoctorSessionDetail.tsx");
 const HOOK = read("src/hooks/use-ai-doctor-sessions.ts");
 const PLANT_PANEL = read("src/components/PlantAiDoctorSessionsPanel.tsx");
 const TENT_PANEL = read("src/components/TentAiDoctorSessionsPanel.tsx");
-const APP = read("src/App.tsx");
+const APP = readAllRouteModuleSources();
 
 describe("AI Doctor Session detail — routing & wiring", () => {
   it("App registers /doctor/sessions/:sessionId route", () => {
-    expect(APP).toMatch(/\/doctor\/sessions\/:sessionId/);
-    expect(APP).toContain("AiDoctorSessionDetail");
+    // File route lives at src/routes/_app/doctor_.sessions_.$sessionId.tsx
+    // (trailing `_` = TanStack un-nesting marker; URL is /doctor/sessions/:sessionId).
+    // EXACT id required — an optional-underscore regex would match the broken
+    // nested predecessor too. Aggregate contract:
+    // src/test/authenticated-detail-route-unnesting.test.ts
+    expect(APP).toContain('createFileRoute("/_app/doctor_/sessions_/$sessionId")');
   });
   it("hook exports useAiDoctorSession with maybeSingle by id", () => {
     expect(HOOK).toMatch(/export function useAiDoctorSession/);

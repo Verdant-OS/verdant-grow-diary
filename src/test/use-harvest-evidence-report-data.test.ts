@@ -84,9 +84,7 @@ describe("useHarvestEvidenceReportData", () => {
   it("maps diary note rows into report input that classify as trichome", () => {
     mocks.useGrowPlant.mockReturnValue({ data: PLANT, isLoading: false, isError: false });
     mocks.usePlantRecentActivity.mockReturnValue({
-      data: [
-        row({ id: "n1", note: "Checked trichomes — 30% cloudy across upper colas." }),
-      ],
+      data: [row({ id: "n1", note: "Checked trichomes — 30% cloudy across upper colas." })],
       isLoading: false,
       isError: false,
     });

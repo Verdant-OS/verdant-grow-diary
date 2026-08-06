@@ -74,9 +74,7 @@ function shuffle<T>(arr: readonly T[], rng: () => number): T[] {
 
 // ---------- baseline (canonical order) ----------
 const baseline = runEcowittCloudCanary(baseFixtures, mapping, options);
-const baselineById = new Map(
-  baseline.summaries.map((s) => [s.fixture_id, s] as const),
-);
+const baselineById = new Map(baseline.summaries.map((s) => [s.fixture_id, s] as const));
 
 describe("ecowitt cloud canary — property-based verdict-count invariants", () => {
   it("baseline sanity: every fixture id is represented and counts are non-negative", () => {
@@ -98,9 +96,7 @@ describe("ecowitt cloud canary — property-based verdict-count invariants", () 
 
       // P4: no silent drop
       expect(v.summaries.length).toBe(baseFixtures.length);
-      expect(new Set(v.summaries.map((s) => s.fixture_id)).size).toBe(
-        baseFixtures.length,
-      );
+      expect(new Set(v.summaries.map((s) => s.fixture_id)).size).toBe(baseFixtures.length);
 
       // P1: totals identical
       expect(v.totals).toEqual(baseline.totals);
@@ -132,8 +128,7 @@ describe("ecowitt cloud canary — property-based verdict-count invariants", () 
         const res = normalizeEcowittCloudReadings(f.payload, mapping, options);
         const mappedKeys = new Set(
           res.rows.map(
-            (r) =>
-              `${r.channel}|${(r.reading.raw_payload as { raw_key?: string })?.raw_key ?? ""}`,
+            (r) => `${r.channel}|${(r.reading.raw_payload as { raw_key?: string })?.raw_key ?? ""}`,
           ),
         );
         for (const u of res.unmapped) {
@@ -150,9 +145,7 @@ describe("ecowitt cloud canary — property-based verdict-count invariants", () 
       const perm = shuffle(baseFixtures, rng);
       const v = runEcowittCloudCanary(perm, mapping, options);
       for (const s of v.summaries) {
-        expect(s.live_count + s.stale_count + s.invalid_count).toBe(
-          s.mapped_count,
-        );
+        expect(s.live_count + s.stale_count + s.invalid_count).toBe(s.mapped_count);
       }
       // Walk normalized output directly to confirm exactly-one source per row.
       for (const f of perm) {
@@ -164,9 +157,9 @@ describe("ecowitt cloud canary — property-based verdict-count invariants", () 
     }
 
     // And at aggregate level
-    expect(
-      baseline.totals.live + baseline.totals.stale + baseline.totals.invalid,
-    ).toBe(baseline.totals.mapped);
+    expect(baseline.totals.live + baseline.totals.stale + baseline.totals.invalid).toBe(
+      baseline.totals.mapped,
+    );
   });
 
   it("P5: determinism — repeated normalize on identical input yields identical counts", () => {
@@ -175,9 +168,7 @@ describe("ecowitt cloud canary — property-based verdict-count invariants", () 
       const b = normalizeEcowittCloudReadings(f.payload, mapping, options);
       expect(b.rows.length).toBe(a.rows.length);
       expect(b.unmapped.length).toBe(a.unmapped.length);
-      expect(b.rows.map((r) => r.reading.source)).toEqual(
-        a.rows.map((r) => r.reading.source),
-      );
+      expect(b.rows.map((r) => r.reading.source)).toEqual(a.rows.map((r) => r.reading.source));
     }
     // And the verdict helper is itself deterministic.
     const again = runEcowittCloudCanary(baseFixtures, mapping, options);

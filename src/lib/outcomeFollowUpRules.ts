@@ -30,12 +30,7 @@ export interface OutcomeFollowUpInput {
 export interface OutcomeFollowUpResult {
   showPrompt: boolean;
   reason:
-    | "needs_follow_up"
-    | "no_action"
-    | "too_soon"
-    | "already_checked"
-    | "expired"
-    | "invalid_now";
+    "needs_follow_up" | "no_action" | "too_soon" | "already_checked" | "expired" | "invalid_now";
   headline: string;
   body: string;
   ctaLabel: string;

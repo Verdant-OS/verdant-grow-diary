@@ -16,10 +16,7 @@ import {
 } from "../lib/aiDoctorEngine";
 import { bandForConfidence } from "../lib/aiDoctorSafetyRules";
 
-import {
-  AI_DOCTOR_GOLDEN_CASES,
-  type GoldenCase,
-} from "./fixtures/aiDoctorGoldenCases";
+import { AI_DOCTOR_GOLDEN_CASES, type GoldenCase } from "./fixtures/aiDoctorGoldenCases";
 import {
   scanDiagnosisForUnsafePhrases,
   formatUnsafePhraseReport,
@@ -235,12 +232,8 @@ describe("AI Doctor Golden Cases v1 — confidence + risk caps", () => {
     it(`[${c.id}] confidence band ≤ ${c.expect.maxConfidenceBand}, risk ≤ ${c.expect.maxRiskLevel}`, async () => {
       const r = await runCase(c);
       const band = bandForConfidence(r.confidence);
-      expect(BAND_RANK[band]).toBeLessThanOrEqual(
-        BAND_RANK[c.expect.maxConfidenceBand],
-      );
-      expect(RISK_RANK[r.risk_level]).toBeLessThanOrEqual(
-        RISK_RANK[c.expect.maxRiskLevel],
-      );
+      expect(BAND_RANK[band]).toBeLessThanOrEqual(BAND_RANK[c.expect.maxConfidenceBand]);
+      expect(RISK_RANK[r.risk_level]).toBeLessThanOrEqual(RISK_RANK[c.expect.maxRiskLevel]);
       // High confidence is never allowed by any golden case.
       expect(r.confidence).toBeLessThan(0.7);
     });
@@ -292,9 +285,7 @@ describe("AI Doctor Golden Cases v1 — missing information signals", () => {
       const r = await runCase(c);
       const haystack = r.missing_information.join(" \n ").toLowerCase();
       for (const group of groups) {
-        const matched = group.some((needle) =>
-          haystack.includes(needle.toLowerCase()),
-        );
+        const matched = group.some((needle) => haystack.includes(needle.toLowerCase()));
         expect(matched, `expected one of ${JSON.stringify(group)} in missing_information`).toBe(
           true,
         );
@@ -377,16 +368,9 @@ describe("AI Doctor Golden Cases v1.1 — Action Queue invariants", () => {
       }
 
       // No hidden write/automation metadata beyond the four contract keys.
-      const allowedKeys = new Set([
-        "action_type",
-        "status",
-        "reason",
-        "risk_level",
-      ]);
+      const allowedKeys = new Set(["action_type", "status", "reason", "risk_level"]);
       for (const k of Object.keys(s)) {
-        expect(allowedKeys.has(k), `unexpected key on suggestion: ${k}`).toBe(
-          true,
-        );
+        expect(allowedKeys.has(k), `unexpected key on suggestion: ${k}`).toBe(true);
       }
     });
   }
@@ -469,4 +453,3 @@ describe("AI Doctor Golden Cases v1.3 — recursive output safety scan", () => {
     expect(all, report || "PASS").toEqual([]);
   });
 });
-

@@ -38,22 +38,16 @@ export default function TentPlantTabs({
   }, [viewModel.selectionWasReset, viewModel.selectedPlantId]);
 
   function focusTabByIndex(index: number) {
-    const tabs = listRef.current?.querySelectorAll<HTMLButtonElement>(
-      '[role="tab"]',
-    );
+    const tabs = listRef.current?.querySelectorAll<HTMLButtonElement>('[role="tab"]');
     if (!tabs || tabs.length === 0) return;
     const safe = ((index % tabs.length) + tabs.length) % tabs.length;
     tabs[safe]?.focus();
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
-    const tabs = listRef.current?.querySelectorAll<HTMLButtonElement>(
-      '[role="tab"]',
-    );
+    const tabs = listRef.current?.querySelectorAll<HTMLButtonElement>('[role="tab"]');
     if (!tabs || tabs.length === 0) return;
-    const current = Array.from(tabs).indexOf(
-      document.activeElement as HTMLButtonElement,
-    );
+    const current = Array.from(tabs).indexOf(document.activeElement as HTMLButtonElement);
     if (e.key === "ArrowRight") {
       e.preventDefault();
       focusTabByIndex(current + 1);
@@ -91,7 +85,7 @@ export default function TentPlantTabs({
             data-testid={tab.testId}
             data-archived={tab.isArchived ? "true" : undefined}
             onClick={() => onSelect(tab.id)}
-            className={`text-xs px-2.5 py-1 rounded-full border transition inline-flex items-center gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+            className={`text-xs px-2.5 py-1 rounded-full border transition inline-flex items-center gap-1 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
               tab.isSelected
                 ? "bg-primary text-primary-foreground border-primary"
                 : "bg-secondary/50 border-border/50 hover:bg-secondary"

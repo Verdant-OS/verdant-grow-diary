@@ -30,8 +30,7 @@ export const OOM_PATTERNS = [
 
 // `gh run view --log` may emit ANSI as real ESC (\x1b[..m) or, in some
 // environments, as literal caret notation (^[[..m). Strip both, plus BOM.
-const stripAnsi = (s) =>
-  s.replace(/(?:\x1b\[|\^\[\[)[0-9;?]*[A-Za-z]/g, "").replace(/﻿/g, "");
+const stripAnsi = (s) => s.replace(/(?:\x1b\[|\^\[\[)[0-9;?]*[A-Za-z]/g, "").replace(/﻿/g, "");
 
 export function detectOOM(text) {
   return OOM_PATTERNS.some((p) => p.test(text));
@@ -39,7 +38,10 @@ export function detectOOM(text) {
 
 /** Sum Vitest summary lines (` Tests  X passed | Y failed | Z skipped (T)`). */
 function sumVitest(section, label) {
-  let passed = 0, failed = 0, skipped = 0, seen = 0;
+  let passed = 0,
+    failed = 0,
+    skipped = 0,
+    seen = 0;
   const re = new RegExp(` ${label} {2}([^\\n(]*)\\(\\d+\\)`, "g");
   for (const m of section.matchAll(re)) {
     seen++;
@@ -65,27 +67,47 @@ export function parseJobLog(rawLog) {
   const log = stripAnsi(rawLog || "");
 
   const startM = log.match(/VERDANT_BATCH_START (\{[^\n]*\})/);
-  let batch = null, fileCount = null, chunksExpected = null;
+  let batch = null,
+    fileCount = null,
+    chunksExpected = null;
   if (startM) {
     try {
       const o = JSON.parse(startM[1]);
-      batch = o.batch; fileCount = o.fileCount ?? null; chunksExpected = o.chunks ?? null;
-    } catch { /* ignore malformed marker */ }
+      batch = o.batch;
+      fileCount = o.fileCount ?? null;
+      chunksExpected = o.chunks ?? null;
+    } catch {
+      /* ignore malformed marker */
+    }
   }
 
   // Section to analyze for counts/OOM = from batch start onward (excludes gates).
   const startIdx = startM ? log.indexOf(startM[0]) : log.search(/▶ Batch \d+:/);
   const section = startIdx >= 0 ? log.slice(startIdx) : log;
 
-  const chunkEnds = [...section.matchAll(/VERDANT_CHUNK_END (\{[^\n]*\})/g)].map((m) => {
-    try { return JSON.parse(m[1]); } catch { return null; }
-  }).filter(Boolean);
-  const chunksRun = chunkEnds.length || (section.match(/chunk \d+\/\d+: (PASS|FAIL)/g) || []).length;
+  const chunkEnds = [...section.matchAll(/VERDANT_CHUNK_END (\{[^\n]*\})/g)]
+    .map((m) => {
+      try {
+        return JSON.parse(m[1]);
+      } catch {
+        return null;
+      }
+    })
+    .filter(Boolean);
+  const chunksRun =
+    chunkEnds.length || (section.match(/chunk \d+\/\d+: (PASS|FAIL)/g) || []).length;
 
   const endM = section.match(/VERDANT_BATCH_END (\{[^\n]*\})/);
-  let endStatus = null, exitCode = null;
+  let endStatus = null,
+    exitCode = null;
   if (endM) {
-    try { const o = JSON.parse(endM[1]); endStatus = o.status; exitCode = o.exitCode; } catch { /* ignore */ }
+    try {
+      const o = JSON.parse(endM[1]);
+      endStatus = o.status;
+      exitCode = o.exitCode;
+    } catch {
+      /* ignore */
+    }
   }
 
   const tests = sumVitest(section, "Tests");
@@ -94,7 +116,7 @@ export function parseJobLog(rawLog) {
 
   let status;
   if (logMissing) status = "incomplete";
-  else if (endStatus) status = endStatus === "pass" ? "pass" : (oom ? "oom" : "fail");
+  else if (endStatus) status = endStatus === "pass" ? "pass" : oom ? "oom" : "fail";
   else if (oom) status = "oom";
   else if (tests.failed > 0 || files.failed > 0) status = "fail";
   else if (/◀ Batch \d+: PASS/.test(section)) status = "pass";
@@ -114,7 +136,10 @@ export function parseJobLog(rawLog) {
     filesPassed: files.passed,
     filesFailed: files.failed,
     filesSkipped: files.skipped,
-    filesValidated: status === "pass" ? (fileCount ?? files.passed + files.skipped) : (files.passed + files.skipped),
+    filesValidated:
+      status === "pass"
+        ? (fileCount ?? files.passed + files.skipped)
+        : files.passed + files.skipped,
     oom,
     exitCode,
     status,
@@ -157,13 +182,34 @@ export function summarizeGates(jobs) {
   const wfSafety = aggregateStep(list, (n) => /Assert batched workflow safety/i.test(n));
 
   const gates = [
-    { gate: "bun run typecheck", status: gatesStep, notes: "bundled: Safety gates step (all legs)" },
-    { gate: "node scripts/sensor-safety-check.mjs", status: gatesStep, notes: "bundled: Safety gates step (all legs)" },
-    { gate: "node scripts/assert-sensor-intelligence-safety.mjs --quiet", status: gatesStep, notes: "bundled: Safety gates step (all legs)" },
-    { gate: "bun run test:docs-demo-safety", status: gatesStep, notes: "bundled: Safety gates step (excluded from batch totals)" },
+    {
+      gate: "bun run typecheck",
+      status: gatesStep,
+      notes: "bundled: Safety gates step (all legs)",
+    },
+    {
+      gate: "node scripts/sensor-safety-check.mjs",
+      status: gatesStep,
+      notes: "bundled: Safety gates step (all legs)",
+    },
+    {
+      gate: "node scripts/assert-sensor-intelligence-safety.mjs --quiet",
+      status: gatesStep,
+      notes: "bundled: Safety gates step (all legs)",
+    },
+    {
+      gate: "bun run test:docs-demo-safety",
+      status: gatesStep,
+      notes: "bundled: Safety gates step (excluded from batch totals)",
+    },
     { gate: "batches=16 guard", status: guardStep, notes: "Assert batches input step (all legs)" },
   ];
-  if (wfSafety) gates.push({ gate: "workflow safety (chunk-size=1)", status: wfSafety, notes: "Assert batched workflow safety step (all legs)" });
+  if (wfSafety)
+    gates.push({
+      gate: "workflow safety (chunk-size=1)",
+      status: wfSafety,
+      notes: "Assert batched workflow safety step (all legs)",
+    });
 
   // Batch-utils self-test: fail-closed across legs (counts from any leg).
   let selfStatus = selfStep;
@@ -197,13 +243,25 @@ export function computeVerdict({ conclusion, batches, gates, selfTest }) {
   const gatesOk = gates.length > 0 && gates.every((g) => g.status === "success");
   const selfOk = !selfTest || selfTest.status !== "failure";
 
-  if (!gatesOk) return { verdict: "NO-GO", reason: "one or more safety gates did not pass (any matrix leg)" };
+  if (!gatesOk)
+    return { verdict: "NO-GO", reason: "one or more safety gates did not pass (any matrix leg)" };
   if (!selfOk) return { verdict: "NO-GO", reason: "batch-utils self-test failed" };
-  if (anySuiteFail) return { verdict: "NO-GO", reason: "at least one test assertion or test file failed" };
-  if (anyLogMissing) return { verdict: "NO-GO", reason: "a matrix job log was missing/unreadable — batch could not be validated" };
-  if (!allPresent) return { verdict: "NO-GO", reason: `cannot prove all ${REQUIRED_BATCHES} batches ran (missing job data)` };
-  if (conclusion === "success" && !anyOOM && !anyIncomplete) return { verdict: "GO", reason: "all batches passed, no OOM, gates green" };
-  if (!anySuiteFail && (anyOOM || anyIncomplete)) return { verdict: "PARTIAL", reason: "OOM/incomplete batch with zero suite failures" };
+  if (anySuiteFail)
+    return { verdict: "NO-GO", reason: "at least one test assertion or test file failed" };
+  if (anyLogMissing)
+    return {
+      verdict: "NO-GO",
+      reason: "a matrix job log was missing/unreadable — batch could not be validated",
+    };
+  if (!allPresent)
+    return {
+      verdict: "NO-GO",
+      reason: `cannot prove all ${REQUIRED_BATCHES} batches ran (missing job data)`,
+    };
+  if (conclusion === "success" && !anyOOM && !anyIncomplete)
+    return { verdict: "GO", reason: "all batches passed, no OOM, gates green" };
+  if (!anySuiteFail && (anyOOM || anyIncomplete))
+    return { verdict: "PARTIAL", reason: "OOM/incomplete batch with zero suite failures" };
   return { verdict: "NO-GO", reason: "unresolved failure state" };
 }
 
@@ -236,7 +294,12 @@ export function buildReceipt({ run, jobs }) {
   const matrixJobs = jobs.filter((j) => /\(matrix\)/.test(j.name || ""));
   const { gates, selfTest } = summarizeGates(matrixJobs.length ? matrixJobs : jobs);
 
-  const { verdict, reason } = computeVerdict({ conclusion: run.conclusion, batches: matrix, gates, selfTest });
+  const { verdict, reason } = computeVerdict({
+    conclusion: run.conclusion,
+    batches: matrix,
+    gates,
+    selfTest,
+  });
 
   const passing = matrix.filter((b) => b.status === "pass");
   const totalPassed = passing.reduce((a, b) => a + b.passed, 0);
@@ -251,7 +314,16 @@ export function buildReceipt({ run, jobs }) {
   const oomBatches = matrix.filter((b) => b.oom).map((b) => b.batch);
   const unvalidated = matrix.filter((b) => b.status !== "pass").map((b) => b.batch);
 
-  const agg = { totalPassed, totalFailed, totalFilesFailed, totalSkipped, totalFiles, failedBatches, oomBatches, unvalidated };
+  const agg = {
+    totalPassed,
+    totalFailed,
+    totalFilesFailed,
+    totalSkipped,
+    totalFiles,
+    failedBatches,
+    oomBatches,
+    unvalidated,
+  };
   const md = buildMarkdown({ run, verdict, reason, gates, selfTest, matrix, agg });
 
   return {
@@ -282,11 +354,13 @@ function buildMarkdown({ run, verdict, reason, gates, selfTest, matrix, agg }) {
   L.push(`- passed: ${selfTest.passed ?? "-"}`);
   L.push(`- failed: ${selfTest.failed ?? "-"}`, "");
   L.push("## Batch matrix results", "");
-  L.push("| batch | status | passed | failed | skipped | files validated | chunks run | duration | OOM | notes |");
+  L.push(
+    "| batch | status | passed | failed | skipped | files validated | chunks run | duration | OOM | notes |",
+  );
   L.push("|---|---|---|---|---|---|---|---|---|---|");
   for (const b of matrix) {
     L.push(
-      `| ${b.batch} | ${b.status} | ${b.passed} | ${b.failed} | ${b.skipped} | ${b.filesValidated ?? "-"} | ${b.chunksRun}${b.chunksExpected != null ? "/" + b.chunksExpected : ""} | ${b.duration ?? "-"} | ${b.oom ? "yes" : "no"} | ${b.status === "pass" ? "" : (b.oom ? "OOM" : "incomplete/failed")} |`,
+      `| ${b.batch} | ${b.status} | ${b.passed} | ${b.failed} | ${b.skipped} | ${b.filesValidated ?? "-"} | ${b.chunksRun}${b.chunksExpected != null ? "/" + b.chunksExpected : ""} | ${b.duration ?? "-"} | ${b.oom ? "yes" : "no"} | ${b.status === "pass" ? "" : b.oom ? "OOM" : "incomplete/failed"} |`,
     );
   }
   L.push("");
@@ -300,7 +374,9 @@ function buildMarkdown({ run, verdict, reason, gates, selfTest, matrix, agg }) {
       agg.totalFailed === 0 && agg.totalFilesFailed === 0
         ? "none"
         : `${agg.totalFailed} failed test(s), ${agg.totalFilesFailed} failed test file(s)` +
-          (agg.failedBatches && agg.failedBatches.length ? ` (batches: ${agg.failedBatches.join(", ")})` : "")
+          (agg.failedBatches && agg.failedBatches.length
+            ? ` (batches: ${agg.failedBatches.join(", ")})`
+            : "")
     }`,
   );
   L.push(`- unvalidated batches: ${agg.unvalidated.length ? agg.unvalidated.join(", ") : "none"}`);
@@ -311,10 +387,16 @@ function buildMarkdown({ run, verdict, reason, gates, selfTest, matrix, agg }) {
   else {
     for (const b of probs) {
       L.push(`- batch: ${b.batch}`);
-      L.push(`  - chunk/file: chunk ${b.chunksRun}${b.chunksExpected != null ? "/" + b.chunksExpected : ""} (first failing)`);
-      L.push(`  - error summary: ${b.oom ? "JavaScript heap out of memory (V8 heap limit)" : "batch did not complete / test failure"}`);
+      L.push(
+        `  - chunk/file: chunk ${b.chunksRun}${b.chunksExpected != null ? "/" + b.chunksExpected : ""} (first failing)`,
+      );
+      L.push(
+        `  - error summary: ${b.oom ? "JavaScript heap out of memory (V8 heap limit)" : "batch did not complete / test failure"}`,
+      );
       L.push(`  - heap size: ${b.oom ? "~4 GB cap reached" : "-"}`);
-      L.push(`  - recommended next step: ${b.oom ? "reduce per-process file load further or fix the leaking test; verify under CI" : "inspect the failing chunk log"}`);
+      L.push(
+        `  - recommended next step: ${b.oom ? "reduce per-process file load further or fix the leaking test; verify under CI" : "inspect the failing chunk log"}`,
+      );
     }
     L.push("");
   }
@@ -330,8 +412,13 @@ function parseArgs(argv) {
   const o = { repo: null, runId: null, jsonOut: null, mdOut: null };
   for (const a of argv) {
     if (a.startsWith("--run-url=")) {
-      const m = a.slice("--run-url=".length).match(/github\.com\/([^/]+\/[^/]+)\/actions\/runs\/(\d+)/);
-      if (m) { o.repo = m[1]; o.runId = m[2]; }
+      const m = a
+        .slice("--run-url=".length)
+        .match(/github\.com\/([^/]+\/[^/]+)\/actions\/runs\/(\d+)/);
+      if (m) {
+        o.repo = m[1];
+        o.runId = m[2];
+      }
     } else if (a.startsWith("--repo=")) o.repo = a.slice("--repo=".length);
     else if (a.startsWith("--run-id=")) o.runId = a.slice("--run-id=".length);
     else if (a.startsWith("--json-out=")) o.jsonOut = a.slice("--json-out=".length);
@@ -364,23 +451,48 @@ function main() {
   let runJson;
   try {
     runJson = JSON.parse(
-      gh(["run", "view", o.runId, "--repo", o.repo, "--json", "workflowName,url,headBranch,headSha,status,conclusion,createdAt,updatedAt,jobs"]),
+      gh([
+        "run",
+        "view",
+        o.runId,
+        "--repo",
+        o.repo,
+        "--json",
+        "workflowName,url,headBranch,headSha,status,conclusion,createdAt,updatedAt,jobs",
+      ]),
     );
   } catch (e) {
     console.error("GitHub CLI authentication required to fetch workflow logs.");
     process.exit(2);
   }
   const run = {
-    workflowName: runJson.workflowName, url: runJson.url, headBranch: runJson.headBranch,
-    headSha: runJson.headSha, status: runJson.status, conclusion: runJson.conclusion,
-    createdAt: runJson.createdAt, updatedAt: runJson.updatedAt,
+    workflowName: runJson.workflowName,
+    url: runJson.url,
+    headBranch: runJson.headBranch,
+    headSha: runJson.headSha,
+    status: runJson.status,
+    conclusion: runJson.conclusion,
+    createdAt: runJson.createdAt,
+    updatedAt: runJson.updatedAt,
   };
   const jobs = (runJson.jobs || []).map((j) => {
     let log = "";
     if (/\(matrix\)/.test(j.name || "")) {
-      try { log = gh(["run", "view", "--repo", o.repo, "--job", String(j.databaseId), "--log"]); } catch { log = ""; }
+      try {
+        log = gh(["run", "view", "--repo", o.repo, "--job", String(j.databaseId), "--log"]);
+      } catch {
+        log = "";
+      }
     }
-    return { databaseId: j.databaseId, name: j.name, conclusion: j.conclusion, startedAt: j.startedAt, completedAt: j.completedAt, steps: j.steps, log };
+    return {
+      databaseId: j.databaseId,
+      name: j.name,
+      conclusion: j.conclusion,
+      startedAt: j.startedAt,
+      completedAt: j.completedAt,
+      steps: j.steps,
+      log,
+    };
   });
 
   const receipt = buildReceipt({ run, jobs });

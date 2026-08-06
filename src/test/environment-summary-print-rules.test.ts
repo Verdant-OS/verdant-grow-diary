@@ -20,9 +20,9 @@ describe("environmentSummaryPrintRules", () => {
     expect(buildEnvironmentSummaryPrintFilename("", "2026-06-07")).toBe(
       "verdant-environment-summary-unknown-to-2026-06-07.pdf",
     );
-    expect(
-      buildEnvironmentSummaryPrintFilename(null as any, undefined as any),
-    ).toBe("verdant-environment-summary-unknown-to-unknown.pdf");
+    expect(buildEnvironmentSummaryPrintFilename(null as any, undefined as any)).toBe(
+      "verdant-environment-summary-unknown-to-unknown.pdf",
+    );
   });
 
   it("buildEnvironmentSummaryPrintTitle includes range", () => {
@@ -39,9 +39,7 @@ describe("environmentSummaryPrintRules", () => {
     });
     expect(meta.dateRangeLabel).toBe("2026-06-01 — 2026-06-07");
     expect(meta.generatedAtLabel).toBe("2026-06-08T12:00:00.000Z");
-    expect(meta.filename).toBe(
-      "verdant-environment-summary-2026-06-01-to-2026-06-07.pdf",
-    );
+    expect(meta.filename).toBe("verdant-environment-summary-2026-06-01-to-2026-06-07.pdf");
     expect(meta.safetyFooter).toBe(PRINT_SAFETY_FOOTER);
   });
 
@@ -69,35 +67,17 @@ describe("environmentSummaryPrintRules", () => {
       "2026-06-07",
       "source.review",
     );
+    expect(a).toBe("verdant-environment-drilldown-2026-06-01-to-2026-06-07-source.review.pdf");
     expect(a).toBe(
-      "verdant-environment-drilldown-2026-06-01-to-2026-06-07-source.review.pdf",
-    );
-    expect(a).toBe(
-      buildEnvironmentSummaryDrilldownPrintFilename(
-        "2026-06-01",
-        "2026-06-07",
-        "source.review",
-      ),
+      buildEnvironmentSummaryDrilldownPrintFilename("2026-06-01", "2026-06-07", "source.review"),
     );
   });
 
   it("drilldown filename falls back when ruleId is missing or unsafe-only", () => {
     expect(
-      buildEnvironmentSummaryDrilldownPrintFilename(
-        "2026-06-01",
-        "2026-06-07",
-        undefined,
-      ),
-    ).toBe(
-      "verdant-environment-drilldown-2026-06-01-to-2026-06-07-selected-issue.pdf",
-    );
-    expect(
-      buildEnvironmentSummaryDrilldownPrintFilename(
-        "2026-06-01",
-        "2026-06-07",
-        "////",
-      ),
-    ).toBe(
+      buildEnvironmentSummaryDrilldownPrintFilename("2026-06-01", "2026-06-07", undefined),
+    ).toBe("verdant-environment-drilldown-2026-06-01-to-2026-06-07-selected-issue.pdf");
+    expect(buildEnvironmentSummaryDrilldownPrintFilename("2026-06-01", "2026-06-07", "////")).toBe(
       "verdant-environment-drilldown-2026-06-01-to-2026-06-07-selected-issue.pdf",
     );
   });
@@ -109,16 +89,8 @@ describe("environmentSummaryPrintRules", () => {
         "2026-06-07",
         "Source review required",
       ),
-    ).toBe(
-      "Verdant — Environment Drilldown — Source review required — 2026-06-01 to 2026-06-07",
-    );
-    expect(
-      buildEnvironmentSummaryDrilldownPrintTitle(
-        "2026-06-01",
-        "2026-06-07",
-        "",
-      ),
-    ).toBe(
+    ).toBe("Verdant — Environment Drilldown — Source review required — 2026-06-01 to 2026-06-07");
+    expect(buildEnvironmentSummaryDrilldownPrintTitle("2026-06-01", "2026-06-07", "")).toBe(
       "Verdant — Environment Drilldown — Selected issue — 2026-06-01 to 2026-06-07",
     );
   });

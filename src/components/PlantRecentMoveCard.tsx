@@ -5,7 +5,7 @@
  * usePlantRecentActivity. No new table. No writes. No sensor_readings,
  * alerts, or action_queue access. Past entries are never rewritten.
  */
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { ArrowRight, Move } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { usePlantRecentActivity } from "@/hooks/usePlantRecentActivity";
@@ -38,9 +38,7 @@ export default function PlantRecentMoveCard({ plantId }: Props) {
       </div>
       <div className="flex-1 min-w-0 truncate" data-testid="plant-recent-move-summary">
         {move.summary}
-        {when ? (
-          <span className="text-xs text-muted-foreground"> · {when}</span>
-        ) : null}
+        {when ? <span className="text-xs text-muted-foreground"> · {when}</span> : null}
       </div>
       {move.nextTentId ? (
         <Link

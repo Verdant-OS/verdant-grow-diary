@@ -58,11 +58,8 @@ export default function HarvestTimelineCard({
     wetOrDry: "dry",
     details: harvest ?? null,
   });
-  const trimmedNote =
-    typeof note === "string" && note.trim().length > 0 ? note.trim() : null;
-  const hasContext = Boolean(
-    plantContextLabel || tentContextLabel || growContextLabel,
-  );
+  const trimmedNote = typeof note === "string" && note.trim().length > 0 ? note.trim() : null;
+  const hasContext = Boolean(plantContextLabel || tentContextLabel || growContextLabel);
 
   return (
     <li
@@ -74,19 +71,13 @@ export default function HarvestTimelineCard({
     >
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2 flex-wrap">
-          <Badge
-            variant="secondary"
-            className="gap-1"
-            data-testid="harvest-timeline-card-label"
-          >
+          <Badge variant="secondary" className="gap-1" data-testid="harvest-timeline-card-label">
             <Scissors className="h-3.5 w-3.5" aria-hidden /> Harvest
           </Badge>
           {stageLabel && (
             <Badge
               variant="outline"
-              className={
-                stageColorToken ? `stage-token-${stageColorToken}` : undefined
-              }
+              className={stageColorToken ? `stage-token-${stageColorToken}` : undefined}
               data-testid="harvest-timeline-card-stage"
             >
               {stageLabel}
@@ -95,14 +86,10 @@ export default function HarvestTimelineCard({
         </div>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           {plantDayLabel && (
-            <span data-testid="harvest-timeline-card-plant-day">
-              {plantDayLabel}
-            </span>
+            <span data-testid="harvest-timeline-card-plant-day">{plantDayLabel}</span>
           )}
           {stageDayLabel && (
-            <span data-testid="harvest-timeline-card-stage-day">
-              {stageDayLabel}
-            </span>
+            <span data-testid="harvest-timeline-card-stage-day">{stageDayLabel}</span>
           )}
           <span
             data-testid="harvest-timeline-card-timestamp"
@@ -114,10 +101,7 @@ export default function HarvestTimelineCard({
         </div>
       </div>
 
-      <p
-        className="mt-1.5 text-sm text-foreground/90"
-        data-testid="harvest-timeline-card-headline"
-      >
+      <p className="mt-1.5 text-sm text-foreground/90" data-testid="harvest-timeline-card-headline">
         Harvest logged
       </p>
 
@@ -129,10 +113,7 @@ export default function HarvestTimelineCard({
           {wetDisplay && (
             <div className="flex items-center gap-1.5">
               <dt className="text-muted-foreground">Wet weight:</dt>
-              <dd
-                className="text-foreground/90"
-                data-testid="harvest-timeline-card-wet-weight"
-              >
+              <dd className="text-foreground/90" data-testid="harvest-timeline-card-wet-weight">
                 {wetDisplay}
               </dd>
             </div>
@@ -140,10 +121,7 @@ export default function HarvestTimelineCard({
           {dryDisplay && (
             <div className="flex items-center gap-1.5">
               <dt className="text-muted-foreground">Dry weight:</dt>
-              <dd
-                className="text-foreground/90"
-                data-testid="harvest-timeline-card-dry-weight"
-              >
+              <dd className="text-foreground/90" data-testid="harvest-timeline-card-dry-weight">
                 {dryDisplay}
               </dd>
             </div>
@@ -167,19 +145,13 @@ export default function HarvestTimelineCard({
           data-testid="harvest-timeline-card-context"
         >
           {plantContextLabel && (
-            <span data-testid="harvest-timeline-card-context-plant">
-              {plantContextLabel}
-            </span>
+            <span data-testid="harvest-timeline-card-context-plant">{plantContextLabel}</span>
           )}
           {tentContextLabel && (
-            <span data-testid="harvest-timeline-card-context-tent">
-              {tentContextLabel}
-            </span>
+            <span data-testid="harvest-timeline-card-context-tent">{tentContextLabel}</span>
           )}
           {growContextLabel && (
-            <span data-testid="harvest-timeline-card-context-grow">
-              {growContextLabel}
-            </span>
+            <span data-testid="harvest-timeline-card-context-grow">{growContextLabel}</span>
           )}
         </p>
       )}

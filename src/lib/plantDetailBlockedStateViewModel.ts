@@ -28,11 +28,7 @@ import {
 import { plantsPath, tentDetailPath, plantDetailPath } from "@/lib/routes";
 import type { PlantDetailLoadState } from "@/lib/plantDetailLoadTimeoutRules";
 
-export type PlantDetailBlockedStateKind =
-  | "loading-slow"
-  | "error"
-  | "archived"
-  | "not-found";
+export type PlantDetailBlockedStateKind = "loading-slow" | "error" | "archived" | "not-found";
 
 export interface PlantDetailBlockedStateAction {
   /** Stable test id for the link element. */
@@ -90,11 +86,8 @@ const PLANTS_FALLBACK: PlantDetailBlockedStateAction = {
 
 function readPlantTentId(p?: ArchivedPlantLike | null): string | null {
   if (!p) return null;
-  const candidate =
-    (p as { tentId?: unknown }).tentId ?? (p as { tent_id?: unknown }).tent_id;
-  return typeof candidate === "string" && candidate.length > 0
-    ? candidate
-    : null;
+  const candidate = (p as { tentId?: unknown }).tentId ?? (p as { tent_id?: unknown }).tent_id;
+  return typeof candidate === "string" && candidate.length > 0 ? candidate : null;
 }
 
 function tentBack(tentId: string): PlantDetailBlockedStateAction {
@@ -106,9 +99,10 @@ function tentBack(tentId: string): PlantDetailBlockedStateAction {
   };
 }
 
-export function resolveBackContext(
-  input: DerivePlantDetailBlockedStateInput,
-): { primary: PlantDetailBlockedStateAction; secondary: PlantDetailBlockedStateAction | null } {
+export function resolveBackContext(input: DerivePlantDetailBlockedStateInput): {
+  primary: PlantDetailBlockedStateAction;
+  secondary: PlantDetailBlockedStateAction | null;
+} {
   const plantTentId = readPlantTentId(input.plant);
   const ctxTentId =
     typeof input.contextTentId === "string" && input.contextTentId.length > 0
@@ -174,10 +168,10 @@ export function derivePlantDetailBlockedStateView(
       const label = getArchivedPlantLabel(plant);
       const merged = label.kind === "merged";
       const plantId =
-        typeof (plant as { id?: unknown }).id === "string"
-          ? ((plant as { id: string }).id)
-          : null;
-      const tentForLink = readPlantTentId(plant) ?? (typeof input.contextTentId === "string" ? input.contextTentId : null);
+        typeof (plant as { id?: unknown }).id === "string" ? (plant as { id: string }).id : null;
+      const tentForLink =
+        readPlantTentId(plant) ??
+        (typeof input.contextTentId === "string" ? input.contextTentId : null);
       const archivedTimelineAction: PlantDetailBlockedStateAction | null = plantId
         ? {
             testId: "plant-detail-view-archived-timeline",

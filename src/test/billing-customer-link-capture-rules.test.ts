@@ -70,21 +70,27 @@ describe("buildBillingCustomerLinkCapturePlan", () => {
   });
 
   it("blocks missing required attribution", () => {
-    expect(buildBillingCustomerLinkCapturePlan({
-      providerCustomerId: "ctm_123",
-    })).toEqual({ ok: false, reason: "missing_user_id" });
+    expect(
+      buildBillingCustomerLinkCapturePlan({
+        providerCustomerId: "ctm_123",
+      }),
+    ).toEqual({ ok: false, reason: "missing_user_id" });
 
-    expect(buildBillingCustomerLinkCapturePlan({
-      authenticatedUserId: "user_123",
-    })).toEqual({ ok: false, reason: "missing_provider_customer_id" });
+    expect(
+      buildBillingCustomerLinkCapturePlan({
+        authenticatedUserId: "user_123",
+      }),
+    ).toEqual({ ok: false, reason: "missing_provider_customer_id" });
   });
 
   it("blocks unsupported providers", () => {
-    expect(buildBillingCustomerLinkCapturePlan({
-      authenticatedUserId: "user_123",
-      provider: "stripe",
-      providerCustomerId: "cus_123",
-    })).toEqual({ ok: false, reason: "unsupported_provider" });
+    expect(
+      buildBillingCustomerLinkCapturePlan({
+        authenticatedUserId: "user_123",
+        provider: "stripe",
+        providerCustomerId: "cus_123",
+      }),
+    ).toEqual({ ok: false, reason: "unsupported_provider" });
   });
 
   it("blocks ambiguous provider customer ownership", () => {
@@ -112,43 +118,55 @@ describe("buildBillingCustomerLinkCapturePlan", () => {
   });
 
   it("blocks ambiguous optional identifiers", () => {
-    expect(buildBillingCustomerLinkCapturePlan({
-      authenticatedUserId: "user_123",
-      providerCustomerId: "ctm_123",
-      providerSubscriptionIds: ["sub_1", "sub_2"],
-    })).toEqual({ ok: false, reason: "ambiguous_provider_subscription_id" });
+    expect(
+      buildBillingCustomerLinkCapturePlan({
+        authenticatedUserId: "user_123",
+        providerCustomerId: "ctm_123",
+        providerSubscriptionIds: ["sub_1", "sub_2"],
+      }),
+    ).toEqual({ ok: false, reason: "ambiguous_provider_subscription_id" });
 
-    expect(buildBillingCustomerLinkCapturePlan({
-      authenticatedUserId: "user_123",
-      providerCustomerId: "ctm_123",
-      providerCheckoutIds: ["chk_1", "chk_2"],
-    })).toEqual({ ok: false, reason: "ambiguous_provider_checkout_id" });
+    expect(
+      buildBillingCustomerLinkCapturePlan({
+        authenticatedUserId: "user_123",
+        providerCustomerId: "ctm_123",
+        providerCheckoutIds: ["chk_1", "chk_2"],
+      }),
+    ).toEqual({ ok: false, reason: "ambiguous_provider_checkout_id" });
 
-    expect(buildBillingCustomerLinkCapturePlan({
-      authenticatedUserId: "user_123",
-      providerCustomerId: "ctm_123",
-      lastPaddleEventIds: ["evt_1", "evt_2"],
-    })).toEqual({ ok: false, reason: "ambiguous_event_reference" });
+    expect(
+      buildBillingCustomerLinkCapturePlan({
+        authenticatedUserId: "user_123",
+        providerCustomerId: "ctm_123",
+        lastPaddleEventIds: ["evt_1", "evt_2"],
+      }),
+    ).toEqual({ ok: false, reason: "ambiguous_event_reference" });
   });
 
   it("blocks invalid metadata enums", () => {
-    expect(buildBillingCustomerLinkCapturePlan({
-      authenticatedUserId: "user_123",
-      providerCustomerId: "ctm_123",
-      linkSource: "browser",
-    })).toEqual({ ok: false, reason: "invalid_link_source" });
+    expect(
+      buildBillingCustomerLinkCapturePlan({
+        authenticatedUserId: "user_123",
+        providerCustomerId: "ctm_123",
+        linkSource: "browser",
+      }),
+    ).toEqual({ ok: false, reason: "invalid_link_source" });
 
-    expect(buildBillingCustomerLinkCapturePlan({
-      authenticatedUserId: "user_123",
-      providerCustomerId: "ctm_123",
-      linkStatus: "active",
-    })).toEqual({ ok: false, reason: "invalid_link_status" });
+    expect(
+      buildBillingCustomerLinkCapturePlan({
+        authenticatedUserId: "user_123",
+        providerCustomerId: "ctm_123",
+        linkStatus: "active",
+      }),
+    ).toEqual({ ok: false, reason: "invalid_link_status" });
 
-    expect(buildBillingCustomerLinkCapturePlan({
-      authenticatedUserId: "user_123",
-      providerCustomerId: "ctm_123",
-      confidence: "trusted_client",
-    })).toEqual({ ok: false, reason: "invalid_confidence" });
+    expect(
+      buildBillingCustomerLinkCapturePlan({
+        authenticatedUserId: "user_123",
+        providerCustomerId: "ctm_123",
+        confidence: "trusted_client",
+      }),
+    ).toEqual({ ok: false, reason: "invalid_confidence" });
   });
 
   it("is pure planning logic with no database, network, storage, or entitlement writes", () => {

@@ -114,10 +114,7 @@ export function handleEcoWittRealIngestRequest(
   input: HandleEcoWittRealIngestRequestInput,
 ): EcoWittRealIngestEndpointResponse {
   // 1) Auth boundary
-  const auth = validateEcoWittBridgeAuthorization(
-    input.authorizationHeader,
-    input.expectedToken,
-  );
+  const auth = validateEcoWittBridgeAuthorization(input.authorizationHeader, input.expectedToken);
   const authResp = authToEndpoint(auth);
   if (authResp) return authResp;
 
@@ -151,9 +148,7 @@ export function handleEcoWittRealIngestRequest(
   // redacted_payload is null (e.g. structural rejection before redaction).
   const redactedPreview =
     result.redacted_payload ??
-    redactEcoWittRawPayload(
-      (input.payload as { raw_payload?: unknown }).raw_payload ?? null,
-    );
+    redactEcoWittRawPayload((input.payload as { raw_payload?: unknown }).raw_payload ?? null);
 
   if (!result.accepted) {
     return envelope("rejected_candidate", 422, {

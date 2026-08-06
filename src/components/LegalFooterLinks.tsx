@@ -6,7 +6,7 @@
  * Paddle reviewers and search engines discover the legal pages through
  * these links, so every public/app/customer footer renders this component.
  */
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 
 export const LEGAL_FOOTER_LINKS = [
   { to: "/terms", label: "Terms" },
@@ -21,10 +21,16 @@ export default function LegalFooterLinks({ className }: { className?: string }) 
     <nav
       aria-label="Legal and support"
       data-testid="legal-footer-links"
-      className={className ?? "flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground"}
+      className={
+        className ?? "flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground"
+      }
     >
       {LEGAL_FOOTER_LINKS.map((l) => (
-        <Link key={l.to} to={l.to} className="hover:text-foreground underline-offset-2 hover:underline">
+        <Link
+          key={l.to}
+          to={l.to}
+          className="hover:text-foreground underline-offset-2 hover:underline"
+        >
           {l.label}
         </Link>
       ))}

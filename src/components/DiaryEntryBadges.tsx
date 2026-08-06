@@ -53,34 +53,23 @@ export default function DiaryEntryBadges({ item, className }: DiaryEntryBadgesPr
   const tagsToShow = PRIMARY_TAGS.filter((t) => item.tags.includes(t));
   const hasWarnings = item.warnings.length > 0;
   const sensorBadge = sensorSnapshotBadge(item.sensorSnapshotState);
-  const sourceLabel = item.hasSensorSnapshot ? item.sensorSourceLabel ?? null : null;
-  const vendorLabel = item.hasSensorSnapshot ? item.sensorVendorLabel ?? null : null;
+  const sourceLabel = item.hasSensorSnapshot ? (item.sensorSourceLabel ?? null) : null;
+  const vendorLabel = item.hasSensorSnapshot ? (item.sensorVendorLabel ?? null) : null;
   const faqLinkInput = {
     eventType: item.eventType,
     tags: item.tags,
     notePreview: item.notePreview,
   };
 
-  if (
-    tagsToShow.length === 0 &&
-    !hasWarnings &&
-    !sensorBadge &&
-    !sourceLabel &&
-    !vendorLabel
-  ) {
+  if (tagsToShow.length === 0 && !hasWarnings && !sensorBadge && !sourceLabel && !vendorLabel) {
     return <DiaryEntryFaqLink item={faqLinkInput} />;
   }
 
-
   const variantClasses: Record<SensorSnapshotBadge["variant"], string> = {
-    positive:
-      "bg-emerald-500/10 border-emerald-500/30 text-emerald-300",
-    neutral:
-      "bg-secondary/60 border-border/40 text-muted-foreground",
-    warning:
-      "bg-amber-500/10 border-amber-500/30 text-amber-300",
-    error:
-      "bg-red-500/10 border-red-500/30 text-red-300",
+    positive: "bg-emerald-500/10 border-emerald-500/30 text-emerald-300",
+    neutral: "bg-secondary/60 border-border/40 text-muted-foreground",
+    warning: "bg-amber-500/10 border-amber-500/30 text-amber-300",
+    error: "bg-red-500/10 border-red-500/30 text-red-300",
   };
 
   return (

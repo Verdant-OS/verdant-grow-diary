@@ -1,7 +1,7 @@
 // Targeted tests for auth error classifier + verification-required UI surface.
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import {
   classifyAuthError,
   EMAIL_VERIFICATION_REQUIRED_MESSAGE,
@@ -87,9 +87,7 @@ describe("Sign-in verification-required UI", () => {
     );
     // Generic sign-in error is NOT shown in this branch.
     expect(screen.queryByText(/couldn['’]t sign you in/i)).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /resend verification email/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /resend verification email/i })).toBeInTheDocument();
   });
 
   it("resend success uses generic non-enumerating copy", async () => {

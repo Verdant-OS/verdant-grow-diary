@@ -7,10 +7,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 
-const FILES = [
-  "src/constants/groveBagCureFields.ts",
-  "src/lib/groveBagAirflowRules.ts",
-];
+const FILES = ["src/constants/groveBagCureFields.ts", "src/lib/groveBagAirflowRules.ts"];
 
 const FORBIDDEN_IMPORT_PATTERNS: Array<{ name: string; re: RegExp }> = [
   { name: "AI gateway import", re: /from\s+["']@\/lib\/ai(?:Doctor|Coach|Gateway)/i },

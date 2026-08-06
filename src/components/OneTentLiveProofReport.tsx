@@ -71,14 +71,10 @@ export default function OneTentLiveProofReport({
                 — {s.statusLabel}
               </div>
               {s.evidenceSummary ? (
-                <div className="text-muted-foreground">
-                  Evidence: {s.evidenceSummary}
-                </div>
+                <div className="text-muted-foreground">Evidence: {s.evidenceSummary}</div>
               ) : null}
               {s.missingEvidence ? (
-                <div className="text-amber-700 dark:text-amber-300">
-                  {s.missingEvidence}
-                </div>
+                <div className="text-amber-700 dark:text-amber-300">{s.missingEvidence}</div>
               ) : null}
             </li>
           ))}
@@ -86,10 +82,7 @@ export default function OneTentLiveProofReport({
       </div>
 
       {report.closingLine ? (
-        <p
-          className="text-xs font-semibold"
-          data-testid="one-tent-live-proof-report-closing"
-        >
+        <p className="text-xs font-semibold" data-testid="one-tent-live-proof-report-closing">
           {report.closingLine}
         </p>
       ) : null}

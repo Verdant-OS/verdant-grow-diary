@@ -12,7 +12,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import ManualSensorReadingCard from "@/components/ManualSensorReadingCard";
 import {
   validateManualEntry,
@@ -163,8 +163,7 @@ describe("ManualSensorReadingCard — PPFD save roundtrip", () => {
     expect(insertedRows.length).toBeGreaterThan(0);
     const flattenedRows = insertedRows.flatMap((row) => (Array.isArray(row) ? row : [row]));
     const ppfdRow = flattenedRows.find((r) => (r as Record<string, unknown>).metric === "ppfd") as
-      | Record<string, unknown>
-      | undefined;
+      Record<string, unknown> | undefined;
     expect(ppfdRow).toBeTruthy();
     expect(ppfdRow?.value).toBe(780);
     expect(ppfdRow?.source).toBe("manual");

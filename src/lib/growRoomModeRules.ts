@@ -15,20 +15,13 @@
  */
 import type { SensorSnapshot, SnapshotSource } from "@/lib/sensorSnapshot";
 
+import { GROW_ROOM_MODE_STALE_MINUTES } from "../constants/sensorTiming";
 // ---------- Inputs --------------------------------------------------------
 
 export type GrowRoomAlertSeverity = "info" | "watch" | "warning" | "critical";
-export type GrowRoomAlertStatus =
-  | "open"
-  | "acknowledged"
-  | "resolved"
-  | "dismissed";
+export type GrowRoomAlertStatus = "open" | "acknowledged" | "resolved" | "dismissed";
 export type GrowRoomActionStatus =
-  | "pending_approval"
-  | "approved"
-  | "rejected"
-  | "completed"
-  | "cancelled";
+  "pending_approval" | "approved" | "rejected" | "completed" | "cancelled";
 
 export interface GrowRoomTentInput {
   id: string;
@@ -74,27 +67,12 @@ export interface GrowRoomAggregationInput {
 
 // ---------- Outputs -------------------------------------------------------
 
-export type SnapshotState =
-  | "live"
-  | "manual"
-  | "diary"
-  | "stale"
-  | "missing"
-  | "demo";
+export type SnapshotState = "live" | "manual" | "diary" | "stale" | "missing" | "demo";
 
-export type DataHealth =
-  | "healthy"
-  | "attention"
-  | "warning"
-  | "critical"
-  | "stale"
-  | "missing";
+export type DataHealth = "healthy" | "attention" | "warning" | "critical" | "stale" | "missing";
 
 export type PrimaryRecommendation =
-  | "review_alert"
-  | "review_action_queue"
-  | "check_stale_data"
-  | "no_action";
+  "review_alert" | "review_action_queue" | "check_stale_data" | "no_action";
 
 export type SeverityOrNone = GrowRoomAlertSeverity | "none";
 
@@ -140,7 +118,7 @@ const HEALTH_RANK: Record<DataHealth, number> = {
   healthy: 1,
 };
 
-const DEFAULT_STALE_MINUTES = 30;
+const DEFAULT_STALE_MINUTES = GROW_ROOM_MODE_STALE_MINUTES;
 const DEFAULT_RECENT_HOURS = 24;
 
 // ---------- Helpers (pure) -------------------------------------------------
@@ -228,9 +206,7 @@ function dataHealthFor(
  *
  * Read-only and pure. The caller must provide `now`.
  */
-export function buildGrowRoomTentCards(
-  input: GrowRoomAggregationInput,
-): GrowRoomTentCard[] {
+export function buildGrowRoomTentCards(input: GrowRoomAggregationInput): GrowRoomTentCard[] {
   const stale = input.staleMinutes ?? DEFAULT_STALE_MINUTES;
   const recentMs = (input.recentAlertWindowHours ?? DEFAULT_RECENT_HOURS) * 3600_000;
   const demoSet = new Set(input.demoTentIds ?? []);
@@ -286,11 +262,7 @@ export function buildGrowRoomTentCards(
       highestSeverity: severity,
       pendingActionCount: pending.length,
       dataHealth: health,
-      primaryRecommendation: recommendationFor(
-        openAlerts.length,
-        pending.length,
-        snapshotState,
-      ),
+      primaryRecommendation: recommendationFor(openAlerts.length, pending.length, snapshotState),
     };
   });
 

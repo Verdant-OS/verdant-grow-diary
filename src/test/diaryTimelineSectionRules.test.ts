@@ -9,79 +9,47 @@ import {
 
 describe("classifyDiaryTimelineEntry", () => {
   it("watering event → watering", () => {
-    expect(classifyDiaryTimelineEntry({ eventType: "watering" })).toBe(
-      "watering",
-    );
+    expect(classifyDiaryTimelineEntry({ eventType: "watering" })).toBe("watering");
   });
   it("feeding event → feeding", () => {
-    expect(classifyDiaryTimelineEntry({ eventType: "feeding" })).toBe(
-      "feeding",
-    );
+    expect(classifyDiaryTimelineEntry({ eventType: "feeding" })).toBe("feeding");
   });
   it("training / defoliation → training", () => {
-    expect(classifyDiaryTimelineEntry({ eventType: "training" })).toBe(
-      "training",
-    );
-    expect(classifyDiaryTimelineEntry({ eventType: "defoliation" })).toBe(
-      "training",
-    );
+    expect(classifyDiaryTimelineEntry({ eventType: "training" })).toBe("training");
+    expect(classifyDiaryTimelineEntry({ eventType: "defoliation" })).toBe("training");
   });
   it("photo event or photo source → photos", () => {
     expect(classifyDiaryTimelineEntry({ eventType: "photo" })).toBe("photos");
-    expect(
-      classifyDiaryTimelineEntry({ eventType: "note", source: "photo" }),
-    ).toBe("photos");
+    expect(classifyDiaryTimelineEntry({ eventType: "note", source: "photo" })).toBe("photos");
   });
   it("symptoms / diagnosis → diagnoses", () => {
-    expect(classifyDiaryTimelineEntry({ eventType: "symptoms" })).toBe(
-      "diagnoses",
-    );
-    expect(classifyDiaryTimelineEntry({ eventType: "diagnosis" })).toBe(
-      "diagnoses",
-    );
-    expect(classifyDiaryTimelineEntry({ eventType: "pest_disease" })).toBe(
-      "diagnoses",
-    );
+    expect(classifyDiaryTimelineEntry({ eventType: "symptoms" })).toBe("diagnoses");
+    expect(classifyDiaryTimelineEntry({ eventType: "diagnosis" })).toBe("diagnoses");
+    expect(classifyDiaryTimelineEntry({ eventType: "pest_disease" })).toBe("diagnoses");
   });
   it("harvest / dry / cure → harvest", () => {
-    expect(classifyDiaryTimelineEntry({ eventType: "harvest" })).toBe(
-      "harvest",
-    );
-    expect(classifyDiaryTimelineEntry({ eventType: "drying" })).toBe(
-      "harvest",
-    );
-    expect(classifyDiaryTimelineEntry({ eventType: "curing" })).toBe(
-      "harvest",
-    );
+    expect(classifyDiaryTimelineEntry({ eventType: "harvest" })).toBe("harvest");
+    expect(classifyDiaryTimelineEntry({ eventType: "drying" })).toBe("harvest");
+    expect(classifyDiaryTimelineEntry({ eventType: "curing" })).toBe("harvest");
   });
   it("unknown / null / missing → other (never guessed)", () => {
     expect(classifyDiaryTimelineEntry(null)).toBe("other");
     expect(classifyDiaryTimelineEntry(undefined)).toBe("other");
     expect(classifyDiaryTimelineEntry({})).toBe("other");
     expect(classifyDiaryTimelineEntry({ eventType: "note" })).toBe("other");
-    expect(classifyDiaryTimelineEntry({ eventType: "something-vague" })).toBe(
-      "other",
-    );
+    expect(classifyDiaryTimelineEntry({ eventType: "something-vague" })).toBe("other");
   });
   it("sensor snapshot / measurement → other (not 'healthy/actionable')", () => {
-    expect(classifyDiaryTimelineEntry({ eventType: "measurement" })).toBe(
-      "other",
-    );
-    expect(classifyDiaryTimelineEntry({ eventType: "sensor_snapshot" })).toBe(
-      "other",
-    );
-    expect(
-      classifyDiaryTimelineEntry({ eventType: "note", source: "sensor" }),
-    ).toBe("other");
+    expect(classifyDiaryTimelineEntry({ eventType: "measurement" })).toBe("other");
+    expect(classifyDiaryTimelineEntry({ eventType: "sensor_snapshot" })).toBe("other");
+    expect(classifyDiaryTimelineEntry({ eventType: "note", source: "sensor" })).toBe("other");
   });
 });
 
 describe("buildDiaryTimelineSections", () => {
   it("returns all seven sections in fixed order, even for empty input", () => {
     const sections = buildDiaryTimelineSections([]);
-    expect(sections.map((s) => s.id)).toEqual([
-      ...DIARY_TIMELINE_SECTION_ORDER,
-    ]);
+    expect(sections.map((s) => s.id)).toEqual([...DIARY_TIMELINE_SECTION_ORDER]);
     for (const s of sections) expect(s.count).toBe(0);
   });
 
@@ -115,19 +83,13 @@ describe("buildDiaryTimelineSections", () => {
       { id: "w2", eventType: "watering" },
       { id: "w3", eventType: "watering" },
     ];
-    const watering = buildDiaryTimelineSections(items).find(
-      (s) => s.id === "watering",
-    )!;
+    const watering = buildDiaryTimelineSections(items).find((s) => s.id === "watering")!;
     expect(watering.items.map((i) => i.id)).toEqual(["w1", "w2", "w3"]);
   });
 
   it("null / undefined input is treated as empty", () => {
-    expect(buildDiaryTimelineSections(null).every((s) => s.count === 0)).toBe(
-      true,
-    );
-    expect(
-      buildDiaryTimelineSections(undefined).every((s) => s.count === 0),
-    ).toBe(true);
+    expect(buildDiaryTimelineSections(null).every((s) => s.count === 0)).toBe(true);
+    expect(buildDiaryTimelineSections(undefined).every((s) => s.count === 0)).toBe(true);
   });
 
   it("attaches the exact required empty copy on every section", () => {

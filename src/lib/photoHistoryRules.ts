@@ -131,9 +131,7 @@ function compareNewestFirst(a: PhotoHistoryRow, b: PhotoHistoryRow): number {
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
 }
 
-export function buildPhotoHistory(
-  entries: readonly NormalizedDiaryEntry[],
-): PhotoHistoryRow[] {
+export function buildPhotoHistory(entries: readonly NormalizedDiaryEntry[]): PhotoHistoryRow[] {
   if (!entries || entries.length === 0) return [];
   const rows: PhotoHistoryRow[] = [];
   for (const e of entries) {

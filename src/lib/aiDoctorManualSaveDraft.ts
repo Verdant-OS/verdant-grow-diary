@@ -13,18 +13,13 @@
 
 import type { AiDoctorCheckInPreviewView } from "./aiDoctorCheckInPreviewViewModel";
 
-export const AI_DOCTOR_MANUAL_SAVE_SOURCE =
-  "ai_doctor_check_in_manual_save" as const;
+export const AI_DOCTOR_MANUAL_SAVE_SOURCE = "ai_doctor_check_in_manual_save" as const;
 export const AI_DOCTOR_MANUAL_SAVE_KIND = "ai_doctor_check_in" as const;
 export const AI_DOCTOR_ENGINE_VERSION_DEFAULT = "phase1" as const;
 export const AI_DOCTOR_RECEIPT_VERSION_DEFAULT = "v1" as const;
 
 export type AiDoctorManualSaveBlockedReason =
-  | "missing_plant_id"
-  | "missing_tent_id"
-  | "missing_grow_id"
-  | "missing_note"
-  | "missing_summary";
+  "missing_plant_id" | "missing_tent_id" | "missing_grow_id" | "missing_note" | "missing_summary";
 
 export interface AiDoctorManualSavePlantIdentity {
   plant_id?: string | null;
@@ -97,8 +92,7 @@ export interface AiDoctorManualSaveDraftBlocked {
 }
 
 export type AiDoctorManualSaveDraftResult =
-  | AiDoctorManualSaveDraftOk
-  | AiDoctorManualSaveDraftBlocked;
+  AiDoctorManualSaveDraftOk | AiDoctorManualSaveDraftBlocked;
 
 export function isBlockedManualSaveDraft(
   r: AiDoctorManualSaveDraftResult,
@@ -170,8 +164,7 @@ export function buildAiDoctorManualSaveDraft(
   if (!identity.tent_id) reasons.push("missing_tent_id");
   if (!identity.grow_id) reasons.push("missing_grow_id");
   if (!receiptText || receiptText.trim() === "") reasons.push("missing_note");
-  if (!view?.summary || view.summary.trim() === "")
-    reasons.push("missing_summary");
+  if (!view?.summary || view.summary.trim() === "") reasons.push("missing_summary");
 
   if (reasons.length > 0) {
     const blocked: AiDoctorManualSaveDraftBlocked = {
@@ -182,8 +175,7 @@ export function buildAiDoctorManualSaveDraft(
   }
 
   const engineVersion = input.engineVersion ?? AI_DOCTOR_ENGINE_VERSION_DEFAULT;
-  const receiptVersion =
-    input.receiptVersion ?? AI_DOCTOR_RECEIPT_VERSION_DEFAULT;
+  const receiptVersion = input.receiptVersion ?? AI_DOCTOR_RECEIPT_VERSION_DEFAULT;
   const now = input.now ?? new Date(0);
   const occurredAt = input.occurredAt ?? now.toISOString();
 

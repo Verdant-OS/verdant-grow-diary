@@ -128,9 +128,7 @@ describe("quickLogGroupedTimelineFilterViewModel", () => {
     expect(QUICK_LOG_GROUPED_TIMELINE_FILTER_LABELS["ai-doctor-evidence"]).toBe(
       "AI Doctor evidence",
     );
-    expect(QUICK_LOG_GROUPED_TIMELINE_EMPTY_OVERALL_TEXT).toBe(
-      "No QuickLog entries yet.",
-    );
+    expect(QUICK_LOG_GROUPED_TIMELINE_EMPTY_OVERALL_TEXT).toBe("No QuickLog entries yet.");
     expect(QUICK_LOG_GROUPED_TIMELINE_EMPTY_FILTERED_TEXT).toBe(
       "No QuickLog entries match this filter.",
     );

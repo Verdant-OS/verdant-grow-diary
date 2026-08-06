@@ -6,7 +6,7 @@
  * Copy stays observational: "Record what changed after completed actions."
  * No claim that an action fixed, healed, or resolved any issue.
  */
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { ArrowRight, ClipboardList } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { actionDetailPath } from "@/lib/routes";
@@ -16,9 +16,7 @@ interface Props {
   scopedGrowId: string | null | undefined;
 }
 
-export default function DashboardPendingOutcomeReviewsCard({
-  scopedGrowId,
-}: Props) {
+export default function DashboardPendingOutcomeReviewsCard({ scopedGrowId }: Props) {
   const state = useDashboardPendingOutcomeReviews(scopedGrowId ?? null);
   if (state.status !== "ok" || state.items.length === 0) return null;
 
@@ -46,8 +44,8 @@ export default function DashboardPendingOutcomeReviewsCard({
             className="text-xs text-muted-foreground mt-1"
             data-testid="pending-outcome-reviews-count"
           >
-            {total} completed {total === 1 ? "action is" : "actions are"}{" "}
-            waiting for a recorded outcome.
+            {total} completed {total === 1 ? "action is" : "actions are"} waiting for a recorded
+            outcome.
           </p>
         </div>
       </div>
@@ -59,9 +57,7 @@ export default function DashboardPendingOutcomeReviewsCard({
             className="flex items-center justify-between gap-2 rounded-lg border border-border/60 px-3 py-2"
           >
             <div className="min-w-0">
-              <p className="text-sm truncate">
-                {item.suggested_change ?? "Completed action"}
-              </p>
+              <p className="text-sm truncate">{item.suggested_change ?? "Completed action"}</p>
               <p className="text-xs text-muted-foreground">
                 Completed ~{item.hours_since_completed}h ago
               </p>

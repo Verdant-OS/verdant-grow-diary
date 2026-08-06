@@ -19,36 +19,13 @@
  *    Vendor lineage is carried as a separate, optional, safe label only.
  */
 
-export type SensorSnapshotSource =
-  | "live"
-  | "manual"
-  | "csv"
-  | "demo"
-  | "stale"
-  | "invalid";
+export type SensorSnapshotSource = "live" | "manual" | "csv" | "demo" | "stale" | "invalid";
 
-export type SensorSnapshotFreshnessState =
-  | "fresh"
-  | "stale"
-  | "invalid"
-  | "demo"
-  | "unknown";
+export type SensorSnapshotFreshnessState = "fresh" | "stale" | "invalid" | "demo" | "unknown";
 
-export type SensorSnapshotTrustTone =
-  | "ok"
-  | "info"
-  | "sample"
-  | "warning"
-  | "danger"
-  | "unknown";
+export type SensorSnapshotTrustTone = "ok" | "info" | "sample" | "warning" | "danger" | "unknown";
 
-export type SensorSnapshotMetricKey =
-  | "temp"
-  | "rh"
-  | "vpd"
-  | "soil"
-  | "ec"
-  | "ph";
+export type SensorSnapshotMetricKey = "temp" | "rh" | "vpd" | "soil" | "ec" | "ph";
 
 export type SensorSnapshotMetricKind = "environment" | "soil" | "other";
 
@@ -138,11 +115,7 @@ const ALLOWED_SOURCES: ReadonlySet<SensorSnapshotSource> = new Set([
   "invalid",
 ]);
 
-const SOIL_METRIC_KEYS: ReadonlySet<SensorSnapshotMetricKey> = new Set([
-  "soil",
-  "ec",
-  "ph",
-]);
+const SOIL_METRIC_KEYS: ReadonlySet<SensorSnapshotMetricKey> = new Set(["soil", "ec", "ph"]);
 
 // Allow lowercase ASCII vendor labels only. No spaces, no quotes, no slashes.
 const SAFE_SOURCE_DETAIL_RE = /^[a-z0-9][a-z0-9_.-]{0,63}$/;
@@ -199,10 +172,7 @@ function metricKindFor(
   return SOIL_METRIC_KEYS.has(key) ? "soil" : "environment";
 }
 
-function staleWindowFor(
-  kind: SensorSnapshotMetricKind,
-  opts?: ResolveOptions,
-): number {
+function staleWindowFor(kind: SensorSnapshotMetricKind, opts?: ResolveOptions): number {
   if (kind === "soil") {
     return opts?.soilStaleWindowMs ?? DEFAULT_SOIL_STALE_WINDOW_MS;
   }
@@ -216,20 +186,14 @@ function clampConfidence(c: unknown): number | null {
   return c;
 }
 
-function safeMetricDisplay(
-  m: SensorSnapshotMetricInput,
-): SensorSnapshotMetricDisplay {
+function safeMetricDisplay(m: SensorSnapshotMetricInput): SensorSnapshotMetricDisplay {
   let display: string | null = null;
   if (typeof m.value === "number" && Number.isFinite(m.value)) {
     // Two-decimal cap to avoid leaking unstable float artifacts.
-    display = Math.abs(m.value) >= 100
-      ? m.value.toFixed(0)
-      : m.value.toFixed(1);
+    display = Math.abs(m.value) >= 100 ? m.value.toFixed(0) : m.value.toFixed(1);
   }
   const unit =
-    typeof m.unit === "string" && m.unit.length > 0 && m.unit.length <= 8
-      ? m.unit
-      : null;
+    typeof m.unit === "string" && m.unit.length > 0 && m.unit.length <= 8 ? m.unit : null;
   return { key: m.key, display, unit };
 }
 
@@ -245,9 +209,7 @@ export function resolveSensorSnapshotDisplay(
   const safeInput: SensorSnapshotInput = input ?? {};
   const normalizedSource = normalizeSource(safeInput.source);
   const originalSource =
-    typeof safeInput.source === "string" && safeInput.source.length > 0
-      ? safeInput.source
-      : null;
+    typeof safeInput.source === "string" && safeInput.source.length > 0 ? safeInput.source : null;
   const sourceDetail = safeSourceDetail(safeInput.sourceDetail);
   const captured = parseCapturedAt(safeInput.capturedAt);
   const confidence = clampConfidence(safeInput.confidence);
@@ -301,9 +263,7 @@ export function resolveSensorSnapshotDisplay(
       originalSource,
       capturedAt: captured?.iso ?? null,
       ageMs: captured ? Math.max(0, nowMs(options) - captured.ms) : null,
-      ageLabel: captured
-        ? formatAgeLabel(Math.max(0, nowMs(options) - captured.ms))
-        : null,
+      ageLabel: captured ? formatAgeLabel(Math.max(0, nowMs(options) - captured.ms)) : null,
       freshness: "demo",
       tone: "sample",
       confidence,
@@ -337,14 +297,11 @@ export function resolveSensorSnapshotDisplay(
       originalSource,
       capturedAt: captured?.iso ?? null,
       ageMs: captured ? Math.max(0, nowMs(options) - captured.ms) : null,
-      ageLabel: captured
-        ? formatAgeLabel(Math.max(0, nowMs(options) - captured.ms))
-        : null,
+      ageLabel: captured ? formatAgeLabel(Math.max(0, nowMs(options) - captured.ms)) : null,
       freshness: "stale",
       tone: "warning",
       confidence,
-      reasonCodes:
-        reasonCodes.length > 0 ? reasonCodes : ["stale_environment"],
+      reasonCodes: reasonCodes.length > 0 ? reasonCodes : ["stale_environment"],
       sourceDetail,
       metrics,
     });
@@ -394,19 +351,12 @@ export function resolveSensorSnapshotDisplay(
   // get the stricter environment window. This protects against
   // mislabeling stale environment data as fresh.
   const hasEnvMetric =
-    metrics.length === 0 ||
-    metrics.some(
-      (m) => metricKindFor(m.key) === "environment",
-    );
-  const kind: SensorSnapshotMetricKind = hasEnvMetric
-    ? "environment"
-    : "soil";
+    metrics.length === 0 || metrics.some((m) => metricKindFor(m.key) === "environment");
+  const kind: SensorSnapshotMetricKind = hasEnvMetric ? "environment" : "soil";
   const staleWindow = staleWindowFor(kind, options);
 
   if (ageMs > staleWindow) {
-    reasonCodes.push(
-      kind === "soil" ? "stale_soil" : "stale_environment",
-    );
+    reasonCodes.push(kind === "soil" ? "stale_soil" : "stale_environment");
     return finalize({
       effectiveSource: "stale",
       originalSource,
@@ -434,12 +384,7 @@ export function resolveSensorSnapshotDisplay(
     ageMs,
     ageLabel: formatAgeLabel(ageMs),
     freshness: "fresh",
-    tone:
-      normalizedSource === "live"
-        ? "ok"
-        : normalizedSource === "manual"
-          ? "info"
-          : "info",
+    tone: normalizedSource === "live" ? "ok" : normalizedSource === "manual" ? "info" : "info",
     confidence,
     reasonCodes,
     sourceDetail,
@@ -447,18 +392,14 @@ export function resolveSensorSnapshotDisplay(
   });
 }
 
-function finalize(
-  m: Omit<SensorSnapshotDisplayModel, "warning">,
-): SensorSnapshotDisplayModel {
+function finalize(m: Omit<SensorSnapshotDisplayModel, "warning">): SensorSnapshotDisplayModel {
   return {
     ...m,
     warning: deriveWarningCopy(m),
   };
 }
 
-function deriveWarningCopy(
-  m: Omit<SensorSnapshotDisplayModel, "warning">,
-): string | null {
+function deriveWarningCopy(m: Omit<SensorSnapshotDisplayModel, "warning">): string | null {
   switch (m.freshness) {
     case "fresh":
       return null;
@@ -489,8 +430,6 @@ function deriveWarningCopy(
 // Public helpers
 // ---------------------------------------------------------------------------
 
-export function isHealthySensorDisplay(
-  m: SensorSnapshotDisplayModel,
-): boolean {
+export function isHealthySensorDisplay(m: SensorSnapshotDisplayModel): boolean {
   return m.freshness === "fresh" && m.tone === "ok";
 }

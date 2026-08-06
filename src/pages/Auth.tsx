@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { Navigate, useNavigate, useSearchParams, Link } from "react-router-dom";
+import { useHydrated } from "@/hooks/useHydrated";
+import { Navigate, useNavigate, useSearchParams, Link } from "@/lib/react-router-compat";
 import { ArrowLeft, Leaf, Gauge, ShieldCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
@@ -80,6 +81,7 @@ export default function Auth() {
     noindex: true,
   });
   const { user, loading } = useAuth();
+  const hydrated = useHydrated();
   const nav = useNavigate();
   const [search] = useSearchParams();
   const explicitRedirect = useMemo(() => {
@@ -230,7 +232,15 @@ export default function Auth() {
     return () => window.clearInterval(id);
   }, [resetResendLastAttemptAt, resetResendNowTick]);
 
-  if (loading) return null;
+  // SSR/hydration contract: the server has no session (auth state lives in
+  // sessionStorage), so it renders null here via `loading`. The client's
+  // hydration render must produce the same output — gating on `hydrated`
+  // guarantees that even when the session resolves before this lazy route
+  // subtree hydrates. Without the gate, the server (no form) and client
+  // (form) disagreed, React discarded the SSR tree, and the regenerated page
+  // read empty search params, silently dropping ?redirectTo deep-link
+  // restoration after sign-in.
+  if (!hydrated || loading) return null;
 
   if (user) return <Navigate to={postSignInTarget()} replace />;
 
@@ -508,7 +518,7 @@ export default function Auth() {
         <div className="mb-4">
           <Link
             to="/welcome"
-            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring rounded"
           >
             <ArrowLeft className="h-4 w-4" aria-hidden /> Back to home
           </Link>
@@ -589,7 +599,7 @@ export default function Auth() {
                       // focus handled on next paint
                       window.setTimeout(() => forgotEmailRef.current?.focus(), 0);
                     }}
-                    className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                    className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring rounded"
                   >
                     Forgot password?
                   </button>

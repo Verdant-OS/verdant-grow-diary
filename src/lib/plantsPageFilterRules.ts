@@ -18,10 +18,7 @@
  * grow instead of vanishing into "Unassigned". Without the index the legacy
  * own-grow_id-only behavior is preserved.
  */
-import {
-  isGrowUnassigned,
-  resolvePlantGrowId,
-} from "@/lib/growAttributionRules";
+import { isGrowUnassigned, resolvePlantGrowId } from "@/lib/growAttributionRules";
 
 /**
  * Sentinel id for the "Unassigned" grow filter option. plants.grow_id is
@@ -123,9 +120,7 @@ export function buildGrowFilterOptions(
   const totalActive = activePlants.length;
 
   const perGrow: PlantsPageGrowOption[] = grows.map((g) => {
-    const count = activePlants.filter(
-      (p) => resolvePlantGrowId(p, tentGrowById) === g.id,
-    ).length;
+    const count = activePlants.filter((p) => resolvePlantGrowId(p, tentGrowById) === g.id).length;
     const name = g.name ?? "Untitled grow";
     return {
       id: g.id,
@@ -135,9 +130,7 @@ export function buildGrowFilterOptions(
     };
   });
 
-  const unassignedCount = activePlants.filter((p) =>
-    isUnassignedToGrow(p, tentGrowById),
-  ).length;
+  const unassignedCount = activePlants.filter((p) => isUnassignedToGrow(p, tentGrowById)).length;
   const unassigned: PlantsPageGrowOption[] =
     unassignedCount > 0
       ? [
@@ -201,7 +194,7 @@ export function filterPlantsBySearch<T extends MinimalPlant>(
     const haystacks = [
       (p.name ?? "").toLowerCase(),
       (p.strain ?? "").toLowerCase(),
-      p.tentId ? tentNameById.get(p.tentId) ?? "" : "",
+      p.tentId ? (tentNameById.get(p.tentId) ?? "") : "",
     ];
     return haystacks.some((h) => h.includes(q));
   });
@@ -235,9 +228,7 @@ export function summarizePlantsPageFilters(
  *   - "Showing 1 active plant in Sour Diesel Auto"
  *   - "Showing 0 active plants in this grow"
  */
-export function formatPlantsPageFilterSummary(
-  summary: PlantsPageFilterSummary,
-): string {
+export function formatPlantsPageFilterSummary(summary: PlantsPageFilterSummary): string {
   return `Showing ${pluralPlants(summary.activeCount)} ${summary.scopeLabel}`;
 }
 

@@ -9,7 +9,7 @@
  *
  * No writes, no AI calls, no device control, no checkout logic.
  */
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { CheckCircle2, Circle, Flame } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePlantLogDays } from "@/hooks/usePlantLogDays";
@@ -46,9 +46,7 @@ export default function PlantLogStreakMarker({ plantId }: Props) {
         data-testid="plant-log-streak-status"
         className={cn(
           "inline-flex items-center gap-1.5",
-          view.loggedToday
-            ? "text-[hsl(var(--success))]"
-            : "text-muted-foreground",
+          view.loggedToday ? "text-[hsl(var(--success))]" : "text-muted-foreground",
         )}
       >
         {view.loggedToday ? (
@@ -64,10 +62,7 @@ export default function PlantLogStreakMarker({ plantId }: Props) {
           data-testid="plant-log-streak-count"
           className="inline-flex items-center gap-1 text-muted-foreground"
         >
-          <Flame
-            className="h-3.5 w-3.5 text-[hsl(var(--warning))]"
-            aria-hidden
-          />
+          <Flame className="h-3.5 w-3.5 text-[hsl(var(--warning))]" aria-hidden />
           {view.streakLabel}
         </span>
       ) : null}
@@ -78,10 +73,7 @@ export default function PlantLogStreakMarker({ plantId }: Props) {
           className="inline-flex flex-wrap items-center gap-1 text-muted-foreground"
         >
           {view.teaser.copy}{" "}
-          <Link
-            to={view.teaser.href}
-            className="text-primary underline-offset-4 hover:underline"
-          >
+          <Link to={view.teaser.href} className="text-primary underline-offset-4 hover:underline">
             {view.teaser.ctaLabel}
           </Link>
         </span>

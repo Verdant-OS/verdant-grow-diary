@@ -169,9 +169,7 @@ function formatTextReport(report) {
 function main(argv) {
   const args = argv.slice(2);
   if (args.length === 0) {
-    console.error(
-      "Usage: analyze-progress.mjs <run-dir-or-progress.jsonl> [more...] [--json]",
-    );
+    console.error("Usage: analyze-progress.mjs <run-dir-or-progress.jsonl> [more...] [--json]");
     process.exit(2);
   }
   const jsonMode = args.includes("--json");

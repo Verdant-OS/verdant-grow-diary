@@ -38,9 +38,7 @@ function fmtTemp(v: number | null, unit: TemperatureUnitPreference): string {
   return `${shown.toFixed(1)} ${symbol}`;
 }
 
-export function CsvTimelineEnvironmentChip(
-  props: CsvTimelineEnvironmentChipProps,
-) {
+export function CsvTimelineEnvironmentChip(props: CsvTimelineEnvironmentChipProps) {
   const { diaryEntryId, snapshot } = props;
   const temperatureUnit = useTemperatureUnitPreference();
   if (!snapshot) return null;
@@ -85,9 +83,7 @@ export function CsvTimelineEnvironmentChip(
         {snapshot.derivedVpdKpa != null ? (
           <div className="col-span-2">
             <dt className="inline">{snapshot.derivedVpdLabel}:</dt>{" "}
-            <dd className="inline text-foreground">
-              {fmt(snapshot.derivedVpdKpa, 2)} kPa
-            </dd>
+            <dd className="inline text-foreground">{fmt(snapshot.derivedVpdKpa, 2)} kPa</dd>
           </div>
         ) : null}
         <div className="col-span-2 text-[10px]">Captured: {captured}</div>

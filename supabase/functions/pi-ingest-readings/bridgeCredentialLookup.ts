@@ -32,8 +32,7 @@ export const BRIDGE_CREDENTIAL_LOOKUP_COLUMNS = [
   "last_used_at",
 ] as const;
 
-export const BRIDGE_CREDENTIAL_TABLE =
-  "pi_ingest_bridge_credentials" as const;
+export const BRIDGE_CREDENTIAL_TABLE = "pi_ingest_bridge_credentials" as const;
 
 /**
  * Minimal client surface required by the lookup. Compatible with the
@@ -47,7 +46,10 @@ export type PiIngestBridgeCredentialLookupResponse = {
 
 export type PiIngestBridgeCredentialLookupQuery = {
   select: (columns: string) => {
-    eq: (column: string, value: string) => {
+    eq: (
+      column: string,
+      value: string,
+    ) => {
       limit: (count: number) => Promise<PiIngestBridgeCredentialLookupResponse>;
     };
   };
@@ -67,9 +69,7 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function coerceCipherField(
-  value: unknown,
-): Uint8Array | string | null {
+function coerceCipherField(value: unknown): Uint8Array | string | null {
   if (value == null) return null;
   if (value instanceof Uint8Array) return value;
   if (typeof value === "string") return value;
@@ -86,10 +86,7 @@ function coerceRow(raw: unknown): PiIngestBridgeCredentialRow {
     throw new Error("invalid_credential_row");
   }
   const status = raw.secret_status;
-  if (
-    typeof status !== "string" ||
-    !ALLOWED_STATUSES.has(status as PiIngestBridgeSecretStatus)
-  ) {
+  if (typeof status !== "string" || !ALLOWED_STATUSES.has(status as PiIngestBridgeSecretStatus)) {
     throw new Error("invalid_secret_status");
   }
   if (typeof raw.bridge_id !== "string" || raw.bridge_id.length === 0) {
@@ -105,12 +102,10 @@ function coerceRow(raw: unknown): PiIngestBridgeCredentialRow {
     is_active: raw.is_active === true,
     secret_ciphertext: coerceCipherField(raw.secret_ciphertext),
     secret_nonce: coerceCipherField(raw.secret_nonce),
-    secret_key_version:
-      typeof version === "number" && Number.isInteger(version) ? version : null,
+    secret_key_version: typeof version === "number" && Number.isInteger(version) ? version : null,
     secret_status: status as PiIngestBridgeSecretStatus,
     allowed_tent_ids: coerceAllowedTentIds(raw.allowed_tent_ids),
-    last_used_at:
-      typeof raw.last_used_at === "string" ? raw.last_used_at : null,
+    last_used_at: typeof raw.last_used_at === "string" ? raw.last_used_at : null,
   };
 }
 

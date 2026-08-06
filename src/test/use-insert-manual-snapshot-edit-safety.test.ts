@@ -19,9 +19,7 @@ const SRC = readFileSync(
 
 describe("useInsertManualSnapshotEdit static safety", () => {
   it("only inserts into manual_sensor_snapshot_edits", () => {
-    expect(SRC).toMatch(
-      /\.from\(\s*["']manual_sensor_snapshot_edits["']\s*\)[\s\S]*\.insert\(/,
-    );
+    expect(SRC).toMatch(/\.from\(\s*["']manual_sensor_snapshot_edits["']\s*\)[\s\S]*\.insert\(/);
   });
 
   it("does not call update/upsert/delete anywhere", () => {

@@ -21,15 +21,21 @@ describe("revoke_lovable_founder_lifetime_by_transaction — refund-retire invar
   });
 
   it("cancels the subscription row (revokes Pro-level access)", () => {
-    expect(REVOKE_MIGRATION!).toMatch(/UPDATE\s+public\.subscriptions[\s\S]*?SET[\s\S]*?status\s*=\s*'canceled'/i);
+    expect(REVOKE_MIGRATION!).toMatch(
+      /UPDATE\s+public\.subscriptions[\s\S]*?SET[\s\S]*?status\s*=\s*'canceled'/i,
+    );
   });
 
   it("marks the founders row refunded (seat stays consumed, number preserved)", () => {
-    expect(REVOKE_MIGRATION!).toMatch(/UPDATE\s+public\.founders[\s\S]*?SET[\s\S]*?status\s*=\s*'refunded'/i);
+    expect(REVOKE_MIGRATION!).toMatch(
+      /UPDATE\s+public\.founders[\s\S]*?SET[\s\S]*?status\s*=\s*'refunded'/i,
+    );
   });
 
   it("keys off paddle_transaction_id to find the founders row", () => {
-    expect(REVOKE_MIGRATION!).toMatch(/WHERE\s+paddle_transaction_id\s*=\s*p_paddle_transaction_id/i);
+    expect(REVOKE_MIGRATION!).toMatch(
+      /WHERE\s+paddle_transaction_id\s*=\s*p_paddle_transaction_id/i,
+    );
   });
 
   it("is SECURITY DEFINER with pinned search_path", () => {

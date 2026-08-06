@@ -12,8 +12,7 @@ import {
   FIXTURE_DUMMY_SENSITIVE_STRINGS,
 } from "./fixtures/ecowitt-real-ingest-phase1-fixtures";
 
-const UUID_RX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_RX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // Conservative deny-list. These substrings would indicate a real credential
 // accidentally checked into the fixture file. The dummy values that prove
@@ -38,7 +37,8 @@ describe("ecowitt-real-ingest Phase 1.5 fixtures — safety", () => {
   });
 
   it("only uses fake/synthetic UUIDs from the allowed set", () => {
-    const found = serialized.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi) ?? [];
+    const found =
+      serialized.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi) ?? [];
     for (const u of found) {
       expect(FIXTURE_ALLOWED_UUIDS).toContain(u);
     }

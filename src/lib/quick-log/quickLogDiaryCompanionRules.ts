@@ -44,15 +44,12 @@ export interface QuickLogCompanionView {
 }
 
 function asObject(v: unknown): Record<string, unknown> | null {
-  return v && typeof v === "object" && !Array.isArray(v)
-    ? (v as Record<string, unknown>)
-    : null;
+  return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
 }
 
 function nonBlankString(v: unknown): string | null {
   return typeof v === "string" && v.trim().length > 0 ? v : null;
 }
-
 
 function extractLinkedGrowEventId(details: unknown): string | null {
   const d = asObject(details);
@@ -60,9 +57,7 @@ function extractLinkedGrowEventId(details: unknown): string | null {
   return nonBlankString(d.linked_grow_event_id);
 }
 
-export function isQuickLogCompanionDiaryRow(
-  row: QuickLogDiaryRowLike | null | undefined,
-): boolean {
+export function isQuickLogCompanionDiaryRow(row: QuickLogDiaryRowLike | null | undefined): boolean {
   if (!row) return false;
   return extractLinkedGrowEventId(row.details) !== null;
 }
@@ -106,8 +101,7 @@ export function extractQuickLogCompanionView(
   const details = asObject(row.details) ?? {};
   return {
     linkedGrowEventId,
-    photoUrl:
-      nonBlankString(row.photo_url) ?? nonBlankString(details.photo_url),
+    photoUrl: nonBlankString(row.photo_url) ?? nonBlankString(details.photo_url),
     sensorSnapshot: normalizeSnapshot(details.sensor_snapshot),
   };
 }

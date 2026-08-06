@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { Link, MemoryRouter, Route, Routes } from "react-router-dom";
+import { Link, MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import type { ResolvedEntitlement } from "@/lib/entitlements";
 import { PLAN_CATALOG } from "@/lib/entitlements";
 import Pricing from "@/pages/Pricing";

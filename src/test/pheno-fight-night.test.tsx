@@ -1,6 +1,6 @@
 import { afterEach, describe, it, expect } from "vitest";
 import { cleanup, render, screen, fireEvent, within } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import PhenoFightNight from "@/components/PhenoFightNight";
 import type { ContenderInput } from "@/lib/phenoContendersViewModel";
 import { DEMO_CANDIDATES } from "@/lib/demo/phenoHuntDemoFixture";

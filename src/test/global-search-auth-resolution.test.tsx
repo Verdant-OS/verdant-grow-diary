@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { MemoryRouter, useLocation } from "react-router-dom";
+import { MemoryRouter, useLocation } from "@/lib/react-router-compat";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import GlobalSearchDialog from "@/components/GlobalSearchDialog";
@@ -11,6 +11,16 @@ import { clearLocalStorageForTest } from "@/test/helpers/localStorageTestHelper"
 const authMock = vi.hoisted(() => ({
   loading: true,
   user: null as { id: string } | null,
+}));
+
+/** Stable empty-search payload — a fresh `results: []` each render retriggers
+ *  GlobalSearchDialog effects that depend on `results` identity and OOMs the
+ *  full Vitest worker (see CI gate shard OOM on this file). */
+const globalSearchMock = vi.hoisted(() => ({
+  results: [] as unknown[],
+  isLoading: false,
+  isError: false,
+  retry: vi.fn(),
 }));
 
 vi.mock("@/store/auth", () => ({
@@ -23,12 +33,7 @@ vi.mock("@/store/auth", () => ({
 }));
 
 vi.mock("@/hooks/useGlobalSearch", () => ({
-  useGlobalSearch: () => ({
-    results: [],
-    isLoading: false,
-    isError: false,
-    retry: vi.fn(),
-  }),
+  useGlobalSearch: () => globalSearchMock,
 }));
 
 const visitedLocations: Array<{ key: string; value: string }> = [];

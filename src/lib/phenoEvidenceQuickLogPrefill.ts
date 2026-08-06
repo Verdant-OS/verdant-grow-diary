@@ -67,7 +67,8 @@ export function buildPhenoEvidenceGoalQuickLogPrefill(
   const tentId = cleanId(input.tentId);
   return {
     plantId,
-    plantName: typeof input.plantName === "string" && input.plantName.trim() ? input.plantName : null,
+    plantName:
+      typeof input.plantName === "string" && input.plantName.trim() ? input.plantName : null,
     growId: cleanId(input.growId),
     tentId,
     eventType: "observation",

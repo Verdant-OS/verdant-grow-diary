@@ -146,6 +146,28 @@ separately from confirmed persisted writes with server-side identity and
 deduplication rules. That future aggregate is not implemented or claimed by
 this client telemetry contract.
 
+## Public lighting-guide CTA measurement status
+
+The two lighting guides render one prominent `GuidePage` CTA each. Both are
+plain public links to `/quick-log`; neither emits a guide-specific funnel or
+CTA-click event today.
+
+| Public guide slug                                    | CTA destination | Event classification | Implemented event |
+| ---------------------------------------------------- | --------------- | -------------------- | ----------------- |
+| `cannabis-grow-light-distance-and-schedule`          | `/quick-log`    | `MISSING`            | none              |
+| `cannabis-light-stress-light-burn-bleaching-or-heat` | `/quick-log`    | `MISSING`            | none              |
+
+`MISSING` means guide CTA clicks must remain unreported. Do not infer them
+from a `/quick-log` page view, a later `quick_log_saved`, signup, checkout, or
+any other downstream event. Because no guide CTA event is emitted, it carries
+no grower-entered text, user identifier, grow/tent/plant identifier, or
+private route value.
+
+Adding guide CTA attribution needs a separately authorized analytics and
+privacy-review slice. This missing conversion detail does not itself block Day
+0 once the page-view contract and authenticated GA4/GSC baselines are sound;
+it is excluded from guide CTA performance reporting until then.
+
 ## Aspirational/internal PostHog taxonomy
 
 The sections below define the first detailed PostHog events Verdant may emit

@@ -12,10 +12,10 @@ import {
 
 describe("QUICK_LOG unified post-save copy", () => {
   it("exposes the same title, save-failed copy, and CTA labels", () => {
-    expect(QUICK_LOG_POST_SAVE_TITLE).toBe("Saved");
-    expect(QUICK_LOG_POST_SAVE_VIEW_LABEL).toBe("View timeline");
+    expect(QUICK_LOG_POST_SAVE_TITLE).toBe("Saved to your diary");
+    expect(QUICK_LOG_POST_SAVE_VIEW_LABEL).toBe("View diary");
     expect(QUICK_LOG_POST_SAVE_ANOTHER_LABEL).toBe("Log another");
-    expect(QUICK_LOG_POST_SAVE_CLOSE_LABEL).toBe("Close");
+    expect(QUICK_LOG_POST_SAVE_CLOSE_LABEL).toBe("Dismiss");
     expect(QUICK_LOG_SAVE_FAILED_MESSAGE).toBe(
       "Save failed. Your draft is still here. Check your connection and try again.",
     );
@@ -24,7 +24,7 @@ describe("QUICK_LOG unified post-save copy", () => {
 });
 
 describe("buildQuickLogPostSaveDescription", () => {
-  it("includes verb, target, tent, and grow when supplied", () => {
+  it("prefers grow/setup name for the Added-to line", () => {
     const desc = buildQuickLogPostSaveDescription({
       targetName: "Skywalker #2",
       tentName: "Tent A",
@@ -32,34 +32,25 @@ describe("buildQuickLogPostSaveDescription", () => {
       action: "note",
       photoAttached: false,
     });
-    expect(desc).toBe("Logged note to Skywalker #2 · Tent A · Fall 2025 · just now");
+    expect(desc).toBe("Added to Fall 2025.");
   });
 
-  it("mentions photo when a photo was attached", () => {
+  it("falls back to target name when grow is absent", () => {
     const desc = buildQuickLogPostSaveDescription({
       targetName: "Skywalker #2",
       action: "note",
       photoAttached: true,
     });
-    expect(desc).toContain("with photo");
+    expect(desc).toBe("Added to Skywalker #2.");
   });
 
-  it("falls back to 'entry' when action is blank", () => {
-    const desc = buildQuickLogPostSaveDescription({
-      targetName: "Blue Dream",
-      action: "",
-      photoAttached: false,
-    });
-    expect(desc.startsWith("Logged entry ")).toBe(true);
-  });
-
-  it("omits scope when no target name is supplied", () => {
+  it("falls back to diary wording when no names are supplied", () => {
     const desc = buildQuickLogPostSaveDescription({
       targetName: null,
       action: "watering",
       photoAttached: false,
     });
-    expect(desc).toBe("Logged watering · just now");
+    expect(desc).toBe("Added to your diary.");
   });
 
   it("never claims yield / quality / diagnosis", () => {

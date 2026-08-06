@@ -5,9 +5,7 @@
 // - Uses the canonical normalized snapshot, never the raw untrusted payload.
 // - Redacts private fields (PASSKEY, MAC, station IDs, tokens, IPs, etc.).
 
-import {
-  CanonicalEcowittTentSnapshot,
-} from "./ecowittTentSnapshot";
+import { CanonicalEcowittTentSnapshot } from "./ecowittTentSnapshot";
 import { EcowittTentKey } from "./ecowittTentNormalizerRouter";
 
 export const ECOWITT_EXPORT_FILENAMES: Record<EcowittTentKey, string> = {
@@ -57,9 +55,7 @@ export function buildEcowittSnapshotExport(
   };
 }
 
-export function ecowittSnapshotExportToJson(
-  payload: EcowittSnapshotExportPayload,
-): string {
+export function ecowittSnapshotExportToJson(payload: EcowittSnapshotExportPayload): string {
   return JSON.stringify(payload, null, 2);
 }
 

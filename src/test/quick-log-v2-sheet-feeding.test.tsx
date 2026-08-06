@@ -11,7 +11,10 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import QuickLogV2Sheet from "@/components/QuickLogV2Sheet";
-import { clearTemperatureUnitPreference, saveTemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
+import {
+  clearTemperatureUnitPreference,
+  saveTemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
 
 const rpcMock = vi.fn();
 const storageRemove = vi.fn().mockResolvedValue({ data: null, error: null });
@@ -117,9 +120,11 @@ describe("QuickLogV2Sheet — structured feeding", () => {
       "utf8",
     );
     expect(source).toMatch(
-      /showTimelineConfirmation\(FEEDING_SAVE_SUCCESS_MESSAGE,[\s\S]*?targetType:\s*null,[\s\S]*?targetId:\s*null,[\s\S]*?growEventId/,
+      /showTimelineConfirmation\(FEEDING_SAVE_SUCCESS_MESSAGE,[\s\S]*?growId:\s*resolved\.growId[\s\S]*?targetType:\s*\(resolved\.targetType[\s\S]*?growEventId/,
     );
-    expect(source).toMatch(/postSave\.action === "feed" \? null : postSave\.targetType/);
+    expect(source).toMatch(
+      /buildQuickLogTimelineNavTarget\(\{[\s\S]*?growId:\s*postSave\.growId[\s\S]*?growEventId:\s*postSave\.growEventId/,
+    );
     const feedingPanel = readFileSync(
       resolve(process.cwd(), "src/components/FeedingHistoryPanel.tsx"),
       "utf8",

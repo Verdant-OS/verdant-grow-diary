@@ -40,30 +40,20 @@ describe("SensorSourceLineageLine — fallback safety", () => {
     render(<SensorSourceLineageLine source="mqtt" vendor="future-brand-9000" />);
     const vendor = screen.getByTestId("sensor-source-lineage-vendor");
     expect(vendor.textContent).toBe("future-brand-9000");
-    expect(vendor.getAttribute("title")?.toLowerCase()).toContain(
-      "never used for auth",
-    );
+    expect(vendor.getAttribute("title")?.toLowerCase()).toContain("never used for auth");
   });
 
   it("unknown source + known vendor never implies Live", () => {
-    render(
-      <SensorSourceLineageLine source="random-thing" vendor="ecowitt" />,
-    );
+    render(<SensorSourceLineageLine source="random-thing" vendor="ecowitt" />);
     const root = screen.getByTestId("sensor-source-lineage");
     expect(root.textContent).not.toContain("Live");
     // Source label preserved verbatim, vendor label normalized.
-    expect(screen.getByTestId("sensor-source-lineage-source").textContent).toBe(
-      "random-thing",
-    );
-    expect(screen.getByTestId("sensor-source-lineage-vendor").textContent).toBe(
-      "EcoWitt",
-    );
+    expect(screen.getByTestId("sensor-source-lineage-source").textContent).toBe("random-thing");
+    expect(screen.getByTestId("sensor-source-lineage-vendor").textContent).toBe("EcoWitt");
   });
 
   it("known source + unknown vendor never implies auth/ownership", () => {
-    render(
-      <SensorSourceLineageLine source="webhook" vendor="mystery-vendor" />,
-    );
+    render(<SensorSourceLineageLine source="webhook" vendor="mystery-vendor" />);
     const root = screen.getByTestId("sensor-source-lineage");
     const html = root.outerHTML;
     // No auth/ownership-implying language anywhere in the rendered tree.
@@ -72,18 +62,12 @@ describe("SensorSourceLineageLine — fallback safety", () => {
     expect(html.toLowerCase()).not.toContain("owner");
     // Vendor must still be marked lineage-only via title hint.
     expect(
-      screen.getByTestId("sensor-source-lineage-vendor").getAttribute("title")
-        ?.toLowerCase(),
+      screen.getByTestId("sensor-source-lineage-vendor").getAttribute("title")?.toLowerCase(),
     ).toContain("never used for auth");
   });
 
   it("no bridge tokens, raw payloads, auth strings, or internal IDs are rendered", () => {
-    render(
-      <SensorSourceLineageLine
-        source="mqtt"
-        vendor="ecowitt"
-      />,
-    );
+    render(<SensorSourceLineageLine source="mqtt" vendor="ecowitt" />);
     const text = screen.getByTestId("sensor-source-lineage").outerHTML;
     assertNoLeaks(text);
   });
@@ -100,9 +84,7 @@ describe("SensorSourceLineageLine — fallback safety", () => {
 
   it("empty / null source falls back to 'Unknown' safely", () => {
     render(<SensorSourceLineageLine source={null} vendor={null} />);
-    expect(screen.getByTestId("sensor-source-lineage-source").textContent).toBe(
-      "Unknown",
-    );
+    expect(screen.getByTestId("sensor-source-lineage-source").textContent).toBe("Unknown");
     expect(screen.queryByTestId("sensor-source-lineage-vendor")).toBeNull();
   });
 });

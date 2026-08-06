@@ -21,7 +21,9 @@ describe("Strain Reference Library V1 data contract", () => {
       ]),
     );
     expect(VERDANT_CULTIVARS.every((profile) => profile.dataOrigin === "sample")).toBe(true);
-    expect(VERDANT_CULTIVARS.every((profile) => profile.verificationStatus === "sample")).toBe(true);
+    expect(VERDANT_CULTIVARS.every((profile) => profile.verificationStatus === "sample")).toBe(
+      true,
+    );
     expect(VERDANT_CULTIVARS.every((profile) => profile.guideVersion === 1)).toBe(true);
     expect(VERDANT_CULTIVARS.every((profile) => profile.contentSchemaVersion === 1)).toBe(true);
   });

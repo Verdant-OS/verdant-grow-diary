@@ -57,9 +57,7 @@ export default function EnvironmentSummaryPrePrintModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent data-testid="env-report-pre-print-modal">
         <DialogHeader>
-          <DialogTitle data-testid="env-report-pre-print-modal-title">
-            {TITLE}
-          </DialogTitle>
+          <DialogTitle data-testid="env-report-pre-print-modal-title">{TITLE}</DialogTitle>
           <DialogDescription data-testid="env-report-pre-print-modal-summary">
             {isDrilldown ? DRILLDOWN_SUMMARY : FULL_SUMMARY}
           </DialogDescription>
@@ -72,19 +70,14 @@ export default function EnvironmentSummaryPrePrintModal({
           <dt className="text-muted-foreground">Date range</dt>
           <dd data-testid="env-report-pre-print-modal-range">{dateRangeLabel}</dd>
           <dt className="text-muted-foreground">Generated</dt>
-          <dd data-testid="env-report-pre-print-modal-generated">
-            {generatedAtLabel}
-          </dd>
+          <dd data-testid="env-report-pre-print-modal-generated">{generatedAtLabel}</dd>
           {isDrilldown && (selectedIssueLabel || selectedIssueRuleId) ? (
             <>
               <dt className="text-muted-foreground">Selected issue</dt>
               <dd data-testid="env-report-pre-print-modal-issue">
                 {selectedIssueLabel || "Selected issue"}
                 {selectedIssueRuleId ? (
-                  <span className="text-muted-foreground">
-                    {" "}
-                    ({selectedIssueRuleId})
-                  </span>
+                  <span className="text-muted-foreground"> ({selectedIssueRuleId})</span>
                 ) : null}
               </dd>
             </>
@@ -92,9 +85,7 @@ export default function EnvironmentSummaryPrePrintModal({
           {isDrilldown && typeof relatedCheckCount === "number" ? (
             <>
               <dt className="text-muted-foreground">Related entries</dt>
-              <dd data-testid="env-report-pre-print-modal-related-count">
-                {relatedCheckCount}
-              </dd>
+              <dd data-testid="env-report-pre-print-modal-related-count">{relatedCheckCount}</dd>
             </>
           ) : null}
         </dl>
@@ -112,10 +103,7 @@ export default function EnvironmentSummaryPrePrintModal({
           >
             {CANCEL_LABEL}
           </Button>
-          <Button
-            onClick={onConfirm}
-            data-testid="env-report-pre-print-modal-confirm"
-          >
+          <Button onClick={onConfirm} data-testid="env-report-pre-print-modal-confirm">
             {CONFIRM_LABEL}
           </Button>
         </DialogFooter>

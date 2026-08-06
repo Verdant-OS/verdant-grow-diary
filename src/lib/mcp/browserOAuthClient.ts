@@ -27,11 +27,7 @@ export type OAuthDiscovery = {
   registration_endpoint?: string;
 };
 
-export type ProbeStatus =
-  | "not_connected"
-  | "connected"
-  | "unauthorized"
-  | "failed";
+export type ProbeStatus = "not_connected" | "connected" | "unauthorized" | "failed";
 
 export type ProbeResult = {
   status: ProbeStatus;
@@ -131,10 +127,7 @@ export function sameOriginRedirect(path: string): string {
   return url.toString();
 }
 
-export async function startAuthorization(
-  issuer: string,
-  redirectPath: string,
-): Promise<void> {
+export async function startAuthorization(issuer: string, redirectPath: string): Promise<void> {
   const discovery = await fetchDiscovery(issuer);
   const redirectUri = sameOriginRedirect(redirectPath);
   const client = await getOrRegisterClient(discovery, redirectUri);
@@ -166,10 +159,7 @@ export function readCallbackParams(search: string): CallbackParams | null {
   return { code, state };
 }
 
-export async function completeAuthorization(
-  issuer: string,
-  params: CallbackParams,
-): Promise<void> {
+export async function completeAuthorization(issuer: string, params: CallbackParams): Promise<void> {
   const raw = sessionStorage.getItem(SS_KEYS.pkce);
   if (!raw) throw new Error("No pending authorization in this browser");
   const pending = JSON.parse(raw) as {
@@ -251,7 +241,13 @@ type JsonRpcResp<T = unknown> = {
   error?: { code: number; message: string };
 };
 
-async function mcpCall<T>(endpoint: string, token: string, method: string, params: unknown, id: number): Promise<JsonRpcResp<T>> {
+async function mcpCall<T>(
+  endpoint: string,
+  token: string,
+  method: string,
+  params: unknown,
+  id: number,
+): Promise<JsonRpcResp<T>> {
   const res = await fetch(endpoint, {
     method: "POST",
     headers: {
@@ -292,14 +288,24 @@ export async function probeTools(endpoint: string): Promise<ProbeResult> {
   }
   try {
     // 1) initialize
-    await mcpCall(endpoint, token, "initialize", {
-      protocolVersion: "2025-06-18",
-      capabilities: {},
-      clientInfo: { name: "verdant-browser-test", version: "0.1.0" },
-    }, 1);
+    await mcpCall(
+      endpoint,
+      token,
+      "initialize",
+      {
+        protocolVersion: "2025-06-18",
+        capabilities: {},
+        clientInfo: { name: "verdant-browser-test", version: "0.1.0" },
+      },
+      1,
+    );
     // 2) tools/list
     const list = await mcpCall<{ tools: Array<{ name: string }> }>(
-      endpoint, token, "tools/list", {}, 2,
+      endpoint,
+      token,
+      "tools/list",
+      {},
+      2,
     );
     if (list.error) throw new Error(list.error.message);
     const toolNames = (list.result?.tools ?? []).map((t) => t.name);
@@ -308,10 +314,16 @@ export async function probeTools(endpoint: string): Promise<ProbeResult> {
       content?: Array<{ type: string; text?: string }>;
       structuredContent?: { grows?: unknown[] };
       isError?: boolean;
-    }>(endpoint, token, "tools/call", {
-      name: "list_grows",
-      arguments: { limit: 1 },
-    }, 3);
+    }>(
+      endpoint,
+      token,
+      "tools/call",
+      {
+        name: "list_grows",
+        arguments: { limit: 1 },
+      },
+      3,
+    );
     if (call.error) throw new Error(call.error.message);
     let growCount: number | undefined;
     const sc = call.result?.structuredContent;
@@ -323,7 +335,9 @@ export async function probeTools(endpoint: string): Promise<ProbeResult> {
           const parsed = JSON.parse(t) as { grows?: unknown[] } | unknown[];
           growCount = Array.isArray(parsed)
             ? parsed.length
-            : Array.isArray(parsed.grows) ? parsed.grows.length : undefined;
+            : Array.isArray(parsed.grows)
+              ? parsed.grows.length
+              : undefined;
         } catch {
           /* ignore parse — count remains undefined */
         }
@@ -384,11 +398,17 @@ export async function callMcpTool(
   }
   try {
     // Ensure the session is initialized before the first call in a fresh tab.
-    await mcpCall(endpoint, token, "initialize", {
-      protocolVersion: "2025-06-18",
-      capabilities: {},
-      clientInfo: { name: "verdant-tool-explorer", version: "0.1.0" },
-    }, 1);
+    await mcpCall(
+      endpoint,
+      token,
+      "initialize",
+      {
+        protocolVersion: "2025-06-18",
+        capabilities: {},
+        clientInfo: { name: "verdant-tool-explorer", version: "0.1.0" },
+      },
+      1,
+    );
     const resp = await mcpCall<{
       content?: Array<{ type: string; text?: string }>;
       structuredContent?: unknown;
@@ -409,4 +429,3 @@ export async function callMcpTool(
     return { status: "error", message: "Tool call failed. Try again or reconnect." };
   }
 }
-

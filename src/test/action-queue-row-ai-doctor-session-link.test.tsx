@@ -15,7 +15,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import ActionQueue from "@/pages/ActionQueue";
 import { aiDoctorSessionDetailPath } from "@/lib/routes";
 
@@ -199,14 +199,10 @@ describe("Action Queue row — Linked from AI Doctor affordance", () => {
 
   it("does not render the affordance when AI Doctor row lacks a session id", async () => {
     renderList();
-    await waitFor(() =>
-      expect(screen.getAllByTestId("action-queue-row").length).toBe(3),
-    );
+    await waitFor(() => expect(screen.getAllByTestId("action-queue-row").length).toBe(3));
     const row = document.querySelector('[data-action-id="aq-ai-2"]') as HTMLElement;
     expect(row).toBeTruthy();
-    expect(
-      row.querySelector('[data-testid="action-queue-row-ai-doctor-session-link"]'),
-    ).toBeNull();
+    expect(row.querySelector('[data-testid="action-queue-row-ai-doctor-session-link"]')).toBeNull();
     // No broken anchor either.
     expect(
       row.querySelector('[data-testid="action-queue-row-ai-doctor-session-link-anchor"]'),
@@ -215,13 +211,9 @@ describe("Action Queue row — Linked from AI Doctor affordance", () => {
 
   it("does not render the affordance on non-AI-Doctor rows", async () => {
     renderList();
-    await waitFor(() =>
-      expect(screen.getAllByTestId("action-queue-row").length).toBe(3),
-    );
+    await waitFor(() => expect(screen.getAllByTestId("action-queue-row").length).toBe(3));
     const row = document.querySelector('[data-action-id="aq-coach-1"]') as HTMLElement;
-    expect(
-      row.querySelector('[data-testid="action-queue-row-ai-doctor-session-link"]'),
-    ).toBeNull();
+    expect(row.querySelector('[data-testid="action-queue-row-ai-doctor-session-link"]')).toBeNull();
   });
 
   it("never leaks raw [session:<id>] token into the row markup", async () => {
@@ -275,9 +267,7 @@ describe("Action Queue row — Linked from AI Doctor affordance", () => {
       expect(screen.getAllByTestId("action-queue-row").length).toBeGreaterThan(0),
     );
     const row = document.querySelector('[data-action-id="aq-ai-1"]') as HTMLElement;
-    expect(
-      row.querySelector('[data-testid="action-queue-row-ai-doctor-badge"]'),
-    ).toBeTruthy();
+    expect(row.querySelector('[data-testid="action-queue-row-ai-doctor-badge"]')).toBeTruthy();
     expect(
       row.querySelector('[data-testid="action-queue-row-review-required-badge"]'),
     ).toBeTruthy();
@@ -286,13 +276,9 @@ describe("Action Queue row — Linked from AI Doctor affordance", () => {
   it("preserves /actions?focus=<id> highlight + Clear focus controls", async () => {
     renderList("/actions?focus=aq-ai-1");
     await waitFor(() =>
-      expect(
-        document.querySelector('[data-testid="action-queue-focus-chip"]'),
-      ).toBeTruthy(),
+      expect(document.querySelector('[data-testid="action-queue-focus-chip"]')).toBeTruthy(),
     );
-    const focused = document.querySelector(
-      '[data-action-id="aq-ai-1"][data-focused="true"]',
-    );
+    const focused = document.querySelector('[data-action-id="aq-ai-1"][data-focused="true"]');
     expect(focused).toBeTruthy();
     const clear = document.querySelector(
       '[data-testid="action-queue-clear-focus"]',
@@ -300,19 +286,14 @@ describe("Action Queue row — Linked from AI Doctor affordance", () => {
     expect(clear).toBeTruthy();
     fireEvent.click(clear);
     await waitFor(() =>
-      expect(
-        document.querySelector('[data-testid="action-queue-focus-chip"]'),
-      ).toBeNull(),
+      expect(document.querySelector('[data-testid="action-queue-focus-chip"]')).toBeNull(),
     );
   });
 });
 
 // --- Static safety scans ----------------------------------------------------
 
-const QUEUE_SRC = readFileSync(
-  resolve(__dirname, "../..", "src/pages/ActionQueue.tsx"),
-  "utf8",
-);
+const QUEUE_SRC = readFileSync(resolve(__dirname, "../..", "src/pages/ActionQueue.tsx"), "utf8");
 
 describe("Linked-from-AI-Doctor affordance — static safety", () => {
   it("introduces no new write paths into action_queue", () => {
@@ -322,21 +303,13 @@ describe("Linked-from-AI-Doctor affordance — static safety", () => {
     const lower = QUEUE_SRC.toLowerCase();
     expect(lower).not.toContain("functions.invoke");
     expect(lower).not.toContain("service_role");
-    expect(lower).not.toMatch(
-      /from\(["']action_queue["'][\s\S]{0,200}?\.upsert\(/,
-    );
-    expect(lower).not.toMatch(
-      /from\(["']action_queue["'][\s\S]{0,200}?\.delete\(/,
-    );
-    expect(lower).not.toMatch(
-      /from\(["']action_queue["'][\s\S]{0,200}?\.rpc\(/,
-    );
+    expect(lower).not.toMatch(/from\(["']action_queue["'][\s\S]{0,200}?\.upsert\(/);
+    expect(lower).not.toMatch(/from\(["']action_queue["'][\s\S]{0,200}?\.delete\(/);
+    expect(lower).not.toMatch(/from\(["']action_queue["'][\s\S]{0,200}?\.rpc\(/);
     // No new insert to action_queue: only inserts allowed are into
     // action_queue_events for approve/reject/etc audit. Assert no insert call
     // is chained to from('action_queue').
-    expect(lower).not.toMatch(
-      /from\(["']action_queue["'][\s\S]{0,200}?\.insert\(/,
-    );
+    expect(lower).not.toMatch(/from\(["']action_queue["'][\s\S]{0,200}?\.insert\(/);
   });
 
   it("uses the shared route helper for the session link", () => {

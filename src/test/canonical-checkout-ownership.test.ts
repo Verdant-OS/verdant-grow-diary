@@ -3,7 +3,7 @@
  *
  *   - `/pricing` (Pricing.tsx) is the sole routed user-facing caller of
  *     `usePaddleCheckout`; the retired Upgrade presenter may delegate to the
- *     same hook but is not mounted by App.tsx.
+ *     same hook but is not mounted in file routes.
  *   - `/upgrade` and `/billing/:plan` are compatibility redirects to
  *     canonical `/pricing` and never mount a second checkout surface.
  *   - `PhenoTrackerUpgradeGate`, `StartPhenoHuntButton`, and the auth
@@ -15,6 +15,10 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { resolve } from "node:path";
+import {
+  extractMountedAppRoutePaths,
+  readRouteModuleSourceForPath,
+} from "./helpers/routeManifestSyncHarness";
 
 const SRC = resolve(__dirname, "..");
 
@@ -60,12 +64,13 @@ describe("Canonical checkout ownership — static guard", () => {
 
     expect(callers).toEqual(["pages/Pricing.tsx", "pages/Upgrade.tsx"]);
 
-    const app = ALL.find((entry) => entry.file.endsWith("/src/App.tsx"));
+    const upgradeRoute = readRouteModuleSourceForPath("/upgrade");
     const retiredUpgrade = ALL.find((entry) => entry.file.endsWith("/src/pages/Upgrade.tsx"));
-    expect(app).toBeDefined();
+    expect(upgradeRoute).toBeTruthy();
     expect(retiredUpgrade).toBeDefined();
-    expect(app!.text).not.toMatch(/import\(["']\.\/pages\/Upgrade["']\)/);
-    expect(app!.text).toMatch(/path="\/upgrade"\s+element=\{<LegacyUpgradeRedirect\s*\/>\}/);
+    expect(upgradeRoute!).not.toMatch(/import\(["']\.\/pages\/Upgrade["']\)/);
+    expect(extractMountedAppRoutePaths()).toContain("/upgrade");
+    expect(upgradeRoute!).toMatch(/LegacyUpgradeRedirect/);
     expect(retiredUpgrade!.text).not.toMatch(/Paddle\.Checkout\.open\s*\(/);
   });
 

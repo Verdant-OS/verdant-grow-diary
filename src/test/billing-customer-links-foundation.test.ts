@@ -13,7 +13,9 @@ const MIGRATION = readProjectFile(
 describe("billing customer links foundation migration", () => {
   it("creates a server-owned billing customer link table", () => {
     expect(MIGRATION).toContain("CREATE TABLE public.billing_customer_links");
-    expect(MIGRATION).toContain("user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE");
+    expect(MIGRATION).toContain(
+      "user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE",
+    );
     expect(MIGRATION).toContain("provider text NOT NULL CHECK (provider IN ('paddle'))");
     expect(MIGRATION).toContain("provider_customer_id text NOT NULL");
     expect(MIGRATION).toContain("provider_subscription_id text NULL");
@@ -22,8 +24,12 @@ describe("billing customer links foundation migration", () => {
   });
 
   it("constrains link state without implying paid access", () => {
-    expect(MIGRATION).toContain("CHECK (link_status IN ('linked', 'pending_review', 'blocked', 'inactive'))");
-    expect(MIGRATION).toContain("CHECK (link_source IN ('checkout', 'webhook', 'operator', 'import', 'unknown'))");
+    expect(MIGRATION).toContain(
+      "CHECK (link_status IN ('linked', 'pending_review', 'blocked', 'inactive'))",
+    );
+    expect(MIGRATION).toContain(
+      "CHECK (link_source IN ('checkout', 'webhook', 'operator', 'import', 'unknown'))",
+    );
     expect(MIGRATION).toContain("CHECK (confidence IN ('verified', 'review_required', 'blocked'))");
     expect(MIGRATION).toContain("No entitlement grant is implied");
     expect(MIGRATION).toContain("Does not grant paid access");
@@ -31,7 +37,9 @@ describe("billing customer links foundation migration", () => {
 
   it("enforces unambiguous provider identifier ownership", () => {
     expect(MIGRATION).toContain("billing_customer_links_provider_customer_uniq");
-    expect(MIGRATION).toContain("ON public.billing_customer_links (provider, provider_customer_id)");
+    expect(MIGRATION).toContain(
+      "ON public.billing_customer_links (provider, provider_customer_id)",
+    );
     expect(MIGRATION).toContain("billing_customer_links_provider_subscription_uniq");
     expect(MIGRATION).toContain("WHERE provider_subscription_id IS NOT NULL");
     expect(MIGRATION).toContain("billing_customer_links_provider_checkout_uniq");
@@ -41,20 +49,34 @@ describe("billing customer links foundation migration", () => {
   it("keeps direct table access service-role only", () => {
     expect(MIGRATION).toContain("REVOKE ALL ON TABLE public.billing_customer_links FROM PUBLIC");
     expect(MIGRATION).toContain("REVOKE ALL ON TABLE public.billing_customer_links FROM anon");
-    expect(MIGRATION).toContain("REVOKE ALL ON TABLE public.billing_customer_links FROM authenticated");
+    expect(MIGRATION).toContain(
+      "REVOKE ALL ON TABLE public.billing_customer_links FROM authenticated",
+    );
     expect(MIGRATION).toContain("GRANT ALL ON TABLE public.billing_customer_links TO service_role");
-    expect(MIGRATION).toContain("ALTER TABLE public.billing_customer_links ENABLE ROW LEVEL SECURITY");
+    expect(MIGRATION).toContain(
+      "ALTER TABLE public.billing_customer_links ENABLE ROW LEVEL SECURITY",
+    );
     expect(MIGRATION).not.toMatch(/CREATE\s+POLICY/i);
-    expect(MIGRATION).not.toMatch(/GRANT\s+SELECT\s+ON\s+TABLE\s+public\.billing_customer_links\s+TO\s+authenticated/i);
+    expect(MIGRATION).not.toMatch(
+      /GRANT\s+SELECT\s+ON\s+TABLE\s+public\.billing_customer_links\s+TO\s+authenticated/i,
+    );
   });
 
   it("adds sanitized self-summary and operator-audit RPCs", () => {
-    expect(MIGRATION).toContain("CREATE OR REPLACE FUNCTION public.billing_customer_link_summary()");
-    expect(MIGRATION).toContain("CREATE OR REPLACE FUNCTION public.billing_customer_link_operator_audit");
+    expect(MIGRATION).toContain(
+      "CREATE OR REPLACE FUNCTION public.billing_customer_link_summary()",
+    );
+    expect(MIGRATION).toContain(
+      "CREATE OR REPLACE FUNCTION public.billing_customer_link_operator_audit",
+    );
     expect(MIGRATION).toContain("SECURITY DEFINER");
     expect(MIGRATION).toContain("public.has_role(auth.uid(), 'operator'::public.app_role)");
-    expect(MIGRATION).toContain("GRANT EXECUTE ON FUNCTION public.billing_customer_link_summary() TO authenticated");
-    expect(MIGRATION).toContain("GRANT EXECUTE ON FUNCTION public.billing_customer_link_operator_audit(integer) TO authenticated");
+    expect(MIGRATION).toContain(
+      "GRANT EXECUTE ON FUNCTION public.billing_customer_link_summary() TO authenticated",
+    );
+    expect(MIGRATION).toContain(
+      "GRANT EXECUTE ON FUNCTION public.billing_customer_link_operator_audit(integer) TO authenticated",
+    );
   });
 
   it("keeps RPC output sanitized", () => {

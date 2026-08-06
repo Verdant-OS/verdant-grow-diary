@@ -1,74 +1,31 @@
-// Operator/Customer route protection audit.
+// Operator/Customer route protection audit (TanStack file routes).
 //
 // Confirms via static inspection that:
-//  - all operator (/operator/*, /diagnostics, /ingest-*, /pi-*, /imports/*,
-//    /sensors/*, /actions, /admin/leads, /leads) routes live INSIDE the
-//    AppShell <Route element={<AppShell />}> block, which calls
-//    useRequireAuth and redirects unauthenticated users to /auth.
-//  - public/Customer routes (/welcome, /pricing, /hardware-integrations,
-//    /billing/:plan, /partners/csv-preview, /auth, /reset-password) live
-//    OUTSIDE the AppShell block.
+//  - protected routes live under the `/_app` layout (AppShell / useRequireAuth).
+//  - public/Customer routes live outside `/_app`.
 import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
+import {
+  extractMountedAppRoutePaths,
+  extractTanstackRouteIds,
+  tanstackRouteIdToClassicPath,
+} from "./helpers/routeManifestSyncHarness";
 
-const APP = fs.readFileSync(path.resolve(__dirname, "../App.tsx"), "utf8");
+const MOUNTED = extractMountedAppRoutePaths();
 
-// Split the file on the AppShell element open/close so we can classify
-// each <Route path="..."/> as protected vs public.
-const shellOpen = APP.indexOf("<Route element={<AppShell />}>");
-expect(shellOpen).toBeGreaterThan(-1);
-
-// Walk the JSX to find the matching </Route> for the AppShell wrapper.
-// We track brace depth so `<RequireOperatorRole />` inside an `element={...}`
-// attribute is not mistaken for a self-closing tag boundary.
-function tagOpenEnd(src: string, openIdx: number): number {
-  let i = openIdx + 1;
-  let braces = 0;
-  while (i < src.length) {
-    const ch = src[i];
-    if (ch === "{") braces += 1;
-    else if (ch === "}") braces -= 1;
-    else if (ch === ">" && braces === 0) return i;
-    i += 1;
+/** Classic paths served under the pathless `/_app` layout (auth shell). */
+function isUnderAppShell(classicPath: string): boolean {
+  for (const id of extractTanstackRouteIds()) {
+    if (!id.startsWith("/_app")) continue;
+    if (id === "/_app") continue;
+    if (tanstackRouteIdToClassicPath(id) === classicPath) return true;
   }
-  return -1;
-}
-function findMatchingShellClose(src: string, openIdx: number): number {
-  const startEnd = tagOpenEnd(src, openIdx);
-  let depth = 1;
-  let i = startEnd + 1;
-  while (i < src.length && depth > 0) {
-    const nextOpen = src.indexOf("<Route", i);
-    const nextClose = src.indexOf("</Route>", i);
-    if (nextClose === -1) return -1;
-    if (nextOpen !== -1 && nextOpen < nextClose) {
-      const end = tagOpenEnd(src, nextOpen);
-      if (end === -1) return -1;
-      if (src[end - 1] !== "/") depth += 1;
-      i = end + 1;
-    } else {
-      depth -= 1;
-      if (depth === 0) return nextClose;
-      i = nextClose + "</Route>".length;
-    }
-  }
-  return -1;
-}
-const shellClose = findMatchingShellClose(APP, shellOpen);
-expect(shellClose).toBeGreaterThan(shellOpen);
-
-const protectedBlock = APP.slice(shellOpen, shellClose);
-const publicBlockBefore = APP.slice(0, shellOpen);
-const publicBlockAfter = APP.slice(shellClose);
-const publicBlock = publicBlockBefore + publicBlockAfter;
-
-function pathsIn(src: string): string[] {
-  return [...src.matchAll(/path="([^"]+)"/g)].map((m) => m[1]);
+  return false;
 }
 
-const PROTECTED = new Set(pathsIn(protectedBlock));
-const PUBLIC = new Set(pathsIn(publicBlock));
+const PROTECTED = new Set(MOUNTED.filter(isUnderAppShell));
+const PUBLIC = new Set(MOUNTED.filter((p) => !isUnderAppShell(p)));
 
 const REQUIRED_PROTECTED = [
   "/operator/ecowitt",
@@ -134,7 +91,8 @@ describe("AppShell protected boundary", () => {
   });
 
   it("does not reference service_role or pull_request_target", () => {
-    expect(APP).not.toMatch(/service_role/i);
-    expect(APP).not.toMatch(/pull_request_target/i);
+    const routesSrc = fs.readFileSync(path.resolve(__dirname, "../routes/__root.tsx"), "utf8");
+    expect(routesSrc).not.toMatch(/service_role/i);
+    expect(routesSrc).not.toMatch(/pull_request_target/i);
   });
 });

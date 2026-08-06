@@ -77,9 +77,7 @@ describe("mergeSavedDiaryTimelineSectionState", () => {
 
 describe("parseDiaryTimelineSectionState", () => {
   it("parses valid JSON with known keys", () => {
-    const out = parseDiaryTimelineSectionState(
-      JSON.stringify({ watering: true, feeding: false }),
-    );
+    const out = parseDiaryTimelineSectionState(JSON.stringify({ watering: true, feeding: false }));
     expect(out).toEqual({ watering: true, feeding: false });
   });
   it("malformed JSON returns null", () => {

@@ -42,8 +42,7 @@ const ALLOWED_FEATURES = new Set<string>([
   "post_grow_report",
 ]);
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}(T[0-9:.\-+Z]+)?$/;
 const MAX_RANGE_DAYS = 366;
 
@@ -208,11 +207,7 @@ Deno.serve(async (req) => {
   // Optional scope ownership check. Uses the same user-JWT-scoped client,
   // so RLS denies any cross-user row visibility automatically.
   async function ownsRow(table: string, id: string): Promise<boolean> {
-    const { data, error } = await supabase
-      .from(table)
-      .select("id")
-      .eq("id", id)
-      .maybeSingle();
+    const { data, error } = await supabase.from(table).select("id").eq("id", id).maybeSingle();
     if (error) return false;
     return !!data;
   }

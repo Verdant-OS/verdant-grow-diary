@@ -29,10 +29,7 @@ export default function CustomerGuideTimeline({
       aria-labelledby="customer-guide-timeline-heading"
       className="rounded-xl border border-border/60 bg-card/60 p-5"
     >
-      <h2
-        id="customer-guide-timeline-heading"
-        className="text-base font-semibold tracking-tight"
-      >
+      <h2 id="customer-guide-timeline-heading" className="text-base font-semibold tracking-tight">
         {label}
       </h2>
       <p
@@ -62,9 +59,7 @@ export default function CustomerGuideTimeline({
               </p>
               <p className="mt-1 text-sm font-medium">{event.title}</p>
               {event.summary ? (
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {event.summary}
-                </p>
+                <p className="mt-1 text-sm text-muted-foreground">{event.summary}</p>
               ) : null}
               {event.publicImageUrl ? (
                 <img

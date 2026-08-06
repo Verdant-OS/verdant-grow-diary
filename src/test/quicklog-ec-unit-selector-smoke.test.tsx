@@ -20,15 +20,13 @@ import { EC_UNIT_LABEL } from "@/constants/units";
 // Radix Select uses pointer-capture APIs and scrollIntoView that jsdom
 // doesn't implement. Shim them so the selector can open in the test env.
 beforeAll(() => {
-  if (!(Element.prototype as unknown as { hasPointerCapture?: unknown })
-    .hasPointerCapture) {
-    (Element.prototype as unknown as { hasPointerCapture: () => boolean })
-      .hasPointerCapture = () => false;
+  if (!(Element.prototype as unknown as { hasPointerCapture?: unknown }).hasPointerCapture) {
+    (Element.prototype as unknown as { hasPointerCapture: () => boolean }).hasPointerCapture = () =>
+      false;
   }
-  (Element.prototype as unknown as { releasePointerCapture: () => void })
-    .releasePointerCapture = () => {};
-  (Element.prototype as unknown as { scrollIntoView: () => void })
-    .scrollIntoView = () => {};
+  (Element.prototype as unknown as { releasePointerCapture: () => void }).releasePointerCapture =
+    () => {};
+  (Element.prototype as unknown as { scrollIntoView: () => void }).scrollIntoView = () => {};
 });
 
 function renderWithClient(ui: ReactElement) {
@@ -47,7 +45,17 @@ vi.mock("@/integrations/supabase/client", () => ({
       insert: vi.fn(),
       update: () => ({ eq: vi.fn() }),
       select: () => ({
-        eq: () => ({ order: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }) }),
+        eq: () => ({
+          order: () => ({
+            limit: () => {
+              const __c: any = {
+                abortSignal: () => __c,
+                then: (r: any, j?: any) => Promise.resolve({ data: [], error: null }).then(r, j),
+              };
+              return __c;
+            },
+          }),
+        }),
       }),
     }),
     storage: { from: () => ({ upload: vi.fn(), remove: vi.fn() }) },
@@ -87,9 +95,9 @@ describe("Bug #13 — EC unit selector smoke", () => {
     fireEvent.keyDown(trigger, { key: "ArrowDown", code: "ArrowDown" });
 
     const listbox = screen.getByRole("listbox");
-    const optionTexts = Array.from(
-      listbox.querySelectorAll('[role="option"]'),
-    ).map((el) => (el.textContent ?? "").trim());
+    const optionTexts = Array.from(listbox.querySelectorAll('[role="option"]')).map((el) =>
+      (el.textContent ?? "").trim(),
+    );
 
     // All four labels from the canonical constant render.
     for (const label of Object.values(EC_UNIT_LABEL)) {

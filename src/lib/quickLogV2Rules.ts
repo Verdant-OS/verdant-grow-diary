@@ -109,9 +109,7 @@ export function resolveQuickLogV2Target(
  * A missing selection is an incomplete draft; a selection that no longer
  * exists is stale context and must keep persistence controls fail-closed.
  */
-export function isStaleQuickLogV2TargetSelection(
-  resolved: ResolvedQuickLogV2Target,
-): boolean {
+export function isStaleQuickLogV2TargetSelection(resolved: ResolvedQuickLogV2Target): boolean {
   return resolved.ok === false && resolved.reason === "selection_not_found";
 }
 

@@ -106,6 +106,12 @@ describe("startScreenPreferences", () => {
     expect(consumeQuickLogStartIntent("?grow=recent&open=quick-log&utm=owned")).toBe(
       "?grow=recent&utm=owned",
     );
+    expect(
+      consumeQuickLogStartIntent(
+        "?open=quick-log&type=observation&prompt=oreoz-vs-gelonade&utm=guide",
+      ),
+    ).toBe("?utm=guide");
+    expect(consumeQuickLogStartIntent("?prompt=oreoz-vs-gelonade")).toBeNull();
     expect(consumeQuickLogStartIntent("?open=dashboard")).toBeNull();
     expect(consumeQuickLogStartIntent("")).toBeNull();
   });

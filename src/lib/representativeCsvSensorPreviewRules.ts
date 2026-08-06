@@ -94,7 +94,10 @@ const HEADER_SYNONYMS: Record<string, ReadonlyArray<string>> = {
 };
 
 function normalizeHeader(raw: string): string {
-  return String(raw ?? "").toLowerCase().replace(/\s+/g, " ").trim();
+  return String(raw ?? "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 export interface RepresentativeColumnPlan {
@@ -190,9 +193,7 @@ function usToMs(us: number): number {
  * Normalize a single parsed CSV row into a draft reading. Pure and
  * deterministic. Never mutates inputs.
  */
-export function normalizeRepresentativeRow(
-  args: NormalizeRowArgs,
-): RepresentativeDraftReading {
+export function normalizeRepresentativeRow(args: NormalizeRowArgs): RepresentativeDraftReading {
   const { cells, headers, plan, rowIndex, units } = args;
   const airTempUnit: TempUnit = units?.airTempUnit ?? "C";
   const subTempUnit: TempUnit = units?.substrateTempUnit ?? "C";
@@ -208,9 +209,7 @@ export function normalizeRepresentativeRow(
   else if (!captured_at) reasons.push("invalid_timestamp");
 
   const rawAirTempNum = parseFiniteNumber(pickCell(cells, plan.air_temp_c ?? null));
-  const rawSubTempNum = parseFiniteNumber(
-    pickCell(cells, plan.substrate_temp_c ?? null),
-  );
+  const rawSubTempNum = parseFiniteNumber(pickCell(cells, plan.substrate_temp_c ?? null));
   const rawEcNum = parseFiniteNumber(pickCell(cells, plan.substrate_ec_mscm ?? null));
 
   const air_temp_c =
@@ -236,7 +235,8 @@ export function normalizeRepresentativeRow(
   const rawAirTempCell = pickCell(cells, plan.air_temp_c ?? null);
   if (rawAirTempCell !== null && air_temp_c === null) reasons.push("air_temp_non_finite");
   const rawSubTempCell = pickCell(cells, plan.substrate_temp_c ?? null);
-  if (rawSubTempCell !== null && substrate_temp_c === null) reasons.push("substrate_temp_non_finite");
+  if (rawSubTempCell !== null && substrate_temp_c === null)
+    reasons.push("substrate_temp_non_finite");
 
   // Range checks (post unit conversion, canonical units).
   if (humidity_pct !== null && (humidity_pct < 0 || humidity_pct > 100)) {
@@ -397,7 +397,7 @@ export function defaultMappingFromHeaders(
   for (const field of REPRESENTATIVE_MAPPING_FIELDS) {
     const planKey = MAPPING_TO_PLAN_KEY[field];
     const idx = plan[planKey];
-    const header = idx !== null && idx !== undefined ? headers[idx] ?? null : null;
+    const header = idx !== null && idx !== undefined ? (headers[idx] ?? null) : null;
     if (header === null) continue;
     if (field === "air_temp" || field === "substrate_temp") {
       mapping[field] = { column: header, unit: "C" };
@@ -428,9 +428,7 @@ export function planFromMapping(
     const planKey = MAPPING_TO_PLAN_KEY[field];
     const value = mapping[field];
     const column =
-      typeof value === "string" || value === null
-        ? (value as string | null)
-        : value.column;
+      typeof value === "string" || value === null ? (value as string | null) : value.column;
     plan[planKey] = indexOfHeader(headers, column);
   }
   return plan;
@@ -499,4 +497,3 @@ export function cToF(c: number | null): number | null {
   if (c === null || !Number.isFinite(c)) return null;
   return c * (9 / 5) + 32;
 }
-

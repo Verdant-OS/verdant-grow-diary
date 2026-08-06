@@ -4,7 +4,7 @@
  *
  * Regression for the bug where a non-Pro account could walk through all six
  * wizard steps and only fail at the final save with a raw RLS error. This
- * mounts the same composition App.tsx registers for the route
+ * mounts the same composition File routes register for the route
  * (PhenoTrackerUpgradeGate wrapping PhenoHuntNew) and proves:
  *   - Free: upgrade card renders, the wizard (steps, save button) never
  *     mounts, and no Supabase query fires at all.
@@ -14,7 +14,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, cleanup, waitFor } from "@testing-library/react";
-import { MemoryRouter, Routes, Route } from "react-router-dom";
+import { MemoryRouter, Routes, Route } from "@/lib/react-router-compat";
 import { resolveEntitlements } from "@/lib/entitlements/resolveEntitlements";
 import { canUseFeature } from "@/lib/featureEntitlements";
 
@@ -34,9 +34,7 @@ vi.mock("sonner", () => ({
 const entMode = vi.hoisted(() => ({ current: "free" as "free" | "pro" }));
 
 vi.mock("@/hooks/useMyEntitlements", async () => {
-  const { resolveEntitlements: resolve } = await import(
-    "@/lib/entitlements/resolveEntitlements"
-  );
+  const { resolveEntitlements: resolve } = await import("@/lib/entitlements/resolveEntitlements");
   const NOW = new Date("2026-08-01T00:00:00Z");
   return {
     useMyEntitlements: () => ({
@@ -100,7 +98,7 @@ function mockGrowData() {
 }
 
 function renderRoute() {
-  // Same shape App.tsx registers for the wizard route.
+  // Same shape File routes register for the wizard route.
   return render(
     <MemoryRouter initialEntries={["/pheno-hunts/new?growId=g1"]}>
       <Routes>
@@ -152,9 +150,7 @@ describe("/pheno-hunts/new route entry gate", () => {
     mockGrowData();
     renderRoute();
 
-    await waitFor(() =>
-      expect(screen.getByTestId("pheno-hunt-onboarding")).toBeDefined(),
-    );
+    await waitFor(() => expect(screen.getByTestId("pheno-hunt-onboarding")).toBeDefined());
     expect(screen.queryByTestId("pheno-tracker-upgrade-gate")).toBeNull();
   });
 });

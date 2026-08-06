@@ -3,7 +3,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "@/lib/react-router-compat";
 import { VERDANT_CULTIVARS } from "@/constants/verdantCultivars";
 
 let currentUser: { id: string } | null = { id: "user-1" };
@@ -69,7 +69,10 @@ describe("CultivarFollowButton", () => {
       expect(screen.getByTestId("cultivar-follow-button")).toHaveTextContent("Following"),
     );
     expect(upsertSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ cultivar_slug: "og-kush", seen_guide_version: cultivar.guideVersion }),
+      expect.objectContaining({
+        cultivar_slug: "og-kush",
+        seen_guide_version: cultivar.guideVersion,
+      }),
       expect.objectContaining({ onConflict: "user_id,cultivar_slug" }),
     );
   });

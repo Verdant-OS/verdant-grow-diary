@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/react-router-compat";
 import { FlaskConical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { breedingLogNewPath } from "@/lib/routes";

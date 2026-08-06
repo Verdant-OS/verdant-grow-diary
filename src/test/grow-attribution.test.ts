@@ -48,21 +48,17 @@ describe("buildTentGrowIndex", () => {
 
 describe("resolvePlantGrowId", () => {
   it("resolves through tent.grow_id when the plant's own grow_id is null", () => {
-    expect(
-      resolvePlantGrowId({ growId: null, tentId: "tent-in-grow" }, tentIndex),
-    ).toBe("grow-a");
+    expect(resolvePlantGrowId({ growId: null, tentId: "tent-in-grow" }, tentIndex)).toBe("grow-a");
   });
 
   it("returns null for a plant under an orphaned tent (tent grow null)", () => {
-    expect(
-      resolvePlantGrowId({ growId: null, tentId: "tent-orphaned" }, tentIndex),
-    ).toBeNull();
+    expect(resolvePlantGrowId({ growId: null, tentId: "tent-orphaned" }, tentIndex)).toBeNull();
   });
 
   it("plant.grow_id precedence wins over a different tent grow", () => {
-    expect(
-      resolvePlantGrowId({ growId: "grow-a", tentId: "tent-other-grow" }, tentIndex),
-    ).toBe("grow-a");
+    expect(resolvePlantGrowId({ growId: "grow-a", tentId: "tent-other-grow" }, tentIndex)).toBe(
+      "grow-a",
+    );
   });
 
   it("returns null for no grow, no tent — genuinely unassigned", () => {
@@ -103,9 +99,10 @@ describe("filterPlantsByResolvedGrow", () => {
       { id: "other", growId: "grow-b", tentId: null },
       { id: "orphan", growId: null, tentId: "tent-orphaned" },
     ];
-    expect(
-      filterPlantsByResolvedGrow(plants, "grow-a", tentIndex).map((p) => p.id),
-    ).toEqual(["direct", "rollup"]);
+    expect(filterPlantsByResolvedGrow(plants, "grow-a", tentIndex).map((p) => p.id)).toEqual([
+      "direct",
+      "rollup",
+    ]);
   });
 });
 
@@ -149,19 +146,14 @@ describe("count consistency — every active plant lands in exactly one bucket",
     const all = opts.find((o) => o.id === "");
     const perGrowAndUnassigned = opts.filter((o) => o.id !== "");
     expect(all?.plantCount).toBe(5);
-    expect(
-      perGrowAndUnassigned.reduce((acc, o) => acc + o.plantCount, 0),
-    ).toBe(all?.plantCount);
+    expect(perGrowAndUnassigned.reduce((acc, o) => acc + o.plantCount, 0)).toBe(all?.plantCount);
     expect(opts.find((o) => o.id === "grow-a")?.plantCount).toBe(2);
     expect(opts.find((o) => o.id === "grow-b")?.plantCount).toBe(1);
     expect(opts.find((o) => o.id === UNASSIGNED_GROW_FILTER_ID)?.plantCount).toBe(2);
   });
 
   it("filterPlantsByGrow buckets partition the same plants the counts describe", () => {
-    const bucketIds = [
-      ...grows.map((g) => g.id),
-      UNASSIGNED_GROW_FILTER_ID,
-    ];
+    const bucketIds = [...grows.map((g) => g.id), UNASSIGNED_GROW_FILTER_ID];
     const seen = new Map<string, number>();
     for (const bucket of bucketIds) {
       for (const p of filterPlantsByGrow(activePlants, bucket, tentIndex)) {
@@ -191,9 +183,7 @@ describe("Banana Cough regression — grow with only tent-rollup plants", () => 
   it("buildGrowFilterOptions shows 9 under the grow and no Unassigned option", () => {
     const opts = buildGrowFilterOptions(grows, ninePlants, index);
     expect(opts.find((o) => o.id === "banana-cough")?.plantCount).toBe(9);
-    expect(opts.find((o) => o.id === "banana-cough")?.label).toBe(
-      "Banana Cough (9 plants)",
-    );
+    expect(opts.find((o) => o.id === "banana-cough")?.label).toBe("Banana Cough (9 plants)");
     expect(opts.some((o) => o.id === UNASSIGNED_GROW_FILTER_ID)).toBe(false);
   });
 

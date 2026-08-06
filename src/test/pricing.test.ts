@@ -8,12 +8,16 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import {
+  extractMountedAppRoutePaths,
+  readAllRouteModuleSources,
+} from "./helpers/routeManifestSyncHarness";
 
 const root = resolve(__dirname, "..", "..");
 const readSrc = (p: string) => readFileSync(resolve(__dirname, "..", p), "utf8");
 const read = (p: string) => readFileSync(resolve(root, p), "utf8");
 
-const APP = readSrc("App.tsx");
+const APP = readAllRouteModuleSources();
 const PAGE = readSrc("pages/Pricing.tsx");
 const CONSTANTS = readSrc("constants/pricing.ts");
 const UPGRADE_CONFIG = readSrc("config/pricing.ts");
@@ -24,14 +28,16 @@ const SITEMAP = read("public/sitemap.xml");
 
 describe("/pricing route", () => {
   it("is registered as a public route", () => {
-    // Page is code-split (React.lazy dynamic import) rather than eagerly imported.
-    expect(APP).toMatch(/import\(\s*["']\.\/pages\/Pricing["']\s*\)/);
-    expect(APP).toMatch(/path="\/pricing"\s+element=\{<Pricing\s*\/>\}/);
+    // TanStack file routes mount pages via static @/pages imports (not React.lazy).
+    expect(APP).toMatch(/from\s+["']@\/pages\/Pricing["']/);
+    expect(extractMountedAppRoutePaths()).toContain("/pricing");
+    expect(APP).toMatch(/Pricing/);
   });
 
   it("redirects legacy /billing/:plan to canonical /pricing via LegacyBillingRedirect", () => {
-    expect(APP).toMatch(/import\(\s*["']\.\/pages\/LegacyBillingRedirect["']\s*\)/);
-    expect(APP).toMatch(/path="\/billing\/:plan"\s+element=\{<LegacyBillingRedirect\s*\/>\}/);
+    expect(APP).toMatch(/from\s+["']@\/pages\/LegacyBillingRedirect["']/);
+    expect(extractMountedAppRoutePaths()).toContain("/billing/:plan");
+    expect(APP).toMatch(/LegacyBillingRedirect/);
   });
 });
 

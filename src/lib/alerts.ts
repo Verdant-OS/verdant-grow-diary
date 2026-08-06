@@ -61,9 +61,7 @@ export interface SaveAlertInput {
    * metadata are persisted; raw payloads / tokens are rejected by the writer.
    * Omitting (or passing []) persists an empty array — never inferred.
    */
-  originating_timeline_events?:
-    | readonly OriginatingTimelineEventInput[]
-    | null;
+  originating_timeline_events?: readonly OriginatingTimelineEventInput[] | null;
 }
 
 function alertsTable() {
@@ -72,9 +70,7 @@ function alertsTable() {
 
 /** Persist a generated alert candidate. Omits user_id (DB default = auth.uid()). */
 export async function saveAlert(input: SaveAlertInput): Promise<AlertRow> {
-  const refs = normalizeOriginatingTimelineEvents(
-    input.originating_timeline_events,
-  );
+  const refs = normalizeOriginatingTimelineEvents(input.originating_timeline_events);
   const payload = {
     grow_id: input.grow_id,
     severity: input.severity,

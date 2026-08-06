@@ -5,6 +5,9 @@
  * for a candidate page has loaded successfully. Staged rounds have their own
  * explicit lifecycle so a failed or delayed read cannot be mistaken for an
  * empty round and overwritten with defaults.
+ *
+ * Also covers the F14 honest-data fence: saveSex never appends a fabricated
+ * "unknown" observation for a candidate the grower never sexed.
  */
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -183,6 +186,87 @@ describe("initial editable evidence loading", () => {
     });
 
     for (const writer of WRITERS) expect(writer, label).not.toHaveBeenCalled();
+  });
+});
+
+describe("sex observation appends (F14 — no fabricated rows)", () => {
+  it("skips the append when a fresh candidate saves with the untouched 'unknown' default", async () => {
+    // The card's Save button fires score + decision + sex together, so the
+    // first save of a card whose sex select was never touched arrives as
+    // "unknown". Appending it would fabricate a "Sex recorded: Unknown"
+    // timeline event the grower never created.
+    const { result } = renderHook(() => usePhenoHuntWorkspace("hunt-1"));
+    await waitFor(() => expect(result.current.status).toBe("ok"));
+
+    await act(async () => {
+      expect(await result.current.saveSex("plant-1", "unknown")).toBe(true);
+    });
+
+    expect(appendSex).not.toHaveBeenCalled();
+    expect(result.current.sexByPlant["plant-1"]).toBeUndefined();
+  });
+
+  it("still appends a first REAL observation for a fresh candidate", async () => {
+    const { result } = renderHook(() => usePhenoHuntWorkspace("hunt-1"));
+    await waitFor(() => expect(result.current.status).toBe("ok"));
+
+    await act(async () => {
+      expect(await result.current.saveSex("plant-1", "female")).toBe(true);
+    });
+
+    expect(appendSex).toHaveBeenCalledTimes(1);
+    expect(appendSex).toHaveBeenCalledWith(
+      expect.objectContaining({ huntId: "hunt-1", plantId: "plant-1", sex: "female" }),
+    );
+    expect(result.current.sexByPlant["plant-1"]?.sex).toBe("female");
+  });
+
+  it("still appends when the grower explicitly changes a real prior value back to unknown", async () => {
+    listSexes.mockResolvedValueOnce({
+      "plant-1": {
+        plantId: "plant-1",
+        sex: "female",
+        hermObserved: false,
+        note: null,
+        observedAt: "2026-07-01T00:00:00Z",
+      },
+    });
+    const { result } = renderHook(() => usePhenoHuntWorkspace("hunt-1"));
+    await waitFor(() => expect(result.current.status).toBe("ok"));
+    expect(result.current.sexByPlant["plant-1"]?.sex).toBe("female");
+
+    await act(async () => {
+      expect(await result.current.saveSex("plant-1", "unknown")).toBe(true);
+    });
+
+    expect(appendSex).toHaveBeenCalledTimes(1);
+    expect(appendSex).toHaveBeenCalledWith(
+      expect.objectContaining({ huntId: "hunt-1", plantId: "plant-1", sex: "unknown" }),
+    );
+    expect(result.current.sexByPlant["plant-1"]?.sex).toBe("unknown");
+  });
+
+  it("still appends an 'unknown' first save when it carries a grower note", async () => {
+    // A note is grower-authored evidence — never silently discarded, even
+    // when the sex value itself is the untouched default.
+    const { result } = renderHook(() => usePhenoHuntWorkspace("hunt-1"));
+    await waitFor(() => expect(result.current.status).toBe("ok"));
+
+    await act(async () => {
+      expect(
+        await result.current.saveSex("plant-1", "unknown", "pre-flowers not visible yet"),
+      ).toBe(true);
+    });
+
+    expect(appendSex).toHaveBeenCalledTimes(1);
+    expect(appendSex).toHaveBeenCalledWith(
+      expect.objectContaining({
+        huntId: "hunt-1",
+        plantId: "plant-1",
+        sex: "unknown",
+        note: "pre-flowers not visible yet",
+      }),
+    );
   });
 });
 

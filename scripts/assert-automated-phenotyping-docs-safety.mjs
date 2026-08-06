@@ -9,8 +9,13 @@
  *        <!-- automated-phenotyping-docs-safety:allow -->
  *      are exempt — intended only for the "Avoid wording" block that
  *      documents the prohibited phrases.
- *   2. Diary Template required-field validation (Section 10).
- *   3. Filename Convention example validation (Section 11).
+ *   2. Diary Template required-field validation (Section 10), plus a
+ *      tripwire rejecting auto-created Action Queue wording.
+ *   3. Filename Convention example validation (Section 11):
+ *        - a minimum number of validatable example filenames
+ *        - every documented example scenario is still present (11.2)
+ *        - each example's Photo ID and photo_date agree with its own
+ *          filename
  *   4. Sample Filled Phenotyping Output Log validation (Section 13):
  *        - required columns present
  *        - filenames match the convention
@@ -52,6 +57,19 @@ export const BANNED_PHRASES = [
   "automated keeper decision",
   "automated cull decision",
   "automated release decision",
+  // Health-framing and certainty wording. Colour and morphology metrics are
+  // visible trait proxies; they must never be presented as health status,
+  // nutrient diagnosis, genetic insight, or harvest readiness.
+  "health indicators",
+  "health scoring",
+  "nutrient deficiency",
+  "nutrient deficiencies",
+  "healthier green",
+  "healthy green",
+  "genetic diversity tracking",
+  "objective health score",
+  "diagnosed from color",
+  "harvest ready",
 ];
 
 function escapeRe(s) {
@@ -128,11 +146,19 @@ export const REQUIRED_DIARY_FIELDS = [
   "Tool / Method",
   "Source Type",
   "Confidence",
+  "Automated Metric(s)",
   "Human Review Status",
   "Human Final Score",
   "Missing Evidence",
   "Notes",
 ];
+
+/**
+ * Wording the Diary Entry Template must never contain. An Action Queue item is
+ * always a grower-approved draft, so a template field implying items were
+ * already created is a constitutional violation, not a formatting nit.
+ */
+export const FORBIDDEN_DIARY_FIELDS = ["Action Queue Items Created"];
 
 export function checkDiaryTemplate(text) {
   const violations = [];
@@ -160,6 +186,17 @@ export function checkDiaryTemplate(text) {
       message: "Diary Entry Template missing 'Action Queue Draft / Grower-review-only:' field.",
     });
   }
+  // Tripwire: auto-created Action Queue wording must never reappear.
+  for (const forbidden of FORBIDDEN_DIARY_FIELDS) {
+    if (new RegExp(escapeRe(forbidden), "i").test(section)) {
+      violations.push({
+        kind: "diary-template",
+        message:
+          `Diary Entry Template must not contain '${forbidden}': Action Queue items are ` +
+          "never created automatically, only drafted for grower approval.",
+      });
+    }
+  }
   return violations;
 }
 
@@ -183,6 +220,148 @@ export function parseFilename(name) {
     date: m[5],
     sequence: m[6],
   };
+}
+
+/** Minimum number of validatable example filenames the section must carry. */
+export const MIN_FILENAME_EXAMPLES = 5;
+
+/**
+ * Scenarios the worked-example subsection must keep covering. Losing one means
+ * a reviewer no longer has a worked reference for that capture situation.
+ */
+export const REQUIRED_EXAMPLE_SCENARIOS = [
+  { label: "side view", re: /\bside\s+view\b/i },
+  { label: "top canopy", re: /\btop\s+canopy\b/i },
+  { label: "macro / trichome", re: /\bmacro\b\s*\/?\s*\btrichome\b/i },
+  { label: "mother plant", re: /\bmother\s+plant\b/i },
+  { label: "retake photo", re: /\bretake\s+photo\b/i },
+];
+
+const EXAMPLE_HEADING_RE = /^\*\*Example\s+(\d+)\s*(?:[-–—:]\s*)?(.*?)\s*\*\*$/;
+const BACKTICKED_LINE_RE = /^`([^`]+)`$/;
+
+/** Extract the worked-example subsection nested inside the Filename Convention section. */
+export function extractExamplesSubsection(text) {
+  const section = extractSection(text, /Filename Convention and Photo ID Mapping/i);
+  if (!section) return "";
+  // Heading-aware, not number-aware: matches "Examples" or "11.2 Examples".
+  return extractSection(section, /^\s*(?:\d+(?:\.\d+)*\.?\s+)?Examples\s*$/i);
+}
+
+/**
+ * Parse the worked examples into structure: heading label, the backtick-wrapped
+ * example filename, and the example's own Field / Value mapping table.
+ *
+ * @param {string} examplesSection
+ * @returns {Array<{number: string, label: string, filename: string|null,
+ *                  hasTable: boolean, fields: Map<string, string>}>}
+ */
+export function parseFilenameExamples(examplesSection) {
+  const lines = String(examplesSection).split(/\r?\n/);
+  /** @type {Array<{number: string, label: string, filename: string|null, block: string[]}>} */
+  const collected = [];
+  let current = null;
+  for (const raw of lines) {
+    const line = raw.trim();
+    const heading = line.match(EXAMPLE_HEADING_RE);
+    if (heading) {
+      current = { number: heading[1], label: heading[2].trim(), filename: null, block: [] };
+      collected.push(current);
+      continue;
+    }
+    if (!current) continue;
+    const backticked = line.match(BACKTICKED_LINE_RE);
+    if (backticked && current.filename === null) current.filename = backticked[1].trim();
+    current.block.push(raw);
+  }
+  return collected.map(({ number, label, filename, block }) => {
+    const table = parseMarkdownTable(block.join("\n"));
+    const fields = new Map();
+    for (const row of table?.rows ?? []) {
+      if (row.length < 2) continue;
+      fields.set(row[0].trim(), row[1].trim().replace(/`/g, ""));
+    }
+    return { number, label, filename, hasTable: table !== null, fields };
+  });
+}
+
+/**
+ * Scenario coverage and per-example Photo ID / photo_date cross-checks.
+ *
+ * Cross-checks read the example's parsed mapping table, so they do not depend
+ * on character distance between the filename and the table.
+ */
+export function checkFilenameExampleDetails(text) {
+  const violations = [];
+  const examplesSection = extractExamplesSubsection(text);
+  if (!examplesSection) {
+    violations.push({
+      kind: "filename-convention",
+      message: "Filename Convention section is missing its 'Examples' subsection.",
+    });
+    return violations;
+  }
+  const examples = parseFilenameExamples(examplesSection);
+
+  for (const scenario of REQUIRED_EXAMPLE_SCENARIOS) {
+    if (!examples.some((ex) => scenario.re.test(ex.label))) {
+      violations.push({
+        kind: "filename-convention",
+        message: `Filename examples missing required scenario: '${scenario.label}'.`,
+      });
+    }
+  }
+
+  for (const ex of examples) {
+    const label = `filename example ${ex.number} (${ex.label || "unlabelled"})`;
+    if (!ex.filename) {
+      violations.push({
+        kind: "filename-convention",
+        message: `${label}: no backtick-wrapped example filename found.`,
+      });
+      continue;
+    }
+    const parsed = parseFilename(ex.filename);
+    // A malformed filename is already reported by the candidate scan; skipping
+    // here keeps one defect from producing two violations.
+    if (!parsed) continue;
+    if (!ex.hasTable) {
+      violations.push({
+        kind: "filename-convention",
+        message: `${label}: no Field / Value mapping table found.`,
+      });
+      continue;
+    }
+    // Section 11.1 also permits a Verdant photo reference as the Photo ID.
+    // No example uses that form today, so equality is enforced: introducing a
+    // reference-style example must be a deliberate scanner change.
+    const stem = ex.filename.replace(/\.[A-Za-z0-9]+$/, "");
+    const photoId = ex.fields.get("Photo ID");
+    if (photoId === undefined) {
+      violations.push({
+        kind: "filename-convention",
+        message: `${label}: mapping table is missing a 'Photo ID' row.`,
+      });
+    } else if (photoId !== stem) {
+      violations.push({
+        kind: "filename-convention",
+        message: `${label}: Photo ID '${photoId}' does not match its example filename '${stem}'.`,
+      });
+    }
+    const photoDate = ex.fields.get("photo_date");
+    if (photoDate === undefined) {
+      violations.push({
+        kind: "filename-convention",
+        message: `${label}: mapping table is missing a 'photo_date' row.`,
+      });
+    } else if (photoDate !== parsed.date) {
+      violations.push({
+        kind: "filename-convention",
+        message: `${label}: photo_date '${photoDate}' does not match the date in its example filename '${parsed.date}'.`,
+      });
+    }
+  }
+  return violations;
 }
 
 export function checkFilenameExamples(text) {
@@ -212,12 +391,15 @@ export function checkFilenameExamples(text) {
       });
     }
   }
-  if (exampleCount === 0) {
+  if (exampleCount < MIN_FILENAME_EXAMPLES) {
     violations.push({
       kind: "filename-convention",
-      message: "Filename Convention section contains no validatable example filenames.",
+      message:
+        `Filename Convention section contains ${exampleCount} validatable example ` +
+        `filename(s); at least ${MIN_FILENAME_EXAMPLES} are required.`,
     });
   }
+  violations.push(...checkFilenameExampleDetails(text));
   return violations;
 }
 
@@ -389,23 +571,52 @@ export function toStructuredFailures(text, filePath) {
     });
   }
   for (const v of diaryViolations) {
+    let check = "diary-template";
+    let expected = "all required diary fields present";
+    if (/must not contain/.test(v.message)) {
+      check = "diary-template-forbidden-wording";
+      expected = "Diary Entry Template contains no auto-created Action Queue wording";
+    }
     out.push({
       scanner: "automated-phenotyping",
       filePath,
       section: "Diary Entry Template",
-      check: "diary-template",
-      expected: "all required diary fields present",
+      check,
+      expected,
       actual: v.message,
       reason: v.message,
     });
   }
   for (const v of filenameViolations) {
+    let check = "filename-convention";
+    let expected = "filenames match {project}_{phenoId}_{stage}_{viewType}_{YYYY-MM-DD}_{NN}[.ext]";
+    if (/missing required scenario/.test(v.message)) {
+      check = "filename-example-scenarios";
+      expected = `all ${REQUIRED_EXAMPLE_SCENARIOS.length} documented example scenarios present`;
+    } else if (/Photo ID '.*' does not match|missing a 'Photo ID' row/.test(v.message)) {
+      check = "filename-example-photo-id";
+      expected = "each example's Photo ID equals its own filename without the extension";
+    } else if (/photo_date '.*' does not match|missing a 'photo_date' row/.test(v.message)) {
+      check = "filename-example-photo-date";
+      expected = "each example's photo_date equals the YYYY-MM-DD in its own filename";
+    } else if (/validatable example filename/.test(v.message)) {
+      check = "filename-example-count";
+      expected = `at least ${MIN_FILENAME_EXAMPLES} validatable example filenames`;
+    } else if (/missing its 'Examples' subsection/.test(v.message)) {
+      check = "filename-examples-section";
+      expected = "Filename Convention section retains its worked-example subsection";
+    } else if (
+      /no backtick-wrapped example filename|no Field \/ Value mapping table/.test(v.message)
+    ) {
+      check = "filename-example-structure";
+      expected = "each worked example carries a filename and a Field / Value mapping table";
+    }
     out.push({
       scanner: "automated-phenotyping",
       filePath,
       section: "Filename Convention and Photo ID Mapping",
-      check: "filename-convention",
-      expected: "filenames match {project}_{phenoId}_{stage}_{viewType}_{YYYY-MM-DD}_{NN}[.ext]",
+      check,
+      expected,
       actual: v.message,
       reason: v.message,
     });

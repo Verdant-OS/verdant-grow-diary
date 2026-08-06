@@ -5,12 +5,20 @@
  * required external_id is missing, so we never merge or deploy a change
  * that ships a checkout the catalog can't fulfill.
  *
- * Why this exists: `craft_monthly` / `craft_annual` are wired end-to-end
- * in the frontend (pricing CTAs), in `get-paddle-price`'s allowlist, and
- * in `payments-webhook`'s KNOWN_PRICE_IDS. If the Paddle catalog entries
- * are missing, sandbox blocks at price resolution and live risks a
- * "silent" charge with no entitlement grant. This preflight is the
- * structural gate that keeps those in sync.
+ * Why this exists: every recurring plan and one-time pack in
+ * `PAID_PLAN_IDS` (Pro, Craft, Founder Lifetime, and the AI credit packs)
+ * is wired end-to-end in the frontend (pricing CTAs), in
+ * `get-paddle-price`'s allowlist, and in `payments-webhook`'s price
+ * resolution. If a Paddle catalog entry is missing, sandbox blocks at
+ * price resolution and live risks a "silent" charge with no entitlement
+ * grant — `payments-webhook` answers Paddle HTTP 200 on
+ * `missing_price_external_id` (no retry, no visible error) while writing
+ * no `subscriptions` row. This preflight is the structural gate that
+ * keeps the live/sandbox catalog in sync with the allowlist so that never
+ * happens un-noticed. Originally scoped to Craft only; widened to cover
+ * every paid SKU after an audit found Pro — the flagship, highest-volume
+ * SKU — had no equivalent net despite an inaccurate comment here claiming
+ * "other preflights" covered it. None did.
  *
  * Usage:
  *   bun run scripts/verify-paddle-craft-catalog.ts [--env sandbox|live|both]
@@ -55,16 +63,19 @@ interface CheckResult {
   cause?: FailureCause;
 }
 
-// External-id prefixes this preflight guards. Craft plans and the one-time
-// AI credit packs both ship through this gate; founder_lifetime and pro_* are
-// covered by other preflights.
+// External-id prefixes this preflight guards. Covers every recurring plan
+// (Pro, Craft, Founder Lifetime) and the one-time AI credit packs — i.e.
+// every entry in PAID_PLAN_IDS. There is no other preflight that verifies
+// the live/sandbox catalog for Pro; a prior version of this comment claimed
+// otherwise and that claim was wrong (see git history for the audit that
+// found it).
 //
-// Prefix-driven rather than an id list on purpose: a new craft_ or
-// credit_pack_ SKU added to PAID_PLAN_IDS is required here automatically,
-// instead of relying on someone remembering to widen a second list. That
-// second list is exactly the shape of the copy that let Craft go missing from
-// the webhook allowlist in the first place.
-const GUARDED_EXTERNAL_ID_PREFIXES = ["craft_", "credit_pack_"] as const;
+// Prefix-driven rather than an id list on purpose: a new pro_, craft_,
+// founder_, or credit_pack_ SKU added to PAID_PLAN_IDS is required here
+// automatically, instead of relying on someone remembering to widen a
+// second list. That second list is exactly the shape of the copy that let
+// Craft go missing from the webhook allowlist in the first place.
+const GUARDED_EXTERNAL_ID_PREFIXES = ["pro_", "craft_", "founder_", "credit_pack_"] as const;
 
 function isGuardedExternalId(id: string): boolean {
   return GUARDED_EXTERNAL_ID_PREFIXES.some((prefix) => id.startsWith(prefix));

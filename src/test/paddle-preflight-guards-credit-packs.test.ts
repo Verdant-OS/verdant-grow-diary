@@ -58,6 +58,22 @@ describe("paddle preflight guards credit packs", () => {
     expect(guarded).toContain("craft_annual");
   });
 
+  it("requires Pro and Founder Lifetime — the flagship SKUs a prior comment wrongly claimed were covered elsewhere", () => {
+    // An audit (2026-08) found no other preflight verifies these against the
+    // live/sandbox Paddle catalog. Uncovered, a missing external_id here
+    // means payments-webhook answers Paddle HTTP 200 on
+    // missing_price_external_id with no subscriptions row written — a real
+    // customer charged and granted nothing, silently, with no retry.
+    for (const id of ["pro_monthly", "pro_annual", "founder_lifetime"] as const) {
+      expect(
+        guarded.includes(id),
+        `${id} is sold on /pricing but the Paddle catalog preflight does not ` +
+          `require it — a silent charge-with-no-grant on the flagship plan ` +
+          `stays unverified until someone checks the dashboard by hand`,
+      ).toBe(true);
+    }
+  });
+
   it("fails closed if the prefixes ever match nothing", () => {
     // A preflight that checks zero ids reports green forever, which is worse
     // than not having one. Assert the guard exists rather than restating it.

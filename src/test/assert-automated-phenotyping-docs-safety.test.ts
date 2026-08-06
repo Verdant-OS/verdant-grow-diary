@@ -21,7 +21,10 @@ import {
   toStructuredFailures,
 } from "../../scripts/assert-automated-phenotyping-docs-safety.mjs";
 
-const REAL_TEXT = readFileSync(TARGET_FILE, "utf8");
+// LF-normalized so fixture surgery (e.g. removing ":\n"-anchored headings)
+// behaves identically on Windows (CRLF checkout) and CI (LF): without this,
+// the removal no-ops under CRLF and the expected violations never fire.
+const REAL_TEXT = readFileSync(TARGET_FILE, "utf8").replace(/\r\n/g, "\n");
 
 /** Health-framing phrases ported from the reconciled June WIP scanner. */
 const HEALTH_FRAMING_PHRASES = [

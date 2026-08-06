@@ -8,9 +8,8 @@
  *
  * Comparison strictness is split by lane — see src/lib/build/ogCardPixelDiff.ts
  * for why. Chrome (background gradient, accent bar, glows, edges) is compared
- * near-exactly; text bands are compared by ink coverage so the gate survives
- * host font substitution without going blind to text that vanished, doubled,
- * or overflowed its band.
+ * near-exactly; text bands are compared by ink coverage so the gate catches
+ * text that vanished, doubled, or overflowed its band.
  *
  * Regenerate baselines ONLY for an intentional template change:
  *   bun run scripts/update-og-card-baselines.ts
@@ -34,17 +33,13 @@ import {
   OG_CARD_TEXT_BANDS,
   type DecodedPng,
 } from "@/lib/build/ogCardPixelDiff";
-import { buildOgCardSvg, OG_IMAGE_WIDTH } from "@/lib/build/ogImageCard";
+import { buildOgCardSvg } from "@/lib/build/ogImageCard";
+import { createOgCardResvgOptions } from "@/lib/build/ogCardResvgOptions";
 
 const BASELINE_DIR = resolve("src/test/fixtures/og-card-baselines");
 
 function renderCardPng(input: { title: string; description: string; path: string }): Buffer {
-  return new Resvg(buildOgCardSvg(input), {
-    fitTo: { mode: "width", value: OG_IMAGE_WIDTH },
-    font: { loadSystemFonts: true, defaultFontFamily: "sans-serif" },
-  })
-    .render()
-    .asPng();
+  return new Resvg(buildOgCardSvg(input), createOgCardResvgOptions()).render().asPng();
 }
 
 /** Solid-colour RGBA image helper for the diff-logic unit tests. */

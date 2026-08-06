@@ -1,12 +1,17 @@
+import { existsSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 import {
   buildOgCardSvg,
   categoryForPath,
   ogImageSlugForPath,
+  resolveOgCardTextLayout,
+  OG_CARD_FOOTER_BASELINE_Y,
   wrapText,
   OG_IMAGE_HEIGHT,
   OG_IMAGE_WIDTH,
 } from "@/lib/build/ogImageCard";
+import { createOgCardResvgOptions, OG_CARD_FONT_FAMILY } from "@/lib/build/ogCardResvgOptions";
 import { STATIC_PUBLIC_SEO_DOCUMENTS } from "@/lib/build/staticPublicSeoDocuments";
 
 describe("ogImageSlugForPath", () => {
@@ -96,5 +101,36 @@ describe("buildOgCardSvg", () => {
         }),
       ).not.toThrow();
     }
+  });
+
+  it("keeps a three-line title and its description clear of the footer", () => {
+    const layout = resolveOgCardTextLayout({
+      title:
+        "Bud rot (Botrytis) identification: early signs, humidity thresholds, and what not to do in late flower",
+      description:
+        "How to spot Botrytis before it spreads, which environmental readings actually matter, and the recovery steps that make things worse.",
+    });
+
+    expect(layout.titleLines).toHaveLength(3);
+    expect(layout.descriptionLines).toHaveLength(2);
+    const lastDescriptionBaseline =
+      layout.descriptionStartY +
+      (layout.descriptionLines.length - 1) * layout.descriptionLineHeight;
+    expect(lastDescriptionBaseline).toBeLessThan(OG_CARD_FOOTER_BASELINE_Y - 22);
+  });
+});
+
+describe("createOgCardResvgOptions", () => {
+  it("loads only the three pinned Inter faces and returns fresh option objects", () => {
+    const first = createOgCardResvgOptions();
+    const second = createOgCardResvgOptions();
+
+    expect(first).not.toBe(second);
+    expect(first.font).not.toBe(second.font);
+    expect(first.font?.loadSystemFonts).toBe(false);
+    expect(first.font?.defaultFontFamily).toBe(OG_CARD_FONT_FAMILY);
+    expect(first.font?.sansSerifFamily).toBe(OG_CARD_FONT_FAMILY);
+    expect(first.font?.fontFiles).toHaveLength(3);
+    expect(first.font?.fontFiles?.every((file) => existsSync(file))).toBe(true);
   });
 });

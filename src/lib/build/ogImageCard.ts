@@ -14,6 +14,7 @@
 
 export const OG_IMAGE_WIDTH = 1200;
 export const OG_IMAGE_HEIGHT = 630;
+export const OG_CARD_FOOTER_BASELINE_Y = 580;
 
 /** Approximate glyph-width factor for sans-serif fonts (0.55 * font size). */
 const CHAR_WIDTH_FACTOR = 0.55;
@@ -126,20 +127,58 @@ function escapeXml(value: string): string {
     .replace(/'/g, "&apos;");
 }
 
+export interface OgCardTextLayout {
+  readonly titleFontSize: number;
+  readonly titleLines: readonly string[];
+  readonly titleStartY: number;
+  readonly titleLineHeight: number;
+  readonly descriptionLines: readonly string[];
+  readonly descriptionStartY: number;
+  readonly descriptionLineHeight: number;
+}
+
 /**
- * Builds the deterministic OG card SVG string. Uses a generic sans-serif
- * family so the raster step falls back to the host's default sans font.
+ * Keeps long title/description combinations above the fixed footer. A three-
+ * line title receives a two-line description budget; shorter titles retain
+ * the full three-line description budget.
+ */
+export function resolveOgCardTextLayout(input: Pick<OgCardInput, "title" | "description">): OgCardTextLayout {
+  const titleFontSize = input.title.length > 70 ? 60 : 72;
+  const titleLines = wrapText(input.title, 1040, titleFontSize, 3);
+  const titleStartY = 260;
+  const titleLineHeight = Math.round(titleFontSize * 1.15);
+  const descriptionLineHeight = 42;
+  const descriptionMaxLines = titleLines.length >= 3 ? 2 : 3;
+  const descriptionLines = wrapText(input.description, 1040, 30, descriptionMaxLines);
+  const lastTitleBaselineY = titleStartY + (titleLines.length - 1) * titleLineHeight;
+  const descriptionStartY = lastTitleBaselineY + titleFontSize + 32;
+
+  return {
+    titleFontSize,
+    titleLines,
+    titleStartY,
+    titleLineHeight,
+    descriptionLines,
+    descriptionStartY,
+    descriptionLineHeight,
+  };
+}
+
+/**
+ * Builds the deterministic OG card SVG string. The raster step loads the
+ * bundled Inter files declared in `ogCardResvgOptions.ts`.
  */
 export function buildOgCardSvg(input: OgCardInput): string {
   const category = input.category ?? categoryForPath(input.path);
-  const titleFontSize = input.title.length > 70 ? 60 : 72;
-  const titleLines = wrapText(input.title, 1040, titleFontSize, 3);
-  const descriptionLines = wrapText(input.description, 1040, 30, 3);
-
-  const titleStartY = 260;
-  const titleLineHeight = Math.round(titleFontSize * 1.15);
-  const descriptionStartY = titleStartY + titleLines.length * titleLineHeight + 40;
-  const descriptionLineHeight = 42;
+  const {
+    titleFontSize,
+    titleLines,
+    titleStartY,
+    titleLineHeight,
+    descriptionLines,
+    descriptionStartY,
+    descriptionLineHeight,
+  } = resolveOgCardTextLayout(input);
 
   const titleTspans = titleLines
     .map(
@@ -171,7 +210,7 @@ export function buildOgCardSvg(input: OgCardInput): string {
   <circle cx="1080" cy="120" r="220" fill="#22c55e" fill-opacity="0.06"/>
   <circle cx="1140" cy="560" r="180" fill="#4ade80" fill-opacity="0.05"/>
 
-  <g font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" fill="#f0fdf4">
+  <g font-family="Inter, sans-serif" fill="#f0fdf4">
     <text x="80" y="110" font-size="28" font-weight="700" letter-spacing="4" fill="#4ade80">VERDANT</text>
     <text x="80" y="150" font-size="20" fill="#86efac" opacity="0.9">Grow Diary · Sensor Truth · Cautious AI</text>
 
@@ -183,8 +222,8 @@ export function buildOgCardSvg(input: OgCardInput): string {
     <text x="80" y="${titleStartY}" font-size="${titleFontSize}" font-weight="700" fill="#ffffff">${titleTspans}</text>
     <text x="80" y="${descriptionStartY}" font-size="30" fill="#d1fae5" opacity="0.92">${descriptionTspans}</text>
 
-    <text x="80" y="580" font-size="22" fill="#86efac" opacity="0.85">verdantgrowdiary.com</text>
-    <text x="1120" y="580" font-size="22" text-anchor="end" fill="#86efac" opacity="0.6">Plant memory. Sensor truth.</text>
+    <text x="80" y="${OG_CARD_FOOTER_BASELINE_Y}" font-size="22" fill="#86efac" opacity="0.85">verdantgrowdiary.com</text>
+    <text x="1120" y="${OG_CARD_FOOTER_BASELINE_Y}" font-size="22" text-anchor="end" fill="#86efac" opacity="0.6">Plant memory. Sensor truth.</text>
   </g>
 </svg>`;
 }

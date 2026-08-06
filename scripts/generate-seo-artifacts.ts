@@ -26,19 +26,15 @@ import {
   VERDANT_SITE_ORIGIN,
 } from "../src/lib/build/staticPublicSeoDocuments";
 import { resolveStaticDocumentMetadata } from "../src/lib/build/staticRouteHead";
-import { buildOgCardSvg, ogImageSlugForPath, OG_IMAGE_WIDTH } from "../src/lib/build/ogImageCard";
+import { buildOgCardSvg, ogImageSlugForPath } from "../src/lib/build/ogImageCard";
+import { createOgCardResvgOptions } from "../src/lib/build/ogCardResvgOptions";
 
 const distDir = resolve(process.argv[2] ?? "dist");
 const clientDir = join(distDir, "client");
 
 function renderPng(title: string, description: string, path: string): Buffer {
   const svg = buildOgCardSvg({ title, description, path });
-  return new Resvg(svg, {
-    fitTo: { mode: "width", value: OG_IMAGE_WIDTH },
-    font: { loadSystemFonts: true, defaultFontFamily: "sans-serif" },
-  })
-    .render()
-    .asPng();
+  return new Resvg(svg, createOgCardResvgOptions()).render().asPng();
 }
 
 function writeFile(filePath: string, contents: Buffer | string): void {

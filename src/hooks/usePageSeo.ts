@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 /**
  * usePageSeo — per-route <head> metadata for a client-rendered SPA.
@@ -66,20 +66,25 @@ function upsertLink(rel: string, href: string) {
 
 export function usePageSeo(seo: PageSeo): void {
   const { title, description, path, ogImage, ogType = "website", noindex = false } = seo;
+  const routeImageRef = useRef<{ path: string; image: string | null } | null>(null);
 
   useEffect(() => {
     const url = path.startsWith("http") ? path : `${SITE_ORIGIN}${path}`;
     const prevTitle = document.title;
-    const routeOwnedImage =
-      document.head
-        .querySelector<HTMLMetaElement>('meta[property="og:image"]')
-        ?.getAttribute("content")
-        ?.trim() ||
-      document.head
-        .querySelector<HTMLMetaElement>('meta[name="twitter:image"]')
-        ?.getAttribute("content")
-        ?.trim();
-    const resolvedOgImage = ogImage ?? routeOwnedImage ?? DEFAULT_OG_IMAGE;
+    if (routeImageRef.current?.path !== path) {
+      const routeOwnedImage =
+        document.head
+          .querySelector<HTMLMetaElement>('meta[property="og:image"]')
+          ?.getAttribute("content")
+          ?.trim() ||
+        document.head
+          .querySelector<HTMLMetaElement>('meta[name="twitter:image"]')
+          ?.getAttribute("content")
+          ?.trim() ||
+        null;
+      routeImageRef.current = { path, image: routeOwnedImage };
+    }
+    const resolvedOgImage = ogImage ?? routeImageRef.current.image ?? DEFAULT_OG_IMAGE;
 
     document.title = title;
     upsertMeta('meta[name="description"]', "name", "description", description);

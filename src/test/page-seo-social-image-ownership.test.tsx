@@ -7,13 +7,14 @@ const ROUTE_IMAGE =
 const EXPLICIT_IMAGE = "https://verdantgrowdiary.com/og/custom-card.png";
 const BRAND_IMAGE = "https://verdantgrowdiary.com/brand/verdant-logo-512.png";
 
-function SeoProbe({ ogImage }: { ogImage?: string }) {
+function SeoProbe({ ogImage, noindex = false }: { ogImage?: string; noindex?: boolean }) {
   usePageSeo({
     title: "Cannabis Grow Light Distance, PPFD & DLI Guide | Verdant",
     description: "Measure PPFD, DLI, and canopy response before changing light distance.",
     path: "/guides/cannabis-grow-light-distance-and-schedule",
     ogType: "article",
     ogImage,
+    noindex,
   });
   return null;
 }
@@ -39,6 +40,17 @@ describe("usePageSeo social-image ownership", () => {
     const twitterImage = addRouteOwnedMeta("name", "twitter:image");
 
     render(<SeoProbe />);
+
+    expect(ogImage.getAttribute("content")).toBe(ROUTE_IMAGE);
+    expect(twitterImage.getAttribute("content")).toBe(ROUTE_IMAGE);
+  });
+
+  it("preserves the initially discovered route image across effect reruns", () => {
+    const ogImage = addRouteOwnedMeta("property", "og:image");
+    const twitterImage = addRouteOwnedMeta("name", "twitter:image");
+    const view = render(<SeoProbe />);
+
+    view.rerender(<SeoProbe noindex />);
 
     expect(ogImage.getAttribute("content")).toBe(ROUTE_IMAGE);
     expect(twitterImage.getAttribute("content")).toBe(ROUTE_IMAGE);

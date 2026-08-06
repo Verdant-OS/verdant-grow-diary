@@ -496,11 +496,11 @@ Runtime:
 
 Environment variables:
 
-| Variable                | Required?                     | Purpose                                                                 |
-|-------------------------|-------------------------------|-------------------------------------------------------------------------|
-| `SUPABASE_DB_URL`       | Yes (diff mode)               | Direct Postgres connection string used by `psql`. Overrides `TARGET_ENV`. |
-| `TARGET_ENV`            | Optional                      | `sandbox` or `live`. When `SUPABASE_DB_URL` is unset, the script reads `SUPABASE_DB_URL_SANDBOX` or `SUPABASE_DB_URL_LIVE`. Also stamped into JSON/SARIF output as `target_env`. |
-| `SUPABASE_DB_URL_SANDBOX` / `SUPABASE_DB_URL_LIVE` | Optional | Convenience env-selected URLs used with `TARGET_ENV`.                    |
+| Variable                                           | Required?       | Purpose                                                                                                                                                                          |
+| -------------------------------------------------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SUPABASE_DB_URL`                                  | Yes (diff mode) | Direct Postgres connection string used by `psql`. Overrides `TARGET_ENV`.                                                                                                        |
+| `TARGET_ENV`                                       | Optional        | `sandbox` or `live`. When `SUPABASE_DB_URL` is unset, the script reads `SUPABASE_DB_URL_SANDBOX` or `SUPABASE_DB_URL_LIVE`. Also stamped into JSON/SARIF output as `target_env`. |
+| `SUPABASE_DB_URL_SANDBOX` / `SUPABASE_DB_URL_LIVE` | Optional        | Convenience env-selected URLs used with `TARGET_ENV`.                                                                                                                            |
 
 The connection string must be the **direct** Postgres URL for the target
 project (usually `postgres://postgres:<PASSWORD>@db.<REF>.supabase.co:5432/postgres`),
@@ -520,10 +520,19 @@ required-money-migrations manifest.
 {
   "target_env": "sandbox",
   "expected": [
-    { "file": "supabase/migrations/20260615120000_ai_credit_spend.sql",       "version": "20260615120000" },
-    { "file": "supabase/migrations/20260615123000_ai_credit_spend_rls.sql",   "version": "20260615123000" },
-    { "file": "supabase/migrations/20260616090000_referrals_schema.sql",      "version": "20260616090000" },
-    { "file": "supabase/migrations/20260616093000_referrals_rls.sql",         "version": "20260616093000" }
+    {
+      "file": "supabase/migrations/20260615120000_ai_credit_spend.sql",
+      "version": "20260615120000"
+    },
+    {
+      "file": "supabase/migrations/20260615123000_ai_credit_spend_rls.sql",
+      "version": "20260615123000"
+    },
+    {
+      "file": "supabase/migrations/20260616090000_referrals_schema.sql",
+      "version": "20260616090000"
+    },
+    { "file": "supabase/migrations/20260616093000_referrals_rls.sql", "version": "20260616093000" }
   ],
   "malformed": []
 }
@@ -589,7 +598,6 @@ node scripts/diff-money-migration-prefixes.mjs --json \
 
 #### Common invocations
 
-
 ```bash
 # 1) Full diff: expected (manifest) vs. actual (target DB).
 #    Requires SUPABASE_DB_URL (or SUPABASE_DB_URL_SANDBOX /
@@ -619,12 +627,12 @@ The JSON payload is stable and safe to parse:
 
 ```json
 {
-  "mode": "diff",              // "diff" | "expected-only"
-  "target": "live",            // "sandbox" | "live" | "custom" | null
+  "mode": "diff", // "diff" | "expected-only"
+  "target": "live", // "sandbox" | "live" | "custom" | null
   "expected": ["20260101000000", "..."],
-  "applied":  ["20260101000000", "..."],   // omitted in --expected mode
-  "missing":  ["20260714120000"],          // required but NOT applied
-  "unexpected": ["20260101999999"],        // applied but NOT required (informational)
+  "applied": ["20260101000000", "..."], // omitted in --expected mode
+  "missing": ["20260714120000"], // required but NOT applied
+  "unexpected": ["20260101999999"], // applied but NOT required (informational)
   "ok": false
 }
 ```
@@ -635,10 +643,10 @@ only.
 
 #### Exit codes
 
-| Code | Meaning                                                              |
-|------|----------------------------------------------------------------------|
-| `0`  | OK — every required prefix is present in the target DB (or `--expected` succeeded). |
-| `1`  | Drift — at least one required prefix is missing. **Do not deploy.**  |
+| Code | Meaning                                                                                                        |
+| ---- | -------------------------------------------------------------------------------------------------------------- |
+| `0`  | OK — every required prefix is present in the target DB (or `--expected` succeeded).                            |
+| `1`  | Drift — at least one required prefix is missing. **Do not deploy.**                                            |
 | `2`  | Failure — no DB URL, `psql` missing, tracker query failed, or a required file has a malformed 14-digit prefix. |
 
 Treat `2` the same as `1` for gating: the check could not complete, so
@@ -670,14 +678,14 @@ node scripts/diff-money-migration-prefixes.mjs --github-annotations
 
 `--sarif-out=PATH` is optional. Behavior when you omit it:
 
-| Aspect                   | `--sarif` only (no `--sarif-out`)                                        | `--sarif --sarif-out=PATH`                                    |
-|--------------------------|--------------------------------------------------------------------------|---------------------------------------------------------------|
-| SARIF destination        | **stdout** — one JSON document, newline-terminated.                      | File at `PATH` (UTF-8, pretty-printed, newline-terminated).   |
-| Text diff on stdout      | **Suppressed** so stdout is machine-parseable SARIF only.                | Printed after the file write so CI logs remain readable.      |
-| Parent directory of PATH | N/A                                                                      | Created automatically (`mkdir -p`) before the write.          |
-| Default filename         | None — there is no implicit `diff.sarif` on disk.                        | Exactly the path you passed. No suffix is appended.           |
-| Stderr                   | Diagnostics only (DB URL missing, psql errors, etc.).                    | Same.                                                         |
-| Exit code                | Unchanged: `0` clean / `1` drift / `2` tooling failure.                  | Same. The file is written on every exit code, including `0`.  |
+| Aspect                   | `--sarif` only (no `--sarif-out`)                         | `--sarif --sarif-out=PATH`                                   |
+| ------------------------ | --------------------------------------------------------- | ------------------------------------------------------------ |
+| SARIF destination        | **stdout** — one JSON document, newline-terminated.       | File at `PATH` (UTF-8, pretty-printed, newline-terminated).  |
+| Text diff on stdout      | **Suppressed** so stdout is machine-parseable SARIF only. | Printed after the file write so CI logs remain readable.     |
+| Parent directory of PATH | N/A                                                       | Created automatically (`mkdir -p`) before the write.         |
+| Default filename         | None — there is no implicit `diff.sarif` on disk.         | Exactly the path you passed. No suffix is appended.          |
+| Stderr                   | Diagnostics only (DB URL missing, psql errors, etc.).     | Same.                                                        |
+| Exit code                | Unchanged: `0` clean / `1` drift / `2` tooling failure.   | Same. The file is written on every exit code, including `0`. |
 
 Practical consequences:
 
@@ -691,8 +699,6 @@ Practical consequences:
 - Redirecting stdout works too: `node ... --sarif > diff.sarif`. The
   script does not create parent directories in that case — the shell does
   the redirect, so `mkdir -p` yourself if needed.
-
-
 
 Upload the SARIF file to code scanning to get one annotation per finding on
 the offending migration file:
@@ -717,13 +723,13 @@ come from one of the rows below being missing.
 
 **Repository settings** — repo → **Settings**.
 
-| Setting                                                      | Location                                                         | Required value                                                                                          |
-|--------------------------------------------------------------|------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------|
-| Code scanning enabled                                        | **Settings → Code security → Code scanning**                     | Enabled. Free on public repos; on private repos it requires GitHub Advanced Security (GHAS).            |
-| Actions enabled for the repo                                 | **Settings → Actions → General → Actions permissions**           | *Allow all actions and reusable workflows* (or an allow-list that includes `github/codeql-action/*`).   |
-| Workflow token permissions default                           | **Settings → Actions → General → Workflow permissions**          | *Read repository contents and packages permissions* (the per-workflow `permissions:` block widens it).  |
-| Fork PRs allowed to run workflows (only if you accept forks) | **Settings → Actions → General → Fork pull request workflows**   | *Require approval for first-time contributors* (default). SARIF upload from forks is blocked by design. |
-| Default branch matches your `on:` triggers                   | **Settings → General → Default branch**                          | Must be one of the branches your workflow runs on, or PR annotations won't attach to the base branch.   |
+| Setting                                                      | Location                                                       | Required value                                                                                          |
+| ------------------------------------------------------------ | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Code scanning enabled                                        | **Settings → Code security → Code scanning**                   | Enabled. Free on public repos; on private repos it requires GitHub Advanced Security (GHAS).            |
+| Actions enabled for the repo                                 | **Settings → Actions → General → Actions permissions**         | _Allow all actions and reusable workflows_ (or an allow-list that includes `github/codeql-action/*`).   |
+| Workflow token permissions default                           | **Settings → Actions → General → Workflow permissions**        | _Read repository contents and packages permissions_ (the per-workflow `permissions:` block widens it).  |
+| Fork PRs allowed to run workflows (only if you accept forks) | **Settings → Actions → General → Fork pull request workflows** | _Require approval for first-time contributors_ (default). SARIF upload from forks is blocked by design. |
+| Default branch matches your `on:` triggers                   | **Settings → General → Default branch**                        | Must be one of the branches your workflow runs on, or PR annotations won't attach to the base branch.   |
 
 **Workflow YAML permissions** — required in the workflow that calls
 `github/codeql-action/upload-sarif@v3`. Add at either workflow or job
@@ -731,10 +737,10 @@ scope; job scope is safer.
 
 ```yaml
 permissions:
-  contents: read           # checkout
-  security-events: write   # upload-sarif → Security tab
-  actions: read            # required for private repos so upload-sarif can read the run
-  pull-requests: write     # optional; only if you also post PR comments from summarize-prefix-diff-json.mjs
+  contents: read # checkout
+  security-events: write # upload-sarif → Security tab
+  actions: read # required for private repos so upload-sarif can read the run
+  pull-requests: write # optional; only if you also post PR comments from summarize-prefix-diff-json.mjs
 ```
 
 - `security-events: write` is the one that unlocks Code scanning. Without
@@ -747,21 +753,21 @@ permissions:
 **Organization settings** — only relevant if the repo is inside an org
 (**Organization → Settings**).
 
-| Setting                                                     | Location                                                                             | Required value                                                                                          |
-|-------------------------------------------------------------|--------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------|
-| GitHub Advanced Security enabled (private repos only)       | **Organization → Settings → Code security → Global settings → GitHub Advanced Security** | Enabled for the repo, or Code scanning is unavailable. Public repos do not need GHAS.                   |
-| Code scanning not blocked at org level                      | **Organization → Settings → Code security → Global settings → Code scanning default setup** | *Not disabled* for this repo. Org-wide disable overrides repo enable.                                   |
-| Actions permission policy allows `github/codeql-action/*`   | **Organization → Settings → Actions → General → Policies**                            | *Allow all actions* or an allow-list that includes `github/codeql-action/*`.                            |
-| `GITHUB_TOKEN` default permissions not restricted below `read` | **Organization → Settings → Actions → General → Workflow permissions**            | Must allow the per-workflow `permissions:` block to grant `security-events: write`.                     |
+| Setting                                                        | Location                                                                                    | Required value                                                                        |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| GitHub Advanced Security enabled (private repos only)          | **Organization → Settings → Code security → Global settings → GitHub Advanced Security**    | Enabled for the repo, or Code scanning is unavailable. Public repos do not need GHAS. |
+| Code scanning not blocked at org level                         | **Organization → Settings → Code security → Global settings → Code scanning default setup** | _Not disabled_ for this repo. Org-wide disable overrides repo enable.                 |
+| Actions permission policy allows `github/codeql-action/*`      | **Organization → Settings → Actions → General → Policies**                                  | _Allow all actions_ or an allow-list that includes `github/codeql-action/*`.          |
+| `GITHUB_TOKEN` default permissions not restricted below `read` | **Organization → Settings → Actions → General → Workflow permissions**                      | Must allow the per-workflow `permissions:` block to grant `security-events: write`.   |
 
 **Account / caller permissions.**
 
-| Actor                           | Required permission                                                                                    |
-|---------------------------------|--------------------------------------------------------------------------------------------------------|
-| You (viewing findings)          | **Read** on the repo is enough to view Code scanning alerts. **Write** is required to dismiss them.    |
-| The workflow's `GITHUB_TOKEN`   | Automatic — the `permissions:` block above grants it. No PAT or app installation required.             |
-| Fork contributors               | Cannot upload SARIF from a `pull_request` event. Use `pull_request_target` or wait until merge.        |
-| Dependabot PRs                  | Same restriction as forks — SARIF upload is skipped. Findings attach on the follow-up `push` to main.  |
+| Actor                         | Required permission                                                                                   |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------- |
+| You (viewing findings)        | **Read** on the repo is enough to view Code scanning alerts. **Write** is required to dismiss them.   |
+| The workflow's `GITHUB_TOKEN` | Automatic — the `permissions:` block above grants it. No PAT or app installation required.            |
+| Fork contributors             | Cannot upload SARIF from a `pull_request` event. Use `pull_request_target` or wait until merge.       |
+| Dependabot PRs                | Same restriction as forks — SARIF upload is skipped. Findings attach on the follow-up `push` to main. |
 
 **Fast preflight checklist.** Before debugging an empty Security tab,
 confirm all four:
@@ -771,10 +777,10 @@ confirm all four:
 - [ ] The run was triggered by `push` or `pull_request` on a branch you
       have permission to see (not a fork PR).
 - [ ] `upload-sarif` step logs `SARIF upload complete` (not `Resource
-      not accessible` or `Invalid SARIF file`).
+    not accessible` or `Invalid SARIF file`).
 
 If all four are true and findings still don't show, jump to the
-*Security tab looks empty (GitHub UI gotchas)* table below — the cause
+_Security tab looks empty (GitHub UI gotchas)_ table below — the cause
 is almost always a filter/scope mismatch in the UI.
 
 ##### Token permissions and scopes (SARIF upload + Code Scanning REST API)
@@ -792,13 +798,13 @@ scopes differently. Pick by **who is calling**:
 Granted through the workflow's `permissions:` block. Nothing to create
 in Settings.
 
-| Operation                                                        | Required permission               | Notes                                                                                              |
-|------------------------------------------------------------------|-----------------------------------|----------------------------------------------------------------------------------------------------|
-| `github/codeql-action/upload-sarif@v3` (POST `/code-scanning/sarifs`) | `security-events: write`      | The one non-negotiable scope. Without it: `Resource not accessible by integration`.                |
-| Checkout the repo (`actions/checkout`)                           | `contents: read`                  | Needed to run the diff at all.                                                                     |
-| Read the current run (private repos only)                        | `actions: read`                   | `upload-sarif` reads the run to attach analysis metadata; public repos work without it.            |
-| Post a PR comment (e.g. `summarize-prefix-diff-json.mjs`)        | `pull-requests: write`            | Only if you also comment. Not required for SARIF upload itself.                                    |
-| Read existing alerts inside the workflow (e.g. `curl /alerts`)   | `security-events: read`           | `write` implies `read`, so declaring `write` is sufficient.                                        |
+| Operation                                                             | Required permission      | Notes                                                                                   |
+| --------------------------------------------------------------------- | ------------------------ | --------------------------------------------------------------------------------------- |
+| `github/codeql-action/upload-sarif@v3` (POST `/code-scanning/sarifs`) | `security-events: write` | The one non-negotiable scope. Without it: `Resource not accessible by integration`.     |
+| Checkout the repo (`actions/checkout`)                                | `contents: read`         | Needed to run the diff at all.                                                          |
+| Read the current run (private repos only)                             | `actions: read`          | `upload-sarif` reads the run to attach analysis metadata; public repos work without it. |
+| Post a PR comment (e.g. `summarize-prefix-diff-json.mjs`)             | `pull-requests: write`   | Only if you also comment. Not required for SARIF upload itself.                         |
+| Read existing alerts inside the workflow (e.g. `curl /alerts`)        | `security-events: read`  | `write` implies `read`, so declaring `write` is sufficient.                             |
 
 Minimum block for the SARIF workflow:
 
@@ -806,7 +812,7 @@ Minimum block for the SARIF workflow:
 permissions:
   contents: read
   security-events: write
-  actions: read           # private repos
+  actions: read # private repos
 ```
 
 **2. Fine-grained personal access token (recommended for scripts).**
@@ -814,16 +820,16 @@ permissions:
 Create at **Settings → Developer settings → Personal access tokens →
 Fine-grained tokens**. Scope to a single repo or a specific org.
 
-| Operation                                                                 | Repository permission             | Access level |
-|---------------------------------------------------------------------------|-----------------------------------|--------------|
-| `POST /repos/{owner}/{repo}/code-scanning/sarifs` (upload)                | **Code scanning alerts**          | **Read and write** |
-| `GET  /repos/{owner}/{repo}/code-scanning/analyses`                       | **Code scanning alerts**          | Read         |
-| `GET  /repos/{owner}/{repo}/code-scanning/alerts`                         | **Code scanning alerts**          | Read         |
-| `GET  /repos/{owner}/{repo}/code-scanning/alerts/{n}` and `/instances`    | **Code scanning alerts**          | Read         |
-| `PATCH /repos/{owner}/{repo}/code-scanning/alerts/{n}` (dismiss / reopen) | **Code scanning alerts**          | Read and write |
-| `GET  /repos/{owner}/{repo}/pulls/{n}` and `/pulls/{n}/files` (used by the troubleshooting checks) | **Pull requests** | Read         |
-| Any of the above on a **private** repo                                    | **Metadata**                      | Read (auto-granted; leave enabled) |
-| Any of the above on a public repo you don't own                           | *No token needed for unauthenticated reads* | Rate-limited to 60 req/hour |
+| Operation                                                                                          | Repository permission                       | Access level                       |
+| -------------------------------------------------------------------------------------------------- | ------------------------------------------- | ---------------------------------- |
+| `POST /repos/{owner}/{repo}/code-scanning/sarifs` (upload)                                         | **Code scanning alerts**                    | **Read and write**                 |
+| `GET  /repos/{owner}/{repo}/code-scanning/analyses`                                                | **Code scanning alerts**                    | Read                               |
+| `GET  /repos/{owner}/{repo}/code-scanning/alerts`                                                  | **Code scanning alerts**                    | Read                               |
+| `GET  /repos/{owner}/{repo}/code-scanning/alerts/{n}` and `/instances`                             | **Code scanning alerts**                    | Read                               |
+| `PATCH /repos/{owner}/{repo}/code-scanning/alerts/{n}` (dismiss / reopen)                          | **Code scanning alerts**                    | Read and write                     |
+| `GET  /repos/{owner}/{repo}/pulls/{n}` and `/pulls/{n}/files` (used by the troubleshooting checks) | **Pull requests**                           | Read                               |
+| Any of the above on a **private** repo                                                             | **Metadata**                                | Read (auto-granted; leave enabled) |
+| Any of the above on a public repo you don't own                                                    | _No token needed for unauthenticated reads_ | Rate-limited to 60 req/hour        |
 
 Fine-grained tokens do **not** need `repo` or `security_events` — those
 are classic-PAT names. Selecting **Code scanning alerts** on the
@@ -833,13 +839,13 @@ resource-permissions page grants the equivalent.
 
 Only use these when a tool doesn't support fine-grained tokens yet.
 
-| Operation                              | Required classic scope                                                                 |
-|----------------------------------------|----------------------------------------------------------------------------------------|
-| Upload SARIF (public repo)             | `public_repo` **and** `security_events`                                                |
-| Upload SARIF (private / internal repo) | `repo` **and** `security_events`                                                       |
-| List / read alerts (public repo)       | `security_events` (or none for unauthenticated public reads, subject to 60/hour)       |
-| List / read alerts (private repo)      | `repo` **and** `security_events`                                                       |
-| Dismiss / reopen alerts                | Same as read + write access to the repo (`repo` or `public_repo`).                     |
+| Operation                              | Required classic scope                                                           |
+| -------------------------------------- | -------------------------------------------------------------------------------- |
+| Upload SARIF (public repo)             | `public_repo` **and** `security_events`                                          |
+| Upload SARIF (private / internal repo) | `repo` **and** `security_events`                                                 |
+| List / read alerts (public repo)       | `security_events` (or none for unauthenticated public reads, subject to 60/hour) |
+| List / read alerts (private repo)      | `repo` **and** `security_events`                                                 |
+| Dismiss / reopen alerts                | Same as read + write access to the repo (`repo` or `public_repo`).               |
 
 `security_events` is the classic-scope equivalent of the fine-grained
 **Code scanning alerts** permission. `repo` alone is **not** enough for
@@ -851,11 +857,11 @@ by personal access token` until `security_events` is added.
 If you're calling from an App instead of a user token, request these
 repository permissions in the App manifest:
 
-| API surface                                    | App permission                    | Access level     |
-|-----------------------------------------------|-----------------------------------|------------------|
-| Upload SARIF, read/list/patch alerts           | **Code scanning alerts**          | Read & write     |
-| Read PR files (for the annotation-check curl)  | **Pull requests**                 | Read-only        |
-| Clone the repo before running the diff         | **Contents**                      | Read-only        |
+| API surface                                   | App permission           | Access level |
+| --------------------------------------------- | ------------------------ | ------------ |
+| Upload SARIF, read/list/patch alerts          | **Code scanning alerts** | Read & write |
+| Read PR files (for the annotation-check curl) | **Pull requests**        | Read-only    |
+| Clone the repo before running the diff        | **Contents**             | Read-only    |
 
 Install the App on the target repo. The installation token inherits
 these permissions automatically — no per-call scope negotiation.
@@ -864,9 +870,9 @@ these permissions automatically — no per-call scope negotiation.
 (classic or fine-grained) must be **authorized for that org**:
 
 - Fine-grained: **Settings → Developer settings → Personal access tokens
-  → Fine-grained tokens → *Your token* → Configure SSO → Authorize**.
+  → Fine-grained tokens → _Your token_ → Configure SSO → Authorize**.
 - Classic: **Settings → Developer settings → Personal access tokens →
-  Tokens (classic) → *Your token* → Configure SSO → Authorize**.
+  Tokens (classic) → _Your token_ → Configure SSO → Authorize**.
 
 Without authorization, every API call returns `200` with an empty body
 or `404` — not a permission error, which makes this failure mode easy
@@ -908,23 +914,23 @@ to prove the scope instead of grepping `x-oauth-scopes`.
 things. Read the response **body** and headers before changing the token
 — GitHub tells you exactly which check failed.
 
-| Status | Response body (`message` field)                                          | Root cause                                                                        | Fix                                                                                                                              |
-|--------|--------------------------------------------------------------------------|-----------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------|
-| `401`  | `Bad credentials`                                                        | Token is malformed, revoked, or expired.                                          | Regenerate the PAT. Confirm you're sending it via `Authorization: Bearer <token>` (no `token ` prefix mixups, no stray newline). |
-| `401`  | `Requires authentication`                                                | Header missing entirely, or wrong header name (`Authentication:` instead of `Authorization:`). | Fix the header name and re-send.                                                                                                 |
-| `403`  | `Resource not accessible by integration`                                 | Workflow's `GITHUB_TOKEN` is missing the required `permissions:` block.           | Add `security-events: write` (or the endpoint's permission) to the job's `permissions:`.                                          |
-| `403`  | `Resource not accessible by personal access token`                       | Fine-grained PAT lacks the **Code scanning alerts** repository permission, or classic PAT lacks `security_events`. | Regenerate the token with the scopes from the table above.                                                                       |
-| `403`  | `Must have admin rights to Repository`                                   | Token owner has Read on the repo but the endpoint (e.g. `PATCH /alerts`) needs Write. | Get Write access on the repo, or use a token from an account that has it.                                                        |
-| `403`  | `API rate limit exceeded for user ID …`                                  | Hit the 5,000/hour authenticated limit (or 60/hour unauthenticated).              | Wait until `X-RateLimit-Reset`, or authenticate/use a different token.                                                           |
-| `403`  | `You have exceeded a secondary rate limit`                               | Too many concurrent or bursty requests to the same endpoint.                       | Back off, add `sleep`s between calls, respect `Retry-After`.                                                                     |
-| `403`  | `SAML enforcement`                                                       | Token is valid but not SSO-authorized for the org.                                | Open the token in **Developer settings** → **Configure SSO** → **Authorize** for that org.                                       |
-| `403`  | `Repository access blocked`                                              | Org policy blocks this repo (e.g. IP allow-list, third-party access restrictions). | Add your IP to the allow-list, or enable third-party access for the org.                                                         |
-| `403`  | (empty body, `x-github-sso: required; url=...` header present)           | Token needs SSO authorization for the org named in the header.                    | Visit the URL from the header and click **Authorize**.                                                                           |
-| `404`  | `Not Found` (with a valid token that *should* see the repo)               | GitHub returns `404` (not `403`) when a token exists but lacks visibility. Ambiguous with a real "wrong path" `404`. | Confirm the repo slug, then verify the token's repo access. For classic PATs, `repo` scope is required on private repos.        |
+| Status | Response body (`message` field)                                | Root cause                                                                                                           | Fix                                                                                                                              |
+| ------ | -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `401`  | `Bad credentials`                                              | Token is malformed, revoked, or expired.                                                                             | Regenerate the PAT. Confirm you're sending it via `Authorization: Bearer <token>` (no `token ` prefix mixups, no stray newline). |
+| `401`  | `Requires authentication`                                      | Header missing entirely, or wrong header name (`Authentication:` instead of `Authorization:`).                       | Fix the header name and re-send.                                                                                                 |
+| `403`  | `Resource not accessible by integration`                       | Workflow's `GITHUB_TOKEN` is missing the required `permissions:` block.                                              | Add `security-events: write` (or the endpoint's permission) to the job's `permissions:`.                                         |
+| `403`  | `Resource not accessible by personal access token`             | Fine-grained PAT lacks the **Code scanning alerts** repository permission, or classic PAT lacks `security_events`.   | Regenerate the token with the scopes from the table above.                                                                       |
+| `403`  | `Must have admin rights to Repository`                         | Token owner has Read on the repo but the endpoint (e.g. `PATCH /alerts`) needs Write.                                | Get Write access on the repo, or use a token from an account that has it.                                                        |
+| `403`  | `API rate limit exceeded for user ID …`                        | Hit the 5,000/hour authenticated limit (or 60/hour unauthenticated).                                                 | Wait until `X-RateLimit-Reset`, or authenticate/use a different token.                                                           |
+| `403`  | `You have exceeded a secondary rate limit`                     | Too many concurrent or bursty requests to the same endpoint.                                                         | Back off, add `sleep`s between calls, respect `Retry-After`.                                                                     |
+| `403`  | `SAML enforcement`                                             | Token is valid but not SSO-authorized for the org.                                                                   | Open the token in **Developer settings** → **Configure SSO** → **Authorize** for that org.                                       |
+| `403`  | `Repository access blocked`                                    | Org policy blocks this repo (e.g. IP allow-list, third-party access restrictions).                                   | Add your IP to the allow-list, or enable third-party access for the org.                                                         |
+| `403`  | (empty body, `x-github-sso: required; url=...` header present) | Token needs SSO authorization for the org named in the header.                                                       | Visit the URL from the header and click **Authorize**.                                                                           |
+| `404`  | `Not Found` (with a valid token that _should_ see the repo)    | GitHub returns `404` (not `403`) when a token exists but lacks visibility. Ambiguous with a real "wrong path" `404`. | Confirm the repo slug, then verify the token's repo access. For classic PATs, `repo` scope is required on private repos.         |
 
 **Validate the token and headers with curl.**
 
-Run these against a repo you *know* you can reach. Any deviation from
+Run these against a repo you _know_ you can reach. Any deviation from
 the expected output points at exactly one row in the table above.
 
 ```bash
@@ -966,14 +972,14 @@ curl -sS -v "${AUTH[@]}" https://api.github.com/user 2>&1 \
 
 **Header cheatsheet — what each one tells you.**
 
-| Response header                       | What to read from it                                                                 |
-|--------------------------------------|--------------------------------------------------------------------------------------|
-| `x-oauth-scopes`                     | Scopes the (classic) token currently has. Empty for fine-grained tokens.             |
-| `x-accepted-oauth-scopes`            | Scopes the endpoint would accept — compare against the row above to find the gap.    |
-| `x-accepted-github-permissions`      | Fine-grained permission required (e.g. `code_scanning_alerts=read`).                 |
-| `x-github-sso`                       | `required; url=...` means authorize the token for the org at that URL.               |
-| `x-ratelimit-remaining` / `-reset`   | Requests left this hour and Unix epoch when the window resets.                       |
-| `x-github-request-id`                | Include this when opening a GitHub support ticket about a specific failure.          |
+| Response header                    | What to read from it                                                              |
+| ---------------------------------- | --------------------------------------------------------------------------------- |
+| `x-oauth-scopes`                   | Scopes the (classic) token currently has. Empty for fine-grained tokens.          |
+| `x-accepted-oauth-scopes`          | Scopes the endpoint would accept — compare against the row above to find the gap. |
+| `x-accepted-github-permissions`    | Fine-grained permission required (e.g. `code_scanning_alerts=read`).              |
+| `x-github-sso`                     | `required; url=...` means authorize the token for the org at that URL.            |
+| `x-ratelimit-remaining` / `-reset` | Requests left this hour and Unix epoch when the window resets.                    |
+| `x-github-request-id`              | Include this when opening a GitHub support ticket about a specific failure.       |
 
 **Common self-inflicted 401/403s.**
 
@@ -1040,13 +1046,13 @@ done
 
 **Common failures.**
 
-| Response                                              | Cause                                                                       | Fix                                                                             |
-|-------------------------------------------------------|-----------------------------------------------------------------------------|---------------------------------------------------------------------------------|
-| `403 Resource not accessible by personal access token` | Token missing `security_events` (classic) or **Code scanning alerts=Write** (fine-grained). | Regenerate token with the correct scope (see *Token permissions and scopes*).   |
-| `422 commit_sha is not a valid commit`                | Sha isn't pushed to the remote, or is on a branch the token can't see.      | `git push` first, then re-run.                                                  |
-| `422 ref must be a fully-qualified ref`               | Passed `main` instead of `refs/heads/main`.                                 | Use `refs/heads/<branch>` or `refs/pull/<n>/head`.                              |
-| `413 Payload Too Large`                               | SARIF over 10 MB compressed.                                                | Split by tool/category, or trim results before upload.                          |
-| `processing_status: failed` with `errors: [...]`       | Structural SARIF problem GitHub caught after ingest.                        | Run `bun run scripts/validate-sarif.mjs <file>` locally to reproduce.           |
+| Response                                               | Cause                                                                                       | Fix                                                                           |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `403 Resource not accessible by personal access token` | Token missing `security_events` (classic) or **Code scanning alerts=Write** (fine-grained). | Regenerate token with the correct scope (see _Token permissions and scopes_). |
+| `422 commit_sha is not a valid commit`                 | Sha isn't pushed to the remote, or is on a branch the token can't see.                      | `git push` first, then re-run.                                                |
+| `422 ref must be a fully-qualified ref`                | Passed `main` instead of `refs/heads/main`.                                                 | Use `refs/heads/<branch>` or `refs/pull/<n>/head`.                            |
+| `413 Payload Too Large`                                | SARIF over 10 MB compressed.                                                                | Split by tool/category, or trim results before upload.                        |
+| `processing_status: failed` with `errors: [...]`       | Structural SARIF problem GitHub caught after ingest.                                        | Run `bun run scripts/validate-sarif.mjs <file>` locally to reproduce.         |
 
 Once `processing_status` is `complete`, the findings appear under
 **Security → Code scanning** for the specified `commit_sha` and category.
@@ -1069,8 +1075,8 @@ on:
 
 permissions:
   contents: read
-  security-events: write   # upload-sarif + read alerts back
-  actions: read            # required on private repos
+  security-events: write # upload-sarif + read alerts back
+  actions: read # required on private repos
 
 jobs:
   sarif:
@@ -1108,7 +1114,7 @@ jobs:
         with:
           sarif_file: prefix-diff.sarif
           category: prefix-diff-${{ env.TARGET_ENV || 'sandbox' }}
-          wait-for-processing: true   # blocks until GitHub finishes ingesting
+          wait-for-processing: true # blocks until GitHub finishes ingesting
 
       # 4. Verify: the analysis exists for THIS sha, and the alert count matches SARIF.
       - name: Verify alerts landed
@@ -1159,13 +1165,13 @@ jobs:
 
 **What each step guarantees.**
 
-| Step                        | Fails when                                                                 |
-|-----------------------------|----------------------------------------------------------------------------|
-| Run prefix-diff (SARIF)     | The tool crashed *before* writing SARIF (test `-s` catches empty files).   |
-| Validate SARIF structure    | Missing `partialFingerprints`, empty rule catalog, malformed `version`.    |
-| Upload SARIF                | Missing `security-events: write`, invalid SARIF, or fork PR upload denied. |
-| Verify alerts landed        | No analysis exists for this sha, or the alert count ≠ SARIF result count.  |
-| Upload artifacts            | Never — runs under `if: always()` so failures still ship the SARIF.        |
+| Step                     | Fails when                                                                 |
+| ------------------------ | -------------------------------------------------------------------------- |
+| Run prefix-diff (SARIF)  | The tool crashed _before_ writing SARIF (test `-s` catches empty files).   |
+| Validate SARIF structure | Missing `partialFingerprints`, empty rule catalog, malformed `version`.    |
+| Upload SARIF             | Missing `security-events: write`, invalid SARIF, or fork PR upload denied. |
+| Verify alerts landed     | No analysis exists for this sha, or the alert count ≠ SARIF result count.  |
+| Upload artifacts         | Never — runs under `if: always()` so failures still ship the SARIF.        |
 
 **Notes.**
 
@@ -1173,7 +1179,7 @@ jobs:
   reliable — without it the verify step races GitHub's ingestion and
   intermittently sees zero alerts.
 - Use `${{ steps.upload.outputs.sarif-id }}` to scope the analysis
-  lookup to *this* upload; otherwise a concurrent workflow on the same
+  lookup to _this_ upload; otherwise a concurrent workflow on the same
   sha can mask a failure.
 - For fork PRs, step 3 is skipped by GitHub. Guard step 4 with
   `if: github.event.pull_request.head.repo.full_name == github.repository`
@@ -1184,12 +1190,12 @@ jobs:
 
 ##### Verifying uploaded findings in GitHub code scanning
 
-
 After the workflow finishes (green **or** red — `upload-sarif` runs under
 `if: always()`), confirm the findings actually landed. Do the checks in
 this order:
 
 **1. Confirm the SARIF was accepted.**
+
 - Open the workflow run: repo → **Actions** → pick the run → expand the
   `Prefix diff (SARIF)` job.
 - Look at the **Upload SARIF** step log. A successful upload prints
@@ -1202,6 +1208,7 @@ this order:
   "Sample SARIF output" section.
 
 **2. Find the findings in the Security tab.**
+
 - Repo → **Security** → **Code scanning** (left sidebar).
 - In the filter bar, set:
   - **Tool:** `diff-money-migration-prefixes`
@@ -1212,9 +1219,10 @@ this order:
     `money-migration-malformed`, or `money-migration-tooling`
 - Each row shows the migration file, the rule ID, and severity **Error**.
   Click a row to see the full message (`Required money migration not
-  applied in <env>: prefix <14-digit>`) and the file location.
+applied in <env>: prefix <14-digit>`) and the file location.
 
 **3. Verify per-file annotations on the PR.**
+
 - Open the PR → **Files changed** tab.
 - Each drifted `supabase/migrations/<file>.sql` should show a red
   gutter marker on line 1 with the same "Required money migration not
@@ -1226,6 +1234,7 @@ this order:
   workflow on the PR itself, or add a `pull_request` trigger.
 
 **4. Confirm de-duplication across re-runs.**
+
 - Re-run the workflow. In **Security → Code scanning**, the finding
   count should stay the same, not double. The **History** panel on the
   finding shows one entry per run, all pointing at the same
@@ -1234,19 +1243,21 @@ this order:
   runs — see the last row of the `--sarif` troubleshooting table.
 
 **5. Confirm resolution.**
+
 - After the missing migration is applied, the next workflow run uploads
   a SARIF with `"results": []`. In **Security → Code scanning**, the
   matching finding's status flips from **Open** to **Closed** (labelled
-  *"Fixed in <sha>"*). A clean run does **not** delete the history —
+  _"Fixed in <sha>"_). A clean run does **not** delete the history —
   the finding stays visible under the **Closed** filter as an audit trail.
 
 **Requirements checklist** if the Security tab is empty:
+
 - Repository setting **Settings → Code security → Code scanning** must
   be enabled (public repos: on by default; private repos: requires
   Advanced Security or a public repo).
 - The workflow needs `permissions: security-events: write` at the job or
   workflow level. Without it, `upload-sarif` fails with `Resource not
-  accessible by integration`.
+accessible by integration`.
 - Findings are scoped to the branch the SARIF was uploaded from. Switch
   the **Branch** filter if you're looking at the default branch but the
   run was on a feature branch.
@@ -1261,6 +1272,7 @@ local run.
 **Step 1 — Download the artifact.**
 
 Via the GitHub UI:
+
 - Repo → **Actions** → the failed/passing run → scroll to **Artifacts**
   at the bottom of the summary page.
 - Click `money-migration-audit-sandbox` (or `-live`) to download a
@@ -1276,6 +1288,7 @@ Via the GitHub UI:
   ```
 
 Via `gh` CLI (faster, scriptable):
+
 ```bash
 # List recent runs of the workflow
 gh run list --workflow required-money-migrations.yml --limit 5
@@ -1369,13 +1382,13 @@ two outputs was truncated — re-download the artifact.
 
 **Step 6 — Common gotchas.**
 
-| Symptom                                                     | Cause / fix                                                                                              |
-|-------------------------------------------------------------|----------------------------------------------------------------------------------------------------------|
-| `gh run download` says *no artifacts found*                 | Artifact expired (>90 days) or the job was skipped/cancelled before the upload step ran.                 |
-| Local SARIF has findings, CI SARIF is empty                 | You're pointed at a different DB. Re-check `TARGET_ENV` and that `SUPABASE_DB_URL_*` matches the job env. |
-| Rule IDs differ (`money-migration-drift` vs old name)       | You're on an older branch locally. Rebase onto `main` and rerun.                                         |
-| `jq: error: Cannot iterate over null (null)`                | SARIF has `results: []` (clean run). Wrap the filter in `.runs[0].results // [] \| .[]`.                 |
-| Fingerprints match but URIs differ                          | One run used absolute paths, the other used repo-relative. The `del(...uriBaseId)` step above fixes it.  |
+| Symptom                                               | Cause / fix                                                                                               |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `gh run download` says _no artifacts found_           | Artifact expired (>90 days) or the job was skipped/cancelled before the upload step ran.                  |
+| Local SARIF has findings, CI SARIF is empty           | You're pointed at a different DB. Re-check `TARGET_ENV` and that `SUPABASE_DB_URL_*` matches the job env. |
+| Rule IDs differ (`money-migration-drift` vs old name) | You're on an older branch locally. Rebase onto `main` and rerun.                                          |
+| `jq: error: Cannot iterate over null (null)`          | SARIF has `results: []` (clean run). Wrap the filter in `.runs[0].results // [] \| .[]`.                  |
+| Fingerprints match but URIs differ                    | One run used absolute paths, the other used repo-relative. The `del(...uriBaseId)` step above fixes it.   |
 
 ##### SARIF field → Code scanning UI mapping
 
@@ -1424,34 +1437,34 @@ Assume this SARIF shape (matches what
 
 **Alert list columns (Security → Code scanning table).**
 
-| UI column / element                    | SARIF field                                                                                                    | Example value                                                             |
-|----------------------------------------|----------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------|
-| Alert title (bold, first line)         | `runs[].results[].message.text` (first line, truncated)                                                        | *Required money migration not applied in sandbox: prefix 20260715120000…* |
-| Rule ID chip (small, next to title)    | `runs[].results[].ruleId`                                                                                       | `money-migration-drift`                                                   |
-| Tool filter dropdown value             | `runs[].tool.driver.name`                                                                                       | `diff-money-migration-prefixes`                                           |
-| Severity pill (colored dot + label)    | `runs[].results[].level` (or the rule's `defaultConfiguration.level` when omitted on the result)               | `error` → red **Error**; `warning` → yellow; `note` → blue                |
-| File path (grey, under the title)      | `runs[].results[].locations[0].physicalLocation.artifactLocation.uri`                                          | `supabase/migrations/20260715120000_ai_credit_spend.sql`                  |
-| Line-number suffix on the file path    | `runs[].results[].locations[0].physicalLocation.region.startLine`                                              | `:1`                                                                      |
-| Branch column                          | The Git ref the workflow ran on (from `GITHUB_REF`), not a SARIF field                                          | `main`, `pr/1234`                                                         |
-| Category filter value                  | `upload-sarif` step's `category:` input (mirrored into `runs[].automationDetails.id` as `<category>/<uuid>`)   | `money-migration-drift-sandbox`                                           |
-| Alert number (`#123`, in the URL)      | Assigned by GitHub on first upload; stable across re-runs that share the same fingerprint                       | `#123`                                                                    |
-| Status column (Open / Closed / Dismissed) | Derived: presence of the fingerprint in the latest SARIF + any manual dismissal on this alert number         | *Open*, *Closed – Fixed*, *Closed – Dismissed (Won't fix)*                |
+| UI column / element                       | SARIF field                                                                                                  | Example value                                                             |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------- |
+| Alert title (bold, first line)            | `runs[].results[].message.text` (first line, truncated)                                                      | _Required money migration not applied in sandbox: prefix 20260715120000…_ |
+| Rule ID chip (small, next to title)       | `runs[].results[].ruleId`                                                                                    | `money-migration-drift`                                                   |
+| Tool filter dropdown value                | `runs[].tool.driver.name`                                                                                    | `diff-money-migration-prefixes`                                           |
+| Severity pill (colored dot + label)       | `runs[].results[].level` (or the rule's `defaultConfiguration.level` when omitted on the result)             | `error` → red **Error**; `warning` → yellow; `note` → blue                |
+| File path (grey, under the title)         | `runs[].results[].locations[0].physicalLocation.artifactLocation.uri`                                        | `supabase/migrations/20260715120000_ai_credit_spend.sql`                  |
+| Line-number suffix on the file path       | `runs[].results[].locations[0].physicalLocation.region.startLine`                                            | `:1`                                                                      |
+| Branch column                             | The Git ref the workflow ran on (from `GITHUB_REF`), not a SARIF field                                       | `main`, `pr/1234`                                                         |
+| Category filter value                     | `upload-sarif` step's `category:` input (mirrored into `runs[].automationDetails.id` as `<category>/<uuid>`) | `money-migration-drift-sandbox`                                           |
+| Alert number (`#123`, in the URL)         | Assigned by GitHub on first upload; stable across re-runs that share the same fingerprint                    | `#123`                                                                    |
+| Status column (Open / Closed / Dismissed) | Derived: presence of the fingerprint in the latest SARIF + any manual dismissal on this alert number         | _Open_, _Closed – Fixed_, _Closed – Dismissed (Won't fix)_                |
 
 **Alert detail page (click a row).**
 
-| UI element                             | SARIF field                                                                                     |
-|----------------------------------------|-------------------------------------------------------------------------------------------------|
-| Header title                           | `runs[].results[].message.text` (full, not truncated)                                           |
-| **Rule** sidebar → Name + description  | `runs[].tool.driver.rules[]` where `id == result.ruleId` → `shortDescription.text` / `fullDescription.text` |
-| **Rule** sidebar → Severity            | `rules[].defaultConfiguration.level`, overridden by `results[].level` when present              |
-| **Rule** sidebar → Tool name + version | `runs[].tool.driver.name` and `runs[].tool.driver.semanticVersion`                              |
-| **Rule** sidebar → *More info* link    | `runs[].tool.driver.rules[].helpUri` (falls back to `runs[].tool.driver.informationUri`)        |
-| Code snippet with red gutter on line 1 | `locations[0].physicalLocation.artifactLocation.uri` + `region.startLine`                       |
-| **Show paths** (multi-location)        | Additional entries in `results[].locations[]` and `results[].codeFlows[]` (unused by this tool) |
-| Timeline: *Detected in run #N*         | Each SARIF upload whose `results[]` still contains the same `partialFingerprints`                |
-| Timeline: *In branch `<name>`*         | Ref of the workflow run that uploaded that SARIF                                                 |
-| Alert dedupe key                       | `(runs[].tool.driver.name, ruleId, results[].partialFingerprints)` — **not** the alert number   |
-| Fingerprint value (visible in the URL when filtering) | `results[].partialFingerprints.migrationVersion` (14-digit prefix)                |
+| UI element                                            | SARIF field                                                                                                 |
+| ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Header title                                          | `runs[].results[].message.text` (full, not truncated)                                                       |
+| **Rule** sidebar → Name + description                 | `runs[].tool.driver.rules[]` where `id == result.ruleId` → `shortDescription.text` / `fullDescription.text` |
+| **Rule** sidebar → Severity                           | `rules[].defaultConfiguration.level`, overridden by `results[].level` when present                          |
+| **Rule** sidebar → Tool name + version                | `runs[].tool.driver.name` and `runs[].tool.driver.semanticVersion`                                          |
+| **Rule** sidebar → _More info_ link                   | `runs[].tool.driver.rules[].helpUri` (falls back to `runs[].tool.driver.informationUri`)                    |
+| Code snippet with red gutter on line 1                | `locations[0].physicalLocation.artifactLocation.uri` + `region.startLine`                                   |
+| **Show paths** (multi-location)                       | Additional entries in `results[].locations[]` and `results[].codeFlows[]` (unused by this tool)             |
+| Timeline: _Detected in run #N_                        | Each SARIF upload whose `results[]` still contains the same `partialFingerprints`                           |
+| Timeline: _In branch `<name>`_                        | Ref of the workflow run that uploaded that SARIF                                                            |
+| Alert dedupe key                                      | `(runs[].tool.driver.name, ruleId, results[].partialFingerprints)` — **not** the alert number               |
+| Fingerprint value (visible in the URL when filtering) | `results[].partialFingerprints.migrationVersion` (14-digit prefix)                                          |
 
 **Two things that look like SARIF fields but aren't.**
 
@@ -1459,11 +1472,11 @@ Assume this SARIF shape (matches what
   #12345" link on the timeline. This is the `GITHUB_RUN_ID` of the
   workflow run, injected by `upload-sarif`. It is **not** stored in
   the SARIF itself — the SARIF's own `runs[]` array is unrelated
-  (SARIF calls each *tool invocation* a "run"; this tool always emits
+  (SARIF calls each _tool invocation_ a "run"; this tool always emits
   exactly one).
 - **Alert number (`#N`).** Assigned by GitHub, not present in SARIF.
   Two uploads with the same `(tool, ruleId, partialFingerprints,
-  category)` update the same alert number; changing any of those four
+category)` update the same alert number; changing any of those four
   creates a new one.
 
 **Fingerprint stability rules for this tool.**
@@ -1527,15 +1540,21 @@ surfaces in a PR's **Files changed** tab.
             {
               "id": "money-migration-drift",
               "name": "MoneyMigrationDrift",
-              "shortDescription": { "text": "Required migration prefix differs from applied prefix" },
-              "fullDescription":  { "text": "The 14-digit prefix on this required file does not match the prefix recorded in supabase_migrations.schema_migrations for the target environment." },
+              "shortDescription": {
+                "text": "Required migration prefix differs from applied prefix"
+              },
+              "fullDescription": {
+                "text": "The 14-digit prefix on this required file does not match the prefix recorded in supabase_migrations.schema_migrations for the target environment."
+              },
               "defaultConfiguration": { "level": "error" },
               "helpUri": "https://github.com/OWNER/REPO#money-migration-applied-check"
             },
             {
               "id": "money-migration-malformed",
               "name": "MoneyMigrationMalformed",
-              "shortDescription": { "text": "Required migration file has an unparseable 14-digit prefix" },
+              "shortDescription": {
+                "text": "Required migration file has an unparseable 14-digit prefix"
+              },
               "defaultConfiguration": { "level": "warning" },
               "helpUri": "https://github.com/OWNER/REPO#money-migration-applied-check"
             }
@@ -1548,48 +1567,66 @@ surfaces in a PR's **Files changed** tab.
           "ruleId": "money-migration-drift",
           "level": "error",
           "message": { "text": "Expected prefix 20260715120000 but sandbox has 20260715115959." },
-          "locations": [{
-            "physicalLocation": {
-              "artifactLocation": { "uri": "supabase/migrations/20260715120000_ai_credit_spend.sql" },
-              "region": { "startLine": 1 }
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "supabase/migrations/20260715120000_ai_credit_spend.sql"
+                },
+                "region": { "startLine": 1 }
+              }
             }
-          }],
+          ],
           "partialFingerprints": { "primaryLocationLineHash": "ai_credit_spend:20260715120000" }
         },
         {
           "ruleId": "money-migration-drift",
           "level": "error",
           "message": { "text": "Expected prefix 20260716090000 but sandbox has 20260716085500." },
-          "locations": [{
-            "physicalLocation": {
-              "artifactLocation": { "uri": "supabase/migrations/20260716090000_referral_conversions.sql" },
-              "region": { "startLine": 1 }
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "supabase/migrations/20260716090000_referral_conversions.sql"
+                },
+                "region": { "startLine": 1 }
+              }
             }
-          }],
-          "partialFingerprints": { "primaryLocationLineHash": "referral_conversions:20260716090000" }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "referral_conversions:20260716090000"
+          }
         },
         {
           "ruleId": "money-migration-drift",
           "level": "error",
           "message": { "text": "Expected prefix 20260717000000 but sandbox has 20260716235959." },
-          "locations": [{
-            "physicalLocation": {
-              "artifactLocation": { "uri": "supabase/migrations/20260717000000_credit_pack_grants.sql" },
-              "region": { "startLine": 1 }
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "supabase/migrations/20260717000000_credit_pack_grants.sql"
+                },
+                "region": { "startLine": 1 }
+              }
             }
-          }],
+          ],
           "partialFingerprints": { "primaryLocationLineHash": "credit_pack_grants:20260717000000" }
         },
         {
           "ruleId": "money-migration-malformed",
           "level": "warning",
-          "message": { "text": "File name does not begin with a 14-digit prefix; cannot compare to applied migrations." },
-          "locations": [{
-            "physicalLocation": {
-              "artifactLocation": { "uri": "supabase/migrations/credit_pack_grants_fix.sql" },
-              "region": { "startLine": 1 }
+          "message": {
+            "text": "File name does not begin with a 14-digit prefix; cannot compare to applied migrations."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": { "uri": "supabase/migrations/credit_pack_grants_fix.sql" },
+                "region": { "startLine": 1 }
+              }
             }
-          }],
+          ],
           "partialFingerprints": { "primaryLocationLineHash": "credit_pack_grants_fix:malformed" }
         }
       ]
@@ -1604,13 +1641,13 @@ GitHub does **not** collapse annotations by rule or by directory — it
 attaches one marker per `results[]` entry, at the file+line named in
 `locations[0].physicalLocation`. Grouping is entirely by file path.
 
-| File in the PR diff                                              | Markers attached                                                                          | Rule / severity chip                                        |
-|------------------------------------------------------------------|-------------------------------------------------------------------------------------------|-------------------------------------------------------------|
-| `supabase/migrations/20260715120000_ai_credit_spend.sql`         | 1 red marker in the line-1 gutter                                                         | `money-migration-drift` · **Error**                          |
-| `supabase/migrations/20260716090000_referral_conversions.sql`    | 1 red marker in the line-1 gutter                                                         | `money-migration-drift` · **Error**                          |
-| `supabase/migrations/20260717000000_credit_pack_grants.sql`      | 1 red marker in the line-1 gutter                                                         | `money-migration-drift` · **Error**                          |
-| `supabase/migrations/credit_pack_grants_fix.sql`                 | 1 yellow marker in the line-1 gutter                                                      | `money-migration-malformed` · **Warning**                    |
-| Any other file in the PR                                         | No markers                                                                                | —                                                            |
+| File in the PR diff                                           | Markers attached                     | Rule / severity chip                      |
+| ------------------------------------------------------------- | ------------------------------------ | ----------------------------------------- |
+| `supabase/migrations/20260715120000_ai_credit_spend.sql`      | 1 red marker in the line-1 gutter    | `money-migration-drift` · **Error**       |
+| `supabase/migrations/20260716090000_referral_conversions.sql` | 1 red marker in the line-1 gutter    | `money-migration-drift` · **Error**       |
+| `supabase/migrations/20260717000000_credit_pack_grants.sql`   | 1 red marker in the line-1 gutter    | `money-migration-drift` · **Error**       |
+| `supabase/migrations/credit_pack_grants_fix.sql`              | 1 yellow marker in the line-1 gutter | `money-migration-malformed` · **Warning** |
+| Any other file in the PR                                      | No markers                           | —                                         |
 
 Concretely, that means:
 
@@ -1620,7 +1657,7 @@ Concretely, that means:
   → Note), then by ruleId alphabetically.
 - **Same rule, different files = separate annotations.** The three
   `money-migration-drift` results above stay on their own files — they
-  are *not* rolled up into a single "3 issues" entry.
+  are _not_ rolled up into a single "3 issues" entry.
 - **Different rules, same file = separate annotations stacked on that
   line.** If `credit_pack_grants_fix.sql` also had a `drift` result,
   its line-1 marker would expand to show both the Warning and the
@@ -1652,7 +1689,7 @@ Code scanning results / diff-money-migration-prefixes
 ```
 
 Clicking through opens the check run detail page, which lists all 4
-results grouped by **rule** (not by file) — this is the *only* place
+results grouped by **rule** (not by file) — this is the _only_ place
 in the UI where rule-level grouping happens:
 
 ```
@@ -1666,13 +1703,13 @@ money-migration-malformed (1)
 
 **What controls the grouping.**
 
-| SARIF field                                                  | Effect on PR UI                                                                    |
-|--------------------------------------------------------------|------------------------------------------------------------------------------------|
-| `results[].locations[0].physicalLocation.artifactLocation.uri` | Determines *which file* gets the marker. Must match the PR diff path exactly.      |
-| `results[].locations[0].physicalLocation.region.startLine`     | Determines *which line* the marker attaches to.                                    |
-| `results[].ruleId`                                             | Shown as the chip on the annotation; used for rule-level grouping on the check-run detail page only. |
-| `results[].level` (or `rules[].defaultConfiguration.level`)    | Drives marker color (Error = red, Warning = yellow, Note = blue) and sort order within a stacked annotation. |
-| `results[].partialFingerprints`                                | Not shown, but controls whether a result on the *next* run is treated as the same alert (dedupe) or a new one. |
+| SARIF field                                                    | Effect on PR UI                                                                                                  |
+| -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `results[].locations[0].physicalLocation.artifactLocation.uri` | Determines _which file_ gets the marker. Must match the PR diff path exactly.                                    |
+| `results[].locations[0].physicalLocation.region.startLine`     | Determines _which line_ the marker attaches to.                                                                  |
+| `results[].ruleId`                                             | Shown as the chip on the annotation; used for rule-level grouping on the check-run detail page only.             |
+| `results[].level` (or `rules[].defaultConfiguration.level`)    | Drives marker color (Error = red, Warning = yellow, Note = blue) and sort order within a stacked annotation.     |
+| `results[].partialFingerprints`                                | Not shown, but controls whether a result on the _next_ run is treated as the same alert (dedupe) or a new one.   |
 | `automationDetails.id` (category)                              | Not shown, but scopes dedupe: two uploads with different categories create two separate alerts on the same line. |
 
 **Verifying the sample locally.**
@@ -1694,19 +1731,18 @@ Expected output:
 
 ```json
 [
-  { "rule": "money-migration-drift",     "count": 3 },
+  { "rule": "money-migration-drift", "count": 3 },
   { "rule": "money-migration-malformed", "count": 1 }
 ]
 ```
 
 If the per-file `jq` groups don't match the badge counts you see in
-the PR after upload, re-check the *Common gotchas* row about
+the PR after upload, re-check the _Common gotchas_ row about
 `uriBaseId` — GitHub compares resolved paths, and a mismatched base
 URI is the usual cause of "SARIF has 4 results but only 2 files show
 markers."
 
 ##### Verifying alerts via the GitHub Code Scanning REST API (curl)
-
 
 Sometimes the fastest way to confirm a SARIF upload landed correctly is
 to skip the UI entirely and ask the REST API. This walkthrough uses
@@ -1717,8 +1753,8 @@ to skip the UI entirely and ask the REST API. This walkthrough uses
 
 - A token with `security_events: read` (for private repos) or
   `public_repo` (for public repos). Any of these work:
-  - **Fine-grained PAT:** *Repository permissions → Code scanning
-    alerts → Read-only*, scoped to the repo.
+  - **Fine-grained PAT:** _Repository permissions → Code scanning
+    alerts → Read-only_, scoped to the repo.
   - **Classic PAT:** `repo` scope for private repos, `public_repo` for
     public.
   - **Inside a workflow:** the built-in `${{ github.token }}` if the
@@ -1765,15 +1801,15 @@ Sample output:
 
 Useful query params (combine with `&`):
 
-| Param            | Values                                        | Notes                                                          |
-|------------------|-----------------------------------------------|----------------------------------------------------------------|
-| `tool_name`      | `diff-money-migration-prefixes`               | Scopes to this scanner only                                    |
-| `state`          | `open`, `closed`, `dismissed`, `fixed`        | Omit for all                                                   |
-| `severity`       | `error`, `warning`, `note`                    | Matches the SARIF `level`                                      |
-| `ref`            | `refs/heads/main`, `refs/pull/1234/merge`     | Scopes to a branch or PR                                       |
-| `rule`           | `money-migration-drift` etc.                  | Same value as `ruleId` in SARIF                                |
-| `sort` / `direction` | `created`/`updated`, `asc`/`desc`         | Default: most recently created first                           |
-| `per_page`       | 1–100                                         | Paginate with `?page=N` or follow the `Link: rel="next"` header |
+| Param                | Values                                    | Notes                                                           |
+| -------------------- | ----------------------------------------- | --------------------------------------------------------------- |
+| `tool_name`          | `diff-money-migration-prefixes`           | Scopes to this scanner only                                     |
+| `state`              | `open`, `closed`, `dismissed`, `fixed`    | Omit for all                                                    |
+| `severity`           | `error`, `warning`, `note`                | Matches the SARIF `level`                                       |
+| `ref`                | `refs/heads/main`, `refs/pull/1234/merge` | Scopes to a branch or PR                                        |
+| `rule`               | `money-migration-drift` etc.              | Same value as `ruleId` in SARIF                                 |
+| `sort` / `direction` | `created`/`updated`, `asc`/`desc`         | Default: most recently created first                            |
+| `per_page`           | 1–100                                     | Paginate with `?page=N` or follow the `Link: rel="next"` header |
 
 **Step 2 — Fetch one alert's full detail.**
 
@@ -1785,28 +1821,28 @@ curl -sSL "${AUTH[@]}" \
 ```
 
 Key fields and their SARIF counterparts (mirrors the mapping table in
-the *SARIF field → Code scanning UI mapping* section):
+the _SARIF field → Code scanning UI mapping_ section):
 
-| API field                                                | SARIF source                                                        |
-|----------------------------------------------------------|---------------------------------------------------------------------|
-| `number`                                                 | Assigned by GitHub — **not** in SARIF                               |
-| `rule.id`                                                | `results[].ruleId`                                                  |
-| `rule.severity` / `rule.security_severity_level`         | `rules[].defaultConfiguration.level` (overridden by `results[].level`) |
-| `tool.name` / `tool.version`                             | `runs[].tool.driver.name` / `.semanticVersion`                      |
-| `most_recent_instance.message.text`                      | `results[].message.text`                                            |
-| `most_recent_instance.location.path`                     | `results[].locations[0].physicalLocation.artifactLocation.uri`      |
-| `most_recent_instance.location.start_line`               | `results[].locations[0].physicalLocation.region.startLine`          |
-| `most_recent_instance.ref`                               | Git ref of the workflow run (`GITHUB_REF`)                          |
-| `most_recent_instance.analysis_key`                      | Workflow file + job name that uploaded the SARIF                    |
-| `most_recent_instance.category`                          | `upload-sarif` step's `category:` input                             |
-| `most_recent_instance.commit_sha`                        | SHA at the time of the upload                                       |
-| `state`                                                  | `open`, `dismissed`, `fixed` (derived from re-upload behavior)      |
-| `dismissed_reason` / `dismissed_by` / `dismissed_at`     | UI dismissal metadata; absent when not dismissed                    |
+| API field                                            | SARIF source                                                           |
+| ---------------------------------------------------- | ---------------------------------------------------------------------- |
+| `number`                                             | Assigned by GitHub — **not** in SARIF                                  |
+| `rule.id`                                            | `results[].ruleId`                                                     |
+| `rule.severity` / `rule.security_severity_level`     | `rules[].defaultConfiguration.level` (overridden by `results[].level`) |
+| `tool.name` / `tool.version`                         | `runs[].tool.driver.name` / `.semanticVersion`                         |
+| `most_recent_instance.message.text`                  | `results[].message.text`                                               |
+| `most_recent_instance.location.path`                 | `results[].locations[0].physicalLocation.artifactLocation.uri`         |
+| `most_recent_instance.location.start_line`           | `results[].locations[0].physicalLocation.region.startLine`             |
+| `most_recent_instance.ref`                           | Git ref of the workflow run (`GITHUB_REF`)                             |
+| `most_recent_instance.analysis_key`                  | Workflow file + job name that uploaded the SARIF                       |
+| `most_recent_instance.category`                      | `upload-sarif` step's `category:` input                                |
+| `most_recent_instance.commit_sha`                    | SHA at the time of the upload                                          |
+| `state`                                              | `open`, `dismissed`, `fixed` (derived from re-upload behavior)         |
+| `dismissed_reason` / `dismissed_by` / `dismissed_at` | UI dismissal metadata; absent when not dismissed                       |
 
 **Step 3 — Verify one specific finding from your local SARIF exists as an alert.**
 
 Given a `ruleId` + `uri` + `migrationVersion` triple from your local
-`diff.sarif` (see the *fingerprint recipes* section), confirm GitHub
+`diff.sarif` (see the _fingerprint recipes_ section), confirm GitHub
 created the matching alert:
 
 ```bash
@@ -1877,7 +1913,7 @@ jq '.runs[0].results | length' github-stored.sarif
 ```
 
 Diff this against your local `diff.sarif` using the normalization
-recipe in the *Downloading and inspecting SARIF artifacts* section.
+recipe in the _Downloading and inspecting SARIF artifacts_ section.
 
 **Step 6 — Cross-check totals against the workflow output.**
 
@@ -1904,19 +1940,16 @@ from the artifact = the pipeline is fully in sync.
 
 **Common gotchas.**
 
-| Symptom                                                              | Cause / fix                                                                                              |
-|----------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------|
-| `HTTP 403 Resource not accessible by personal access token`          | Token lacks `security_events: read` (fine-grained) or `repo`/`public_repo` (classic). Regenerate.        |
-| `HTTP 404` on `/code-scanning/alerts`                                | Code scanning not enabled on the repo, or the org disabled it. See *Required GitHub settings* section.   |
-| Empty list even though the Security tab shows alerts                 | Missing `tool_name` filter picks the wrong scanner's namespace, or `ref` doesn't match the branch.       |
-| `most_recent_instance.location.path` shows an absolute path          | The SARIF used `uriBaseId` — GitHub resolved it. Normalize before comparing (see *artifact diff* recipe).|
-| `state: fixed` but the alert reappears in the next run               | Fingerprint changed. Compare `partialFingerprints` across the two SARIFs; usually a renamed migration.   |
-| `X-RateLimit-Remaining: 0` on rapid polling                          | REST API is rate-limited to 5,000/hr per token. Batch with `per_page=100` and cache results.             |
+| Symptom                                                     | Cause / fix                                                                                               |
+| ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `HTTP 403 Resource not accessible by personal access token` | Token lacks `security_events: read` (fine-grained) or `repo`/`public_repo` (classic). Regenerate.         |
+| `HTTP 404` on `/code-scanning/alerts`                       | Code scanning not enabled on the repo, or the org disabled it. See _Required GitHub settings_ section.    |
+| Empty list even though the Security tab shows alerts        | Missing `tool_name` filter picks the wrong scanner's namespace, or `ref` doesn't match the branch.        |
+| `most_recent_instance.location.path` shows an absolute path | The SARIF used `uriBaseId` — GitHub resolved it. Normalize before comparing (see _artifact diff_ recipe). |
+| `state: fixed` but the alert reappears in the next run      | Fingerprint changed. Compare `partialFingerprints` across the two SARIFs; usually a renamed migration.    |
+| `X-RateLimit-Remaining: 0` on rapid polling                 | REST API is rate-limited to 5,000/hr per token. Batch with `per_page=100` and cache results.              |
 
 ##### Walkthrough: inspecting PR file annotations from an uploaded SARIF
-
-
-
 
 Once `upload-sarif` finishes on a PR run, GitHub renders each SARIF
 result as an inline annotation on the PR. Here's exactly where to click
@@ -1924,8 +1957,9 @@ and what each UI element maps back to in the SARIF file so you can trust
 what you're seeing.
 
 **Step 1 — Open the PR's Files changed tab.**
+
 - Repo → **Pull requests** → your PR → **Files changed** (top tab bar,
-  next to *Conversation*, *Commits*, *Checks*).
+  next to _Conversation_, _Commits_, _Checks_).
 - The tab header shows a small badge like **`3 errors`** in red — that
   count comes directly from the number of SARIF `results` with
   `level: "error"` uploaded for this PR's head SHA. If the badge is
@@ -1933,9 +1967,10 @@ what you're seeing.
   `results: []` (clean run).
 
 **Step 2 — Locate a red gutter marker.**
+
 - Scroll to any `supabase/migrations/<file>.sql` listed in the PR diff.
   If the file isn't in the diff, jump directly via the **Jump to file**
-  dropdown at the top of *Files changed*.
+  dropdown at the top of _Files changed_.
 - A red circle with a white **×** in the left gutter on **line 1** marks
   a drift finding. That gutter position corresponds to the SARIF field:
   ```
@@ -1947,19 +1982,21 @@ what you're seeing.
   instead of a migration file — same visual, different `uri`.
 
 **Step 3 — Expand the annotation.**
+
 - Click the red gutter marker. An inline expandable panel opens directly
   below line 1 with three visible pieces:
 
-  | UI element                                   | SARIF field it comes from                                          |
-  |----------------------------------------------|--------------------------------------------------------------------|
-  | Bold header, e.g. **`Code scanning / diff-money-migration-prefixes`** | `runs[0].tool.driver.name`                                       |
-  | Rule ID chip, e.g. `money-migration-drift`   | `results[i].ruleId`                                                |
-  | Severity pill (**Error** in red)             | `results[i].level` (`"error"` → red, `"warning"` → yellow)         |
-  | Message text — *"Required money migration not applied in sandbox: prefix 20260715120000…"* | `results[i].message.text`                                          |
-  | **View alert** link (bottom-right of panel)  | Deep-link to `Security → Code scanning → alert #N` for this result |
-  | **Dismiss** dropdown (*False positive*, *Used in tests*, *Won't fix*) | Writes a `dismissal` back to the alert; SARIF file is unchanged    |
+  | UI element                                                                                 | SARIF field it comes from                                          |
+  | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------ |
+  | Bold header, e.g. **`Code scanning / diff-money-migration-prefixes`**                      | `runs[0].tool.driver.name`                                         |
+  | Rule ID chip, e.g. `money-migration-drift`                                                 | `results[i].ruleId`                                                |
+  | Severity pill (**Error** in red)                                                           | `results[i].level` (`"error"` → red, `"warning"` → yellow)         |
+  | Message text — _"Required money migration not applied in sandbox: prefix 20260715120000…"_ | `results[i].message.text`                                          |
+  | **View alert** link (bottom-right of panel)                                                | Deep-link to `Security → Code scanning → alert #N` for this result |
+  | **Dismiss** dropdown (_False positive_, _Used in tests_, _Won't fix_)                      | Writes a `dismissal` back to the alert; SARIF file is unchanged    |
 
 **Step 4 — Confirm the finding matches your local SARIF.**
+
 - Download the `diff.sarif` artifact from the workflow run
   (**Actions → run → Artifacts → `money-migration-audit-<env>`**).
 - Cross-reference one annotation against the file:
@@ -1976,6 +2013,7 @@ what you're seeing.
   named in the message.
 
 **Step 5 — Follow the "View alert" deep-link.**
+
 - Clicking **View alert** on the annotation lands you on
   `Security → Code scanning → alert #N` for this exact result.
 - The alert page shows:
@@ -1990,17 +2028,19 @@ what you're seeing.
     pulled from `runs[0].tool.driver.rules[]` matching `ruleId`.
 
 **Step 6 — Handle the "no annotations visible" case.**
-- If the *Files changed* badge shows errors but no red gutter markers
+
+- If the _Files changed_ badge shows errors but no red gutter markers
   appear on the migration file, the file is likely **collapsed**. Look
-  for a *"Load diff"* link at the top of the file card and click it —
+  for a _"Load diff"_ link at the top of the file card and click it —
   GitHub skips annotations on unloaded diffs.
 - If the migration file isn't in the PR diff at all, annotations for it
-  will **only** appear in the Security tab. The PR *Files changed* view
+  will **only** appear in the Security tab. The PR _Files changed_ view
   is scoped to changed files; annotations on unchanged files render on
   the branch's default file view instead
   (`https://github.com/<owner>/<repo>/blob/<sha>/<path>#L1`).
 
 **Step 7 — Compare with the `--github-annotations` fallback.**
+
 - If you also ran the script with `--github-annotations`, the same
   findings appear as **`::error file=…,line=1::…`** entries in the
   workflow **job log** (Actions → run → job → the diff step). Those are
@@ -2009,7 +2049,6 @@ what you're seeing.
   gutter markers. They are ephemeral (one per run) and do **not**
   create Security tab alerts. Use them as a quick fallback when Code
   scanning is disabled on the repo.
-
 
 ##### Dismiss vs resolve: alert lifecycle and re-run behavior
 
@@ -2023,14 +2062,14 @@ they behave differently on the next SARIF upload.
 - Open the alert (Security → Code scanning → click the row, or
   **View alert** from the PR annotation) → **Dismiss alert** dropdown
   in the top-right → pick a reason:
-  - *Won't fix* — accepted risk; drift is intentional
-  - *False positive* — the finding is wrong
-  - *Used in tests* — expected in this context
+  - _Won't fix_ — accepted risk; drift is intentional
+  - _False positive_ — the finding is wrong
+  - _Used in tests_ — expected in this context
 - Immediate effects:
   - Security tab row moves from **Open** → **Closed** with a
     **Dismissed (<reason>)** badge and your username.
   - PR **Files changed** tab: the red gutter marker on the migration
-    file disappears on refresh, and the *N errors* badge decrements.
+    file disappears on refresh, and the _N errors_ badge decrements.
   - The alert history gains a `Dismissed by <user>` timeline entry.
 - What does **not** happen:
   - The SARIF file is not modified. The dismissal lives in GitHub's
@@ -2052,14 +2091,14 @@ Re-trigger the workflow (Actions → run → **Re-run all jobs**, or push
 a new commit). The alert's next state depends on whether the fingerprint
 reappears in the freshly uploaded SARIF:
 
-| Previous state       | Next SARIF contains the same fingerprint? | New alert state                                                        | PR annotation                                            |
-|----------------------|-------------------------------------------|------------------------------------------------------------------------|----------------------------------------------------------|
-| Open                 | Yes                                       | **Open** (unchanged); history gains a new "Detected in run #N" row     | Red gutter marker stays on migration file line 1         |
-| Open                 | No                                        | **Closed → Fixed in `<sha>`**; auto-closed by GitHub                    | Red gutter marker disappears; *N errors* badge decrements |
-| Dismissed (any)      | Yes                                       | **Closed → Dismissed** (unchanged); history gains "Detected in run #N" | No annotation (dismissed alerts don't annotate PRs)      |
-| Dismissed (any)      | No                                        | **Closed → Fixed in `<sha>`**; dismissal is superseded by the fix       | No annotation; alert history shows both events           |
-| Closed → Fixed       | Yes (regression)                          | **Reopened → Open**; history shows "Reopened by run #N"                | Red gutter marker returns on the migration file          |
-| Closed → Fixed       | No                                        | **Closed → Fixed** (unchanged); no new history entry                    | No annotation                                            |
+| Previous state  | Next SARIF contains the same fingerprint? | New alert state                                                        | PR annotation                                             |
+| --------------- | ----------------------------------------- | ---------------------------------------------------------------------- | --------------------------------------------------------- |
+| Open            | Yes                                       | **Open** (unchanged); history gains a new "Detected in run #N" row     | Red gutter marker stays on migration file line 1          |
+| Open            | No                                        | **Closed → Fixed in `<sha>`**; auto-closed by GitHub                   | Red gutter marker disappears; _N errors_ badge decrements |
+| Dismissed (any) | Yes                                       | **Closed → Dismissed** (unchanged); history gains "Detected in run #N" | No annotation (dismissed alerts don't annotate PRs)       |
+| Dismissed (any) | No                                        | **Closed → Fixed in `<sha>`**; dismissal is superseded by the fix      | No annotation; alert history shows both events            |
+| Closed → Fixed  | Yes (regression)                          | **Reopened → Open**; history shows "Reopened by run #N"                | Red gutter marker returns on the migration file           |
+| Closed → Fixed  | No                                        | **Closed → Fixed** (unchanged); no new history entry                   | No annotation                                             |
 
 **Verification checklist after the re-run.**
 
@@ -2079,13 +2118,13 @@ reappears in the freshly uploaded SARIF:
 
 **Common gotchas.**
 
-| Symptom                                                             | Cause / fix                                                                                                     |
-|---------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------|
-| Dismissed alert reappears as a **new** Open alert after re-run      | The fingerprint changed (e.g. filename renamed, migrationVersion prefix shifted). Dismissals are per-fingerprint. |
-| Alert stuck on **Open** even after applying the migration           | Wrong `TARGET_ENV` in the re-run — the job is still pointed at the environment where drift exists.              |
-| PR annotation lingers after dismissal                               | Browser cache. Hard-reload the *Files changed* tab.                                                             |
-| Alert flips to **Fixed** then back to **Open** on the next run      | Two workflows uploading with the **same** `category:` but different DB targets are overwriting each other. Give each env a distinct category (`money-migration-drift-sandbox`, `-live`). |
-| Timeline shows the re-run but status didn't change                  | The re-run used a cached `diff.sarif` artifact instead of regenerating it. Confirm the CLI step actually ran (check the job log, not just `upload-sarif`). |
+| Symptom                                                        | Cause / fix                                                                                                                                                                              |
+| -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Dismissed alert reappears as a **new** Open alert after re-run | The fingerprint changed (e.g. filename renamed, migrationVersion prefix shifted). Dismissals are per-fingerprint.                                                                        |
+| Alert stuck on **Open** even after applying the migration      | Wrong `TARGET_ENV` in the re-run — the job is still pointed at the environment where drift exists.                                                                                       |
+| PR annotation lingers after dismissal                          | Browser cache. Hard-reload the _Files changed_ tab.                                                                                                                                      |
+| Alert flips to **Fixed** then back to **Open** on the next run | Two workflows uploading with the **same** `category:` but different DB targets are overwriting each other. Give each env a distinct category (`money-migration-drift-sandbox`, `-live`). |
+| Timeline shows the re-run but status didn't change             | The re-run used a cached `diff.sarif` artifact instead of regenerating it. Confirm the CLI step actually ran (check the job log, not just `upload-sarif`).                               |
 
 ##### Fingerprint collisions: when alerts merge vs split
 
@@ -2117,16 +2156,16 @@ Assume both results have identical `ruleId`, `partialFingerprints`,
 category, and ref. Only the columns marked as varying differ between
 the two results:
 
-| Scenario                                                | `location.uri` | `region.startLine` | `message.text` | UI outcome                                                                                     |
-|---------------------------------------------------------|----------------|--------------------|----------------|------------------------------------------------------------------------------------------------|
-| Identical results (idempotent re-upload)                | same           | same               | same           | **1 alert.** Timeline gains "Detected in run #N". No visible change.                            |
-| Same file, different line                               | same           | **different**      | same           | **1 alert.** Gutter marker moves to the new line; old line's marker disappears on refresh.     |
-| Same file, different message                            | same           | same               | **different**  | **1 alert.** Alert detail page shows the **newest** message; old text is discarded (not diffed). |
-| Different file, same line/message                       | **different**  | same               | same           | **1 alert.** Alert's *Location* changes to the new URI. The previous file loses its annotation. Ambiguous — usually a fingerprint bug. |
-| Two results in the **same SARIF run** with same key     | any            | any                | any            | **1 alert.** GitHub keeps the **first** `results[]` entry and drops the rest silently. Check `jq '[.runs[0].results[] \| .partialFingerprints] \| group_by(.) \| map(select(length>1))' diff.sarif`. |
-| Different `ruleId`, same fingerprint                    | same           | same               | same           | **2 alerts.** `ruleId` is part of the key. Expected when a finding is reclassified. |
-| Same fingerprint, different upload `category:`          | same           | same               | same           | **2 alerts** (one per category stream). This is why sandbox/live use distinct categories. |
-| Same fingerprint, different Git ref (branch/PR head)    | same           | same               | same           | **2 alerts**, one per ref. Merging the PR into the default branch does **not** merge the alerts — the default-branch run creates its own. |
+| Scenario                                             | `location.uri` | `region.startLine` | `message.text` | UI outcome                                                                                                                                                                                           |
+| ---------------------------------------------------- | -------------- | ------------------ | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Identical results (idempotent re-upload)             | same           | same               | same           | **1 alert.** Timeline gains "Detected in run #N". No visible change.                                                                                                                                 |
+| Same file, different line                            | same           | **different**      | same           | **1 alert.** Gutter marker moves to the new line; old line's marker disappears on refresh.                                                                                                           |
+| Same file, different message                         | same           | same               | **different**  | **1 alert.** Alert detail page shows the **newest** message; old text is discarded (not diffed).                                                                                                     |
+| Different file, same line/message                    | **different**  | same               | same           | **1 alert.** Alert's _Location_ changes to the new URI. The previous file loses its annotation. Ambiguous — usually a fingerprint bug.                                                               |
+| Two results in the **same SARIF run** with same key  | any            | any                | any            | **1 alert.** GitHub keeps the **first** `results[]` entry and drops the rest silently. Check `jq '[.runs[0].results[] \| .partialFingerprints] \| group_by(.) \| map(select(length>1))' diff.sarif`. |
+| Different `ruleId`, same fingerprint                 | same           | same               | same           | **2 alerts.** `ruleId` is part of the key. Expected when a finding is reclassified.                                                                                                                  |
+| Same fingerprint, different upload `category:`       | same           | same               | same           | **2 alerts** (one per category stream). This is why sandbox/live use distinct categories.                                                                                                            |
+| Same fingerprint, different Git ref (branch/PR head) | same           | same               | same           | **2 alerts**, one per ref. Merging the PR into the default branch does **not** merge the alerts — the default-branch run creates its own.                                                            |
 
 **When alerts split (new alert appears instead of updating).**
 
@@ -2176,28 +2215,26 @@ of them will disappear in the UI with no warning.
 
 ##### Security tab looks empty (GitHub UI gotchas)
 
-
-
 If `Upload SARIF` printed `SARIF upload complete` but **Security → Code
 scanning** still shows no findings, it's almost always a filter/scope
 mismatch in the UI rather than a real upload failure. Walk this table
 top-to-bottom — the fixes are ordered by how often each one bites:
 
-| Symptom                                                                 | Likely cause                                                                                          | Where to look / quick fix                                                                                                                        |
-|-------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------|
-| "No open alerts" on Security tab, but upload succeeded                   | **Branch filter** defaults to the repo's default branch; your run was on a feature/PR branch          | Top of Code scanning → **Branch** dropdown → select the branch the workflow ran on (or `All branches`).                                          |
-| Findings appear then vanish on refresh                                   | **Status filter** defaults to `Open`; a follow-up clean run auto-closed them                          | Change **Open** → **Closed** (or `All`). Closed = fixed by a later run, not deleted.                                                             |
-| Only some findings visible                                               | **Tool** or **Category** filter narrowed to something else (CodeQL, another SARIF category)           | Set **Tool:** `diff-money-migration-prefixes` and clear **Category**, or select the exact `money-migration-drift` category you uploaded.         |
-| Nothing at all under Code scanning, even with all filters cleared        | **Code scanning not enabled** on the repo                                                             | Repo → **Settings → Code security → Code scanning** → enable. Private repos need GitHub Advanced Security; public repos are free.                |
-| Upload step logs `Resource not accessible by integration`                | Missing `permissions: security-events: write` on the workflow/job                                     | Add at the workflow or job level: `permissions:\n  security-events: write\n  contents: read`. Re-run.                                            |
-| Upload succeeds on PR but Security tab is empty for the PR head branch   | GitHub only stores PR-scoped alerts when the workflow runs on `pull_request`, not `push`             | Trigger the workflow on `pull_request:` (not only `push:`). Existing `push` runs populate the target branch instead.                             |
-| Findings show on default branch but not on the feature branch            | Same as above — `push` events attach findings to the pushed branch only                              | Push the branch, or add a `pull_request` trigger so the PR head branch gets its own scan.                                                        |
-| Sandbox and live findings collide / one overwrites the other             | Both uploads used the same `category:`                                                                | Give each env a distinct category: `category: money-migration-drift-sandbox` and `-live`. Findings are keyed on `(tool, category, ref)`.         |
-| Fork PR: upload step is skipped with a permissions warning               | GitHub blocks `security-events: write` for pull requests **from forks** by design                    | Expected. Findings only appear once the PR merges (workflow re-runs on `push` to the default branch) or when run via `pull_request_target`.      |
-| Security tab entirely missing from repo nav                              | Repo is in an org that disabled Advanced Security, or you lack **Security** permission                | Org owner: **Organization → Settings → Code security** → enable. Individual: ask a maintainer for the **Security manager** role or write access. |
+| Symptom                                                                     | Likely cause                                                                                      | Where to look / quick fix                                                                                                                        |
+| --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| "No open alerts" on Security tab, but upload succeeded                      | **Branch filter** defaults to the repo's default branch; your run was on a feature/PR branch      | Top of Code scanning → **Branch** dropdown → select the branch the workflow ran on (or `All branches`).                                          |
+| Findings appear then vanish on refresh                                      | **Status filter** defaults to `Open`; a follow-up clean run auto-closed them                      | Change **Open** → **Closed** (or `All`). Closed = fixed by a later run, not deleted.                                                             |
+| Only some findings visible                                                  | **Tool** or **Category** filter narrowed to something else (CodeQL, another SARIF category)       | Set **Tool:** `diff-money-migration-prefixes` and clear **Category**, or select the exact `money-migration-drift` category you uploaded.         |
+| Nothing at all under Code scanning, even with all filters cleared           | **Code scanning not enabled** on the repo                                                         | Repo → **Settings → Code security → Code scanning** → enable. Private repos need GitHub Advanced Security; public repos are free.                |
+| Upload step logs `Resource not accessible by integration`                   | Missing `permissions: security-events: write` on the workflow/job                                 | Add at the workflow or job level: `permissions:\n  security-events: write\n  contents: read`. Re-run.                                            |
+| Upload succeeds on PR but Security tab is empty for the PR head branch      | GitHub only stores PR-scoped alerts when the workflow runs on `pull_request`, not `push`          | Trigger the workflow on `pull_request:` (not only `push:`). Existing `push` runs populate the target branch instead.                             |
+| Findings show on default branch but not on the feature branch               | Same as above — `push` events attach findings to the pushed branch only                           | Push the branch, or add a `pull_request` trigger so the PR head branch gets its own scan.                                                        |
+| Sandbox and live findings collide / one overwrites the other                | Both uploads used the same `category:`                                                            | Give each env a distinct category: `category: money-migration-drift-sandbox` and `-live`. Findings are keyed on `(tool, category, ref)`.         |
+| Fork PR: upload step is skipped with a permissions warning                  | GitHub blocks `security-events: write` for pull requests **from forks** by design                 | Expected. Findings only appear once the PR merges (workflow re-runs on `push` to the default branch) or when run via `pull_request_target`.      |
+| Security tab entirely missing from repo nav                                 | Repo is in an org that disabled Advanced Security, or you lack **Security** permission            | Org owner: **Organization → Settings → Code security** → enable. Individual: ask a maintainer for the **Security manager** role or write access. |
 | Findings visible in the Security tab but no red gutter on **Files changed** | PR annotations only render if the SARIF was uploaded from the **same PR run**, on the PR head SHA | Confirm the workflow ran on the PR (not just `main`). Re-run the workflow on the PR to attach annotations to the current head SHA.               |
-| "This SARIF file was processed" banner but zero results                  | SARIF's `results: []` was empty — clean run, no drift to show                                        | Expected. Re-check locally with `jq '.runs[0].results \| length' diff.sarif`. `0` means nothing to report, not a bug.                            |
-| Findings dated hours ago don't refresh after a re-run                    | Browser cached the Security tab                                                                       | Hard-reload (Cmd/Ctrl-Shift-R). GitHub does not push updates over websocket here.                                                                |
+| "This SARIF file was processed" banner but zero results                     | SARIF's `results: []` was empty — clean run, no drift to show                                     | Expected. Re-check locally with `jq '.runs[0].results \| length' diff.sarif`. `0` means nothing to report, not a bug.                            |
+| Findings dated hours ago don't refresh after a re-run                       | Browser cached the Security tab                                                                   | Hard-reload (Cmd/Ctrl-Shift-R). GitHub does not push updates over websocket here.                                                                |
 
 If none of the above matches, download the `diff.sarif` artifact from
 the workflow run and run the `jq -e` self-check in the "Sample SARIF
@@ -2379,17 +2416,14 @@ If no row has `matches_pr_head: true`, you're in case 1. If the
 matching row has `results_count: 0`, case 3. If it's non-zero but the
 PR shows nothing, jump to cases 4–6.
 
-
-
-
 Rule catalog (always present in the SARIF `tool.driver.rules`, even on
 clean runs):
 
-| Rule ID                         | Fires when                                                        |
-|---------------------------------|-------------------------------------------------------------------|
-| `money-migration-drift`         | A required 14-digit prefix is absent from the target DB.          |
-| `money-migration-malformed`     | A `REQUIRED_MONEY_MIGRATIONS` entry has no 14-digit prefix.       |
-| `money-migration-tooling`       | No DB URL, `psql` missing, or the tracker query failed.           |
+| Rule ID                     | Fires when                                                  |
+| --------------------------- | ----------------------------------------------------------- |
+| `money-migration-drift`     | A required 14-digit prefix is absent from the target DB.    |
+| `money-migration-malformed` | A `REQUIRED_MONEY_MIGRATIONS` entry has no 14-digit prefix. |
+| `money-migration-tooling`   | No DB URL, `psql` missing, or the tracker query failed.     |
 
 Every result is `level: error`, points at
 `supabase/migrations/<file>` (or the manifest for malformed / tooling
@@ -2437,15 +2471,26 @@ jq '{version, schema: ."$schema", runs: (.runs | length),
           "name": "diff-money-migration-prefixes",
           "informationUri": "https://github.com/<owner>/<repo>",
           "rules": [
-            { "id": "money-migration-drift",     "shortDescription": { "text": "Required migration prefix not applied in target DB" } },
-            { "id": "money-migration-malformed", "shortDescription": { "text": "Manifest entry missing a 14-digit prefix" } },
-            { "id": "money-migration-tooling",   "shortDescription": { "text": "DB URL missing, psql missing, or tracker query failed" } }
-          ]
-        }
+            {
+              "id": "money-migration-drift",
+              "shortDescription": { "text": "Required migration prefix not applied in target DB" },
+            },
+            {
+              "id": "money-migration-malformed",
+              "shortDescription": { "text": "Manifest entry missing a 14-digit prefix" },
+            },
+            {
+              "id": "money-migration-tooling",
+              "shortDescription": {
+                "text": "DB URL missing, psql missing, or tracker query failed",
+              },
+            },
+          ],
+        },
       },
-      "results": []   // empty on a clean run — this is valid SARIF, not an error
-    }
-  ]
+      "results": [], // empty on a clean run — this is valid SARIF, not an error
+    },
+  ],
 }
 ```
 
@@ -2457,30 +2502,32 @@ jq '{version, schema: ."$schema", runs: (.runs | length),
   "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/Schemata/sarif-schema-2.1.0.json",
   "runs": [
     {
-      "tool": { "driver": { "name": "diff-money-migration-prefixes", "rules": [ /* …3 rules… */ ] } },
+      "tool": { "driver": { "name": "diff-money-migration-prefixes", "rules": [/* …3 rules… */] } },
       "results": [
         {
           "ruleId": "money-migration-drift",
           "level": "error",
           "message": {
-            "text": "Required money migration not applied in sandbox: prefix 20260715120000 (supabase/migrations/20260715120000_ai_credit_spend.sql)"
+            "text": "Required money migration not applied in sandbox: prefix 20260715120000 (supabase/migrations/20260715120000_ai_credit_spend.sql)",
           },
           "locations": [
             {
               "physicalLocation": {
-                "artifactLocation": { "uri": "supabase/migrations/20260715120000_ai_credit_spend.sql" },
-                "region": { "startLine": 1 }
-              }
-            }
+                "artifactLocation": {
+                  "uri": "supabase/migrations/20260715120000_ai_credit_spend.sql",
+                },
+                "region": { "startLine": 1 },
+              },
+            },
           ],
           "partialFingerprints": {
             "migrationVersion": "20260715120000",
-            "targetEnv": "sandbox"
-          }
-        }
-      ]
-    }
-  ]
+            "targetEnv": "sandbox",
+          },
+        },
+      ],
+    },
+  ],
 }
 ```
 
@@ -2496,8 +2543,6 @@ jq -e '
 ' audit/money-migrations/diff.sarif >/dev/null \
   && echo "SARIF OK" || echo "SARIF INVALID"
 ```
-
-
 
 ##### Using `--github-annotations` locally and in CI
 
@@ -2517,11 +2562,11 @@ inputs as any other invocation of the CLI — nothing extra to prepare:
 
 Annotations map 1:1 to SARIF results:
 
-| Rule                            | `file=` points at                                     |
-|---------------------------------|-------------------------------------------------------|
-| `money-migration-drift`         | `supabase/migrations/<missing-file>.sql`              |
-| `money-migration-malformed`     | `scripts/required-money-migrations.mjs` (manifest)    |
-| `money-migration-tooling`       | `scripts/required-money-migrations.mjs` (manifest)    |
+| Rule                        | `file=` points at                                  |
+| --------------------------- | -------------------------------------------------- |
+| `money-migration-drift`     | `supabase/migrations/<missing-file>.sql`           |
+| `money-migration-malformed` | `scripts/required-money-migrations.mjs` (manifest) |
+| `money-migration-tooling`   | `scripts/required-money-migrations.mjs` (manifest) |
 
 **Local usage.** Annotations render as plain `::error ...::` lines
 outside Actions — useful for a quick eyeball, but the text diff on
@@ -2571,48 +2616,48 @@ Common failure modes and the fastest fix for each. All apply to both
 `scripts/assert-required-money-migrations-applied.mjs` and
 `scripts/diff-money-migration-prefixes.mjs` unless noted.
 
-| Symptom                                                                          | Likely cause                                                        | Quickest fix                                                                                                                          |
-|----------------------------------------------------------------------------------|---------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------|
-| `No DB URL provided` / exit code `2` / SARIF `money-migration-tooling`           | Neither `SUPABASE_DB_URL` nor the env-specific URL is set           | `export SUPABASE_DB_URL_SANDBOX=...` (or `_LIVE`) **and** `export TARGET_ENV=sandbox`. Verify with `env \| grep SUPABASE_DB_URL`.     |
-| `psql: command not found` / `spawn psql ENOENT`                                  | Postgres client not installed or not on `PATH`                      | macOS: `brew install libpq && brew link --force libpq`. Debian/Ubuntu: `sudo apt-get install postgresql-client`. Confirm: `which psql`. |
-| Applied-check reports drift but sandbox is definitely up to date                 | `TARGET_ENV` points at the wrong DB (e.g. `live` while URL is sandbox) | Set `TARGET_ENV` to match the URL variable you exported. Cross-check with `echo $TARGET_ENV` and the `target_env` field in JSON output. |
-| `psql: FATAL: password authentication failed`                                    | Stale or wrong pooler credentials in the DB URL                     | Refresh the connection string; ensure no shell-escaped `$` characters in the password. Test with `psql "$SUPABASE_DB_URL_SANDBOX" -c 'select 1'`. |
-| `Tracker query failed` / SARIF `money-migration-tooling`                          | `supabase_migrations.schema_migrations` unreachable (network, SSL, wrong DB) | Add `?sslmode=require` if the pooler needs it, and confirm the URL points at the Supabase project's Postgres, not a local instance.   |
-| Exit `1` immediately, no drift table                                              | Manifest entry missing a 14-digit prefix (`money-migration-malformed`) | Open `scripts/required-money-migrations.mjs` and confirm each path begins with a 14-digit timestamp. Re-run the unit tests: `bun run test:prefix-diff`. |
-| `mkdir` / `ENOENT` errors when writing diff or redirected SARIF artifacts        | `DIFF_PATH` and shell `>` redirects don't auto-create parent dirs   | `mkdir -p audit/money-migrations` before setting `DIFF_PATH=` or `--sarif > path`. `--sarif-out=PATH` creates parents itself.          |
-| CI green locally, red in Actions                                                  | `SUPABASE_DB_URL_SANDBOX` / `_LIVE` GitHub secrets missing or misnamed | Re-check the exact names in the repo Secrets settings — the workflow only reads those two, not `DATABASE_URL`.                        |
-| Sandbox smoke script hangs                                                       | Missing `SANDBOX_SMOKE_USER` or the user has no Paddle sandbox entitlement | Set `SANDBOX_SMOKE_USER` to a real sandbox account UUID; re-run with `--verbose` to see the checkpoint it stalls on.                  |
-| `Edge shared-lib mirror is out of sync` during `bun run build` / prebuild        | Files under `src/lib` (or imported closure) changed without regenerating `supabase/functions/_shared/lib` and `.sync-manifest.json` | Run `bun run sync-edge-shared`, then `git add supabase/functions/_shared/lib .sync-manifest.json` and commit. Locally, `prebuild` auto-regenerates; in CI (`CI=1` / `--check-only`) it fails closed so drift can't be papered over — commit the sync output and push. |
-
-
+| Symptom                                                                   | Likely cause                                                                                                                        | Quickest fix                                                                                                                                                                                                                                                          |
+| ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `No DB URL provided` / exit code `2` / SARIF `money-migration-tooling`    | Neither `SUPABASE_DB_URL` nor the env-specific URL is set                                                                           | `export SUPABASE_DB_URL_SANDBOX=...` (or `_LIVE`) **and** `export TARGET_ENV=sandbox`. Verify with `env \| grep SUPABASE_DB_URL`.                                                                                                                                     |
+| `psql: command not found` / `spawn psql ENOENT`                           | Postgres client not installed or not on `PATH`                                                                                      | macOS: `brew install libpq && brew link --force libpq`. Debian/Ubuntu: `sudo apt-get install postgresql-client`. Confirm: `which psql`.                                                                                                                               |
+| Applied-check reports drift but sandbox is definitely up to date          | `TARGET_ENV` points at the wrong DB (e.g. `live` while URL is sandbox)                                                              | Set `TARGET_ENV` to match the URL variable you exported. Cross-check with `echo $TARGET_ENV` and the `target_env` field in JSON output.                                                                                                                               |
+| `psql: FATAL: password authentication failed`                             | Stale or wrong pooler credentials in the DB URL                                                                                     | Refresh the connection string; ensure no shell-escaped `$` characters in the password. Test with `psql "$SUPABASE_DB_URL_SANDBOX" -c 'select 1'`.                                                                                                                     |
+| `Tracker query failed` / SARIF `money-migration-tooling`                  | `supabase_migrations.schema_migrations` unreachable (network, SSL, wrong DB)                                                        | Add `?sslmode=require` if the pooler needs it, and confirm the URL points at the Supabase project's Postgres, not a local instance.                                                                                                                                   |
+| Exit `1` immediately, no drift table                                      | Manifest entry missing a 14-digit prefix (`money-migration-malformed`)                                                              | Open `scripts/required-money-migrations.mjs` and confirm each path begins with a 14-digit timestamp. Re-run the unit tests: `bun run test:prefix-diff`.                                                                                                               |
+| `mkdir` / `ENOENT` errors when writing diff or redirected SARIF artifacts | `DIFF_PATH` and shell `>` redirects don't auto-create parent dirs                                                                   | `mkdir -p audit/money-migrations` before setting `DIFF_PATH=` or `--sarif > path`. `--sarif-out=PATH` creates parents itself.                                                                                                                                         |
+| CI green locally, red in Actions                                          | `SUPABASE_DB_URL_SANDBOX` / `_LIVE` GitHub secrets missing or misnamed                                                              | Re-check the exact names in the repo Secrets settings — the workflow only reads those two, not `DATABASE_URL`.                                                                                                                                                        |
+| Sandbox smoke script hangs                                                | Missing `SANDBOX_SMOKE_USER` or the user has no Paddle sandbox entitlement                                                          | Set `SANDBOX_SMOKE_USER` to a real sandbox account UUID; re-run with `--verbose` to see the checkpoint it stalls on.                                                                                                                                                  |
+| `Edge shared-lib mirror is out of sync` during `bun run build` / prebuild | Files under `src/lib` (or imported closure) changed without regenerating `supabase/functions/_shared/lib` and `.sync-manifest.json` | Run `bun run sync-edge-shared`, then `git add supabase/functions/_shared/lib .sync-manifest.json` and commit. Locally, `prebuild` auto-regenerates; in CI (`CI=1` / `--check-only`) it fails closed so drift can't be papered over — commit the sync output and push. |
 
 ##### `--sarif` specific issues
 
 Symptoms and fixes unique to the SARIF output path:
 
-| Symptom                                                                          | Likely cause                                                        | Quickest fix                                                                                                                          |
-|----------------------------------------------------------------------------------|---------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------|
-| `jq: parse error: Invalid numeric literal` when piping `--sarif` into `jq`       | Text diff was mixed into stdout (e.g. `--sarif-out=PATH` was passed, so stdout has the human diff, not JSON) | For piping to `jq`, use `--sarif` **without** `--sarif-out`. Or read the file: `jq . audit/money-migrations/diff.sarif`.              |
-| `jq: error: Cannot iterate over null` on `.runs[0].results[]`                    | Clean run — SARIF has an empty `results: []` array, which is valid  | Guard with `//`: `jq '.runs[0].results // [] \| length'`. Empty results = no drift, not a failure.                                    |
-| `upload-sarif` step: `Path does not exist: audit/money-migrations/diff.sarif`    | You passed `--sarif` (stdout) instead of `--sarif-out=PATH`, or the step exited before the file was written | Always use `--sarif-out=PATH` in CI. Add `if: always()` on the upload step so tooling failures (exit `2`) still upload the SARIF.     |
-| `upload-sarif` rejects the file: `Invalid SARIF file`                            | stdout was redirected on top of workflow-command output, or the file is empty | Use `--sarif-out=PATH` (never `--sarif > path` in CI). Verify locally: `jq '.version, .runs \| length' path/to/diff.sarif`.           |
-| SARIF file exists but code scanning shows **no** findings on a known-drifted DB   | Wrong `category:` on `upload-sarif`, or the file was overwritten by a later clean run | Use a stable `category: money-migration-drift` per env; upload sandbox and live to distinct categories so they don't overwrite.       |
-| Non-zero exit (`1` or `2`) fails the workflow before `upload-sarif` runs         | Default `run:` step short-circuits on non-zero exit                 | Append `\|\| true` to the diff step and gate the real failure on the `upload-sarif` outcome, or put `upload-sarif` under `if: always()`. |
-| Exit `2` with SARIF that only contains a `money-migration-tooling` result        | DB URL missing, `psql` missing, or tracker query failed — no drift was actually evaluated | Fix the tooling cause first (see the main troubleshooting table). Exit `2` is never drift; treat it as infrastructure, not data.      |
-| SARIF `results[].locations[0].physicalLocation.artifactLocation.uri` is a manifest path, not a migration file | Finding is `money-migration-malformed` or `money-migration-tooling` — no specific migration to point at | Expected. Only `money-migration-drift` results point at `supabase/migrations/<file>.sql`.                                             |
-| Duplicate annotations in code scanning after re-running the workflow             | `partialFingerprints` mismatch (e.g. `TARGET_ENV` changed between runs) | Keep `TARGET_ENV` stable per category. The script fingerprints on `(migrationVersion, targetEnv)` — changing either creates a new finding. |
+| Symptom                                                                                                       | Likely cause                                                                                                 | Quickest fix                                                                                                                               |
+| ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `jq: parse error: Invalid numeric literal` when piping `--sarif` into `jq`                                    | Text diff was mixed into stdout (e.g. `--sarif-out=PATH` was passed, so stdout has the human diff, not JSON) | For piping to `jq`, use `--sarif` **without** `--sarif-out`. Or read the file: `jq . audit/money-migrations/diff.sarif`.                   |
+| `jq: error: Cannot iterate over null` on `.runs[0].results[]`                                                 | Clean run — SARIF has an empty `results: []` array, which is valid                                           | Guard with `//`: `jq '.runs[0].results // [] \| length'`. Empty results = no drift, not a failure.                                         |
+| `upload-sarif` step: `Path does not exist: audit/money-migrations/diff.sarif`                                 | You passed `--sarif` (stdout) instead of `--sarif-out=PATH`, or the step exited before the file was written  | Always use `--sarif-out=PATH` in CI. Add `if: always()` on the upload step so tooling failures (exit `2`) still upload the SARIF.          |
+| `upload-sarif` rejects the file: `Invalid SARIF file`                                                         | stdout was redirected on top of workflow-command output, or the file is empty                                | Use `--sarif-out=PATH` (never `--sarif > path` in CI). Verify locally: `jq '.version, .runs \| length' path/to/diff.sarif`.                |
+| SARIF file exists but code scanning shows **no** findings on a known-drifted DB                               | Wrong `category:` on `upload-sarif`, or the file was overwritten by a later clean run                        | Use a stable `category: money-migration-drift` per env; upload sandbox and live to distinct categories so they don't overwrite.            |
+| Non-zero exit (`1` or `2`) fails the workflow before `upload-sarif` runs                                      | Default `run:` step short-circuits on non-zero exit                                                          | Append `\|\| true` to the diff step and gate the real failure on the `upload-sarif` outcome, or put `upload-sarif` under `if: always()`.   |
+| Exit `2` with SARIF that only contains a `money-migration-tooling` result                                     | DB URL missing, `psql` missing, or tracker query failed — no drift was actually evaluated                    | Fix the tooling cause first (see the main troubleshooting table). Exit `2` is never drift; treat it as infrastructure, not data.           |
+| SARIF `results[].locations[0].physicalLocation.artifactLocation.uri` is a manifest path, not a migration file | Finding is `money-migration-malformed` or `money-migration-tooling` — no specific migration to point at      | Expected. Only `money-migration-drift` results point at `supabase/migrations/<file>.sql`.                                                  |
+| Duplicate annotations in code scanning after re-running the workflow                                          | `partialFingerprints` mismatch (e.g. `TARGET_ENV` changed between runs)                                      | Keep `TARGET_ENV` stable per category. The script fingerprints on `(migrationVersion, targetEnv)` — changing either creates a new finding. |
 
 Still stuck? Run the diff CLI with `--json` and share the output — every
 failure mode is annotated with `target_env`, exit code, and the exact
 missing/malformed prefix, which is enough to diagnose without repo access.
 
-
 ## Paddle Craft catalog preflight
 
 `scripts/verify-paddle-craft-catalog.ts` and the
-`.github/workflows/paddle-craft-catalog-preflight.yml` workflow guard
-the Craft plan catalog: they fail closed if `craft_monthly` or
-`craft_annual` is missing or inactive in Paddle sandbox or live.
+`.github/workflows/paddle-craft-catalog-preflight.yml` workflow guard the
+full paid-plan catalog — every id in `PAID_PLAN_IDS` (Pro, Craft, Founder
+Lifetime, and the one-time AI credit packs): they fail closed if any of
+them is missing or inactive in Paddle sandbox or live. Originally scoped
+to Craft only; widened after an audit found Pro — the flagship,
+highest-volume SKU — had no equivalent net.
 
 ### Local usage
 
@@ -2628,11 +2673,11 @@ Required environment variables (read scope is sufficient for both):
 
 ### Exit codes
 
-| Exit | Meaning | CI treatment |
-|------|---------|--------------|
-| `0` | Every required external_id is present and active in the checked env(s). | Pass. |
-| `1` | At least one required id is missing, archived-only, or the Paddle API returned an error (e.g. 4xx/5xx). | Fail. |
-| `2` | Misconfiguration — API key not set for a requested env, or bad flags. | On `pull_request` runs with zero real failures: warn-only (non-blocking) sticky comment. On `schedule` / `workflow_dispatch` runs, or any run with `fail>0`, fails the workflow. |
+| Exit | Meaning                                                                                                 | CI treatment                                                                                                                                                                     |
+| ---- | ------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `0`  | Every required external_id is present and active in the checked env(s).                                 | Pass.                                                                                                                                                                            |
+| `1`  | At least one required id is missing, archived-only, or the Paddle API returned an error (e.g. 4xx/5xx). | Fail.                                                                                                                                                                            |
+| `2`  | Misconfiguration — API key not set for a requested env, or bad flags.                                   | On `pull_request` runs with zero real failures: warn-only (non-blocking) sticky comment. On `schedule` / `workflow_dispatch` runs, or any run with `fail>0`, fails the workflow. |
 
 Exit `2` is **not a pass**. Exit `1` covers Paddle API failures as well
 as missing prices — telling an operator to "create the price" during a
@@ -2641,22 +2686,29 @@ cause (missing / inactive / API error) and picks the remedy accordingly.
 
 ### Extending the allowlist
 
-`REQUIRED_PLAN_IDS` in `scripts/verify-paddle-craft-catalog.ts` is derived
-from `PAID_PLAN_IDS` by external-id **prefix**
-(`GUARDED_EXTERNAL_ID_PREFIXES`, currently `craft_` and `credit_pack_`), so
-a new `craft_*` or `credit_pack_*` SKU added to the allowlist is required by
-this preflight automatically — there is no second list to remember.
+`REQUIRED_PLAN_IDS` in `scripts/verify-paddle-craft-catalog.ts` is assigned
+directly from the full, unfiltered `PAID_PLAN_IDS` — so **any** new id
+added there, on any prefix, is required by this preflight automatically.
+There is no second list to remember and no prefix to update.
 
-> ⚠️ A new plan on a **different** prefix (say `studio_monthly`) is still
-> silently uncovered: it matches no guarded prefix, so the preflight would
-> neither require it nor flag it as a coverage gap, and would keep
-> reporting green while that plan's Paddle price went unverified. Add the
-> prefix to `GUARDED_EXTERNAL_ID_PREFIXES` in the same change that
-> introduces the plan.
+> An earlier version of this preflight filtered `REQUIRED_PLAN_IDS` down to
+> ids matching a `GUARDED_EXTERNAL_ID_PREFIXES` allowlist. That reintroduced
+> the same drift risk one layer down: a new SKU on a prefix nobody
+> remembered to add to that second list would be silently unverified while
+> the preflight kept reporting green — the same failure mode that let Pro
+> ship with no catalog check in the first place. Fixed by requiring the
+> allowlist directly (2026-08, PR #762 review).
 
-The script exits `2` if the prefixes ever match nothing in `PAID_PLAN_IDS`
-— a preflight that verifies zero ids reports green forever, which is worse
-than not having one.
+`GUARDED_EXTERNAL_ID_PREFIXES` still exists, but only for the catalog's own
+coverage-discovery scan — the _opposite_-direction check that flags a plan
+created straight in the Paddle dashboard which our naming convention
+recognises (`pro_`, `craft_`, `founder_`, `credit_pack_`) but that
+`PAID_PLAN_IDS` doesn't know about yet. It does not gate what this
+preflight requires.
+
+The script exits `2` if `PAID_PLAN_IDS` is ever emptied — a preflight that
+verifies zero ids reports green forever, which is worse than not having
+one.
 
 **If the new id is a one-time credit pack, also add it to
 `CREDIT_PACK_IDS`** in the same file. `PAID_PLAN_IDS` is the full
@@ -2687,5 +2739,3 @@ Fork PRs skip the report job (their token is read-only and would 403).
 Comment matching keys on both the hidden marker **and** the
 `github-actions[bot]` login, so a forged marker from a human account
 can't wedge future updates.
-
-

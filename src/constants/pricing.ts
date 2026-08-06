@@ -99,7 +99,7 @@ export const AI_CREDIT_EXPLAINER = {
     "Free users can upgrade when credits are used",
     "Pro, Craft and Founder members can buy one-time credit packs when they need more",
   ],
-  note: "Included AI Doctor credits work today: Free includes 3 per grow; Pro and Founder include 100 per month; Craft includes 300. Out of monthly credits? A one-time AI credit pack tops you up (50 for $9, 150 for $19) — packs never expire and are spent only after your monthly allowance.",
+  note: "Included AI Doctor credits work today: Free includes 3 per grow; Pro and Founder include 100 per month; Craft includes 300. Pro, Craft and Founder members who are out of monthly credits can buy a one-time top-up pack (50 for $9, 150 for $19) — packs never expire and are spent only after the monthly allowance.",
 } as const;
 
 /**

@@ -183,6 +183,16 @@ describe("Pricing credit-pack entitlement gate", () => {
     expect(mocks.openCheckout).not.toHaveBeenCalled();
   });
 
+  it("never pitches a purchase a Free viewer cannot complete", () => {
+    // Regression: the "Out of monthly credits? Buy a one-time pack." subhead
+    // used to render unconditionally, above the (correct) blocked-reason
+    // copy — so a signed-in Free grower read a purchase pitch immediately
+    // followed by the explanation of why they can't act on it. Gated on
+    // creditPackGate.kind === "allowed" per the 2026-08 checkout-funnel audit.
+    renderPricing();
+    expect(screen.queryByText(/Buy a one-time pack/i)).toBeNull();
+  });
+
   it.each([
     ["pro_monthly", "lovable_paddle_subscription"],
     ["craft_annual", "lovable_paddle_subscription"],
@@ -196,6 +206,7 @@ describe("Pricing credit-pack entitlement gate", () => {
       "data-gate-kind",
       "allowed",
     );
+    expect(screen.getByText(/Buy a one-time pack/i)).toBeInTheDocument();
     const buyButton = screen.getByTestId("pricing-cta-credit_pack_50");
     expect(buyButton).toBeEnabled();
     await user.click(buyButton);
@@ -210,6 +221,7 @@ describe("Pricing credit-pack entitlement gate", () => {
       "data-gate-kind",
       "pending",
     );
+    expect(screen.queryByText(/Buy a one-time pack/i)).toBeNull();
     expect(screen.getByTestId("pricing-cta-credit_pack_50")).toBeDisabled();
     expect(screen.getByTestId("pricing-cta-credit_pack_50")).toHaveTextContent(/Checking plan/i);
   });
@@ -222,6 +234,7 @@ describe("Pricing credit-pack entitlement gate", () => {
     expect(screen.getByTestId("pricing-credit-pack-gate")).toHaveTextContent(
       /couldn't confirm your plan/i,
     );
+    expect(screen.queryByText(/Buy a one-time pack/i)).toBeNull();
     expect(screen.getByTestId("pricing-cta-credit_pack_150")).toBeDisabled();
     expect(mocks.openCheckout).not.toHaveBeenCalled();
   });

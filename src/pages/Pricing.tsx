@@ -891,10 +891,12 @@ export default function Pricing() {
         >
           Top up AI Doctor credits
         </h2>
-        <p className="mt-3 text-sm text-muted-foreground text-center max-w-2xl mx-auto">
-          Out of monthly credits? Buy a one-time pack. Packs never expire and are spent only after
-          your included monthly allowance.
-        </p>
+        {creditPackGate.kind === "allowed" && (
+          <p className="mt-3 text-sm text-muted-foreground text-center max-w-2xl mx-auto">
+            Out of monthly credits? Buy a one-time pack. Packs never expire and are spent only after
+            your included monthly allowance.
+          </p>
+        )}
         <p
           data-testid="pricing-credit-pack-gate"
           data-gate-kind={creditPackGate.kind}

@@ -481,13 +481,12 @@ function MemoryRouterProvider({ children, initialEntries, initialIndex }: Legacy
     );
   }, [entriesKey, index]);
 
-  // Mirror Transitioner's history wiring (see @tanstack/react-router Transitioner):
-  //   history.subscribe(router.load) + initial load on mount.
-  // Without this, commitLocation sees zero history subscribers and may load
-  // once, but back/forward and some navigations won't refresh useRouterState.
+  // Keep the history subscription that navigation needs. The memory history
+  // already owns the initial location, and the compatibility matcher reads it
+  // directly; calling router.load() again after mount schedules a redundant
+  // store update outside Testing Library's render act() boundary.
   useEffect(() => {
     const unsub = router.history.subscribe(router.load);
-    void router.load();
     return unsub;
   }, [router]);
 

@@ -735,6 +735,7 @@ export default function PlantDetail() {
               tentId={plant.tentId ?? null}
               tentName={tent?.name ?? null}
               growId={plant.growId ?? null}
+              plantId={plant.id}
             />
           </div>
           <div

@@ -1,5 +1,5 @@
-import { useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useGrows } from "@/store/grows";
@@ -34,6 +34,12 @@ import AiCreditRemainingBadge from "@/components/AiCreditRemainingBadge";
 import AiCreditServiceDegradedNotice from "@/components/AiCreditServiceDegradedNotice";
 import { adaptCreditedAiResponse } from "@/lib/aiCreditedResponseAdapter";
 import type { AiCreditDenial } from "@/lib/aiCreditLimitNoticeViewModel";
+import { getAlertById } from "@/lib/alerts";
+import {
+  COACH_ALERT_ID_PARAM,
+  buildCoachAlertPrefillQuestion,
+  normalizeCoachAlertIdParam,
+} from "@/lib/coachAlertPrefill";
 
 type Mode = "diagnose" | "next_steps";
 
@@ -87,6 +93,37 @@ export default function Coach() {
   const [creditDenial, setCreditDenial] = useState<AiCreditDenial | null>(null);
   const [upstreamCreditExhausted, setUpstreamCreditExhausted] = useState(false);
   const diagnosisSeqRef = useRef(0);
+
+  // --- Optional alert-context prefill (`?alertId=...`) ---
+  // Alert surfaces (e.g. the Plant Detail assigned-tent alerts panel) link
+  // here with the alert id. Read the grower's own alert row via the
+  // RLS-scoped alerts lib and prefill the question textarea — only while it
+  // is still empty, so typed input is never clobbered. The grower reviews
+  // and explicitly presses Ask; navigation alone never fires an AI request
+  // and never spends credits.
+  const [searchParams] = useSearchParams();
+  const alertIdParam = searchParams.get(COACH_ALERT_ID_PARAM);
+  useEffect(() => {
+    const alertId = normalizeCoachAlertIdParam(alertIdParam);
+    if (!alertId) return;
+    let cancelled = false;
+    void getAlertById(alertId)
+      .then((row) => {
+        if (cancelled || !row) return;
+        const prefill = buildCoachAlertPrefillQuestion({
+          title: row.title,
+          reason: row.reason,
+        });
+        if (!prefill) return;
+        setQuestion((q) => (q.trim().length > 0 ? q : prefill));
+      })
+      .catch(() => {
+        /* alert unavailable — leave the form untouched */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [alertIdParam]);
 
   // --- Real grow context for AI sufficiency evaluation (presenter only) ---
   const { data: ctxPlants = [] } = useGrowPlants(undefined, activeGrowId ?? undefined);

@@ -37,6 +37,8 @@ import type { AiCreditDenial } from "@/lib/aiCreditLimitNoticeViewModel";
 import { getAlertById } from "@/lib/alerts";
 import {
   COACH_ALERT_ID_PARAM,
+  appendAlertBackPointerToken,
+  appendSessionBackPointerToken,
   buildCoachAlertPrefillQuestion,
   normalizeCoachAlertIdParam,
 } from "@/lib/coachAlertPrefill";
@@ -101,20 +103,38 @@ export default function Coach() {
   // is still empty, so typed input is never clobbered. The grower reviews
   // and explicitly presses Ask; navigation alone never fires an AI request
   // and never spends credits.
+  //
+  // Scope guard: the prefill only binds when the alert belongs to the grow
+  // Coach will actually analyze (and debit). A cross-grow alert leaves the
+  // form untouched rather than mixing another grow's diary/sensor evidence
+  // into this ask. The validated alert's DB-stored scope (id, tent, plant)
+  // is kept so the persisted session and queued suggestions can carry the
+  // linkage; the nav param is never trusted for scope.
   const [searchParams] = useSearchParams();
   const alertIdParam = searchParams.get(COACH_ALERT_ID_PARAM);
+  const [alertContext, setAlertContext] = useState<{
+    id: string;
+    tentId: string | null;
+    plantId: string | null;
+  } | null>(null);
   useEffect(() => {
     const alertId = normalizeCoachAlertIdParam(alertIdParam);
-    if (!alertId) return;
+    if (!alertId || !activeGrowId) return;
     let cancelled = false;
     void getAlertById(alertId)
       .then((row) => {
         if (cancelled || !row) return;
+        if (row.grow_id !== activeGrowId) return;
         const prefill = buildCoachAlertPrefillQuestion({
           title: row.title,
           reason: row.reason,
         });
         if (!prefill) return;
+        setAlertContext({
+          id: row.id,
+          tentId: row.tent_id ?? null,
+          plantId: row.plant_id ?? null,
+        });
         setQuestion((q) => (q.trim().length > 0 ? q : prefill));
       })
       .catch(() => {
@@ -123,7 +143,7 @@ export default function Coach() {
     return () => {
       cancelled = true;
     };
-  }, [alertIdParam]);
+  }, [alertIdParam, activeGrowId]);
 
   // --- Real grow context for AI sufficiency evaluation (presenter only) ---
   const { data: ctxPlants = [] } = useGrowPlants(undefined, activeGrowId ?? undefined);
@@ -246,11 +266,23 @@ export default function Coach() {
         action_type: action.type === "task" ? "task" : "advisory",
         target_metric: "general",
         suggested_change: `${action.title}: ${action.detail}`,
-        reason:
-          action.reason ||
-          diagnosis.likelyIssue ||
-          diagnosis.summary ||
-          "AI Doctor suggestion",
+        // When this ask was seeded from a grow-validated alert, append the
+        // session + alert back-pointer tokens (composed in the pure lib —
+        // no token literal appears in this file) so the existing read
+        // surfaces light up: AlertDetail back-link, Alerts-index
+        // linked-action badge, session-detail linked alert. Display paths
+        // strip tokens before rendering. Both helpers no-op on
+        // null/invalid ids.
+        reason: appendAlertBackPointerToken(
+          appendSessionBackPointerToken(
+            action.reason ||
+              diagnosis.likelyIssue ||
+              diagnosis.summary ||
+              "AI Doctor suggestion",
+            persistedSessionId,
+          ),
+          alertContext?.id ?? null,
+        ),
         risk_level: risk,
         source: ACTION_QUEUE_SOURCE_VALUES.AI_DOCTOR,
         status: "pending_approval",
@@ -355,8 +387,10 @@ export default function Coach() {
         // Fire-and-forget; we intentionally do not await before clearing busy.
         void persistAiDoctorSession(supabase, {
           growId: activeGrowId,
-          tentId: null,
-          plantId: null,
+          // Scope hints from the grow-validated source alert when this ask
+          // was seeded by one (DB-stored values, never the nav param).
+          tentId: alertContext?.tentId ?? null,
+          plantId: alertContext?.plantId ?? null,
           question: question.trim() || null,
           analysis: d.analysis ?? null,
           diagnosis: sanitized,

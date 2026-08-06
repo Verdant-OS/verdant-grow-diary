@@ -295,6 +295,49 @@ function entryKinds(e: Entry): EventFilter[] {
   return kinds;
 }
 
+/**
+ * Resolve grow_event parents that loaded diary companions reference but no
+ * prior fetch returned — deleted (filtered by the primary page's is_deleted
+ * clause) or simply outside that page's own date/limit bound. The exact-id
+ * lookup carries no is_deleted or date filter: an id fetch has no window to
+ * fall outside of. Shared by the initial load and every loadOlder page so
+ * collapseQuickLogSaveFanOut can always tell "known gone" apart from "never
+ * fetched". `onResolved`/`onPartial` own their scope-currency guards and the
+ * merge into the supplemental collapse-only state.
+ */
+async function resolveMissingLinkedGrowEventParents(input: {
+  growId: string;
+  diaryRows: ReadonlyArray<{ id: string; details?: unknown }>;
+  knownGrowEvents: ReadonlyArray<GrowEventRowForRecent>;
+  isCurrent: () => boolean;
+  onResolved: (rows: GrowEventRowForRecent[]) => void;
+  onPartial: () => void;
+}): Promise<void> {
+  const missingLinkedGrowEventIds = findMissingLinkedGrowEventIds({
+    diaryEntries: input.diaryRows.map((row) => ({
+      id: row.id,
+      details: (row.details ?? null) as Record<string, unknown> | null,
+    })),
+    growEvents: input.knownGrowEvents,
+  });
+  if (missingLinkedGrowEventIds.length === 0) return;
+  try {
+    const linkedResult = await supabase
+      .from("grow_events")
+      .select(ROOT_ZONE_GROW_EVENT_SELECT)
+      .eq("grow_id", input.growId)
+      .in("id", missingLinkedGrowEventIds);
+    if (!input.isCurrent()) return;
+    if (linkedResult.error || !Array.isArray(linkedResult.data)) {
+      input.onPartial();
+      return;
+    }
+    input.onResolved(linkedResult.data as unknown as GrowEventRowForRecent[]);
+  } catch {
+    input.onPartial();
+  }
+}
+
 export default function Timeline() {
   const temperatureUnit = useTemperatureUnitPreference();
   const authUser = useAuth().user;
@@ -619,6 +662,12 @@ export default function Timeline() {
       setGrowEventsTotal(
         typeof growEventsResult.count === "number" ? growEventsResult.count : null,
       );
+      // Cleared unconditionally with every fresh core commit: rows resolved
+      // for a previous grow/date scope must never survive into this one —
+      // not while the new lookup below is in flight, and not indefinitely
+      // when that lookup fails (the partial-source disclosure covers the
+      // gap; stale cross-scope evidence must not).
+      setSupplementalLinkedGrowEvents([]);
       setActionEvents([]);
       setAlertEvents([]);
       setPartialReadSources([]);
@@ -636,43 +685,25 @@ export default function Timeline() {
       // exact page's `growEvents` fetch doesn't include — deleted (filtered
       // by is_deleted above) or simply outside this page's own date/limit
       // bound while the independently-bounded diary fetch still includes
-      // the companion. Resolve exactly those referenced-but-missing ids by
-      // id (no is_deleted or date filter — an exact-id lookup has no
-      // window to fall outside of) so collapseQuickLogSaveFanOut can tell
-      // "known gone" apart from "never fetched" instead of guessing from a
-      // primary page that was never meant to be exhaustive.
-      const missingLinkedGrowEventIds = findMissingLinkedGrowEventIds({
-        diaryEntries: coreRows.map((row) => ({
-          id: row.id,
-          details: (row.details ?? null) as Record<string, unknown> | null,
-        })),
-        growEvents: nextGrowEvents,
-      });
-      if (missingLinkedGrowEventIds.length > 0) {
-        supplementalTasks.push(
-          (async () => {
-            try {
-              const linkedResult = await supabase
-                .from("grow_events")
-                .select(ROOT_ZONE_GROW_EVENT_SELECT)
-                .eq("grow_id", activeGrowId)
-                .in("id", missingLinkedGrowEventIds);
-              if (!isCurrentRequest()) return;
-              if (linkedResult.error || !Array.isArray(linkedResult.data)) {
-                markPartial("linked_grow_events");
-                return;
-              }
-              setSupplementalLinkedGrowEvents(
-                linkedResult.data as unknown as GrowEventRowForRecent[],
-              );
-            } catch {
-              markPartial("linked_grow_events");
-            }
-          })(),
-        );
-      } else {
-        setSupplementalLinkedGrowEvents([]);
-      }
+      // the companion. Resolve exactly those referenced-but-missing ids so
+      // collapseQuickLogSaveFanOut can tell "known gone" apart from "never
+      // fetched" instead of guessing from a primary page that was never
+      // meant to be exhaustive.
+      supplementalTasks.push(
+        resolveMissingLinkedGrowEventParents({
+          growId: activeGrowId,
+          diaryRows: coreRows,
+          knownGrowEvents: nextGrowEvents,
+          isCurrent: isCurrentRequest,
+          onResolved: (rows) =>
+            setSupplementalLinkedGrowEvents((current) => {
+              const seen = new Set(current.map((row) => row.id));
+              const extra = rows.filter((row) => !seen.has(row.id));
+              return extra.length === 0 ? current : [...current, ...extra];
+            }),
+          onPartial: () => markPartial("linked_grow_events"),
+        }),
+      );
 
       if (paths.length > 0) {
         supplementalTasks.push(
@@ -841,6 +872,28 @@ export default function Timeline() {
         setEntries((prev) => {
           const seen = new Set(prev.map((e) => e.id));
           return [...prev, ...older.filter((e) => !seen.has(e.id))];
+        });
+        // Older diary pages can reference parents no prior fetch returned
+        // (deleted, or outside the newest-100 grow_events page). Resolve
+        // them exactly like the initial load so the collapse never mistakes
+        // a known-gone parent for never-fetched on paginated companions.
+        await resolveMissingLinkedGrowEventParents({
+          growId: requestedGrowId,
+          diaryRows: older,
+          knownGrowEvents: [...growEvents, ...supplementalLinkedGrowEvents],
+          isCurrent: isCurrentPage,
+          onResolved: (rows) =>
+            setSupplementalLinkedGrowEvents((current) => {
+              const seen = new Set(current.map((row) => row.id));
+              const extra = rows.filter((row) => !seen.has(row.id));
+              return extra.length === 0 ? current : [...current, ...extra];
+            }),
+          onPartial: () => {
+            if (!isCurrentPage()) return;
+            setPartialReadSources((current) =>
+              mergeTimelinePartialSources(current, ["linked_grow_events"]),
+            );
+          },
         });
       }
     } catch {

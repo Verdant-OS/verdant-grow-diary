@@ -284,13 +284,21 @@ test.describe("Plant Detail Symptom Check — local mocked branch proof", () => 
 
     // SSR/first-hydration guard: this navigation restores a session BEFORE the
     // protected route hydrates — the exact race where a server render
-    // (loading state) and a client render (resolved shell) can diverge. React
-    // recovers from such a mismatch by discarding the SSR tree, so the page
-    // still "works" and no assertion below would notice; the pageerror stream
-    // is the only reliable signal. Guards AppShell's hydration gate.
+    // (loading state) and a client render (resolved shell) can diverge.
+    // Recoverable mismatches surface as CONSOLE diagnostics (React's
+    // onRecoverableError path), not uncaught page exceptions — a mismatch can
+    // recover, render the expected shell, and leave pageerror empty. Capture
+    // both streams so the guard actually exercises the regression it exists
+    // for. Guards AppShell's hydration gate.
     const pageErrors: string[] = [];
     page.on("pageerror", (error) => {
       pageErrors.push(String(error && error.message ? error.message : error));
+    });
+    const consoleDiagnostics: string[] = [];
+    page.on("console", (message) => {
+      if (message.type() === "error" || message.type() === "warning") {
+        consoleDiagnostics.push(message.text());
+      }
     });
 
     await page.goto(`/plants/${FAKE_PLANT_ID}`);
@@ -301,9 +309,12 @@ test.describe("Plant Detail Symptom Check — local mocked branch proof", () => 
       page.getByRole("heading", { name: "This page ran into an unexpected error", exact: true }),
     ).not.toBeVisible();
 
-    const hydrationErrors = pageErrors.filter((message) => /hydrat/i.test(message));
+    const allDiagnostics = [...pageErrors, ...consoleDiagnostics];
+    const hydrationErrors = allDiagnostics.filter((message) => /hydrat/i.test(message));
     expect(hydrationErrors, "recoverable hydration mismatches must not occur").toEqual([]);
-    const updateDepthErrors = pageErrors.filter((message) => /Maximum update depth/i.test(message));
+    const updateDepthErrors = allDiagnostics.filter((message) =>
+      /Maximum update depth/i.test(message),
+    );
     expect(updateDepthErrors, "render/navigation loops must not occur").toEqual([]);
   });
 

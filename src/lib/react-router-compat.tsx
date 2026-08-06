@@ -131,6 +131,25 @@ function flattenTo(to: CompatTo): string {
 }
 
 /**
+ * Split a react-router-style path string into TanStack navigation options.
+ *
+ * TanStack reads fragments only from the separate `hash` option; a `#` left
+ * inside `to` rides into the COMMITTED pathname (`buildLocation` never
+ * re-splits it), so `/hunts/55/workspace#notes` pollutes router state — the
+ * page "works" only because the history layer happens to re-parse the pushed
+ * href at `#` on commit. A bare-fragment string (`#notes`) targets the
+ * current route (`.`), matching react-router semantics.
+ */
+function toTanStackTarget(path: string): { to: string; hash?: string } {
+  const hashIndex = path.indexOf("#");
+  if (hashIndex === -1) return { to: path };
+  return {
+    to: hashIndex === 0 ? "." : path.slice(0, hashIndex),
+    hash: path.slice(hashIndex + 1),
+  };
+}
+
+/**
  * react-router `useNavigate()`. Supports `navigate("/path", { replace })`,
  * the `{ pathname, search, hash }` object form, and history-delta calls such
  * as `navigate(-1)`.
@@ -150,8 +169,10 @@ export function useNavigate(): CompatNavigateFunction {
         else router.history.forward();
         return;
       }
+      const target = toTanStackTarget(flattenTo(to));
       void navigate({
-        to: flattenTo(to),
+        to: target.to,
+        ...(target.hash !== undefined ? { hash: target.hash } : {}),
         replace: options?.replace ?? false,
         ...(options?.state !== undefined ? { state: options.state as never } : {}),
         resetScroll: options?.preventScrollReset !== true,
@@ -199,10 +220,12 @@ export const Link = forwardRef<HTMLAnchorElement, CompatLinkProps>(function Link
       </a>
     );
   }
+  const target = toTanStackTarget(to);
   return (
     <TanStackLink
       ref={ref}
-      to={to as never}
+      to={target.to as never}
+      {...(target.hash !== undefined ? { hash: target.hash } : {})}
       replace={replace ?? false}
       {...(state !== undefined ? { state: state as never } : {})}
       resetScroll={preventScrollReset !== true}
@@ -333,9 +356,12 @@ export function useSearchParams(): [URLSearchParams, CompatSetSearchParams] {
     // navigation is pending, building the next URL from the in-flight
     // target would move the wrong page's search params.
     const { pathname, hash } = selectCommittedLocation(router.state);
-    const suffix = `${serialized ? `?${serialized}` : ""}${hash ? (hash.startsWith("#") ? hash : `#${hash}`) : ""}`;
+    const normalizedHash = hash ? hash.replace(/^#/, "") : undefined;
     void router.navigate({
-      to: `${pathname}${suffix}` as never,
+      to: `${pathname}${serialized ? `?${serialized}` : ""}` as never,
+      // Keep the fragment in TanStack's dedicated option — inside `to` it
+      // would ride into the committed pathname (see toTanStackTarget).
+      ...(normalizedHash ? { hash: normalizedHash } : {}),
       replace: options?.replace ?? false,
       resetScroll: options?.preventScrollReset !== true,
     } as never);

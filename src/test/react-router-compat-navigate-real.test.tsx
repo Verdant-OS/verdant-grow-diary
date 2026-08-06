@@ -16,7 +16,8 @@
  * bypasses that alias on purpose — do not "clean it up" to `@/`.
  */
 import { describe, expect, it, vi, afterEach } from "vitest";
-import { render, screen, cleanup, waitFor } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react";
+import { useEffect } from "react";
 import {
   RouterProvider,
   createMemoryHistory,
@@ -24,7 +25,16 @@ import {
   createRoute,
   createRouter,
 } from "@tanstack/react-router";
-import { Navigate, Outlet, useLocation } from "../lib/react-router-compat";
+import {
+  Link,
+  MemoryRouter,
+  Navigate,
+  Outlet,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+} from "../lib/react-router-compat";
 
 /**
  * Mirrors src/components/RouteAliasRedirect.tsx: the useLocation() call
@@ -103,5 +113,106 @@ describe("react-router-compat Navigate (real product shim)", () => {
     });
     // replace: the /features entry must not linger behind the target.
     expect(router.history.length).toBe(1);
+  });
+
+  it("legacy MemoryRouter context: Navigate redirects without a TanStack provider", async () => {
+    // The PRIMARY #740 fix: Navigate must not call a TanStack hook when the
+    // module's own legacy router context is active — there is no TanStack
+    // provider here, so an unconditional useTanStackNavigate() throws.
+    render(
+      <MemoryRouter initialEntries={["/features"]}>
+        <Routes>
+          <Route path="/features" element={<Navigate to="/welcome" replace />} />
+          <Route path="/welcome" element={<div data-testid="legacy-welcome">welcome</div>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(await screen.findByTestId("legacy-welcome")).toBeTruthy();
+  });
+});
+
+describe("react-router-compat fragment handling (real product shim)", () => {
+  const mounts = { count: 0 };
+
+  function Workspace() {
+    useEffect(() => {
+      mounts.count += 1;
+    }, []);
+    const nav = useNavigate();
+    return (
+      <div data-testid="workspace-page">
+        <Link to="/hunts/55/workspace#notes" data-testid="fragment-link">
+          Record notes
+        </Link>
+        <button
+          type="button"
+          data-testid="fragment-nav-button"
+          onClick={() => nav("/hunts/55/workspace#notes")}
+        >
+          navigate with fragment
+        </button>
+      </div>
+    );
+  }
+
+  function buildWorkspaceRouter() {
+    const rootRoute = createRootRoute({ component: () => <Outlet /> });
+    const workspaceRoute = createRoute({
+      getParentRoute: () => rootRoute,
+      path: "/hunts/$id/workspace",
+      component: Workspace,
+    });
+    return createRouter({
+      routeTree: rootRoute.addChildren([workspaceRoute]),
+      history: createMemoryHistory({ initialEntries: ["/hunts/55/workspace"] }),
+    });
+  }
+
+  it("useNavigate splits '/path#hash' into TanStack's to + hash options", async () => {
+    // The census hang investigation found compat Link/useNavigate forwarding
+    // the raw '/path#hash' string as TanStack `to`; TanStack reads fragments
+    // only from its dedicated `hash` option, so the '#' rode into the built
+    // pathname. This spy-shape assertion discriminates the fix directly.
+    const router = buildWorkspaceRouter();
+    const navigateSpy = vi.spyOn(router, "navigate");
+    render(<RouterProvider router={router} />);
+    fireEvent.click(await screen.findByTestId("fragment-nav-button"));
+
+    await waitFor(() => {
+      const fragmentCalls = navigateSpy.mock.calls.filter((call) => {
+        const options = call[0] as { to?: string; hash?: string } | undefined;
+        return typeof options?.to === "string" && options.to.startsWith("/hunts");
+      });
+      expect(fragmentCalls).toHaveLength(1);
+      const options = fragmentCalls[0]?.[0] as { to?: string; hash?: string };
+      expect(options.to).toBe("/hunts/55/workspace");
+      expect(options.to).not.toContain("#");
+      expect(options.hash).toBe("notes");
+    });
+  });
+
+  it("clicking a same-page fragment Link commits a clean pathname + hash, no remount, no loop", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const router = buildWorkspaceRouter();
+    render(<RouterProvider router={router} />);
+    await screen.findByTestId("workspace-page");
+    const mountsBefore = mounts.count;
+
+    fireEvent.click(await screen.findByTestId("fragment-link"));
+
+    await waitFor(() => {
+      expect(router.state.location.hash).toBe("notes");
+    });
+    expect(router.state.location.pathname).toBe("/hunts/55/workspace");
+    expect(router.state.location.pathname).not.toContain("#");
+    expect(router.state.status).toBe("idle");
+    // Same-route fragment navigation must not remount the page component —
+    // a remount is what detached the census's clicked anchor mid-action.
+    expect(mounts.count).toBe(mountsBefore);
+
+    const updateDepthErrors = consoleError.mock.calls.filter((call) =>
+      call.some((arg) => typeof arg === "string" && arg.includes("Maximum update depth")),
+    );
+    expect(updateDepthErrors).toHaveLength(0);
   });
 });

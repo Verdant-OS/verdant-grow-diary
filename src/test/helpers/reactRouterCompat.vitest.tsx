@@ -160,6 +160,17 @@ function flattenTo(to: CompatTo): string {
   return `${to.pathname ?? ""}${search}${hash}`;
 }
 
+// Mirrors the product shim: TanStack reads fragments only from its dedicated
+// `hash` option; a '#' left inside `to` rides into the committed pathname.
+function toTanStackTarget(path: string): { to: string; hash?: string } {
+  const hashIndex = path.indexOf("#");
+  if (hashIndex === -1) return { to: path };
+  return {
+    to: hashIndex === 0 ? "." : path.slice(0, hashIndex),
+    hash: path.slice(hashIndex + 1),
+  };
+}
+
 /**
  * react-router `useNavigate()`. Supports `navigate("/path", { replace })`,
  * the `{ pathname, search, hash }` object form, and history-delta calls such
@@ -181,8 +192,10 @@ export function useNavigate(): CompatNavigateFunction {
         else router.history.forward();
         return;
       }
+      const target = toTanStackTarget(flattenTo(to));
       void navigate({
-        to: flattenTo(to),
+        to: target.to,
+        ...(target.hash !== undefined ? { hash: target.hash } : {}),
         replace: options?.replace ?? false,
         ...(options?.state !== undefined ? { state: options.state as never } : {}),
         resetScroll: options?.preventScrollReset !== true,
@@ -205,10 +218,12 @@ export const Link = forwardRef<HTMLAnchorElement, CompatLinkProps>(function Link
   { to, replace, state, preventScrollReset, children, ...rest },
   ref,
 ) {
+  const target = toTanStackTarget(to);
   return (
     <TanStackLink
       ref={ref}
-      to={to as never}
+      to={target.to as never}
+      {...(target.hash !== undefined ? { hash: target.hash } : {})}
       replace={replace ?? false}
       {...(state !== undefined ? { state: state as never } : {})}
       resetScroll={preventScrollReset !== true}
@@ -306,9 +321,10 @@ export function useSearchParams(): [URLSearchParams, CompatSetSearchParams] {
           : new URLSearchParams(resolved).toString();
     // Setter operates from the COMMITTED page location (mirrors production).
     const { pathname, hash } = selectCommittedLocation(router.state);
-    const suffix = `${serialized ? `?${serialized}` : ""}${hash ? (hash.startsWith("#") ? hash : `#${hash}`) : ""}`;
+    const normalizedHash = hash ? hash.replace(/^#/, "") : undefined;
     void router.navigate({
-      to: `${pathname}${suffix}` as never,
+      to: `${pathname}${serialized ? `?${serialized}` : ""}` as never,
+      ...(normalizedHash ? { hash: normalizedHash } : {}),
       replace: options?.replace ?? false,
       resetScroll: options?.preventScrollReset !== true,
     } as never);

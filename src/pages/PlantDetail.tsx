@@ -22,6 +22,7 @@ import PlantStatusStrip from "@/components/PlantStatusStrip";
 import QuickLogV2Fab from "@/components/QuickLogV2Fab";
 import PlantQuickStatusStrip from "@/components/PlantQuickStatusStrip";
 import PlantLogStreakMarker from "@/components/PlantLogStreakMarker";
+import AiDoctorCreditsExhaustedTeaser from "@/components/AiDoctorCreditsExhaustedTeaser";
 import PlantDetailQuickActions from "@/components/PlantDetailQuickActions";
 import PlantGrowContextRescueCard from "@/components/PlantGrowContextRescueCard";
 import PlantDetailPhotoStrip from "@/components/PlantDetailPhotoStrip";
@@ -386,6 +387,7 @@ export default function PlantDetail() {
         growId={plant.growId ?? null}
       />
       <PlantLogStreakMarker plantId={plant.id} />
+      <AiDoctorCreditsExhaustedTeaser growId={plant.growId ?? null} />
       <PlantDetailQuickActions
         plantId={plant.id}
         plantName={plant.name}

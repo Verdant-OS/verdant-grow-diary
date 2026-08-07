@@ -1,0 +1,118 @@
+{
+  "generated_at": "2026-08-07T23:27:31.449Z",
+  "started_at": "2026-08-07T23:26:57.315Z",
+  "method": "NON_TRANSMITTING_INTERCEPTED_BROWSER_COLLECTION",
+  "production_host": "https://verdantgrowdiary.com",
+  "measurement_id_expected": "G-MCXQ9GVS5H",
+  "version": {
+    "version": "0.0.0+20260807.a21afd5c1e44",
+    "packageVersion": "0.0.0",
+    "commit": "a21afd5c1e4467334e714e6898ee4cf2ec2f1d0e",
+    "shortCommit": "a21afd5c1e44",
+    "ref": "__orphan__",
+    "tag": null,
+    "commitTime": "2026-08-07T22:23:29Z",
+    "buildTime": "2026-08-07T22:31:05.591Z",
+    "dirty": false,
+    "ciRunId": null,
+    "ciRunUrl": null,
+    "commitSource": "git",
+    "treeHash": "1a2ea49c220c1e0b2b1f55f5954a94805640548bfd972332d1203fc4f8d1503d",
+    "treeHashShort": "1a2ea49c220c",
+    "treeHashError": null,
+    "inherited": null
+  },
+  "public_probe": {
+    "/guides/cannabis-grow-light-distance-and-schedule": 200,
+    "/guides/cannabis-light-stress-light-burn-bleaching-or-heat": 200,
+    "/sitemap.xml": 200,
+    "/robots.txt": 200,
+    "/version.json": 200
+  },
+  "sitemap": {
+    "loc_count": 55,
+    "distance_occurrences": 1,
+    "stress_occurrences": 1
+  },
+  "navigation_states": [
+    {
+      "state": "1_direct_deep_link_distance",
+      "url": "https://verdantgrowdiary.com/guides/cannabis-grow-light-distance-and-schedule",
+      "title": "Cannabis Grow Light Distance, PPFD & DLI Guide | Verdant",
+      "page_views_delta": 0,
+      "total_page_views_after": 0
+    },
+    {
+      "state": "2_refresh_distance",
+      "url": "https://verdantgrowdiary.com/guides/cannabis-grow-light-distance-and-schedule",
+      "title": "Cannabis Grow Light Distance, PPFD & DLI Guide | Verdant",
+      "page_views_delta": 0,
+      "total_page_views_after": 0
+    },
+    {
+      "state": "3_cross_guide_to_stress",
+      "url": "https://verdantgrowdiary.com/guides/cannabis-light-stress-light-burn-bleaching-or-heat",
+      "title": "Cannabis Light Stress: Burn, Bleaching, or Heat? | Verdant",
+      "page_views_delta": 0,
+      "total_page_views_after": 0
+    },
+    {
+      "state": "4_cross_guide_to_distance",
+      "url": "https://verdantgrowdiary.com/guides/cannabis-grow-light-distance-and-schedule",
+      "title": "Cannabis Grow Light Distance, PPFD & DLI Guide | Verdant",
+      "page_views_delta": 0,
+      "total_page_views_after": 0
+    },
+    {
+      "state": "5_history_back",
+      "url": "https://verdantgrowdiary.com/guides/cannabis-grow-light-distance-and-schedule",
+      "title": "Cannabis Grow Light Distance, PPFD & DLI Guide | Verdant",
+      "page_views_delta": 0,
+      "total_page_views_after": 0
+    },
+    {
+      "state": "6_history_forward",
+      "url": "https://verdantgrowdiary.com/guides/cannabis-light-stress-light-burn-bleaching-or-heat",
+      "title": "Cannabis Light Stress: Burn, Bleaching, or Heat? | Verdant",
+      "page_views_delta": 0,
+      "total_page_views_after": 0
+    },
+    {
+      "state": "7_repeated_navigation",
+      "url": "https://verdantgrowdiary.com/guides/cannabis-grow-light-distance-and-schedule",
+      "title": "Cannabis Grow Light Distance, PPFD & DLI Guide | Verdant",
+      "page_views_delta": 0,
+      "total_page_views_after": 0
+    },
+    {
+      "state": "8_new_tab_stress",
+      "url": "https://verdantgrowdiary.com/guides/cannabis-light-stress-light-burn-bleaching-or-heat",
+      "title": "Cannabis Light Stress: Burn, Bleaching, or Heat? | Verdant",
+      "page_views_delta": null,
+      "total_page_views_after": 0
+    },
+    {
+      "state": "9_refresh_stress",
+      "url": "https://verdantgrowdiary.com/guides/cannabis-light-stress-light-burn-bleaching-or-heat",
+      "title": "Cannabis Light Stress: Burn, Bleaching, or Heat? | Verdant",
+      "page_views_delta": 0,
+      "total_page_views_after": 0
+    }
+  ],
+  "navigation_actions_count": 9,
+  "collection_requests_total": 0,
+  "collection_requests_fulfilled_locally": 0,
+  "escaped_collection_requests": 0,
+  "verification_events_transmitted": 0,
+  "page_view_events": 0,
+  "exact_explicit_page_views": 0,
+  "explicit_page_views_total": 0,
+  "automatic_page_views_without_explicit_page_path": 0,
+  "other_collection_events": 0,
+  "protected_id_masking_failures": 0,
+  "explicit_events_summary": [],
+  "automatic_events_summary": [],
+  "all_page_views": [],
+  "singleton_contract": "FAIL",
+  "guide_page_identity": "FAIL"
+}

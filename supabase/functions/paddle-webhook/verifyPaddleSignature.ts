@@ -12,6 +12,10 @@
  *  - Secret is server-only; never logged, never returned in errors.
  */
 
+import { constantTimeEqual, constantTimeEqualAny } from "../_shared/lib/lib/constantTimeEqual.ts";
+
+export { constantTimeEqual };
+
 export type PaddleSignatureParts = {
   ts: string;
   /** Last h1 value (back-compat with earlier callers/tests). */
@@ -36,15 +40,6 @@ export function parsePaddleSignature(header: string): PaddleSignatureParts | nul
   }
   if (!ts || h1s.length === 0) return null;
   return { ts, h1: h1s[h1s.length - 1], h1s };
-}
-
-export function constantTimeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) {
-    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  }
-  return diff === 0;
 }
 
 export async function hmacSha256Hex(secret: string, message: string): Promise<string> {
@@ -125,11 +120,7 @@ export async function verifyPaddleWebhookSignature(
   // any match verifies. No early exit on match order — all candidates are
   // compared so timing does not reveal which slot matched.
   const expected = await hmacSha256Hex(secret, `${parsed.ts}:${rawBody}`);
-  let anyMatch = false;
-  for (const candidate of parsed.h1s) {
-    if (constantTimeEqual(expected, candidate)) anyMatch = true;
-  }
-  if (!anyMatch) {
+  if (!constantTimeEqualAny(expected, parsed.h1s)) {
     return { ok: false, reason: "signature_mismatch" };
   }
   return { ok: true };

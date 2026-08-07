@@ -90,7 +90,7 @@ describe("dependency security Phase A resolution floors", () => {
     ["postcss", [8, 5, 18] as const],
     ["fast-uri", [3, 1, 5] as const],
     ["form-data", [4, 0, 6] as const],
-    ["js-yaml", [4, 3, 0] as const],
+    ["js-yaml", [4, 3, 1] as const],
     ["ajv", [6, 15, 0] as const],
     ["picomatch", [2, 3, 2] as const],
     ["rollup", [4, 59, 0] as const],
@@ -161,7 +161,7 @@ describe("dependency security Phase A resolution floors", () => {
     expect(packageJson.overrides).toMatchObject({
       "fast-uri": "3.1.5",
       "form-data": "4.0.6",
-      "js-yaml": "4.3.0",
+      "js-yaml": "4.3.1",
     });
     expect(packageJson.overrides?.postcss).toBeUndefined();
     expect(packageJson.overrides?.vite).toBeUndefined();

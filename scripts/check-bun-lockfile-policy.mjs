@@ -26,7 +26,7 @@ export const PACKAGE_LOCK_SECURITY_FLOORS = Object.freeze({
   "brace-expansion": "1.1.18",
   "fast-uri": "3.1.5",
   "form-data": "4.0.6",
-  "js-yaml": "4.3.0",
+  "js-yaml": "4.3.1",
   ajv: "6.15.0",
   picomatch: "2.3.2",
   rollup: "4.59.0",

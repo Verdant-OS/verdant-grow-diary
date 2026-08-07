@@ -26,6 +26,8 @@ import {
 import { buildPhenoHuntActivityEntries } from "@/lib/phenoHuntActivityViewModel";
 import PhenoTimelineEntries from "@/components/PhenoTimelineEntries";
 import PhenoStabilityLedger from "@/components/PhenoStabilityLedger";
+import PhenoGrowOutHandoff from "@/components/PhenoGrowOutHandoff";
+import { buildGrowOutSuggestions, type GrowOutPlantInput } from "@/lib/phenoGrowOutHandoffRules";
 import { buildCloneTreeRows } from "@/lib/phenoCloneTreeViewModel";
 
 /** Depth → indent class (capped) so the clone lineage nests without inline styles. */
@@ -41,6 +43,7 @@ interface KeeperCardProps {
   view: PhenoKeeperLineageView;
   clones: readonly CloneRow[];
   stabilityRuns: readonly StabilityRun[];
+  growOutPlantsById: Readonly<Record<string, GrowOutPlantInput>>;
   reversed: boolean;
   saving: boolean;
   onAddClone: (keeperId: string, label: string) => Promise<boolean>;
@@ -58,6 +61,7 @@ const KeeperCard = memo(function KeeperCard({
   view,
   clones,
   stabilityRuns,
+  growOutPlantsById,
   reversed,
   saving,
   onAddClone,
@@ -70,6 +74,29 @@ const KeeperCard = memo(function KeeperCard({
   const saveStabilityRuns = useCallback(
     (runs: readonly StabilityRun[]) => onSaveStabilityRuns(view.keeperId, runs),
     [onSaveStabilityRuns, view.keeperId],
+  );
+
+  // Grow-outs Verdant can carry into the ledger: clones the grower linked to a
+  // real plant, whose recorded traits aren't in the ledger yet. Suggest-only.
+  const growOutSuggestions = useMemo(
+    () =>
+      buildGrowOutSuggestions({
+        clones: clones.map((c) => ({
+          cloneId: c.id,
+          cloneLabel: c.cloneLabel,
+          clonePlantId: c.clonePlantId ?? null,
+        })),
+        plantsById: growOutPlantsById,
+        existingRuns: stabilityRuns,
+      }),
+    [clones, growOutPlantsById, stabilityRuns],
+  );
+
+  // Accepting a proposal APPENDS it to the existing ledger — the service
+  // replaces the whole set, so the current runs must be carried along.
+  const acceptGrowOut = useCallback(
+    (run: StabilityRun) => onSaveStabilityRuns(view.keeperId, [...stabilityRuns, run]),
+    [onSaveStabilityRuns, view.keeperId, stabilityRuns],
   );
 
   return (
@@ -169,6 +196,12 @@ const KeeperCard = memo(function KeeperCard({
           </button>
         </div>
       )}
+      <PhenoGrowOutHandoff
+        keeperId={view.keeperId}
+        suggestions={growOutSuggestions}
+        onAccept={acceptGrowOut}
+        saving={saving}
+      />
       <PhenoStabilityLedger
         keeperId={view.keeperId}
         runs={stabilityRuns}
@@ -384,6 +417,7 @@ export default function PhenoKeepersPage() {
                   view={view}
                   clones={ks.clonesByKeeper[view.keeperId] ?? EMPTY_CLONES}
                   stabilityRuns={stabilityRunsByKeeper[view.keeperId] ?? EMPTY_STABILITY_RUNS}
+                  growOutPlantsById={ks.growOutPlantsById}
                   reversed={reversedSet.has(view.keeperId)}
                   saving={ks.saving}
                   onAddClone={ks.addKeeperClone}

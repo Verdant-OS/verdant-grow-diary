@@ -38,6 +38,12 @@ export interface CloneRow {
   readonly id: string;
   readonly keeperId: string;
   readonly parentCloneId: string | null;
+  /**
+   * The real plant this clone was grown as, when the grower linked one.
+   * Optional so fixtures and callers predating the grow-out handoff still
+   * type-check; the mapper always populates it (null when unlinked).
+   */
+  readonly clonePlantId?: string | null;
   readonly cloneLabel: string;
   readonly note: string | null;
   readonly takenAt: string | null;
@@ -221,7 +227,7 @@ export async function listClonesForKeepers(keeperIds: readonly string[]): Promis
   if (ids.length === 0) return [];
   const { data, error } = await phenoDb
     .from("pheno_keeper_clones")
-    .select("id, keeper_id, parent_clone_id, clone_label, note, taken_at")
+    .select("id, keeper_id, parent_clone_id, clone_plant_id, clone_label, note, taken_at")
     .in("keeper_id", ids)
     // Deterministic order + explicit bound: clones accumulate indefinitely
     // per keeper, and an uncapped read is silently truncated at the server's
@@ -233,10 +239,48 @@ export async function listClonesForKeepers(keeperIds: readonly string[]): Promis
     id: r.id,
     keeperId: r.keeper_id,
     parentCloneId: r.parent_clone_id ?? null,
+    clonePlantId: (r as { clone_plant_id?: string | null }).clone_plant_id ?? null,
     cloneLabel: r.clone_label,
     note: r.note ?? null,
     takenAt: r.taken_at ?? null,
   }));
+}
+
+/**
+ * Link (or unlink, with plantId null) the real plant a clone was grown as.
+ *
+ * This is the join the grow-out handoff reads: once a clone points at a
+ * plant, that plant's own recorded traits can be PROPOSED as a stability run
+ * instead of retyped. Scoped to the owner on both sides — the caller must own
+ * the clone row, and the table's RLS additionally requires the referenced
+ * plant belong to the caller, so a foreign plant id is rejected by the server
+ * rather than trusted here. Reads the row back so a silently-blocked write
+ * surfaces as an error instead of a false success.
+ */
+export async function linkClonePlant(input: {
+  cloneId: string;
+  plantId: string | null;
+}): Promise<SaveResult> {
+  const userId = await currentUserId();
+  if (!userId) return { ok: false, error: "Sign in to link a grow-out plant." };
+  const cloneId = typeof input.cloneId === "string" ? input.cloneId.trim() : "";
+  if (!cloneId) return { ok: false, error: "Missing clone id." };
+  const plantId = typeof input.plantId === "string" ? input.plantId.trim() : "";
+  const { data, error } = await phenoDb
+    .from("pheno_keeper_clones")
+    .update({ clone_plant_id: plantId === "" ? null : plantId } as never)
+    .eq("id", cloneId)
+    .eq("user_id", userId)
+    .select("id")
+    .maybeSingle();
+  if (error) return { ok: false, error: error.message };
+  if (!data) {
+    return {
+      ok: false,
+      error: "That grow-out plant was not linked (clone missing, or the plant is not yours).",
+    };
+  }
+  return { ok: true, id: data.id as string };
 }
 
 /**

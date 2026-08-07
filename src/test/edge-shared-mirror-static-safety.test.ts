@@ -5,10 +5,14 @@
  * mirror at supabase/functions/_shared/lib/**) imports src/lib/**,
  * src/constants/**, or @/integrations/supabase/types directly. Those
  * imports must go through the generated mirror; see docs/edge-shared-sync.md.
+ *
+ * Also defers broad @/ / browser-module scanning to
+ * scripts/check-no-src-lib-imports.mjs (CI preflight + this suite via import).
  */
 import { describe, it, expect } from "vitest";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
+import { findForbiddenImportsInSource } from "../../scripts/check-no-src-lib-imports.mjs";
 
 const ROOT = resolve(__dirname, "..", "..");
 const FUNCTIONS = join(ROOT, "supabase", "functions");
@@ -55,6 +59,25 @@ describe("edge functions: no direct src/lib reach", () => {
       expect(bad, `unmirrored imports: ${bad.join(", ")}`).toEqual([]);
     });
   }
+});
+
+describe("edge functions: check-no-src-lib-imports scan (full tree)", () => {
+  const files = walk(FUNCTIONS).filter((f) => /\.tsx?$/.test(f));
+
+  it("finds typescript under supabase/functions", () => {
+    expect(files.length).toBeGreaterThan(0);
+  });
+
+  it("every function file is free of @/, src escapes, Windows paths, and browser bare modules", () => {
+    const offenders: string[] = [];
+    for (const f of files) {
+      const hits = findForbiddenImportsInSource(readFileSync(f, "utf8"));
+      for (const h of hits) {
+        offenders.push(`${relative(ROOT, f)} → ${h.spec} (${h.reason})`);
+      }
+    }
+    expect(offenders, offenders.join("\n")).toEqual([]);
+  });
 });
 
 describe("edge shared mirror formatting contract", () => {

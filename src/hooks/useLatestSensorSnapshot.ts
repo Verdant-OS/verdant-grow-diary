@@ -21,7 +21,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import {
   EMPTY_SNAPSHOT,
-  isStale,
+  isSnapshotStale,
   type SensorSnapshot,
   snapshotFromDiary,
   snapshotFromEnvironmentCheck,
@@ -93,16 +93,18 @@ export function useLatestSensorSnapshot(
                 raw_payload: (r as { raw_payload?: unknown }).raw_payload,
               })),
             );
-            if (snap && !isStale(snap.ts)) return snap;
+            if (snap && !isSnapshotStale(snap)) return snap;
             staleSensorCandidate = snap;
           }
         }
         // 2) Fall back to latest diary_entries.details.sensor_snapshot.
         // `enabled` already gates on growId; re-narrow for the query builder.
+        // Select `id` so Environment Check snapshots can carry a diary
+        // evidence ref for alert persistence (#603).
         if (!growId) return staleSensorCandidate ?? EMPTY_SNAPSHOT;
         const { data: diaryRows, error: diaryErr } = await supabase
           .from("diary_entries")
-          .select("entry_at,details,tent_id")
+          .select("id,entry_at,details,tent_id")
           .eq("grow_id", growId)
           .order("entry_at", { ascending: false })
           .limit(20);
@@ -124,9 +126,14 @@ export function useLatestSensorSnapshot(
           const envScopeOk =
             tentIds.length === 0 || (row.tent_id != null && tentIds.includes(row.tent_id));
           if (!envScopeOk) continue;
+          const diaryEntryId =
+            typeof (row as { id?: string | null }).id === "string"
+              ? (row as { id: string }).id
+              : null;
           const envSnap = snapshotFromEnvironmentCheck(
             row.entry_at,
             details.environment_check as Record<string, unknown> | undefined,
+            { diaryEntryId },
           );
           if (envSnap) return preferNewer(staleSensorCandidate, envSnap);
         }

@@ -178,8 +178,8 @@ describe("buildAiSensorSnapshotContext — staleThresholdMs edges", () => {
     expect(r.annotationLine).toContain("captured_at invalid");
   });
 
-  it("default threshold constant matches 30 minutes", () => {
-    expect(DEFAULT_AI_SENSOR_STALE_THRESHOLD_MS).toBe(30 * 60 * 1000);
+  it("default threshold constant matches 15 minutes (live canon)", () => {
+    expect(DEFAULT_AI_SENSOR_STALE_THRESHOLD_MS).toBe(15 * 60 * 1000);
   });
 });
 

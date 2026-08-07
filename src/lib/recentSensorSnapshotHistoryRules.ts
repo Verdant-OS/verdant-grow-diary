@@ -116,10 +116,11 @@ export function buildRecentSensorSnapshotHistory(
         break;
       }
     }
+    const source = classifySource(group);
     out.push({
       ts,
-      source: classifySource(group),
-      stale: isStale(ts, now),
+      source,
+      stale: isStale(ts, now, undefined, source),
       temp: pickMetric(group, "temperature_c"),
       rh: pickMetric(group, "humidity_pct"),
       vpd: pickMetric(group, "vpd_kpa"),

@@ -172,7 +172,7 @@ export function buildTentSensorHeaderView(
       source: snap.source,
       deviceId: snap.device_id ?? null,
     }),
-    stale: isStale(snap.ts, now),
+    stale: isStale(snap.ts, now, undefined, snap.source),
     snapshot: truth.snapshot,
     truth,
   };

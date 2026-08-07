@@ -6,10 +6,18 @@ import {
   SOURCE_ELIGIBILITY_HELP,
 } from "@/lib/alertFreshnessContext";
 import { STALE_THRESHOLD_MS, type SensorSnapshot } from "@/lib/sensorSnapshot";
+import { MANUAL_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
 
 const NOW = Date.parse("2026-06-23T12:00:00Z");
 const FRESH_TS = new Date(NOW - 5 * 60_000).toISOString();
+// Staleness is source-aware since the #592 canon: live 15m, manual 24h.
+// STALE_THRESHOLD_MS is the *live* window, so a timestamp derived from it is
+// stale for live and deliberately current for manual. Derive each from its own
+// window instead of reusing one for both.
 const STALE_TS = new Date(NOW - STALE_THRESHOLD_MS - 60_000).toISOString();
+const MANUAL_STALE_TS = new Date(NOW - MANUAL_CURRENT_STATE_STALE_MS - 60_000).toISOString();
+const staleTsFor = (source: "manual" | "live") =>
+  source === "manual" ? MANUAL_STALE_TS : STALE_TS;
 
 function snap(
   overrides: Partial<SensorSnapshot> & {
@@ -58,13 +66,25 @@ describe("buildSourceChip", () => {
     for (const source of ["manual", "live"] as const) {
       const c = buildSourceChip({
         status: "ok",
-        snapshot: snap({ source, ts: STALE_TS }),
+        snapshot: snap({ source, ts: staleTsFor(source) }),
         now: NOW,
       });
       expect(c.tone).toBe("warning");
       expect(c.canPersist).toBe(false);
       expect(c.qualifier).toBe("stale");
     }
+  });
+  // The other half of the source-aware boundary: an age that is stale for live
+  // must remain current for manual, or the widened manual window is not real.
+  it("a live-stale age is still current for manual", () => {
+    const c = buildSourceChip({
+      status: "ok",
+      snapshot: snap({ source: "manual", ts: STALE_TS }),
+      now: NOW,
+    });
+    expect(c.tone).toBe("eligible");
+    expect(c.canPersist).toBe(true);
+    expect(c.qualifier).toBe("fresh");
   });
   it("csv / diary / sim → context tone, never eligible", () => {
     for (const source of ["csv", "diary", "sim"] as const) {
@@ -95,7 +115,7 @@ describe("buildSourceChip", () => {
       snap({ source: "csv", ts: FRESH_TS }),
       snap({ source: "diary", ts: FRESH_TS }),
       snap({ source: "sim", ts: FRESH_TS }),
-      snap({ source: "manual", ts: STALE_TS }),
+      snap({ source: "manual", ts: MANUAL_STALE_TS }),
       snap({ source: "live", ts: STALE_TS }),
       snap({ source: "unavailable", ts: null }),
     ];
@@ -134,12 +154,21 @@ describe("emptyStateSnapshotCta", () => {
   it("stale manual → stale CTA prompting fresh snapshot", () => {
     const cta = emptyStateSnapshotCta({
       status: "ok",
-      snapshot: snap({ source: "manual", ts: STALE_TS }),
+      snapshot: snap({ source: "manual", ts: MANUAL_STALE_TS }),
       now: NOW,
     });
     expect(cta?.kind).toBe("stale");
     expect(cta?.showAddManualSnapshot).toBe(true);
     expect(cta?.message.toLowerCase()).toMatch(/fresh manual snapshot/);
+  });
+  it("stale live → stale CTA prompting fresh snapshot", () => {
+    const cta = emptyStateSnapshotCta({
+      status: "ok",
+      snapshot: snap({ source: "live", ts: STALE_TS }),
+      now: NOW,
+    });
+    expect(cta?.kind).toBe("stale");
+    expect(cta?.showAddManualSnapshot).toBe(true);
   });
   it("context-only csv → context-only CTA", () => {
     const cta = emptyStateSnapshotCta({

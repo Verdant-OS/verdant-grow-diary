@@ -50,7 +50,7 @@ describe("sensorSnapshot pure helpers", () => {
     expect(formatValue(1.234, " kPa", 2)).toBe("1.23 kPa");
   });
 
-  it("isStale honors the 30-minute default and never crashes on bad input", () => {
+  it("isStale honors the 15-minute live default and never crashes on bad input", () => {
     const now = new Date("2026-05-20T12:00:00Z").getTime();
     const fresh = new Date(now - 5 * 60 * 1000).toISOString();
     const stale = new Date(now - 45 * 60 * 1000).toISOString();
@@ -58,7 +58,7 @@ describe("sensorSnapshot pure helpers", () => {
     expect(isStale(stale, now)).toBe(true);
     expect(isStale(null, now)).toBe(false);
     expect(isStale("not-a-date", now)).toBe(false);
-    expect(STALE_THRESHOLD_MS).toBe(30 * 60 * 1000);
+    expect(STALE_THRESHOLD_MS).toBe(15 * 60 * 1000);
   });
 
   it("snapshotFromReadings folds latest-ts metrics and labels source", () => {
@@ -145,7 +145,7 @@ describe("useLatestSensorSnapshot hook — source priority and safety", () => {
   it("never lets a stale sensor row suppress fresher diary evidence (Codex, PR #601)", () => {
     // Fresh sensor rows return immediately; a stale sensor snapshot is only
     // a candidate that strictly newer manual/env-check evidence replaces.
-    expect(HOOK).toMatch(/if \(snap && !isStale\(snap\.ts\)\) return snap;/);
+    expect(HOOK).toMatch(/if \(snap && !isSnapshotStale\(snap\)\) return snap;/);
     expect(HOOK).toMatch(/staleSensorCandidate = snap;/);
     expect(HOOK).toMatch(/return preferNewer\(staleSensorCandidate, snap\);/);
     expect(HOOK).toMatch(/return preferNewer\(staleSensorCandidate, envSnap\);/);
@@ -156,7 +156,16 @@ describe("useLatestSensorSnapshot hook — source priority and safety", () => {
     // The diary query selects tent_id, and a tent-scoped view only accepts
     // env checks attributed to one of those tents — null/foreign tent_id
     // rows must not surface as the selected tent's evidence.
-    expect(HOOK).toMatch(/\.select\(\s*['"]entry_at,details,tent_id['"]\s*\)/);
+    // Pin the columns the scope gate actually depends on, not the exact column
+    // list: the diary select has since gained `id` (diary evidence ref), which
+    // does not weaken tent scoping. Dropping `tent_id` still fails this.
+    const diarySelect =
+      HOOK.match(/\.select\(\s*["']([^"']*\bentry_at\b[^"']*)["']\s*\)/)?.[1] ?? null;
+    expect(diarySelect, "the diary query must still exist and select entry_at").not.toBeNull();
+    const diaryColumns = (diarySelect ?? "").split(",").map((c) => c.trim());
+    for (const column of ["entry_at", "details", "tent_id"]) {
+      expect(diaryColumns, `diary select must include ${column}`).toContain(column);
+    }
     expect(HOOK).toMatch(
       /tentIds\.length === 0 \|\| \(row\.tent_id != null && tentIds\.includes\(row\.tent_id\)\)/,
     );
@@ -189,7 +198,7 @@ describe("Dashboard — Latest Environment card wiring", () => {
     );
     expect(DASHBOARD).toMatch(/SOURCE_LABEL/);
     expect(DASHBOARD).toMatch(/formatValue/);
-    expect(DASHBOARD).toMatch(/isStale/);
+    expect(DASHBOARD).toMatch(/isSnapshotStale/);
     expect(DASHBOARD).toMatch(
       /useLatestSensorSnapshot\(\s*scopedGrowId\s*\?\?\s*null\s*,\s*selectedTentIds/,
     );

@@ -40,7 +40,7 @@ describe("sensorSourceHealthRules.buildSensorSourceHealth", () => {
     expect(esp.metrics).toEqual(["humidity_pct", "temperature_c"]);
   });
 
-  it("marks source active when newest reading is within 30 minutes", () => {
+  it("marks source active when newest reading is within 15 minutes", () => {
     const rows: SensorSourceHealthInput[] = [
       {
         source: "esp32",
@@ -138,7 +138,7 @@ describe("sensorSourceHealthRules.buildSensorSourceHealth", () => {
     expect(out[0].metrics).toEqual(["temperature_c"]);
   });
 
-  it("marks source stale when newest reading is older than 30 minutes", () => {
+  it("marks source stale when newest reading is older than 15 minutes", () => {
     const rows: SensorSourceHealthInput[] = [
       {
         source: "esp32",

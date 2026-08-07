@@ -20,6 +20,7 @@ export type Database = {
           approved_at: string | null
           completed_at: string | null
           created_at: string
+          dedupe_key: string | null
           grow_id: string
           id: string
           originating_timeline_events: Json
@@ -41,6 +42,7 @@ export type Database = {
           approved_at?: string | null
           completed_at?: string | null
           created_at?: string
+          dedupe_key?: string | null
           grow_id: string
           id?: string
           originating_timeline_events?: Json
@@ -62,6 +64,7 @@ export type Database = {
           approved_at?: string | null
           completed_at?: string | null
           created_at?: string
+          dedupe_key?: string | null
           grow_id?: string
           id?: string
           originating_timeline_events?: Json
@@ -4469,6 +4472,23 @@ export type Database = {
       }
     }
     Functions: {
+      action_queue_create: {
+        Args: {
+          p_action_type: string
+          p_audit_note?: string
+          p_dedupe_key?: string
+          p_grow_id: string
+          p_originating_timeline_events?: Json
+          p_plant_id?: string
+          p_reason: string
+          p_risk_level?: string
+          p_source?: string
+          p_suggested_change: string
+          p_target_metric?: string
+          p_tent_id?: string
+        }
+        Returns: Json
+      }
       admin_schema_audit:
         | { Args: { _migrations: string[]; _tables: string[] }; Returns: Json }
         | {

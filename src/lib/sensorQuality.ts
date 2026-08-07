@@ -68,8 +68,12 @@ export function evaluateSensorQuality(
   const reasons: string[] = [];
   const suspiciousFields: string[] = [];
 
-  if (isStale(snapshot.ts, now)) {
-    reasons.push("Latest reading is stale (older than 30 minutes).");
+  if (isStale(snapshot.ts, now, undefined, snapshot.source)) {
+    reasons.push(
+      snapshot.source === "manual" || snapshot.source === "diary"
+        ? "Latest reading is stale (older than 24 hours)."
+        : "Latest reading is stale (older than 15 minutes).",
+    );
   }
 
   const { temp, rh, vpd, soil_ec, ppfd } = snapshot;

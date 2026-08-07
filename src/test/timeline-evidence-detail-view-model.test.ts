@@ -74,7 +74,7 @@ describe("timelineEvidenceDetailViewModel", () => {
     }
   });
 
-  it("flags stale sensor snapshot when older than 30 minutes", () => {
+  it("flags stale sensor snapshot when older than the live window", () => {
     const m = vm({
       id: "e2",
       photo_url: "https://x/2.jpg",

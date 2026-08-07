@@ -91,7 +91,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 
-import { SOURCE_LABEL, formatValue, isStale } from "@/lib/sensorSnapshot";
+import { SOURCE_LABEL, formatValue, isSnapshotStale } from "@/lib/sensorSnapshot";
 import { buildSensorSourceDisplayLabel } from "@/lib/sensorSourceDisplayLabel";
 import { formatSensorSourceLabel } from "@/lib/manualSensorSourceLabel";
 import { formatTemperatureDisplay } from "@/lib/temperatureUnitPreference";
@@ -458,7 +458,7 @@ export default function Dashboard() {
               const isStaleSnap =
                 sensorState.status === "ok" &&
                 !!sensorState.snapshot.ts &&
-                isStale(sensorState.snapshot.ts);
+                isSnapshotStale(sensorState.snapshot);
               const isInvalidSnap =
                 !!snapshotQuality && snapshotQuality.suspiciousFields.length > 0;
               const isUnverifiedSnap =
@@ -996,7 +996,7 @@ export default function Dashboard() {
                       })}
                     </span>
                   )}
-                  {isStale(sensorState.snapshot.ts) && (
+                  {isSnapshotStale(sensorState.snapshot) && (
                     <Badge
                       variant="outline"
                       className="text-[10px] uppercase border-amber-500 text-amber-600"
@@ -1293,7 +1293,7 @@ export default function Dashboard() {
                   )}
                   {(() => {
                     const vpdValue = snap?.vpd ?? null;
-                    const stale = snap ? isStale(snap.ts) : false;
+                    const stale = snap ? isSnapshotStale(snap) : false;
                     const vpd = classifyVpdAgainstStage({
                       value: vpdValue,
                       stage: alertContextStage,

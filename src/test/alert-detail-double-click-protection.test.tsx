@@ -1,14 +1,14 @@
 /**
  * AlertDetail — fast double-click duplicate-prevention E2E test.
  *
- * Holds the first insert in-flight via a deferred promise and proves:
- *   - first click triggers the insert (1)
+ * Holds the first create RPC in-flight via a deferred promise and proves:
+ *   - first click triggers action_queue_create once
  *   - second rapid click is blocked while the first is in flight (still 1)
  *   - after resolution the decision region lands on `already_exists`
  *   - the rendered duplicate label is grower-safe (no [alert:<id>],
  *     no raw alert/grow ids leaked into the handoff region)
- *   - inserted action stays approval-required (pending_approval)
- *   - no executable device payload is present on the insert
+ *   - created action stays approval-required (pending_approval)
+ *   - no executable device payload is present on the RPC args
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { act, render, screen, waitFor, fireEvent } from "@testing-library/react";
@@ -34,7 +34,7 @@ const BASE_ALERT = {
   updated_at: "2026-05-30T10:30:00Z",
 };
 
-const inserts: Array<{ table: string; payload: Record<string, unknown> }> = [];
+const rpcCalls: Array<{ name: string; args: Record<string, unknown> }> = [];
 let deferred: {
   promise: Promise<{ data: unknown; error: unknown }>;
   resolve: (v: { data: unknown; error: unknown }) => void;
@@ -75,7 +75,7 @@ vi.mock("sonner", () => ({
 
 vi.mock("@/integrations/supabase/client", () => {
   type Result = { data: unknown; error: unknown };
-  const makeChain = (table: string) => {
+  const makeChain = () => {
     const resolveSelect = (): Result => ({ data: [], error: null });
     const chain: Record<string, unknown> = {
       select: () => chain,
@@ -92,26 +92,23 @@ vi.mock("@/integrations/supabase/client", () => {
 
   return {
     supabase: {
-      from: (table: string) => ({
-        ...makeChain(table),
-        insert: (payload: Record<string, unknown>) => {
-          inserts.push({ table, payload });
-          if (table === "action_queue") {
-            return {
-              select: () => ({
-                single: () => deferred!.promise,
-              }),
-            };
-          }
-          return Promise.resolve({ data: null, error: null });
-        },
+      from: () => ({
+        ...makeChain(),
+        insert: () => Promise.resolve({ data: null, error: null }),
       }),
+      rpc: (name: string, args: Record<string, unknown>) => {
+        rpcCalls.push({ name, args });
+        if (name === "action_queue_create") {
+          return deferred!.promise;
+        }
+        return Promise.resolve({ data: null, error: { message: `unknown rpc ${name}` } });
+      },
     },
   };
 });
 
 beforeEach(() => {
-  inserts.length = 0;
+  rpcCalls.length = 0;
   deferred = makeDeferred();
 });
 
@@ -125,35 +122,47 @@ function renderDetail() {
   );
 }
 
-const actionQueueInserts = () => inserts.filter((i) => i.table === "action_queue");
+const createCalls = () => rpcCalls.filter((c) => c.name === "action_queue_create");
 
 describe("AlertDetail — fast double-click duplicate protection (E2E)", () => {
-  it("blocks a second click while the first insert is still in flight", async () => {
+  it("blocks a second click while the first create is still in flight", async () => {
     renderDetail();
     const btn = await screen.findByTestId("alert-handoff-add-button");
 
-    // First click — insert is in flight (deferred not resolved yet).
+    // First click — create is in flight (deferred not resolved yet).
     await act(async () => {
       fireEvent.click(btn);
     });
-    // Second rapid click before the in-flight insert resolves.
+    // Second rapid click before the in-flight create resolves.
     await act(async () => {
       fireEvent.click(btn);
     });
 
-    expect(actionQueueInserts()).toHaveLength(1);
+    expect(createCalls()).toHaveLength(1);
 
-    // Insert stays approval-required, no executable device payload.
-    const payload = actionQueueInserts()[0].payload as Record<string, unknown>;
-    expect(payload.status).toBe("pending_approval");
-    expect(payload).not.toHaveProperty("execute");
-    expect(payload).not.toHaveProperty("device_command");
-    expect(payload).not.toHaveProperty("device_payload");
+    // RPC stays approval-required, no executable device payload.
+    const args = createCalls()[0].args as Record<string, unknown>;
+    expect(args).not.toHaveProperty("p_user_id");
+    expect(args).not.toHaveProperty("user_id");
+    expect(args).not.toHaveProperty("p_target_device");
+    expect(args).not.toHaveProperty("target_device");
+    expect(args).not.toHaveProperty("execute");
+    expect(args).not.toHaveProperty("device_command");
+    expect(args).not.toHaveProperty("device_payload");
+    expect(args.p_source).toBe("environment_alert");
+    expect(args.p_dedupe_key).toBe(`env_alert:${BASE_ALERT.id}`);
 
-    // Resolve the in-flight insert.
+    // Resolve the in-flight create.
     await act(async () => {
       deferred!.resolve({
-        data: { id: "new-action-uuid-dc1", grow_id: BASE_ALERT.grow_id },
+        data: {
+          ok: true,
+          action_queue_id: "new-action-uuid-dc1",
+          grow_id: BASE_ALERT.grow_id,
+          status: "pending_approval",
+          event_id: "event-uuid-dc1",
+          reused: false,
+        },
         error: null,
       });
     });
@@ -162,10 +171,10 @@ describe("AlertDetail — fast double-click duplicate protection (E2E)", () => {
     const region = await screen.findByTestId("alert-handoff-decision");
     await waitFor(() => expect(region.getAttribute("data-decision-state")).toBe("already_exists"));
 
-    // After landing, a third click cannot create a duplicate insert.
+    // After landing, a third click cannot create a duplicate RPC.
     const queuedLink = await screen.findByTestId("alert-handoff-already-queued-link");
     expect(queuedLink.textContent?.toLowerCase()).toContain("already queued");
-    expect(actionQueueInserts()).toHaveLength(1);
+    expect(createCalls()).toHaveLength(1);
 
     // No raw back-pointer tokens or ids in the visible handoff region.
     const handoff = screen.getByTestId("alert-handoff-region");

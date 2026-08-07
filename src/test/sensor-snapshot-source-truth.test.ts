@@ -149,7 +149,7 @@ describe("static contract — the classification has no live fallthrough", () =>
 
   it("gates 'live' behind an every(live-reservation) check", () => {
     expect(SRC).toMatch(/allLive\s*=/);
-    expect(SRC).toContain('r.source === "live" || r.source === "pi_bridge"');
+    expect(SRC).toContain("isVerifiedSnapshotLiveRowSource");
     expect(SRC).toContain("!isSensorTestbenchRow(r)");
   });
 

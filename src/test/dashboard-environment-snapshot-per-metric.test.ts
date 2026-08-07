@@ -21,7 +21,10 @@ const SENSORS = readFileSync(resolve(ROOT, "src/pages/Sensors.tsx"), "utf8");
 
 const NOW = new Date("2026-06-04T12:00:00Z").getTime();
 const FRESH_TS = "2026-06-04T11:55:00Z";
-const STALE_TS = "2026-06-04T10:00:00Z"; // > 30 min old
+// Past the 24h manual current-context window (and the 15m live window).
+const STALE_TS = "2026-06-03T10:00:00Z";
+// Past live 15m, still inside manual 24h — use only with source: "live".
+const LIVE_STALE_TS = "2026-06-04T10:00:00Z";
 
 function row(over: Partial<BuildTentSnapshotInput>): BuildTentSnapshotInput {
   return {
@@ -193,6 +196,42 @@ describe("buildTentSnapshotView · per-metric status", () => {
     for (const m of v.metrics) expect(m.statusLabel).toBe("Stale");
   });
 
+  it("2h-old manual stays current; same age live is stale (Sensor Truth Canon)", () => {
+    const manual = buildTentSnapshotView(
+      [
+        row({ ts: LIVE_STALE_TS, captured_at: LIVE_STALE_TS, source: "manual", value: 24 }),
+        row({
+          ts: LIVE_STALE_TS,
+          metric: "humidity_pct",
+          value: 55,
+          captured_at: LIVE_STALE_TS,
+          source: "manual",
+        }),
+      ],
+      "veg",
+      NOW,
+    );
+    expect(manual.stale).toBe(false);
+    expect(manual.sourceLabel).toBe("Manual");
+
+    const live = buildTentSnapshotView(
+      [
+        row({ ts: LIVE_STALE_TS, captured_at: LIVE_STALE_TS, source: "live", value: 24 }),
+        row({
+          ts: LIVE_STALE_TS,
+          metric: "humidity_pct",
+          value: 55,
+          captured_at: LIVE_STALE_TS,
+          source: "live",
+        }),
+      ],
+      "veg",
+      NOW,
+    );
+    expect(live.stale).toBe(true);
+    expect(live.sourceLabel).toBe("Stale");
+  });
+
   it("invalid metric is marked Invalid for that specific metric", () => {
     // RH=0 is sensor-fault per evaluateSensorQuality; temp valid.
     const v = buildTentSnapshotView(
@@ -227,19 +266,25 @@ describe("buildTentSnapshotView · per-metric status", () => {
     const v = buildTentSnapshotView(
       [
         row({
-          ts: STALE_TS,
-          captured_at: STALE_TS,
+          ts: LIVE_STALE_TS,
+          captured_at: LIVE_STALE_TS,
           source: "live",
           raw_payload: { vendor: "ecowitt" },
         }),
         row({
-          ts: STALE_TS,
+          ts: LIVE_STALE_TS,
           metric: "humidity_pct",
           value: 55,
-          captured_at: STALE_TS,
+          captured_at: LIVE_STALE_TS,
           source: "live",
         }),
-        row({ ts: STALE_TS, metric: "vpd_kpa", value: 1.1, captured_at: STALE_TS, source: "live" }),
+        row({
+          ts: LIVE_STALE_TS,
+          metric: "vpd_kpa",
+          value: 1.1,
+          captured_at: LIVE_STALE_TS,
+          source: "live",
+        }),
       ],
       "veg",
       NOW,
@@ -298,10 +343,11 @@ describe("Static safety", () => {
   }
 
   it("Dashboard snapshot strip does not duplicate freshness thresholds in JSX", () => {
-    // The new view-model branch must not introduce inline 30-minute math.
-    // (The existing banner copy mentions 30 minutes as user-facing text,
-    // not as a threshold constant — exclude that exact string.)
+    // The view-model branch must not introduce inline minute-window math.
+    // User-facing copy may mention the window; threshold constants live in
+    // sensorTiming / sensorTruthCanon only.
     expect(DASH).not.toMatch(/30\s*\*\s*60\s*\*\s*1000/);
+    expect(DASH).not.toMatch(/15\s*\*\s*60\s*\*\s*1000/);
   });
 
   it("Dashboard does not invent demo/sample readings to fill the snapshot", () => {

@@ -1,8 +1,10 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-05 UTC / 2026-08-05 America/Chicago
-**Updated by:** Claude (replay-fix reconciliation; SEO/analytics facts below retain
-their 2026-08-02 verification dates and were not re-measured)
+**Last updated:** 2026-08-07 UTC / 2026-08-07 America/Chicago
+**Updated by:** Claude (operating-state refresh: branch topology, deploy-head tip
+movement, and agent assignment re-verified against `git fetch origin` on 2026-08-07.
+SEO/analytics facts below retain their 2026-08-02 verification dates, and release
+identity its 2026-08-05 date; none of them were re-measured in this refresh)
 
 This is the changing shift report. Permanent rules live in `/AGENTS.md`; do not edit
 that constitution to record branch, deployment, blocker, or assignment changes.
@@ -15,10 +17,10 @@ inside the active governance handoff.
 
 ## Branch topology
 
-| Branch               | Role                                             | Verified head                                                                                                      |
-| -------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
-| `verdant-grow-diary` | **Deploy branch. Production ships from here.**   | `6c78266edb7f` (#737) at this snapshot; the queue advances it several times daily — re-verify before relying on it |
-| `main`               | Integration branch. It is not production parity. | `ecc9ae4b95dcf34163d33465bc442566b359f8e2` at this snapshot                                                        |
+| Branch               | Role                                             | Verified head                                                                                                                                                               |
+| -------------------- | ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `verdant-grow-diary` | **Deploy branch. Production ships from here.**   | `c09b33d95ed2290c3364e54c77d5d980eb4e714a` (#814), verified 2026-08-07 after `git fetch origin`; the queue advances it several times daily — re-verify before relying on it |
+| `main`               | Integration branch. It is not production parity. | `b6d747941948ce68157185a2b0847acea6970d44` (#779), verified 2026-08-07                                                                                                      |
 
 `main` and `verdant-grow-diary` are divergent. Do not infer production behavior from
 `main`, and do not backport deploy-only governance or data rules without a scoped branch
@@ -93,8 +95,16 @@ GitHub Actions push runs observed 2026-08-05 ~16:05 UTC for deploy commit
 The validation evidence in this section is tied to deploy commit `5611b130e81a` and
 must not be carried forward to later commits. The tip has since advanced through
 `acad6cb938e5` (#727), `864eab892` (#725), `1ae1677645a0` (#729), `1a2df78ac3`
-(#735), `6c78266edb7f` (#737), and further; the Branch topology row above names
-its own verification snapshot and is decoupled from this section's evidence.
+(#735), `6c78266edb7f` (#737), `a9a88e6ed` (#809), `63ed76c6d` (#794),
+`ad29943ea9ec` (#785), `821adb9fafda` (#812), `b972ad8225ef` (#821) and on to
+`c09b33d95ed2` (#814) — **69 commits ahead of `5611b130e81a`**, counted with
+`git log --oneline 5611b130e81a..c09b33d95ed2` on 2026-08-07.
+(PR numbers on this branch do not order by merge time: #809 merged before #794, which
+merged before #785. Order commits with `git log`, never by PR number.)
+None of the checks in the table above have been re-measured against any of those
+commits; treat every row as evidence about `5611b130e81a` only. The Branch
+topology row above names its own verification snapshot and is decoupled from this
+section's evidence.
 Notably, the full enabled Security DB Local run cited above (`31021835479`)
 executed against `5611b130e81a` and is the replay-repair proof point regardless of
 tip movement.
@@ -119,7 +129,61 @@ description across the canonical constitution and its mirrors/role prompts. This
 docs/governance reconciliation only; it does not change the approved product or analytics
 implementation scope.
 
-In scope:
+Handoff status as of 2026-08-07: the `SKIPPED` vocabulary row is present in `AGENTS.md`
+and in every mirror that carries a status table (`GEMINI.md`, `docs/agents/roles/security.md`,
+`docs/agents/roles/gemini.md`); the corrected signed-out root-route description is present in
+`AGENTS.md`. Both items read as complete. The stale-facts refresh is this edit.
+
+**Completed, out of slice (recorded 2026-08-07):** #586 Action Queue atomic create. This
+shipped as three separate merges, recorded separately because each carries different
+migrations and different client moves:
+
+- [PR #586](https://github.com/Verdant-OS/verdant-grow-diary/pull/586) merged as
+  `dc29093b5`. **Introduced the RPC migration**
+  `supabase/migrations/20260807010000_action_queue_create_rpc.sql` (nullable `dedupe_key`
+  column, partial unique index on non-terminal statuses, and the `action_queue_create`
+  SECURITY DEFINER RPC that writes the queue row and its `created` audit event in one
+  transaction), plus `src/lib/actionQueueCreateRules.ts`,
+  `src/lib/actionQueueCreateService.ts`, and the **Alert Detail** and **AI Doctor** client
+  moves onto the RPC.
+- [PR #809](https://github.com/Verdant-OS/verdant-grow-diary/pull/809) merged as
+  `a9a88e6ed`. Added **only** `20260807140000_action_queue_create_allow_ai_coach.sql`
+  (adds `ai_coach` to the RPC source allowlist) and the **Coach** client move, with tests.
+  It did **not** introduce the RPC migration — that file already exists in `a9a88e6ed^`.
+- [PR #812](https://github.com/Verdant-OS/verdant-grow-diary/pull/812) merged as
+  `821adb9fa`, reconciling three lagging Action Queue pins against the atomic RPC.
+
+All three (`dc29093b5`, `a9a88e6ed`, `821adb9fa`) are ancestors of the deploy tip recorded
+in Branch topology above — verified 2026-08-07 with `git merge-base --is-ancestor` against
+`c09b33d95ed2290c3364e54c77d5d980eb4e714a`. Re-verify this block
+alongside the Branch-topology row: if a later reader advances that row, the ancestry claim
+here is only as current as the head it was checked against.
+
+Read directly from the migration bodies: the RPC inserts `status` `'pending_approval'`
+literally, inserts `target_device` as NULL literally, and derives `user_id` from
+`auth.uid()` rather than any client argument. That is an observation about this RPC only —
+it is **not** a cleared system-wide fence. Per the migration's own header this is an expand
+step: client `INSERT` on `action_queue` is deliberately not revoked and legacy
+direct-insert paths remain functional, so the RPC's constraints do not bind writers that
+bypass it. A contract/revoke step would be a separate slice.
+
+Authoring agent is **not determinable from git**: all three commits are squash merges
+attributed to the repository owner, and #809's source branch is deleted. The fact recorded
+here is that this work shipped while this file listed the active slice as Mode A SEO and
+every agent row except Codex as `Unassigned`. This entry records that; it does not
+retroactively authorize it, and it does not assign it to an agent.
+
+Production application state of both migrations: `BLOCKED` — not verified, and not
+verifiable from an agent session. The Supabase MCP path available to agents resolves to the
+**sandbox** project `bzatgtgjvuojpoxcknaa`, not production `knkwiiywfkbqznbxwqfh`
+(refs pinned in `scripts/lib/supabaseDatabaseTargetIdentity.mjs`). A sandbox check on
+2026-08-07 found the column, index, and function absent there; that is a sandbox
+observation and carries no implication about production.
+`scripts/apply-pinned-production-migrations.mjs` is SHA-pinned to three 2026-07-28 files
+and does not cover these two.
+
+In scope — these bullets scope the **Mode A SEO parent program above**, not the completed
+#809 entry:
 
 - reverify the two existing lighting routes and the deployed release identity
 - intercept and locally fulfill GA4 collection requests so verification traffic is not sent
@@ -214,11 +278,11 @@ write is approved by this state file.
 
 ## Agents currently assigned
 
-| Agent             | Assignment                                                 |
-| ----------------- | ---------------------------------------------------------- |
-| Codex             | Standing SEO measurement readiness and analytics integrity |
-| Claude            | Unassigned                                                 |
-| Grok              | Unassigned                                                 |
-| Security reviewer | Unassigned                                                 |
-| Gemini            | Unassigned                                                 |
-| Council Chair     | Unassigned                                                 |
+| Agent             | Assignment                                                   |
+| ----------------- | ------------------------------------------------------------ |
+| Codex             | Standing SEO measurement readiness and analytics integrity   |
+| Claude            | Unassigned — see completed out-of-slice #586/#809/#812 above |
+| Grok              | Unassigned                                                   |
+| Security reviewer | Unassigned                                                   |
+| Gemini            | Unassigned                                                   |
+| Council Chair     | Unassigned                                                   |

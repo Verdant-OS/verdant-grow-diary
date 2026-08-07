@@ -55,6 +55,15 @@ jobs:
 
       # Deterministic 1/16 partition of src/test, run one file per vitest
       # invocation with worker isolation so memory is released between files.
+      #
+      # TEMPORARY DIAGNOSTIC (branch diag/full-suite-continue-on-fail — do NOT
+      # merge): --continue-on-fail is added so a batch does not stop at its
+      # first failing file. Normally the runner breaks on the first failure
+      # (scripts/run-vitest-batches.mjs:134,194), which means a red suite only
+      # ever reveals ~58% of its failing files and hides the rest. This run
+      # exists solely to enumerate the COMPLETE failing set on the deploy
+      # branch. Revert before merging anything — the gate should keep failing
+      # fast in normal operation.
       - name: Run batch ${{ matrix.batch }} of 16 (round-robin, chunked, isolated)
         run: |
           node scripts/run-vitest-batches.mjs \
@@ -65,4 +74,5 @@ jobs:
             --chunk-size=1 \
             --isolate \
             --pool=forks \
-            --retry-failed-chunk-once
+            --retry-failed-chunk-once \
+            --continue-on-fail

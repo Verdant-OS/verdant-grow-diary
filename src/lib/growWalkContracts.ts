@@ -116,6 +116,8 @@ export interface GrowWalkActionQueueEvidence {
 export interface GrowWalkSensorEvidence {
   readonly available: boolean;
   readonly readings: Readonly<Record<string, McpSensorReading>>;
+  /** Metrics whose independently sourced readings conflict after normalization. */
+  readonly contradictionMetrics?: readonly string[];
 }
 
 export interface GrowWalkEvidenceDerivation {

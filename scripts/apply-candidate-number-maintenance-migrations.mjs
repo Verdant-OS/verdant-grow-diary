@@ -119,56 +119,55 @@ export function validatePinnedMigrationFiles({ root = migrationsRoot, readFile =
 }
 
 /**
- * One transaction: lock the ledger table, guard against a concurrent
- * collision, run both file bodies exactly as validated, then explicitly
- * insert each row's OWN filename-derived version and name. This is what
- * prevents a freshly generated duplicate timestamp — nothing else writes
- * to supabase_migrations.schema_migrations in this script.
+ * SQL for exactly ONE migration step: guard against a concurrent collision
+ * on THIS version/name, run this one file's body exactly as validated, then
+ * explicitly insert this row's OWN filename-derived version and name. This
+ * is what prevents a freshly generated duplicate timestamp — nothing else
+ * writes to supabase_migrations.schema_migrations in this script.
+ *
+ * Deliberately ONE MIGRATION PER CALL, not both bundled together — proven
+ * necessary, not stylistic. 20260806230020 adds
+ * plants_candidate_number_requires_hunt_chk NOT VALID (a brief ACCESS
+ * EXCLUSIVE lock) and 20260806230021 VALIDATEs it (a full-table scan under
+ * only SHARE UPDATE EXCLUSIVE) specifically so that scan does not run while
+ * the stronger lock is held. Postgres holds ACCESS EXCLUSIVE for the
+ * REMAINDER OF THE TRANSACTION regardless of which statement is
+ * "currently running" — verified empirically: a concurrent SELECT against
+ * the table blocked for the full duration of a held-open transaction, not
+ * just the ALTER TABLE statement. Bundling both files into one
+ * --single-transaction call would silently re-hold that lock through the
+ * VALIDATE scan, defeating the whole reason these are two files. The
+ * caller (runApplyCandidateNumberMaintenanceMigrations) must invoke this
+ * once per migration, as two separate --single-transaction psql
+ * invocations, so the first migration's transaction commits — releasing
+ * its lock — before the second one's transaction begins.
  *
  * The atomicity and the legality of SET LOCAL / LOCK TABLE below come from
  * the CALLER, not from any BEGIN/COMMIT text in this string: runPsqlFile
  * invokes psql with --single-transaction, which wraps the whole file in an
  * implicit BEGIN/COMMIT. Without that flag psql defaults to autocommit and
  * LOCK TABLE errors immediately ("can only be used in transaction
- * blocks") — verified empirically. Do not "fix" that by adding a literal
- * BEGIN/COMMIT here; it would conflict with --single-transaction's own
- * wrapping.
+ * blocks") — also verified empirically. Do not "fix" that by adding a
+ * literal BEGIN/COMMIT here; it would conflict with --single-transaction's
+ * own wrapping.
  */
-export function buildApplySql(validatedMigrations) {
+export function buildApplyStepSql(migration) {
+  const expected = PINNED_MIGRATIONS.find((m) => m.version === migration?.version);
   if (
-    !Array.isArray(validatedMigrations) ||
-    validatedMigrations.length !== PINNED_MIGRATIONS.length
+    !expected ||
+    migration.version !== expected.version ||
+    migration.name !== expected.name ||
+    migration.sha256 !== expected.sha256 ||
+    typeof migration.text !== "string"
   ) {
-    throw new Error("validated_migration_count");
-  }
-  for (let index = 0; index < PINNED_MIGRATIONS.length; index++) {
-    const expected = PINNED_MIGRATIONS[index];
-    const observed = validatedMigrations[index];
-    if (
-      observed.version !== expected.version ||
-      observed.name !== expected.name ||
-      observed.sha256 !== expected.sha256 ||
-      typeof observed.text !== "string"
-    ) {
-      throw new Error(`validated_migration_order:${expected.version}`);
-    }
+    throw new Error(`validated_migration_step:${migration?.version}`);
   }
 
-  const collisionValues = PINNED_MIGRATIONS.map(
-    ({ version, name }) => `(${sqlLiteral(version)}, ${sqlLiteral(name)})`,
-  ).join(",\n      ");
-  const ledgerValues = PINNED_MIGRATIONS.map(
-    ({ version, name, sha256: hash }) =>
-      `(${sqlLiteral(version)}, ${sqlLiteral(name)}, ` +
-      `array[${sqlLiteral(`-- applied verbatim by protected GitHub workflow; sha256=${hash}`)}]::text[])`,
-  ).join(",\n  ");
-
-  const bodies = validatedMigrations
-    .map(
-      ({ file, text }) =>
-        `\n-- BEGIN EXACT PINNED FILE: ${file}\n${text}-- END EXACT PINNED FILE: ${file}\n`,
-    )
-    .join("");
+  const { version, name, sha256: hash, file, text } = migration;
+  const ledgerValue =
+    `(${sqlLiteral(version)}, ${sqlLiteral(name)}, ` +
+    `array[${sqlLiteral(`-- applied verbatim by protected GitHub workflow; sha256=${hash}`)}]::text[])`;
+  const body = `\n-- BEGIN EXACT PINNED FILE: ${file}\n${text}-- END EXACT PINNED FILE: ${file}\n`;
 
   return [
     "\\set ON_ERROR_STOP on",
@@ -179,15 +178,10 @@ export function buildApplySql(validatedMigrations) {
     "declare",
     "  v_collision_count integer;",
     "begin",
-    "  with expected(version, name) as (",
-    "    values",
-    `      ${collisionValues}`,
-    "  )",
     "  select count(*)",
     "    into v_collision_count",
-    "  from expected e",
-    "  join supabase_migrations.schema_migrations sm",
-    "    on sm.version = e.version or sm.name = e.name;",
+    "  from supabase_migrations.schema_migrations sm",
+    `  where sm.version = ${sqlLiteral(version)} or sm.name = ${sqlLiteral(name)};`,
     "",
     "  if v_collision_count <> 0 then",
     "    raise exception using",
@@ -196,10 +190,9 @@ export function buildApplySql(validatedMigrations) {
     "  end if;",
     "end",
     "$candidate_number_apply_guard$;",
-    bodies,
+    body,
     "insert into supabase_migrations.schema_migrations (version, name, statements)",
-    "values",
-    `  ${ledgerValues};`,
+    `values ${ledgerValue};`,
     "",
   ].join("\n");
 }
@@ -511,23 +504,50 @@ export function runApplyCandidateNumberMaintenanceMigrations({
   }
 
   if (ledger.status === "apply") {
-    const temporaryRoot = mkdtempSync(
-      join(env.RUNNER_TEMP || env.TEMP || env.TMP || tmpdir(), "verdant-candidate-number-apply-"),
-    );
-    const applyPath = join(temporaryRoot, "apply.sql");
-    try {
-      writeFileSync(applyPath, buildApplySql(validatedMigrations), { encoding: "utf8", mode: 0o600 });
-      const applyResult = runPsqlFile({ path: applyPath, childEnv, spawnImpl });
-      if (!applyResult.ok) {
-        logger.error("The candidate-number transaction failed and was rolled back.");
-        writeReport("FAILED - transaction rolled back", [
-          "psql returned a failure while running the exact single transaction. No partial success is accepted.",
-        ]);
-        writeAudit("apply_failed", { ...auditBase, ledgerState: ledger.status, note: applyResult.kind });
-        return applyResult.kind === "not_invocable" ? EXIT.PSQL_NOT_INVOCABLE : EXIT.APPLY_FAILED;
+    // Each migration is its own --single-transaction psql invocation, run
+    // SEQUENTIALLY — never bundled into one call. 20260806230020's ACCESS
+    // EXCLUSIVE lock (from ADD CONSTRAINT NOT VALID) must be released at
+    // ITS OWN commit before 20260806230021's VALIDATE CONSTRAINT scan
+    // begins; verified empirically that Postgres holds that lock for the
+    // remainder of whatever transaction it started in, not just the
+    // statement. A failure on step 2 after step 1 already committed is a
+    // real, reportable partial-apply state, not the "nothing happened"
+    // rollback a single combined transaction would have guaranteed — the
+    // report below says so explicitly so an operator investigates the
+    // actual ledger state rather than assuming an all-or-nothing outcome.
+    for (let stepIndex = 0; stepIndex < validatedMigrations.length; stepIndex++) {
+      const migration = validatedMigrations[stepIndex];
+      const temporaryRoot = mkdtempSync(
+        join(env.RUNNER_TEMP || env.TEMP || env.TMP || tmpdir(), "verdant-candidate-number-apply-"),
+      );
+      const applyPath = join(temporaryRoot, `apply-${migration.version}.sql`);
+      try {
+        writeFileSync(applyPath, buildApplyStepSql(migration), { encoding: "utf8", mode: 0o600 });
+        const applyResult = runPsqlFile({ path: applyPath, childEnv, spawnImpl });
+        if (!applyResult.ok) {
+          const isFirstStep = stepIndex === 0;
+          logger.error(
+            `Migration ${migration.version} failed and was rolled back` +
+              (isFirstStep ? "; no earlier step ran." : "; the earlier step(s) already committed."),
+          );
+          writeReport(`FAILED - ${migration.version} rolled back`, [
+            `psql returned a failure while applying ${migration.version} in its own transaction.`,
+            isFirstStep
+              ? "No earlier migration in this run committed."
+              : `${stepIndex} earlier migration(s) in this run already committed and are NOT rolled back. Check the exact ledger state with scripts/verify-candidate-number-migration-history.mjs before retrying.`,
+          ]);
+          writeAudit("apply_failed", {
+            ...auditBase,
+            ledgerState: ledger.status,
+            failedVersion: migration.version,
+            stepIndex,
+            note: applyResult.kind,
+          });
+          return applyResult.kind === "not_invocable" ? EXIT.PSQL_NOT_INVOCABLE : EXIT.APPLY_FAILED;
+        }
+      } finally {
+        rmSync(temporaryRoot, { recursive: true, force: true });
       }
-    } finally {
-      rmSync(temporaryRoot, { recursive: true, force: true });
     }
   }
 

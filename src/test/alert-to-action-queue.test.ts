@@ -123,12 +123,20 @@ describe("AlertDetail — static safety", () => {
     expect(ALERT_DETAIL).toMatch(/existingActionId/);
   });
 
-  it("does NOT include user_id in client insert payload", () => {
-    const match = ALERT_DETAIL.match(
-      /\.from\(\s*["']action_queue["']\s*\)\s*\.insert\(\s*\{([\s\S]*?)\}\s*\)/,
-    );
-    expect(match).not.toBeNull();
+  it("does NOT include user_id in the client action_queue create payload", () => {
+    // #586 moved this write from a raw `.from("action_queue").insert({...})`
+    // to the atomic `createActionQueueItem(...)` RPC wrapper. The old regex
+    // stopped matching and the guard silently verified nothing, so it follows
+    // the payload to its new home.
+    const match = ALERT_DETAIL.match(/createActionQueueItem\(\s*\{([\s\S]*?)\}\s*\)/);
+    expect(
+      match,
+      "AlertDetail must create action_queue rows via createActionQueueItem",
+    ).not.toBeNull();
     expect(match![1]).not.toMatch(/\buser_id\s*:/);
+    expect(match![1]).not.toMatch(/\btarget_device\s*:/);
+    // The retired raw-insert path must not come back.
+    expect(ALERT_DETAIL).not.toMatch(/from\(\s*["']action_queue["']\s*\)\s*\.insert\(/);
   });
 
   it("pins status='pending_approval' and source='environment_alert'", () => {

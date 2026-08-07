@@ -19,7 +19,11 @@
  *   - When `stage` is undefined (legacy callers), the conservative generic
  *     0.6–1.6 kPa default range still applies for backward compatibility.
  */
-import { isStale, type SensorSnapshot } from "@/lib/sensorSnapshot";
+import {
+  isStale,
+  LIVE_CURRENT_STATE_STALE_MS,
+  type SensorSnapshot,
+} from "@/lib/sensorSnapshot";
 import type { EnvironmentAlert } from "@/lib/environmentAlerts";
 import { classifyVpdAgainstStage } from "@/lib/vpdStageTargetRules";
 import {
@@ -108,7 +112,11 @@ export function buildDefaultThresholdAlerts(args: BuildArgs): EnvironmentAlert[]
   if (!snapshot) return [];
   if (snapshot.source !== "live" && snapshot.source !== "manual") return [];
   const now = args.now ?? Date.now();
-  if (isStale(snapshot.ts, now, undefined, snapshot.source)) return [];
+  // LIVE window for every source — these alerts are persistable, and
+  // persistence is deliberately tighter than source-aware DISPLAY freshness
+  // (Sensor Truth Canon live 15m / manual 24h). Must stay in lockstep with
+  // isSnapshotPersistable + alertFreshnessContext; do NOT pass snapshot.source.
+  if (isStale(snapshot.ts, now, LIVE_CURRENT_STATE_STALE_MS)) return [];
 
   const createdAt = args.createdAt ?? new Date(now).toISOString();
   const out: EnvironmentAlert[] = [];

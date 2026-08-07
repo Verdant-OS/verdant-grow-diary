@@ -34,10 +34,14 @@ function snap(
 }
 
 describe("alertFreshnessContext — shared constants", () => {
-  it("derives the minute label from STALE_THRESHOLD_MS and exposes the canon window label", () => {
+  it("derives the minute label from STALE_THRESHOLD_MS and exposes the LIVE alert window label", () => {
     expect(STALE_THRESHOLD_MINUTES).toBe(Math.round(STALE_THRESHOLD_MS / 60_000));
     expect(STALE_THRESHOLD_MINUTES).toBe(15);
-    expect(FRESHNESS_WINDOW_LABEL).toBe("15-minute live / 24-hour manual alert window");
+    // Alert PERSISTENCE uses the live window for every source — deliberately
+    // tighter than source-aware DISPLAY freshness (live 15m / manual 24h).
+    // Advertising a 24h manual window here would promise persistence for
+    // snapshots isSnapshotPersistable rejects.
+    expect(FRESHNESS_WINDOW_LABEL).toBe("15-minute alert window");
   });
 });
 

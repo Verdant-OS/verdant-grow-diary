@@ -1,6 +1,6 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-07-31
+**Last updated:** 2026-08-07
 **Updated by:** Claude (Knowledge Library & Product Specification Architect)
 
 This is the shift report. It changes often. Permanent rules live in `/AGENTS.md` and must
@@ -94,16 +94,47 @@ Grok's research feeds step 6, not step 1.
 
 ## Agents currently assigned
 
-| Agent  | Status                                                       |
-| ------ | ------------------------------------------------------------ |
-| Claude | Architecture delivered — verdict `HOLD` on library expansion |
-| Codex  | Not yet started — awaiting slice 1                           |
-| Grok   | Not yet started — research feeds slice 6                     |
-| Others | Not yet engaged                                              |
+| Agent  | Status                                                                               |
+| ------ | ------------------------------------------------------------------------------------ |
+| Claude | SEO: architecture delivered, verdict `HOLD`. EcoWitt: Phase 1.7 verified (see below) |
+| Codex  | Not yet started — awaiting slice 1                                                   |
+| Grok   | Not yet started — research feeds slice 6                                             |
+| Others | Not yet engaged                                                                      |
 
 ---
 
 ## Unrelated work in flight
+
+### EcoWitt real ingest — Phase 1.7 verified, Phase 1.8 not started
+
+Branch `claude/ecowitt-sensor-verify-98f1bd` (based on `main`). Record:
+`docs/ecowitt-real-ingest-phase-1-7-verification-record.md`.
+
+| Phase 2 gate item                             | Status                                    |
+| --------------------------------------------- | ----------------------------------------- |
+| 1. Wrapper tests pass                         | `PASS` — 22/22 targeted tests, 2026-08-07 |
+| 2. Token storage/rotation/revocation policy   | `BLOCKED` — Cheek (owner-only)            |
+| 3. Schema/RLS/idempotency audit (= Phase 1.8) | `NOT_STARTED`                             |
+| 4. Live-label fencing policy                  | `BLOCKED` — Cheek (owner-only)            |
+
+Persistence remains blocked. **`source='live'` is unreachable at Phase 1.7 by design** — the
+Edge wrapper has no database client. A live-labelled EcoWitt row would be a defect, not a
+pass signal, and a Sensor Snapshot screenshot is not a valid Phase 1.7 exit artifact.
+
+Two cautions for anyone picking this up:
+
+- A verification guide circulating outside the repo names Supabase project
+  `bzatgtgjvuojpoxcknaa`. That ref exists in **no** file here. The project is
+  `knkwiiywfkbqznbxwqfh`. The same guide describes `~/verdant-testbench` as a copy of
+  Verdant; it is not a git repository.
+- Phase 1.8 idempotency drafts produced without repo access assume a wide
+  one-row-per-sample table. `public.sensor_readings` is **long format — one row per
+  `(tent, metric, ts)`**. Start 1.8 from the real cardinality.
+
+**This is not the approved slice.** The approved slice above remains SEO repair and
+measurement. Whether EcoWitt supersedes it is Cheek's call, not an agent's.
+
+### Skill Runtime v1
 
 `PR #616` — Skill Runtime v1 Build 7 (evaluation harness), branch
 `build/07-skill-evaluation-harness`. CI green at `22d9054d3`. Five findings open. This is

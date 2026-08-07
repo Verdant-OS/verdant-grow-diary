@@ -185,3 +185,139 @@ describe("buildDrybackMonitoring", () => {
     expect(vm.openWindow?.sampleCount).toBe(2);
   });
 });
+
+describe("projectDrybackSamplesForMonitoring / calibrated series", () => {
+  const GROW = "11111111-1111-4111-8111-111111111111";
+  const TENT = "22222222-2222-4222-8222-222222222222";
+
+  it("uses calibrated VWC for peak/trough when a dry/wet baseline is active", () => {
+    const w0 = hoursFrom(T0, -48);
+    const w1 = hoursFrom(T0, -12);
+    // dry=0 wet=100 identity-ish but dry=10 wet=90 → map 55→50, 32→24.4 approx
+    // Use dry=0 wet=100 for easy math: calibrated == raw when points 0 and 100...
+    // dry=10, wet=90: cal(55)=(55-10)/80*100 = 56.25; cal(32)=(32-10)/80*100=27.5
+    const vm = buildDrybackMonitoringFromSensorRows(
+      [
+        {
+          id: "a",
+          metric: "soil_moisture_pct",
+          value: 55,
+          source: "live",
+          captured_at: hoursFrom(T0, -47),
+        },
+        {
+          id: "b",
+          metric: "soil_moisture_pct",
+          value: 48,
+          source: "live",
+          captured_at: hoursFrom(T0, -40),
+        },
+        {
+          id: "c",
+          metric: "soil_moisture_pct",
+          value: 40,
+          source: "live",
+          captured_at: hoursFrom(T0, -30),
+        },
+        {
+          id: "d",
+          metric: "soil_moisture_pct",
+          value: 35,
+          source: "live",
+          captured_at: hoursFrom(T0, -20),
+        },
+        {
+          id: "e",
+          metric: "soil_moisture_pct",
+          value: 32,
+          source: "live",
+          captured_at: hoursFrom(T0, -13),
+        },
+        {
+          id: "f",
+          metric: "soil_moisture_pct",
+          value: 58,
+          source: "live",
+          captured_at: hoursFrom(T0, -10),
+        },
+        {
+          id: "g",
+          metric: "soil_moisture_pct",
+          value: 50,
+          source: "live",
+          captured_at: hoursFrom(T0, -4),
+        },
+        {
+          id: "h",
+          metric: "soil_moisture_pct",
+          value: 46,
+          source: "live",
+          captured_at: hoursFrom(T0, -1),
+        },
+      ],
+      [
+        { id: "w0", occurredAt: w0, volumeMl: 1800 },
+        { id: "w1", occurredAt: w1, volumeMl: 1600 },
+      ],
+      {
+        now: T0,
+        calibration: {
+          context: { growId: GROW, tentId: TENT, plantId: null, deviceId: null },
+          calibrations: [
+            {
+              id: "cal-1",
+              growId: GROW,
+              tentId: TENT,
+              plantId: null,
+              deviceId: null,
+              dryRaw: 10,
+              wetRaw: 90,
+              source: "manual",
+              isActive: true,
+              createdAt: "2026-08-01T00:00:00.000Z",
+            },
+          ],
+        },
+      },
+    );
+
+    expect(vm.seriesValueKind).toBe("calibrated");
+    expect(vm.seriesLabel.toLowerCase()).toMatch(/calibrated/);
+    // peak raw 55 → 56.3; trough raw 32 → 27.5; delta 28.8
+    expect(vm.latestClosed?.peakVwcPct).toBe(56.3);
+    expect(vm.latestClosed?.troughVwcPct).toBe(27.5);
+    expect(vm.latestClosed?.deltaPctPoints).toBe(28.8);
+  });
+
+  it("falls back to raw when no active baseline", () => {
+    const vm = buildDrybackMonitoringFromSensorRows(
+      [
+        {
+          id: "r1",
+          metric: "soil_moisture_pct",
+          value: 50,
+          source: "manual",
+          captured_at: hoursFrom(T0, -5),
+        },
+        {
+          id: "r2",
+          metric: "soil_moisture_pct",
+          value: 40,
+          source: "manual",
+          captured_at: hoursFrom(T0, -1),
+        },
+      ],
+      [{ id: "w1", occurredAt: hoursFrom(T0, -10), volumeMl: 1000 }],
+      {
+        now: T0,
+        calibration: {
+          context: { growId: GROW, tentId: TENT },
+          calibrations: [],
+        },
+      },
+    );
+    expect(vm.seriesValueKind).toBe("raw");
+    expect(vm.openWindow?.peakVwcPct).toBe(50);
+    expect(vm.openWindow?.troughVwcPct).toBe(40);
+  });
+});

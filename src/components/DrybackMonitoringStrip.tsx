@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useSensorReadings } from "@/hooks/use-sensor-readings";
 import { useTentIrrigationLedger } from "@/hooks/useTentIrrigationLedger";
+import { useSoilMoistureCalibrations } from "@/hooks/useSoilMoistureCalibrations";
 import {
   DRYBACK_MONITORING_CAVEAT,
   DRYBACK_MONITORING_TITLE,
@@ -100,6 +101,10 @@ export function DrybackMonitoringStrip({
     plantId: plant,
     pageSize: 30,
   });
+  const calibrationsQuery = useSoilMoistureCalibrations({
+    growId,
+    tentId: tent,
+  });
 
   const model = useMemo(() => {
     const waterings = ledger.rows
@@ -111,8 +116,18 @@ export function DrybackMonitoringStrip({
       }));
     return buildDrybackMonitoringFromSensorRows(readingsQuery.data ?? [], waterings, {
       now: Date.now(),
+      calibration: {
+        context: {
+          growId: growId ?? null,
+          tentId: tent,
+          // Plant-scoped baselines win when present; tent-level still applies.
+          plantId: plant,
+          deviceId: null,
+        },
+        calibrations: calibrationsQuery.data ?? [],
+      },
     });
-  }, [readingsQuery.data, ledger.rows]);
+  }, [readingsQuery.data, ledger.rows, calibrationsQuery.data, growId, tent, plant]);
 
   const ariaLabel = scopeLabel
     ? `${DRYBACK_MONITORING_TITLE} for ${scopeLabel}`
@@ -143,7 +158,7 @@ export function DrybackMonitoringStrip({
     );
   }
 
-  const loading = readingsQuery.isLoading || ledger.isLoading;
+  const loading = readingsQuery.isLoading || ledger.isLoading || calibrationsQuery.isLoading;
   if (loading) {
     return (
       <Card
@@ -210,6 +225,7 @@ export function DrybackMonitoringStrip({
       className={cn("min-w-0", className)}
       data-testid="dryback-monitoring-strip"
       data-status={model.status}
+      data-series-kind={model.seriesValueKind}
       data-usable-windows={model.usableWindowCount}
       data-sample-count={model.sampleCount}
       aria-label={ariaLabel}
@@ -264,6 +280,24 @@ export function DrybackMonitoringStrip({
               ))}
             </ul>
           </div>
+        ) : null}
+
+        <p
+          className="text-xs text-muted-foreground"
+          data-testid="dryback-monitoring-series"
+          data-series-kind={model.seriesValueKind}
+        >
+          {model.seriesLabel}
+        </p>
+        {model.seriesWarnings.length > 0 ? (
+          <ul
+            className="text-xs text-muted-foreground list-disc pl-4"
+            data-testid="dryback-monitoring-series-warnings"
+          >
+            {model.seriesWarnings.map((w) => (
+              <li key={w}>{w}</li>
+            ))}
+          </ul>
         ) : null}
 
         <p className="text-xs text-muted-foreground" data-testid="dryback-monitoring-meta">

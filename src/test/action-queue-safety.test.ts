@@ -587,8 +587,11 @@ describe("Action Queue safety — tightened plant/tent ownership (active once po
   // Pull out just the latest CREATE POLICY ... FOR INSERT / UPDATE blocks on action_queue
   // from across all migrations. The last one wins (later DROP + recreate).
   function lastPolicyBlock(cmd: "INSERT" | "UPDATE"): string {
+    // Require policy grammar after FOR <cmd> (TO / USING / WITH CHECK) so a
+    // PL/pgSQL row lock `SELECT … FOR UPDATE` inside SECURITY DEFINER RPCs
+    // (e.g. action_queue_create) cannot span the match into later migrations.
     const re = new RegExp(
-      `CREATE\\s+POLICY[^;]*?ON\\s+public\\.action_queue[\\s\\S]*?FOR\\s+${cmd}[\\s\\S]*?;`,
+      `CREATE\\s+POLICY[^;]*?ON\\s+public\\.action_queue[\\s\\S]*?FOR\\s+${cmd}\\s+(?:TO\\s+\\w+\\s+)?(?:USING|WITH\\s+CHECK)[\\s\\S]*?;`,
       "gi",
     );
     const matches = [...ALL_ACTION_QUEUE_SQL.matchAll(re)];
@@ -684,8 +687,11 @@ describe("Action Queue safety — tightened plant/tent ownership (active once po
 describe("Action Queue safety — same-grow lineage (plants/tents must share grow_id)", () => {
   // Reuse the last INSERT/UPDATE policy text.
   function lastPolicyBlock(cmd: "INSERT" | "UPDATE"): string {
+    // Require policy grammar after FOR <cmd> (TO / USING / WITH CHECK) so a
+    // PL/pgSQL row lock `SELECT … FOR UPDATE` inside SECURITY DEFINER RPCs
+    // (e.g. action_queue_create) cannot span the match into later migrations.
     const re = new RegExp(
-      `CREATE\\s+POLICY[^;]*?ON\\s+public\\.action_queue[\\s\\S]*?FOR\\s+${cmd}[\\s\\S]*?;`,
+      `CREATE\\s+POLICY[^;]*?ON\\s+public\\.action_queue[\\s\\S]*?FOR\\s+${cmd}\\s+(?:TO\\s+\\w+\\s+)?(?:USING|WITH\\s+CHECK)[\\s\\S]*?;`,
       "gi",
     );
     const matches = [...ALL_ACTION_QUEUE_SQL.matchAll(re)];

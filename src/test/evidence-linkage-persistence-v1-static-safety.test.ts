@@ -85,8 +85,7 @@ describe("Evidence Linkage Persistence v1 — static safety", () => {
   it("write paths persist refs from a safe source (explicit [] or forwarded via adapter)", () => {
     const alertDetail = read("src/pages/AlertDetail.tsx");
     const aiHook = read("src/hooks/useAddAiDoctorSessionSuggestionToActionQueue.ts");
-    // AlertDetail now forwards the alert's already-sanitized persisted refs
-    // (Evidence Ref Population v1) via the shared adapter wrapper.
+    // AlertDetail forwards already-sanitized alert refs via createActionQueueItem (#586).
     expect(alertDetail).toMatch(
       /originating_timeline_events:\s*\n?\s*forwardAlertRefsToActionQueue\(alert\)/,
     );
@@ -97,6 +96,7 @@ describe("Evidence Linkage Persistence v1 — static safety", () => {
     // session text, or inferred values.
     const ALLOWED = new Set([
       "originating_timeline_events:[]",
+      "originating_timeline_events:forwardAlertRefsToActionQueue(alert)",
       "originating_timeline_events:forwardAlertRefsToActionQueue(alert)asunknownasnever",
     ]);
     for (const src of [alertDetail, aiHook]) {

@@ -11,14 +11,26 @@
 import { useMemo } from "react";
 import { useAlertsList } from "@/hooks/useAlertsList";
 import {
+  ASSIGNED_TENT_ALERTS_DEFAULT_LIMIT,
   ASSIGNED_TENT_ALERT_STATUSES,
-  buildAssignedTentAlerts,
+  countOpenAlerts,
+  selectActiveTentAlerts,
   type PlantAssignedTentAlertRow,
 } from "@/lib/plantAssignedTentAlertRules";
 
 export interface UsePlantAssignedTentAlertsResult {
   status: ReturnType<typeof useAlertsList>["status"];
+  /** Capped for display (see ASSIGNED_TENT_ALERTS_DEFAULT_LIMIT). */
   rows: PlantAssignedTentAlertRow[];
+  /**
+   * Strictly-open count across ALL active alerts for the tent, computed before
+   * the display cap. Surfaces whose copy says "open alerts" must use this and
+   * never count `rows`: acknowledged alerts of higher severity can fill every
+   * capped slot, which would report zero open alerts on a tent that has one.
+   */
+  openCount: number;
+  /** Active (open + acknowledged) count for the tent, also uncapped. */
+  activeCount: number;
   error: string | null;
 }
 
@@ -44,9 +56,16 @@ export function usePlantAssignedTentAlerts(
     // No tent means the rules layer returns [] regardless — don't read at all.
     { enabled: !!tentId },
   );
-  const rows = useMemo(
-    () => buildAssignedTentAlerts(alerts, { tentId, growId, limit }),
-    [alerts, tentId, growId, limit],
+  // Select once, uncapped, then derive both the display slice and the counts
+  // from it — counting the capped slice is what produced the false zero.
+  const active = useMemo(
+    () => selectActiveTentAlerts(alerts, { tentId, growId }),
+    [alerts, tentId, growId],
   );
-  return { status, rows, error };
+  const rows = useMemo(
+    () => active.slice(0, Math.max(1, limit ?? ASSIGNED_TENT_ALERTS_DEFAULT_LIMIT)),
+    [active, limit],
+  );
+  const openCount = useMemo(() => countOpenAlerts(active), [active]);
+  return { status, rows, openCount, activeCount: active.length, error };
 }

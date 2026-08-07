@@ -220,7 +220,16 @@ function setupHooks({
   actionsLoading?: boolean;
 } = {}) {
   mockEntries.mockReturnValue({ data: entries, isLoading: entriesLoading });
-  mockAlerts.mockReturnValue({ rows: alertRows, status: alertStatus });
+  // openCount mirrors what the hook derives from the UNCAPPED active set.
+  const openCount = (alertRows as Array<{ status?: string }>).filter(
+    (r) => r?.status === "open",
+  ).length;
+  mockAlerts.mockReturnValue({
+    rows: alertRows,
+    openCount,
+    activeCount: alertRows.length,
+    status: alertStatus,
+  });
   mockActions.mockReturnValue({ rows: actionRows, isLoading: actionsLoading });
 }
 

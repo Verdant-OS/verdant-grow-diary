@@ -114,11 +114,27 @@ export function buildAssignedTentAlerts(
   rows: readonly AlertRow[] | null | undefined,
   opts: BuildAssignedTentAlertsOptions,
 ): PlantAssignedTentAlertRow[] {
+  const limit = Math.max(1, opts.limit ?? ASSIGNED_TENT_ALERTS_DEFAULT_LIMIT);
+  return selectActiveTentAlerts(rows, opts).slice(0, limit);
+}
+
+/**
+ * The same scoping and ordering as `buildAssignedTentAlerts`, but WITHOUT the
+ * display cap.
+ *
+ * Counts must be derived from this, never from the capped list. The cap is a
+ * display concern; a tent whose top slots are filled by higher-severity
+ * acknowledged alerts would otherwise report zero open alerts while an open one
+ * sits just past the cutoff — a false "No open alerts" on a tent that has one.
+ */
+export function selectActiveTentAlerts(
+  rows: readonly AlertRow[] | null | undefined,
+  opts: BuildAssignedTentAlertsOptions,
+): PlantAssignedTentAlertRow[] {
   const tentId = opts.tentId ?? null;
   if (!tentId) return [];
   if (!rows || rows.length === 0) return [];
   const growId = opts.growId ?? null;
-  const limit = Math.max(1, opts.limit ?? ASSIGNED_TENT_ALERTS_DEFAULT_LIMIT);
 
   const scoped = rows.filter((a) => {
     if (!a) return false;
@@ -135,5 +151,5 @@ export function buildAssignedTentAlerts(
     if (bt !== at) return bt - at;
     return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
   });
-  return mapped.slice(0, limit);
+  return mapped;
 }

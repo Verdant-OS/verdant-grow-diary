@@ -21,7 +21,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
 
 import type { AlertRow, AlertsQuery } from "@/lib/alerts";
-import { ASSIGNED_TENT_ALERT_STATUSES, countOpenAlerts } from "@/lib/plantAssignedTentAlertRules";
+import {
+  ASSIGNED_TENT_ALERTS_DEFAULT_LIMIT,
+  ASSIGNED_TENT_ALERT_STATUSES,
+  countOpenAlerts,
+} from "@/lib/plantAssignedTentAlertRules";
 
 const listAlertsMock = vi.fn();
 
@@ -201,5 +205,38 @@ describe("countOpenAlerts — 'open alerts' copy stays truthful", () => {
     expect(countOpenAlerts(null)).toBe(0);
     expect(countOpenAlerts(undefined)).toBe(0);
     expect(countOpenAlerts([])).toBe(0);
+  });
+
+  it("counts open alerts pushed past the display cap by higher-severity acknowledged ones", async () => {
+    // Five critical acknowledged alerts fill every one of the 5 display slots,
+    // leaving a genuinely open (but lower-severity) alert off `rows`. Counting
+    // the capped list would report "No open alerts" on a tent that has one —
+    // a false zero, which is worse than the false positive it replaced.
+    respondWith([
+      ...Array.from({ length: ASSIGNED_TENT_ALERTS_DEFAULT_LIMIT }, (_, i) =>
+        alert({ id: `ack-${i}`, status: "acknowledged", severity: "critical" }),
+      ),
+      alert({ id: "open-late", status: "open", severity: "info" }),
+    ]);
+
+    const { result } = renderHook(() => usePlantAssignedTentAlerts(TENT, GROW));
+
+    await waitFor(() => expect(result.current.status).toBe("ok"));
+    // The open alert really is off the capped display list...
+    expect(result.current.rows).toHaveLength(ASSIGNED_TENT_ALERTS_DEFAULT_LIMIT);
+    expect(result.current.rows.map((r) => r.id)).not.toContain("open-late");
+    // ...but the count must still see it.
+    expect(result.current.openCount).toBe(1);
+    expect(result.current.activeCount).toBe(ASSIGNED_TENT_ALERTS_DEFAULT_LIMIT + 1);
+  });
+
+  it("counts every open alert beyond the cap, not just the displayed ones", async () => {
+    respondWith(Array.from({ length: 8 }, (_, i) => alert({ id: `open-${i}`, status: "open" })));
+
+    const { result } = renderHook(() => usePlantAssignedTentAlerts(TENT, GROW));
+
+    await waitFor(() => expect(result.current.status).toBe("ok"));
+    expect(result.current.rows).toHaveLength(ASSIGNED_TENT_ALERTS_DEFAULT_LIMIT);
+    expect(result.current.openCount).toBe(8);
   });
 });

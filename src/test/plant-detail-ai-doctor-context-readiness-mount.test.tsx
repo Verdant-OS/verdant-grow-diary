@@ -55,6 +55,9 @@ vi.mock("@/hooks/usePlantAssignedTentAlerts", () => ({
   usePlantAssignedTentAlerts: () => ({
     status: "idle",
     rows: alertsState.rows,
+    // Mirrors the hook: counts come from the uncapped active set, not `rows`.
+    openCount: alertsState.rows.filter((r) => r.status === "open").length,
+    activeCount: alertsState.rows.length,
     error: null,
   }),
 }));
@@ -102,10 +105,12 @@ describe("PlantDetailAiDoctorContextReadinessMount", () => {
       ],
       isLoading: false,
     };
-    alertsState = { rows: [
-      { id: "a1", status: "open" },
-      { id: "a2", status: "open" },
-    ] };
+    alertsState = {
+      rows: [
+        { id: "a1", status: "open" },
+        { id: "a2", status: "open" },
+      ],
+    };
 
     render(<PlantDetailAiDoctorContextReadinessMount {...baseProps} />);
     expect(screen.getByTestId("plant-detail-ai-doctor-context-readiness-mount")).toBeTruthy();

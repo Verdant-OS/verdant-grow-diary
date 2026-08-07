@@ -61,6 +61,25 @@ function isActive(status: AlertStatusRow): boolean {
   return ASSIGNED_TENT_ALERT_STATUSES.includes(status);
 }
 
+/**
+ * Count only the strictly-open rows in an already-built active list.
+ *
+ * Surfaces whose copy says "open alerts" must use this rather than
+ * `rows.length`. `rows` is the ACTIVE set (open + acknowledged), so counting it
+ * under an "open" label would report open alerts that do not exist — an
+ * acknowledged-only tent would read as though nothing had been seen yet.
+ *
+ * Kept as a separate count rather than relabelling those surfaces to "active":
+ * whether the quick-status strips should start counting acknowledged alerts is
+ * a product decision, not a side effect of repairing the panel's query.
+ */
+export function countOpenAlerts(
+  rows: readonly PlantAssignedTentAlertRow[] | null | undefined,
+): number {
+  if (!rows || rows.length === 0) return 0;
+  return rows.reduce((n, r) => (r.status === "open" ? n + 1 : n), 0);
+}
+
 function toRow(a: AlertRow): PlantAssignedTentAlertRow {
   return {
     id: a.id,

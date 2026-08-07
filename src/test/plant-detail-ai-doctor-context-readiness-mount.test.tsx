@@ -40,7 +40,7 @@ let manualLogsState: { data?: unknown; isLoading: boolean } = {
   data: [],
   isLoading: false,
 };
-let alertsState: { rows: ReadonlyArray<{ id: string }> } = { rows: [] };
+let alertsState: { rows: ReadonlyArray<{ id: string; status?: string }> } = { rows: [] };
 
 vi.mock("@/hooks/usePlantRecentActivity", () => ({
   PLANT_RECENT_ACTIVITY_LIMIT: 10,
@@ -102,7 +102,10 @@ describe("PlantDetailAiDoctorContextReadinessMount", () => {
       ],
       isLoading: false,
     };
-    alertsState = { rows: [{ id: "a1" }, { id: "a2" }] };
+    alertsState = { rows: [
+      { id: "a1", status: "open" },
+      { id: "a2", status: "open" },
+    ] };
 
     render(<PlantDetailAiDoctorContextReadinessMount {...baseProps} />);
     expect(screen.getByTestId("plant-detail-ai-doctor-context-readiness-mount")).toBeTruthy();

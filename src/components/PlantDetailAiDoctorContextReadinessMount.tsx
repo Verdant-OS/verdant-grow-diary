@@ -16,6 +16,7 @@ import PlantSensorContextAuditPanel from "@/components/PlantSensorContextAuditPa
 import { usePlantRecentActivity } from "@/hooks/usePlantRecentActivity";
 import { usePlantManualSensorLogs } from "@/hooks/usePlantManualSensorHistory";
 import { usePlantAssignedTentAlerts } from "@/hooks/usePlantAssignedTentAlerts";
+import { countOpenAlerts } from "@/lib/plantAssignedTentAlertRules";
 import {
   buildPlantAiDoctorContext,
   type DiaryEntryRowLike,
@@ -219,7 +220,9 @@ export default function PlantDetailAiDoctorContextReadinessMount({
     <div data-testid="plant-detail-ai-doctor-context-readiness-mount" className="my-3 space-y-2">
       <AiDoctorContextReadinessPanel
         context={built.context}
-        openAlertsCount={alerts.rows.length}
+        // The readiness panel renders this under "Open alerts", so it must be
+        // the strictly-open count — the hook also returns acknowledged rows.
+        openAlertsCount={countOpenAlerts(alerts.rows)}
         quickActions={{
           // Every action routes into an existing Quick Log surface; the
           // grower still reviews and saves. Dispatching never writes.

@@ -165,11 +165,19 @@ describe("Plant Detail wiring", () => {
     expect(HOOK).toContain("useAlertsList");
     expect(HOOK).toMatch(/growId/);
     // Status filtering belongs to buildAssignedTentAlerts, which keeps
-    // acknowledged alerts alongside open ones. Narrowing the query here turns
-    // into an `.eq(...)` on the status column and drops acknowledged rows
+    // acknowledged alerts alongside open ones. Pinning a single status here
+    // turns into an `.eq(...)` on the status column and drops acknowledged rows
     // before the rules layer runs — the defect this anchor now guards against.
     expect(HOOK).not.toMatch(/status:\s*["']open["']/);
-    expect(HOOK).toMatch(/status:\s*["']all["']/);
+    // The status set must be PASSED FROM the rules layer, not restated here,
+    // so the query and the rule cannot drift apart again.
+    expect(HOOK).toMatch(/statuses:\s*ASSIGNED_TENT_ALERT_STATUSES/);
+    expect(RULES).toMatch(/export const ASSIGNED_TENT_ALERT_STATUSES/);
+  });
+  it("hook skips the read entirely when the plant has no assigned tent", () => {
+    // Without a tent the rules layer returns [] regardless, so firing the
+    // query would be a wasted read on every tentless Plant Detail mount.
+    expect(HOOK).toMatch(/enabled:\s*!!tentId/);
   });
 });
 

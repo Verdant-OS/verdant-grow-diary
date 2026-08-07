@@ -98,6 +98,12 @@ export function useLatestSensorSnapshot(
                 metric: r.metric,
                 value: r.value as number | string | null,
                 source: r.source as string | null,
+                // Carry the row's tent so snapshotFromReadings can attribute
+                // the snapshot when every contributing row agrees. Dropping
+                // it here is what left every persisted environment alert
+                // tent-less, which in turn left the Plant Detail
+                // assigned-tent alerts panel permanently empty.
+                tent_id: (r as { tent_id?: string | null }).tent_id ?? null,
                 raw_payload: (r as { raw_payload?: unknown }).raw_payload,
               })),
             );
@@ -124,11 +130,20 @@ export function useLatestSensorSnapshot(
           // to one of those tents — null/foreign tent_id is not this tent's
           // evidence (sensor_snapshot and environment_check share the gate).
           if (!isDiaryRowInTentScope(row.tent_id, tentIds)) continue;
+          // Past that gate the row is proven in scope, so its own tent is the
+          // honest attribution for whichever snapshot this row yields. (This
+          // replaces an earlier local `envScopeOk` hoist from this branch:
+          // #602 made the gate a hard skip for BOTH diary paths, so the
+          // in-scope check no longer needs restating here.)
+          const rowTentInScope = row.tent_id ?? null;
           const snap = snapshotFromDiary(
             row.entry_at,
             details.sensor_snapshot as Record<string, unknown> | undefined,
           );
-          if (snap) return preferNewer(staleSensorCandidate, snap);
+          if (snap) {
+            snap.tent_id = rowTentInScope;
+            return preferNewer(staleSensorCandidate, snap);
+          }
           // #596: a Quick Log Environment Check is grower-entered manual
           // evidence; within the same row a full sensor_snapshot blob wins,
           // and rows are already newest-first.
@@ -141,7 +156,11 @@ export function useLatestSensorSnapshot(
             details.environment_check as Record<string, unknown> | undefined,
             { diaryEntryId },
           );
-          if (envSnap) return preferNewer(staleSensorCandidate, envSnap);
+          if (envSnap) {
+            // Already proven in-scope by the isDiaryRowInTentScope gate above.
+            envSnap.tent_id = rowTentInScope;
+            return preferNewer(staleSensorCandidate, envSnap);
+          }
         }
         // 3) Nothing newer in the diary: a stale sensor snapshot is still the
         // latest evidence (rendered with its stale badge), else nothing.

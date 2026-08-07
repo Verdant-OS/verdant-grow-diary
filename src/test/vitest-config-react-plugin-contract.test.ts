@@ -3,6 +3,13 @@ import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+/**
+ * @source-scan-justified: which package a plugin came from is not recoverable
+ * from the resolved config — the plugin object carries no origin package — and
+ * asserting the -swc variant is ABSENT is inherently a source-level claim.
+ * See AGENTS.md > Testing Standard.
+ */
+
 type PackageManifest = {
   dependencies?: Record<string, string>;
   devDependencies?: Record<string, string>;

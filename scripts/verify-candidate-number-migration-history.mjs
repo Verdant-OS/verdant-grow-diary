@@ -48,6 +48,23 @@ export const EXPECTED_MIGRATIONS = Object.freeze([
   }),
 ]);
 
+// Captured empirically from a throwaway Postgres 17 instance after applying
+// both pinned migration files, in order, to a clean baseline schema:
+// pg_get_constraintdef's rendering is deterministic for a given catalog
+// entry, and md5(pg_get_functiondef(...)) fingerprints the guard function's
+// actual logic rather than just a name or a marker substring inside it.
+// Both pins exist so a later DDL change that keeps the same object names
+// (and even keeps an old marker string somewhere in a comment or unrelated
+// variable) but swaps in different logic — e.g. `ALTER TABLE ... DROP
+// CONSTRAINT plants_candidate_number_requires_hunt_chk; ALTER TABLE ... ADD
+// CONSTRAINT plants_candidate_number_requires_hunt_chk CHECK (true);` —
+// is classified as NOT live instead of silently passing. Verified against a
+// real Postgres instance that this exact drift (same name, `CHECK (true)`
+// body) produces a different pg_get_constraintdef string.
+export const EXPECTED_GUARD_FUNCTION_MD5 = "f80bd729ca8721780c01c4740cd3a7d6";
+export const EXPECTED_CONSTRAINT_DEF =
+  "CHECK (((candidate_number IS NULL) OR (pheno_hunt_id IS NOT NULL)))";
+
 export const EXIT = Object.freeze({
   OK: 0,
   VERSION_MISSING_FROM_LEDGER: 1,
@@ -93,13 +110,14 @@ select jsonb_build_object(
       ('20260806230021', 'candidate_number_membership_validate')
     ) as expected(version, name)
   ),
-  'guard_has_fix', coalesce((
-    select pg_get_functiondef(p.oid) ilike '%v_caller_set_num%'
+  'guard_functiondef_md5', (
+    select md5(pg_get_functiondef(p.oid))
     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and p.proname = 'plants_candidate_number_guard'
-  ), false),
-  'constraint_present', exists (
-    select 1 from pg_catalog.pg_constraint
+  ),
+  'constraint_def', (
+    select pg_get_constraintdef(oid)
+    from pg_catalog.pg_constraint
     where conname = 'plants_candidate_number_requires_hunt_chk'
       and conrelid = 'public.plants'::regclass
   ),
@@ -133,8 +151,8 @@ export function parseVerifyStdout(stdout) {
         typeof m?.exact_match === "boolean" &&
         typeof m?.mismatch === "boolean",
     ) ||
-    typeof parsed.guard_has_fix !== "boolean" ||
-    typeof parsed.constraint_present !== "boolean" ||
+    (parsed.guard_functiondef_md5 !== null && typeof parsed.guard_functiondef_md5 !== "string") ||
+    (parsed.constraint_def !== null && typeof parsed.constraint_def !== "string") ||
     typeof parsed.constraint_validated !== "boolean"
   ) {
     throw new Error("verify_result_shape");
@@ -145,6 +163,14 @@ export function parseVerifyStdout(stdout) {
 /**
  * Classify the two facts independently: which expected versions are
  * literally in the ledger, and whether the schema effect is actually live.
+ *
+ * "Live" requires the guard function's full body and the constraint's full
+ * expression to match pinned canonical values (EXPECTED_GUARD_FUNCTION_MD5 /
+ * EXPECTED_CONSTRAINT_DEF), not just that an object with the right name
+ * exists. A same-named object with different logic — e.g. the constraint
+ * redefined as `CHECK (true)` — has to fail this check, since it no longer
+ * enforces the invariant even though a name/marker-substring check would
+ * have called it live.
  */
 export function classifyHistory(result) {
   const byVersion = new Map(result.migrations.map((m) => [m.version, m]));
@@ -162,16 +188,18 @@ export function classifyHistory(result) {
       missingVersions.push(expected.version);
     }
   }
+  const guardFunctionMatches = result.guard_functiondef_md5 === EXPECTED_GUARD_FUNCTION_MD5;
+  const constraintDefMatches = result.constraint_def === EXPECTED_CONSTRAINT_DEF;
   const schemaEffectLive =
-    result.guard_has_fix && result.constraint_present && result.constraint_validated;
+    guardFunctionMatches && constraintDefMatches && result.constraint_validated;
 
   return Object.freeze({
     missingVersions,
     mismatchedVersions,
     allVersionsPresent: missingVersions.length === 0 && mismatchedVersions.length === 0,
     schemaEffectLive,
-    guardHasFix: result.guard_has_fix,
-    constraintPresent: result.constraint_present,
+    guardFunctionMatches,
+    constraintDefMatches,
     constraintValidated: result.constraint_validated,
   });
 }
@@ -191,8 +219,8 @@ function createArtifactWriters({ targetEnv, reportPath, auditPath, logger, now }
           expected_versions: EXPECTED_MIGRATIONS.map((m) => m.version),
           missing_versions: classification?.missingVersions ?? null,
           schema_effect_live: classification?.schemaEffectLive ?? null,
-          guard_has_fix: classification?.guardHasFix ?? null,
-          constraint_present: classification?.constraintPresent ?? null,
+          guard_function_matches: classification?.guardFunctionMatches ?? null,
+          constraint_def_matches: classification?.constraintDefMatches ?? null,
           constraint_validated: classification?.constraintValidated ?? null,
           ...(note ? { note } : {}),
         },
@@ -221,6 +249,62 @@ function createArtifactWriters({ targetEnv, reportPath, auditPath, logger, now }
   };
 
   return { writeAudit, writeReport };
+}
+
+// Predicts, without dispatching it, what
+// scripts/apply-candidate-number-maintenance-migrations.mjs's own
+// classifyTargetLedger would do against this exact per-migration state, so
+// remediation text never recommends an action that tool would actually
+// refuse or silently skip. Only meaningful once mismatchedVersions is known
+// to be empty (a mismatch is handled by its own branch before this runs).
+export function describeApplyBehavior(classification) {
+  const [first, second] = EXPECTED_MIGRATIONS.map((m) => m.version);
+  const firstMissing = classification.missingVersions.includes(first);
+  const secondMissing = classification.missingVersions.includes(second);
+  if (!firstMissing && !secondMissing) return "verify_only";
+  if (firstMissing && secondMissing) return "apply";
+  if (!firstMissing && secondMissing) return "resume";
+  // firstMissing && !secondMissing: the later migration is recorded while
+  // the earlier one is not — an order the apply script's own write path
+  // never produces (it always applies in dependency order), so its ledger
+  // classifier treats this as drift and refuses to run.
+  return "reverse_gap_drift";
+}
+
+export function buildSchemaRepairGuidance({ targetEnv, classification }) {
+  // scripts/apply-candidate-number-maintenance-migrations.mjs is
+  // deliberately production-only (its own confirmation gate rejects any
+  // other TARGET_ENV) — pointing a sandbox failure at it would always fail
+  // again. Report the honest gap rather than a repair step that cannot
+  // work for this target.
+  if (targetEnv !== "production") {
+    return "This PR ships no automated sandbox repair path — the apply script is intentionally production-only and will refuse any other TARGET_ENV. Record or restore the exact ledger rows and schema objects manually against the sandbox database, or extend the apply script with its own sandbox confirmation gate before dispatching it here.";
+  }
+  const behavior = describeApplyBehavior(classification);
+  switch (behavior) {
+    case "apply":
+      return "Re-apply via `scripts/apply-candidate-number-maintenance-migrations.mjs`, which records the exact expected ledger rows.";
+    case "resume":
+      return "Re-apply via `scripts/apply-candidate-number-maintenance-migrations.mjs` — it will detect the clean partial state and resume from the remaining migration.";
+    case "verify_only":
+      return (
+        "Both exact ledger rows already exist, so `scripts/apply-candidate-number-maintenance-migrations.mjs` " +
+        'will classify this as already applied (`"verify_only"`), skip re-running any SQL, and simply fail ' +
+        "postflight again — there is no automated repair path for this state today. The schema must have " +
+        "drifted after a legitimate apply (for example, a manual `ALTER`/`DROP` outside this tooling). Restore " +
+        "it by hand: re-run the affected migration file's body directly, or delete the stale ledger row(s) so " +
+        "the apply script treats the migration(s) as unapplied again."
+      );
+    case "reverse_gap_drift":
+    default:
+      return (
+        `The ledger shows \`${EXPECTED_MIGRATIONS[1].version}\` recorded while \`${EXPECTED_MIGRATIONS[0].version}\` ` +
+        "is absent — an order the apply script's own write path never produces on its own. " +
+        "`scripts/apply-candidate-number-maintenance-migrations.mjs` will refuse to run against this state " +
+        "(its ledger classifier treats it as drift, not a resumable gap). Investigate " +
+        "`supabase_migrations.schema_migrations` by hand before taking any action."
+      );
+  }
 }
 
 export function runVerifyCandidateNumberMigrationHistory({
@@ -322,41 +406,25 @@ export function runVerifyCandidateNumberMigrationHistory({
 
   const classification = classifyHistory(parsed);
 
-  if (!classification.schemaEffectLive) {
-    logger.error("The candidate-number maintenance fix is NOT live in the database.");
-    logger.error(
-      `  guard_has_fix=${classification.guardHasFix} constraint_present=${classification.constraintPresent} constraint_validated=${classification.constraintValidated}`,
-    );
-    writeReport("FAIL - schema effect not live", [
-      "| Fact | Value |",
-      "| --- | --- |",
-      `| Guard function has the fix | ${classification.guardHasFix} |`,
-      `| Constraint present | ${classification.constraintPresent} |`,
-      `| Constraint validated | ${classification.constraintValidated} |`,
-      "",
-      "Apply the migrations before re-checking.",
-    ]);
-    writeAudit("schema_effect_missing", classification);
-    return EXIT.SCHEMA_EFFECT_MISSING;
-  }
-
-  // Checked BEFORE "missing": a mismatched row (right version, wrong name,
-  // or vice versa) is a ledger anomaly that needs investigation, never a
-  // "just apply it" situation — applying again would hit the apply
-  // script's own collision guard, or worse, produce an ambiguous ledger if
-  // that guard were ever bypassed.
+  // Checked FIRST, before the schema-effect check below: a mismatched row
+  // (right version, wrong name, or vice versa) is a ledger anomaly that
+  // needs investigation regardless of whether the schema effect happens to
+  // be live. Checking schema-effect first would silently drop this signal
+  // whenever the schema effect was ALSO not live — a compound failure
+  // reported as if it were only the simpler one.
   if (classification.mismatchedVersions.length > 0) {
     logger.error(
-      `Schema effect is live, but ${classification.mismatchedVersions.length} expected version(s) are claimed by a MISMATCHED ledger row (right version, wrong name, or vice versa):`,
+      `${classification.mismatchedVersions.length} expected version(s) are claimed by a MISMATCHED ledger row (right version, wrong name, or vice versa):`,
     );
     for (const version of classification.mismatchedVersions) {
       logger.error(`  ${version}`);
     }
+    logger.error(`  schema effect live: ${classification.schemaEffectLive}`);
     logger.error(
       "This is a ledger anomaly, not a missing apply — investigate supabase_migrations.schema_migrations by hand before doing anything else. Do not re-apply; the apply script's own collision guard would refuse it for the same reason.",
     );
     writeReport(`FAIL - ${classification.mismatchedVersions.length} mismatched ledger row(s)`, [
-      "The schema effect (guard fix + validated constraint) IS live, but at least one expected version is claimed by a row whose version/name pair does not match exactly:",
+      `The schema effect (guard fingerprint + constraint definition + validated) is ${classification.schemaEffectLive ? "" : "NOT "}live, but at least one expected version is claimed by a row whose version/name pair does not match exactly:`,
       "",
       ...classification.mismatchedVersions.map((v) => `- \`${v}\``),
       "",
@@ -364,6 +432,26 @@ export function runVerifyCandidateNumberMigrationHistory({
     ]);
     writeAudit("ledger_version_mismatch", classification);
     return EXIT.LEDGER_VERSION_MISMATCH;
+  }
+
+  if (!classification.schemaEffectLive) {
+    logger.error("The candidate-number maintenance fix is NOT live in the database.");
+    logger.error(
+      `  guard_function_matches=${classification.guardFunctionMatches} constraint_def_matches=${classification.constraintDefMatches} constraint_validated=${classification.constraintValidated}`,
+    );
+    const repairLine = buildSchemaRepairGuidance({ targetEnv, classification });
+    logger.error(repairLine);
+    writeReport("FAIL - schema effect not live", [
+      "| Fact | Value |",
+      "| --- | --- |",
+      `| Guard function matches pinned fingerprint | ${classification.guardFunctionMatches} |`,
+      `| Constraint definition matches pinned text | ${classification.constraintDefMatches} |`,
+      `| Constraint validated | ${classification.constraintValidated} |`,
+      "",
+      repairLine,
+    ]);
+    writeAudit("schema_effect_missing", classification);
+    return EXIT.SCHEMA_EFFECT_MISSING;
   }
 
   if (!classification.allVersionsPresent) {
@@ -376,18 +464,10 @@ export function runVerifyCandidateNumberMigrationHistory({
     logger.error(
       "This means the apply path recorded the change under a DIFFERENT version (or not at all) rather than the repository's own filename-derived version.",
     );
-    // scripts/apply-candidate-number-maintenance-migrations.mjs is
-    // deliberately production-only (its own confirmation gate rejects any
-    // other TARGET_ENV) — pointing a sandbox failure at it would always
-    // fail again. Report the honest gap rather than a repair step that
-    // cannot work for this target.
-    const repairLine =
-      targetEnv === "production"
-        ? "Re-apply via `scripts/apply-candidate-number-maintenance-migrations.mjs`, which records the exact expected ledger rows."
-        : "This PR ships no automated sandbox repair path — the apply script is intentionally production-only and will refuse any other TARGET_ENV. Record the exact ledger rows manually against the sandbox database, or extend the apply script with its own sandbox confirmation gate before dispatching it here.";
+    const repairLine = buildSchemaRepairGuidance({ targetEnv, classification });
     logger.error(repairLine);
     writeReport(`FAIL - ${classification.missingVersions.length} exact version(s) missing`, [
-      "The schema effect (guard fix + validated constraint) IS live, but the migration ledger does not record the exact expected version string(s):",
+      "The schema effect (guard fingerprint + constraint definition + validated) IS live, but the migration ledger does not record the exact expected version string(s):",
       "",
       ...classification.missingVersions.map((v) => `- \`${v}\``),
       "",
@@ -403,7 +483,7 @@ export function runVerifyCandidateNumberMigrationHistory({
     "Both expected migration versions are present in the ledger and the schema effect is live.",
   );
   writeReport("PASS", [
-    "Both `20260806230020` and `20260806230021` are present in `supabase_migrations.schema_migrations`, and the schema effect (guard fix + validated constraint) is live.",
+    "Both `20260806230020` and `20260806230021` are present in `supabase_migrations.schema_migrations`, and the schema effect (guard fingerprint + constraint definition + validated) is live.",
   ]);
   writeAudit("verified", classification);
   return EXIT.OK;

@@ -9,14 +9,23 @@
  *  - controls devices
  *  - emits Action Queue items
  *
- * A "dryback window" is the soil_moisture_pct series between two watering
- * markers (or an open window after the latest watering). Peak and trough are
- * arithmetic extrema over accepted samples — not crop-steering targets.
+ * A "dryback window" is the soil moisture series between two watering
+ * markers (or an open window after the latest watering). When an active
+ * dry/wet baseline is selected, samples are projected through
+ * calibrateSoilMoisture first; otherwise raw stored soil_moisture_pct is used.
+ * Peak and trough are arithmetic extrema — not crop-steering targets.
  */
+
+import { calibrateSoilMoisture } from "@/lib/soilMoistureCalibrationRules";
+import {
+  selectSoilMoistureCalibration,
+  type SoilMoistureCalibrationCandidate,
+  type SoilMoistureCalibrationContext,
+} from "@/lib/soilMoistureCalibrationSelectionRules";
 
 export const DRYBACK_MONITORING_TITLE = "Dryback monitoring";
 export const DRYBACK_MONITORING_CAVEAT =
-  "Evidence only — dryback is arithmetic VWC change between waterings. Not a schedule, not plant health, not a watering recommendation." as const;
+  "Evidence only — dryback is arithmetic VWC change between waterings (calibrated when a dry/wet baseline is active; otherwise raw). Not a schedule, not plant health, not a watering recommendation." as const;
 export const DRYBACK_EMPTY_NO_SAMPLES =
   "No usable soil moisture samples for this tent yet.";
 export const DRYBACK_EMPTY_NO_WATERINGS =
@@ -47,13 +56,25 @@ export type DrybackWindowKind = "closed" | "open";
 export type DrybackWindowQuality = "usable" | "weak" | "unusable";
 export type DrybackConfidence = "high" | "medium" | "low" | null;
 
+export type DrybackSeriesValueKind = "calibrated" | "raw";
+export type DrybackSampleValueKind = "calibrated" | "raw";
+
 export interface DrybackVwcSampleInput {
   readonly id: string;
   readonly capturedAt: string | null;
+  /** Value used for dryback math (calibrated when projection applied). */
   readonly vwcPct: number | null;
+  /** Original stored reading when vwcPct was calibrated. */
+  readonly vwcPctRaw?: number | null;
+  readonly valueKind?: DrybackSampleValueKind;
   readonly source?: string | null;
   readonly quality?: string | null;
   readonly metric?: string | null;
+}
+
+export interface DrybackCalibrationInput {
+  readonly context: SoilMoistureCalibrationContext;
+  readonly calibrations: readonly SoilMoistureCalibrationCandidate[] | null | undefined;
 }
 
 export interface DrybackWateringMarkerInput {
@@ -80,6 +101,12 @@ export interface DrybackMonitoringOptions {
   readonly minSamplesUsable?: number;
   readonly minDeltaPctPoints?: number;
   readonly recentCap?: number;
+  /** Series provenance after optional calibration projection. */
+  readonly seriesValueKind?: DrybackSeriesValueKind;
+  readonly seriesLabel?: string;
+  readonly seriesWarnings?: readonly string[];
+  /** When set on FromSensorRows helper, projects raw samples through dry/wet baseline. */
+  readonly calibration?: DrybackCalibrationInput | null;
 }
 
 export interface DrybackWindowView {
@@ -119,6 +146,11 @@ export interface DrybackMonitoringViewModel {
   readonly openWindow: DrybackWindowView | null;
   readonly recentWindows: readonly DrybackWindowView[];
   readonly emptyCopy: string | null;
+  /** Whether peak/trough math used calibrated or raw VWC. */
+  readonly seriesValueKind: DrybackSeriesValueKind;
+  /** Grower-facing provenance for the series. */
+  readonly seriesLabel: string;
+  readonly seriesWarnings: readonly string[];
   readonly caveat: typeof DRYBACK_MONITORING_CAVEAT;
 }
 
@@ -467,6 +499,107 @@ function buildWindow(args: {
 }
 
 /**
+ * Project extracted soil samples through the active dry/wet baseline when present.
+ * Never invents values: failed calibration falls back to raw with an explicit warning.
+ */
+export function projectDrybackSamplesForMonitoring(
+  samples: readonly DrybackVwcSampleInput[] | null | undefined,
+  calibration: DrybackCalibrationInput | null | undefined,
+): {
+  samples: DrybackVwcSampleInput[];
+  seriesValueKind: DrybackSeriesValueKind;
+  seriesLabel: string;
+  warnings: string[];
+} {
+  const list = Array.isArray(samples) ? [...samples] : [];
+  const asRaw = (rows: readonly DrybackVwcSampleInput[]): DrybackVwcSampleInput[] =>
+    rows.map((s) => ({
+      ...s,
+      vwcPctRaw: s.vwcPctRaw ?? s.vwcPct,
+      valueKind: "raw" as const,
+    }));
+
+  if (!calibration) {
+    return {
+      samples: asRaw(list),
+      seriesValueKind: "raw",
+      seriesLabel: "Using raw soil moisture (no calibration context)",
+      warnings: [],
+    };
+  }
+
+  const selection = selectSoilMoistureCalibration(
+    calibration.context,
+    calibration.calibrations,
+  );
+
+  if (selection.status === "unavailable") {
+    return {
+      samples: asRaw(list),
+      seriesValueKind: "raw",
+      seriesLabel: "Active baseline invalid — dryback uses raw soil moisture",
+      warnings: ["Active dry/wet baseline invalid; dryback fell back to raw stored values."],
+    };
+  }
+
+  if (selection.status !== "selected") {
+    return {
+      samples: asRaw(list),
+      seriesValueKind: "raw",
+      seriesLabel: "Using raw soil moisture (no active dry/wet baseline)",
+      warnings: [],
+    };
+  }
+
+  const dry = selection.calibration.dryRaw;
+  const wet = selection.calibration.wetRaw;
+  const calibrated: DrybackVwcSampleInput[] = [];
+  let failed = 0;
+  for (const s of list) {
+    const raw = typeof s.vwcPct === "number" && Number.isFinite(s.vwcPct) ? s.vwcPct : null;
+    if (raw === null) {
+      failed += 1;
+      continue;
+    }
+    const result = calibrateSoilMoisture(raw, dry, wet);
+    if (!result.ok) {
+      failed += 1;
+      continue;
+    }
+    calibrated.push({
+      ...s,
+      vwcPctRaw: raw,
+      vwcPct: result.calibratedValue,
+      valueKind: "calibrated",
+    });
+  }
+
+  if (calibrated.length === 0 && list.length > 0) {
+    return {
+      samples: asRaw(list),
+      seriesValueKind: "raw",
+      seriesLabel: "Calibration could not map samples — dryback uses raw soil moisture",
+      warnings: ["Calibration mapping failed for all samples; fell back to raw."],
+    };
+  }
+
+  const warnings: string[] = [];
+  if (failed > 0) {
+    warnings.push(`${failed} sample(s) could not be calibrated and were omitted.`);
+  }
+  if (selection.source === "demo") {
+    warnings.push("Demo calibration baseline — not live factory calibration.");
+  }
+
+  return {
+    samples: calibrated,
+    seriesValueKind: "calibrated",
+    seriesLabel: `Using calibrated VWC (${selection.source} dry/wet baseline · confidence limited)`,
+    warnings,
+  };
+}
+
+/**
  * Build the read-only dryback monitoring view-model from VWC samples + watering markers.
  */
 export function buildDrybackMonitoring(
@@ -479,6 +612,12 @@ export function buildDrybackMonitoring(
   const minSamples = options.minSamplesUsable ?? DRYBACK_MIN_SAMPLES_USABLE;
   const minDelta = options.minDeltaPctPoints ?? DRYBACK_MIN_DELTA_PCT_POINTS;
   const recentCap = Math.max(1, Math.floor(options.recentCap ?? DRYBACK_RECENT_WINDOW_CAP));
+  const seriesValueKind: DrybackSeriesValueKind = options.seriesValueKind ?? "raw";
+  const seriesLabel =
+    typeof options.seriesLabel === "string" && options.seriesLabel.trim()
+      ? options.seriesLabel.trim()
+      : "Using raw soil moisture";
+  const seriesWarnings = Array.isArray(options.seriesWarnings) ? options.seriesWarnings : [];
 
   const samples = normalizeSamples(Array.isArray(samplesInput) ? samplesInput : []);
   const waterings = normalizeWaterings(Array.isArray(wateringsInput) ? wateringsInput : []);
@@ -494,6 +633,9 @@ export function buildDrybackMonitoring(
       openWindow: null,
       recentWindows: [],
       emptyCopy: DRYBACK_EMPTY_NO_SAMPLES,
+      seriesValueKind,
+      seriesLabel,
+      seriesWarnings,
       caveat: DRYBACK_MONITORING_CAVEAT,
     };
   }
@@ -509,6 +651,9 @@ export function buildDrybackMonitoring(
       openWindow: null,
       recentWindows: [],
       emptyCopy: DRYBACK_EMPTY_NO_WATERINGS,
+      seriesValueKind,
+      seriesLabel,
+      seriesWarnings,
       caveat: DRYBACK_MONITORING_CAVEAT,
     };
   }
@@ -554,6 +699,9 @@ export function buildDrybackMonitoring(
       openWindow,
       recentWindows: newestFirst.slice(0, recentCap),
       emptyCopy: DRYBACK_INSUFFICIENT_COPY,
+      seriesValueKind,
+      seriesLabel,
+      seriesWarnings,
       caveat: DRYBACK_MONITORING_CAVEAT,
     };
   }
@@ -568,15 +716,26 @@ export function buildDrybackMonitoring(
     openWindow,
     recentWindows: newestFirst.slice(0, recentCap),
     emptyCopy: null,
+    seriesValueKind,
+    seriesLabel,
+    seriesWarnings,
     caveat: DRYBACK_MONITORING_CAVEAT,
   };
 }
 
-/** Convenience: sensor rows + watering markers → view-model. */
+/** Convenience: sensor rows + watering markers → view-model (optional calibration projection). */
 export function buildDrybackMonitoringFromSensorRows(
   sensorRows: readonly DrybackSensorReadingLike[] | null | undefined,
   waterings: readonly DrybackWateringMarkerInput[] | null | undefined,
-  options?: DrybackMonitoringOptions,
+  options: DrybackMonitoringOptions = {},
 ): DrybackMonitoringViewModel {
-  return buildDrybackMonitoring(extractDrybackVwcSamples(sensorRows), waterings, options);
+  const extracted = extractDrybackVwcSamples(sensorRows);
+  const projected = projectDrybackSamplesForMonitoring(extracted, options.calibration ?? null);
+  const { calibration: _calibration, ...rest } = options;
+  return buildDrybackMonitoring(projected.samples, waterings, {
+    ...rest,
+    seriesValueKind: projected.seriesValueKind,
+    seriesLabel: projected.seriesLabel,
+    seriesWarnings: projected.warnings,
+  });
 }

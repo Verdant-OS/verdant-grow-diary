@@ -210,7 +210,14 @@ export function usePersistEnvironmentAlerts(
       // inside derivedAlertKey so its other callers are unaffected. Rows with
       // no tent (all historical rows, and any snapshot spanning tents) key on
       // "" and so keep their existing grow-wide dedupe behavior.
-      const scopedKey = (tent: string | null, ruleKey: string) => `${tent ?? ""}::${ruleKey}`;
+      // Grow is part of the key because `inFlightKeys` is a ref that survives
+      // grow switches and never drops successful keys. Without it, a
+      // tent-null rule persisted for one grow would suppress the same rule
+      // in the next grow the user selects, even with that grow's open-alert
+      // query empty. (The pre-existing key omitted grow too; it is included
+      // here rather than left as a latent collision in code being rewritten.)
+      const scopedKey = (tent: string | null, ruleKey: string) =>
+        `${growId ?? ""}::${tent ?? ""}::${ruleKey}`;
 
       const existing = new Set(
         openRows.map((r) =>

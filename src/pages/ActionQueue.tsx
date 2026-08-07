@@ -81,7 +81,11 @@ import {
   extractSourceAlertId,
   stripBackPointerTokens,
 } from "@/lib/actionQueueProvenanceRules";
-import { buildActionQueueGrowContextHint } from "@/lib/actionQueueGrowContextHintRules";
+import {
+  buildActionQueueGrowContextHint,
+  buildOtherGrowPendingDisclosure,
+} from "@/lib/actionQueueGrowContextHintRules";
+import { useOtherGrowPendingActionCount } from "@/hooks/useOtherGrowPendingActionCount";
 import {
   parseAlertContextParam,
   filterActionsByAlertContext,
@@ -952,6 +956,19 @@ export default function ActionQueue() {
     grows,
   });
 
+  // Read-only count of approval-required actions pending outside the scoped
+  // grow. Does not change which rows are loaded — it only lets the empty state
+  // disclose that pending work exists elsewhere, including in grows hidden
+  // from every selector because they are archived.
+  const otherGrowPending = useOtherGrowPendingActionCount(effectiveGrowId);
+  const otherGrowPendingDisclosure =
+    otherGrowPending.status === "ok"
+      ? buildOtherGrowPendingDisclosure({
+          count: otherGrowPending.count,
+          isScoped: growContextHint.isScoped,
+        })
+      : null;
+
   return (
     <div>
       <GrowBreadcrumbs growId={urlGrowId} growName={scopedGrowName} current="Action Queue" section="actions" />
@@ -1394,6 +1411,15 @@ export default function ActionQueue() {
                 {growContextHint.isScoped && growContextHint.growName
                   ? `No approval-required actions are pending in ${growContextHint.growName}.`
                   : "No approval-required actions are pending."}
+              </p>
+            )}
+            {!filtersActive && otherGrowPendingDisclosure && (
+              <p
+                className="text-xs text-amber-700 dark:text-amber-300 mt-1"
+                data-testid="action-queue-other-grow-pending"
+                role="status"
+              >
+                {otherGrowPendingDisclosure}
               </p>
             )}
             {!filtersActive && (

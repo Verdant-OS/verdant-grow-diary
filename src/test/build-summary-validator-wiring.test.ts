@@ -137,7 +137,20 @@ describe("BUILD_SUMMARY_VALIDATORS is wired to real step outcomes", () => {
 });
 
 describe("generate-build-summary verdict precedence", () => {
-  function overallFor(validators: Array<Record<string, string>>): string {
+  /**
+   * Run the generator against a synthetic validator set.
+   *
+   * Returns the edge-shared status alongside the verdict on purpose. The
+   * generator re-runs `verify-edge-shared-in-sync.mjs` on every invocation and
+   * folds drift into `overall`, so a bare `toBe("pass")` here would silently
+   * depend on the working tree's mirror state and fail for a reason that has
+   * nothing to do with validator precedence. Assertions below either hold
+   * under both states, or branch on `edgeShared` explicitly.
+   */
+  function runGenerator(validators: Array<Record<string, string>>): {
+    overall: string;
+    edgeShared: string;
+  } {
     const out = mkdtempSync(join(tmpdir(), "verdant-build-summary-"));
     try {
       execFileSync("node", [GENERATOR], {
@@ -148,22 +161,28 @@ describe("generate-build-summary verdict precedence", () => {
         },
         stdio: "pipe",
       });
-      return JSON.parse(readFileSync(join(out, "build-summary.json"), "utf8")).overall;
+      const summary = JSON.parse(readFileSync(join(out, "build-summary.json"), "utf8"));
+      return { overall: summary.overall, edgeShared: summary.edgeShared?.status ?? "unknown" };
     } finally {
       rmSync(out, { recursive: true, force: true });
     }
   }
 
-  it("all stages successful → pass", () => {
-    expect(
-      overallFor([
-        { name: "a", result: "success" },
-        { name: "b", result: "success" },
-      ]),
-    ).toBe("pass");
+  const overallFor = (v: Array<Record<string, string>>) => runGenerator(v).overall;
+
+  it("all stages successful → pass (drift is the only other legal answer)", () => {
+    const { overall, edgeShared } = runGenerator([
+      { name: "a", result: "success" },
+      { name: "b", result: "success" },
+    ]);
+    // Edge-shared drift legitimately fails the summary on its own. Branch
+    // rather than assume, so this test reports the real reason if it ever
+    // does fail instead of looking like a precedence regression.
+    expect(overall, `edgeShared=${edgeShared}`).toBe(edgeShared === "in-sync" ? "pass" : "fail");
   });
 
   it("any stage failed → fail", () => {
+    // Holds under both edge-shared states.
     expect(
       overallFor([
         { name: "a", result: "success" },
@@ -175,12 +194,17 @@ describe("generate-build-summary verdict precedence", () => {
   it("an unresolved outcome never reports pass — this is the false-green case", () => {
     // A step after a failure never runs, so `steps.<id>.outcome` expands to
     // "". Reporting that as green is exactly the defect being fixed.
-    expect(
-      overallFor([
-        { name: "a", result: "success" },
-        { name: "b", result: "" },
-      ]),
-    ).toBe("incomplete");
+    //
+    // "never pass" is the invariant that matters and it holds regardless of
+    // edge-shared state (in-sync → incomplete, drift → fail). Assert that
+    // first so the guarantee is unconditional, then pin the exact value in
+    // the normal case.
+    const { overall, edgeShared } = runGenerator([
+      { name: "a", result: "success" },
+      { name: "b", result: "" },
+    ]);
+    expect(overall, `edgeShared=${edgeShared}`).not.toBe("pass");
+    expect(overall).toBe(edgeShared === "in-sync" ? "incomplete" : "fail");
   });
 
   it("a real failure still outranks an unresolved outcome", () => {
@@ -198,12 +222,13 @@ describe("generate-build-summary verdict precedence", () => {
 
   it("an intentionally skipped stage does not poison the verdict", () => {
     // `skipped` is a deliberate, recorded non-run (e.g. a conditional step),
-    // distinct from an unresolved reference.
-    expect(
-      overallFor([
-        { name: "a", result: "success" },
-        { name: "b", result: "skipped" },
-      ]),
-    ).toBe("pass");
+    // distinct from an unresolved reference. It must NOT downgrade to
+    // `incomplete` — same edge-shared branching as the all-success case.
+    const { overall, edgeShared } = runGenerator([
+      { name: "a", result: "success" },
+      { name: "b", result: "skipped" },
+    ]);
+    expect(overall, `edgeShared=${edgeShared}`).toBe(edgeShared === "in-sync" ? "pass" : "fail");
+    expect(overall).not.toBe("incomplete");
   });
 });

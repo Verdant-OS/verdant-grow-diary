@@ -2,6 +2,7 @@ import VpdStageMissingBadge from "@/components/VpdStageMissingBadge";
 import EcowittLatestSnapshotCard from "@/components/EcowittLatestSnapshotCard";
 import EnvironmentStabilityCard from "@/components/EnvironmentStabilityCard";
 import WateringCadenceHistoryStrip from "@/components/WateringCadenceHistoryStrip";
+import DrybackMonitoringStrip from "@/components/DrybackMonitoringStrip";
 import TentAiDoctorSessionsPanel from "@/components/TentAiDoctorSessionsPanel";
 import { computeEnvironmentStability } from "@/lib/environmentStabilityRules";
 import { useParams, Link, useSearchParams } from "@/lib/react-router-compat";
@@ -382,6 +383,12 @@ export default function TentDetail() {
         tentId={id ?? null}
         growId={tent.growId ?? null}
         scopeLabel={tent.name ?? "Tent"}
+      />
+      <DrybackMonitoringStrip
+        tentId={id ?? null}
+        growId={tent.growId ?? null}
+        scopeLabel={tent.name ?? "Tent"}
+        className="mb-4"
       />
 
 

@@ -10,6 +10,7 @@ import PlantGrowContextRescueCard from "@/components/PlantGrowContextRescueCard"
 import AssignTentDialog from "@/components/AssignTentDialog";
 import PlantTentEnvironmentPanel from "@/components/PlantTentEnvironmentPanel";
 import WateringCadenceHistoryStrip from "@/components/WateringCadenceHistoryStrip";
+import DrybackMonitoringStrip from "@/components/DrybackMonitoringStrip";
 import { PlantBlueprintOverlaySection } from "@/components/PlantBlueprintOverlaySection";
 import PlantRecentActivityPanel from "@/components/PlantRecentActivityPanel";
 import PlantRelativeTimelineSection from "@/components/PlantRelativeTimelineSection";
@@ -646,6 +647,12 @@ export default function PlantDetail() {
         />
 
         <WateringCadenceHistoryStrip
+          tentId={plant.tentId ?? null}
+          plantId={plant.id}
+          growId={plant.growId ?? null}
+          scopeLabel={plant.name}
+        />
+        <DrybackMonitoringStrip
           tentId={plant.tentId ?? null}
           plantId={plant.id}
           growId={plant.growId ?? null}

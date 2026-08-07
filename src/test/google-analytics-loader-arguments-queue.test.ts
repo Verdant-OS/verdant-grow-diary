@@ -6,15 +6,19 @@ import {
   loadGoogleAnalytics,
 } from "@/lib/googleAnalyticsLoader";
 
+type TestGtagWindow = Window & {
+  dataLayer?: unknown[];
+  gtag?: (...args: unknown[]) => void;
+};
+
 describe("googleAnalyticsLoader — dataLayer queue shape", () => {
   beforeEach(() => {
     __resetGoogleAnalyticsLoaderForTests();
     // Fresh DOM stubs
     document.head.innerHTML = "";
-    // @ts-expect-error test window cleanup
-    delete window.dataLayer;
-    // @ts-expect-error test window cleanup
-    delete window.gtag;
+    const w = window as TestGtagWindow;
+    delete w.dataLayer;
+    delete w.gtag;
   });
 
   afterEach(() => {
@@ -25,11 +29,12 @@ describe("googleAnalyticsLoader — dataLayer queue shape", () => {
   it("pushes Arguments objects (not rest Arrays) so gtag.js can process the queue", () => {
     loadGoogleAnalytics("G-MCXQ9GVS5H");
 
+    const w = window as TestGtagWindow;
     expect(isGoogleAnalyticsLoaded()).toBe(true);
-    expect(typeof window.gtag).toBe("function");
-    expect(Array.isArray(window.dataLayer)).toBe(true);
+    expect(typeof w.gtag).toBe("function");
+    expect(Array.isArray(w.dataLayer)).toBe(true);
 
-    const entries = window.dataLayer as unknown[];
+    const entries = w.dataLayer as unknown[];
     // js + config from bootstrap
     expect(entries.length).toBeGreaterThanOrEqual(2);
 

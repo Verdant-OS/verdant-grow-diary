@@ -1,6 +1,6 @@
 # Verdant Agent Governance
 
-**Sentinel-Version: 2026-08-01.7**
+**Sentinel-Version: 2026-08-07.1**
 
 Multi-agent work on Verdant runs under one shared constitution plus a small
 platform-specific bootstrap per agent. A single file cannot reach every AI platform

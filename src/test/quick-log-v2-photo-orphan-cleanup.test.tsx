@@ -15,6 +15,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 const rpcMock = vi.fn();
 const uploadCalls: Array<{ path: string }> = [];
 const removeCalls: string[][] = [];
+const insertRows: unknown[] = [];
 let insertResult: { error: { message?: string } | null } = { error: null };
 
 vi.mock("@/integrations/supabase/client", () => ({
@@ -33,7 +34,10 @@ vi.mock("@/integrations/supabase/client", () => ({
       }),
     },
     from: () => ({
-      insert: () => Promise.resolve(insertResult),
+      insert: (row: unknown) => {
+        insertRows.push(row);
+        return Promise.resolve(insertResult);
+      },
     }),
   },
 }));
@@ -56,6 +60,7 @@ vi.mock("sonner", () => ({
 }));
 
 import QuickLogV2Sheet from "@/components/QuickLogV2Sheet";
+import { QUICK_LOG_V2_ENTRY_CREATED_EVENT } from "@/lib/quickLogV2EntryCreatedEvent";
 
 function renderSheet() {
   const client = new QueryClient({
@@ -92,6 +97,7 @@ beforeEach(() => {
   rpcMock.mockReset();
   uploadCalls.length = 0;
   removeCalls.length = 0;
+  insertRows.length = 0;
   insertResult = { error: null };
   rpcMock.mockResolvedValue({ data: { ok: true, grow_event_id: "event-1" }, error: null });
   if (typeof URL.createObjectURL !== "function") {
@@ -122,5 +128,71 @@ describe("QuickLogV2Sheet — orphaned-photo cleanup", () => {
     });
     // Nothing failed, so the upload must be kept, not cleaned up.
     expect(removeCalls).toHaveLength(0);
+  });
+
+  it("retry after the companion failure re-attempts only the photo entry — save() runs exactly once", async () => {
+    // First attempt: the main log commits (rpc ok) but the companion
+    // diary entry insert errors, leaving the sheet open with a Retry.
+    insertResult = { error: { message: "companion insert failed" } };
+
+    const onOpenChange = vi.fn();
+    const entryCreatedEvents: Event[] = [];
+    const entryCreatedListener = (e: Event) => entryCreatedEvents.push(e);
+    window.addEventListener(QUICK_LOG_V2_ENTRY_CREATED_EVENT, entryCreatedListener);
+
+    try {
+      const client = new QueryClient({
+        defaultOptions: { queries: { retry: false, gcTime: 0 } },
+      });
+      const invalidateSpy = vi.fn();
+      const origInvalidate = client.invalidateQueries.bind(client);
+      client.invalidateQueries = ((opts: unknown) => {
+        invalidateSpy(opts);
+        return origInvalidate(opts as Parameters<typeof origInvalidate>[0]);
+      }) as typeof client.invalidateQueries;
+
+      render(
+        <QueryClientProvider client={client}>
+          <QuickLogV2Sheet open onOpenChange={onOpenChange} defaultTargetKey="plant:plant-1" />
+        </QueryClientProvider>,
+      );
+
+      const library = screen.getByTestId("qlv2-photo-library-input") as HTMLInputElement;
+      await pickFile(library, makeImage());
+      fireEvent.change(screen.getByLabelText("Note (optional)"), {
+        target: { value: "Observation with attached photo" },
+      });
+      fireEvent.click(screen.getByTestId("qlv2-save"));
+
+      // First attempt settled: main log committed once, companion failed,
+      // orphaned upload cleaned up, sheet still open (Retry offered).
+      await waitFor(() => {
+        expect(screen.getByTestId("qlv2-save-retry")).toBeInTheDocument();
+      });
+      expect(rpcMock).toHaveBeenCalledTimes(1);
+      expect(uploadCalls).toHaveLength(1);
+      expect(insertRows).toHaveLength(1);
+      expect(removeCalls.flat()).toContain(uploadCalls[0].path);
+      expect(onOpenChange).not.toHaveBeenCalledWith(false);
+
+      // The companion write now succeeds; a Retry must finish ONLY the
+      // photo entry and never re-run the main-log save.
+      insertResult = { error: null };
+      fireEvent.click(screen.getByTestId("qlv2-save-retry"));
+
+      await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+
+      // The RPC save must NOT have run a second time — no duplicate
+      // grow_event / diary row is persisted server-side.
+      expect(rpcMock).toHaveBeenCalledTimes(1);
+      // The photo entry was re-attempted end-to-end (fresh upload + insert).
+      expect(uploadCalls).toHaveLength(2);
+      expect(insertRows).toHaveLength(2);
+      // The success effects fire exactly once, and only on the retry.
+      expect(entryCreatedEvents).toHaveLength(1);
+      expect(invalidateSpy).toHaveBeenCalled();
+    } finally {
+      window.removeEventListener(QUICK_LOG_V2_ENTRY_CREATED_EVENT, entryCreatedListener);
+    }
   });
 });

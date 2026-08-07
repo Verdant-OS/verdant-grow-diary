@@ -71,6 +71,22 @@ interface Props {
   defaultTargetKey?: string | null;
 }
 
+// Snapshot of a main log that has already committed (its grow_event exists)
+// within one sheet-open session. Held so that if the companion photo entry
+// fails, a Retry can finish ONLY the photo entry against this frozen context
+// and never re-call save() — the RPC has no idempotency key, so a second call
+// would persist a duplicate grow_event.
+interface CommittedMainLog {
+  growEventId: string | null;
+  targetType: "plant" | "tent";
+  targetId: string;
+  tentId: string | null;
+  plantId: string | null;
+  growId: string | null;
+  note: string;
+  action: QuickLogV2Action;
+}
+
 // Mirror of the builder's write-time cap so the counter/maxLength and the
 // persisted validation stay on one source of truth.
 const NOTE_LIMIT = QUICK_LOG_NOTE_LIMIT;
@@ -147,6 +163,7 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [feedingDefaultsApplied, setFeedingDefaultsApplied] = useState(false);
+  const [committedLog, setCommittedLog] = useState<CommittedMainLog | null>(null);
 
   const options = useMemo(() => buildQuickLogV2TargetOptions(tents, plants), [tents, plants]);
 
@@ -214,6 +231,7 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
       setFeedingForm(EMPTY_QUICKLOG_FEEDING_FORM);
       setMaturityEvidenceForm(EMPTY_QUICK_LOG_MATURITY_EVIDENCE_FORM);
       setFeedingDefaultsApplied(false);
+      setCommittedLog(null);
       setLocalError(null);
       setSaveStatus("");
       resetPhotoSelection();
@@ -289,6 +307,17 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
   const handleSave = async () => {
     setLocalError(null);
     setSaveStatus("");
+
+    // A prior attempt this session already committed the main log via the
+    // RPC (its grow_event exists), but its companion photo entry failed.
+    // Never call save() again — the RPC has no idempotency key, so a second
+    // call would persist a duplicate. Finish ONLY the outstanding photo
+    // entry against the committed context, then run the success path.
+    if (committedLog) {
+      await finishCommittedPhotoLog(committedLog);
+      return;
+    }
+
     const resolved = resolveQuickLogV2Target(options, form.selectedKey);
     if (!resolved.ok) {
       setLocalError("Choose a plant or tent before saving.");
@@ -407,23 +436,65 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
       return;
     }
 
-    if (uploadedPath && resolved.growId) {
+    // The main log is now committed server-side. Record it (with its
+    // grow_event id and the context this save resolved to) so that if the
+    // companion photo entry below fails, a Retry finishes ONLY that photo
+    // entry and never calls save() again.
+    const committed: CommittedMainLog = {
+      growEventId: (res as { growEventId?: string | null }).growEventId ?? null,
+      targetType: resolved.targetType as "plant" | "tent",
+      targetId: resolved.targetId as string,
+      tentId: resolved.tentId ?? null,
+      plantId: resolved.plantId ?? null,
+      growId: resolved.growId ?? null,
+      note: form.note,
+      action: form.action,
+    };
+    setCommittedLog(committed);
+    // Pass the path already uploaded above so the first attempt does not
+    // re-upload; a later Retry (no path) re-uploads because the earlier
+    // object was cleaned up.
+    await finishCommittedPhotoLog(committed, uploadedPath);
+  };
+
+  // Completes a committed Quick Log's optional companion photo entry, then
+  // runs the shared success path. Reached twice: inline right after the main
+  // log commits (with the already-uploaded path), and again on a Retry after
+  // the companion entry failed (re-uploading, since the earlier object was
+  // cleaned up). It never calls save(), so retries cannot duplicate the log.
+  async function finishCommittedPhotoLog(
+    committed: CommittedMainLog,
+    preUploadedPath?: string | null,
+  ) {
+    let uploadedPath: string | null = preUploadedPath ?? null;
+    if (!uploadedPath && photoFile && committed.growId) {
+      setSaveStatus("Uploading photo…");
+      const upload = await uploadQuickLogPhoto(committed.growId);
+      if (!upload.ok) {
+        setLocalError((upload as { message: string }).message);
+        setSaveStatus("");
+        return;
+      }
+      uploadedPath = upload.path;
+    }
+
+    if (uploadedPath && committed.growId) {
       // Companion diary entry goes through the sanctioned lib writer —
       // the sheet itself must never write tables directly (static-safety
       // tests enforce this).
       const photoEntry = await writeQuickLogPhotoAttachment({
-        growId: resolved.growId,
-        tentId: resolved.tentId ?? null,
-        plantId: resolved.plantId ?? null,
+        growId: committed.growId,
+        tentId: committed.tentId,
+        plantId: committed.plantId,
         photoPath: uploadedPath,
-        note: form.note,
-        attachedToAction: form.action,
+        note: committed.note,
+        attachedToAction: committed.action,
       });
       if (!photoEntry.ok) {
         // The main log saved but its companion photo entry did not, so the
         // uploaded object is now orphaned (no row references it). Remove it
-        // so storage does not leak — mirrors the build- and save-failure
-        // cleanup paths above. uploadedPath is non-null in this branch.
+        // so storage does not leak, then leave the sheet in its committed
+        // state — a Retry re-enters here WITHOUT re-saving the main log.
         await supabase.storage
           .from("diary-photos")
           .remove([uploadedPath])
@@ -437,15 +508,15 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
     const successMessage = photoFile ? "Log and photo saved" : "Log saved";
     setSaveStatus(successMessage);
     showTimelineConfirmation(successMessage, {
-      targetType: resolved.targetType as "plant" | "tent",
-      targetId: resolved.targetId as string,
-      tentId: resolved.tentId ?? null,
-      growEventId: (res as { growEventId?: string | null }).growEventId ?? null,
+      targetType: committed.targetType,
+      targetId: committed.targetId,
+      tentId: committed.tentId,
+      growEventId: committed.growEventId,
     });
     applyQuickLogV2Refresh(queryClient, {
-      targetType: resolved.targetType as "plant" | "tent",
-      targetId: resolved.targetId as string,
-      tentId: resolved.tentId ?? null,
+      targetType: committed.targetType,
+      targetId: committed.targetId,
+      tentId: committed.tentId,
     });
     // Notify Timeline-style listeners that a new entry exists so the
     // local-state Timeline page can refetch. Dispatched once per
@@ -453,12 +524,13 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
     // has resolved.
     dispatchQuickLogV2EntryCreated({
       createdAt: new Date().toISOString(),
-      growEventId: (res as { growEventId?: string | null }).growEventId ?? null,
+      growEventId: committed.growEventId,
       source: "quick_log_v2",
     });
+    setCommittedLog(null);
     resetPhotoSelection();
     onOpenChange(false);
-  };
+  }
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>

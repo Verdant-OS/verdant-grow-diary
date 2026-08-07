@@ -48,6 +48,11 @@ There is no automatic transition from suggested → approved → executed.
 - The Action Queue surface performs no device I/O.
 - Resolved or dismissed alerts do not silently regenerate Action Queue items.
 - Duplicate suggestions are de-duplicated by source reference.
+- **Create path (#586):** grower handoffs from Alert Detail and AI Doctor use
+  `public.action_queue_create`, which inserts the queue row and the `created`
+  `action_queue_events` audit event in one transaction. Optional `dedupe_key`
+  enforces non-terminal uniqueness server-side. Legacy direct INSERT paths
+  remain for other surfaces until migrated.
 
 ## Phrase usage
 

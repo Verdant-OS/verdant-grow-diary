@@ -3,21 +3,19 @@
  * approval-required Action Queue row.
  *
  * Safety envelope:
- *   - INSERT-only into `public.action_queue` (+ optional `action_queue_events`
- *     audit row, matching the existing AlertDetail pattern).
- *   - No update / upsert / delete / rpc / edge-function invocations.
+ *   - Writes via `action_queue_create` RPC so the queue row and `created`
+ *     audit event commit together (#586). No best-effort second insert.
+ *   - No update / upsert / delete / edge-function invocations.
  *   - No edge functions, no AI calls, no automation, no device control.
  *   - No alerts/tasks writes.
- *   - Never sends `user_id` (DB default `auth.uid()` + RLS own ownership).
+ *   - Never sends `user_id` (RPC resolves auth.uid()).
  *   - Never sends `target_device`.
  *   - `source` pinned to "ai_doctor"; `status` pinned to "pending_approval".
  *
  * Idempotency:
- *   - Before insert, probes open ai_doctor rows for the same grow_id with the
- *     session back-pointer in `reason`, then filters via the pure helper
- *     `sessionActionMatchesExisting` (terminal-status rows are ignored).
- *   - If a matching open row exists, returns `duplicate_skipped` and does NOT
- *     insert a second row.
+ *   - Client probe still skips when an open match already exists (fast path).
+ *   - Server `dedupe_key` (`ai_doctor_session:<id>`) enforces non-terminal
+ *     uniqueness under concurrent tabs.
  *
  * Cache behaviour:
  *   - No optimistic cache update — the project does not have a unified
@@ -34,6 +32,8 @@ import {
   type AiDoctorSuggestedActionLike,
   type ExistingActionQueueRowLike,
 } from "@/lib/aiDoctorSessionToActionQueueRules";
+import { createActionQueueItem } from "@/lib/actionQueueCreateService";
+import { buildAiDoctorSessionDedupeKey } from "@/lib/actionQueueCreateRules";
 
 export interface AddAiDoctorSessionSuggestionInput {
   session: AiDoctorSessionLike;
@@ -84,53 +84,51 @@ export function useAddAiDoctorSessionSuggestionToActionQueue() {
       }
       const { draft } = draftResult;
 
-      // Dedupe probe — never blocks insert on terminal-status rows.
+      // Client-side dedupe probe — never blocks insert on terminal-status rows.
       const candidates = await probeExistingAiDoctorActionQueueRows(session);
       const match = candidates.find((row) => sessionActionMatchesExisting(row, session, action));
       if (match) {
         return { status: "duplicate_skipped", existingActionQueueId: match.id };
       }
 
-      // SECURITY: never send user_id (DB default auth.uid() owns it).
-      // SECURITY: never send target_device — AI Doctor suggestions are advisory only.
-      const { data: inserted, error: insErr } = await supabase
-        .from("action_queue")
-        .insert({
-          grow_id: draft.grow_id,
-          tent_id: draft.tent_id,
-          plant_id: draft.plant_id,
-          action_type: draft.action_type,
-          target_metric: draft.target_metric,
-          suggested_change: draft.suggested_change,
-          reason: draft.reason,
-          risk_level: draft.risk_level,
-          source: draft.source,
-          status: draft.status,
-          // Evidence Linkage Persistence v1: AI Doctor session suggestions
-          // do not yet carry typed timeline refs at this boundary. Persist
-          // an explicit empty array — never infer from session prose, ids,
-          // timestamps, or model output.
-          originating_timeline_events: [],
-        })
-        .select("id,grow_id")
-        .single();
-      if (insErr) throw insErr;
-      if (!inserted?.id) {
-        throw new Error("Action queue insert returned no row");
-      }
-
-      // Best-effort audit event — mirrors AlertDetail's existing pattern.
-      // A failure here does NOT roll back the action_queue row (append-only event log).
-      await supabase.from("action_queue_events").insert({
-        action_queue_id: inserted.id,
-        grow_id: inserted.grow_id ?? draft.grow_id,
-        event_type: "created",
-        previous_status: null,
-        new_status: "pending_approval",
-        note: draft.audit_note,
+      // Atomic create + created audit (#586). Never user_id / target_device.
+      // Evidence Linkage Persistence v1: AI Doctor session suggestions do not
+      // yet carry typed timeline refs — persist explicit empty array.
+      const result = await createActionQueueItem({
+        grow_id: draft.grow_id,
+        tent_id: draft.tent_id,
+        plant_id: draft.plant_id,
+        action_type: draft.action_type,
+        target_metric: draft.target_metric,
+        suggested_change: draft.suggested_change,
+        reason: draft.reason,
+        risk_level: draft.risk_level,
+        source: draft.source,
+        dedupe_key: buildAiDoctorSessionDedupeKey(session.id),
+        audit_note: draft.audit_note,
+        originating_timeline_events: [],
       });
 
-      return { status: "inserted", actionQueueId: inserted.id };
+      if (!result.ok) {
+        if (result.reason === "dedupe_conflict") {
+          // Concurrent tab won the race — surface as skip if we can probe again.
+          const again = await probeExistingAiDoctorActionQueueRows(session);
+          const existing = again.find((row) => sessionActionMatchesExisting(row, session, action));
+          if (existing) {
+            return { status: "duplicate_skipped", existingActionQueueId: existing.id };
+          }
+        }
+        throw new Error(result.reason || "insert_failed");
+      }
+
+      if (result.reused) {
+        return {
+          status: "duplicate_skipped",
+          existingActionQueueId: result.action_queue_id,
+        };
+      }
+
+      return { status: "inserted", actionQueueId: result.action_queue_id };
     },
     onSettled: () => {
       // Reconcile any future ["action_queue"] caches with server truth.

@@ -14,17 +14,27 @@ const VERCEL = JSON.parse(read("vercel.json")) as {
 };
 
 describe("Founder static social document build contract", () => {
-  it("emits every static SEO document, including founder/index.html, from the Vite-built index asset", () => {
-    expect(VITE).toContain("staticSocialRouteDocuments()");
-    expect(VITE).toContain("STATIC_PUBLIC_OUTPUT_DOCUMENTS");
-    expect(VITE).toContain("for (const document of STATIC_PUBLIC_OUTPUT_DOCUMENTS)");
+  it("prerenders every public SEO document through TanStack Start", () => {
+    expect(VITE).toContain("TANSTACK_PUBLIC_PRERENDER_PATHS.map");
+    expect(VITE).toContain("pages:");
+    expect(VITE).toContain("prerender:");
+    expect(VITE).toContain("enabled: true");
+    expect(VITE).toContain("crawlLinks: false");
+    expect(VITE).toContain("autoStaticPathsDiscovery: false");
+    expect(VITE).toContain("failOnError: true");
     expect(STATIC_PUBLIC_OUTPUT_DOCUMENTS.length).toBeGreaterThan(
       STATIC_PUBLIC_SEO_DOCUMENTS.length,
     );
-    expect(VITE).toContain("const metadataWithOg = { ...document.metadata, image: ogImageUrl }");
-    expect(VITE).toContain("buildStaticSocialRouteHtml(indexAsset.source, metadataWithOg)");
-    expect(VITE).toContain("fileName: document.fileName");
-    expect(VITE).toContain('apply: "build"');
+  });
+
+  it("emits route OG images and the SEO manifest without replacing prerendered HTML", () => {
+    expect(VITE).toContain("staticSeoAssets()");
+    expect(VITE).not.toContain("buildStaticSocialRouteHtml");
+    expect(VITE).not.toContain("staticSocialRouteDocuments");
+  });
+
+  it("keeps the MCP generator outside Windows builds", () => {
+    expect(VITE).toMatch(/process\.platform\s*!==\s*["']win32["']\s*&&\s*mcpPlugin\(\)/);
   });
 
   it("uses a filesystem-first static entry for /founder before the SPA fallback", () => {

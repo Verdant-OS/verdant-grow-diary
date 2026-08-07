@@ -9,12 +9,12 @@
  * out of scope here); this pins DISPLAY truth only.
  */
 import { describe, it, expect } from "vitest";
+import { PRICING } from "@/constants/pricing";
+import { SOFTWARE_APPLICATION_JSON_LD } from "@/lib/build/tanstackPublicSeoHead";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { PRICING } from "@/constants/pricing";
 
 const ROOT = resolve(__dirname, "../..");
-const VITE_CONFIG = readFileSync(resolve(ROOT, "vite.config.ts"), "utf8");
 const HEAD_INVARIANTS = readFileSync(
   resolve(ROOT, "scripts/public-route-head-invariants.config.mjs"),
   "utf8",
@@ -30,33 +30,24 @@ const EXPECTED_PUBLIC_OFFER_NAMES = [
   "Craft (annual)",
 ] as const;
 
-function extractOffersBlock(source: string): string {
-  const start = source.indexOf("offers: [");
-  expect(start, "vite.config.ts must contain the offers block").toBeGreaterThan(-1);
-  const end = source.indexOf("],", start);
-  expect(end, "offers block must terminate").toBeGreaterThan(start);
-  return source.slice(start, end);
-}
-
 describe("SoftwareApplication offers match the publicly purchasable SKU list", () => {
-  const offersBlock = extractOffersBlock(VITE_CONFIG);
-
   it("advertises exactly the public plans, in order", () => {
-    const names = [...offersBlock.matchAll(/name: "([^"]+)"/g)].map((m) => m[1]);
+    const names = SOFTWARE_APPLICATION_JSON_LD.offers.map((offer) => offer.name);
     expect(names).toEqual([...EXPECTED_PUBLIC_OFFER_NAMES]);
   });
 
   it("never advertises Founder Lifetime (deep-link-only, not public)", () => {
-    expect(offersBlock).not.toContain("Founder Lifetime");
-    expect(offersBlock).not.toContain("PRICING.founder");
+    expect(JSON.stringify(SOFTWARE_APPLICATION_JSON_LD)).not.toMatch(/Founder Lifetime/i);
   });
 
   it("prices come from the pricing single source of truth", () => {
-    expect(offersBlock).toContain("PRICING.free.price");
-    expect(offersBlock).toContain("PRICING.pro.monthlyPrice");
-    expect(offersBlock).toContain("PRICING.pro.annualPrice");
-    expect(offersBlock).toContain("PRICING.craft.monthlyPrice");
-    expect(offersBlock).toContain("PRICING.craft.annualPrice");
+    expect(SOFTWARE_APPLICATION_JSON_LD.offers.map((offer) => offer.price)).toEqual([
+      String(PRICING.free.price),
+      String(PRICING.pro.monthlyPrice),
+      String(PRICING.pro.annualPrice),
+      String(PRICING.craft.monthlyPrice),
+      String(PRICING.craft.annualPrice),
+    ]);
     // The referenced fields must actually exist and be finite numbers.
     for (const price of [
       PRICING.free.price,

@@ -446,7 +446,7 @@ export function validateDist(distDir) {
     return {
       ok: false,
       issues: [
-        `seo-manifest.json missing at ${manifestPath}. The staticSocialRouteDocuments vite plugin must run before this validator.`,
+        `seo-manifest.json missing at ${manifestPath}. The staticSeoAssets Vite plugin must run before this validator.`,
       ],
       report: null,
     };

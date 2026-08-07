@@ -20,7 +20,6 @@ import { Badge } from "@/components/ui/badge";
 import { usePlantTentLatestReadings } from "@/hooks/usePlantTentLatestReadings";
 import { buildPlantTentEnvironmentView } from "@/lib/plantTentEnvironmentRules";
 import { usePlantAssignedTentAlerts } from "@/hooks/usePlantAssignedTentAlerts";
-import { countOpenAlerts } from "@/lib/plantAssignedTentAlertRules";
 import { usePlantAssignedTentActions } from "@/hooks/usePlantAssignedTentActions";
 
 import { tentDetailPath } from "@/lib/routes";
@@ -38,7 +37,7 @@ export default function PlantStatusStrip({ tentId, tentName, growId }: Props) {
   );
   const env = buildPlantTentEnvironmentView(hasTent ? (readings ?? []) : []);
 
-  const { rows: alertRows, status: alertStatus } = usePlantAssignedTentAlerts(
+  const { openCount: openAlertCount, status: alertStatus } = usePlantAssignedTentAlerts(
     hasTent ? (tentId ?? null) : null,
     growId ?? null,
   );
@@ -59,9 +58,9 @@ export default function PlantStatusStrip({ tentId, tentName, growId }: Props) {
           : (env.sourceLabel ?? "Unknown");
 
   const alertsKnown = hasTent && alertStatus === "ok";
-  // countOpenAlerts, not rows.length — the hook now returns acknowledged rows
-  // too, and this count renders under an "open alerts" label.
-  const alertCount = alertsKnown ? countOpenAlerts(alertRows) : null;
+  // openCount, not rows.length — the hook's rows include acknowledged alerts
+  // and are capped for display; this count renders under an "open" label.
+  const alertCount = alertsKnown ? openAlertCount : null;
   const actionsKnown = hasTent && !actionsLoading;
   const actionCount = actionsKnown ? actionRows.length : null;
 

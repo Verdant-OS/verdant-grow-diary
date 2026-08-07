@@ -15,7 +15,6 @@ import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePlantRecentActivity } from "@/hooks/usePlantRecentActivity";
 import { usePlantAssignedTentAlerts } from "@/hooks/usePlantAssignedTentAlerts";
-import { countOpenAlerts } from "@/lib/plantAssignedTentAlertRules";
 import { usePlantAssignedTentActions } from "@/hooks/usePlantAssignedTentActions";
 import { buildRelativeTimelineProjection } from "@/lib/relativeTimelineProjectionRules";
 import { buildPlantQuickStatusView } from "@/lib/plantQuickStatusRules";
@@ -56,7 +55,7 @@ export default function PlantQuickStatusStrip({
   });
 
   const hasTent = !!tentId;
-  const { rows: alertRows, status: alertStatus } = usePlantAssignedTentAlerts(
+  const { openCount: openAlertCount, status: alertStatus } = usePlantAssignedTentAlerts(
     hasTent ? (tentId ?? null) : null,
     growId ?? null,
   );
@@ -66,9 +65,9 @@ export default function PlantQuickStatusStrip({
   );
 
   const alertsLoading = hasTent && alertStatus !== "ok";
-  // countOpenAlerts, not rows.length: this strip's copy says "open alert(s)"
-  // and the hook now returns acknowledged rows too.
-  const alertCount = hasTent && alertStatus === "ok" ? countOpenAlerts(alertRows) : null;
+  // openCount, not rows.length: this strip's copy says "open alert(s)", the
+  // hook's rows now include acknowledged ones, and rows is capped for display.
+  const alertCount = hasTent && alertStatus === "ok" ? openAlertCount : null;
   const actionCount = hasTent && !actionsLoading ? actionRows.length : null;
 
   const view = buildPlantQuickStatusView({

@@ -15,6 +15,7 @@ import {
   normalizeFollowupKindLabel,
 } from "@/lib/actionFollowupVisibilityRules";
 import DiaryEntryFaqLink from "@/components/DiaryEntryFaqLink";
+import { formatArchiveWindowLabel, type CameraCode } from "@/lib/quick-log/archiveWindowRules";
 
 const TAG_LABELS: Record<string, string> = {
   watering: "Watering",
@@ -60,8 +61,26 @@ export default function DiaryEntryBadges({ item, className }: DiaryEntryBadgesPr
     tags: item.tags,
     notePreview: item.notePreview,
   };
+  const archiveLabel =
+    item.hasArchiveWindow &&
+    item.archiveCameraCode &&
+    item.archiveWindowStart &&
+    item.archiveWindowEnd
+      ? formatArchiveWindowLabel({
+          code: item.archiveCameraCode as CameraCode,
+          start: item.archiveWindowStart,
+          end: item.archiveWindowEnd,
+        })
+      : null;
 
-  if (tagsToShow.length === 0 && !hasWarnings && !sensorBadge && !sourceLabel && !vendorLabel) {
+  if (
+    tagsToShow.length === 0 &&
+    !hasWarnings &&
+    !sensorBadge &&
+    !sourceLabel &&
+    !vendorLabel &&
+    !archiveLabel
+  ) {
     return <DiaryEntryFaqLink item={faqLinkInput} />;
   }
 
@@ -116,6 +135,15 @@ export default function DiaryEntryBadges({ item, className }: DiaryEntryBadgesPr
           className="text-[11px] px-2 py-0.5 rounded-full bg-secondary/40 border border-border/30 text-muted-foreground"
         >
           Vendor: {vendorLabel}
+        </span>
+      )}
+      {archiveLabel && (
+        <span
+          data-testid="diary-entry-archive-window-badge"
+          title="Camera archive pointer only. Footage stays on your camera."
+          className="text-[11px] px-2 py-0.5 rounded-full bg-secondary/60 border border-border/40 text-muted-foreground max-w-full truncate"
+        >
+          {archiveLabel}
         </span>
       )}
       {hasWarnings && (

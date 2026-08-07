@@ -37,6 +37,12 @@ import {
   type ResolvedQuickLogV2Target,
 } from "@/lib/quickLogV2Rules";
 import { buildQuickLogV2SavePayload } from "@/lib/quickLogV2SavePayload";
+import {
+  CAMERA_CODES,
+  archiveWindowReasonToMessage,
+  buildArchiveWindowDetails,
+  validateArchiveWindow,
+} from "@/lib/quick-log/archiveWindowRules";
 import { applyQuickLogV2Refresh } from "@/lib/quickLogV2RefreshRules";
 import { createQuickLogPhotoDiaryEntry } from "@/lib/quickLogPhotoDiaryEntry";
 import { createQuickLogVideoDiaryEntry } from "@/lib/quickLogVideoDiaryEntry";
@@ -158,6 +164,7 @@ interface LockedWateringSubmission {
 }
 
 const NOTE_LIMIT = 500;
+const EMPTY_ARCHIVE_WINDOW_FORM = { code: "", start: "", end: "" };
 
 export default function QuickLogV2Sheet({
   open,
@@ -252,6 +259,7 @@ export default function QuickLogV2Sheet({
   );
   const [maturityEvidenceForm, setMaturityEvidenceForm] =
     useState<QuickLogMaturityEvidenceFormState>(EMPTY_QUICK_LOG_MATURITY_EVIDENCE_FORM);
+  const [archiveWindowForm, setArchiveWindowForm] = useState(EMPTY_ARCHIVE_WINDOW_FORM);
   const [feedingSaving, setFeedingSaving] = useState(false);
   const [wateringSaving, setWateringSaving] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
@@ -430,6 +438,7 @@ export default function QuickLogV2Sheet({
       setWateringForm(EMPTY_QUICKLOG_WATERING_FORM);
       wateringTempEntryUnitRef.current = null;
       setMaturityEvidenceForm(EMPTY_QUICK_LOG_MATURITY_EVIDENCE_FORM);
+      setArchiveWindowForm(EMPTY_ARCHIVE_WINDOW_FORM);
       setFeedingDefaultsApplied(false);
       setLocalError(null);
       setSaveStatus("");
@@ -490,6 +499,9 @@ export default function QuickLogV2Sheet({
     if (prev === "water") {
       setWateringForm(EMPTY_QUICKLOG_WATERING_FORM);
       wateringTempEntryUnitRef.current = null;
+    }
+    if (prev === "note") {
+      setArchiveWindowForm(EMPTY_ARCHIVE_WINDOW_FORM);
     }
     // Entering feed → maturity evidence surface hides; clear its draft
     // so stale plant-maturity notes don't get retained under the hood.
@@ -814,7 +826,18 @@ export default function QuickLogV2Sheet({
         setSaveStatus("");
         return;
       }
-      maturityDetails = maturityEvidence.details;
+      const archiveWindow =
+        form.action === "note" ? validateArchiveWindow(archiveWindowForm) : null;
+      if (archiveWindow && archiveWindow.ok !== true) {
+        setLocalError(archiveWindowReasonToMessage(archiveWindow.reason));
+        setSaveStatus("");
+        return;
+      }
+      const archiveDetails = buildArchiveWindowDetails(archiveWindow?.value ?? null);
+      maturityDetails =
+        maturityEvidence.details || archiveDetails
+          ? { ...(maturityEvidence.details ?? {}), ...(archiveDetails ?? {}) }
+          : null;
     }
 
     let wateringPayload: WateringTypedEventInput | null = null;
@@ -1137,6 +1160,7 @@ export default function QuickLogV2Sheet({
     wateringSubmissionLockedRef.current = false;
     keepWateringSubmissionLockedRef.current = false;
     setMaturityEvidenceForm(EMPTY_QUICK_LOG_MATURITY_EVIDENCE_FORM);
+    setArchiveWindowForm(EMPTY_ARCHIVE_WINDOW_FORM);
     setFeedingDefaultsApplied(false);
     resetPhotoSelection();
     resetVideoSelection();
@@ -1596,6 +1620,90 @@ export default function QuickLogV2Sheet({
                 </p>
               </div>
             </div>
+          )}
+
+          {form.action === "note" && (
+            <details className="rounded-md border border-border p-3">
+              <summary className="cursor-pointer text-sm font-medium">
+                Camera archive window (optional)
+              </summary>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Links this log to footage you reviewed. Footage stays on your cameras — not
+                uploaded.
+              </p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                <div>
+                  <Label htmlFor="qlv2-archive-camera">Camera code</Label>
+                  <Select
+                    value={archiveWindowForm.code}
+                    onValueChange={(code) => {
+                      if (wateringSubmissionLockedRef.current) return;
+                      setArchiveWindowForm((previous) => ({ ...previous, code }));
+                      setLocalError(null);
+                    }}
+                    disabled={wateringSubmissionLocked}
+                  >
+                    <SelectTrigger id="qlv2-archive-camera" data-testid="qlv2-archive-camera">
+                      <SelectValue placeholder="Choose camera" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CAMERA_CODES.map((code) => (
+                        <SelectItem key={code} value={code}>
+                          {code}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="qlv2-archive-start">Archive start</Label>
+                  <Input
+                    id="qlv2-archive-start"
+                    type="datetime-local"
+                    value={archiveWindowForm.start}
+                    disabled={wateringSubmissionLocked}
+                    onChange={(event) => {
+                      setArchiveWindowForm((previous) => ({
+                        ...previous,
+                        start: event.target.value,
+                      }));
+                      setLocalError(null);
+                    }}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="qlv2-archive-end">Archive end</Label>
+                  <Input
+                    id="qlv2-archive-end"
+                    type="datetime-local"
+                    value={archiveWindowForm.end}
+                    disabled={wateringSubmissionLocked}
+                    onChange={(event) => {
+                      setArchiveWindowForm((previous) => ({
+                        ...previous,
+                        end: event.target.value,
+                      }));
+                      setLocalError(null);
+                    }}
+                  />
+                </div>
+              </div>
+              {(archiveWindowForm.code || archiveWindowForm.start || archiveWindowForm.end) && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="mt-2"
+                  disabled={wateringSubmissionLocked}
+                  onClick={() => {
+                    setArchiveWindowForm(EMPTY_ARCHIVE_WINDOW_FORM);
+                    setLocalError(null);
+                  }}
+                >
+                  Clear archive fields
+                </Button>
+              )}
+            </details>
           )}
 
           <QuickLogMaturityEvidenceFields

@@ -14,6 +14,7 @@ import { composeActionFollowUpTitle } from "./actionFollowUpEvidenceViewModel";
 import { findCannabisSymptomByObservedSign } from "@/constants/cannabisSymptomTypes";
 import type { CanonicalQuickLogStage } from "@/lib/grow";
 import { normalizeQuickLogStage } from "@/lib/quickLogStageDefaultRules";
+import type { ArchiveWindow } from "@/lib/quick-log/archiveWindowRules";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -40,6 +41,10 @@ export interface GrowDiaryTimelineItem {
   sensorSourceLabel?: string | null;
   /** Display label for vendor lineage (lineage only; never auth/ownership). */
   sensorVendorLabel?: string | null;
+  archiveCameraCode?: string | null;
+  archiveWindowStart?: string | null;
+  archiveWindowEnd?: string | null;
+  hasArchiveWindow?: boolean;
   tags: string[];
   warnings: string[];
   isUsefulForAiContext: boolean;
@@ -383,6 +388,7 @@ export function toTimelineItem(
   const maxLen = opts.notePreviewMaxLength ?? DEFAULT_NOTE_PREVIEW_MAX;
   const timestamp = entry.createdAt ? Date.parse(entry.createdAt) : null;
   const stage = resolveTimelineDiaryEntryStage(entry);
+  const archiveWindow: ArchiveWindow | null = entry.details.archiveWindow ?? null;
   return {
     id: entry.id,
     title: titleForEventType(entry.eventType, entry.details.extras ?? null),
@@ -400,6 +406,10 @@ export function toTimelineItem(
     sensorSnapshotState: entry.details.sensorSnapshot?.state ?? null,
     sensorSourceLabel: resolveDiarySensorSourceLabel(entry.details.sensorSnapshot?.source ?? null),
     sensorVendorLabel: resolveDiarySensorVendorLabel(entry.details.sensorSnapshot?.vendor ?? null),
+    archiveCameraCode: archiveWindow?.code ?? null,
+    archiveWindowStart: archiveWindow?.start ?? null,
+    archiveWindowEnd: archiveWindow?.end ?? null,
+    hasArchiveWindow: archiveWindow !== null,
     tags: buildTags(entry),
     warnings: entry.warnings.slice(),
     isUsefulForAiContext: entry.isValidForAiContext,

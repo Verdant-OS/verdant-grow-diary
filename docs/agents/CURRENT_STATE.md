@@ -151,7 +151,17 @@ migrations and different client moves:
 - [PR #812](https://github.com/Verdant-OS/verdant-grow-diary/pull/812) merged as
   `821adb9fa`, reconciling three lagging Action Queue pins against the atomic RPC.
 
-All three are ancestors of the deploy tip recorded in Branch topology above.
+Ancestry against the deploy tip recorded in Branch topology above
+(`ad29943ea9eca67aded2c88c25e6cd1bbe4d5790`), verified 2026-08-07 with
+`git merge-base --is-ancestor`:
+
+- `dc29093b5` (#586) — **ancestor**; present at the recorded tip.
+- `a9a88e6ed` (#809) — **ancestor**; present at the recorded tip.
+- `821adb9fa` (#812) — **descendant, NOT present at the recorded tip**. It merged after
+  that snapshot was taken; the recorded tip is an ancestor of it. Anyone auditing at
+  `ad29943ea9ec` will not find #812's three test-pin reconciliations there. This is the
+  Branch-topology caveat in action, not an inconsistency to reconcile by editing: the tip
+  moves several times daily and the snapshot is deliberately point-in-time.
 
 Read directly from the migration bodies: the RPC inserts `status` `'pending_approval'`
 literally, inserts `target_device` as NULL literally, and derives `user_id` from

@@ -30,8 +30,9 @@ describe("webhook verification — replay bounds + rotation enforced at runtime"
 
   it("verifier supports rotation: all h1 values compared, constant-time, no early exit", () => {
     expect(VERIFIER).toMatch(/h1s: readonly string\[\]/);
-    expect(VERIFIER).toMatch(/for \(const candidate of parsed\.h1s\)/);
-    expect(VERIFIER).toMatch(/if \(constantTimeEqual\(expected, candidate\)\) anyMatch = true;/);
+    // Multi-h1 compare delegated to constantTimeEqualAny (scans every candidate).
+    expect(VERIFIER).toMatch(/constantTimeEqualAny\(expected, parsed\.h1s\)/);
+    expect(read("src/lib/constantTimeEqual.ts")).toMatch(/for \(const candidate of candidates\)/);
   });
 
   it("sandbox-only request gate is intact (live remains blocked)", () => {

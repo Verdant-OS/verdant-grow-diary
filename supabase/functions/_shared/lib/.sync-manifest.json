@@ -1,6 +1,6 @@
 {
   "generator": "scripts/sync-edge-shared.mjs",
-  "sourceCount": 95,
+  "sourceCount": 96,
   "sourceHashes": {
     "src/constants/aiDoctorContextReadiness.ts": "387a0f98abfe7eeaeda0a24cc289b6491b5c017592989e095facf1efb2e671f2",
     "src/constants/aiDoctorImportedHistory.ts": "f04d998dea22c9e8e7aaa6489a64cf4af44202435982039a1f216ccba9c317a0",
@@ -26,6 +26,7 @@
     "src/lib/aiDoctorSensorContextRules.ts": "3f070272159b8b2596d4000b52500919ecc21a0e6d6a804fa640f7b7faf3f961",
     "src/lib/aiSensorSnapshotContextRules.ts": "7be6cac6b08c1acb7562429c71dac4ab73f5dc4f23b75cbd7674b3d52b1e8a0a",
     "src/lib/billingCustomerLinkCaptureRules.ts": "18de37a055aadeebfc25ca9e0e24530e01789396a10ac56b96eb0c9d9a1d2917",
+    "src/lib/constantTimeEqual.ts": "11f0a22d0e5c60f44799a08083f74e79c112e17440835e35609df62e27b1e156",
     "src/lib/cost/aiDoctorPromptMeasurement.ts": "251a799ea8c4cbb9db7a8e18978ae31a53d53e99df8485d65bb747da10c06e14",
     "src/lib/cost/aiDoctorProviderResponseMeasurementComposer.ts": "a4aa174a683d4baf14004dcfed1ac5f4431a3c049cbc5c114b7604fc542d3f15",
     "src/lib/cost/aiDoctorProviderResponseUsageExtractor.ts": "f1c9404608cbd9a999d5c37ffbed82ae2f2c85f51c5247ada450a626c5dee5e6",
@@ -57,7 +58,7 @@
     "src/lib/paddleSubscriptionAccessRules.ts": "715f5b5f70ff94c06435f8ea0a2df9131346dcc5317e0e2f3004dfe431f15c4b",
     "src/lib/paidPlanAllowlist.ts": "3d8869e186f8f9613bd553eb6cde5f99083708ad72269dae0b1e569af7540056",
     "src/lib/photoEventNonDiagnosticLabelRules.ts": "bc9c49194aff528e36bd342478718d1dce7c74e41cae18723409edd0e69b0385",
-    "src/lib/piIngestAuthRules.ts": "3636a5e61e12e946e2201cc52f069b4782539eeaa0cf3e02ea66dcf92592c272",
+    "src/lib/piIngestAuthRules.ts": "c930c2a60e81475d3bb78b625d34dff35affc695280438dacadf8a65cef13d17",
     "src/lib/piIngestBridgeAuthorizationRules.ts": "82286002b3b5dc3f4d9fe906a515fb8860248c355b39587aeaa08b82fac3d4db",
     "src/lib/piIngestBridgeCredentialMetadataResolver.ts": "ffbaef9d107fcfcc791ba5a6113104eedb1b3bad34cd6ac1788d671d5f8c3967",
     "src/lib/piIngestBridgeOwnerScopeRules.ts": "58afd1abb485061cf3751ea003a3d5f866a9685ba489c2e0e78d5348d7642390",

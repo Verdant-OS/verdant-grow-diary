@@ -44,8 +44,16 @@ describe("Environment Snapshot (multi-tent overview) — sensor truth copy", () 
     expect(DASHBOARD).toMatch(/data-testid="dashboard-environment-snapshot-status-banner"/);
   });
 
-  it("uses isStale + source-aware Dashboard quality to flag stale, suspicious, and unverified snapshots", () => {
-    expect(DASHBOARD).toMatch(/isStale\(/);
+  it("uses isSnapshotStale + source-aware Dashboard quality to flag stale, suspicious, and unverified snapshots", () => {
+    // Dashboard reaches staleness through `isSnapshotStale(snapshot)`, the
+    // source-aware canon helper, rather than a bare `isStale(ts, now)`. The
+    // old `/isStale\(/` probe does not match `isSnapshotStale(` and so had
+    // stopped guarding anything. Assert the import too, so a future rename
+    // fails loudly here instead of silently orphaning this scan again.
+    expect(DASHBOARD).toMatch(
+      /isSnapshotStale\b[^\n]*from "@\/lib\/sensorSnapshot"|isSnapshotStale,/,
+    );
+    expect(DASHBOARD).toMatch(/isSnapshotStale\(/);
     expect(DASHBOARD).toMatch(/evaluateDashboardSensorQuality\(/);
     expect(DASHBOARD).toMatch(/dashboardHealthSnapshot\s*===\s*null/);
   });

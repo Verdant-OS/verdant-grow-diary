@@ -261,6 +261,23 @@ describe("Action Queue safety — current posture (suggest-only by construction)
       ROOT,
       "supabase/functions/_shared/lib/lib/aiDoctorContextCompiler.ts",
     );
+    // Also allow-list (EXACT FILE PATH ONLY): src/lib/sensorLiveMembership.ts
+    // documents which source strings count as "live" for each of the four
+    // distinct membership roles. Same shape, and the same false positive, as
+    // the two entries above: LIVE_WINDOW_ALIASES is a ReadonlySet whose
+    // members include "pi_bridge" and "mqtt" as adjacent string literals, so
+    // the 60-char context window trips the control-call regex on "mqtt".
+    // Verified inert before allow-listing: the whole 110-line module is four
+    // ReadonlySet constants plus three pure predicates. It has no fetch, no
+    // http, no mqtt client, no supabase handle, no await, and no writer of
+    // any kind -- it only CLASSIFIES source strings it is handed.
+    // Keep file-specific.
+    const SENSOR_LIVE_MEMBERSHIP_PATH = resolve(ROOT, "src/lib/sensorLiveMembership.ts");
+    // ...and its generated mirror twin, byte-synced by scripts/sync-edge-shared.mjs.
+    const SENSOR_LIVE_MEMBERSHIP_MIRROR_PATH = resolve(
+      ROOT,
+      "supabase/functions/_shared/lib/lib/sensorLiveMembership.ts",
+    );
     const piContexts = [...ALL_PROD_CODE.matchAll(/pi[_-]bridge/gi)];
     for (const m of piContexts) {
       const ctx = ALL_PROD_CODE.slice(Math.max(0, m.index! - 60), m.index! + 60);
@@ -271,7 +288,9 @@ describe("Action Queue safety — current posture (suggest-only by construction)
         path === PROVIDER_LABELS_PATH ||
         path === SENSOR_INGEST_PROVENANCE_PATH ||
         path === AI_DOCTOR_CONTEXT_COMPILER_PATH ||
-        path === AI_DOCTOR_CONTEXT_COMPILER_MIRROR_PATH
+        path === AI_DOCTOR_CONTEXT_COMPILER_MIRROR_PATH ||
+        path === SENSOR_LIVE_MEMBERSHIP_PATH ||
+        path === SENSOR_LIVE_MEMBERSHIP_MIRROR_PATH
       )
         continue;
       expect(ctx, `pi_bridge reference must not be a control call: ${ctx}`).not.toMatch(
@@ -868,6 +887,24 @@ describe("pi_bridge scanner allow-list hardening", () => {
     expect(provenanceSrc).not.toMatch(
       /fetch\(|mqtt:\/\/|mqtt\.connect|\.publish\(|\.post\(|\.trigger\(|http:\/\/|https:\/\//i,
     );
+  });
+
+  it("allows sensorLiveMembership.ts only while it stays a read-only classifier", () => {
+    // Mirrors the provenance-constants test above: an allow-list entry is only
+    // legitimate while the file it exempts stays inert. Encodes the manual
+    // review done when this entry was added, so the exemption cannot silently
+    // outlive its justification if the module later grows a real call.
+    const membershipSrc = readFileSync(resolve(ROOT, "src/lib/sensorLiveMembership.ts"), "utf8");
+    // The allow-list is justified by a real adjacency, not a stale path: the
+    // control-call regex fires on "mqtt" sitting beside "pi_bridge" in a Set.
+    expect(membershipSrc).toMatch(/pi_bridge/);
+    expect(membershipSrc).toMatch(/mqtt/);
+    // And the file must not itself contain device-control surfaces.
+    expect(membershipSrc).not.toMatch(
+      /fetch\(|mqtt:\/\/|mqtt\.connect|\.publish\(|\.post\(|\.trigger\(|http:\/\/|https:\/\//i,
+    );
+    // Read-only classifier: no client handle, no async work, no writes.
+    expect(membershipSrc).not.toMatch(/\bawait\b|\bsupabase\b|\.insert\(|\.update\(|\.upsert\(/);
   });
 
   it("keeps sensorProviderLabels.ts allowed only as an exact file path", () => {

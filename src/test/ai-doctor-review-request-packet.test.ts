@@ -192,8 +192,10 @@ describe("buildAiDoctorReviewRequestPacket", () => {
 
   it("downgrades stale snapshots and emits a safety note (provenance preserved)", () => {
     const NOW = new Date("2026-06-01T12:00:00Z");
-    // Captured 2 hours ago → stale
-    const items: TimelineMemoryItem[] = [snapshot("2026-06-01T10:00:00Z")];
+    // Captured ~2 days ago → stale. The snapshot is `manual`, which Sensor
+    // Truth Canon keeps current for 24h, so the fixture must clear that window
+    // for the downgrade path under test to engage at all.
+    const items: TimelineMemoryItem[] = [snapshot("2026-05-30T10:00:00Z")];
     const packet = buildAiDoctorReviewRequestPacket({
       plant: null,
       timelineItems: items,

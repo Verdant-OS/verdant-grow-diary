@@ -33,9 +33,12 @@ import { buildTentSensorHeaderView } from "@/lib/tentSensorChartRules";
 const H = vi.hoisted(() => {
   const TENT_ID = "5a1c6e0f-2b3d-4c5e-8f90-1a2b3c4d5e6f";
   // Relative timestamps so the page's real Date.now() staleness check is
-  // deterministic: newest is 2h old (stale), oldest is 4h old.
-  const newestTs = new Date(Date.now() - 2 * 3_600_000).toISOString();
-  const oldestTs = new Date(Date.now() - 4 * 3_600_000).toISOString();
+  // deterministic. These rows are `source: "manual"`, and Sensor Truth Canon
+  // gives manual readings a 24h current-state window (live gets 15m), so the
+  // ages must clear 24h to be genuinely stale. Mirrors NEWEST_TS/OLDEST_TS
+  // below, which already use the post-canon ">24h old" shape.
+  const newestTs = new Date(Date.now() - 28 * 3_600_000).toISOString();
+  const oldestTs = new Date(Date.now() - 30 * 3_600_000).toISOString();
   const raw = (ts: string, metric: string, value: number) => ({
     id: `${metric}-${ts}`,
     tent_id: TENT_ID,

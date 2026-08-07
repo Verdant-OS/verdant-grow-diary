@@ -75,7 +75,10 @@ describe("validateManualSensorSnapshotFields", () => {
 
   it("stale capturedAt warns but does not block", () => {
     const v = validateManualSensorSnapshotFields(
-      { source: "manual", capturedAt: HOURS_AGO(24), temperatureC: 24, humidityPct: 55 },
+      // Must exceed MANUAL_SNAPSHOT_CURRENT_STALE_HOURS (24), not equal it:
+      // the validator's check is `now - captured > staleHours`, so exactly 24h
+      // sits on the boundary and is still current.
+      { source: "manual", capturedAt: HOURS_AGO(30), temperatureC: 24, humidityPct: 55 },
       { nowMs: NOW_MS },
     );
     const h = v.hints.find((x) => x.field === "capturedAt");

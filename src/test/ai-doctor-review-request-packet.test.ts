@@ -191,8 +191,12 @@ describe("buildAiDoctorReviewRequestPacket", () => {
   });
 
   it("downgrades stale snapshots and emits a safety note (provenance preserved)", () => {
-    const NOW = new Date("2026-06-01T12:00:00Z");
-    // Captured 2 hours ago → stale
+    // The #592 canon made staleness source-aware and widened the manual window
+    // from 6h to 24h, so the original 2-hour-old manual fixture is now current
+    // by design. Age it past the manual window; the live case below covers the
+    // tightened 15-minute window this suite did not previously pin.
+    const NOW = new Date("2026-06-02T12:00:00Z");
+    // Captured 26 hours ago → past the 24h manual window
     const items: TimelineMemoryItem[] = [snapshot("2026-06-01T10:00:00Z")];
     const packet = buildAiDoctorReviewRequestPacket({
       plant: null,

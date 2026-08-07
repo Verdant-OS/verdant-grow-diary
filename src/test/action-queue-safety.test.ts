@@ -31,6 +31,8 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { resolve, join } from "node:path";
 
 const ROOT = resolve(__dirname, "../..");
+const PI_BRIDGE_OUTBOUND_CALL_PATTERN =
+  /fetch\s*\(|mqtt:\/\/|mqtt\.connect|\.publish\s*\(|\.post\s*\(|\.send\s*\(|\.trigger\s*\(|https?:\/\//i;
 const AI_COACH_SRC = readFileSync(resolve(ROOT, "supabase/functions/ai-coach/index.ts"), "utf8");
 const TYPES_SRC = readFileSync(resolve(ROOT, "src/integrations/supabase/types.ts"), "utf8");
 
@@ -261,6 +263,25 @@ describe("Action Queue safety — current posture (suggest-only by construction)
       ROOT,
       "supabase/functions/_shared/lib/lib/aiDoctorContextCompiler.ts",
     );
+    // Also allow-list (EXACT FILE PATH ONLY): src/lib/sensorLiveMembership.ts
+    // holds read-only ReadonlySet<string> membership tables that CLASSIFY an
+    // incoming sensor source string as live-class (e.g. LIVE_WINDOW_ALIASES,
+    // VERIFIED_SNAPSHOT_LIVE_ROW_SOURCES). Added by the #592 sensor-truth
+    // canon re-land. Verified inert at the time of allow-listing: the whole
+    // file is Set/const declarations with ZERO call sites — no fetch, no http,
+    // no mqtt client, no publish/send, no Supabase, no writer. The regex trips
+    // only because sibling alias literals ("webhook", "mqtt") sit inside the
+    // 60-char context window around "pi_bridge" — the identical adjacency
+    // false positive already documented for the two files above.
+    // The companion assertion in the "pi_bridge scanner allow-list hardening"
+    // suite keeps this honest: if this file ever gains a real outbound call,
+    // that test fails even though the path is allow-listed here.
+    const SENSOR_LIVE_MEMBERSHIP_PATH = resolve(ROOT, "src/lib/sensorLiveMembership.ts");
+    // The generated edge mirror twin of the same read-only membership tables.
+    const SENSOR_LIVE_MEMBERSHIP_MIRROR_PATH = resolve(
+      ROOT,
+      "supabase/functions/_shared/lib/lib/sensorLiveMembership.ts",
+    );
     const piContexts = [...ALL_PROD_CODE.matchAll(/pi[_-]bridge/gi)];
     for (const m of piContexts) {
       const ctx = ALL_PROD_CODE.slice(Math.max(0, m.index! - 60), m.index! + 60);
@@ -271,7 +292,9 @@ describe("Action Queue safety — current posture (suggest-only by construction)
         path === PROVIDER_LABELS_PATH ||
         path === SENSOR_INGEST_PROVENANCE_PATH ||
         path === AI_DOCTOR_CONTEXT_COMPILER_PATH ||
-        path === AI_DOCTOR_CONTEXT_COMPILER_MIRROR_PATH
+        path === AI_DOCTOR_CONTEXT_COMPILER_MIRROR_PATH ||
+        path === SENSOR_LIVE_MEMBERSHIP_PATH ||
+        path === SENSOR_LIVE_MEMBERSHIP_MIRROR_PATH
       )
         continue;
       expect(ctx, `pi_bridge reference must not be a control call: ${ctx}`).not.toMatch(
@@ -868,6 +891,37 @@ describe("pi_bridge scanner allow-list hardening", () => {
     expect(provenanceSrc).not.toMatch(
       /fetch\(|mqtt:\/\/|mqtt\.connect|\.publish\(|\.post\(|\.trigger\(|http:\/\/|https:\/\//i,
     );
+  });
+
+  it("allows both sensorLiveMembership mirrors only as exact paths, and only while they stay inert", () => {
+    // Exact-path allow-list, never a directory prefix. Both skipped files must
+    // be pinned here so the generated mirror cannot drift outside the fence.
+    // `\s*` after `resolve(` as well as after `ROOT,`: the mirror path is long
+    // enough that Prettier wraps the call across four lines, so a pattern
+    // anchored on `resolve(ROOT,` can never match it however correct the
+    // allow-list is. Match the call shape, not one formatting of it.
+    expect(PI_REGION).toMatch(/resolve\(\s*ROOT,\s*["']src\/lib\/sensorLiveMembership\.ts["']/);
+    expect(PI_REGION).toMatch(
+      /resolve\(\s*ROOT,\s*["']supabase\/functions\/_shared\/lib\/lib\/sensorLiveMembership\.ts["']/,
+    );
+    expect(PI_REGION).toMatch(/path === SENSOR_LIVE_MEMBERSHIP_PATH/);
+    expect(PI_REGION).toMatch(/path === SENSOR_LIVE_MEMBERSHIP_MIRROR_PATH/);
+
+    // The allow-list is only justified while the file remains a read-only
+    // membership table. Match call-shaped outbound behavior because the
+    // generated membership data legitimately contains provider labels such as
+    // "mqtt" and "webhook".
+    const membershipPaths = [
+      resolve(ROOT, "src/lib/sensorLiveMembership.ts"),
+      resolve(ROOT, "supabase/functions/_shared/lib/lib/sensorLiveMembership.ts"),
+    ];
+    for (const membershipPath of membershipPaths) {
+      const membershipSrc = readFileSync(membershipPath, "utf8");
+      expect(membershipSrc).toMatch(/pi_bridge/);
+      expect(membershipSrc).not.toMatch(PI_BRIDGE_OUTBOUND_CALL_PATTERN);
+      // No writer / client surface either.
+      expect(membershipSrc).not.toMatch(/\.insert\(|\.update\(|\.delete\(|\.rpc\(|supabase/i);
+    }
   });
 
   it("keeps sensorProviderLabels.ts allowed only as an exact file path", () => {

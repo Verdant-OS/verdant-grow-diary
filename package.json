@@ -215,6 +215,8 @@
     "ai-doctor:preview-safety": "node scripts/assert-ai-doctor-preview-safety.mjs",
     "supabase:migrations:sync": "node scripts/sync-supabase-migrations-from-integration.mjs",
     "supabase:migrations:verify-remote": "node scripts/verify-supabase-migrations-complete.mjs",
+    "candidate-number:preflight": "node scripts/preflight-candidate-number-membership.mjs",
+    "candidate-number:verify-history": "node scripts/verify-candidate-number-migration-history.mjs",
     "preflight:privilege-matrix": "bun run scripts/run-privilege-matrix-preflight.ts",
     "preflight:privilege-matrix:report-only": "bun run scripts/run-privilege-matrix-preflight.ts --report-only",
     "precommit:ai-doctor-preview-safety": "node scripts/precommit-ai-doctor-preview-safety.mjs",

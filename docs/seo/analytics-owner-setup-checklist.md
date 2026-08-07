@@ -1,6 +1,8 @@
 # Lighting analytics owner setup checklist
 
-**Last reconciled against production (UTC):** 2026-08-02T02:55:07.852Z
+**Last public production recheck (UTC):** 2026-08-07T22:59:05.5797248Z
+
+**Last authenticated access recheck:** BLOCKED — Chrome control connection unavailable
 
 **Production host:** `https://verdantgrowdiary.com`
 
@@ -24,6 +26,10 @@ Measurement change below. The owner
 has confirmed the production stream name, stream URL, stream ID, and measurement ID, and the
 deployed tag matches that measurement ID. The GA4 property identity and authenticated reporting
 access are still unavailable to Codex, as is authenticated Search Console access.
+
+The August 7 recheck confirms both pages and the 55-URL sitemap at commit
+`f20c2f9f1ac341fb9bd89adf4fe5a678c514ec2e`. GA4, duplicate-page views, and GSC still require
+authenticated Chrome request interception.
 
 Never paste a Google password, OAuth code, client secret, refresh token, access token,
 service-account key, verification token, or private export into chat, an issue, a pull request, a

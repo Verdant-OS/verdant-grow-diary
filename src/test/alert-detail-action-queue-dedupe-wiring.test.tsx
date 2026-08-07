@@ -49,9 +49,30 @@ let actionQueueInsertResult: { data: unknown; error: { code?: string; message: s
   data: { id: "new-action-uuid-1", grow_id: "grow-uuid-1" },
   error: null,
 };
-let insertDelayMs = 0;
+/**
+ * #586 moved the Action Queue create off `.from("action_queue").insert(...)`
+ * and onto the atomic `action_queue_create` RPC, so the create path is
+ * observed through `rpcCalls` now. `inserts` is retained so any *other*
+ * table write from this page would still be visible (and so a regression
+ * back to a raw client insert would show up rather than pass silently).
+ */
+let createDelayMs = 0;
 
 const inserts: Array<{ table: string; payload: unknown }> = [];
+const rpcCalls: Array<{ fn: string; args: Record<string, unknown> }> = [];
+
+let actionQueueCreateResult: { data: unknown; error: { code?: string; message: string } | null } = {
+  data: {
+    ok: true,
+    action_queue_id: "new-action-uuid-1",
+    grow_id: "grow-uuid-1",
+    status: "pending_approval",
+    event_id: "event-uuid-1",
+    reused: false,
+    created_at: "2026-05-30T10:31:00Z",
+  },
+  error: null,
+};
 
 vi.mock("@/lib/alerts", async () => {
   const actual: Record<string, unknown> = await vi.importActual("@/lib/alerts");
@@ -122,7 +143,7 @@ vi.mock("@/integrations/supabase/client", () => {
         select: () => ({
           single: () =>
             new Promise((resolve) => {
-              setTimeout(() => resolve(actionQueueInsertResult), insertDelayMs);
+              setTimeout(() => resolve(actionQueueInsertResult), createDelayMs);
             }),
         }),
         then: (resolve: (r: typeof actionQueueInsertResult) => unknown) =>
@@ -139,6 +160,12 @@ vi.mock("@/integrations/supabase/client", () => {
         ...makeSelectChain(table),
         insert: (payload: unknown) => makeInsert(table, payload),
       }),
+      rpc: (fn: string, args: Record<string, unknown>) => {
+        rpcCalls.push({ fn, args });
+        return new Promise((resolve) => {
+          setTimeout(() => resolve(actionQueueCreateResult), createDelayMs);
+        });
+      },
     },
   };
 });
@@ -150,8 +177,21 @@ beforeEach(() => {
     data: { id: "new-action-uuid-1", grow_id: "grow-uuid-1" },
     error: null,
   };
-  insertDelayMs = 0;
+  actionQueueCreateResult = {
+    data: {
+      ok: true,
+      action_queue_id: "new-action-uuid-1",
+      grow_id: "grow-uuid-1",
+      status: "pending_approval",
+      event_id: "event-uuid-1",
+      reused: false,
+      created_at: "2026-05-30T10:31:00Z",
+    },
+    error: null,
+  };
+  createDelayMs = 0;
   inserts.length = 0;
+  rpcCalls.length = 0;
   toastSuccess.mockClear();
   toastError.mockClear();
   toastWarning.mockClear();
@@ -168,6 +208,7 @@ function renderDetail() {
 }
 
 const actionQueueInserts = () => inserts.filter((i) => i.table === "action_queue");
+const actionQueueCreateCalls = () => rpcCalls.filter((c) => c.fn === "action_queue_create");
 
 describe("AlertDetail — decideAddButtonState wiring", () => {
   it("renders Add to Action Queue and exposes can_add decision state when eligible", async () => {
@@ -200,15 +241,21 @@ describe("AlertDetail — decideAddButtonState wiring", () => {
     expect(region.getAttribute("data-decision-state")).toBe("already_exists");
   });
 
-  it("fast double-click creates exactly one action_queue insert", async () => {
-    insertDelayMs = 40;
+  it("fast double-click creates exactly one action_queue row", async () => {
+    createDelayMs = 40;
     renderDetail();
     const btn = await screen.findByTestId("alert-handoff-add-button");
-    // Two rapid clicks before the insert promise resolves.
+    // Two rapid clicks before the create promise resolves.
     await clickAct(btn);
     await clickAct(btn);
     await waitFor(() => expect(toastSuccess).toHaveBeenCalled());
-    expect(actionQueueInserts()).toHaveLength(1);
+    // The in-flight guard must collapse the pair into a single create.
+    expect(actionQueueCreateCalls()).toHaveLength(1);
+    // And the create must still go through the atomic RPC, never a raw
+    // client insert — a regression to `.from("action_queue").insert(...)`
+    // would lose the paired audit event and the server dedupe key.
+    expect(actionQueueInserts()).toHaveLength(0);
+    expect(actionQueueCreateCalls()[0].args.p_dedupe_key).toBe("env_alert:alert-uuid-1");
   });
 
   it("never leaks raw [alert:<id>] tokens, alert id, or grow id in handoff region", async () => {

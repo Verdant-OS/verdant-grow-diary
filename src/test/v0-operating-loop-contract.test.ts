@@ -209,15 +209,27 @@ describe("V0 loop · action drafts are safe by construction", () => {
     expect(buildActionQueueDraftFromAlert({ ...alert, metric: "" }).ok).toBe(false);
   });
 
-  it("AlertDetail insert payload omits user_id", () => {
-    // Static check: the action_queue insert object passed in AlertDetail must
-    // not set user_id (DB default auth.uid() owns it).
-    const insertIdx = ALERT_DETAIL.indexOf(".insert({");
-    expect(insertIdx).toBeGreaterThan(-1);
-    // Capture the immediate insert payload object.
-    const block = ALERT_DETAIL.slice(insertIdx, insertIdx + 800);
+  it("AlertDetail action_queue create payload omits user_id", () => {
+    // Static check: the action_queue create payload built in AlertDetail must
+    // not set user_id (DB default auth.uid() owns it) and must not carry a
+    // device-control field.
+    //
+    // #586 replaced the raw `.from("action_queue").insert({...})` with the
+    // atomic `createActionQueueItem(...)` RPC wrapper. This guard follows the
+    // payload to its new home rather than scanning for the retired pattern —
+    // an indexOf on `.insert({` silently returned -1 and verified nothing.
+    const createIdx = ALERT_DETAIL.indexOf("createActionQueueItem({");
+    expect(
+      createIdx,
+      "AlertDetail must create action_queue rows via createActionQueueItem",
+    ).toBeGreaterThan(-1);
+    // Capture the immediate create payload object.
+    const block = ALERT_DETAIL.slice(createIdx, createIdx + 800);
     expect(block).toMatch(/grow_id\s*:/);
     expect(block).not.toMatch(/\buser_id\s*:/);
+    expect(block).not.toMatch(/\btarget_device\s*:/);
+    // The retired raw-insert path must not come back.
+    expect(ALERT_DETAIL).not.toMatch(/from\(\s*["']action_queue["']\s*\)\s*\.insert\(/);
   });
 });
 

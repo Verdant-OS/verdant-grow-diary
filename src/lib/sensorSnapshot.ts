@@ -329,12 +329,17 @@ export function snapshotFromReadings(rows: SensorReadingLike[]): SensorSnapshot 
   // so the tent can never describe evidence that did not produce it.
   // Mixed tents (e.g. the Dashboard's "All tents" view) yield null rather
   // than an arbitrary winner.
-  const latestTents = new Set(
-    latest
-      .map((r) => (typeof r.tent_id === "string" ? r.tent_id.trim() : ""))
-      .filter((id) => id.length > 0),
-  );
-  const tent_id = latestTents.size === 1 ? [...latestTents][0] : null;
+  // EVERY contributing row must carry the SAME non-blank tent. Filtering
+  // blanks out before testing uniqueness would make ["tent-a", null] look
+  // unanimous and pin the alert on tent-a, even though one contributing row
+  // had no known tent — the precise mis-attribution this guard exists to
+  // prevent. An unknown tent is disagreement, not absence.
+  const latestTentIds = latest.map((r) => (typeof r.tent_id === "string" ? r.tent_id.trim() : ""));
+  const tent_id =
+    latestTentIds.length > 0 &&
+    latestTentIds.every((id) => id.length > 0 && id === latestTentIds[0])
+      ? latestTentIds[0]
+      : null;
   return {
     source,
     ts: latestTs,

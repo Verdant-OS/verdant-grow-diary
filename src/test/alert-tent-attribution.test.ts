@@ -67,6 +67,19 @@ describe("snapshotFromReadings · tent attribution", () => {
     expect(snap?.tent_id).toBeNull();
   });
 
+  it("treats an UNKNOWN tent as disagreement, not absence (regression)", () => {
+    // Filtering blanks out before testing uniqueness made ["tent-a", null]
+    // look unanimous, pinning the alert on tent-a even though a contributing
+    // row had no known tent. Caught in review on #775.
+    for (const other of [null, "", "   "]) {
+      const snap = snapshotFromReadings([
+        reading("tent-a", "temperature_c", 30),
+        reading(other, "humidity_pct", 55),
+      ]);
+      expect(snap?.tent_id, `["tent-a", ${JSON.stringify(other)}] must not attribute`).toBeNull();
+    }
+  });
+
   it("derives from the LATEST rows only, not superseded ones", () => {
     // A snapshot describes one instant. An older row from a different tent
     // must not influence the attribution of the rows that actually won.
@@ -117,6 +130,36 @@ describe("wiring · the tent actually reaches the alert row", () => {
     expect(AUTO).toMatch(/tentId:[\s\S]{0,120}snapshot\.tent_id/);
   });
 
+  it("EVERY usePersistEnvironmentAlerts call site passes a tentId", () => {
+    // The original version of this test asserted the two saveAlert sites and
+    // AlertsAutoPersistForGrow, and so passed while Dashboard's own
+    // usePersistEnvironmentAlerts({...}) call silently omitted tentId —
+    // meaning Dashboard-originated auto-persisted alerts stayed tent-less.
+    // Caught in review on #775. Enumerate the call sites instead of naming
+    // the ones we happen to remember.
+    const callers = [
+      ["src/components/AlertsAutoPersistForGrow.tsx", AUTO],
+      ["src/pages/Dashboard.tsx", DASHBOARD],
+    ] as const;
+    let found = 0;
+    for (const [name, src] of callers) {
+      for (const m of src.matchAll(/usePersistEnvironmentAlerts\(\{/g)) {
+        // Scan the argument object: from the call to the line that closes it.
+        const start = m.index ?? 0;
+        const end = src.indexOf("\n  });", start);
+        expect(end, `${name}: could not find end of call at ${start}`).toBeGreaterThan(start);
+        const args = src.slice(start, end);
+        expect(args, `${name} calls usePersistEnvironmentAlerts without tentId`).toMatch(
+          /\btentId\s*:/,
+        );
+        found += 1;
+      }
+    }
+    // Non-triviality: if the call sites are ever renamed/moved, this test
+    // must fail loudly rather than pass by matching nothing.
+    expect(found).toBeGreaterThanOrEqual(2);
+  });
+
   it("a tent change re-runs the persist effect", () => {
     // tentKey is part of the dedupe key; omitting it from the dep array would
     // let a stale tent attribute the next grow's alerts.
@@ -162,21 +205,29 @@ describe("dedupe is per (tent, rule), not per rule", () => {
 describe("the dedupe key behaves correctly for the multi-tent case", () => {
   // Mirrors the production composition so the collapse bug is provable
   // rather than merely described.
-  const scopedKey = (tent: string | null, ruleKey: string) => `${tent ?? ""}::${ruleKey}`;
+  const scopedKey = (grow: string | null, tent: string | null, ruleKey: string) =>
+    `${grow ?? ""}::${tent ?? ""}::${ruleKey}`;
+  const rule = "environment_alerts|temp|Temperature high";
+  const G = "grow-1";
 
   it("keeps two tents breaching the same metric as DISTINCT rows", () => {
-    const rule = "environment_alerts|temp|Temperature high";
-    expect(scopedKey("tent-a", rule)).not.toBe(scopedKey("tent-b", rule));
+    expect(scopedKey(G, "tent-a", rule)).not.toBe(scopedKey(G, "tent-b", rule));
   });
 
   it("still dedupes a repeat breach within the SAME tent", () => {
-    const rule = "environment_alerts|temp|Temperature high";
-    expect(scopedKey("tent-a", rule)).toBe(scopedKey("tent-a", rule));
+    expect(scopedKey(G, "tent-a", rule)).toBe(scopedKey(G, "tent-a", rule));
   });
 
-  it("keeps historical tent-less rows on their existing grow-wide behavior", () => {
-    const rule = "environment_alerts|temp|Temperature high";
-    expect(scopedKey(null, rule)).toBe(scopedKey(null, rule));
-    expect(scopedKey(null, rule)).not.toBe(scopedKey("tent-a", rule));
+  it("keeps historical tent-less rows distinct from tent-scoped ones", () => {
+    expect(scopedKey(G, null, rule)).toBe(scopedKey(G, null, rule));
+    expect(scopedKey(G, null, rule)).not.toBe(scopedKey(G, "tent-a", rule));
+  });
+
+  it("does not let one grow's in-flight key suppress the same rule in another", () => {
+    // inFlightKeys is a ref that survives grow switches and never drops
+    // successful keys, so a grow-blind key would silently suppress a real
+    // alert after the user changes grows. Caught in review on #775.
+    expect(scopedKey("grow-1", null, rule)).not.toBe(scopedKey("grow-2", null, rule));
+    expect(scopedKey("grow-1", "tent-a", rule)).not.toBe(scopedKey("grow-2", "tent-a", rule));
   });
 });

@@ -19,7 +19,7 @@ inside the active governance handoff.
 
 | Branch               | Role                                             | Verified head                                                                                                                                                               |
 | -------------------- | ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `verdant-grow-diary` | **Deploy branch. Production ships from here.**   | `821adb9fafda25d84f11fe5d42a321f18bfe0a0f` (#812), verified 2026-08-07 after `git fetch origin`; the queue advances it several times daily — re-verify before relying on it |
+| `verdant-grow-diary` | **Deploy branch. Production ships from here.**   | `b972ad8225ef20b4d24aeb85645f0a4779b277ba` (#821), verified 2026-08-07 after `git fetch origin`; the queue advances it several times daily — re-verify before relying on it |
 | `main`               | Integration branch. It is not production parity. | `b6d747941948ce68157185a2b0847acea6970d44` (#779), verified 2026-08-07                                                                                                      |
 
 `main` and `verdant-grow-diary` are divergent. Do not infer production behavior from
@@ -96,9 +96,9 @@ The validation evidence in this section is tied to deploy commit `5611b130e81a` 
 must not be carried forward to later commits. The tip has since advanced through
 `acad6cb938e5` (#727), `864eab892` (#725), `1ae1677645a0` (#729), `1a2df78ac3`
 (#735), `6c78266edb7f` (#737), `a9a88e6ed` (#809), `63ed76c6d` (#794),
-`ad29943ea9ec` (#785) and on to `821adb9fafda` (#812) — **67 commits ahead of
-`5611b130e81a`**, counted with `git log --oneline 5611b130e81a..821adb9fafda` on
-2026-08-07.
+`ad29943ea9ec` (#785), `821adb9fafda` (#812) and on to `b972ad8225ef` (#821) —
+**68 commits ahead of `5611b130e81a`**, counted with
+`git log --oneline 5611b130e81a..b972ad8225ef` on 2026-08-07.
 (PR numbers on this branch do not order by merge time: #809 merged before #794, which
 merged before #785. Order commits with `git log`, never by PR number.)
 None of the checks in the table above have been re-measured against any of those
@@ -155,7 +155,7 @@ migrations and different client moves:
 
 All three (`dc29093b5`, `a9a88e6ed`, `821adb9fa`) are ancestors of the deploy tip recorded
 in Branch topology above — verified 2026-08-07 with `git merge-base --is-ancestor` against
-`821adb9fafda25d84f11fe5d42a321f18bfe0a0f`, and #812 _is_ that tip. Re-verify this block
+`b972ad8225ef20b4d24aeb85645f0a4779b277ba`. Re-verify this block
 alongside the Branch-topology row: if a later reader advances that row, the ancestry claim
 here is only as current as the head it was checked against.
 

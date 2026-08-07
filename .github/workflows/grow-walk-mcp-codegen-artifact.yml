@@ -12,7 +12,7 @@ permissions:
   contents: write
 
 jobs:
-  generate-and-commit:
+  verify-generate-and-commit:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout exact branch head
@@ -28,7 +28,20 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Generate and verify the executable MCP bundle
+      - name: Add focused package scripts deterministically
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = 'package.json';
+          const pkg = JSON.parse(fs.readFileSync(path, 'utf8'));
+          pkg.scripts['check:grow-walk-plugin'] = 'node scripts/validate-grow-walk-plugin.mjs';
+          pkg.scripts['test:grow-walk'] = 'vitest run src/test/grow-walk-contracts.test.ts src/test/grow-walk-evidence-rules.test.ts src/test/grow-walk-attention-rules.test.ts src/test/grow-walk-context-view-model.test.ts src/test/grow-walk-safety-golden-cases.test.ts src/test/grow-walk-target-read-models.test.ts src/test/grow-walk-context-read-models.test.ts src/test/grow-walk-mcp-tools.test.ts src/test/grow-walk-mcp-manifest-contract.test.ts src/test/mcp-manifest-drift.test.ts src/test/grow-walk-plugin-package.test.ts src/test/grow-walk-mcp-local-rls-integration.test.ts --reporter=dot';
+          fs.writeFileSync(path, `${JSON.stringify(pkg, null, 2)}\n`);
+          NODE
+
+      - name: Generate the executable MCP bundle
         shell: bash
         run: |
           set -euo pipefail
@@ -39,16 +52,27 @@ jobs:
           grep -q 'list_grow_walk_targets' .lovable/mcp/manifest.json
           grep -q 'get_grow_walk_context' .lovable/mcp/manifest.json
 
-      - name: Commit only the generated bundle when changed
+      - name: Validate plugin package
+        run: node scripts/validate-grow-walk-plugin.mjs
+
+      - name: Run focused Grow Walk tests
+        run: bun run test:grow-walk
+
+      - name: Typecheck
+        run: |
+          bun run typecheck
+          bun run typecheck:tsgo
+
+      - name: Commit generated bundle and focused scripts
         shell: bash
         run: |
           set -euo pipefail
-          git add supabase/functions/mcp/index.ts
+          git add package.json supabase/functions/mcp/index.ts
           if git diff --cached --quiet; then
-            echo "Generated MCP bundle already matches source."
+            echo "Generated MCP bundle and package scripts already match source."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "chore: regenerate MCP bundle for Grow Walk"
+          git commit -m "chore: verify and regenerate Grow Walk MCP"
           git push origin HEAD:codex/verdant-grow-walk-v0

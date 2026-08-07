@@ -588,32 +588,48 @@ function scanActivePermissivePolicies(migrations) {
 }
 
 function scanTablesWithoutRls(migrations) {
-  // Collect all public tables created and all ENABLE ROW LEVEL SECURITY
-  // targets across the whole migrations tree. A CREATE TABLE without a
-  // matching enable anywhere is flagged against the migration that
-  // creates it.
-  const created = new Map(); // table -> {migration, snippet}
-  const enabled = new Set();
+  // Replay CREATE / ENABLE / DROP events in source order. A table that
+  // survives the migration tree without RLS is reportable; a transaction-local
+  // self-test table that is dropped before commit is not a persistent surface.
+  // A later CREATE after DROP starts a fresh state and must enable RLS again.
+  const tables = new Map(); // table -> {migration, snippet, enabled}
   const createRe = /CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?public\.([a-zA-Z0-9_]+)/gi;
   const enableRe =
     /ALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?(?:ONLY\s+)?public\.([a-zA-Z0-9_]+)\s+ENABLE\s+ROW\s+LEVEL\s+SECURITY/gi;
+  const dropRe = /DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?public\.([a-zA-Z0-9_]+)/gi;
   for (const m of migrations) {
+    const events = [];
     let match;
     while ((match = createRe.exec(m.sql))) {
       const t = match[1].toLowerCase();
-      if (!created.has(t)) {
-        const idx = match.index;
-        const snippet = m.sql.slice(idx, idx + 200).replace(/\s+/g, " ");
-        created.set(t, { migration: m.name, snippet });
-      }
+      const snippet = m.sql.slice(match.index, match.index + 200).replace(/\s+/g, " ");
+      events.push({ kind: "create", table: t, index: match.index, snippet });
     }
     while ((match = enableRe.exec(m.sql))) {
-      enabled.add(match[1].toLowerCase());
+      events.push({ kind: "enable", table: match[1].toLowerCase(), index: match.index });
+    }
+    while ((match = dropRe.exec(m.sql))) {
+      events.push({ kind: "drop", table: match[1].toLowerCase(), index: match.index });
+    }
+    events.sort((a, b) => a.index - b.index);
+    for (const event of events) {
+      if (event.kind === "create") {
+        tables.set(event.table, {
+          migration: m.name,
+          snippet: event.snippet,
+          enabled: false,
+        });
+      } else if (event.kind === "enable") {
+        const state = tables.get(event.table);
+        if (state) state.enabled = true;
+      } else {
+        tables.delete(event.table);
+      }
     }
   }
   const findings = [];
-  for (const [table, info] of created) {
-    if (enabled.has(table)) continue;
+  for (const [table, info] of tables) {
+    if (info.enabled) continue;
     findings.push({
       scanner: "TABLE_WITHOUT_RLS",
       migration: info.migration,

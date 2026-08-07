@@ -185,6 +185,18 @@
         }
       ],
       "reason": "A fresh local reset fails three of this migration's REVOKEs with SQLSTATE 42883: email_queue_dispatch and email_queue_wake were created in production outside committed migrations, while the legacy two-argument admin_schema_audit was created by committed 20260728084921 but is dropped during replay by 20260728103000 even though production still holds it; existence-guarded DO blocks skip exactly the three signatures a clean replay verified missing while leaving every hosted revoke intact."
+    },
+    {
+      "source_path": "supabase/migrations/20260805090000_security_advisor_hardening_followup.sql",
+      "source_sha256": "13d85bde5a60f2df9d5f62e72a61b91b0073f615d2d9e8b4da8e5ef57dbd40ff",
+      "patched_sha256": "ac5f665bd97d318cc25b5ee7fd3a50be5d48aca8e1c28b360733bae7d7da31e4",
+      "replacements": [
+        {
+          "from": "ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON FUNCTIONS FROM PUBLIC, anon;\nALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON FUNCTIONS FROM PUBLIC, anon;",
+          "to": "ALTER DEFAULT PRIVILEGES REVOKE ALL ON FUNCTIONS FROM PUBLIC, anon;\nALTER DEFAULT PRIVILEGES FOR ROLE postgres REVOKE ALL ON FUNCTIONS FROM PUBLIC, anon;\nALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON FUNCTIONS FROM PUBLIC, anon;\nALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON FUNCTIONS FROM PUBLIC, anon;"
+        }
+      ],
+      "reason": "PostgreSQL schema-specific default privileges add to global defaults and cannot revoke the global PUBLIC function EXECUTE grant. The disposable replay copy adds the missing global revokes before the immutable migration's effective-privilege self-test; the published migration remains byte-for-byte unchanged."
     }
   ],
   "compatibility_injections": [

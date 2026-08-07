@@ -102,12 +102,26 @@ describe("V0 loop · manual readings count as real input", () => {
         isDemoData: true,
       }),
     ).toBe(false);
-    // stale
-    const stale = {
+    // stale — source-aware since the #592 canon: manual 24h, live 15m. The old
+    // single 1-hour fixture is now current for manual by design, so age each
+    // source past its own window and keep an inside-window manual case so this
+    // assertion still proves staleness rather than quietly passing.
+    const staleManual = {
       ...fresh,
-      ts: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+      ts: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString(),
     };
-    expect(isSnapshotPersistable({ snapshot: stale, quality: "good" })).toBe(false);
+    expect(isSnapshotPersistable({ snapshot: staleManual, quality: "good" })).toBe(false);
+    const staleLive = {
+      ...fresh,
+      source: "live" as const,
+      ts: new Date(Date.now() - 20 * 60 * 1000).toISOString(),
+    };
+    expect(isSnapshotPersistable({ snapshot: staleLive, quality: "good" })).toBe(false);
+    const currentManual = {
+      ...fresh,
+      ts: new Date(Date.now() - 23 * 60 * 60 * 1000).toISOString(),
+    };
+    expect(isSnapshotPersistable({ snapshot: currentManual, quality: "good" })).toBe(true);
   });
 });
 
@@ -209,15 +223,20 @@ describe("V0 loop · action drafts are safe by construction", () => {
     expect(buildActionQueueDraftFromAlert({ ...alert, metric: "" }).ok).toBe(false);
   });
 
-  it("AlertDetail insert payload omits user_id", () => {
-    // Static check: the action_queue insert object passed in AlertDetail must
-    // not set user_id (DB default auth.uid() owns it).
-    const insertIdx = ALERT_DETAIL.indexOf(".insert({");
-    expect(insertIdx).toBeGreaterThan(-1);
-    // Capture the immediate insert payload object.
-    const block = ALERT_DETAIL.slice(insertIdx, insertIdx + 800);
+  it("AlertDetail action_queue payload omits user_id", () => {
+    // #586 replaced AlertDetail's client-side `.insert({...})` with the
+    // `action_queue_create` RPC, where the server derives the owner from the
+    // verified JWT. Re-point the fence at the creation path that actually
+    // exists — a client-trusted user_id must be impossible either way.
+    const callIdx = ALERT_DETAIL.indexOf("createActionQueueItem({");
+    expect(callIdx, "AlertDetail must create via the action_queue_create RPC").toBeGreaterThan(-1);
+    const block = ALERT_DETAIL.slice(callIdx, callIdx + 800);
     expect(block).toMatch(/grow_id\s*:/);
     expect(block).not.toMatch(/\buser_id\s*:/);
+    // And the old client-side insert must not come back.
+    expect(ALERT_DETAIL).not.toMatch(
+      /\.from\(\s*["']action_queue["']\s*\)[\s\S]{0,200}?\.insert\(/,
+    );
   });
 });
 

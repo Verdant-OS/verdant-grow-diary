@@ -73,13 +73,26 @@ describe("validateManualSensorSnapshotFields", () => {
     expect(h?.severity).toBe("block");
   });
 
+  // The #592 sensor-truth canon widened the MANUAL current-context window from
+  // 6h to 24h, so the old 24-hour fixture now sits exactly AT the boundary and
+  // no longer warns. Age it past the new window, and pin the inside-window
+  // case too so the boundary is proven from both directions.
   it("stale capturedAt warns but does not block", () => {
     const v = validateManualSensorSnapshotFields(
-      { source: "manual", capturedAt: HOURS_AGO(24), temperatureC: 24, humidityPct: 55 },
+      { source: "manual", capturedAt: HOURS_AGO(25), temperatureC: 24, humidityPct: 55 },
       { nowMs: NOW_MS },
     );
     const h = v.hints.find((x) => x.field === "capturedAt");
     expect(h?.severity).toBe("warn");
+    expect(v.hasBlockingErrors).toBe(false);
+  });
+
+  it("capturedAt INSIDE the 24h manual window does not warn", () => {
+    const v = validateManualSensorSnapshotFields(
+      { source: "manual", capturedAt: HOURS_AGO(6), temperatureC: 24, humidityPct: 55 },
+      { nowMs: NOW_MS },
+    );
+    expect(v.hints.find((x) => x.field === "capturedAt")).toBeUndefined();
     expect(v.hasBlockingErrors).toBe(false);
   });
 

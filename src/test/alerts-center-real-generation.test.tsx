@@ -47,7 +47,13 @@ const PERSIST_HOOK = readFileSync(
 );
 
 const FRESH = new Date().toISOString();
-const STALE = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+// Staleness is source-aware since the #592 canon: live 15m, manual 24h. The
+// snapshots here are `manual`, so a 1-hour-old timestamp is now current by
+// design — age the stale fixture past the manual window, and keep a live-stale
+// timestamp for the tightened window.
+const STALE = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
+const LIVE_STALE = new Date(Date.now() - 20 * 60 * 1000).toISOString();
+const MANUAL_CURRENT = new Date(Date.now() - 23 * 60 * 60 * 1000).toISOString();
 
 function manualSnap(over: Partial<{ temp: number; rh: number; vpd: number; ts: string }> = {}) {
   return {
@@ -147,6 +153,26 @@ describe("alert persistence — source-truth guards", () => {
         quality: "good",
       }),
     ).toBe(false);
+  });
+
+  it("never persists from a stale live snapshot (15-minute window)", () => {
+    const snap = { ...manualSnap({ ts: LIVE_STALE, rh: 65 }), source: "live" as const };
+    expect(
+      isSnapshotPersistable({
+        snapshot: snap,
+        quality: "good",
+      }),
+    ).toBe(false);
+  });
+
+  it("still persists from a manual snapshot inside the 24-hour window", () => {
+    const snap = manualSnap({ ts: MANUAL_CURRENT, rh: 65 });
+    expect(
+      isSnapshotPersistable({
+        snapshot: snap,
+        quality: "good",
+      }),
+    ).toBe(true);
   });
 
   it("never persists demo/fallback snapshots", () => {

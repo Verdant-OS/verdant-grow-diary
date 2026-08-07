@@ -540,8 +540,19 @@ jobs:
           # The one exception is edge-shared-preflight: it is a separate job
           # reached through `needs:`, so this job cannot run at all unless it
           # succeeded. That justification is recorded in its `detail`.
+          #
+          # job-status is the backstop and must stay first. Wiring the listed
+          # stages was not sufficient on its own: this job runs many gate
+          # steps that are NOT represented below (the V0 operating loop
+          # contract test, the reconsent a11y contract, the leakage guards,
+          # ...). When one of those fails, every later step is `skipped` and
+          # no tracked row is `fail`, so the verdict came out `pass` a second
+          # time through a different door. `job.status` is failure/cancelled
+          # the moment ANY step fails, listed or not, so it closes that hole
+          # regardless of which stages this list happens to name.
           BUILD_SUMMARY_VALIDATORS: >-
             [
+              {"name":"job-status","result":"${{ job.status }}","detail":"backstop: covers steps not listed below"},
               {"name":"edge-shared-preflight","result":"pass","detail":"gated by needs: edge-shared-sync-preflight"},
               {"name":"lint","result":"${{ steps.lint.outcome }}"},
               {"name":"typecheck","result":"${{ steps.typecheck.outcome }}"},

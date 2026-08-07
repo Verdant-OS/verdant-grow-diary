@@ -104,6 +104,7 @@ jobs:
           BUILD_SUMMARY_TRIGGER: ${{ github.event_name }}
           BUILD_SUMMARY_VALIDATORS: >-
             [
+              {"name":"job-status","result":"${{ job.status }}","detail":"backstop: covers steps not listed below"},
               {"name":"edge-shared-preflight","result":"pass","detail":"gated by needs: preflight"},
               {"name":"typecheck","result":"${{ steps.typecheck.outcome }}"},
               {"name":"production-build","result":"${{ steps.prod_build.outcome }}"}

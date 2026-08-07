@@ -40,6 +40,12 @@ const WORKFLOWS = [".github/workflows/ci.yml", ".github/workflows/deployment-pre
  */
 const LITERAL_PASS_ALLOW_LIST = new Set(["edge-shared-preflight"]);
 
+/**
+ * A validator result is "wired" if it reads real state: a step outcome, or the
+ * job status. Anything else is a claim made without evidence.
+ */
+const WIRED_RESULT = /^\$\{\{\s*(?:steps\.[A-Za-z0-9_-]+\.outcome|job\.status)\s*\}\}$/;
+
 function readWorkflow(rel: string): string {
   return readFileSync(resolve(ROOT, rel), "utf8");
 }
@@ -100,7 +106,7 @@ describe("BUILD_SUMMARY_VALIDATORS is wired to real step outcomes", () => {
           `${wf}: validator "${name}" hardcodes "${result}" instead of a steps.<id>.outcome ` +
             `reference. The summary step is \`if: always()\` and also runs on failed jobs, so a ` +
             `literal here reports green for a red run.`,
-        ).toMatch(/^\$\{\{\s*steps\.[A-Za-z0-9_-]+\.outcome\s*\}\}$/);
+        ).toMatch(WIRED_RESULT);
       }
     }
   });
@@ -124,6 +130,25 @@ describe("BUILD_SUMMARY_VALIDATORS is wired to real step outcomes", () => {
     }
   });
 
+  it.each(WORKFLOWS)("%s carries the job.status backstop", (wf) => {
+    // Wiring the listed stages is NOT sufficient on its own. These jobs run
+    // gate steps that the validator list does not name, and when one of those
+    // fails every later step is `skipped` while no tracked row is `fail` — so
+    // the verdict came out `pass` a second time, through a different door.
+    // `job.status` is failure/cancelled the moment ANY step fails, listed or
+    // not. Without this row the artifact can still report green for a red run.
+    for (const block of validatorBlocks(readWorkflow(wf))) {
+      const rows = validatorRows(block);
+      const backstop = rows.find((r) => /job\.status/.test(r.result));
+      expect(
+        backstop,
+        `${wf}: every BUILD_SUMMARY_VALIDATORS block must include a ` +
+          `\`\${{ job.status }}\` row, so a failure in an untracked step ` +
+          `cannot be reported as green.`,
+      ).toBeDefined();
+    }
+  });
+
   it("ci.yml wires the stage that actually regressed", () => {
     // static-safety-scans is the specific row that reported `pass` while
     // `bun run test:static-safety` had exited 1. Pin it by name so a future
@@ -132,7 +157,7 @@ describe("BUILD_SUMMARY_VALIDATORS is wired to real step outcomes", () => {
     const rows = validatorBlocks(src).flatMap(validatorRows);
     const staticSafety = rows.find((r) => r.name === "static-safety-scans");
     expect(staticSafety, "ci.yml must still report a static-safety-scans stage").toBeDefined();
-    expect(staticSafety!.result).toMatch(/^\$\{\{\s*steps\.[A-Za-z0-9_-]+\.outcome\s*\}\}$/);
+    expect(staticSafety!.result).toMatch(WIRED_RESULT);
   });
 });
 

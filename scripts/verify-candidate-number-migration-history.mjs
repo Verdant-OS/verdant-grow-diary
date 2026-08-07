@@ -57,18 +57,42 @@ export const EXIT = Object.freeze({
   PSQL_NOT_INVOCABLE: 5,
   QUERY_FAILED: 6,
   TARGET_IDENTITY_INVALID: 7,
+  LEDGER_VERSION_MISMATCH: 8,
 });
 
 // Checks the exact literal version strings AND, independently, the schema
 // effect (guard function markers + validated constraint). Never treats one
 // as a proxy for the other.
+// Requires BOTH version AND name to match for a row to count as the exact
+// expected migration — matching the apply script's own collision
+// discipline (classifyTargetLedger treats a version/name mismatch as a
+// collision, never as "present"). Checking version alone would let a row
+// with the right version but a DIFFERENT name (a genuine ledger anomaly)
+// read as "applied", exactly the false-positive the apply preflight
+// already guards against on the write path.
 export const VERIFY_SQL = `
 select jsonb_build_object(
-  'ledger_versions', coalesce((
-    select jsonb_agg(version order by version)
-    from supabase_migrations.schema_migrations
-    where version in ('20260806230020', '20260806230021')
-  ), '[]'::jsonb),
+  'migrations', (
+    select jsonb_agg(
+      jsonb_build_object(
+        'version', expected.version,
+        'exact_match', exists (
+          select 1 from supabase_migrations.schema_migrations sm
+          where sm.version = expected.version and sm.name = expected.name
+        ),
+        'mismatch', exists (
+          select 1 from supabase_migrations.schema_migrations sm
+          where (sm.version = expected.version or sm.name = expected.name)
+            and not (sm.version = expected.version and sm.name = expected.name)
+        )
+      )
+      order by expected.version
+    )
+    from (values
+      ('20260806230020', 'candidate_number_maintenance_paths'),
+      ('20260806230021', 'candidate_number_membership_validate')
+    ) as expected(version, name)
+  ),
   'guard_has_fix', coalesce((
     select pg_get_functiondef(p.oid) ilike '%v_caller_set_num%'
     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
@@ -101,7 +125,14 @@ export function parseVerifyStdout(stdout) {
   }
   const parsed = JSON.parse(lines[0]);
   if (
-    !Array.isArray(parsed.ledger_versions) ||
+    !Array.isArray(parsed.migrations) ||
+    parsed.migrations.length !== EXPECTED_MIGRATIONS.length ||
+    !parsed.migrations.every(
+      (m) =>
+        typeof m?.version === "string" &&
+        typeof m?.exact_match === "boolean" &&
+        typeof m?.mismatch === "boolean",
+    ) ||
     typeof parsed.guard_has_fix !== "boolean" ||
     typeof parsed.constraint_present !== "boolean" ||
     typeof parsed.constraint_validated !== "boolean"
@@ -116,16 +147,28 @@ export function parseVerifyStdout(stdout) {
  * literally in the ledger, and whether the schema effect is actually live.
  */
 export function classifyHistory(result) {
-  const ledgerSet = new Set(result.ledger_versions);
-  const missingVersions = EXPECTED_MIGRATIONS.filter((m) => !ledgerSet.has(m.version)).map(
-    (m) => m.version,
-  );
+  const byVersion = new Map(result.migrations.map((m) => [m.version, m]));
+  const missingVersions = [];
+  const mismatchedVersions = [];
+  for (const expected of EXPECTED_MIGRATIONS) {
+    const row = byVersion.get(expected.version);
+    if (row?.mismatch) {
+      // A row exists claiming this version or this name, but not both —
+      // e.g. the right version under a different name. This is a ledger
+      // anomaly, never "applied": the same signal the apply script's own
+      // collision guard would refuse to write over.
+      mismatchedVersions.push(expected.version);
+    } else if (!row?.exact_match) {
+      missingVersions.push(expected.version);
+    }
+  }
   const schemaEffectLive =
     result.guard_has_fix && result.constraint_present && result.constraint_validated;
 
   return Object.freeze({
     missingVersions,
-    allVersionsPresent: missingVersions.length === 0,
+    mismatchedVersions,
+    allVersionsPresent: missingVersions.length === 0 && mismatchedVersions.length === 0,
     schemaEffectLive,
     guardHasFix: result.guard_has_fix,
     constraintPresent: result.constraint_present,
@@ -297,6 +340,32 @@ export function runVerifyCandidateNumberMigrationHistory({
     return EXIT.SCHEMA_EFFECT_MISSING;
   }
 
+  // Checked BEFORE "missing": a mismatched row (right version, wrong name,
+  // or vice versa) is a ledger anomaly that needs investigation, never a
+  // "just apply it" situation — applying again would hit the apply
+  // script's own collision guard, or worse, produce an ambiguous ledger if
+  // that guard were ever bypassed.
+  if (classification.mismatchedVersions.length > 0) {
+    logger.error(
+      `Schema effect is live, but ${classification.mismatchedVersions.length} expected version(s) are claimed by a MISMATCHED ledger row (right version, wrong name, or vice versa):`,
+    );
+    for (const version of classification.mismatchedVersions) {
+      logger.error(`  ${version}`);
+    }
+    logger.error(
+      "This is a ledger anomaly, not a missing apply — investigate supabase_migrations.schema_migrations by hand before doing anything else. Do not re-apply; the apply script's own collision guard would refuse it for the same reason.",
+    );
+    writeReport(`FAILED - ${classification.mismatchedVersions.length} mismatched ledger row(s)`, [
+      "The schema effect (guard fix + validated constraint) IS live, but at least one expected version is claimed by a row whose version/name pair does not match exactly:",
+      "",
+      ...classification.mismatchedVersions.map((v) => `- \`${v}\``),
+      "",
+      "This is a ledger anomaly, not a missing apply. Investigate `supabase_migrations.schema_migrations` directly before taking any action — do not re-apply.",
+    ]);
+    writeAudit("ledger_version_mismatch", classification);
+    return EXIT.LEDGER_VERSION_MISMATCH;
+  }
+
   if (!classification.allVersionsPresent) {
     logger.error(
       `Schema effect is live, but ${classification.missingVersions.length} expected version string(s) are absent from supabase_migrations.schema_migrations:`,
@@ -305,14 +374,26 @@ export function runVerifyCandidateNumberMigrationHistory({
       logger.error(`  ${version}`);
     }
     logger.error(
-      "This means the apply path recorded the change under a DIFFERENT version (or not at all) rather than the repository's own filename-derived version. Re-apply via scripts/apply-candidate-number-maintenance-migrations.mjs to record the exact expected ledger rows.",
+      "This means the apply path recorded the change under a DIFFERENT version (or not at all) rather than the repository's own filename-derived version.",
     );
+    // scripts/apply-candidate-number-maintenance-migrations.mjs is
+    // deliberately production-only (its own confirmation gate rejects any
+    // other TARGET_ENV) — pointing a sandbox failure at it would always
+    // fail again. Report the honest gap rather than a repair step that
+    // cannot work for this target.
+    const repairLine =
+      targetEnv === "production"
+        ? "Re-apply via `scripts/apply-candidate-number-maintenance-migrations.mjs`, which records the exact expected ledger rows."
+        : "This PR ships no automated sandbox repair path — the apply script is intentionally production-only and will refuse any other TARGET_ENV. Record the exact ledger rows manually against the sandbox database, or extend the apply script with its own sandbox confirmation gate before dispatching it here.";
+    logger.error(repairLine);
     writeReport(`FAILED - ${classification.missingVersions.length} exact version(s) missing`, [
       "The schema effect (guard fix + validated constraint) IS live, but the migration ledger does not record the exact expected version string(s):",
       "",
       ...classification.missingVersions.map((v) => `- \`${v}\``),
       "",
-      "This is the signature of an apply path that ran the SQL under a different, freshly generated version instead of the repository's own filename-derived version. Re-apply via `scripts/apply-candidate-number-maintenance-migrations.mjs`, which records the exact expected ledger rows.",
+      "This is the signature of an apply path that ran the SQL under a different, freshly generated version instead of the repository's own filename-derived version.",
+      "",
+      repairLine,
     ]);
     writeAudit("version_missing_from_ledger", classification);
     return EXIT.VERSION_MISSING_FROM_LEDGER;

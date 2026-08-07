@@ -577,6 +577,7 @@ export function runApplyCandidateNumberMaintenanceMigrations({
     logger.error("Postflight contract verification failed.");
     writeReport("FAILED - postflight contract mismatch", [
       `Missing exact versions: ${history.missingVersions.join(", ") || "(none)"}.`,
+      `Mismatched ledger rows (right version, wrong name, or vice versa): ${history.mismatchedVersions.join(", ") || "(none)"}.`,
       `Schema effect live: ${history.schemaEffectLive}.`,
     ]);
     writeAudit("postflight_contract_failed", { ...auditBase, ledgerState: ledger.status, ...history });

@@ -30,10 +30,10 @@ import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import {
   assertSupabaseDatabaseTargetIdentity,
-  sanitizeSupabaseDatabaseUrlForPsql,
   SUPABASE_DATABASE_TARGETS,
   SupabaseDatabaseTargetIdentityError,
 } from "./lib/supabaseDatabaseTargetIdentity.mjs";
+import { buildPsqlEnvironment as buildSharedPsqlEnvironment } from "./lib/candidateNumberToolRuntime.mjs";
 import { findUnsafeSqlReason } from "./apply-pinned-production-migrations.mjs";
 import {
   classifyPreflightResult,
@@ -124,6 +124,15 @@ export function validatePinnedMigrationFiles({ root = migrationsRoot, readFile =
  * insert each row's OWN filename-derived version and name. This is what
  * prevents a freshly generated duplicate timestamp — nothing else writes
  * to supabase_migrations.schema_migrations in this script.
+ *
+ * The atomicity and the legality of SET LOCAL / LOCK TABLE below come from
+ * the CALLER, not from any BEGIN/COMMIT text in this string: runPsqlFile
+ * invokes psql with --single-transaction, which wraps the whole file in an
+ * implicit BEGIN/COMMIT. Without that flag psql defaults to autocommit and
+ * LOCK TABLE errors immediately ("can only be used in transaction
+ * blocks") — verified empirically. Do not "fix" that by adding a literal
+ * BEGIN/COMMIT here; it would conflict with --single-transaction's own
+ * wrapping.
  */
 export function buildApplySql(validatedMigrations) {
   if (
@@ -255,32 +264,11 @@ select jsonb_agg(
 from expected e;
 `;
 
-function buildPsqlEnvironment(sourceEnv, databaseUrl) {
-  const childEnv = {};
-  const pathValue = sourceEnv.PATH ?? sourceEnv.Path;
-  if (typeof pathValue === "string") childEnv.PATH = pathValue;
-  for (const key of [
-    "HOME",
-    "USERPROFILE",
-    "SystemRoot",
-    "SYSTEMROOT",
-    "WINDIR",
-    "TEMP",
-    "TMP",
-    "TMPDIR",
-    "LANG",
-    "LC_ALL",
-    "LC_CTYPE",
-    "SSL_CERT_FILE",
-    "SSL_CERT_DIR",
-  ]) {
-    if (typeof sourceEnv[key] === "string") childEnv[key] = sourceEnv[key];
-  }
-  const connection = sanitizeSupabaseDatabaseUrlForPsql(databaseUrl, "production");
-  childEnv.PGDATABASE = connection.databaseUrl;
-  childEnv.PGSSLMODE = connection.sslMode;
-  return childEnv;
-}
+// This script only ever targets production (enforced by the confirmation
+// gate below), so the shared helper's targetEnv is always the literal
+// "production" here.
+const buildPsqlEnvironment = (sourceEnv, databaseUrl) =>
+  buildSharedPsqlEnvironment(sourceEnv, databaseUrl, "production");
 
 function runPsqlQuery({ sql, childEnv, spawnImpl }) {
   let result;

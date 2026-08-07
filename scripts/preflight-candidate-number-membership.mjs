@@ -17,15 +17,17 @@
  * DATABASE_URL and PG* are ignored). Optional: REPORT_PATH, AUDIT_PATH.
  */
 import { spawnSync } from "node:child_process";
-import { mkdirSync, writeFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   assertSupabaseDatabaseTargetIdentity,
   databaseTargetForEnvironment,
-  sanitizeSupabaseDatabaseUrlForPsql,
   SupabaseDatabaseTargetIdentityError,
 } from "./lib/supabaseDatabaseTargetIdentity.mjs";
+import {
+  buildPsqlEnvironment,
+  writeTextFile as writeToolArtifact,
+} from "./lib/candidateNumberToolRuntime.mjs";
 import {
   classifyPreflightResult,
   parsePreflightStdout,
@@ -43,42 +45,9 @@ export const EXIT = Object.freeze({
   TARGET_IDENTITY_INVALID: 6,
 });
 
-function writeTextFile(path, contents, logger) {
-  if (!path) return;
-  try {
-    mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, contents);
-  } catch {
-    logger.error("Warning: could not write a preflight artifact.");
-  }
-}
-
-export function buildPsqlEnvironment(sourceEnv, databaseUrl, targetEnv) {
-  const childEnv = {};
-  const pathValue = sourceEnv.PATH ?? sourceEnv.Path;
-  if (typeof pathValue === "string") childEnv.PATH = pathValue;
-  for (const key of [
-    "HOME",
-    "USERPROFILE",
-    "SystemRoot",
-    "SYSTEMROOT",
-    "WINDIR",
-    "TEMP",
-    "TMP",
-    "TMPDIR",
-    "LANG",
-    "LC_ALL",
-    "LC_CTYPE",
-    "SSL_CERT_FILE",
-    "SSL_CERT_DIR",
-  ]) {
-    if (typeof sourceEnv[key] === "string") childEnv[key] = sourceEnv[key];
-  }
-  const connection = sanitizeSupabaseDatabaseUrlForPsql(databaseUrl, targetEnv);
-  childEnv.PGDATABASE = connection.databaseUrl;
-  childEnv.PGSSLMODE = connection.sslMode;
-  return childEnv;
-}
+const TOOL_NAME = "preflight-candidate-number-membership";
+const writeTextFile = (path, contents, logger) =>
+  writeToolArtifact(path, contents, logger, TOOL_NAME);
 
 function createArtifactWriters({ targetEnv, reportPath, auditPath, logger, now }) {
   const writeAudit = (outcome, classification, note = "") => {
@@ -88,7 +57,7 @@ function createArtifactWriters({ targetEnv, reportPath, auditPath, logger, now }
       `${JSON.stringify(
         {
           schema_version: 1,
-          tool: "preflight-candidate-number-membership",
+          tool: TOOL_NAME,
           target_env: targetEnv,
           checked_at: now().toISOString(),
           outcome,

@@ -4,8 +4,15 @@
  *
  * Data source priority:
  *  1. latest sensor_readings rows for the scoped grow's tents (if any)
- *  2. latest diary_entries.details.sensor_snapshot for the scoped grow
+ *  2. latest diary_entries evidence for the scoped grow, tent-scoped when
+ *     tentIds is non-empty:
+ *       a. details.sensor_snapshot
+ *       b. details.environment_check (manual envelope; #596)
  *  3. otherwise EMPTY_SNAPSHOT (rendered as "No sensor data yet.")
+ *
+ * Tent scope (#602): when the view is tent-scoped, diary rows with null or
+ * foreign tent_id never surface as that tent's environment evidence — same
+ * fail-closed gate for sensor_snapshot and environment_check.
  *
  * Backed by TanStack Query so manual sensor inserts that invalidate
  * `["latest-sensor-snapshot"]` (or `["sensor_readings"]`) trigger a refetch
@@ -27,6 +34,8 @@ import {
   snapshotFromEnvironmentCheck,
   snapshotFromReadings,
 } from "@/lib/sensorSnapshot";
+import { isDiaryRowInTentScope } from "@/lib/diaryEvidenceTentScopeRules";
+import { selectDashboardSensorEvidenceRows } from "@/lib/dashboardSensorEvidenceRules";
 
 /**
  * A stale sensor snapshot must not suppress fresher grower evidence (Codex
@@ -46,7 +55,6 @@ function preferNewer(
   if (!Number.isFinite(diaryAt)) return staleSensor;
   return diaryAt > sensorAt ? diaryEvidence : staleSensor;
 }
-import { selectDashboardSensorEvidenceRows } from "@/lib/dashboardSensorEvidenceRules";
 
 export type SnapshotState =
   | { status: "idle"; snapshot: SensorSnapshot }
@@ -97,10 +105,10 @@ export function useLatestSensorSnapshot(
             staleSensorCandidate = snap;
           }
         }
-        // 2) Fall back to latest diary_entries.details.sensor_snapshot.
-        // `enabled` already gates on growId; re-narrow for the query builder.
+        // 2) Fall back to latest diary_entries evidence for this grow.
         // Select `id` so Environment Check snapshots can carry a diary
-        // evidence ref for alert persistence (#603).
+        // evidence ref for alert persistence (#603). Select `tent_id` so
+        // tent-scoped views reject foreign/null attribution (#602).
         if (!growId) return staleSensorCandidate ?? EMPTY_SNAPSHOT;
         const { data: diaryRows, error: diaryErr } = await supabase
           .from("diary_entries")
@@ -112,6 +120,10 @@ export function useLatestSensorSnapshot(
         for (const row of diaryRows ?? []) {
           const details = (row.details ?? null) as Record<string, unknown> | null;
           if (!details || typeof details !== "object") continue;
+          // #602 / #601: tent-scoped views only accept diary rows attributed
+          // to one of those tents — null/foreign tent_id is not this tent's
+          // evidence (sensor_snapshot and environment_check share the gate).
+          if (!isDiaryRowInTentScope(row.tent_id, tentIds)) continue;
           const snap = snapshotFromDiary(
             row.entry_at,
             details.sensor_snapshot as Record<string, unknown> | undefined,
@@ -119,13 +131,7 @@ export function useLatestSensorSnapshot(
           if (snap) return preferNewer(staleSensorCandidate, snap);
           // #596: a Quick Log Environment Check is grower-entered manual
           // evidence; within the same row a full sensor_snapshot blob wins,
-          // and rows are already newest-first. When the view is scoped to
-          // tents, only rows attributed to one of those tents count — a
-          // null/foreign tent_id must not surface as this tent's evidence
-          // (Codex review, PR #601).
-          const envScopeOk =
-            tentIds.length === 0 || (row.tent_id != null && tentIds.includes(row.tent_id));
-          if (!envScopeOk) continue;
+          // and rows are already newest-first.
           const diaryEntryId =
             typeof (row as { id?: string | null }).id === "string"
               ? (row as { id: string }).id

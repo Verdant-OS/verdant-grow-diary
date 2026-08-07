@@ -31,6 +31,8 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { resolve, join } from "node:path";
 
 const ROOT = resolve(__dirname, "../..");
+const PI_BRIDGE_OUTBOUND_CALL_PATTERN =
+  /fetch\s*\(|mqtt:\/\/|mqtt\.connect|\.publish\s*\(|\.post\s*\(|\.send\s*\(|\.trigger\s*\(|https?:\/\//i;
 const AI_COACH_SRC = readFileSync(resolve(ROOT, "supabase/functions/ai-coach/index.ts"), "utf8");
 const TYPES_SRC = readFileSync(resolve(ROOT, "src/integrations/supabase/types.ts"), "utf8");
 
@@ -891,22 +893,31 @@ describe("pi_bridge scanner allow-list hardening", () => {
     );
   });
 
-  it("allows sensorLiveMembership.ts only as an exact path, and only while it stays inert", () => {
-    // Exact-path allow-list, never a directory prefix.
+  it("allows both sensorLiveMembership mirrors only as exact paths, and only while they stay inert", () => {
+    // Exact-path allow-list, never a directory prefix. Both skipped files must
+    // be pinned here so the generated mirror cannot drift outside the fence.
     expect(PI_REGION).toMatch(/resolve\(ROOT,\s*["']src\/lib\/sensorLiveMembership\.ts["']\)/);
+    expect(PI_REGION).toMatch(
+      /resolve\(ROOT,\s*["']supabase\/functions\/_shared\/lib\/lib\/sensorLiveMembership\.ts["']\)/,
+    );
     expect(PI_REGION).toMatch(/path === SENSOR_LIVE_MEMBERSHIP_PATH/);
+    expect(PI_REGION).toMatch(/path === SENSOR_LIVE_MEMBERSHIP_MIRROR_PATH/);
 
     // The allow-list is only justified while the file remains a read-only
-    // membership table. This is the assertion that keeps the skip honest: if
-    // the file ever gains a real outbound call or a writer, THIS fails even
-    // though the scanner above now skips the path.
-    const membershipSrc = readFileSync(resolve(ROOT, "src/lib/sensorLiveMembership.ts"), "utf8");
-    expect(membershipSrc).toMatch(/pi_bridge/);
-    expect(membershipSrc).not.toMatch(
-      /fetch\(|mqtt:\/\/|mqtt\.connect|\.publish\(|\.post\(|\.trigger\(|http:\/\/|https:\/\//i,
-    );
-    // No writer / client surface either.
-    expect(membershipSrc).not.toMatch(/\.insert\(|\.update\(|\.delete\(|\.rpc\(|supabase/i);
+    // membership table. Match call-shaped outbound behavior because the
+    // generated membership data legitimately contains provider labels such as
+    // "mqtt" and "webhook".
+    const membershipPaths = [
+      resolve(ROOT, "src/lib/sensorLiveMembership.ts"),
+      resolve(ROOT, "supabase/functions/_shared/lib/lib/sensorLiveMembership.ts"),
+    ];
+    for (const membershipPath of membershipPaths) {
+      const membershipSrc = readFileSync(membershipPath, "utf8");
+      expect(membershipSrc).toMatch(/pi_bridge/);
+      expect(membershipSrc).not.toMatch(PI_BRIDGE_OUTBOUND_CALL_PATTERN);
+      // No writer / client surface either.
+      expect(membershipSrc).not.toMatch(/\.insert\(|\.update\(|\.delete\(|\.rpc\(|supabase/i);
+    }
   });
 
   it("keeps sensorProviderLabels.ts allowed only as an exact file path", () => {

@@ -66,11 +66,23 @@ async function api(path, { token = TOKEN } = {}) {
   return response.json();
 }
 
-/** Check runs paginate at 100; a 35-context repo can exceed one page. */
+/**
+ * Check runs paginate at 100; a 35-context repo can exceed one page.
+ *
+ * `filter=all` is load-bearing, not tidiness. The endpoint defaults to
+ * `filter=latest`, which returns only the most recent attempt per check — so
+ * after a post-merge re-run the original pre-merge attempt is simply absent
+ * from the payload. Combined with the merge-time cutoff that would report a
+ * context as "finished only after the merge" when it had in fact completed
+ * green beforehand: a false red produced by the very fix meant to prevent a
+ * false green.
+ */
 async function fetchAllCheckRuns(sha) {
   const runs = [];
   for (let page = 1; page <= 10; page += 1) {
-    const data = await api(`/repos/${REPO}/commits/${sha}/check-runs?per_page=100&page=${page}`);
+    const data = await api(
+      `/repos/${REPO}/commits/${sha}/check-runs?filter=all&per_page=100&page=${page}`,
+    );
     const batch = data?.check_runs ?? [];
     runs.push(...batch);
     if (batch.length < 100) break;
@@ -124,7 +136,14 @@ async function resolveRulesetDrift(pinned) {
     });
     const rule = (ruleset?.rules ?? []).find((r) => r.type === "required_status_checks");
     const live = (rule?.parameters?.required_status_checks ?? []).map((c) => c.context);
-    return diffPinnedAgainstRuleset(pinned.required, live);
+    // The context names are not the whole contract. `strict` is what forces a
+    // head to be up to date with its base before those checks count; turning
+    // it off silently admits results proven against a stale base, and the
+    // context list would still match exactly.
+    return diffPinnedAgainstRuleset(pinned.required, live, {
+      pinnedStrict: pinned.strictRequiredStatusChecksPolicy,
+      liveStrict: rule?.parameters?.strict_required_status_checks_policy,
+    });
   } catch (error) {
     return { status: "BLOCKED", reason: `ruleset read failed: ${error.message}` };
   }
@@ -142,14 +161,34 @@ async function main() {
   }
 
   const prResolution = await resolvePullRequest(SHA);
-  const evidenceSha =
-    prResolution.kind === PR_RESOLUTION.PULL_REQUEST ? prResolution.headSha || SHA : SHA;
 
-  const [checkRuns, commitStatuses, rulesetDrift] = await Promise.all([
-    fetchAllCheckRuns(evidenceSha),
-    fetchCommitStatuses(evidenceSha),
+  // Two places the gating evidence can live, and which one applies depends on
+  // how the merge happened:
+  //
+  //   queued   the merge queue builds a merge-group commit, runs the required
+  //            checks on it, and that commit becomes the branch commit. The
+  //            evidence is on the LANDED sha.
+  //   direct   merged straight from the PR. The evidence is the pull_request
+  //            run on the PR HEAD.
+  //
+  // Reading only the head would let an older green pull_request run vouch for
+  // a queued merge whose merge-group run was red or unfinished. Reading only
+  // the landed sha would miss direct merges entirely. So collect both and let
+  // the merge-time cutoff discard whatever had not finished — for a direct
+  // merge the landed sha carries post-merge `push` runs, which the cutoff
+  // correctly refuses to credit.
+  const evidenceShas = [SHA];
+  if (prResolution.kind === PR_RESOLUTION.PULL_REQUEST && prResolution.headSha) {
+    if (!evidenceShas.includes(prResolution.headSha)) evidenceShas.push(prResolution.headSha);
+  }
+
+  const [checkRunBatches, statusBatches, rulesetDrift] = await Promise.all([
+    Promise.all(evidenceShas.map((sha) => fetchAllCheckRuns(sha))),
+    Promise.all(evidenceShas.map((sha) => fetchCommitStatuses(sha))),
     resolveRulesetDrift(pinned),
   ]);
+  const checkRuns = checkRunBatches.flat();
+  const commitStatuses = statusBatches.flat();
 
   const result = auditRequiredChecks({
     pinned,

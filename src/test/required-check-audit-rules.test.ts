@@ -315,13 +315,68 @@ describe("auditRequiredChecks — the failures it exists to catch", () => {
     expect(result.failingFindings[0].reason).toContain("still");
   });
 
-  it("tolerates a skipped required context but never calls it PASS", () => {
+  it("fails a skipped required context — unmeasured is not proof (Codex, PR #818)", () => {
+    // A skipped required check did not run. AGENTS.md is explicit that an
+    // unmeasured verification is never a pass, and tolerating it here while the
+    // weaker mustBeGreen list rejected it was incoherent. Measured first: zero
+    // skipped required contexts across the last 20 merges, so this is free.
     const runs = allGreen(EVERY_PINNED);
     runs.find((r) => r.name === "test:legal-seo")!.conclusion = "skipped";
     const result = auditRequiredChecks({ pinned: PINNED, checkRuns: runs, prResolution: MERGED });
-    expect(result.verdict).toBe(AUDIT_VERDICT.PASS);
-    const finding = result.findings.find((f) => f.context === "test:legal-seo");
+    expect(result.verdict).toBe(AUDIT_VERDICT.FAIL);
+    const finding = result.failingFindings.find((f) => f.context === "test:legal-seo");
     expect(finding?.status).toBe(CHECK_STATUS.NOT_MEASURED);
+    expect(finding?.reason).toContain("proves nothing");
+  });
+
+  it("fails when a red check run is contradicted by a green commit status (Codex, PR #818)", () => {
+    // GitHub treats both sources as independently required. Folding them into
+    // one slot let the newer green status overwrite direct evidence of failure.
+    const result = auditRequiredChecks({
+      pinned: PINNED,
+      checkRuns: [
+        ...allGreen(EVERY_PINNED).filter((r) => r.name !== "test:legal-seo"),
+        {
+          name: "test:legal-seo",
+          status: "completed",
+          conclusion: "failure",
+          id: 1,
+          completed_at: "2026-08-07T01:00:00Z",
+        },
+      ],
+      commitStatuses: [
+        {
+          context: "test:legal-seo",
+          state: "success",
+          id: 2,
+          created_at: "2026-08-07T02:00:00Z",
+          updated_at: "2026-08-07T02:00:00Z",
+        },
+      ],
+      prResolution: MERGED,
+    });
+    expect(result.verdict).toBe(AUDIT_VERDICT.FAIL);
+    const finding = result.failingFindings.find((f) => f.context === "test:legal-seo");
+    expect(finding?.status).toBe(CHECK_STATUS.FAIL);
+    expect(finding?.source).toBe("check_run");
+  });
+
+  it("still passes when both sources agree the context is green", () => {
+    const result = auditRequiredChecks({
+      pinned: PINNED,
+      checkRuns: allGreen(EVERY_PINNED),
+      commitStatuses: [
+        {
+          context: "test:legal-seo",
+          state: "success",
+          id: 2,
+          created_at: "2026-08-07T02:00:00Z",
+          updated_at: "2026-08-07T02:00:00Z",
+        },
+      ],
+      prResolution: MERGED,
+    });
+    expect(result.verdict).toBe(AUDIT_VERDICT.PASS);
   });
 });
 
@@ -473,6 +528,43 @@ describe("ruleset drift", () => {
   it("passes only when both sides match exactly", () => {
     expect(diffPinnedAgainstRuleset(["b", "a"], ["a", "b"]).status).toBe("PASS");
   });
+
+  it("fails when strict_required_status_checks_policy is turned off (Codex, PR #818)", () => {
+    // Context names can match exactly while `strict` flips off, which admits
+    // checks proven against a stale base. Names alone would report PASS.
+    const drift = diffPinnedAgainstRuleset(["a"], ["a"], { pinnedStrict: true, liveStrict: false });
+    expect(drift.status).toBe("FAIL");
+    expect(drift.strictPolicy).toEqual({ pinned: true, live: false, changed: true });
+  });
+
+  it("passes when the strict policy still matches", () => {
+    const drift = diffPinnedAgainstRuleset(["a"], ["a"], { pinnedStrict: true, liveStrict: true });
+    expect(drift.status).toBe("PASS");
+    expect(drift.strictPolicy?.changed).toBe(false);
+  });
+
+  it("does not invent a strict-policy verdict when either side is unknown", () => {
+    const drift = diffPinnedAgainstRuleset(["a"], ["a"], { pinnedStrict: true });
+    expect(drift.status).toBe("PASS");
+    expect(drift.strictPolicy).toBeNull();
+  });
+
+  it("names the strict-policy change in the blocker message", () => {
+    const result = auditRequiredChecks({
+      pinned: PINNED,
+      checkRuns: allGreen(EVERY_PINNED),
+      prResolution: MERGED,
+      rulesetDrift: {
+        status: "FAIL",
+        addedToRuleset: [],
+        removedFromRuleset: [],
+        strictPolicy: { pinned: true, live: false, changed: true },
+      },
+    });
+    expect(result.verdict).toBe(AUDIT_VERDICT.FAIL);
+    const blocker = result.blockers.find((b) => b.code === "ruleset_drift");
+    expect(blocker?.message).toContain("stale base");
+  });
 });
 
 describe("formatAuditReport", () => {
@@ -489,9 +581,18 @@ describe("formatAuditReport", () => {
   });
 
   it("does not claim everything went green when something was skipped (Copilot, PR #818)", () => {
-    const runs = allGreen(EVERY_PINNED);
-    runs.find((r) => r.name === "test:legal-seo")!.conclusion = "skipped";
-    const result = auditRequiredChecks({ pinned: PINNED, checkRuns: runs, prResolution: MERGED });
+    // Only a CONDITIONAL must-be-green entry can be skipped and still pass —
+    // required and alwaysRuns entries both fail on NOT_MEASURED now. That case
+    // is exactly where the summary must not overclaim.
+    const pinned = { ...PINNED, mustBeGreen: [{ context: "opt-in-lane", alwaysRuns: false }] };
+    const result = auditRequiredChecks({
+      pinned,
+      checkRuns: [
+        ...allGreen(PINNED.required),
+        { name: "opt-in-lane", status: "completed", conclusion: "skipped", id: 9001 },
+      ],
+      prResolution: MERGED,
+    });
     const report = formatAuditReport(result, { sha: "abc", prNumber: 1 });
     expect(result.verdict).toBe(AUDIT_VERDICT.PASS);
     expect(report).not.toContain("Every pinned context ran and went green");

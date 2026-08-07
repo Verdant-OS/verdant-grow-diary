@@ -19,9 +19,9 @@
 
 ## Recommended first implementation PR
 
-**→ SC-P0-01** (payments-webhook pure HMAC verification)
+**→ SC-P0-01** (payments-webhook pure HMAC verification) — **refined** implementation card below.
 
-Money path on tip still uses SDK `unmarshal` only. Align with BYO `verifyPaddleWebhookSignature` (already PASS).
+Money path on tip still uses SDK `unmarshal` only. Align with BYO `verifyPaddleWebhookSignature` (already PASS). Includes SC-P0-02 logging. See detailed API, HTTP matrix, normalize rules, and checklist under SC-P0-01.
 
 ---
 
@@ -29,39 +29,185 @@ Money path on tip still uses SDK `unmarshal` only. Align with BYO `verifyPaddleW
 
 ### SC-P0-01 — payments-webhook pure HMAC verification (fail closed)
 
-| Field                  | Content                                                                                                                                                                                                                                                                                                                                                                   |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Problem**            | Production Lovable sink `payments-webhook` verifies via `paddle.webhooks.unmarshal` only. Missing secret throws into generic 400; no app-level replay window; SDK compare not source-auditable; `console.error(String(e))` may log noisy throws.                                                                                                                          |
-| **Owned files**        | `supabase/functions/_shared/paddle.ts`, `supabase/functions/payments-webhook/index.ts`, optional re-use of `supabase/functions/paddle-webhook/verifyPaddleSignature.ts`, new static test under `src/test/`                                                                                                                                                                |
-| **Non-goals**          | Change entitlement logic, orchestrator decisions, Paddle product mapping, BYO paddle-webhook sandbox policy                                                                                                                                                                                                                                                               |
-| **Proposed change**    | Add `verifyPaymentsWebhookRequest(req, env)` pure path: resolve `PAYMENTS_{SANDBOX\|LIVE}_WEBHOOK_SECRET` (missing → `webhook_secret_not_configured`), raw body, `verifyPaddleWebhookSignature` with maxAge=300 / futureSkew=60, JSON parse after verify, normalize snake_case → EventLike. Map failures: 500 missing secret; 400 header/json; 401 mismatch/stale/future. |
-| **Regression tests**   | Static pin that payments-webhook does not call `webhooks.unmarshal` for auth; unit/security tests already on verifyPaddleSignature; optional Deno tests if harness exists                                                                                                                                                                                                 |
-| **Static-scan fences** | Assert `verifyPaddleWebhookSignature` or shared pure entry used; forbid `unmarshal` on verify path                                                                                                                                                                                                                                                                        |
-| **Runtime harness**    | None required for merge; no live Paddle calls                                                                                                                                                                                                                                                                                                                             |
-| **Validation**         | `npx vitest run src/test/payments-webhook-signature-static.test.ts` (add); existing paddle security tests                                                                                                                                                                                                                                                                 |
-| **Rollout / rollback** | Single PR; revert restores SDK path. Paddle retries 5xx after secret fix.                                                                                                                                                                                                                                                                                                 |
-| **Depends on**         | None (can import existing verifyPaddleSignature)                                                                                                                                                                                                                                                                                                                          |
-| **Priority**           | **P0**                                                                                                                                                                                                                                                                                                                                                                    |
-| **Inventory**          | `sc-payments-webhook-sdk-verify`, `sc-payments-webhook-handler`                                                                                                                                                                                                                                                                                                           |
+| Field                         | Content                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Problem**                   | Production Lovable sink `payments-webhook` verifies via `paddle.webhooks.unmarshal` only (`_shared/paddle.ts` `verifyWebhook`). Missing secret throws from `getEnv` into the same catch as bad signatures → **400 Invalid signature** (wrong retry class). No app-level replay window. SDK compare is not source-auditable. `console.error(..., String(e))` can log unexpected exception text.                                                                                                                                                            |
+| **Owned files (edit)**        | `supabase/functions/payments-webhook/index.ts` (handler wire); **new** `supabase/functions/payments-webhook/verifyPaymentsWebhookRequest.ts` (pure verify + parse + normalize); **new** `supabase/functions/payments-webhook/verifyPaymentsWebhookRequest.test.ts` _or_ `src/test/payments-webhook-signature-static.test.ts` (Node/Vitest static + pure unit); optionally thin re-export of secrets from `_shared/paddle.ts` **without** deleting `getPaddleClient` / `gatewayFetch` (still used post-auth for price lookup in `index.ts` ~123–126, ~205) |
+| **Owned files (import only)** | `supabase/functions/paddle-webhook/verifyPaddleSignature.ts` (`verifyPaddleWebhookSignature`, already multi-h1 + optional replay opts) — **do not fork** the compare algorithm                                                                                                                                                                                                                                                                                                                                                                            |
+| **Do not touch**              | `orchestrator.ts`, `eventProcessor.ts`, `eventLogInsert.ts`, BYO `paddle-webhook/index.ts`, entitlements SQL, checkout UI                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| **Non-goals**                 | Shared `constantTimeEqual` extraction (SC-P1-01); EcoWitt; changing 200 body `{ status, email }` success contract; dual-secret env rotation matrix beyond multi-h1 already in verifier                                                                                                                                                                                                                                                                                                                                                                    |
+| **Priority**                  | **P0**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| **Inventory IDs**             | `sc-payments-webhook-sdk-verify`, `sc-payments-webhook-handler`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| **Depends on**                | None. **Folds SC-P0-02** (reason-code logs only) into this PR if cheap.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| **Blocks**                    | Nothing hard; SC-P1-01 can still land independently                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 
----
+#### Current tip behavior (evidence)
+
+| Step           | Today                                                              | File:line (tip)                     |
+| -------------- | ------------------------------------------------------------------ | ----------------------------------- |
+| Secret resolve | `getWebhookSecret` → `getEnv` **throws** if unset                  | `_shared/paddle.ts:58-62`, `11-15`  |
+| Body           | `req.clone().text()` then `verifyWebhook(req)` reads body again    | `payments-webhook/index.ts:261-268` |
+| Verify         | `paddle.webhooks.unmarshal(body, secret, signature)`               | `_shared/paddle.ts:64-75`           |
+| Failure        | catch → `console.error(String(e))` → **400** `"Invalid signature"` | `index.ts:269-271`                  |
+| Success event  | SDK camelCase `EventLikeWithId`                                    | cast `as EventLikeWithId`           |
+| Post-auth      | `handleVerifiedEvent` + optional email                             | unchanged                           |
+
+#### Target design
+
+```text
+POST /payments-webhook?env=sandbox|live
+  → method/env gate (unchanged)
+  → resolve secret (no throw): missing → 500 { error: "webhook_secret_not_configured" }
+  → rawBody = await req.text()   // single read; no clone+double-read required
+  → verifyPaddleWebhookSignature(secret, paddle-signature header, rawBody, {
+        maxAgeSeconds: 300,
+        maxFutureSkewSeconds: 60,
+      })
+  → if !ok → status by reason (below); log reason code only
+  → JSON.parse(rawBody); if fail → 400 { error: "invalid_json" }
+  → event = normalizePaddleWebhookEvent(parsed)  // snake_case + camelCase → EventLikeWithId
+  → handleVerifiedEvent(...)  // UNCHANGED
+```
+
+**Recommended module API** (`verifyPaymentsWebhookRequest.ts`):
+
+```ts
+export const PAYMENTS_SIGNATURE_MAX_AGE_SECONDS = 300;
+export const PAYMENTS_SIGNATURE_MAX_FUTURE_SKEW_SECONDS = 60;
+
+export type PaymentsWebhookVerifyFailureReason =
+  | "webhook_secret_not_configured"
+  | "missing_header"
+  | "invalid_signature_header"
+  | "signature_mismatch"
+  | "timestamp_stale"
+  | "timestamp_future"
+  | "invalid_json";
+
+export type PaymentsWebhookVerifyResult =
+  | { ok: true; event: EventLikeWithId; rawBody: string; payload: unknown }
+  | { ok: false; reason: PaymentsWebhookVerifyFailureReason; httpStatus: 400 | 401 | 500 };
+
+export function resolvePaymentsWebhookSecret(
+  env: "sandbox" | "live",
+  readEnv?: (k: string) => string | undefined,
+): string | null; // null = not configured
+
+export function normalizePaddleWebhookEvent(parsed: unknown): EventLikeWithId | null;
+
+export async function verifyPaymentsWebhookRequest(input: {
+  env: "sandbox" | "live";
+  signatureHeader: string | null;
+  rawBody: string;
+  nowSeconds?: number;
+  readEnv?: (k: string) => string | undefined;
+}): Promise<PaymentsWebhookVerifyResult>;
+```
+
+**Secret names (unchanged):**  
+`PAYMENTS_SANDBOX_WEBHOOK_SECRET` / `PAYMENTS_LIVE_WEBHOOK_SECRET` via `?env=`.
+
+**HTTP mapping (public):**
+
+| `reason`                                                      | HTTP    | Public body (JSON preferred)                   | Paddle retry? |
+| ------------------------------------------------------------- | ------- | ---------------------------------------------- | ------------- |
+| `webhook_secret_not_configured`                               | **500** | `{ "error": "webhook_secret_not_configured" }` | Yes (ops fix) |
+| `missing_header` / `invalid_signature_header`                 | **400** | `{ "error": "<reason>" }`                      | No            |
+| `signature_mismatch` / `timestamp_stale` / `timestamp_future` | **401** | `{ "error": "<reason>" }`                      | No            |
+| `invalid_json`                                                | **400** | `{ "error": "invalid_json" }`                  | No            |
+
+Plain-text `"Invalid signature"` may be **replaced** by JSON error objects for machine-stable clients; document as intentional. Do **not** put MAC/hex/secret in body or logs.
+
+**Event normalization rules (critical):**
+
+SDK historically returned **camelCase** (`eventType`, `eventId`, `data.customerId`, …). Paddle HTTP payloads are often **snake_case** (`event_type`, `event_id`, `data.customer_id`). Orchestrator/`EventLike` reads **camelCase** (`eventProcessor.ts:128-165`).
+
+`normalizePaddleWebhookEvent` must:
+
+1. Prefer camelCase if already present; else map snake_case top-level `event_type` → `eventType`, `event_id` → `eventId`.
+2. Map `data` object keys used by `decide`/`auditFields` (at minimum: `id`, `customer_id`→`customerId`, `subscription_id`→`subscriptionId`, `custom_data`→`customData`, `current_billing_period`→`currentBillingPeriod`, `scheduled_change`→`scheduledChange`, nested `import_meta`→`importMeta`, `starts_at`/`ends_at`/`effective_at`, `product_id`→`productId`, items[].price).
+3. Return `null` only if structure is not an object (caller treats as invalid_json or 400 invalid_event).
+4. Never drop unknown fields if easier to shallow-map recursively for known Paddle shapes — **minimum** is what `decide` and `auditFields` touch; pin with unit fixtures copied from existing orchestrator tests if available.
+
+**`_shared/paddle.ts` after change:**
+
+| Symbol                                                     | Action                                                                                                                           |
+| ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `getPaddleClient` / `gatewayFetch` / `getConnectionApiKey` | **Keep** (post-auth price lookup)                                                                                                |
+| `getWebhookSecret`                                         | Prefer move to payments helper or make non-throwing `tryGetWebhookSecret`; stop using throw-for-control-flow on the webhook path |
+| `verifyWebhook`                                            | **Remove from payments-webhook call path.** Deprecate or delete if no other callers (grep: payments-webhook only for verify)     |
+
+**Logging (includes SC-P0-02):**
+
+```ts
+// only
+console.error("payments-webhook.verify", result.reason);
+// never String(e) from verify path
+```
+
+#### Tests required
+
+| Test                                   | Asserts                                                                                                                                         |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Static** `payments-webhook/index.ts` | Does **not** contain `webhooks.unmarshal` or `verifyWebhook(`; **does** import `verifyPaymentsWebhookRequest` or `verifyPaddleWebhookSignature` |
+| **Unit** missing secret                | `httpStatus === 500`, reason `webhook_secret_not_configured`, no throw                                                                          |
+| **Unit** bad header                    | 400 `missing_header` / `invalid_signature_header`                                                                                               |
+| **Unit** wrong HMAC                    | 401 `signature_mismatch` (build body + header with known secret using same helpers as `paddle-webhook/security.test.ts`)                        |
+| **Unit** stale/future ts               | 401 with bounds 300 / 60                                                                                                                        |
+| **Unit** multi-h1                      | one of two h1 matches → ok (rotation)                                                                                                           |
+| **Unit** normalize                     | snake_case fixture → `eventType` / `eventId` populated                                                                                          |
+| **Unit** invalid JSON after good sig   | 400 `invalid_json` (sig over non-JSON still verifies)                                                                                           |
+| **Regression**                         | Existing `paddle-webhook/security.test.ts` still green (untouched)                                                                              |
+
+#### Static-scan fences
+
+- Source of `payments-webhook/index.ts` must not match `/webhooks\.unmarshal|verifyWebhook\s*\(/`.
+- Verify module must not match `/console\.(log|error|warn)\([^)]*secret|rawBody|signatureHeader/i` beyond reason codes.
+- Optional: pin `maxAgeSeconds: 300` and `maxFutureSkewSeconds: 60` appear in payments verify path.
+
+#### Validation commands
+
+```bash
+npx vitest run \
+  src/test/payments-webhook-signature-static.test.ts \
+  supabase/functions/paddle-webhook/security.test.ts
+# plus any new pure unit file path chosen by implementer
+```
+
+#### Rollout / rollback
+
+|              |                                                                                                                                                                                                                                                                          |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Rollout**  | Single PR; no feature flag. Deploy edge `payments-webhook` only.                                                                                                                                                                                                         |
+| **Compat**   | Success path still returns 200 + `{ status, email }`. Failure bodies become structured JSON (document).                                                                                                                                                                  |
+| **Ops**      | Missing secret now 500 (Paddle retries) — **fix** vs today’s silent 400. Alert on `webhook_secret_not_configured`.                                                                                                                                                       |
+| **Rollback** | Revert PR; SDK path returns.                                                                                                                                                                                                                                             |
+| **Risk**     | Snake_case→camelCase incomplete mapping could skip/mis-route events after verify. **Mitigation:** fixture tests from real-shaped payloads used in orchestrator tests; prefer reusing SDK unmarshal **only** as a offline fixture generator in tests, never in prod path. |
+
+#### Implementation checklist (for Codex)
+
+1. [ ] Add `verifyPaymentsWebhookRequest.ts` with secret resolve, signature verify, parse, normalize
+2. [ ] Wire `index.ts`: single `rawBody` read; map `PaymentsWebhookVerifyResult` to Response; remove try/catch around SDK verify
+3. [ ] Keep `getPaddleClient` imports for price lookup
+4. [ ] Log reason codes only (SC-P0-02)
+5. [ ] Static + unit tests as above
+6. [ ] Grep repo: no remaining production caller of `verifyWebhook`
+7. [ ] Do **not** change orchestrator/decide
+
+#### Relationship to SC-P0-02
+
+Ship logging fix **inside SC-P0-01**. Leave SC-P0-02 card as “satisfied by SC-P0-01” once merged, or close as duplicate.
 
 ### SC-P0-02 — payments-webhook: never log raw verify exceptions
 
-| Field                  | Content                                                                                                         |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------- |
-| **Problem**            | `console.error("paddle signature verification failed:", String(e))` may include unexpected SDK message content. |
-| **Owned files**        | `supabase/functions/payments-webhook/index.ts`                                                                  |
-| **Non-goals**          | Change success path                                                                                             |
-| **Proposed change**    | Log only stable reason codes after pure verify; never `String(e)` from crypto libraries                         |
-| **Regression tests**   | Static scan: no `String(e)` on verify failure path                                                              |
-| **Static-scan fences** | Same                                                                                                            |
-| **Runtime harness**    | None                                                                                                            |
-| **Validation**         | Vitest static                                                                                                   |
-| **Rollout / rollback** | Trivial revert                                                                                                  |
-| **Depends on**         | Ideally SC-P0-01 (reason codes available); can ship partial alone                                               |
-| **Priority**           | **P0** (leakage)                                                                                                |
-| **Inventory**          | `sc-payments-webhook-handler`                                                                                   |
+| Field               | Content                                                                                                         |
+| ------------------- | --------------------------------------------------------------------------------------------------------------- |
+| **Status**          | **Fold into SC-P0-01** (same PR). Do not open a separate PR unless SC-P0-01 ships without log fix.              |
+| **Problem**         | `console.error("paddle signature verification failed:", String(e))` may include unexpected SDK message content. |
+| **Owned files**     | `supabase/functions/payments-webhook/index.ts` (with SC-P0-01)                                                  |
+| **Proposed change** | `console.error("payments-webhook.verify", reason)` only; never `String(e)` on verify path                       |
+| **Priority**        | **P0** (satisfied by SC-P0-01 checklist item 4)                                                                 |
+| **Inventory**       | `sc-payments-webhook-handler`                                                                                   |
 
 ---
 

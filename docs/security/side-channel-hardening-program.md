@@ -244,8 +244,8 @@ Reference: `src/lib/piIngestAuthRules.ts`.
 
 ### 9.3 Recommended first Codex implementation slice
 
-See `side-channel-remediation-backlog.md` card **SC-P0-01**:  
-**payments-webhook pure HMAC verification (align with BYO paddle-webhook).**
+See `side-channel-remediation-backlog.md` card **SC-P0-01** (refined):  
+**`verifyPaymentsWebhookRequest` pure path** — secret fail-closed → raw body → `verifyPaddleWebhookSignature` (300s/60s, multi-h1) → normalize snake/camel → `handleVerifiedEvent`. Folds SC-P0-02 logging. Do not touch orchestrator.
 
 ---
 

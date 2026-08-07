@@ -614,7 +614,12 @@ describe("Tents list sensor truth — rendered page (walkthrough regression)", (
     expect(screen.getByTestId(`tents-list-metric-${H.TENT_ID}-temp`)).toHaveTextContent("Stale");
   });
 
-  it("card shows the newest reading with honest stale/source/no-data labels — never 32.0°F", () => {
+  // The #592 canon made staleness source-aware: these rows are `manual`, whose
+  // current-state window widened 6h → 24h, so the 2h-old walkthrough fixture is
+  // now deliberately current. The zero-fabrication regression this test exists
+  // for is unaffected, so it keeps the 2h fixture and drops the staleness claim;
+  // the case below re-asserts staleness against the window that actually applies.
+  it("card shows the newest reading with honest source/no-data labels — never 32.0°F", () => {
     render(
       <MemoryRouter>
         <Tents />
@@ -625,7 +630,6 @@ describe("Tents list sensor truth — rendered page (walkthrough regression)", (
     const temp = screen.getByTestId(`tents-list-metric-${H.TENT_ID}-temp`);
     expect(temp).toHaveTextContent("71.2");
     expect(temp).not.toHaveTextContent("32.0");
-    expect(temp).toHaveTextContent("Stale");
 
     // Newest RH (56), not the older group's 58.
     const rh = screen.getByTestId(`tents-list-metric-${H.TENT_ID}-rh`);
@@ -639,13 +643,39 @@ describe("Tents list sensor truth — rendered page (walkthrough regression)", (
     expect(vpd).not.toHaveTextContent("0.9");
 
     // Honest freshness/source context, consistent with the detail page.
-    expect(screen.getByTestId(`tents-list-sensor-source-${H.TENT_ID}`)).toHaveTextContent("Stale");
     expect(screen.getByTestId(`tents-list-sensor-last-updated-${H.TENT_ID}`)).toHaveTextContent(
       /Last updated/,
     );
 
     // The fabricated freezing-point reading must not appear anywhere.
     expect(screen.queryByText(/32\.0/)).toBeNull();
+  });
+
+  it("labels a manual reading past the 24-hour window as Stale", () => {
+    const staleTs = new Date(Date.now() - 25 * 3_600_000).toISOString();
+    H.hookState.byTent = {
+      [H.TENT_ID]: [H.raw(staleTs, "temperature_c", 21.78), H.raw(staleTs, "humidity_pct", 56)],
+    };
+    render(
+      <MemoryRouter>
+        <Tents />
+      </MemoryRouter>,
+    );
+    expect(screen.getByTestId(`tents-list-sensor-source-${H.TENT_ID}`)).toHaveTextContent("Stale");
+    expect(screen.getByTestId(`tents-list-metric-${H.TENT_ID}-temp`)).toHaveTextContent("Stale");
+    // Still the real value — stale never means fabricated.
+    expect(screen.getByTestId(`tents-list-metric-${H.TENT_ID}-temp`)).toHaveTextContent("71.2");
+  });
+
+  it("keeps a manual reading inside the 24-hour window out of the Stale label", () => {
+    render(
+      <MemoryRouter>
+        <Tents />
+      </MemoryRouter>,
+    );
+    expect(screen.getByTestId(`tents-list-sensor-source-${H.TENT_ID}`)).not.toHaveTextContent(
+      "Stale",
+    );
   });
 });
 

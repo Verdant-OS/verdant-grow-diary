@@ -52,6 +52,26 @@ let actionQueueInsertResult: { data: unknown; error: { code?: string; message: s
 let insertDelayMs = 0;
 
 const inserts: Array<{ table: string; payload: unknown }> = [];
+// #586 moved AlertDetail's create off a client `.insert()` and onto the
+// `action_queue_create` RPC (the server derives the owner from the verified
+// JWT). Record RPC calls so the double-click fence still counts *creations* —
+// the client `.insert()` recorder stays so a regression back to it is visible.
+const rpcCalls: Array<{ fn: string; args: Record<string, unknown> }> = [];
+let actionQueueRpcResult: {
+  data: unknown;
+  error: { code?: string; message: string } | null;
+} = {
+  data: {
+    ok: true,
+    action_queue_id: "new-action-uuid-1",
+    grow_id: "grow-uuid-1",
+    status: "pending_approval",
+    event_id: "evt-1",
+    reused: false,
+    created_at: "2026-06-01T12:00:00.000Z",
+  },
+  error: null,
+};
 
 vi.mock("@/lib/alerts", async () => {
   const actual: Record<string, unknown> = await vi.importActual("@/lib/alerts");
@@ -139,6 +159,12 @@ vi.mock("@/integrations/supabase/client", () => {
         ...makeSelectChain(table),
         insert: (payload: unknown) => makeInsert(table, payload),
       }),
+      rpc: (fn: string, args: Record<string, unknown>) => {
+        rpcCalls.push({ fn, args });
+        return new Promise((resolve) => {
+          setTimeout(() => resolve(actionQueueRpcResult), insertDelayMs);
+        });
+      },
     },
   };
 });
@@ -150,8 +176,21 @@ beforeEach(() => {
     data: { id: "new-action-uuid-1", grow_id: "grow-uuid-1" },
     error: null,
   };
+  actionQueueRpcResult = {
+    data: {
+      ok: true,
+      action_queue_id: "new-action-uuid-1",
+      grow_id: "grow-uuid-1",
+      status: "pending_approval",
+      event_id: "evt-1",
+      reused: false,
+      created_at: "2026-06-01T12:00:00.000Z",
+    },
+    error: null,
+  };
   insertDelayMs = 0;
   inserts.length = 0;
+  rpcCalls.length = 0;
   toastSuccess.mockClear();
   toastError.mockClear();
   toastWarning.mockClear();
@@ -168,6 +207,7 @@ function renderDetail() {
 }
 
 const actionQueueInserts = () => inserts.filter((i) => i.table === "action_queue");
+const actionQueueCreates = () => rpcCalls.filter((c) => c.fn === "action_queue_create");
 
 describe("AlertDetail — decideAddButtonState wiring", () => {
   it("renders Add to Action Queue and exposes can_add decision state when eligible", async () => {
@@ -200,15 +240,28 @@ describe("AlertDetail — decideAddButtonState wiring", () => {
     expect(region.getAttribute("data-decision-state")).toBe("already_exists");
   });
 
-  it("fast double-click creates exactly one action_queue insert", async () => {
+  it("fast double-click creates exactly one action_queue row", async () => {
     insertDelayMs = 40;
     renderDetail();
     const btn = await screen.findByTestId("alert-handoff-add-button");
-    // Two rapid clicks before the insert promise resolves.
+    // Two rapid clicks before the create promise resolves.
     await clickAct(btn);
     await clickAct(btn);
     await waitFor(() => expect(toastSuccess).toHaveBeenCalled());
-    expect(actionQueueInserts()).toHaveLength(1);
+    expect(actionQueueCreates()).toHaveLength(1);
+    // And the client-side insert path must stay unused.
+    expect(actionQueueInserts()).toHaveLength(0);
+  });
+
+  it("never sends user_id or target_device in the create payload", async () => {
+    renderDetail();
+    const btn = await screen.findByTestId("alert-handoff-add-button");
+    await clickAct(btn);
+    await waitFor(() => expect(actionQueueCreates()).toHaveLength(1));
+    const args = actionQueueCreates()[0].args;
+    expect(Object.keys(args)).not.toContain("p_user_id");
+    expect(Object.keys(args)).not.toContain("p_target_device");
+    expect(JSON.stringify(args)).not.toMatch(/\buser_id\b|\btarget_device\b/);
   });
 
   it("never leaks raw [alert:<id>] tokens, alert id, or grow id in handoff region", async () => {

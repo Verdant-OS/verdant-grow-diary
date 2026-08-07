@@ -156,7 +156,16 @@ describe("useLatestSensorSnapshot hook — source priority and safety", () => {
     // The diary query selects tent_id, and a tent-scoped view only accepts
     // env checks attributed to one of those tents — null/foreign tent_id
     // rows must not surface as the selected tent's evidence.
-    expect(HOOK).toMatch(/\.select\(\s*['"]entry_at,details,tent_id['"]\s*\)/);
+    // Pin the columns the scope gate actually depends on, not the exact column
+    // list: the diary select has since gained `id` (diary evidence ref), which
+    // does not weaken tent scoping. Dropping `tent_id` still fails this.
+    const diarySelect =
+      HOOK.match(/\.select\(\s*["']([^"']*\bentry_at\b[^"']*)["']\s*\)/)?.[1] ?? null;
+    expect(diarySelect, "the diary query must still exist and select entry_at").not.toBeNull();
+    const diaryColumns = (diarySelect ?? "").split(",").map((c) => c.trim());
+    for (const column of ["entry_at", "details", "tent_id"]) {
+      expect(diaryColumns, `diary select must include ${column}`).toContain(column);
+    }
     expect(HOOK).toMatch(
       /tentIds\.length === 0 \|\| \(row\.tent_id != null && tentIds\.includes\(row\.tent_id\)\)/,
     );

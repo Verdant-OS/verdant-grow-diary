@@ -44,8 +44,14 @@ describe("Environment Snapshot (multi-tent overview) — sensor truth copy", () 
     expect(DASHBOARD).toMatch(/data-testid="dashboard-environment-snapshot-status-banner"/);
   });
 
-  it("uses isStale + source-aware Dashboard quality to flag stale, suspicious, and unverified snapshots", () => {
-    expect(DASHBOARD).toMatch(/isStale\(/);
+  // The #592 canon made staleness source-aware (live 15m, manual 24h) and
+  // introduced `isSnapshotStale`, which forwards the snapshot's own `source`.
+  // The bare `isStale(ts, now)` form falls back to the LIVE window and would
+  // flag an ordinary 1-hour-old manual reading as stale. Dashboard moved to the
+  // source-aware helper, so require it and forbid the source-dropping form.
+  it("uses isSnapshotStale + source-aware Dashboard quality to flag stale, suspicious, and unverified snapshots", () => {
+    expect(DASHBOARD).toMatch(/isSnapshotStale\(/);
+    expect(DASHBOARD).not.toMatch(/(?<!Snapshot)\bisStale\s*\(/);
     expect(DASHBOARD).toMatch(/evaluateDashboardSensorQuality\(/);
     expect(DASHBOARD).toMatch(/dashboardHealthSnapshot\s*===\s*null/);
   });

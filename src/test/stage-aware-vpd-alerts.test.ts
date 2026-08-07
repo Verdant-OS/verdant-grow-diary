@@ -99,13 +99,34 @@ describe("stage-aware VPD alerts — direction + stage routing", () => {
 });
 
 describe("stage-aware VPD alerts — source filtering", () => {
-  it("7a. stale snapshot → no persisted VPD alert", () => {
+  // `snap` defaults to source "manual", and the #592 canon widened the manual
+  // current-state window from 6h to 24h. A 1-hour-old manual reading is now
+  // deliberately current, so age this past the manual window; the live case
+  // below pins the tightened 15-minute window that this suite never covered.
+  it("7a. stale manual snapshot (past 24h) → no persisted VPD alert", () => {
     const s = snap({
-      ts: new Date(NOW - 60 * 60 * 1000).toISOString(),
+      ts: new Date(NOW - 25 * 60 * 60 * 1000).toISOString(),
       vpd: 2.4,
     });
     const out = buildDefaultThresholdAlerts({ snapshot: s, now: NOW, stage: "flower" });
     expect(out).toEqual([]);
+  });
+  it("7a-ii. stale live snapshot (past 15m) → no persisted VPD alert", () => {
+    const s = snap({
+      source: "live",
+      ts: new Date(NOW - 20 * 60 * 1000).toISOString(),
+      vpd: 2.4,
+    });
+    const out = buildDefaultThresholdAlerts({ snapshot: s, now: NOW, stage: "flower" });
+    expect(out).toEqual([]);
+  });
+  it("7a-iii. manual snapshot inside the 24h window → VPD alert still generated", () => {
+    const s = snap({
+      ts: new Date(NOW - 23 * 60 * 60 * 1000).toISOString(),
+      vpd: 2.4,
+    });
+    const out = buildDefaultThresholdAlerts({ snapshot: s, now: NOW, stage: "flower" });
+    expect(out.length).toBeGreaterThan(0);
   });
   it("7b. sim snapshot → no persisted VPD alert", () => {
     const s = snap({ source: "sim", vpd: 2.4 });

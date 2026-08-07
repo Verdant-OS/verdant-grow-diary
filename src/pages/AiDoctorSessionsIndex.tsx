@@ -416,6 +416,14 @@ export default function AiDoctorSessionsIndex() {
       copyResetRef.current = setTimeout(() => setCopyStatus("idle"), 2000);
     }
   };
+  // Clearing on the next call is not enough: an unmount with the reset still
+  // pending would set state on a torn-down tree.
+  useEffect(
+    () => () => {
+      if (copyResetRef.current) clearTimeout(copyResetRef.current);
+    },
+    [],
+  );
 
   // --- saved views (localStorage) ---
   const [savedViews, setSavedViews] = useState<SavedView[]>(() => readSavedViews());
@@ -521,6 +529,12 @@ export default function AiDoctorSessionsIndex() {
       exportResetRef.current = setTimeout(() => setExportStatus("idle"), 2000);
     }
   };
+  useEffect(
+    () => () => {
+      if (exportResetRef.current) clearTimeout(exportResetRef.current);
+    },
+    [],
+  );
 
   const [importOpen, setImportOpen] = useState(false);
   const [importText, setImportText] = useState("");

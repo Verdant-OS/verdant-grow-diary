@@ -154,7 +154,19 @@ export function buildTentSnapshotView(
   const capturedAt = resolveCapturedAt(latestRows, snap.ts);
   const stale = !!capturedAt && isStale(capturedAt, now);
   const quality = evaluateSensorQuality(snap, now);
-  const invalid = quality.suspiciousFields.length > 0;
+  // `evaluateSensorQuality` deliberately lists a *missing* VPD in
+  // `suspiciousFields` so the snapshot grades as "watch". That must not
+  // escalate the tent's source label to "Invalid": absence is "Unknown" —
+  // which the per-metric renderer below already reports correctly — whereas
+  // "Invalid" asserts present-but-implausible telemetry ("do not treat as
+  // healthy"). Only a field that actually carries a value can make the
+  // snapshot invalid, otherwise a tent of sound manual readings with no
+  // stored VPD is branded untrustworthy.
+  const hasValue = (field: string): boolean => {
+    const v = (snap as unknown as Record<string, unknown>)[field];
+    return v !== null && v !== undefined;
+  };
+  const invalid = quality.suspiciousFields.some(hasValue);
 
   // Stale/invalid override the source label per requirement #2/#6.
   let sourceLabel = resolved.label;

@@ -45,6 +45,47 @@ describe("buildTentSnapshotView · empty + missing inputs", () => {
 });
 
 describe("buildTentSnapshotView · source labels", () => {
+  it("manual rows with no stored VPD are not branded Invalid", () => {
+    // Regression: `evaluateSensorQuality` deliberately lists a *missing* VPD in
+    // suspiciousFields so the snapshot grades as "watch". The tent label was
+    // derived from `suspiciousFields.length > 0`, so a tent of sound manual
+    // readings with no stored VPD was branded "Invalid" — i.e. "do not treat
+    // as healthy" — while the VPD metric itself correctly rendered "Unknown".
+    const v = buildTentSnapshotView(
+      [
+        row({ source: "manual", ts: STALE_TS, captured_at: STALE_TS }),
+        row({
+          metric: "humidity_pct",
+          value: 55,
+          source: "manual",
+          ts: STALE_TS,
+          captured_at: STALE_TS,
+        }),
+      ],
+      "veg",
+      NOW,
+    );
+    expect(v.invalid).toBe(false);
+    expect(v.sourceLabel).not.toBe("Invalid");
+    expect(v.metrics.find((m) => m.key === "vpd")?.status).toBe("unknown");
+  });
+
+  it("a present-but-implausible field still marks the tent Invalid", () => {
+    // Counter-test for the above: absence must be forgiven, corruption must
+    // not. rh=100 is a sensor-fault value, present in the snapshot.
+    const v = buildTentSnapshotView(
+      [
+        row({ source: "manual" }),
+        row({ metric: "humidity_pct", value: 100, source: "manual" }),
+        row({ metric: "vpd_kpa", value: 1.1, source: "manual" }),
+      ],
+      "veg",
+      NOW,
+    );
+    expect(v.invalid).toBe(true);
+    expect(v.sourceLabel).toBe("Invalid");
+  });
+
   it("Manual reading shows Manual", () => {
     const v = buildTentSnapshotView(
       [

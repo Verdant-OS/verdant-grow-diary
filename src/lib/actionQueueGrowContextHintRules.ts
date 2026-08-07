@@ -132,3 +132,38 @@ function lookupGrowName(
   const g = grows.find((x) => x.id === id);
   return (g?.name ?? null) || null;
 }
+
+/* -------------------------------------------------------------------------- */
+/* Other-grow pending disclosure                                               */
+/* -------------------------------------------------------------------------- */
+
+export interface OtherGrowPendingDisclosureOptions {
+  /** Exact count of pending approval-required actions outside the scoped grow. */
+  count: number;
+  /** True only when the queue is showing a single grow. */
+  isScoped: boolean;
+}
+
+/**
+ * One-line disclosure for the Action Queue empty state when the scoped grow
+ * has nothing pending but other grows do.
+ *
+ * The queue only ever loads the scoped grow's actions, so an unqualified
+ * "nothing is pending" is a claim it cannot support. Worse, a grow can hold an
+ * unapproved high-risk action while being absent from every selector — grows
+ * are filtered by `is_archived = false`, so archiving hides the container but
+ * not the live records inside it. This line is the only signal such an action
+ * exists.
+ *
+ * Returns null when there is nothing to disclose: an unscoped queue is already
+ * showing everything, and a zero count has nothing to report.
+ */
+export function buildOtherGrowPendingDisclosure(
+  opts: OtherGrowPendingDisclosureOptions,
+): string | null {
+  if (!opts.isScoped) return null;
+  if (!Number.isFinite(opts.count) || opts.count <= 0) return null;
+  const noun = opts.count === 1 ? "action" : "actions";
+  const verb = opts.count === 1 ? "is" : "are";
+  return `${opts.count} approval-required ${noun} ${verb} pending in another grow. Some grows are hidden from the grow switcher once archived.`;
+}

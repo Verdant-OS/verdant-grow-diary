@@ -79,15 +79,48 @@ describe("packet-loop slice — Quick Log bridge stays single-path", () => {
     );
   });
 
-  it("the prefill seed is guarded by plant, hunt, ready context, and configured goal", () => {
-    expect(quickLog).toMatch(/selectedPlant\?\.id !== prefill\.plantId\) return;/);
-    expect(quickLog).toMatch(/selectedPhenoHuntId !== prefill\.phenoHuntId\) return;/);
+  it("the prefill seed delegates its guard to the pure resolver, and only that resolver", () => {
+    // #780 extracted the four inline early-returns this test used to pin
+    // (plant match, hunt match, ready context, configured goal) into a pure,
+    // independently-tested resolver — see
+    // resolveQuickLogPhenoGoalSeed in quickLogPhenoEvidenceHandoffRules.ts and
+    // its exhaustive fail-closed cases in
+    // quick-log-pheno-evidence-handoff-rules.test.ts. Re-pinning the old
+    // inline conditionals here would test dead code; the guard now belongs to
+    // the resolver, so this pin only needs to prove the seed effect (a) calls
+    // it with every input the guard depends on, (b) never sets the goal
+    // without an explicit "seed" decision, and (c) never seeds a value the
+    // resolver did not itself hand back.
     expect(quickLog).toMatch(
-      /phenoEvidenceContext\.status !== "ready" \|\| !phenoEvidenceContext\.context\) return;/,
+      /import\s*\{[^}]*\bresolveQuickLogPhenoGoalSeed\b[^}]*\}\s*from\s*["']@\/lib\/quickLogPhenoEvidenceHandoffRules["']/,
     );
-    expect(quickLog).toMatch(
-      /coverage\.goals\.some\(\(g\) => g\.id === goal\);\s*if \(!configured\) return;/,
-    );
+    const seedEffect = quickLog.split("const decision = resolveQuickLogPhenoGoalSeed(")[1] ?? "";
+    expect(seedEffect).not.toBe("");
+    const callArgs = seedEffect.split(/^\s*\}\);/m)[0];
+    for (const field of [
+      "prefillGoalId: prefill?.phenoEvidenceGoal",
+      "prefillHuntId: prefill?.phenoHuntId",
+      "prefillPlantId: prefill?.plantId",
+      "selectedPlantId: selectedPlant?.id",
+      "resolvedHuntId: selectedPhenoHuntId",
+      "contextStatus: phenoEvidenceContext.status",
+      "contextHuntId: phenoEvidenceContext.context?.huntId",
+      "configuredGoalIds:",
+    ]) {
+      expect(callArgs, field).toContain(field);
+    }
+    // The setter only fires behind the resolver's own "seed" verdict, and
+    // only with the goalId the resolver returned — never the raw, unvalidated
+    // prefill value. A future edit that seeds unconditionally, or that trusts
+    // prefill.phenoEvidenceGoal directly, defeats every fail-closed case the
+    // resolver's own tests prove.
+    const afterDecision = seedEffect.slice(callArgs.length);
+    expect(afterDecision).toMatch(/if\s*\(decision\.action\s*!==\s*"seed"\)\s*return;/);
+    const guardIdx = afterDecision.indexOf('if (decision.action !== "seed") return;');
+    const setterIdx = afterDecision.indexOf("setSelectedPhenoEvidenceGoal(");
+    expect(setterIdx).toBeGreaterThan(guardIdx);
+    expect(afterDecision).toMatch(/setSelectedPhenoEvidenceGoal\(decision\.goalId/);
+    expect(afterDecision).not.toMatch(/setSelectedPhenoEvidenceGoal\(prefill/);
   });
 
   it("save-time revalidation against live configured goals is intact", () => {

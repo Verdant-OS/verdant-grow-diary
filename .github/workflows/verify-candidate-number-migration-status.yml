@@ -1,0 +1,107 @@
+name: Verify candidate-number migration status
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_env:
+        description: Pinned Supabase database to check
+        type: choice
+        required: true
+        default: sandbox
+        options:
+          - sandbox
+          - production
+
+permissions:
+  contents: read
+
+concurrency:
+  group: candidate-number-migration-status-${{ inputs.target_env }}
+  cancel-in-progress: false
+
+jobs:
+  verify-sandbox:
+    name: Check pinned Verdant sandbox
+    if: ${{ inputs.target_env == 'sandbox' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: verdant-sandbox
+    env:
+      TARGET_ENV: sandbox
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
+      - name: Prepare audit directory
+        run: mkdir -p "${{ github.workspace }}/audit/candidate-number-status-sandbox"
+      - name: Preflight membership constraint (orphan-row check)
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL_SANDBOX }}
+          REPORT_PATH: ${{ github.workspace }}/audit/candidate-number-status-sandbox/preflight-report.md
+          AUDIT_PATH: ${{ github.workspace }}/audit/candidate-number-status-sandbox/preflight-audit.json
+        run: node scripts/preflight-candidate-number-membership.mjs
+      - name: Verify exact migration-ledger history
+        if: always()
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL_SANDBOX }}
+          REPORT_PATH: ${{ github.workspace }}/audit/candidate-number-status-sandbox/history-report.md
+          AUDIT_PATH: ${{ github.workspace }}/audit/candidate-number-status-sandbox/history-audit.json
+        run: node scripts/verify-candidate-number-migration-history.mjs
+      - name: Publish sanitized reports
+        if: always()
+        run: |
+          for report in "${{ github.workspace }}"/audit/candidate-number-status-sandbox/*-report.md; do
+            if [ -f "$report" ]; then
+              cat "$report" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done
+      - name: Upload sanitized audit
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: candidate-number-migration-status-sandbox
+          path: audit/candidate-number-status-sandbox
+          if-no-files-found: error
+
+  verify-production:
+    name: Check pinned Verdant production
+    if: ${{ inputs.target_env == 'production' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: verdant-production
+    env:
+      TARGET_ENV: production
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
+      - name: Prepare audit directory
+        run: mkdir -p "${{ github.workspace }}/audit/candidate-number-status-production"
+      - name: Preflight membership constraint (orphan-row check)
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          REPORT_PATH: ${{ github.workspace }}/audit/candidate-number-status-production/preflight-report.md
+          AUDIT_PATH: ${{ github.workspace }}/audit/candidate-number-status-production/preflight-audit.json
+        run: node scripts/preflight-candidate-number-membership.mjs
+      - name: Verify exact migration-ledger history
+        if: always()
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          REPORT_PATH: ${{ github.workspace }}/audit/candidate-number-status-production/history-report.md
+          AUDIT_PATH: ${{ github.workspace }}/audit/candidate-number-status-production/history-audit.json
+        run: node scripts/verify-candidate-number-migration-history.mjs
+      - name: Publish sanitized reports
+        if: always()
+        run: |
+          for report in "${{ github.workspace }}"/audit/candidate-number-status-production/*-report.md; do
+            if [ -f "$report" ]; then
+              cat "$report" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done
+      - name: Upload sanitized audit
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: candidate-number-migration-status-production
+          path: audit/candidate-number-status-production
+          if-no-files-found: error

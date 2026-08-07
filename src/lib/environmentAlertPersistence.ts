@@ -13,14 +13,20 @@
  * Only alerts derived from REAL, VALID sensor readings are eligible:
  *   - snapshot must exist
  *   - snapshot.source must be "live" or "manual" (never "sim", "diary", "unavailable")
- *   - snapshot must not be stale
+ *   - snapshot must not be stale, measured against the LIVE window for
+ *     every source (tighter than source-aware display freshness — see
+ *     isSnapshotPersistable)
  *   - quality must not be "unavailable"
  *   - the alert must not itself be a "data unavailable / stale / missing
  *     targets" synthetic signal (those describe missing data, not real
  *     environment problems)
  *   - demo/fallback/mock data is explicitly rejected
  */
-import { isStale, type SensorSnapshot } from "@/lib/sensorSnapshot";
+import {
+  isStale,
+  LIVE_CURRENT_STATE_STALE_MS,
+  type SensorSnapshot,
+} from "@/lib/sensorSnapshot";
 import type { SensorQuality } from "@/lib/sensorQuality";
 import type { EnvironmentAlert } from "@/lib/environmentAlerts";
 
@@ -50,7 +56,15 @@ export function isSnapshotPersistable(ctx: PersistenceContext): boolean {
   if (snapshot.source !== "live" && snapshot.source !== "manual") return false;
   if (quality === "unavailable") return false;
   const now = ctx.now ?? Date.now();
-  if (isStale(snapshot.ts, now, undefined, snapshot.source)) return false;
+  // Persistence uses the LIVE window for every source — deliberately tighter
+  // than display freshness. Sensor Truth Canon lets a MANUAL reading stay
+  // "current" for 24h on read-only surfaces, but writing an alert row is a
+  // stronger claim than rendering a value: it asserts this environment
+  // problem is happening NOW. A manual reading hours old cannot support that,
+  // so `snapshot.source` is intentionally NOT forwarded to isStale here.
+  // See docs/action-outcome-analysis-v1.md doctrine + the regression tests in
+  // src/test/environment-alert-persistence-live-window.test.ts.
+  if (isStale(snapshot.ts, now, LIVE_CURRENT_STATE_STALE_MS)) return false;
   return true;
 }
 

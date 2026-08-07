@@ -185,6 +185,22 @@
         }
       ],
       "reason": "A fresh local reset fails three of this migration's REVOKEs with SQLSTATE 42883: email_queue_dispatch and email_queue_wake were created in production outside committed migrations, while the legacy two-argument admin_schema_audit was created by committed 20260728084921 but is dropped during replay by 20260728103000 even though production still holds it; existence-guarded DO blocks skip exactly the three signatures a clean replay verified missing while leaving every hosted revoke intact."
+    },
+    {
+      "source_path": "supabase/migrations/20260805090000_security_advisor_hardening_followup.sql",
+      "source_sha256": "13d85bde5a60f2df9d5f62e72a61b91b0073f615d2d9e8b4da8e5ef57dbd40ff",
+      "patched_sha256": "1a7773344039fe8638fa55746772e51c3acb44b39ff198831a2521ef6457490d",
+      "replacements": [
+        {
+          "from": "    RAISE EXCEPTION 'default-privilege change did not take: a freshly created function is anon-executable';",
+          "to": "    RAISE WARNING 'REPLAY-ONLY (local default-ACL divergence, see config/local-supabase-replay-compatibility.json): a freshly created function is anon-executable';"
+        },
+        {
+          "from": "    RAISE EXCEPTION 'default-privilege change did not take: a freshly created table is anon-readable';",
+          "to": "    RAISE WARNING 'REPLAY-ONLY (local default-ACL divergence, see config/local-supabase-replay-compatibility.json): a freshly created table is anon-readable';"
+        }
+      ],
+      "reason": "UNPROVEN — DO NOT MERGE until a local `supabase db reset` confirms this is the minimum change that completes the replay. Observed: run 31172341902 aborts `db reset` at this migration's statement 11 with SQLSTATE P0001, 'default-privilege change did not take: a freshly created function is anon-executable', so nothing after it applies and the whole Security DB Local lane never runs. The migration's section 4c is a self-test of its own ALTER DEFAULT PRIVILEGES, and this repository already documents that local default-ACL posture deliberately diverges from the hosted project — see supabase/seed.sql's 'LOCAL-STACK PROD-PARITY GRANTS' header, which the migration's own comment cites, and the existing irrigation-acl-baseline injection whose reason is the same divergence. Production already executed section 4c with the real RAISE EXCEPTION and passed; the committed file is byte-unchanged, so a future fresh production provision still runs the real assertion. This entry downgrades ONLY the two section-4c assertions, and only in the disposable replay copy. All ten RAISE EXCEPTIONs in sections 4a and 4b — quicklog_save_manual overloads, lovable_paddle_events, lead_events — are untouched and still abort the replay, because those assert this migration's own REVOKEs rather than an environment-dependent default. The table assertion is downgraded alongside the function one by inference, not observation: replay aborts at the function check, so the table check has never been reached, but it tests the same divergent default and would otherwise fail six lines later. Reviewer with Docker: if the reset reveals the actual mechanism, prefer a compatibility_injections entry that establishes the hosted default-privilege baseline before this migration so section 4c passes for real, and delete this patch entry."
     }
   ],
   "compatibility_injections": [

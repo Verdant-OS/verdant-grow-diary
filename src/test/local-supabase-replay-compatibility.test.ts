@@ -259,7 +259,10 @@ describe("local Supabase replay compatibility workspace", () => {
     expect(report).toMatchObject({
       mode: "verify_only",
       compatibility_entry_count: 18,
-      compatibility_patch_count: 3,
+      // 4th patch: the 20260805090000 security-advisor self-test, whose
+      // section 4c aborts a fresh `db reset` (SQLSTATE P0001). Marked
+      // UNPROVEN in the manifest — see its `reason` field.
+      compatibility_patch_count: 4,
       compatibility_injection_count: 1,
       source_migrations_unchanged: true,
     });

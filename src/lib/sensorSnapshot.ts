@@ -114,6 +114,20 @@ export interface SensorSnapshot {
    * snapshots. Never confusable with {@link metric_refs}.
    */
   diary_evidence_ref?: SensorSnapshotDiaryEvidenceRef;
+  /**
+   * Tent the contributing rows came from, when they UNAMBIGUOUSLY share
+   * one. Environment alerts persist this so tent-scoped surfaces (e.g.
+   * Plant Detail's assigned-tent alerts panel) can attribute a breach to
+   * the tent whose readings produced it.
+   *
+   * Deliberately null when the evidence spans several tents — the
+   * Dashboard's "All tents" view genuinely mixes rows, and inventing a
+   * winner there would attach a real breach to an arbitrary tent. Null is
+   * the honest answer and matches this file's never-invent-provenance
+   * posture. Carried ON the snapshot rather than beside it so attribution
+   * can never drift from the evidence it describes.
+   */
+  tent_id?: string | null;
 }
 
 export const EMPTY_SNAPSHOT: SensorSnapshot = {
@@ -129,6 +143,7 @@ export const EMPTY_SNAPSHOT: SensorSnapshot = {
   ppfd: null,
   device_id: null,
   csvVendor: null,
+  tent_id: null,
 };
 
 /** Coerce numeric DB values; returns null for null/undefined/NaN/Infinity. */
@@ -194,6 +209,11 @@ export interface SensorReadingLike {
    * for the env-alert ref population path. Never inferred.
    */
   id?: string | null;
+  /**
+   * Originating `sensor_readings.tent_id`. Used only to derive
+   * {@link SensorSnapshot.tent_id} when every contributing row agrees.
+   */
+  tent_id?: string | null;
   /**
    * Upstream provenance envelope. This file NEVER reads, returns, or
    * renders its contents — it is forwarded as-is to
@@ -304,6 +324,17 @@ export function snapshotFromReadings(rows: SensorReadingLike[]): SensorSnapshot 
       source: typeof row.source === "string" ? row.source : "",
     };
   }
+  // Attribute a tent ONLY when every contributing row agrees on one.
+  // Derived from `latest` — the exact rows this snapshot is built from —
+  // so the tent can never describe evidence that did not produce it.
+  // Mixed tents (e.g. the Dashboard's "All tents" view) yield null rather
+  // than an arbitrary winner.
+  const latestTents = new Set(
+    latest
+      .map((r) => (typeof r.tent_id === "string" ? r.tent_id.trim() : ""))
+      .filter((id) => id.length > 0),
+  );
+  const tent_id = latestTents.size === 1 ? [...latestTents][0] : null;
   return {
     source,
     ts: latestTs,
@@ -317,6 +348,7 @@ export function snapshotFromReadings(rows: SensorReadingLike[]): SensorSnapshot 
     ppfd: get("ppfd"),
     device_id: deviceRow?.device_id ?? null,
     csvVendor,
+    tent_id,
     ...(metric_refs ? { metric_refs } : {}),
   };
 }

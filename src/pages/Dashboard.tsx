@@ -192,6 +192,13 @@ export default function Dashboard() {
   const targetsState = useGrowTargets(scopedGrowId ?? null);
   const [targetsEditorOpen, setTargetsEditorOpen] = useState(false);
   const currentSensorSnapshot = sensorState.status === "ok" ? sensorState.snapshot : null;
+  // Tent attribution for a manually saved alert, taken from the same snapshot
+  // the alert was derived from. Null when the current view spans several tents
+  // — inventing a winner there would pin a real breach on an arbitrary tent.
+  // Hoisted (rather than inlined at the saveAlert call) to keep that payload
+  // short: alert-events.test.ts scans a fixed 2000-char window ending at the
+  // save-alert button label, and had only ~92 bytes of slack on CI.
+  const manualAlertTentId = currentSensorSnapshot?.tent_id ?? null;
   // Unverified/simulated snapshots remain visible with their honest source
   // label, but they cannot drive green quality, target, stage, alert, or
   // persistence semantics.
@@ -1407,6 +1414,7 @@ export default function Dashboard() {
                                     try {
                                       const saved = await saveAlert({
                                         grow_id: scopedGrowId,
+                                        tent_id: manualAlertTentId,
                                         severity: a.severity,
                                         title: a.title,
                                         reason: a.reason,

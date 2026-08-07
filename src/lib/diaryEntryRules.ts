@@ -8,6 +8,8 @@
  * never echo raw payload values.
  */
 
+import { readArchiveWindowFromDetails, type ArchiveWindow } from "./quick-log/archiveWindowRules";
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -45,6 +47,8 @@ export interface NormalizedDiaryDetails {
     vendor?: string;
   };
   remindAt?: string;
+  /** Optional, complete camera archive pointer. Never telemetry or media. */
+  archiveWindow?: ArchiveWindow;
   /**
    * Raw declared event-type string carried inside the diary_entries
    * `details` jsonb (Quick Log companion rows stamp this — the envelope
@@ -115,6 +119,8 @@ const KNOWN_DETAIL_KEYS = new Set([
   "sensorSnapshot",
   "remind_at",
   "remindAt",
+  "archive_window",
+  "archiveWindow",
   // Consumed as the row's eventType fallback (diary_entries has no event_type
   // column; quick-log companions carry the type inside details) — not an extra.
   "event_type",
@@ -508,6 +514,7 @@ export function normalizeDiaryEntry(
       warnings,
     );
     const remindAt = normalizeRemindAt(pickFirst(d.remind_at, d.remindAt), warnings);
+    const archiveWindow = readArchiveWindowFromDetails(d);
     const extras = collectExtras(d);
 
     if (ph !== undefined) details.ph = ph;
@@ -523,6 +530,7 @@ export function normalizeDiaryEntry(
     if (observations) details.observations = observations;
     if (sensorSnapshot) details.sensorSnapshot = sensorSnapshot;
     if (remindAt) details.remindAt = remindAt;
+    if (archiveWindow) details.archiveWindow = archiveWindow;
     // Preserve the raw declared event-type inside details for downstream
     // Quick Log identity resolution (envelope event_type may be "quick_log").
     if (detailsEventTypeCandidate) {

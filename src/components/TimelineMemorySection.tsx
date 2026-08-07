@@ -35,6 +35,7 @@ import {
   EARLY_STAGE_MILESTONE_UNKNOWN_LABEL,
   EARLY_STAGE_VIGOR_UNKNOWN_LABEL,
 } from "@/lib/earlyStageTimelineViewModel";
+import { formatArchiveWindowLabel } from "@/lib/quick-log/archiveWindowRules";
 
 type Props =
   | {
@@ -104,6 +105,17 @@ function DiaryItemRow({ item }: { item: Extract<TimelineMemoryItem, { kind: "dia
         </time>
       </div>
       {item.note && <p className="mt-1.5 text-sm text-foreground/90 break-words">{item.note}</p>}
+
+      {item.archiveWindow && (
+        <Badge
+          variant="outline"
+          data-testid="timeline-memory-archive-window-badge"
+          title="Camera archive pointer only. Footage stays on your camera."
+          className="mt-2 max-w-full truncate text-[10px] text-muted-foreground"
+        >
+          {formatArchiveWindowLabel(item.archiveWindow)}
+        </Badge>
+      )}
 
       {item.earlyStage && (
         <div

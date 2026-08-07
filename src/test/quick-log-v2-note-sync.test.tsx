@@ -76,6 +76,10 @@ async function savedNote(): Promise<string | null> {
 }
 
 beforeEach(() => {
+  Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+    configurable: true,
+    value: vi.fn(),
+  });
   rpcMock.mockReset();
   rpcMock.mockResolvedValue({
     data: { ok: true, grow_event_id: "ge-1", environment_event_id: null },
@@ -147,6 +151,42 @@ describe("QuickLogV2Sheet note → save payload sync", () => {
     // No note entered at all — V2 allows this; do not regress it to required.
     clickSave();
     expect(await savedNote()).toBeNull();
+  });
+
+  it("blocks a partial archive pointer before it reaches the save RPC", async () => {
+    renderSheet();
+    clickNoteAction();
+    fireEvent.change(screen.getByLabelText("Archive start"), {
+      target: { value: "2026-07-29T09:30" },
+    });
+    clickSave();
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Add a camera, archive start, and archive end",
+    );
+    expect(rpcMock).not.toHaveBeenCalled();
+  });
+
+  it("writes one complete UTC archive envelope with the existing note payload", async () => {
+    renderSheet();
+    clickNoteAction();
+    fireEvent.click(screen.getByTestId("qlv2-archive-camera"));
+    fireEvent.click(await screen.findByRole("option", { name: "F4K" }));
+    fireEvent.change(screen.getByLabelText("Archive start"), {
+      target: { value: "2026-07-29T09:30" },
+    });
+    fireEvent.change(screen.getByLabelText("Archive end"), {
+      target: { value: "2026-07-29T21:30" },
+    });
+    clickSave();
+    await waitFor(() => expect(rpcMock).toHaveBeenCalled());
+    const [, payload] = rpcMock.mock.calls[0] as [string, { p_details?: Record<string, unknown> }];
+    expect(payload.p_details).toMatchObject({
+      archive_window: {
+        camera_code: "F4K",
+        start_at: expect.stringMatching(/Z$/),
+        end_at: expect.stringMatching(/Z$/),
+      },
+    });
   });
 });
 

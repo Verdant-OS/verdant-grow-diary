@@ -28,6 +28,7 @@ import {
 } from "@/lib/timelineEntryClassification";
 import type { ManualSnapshotTimelineCard } from "@/lib/manualSensorSnapshotViewModel";
 import { isHarvestEvidenceDiaryItem } from "@/lib/harvestWatchEvidenceHistoryViewModel";
+import type { ArchiveWindow } from "@/lib/quick-log/archiveWindowRules";
 
 export type TimelineFilterKey =
   | "all"
@@ -91,6 +92,8 @@ export interface TimelineDiaryItem {
    * Presenter-only — never echoed as raw payload.
    */
   earlyStage?: import("./earlyStageTimelineViewModel").EarlyStageTimelineViewModel | null;
+  /** Optional complete camera archive pointer; never a live-media claim. */
+  archiveWindow?: ArchiveWindow | null;
 }
 
 export interface TimelineManualSnapshotItem {

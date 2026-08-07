@@ -50,6 +50,7 @@ import {
   type QuickLogGroupedTimelineScope,
 } from "@/hooks/useQuickLogGroupedTimeline";
 import { resolveTimelineDiaryEntryStage } from "@/lib/growDiaryTimelineRules";
+import { readArchiveWindowFromDetails } from "@/lib/quick-log/archiveWindowRules";
 
 export const TIMELINE_MEMORY_DEFAULT_LIMIT = 100;
 
@@ -100,6 +101,7 @@ function diaryRowToDiaryItem(
     photos: readPhotosArray(row.details),
     stage: readStage(row.details),
     earlyStage: buildEarlyStageTimelineViewModel(row.details),
+    archiveWindow: readArchiveWindowFromDetails(row.details),
   };
 }
 

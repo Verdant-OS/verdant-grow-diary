@@ -361,6 +361,61 @@ describe("auditRequiredChecks — the failures it exists to catch", () => {
     expect(finding?.source).toBe("check_run");
   });
 
+  it("does not let a PR-head rerun hide a red merge-group result (Codex, PR #818)", () => {
+    // Queued merge: the merge-group run on the LANDED sha failed at 01:30, a
+    // same-named rerun on the PR HEAD succeeded at 01:40 — both before the
+    // merge. Keying only on (source, context) let the later head success win
+    // on recency and bury the red that actually gated.
+    const observed = normalizeObservedChecks({
+      checkRuns: [
+        {
+          name: "Full test suite (shard 1/32)",
+          head_sha: "landed",
+          status: "completed",
+          conclusion: "failure",
+          id: 1,
+          completed_at: "2026-08-07T01:30:00Z",
+        },
+        {
+          name: "Full test suite (shard 1/32)",
+          head_sha: "prhead",
+          status: "completed",
+          conclusion: "success",
+          id: 2,
+          completed_at: "2026-08-07T01:40:00Z",
+        },
+      ],
+      mergedAt: "2026-08-07T01:42:45Z",
+    });
+    expect(observed.get("Full test suite (shard 1/32)")?.status).toBe(CHECK_STATUS.FAIL);
+    expect(observed.get("Full test suite (shard 1/32)")?.sha).toBe("landed");
+  });
+
+  it("still passes when the same context is green on both SHAs", () => {
+    const observed = normalizeObservedChecks({
+      checkRuns: [
+        {
+          name: "x",
+          head_sha: "landed",
+          status: "completed",
+          conclusion: "success",
+          id: 1,
+          completed_at: "2026-08-07T01:30:00Z",
+        },
+        {
+          name: "x",
+          head_sha: "prhead",
+          status: "completed",
+          conclusion: "success",
+          id: 2,
+          completed_at: "2026-08-07T01:40:00Z",
+        },
+      ],
+      mergedAt: "2026-08-07T01:42:45Z",
+    });
+    expect(observed.get("x")?.status).toBe(CHECK_STATUS.PASS);
+  });
+
   it("still passes when both sources agree the context is green", () => {
     const result = auditRequiredChecks({
       pinned: PINNED,
@@ -549,6 +604,28 @@ describe("ruleset drift", () => {
     expect(drift.strictPolicy).toBeNull();
   });
 
+  it("treats a deleted ruleset as verified FAIL, not BLOCKED (Codex, PR #818)", () => {
+    // A 404 is a verified answer, not an inability to verify: the pinned
+    // ruleset does not exist, so nothing enforces the 35 contexts. BLOCKED is
+    // advisory and would let an otherwise-green run report PASS beside it.
+    const result = auditRequiredChecks({
+      pinned: PINNED,
+      checkRuns: allGreen(EVERY_PINNED),
+      prResolution: MERGED,
+      rulesetDrift: {
+        status: "FAIL",
+        addedToRuleset: [],
+        removedFromRuleset: [],
+        strictPolicy: null,
+        reason:
+          "ruleset 20421416 does not exist (404) — the pinned required contexts are not enforced by anything",
+      },
+    });
+    expect(result.verdict).toBe(AUDIT_VERDICT.FAIL);
+    const blocker = result.blockers.find((b) => b.code === "ruleset_drift");
+    expect(blocker?.message).toContain("does not exist (404)");
+  });
+
   it("names the strict-policy change in the blocker message", () => {
     const result = auditRequiredChecks({
       pinned: PINNED,
@@ -620,6 +697,34 @@ describe("formatAuditReport", () => {
     });
     const report = formatAuditReport(result, { sha: "abc", prNumber: 1 });
     expect(report).toContain("Every pinned context ran and went green before this merge landed");
+  });
+
+  it("never calls a failing skipped context 'surfaced, not failed' (Codex, PR #818)", () => {
+    // Since skipped became a failure for required contexts, an unconditional
+    // "surfaced, not failed" heading contradicted both the verdict and the
+    // failing-contexts table directly above it.
+    const runs = allGreen(EVERY_PINNED);
+    runs.find((r) => r.name === "test:legal-seo")!.conclusion = "skipped";
+    const result = auditRequiredChecks({ pinned: PINNED, checkRuns: runs, prResolution: MERGED });
+    const report = formatAuditReport(result, { sha: "abc", prNumber: 1 });
+    expect(result.verdict).toBe(AUDIT_VERDICT.FAIL);
+    expect(report).toContain("| `test:legal-seo` | required | NOT_MEASURED |");
+    expect(report).not.toContain("surfaced, not failed");
+  });
+
+  it("still shows the heading for a genuinely non-failing skipped context", () => {
+    const pinned = { ...PINNED, mustBeGreen: [{ context: "opt-in-lane", alwaysRuns: false }] };
+    const result = auditRequiredChecks({
+      pinned,
+      checkRuns: [
+        ...allGreen(PINNED.required),
+        { name: "opt-in-lane", status: "completed", conclusion: "skipped", id: 9002 },
+      ],
+      prResolution: MERGED,
+    });
+    const report = formatAuditReport(result, { sha: "abc", prNumber: 1 });
+    expect(result.verdict).toBe(AUDIT_VERDICT.PASS);
+    expect(report).toContain("surfaced, not failed");
   });
 
   it("marks an unverified drift axis as unproved in the PASS summary", () => {

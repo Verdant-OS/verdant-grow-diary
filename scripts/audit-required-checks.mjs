@@ -90,9 +90,26 @@ async function fetchAllCheckRuns(sha) {
   return runs;
 }
 
+/**
+ * The combined-status endpoint paginates too. Reading only the first page
+ * means that after enough retries or post-merge updates, the status that
+ * actually existed at `mergedAt` can sit on a later page — and the merge
+ * cutoff would then call a required context late or missing on evidence that
+ * was simply never fetched.
+ *
+ * Each status is stamped with the commit it came from: the payload carries the
+ * sha once at the top level, but the audit needs it per observation to keep
+ * landed and head evidence distinct.
+ */
 async function fetchCommitStatuses(sha) {
-  const data = await api(`/repos/${REPO}/commits/${sha}/status?per_page=100`);
-  return data?.statuses ?? [];
+  const statuses = [];
+  for (let page = 1; page <= 10; page += 1) {
+    const data = await api(`/repos/${REPO}/commits/${sha}/status?per_page=100&page=${page}`);
+    const batch = data?.statuses ?? [];
+    statuses.push(...batch.map((entry) => ({ ...entry, sha: data?.sha ?? sha })));
+    if (batch.length < 100) break;
+  }
+  return statuses;
 }
 
 /**
@@ -145,6 +162,23 @@ async function resolveRulesetDrift(pinned) {
       liveStrict: rule?.parameters?.strict_required_status_checks_policy,
     });
   } catch (error) {
+    // A 404 is not an inability to verify — it is a verified answer. The
+    // pinned ruleset does not exist, so nothing is enforcing the 35 contexts
+    // this audit assumes are required. BLOCKED is advisory and would let an
+    // otherwise-green run report PASS beside a ruleset that has been deleted
+    // or replaced, so that case has to fail. BLOCKED stays for what it is for:
+    // permission, dependency, and transient access failures.
+    if (error.status === 404) {
+      return {
+        status: "FAIL",
+        addedToRuleset: [],
+        removedFromRuleset: [],
+        strictPolicy: null,
+        reason:
+          `ruleset ${pinned.rulesetId} does not exist (404) — the pinned required ` +
+          "contexts are not enforced by anything",
+      };
+    }
     return { status: "BLOCKED", reason: `ruleset read failed: ${error.message}` };
   }
 }

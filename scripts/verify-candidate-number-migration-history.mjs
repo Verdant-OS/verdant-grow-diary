@@ -218,6 +218,7 @@ function createArtifactWriters({ targetEnv, reportPath, auditPath, logger, now }
           outcome,
           expected_versions: EXPECTED_MIGRATIONS.map((m) => m.version),
           missing_versions: classification?.missingVersions ?? null,
+          mismatched_versions: classification?.mismatchedVersions ?? null,
           schema_effect_live: classification?.schemaEffectLive ?? null,
           guard_function_matches: classification?.guardFunctionMatches ?? null,
           constraint_def_matches: classification?.constraintDefMatches ?? null,

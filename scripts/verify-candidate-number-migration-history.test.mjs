@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 import {
   EXPECTED_CONSTRAINT_DEF,
@@ -179,6 +182,35 @@ test("end-to-end: a mismatch is reported even when the schema effect is ALSO not
     logged.some((line) => line.includes("schema effect live: false")),
     `expected a log line surfacing that the schema effect is also not live, got: ${JSON.stringify(logged)}`,
   );
+});
+
+test("end-to-end: the audit JSON includes mismatched_versions, not just missing_versions, for a pure-mismatch failure", () => {
+  // Regression for review comment 3738263910: a pure mismatch (no missing
+  // versions at all) used to serialize `missing_versions: []` with no
+  // field naming the actual offending version, leaving the uploaded
+  // machine-readable artifact unable to identify the collision without
+  // separately parsing the Markdown report.
+  const env = {
+    TARGET_ENV: "production",
+    SUPABASE_DB_URL:
+      "postgres://postgres:pass@db.knkwiiywfkbqznbxwqfh.supabase.co:5432/postgres?sslmode=require",
+  };
+  const stdout = stdoutFor({ migrations: { mismatchVersions: [FIRST_VERSION] } });
+  const spawnImpl = () => ({ status: 0, stdout, stderr: "" });
+  const dir = mkdtempSync(join(tmpdir(), "vgd-audit-test-"));
+  const auditPath = join(dir, "audit.json");
+  try {
+    const exitCode = runVerifyCandidateNumberMigrationHistory({
+      env: { ...env, AUDIT_PATH: auditPath },
+      spawnImpl,
+      logger: { log: () => {}, error: () => {} },
+    });
+    assert.equal(exitCode, EXIT.LEDGER_VERSION_MISMATCH);
+    const audit = JSON.parse(readFileSync(auditPath, "utf8"));
+    assert.deepEqual(audit.mismatched_versions, [FIRST_VERSION]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test("end-to-end: verify_only-but-drifted schema gives production the honest no-repair-path message, not a circular apply instruction", () => {

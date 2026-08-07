@@ -43,6 +43,8 @@
     "check:lockfile": "node scripts/check-bun-lockfile-policy.mjs",
     "check:npm-lock-semantic": "node scripts/check-npm-lock-semantic.mjs",
     "check:sitemap-robots": "node scripts/check-sitemap-robots-parity.mjs",
+    "check:stale-contract-pins": "node scripts/check-stale-contract-pins.mjs",
+    "test:stale-contract-pins": "node --test scripts/check-stale-contract-pins.test.mjs",
     "knowledge:test": "node --test scripts/knowledge/validate-roadmap.test.mjs scripts/knowledge/validate-governance.test.mjs scripts/knowledge/validate-schemas.test.mjs",
     "knowledge:validate": "node scripts/knowledge/validate-roadmap.mjs && node scripts/knowledge/validate-governance.mjs && node scripts/knowledge/validate-schemas.mjs && node --test scripts/knowledge/validate-roadmap.test.mjs scripts/knowledge/validate-governance.test.mjs scripts/knowledge/validate-schemas.test.mjs",
     "test:sentinel-governance": "node --test scripts/check-sentinel-version-parity.test.mjs",

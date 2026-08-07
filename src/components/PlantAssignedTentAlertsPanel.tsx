@@ -1,9 +1,9 @@
 /**
- * Render-only panel: open alerts for the plant's assigned tent.
+ * Render-only panel: open alerts for the plant's assigned tent + Pro history.
  *
- * Reads from `public.alerts` via `useAlertsList` (RLS-scoped) and filters in
- * the pure rules layer. No writes. No action_queue handoff from this panel.
- * Recommendations are never invented — only fields already stored render.
+ * One `usePlantAssignedTentAlerts` read (status all). Open rows stay free;
+ * closed history is a Pro presenter (`TentAlertHistoryPanel`) over the same
+ * payload — no second query, no schema, no invented recommendations.
  */
 import { Link } from "@/lib/react-router-compat";
 import { ArrowRight, Bell, AlertCircle, AlertTriangle, Info, Eye } from "lucide-react";
@@ -14,6 +14,7 @@ import { formatDistanceToNow } from "date-fns";
 import { usePlantAssignedTentAlerts } from "@/hooks/usePlantAssignedTentAlerts";
 import type { PlantAssignedTentAlertRow } from "@/lib/plantAssignedTentAlertRules";
 import { alertsPath } from "@/lib/routes";
+import TentAlertHistoryPanel from "@/components/TentAlertHistoryPanel";
 
 interface Props {
   tentId: string | null | undefined;
@@ -112,57 +113,71 @@ function AlertRowItem({ row }: { row: PlantAssignedTentAlertRow }) {
 
 export default function PlantAssignedTentAlertsPanel({ tentId, tentName, growId }: Props) {
   const enabled = !!tentId;
-  const { status, rows } = usePlantAssignedTentAlerts(tentId ?? null, growId ?? null);
+  const { status, rows, historyRows } = usePlantAssignedTentAlerts(tentId ?? null, growId ?? null);
 
   return (
-    <Card data-testid="plant-assigned-tent-alerts-panel" className="mt-4">
-      <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
-        <CardTitle className="text-base flex items-center gap-2">
-          <Bell className="h-4 w-4" /> Tent Alerts
-          {tentName ? (
-            <span className="text-xs font-normal text-muted-foreground">· {tentName}</span>
+    <>
+      <Card data-testid="plant-assigned-tent-alerts-panel" className="mt-4">
+        <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Bell className="h-4 w-4" /> Tent Alerts
+            {tentName ? (
+              <span className="text-xs font-normal text-muted-foreground">· {tentName}</span>
+            ) : null}
+          </CardTitle>
+          {enabled ? (
+            <Button
+              asChild
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 gap-1"
+              data-testid="plant-assigned-tent-alerts-open-alerts"
+            >
+              <Link to={alertsPath()}>
+                Open Alerts <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </Button>
           ) : null}
-        </CardTitle>
-        {enabled ? (
-          <Button
-            asChild
-            variant="ghost"
-            size="sm"
-            className="h-7 px-2 gap-1"
-            data-testid="plant-assigned-tent-alerts-open-alerts"
-          >
-            <Link to={alertsPath()}>
-              Open Alerts <ArrowRight className="h-3.5 w-3.5" />
-            </Link>
-          </Button>
-        ) : null}
-      </CardHeader>
-      <CardContent className="text-sm">
-        {!enabled ? (
-          <p
-            className="text-muted-foreground"
-            data-testid="plant-assigned-tent-alerts-empty-no-tent"
-          >
-            Assign this plant to a tent to see tent alerts.
-          </p>
-        ) : status === "loading" || status === "idle" ? (
-          <p className="text-muted-foreground">Loading tent alerts…</p>
-        ) : status === "unavailable" ? (
-          <p className="text-muted-foreground" data-testid="plant-assigned-tent-alerts-unavailable">
-            Tent alerts are temporarily unavailable.
-          </p>
-        ) : rows.length === 0 ? (
-          <p className="text-muted-foreground" data-testid="plant-assigned-tent-alerts-empty">
-            No open alerts for this assigned tent.
-          </p>
-        ) : (
-          <ul className="space-y-2" data-testid="plant-assigned-tent-alerts-list">
-            {rows.map((r) => (
-              <AlertRowItem key={r.id} row={r} />
-            ))}
-          </ul>
-        )}
-      </CardContent>
-    </Card>
+        </CardHeader>
+        <CardContent className="text-sm">
+          {!enabled ? (
+            <p
+              className="text-muted-foreground"
+              data-testid="plant-assigned-tent-alerts-empty-no-tent"
+            >
+              Assign this plant to a tent to see tent alerts.
+            </p>
+          ) : status === "loading" || status === "idle" ? (
+            <p className="text-muted-foreground">Loading tent alerts…</p>
+          ) : status === "unavailable" ? (
+            <p
+              className="text-muted-foreground"
+              data-testid="plant-assigned-tent-alerts-unavailable"
+            >
+              Tent alerts are temporarily unavailable.
+            </p>
+          ) : rows.length === 0 ? (
+            <p className="text-muted-foreground" data-testid="plant-assigned-tent-alerts-empty">
+              No open alerts for this assigned tent.
+            </p>
+          ) : (
+            <ul className="space-y-2" data-testid="plant-assigned-tent-alerts-list">
+              {rows.map((r) => (
+                <AlertRowItem key={r.id} row={r} />
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Same payload — Pro history only; no second listAlerts call. */}
+      <TentAlertHistoryPanel
+        tentId={tentId}
+        tentName={tentName}
+        growId={growId}
+        historyRows={historyRows}
+        listStatus={status}
+      />
+    </>
   );
 }

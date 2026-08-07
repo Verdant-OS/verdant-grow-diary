@@ -17,6 +17,10 @@
  *       rejected at the database even if they bypass the UI.
  *     - Edge callers should use
  *       `supabase/functions/_shared/assertPhenoTrackerEntitlement.ts`.
+ *
+ *   `tent_alert_history` and `advanced_timeline_filters` are presentation
+ *   conveniences over data the grower already owns under RLS — no extra
+ *   schema; gating is client-side only (same class as timeline filters).
  */
 
 import type { PlanId, ResolvedEntitlement } from "@/lib/entitlements/types";
@@ -26,8 +30,12 @@ import type { PlanId, ResolvedEntitlement } from "@/lib/entitlements/types";
  * (date-range filtering, next-missing-action jump). Presentation-only:
  * it never gates access to the grower's own diary data, only the
  * advanced view tooling — so no server-side enforcement is required.
+ *
+ * `tent_alert_history` gates the closed-alert history strip on tent/plant
+ * detail (resolved/dismissed already loaded with open alerts). Same
+ * presentation-only class — no new reads or schema.
  */
-export type FeatureKey = "pheno_tracker" | "advanced_timeline_filters";
+export type FeatureKey = "pheno_tracker" | "advanced_timeline_filters" | "tent_alert_history";
 
 const PRO_PLAN_IDS: ReadonlyArray<PlanId> = [
   "pro_monthly",
@@ -85,4 +93,5 @@ export function canWriteFeatureData(
 export const FEATURE_KEYS: ReadonlyArray<FeatureKey> = [
   "pheno_tracker",
   "advanced_timeline_filters",
+  "tent_alert_history",
 ];

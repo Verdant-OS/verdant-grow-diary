@@ -161,9 +161,9 @@ describe("Plant Detail wiring", () => {
   it("panel shows the no-open-alerts empty state copy", () => {
     expect(PANEL).toContain("No open alerts for this assigned tent.");
   });
-  it("hook queries the existing alerts source scoped to grow + open status", () => {
+  it("hook queries the existing alerts source scoped to grow (all statuses; open filtered in rules)", () => {
     expect(HOOK).toContain("useAlertsList");
-    expect(HOOK).toMatch(/status:\s*["']open["']/);
+    expect(HOOK).toMatch(/status:\s*["']all["']/);
     expect(HOOK).toMatch(/growId/);
   });
 });

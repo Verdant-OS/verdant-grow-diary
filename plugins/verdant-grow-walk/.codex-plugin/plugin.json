@@ -1,0 +1,35 @@
+{
+  "name": "verdant-grow-walk",
+  "version": "0.1.0",
+  "description": "Run a calm evidence-led daily inspection of a Verdant grow.",
+  "author": {
+    "name": "Verdant"
+  },
+  "homepage": "https://verdantgrowdiary.com",
+  "repository": "https://github.com/Verdant-OS/verdant-grow-diary",
+  "keywords": [
+    "cultivation",
+    "grow-journal",
+    "sensor-truth",
+    "plant-memory",
+    "scouting"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Verdant Grow Walk",
+    "shortDescription": "Know where to look before deciding what to do",
+    "longDescription": "Use Verdant plant memory, source-labeled sensor evidence, alerts, and prior actions to prioritize a calm physical grow-room inspection without automatic writes or device control.",
+    "developerName": "Verdant",
+    "category": "Productivity",
+    "capabilities": [
+      "Read"
+    ],
+    "websiteURL": "https://verdantgrowdiary.com",
+    "defaultPrompt": [
+      "Run my morning grow walk.",
+      "Which plant should I inspect first?",
+      "Review my tent before I water."
+    ],
+    "brandColor": "#2F6B45"
+  }
+}

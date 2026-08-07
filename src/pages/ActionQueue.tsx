@@ -61,7 +61,10 @@ import {
   alertDetailPath,
   timelinePath,
 } from "@/lib/routes";
+import ManualSensorSnapshotQualityBadge from "@/components/ManualSensorSnapshotQualityBadge";
 import ActionQueueDetailDrawer from "@/components/ActionQueueDetailDrawer";
+import { adaptOriginatingTimelineEventsFromRow } from "@/lib/originatingTimelineEventAdapter";
+import { extractManualSnapshotFromTimelineEvents } from "@/lib/actionQueueEvidenceSnapshotRules";
 import ActionQueueLoadingSkeleton from "@/components/ActionQueueLoadingSkeleton";
 import ActionQueueTraceStatusAnnouncer from "@/components/ActionQueueTraceStatusAnnouncer";
 import {
@@ -177,10 +180,12 @@ interface ActionRow {
   reason: string;
   risk_level: "low" | "medium" | "high" | "critical";
   status: Status;
-  approved_at: string | null;
-  rejected_at: string | null;
-  completed_at: string | null;
+  approved_at?: string | null;
+  rejected_at?: string | null;
+  completed_at?: string | null;
   created_at: string;
+  /** Safe evidence refs (may include allowlisted sanitized_metrics). */
+  originating_timeline_events?: unknown;
 }
 
 interface EventRow {
@@ -256,6 +261,22 @@ function LinkedAlertLink({ row }: { row: Pick<ActionRow, "reason"> }) {
       </Link>
     </span>
   );
+}
+
+function buildRowEvidenceVm(row: {
+  source: string;
+  action_type: string;
+  created_at: string;
+  originating_timeline_events?: unknown;
+}) {
+  const events = adaptOriginatingTimelineEventsFromRow(row);
+  const snapshot = extractManualSnapshotFromTimelineEvents(events);
+  return buildActionEvidenceViewModel({
+    source: row.source,
+    action_type: row.action_type,
+    captured_at: row.created_at,
+    snapshot,
+  });
 }
 
 const EVIDENCE_TONE_VARIANT: Record<ActionEvidenceViewModel["rowEvidenceStatusTone"], string> = {
@@ -535,7 +556,7 @@ export default function ActionQueue() {
     const q = supabase
       .from("action_queue")
       .select(
-        "id,grow_id,tent_id,plant_id,source,action_type,target_metric,target_device,suggested_change,reason,risk_level,status,created_at",
+        "id,grow_id,tent_id,plant_id,source,action_type,target_metric,target_device,suggested_change,reason,risk_level,status,created_at,originating_timeline_events",
       )
       .order("created_at", { ascending: false })
       .limit(100);
@@ -553,7 +574,7 @@ export default function ActionQueue() {
     } else {
       setLastUpdatedAt(Date.now());
     }
-    const list = (data ?? []) as ActionRow[];
+    const list = (data ?? []) as unknown as ActionRow[];
     setRows(list);
     if (!error) {
       // Keep the open drawer aligned with the newly fetched row. This closes
@@ -1474,11 +1495,7 @@ export default function ActionQueue() {
                   const descId = `aq-pending-desc-${row.id}`;
                   const isFocused = focusedActionId === row.id;
                   const isHighlightedTrace = highlightedActionId === row.id;
-                  const ev = buildActionEvidenceViewModel({
-                    source: row.source,
-                    action_type: row.action_type,
-                    captured_at: row.created_at,
-                  });
+                  const ev = buildRowEvidenceVm(row);
                   return (
                     <li
                       key={row.id}
@@ -1609,12 +1626,21 @@ export default function ActionQueue() {
                             <AiDoctorSessionLink row={row} />
                             <LinkedAlertLink row={row} />
                           </div>
-                          <p
-                            className="mt-1 text-[11px] text-muted-foreground"
+                          <div
+                            className="mt-1 space-y-1"
                             data-testid="action-queue-row-evidence-quality"
                           >
-                            {ev.evidenceQualityLabel}
-                          </p>
+                            {ev.hasSnapshotQuality && ev.snapshotQuality ? (
+                              <ManualSensorSnapshotQualityBadge
+                                evaluation={ev.snapshotQuality}
+                                className="text-[11px]"
+                              />
+                            ) : (
+                              <p className="text-[11px] text-muted-foreground">
+                                {ev.evidenceQualityLabel}
+                              </p>
+                            )}
+                          </div>
                         </div>
                       </div>
                       <div className="mt-3 flex min-w-0 flex-wrap gap-2">
@@ -1746,11 +1772,7 @@ export default function ActionQueue() {
                   const descId = `aq-reviewed-desc-${row.id}`;
                   const isFocused = focusedActionId === row.id;
                   const isHighlightedTrace = highlightedActionId === row.id;
-                  const ev = buildActionEvidenceViewModel({
-                    source: row.source,
-                    action_type: row.action_type,
-                    captured_at: row.created_at,
-                  });
+                  const ev = buildRowEvidenceVm(row);
                   return (
                     <li
                       key={row.id}

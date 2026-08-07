@@ -15,6 +15,7 @@ import {
   type OriginatingTimelineEventInput,
   type OriginatingTimelineEventRef,
 } from "./originatingTimelineEventRules";
+import { sanitizeRefMetrics } from "./actionQueueEvidenceSnapshotRules";
 
 /**
  * Field names that must NEVER appear inside a persisted ref. Their presence
@@ -67,11 +68,13 @@ function coerceInput(entry: unknown): OriginatingTimelineEventInput | null {
         : null;
   const source = typeof entry.source === "string" ? entry.source : null;
   const occurred_at = typeof entry.occurred_at === "string" ? entry.occurred_at : null;
+  const metrics = sanitizeRefMetrics(entry.sanitized_metrics);
   return {
     id,
     type: kindRaw,
     source,
     occurred_at,
+    ...(metrics ? { sanitized_metrics: metrics } : {}),
   };
 }
 

@@ -33,6 +33,12 @@ export interface OriginatingTimelineEventRef {
   type?: string | null;
   occurred_at?: string | null;
   source?: OriginatingTimelineEventSource;
+  /**
+   * Optional allowlisted numeric metrics (temperature_c, humidity_pct, …).
+   * Never raw payloads. Used by Action Queue evidence quality chips only.
+   */
+  /** Allowlisted finite metrics only (see actionQueueEvidenceSnapshotRules). */
+  sanitized_metrics?: Readonly<Partial<Record<string, number>>> | null;
 }
 
 export interface OriginatingTimelineEventInput {
@@ -40,6 +46,8 @@ export interface OriginatingTimelineEventInput {
   type?: string | null;
   occurred_at?: string | null;
   source?: string | null;
+  /** Allowlisted finite metrics only (see actionQueueEvidenceSnapshotRules). */
+  sanitized_metrics?: Readonly<Partial<Record<string, number>>> | null;
 }
 
 function normalizeSource(raw: string | null | undefined): OriginatingTimelineEventSource {
@@ -70,6 +78,33 @@ function normalizeType(raw: string | null | undefined): string | null {
  * - Dedupe by id (first occurrence wins).
  * - Sort by occurred_at ascending (null-last), then by id ascending.
  */
+
+const ALLOWED_REF_METRIC_KEYS = new Set([
+  "temperature_c",
+  "humidity_pct",
+  "vpd_kpa",
+  "soil_temp_c",
+  "soil_moisture_pct",
+  "soil_ec_mscm",
+  "ph",
+]);
+
+function pickSanitizedMetrics(
+  raw: OriginatingTimelineEventInput["sanitized_metrics"],
+): Readonly<Partial<Record<string, number>>> | null {
+  if (!raw || typeof raw !== "object") return null;
+  const out: Record<string, number> = {};
+  let any = false;
+  for (const [k, v] of Object.entries(raw)) {
+    if (!ALLOWED_REF_METRIC_KEYS.has(k)) continue;
+    if (typeof v === "number" && Number.isFinite(v)) {
+      out[k] = v;
+      any = true;
+    }
+  }
+  return any ? out : null;
+}
+
 export function normalizeOriginatingTimelineEvents(
   input: readonly OriginatingTimelineEventInput[] | null | undefined,
 ): OriginatingTimelineEventRef[] {
@@ -80,11 +115,13 @@ export function normalizeOriginatingTimelineEvents(
     const id = typeof raw.id === "string" ? raw.id.trim() : "";
     if (!id) continue;
     if (byId.has(id)) continue;
+    const metrics = pickSanitizedMetrics(raw.sanitized_metrics ?? null);
     byId.set(id, {
       id,
       type: normalizeType(raw.type),
       occurred_at: normalizeOccurredAt(raw.occurred_at),
       source: normalizeSource(raw.source),
+      ...(metrics && typeof metrics === "object" ? { sanitized_metrics: metrics } : {}),
     });
   }
   const out = Array.from(byId.values());

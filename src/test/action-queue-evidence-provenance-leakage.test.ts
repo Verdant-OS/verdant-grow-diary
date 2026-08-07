@@ -183,9 +183,10 @@ describe("ActionQueue.tsx — row evidence/provenance static leakage scan", () =
 
   it("uses the centralized evidence view-model builder, not ad-hoc string assembly", () => {
     expect(ACTION_QUEUE_SRC).toContain("buildActionEvidenceViewModel");
-    // Both pending and reviewed row blocks call the builder.
-    const calls = ACTION_QUEUE_SRC.match(/buildActionEvidenceViewModel\(/g) ?? [];
-    expect(calls.length).toBeGreaterThanOrEqual(2);
+    // Row blocks route through buildRowEvidenceVm → buildActionEvidenceViewModel.
+    const rowCalls = ACTION_QUEUE_SRC.match(/buildRowEvidenceVm\(/g) ?? [];
+    expect(rowCalls.length).toBeGreaterThanOrEqual(2);
+    expect(ACTION_QUEUE_SRC).toMatch(/extractManualSnapshotFromTimelineEvents/);
   });
 
   it("approval / rejection / simulate controls remain wired (review-only posture)", () => {

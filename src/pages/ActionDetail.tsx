@@ -85,8 +85,13 @@ import {
 } from "@/lib/actionQueueRowView";
 import {
   buildActionEvidenceViewModel,
+  // snapshot extract used below
   ACTION_EVIDENCE_MISSING_PANEL_HELP,
 } from "@/lib/actionQueueEvidenceViewModel";
+import ManualSensorSnapshotQualityBadge from "@/components/ManualSensorSnapshotQualityBadge";
+import { adaptOriginatingTimelineEventsFromRow } from "@/lib/originatingTimelineEventAdapter";
+import { extractManualSnapshotFromTimelineEvents } from "@/lib/actionQueueEvidenceSnapshotRules";
+
 import {
   buildMissingEvidenceReviewLink,
   ACTION_EVIDENCE_REVIEW_LINK_ARIA_LABEL,
@@ -115,7 +120,6 @@ import {
   ACTION_QUEUE_ALERT_DERIVED_EVIDENCE_NOT_LINKED_COPY,
   ACTION_QUEUE_AI_DOCTOR_DERIVED_EVIDENCE_NOT_LINKED_COPY,
 } from "@/lib/originatingTimelineEventRules";
-import { adaptOriginatingTimelineEventsFromRow } from "@/lib/originatingTimelineEventAdapter";
 import { useGrows } from "@/store/grows";
 
 type Status = ActionStatus;
@@ -800,19 +804,25 @@ export default function ActionDetail() {
                   </div>
                 )}
                 {(() => {
+                  const events = adaptOriginatingTimelineEventsFromRow(row);
+                  const snapshot = extractManualSnapshotFromTimelineEvents(events);
                   const ev = buildActionEvidenceViewModel({
                     source: row.source,
                     action_type: row.action_type,
                     captured_at: row.created_at,
+                    snapshot,
                   });
                   return (
                     <>
-                      <p
-                        className="mt-3 text-[11px] text-muted-foreground"
-                        data-testid="action-detail-evidence-quality"
-                      >
-                        {ev.evidenceQualityLabel}
-                      </p>
+                      <div className="mt-3 space-y-1" data-testid="action-detail-evidence-quality">
+                        {ev.hasSnapshotQuality && ev.snapshotQuality ? (
+                          <ManualSensorSnapshotQualityBadge evaluation={ev.snapshotQuality} />
+                        ) : (
+                          <p className="text-[11px] text-muted-foreground">
+                            {ev.evidenceQualityLabel}
+                          </p>
+                        )}
+                      </div>
                       {!ev.hasSnapshotQuality && (
                         <div
                           className="flex flex-col gap-2"
@@ -900,19 +910,25 @@ export default function ActionDetail() {
                   </Button>
                 )}
                 {(() => {
+                  const events = adaptOriginatingTimelineEventsFromRow(row);
+                  const snapshot = extractManualSnapshotFromTimelineEvents(events);
                   const ev = buildActionEvidenceViewModel({
                     source: row.source,
                     action_type: row.action_type,
                     captured_at: row.created_at,
+                    snapshot,
                   });
                   return (
                     <>
-                      <p
-                        className="mt-3 text-[11px] text-muted-foreground"
-                        data-testid="action-detail-evidence-quality"
-                      >
-                        {ev.evidenceQualityLabel}
-                      </p>
+                      <div className="mt-3 space-y-1" data-testid="action-detail-evidence-quality">
+                        {ev.hasSnapshotQuality && ev.snapshotQuality ? (
+                          <ManualSensorSnapshotQualityBadge evaluation={ev.snapshotQuality} />
+                        ) : (
+                          <p className="text-[11px] text-muted-foreground">
+                            {ev.evidenceQualityLabel}
+                          </p>
+                        )}
+                      </div>
                       {!ev.hasSnapshotQuality && (
                         <div
                           className="flex flex-col gap-2"

@@ -214,7 +214,19 @@ describe("QuickLog watering inline validation a11y", () => {
     await waitFor(() => {
       expect(input.getAttribute("aria-invalid")).toBe("true");
     });
-    expect(input.getAttribute("aria-describedby")).toBe("quicklog-watering-error");
+    // aria-describedby is a space-separated id list. #781 added the volume-
+    // preset help text as a second id alongside the error id, so a screen
+    // reader announces both — the old exact-string pin predates that and
+    // broke on the legitimate addition. Assert membership, not an exact
+    // string, and that every referenced id resolves to a real element: an
+    // aria-describedby pointing at nothing is a silent a11y regression no
+    // visual check would catch.
+    const describedBy = (input.getAttribute("aria-describedby") ?? "").split(/\s+/).filter(Boolean);
+    expect(describedBy).toContain("quicklog-watering-error");
+    expect(describedBy).toContain("quicklog-watering-presets-help");
+    for (const id of describedBy) {
+      expect(document.getElementById(id), id).not.toBeNull();
+    }
     const err = screen.getByTestId("quicklog-watering-error");
     expect(err.getAttribute("role")).toBe("alert");
   });

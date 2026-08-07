@@ -1,6 +1,8 @@
 # Orphan Tent Cleanup Plan (AUDIT / PLAN ONLY)
 
-Status: **Plan only. No data, schema, FK, RLS, or code changes.**
+Status: **RESOLVED.** Option A was executed via commit `bb0d6e302`
+("Restored orphan tent placeholder", 2026-06-06), 14 minutes after this
+plan was last edited. Kept for historical record; no action remains open.
 Source audit: `src/lib/orphanTentReferenceAudit.ts`, `scripts/run-orphan-tent-audit.ts`.
 
 ## Summary

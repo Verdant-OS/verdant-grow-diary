@@ -328,7 +328,6 @@ async function main(): Promise<void> {
   // provider:"ecowitt", transport:"mqtt"). The bridge's internal webhook
   // payload (vendor lineage `source:"ecowitt"`) is intentionally NOT
   // surfaced here — operators only need to verify the canonical shape.
-  // eslint-disable-next-line no-console
   console.log(
     JSON.stringify(
       {

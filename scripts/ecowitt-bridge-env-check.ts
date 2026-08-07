@@ -152,7 +152,6 @@ async function main(): Promise<void> {
   const mode: "dry-run" | "send" = argv.includes("--send") ? "send" : "dry-run";
   const res = checkBridgeEnv({ env: process.env, mode });
 
-  // eslint-disable-next-line no-console
   console.log(`ecowitt-bridge env preflight — mode: ${res.mode}`);
   for (const l of res.lines) console.log(`  ${safeLine(l)}`);
   for (const w of res.warnings) console.log(`  WARN  ${w}`);

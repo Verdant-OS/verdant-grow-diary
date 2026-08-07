@@ -66,7 +66,6 @@ import {
   canComplete,
   canCancel,
   buildTransitionPatch,
-  
   eventTypeFor,
   nextStatusFor,
   normalizeNote,
@@ -597,7 +596,6 @@ export default function ActionQueue() {
   // Reset to page 1 whenever search/filters/page size change. Skip the
   // very first run so an initial ?page=N from the URL is preserved.
   const filterResetSkipRef = useRef(true);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (filterResetSkipRef.current) {
       filterResetSkipRef.current = false;

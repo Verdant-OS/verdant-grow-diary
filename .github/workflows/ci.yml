@@ -230,9 +230,11 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y ripgrep
 
       - name: Lint
+        id: lint
         run: bun run lint
 
       - name: Typecheck
+        id: typecheck
         run: bun run typecheck
 
       # Stop-ship: the blocking Agreement Reconsent Gate must preserve its
@@ -254,11 +256,13 @@ jobs:
       # Stop-ship: Gate 2A CSV import safety + manual sensor freshness/delta
       # invariants must pass before any sensor-touching change merges.
       - name: Sensor safety tests (CSV + manual freshness/delta)
+        id: sensor_safety
         run: bun run test:sensor-safety
 
       # Stop-ship: Action Queue provenance + alert/session token leak
       # static-safety scans must pass on every PR.
       - name: Static safety scans (Action Queue provenance + chip)
+        id: static_safety
         run: bun run test:static-safety
 
       # Stop-ship: client-side product code must never reference
@@ -327,6 +331,7 @@ jobs:
       # Pure: no network, no model provider, no Supabase, no secrets. See
       # docs/ai-doctor-output-evaluation.md.
       - name: AI Doctor output safety and golden cases
+        id: ai_doctor_output_eval
         run: bun run test:ai-doctor-output-evaluation
 
       # Optional machine-readable report (informational, never a hard gate;
@@ -466,6 +471,7 @@ jobs:
       # NOT replace the full suite above. See
       # docs/testing/scanner-guardrails.md.
       - name: Scanner guardrail timeout sentinel
+        id: scanner_guardrails
         run: bun run test:scanner-guardrails:ci
 
       - name: Upload scanner guardrail slow-test report
@@ -521,17 +527,28 @@ jobs:
           OUT_DIR: artifacts/build-summary
           BUILD_SUMMARY_TRIGGER: ${{ github.event_name }}
           # Compact JSON — each entry is a stage this job already ran.
-          # Results reflect the recorded step outcomes so the artifact
-          # matches the actual pipeline verdict.
+          # Every result MUST be a `steps.<id>.outcome` reference. Literal
+          # "pass" values are forbidden here: this step is `if: always()`, so
+          # it also runs on failed jobs, and a hardcoded value produced a green
+          # artifact for a red run — static-safety-scans reported `pass` and
+          # overall `pass` while `bun run test:static-safety` had exited 1.
+          # Steps after a failure never run, so their outcome is empty and
+          # normalizes to `unknown`, which is honest and no longer counts as
+          # green. src/test/build-summary-validator-wiring.test.ts fails if a
+          # literal result returns here.
+          #
+          # The one exception is edge-shared-preflight: it is a separate job
+          # reached through `needs:`, so this job cannot run at all unless it
+          # succeeded. That justification is recorded in its `detail`.
           BUILD_SUMMARY_VALIDATORS: >-
             [
               {"name":"edge-shared-preflight","result":"pass","detail":"gated by needs: edge-shared-sync-preflight"},
-              {"name":"lint","result":"pass"},
-              {"name":"typecheck","result":"pass"},
-              {"name":"static-safety-scans","result":"pass"},
-              {"name":"sensor-safety","result":"pass"},
-              {"name":"ai-doctor-output-evaluation","result":"pass"},
-              {"name":"scanner-guardrail-timeout-sentinel","result":"pass"},
+              {"name":"lint","result":"${{ steps.lint.outcome }}"},
+              {"name":"typecheck","result":"${{ steps.typecheck.outcome }}"},
+              {"name":"static-safety-scans","result":"${{ steps.static_safety.outcome }}"},
+              {"name":"sensor-safety","result":"${{ steps.sensor_safety.outcome }}"},
+              {"name":"ai-doctor-output-evaluation","result":"${{ steps.ai_doctor_output_eval.outcome }}"},
+              {"name":"scanner-guardrail-timeout-sentinel","result":"${{ steps.scanner_guardrails.outcome }}"},
               {"name":"ecowitt-bridge-ci","result":"${{ steps.ecowitt_bridge_ci.outcome }}"},
               {"name":"production-build","result":"${{ steps.prod_build.outcome }}"}
             ]

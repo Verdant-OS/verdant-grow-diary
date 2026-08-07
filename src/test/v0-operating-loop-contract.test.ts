@@ -17,6 +17,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { isSnapshotPersistable, selectPersistableAlerts } from "@/lib/environmentAlertPersistence";
+import { MANUAL_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
 import type { EnvironmentAlert } from "@/lib/environmentAlerts";
 import type { SensorSnapshot } from "@/lib/sensorSnapshot";
 import type { SensorQuality } from "@/lib/sensorQuality";
@@ -102,10 +103,15 @@ describe("V0 loop · manual readings count as real input", () => {
         isDemoData: true,
       }),
     ).toBe(false);
-    // stale
+    // Stale. This fixture is a MANUAL snapshot, and staleness is source-aware
+    // (see sensorTruthCanon: live = 15 minutes, manual/diary = 24 hours), so
+    // the age must exceed the MANUAL window to be rejected. The previous 60
+    // minutes predated cb98fe4e4, when isSnapshotPersistable called isStale
+    // without a source and every snapshot got the flat live window. Derived
+    // from the canon constant rather than hardcoded so the two cannot drift.
     const stale = {
       ...fresh,
-      ts: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+      ts: new Date(Date.now() - (MANUAL_CURRENT_STATE_STALE_MS + 60 * 60 * 1000)).toISOString(),
     };
     expect(isSnapshotPersistable({ snapshot: stale, quality: "good" })).toBe(false);
   });

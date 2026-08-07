@@ -12,6 +12,11 @@
  *  - Secret is server-only; never logged, never returned in errors.
  */
 
+import { constantTimeEqual } from "../_shared/lib/lib/constantTimeEqual.ts";
+
+// Re-export for tests and static contract scanners that expect this symbol.
+export { constantTimeEqual };
+
 export type PaddleSignatureParts = {
   ts: string;
   /** Last h1 value (back-compat with earlier callers/tests). */
@@ -36,15 +41,6 @@ export function parsePaddleSignature(header: string): PaddleSignatureParts | nul
   }
   if (!ts || h1s.length === 0) return null;
   return { ts, h1: h1s[h1s.length - 1], h1s };
-}
-
-export function constantTimeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) {
-    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  }
-  return diff === 0;
 }
 
 export async function hmacSha256Hex(secret: string, message: string): Promise<string> {

@@ -2,6 +2,8 @@
 // Keep behavior in parity with src/lib via ecowitt-real-ingest-edge-parity tests.
 // Do not add persistence, Supabase writes, network calls, alerts, Action Queue writes, AI calls, automation, or device control here.
 
+import { constantTimeEqual } from "./lib/lib/constantTimeEqual.ts";
+
 export type EcoWittRealIngestAuthStatus =
   "authorized" | "unauthorized" | "forbidden" | "not_configured";
 
@@ -23,15 +25,6 @@ function result(
   reason: EcoWittRealIngestAuthResult["reason"],
 ): EcoWittRealIngestAuthResult {
   return { status, ok: status === "authorized", reason };
-}
-
-function safeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) {
-    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  }
-  return diff === 0;
 }
 
 export function validateEcoWittBridgeAuthorization(
@@ -68,7 +61,7 @@ export function validateEcoWittBridgeAuthorization(
     return result("not_configured", "server_token_not_configured");
   }
 
-  if (!safeEqual(token, expectedToken as string)) {
+  if (!constantTimeEqual(token, expectedToken as string)) {
     return result("forbidden", "token_mismatch");
   }
 

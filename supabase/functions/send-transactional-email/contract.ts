@@ -1,3 +1,5 @@
+import { constantTimeEqual } from "../_shared/lib/lib/constantTimeEqual.ts";
+
 export const MAX_TRANSACTIONAL_EMAIL_BODY_BYTES = 64 * 1024;
 export const MAX_TRANSACTIONAL_EMAIL_SUBJECT_LENGTH = 200;
 
@@ -31,17 +33,6 @@ export type TransactionalEmailRequestResult =
         | "invalid_idempotency_key"
         | "invalid_template_data";
     };
-
-function constantTimeEqual(left: string, right: string): boolean {
-  const maxLength = Math.max(left.length, right.length);
-  let mismatch = left.length ^ right.length;
-
-  for (let index = 0; index < maxLength; index += 1) {
-    mismatch |= (left.charCodeAt(index) || 0) ^ (right.charCodeAt(index) || 0);
-  }
-
-  return mismatch === 0;
-}
 
 function normalizeSecret(value: unknown): string | null {
   return typeof value === "string" && value.length > 0 ? value : null;

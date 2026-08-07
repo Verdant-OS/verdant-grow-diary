@@ -122,7 +122,7 @@ export function runCandidateNumberMembershipPreflight({
 
   if (!databaseUrl) {
     logger.error("SUPABASE_DB_URL is required; ambient DATABASE_URL and PG* are ignored.");
-    writeReport("FAILED - database connection missing", [
+    writeReport("BLOCKED - database connection missing", [
       "The protected environment did not provide `SUPABASE_DB_URL`.",
       "No database query ran.",
     ]);
@@ -139,7 +139,7 @@ export function runCandidateNumberMembershipPreflight({
         ? error.code
         : "identity_validation_failed";
     logger.error(`Database target identity rejected (${code}).`);
-    writeReport("FAILED - database identity rejected", [
+    writeReport("BLOCKED - database identity rejected", [
       "The configured URL does not prove that it targets the pinned Verdant project.",
       "No database query ran.",
     ]);
@@ -162,7 +162,7 @@ export function runCandidateNumberMembershipPreflight({
 
   if (result.error) {
     logger.error("psql is not invocable on this runner. No preflight verdict was reached.");
-    writeReport("FAILED - psql unavailable", ["Install `postgresql-client` and re-run."]);
+    writeReport("BLOCKED - psql unavailable", ["Install `postgresql-client` and re-run."]);
     writeAudit("psql_not_invocable", null, "psql could not be invoked.");
     return EXIT.PSQL_NOT_INVOCABLE;
   }
@@ -170,7 +170,7 @@ export function runCandidateNumberMembershipPreflight({
     logger.error(
       `psql exited ${String(result.status)} while running the preflight query; stderr was suppressed.`,
     );
-    writeReport("FAILED - preflight query failed", [
+    writeReport("BLOCKED - preflight query failed", [
       "The preflight state remains unknown. Raw psql stderr was suppressed to protect credentials.",
       `psql exit status: ${String(result.status)}.`,
     ]);
@@ -183,7 +183,7 @@ export function runCandidateNumberMembershipPreflight({
     row = parsePreflightStdout(result.stdout);
   } catch (error) {
     logger.error(`Preflight result could not be parsed (${error.message}).`);
-    writeReport("FAILED - malformed preflight result", [
+    writeReport("BLOCKED - malformed preflight result", [
       "The preflight query did not return exactly one well-formed JSON row.",
     ]);
     writeAudit("malformed_result", null, "Preflight query returned an unexpected shape.");
@@ -194,7 +194,7 @@ export function runCandidateNumberMembershipPreflight({
 
   if (classification.outcome === PREFLIGHT_OUTCOME.MALFORMED_RESULT) {
     logger.error("Preflight result failed shape validation.");
-    writeReport("FAILED - malformed preflight result", [
+    writeReport("BLOCKED - malformed preflight result", [
       "The preflight query row did not have the expected fields/types.",
     ]);
     writeAudit("malformed_result", classification);

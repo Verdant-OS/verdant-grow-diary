@@ -252,7 +252,7 @@ export function runVerifyCandidateNumberMigrationHistory({
 
   if (!databaseUrl) {
     logger.error("SUPABASE_DB_URL is required; ambient DATABASE_URL and PG* are ignored.");
-    writeReport("FAILED - database connection missing", [
+    writeReport("BLOCKED - database connection missing", [
       "The protected environment did not provide `SUPABASE_DB_URL`.",
       "No database query ran.",
     ]);
@@ -269,7 +269,7 @@ export function runVerifyCandidateNumberMigrationHistory({
         ? error.code
         : "identity_validation_failed";
     logger.error(`Database target identity rejected (${code}).`);
-    writeReport("FAILED - database identity rejected", [
+    writeReport("BLOCKED - database identity rejected", [
       "The configured URL does not prove that it targets the pinned Verdant project.",
       "No database query ran.",
     ]);
@@ -292,7 +292,7 @@ export function runVerifyCandidateNumberMigrationHistory({
 
   if (result.error) {
     logger.error("psql is not invocable on this runner. No history verdict was reached.");
-    writeReport("FAILED - psql unavailable", ["Install `postgresql-client` and re-run."]);
+    writeReport("BLOCKED - psql unavailable", ["Install `postgresql-client` and re-run."]);
     writeAudit("psql_not_invocable", null, "psql could not be invoked.");
     return EXIT.PSQL_NOT_INVOCABLE;
   }
@@ -300,7 +300,7 @@ export function runVerifyCandidateNumberMigrationHistory({
     logger.error(
       `psql exited ${String(result.status)} while running the history query; stderr was suppressed.`,
     );
-    writeReport("FAILED - history query failed", [
+    writeReport("BLOCKED - history query failed", [
       "The ledger and schema state remain unknown. Raw psql stderr was suppressed.",
       `psql exit status: ${String(result.status)}.`,
     ]);
@@ -313,7 +313,7 @@ export function runVerifyCandidateNumberMigrationHistory({
     parsed = parseVerifyStdout(result.stdout);
   } catch (error) {
     logger.error(`History result could not be parsed (${error.message}).`);
-    writeReport("FAILED - malformed history result", [
+    writeReport("BLOCKED - malformed history result", [
       "The history query did not return the expected shape.",
     ]);
     writeAudit("malformed_result", null, "History query returned an unexpected shape.");

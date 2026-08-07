@@ -593,7 +593,7 @@ export function runApplyCandidateNumberMaintenanceMigrations({
   writeReport("PASS", [
     ledger.status === "verify_only"
       ? "Both exact target ledger rows already existed; no persistent write was attempted."
-      : "Both migrations committed in one transaction and their own ledger rows were recorded.",
+      : "Each migration committed in its own separate transaction (deliberately not bundled — see buildApplyStepSql), each recording its own filename-derived ledger row.",
     "Both expected version strings are present in the ledger, and the guard fix + validated constraint are live.",
   ]);
   writeAudit(outcome, { ...auditBase, ledgerState: ledger.status });

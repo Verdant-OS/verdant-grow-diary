@@ -13,6 +13,34 @@ commit `b62aac5d4b0e9296bfdbee4c46e03fc35f350c0c`
 **Deploy branch head:** `a20776993bd606f07977674934864b888a407e1c`
 **Production deployment ID:** not exposed by the current production response
 
+## Current recheck — 2026-08-07
+
+This document retains the count-bearing August 2 intercepted-browser matrix as historical evidence.
+The current production recheck at `2026-08-07T22:59:05.5797248Z` found:
+
+- production manifest commit `f20c2f9f1ac341fb9bd89adf4fe5a678c514ec2e`, built at
+  `2026-08-07T20:32:32.558Z`;
+- deploy head `a21afd5c1e4467334e714e6898ee4cf2ec2f1d0e`, ahead only by PR #831's
+  test-only line-ending normalization, with no production runtime or public-file delta;
+- HTTP 200 for both lighting routes, `robots.txt`, `sitemap.xml`, and `version.json`;
+- one sitemap occurrence per lighting route in the current 55-URL sitemap;
+- correct direct-load titles, descriptions, canonicals, `index, follow` directives, H1s, and six
+  JSON-LD script blocks per lighting page;
+- the production sitemap contains no protected grow, tent, plant, timeline, sensor, AI Doctor,
+  alert, Action Queue, billing, settings, or account route.
+
+The analytics runtime has materially changed since the August 2 matrix: production now uses the
+consent-gated loader, connector-aware measurement-ID resolver, and TanStack route-location hook.
+Source contracts still pin `G-MCXQ9GVS5H`, `send_page_view: false`, explicit route-specific
+`page_view` events, query stripping, and protected-ID masking. Those source checks are
+`IMPLEMENTED_NOT_VERIFIED`, not a substitute for the current intercepted matrix.
+
+The authenticated Chrome control connection was unavailable in this run. Therefore the historical
+duplicate-page-view defect remains unresolved pending a current non-transmitting matrix and an
+authenticated Enhanced Measurement setting check. GA4 and GSC baselines remain blocked, Day 0 is
+unset, and the four-week clock has not started. Current machine-readable evidence is appended under
+`current_run` in [`artifacts/seo/seo-readiness-status.json`](../../artifacts/seo/seo-readiness-status.json).
+
 ## Launch verdict
 
 **NOT READY — ANALYTICS INSTRUMENTATION DEFECT FOUND**

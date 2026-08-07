@@ -9,6 +9,70 @@
     "revision_scope": "POST_DEPLOY_ANALYTICS_RECHECK_PROVENANCE_CORRECTION_ONLY",
     "production_or_analytics_reverification_performed": false
   },
+  "current_run": {
+    "observed_at": "2026-08-07T22:59:05.5797248Z",
+    "observed_at_chicago": "2026-08-07T17:59:05.5797248-05:00",
+    "operating_mode": "MODE_A_ACCESS_BLOCKED_READINESS_WORK",
+    "repository": {
+      "root": ".",
+      "branch": "codex/seo-readiness-20260807-refresh",
+      "audit_start_head": "a21afd5c1e4467334e714e6898ee4cf2ec2f1d0e",
+      "deploy_branch": "verdant-grow-diary",
+      "deploy_branch_head": "a21afd5c1e4467334e714e6898ee4cf2ec2f1d0e",
+      "working_tree_at_audit_start": "CLEAN"
+    },
+    "production": {
+      "host": "https://verdantgrowdiary.com",
+      "manifest_commit": "f20c2f9f1ac341fb9bd89adf4fe5a678c514ec2e",
+      "build_time": "2026-08-07T20:32:32.558Z",
+      "deploy_branch_ahead_by": "TEST_ONLY_COMMIT_831",
+      "runtime_source_or_public_delta_from_production": "NONE",
+      "release_content_match": "PASS",
+      "version_http_status": 200,
+      "lighting_pages_http_status": 200,
+      "sitemap_http_status": 200,
+      "robots_http_status": 200,
+      "sitemap_url_count": 55,
+      "distance_guide_sitemap_occurrences": 1,
+      "light_stress_guide_sitemap_occurrences": 1,
+      "robots_declares_production_sitemap": true,
+      "protected_route_sitemap_hits": 0
+    },
+    "analytics_instrumentation": {
+      "measurement_id_source_contract": "PASS",
+      "measurement_id": "G-MCXQ9GVS5H",
+      "explicit_page_view_source_contract": "PASS",
+      "send_page_view_false_source_contract": "PASS",
+      "protected_id_masking_source_contract": "PASS",
+      "current_release_intercepted_matrix_status": "BLOCKED",
+      "current_release_intercepted_matrix_reason": "CHROME_CONTROL_CONNECTION_UNAVAILABLE",
+      "current_source_contract_classification": "IMPLEMENTED_NOT_VERIFIED",
+      "historical_duplicate_page_view_defect": "UNRESOLVED_CURRENT_RELEASE_REVERIFY_REQUIRED",
+      "material_runtime_changes_since_last_intercepted_matrix": [
+        "CONSENT_GATED_ANALYTICS_LOADER",
+        "MEASUREMENT_ID_CONNECTOR_RESOLVER",
+        "TANSTACK_ROUTE_LOCATION_INTEGRATION"
+      ],
+      "historical_matrix_is_current_release_proof": false,
+      "test_events_transmitted": false
+    },
+    "access": {
+      "ga4_status": "BLOCKED",
+      "ga4_reason": "AUTHENTICATED_BROWSER_CONTROL_UNAVAILABLE",
+      "gsc_status": "BLOCKED",
+      "gsc_reason": "AUTHENTICATED_BROWSER_CONTROL_UNAVAILABLE"
+    },
+    "measurement": {
+      "day_0_status": "UNSET",
+      "four_week_clock_status": "NOT_STARTED"
+    },
+    "highest_priority_remaining_slice": {
+      "priority": "P0",
+      "id": "CURRENT_RELEASE_INTERCEPTED_ANALYTICS_MATRIX",
+      "status": "BLOCKED",
+      "required_action": "Expose an authenticated Chrome control connection, then rerun the non-transmitting navigation matrix and verify the GA4 Enhanced Measurement history setting."
+    }
+  },
   "timezone": "America/Chicago",
   "artifact_semantics": "POINT_IN_TIME_EVIDENCE_SNAPSHOT",
   "operating_mode": "MODE_A_ACCESS_BLOCKED_READINESS_WORK",

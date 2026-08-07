@@ -116,6 +116,62 @@ describe("SEO readiness status artifact", () => {
     }
   });
 
+  it("appends current production truth without rewriting historical analytics evidence", () => {
+    expect(READINESS.current_run).toEqual({
+      observed_at: "2026-08-07T22:59:05.5797248Z",
+      observed_at_chicago: "2026-08-07T17:59:05.5797248-05:00",
+      operating_mode: "MODE_A_ACCESS_BLOCKED_READINESS_WORK",
+      repository: {
+        root: ".",
+        branch: "codex/seo-readiness-20260807-refresh",
+        audit_start_head: "a21afd5c1e4467334e714e6898ee4cf2ec2f1d0e",
+        deploy_branch: "verdant-grow-diary",
+        deploy_branch_head: "a21afd5c1e4467334e714e6898ee4cf2ec2f1d0e",
+        working_tree_at_audit_start: "CLEAN",
+      },
+      production: expect.objectContaining({
+        manifest_commit: "f20c2f9f1ac341fb9bd89adf4fe5a678c514ec2e",
+        deploy_branch_ahead_by: "TEST_ONLY_COMMIT_831",
+        runtime_source_or_public_delta_from_production: "NONE",
+        release_content_match: "PASS",
+        sitemap_url_count: 55,
+        distance_guide_sitemap_occurrences: 1,
+        light_stress_guide_sitemap_occurrences: 1,
+        protected_route_sitemap_hits: 0,
+      }),
+      analytics_instrumentation: expect.objectContaining({
+        measurement_id: GOOGLE_ANALYTICS_MEASUREMENT_ID,
+        current_release_intercepted_matrix_status: "BLOCKED",
+        current_source_contract_classification: "IMPLEMENTED_NOT_VERIFIED",
+        historical_duplicate_page_view_defect: "UNRESOLVED_CURRENT_RELEASE_REVERIFY_REQUIRED",
+        historical_matrix_is_current_release_proof: false,
+        test_events_transmitted: false,
+      }),
+      access: {
+        ga4_status: "BLOCKED",
+        ga4_reason: "AUTHENTICATED_BROWSER_CONTROL_UNAVAILABLE",
+        gsc_status: "BLOCKED",
+        gsc_reason: "AUTHENTICATED_BROWSER_CONTROL_UNAVAILABLE",
+      },
+      measurement: {
+        day_0_status: "UNSET",
+        four_week_clock_status: "NOT_STARTED",
+      },
+      highest_priority_remaining_slice: {
+        priority: "P0",
+        id: "CURRENT_RELEASE_INTERCEPTED_ANALYTICS_MATRIX",
+        status: "BLOCKED",
+        required_action:
+          "Expose an authenticated Chrome control connection, then rerun the non-transmitting navigation matrix and verify the GA4 Enhanced Measurement history setting.",
+      },
+    });
+
+    expect(READINESS.analytics_identity).toMatchObject({
+      last_full_verified_at: "2026-08-02T02:08:43.179Z",
+      duplicate_page_views: "FAIL",
+    });
+  });
+
   it("keeps the human-readable handoff aligned with the artifact revision metadata", () => {
     const revision = READINESS.artifact_revision as Record<string, unknown>;
     const targetedRecheck = (READINESS.analytics_identity as Record<string, unknown>)

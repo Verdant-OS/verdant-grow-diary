@@ -8,7 +8,7 @@
 --      psql, migrations, pg_cron) — the guard's own auto-clear was mistaken for
 --      a caller-initiated number write;
 --   2. "a number requires a hunt" was trigger-only, so any trigger-disabled
---      window (pg_restore --disable-triggers, bulk load) could leave orphans;
+--      window (pg_restore --disable-triggers, bulk load) could leave strays;
 --   3. the service_role bypass was documented more broadly than it behaves.
 --
 -- Also re-asserts what the fix deliberately PRESERVED: a non-owner still cannot
@@ -134,19 +134,19 @@ BEGIN
   PERFORM set_config('request.jwt.claim.sub', v_owner::text, true);
   UPDATE public.plants SET candidate_number = 5 WHERE id = v_plant;
 
-  -- ---- FIX 2: orphan rejected declaratively, trigger disabled --------------
+  -- ---- FIX 2: stray rejected declaratively, trigger disabled --------------
   -- Back to the session user: ALTER TABLE requires table ownership, which the
   -- 'authenticated' role does not have.
   PERFORM set_config('role', 'none', true);
   ALTER TABLE public.plants DISABLE TRIGGER trg_plants_candidate_number_guard;
   BEGIN
     INSERT INTO public.plants(user_id, grow_id, pheno_hunt_id, candidate_number, name)
-      VALUES (v_owner, NULL, NULL, 42, 'mp-orphan');
+      VALUES (v_owner, NULL, NULL, 42, 'mp-stray');
     v_fail := v_fail + 1;
-    RAISE WARNING 'FAIL  orphan number accepted while the trigger was disabled';
+    RAISE WARNING 'FAIL  stray number accepted while the trigger was disabled';
   EXCEPTION WHEN check_violation THEN
     v_pass := v_pass + 1;
-    RAISE NOTICE 'PASS  orphan number rejected declaratively with the trigger disabled';
+    RAISE NOTICE 'PASS  stray number rejected declaratively with the trigger disabled';
   END;
   ALTER TABLE public.plants ENABLE TRIGGER trg_plants_candidate_number_guard;
 

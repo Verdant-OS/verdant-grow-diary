@@ -1,15 +1,17 @@
 /**
  * Sensor Snapshot → Alert Evidence Ref Population — UNBLOCKED in v2
- * ("Per-Metric Sensor Evidence Refs v1").
+ * ("Per-Metric Sensor Evidence Refs v1") and extended in #603
+ * ("Diary Evidence Refs for Environment Check").
  *
- * The env-alert write path now forwards an EXPLICIT per-metric
- * `sensor_readings.id` carried on `SensorSnapshot.metric_refs` — the
- * same row already selected by `snapshotFromReadings` for that metric.
+ * The env-alert write path now forwards EXPLICIT ids only:
+ *  - per-metric `sensor_readings.id` from `SensorSnapshot.metric_refs`
+ *  - `diary_entries.id` from `SensorSnapshot.diary_evidence_ref` (env check)
+ *
  * No nearest matching, no metric-only DB lookup, no prose inference.
  *
- * This file is the regression fence for the new path: it asserts that
- * the only ref source remains `snapshot.metric_refs` (no fabrication,
- * no payload leakage, no device-control language).
+ * This file is the regression fence for both paths: it asserts that
+ * the only ref sources remain those two explicit snapshot fields
+ * (no fabrication, no payload leakage, no device-control language).
  */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -22,18 +24,26 @@ function read(rel: string): string {
 const HOOK = "src/hooks/usePersistEnvironmentAlerts.ts";
 
 describe("Per-Metric Sensor Evidence Refs v1 — env-alert write path", () => {
-  it("env-alert hook imports the snapshot evidence helper exactly once", () => {
+  it("env-alert hook imports the snapshot evidence helper", () => {
     const src = read(HOOK);
     expect(src.includes("buildSensorSnapshotEvidenceRefs")).toBe(true);
     expect(src.includes("sensorSnapshotEvidenceRefRules")).toBe(true);
   });
 
-  it("env-alert hook sources ref id from snapshot.metric_refs only", () => {
+  it("env-alert hook also imports the diary evidence helper (#603)", () => {
     const src = read(HOOK);
-    // The only allowed ref origin is snapshot.metric_refs[<metric>].
-    expect(src).toMatch(/snapshot\.metric_refs/);
-    // No DB-side metric lookup, no nearest-row search.
+    expect(src.includes("buildDiaryEntryEvidenceRefs")).toBe(true);
+    expect(src.includes("diaryEntryEvidenceRefRules")).toBe(true);
+  });
+
+  it("env-alert hook sources ref ids only from explicit snapshot fields", () => {
+    const src = read(HOOK);
+    // Allowed ref origins: metric_refs and diary_evidence_ref.
+    expect(src).toMatch(/metric_refs/);
+    expect(src).toMatch(/diary_evidence_ref/);
+    // No DB-side metric/diary lookup, no nearest-row search.
     expect(src).not.toMatch(/from\(["']sensor_readings["']\)/);
+    expect(src).not.toMatch(/from\(["']diary_entries["']\)/);
     expect(src).not.toMatch(/nearestReading|closestReading|fuzzyMatch/);
   });
 
@@ -79,6 +89,12 @@ describe("Per-Metric Sensor Evidence Refs v1 — env-alert write path", () => {
     expect(src).not.toMatch(/id:\s*tent_id/);
     expect(src).not.toMatch(/id:\s*plant_id/);
     expect(src).not.toMatch(/id:\s*a\.metric/);
-    expect(src).not.toMatch(/snapshot_id\s*:\s*alert/i);
+    expect(src).not.toMatch(/id:\s*metric\b/);
+  });
+
+  it("latest-sensor-snapshot selects diary id for env-check evidence (#603)", () => {
+    const src = read("src/hooks/useLatestSensorSnapshot.ts");
+    expect(src).toMatch(/select\(["']id,entry_at,details,tent_id["']\)/);
+    expect(src).toMatch(/diaryEntryId/);
   });
 });

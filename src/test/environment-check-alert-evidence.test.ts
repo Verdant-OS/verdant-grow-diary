@@ -8,6 +8,8 @@
  *     gates; a stale one does not.
  *  3. The diary fence is untouched: sensor_snapshot blobs remain `diary`
  *     and remain non-persistable — this slice widens nothing.
+ *
+ * #603 (diary evidence trail) lives in environment-check-diary-evidence-ref.test.ts.
  */
 import { describe, expect, it } from "vitest";
 import { snapshotFromDiary, snapshotFromEnvironmentCheck } from "@/lib/sensorSnapshot";
@@ -112,6 +114,13 @@ describe("snapshotFromEnvironmentCheck (#596)", () => {
         vpd_kpa: Number.POSITIVE_INFINITY,
       }),
     ).toBeNull();
+  });
+
+  it("never populates metric_refs (sensor_readings contract)", () => {
+    const snap = snapshotFromEnvironmentCheck(minutesAgoIso(1), envelope(), {
+      diaryEntryId: "diary-x",
+    });
+    expect(snap?.metric_refs).toBeUndefined();
   });
 });
 

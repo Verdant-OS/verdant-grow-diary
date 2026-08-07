@@ -19,9 +19,25 @@ import { MCP_MANIFEST } from "@/lib/mcp/manifestView";
 import listGrowsTool from "@/lib/mcp/tools/list-grows";
 import listDiaryTool from "@/lib/mcp/tools/list-recent-diary-entries";
 import getSnapshotTool from "@/lib/mcp/tools/get-latest-sensor-snapshot";
+import listGrowWalkTargetsTool from "@/lib/mcp/tools/list-grow-walk-targets";
+import getGrowWalkContextTool from "@/lib/mcp/tools/get-grow-walk-context";
 
 /** The tool definitions the generated bundle/manifest are built from. */
-const SOURCE_TOOLS = [listGrowsTool, listDiaryTool, getSnapshotTool];
+const SOURCE_TOOLS = [
+  listGrowsTool,
+  listDiaryTool,
+  getSnapshotTool,
+  listGrowWalkTargetsTool,
+  getGrowWalkContextTool,
+];
+
+const EXPECTED_TOOL_NAMES = [
+  "get_grow_walk_context",
+  "get_latest_sensor_snapshot",
+  "list_grow_walk_targets",
+  "list_grows",
+  "list_recent_diary_entries",
+].sort();
 
 type RawTool = {
   name: string;
@@ -68,13 +84,11 @@ describe("MCP manifest drift", () => {
     expect(MCP_MANIFEST.oauthIssuer).not.toMatch(/lovable\.cloud/);
   });
 
-  it("exposes exactly the three read-only tools", () => {
+  it("exposes exactly the five read-only tools", () => {
     const realNames = real.mcp.tools.map((t) => t.name).sort();
     const viewNames = MCP_MANIFEST.tools.map((t) => t.name).sort();
     expect(viewNames).toEqual(realNames);
-    expect(viewNames).toEqual(
-      ["get_latest_sensor_snapshot", "list_grows", "list_recent_diary_entries"].sort(),
-    );
+    expect(viewNames).toEqual(EXPECTED_TOOL_NAMES);
   });
 
   it("every tool is annotated read-only in the real manifest", () => {

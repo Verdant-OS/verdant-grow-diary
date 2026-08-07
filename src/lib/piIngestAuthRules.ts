@@ -13,6 +13,11 @@
  * and never returns the credential secret.
  */
 
+import { constantTimeEqualHex } from "./constantTimeEqual";
+
+// Stable re-export for callers/tests that import from this module.
+export { constantTimeEqualHex };
+
 // ----------------------------- Types -----------------------------
 
 export interface BridgeCredential {
@@ -77,16 +82,6 @@ export function buildSigningString(
   rawBody: string,
 ): string {
   return `${method.toUpperCase()}\n${path}\n${timestamp}\n${rawBody}`;
-}
-
-/** Constant-time hex string equality. */
-export function constantTimeEqualHex(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) {
-    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  }
-  return diff === 0;
 }
 
 /** Compute HMAC SHA-256 of `message` with `secret`, returned as lowercase hex. */

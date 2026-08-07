@@ -1,6 +1,6 @@
 # Role — Claude: Knowledge Library and Product Specification Architect
 
-**Sentinel-Version: 2026-08-01.2**
+**Sentinel-Version: 2026-08-01.8**
 **Source:** Verdant Multi-Agent Prompt Pack 2026-07-31, section 2.
 
 > **Incomplete source.** The pack text for this role was truncated mid-assignment-item-6,
@@ -72,3 +72,37 @@ the smallest credible next tranche, unknowns and blocked items, and a clean hand
 Codex per `docs/agents/HANDOFF_PROTOCOL.md`.
 
 End with one calibrated verdict. Do not end with vague enthusiasm.
+
+---
+
+The only action permitted before this gate is read-only acquisition of
+`AGENTS.md`, `docs/agents/CURRENT_STATE.md`, and the assigned role file so the
+acknowledgment can be truthful. No application-code inspection, network calls of any kind, or
+recommendation is permitted before the acknowledgment.
+
+MANDATORY STARTUP GATE
+
+Before analysis, research, commands, edits, writes, outreach, deployment,
+or recommendations, return:
+
+```text
+SENTINEL_ACK
+agent:
+assigned_role:
+sentinel_version:
+files_read:
+current_task:
+scope:
+out_of_scope:
+conflicts_found:
+data_access_status:
+write_permission:
+```
+
+If a required file is missing or conflicting, return:
+
+```text
+STATUS: BLOCKED — AGENT CONTEXT INCOMPLETE
+```
+
+Do not continue until the context issue is resolved.

@@ -11,7 +11,9 @@ on:
       - "GEMINI.md"
       - ".grok/rules/**"
       - "docs/agents/**"
+      - "docs/archive/legacy/verdant-master-prompt-legacy.md"
       - "scripts/check-sentinel-version-parity.mjs"
+      - "scripts/check-sentinel-version-parity.test.mjs"
       - ".github/workflows/sentinel-version-parity.yml"
   push:
     branches:
@@ -23,7 +25,9 @@ on:
       - "GEMINI.md"
       - ".grok/rules/**"
       - "docs/agents/**"
+      - "docs/archive/legacy/verdant-master-prompt-legacy.md"
       - "scripts/check-sentinel-version-parity.mjs"
+      - "scripts/check-sentinel-version-parity.test.mjs"
       - ".github/workflows/sentinel-version-parity.yml"
 
 permissions:
@@ -46,9 +50,14 @@ jobs:
         with:
           node-version: "20"
 
+      - name: Test Sentinel-Version guard
+        run: node --test scripts/check-sentinel-version-parity.test.mjs
+
       # No dependencies: the checker uses only node:fs and git, so it runs before install.
       - name: Check Sentinel-Version parity and bump
         env:
-          # Empty on push events; the script falls back to origin/main.
-          SENTINEL_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          # PRs compare to their target branch; pushes compare to the exact pre-push
+          # commit. The latter matters because main and the deploy branch intentionally
+          # diverge, so origin/main is not a safe push baseline for verdant-grow-diary.
+          SENTINEL_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: node scripts/check-sentinel-version-parity.mjs

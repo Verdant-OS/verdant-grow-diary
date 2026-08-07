@@ -2,10 +2,11 @@
 /**
  * Sentinel-Version parity and bump check.
  *
- * GEMINI.md mirrors the safety-critical core of AGENTS.md because Gemini cannot follow a
- * link to get context. Duplication invites drift. Two rules together close it:
+ * GEMINI.md mirrors the full universal constitution in AGENTS.md because Gemini cannot
+ * follow a link to get context. Duplication invites drift. Three rules together close it:
  *
  *   PARITY  every governance file carries the same Sentinel-Version.
+ *   MIRROR  GEMINI.md's embedded constitution matches AGENTS.md (except line endings).
  *   BUMP    if a governance file's content changed against the base revision, its
  *           Sentinel-Version must have changed too.
  *
@@ -43,7 +44,53 @@ const MIRRORS = [
 ];
 const ALL = [CANONICAL, ...MIRRORS];
 
-/** Markers proving GEMINI.md still carries an embedded core rather than a bare link. */
+const ROLE_FILES = [
+  "docs/agents/roles/grok.md",
+  "docs/agents/roles/claude.md",
+  "docs/agents/roles/codex.md",
+  "docs/agents/roles/security.md",
+  "docs/agents/roles/gemini.md",
+  "docs/agents/roles/council-chair.md",
+];
+
+const REQUIRED_STARTUP_GATE = `MANDATORY STARTUP GATE
+
+Before analysis, research, commands, edits, writes, outreach, deployment,
+or recommendations, return:
+
+\`\`\`text
+SENTINEL_ACK
+agent:
+assigned_role:
+sentinel_version:
+files_read:
+current_task:
+scope:
+out_of_scope:
+conflicts_found:
+data_access_status:
+write_permission:
+\`\`\`
+
+If a required file is missing or conflicting, return:
+
+\`\`\`text
+STATUS: BLOCKED — AGENT CONTEXT INCOMPLETE
+\`\`\`
+
+Do not continue until the context issue is resolved.`;
+
+const CLAUDE_IMPORTS = `@AGENTS.md
+@docs/agents/CURRENT_STATE.md
+@docs/agents/roles/claude.md`;
+
+const LEGACY_ARCHIVE = "docs/archive/legacy/verdant-master-prompt-legacy.md";
+const LEGACY_HEADER = `> LEGACY — NOT ACTIVE AGENT INSTRUCTIONS
+>
+> Preserved for historical reference only.
+> Current instructions are defined by \`/AGENTS.md\`.`;
+
+/** Markers proving GEMINI.md still carries the full embedded constitution rather than a link. */
 const CORE_BEGIN = "<!-- SENTINEL-CORE:BEGIN";
 const CORE_END = "<!-- SENTINEL-CORE:END";
 
@@ -67,6 +114,18 @@ function normalize(text) {
     .filter((line) => !VERSION_RE.test(line))
     .join("\n")
     .trim();
+}
+
+/** Return the body between GEMINI's constitution markers, excluding the marker lines. */
+function embeddedGeminiCore(text) {
+  const begin = text.indexOf(CORE_BEGIN);
+  const end = text.indexOf(CORE_END);
+  if (begin === -1 || end === -1 || end <= begin) return null;
+
+  const beginLineEnd = text.indexOf("\n", begin);
+  if (beginLineEnd === -1 || beginLineEnd >= end) return null;
+
+  return text.slice(beginLineEnd + 1, end).trim();
 }
 
 // ---------------------------------------------------------------- PARITY
@@ -100,14 +159,53 @@ if (canonicalVersion) {
   }
 }
 
-// GEMINI.md must still embed the core. Replacing it with "see AGENTS.md" would silently
-// leave Gemini with no constitution, because it cannot follow the link.
+// GEMINI.md must embed the full constitution. Replacing it with "see AGENTS.md" would
+// silently leave Gemini with no durable context, because it cannot follow the link.
 const geminiText = head.get("GEMINI.md")?.text ?? "";
-if (geminiText && !(geminiText.includes(CORE_BEGIN) && geminiText.includes(CORE_END))) {
+if (geminiText) {
+  const embeddedCore = embeddedGeminiCore(geminiText);
+  if (!embeddedCore) {
+    problems.push(
+      "GEMINI.md: embedded SENTINEL-CORE block is missing. Gemini cannot follow a link " +
+        "to AGENTS.md, so the full constitution must stay inline between the markers.",
+    );
+  } else if (normalize(embeddedCore) !== normalize(head.get(CANONICAL)?.text ?? "")) {
+    problems.push(
+      "GEMINI.md: embedded SENTINEL-CORE differs from AGENTS.md. Keep the full " +
+        "universal constitution byte-equivalent (except line endings).",
+    );
+  }
+}
+
+// The owner requires the full visible startup block in the canonical constitution and
+// every detailed role file. A reference to the gate is not enough for disconnected
+// agents that receive only their role prompt.
+for (const path of [CANONICAL, ...ROLE_FILES]) {
+  const text = head.get(path)?.text.replace(/\r\n/g, "\n") ?? "";
+  if (text && !text.includes(REQUIRED_STARTUP_GATE)) {
+    problems.push(`${path}: exact mandatory SENTINEL_ACK startup gate is missing`);
+  }
+}
+
+const claudeText = head.get("CLAUDE.md")?.text.replace(/\r\n/g, "\n") ?? "";
+if (claudeText && !claudeText.startsWith(CLAUDE_IMPORTS)) {
   problems.push(
-    "GEMINI.md: embedded SENTINEL-CORE block is missing. Gemini cannot follow a link " +
-      "to AGENTS.md, so the core rules must stay inline between the markers.",
+    "CLAUDE.md: the first three lines must import AGENTS.md, CURRENT_STATE.md, and " +
+      "the Claude role in that order",
   );
+}
+
+if (!existsSync("docs/agents/CURRENT_STATE.md")) {
+  problems.push("docs/agents/CURRENT_STATE.md: missing changing shift report");
+}
+
+if (!existsSync(LEGACY_ARCHIVE)) {
+  problems.push(`${LEGACY_ARCHIVE}: missing legacy prompt archive`);
+} else {
+  const archiveText = readFileSync(LEGACY_ARCHIVE, "utf8").replace(/\r\n/g, "\n");
+  if (!archiveText.startsWith(LEGACY_HEADER)) {
+    problems.push(`${LEGACY_ARCHIVE}: required inactive-instructions header is missing`);
+  }
 }
 
 // ------------------------------------------------------------------ BUMP
@@ -204,12 +302,10 @@ if (problems.length > 0) {
   console.error("\nSentinel-Version check FAILED:\n");
   for (const p of problems) console.error(`  - ${p}`);
   console.error(
-    "\nBump the version in every governance file when the safety core, status " +
+    "\nBump the version in every governance file when the universal constitution, status " +
       "vocabulary, startup gate, or operating order changes.",
   );
   process.exit(1);
 }
 
-console.log(
-  `Sentinel-Version OK — ${canonicalVersion} across ${ALL.length} governance files.`,
-);
+console.log(`Sentinel-Version OK — ${canonicalVersion} across ${ALL.length} governance files.`);

@@ -22,6 +22,12 @@ import {
   type DiagnosisSuggestedAction,
 } from "@/lib/aiDoctorDiagnosisRules";
 import { ACTION_QUEUE_SOURCE_VALUES } from "@/lib/actionQueueProvenanceRules";
+import { createActionQueueItem } from "@/lib/actionQueueCreateService";
+import {
+  actionQueueCreateFailureCopy,
+  buildAiCoachRecommendationDedupeKey,
+  buildAiDoctorCoachSuggestionDedupeKey,
+} from "@/lib/actionQueueCreateRules";
 import { persistAiDoctorSession } from "@/lib/aiDoctorSessionPersistence";
 import { harmonizeDiagnosisConfidence } from "@/lib/aiDoctorConfidenceRules";
 import { actionsPath } from "@/lib/routes";
@@ -139,63 +145,45 @@ export default function Coach() {
     });
   }, [activeGrowId, ctxPlants, ctxSensors, ctxDiary, photoFile]);
 
-  // SECURITY: never send user_id from the client. DB default (auth.uid()) wins.
-  // status always defaults to pending_approval. No device-control fields.
+  // SECURITY: never send user_id from the client. RPC resolves auth.uid().
+  // status always pending_approval server-side. No device-control fields.
+  // Atomic create + created audit via action_queue_create (#586 residual).
   async function addToQueue(idx: number, recommendation: string) {
     if (!user || !activeGrowId || !analysis) return;
     const risk: "low" | "medium" | "high" | "critical" =
       analysis.risk_level === "unknown" ? "low" : analysis.risk_level;
     setQueuingIdx(idx);
-    const { data: inserted, error } = await supabase
-      .from("action_queue")
-      .insert({
-        grow_id: activeGrowId,
-        action_type: "advisory",
-        target_metric: "general",
-        suggested_change: recommendation,
-        reason: analysis.likely_issue || analysis.summary || "AI Coach recommendation",
-        risk_level: risk,
-        source: "ai_coach",
-        status: "pending_approval",
-      })
-      .select("id,grow_id")
-      .single();
+    const result = await createActionQueueItem({
+      grow_id: activeGrowId,
+      action_type: "advisory",
+      target_metric: "general",
+      suggested_change: recommendation,
+      reason: analysis.likely_issue || analysis.summary || "AI Coach recommendation",
+      risk_level: risk,
+      source: ACTION_QUEUE_SOURCE_VALUES.AI_COACH,
+      dedupe_key: buildAiCoachRecommendationDedupeKey(activeGrowId, recommendation),
+      audit_note: "Created from AI Coach recommendation",
+      originating_timeline_events: [],
+    });
     setQueuingIdx(null);
-    if (error) {
-      const msg = (error.message || "").toLowerCase();
+    if (!result.ok) {
       if (
-        error.code === "42501" ||
-        msg.includes("row-level security") ||
-        msg.includes("violates")
+        result.reason === "plant_not_in_grow" ||
+        result.reason === "tent_not_in_grow" ||
+        result.reason === "forbidden"
       ) {
         toast.error("This action cannot be queued until the plant/tent is assigned to this grow.", {
           description: "Open Lineage Repair to assign tents to this grow.",
         });
         return;
       }
-      toast.error(error.message);
+      toast.error(actionQueueCreateFailureCopy(result.reason));
       return;
     }
     setQueuedIdx((s) => new Set(s).add(idx));
-
-    // SECURITY: audit-only insert. No device commands. user_id omitted (DB default auth.uid()).
-    if (inserted?.id) {
-      const { error: auditError } = await supabase.from("action_queue_events").insert({
-        action_queue_id: inserted.id,
-        grow_id: inserted.grow_id ?? activeGrowId,
-        event_type: "created",
-        previous_status: null,
-        new_status: "pending_approval",
-        note: "Created from AI Coach recommendation",
-      });
-      if (auditError) {
-        toast.warning("Action queued, but audit log failed.", {
-          description: auditError.message,
-        });
-        return;
-      }
-    }
-    toast.success("Action queued for approval.");
+    toast.success(
+      result.reused ? "Action already in queue for approval." : "Action queued for approval.",
+    );
   }
 
   // Sanitized structured diagnosis from AI Doctor v1 (approval-first).
@@ -205,55 +193,46 @@ export default function Coach() {
   }, [result?.diagnosis]);
   const [doctorQueuedKeys, setDoctorQueuedKeys] = useState<Set<string>>(new Set());
 
-  // SECURITY: never send user_id from the client. status pins pending_approval.
-  // Source is "ai_doctor"; no device commands. Idempotent per (title|detail).
+  // SECURITY: never send user_id from the client. status pins pending_approval
+  // server-side. Source is "ai_doctor"; no device commands. Idempotent per
+  // (title|detail) via client set + server dedupe_key.
   async function addDoctorSuggestionToQueue(action: DiagnosisSuggestedAction): Promise<void> {
     if (!user || !activeGrowId || !diagnosis) return;
     const key = `${action.title}::${action.detail}`;
     if (doctorQueuedKeys.has(key)) return;
     const risk: "low" | "medium" | "high" = action.priority;
-    const { data: inserted, error } = await supabase
-      .from("action_queue")
-      .insert({
-        grow_id: activeGrowId,
-        action_type: action.type === "task" ? "task" : "advisory",
-        target_metric: "general",
-        suggested_change: `${action.title}: ${action.detail}`,
-        reason:
-          action.reason || diagnosis.likelyIssue || diagnosis.summary || "AI Doctor suggestion",
-        risk_level: risk,
-        source: ACTION_QUEUE_SOURCE_VALUES.AI_DOCTOR,
-        status: "pending_approval",
-      })
-      .select("id,grow_id")
-      .single();
-    if (error) {
-      const msg = (error.message || "").toLowerCase();
+    const result = await createActionQueueItem({
+      grow_id: activeGrowId,
+      action_type: action.type === "task" ? "task" : "advisory",
+      target_metric: "general",
+      suggested_change: `${action.title}: ${action.detail}`,
+      reason: action.reason || diagnosis.likelyIssue || diagnosis.summary || "AI Doctor suggestion",
+      risk_level: risk,
+      source: ACTION_QUEUE_SOURCE_VALUES.AI_DOCTOR,
+      dedupe_key: buildAiDoctorCoachSuggestionDedupeKey(activeGrowId, action.title, action.detail),
+      audit_note: "Created from AI Doctor suggestion (approval required)",
+      originating_timeline_events: [],
+    });
+    if (!result.ok) {
       if (
-        error.code === "42501" ||
-        msg.includes("row-level security") ||
-        msg.includes("violates")
+        result.reason === "plant_not_in_grow" ||
+        result.reason === "tent_not_in_grow" ||
+        result.reason === "forbidden"
       ) {
         toast.error("This action cannot be queued until the plant/tent is assigned to this grow.", {
           description: "Open Lineage Repair to assign tents to this grow.",
         });
         return;
       }
-      toast.error(error.message);
+      toast.error(actionQueueCreateFailureCopy(result.reason));
       return;
     }
     setDoctorQueuedKeys((s) => new Set(s).add(key));
-    if (inserted?.id) {
-      await supabase.from("action_queue_events").insert({
-        action_queue_id: inserted.id,
-        grow_id: inserted.grow_id ?? activeGrowId,
-        event_type: "created",
-        previous_status: null,
-        new_status: "pending_approval",
-        note: "Created from AI Doctor suggestion (approval required)",
-      });
-    }
-    toast.success("AI Doctor suggestion queued for approval.");
+    toast.success(
+      result.reused
+        ? "AI Doctor suggestion already in queue for approval."
+        : "AI Doctor suggestion queued for approval.",
+    );
   }
 
   async function ask(mode: Mode) {

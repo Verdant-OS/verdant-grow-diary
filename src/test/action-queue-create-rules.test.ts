@@ -1,10 +1,12 @@
 /**
- * Pure coverage for actionQueueCreateRules (#586).
+ * Pure coverage for actionQueueCreateRules (#586 + Coach residual).
  */
 import { describe, expect, it } from "vitest";
 import {
   actionQueueCreateFailureCopy,
   buildActionQueueCreateRpcArgs,
+  buildAiCoachRecommendationDedupeKey,
+  buildAiDoctorCoachSuggestionDedupeKey,
   buildAiDoctorSessionDedupeKey,
   buildEnvironmentAlertDedupeKey,
   parseActionQueueCreateResult,
@@ -23,6 +25,36 @@ describe("buildEnvironmentAlertDedupeKey", () => {
 describe("buildAiDoctorSessionDedupeKey", () => {
   it("prefixes a trimmed session id", () => {
     expect(buildAiDoctorSessionDedupeKey("sess-9")).toBe("ai_doctor_session:sess-9");
+  });
+});
+
+describe("buildAiCoachRecommendationDedupeKey", () => {
+  it("scopes a normalized recommendation to the grow", () => {
+    expect(buildAiCoachRecommendationDedupeKey("grow-1", "  Lower VPD  ")).toBe(
+      "ai_coach:grow-1:lower vpd",
+    );
+  });
+  it("returns null without grow or recommendation", () => {
+    expect(buildAiCoachRecommendationDedupeKey("", "x")).toBeNull();
+    expect(buildAiCoachRecommendationDedupeKey("g", "  ")).toBeNull();
+  });
+  it("bounds long recommendations", () => {
+    const long = "a".repeat(200);
+    const key = buildAiCoachRecommendationDedupeKey("g", long)!;
+    expect(key.startsWith("ai_coach:g:")).toBe(true);
+    expect(key.length).toBeLessThanOrEqual("ai_coach:g:".length + 160);
+  });
+});
+
+describe("buildAiDoctorCoachSuggestionDedupeKey", () => {
+  it("combines title and detail under grow", () => {
+    expect(buildAiDoctorCoachSuggestionDedupeKey("g1", "Check RH", "Raise airflow")).toBe(
+      "ai_doctor_coach:g1:check rh::raise airflow",
+    );
+  });
+  it("returns null without grow or title", () => {
+    expect(buildAiDoctorCoachSuggestionDedupeKey(null, "t", "d")).toBeNull();
+    expect(buildAiDoctorCoachSuggestionDedupeKey("g", "", "d")).toBeNull();
   });
 });
 
@@ -59,6 +91,19 @@ describe("buildActionQueueCreateRpcArgs", () => {
     const json = JSON.stringify(args);
     expect(json).not.toContain("user_id");
     expect(json).not.toContain("target_device");
+  });
+
+  it("accepts ai_coach as a source", () => {
+    const args = buildActionQueueCreateRpcArgs({
+      grow_id: "g",
+      action_type: "advisory",
+      suggested_change: "Review RH",
+      reason: "AI Coach recommendation",
+      risk_level: "low",
+      source: "ai_coach",
+      dedupe_key: "ai_coach:g:review rh",
+    });
+    expect(args).toMatchObject({ p_source: "ai_coach", p_dedupe_key: "ai_coach:g:review rh" });
   });
 
   it("rejects missing required fields", () => {

@@ -1,6 +1,7 @@
 import VpdStageMissingBadge from "@/components/VpdStageMissingBadge";
 import EcowittLatestSnapshotCard from "@/components/EcowittLatestSnapshotCard";
 import EnvironmentStabilityCard from "@/components/EnvironmentStabilityCard";
+import WateringCadenceHistoryStrip from "@/components/WateringCadenceHistoryStrip";
 import TentAiDoctorSessionsPanel from "@/components/TentAiDoctorSessionsPanel";
 import { computeEnvironmentStability } from "@/lib/environmentStabilityRules";
 import { useParams, Link, useSearchParams } from "@/lib/react-router-compat";
@@ -377,6 +378,12 @@ export default function TentDetail() {
         className="mb-4"
         result={computeEnvironmentStability(series, { stage: tent.stage })}
       />
+      <WateringCadenceHistoryStrip
+        tentId={id ?? null}
+        growId={tent.growId ?? null}
+        scopeLabel={tent.name ?? "Tent"}
+      />
+
 
       <div className="glass rounded-2xl p-4 mb-6">
         <div className="flex items-center justify-between gap-2 flex-wrap mb-3">

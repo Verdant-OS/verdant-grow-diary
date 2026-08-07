@@ -6,7 +6,18 @@ import {
   buildGrowWalkBrief,
 } from "@/lib/growWalkContextViewModel";
 
-function context(overrides: Partial<GrowWalkContext> = {}): GrowWalkContext {
+type GrowWalkContextPatch = {
+  scope?: Partial<GrowWalkContext["scope"]>;
+  profile?: Partial<GrowWalkContext["profile"]>;
+  evidence?: Partial<Omit<GrowWalkContext["evidence"], "sensors" | "actionQueue">> & {
+    sensors?: Partial<GrowWalkContext["evidence"]["sensors"]>;
+    actionQueue?: Partial<GrowWalkContext["evidence"]["actionQueue"]>;
+  };
+  derived?: Partial<GrowWalkContext["derived"]>;
+  receipt?: Partial<GrowWalkContext["receipt"]>;
+};
+
+function context(overrides: GrowWalkContextPatch = {}): GrowWalkContext {
   const base: GrowWalkContext = {
     scope: {
       growId: "grow-1",
@@ -78,7 +89,6 @@ function context(overrides: Partial<GrowWalkContext> = {}): GrowWalkContext {
 
   return {
     ...base,
-    ...overrides,
     scope: { ...base.scope, ...overrides.scope },
     profile: { ...base.profile, ...overrides.profile },
     evidence: {
@@ -109,7 +119,7 @@ describe("buildGrowWalkBrief", () => {
             "worsening_observation",
           ],
           attentionBand: "immediate_physical_verification",
-        } as GrowWalkContext["derived"],
+        },
       }),
     );
 
@@ -146,7 +156,7 @@ describe("buildGrowWalkBrief", () => {
           attentionBand: "watch_today",
           reasonCodes: ["stacked_major_changes_48h"],
           recentMajorChangeCount48h: 3,
-        } as GrowWalkContext["derived"],
+        },
       }),
     );
     expect(brief.whatNotToDo.length).toBeGreaterThan(0);
@@ -175,7 +185,7 @@ describe("buildGrowWalkBrief", () => {
               },
             },
           },
-        } as GrowWalkContext["evidence"],
+        },
         derived: {
           attentionBand: "watch_today",
           missingEvidenceCodes: [
@@ -183,7 +193,7 @@ describe("buildGrowWalkBrief", () => {
             "sensor_lane_not_current_live",
           ],
           evidenceConfidence: "medium",
-        } as GrowWalkContext["derived"],
+        },
       }),
     );
 
@@ -195,7 +205,7 @@ describe("buildGrowWalkBrief", () => {
 
   it("never describes photo metadata as inspected image content", () => {
     const brief = buildGrowWalkBrief(context());
-    expect(brief.evidenceTrustSummary.join(" ")).toMatch(/photo recorded|not inspected/i);
+    expect(brief.evidenceTrustSummary.join(" ")).toMatch(/photo record|not inspected/i);
     expect(JSON.stringify(brief)).not.toMatch(/i see|visible deficiency|the image shows/i);
   });
 
@@ -215,7 +225,7 @@ describe("buildGrowWalkBrief", () => {
               },
             ],
           },
-        } as GrowWalkContext["evidence"],
+        },
       }),
     );
     expect(brief.actionQueuePosture).toBe("existing_item_review");
@@ -233,7 +243,7 @@ describe("buildGrowWalkBrief", () => {
             "no_current_visual_evidence",
             "sensor_lane_unavailable",
           ],
-        } as GrowWalkContext["derived"],
+        },
       }),
     );
     expect(brief.actionQueuePosture).toBe("none");
@@ -246,7 +256,7 @@ describe("buildGrowWalkBrief", () => {
           attentionBand: "immediate_physical_verification",
           reasonCodes: ["multiple_adverse_evidence_lanes", "worsening_observation"],
           evidenceConfidence: "high",
-        } as GrowWalkContext["derived"],
+        },
       }),
     );
     expect(recommended.aiDoctorPosture).toBe("recommended");
@@ -262,7 +272,7 @@ describe("buildGrowWalkBrief", () => {
             "no_post_intervention_observation",
           ],
           evidenceConfidence: "medium",
-        } as GrowWalkContext["derived"],
+        },
       }),
     );
     expect(wait.aiDoctorPosture).toBe("wait_for_missing_evidence");
@@ -273,8 +283,8 @@ describe("buildGrowWalkBrief", () => {
           attentionBand: "insufficient_evidence",
           contradictionCodes: ["sensor_sources_disagree"],
           evidenceConfidence: "low",
-        } as GrowWalkContext["derived"],
-        receipt: { partialLanes: ["sensors"] } as GrowWalkContext["receipt"],
+        },
+        receipt: { partialLanes: ["sensors"] },
       }),
     );
     expect(cannot.aiDoctorPosture).toBe("cannot_assess_reliably");
@@ -292,7 +302,7 @@ describe("buildGrowWalkBrief", () => {
           attentionBand: "insufficient_evidence",
           contradictionCodes: ["scope_relationship_invalid"],
           evidenceConfidence: "low",
-        } as GrowWalkContext["derived"],
+        },
       }),
     );
     expect(invalidScope.quickLogTemplate).toBeNull();

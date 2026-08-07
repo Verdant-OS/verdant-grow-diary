@@ -450,6 +450,18 @@ export function runApplyCandidateNumberMaintenanceMigrations({
     writeAudit("membership_preflight_failed", { ...auditBase, note: reason });
     return EXIT.MEMBERSHIP_PREFLIGHT_FAILED;
   }
+  if (membershipClassification.outcome === PREFLIGHT_OUTCOME.MALFORMED_RESULT) {
+    // classifyPreflightResult's blocksApply is true here too — an unknown
+    // preflight state must never fall through to the ledger query and a
+    // possible apply, the same fail-closed discipline the standalone
+    // preflight script already applies to this exact outcome.
+    logger.error("Membership preflight result failed shape validation.");
+    writeReport("BLOCKED - membership preflight malformed", [
+      "The preflight query returned syntactically valid but unexpectedly shaped data. No migration SQL was submitted.",
+    ]);
+    writeAudit("membership_preflight_failed", { ...auditBase, note: "malformed_result" });
+    return EXIT.MEMBERSHIP_PREFLIGHT_FAILED;
+  }
   if (membershipClassification.outcome === PREFLIGHT_OUTCOME.ORPHANS_BLOCK_APPLY) {
     logger.error(
       `${membershipClassification.orphanCount} plants row(s) carry a candidate_number with no pheno_hunt_id.`,

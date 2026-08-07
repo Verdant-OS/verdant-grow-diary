@@ -896,9 +896,13 @@ describe("pi_bridge scanner allow-list hardening", () => {
   it("allows both sensorLiveMembership mirrors only as exact paths, and only while they stay inert", () => {
     // Exact-path allow-list, never a directory prefix. Both skipped files must
     // be pinned here so the generated mirror cannot drift outside the fence.
-    expect(PI_REGION).toMatch(/resolve\(ROOT,\s*["']src\/lib\/sensorLiveMembership\.ts["']\)/);
+    // `\s*` after `resolve(` as well as after `ROOT,`: the mirror path is long
+    // enough that Prettier wraps the call across four lines, so a pattern
+    // anchored on `resolve(ROOT,` can never match it however correct the
+    // allow-list is. Match the call shape, not one formatting of it.
+    expect(PI_REGION).toMatch(/resolve\(\s*ROOT,\s*["']src\/lib\/sensorLiveMembership\.ts["']/);
     expect(PI_REGION).toMatch(
-      /resolve\(ROOT,\s*["']supabase\/functions\/_shared\/lib\/lib\/sensorLiveMembership\.ts["']\)/,
+      /resolve\(\s*ROOT,\s*["']supabase\/functions\/_shared\/lib\/lib\/sensorLiveMembership\.ts["']/,
     );
     expect(PI_REGION).toMatch(/path === SENSOR_LIVE_MEMBERSHIP_PATH/);
     expect(PI_REGION).toMatch(/path === SENSOR_LIVE_MEMBERSHIP_MIRROR_PATH/);

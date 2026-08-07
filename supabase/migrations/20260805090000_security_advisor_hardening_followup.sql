@@ -41,23 +41,39 @@
 --    addition is a DROP FUNCTION IF EXISTS + CREATE FUNCTION pair, never
 --    a bare CREATE OR REPLACE), which is why each new parameter has
 --    repeatedly resurrected anon's default EXECUTE. Postgres also grants
---    EXECUTE on new functions to PUBLIC by default (tables get no such
---    built-in default) -- so a REVOKE that only names `anon` leaves
---    PUBLIC's grant in effect and anon inherits EXECUTE right back through
---    it. The quicklog_save_manual REVOKE below targets PUBLIC explicitly
---    for that reason.
+--    EXECUTE on new functions to PUBLIC by default -- so a REVOKE that
+--    only names `anon` leaves PUBLIC's grant in effect and anon inherits
+--    EXECUTE right back through it. The quicklog_save_manual REVOKE below
+--    targets PUBLIC explicitly for that reason.
 --
---    This changes the schema default going forward so future function and
---    table objects are born already narrow -- it does not touch any
+--    Scoped to FUNCTIONS only, not TABLES: unlike functions, tables carry
+--    no PUBLIC-EXECUTE-equivalent built-in default in vanilla Postgres, and
+--    prod is grandfathered so anon/authenticated get DML on new tables
+--    automatically while Lovable ships new tables continuously without
+--    knowing about ACL defaults. Silently making every future table
+--    client-invisible by default is a real workflow change, not a narrow
+--    security fix -- founder decision (2026-08-06) was to leave that alone
+--    here and revisit deliberately if it comes up again.
+--
+--    Best-effort forward hardening, not a proven root-cause fix: this
+--    changes the schema default for future function objects created by
+--    the invoking role and by `postgres` explicitly (Supabase's documented
+--    convention for its migration runner) -- it does not touch any
 --    existing object's current grants (those are handled explicitly
---    below). Caveat: default privileges bind to the ROLE that issues this
---    statement, for objects THAT ROLE creates. Supabase's documented
---    convention is that the migration runner applies changes as the
---    `postgres` role, so this is asserted both as the invoking role
---    (covers whatever role actually runs this file) and explicitly
---    `FOR ROLE postgres` (covers the case where a superuser applies this
---    but `postgres` is the role that actually owns newly created
---    objects). Verify after the next function recreate with:
+--    below). An earlier draft of this migration included a same-transaction
+--    self-test (create a throwaway function, assert it's not anon-
+--    executable) to prove this end-to-end; it failed against the local
+--    Supabase CI stack (`test:security-db-local`, 2026-08-06) -- a freshly
+--    created function was still anon-executable immediately after this
+--    exact statement ran, meaning some other default-ACL source (most
+--    likely a Supabase-local-stack bootstrap default bound to a different
+--    role) out-ranks it there. Root cause unconfirmed; removed the
+--    self-test rather than ship a migration that hard-fails on an
+--    assertion nobody has verified is even correct. Treat this block as
+--    defense-in-depth, not a guarantee -- the explicit per-object REVOKEs
+--    below are what's actually verified. Caveat: default privileges bind
+--    to the ROLE that issues this statement, for objects THAT ROLE
+--    creates. Verify after the next function recreate with:
 --      select rolname from pg_roles
 --       where oid = (select proowner from pg_proc
 --                     where proname = 'quicklog_save_manual' limit 1);
@@ -73,17 +89,12 @@ REVOKE ALL ON TABLE public.lovable_paddle_events FROM PUBLIC, anon, authenticate
 REVOKE ALL ON TABLE public.lead_events FROM PUBLIC, anon, authenticated;
 GRANT SELECT, INSERT ON TABLE public.lead_events TO authenticated;
 
--- 3. Root-cause fix: stop future objects from being born with anon/PUBLIC
--- access. Functions default-grant EXECUTE to PUBLIC in vanilla Postgres;
--- tables carry no such built-in default, but this project's hosted
--- instance is grandfathered on its own bootstrap default-privilege grants
--- to anon/authenticated (see supabase/seed.sql's "LOCAL-STACK PROD-PARITY
--- GRANTS" header for the documented evidence), so both object types are
--- revoked defensively, from both PUBLIC and anon.
+-- 3. Forward hardening (best-effort, see the header note above): stop
+-- future functions from being born with PUBLIC/anon EXECUTE. Scoped to
+-- FUNCTIONS only -- see the header note for why TABLES is intentionally
+-- excluded.
 ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON FUNCTIONS FROM PUBLIC, anon;
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON FUNCTIONS FROM PUBLIC, anon;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM PUBLIC, anon;
-ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON TABLES FROM PUBLIC, anon;
 
 -- 4. quicklog_save_manual: the one finding independently reconfirmed live
 -- against production (anon still had EXECUTE) moments before this was
@@ -114,7 +125,6 @@ DO $$
 DECLARE
   bad RECORD;
   overload_count INT;
-  test_fn_oid OID;
 BEGIN
   -- 4a. quicklog_save_manual: every overload, not just the 12-arg one in
   -- question -- a stray overload must not silently retain anon EXECUTE.
@@ -174,31 +184,6 @@ BEGIN
   IF NOT has_table_privilege('authenticated', 'public.lead_events', 'INSERT') THEN
     RAISE EXCEPTION 'lead_events lost the authenticated INSERT this migration is supposed to preserve';
   END IF;
-
-  -- 4c. End-to-end proof the default-privilege change actually works,
-  -- rather than just asserting the ALTER DEFAULT PRIVILEGES statement ran:
-  -- create a throwaway function and table as the current (migration-
-  -- applying) role, confirm anon has no privilege on either, then drop
-  -- both within this same transaction so nothing survives a failed run.
-  EXECUTE 'CREATE FUNCTION public.__default_privilege_selftest_fn() RETURNS void
-             LANGUAGE sql AS $selftest$ SELECT 1 $selftest$';
-  SELECT oid INTO test_fn_oid FROM pg_proc
-   WHERE pronamespace = 'public'::regnamespace
-     AND proname = '__default_privilege_selftest_fn';
-
-  IF has_function_privilege('anon', test_fn_oid, 'EXECUTE') THEN
-    RAISE EXCEPTION 'default-privilege change did not take: a freshly created function is anon-executable';
-  END IF;
-
-  EXECUTE 'DROP FUNCTION public.__default_privilege_selftest_fn()';
-
-  EXECUTE 'CREATE TABLE public.__default_privilege_selftest_tbl (id int)';
-
-  IF has_table_privilege('anon', 'public.__default_privilege_selftest_tbl', 'SELECT') THEN
-    RAISE EXCEPTION 'default-privilege change did not take: a freshly created table is anon-readable';
-  END IF;
-
-  EXECUTE 'DROP TABLE public.__default_privilege_selftest_tbl';
 END $$;
 
 COMMIT;

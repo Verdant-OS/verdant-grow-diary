@@ -132,23 +132,40 @@ and in every mirror that carries a status table (`GEMINI.md`, `docs/agents/roles
 `docs/agents/roles/gemini.md`); the corrected signed-out root-route description is present in
 `AGENTS.md`. Both items read as complete. The stale-facts refresh is this edit.
 
-**Completed, out of slice (recorded 2026-08-07):** #586 Action Queue atomic create.
-[PR #809](https://github.com/Verdant-OS/verdant-grow-diary/pull/809) merged as `a9a88e6ed`
-and is an ancestor of the current deploy tip. It shipped
-`supabase/migrations/20260807010000_action_queue_create_rpc.sql` (nullable `dedupe_key`
-column, partial unique index on non-terminal statuses, and the `action_queue_create`
-SECURITY DEFINER RPC that writes the queue row and its `created` audit event in one
-transaction) plus `20260807140000_action_queue_create_allow_ai_coach.sql` (adds `ai_coach`
-to the RPC source allowlist), alongside the Coach / Alert Detail / AI Doctor client move
-onto the RPC. Read directly from both migration bodies: the RPC inserts `status`
-`'pending_approval'` literally, inserts `target_device` as NULL literally, and derives
-`user_id` from `auth.uid()` rather than any client argument. That is an observation about
-this RPC only — it is **not** a cleared system-wide fence. Per the migration's own header
-this is an expand step: client `INSERT` on `action_queue` is deliberately not revoked and
-legacy direct-insert paths remain functional, so the RPC's constraints do not bind writers
-that bypass it. A contract/revoke step would be a separate slice. Claude authored this
-while this file recorded Claude as `Unassigned` and the active slice as Mode A SEO; this
-entry records the fact and does not retroactively authorize it.
+**Completed, out of slice (recorded 2026-08-07):** #586 Action Queue atomic create. This
+shipped as three separate merges, recorded separately because each carries different
+migrations and different client moves:
+
+- [PR #586](https://github.com/Verdant-OS/verdant-grow-diary/pull/586) merged as
+  `dc29093b5`. **Introduced the RPC migration**
+  `supabase/migrations/20260807010000_action_queue_create_rpc.sql` (nullable `dedupe_key`
+  column, partial unique index on non-terminal statuses, and the `action_queue_create`
+  SECURITY DEFINER RPC that writes the queue row and its `created` audit event in one
+  transaction), plus `src/lib/actionQueueCreateRules.ts`,
+  `src/lib/actionQueueCreateService.ts`, and the **Alert Detail** and **AI Doctor** client
+  moves onto the RPC.
+- [PR #809](https://github.com/Verdant-OS/verdant-grow-diary/pull/809) merged as
+  `a9a88e6ed`. Added **only** `20260807140000_action_queue_create_allow_ai_coach.sql`
+  (adds `ai_coach` to the RPC source allowlist) and the **Coach** client move, with tests.
+  It did **not** introduce the RPC migration — that file already exists in `a9a88e6ed^`.
+- [PR #812](https://github.com/Verdant-OS/verdant-grow-diary/pull/812) merged as
+  `821adb9fa`, reconciling three lagging Action Queue pins against the atomic RPC.
+
+All three are ancestors of the deploy tip recorded in Branch topology above.
+
+Read directly from the migration bodies: the RPC inserts `status` `'pending_approval'`
+literally, inserts `target_device` as NULL literally, and derives `user_id` from
+`auth.uid()` rather than any client argument. That is an observation about this RPC only —
+it is **not** a cleared system-wide fence. Per the migration's own header this is an expand
+step: client `INSERT` on `action_queue` is deliberately not revoked and legacy
+direct-insert paths remain functional, so the RPC's constraints do not bind writers that
+bypass it. A contract/revoke step would be a separate slice.
+
+Authoring agent is **not determinable from git**: all three commits are squash merges
+attributed to the repository owner, and #809's source branch is deleted. The fact recorded
+here is that this work shipped while this file listed the active slice as Mode A SEO and
+every agent row except Codex as `Unassigned`. This entry records that; it does not
+retroactively authorize it, and it does not assign it to an agent.
 
 Production application state of both migrations: `BLOCKED` — not verified, and not
 verifiable from an agent session. The Supabase MCP path available to agents resolves to the
@@ -255,11 +272,11 @@ write is approved by this state file.
 
 ## Agents currently assigned
 
-| Agent             | Assignment                                                 |
-| ----------------- | ---------------------------------------------------------- |
-| Codex             | Standing SEO measurement readiness and analytics integrity |
-| Claude            | Unassigned — see completed out-of-slice #809 above         |
-| Grok              | Unassigned                                                 |
-| Security reviewer | Unassigned                                                 |
-| Gemini            | Unassigned                                                 |
-| Council Chair     | Unassigned                                                 |
+| Agent             | Assignment                                                   |
+| ----------------- | ------------------------------------------------------------ |
+| Codex             | Standing SEO measurement readiness and analytics integrity   |
+| Claude            | Unassigned — see completed out-of-slice #586/#809/#812 above |
+| Grok              | Unassigned                                                   |
+| Security reviewer | Unassigned                                                   |
+| Gemini            | Unassigned                                                   |
+| Council Chair     | Unassigned                                                   |

@@ -72,6 +72,12 @@ import {
   type QuickLogHardwareReadings,
 } from "@/lib/quickLogHardwareReadingsRules";
 import {
+  applyWateringVolumePreset,
+  isWateringVolumePresetSelected,
+  QUICK_LOG_WATERING_VOLUME_PRESET_HELP,
+  QUICK_LOG_WATERING_VOLUME_PRESET_OPTIONS,
+} from "@/lib/quickLogWateringVolumePresetRules";
+import {
   filterQuickLogPlantOptions,
   quickLogPlantHelperText,
 } from "@/lib/quickLogPlantOptionRules";
@@ -2560,8 +2566,48 @@ export default function QuickLog({
                     required={eventType === "watering"}
                     aria-required={eventType === "watering"}
                     aria-invalid={!!wateringError}
-                    aria-describedby={wateringError ? "quicklog-watering-error" : undefined}
+                    aria-describedby={
+                      wateringError
+                        ? "quicklog-watering-error quicklog-watering-presets-help"
+                        : "quicklog-watering-presets-help"
+                    }
                   />
+                  <div
+                    className="mt-2 flex flex-wrap gap-1.5"
+                    role="group"
+                    aria-label="Volume presets"
+                    data-testid="quicklog-watering-volume-presets"
+                  >
+                    {QUICK_LOG_WATERING_VOLUME_PRESET_OPTIONS.map((preset) => {
+                      const selected = isWateringVolumePresetSelected(details.watering, preset);
+                      return (
+                        <Button
+                          key={preset.ml}
+                          type="button"
+                          size="sm"
+                          variant={selected ? "default" : "outline"}
+                          aria-pressed={selected}
+                          disabled={saveLocked}
+                          data-testid={`quicklog-watering-preset-${preset.ml}`}
+                          onClick={() => {
+                            if (isMainDraftMutationLocked()) return;
+                            setDetails({
+                              ...details,
+                              watering: applyWateringVolumePreset(details.watering, preset),
+                            });
+                          }}
+                        >
+                          {preset.label}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                  <p
+                    id="quicklog-watering-presets-help"
+                    className="text-[11px] text-muted-foreground mt-1"
+                  >
+                    {QUICK_LOG_WATERING_VOLUME_PRESET_HELP}
+                  </p>
                   {wateringError && (
                     <p
                       id="quicklog-watering-error"

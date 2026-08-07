@@ -182,6 +182,35 @@ export function normalizeObservedChecks({
   return byContext;
 }
 
+/**
+ * Accept `mustBeGreen` entries as either a bare string or a declaration object.
+ *
+ * `alwaysRuns` decides whether an absent result is a finding. It has to be
+ * per-entry, not a blanket rule: `test:security-regression` has no path filter
+ * and runs on every pull request to this branch, so its absence is the exact
+ * silent-gate failure its own workflow header documents — treating that as
+ * "did not apply" would leave the ungated security check unaudited unless it
+ * happened to go red. A path-filtered or opt-in entry is the opposite case,
+ * where failing on absent would produce a false red on every merge.
+ *
+ * A bare string reads as `alwaysRuns: false`, the conservative default.
+ */
+export function normalizeMustBeGreen(entries) {
+  const list = Array.isArray(entries) ? entries : [];
+  const normalized = [];
+  for (const entry of list) {
+    if (typeof entry === "string") {
+      const context = entry.trim();
+      if (context) normalized.push({ context, alwaysRuns: false });
+      continue;
+    }
+    const context = asString(entry?.context).trim();
+    if (!context) continue;
+    normalized.push({ context, alwaysRuns: entry?.alwaysRuns === true });
+  }
+  return normalized;
+}
+
 function evaluate(contexts, provenance, observed, failOn) {
   const findings = [];
   for (const context of [...new Set(contexts)].sort()) {
@@ -241,16 +270,27 @@ export function auditRequiredChecks({
   rulesetDrift = null,
 } = {}) {
   const required = Array.isArray(pinned?.required) ? pinned.required : [];
-  const mustBeGreen = Array.isArray(pinned?.mustBeGreen) ? pinned.mustBeGreen : [];
+  const mustBeGreen = normalizeMustBeGreen(pinned?.mustBeGreen);
   const observed = normalizeObservedChecks({
     checkRuns,
     commitStatuses,
     mergedAt: prResolution?.mergedAt ?? null,
   });
 
+  // An always-on entry must report as well as be green: absent or skipped is
+  // the silent-gate failure. A conditional entry fails only when it is present
+  // and red, so a path-filtered workflow that did not apply stays quiet.
+  const alwaysRuns = mustBeGreen.filter((e) => e.alwaysRuns).map((e) => e.context);
+  const conditional = mustBeGreen.filter((e) => !e.alwaysRuns).map((e) => e.context);
+
   const findings = [
     ...evaluate(required, "required", observed, [CHECK_STATUS.FAIL, CHECK_STATUS.MISSING]),
-    ...evaluate(mustBeGreen, "mustBeGreen", observed, [CHECK_STATUS.FAIL]),
+    ...evaluate(alwaysRuns, "mustBeGreen", observed, [
+      CHECK_STATUS.FAIL,
+      CHECK_STATUS.MISSING,
+      CHECK_STATUS.NOT_MEASURED,
+    ]),
+    ...evaluate(conditional, "mustBeGreen", observed, [CHECK_STATUS.FAIL]),
   ];
 
   const blockers = [];

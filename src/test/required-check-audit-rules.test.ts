@@ -19,6 +19,7 @@ import {
   auditRequiredChecks,
   diffPinnedAgainstRuleset,
   formatAuditReport,
+  normalizeMustBeGreen,
   normalizeObservedChecks,
 } from "../../scripts/lib/requiredCheckAuditRules.mjs";
 
@@ -44,7 +45,10 @@ function allGreen(contexts: string[]) {
   }));
 }
 
-const EVERY_PINNED = [...PINNED.required, ...PINNED.mustBeGreen];
+const MUST_BE_GREEN: string[] = normalizeMustBeGreen(PINNED.mustBeGreen).map(
+  (e: { context: string }) => e.context,
+);
+const EVERY_PINNED = [...PINNED.required, ...MUST_BE_GREEN];
 
 describe("config/required-status-checks.json", () => {
   it("pins the 35 contexts of ruleset 20421416 and targets the deploy branch", () => {
@@ -60,14 +64,47 @@ describe("config/required-status-checks.json", () => {
 
   it("keeps mustBeGreen disjoint from required (a context has one provenance)", () => {
     const required = new Set(PINNED.required);
-    for (const context of PINNED.mustBeGreen) expect(required.has(context)).toBe(false);
+    for (const context of MUST_BE_GREEN) expect(required.has(context)).toBe(false);
   });
 
   it("lists test:security-regression as a coverage hole, not a ruleset gate", () => {
     // The workflow's own header calls it "the required PR gate". It is not in
     // the ruleset, so nothing enforces it — that is the whole point of the list.
-    expect(PINNED.mustBeGreen).toContain("test:security-regression");
+    expect(MUST_BE_GREEN).toContain("test:security-regression");
     expect(PINNED.required).not.toContain("test:security-regression");
+  });
+
+  it("marks test:security-regression alwaysRuns — it has no path filter (Codex, PR #818)", () => {
+    const entry = normalizeMustBeGreen(PINNED.mustBeGreen).find(
+      (e: { context: string }) => e.context === "test:security-regression",
+    );
+    expect(entry?.alwaysRuns).toBe(true);
+  });
+});
+
+describe("normalizeMustBeGreen", () => {
+  it("reads a bare string as the conservative alwaysRuns: false", () => {
+    expect(normalizeMustBeGreen(["a"])).toEqual([{ context: "a", alwaysRuns: false }]);
+  });
+
+  it("honours an explicit declaration object", () => {
+    expect(normalizeMustBeGreen([{ context: "a", alwaysRuns: true }])).toEqual([
+      { context: "a", alwaysRuns: true },
+    ]);
+    expect(normalizeMustBeGreen([{ context: "b", alwaysRuns: false }])).toEqual([
+      { context: "b", alwaysRuns: false },
+    ]);
+  });
+
+  it("drops junk without throwing", () => {
+    expect(normalizeMustBeGreen(null)).toEqual([]);
+    expect(normalizeMustBeGreen([null, "", "  ", { context: "" }, {}])).toEqual([]);
+  });
+
+  it("treats a truthy-but-not-true alwaysRuns as false (no accidental opt-in)", () => {
+    expect(normalizeMustBeGreen([{ context: "a", alwaysRuns: "yes" }])).toEqual([
+      { context: "a", alwaysRuns: false },
+    ]);
   });
 });
 
@@ -219,13 +256,38 @@ describe("auditRequiredChecks — the failures it exists to catch", () => {
     expect(result.failingFindings[0].provenance).toBe("mustBeGreen");
   });
 
-  it("does NOT fail when a must-be-green context simply did not run", () => {
-    // security-db-local is opt-in; path-filtered workflows behave the same way.
-    // Failing on absent here would fire on every run and get the job disabled.
+  it("fails when an alwaysRuns must-be-green context never reported (Codex, PR #818)", () => {
+    // test:security-regression has no path filter. If it is renamed, disabled,
+    // or fails to schedule, MISSING is the silent-gate failure its own workflow
+    // header documents — not "did not apply".
     const runs = allGreen(EVERY_PINNED).filter((r) => r.name !== "test:security-regression");
     const result = auditRequiredChecks({ pinned: PINNED, checkRuns: runs, prResolution: MERGED });
+    expect(result.verdict).toBe(AUDIT_VERDICT.FAIL);
+    const finding = result.failingFindings.find((f) => f.context === "test:security-regression");
+    expect(finding?.status).toBe(CHECK_STATUS.MISSING);
+    expect(finding?.provenance).toBe("mustBeGreen");
+  });
+
+  it("fails when an alwaysRuns must-be-green context was skipped", () => {
+    const runs = allGreen(EVERY_PINNED);
+    runs.find((r) => r.name === "test:security-regression")!.conclusion = "skipped";
+    const result = auditRequiredChecks({ pinned: PINNED, checkRuns: runs, prResolution: MERGED });
+    expect(result.verdict).toBe(AUDIT_VERDICT.FAIL);
+    const finding = result.failingFindings.find((f) => f.context === "test:security-regression");
+    expect(finding?.status).toBe(CHECK_STATUS.NOT_MEASURED);
+  });
+
+  it("does NOT fail when a CONDITIONAL must-be-green context did not run", () => {
+    // Path-filtered and opt-in workflows legitimately do not run. Failing on
+    // absent for these would fire every merge and get the job switched off.
+    const pinned = { ...PINNED, mustBeGreen: [{ context: "opt-in-lane", alwaysRuns: false }] };
+    const result = auditRequiredChecks({
+      pinned,
+      checkRuns: allGreen(PINNED.required),
+      prResolution: MERGED,
+    });
     expect(result.verdict).toBe(AUDIT_VERDICT.PASS);
-    const finding = result.findings.find((f) => f.context === "test:security-regression");
+    const finding = result.findings.find((f) => f.context === "opt-in-lane");
     expect(finding?.status).toBe(CHECK_STATUS.MISSING);
     expect(finding?.failing).toBe(false);
   });
@@ -437,9 +499,13 @@ describe("formatAuditReport", () => {
     expect(report).toContain("1 skipped");
   });
 
-  it("does not claim everything went green when a must-be-green never reported", () => {
-    const runs = allGreen(EVERY_PINNED).filter((r) => r.name !== "test:security-regression");
-    const result = auditRequiredChecks({ pinned: PINNED, checkRuns: runs, prResolution: MERGED });
+  it("does not claim everything went green when a conditional must-be-green never reported", () => {
+    const pinned = { ...PINNED, mustBeGreen: [{ context: "opt-in-lane", alwaysRuns: false }] };
+    const result = auditRequiredChecks({
+      pinned,
+      checkRuns: allGreen(PINNED.required),
+      prResolution: MERGED,
+    });
     const report = formatAuditReport(result, { sha: "abc", prNumber: 1 });
     expect(result.verdict).toBe(AUDIT_VERDICT.PASS);
     expect(report).toContain("1 never reported");

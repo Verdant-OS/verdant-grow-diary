@@ -66,6 +66,26 @@ describe("bridge-sensor PlantUML architecture pack", () => {
     expect(puml.sort()).toEqual([...REQUIRED_DIAGRAMS].sort());
   });
 
+  it("README includes expanded text alternatives for all five diagrams", () => {
+    const readme = readFileSync(join(ARCH, "README.md"), "utf8");
+    expect(readme).toMatch(/Text alternatives/i);
+    // One section per diagram topic
+    expect(readme).toMatch(/Mint.*use.*revoke|Mint → use → revoke/i);
+    expect(readme).toMatch(/Verification activity/i);
+    expect(readme).toMatch(/Token lifecycle|lifecycle state/i);
+    expect(readme).toMatch(/Trust-boundary|Trust boundary|Trust boundaries/i);
+    expect(readme).toMatch(/Sibling isolation/i);
+    // Load-bearing prose (not only diagram source)
+    expect(readme).toMatch(/allowJwt:\s*false|allowJwt: false/);
+    expect(readme).toMatch(/30-minute|30 minutes/);
+    expect(readme).toMatch(/accepted:false/);
+    expect(readme).toMatch(/insertedCount\s*>\s*0/);
+    expect(readme).toMatch(/Do not mix Pi HMAC/i);
+    expect(readme).toMatch(/BLOCKED/);
+    expect(readme).toMatch(/#717|717/);
+    expect(readme).toMatch(/CLOSED|unmerged/i);
+  });
+
   it("each diagram has @startuml/@enduml, relative style include, and a title", () => {
     for (const name of REQUIRED_DIAGRAMS) {
       const text = read(name);
@@ -277,8 +297,9 @@ describe("bridge-sensor PlantUML architecture pack", () => {
   it("does not launder BLOCKED harness evidence as PASS", () => {
     const all = allDiagramText() + readFileSync(join(ARCH, "README.md"), "utf8");
     expect(all).toMatch(/BLOCKED/);
-    // Must not claim strict harness PASS
-    expect(all).not.toMatch(/strict[^\n]{0,40}PASS/i);
-    expect(all).not.toMatch(/zero-skip[^\n]{0,40}PASS/i);
+    // Status word PASS only — do not trip on "passed > 0" evidence criteria.
+    expect(all).not.toMatch(/strict[^\n]{0,80}\bPASS\b(?![a-z])/i);
+    expect(all).not.toMatch(/zero-skip[^\n]{0,80}\bPASS\b(?![a-z])/i);
+    expect(all).not.toMatch(/BLOCKED[^\n]{0,40}\bas PASS\b/i);
   });
 });

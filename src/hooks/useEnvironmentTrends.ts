@@ -4,7 +4,9 @@
  *
  * Source priority:
  *  1. sensor_readings for the scoped grow's tents (latest 24h, fallback 20 rows)
- *  2. diary_entries.details.sensor_snapshot for the scoped grow
+ *  2. diary_entries.details.sensor_snapshot for the scoped grow, tent-scoped
+ *     when tentIds is non-empty (#602 — same fail-closed attribution as
+ *     useLatestSensorSnapshot)
  *
  * Read-only. No .insert/.update/.delete/.upsert/.rpc. No ai-coach call.
  * No external-control surface. No elevated keys. RLS enforces ownership.
@@ -20,6 +22,7 @@ import {
   samplesFromReadings,
   selectWindow,
 } from "@/lib/environmentTrends";
+import { isDiaryRowInTentScope } from "@/lib/diaryEvidenceTentScopeRules";
 
 export type TrendsState =
   | { status: "idle"; trends: EnvironmentTrends }
@@ -118,7 +121,7 @@ export function useEnvironmentTrends(
 
       const { data: diaryRows, error: diaryErr } = await supabase
         .from("diary_entries")
-        .select("entry_at,details")
+        .select("entry_at,details,tent_id")
         .eq("grow_id", growId)
         .order("entry_at", { ascending: false })
         .limit(50);
@@ -126,8 +129,12 @@ export function useEnvironmentTrends(
         setState({ status: "unavailable", trends: EMPTY_TRENDS });
         return;
       }
+      // #602: tent-scoped trends only use diary rows attributed to those tents.
+      const scopedDiaryRows = (diaryRows ?? []).filter((r) =>
+        isDiaryRowInTentScope((r as { tent_id?: string | null }).tent_id, tentIds),
+      );
       const diarySamples = samplesFromDiary(
-        (diaryRows ?? []).map((r) => ({
+        scopedDiaryRows.map((r) => ({
           entry_at: r.entry_at,
           details: r.details as Record<string, unknown> | null | undefined,
         })),

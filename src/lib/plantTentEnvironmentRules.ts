@@ -71,7 +71,7 @@ export function buildPlantTentEnvironmentView(
   if (!rows || rows.length === 0) return EMPTY_VIEW;
   const snap: SensorSnapshot | null = snapshotFromReadings(rows);
   if (!snap) return EMPTY_VIEW;
-  const stale = isStale(snap.ts, now);
+  const stale = isStale(snap.ts, now, undefined, snap.source);
   const tempSymbol = getTemperatureUnitSymbol(tempUnit);
   return {
     hasReadings: true,

@@ -50,7 +50,7 @@ export function isSnapshotPersistable(ctx: PersistenceContext): boolean {
   if (snapshot.source !== "live" && snapshot.source !== "manual") return false;
   if (quality === "unavailable") return false;
   const now = ctx.now ?? Date.now();
-  if (isStale(snapshot.ts, now)) return false;
+  if (isStale(snapshot.ts, now, undefined, snapshot.source)) return false;
   return true;
 }
 

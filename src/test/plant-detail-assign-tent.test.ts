@@ -22,10 +22,29 @@ describe("AssignTentDialog · same-grow tent assignment", () => {
     expect(DIALOG).toMatch(/\.eq\(\s*["']is_archived["']\s*,\s*false\s*\)/);
   });
 
-  it("guards against cross-grow listing by requiring growId", () => {
-    expect(DIALOG).toMatch(/hasGrowContext/);
-    expect(DIALOG).toContain("missing grow context");
-    expect(DIALOG).toMatch(/enabled:\s*open\s*&&\s*hasGrowContext/);
+  it("applies the cross-grow filter whenever the plant HAS a grow", () => {
+    // The grow filter must stay conditional on growId being present — that
+    // is what still prevents cross-grow listing for the normal case. What
+    // changed (2026-08) is that a MISSING grow no longer blocks the dialog:
+    // previously `enabled: open && hasGrowContext` disabled the fetch and
+    // rendered a dead end, so a plant whose grow_id was null (legacy rows,
+    // or a server-side grow delete — plants.grow_id is ON DELETE SET NULL)
+    // could never be assigned to a tent at all.
+    expect(DIALOG).toMatch(
+      /if\s*\(\s*growId\s*\)\s*q\s*=\s*q\.eq\(\s*["']grow_id["']\s*,\s*growId/,
+    );
+  });
+
+  it("never renders the missing-grow dead end (regression: reported prod bug)", () => {
+    // Reported symptom: "Unable to load tents because this plant is missing
+    // grow context" on the Assign-to-tent quick action, while Edit Plant's
+    // tent dropdown worked for the SAME plant (it falls back to the full
+    // tent list — EditPlantDialog.tsx). Both the copy and its testid must
+    // stay gone, and the fetch must not be gated on grow context again.
+    expect(DIALOG).not.toContain("missing grow context");
+    expect(DIALOG).not.toContain("assign-tent-no-grow");
+    expect(DIALOG).not.toMatch(/hasGrowContext/);
+    expect(DIALOG).toMatch(/enabled:\s*open\s*,/);
   });
 
   it("marks the current tent as disabled / labeled current", () => {

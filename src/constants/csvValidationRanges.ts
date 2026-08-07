@@ -4,27 +4,37 @@
  * tables; import from here.
  *
  * Pure constants. No I/O, no Supabase, no React.
+ *
+ * EC / presentation pH tiers are owned by `@/constants/sensorTruthRanges`
+ * (#592 residual). This module re-exports the soft entry windows used by
+ * CSV import so preview + row validation never drift from the canon.
  */
 
-export interface RangeMinMax {
-  readonly min: number;
-  readonly max: number;
-}
+import {
+  EC_MSCM_SUSPICIOUS_MAX,
+  PH_CULTIVATION_SOFT,
+  RH_PCT_RANGE,
+  RH_STUCK_VALUES,
+  type RangeMinMax,
+} from "@/constants/sensorTruthRanges";
 
-export const HUMIDITY_RANGE: RangeMinMax = { min: 0, max: 100 };
-export const HUMIDITY_STUCK_VALUES: ReadonlyArray<number> = [0, 100];
+export type { RangeMinMax };
+
+export const HUMIDITY_RANGE: RangeMinMax = RH_PCT_RANGE;
+export const HUMIDITY_STUCK_VALUES: ReadonlyArray<number> = RH_STUCK_VALUES;
 
 /**
- * Realistic cultivation pH window. Outside this range we warn (not invalid)
- * because a CSV could still represent a legitimate edge case.
+ * Soft cultivation pH for CSV warnings (not presentation nulling).
+ * Presentation uses PH_PRESENTATION_REALISTIC (3–9) in sensorTruthRanges.
  */
-export const PH_REALISTIC_RANGE: RangeMinMax = { min: 4.5, max: 8.5 };
+export const PH_REALISTIC_RANGE: RangeMinMax = PH_CULTIVATION_SOFT;
 
 /**
  * Raw EC magnitudes above this threshold, when the user selected mS/cm,
  * are likely µS/cm. Treated as warning, never invalid.
+ * Same as EC_MSCM_SUSPICIOUS_MAX (soft tier; presentation floor is 20).
  */
-export const EC_SUSPICIOUS_MSCM_MAX = 50;
+export const EC_SUSPICIOUS_MSCM_MAX = EC_MSCM_SUSPICIOUS_MAX;
 
 export const AIR_TEMP_C_RANGE: RangeMinMax = { min: -10, max: 50 };
 export const SUBSTRATE_TEMP_C_RANGE: RangeMinMax = { min: -10, max: 50 };

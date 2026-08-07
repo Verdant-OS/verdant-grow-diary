@@ -27,6 +27,8 @@ import { buildEnvironmentAlerts, type EnvironmentAlert } from "@/lib/environment
 import { derivedAlertKey, selectPersistableAlerts } from "@/lib/environmentAlertPersistence";
 import { listAlerts, saveAlert, logAlertEvent } from "@/lib/alerts";
 import { buildSensorSnapshotEvidenceRefs } from "@/lib/sensorSnapshotEvidenceRefRules";
+import { buildDiaryEntryEvidenceRefs } from "@/lib/diaryEntryEvidenceRefRules";
+import type { OriginatingTimelineEventRef } from "@/lib/originatingTimelineEventRules";
 
 export type PersistStatus = "idle" | "skipped" | "checking" | "writing" | "done" | "error";
 
@@ -54,6 +56,45 @@ export interface PersistEnvironmentAlertsInput {
 
 const SOURCE = "environment_alerts";
 
+/**
+ * Resolve originating timeline refs for a derived alert.
+ *
+ * Preference order (both paths are explicit-id only; never inferred):
+ *  1. Per-metric `sensor_readings` id from `snapshot.metric_refs`
+ *  2. Diary entry id from `snapshot.diary_evidence_ref` (Environment Check)
+ *
+ * Returns [] when neither is available — never invents ids.
+ */
+export function resolveEnvironmentAlertEvidenceRefs(
+  alert: Pick<EnvironmentAlert, "metric">,
+  snapshot: SensorSnapshot | null | undefined,
+): OriginatingTimelineEventRef[] {
+  const metricRef =
+    typeof alert.metric === "string" && snapshot?.metric_refs
+      ? (snapshot.metric_refs[alert.metric as SensorSnapshotMetricRefKey] ?? null)
+      : null;
+  if (metricRef) {
+    return buildSensorSnapshotEvidenceRefs({
+      id: metricRef.id,
+      captured_at: metricRef.captured_at,
+      source: metricRef.source,
+      metric: alert.metric,
+    });
+  }
+  const diaryRef = snapshot?.diary_evidence_ref;
+  if (diaryRef && snapshot) {
+    return buildDiaryEntryEvidenceRefs({
+      id: diaryRef.id,
+      entry_at: diaryRef.entry_at,
+      // Env-check snapshots are always manual evidence; prefer the
+      // snapshot's own source so a future path cannot invent "live".
+      source:
+        snapshot.source === "manual" || snapshot.source === "live" ? snapshot.source : "manual",
+    });
+  }
+  return [];
+}
+
 export function usePersistEnvironmentAlerts(
   input: PersistEnvironmentAlertsInput,
 ): PersistEnvironmentAlertsState {
@@ -70,6 +111,7 @@ export function usePersistEnvironmentAlerts(
   // Stable deps — recompute on snapshot ts / quality / targets identity.
   const tsKey = input.snapshot?.ts ?? "";
   const sourceKey = input.snapshot?.source ?? "unavailable";
+  const diaryRefKey = input.snapshot?.diary_evidence_ref?.id ?? "";
   const qualityKey = input.quality?.quality ?? "unavailable";
   const targetsKey =
     input.targets?.status === "out_of_range"
@@ -182,22 +224,10 @@ export function usePersistEnvironmentAlerts(
       for (const a of toInsert) {
         const key = derivedAlertKey(a, SOURCE);
         try {
-          // Look up the metric-scoped row ref that THIS snapshot was
-          // already built from (no nearest matching, no metric-only DB
-          // lookup, no prose inference). Only metric-scoped alerts whose
-          // metric key matches a known sensor metric can resolve a ref.
-          const metricRef =
-            typeof a.metric === "string" && input.snapshot?.metric_refs
-              ? (input.snapshot.metric_refs[a.metric as SensorSnapshotMetricRefKey] ?? null)
-              : null;
-          const refs = metricRef
-            ? buildSensorSnapshotEvidenceRefs({
-                id: metricRef.id,
-                captured_at: metricRef.captured_at,
-                source: metricRef.source,
-                metric: a.metric,
-              })
-            : [];
+          // Explicit refs only: metric_refs (sensor_readings) first, then
+          // diary_evidence_ref (Environment Check diary row). Never
+          // nearest-match, never metric-only DB lookup, never prose.
+          const refs = resolveEnvironmentAlertEvidenceRefs(a, input.snapshot);
           const saved = await saveAlert({
             grow_id: growId,
             severity: a.severity,
@@ -243,6 +273,7 @@ export function usePersistEnvironmentAlerts(
     growId,
     tsKey,
     sourceKey,
+    diaryRefKey,
     qualityKey,
     targetsKey,
     isDemoData,

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 /**
  * usePageSeo — per-route <head> metadata for a client-rendered SPA.
@@ -26,7 +26,7 @@ export interface PageSeo {
   description: string;
   /** Path (e.g. "/pricing") or absolute URL for the self-canonical + og:url. */
   path: string;
-  /** Absolute og:image URL. Defaults to the brand logo. */
+  /** Absolute og:image URL. Otherwise preserves route-owned head metadata, then uses the brand. */
   ogImage?: string;
   /** Open Graph type. Defaults to "website"; use "article" for guides/posts. */
   ogType?: "website" | "article";
@@ -65,18 +65,26 @@ function upsertLink(rel: string, href: string) {
 }
 
 export function usePageSeo(seo: PageSeo): void {
-  const {
-    title,
-    description,
-    path,
-    ogImage = DEFAULT_OG_IMAGE,
-    ogType = "website",
-    noindex = false,
-  } = seo;
+  const { title, description, path, ogImage, ogType = "website", noindex = false } = seo;
+  const routeImageRef = useRef<{ path: string; image: string | null } | null>(null);
 
   useEffect(() => {
     const url = path.startsWith("http") ? path : `${SITE_ORIGIN}${path}`;
     const prevTitle = document.title;
+    if (routeImageRef.current?.path !== path) {
+      const routeOwnedImage =
+        document.head
+          .querySelector<HTMLMetaElement>('meta[property="og:image"]')
+          ?.getAttribute("content")
+          ?.trim() ||
+        document.head
+          .querySelector<HTMLMetaElement>('meta[name="twitter:image"]')
+          ?.getAttribute("content")
+          ?.trim() ||
+        null;
+      routeImageRef.current = { path, image: routeOwnedImage };
+    }
+    const resolvedOgImage = ogImage ?? routeImageRef.current.image ?? DEFAULT_OG_IMAGE;
 
     document.title = title;
     upsertMeta('meta[name="description"]', "name", "description", description);
@@ -91,13 +99,13 @@ export function usePageSeo(seo: PageSeo): void {
     upsertMeta('meta[property="og:title"]', "property", "og:title", title);
     upsertMeta('meta[property="og:description"]', "property", "og:description", description);
     upsertMeta('meta[property="og:url"]', "property", "og:url", url);
-    upsertMeta('meta[property="og:image"]', "property", "og:image", ogImage);
+    upsertMeta('meta[property="og:image"]', "property", "og:image", resolvedOgImage);
     upsertMeta('meta[property="og:site_name"]', "property", "og:site_name", SITE_NAME);
     upsertMeta('meta[property="og:type"]', "property", "og:type", ogType);
 
     upsertMeta('meta[name="twitter:title"]', "name", "twitter:title", title);
     upsertMeta('meta[name="twitter:description"]', "name", "twitter:description", description);
-    upsertMeta('meta[name="twitter:image"]', "name", "twitter:image", ogImage);
+    upsertMeta('meta[name="twitter:image"]', "name", "twitter:image", resolvedOgImage);
     upsertMeta('meta[name="twitter:card"]', "name", "twitter:card", "summary_large_image");
 
     return () => {

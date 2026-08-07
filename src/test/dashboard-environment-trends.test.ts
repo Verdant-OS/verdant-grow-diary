@@ -307,6 +307,13 @@ describe("useEnvironmentTrends hook contract", () => {
     expect(HOOK).toMatch(/\.from\(["']diary_entries["']\)/);
     expect(HOOK).toMatch(/\.eq\(["']grow_id["']/);
   });
+  it("tent-scopes diary sensor_snapshot fallback when tentIds is non-empty (#602)", () => {
+    expect(HOOK).toMatch(/\.select\(["']entry_at,details,tent_id["']\)/);
+    expect(HOOK).toMatch(/isDiaryRowInTentScope/);
+    expect(HOOK).toMatch(
+      /import\s*\{\s*isDiaryRowInTentScope\s*\}\s*from\s*["']@\/lib\/diaryEvidenceTentScopeRules["']/,
+    );
+  });
   it("introduces no write paths", () => {
     expect(WRITE_PATH.test(HOOK)).toBe(false);
   });

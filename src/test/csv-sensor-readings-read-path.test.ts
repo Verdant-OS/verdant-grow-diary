@@ -61,14 +61,14 @@ describe("snapshotFromReadings — CSV (Spider Farmer / Vivosun) classification"
     expect(snap?.source).toBe("manual");
   });
 
-  it("CSV-only snapshot still flags as stale when ts is older than 30m", () => {
+  it("CSV-only snapshot still flags as stale when ts is older than the live window", () => {
     const oldTs = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
     const snap = snapshotFromReadings([
       { ts: oldTs, metric: "temperature_c", value: 22, source: "csv" },
     ]);
     expect(snap?.source).toBe("csv");
     expect(isStale(snap?.ts ?? null)).toBe(true);
-    expect(STALE_THRESHOLD_MS).toBe(30 * 60 * 1000);
+    expect(STALE_THRESHOLD_MS).toBe(15 * 60 * 1000);
   });
 });
 

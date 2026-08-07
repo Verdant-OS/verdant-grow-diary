@@ -19,6 +19,8 @@
  *    Vendor lineage is carried as a separate, optional, safe label only.
  */
 
+import { LIVE_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
+
 export type SensorSnapshotSource = "live" | "manual" | "csv" | "demo" | "stale" | "invalid";
 
 export type SensorSnapshotFreshnessState = "fresh" | "stale" | "invalid" | "demo" | "unknown";
@@ -103,7 +105,7 @@ export interface SensorSnapshotDisplayModel {
 // Constants
 // ---------------------------------------------------------------------------
 
-export const DEFAULT_ENVIRONMENT_STALE_WINDOW_MS = 15 * 60 * 1000;
+export const DEFAULT_ENVIRONMENT_STALE_WINDOW_MS = LIVE_CURRENT_STATE_STALE_MS;
 export const DEFAULT_SOIL_STALE_WINDOW_MS = 60 * 60 * 1000;
 
 const ALLOWED_SOURCES: ReadonlySet<SensorSnapshotSource> = new Set([

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-08-07T15:59:33.065Z",
+  "generated_at": "2026-08-07T16:32:46.871Z",
   "_notes": "Fingerprints of accepted historical Supabase migration safety findings. Do not edit by hand except to remove an item after the underlying SQL is truly fixed. Never add a NEW finding to this file to silence CI — fix the migration instead.",
   "accepted": [
     {
@@ -8,12 +8,6 @@
       "scanner": "SEARCH_PATH_MUTABLE",
       "migration": "20260707153206_email_infra.sql",
       "subject": "public.delete_email"
-    },
-    {
-      "fingerprint": "0ab953bcd1232e3b",
-      "scanner": "TABLE_WITHOUT_RLS",
-      "migration": "20260805090000_security_advisor_hardening_followup.sql",
-      "subject": "public.__default_privilege_selftest_tbl"
     },
     {
       "fingerprint": "3657d976aef7da29",

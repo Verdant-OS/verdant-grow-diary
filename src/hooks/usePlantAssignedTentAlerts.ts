@@ -11,6 +11,7 @@
 import { useMemo } from "react";
 import { useAlertsList } from "@/hooks/useAlertsList";
 import {
+  ASSIGNED_TENT_ALERT_STATUSES,
   buildAssignedTentAlerts,
   type PlantAssignedTentAlertRow,
 } from "@/lib/plantAssignedTentAlertRules";
@@ -26,18 +27,23 @@ export function usePlantAssignedTentAlerts(
   growId: string | null | undefined,
   limit?: number,
 ): UsePlantAssignedTentAlertsResult {
-  // Read every status and let `buildAssignedTentAlerts` decide what still
-  // counts as active (ASSIGNED_TENT_ALERT_STATUSES = open + acknowledged).
+  // Ask the server for exactly the statuses the rules layer treats as active.
   //
   // This query used to narrow to open-only, which `listAlerts` turns into an
   // `.eq(...)` on the status column. That dropped acknowledged rows before the
   // rules layer ever saw them, so its acknowledged branch was unreachable and
-  // the panel hid alerts the grower had merely acknowledged. Status filtering
-  // lives in one place — the rules layer — so the two cannot drift again.
-  const { status, alerts, error } = useAlertsList({
-    growId: growId ?? null,
-    status: "all",
-  });
+  // the panel hid alerts the grower had merely acknowledged.
+  //
+  // The status list is passed from ASSIGNED_TENT_ALERT_STATUSES rather than
+  // restated here, so the query cannot drift from the rule again. Filtering
+  // server-side (rather than fetching everything and discarding) also means a
+  // long tail of resolved/dismissed rows can never crowd an older active alert
+  // out of the result set.
+  const { status, alerts, error } = useAlertsList(
+    { growId: growId ?? null, statuses: ASSIGNED_TENT_ALERT_STATUSES },
+    // No tent means the rules layer returns [] regardless — don't read at all.
+    { enabled: !!tentId },
+  );
   const rows = useMemo(
     () => buildAssignedTentAlerts(alerts, { tentId, growId, limit }),
     [alerts, tentId, growId, limit],

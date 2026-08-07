@@ -21,7 +21,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
 
 import type { AlertRow, AlertsQuery } from "@/lib/alerts";
-import { ASSIGNED_TENT_ALERT_STATUSES } from "@/lib/plantAssignedTentAlertRules";
+import { ASSIGNED_TENT_ALERT_STATUSES, countOpenAlerts } from "@/lib/plantAssignedTentAlertRules";
 
 const listAlertsMock = vi.fn();
 
@@ -66,7 +66,9 @@ function respondWith(rows: AlertRow[]) {
   listAlertsMock.mockImplementation(async (q: AlertsQuery = {}) =>
     rows.filter((r) => {
       if (q.growId && r.grow_id !== q.growId) return false;
-      if (q.status && q.status !== "all" && r.status !== q.status) return false;
+      if (q.statuses && q.statuses.length > 0) {
+        if (!q.statuses.includes(r.status)) return false;
+      } else if (q.status && q.status !== "all" && r.status !== q.status) return false;
       if (q.severity && q.severity !== "all" && r.severity !== q.severity) return false;
       return true;
     }),
@@ -90,7 +92,7 @@ describe("usePlantAssignedTentAlerts — acknowledged alerts stay reachable", ()
     expect([...result.current.rows.map((r) => r.id)].sort()).toEqual(["ack-1", "open-1"]);
   });
 
-  it("does not narrow the query below what the rules layer accepts", async () => {
+  it("filters status server-side to exactly the active set", async () => {
     respondWith([alert({ id: "ack-1", status: "acknowledged" })]);
 
     const { result } = renderHook(() => usePlantAssignedTentAlerts(TENT, GROW));
@@ -98,9 +100,15 @@ describe("usePlantAssignedTentAlerts — acknowledged alerts stay reachable", ()
     await waitFor(() => expect(result.current.status).toBe("ok"));
     // The read stays grow-scoped (RLS already scopes by user)...
     expect(listAlertsMock).toHaveBeenCalledWith(expect.objectContaining({ growId: GROW }));
-    // ...but must not pin a single status and starve the rules layer.
+
     const query = listAlertsMock.mock.calls[0]?.[0] as AlertsQuery;
+    // ...must not pin a single status and starve the rules layer...
     expect(ASSIGNED_TENT_ALERT_STATUSES).not.toContain(query.status);
+    // ...and must narrow server-side rather than hauling back every closed row
+    // and discarding it, which would let a long tail of resolved/dismissed
+    // alerts crowd an older active one out of a capped result set.
+    expect([...(query.statuses ?? [])].sort()).toEqual([...ASSIGNED_TENT_ALERT_STATUSES].sort());
+    expect(query.statuses).toContain("acknowledged");
   });
 
   // Drift guard: adding a status to ASSIGNED_TENT_ALERT_STATUSES automatically
@@ -148,12 +156,50 @@ describe("usePlantAssignedTentAlerts — widening did not leak closed alerts", (
     expect(result.current.rows.map((r) => r.id)).toEqual(["mine"]);
   });
 
-  it("returns nothing when the plant has no assigned tent", async () => {
+  it("returns nothing — and reads nothing — when the plant has no assigned tent", async () => {
     respondWith([alert({ id: "ack-1", status: "acknowledged" })]);
 
     const { result } = renderHook(() => usePlantAssignedTentAlerts(null, GROW));
 
-    await waitFor(() => expect(result.current.status).toBe("ok"));
+    // Give any stray effect a tick to fire.
+    await new Promise((r) => setTimeout(r, 20));
     expect(result.current.rows).toEqual([]);
+    // The rules layer would return [] anyway, so the read is pure waste.
+    expect(listAlertsMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("countOpenAlerts — 'open alerts' copy stays truthful", () => {
+  // The hook returns the ACTIVE set. Surfaces whose label says "open" must not
+  // count acknowledged rows, or an acknowledged-only tent reports open alerts
+  // that do not exist.
+  it("counts only strictly-open rows, not the acknowledged ones", async () => {
+    respondWith([
+      alert({ id: "open-1", status: "open" }),
+      alert({ id: "ack-1", status: "acknowledged" }),
+      alert({ id: "ack-2", status: "acknowledged" }),
+    ]);
+
+    const { result } = renderHook(() => usePlantAssignedTentAlerts(TENT, GROW));
+
+    await waitFor(() => expect(result.current.status).toBe("ok"));
+    expect(result.current.rows).toHaveLength(3);
+    expect(countOpenAlerts(result.current.rows)).toBe(1);
+  });
+
+  it("reports zero open alerts for an acknowledged-only tent", async () => {
+    respondWith([alert({ id: "ack-1", status: "acknowledged" })]);
+
+    const { result } = renderHook(() => usePlantAssignedTentAlerts(TENT, GROW));
+
+    await waitFor(() => expect(result.current.status).toBe("ok"));
+    expect(result.current.rows).toHaveLength(1);
+    expect(countOpenAlerts(result.current.rows)).toBe(0);
+  });
+
+  it("is null-safe", () => {
+    expect(countOpenAlerts(null)).toBe(0);
+    expect(countOpenAlerts(undefined)).toBe(0);
+    expect(countOpenAlerts([])).toBe(0);
   });
 });

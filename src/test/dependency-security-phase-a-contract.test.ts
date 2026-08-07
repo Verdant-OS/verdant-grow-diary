@@ -161,7 +161,7 @@ describe("dependency security Phase A resolution floors", () => {
     expect(packageJson.overrides).toMatchObject({
       "fast-uri": "3.1.5",
       "form-data": "4.0.6",
-      "js-yaml": "4.3.0",
+      "js-yaml": "4.3.1",
     });
     expect(packageJson.overrides?.postcss).toBeUndefined();
     expect(packageJson.overrides?.vite).toBeUndefined();

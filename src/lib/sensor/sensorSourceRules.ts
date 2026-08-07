@@ -11,7 +11,10 @@
  * are separate tables — do not fold them into this normalizer.
  */
 
-import { TRUST_LIVE_ALIASES } from "@/lib/sensorLiveMembership";
+// Relative, not "@/lib/…": this module is inside the auto-generated MCP edge
+// bundle's import closure, and the Vite "@/" alias does not exist in the Deno
+// runtime. See docs/edge-shared-sync.md.
+import { TRUST_LIVE_ALIASES } from "../sensorLiveMembership";
 
 export const SENSOR_SOURCES = ["live", "manual", "csv", "demo", "stale", "invalid"] as const;
 

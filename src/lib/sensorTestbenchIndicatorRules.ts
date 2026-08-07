@@ -20,8 +20,11 @@
  *  - Manual / CSV / demo readings do not promote to "receiving".
  */
 
+// Relative, not "@/lib/…": this module is inside the auto-generated MCP edge
+// bundle's import closure, and the Vite "@/" alias does not exist in the Deno
+// runtime. See docs/edge-shared-sync.md.
 import { SENSOR_TESTBENCH_LIVE_WINDOW_MS } from "../constants/sensorTiming";
-import { RECEIVING_TRANSPORT_SOURCES } from "@/lib/sensorLiveMembership";
+import { RECEIVING_TRANSPORT_SOURCES } from "./sensorLiveMembership";
 export { SENSOR_TESTBENCH_LIVE_WINDOW_MS };
 
 // "receiving" was previously named "live" (#584): a fresh ingest from a

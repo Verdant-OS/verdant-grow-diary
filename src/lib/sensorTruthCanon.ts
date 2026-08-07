@@ -16,12 +16,15 @@
  * only for callers that have age but no provenance.
  */
 
+// Relative, not "@/…": this module is inside the auto-generated MCP edge
+// bundle's import closure, and the Vite "@/" alias does not exist in the Deno
+// runtime. See docs/edge-shared-sync.md.
 import {
   MANUAL_SNAPSHOT_CURRENT_STALE_HOURS,
   SENSOR_FRESH_WINDOW_MINUTES,
   SENSOR_SNAPSHOT_STALE_THRESHOLD_MS,
-} from "@/constants/sensorTiming";
-import { LIVE_WINDOW_ALIASES } from "@/lib/sensorLiveMembership";
+} from "../constants/sensorTiming";
+import { LIVE_WINDOW_ALIASES } from "./sensorLiveMembership";
 
 /** Live current-state window (15 minutes). */
 export const LIVE_CURRENT_STATE_STALE_MS = SENSOR_SNAPSHOT_STALE_THRESHOLD_MS;

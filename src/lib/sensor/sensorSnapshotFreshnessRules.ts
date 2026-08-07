@@ -10,7 +10,10 @@
  *    informs the age label but they are not promoted to "live".
  */
 import { normalizeSensorSource, type SensorSource } from "./sensorSourceRules";
-import { LIVE_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
+// Relative, not "@/lib/…": this module is inside the auto-generated MCP edge
+// bundle's import closure, and the Vite "@/" alias does not exist in the Deno
+// runtime. See docs/edge-shared-sync.md.
+import { LIVE_CURRENT_STATE_STALE_MS } from "../sensorTruthCanon";
 
 export type SensorMetrics = Partial<{
   temp_f: number | null;

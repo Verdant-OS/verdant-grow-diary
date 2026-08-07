@@ -83,25 +83,40 @@ ${JSON.stringify(rows, null, 2)}`,
 import { defineTool as defineTool2 } from "npm:@lovable.dev/mcp-js@0.24.0";
 import { z as z2 } from "npm:zod@^3.24.2";
 
+// src/lib/sensorLiveMembership.ts
+var TRUST_LIVE_ALIASES = /* @__PURE__ */ new Set(["live", "sensor", "realtime"]);
+
 // src/lib/sensor/sensorSourceRules.ts
 var ALIAS = {
   live: "live",
   sensor: "live",
   realtime: "live",
+  // First-party bridge is trust-live for badge purposes (matches
+  // VERIFIED_SNAPSHOT_LIVE_ROW_SOURCES reservation in sensorSnapshot).
+  pi_bridge: "live",
   manual: "manual",
   user: "manual",
   entry: "manual",
   log: "manual",
+  diary: "manual",
+  manual_snapshot: "manual",
   csv: "csv",
   import: "csv",
+  imported: "csv",
   demo: "demo",
   mock: "demo",
   sample: "demo",
   fixture: "demo",
+  sim: "demo",
   stale: "stale",
   invalid: "invalid",
   unknown: "invalid",
 };
+for (const alias of TRUST_LIVE_ALIASES) {
+  if (ALIAS[alias] === void 0) {
+    ALIAS[alias] = "live";
+  }
+}
 function normalizeSensorSource(input) {
   if (typeof input !== "string") return "invalid";
   const v = input.trim().toLowerCase();
@@ -109,8 +124,32 @@ function normalizeSensorSource(input) {
   return ALIAS[v] ?? "invalid";
 }
 
+// src/constants/sensorTiming.ts
+var SENSOR_FRESH_WINDOW_MINUTES = 15;
+var ECOWITT_LIVE_SOIL_STALE_MS = 15 * 60 * 1e3;
+var ECOWITT_MQTT_STALE_MS = 15 * 60 * 1e3;
+var GROW_DATA_SOURCE_LABEL_STALE_MS = 15 * 60 * 1e3;
+var ECOWITT_BRIDGE_TROUBLESHOOTING_STALE_MS = 15 * 60 * 1e3;
+var SENSOR_TESTBENCH_LIVE_WINDOW_MS = 15 * 60 * 1e3;
+var SENSOR_SNAPSHOT_STALE_THRESHOLD_MS = 15 * 60 * 1e3;
+var SENSOR_READING_NORMALIZATION_STALE_MS = 15 * 60 * 1e3;
+var DEFAULT_AI_COACH_STALE_THRESHOLD_MS = 15 * 60 * 1e3;
+var DEFAULT_AI_SENSOR_STALE_THRESHOLD_MS = 15 * 60 * 1e3;
+var ECOWITT_CHANNEL_LABELING_STALE_AFTER_MS = 60 * 60 * 1e3;
+var MANUAL_SNAPSHOT_CURRENT_STALE_HOURS = 24;
+var DEFAULT_SENSOR_STALE_MS = 24 * 60 * 60 * 1e3;
+var DEFAULT_STALE_WINDOW_MS = 24 * 60 * 60 * 1e3;
+var ECOWITT_INGEST_VALIDATION_STALE_AFTER_MS = 24 * 60 * 60 * 1e3;
+
+// src/lib/sensorTruthCanon.ts
+var LIVE_CURRENT_STATE_STALE_MS = SENSOR_SNAPSHOT_STALE_THRESHOLD_MS;
+var MANUAL_CURRENT_STATE_STALE_MS = MANUAL_SNAPSHOT_CURRENT_STALE_HOURS * 60 * 60 * 1e3;
+var LIVE_CURRENT_STATE_STALE_MINUTES = SENSOR_FRESH_WINDOW_MINUTES;
+var MANUAL_CURRENT_STATE_STALE_HOURS = MANUAL_SNAPSHOT_CURRENT_STALE_HOURS;
+var CURRENT_STATE_FRESHNESS_WINDOW_LABEL = `${LIVE_CURRENT_STATE_STALE_MINUTES}-minute live / ${MANUAL_CURRENT_STATE_STALE_HOURS}-hour manual`;
+
 // src/lib/sensor/sensorSnapshotFreshnessRules.ts
-var DEFAULT_FRESH_MS = 30 * 60 * 1e3;
+var DEFAULT_FRESH_MS = LIVE_CURRENT_STATE_STALE_MS;
 var DEFAULT_FUTURE_TOL = 2 * 60 * 1e3;
 function formatAge(ms) {
   if (ms < 6e4) return "just now";
@@ -194,21 +233,6 @@ function classifySnapshotFreshness(snapshot, options = {}) {
     isDegraded: isStale || source !== "live",
   };
 }
-
-// src/constants/sensorTiming.ts
-var ECOWITT_LIVE_SOIL_STALE_MS = 15 * 60 * 1e3;
-var ECOWITT_MQTT_STALE_MS = 15 * 60 * 1e3;
-var GROW_DATA_SOURCE_LABEL_STALE_MS = 15 * 60 * 1e3;
-var ECOWITT_BRIDGE_TROUBLESHOOTING_STALE_MS = 15 * 60 * 1e3;
-var SENSOR_TESTBENCH_LIVE_WINDOW_MS = 15 * 60 * 1e3;
-var SENSOR_SNAPSHOT_STALE_THRESHOLD_MS = 15 * 60 * 1e3;
-var SENSOR_READING_NORMALIZATION_STALE_MS = 15 * 60 * 1e3;
-var DEFAULT_AI_COACH_STALE_THRESHOLD_MS = 15 * 60 * 1e3;
-var DEFAULT_AI_SENSOR_STALE_THRESHOLD_MS = 15 * 60 * 1e3;
-var ECOWITT_CHANNEL_LABELING_STALE_AFTER_MS = 60 * 60 * 1e3;
-var DEFAULT_SENSOR_STALE_MS = 24 * 60 * 60 * 1e3;
-var DEFAULT_STALE_WINDOW_MS = 24 * 60 * 60 * 1e3;
-var ECOWITT_INGEST_VALIDATION_STALE_AFTER_MS = 24 * 60 * 60 * 1e3;
 
 // src/lib/sensorTestbenchIndicatorRules.ts
 function readString(obj, key) {

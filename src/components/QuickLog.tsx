@@ -145,6 +145,10 @@ import { usePhenoEvidenceCaptureContext } from "@/hooks/usePhenoEvidenceCaptureC
 import { buildPhenoEvidenceReceiptDetails } from "@/lib/phenoEvidenceCaptureRules";
 import type { PhenoEvidenceGoalId } from "@/lib/phenoEvidenceGoals";
 import {
+  resolveQuickLogPhenoGoalSeed,
+  resolveQuickLogPhenoHuntId,
+} from "@/lib/quickLogPhenoEvidenceHandoffRules";
+import {
   buildHarvestInspectionPreviewViewModel,
   HARVEST_PHOTO_COMPARISON_ANGLES,
   HARVEST_PHOTO_COMPARISON_LIGHTINGS,
@@ -525,9 +529,14 @@ export default function QuickLog({
   );
 
   const selectedPhenoHuntId = useMemo(() => {
-    const raw = (selectedPlant as { pheno_hunt_id?: unknown } | null)?.pheno_hunt_id;
-    return typeof raw === "string" && raw.trim().length > 0 ? raw.trim() : null;
-  }, [selectedPlant]);
+    const plantHuntRaw = (selectedPlant as { pheno_hunt_id?: unknown } | null)?.pheno_hunt_id;
+    return resolveQuickLogPhenoHuntId({
+      plantHuntId: typeof plantHuntRaw === "string" ? plantHuntRaw : null,
+      prefillHuntId: prefill?.phenoHuntId,
+      prefillPlantId: prefill?.plantId,
+      selectedPlantId: selectedPlant?.id ?? null,
+    });
+  }, [selectedPlant, prefill?.phenoHuntId, prefill?.plantId]);
   const phenoEvidenceContext = usePhenoEvidenceCaptureContext(
     selectedPhenoHuntId,
     selectedPlant?.id ?? null,
@@ -735,20 +744,25 @@ export default function QuickLog({
   // leaves the selection empty — never auto-picks a different goal. Runs at
   // most ONCE per dialog handoff via phenoSeedConsumedRef.
   useEffect(() => {
-    if (!open || saveInFlightRef.current) return;
-    if (phenoSeedConsumedRef.current) return;
-    const goal = prefill?.phenoEvidenceGoal;
-    if (typeof goal !== "string" || goal.length === 0) return;
-    if (!prefill?.plantId || selectedPlant?.id !== prefill.plantId) return;
-    if (!prefill?.phenoHuntId || selectedPhenoHuntId !== prefill.phenoHuntId) return;
-    if (phenoEvidenceContext.status !== "ready" || !phenoEvidenceContext.context) return;
-    if (phenoEvidenceContext.context.huntId !== prefill.phenoHuntId) return;
-    const configured = phenoEvidenceContext.context.coverage.goals.some((g) => g.id === goal);
-    if (!configured) return;
+    if (saveInFlightRef.current) return;
+    const decision = resolveQuickLogPhenoGoalSeed({
+      open,
+      alreadyConsumed: phenoSeedConsumedRef.current,
+      prefillGoalId: prefill?.phenoEvidenceGoal,
+      prefillHuntId: prefill?.phenoHuntId,
+      prefillPlantId: prefill?.plantId,
+      selectedPlantId: selectedPlant?.id ?? null,
+      resolvedHuntId: selectedPhenoHuntId,
+      contextStatus: phenoEvidenceContext.status,
+      contextHuntId: phenoEvidenceContext.context?.huntId ?? null,
+      configuredGoalIds:
+        phenoEvidenceContext.context?.coverage.goals.map((g) => g.id) ?? null,
+    });
+    if (decision.action !== "seed") return;
     // Consume the handoff BEFORE seeding so any concurrent context refetch
     // that re-runs this effect finds the guard already set.
     phenoSeedConsumedRef.current = true;
-    setSelectedPhenoEvidenceGoal(goal as PhenoEvidenceGoalId);
+    setSelectedPhenoEvidenceGoal(decision.goalId as PhenoEvidenceGoalId);
   }, [
     open,
     prefill?.phenoEvidenceGoal,
@@ -1384,11 +1398,15 @@ export default function QuickLog({
                 <div
                   data-testid="quick-log-draft-preview"
                   data-source={prefill?.source ?? "unknown"}
+                  data-has-note={String(Boolean(draftPreview.noteSummary))}
                   className="rounded-lg border border-primary/30 bg-primary/[0.04] p-2.5 space-y-1"
                 >
                   <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <p className="text-[11px] uppercase tracking-wide text-primary/80">
-                      {draftPreview.eventTypeLabel ?? "Draft"} prefilled
+                    <p
+                      data-testid="quick-log-draft-preview-headline"
+                      className="text-[11px] uppercase tracking-wide text-primary/80"
+                    >
+                      {draftPreview.headline ?? "Draft handoff"}
                     </p>
                     {draftPreview.sourceLabel ? (
                       <span
@@ -1399,12 +1417,28 @@ export default function QuickLog({
                       </span>
                     ) : null}
                   </div>
+                  {draftPreview.goalLabel ? (
+                    <p
+                      data-testid="quick-log-draft-preview-goal"
+                      className="text-[12px] text-foreground/90 leading-snug"
+                    >
+                      {draftPreview.goalLabel}
+                    </p>
+                  ) : null}
                   {draftPreview.noteSummary ? (
                     <p
                       data-testid="quick-log-draft-preview-note"
                       className="text-[12px] text-foreground/90 leading-snug"
                     >
                       {draftPreview.noteSummary}
+                    </p>
+                  ) : null}
+                  {draftPreview.emptyNoteHint ? (
+                    <p
+                      data-testid="quick-log-draft-preview-empty-note"
+                      className="text-[11px] text-muted-foreground italic"
+                    >
+                      {draftPreview.emptyNoteHint}
                     </p>
                   ) : null}
                   {draftPreview.snapshotLabel ? (

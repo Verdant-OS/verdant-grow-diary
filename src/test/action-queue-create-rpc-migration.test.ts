@@ -1,11 +1,13 @@
 /**
- * Static contract tests for the action_queue_create migration (#586).
+ * Static contract tests for the action_queue_create migration (#586)
+ * and the ai_coach allowlist expand (Coach residual).
  */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const MIGRATION = "supabase/migrations/20260807010000_action_queue_create_rpc.sql";
+const EXPAND = "supabase/migrations/20260807140000_action_queue_create_allow_ai_coach.sql";
 
 function read(rel: string): string {
   return readFileSync(resolve(process.cwd(), rel), "utf8");
@@ -56,6 +58,31 @@ describe("action_queue_create migration (#586)", () => {
   });
 });
 
+describe("action_queue_create ai_coach expand", () => {
+  const expand = read(EXPAND);
+
+  it("redefines the RPC as SECURITY DEFINER with empty search_path", () => {
+    expect(expand).toMatch(/CREATE OR REPLACE FUNCTION public\.action_queue_create\s*\(/);
+    expect(expand).toMatch(/SECURITY DEFINER/);
+    expect(expand).toMatch(/SET search_path = ''/);
+  });
+
+  it("allowlists ai_coach alongside existing sources", () => {
+    expect(expand).toMatch(/'ai_coach'/);
+    expect(expand).toMatch(/'environment_alert'/);
+    expect(expand).toMatch(/'ai_doctor'/);
+    expect(expand).toMatch(/'manual'/);
+    expect(expand).toMatch(/'grower'/);
+  });
+
+  it("still forces target_device NULL and pending_approval", () => {
+    expect(expand).toMatch(/NULL, -- never accept device control surface/);
+    expect(expand).toMatch(/'pending_approval'/);
+    expect(expand).not.toMatch(/p_user_id/);
+    expect(expand).not.toMatch(/p_target_device/);
+  });
+});
+
 describe("client create paths prefer the atomic RPC (#586)", () => {
   it("shared service calls action_queue_create", () => {
     const src = read("src/lib/actionQueueCreateService.ts");
@@ -76,6 +103,17 @@ describe("client create paths prefer the atomic RPC (#586)", () => {
     const src = read("src/pages/AlertDetail.tsx");
     expect(src).toMatch(/createActionQueueItem/);
     expect(src).toMatch(/buildEnvironmentAlertDedupeKey/);
+    expect(src).not.toMatch(/Action queued, but audit log failed/);
+  });
+
+  it("Coach handoff uses createActionQueueItem for both writers", () => {
+    const src = read("src/pages/Coach.tsx");
+    expect(src).toMatch(/createActionQueueItem/);
+    expect(src).toMatch(/buildAiCoachRecommendationDedupeKey/);
+    expect(src).toMatch(/buildAiDoctorCoachSuggestionDedupeKey/);
+    expect(src).toMatch(/ACTION_QUEUE_SOURCE_VALUES\.AI_COACH/);
+    expect(src).not.toMatch(/from\(["']action_queue["']\)\.insert/);
+    expect(src).not.toMatch(/from\(["']action_queue_events["']\)\.insert/);
     expect(src).not.toMatch(/Action queued, but audit log failed/);
   });
 });

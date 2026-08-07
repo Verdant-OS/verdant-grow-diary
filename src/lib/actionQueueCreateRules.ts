@@ -6,7 +6,8 @@
  * Never invents user_id or target_device.
  */
 
-export type ActionQueueCreateSource = "environment_alert" | "ai_doctor" | "manual" | "grower";
+export type ActionQueueCreateSource =
+  "environment_alert" | "ai_doctor" | "ai_coach" | "manual" | "grower";
 
 export type ActionQueueCreateRisk = "low" | "medium" | "high" | "critical";
 
@@ -70,6 +71,42 @@ export function buildAiDoctorSessionDedupeKey(sessionId: string | null | undefin
   const id = typeof sessionId === "string" ? sessionId.trim() : "";
   if (!id) return null;
   return `ai_doctor_session:${id}`;
+}
+
+/**
+ * Stable dedupe key for an AI Coach recommendation on a grow.
+ * Recommendation text is normalized so double-click / multi-tab reuse one
+ * non-terminal queue row instead of spamming duplicates.
+ */
+export function buildAiCoachRecommendationDedupeKey(
+  growId: string | null | undefined,
+  recommendation: string | null | undefined,
+): string | null {
+  const grow = typeof growId === "string" ? growId.trim() : "";
+  const rec = typeof recommendation === "string" ? recommendation.trim().toLowerCase() : "";
+  if (!grow || !rec) return null;
+  // Bound length so the index stays healthy; collisions across long tails are
+  // acceptable (same grow + same prefix ≈ same operator intent).
+  const slice = rec.length > 160 ? rec.slice(0, 160) : rec;
+  return `ai_coach:${grow}:${slice}`;
+}
+
+/**
+ * Stable dedupe key for a Coach-surface AI Doctor suggestion (title+detail).
+ * Distinct from session-scoped keys used by the session-detail handoff.
+ */
+export function buildAiDoctorCoachSuggestionDedupeKey(
+  growId: string | null | undefined,
+  title: string | null | undefined,
+  detail: string | null | undefined,
+): string | null {
+  const grow = typeof growId === "string" ? growId.trim() : "";
+  const t = typeof title === "string" ? title.trim().toLowerCase() : "";
+  const d = typeof detail === "string" ? detail.trim().toLowerCase() : "";
+  if (!grow || !t) return null;
+  const combined = `${t}::${d}`;
+  const slice = combined.length > 160 ? combined.slice(0, 160) : combined;
+  return `ai_doctor_coach:${grow}:${slice}`;
 }
 
 /**

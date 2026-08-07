@@ -166,11 +166,21 @@ describe("useLatestSensorSnapshot hook — source priority and safety", () => {
     for (const column of ["entry_at", "details", "tent_id"]) {
       expect(diaryColumns, `diary select must include ${column}`).toContain(column);
     }
-    expect(HOOK).toMatch(
-      /tentIds\.length === 0 \|\| \(row\.tent_id != null && tentIds\.includes\(row\.tent_id\)\)/,
-    );
+    // #602: shared pure helper (same fail-closed gate as sensor_snapshot).
+    expect(HOOK).toMatch(/isDiaryRowInTentScope\(row\.tent_id,\s*tentIds\)/);
     // The scope gate must sit before the env-check fallback returns.
-    expect(HOOK).toMatch(/envScopeOk[\s\S]*?snapshotFromEnvironmentCheck\(/);
+    expect(HOOK).toMatch(/isDiaryRowInTentScope[\s\S]*?snapshotFromEnvironmentCheck\(/);
+  });
+
+  it("scopes diary sensor_snapshot evidence to the requested tents (#602)", () => {
+    // Same fail-closed tent gate as environment_check: foreign/null tent_id
+    // must not win the snapshotFromDiary branch before scope is checked.
+    expect(HOOK).toMatch(/isDiaryRowInTentScope\(row\.tent_id,\s*tentIds\)/);
+    expect(HOOK).toMatch(/isDiaryRowInTentScope[\s\S]*?snapshotFromDiary\(/);
+    // Import the pure helper rather than inlining a one-off predicate.
+    expect(HOOK).toMatch(
+      /import\s*\{\s*isDiaryRowInTentScope\s*\}\s*from\s*["']@\/lib\/diaryEvidenceTentScopeRules["']/,
+    );
   });
 
   it("idles when growId is missing (does not query)", () => {

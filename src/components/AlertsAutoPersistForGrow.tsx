@@ -56,6 +56,10 @@ export default function AlertsAutoPersistForGrow({ growId, stage }: Props) {
 
   usePersistEnvironmentAlerts({
     growId: safeGrowId,
+    // Attribution rides on the snapshot, so it always describes the same
+    // evidence the alert was derived from. Null when that evidence spans
+    // tents (this component scopes every tent in the grow).
+    tentId: sensorState.status === "ok" ? (sensorState.snapshot.tent_id ?? null) : null,
     snapshot: sensorState.status === "ok" ? sensorState.snapshot : null,
     quality: evaluateSensorQuality(sensorState.status === "ok" ? sensorState.snapshot : null),
     targets: compareSnapshotToTargets(

@@ -136,10 +136,28 @@ describe("Dashboard save-alert audit wiring", () => {
     );
   });
 
+  /**
+   * The manual save-alert handler, anchored by CONTENT rather than by a fixed
+   * character window.
+   *
+   * This previously sliced `[indexOf("Save alert") - 2000, +200]`. That window
+   * had ~92 bytes of slack under LF and ~59 under CRLF, so (a) any addition to
+   * the saveAlert payload silently pushed `await saveAlert` out of range, and
+   * (b) the same source could pass on CI and fail on a Windows checkout purely
+   * from line-ending width. Anchoring from the `await saveAlert` call to the
+   * button label that closes the handler is strictly TIGHTER than the old
+   * window — it cannot span unrelated code — while being immune to both.
+   */
+  function saveAlertHandler(): string {
+    const start = DASHBOARD.search(/await\s+saveAlert/);
+    expect(start).toBeGreaterThan(-1);
+    const labelIdx = DASHBOARD.indexOf("Save alert", start);
+    expect(labelIdx).toBeGreaterThan(start);
+    return DASHBOARD.slice(start, labelIdx + 200);
+  }
+
   it("appends a 'created' event after a successful saveAlert", () => {
-    const idx = DASHBOARD.indexOf("Save alert");
-    expect(idx).toBeGreaterThan(-1);
-    const around = DASHBOARD.slice(Math.max(0, idx - 2000), idx + 200);
+    const around = saveAlertHandler();
     expect(around).toMatch(/await\s+saveAlert/);
     expect(around).toMatch(/await\s+logAlertEvent/);
     expect(around).toMatch(/event_type\s*:\s*["']created["']/);
@@ -151,8 +169,7 @@ describe("Dashboard save-alert audit wiring", () => {
   });
 
   it("shows a warning toast if the audit log fails (status change preserved)", () => {
-    const idx = DASHBOARD.indexOf("Save alert");
-    const around = DASHBOARD.slice(Math.max(0, idx - 2000), idx + 200);
+    const around = saveAlertHandler();
     expect(around).toMatch(/toast\.warning\(/);
     expect(around).toMatch(/audit log failed/i);
   });

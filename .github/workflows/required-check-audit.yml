@@ -1,0 +1,60 @@
+name: Required-check audit
+
+# Gate on the bypass, not the shard.
+#
+# Ruleset 20421416 requires 35 contexts on `verdant-grow-diary`, but grants
+# `RepositoryRole 5` a `pull_request` bypass. On PR #769 the context
+# `Full test suite (shard 26/32)` reported `failure`, the PR was merged by an
+# admin anyway, and the deploy branch stayed red for roughly nine hours until
+# someone noticed by hand. A green merge is not proof the gates ran.
+#
+# This job re-checks, after the fact, that every context the repo relies on
+# actually ran and went green on the merged PR head.
+#
+# DO NOT ADD THIS JOB TO THE REQUIRED CONTEXTS. It runs on `push`, i.e. after
+# the merge has already landed, so requiring it would deadlock the merge queue:
+# the merge cannot complete until a check runs that only runs post-merge.
+#
+# `workflow_dispatch` takes a SHA so past merges can be audited retroactively —
+# run it against aa361911 (PR #769) to watch it go red on real history.
+
+on:
+  push:
+    branches: [verdant-grow-diary]
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: "Commit on the deploy branch to audit (defaults to branch head)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  checks: read
+  statuses: read
+  pull-requests: read
+
+concurrency:
+  group: required-check-audit-${{ github.event.inputs.sha || github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    name: Required-check audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+      - name: Audit required status checks on the merged pull request head
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          AUDIT_SHA: ${{ github.event.inputs.sha || github.sha }}
+          AUDIT_BRANCH: verdant-grow-diary
+          # Optional. A PAT with Administration:read lets the audit also prove
+          # config/required-status-checks.json still matches the live ruleset.
+          # Without it that axis reports BLOCKED and is never claimed as PASS.
+          RULESET_ADMIN_TOKEN: ${{ secrets.RULESET_ADMIN_TOKEN }}
+        run: node scripts/audit-required-checks.mjs

@@ -5,20 +5,20 @@ on:
     branches:
       - codex/verdant-grow-walk-v0
     paths:
-      - src/lib/mcp/**
-      - src/lib/growWalk*.ts
       - .github/workflows/grow-walk-mcp-codegen-artifact.yml
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  generate:
+  generate-and-commit:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout exact branch head
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: codex/verdant-grow-walk-v0
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
@@ -28,98 +28,27 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Run the repository MCP generator
-        id: codegen
+      - name: Generate and verify the executable MCP bundle
         shell: bash
         run: |
-          set -uo pipefail
-          mkdir -p artifacts
-          rm -f .lovable/mcp/manifest.json
-          set +e
-          bunx vite build 2>&1 | tee artifacts/vite-build.log
-          status=${PIPESTATUS[0]}
-          set -e
-          echo "vite_status=$status" >> "$GITHUB_OUTPUT"
-          exit 0
+          set -euo pipefail
+          bunx vite build
+          test -s supabase/functions/mcp/index.ts
+          grep -q 'list_grow_walk_targets' supabase/functions/mcp/index.ts
+          grep -q 'get_grow_walk_context' supabase/functions/mcp/index.ts
+          grep -q 'list_grow_walk_targets' .lovable/mcp/manifest.json
+          grep -q 'get_grow_walk_context' .lovable/mcp/manifest.json
 
-      - name: Inspect generated artifacts
-        id: inspect
-        if: always()
+      - name: Commit only the generated bundle when changed
         shell: bash
         run: |
-          set -uo pipefail
-          manifest_exists=0
-          bundle_exists=0
-          manifest_targets=0
-          manifest_context=0
-          bundle_targets=0
-          bundle_context=0
-
-          test -s .lovable/mcp/manifest.json && manifest_exists=1
-          test -s supabase/functions/mcp/index.ts && bundle_exists=1
-          if [[ "$manifest_exists" == "1" ]]; then
-            grep -q 'list_grow_walk_targets' .lovable/mcp/manifest.json && manifest_targets=1
-            grep -q 'get_grow_walk_context' .lovable/mcp/manifest.json && manifest_context=1
+          set -euo pipefail
+          git add supabase/functions/mcp/index.ts
+          if git diff --cached --quiet; then
+            echo "Generated MCP bundle already matches source."
+            exit 0
           fi
-          if [[ "$bundle_exists" == "1" ]]; then
-            grep -q 'list_grow_walk_targets' supabase/functions/mcp/index.ts && bundle_targets=1
-            grep -q 'get_grow_walk_context' supabase/functions/mcp/index.ts && bundle_context=1
-          fi
-
-          {
-            echo "vite_status=${{ steps.codegen.outputs.vite_status }}"
-            echo "manifest_exists=$manifest_exists"
-            echo "bundle_exists=$bundle_exists"
-            echo "manifest_targets=$manifest_targets"
-            echo "manifest_context=$manifest_context"
-            echo "bundle_targets=$bundle_targets"
-            echo "bundle_context=$bundle_context"
-          } | tee artifacts/codegen-status.txt
-
-          if [[ "$manifest_exists" == "1" ]]; then
-            node -e 'const m=require("./.lovable/mcp/manifest.json"); console.log((m.mcp?.tools??[]).map(t=>t.name).sort().join("\n"))' > artifacts/manifest-tool-names.txt
-          else
-            echo "manifest missing" > artifacts/manifest-tool-names.txt
-          fi
-
-          git diff -- .lovable/mcp/manifest.json supabase/functions/mcp/index.ts > artifacts/grow-walk-mcp-generated.diff
-          {
-            echo "### Grow Walk MCP codegen"
-            echo
-            echo '```text'
-            cat artifacts/codegen-status.txt
-            echo '```'
-            echo
-            echo "Manifest tools:"
-            echo '```text'
-            cat artifacts/manifest-tool-names.txt
-            echo '```'
-            echo
-            echo "Generated diff:"
-            echo '```text'
-            git diff --stat -- .lovable/mcp/manifest.json supabase/functions/mcp/index.ts
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
-
-          [[ "${{ steps.codegen.outputs.vite_status }}" == "0" ]]
-          [[ "$manifest_exists" == "1" ]]
-          [[ "$bundle_exists" == "1" ]]
-          [[ "$manifest_targets" == "1" ]]
-          [[ "$manifest_context" == "1" ]]
-          [[ "$bundle_targets" == "1" ]]
-          [[ "$bundle_context" == "1" ]]
-
-      - name: Upload generated files and diagnostics
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: grow-walk-mcp-generated
-          if-no-files-found: warn
-          retention-days: 1
-          path: |
-            .lovable/mcp/manifest.json
-            supabase/functions/mcp/index.ts
-            artifacts/grow-walk-mcp-generated.diff
-            artifacts/vite-build.log
-            artifacts/codegen-status.txt
-            artifacts/manifest-tool-names.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore: regenerate MCP bundle for Grow Walk"
+          git push origin HEAD:codex/verdant-grow-walk-v0

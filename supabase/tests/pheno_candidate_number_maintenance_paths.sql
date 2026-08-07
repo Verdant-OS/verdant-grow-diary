@@ -150,16 +150,28 @@ BEGIN
   END;
   ALTER TABLE public.plants ENABLE TRIGGER trg_plants_candidate_number_guard;
 
-  -- ---- PRESERVED: a non-owner cannot clear a number by untagging -----------
-  PERFORM set_config('role', 'authenticated', true);
+  -- ---- PRESERVED: the GUARD refuses a non-owner clearing by untagging ------
+  -- Deliberately left under the session role rather than 'authenticated'. As
+  -- 'authenticated' with a foreign sub, RLS ("Users update own plants" /
+  -- "Operators update all plants") would filter this UPDATE to zero rows, the
+  -- trigger would never fire, and a no-op would be misread as a guard failure.
+  -- RLS is a separate, already-covered layer; what must be asserted here is that
+  -- a caller who DOES reach the row (e.g. an operator via the operator policy)
+  -- is still refused by the guard itself.
+  PERFORM set_config('role', 'none', true);
   PERFORM set_config('request.jwt.claim.sub', v_other::text, true);
   BEGIN
     UPDATE public.plants SET pheno_hunt_id = NULL WHERE id = v_plant;
-    v_fail := v_fail + 1;
-    RAISE WARNING 'FAIL  a non-owner cleared a candidate number by untagging';
+    IF NOT FOUND THEN
+      v_fail := v_fail + 1;
+      RAISE WARNING 'FAIL  non-owner untag matched zero rows - the guard was never exercised';
+    ELSE
+      v_fail := v_fail + 1;
+      RAISE WARNING 'FAIL  a non-owner cleared a candidate number by untagging';
+    END IF;
   EXCEPTION WHEN insufficient_privilege THEN
     v_pass := v_pass + 1;
-    RAISE NOTICE 'PASS  a non-owner still cannot clear a number by untagging';
+    RAISE NOTICE 'PASS  the guard refuses a non-owner clearing a number by untagging';
   END;
 
   -- ---- PRESERVED: a caller without a JWT cannot explicitly set a number ----

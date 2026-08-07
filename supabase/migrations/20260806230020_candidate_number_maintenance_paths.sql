@@ -189,8 +189,16 @@ COMMENT ON FUNCTION public.plants_candidate_number_guard() IS
 -- NULL number, which is the whole point of manual assignment.
 --
 -- Fail loudly and actionably if legacy orphans already exist rather than letting
--- VALIDATE emit a bare constraint error. The whole migration is one transaction,
--- so a failure here leaves nothing behind.
+-- the constraint emit a bare error. The whole migration is one transaction, so a
+-- failure here leaves nothing behind.
+--
+-- The constraint is added NOT VALID here and VALIDATEd in the NEXT migration, on
+-- purpose: locks are held until the transaction commits, so validating in this
+-- same file would run the full scan while ADD CONSTRAINT's ACCESS EXCLUSIVE lock
+-- is still held and block all access to plants. Splitting lets this lock be
+-- released at commit, after which VALIDATE takes only SHARE UPDATE EXCLUSIVE and
+-- allows concurrent reads and writes. A NOT VALID CHECK is already enforced for
+-- every new INSERT/UPDATE, so the intermediate state is safe.
 -- -----------------------------------------------------------------------------
 DO $$
 DECLARE v_orphans bigint;
@@ -202,7 +210,7 @@ BEGIN
 
   IF v_orphans > 0 THEN
     RAISE EXCEPTION
-      'cannot add plants_candidate_number_requires_hunt_chk: % plant row(s) carry a candidate_number with no pheno_hunt_id. Clear them first: UPDATE public.plants SET candidate_number = NULL WHERE candidate_number IS NOT NULL AND pheno_hunt_id IS NULL;',
+      'cannot add plants_candidate_number_requires_hunt_chk: % plant row(s) carry a candidate_number with no pheno_hunt_id. An explicit clear is caller-initiated, so the guard requires service_role — run: BEGIN; SET LOCAL role = ''service_role''; UPDATE public.plants SET candidate_number = NULL WHERE candidate_number IS NOT NULL AND pheno_hunt_id IS NULL; COMMIT;',
       v_orphans;
   END IF;
 END $$;
@@ -210,13 +218,10 @@ END $$;
 ALTER TABLE public.plants
   DROP CONSTRAINT IF EXISTS plants_candidate_number_requires_hunt_chk;
 
--- NOT VALID + VALIDATE keeps the exclusive lock brief; the pre-check above has
--- already established that validation will pass.
+-- Enforced for all new writes immediately; validated against existing rows by
+-- 20260806230021 so this transaction's ACCESS EXCLUSIVE lock is released first.
 ALTER TABLE public.plants
   ADD CONSTRAINT plants_candidate_number_requires_hunt_chk
   CHECK (candidate_number IS NULL OR pheno_hunt_id IS NOT NULL) NOT VALID;
-
-ALTER TABLE public.plants
-  VALIDATE CONSTRAINT plants_candidate_number_requires_hunt_chk;
 
 NOTIFY pgrst, 'reload schema';

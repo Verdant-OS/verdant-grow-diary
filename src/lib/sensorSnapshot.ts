@@ -52,6 +52,18 @@ export interface SensorSnapshotMetricRef {
   source: string;
 }
 
+/**
+ * Provenance for a diary-backed Environment Check snapshot. Carries ONLY
+ * the EXACT `diary_entries.id` + `entry_at` already known when the
+ * snapshot was built from that row. Distinct from {@link SensorSnapshotMetricRef}
+ * so diary ids never masquerade as `sensor_readings` rows (see #603).
+ * Never carries details/raw_payload/note body.
+ */
+export interface SensorSnapshotDiaryEvidenceRef {
+  id: string;
+  entry_at: string;
+}
+
 export interface SensorSnapshot {
   source: SnapshotSource;
   ts: string | null;
@@ -89,6 +101,13 @@ export interface SensorSnapshot {
    * row carried an `id`. Diary-derived snapshots never populate this.
    */
   metric_refs?: Partial<Record<SensorSnapshotMetricRefKey, SensorSnapshotMetricRef>>;
+  /**
+   * Diary-row provenance for Environment Check snapshots only. Populated
+   * when {@link snapshotFromEnvironmentCheck} is given the originating
+   * `diary_entries.id`. Never present on sensor_readings-derived
+   * snapshots. Never confusable with {@link metric_refs}.
+   */
+  diary_evidence_ref?: SensorSnapshotDiaryEvidenceRef;
 }
 
 export const EMPTY_SNAPSHOT: SensorSnapshot = {
@@ -372,15 +391,25 @@ export function snapshotFromDiary(
  *    accepted only as number-typed finite values inside the same canonical
  *    plausibility bands the writer uses; `""`/booleans/numeric strings are
  *    rejected, never coerced, and an out-of-band metric drops to null.
+ *  - When `diaryEntryId` is provided, the snapshot carries
+ *    `diary_evidence_ref` so alert persistence can link the EXACT diary
+ *    row (see #603). Never populates `metric_refs` (those are for
+ *    `sensor_readings` rows only).
  */
 function strictBandValue(value: unknown, isValid: (n: number | null) => boolean): number | null {
   if (typeof value !== "number" || !Number.isFinite(value)) return null;
   return isValid(value) ? value : null;
 }
 
+export interface SnapshotFromEnvironmentCheckOptions {
+  /** Exact `diary_entries.id` for the row this envelope came from. */
+  diaryEntryId?: string | null;
+}
+
 export function snapshotFromEnvironmentCheck(
   entryAt: string | null,
   envCheck: Record<string, unknown> | null | undefined,
+  options?: SnapshotFromEnvironmentCheckOptions | null,
 ): SensorSnapshot | null {
   if (!envCheck || typeof envCheck !== "object") return null;
   if (!entryAt) return null;
@@ -388,6 +417,13 @@ export function snapshotFromEnvironmentCheck(
   const rh = strictBandValue(envCheck.humidity_pct, isHumidityValid);
   const vpd = strictBandValue(envCheck.vpd_kpa, isVpdValid);
   if (temp === null && rh === null && vpd === null) return null;
+
+  const diaryId = typeof options?.diaryEntryId === "string" ? options.diaryEntryId.trim() : "";
+  const diary_evidence_ref =
+    diaryId && entryAt
+      ? ({ id: diaryId, entry_at: entryAt } satisfies SensorSnapshotDiaryEvidenceRef)
+      : undefined;
+
   return {
     source: "manual",
     ts: entryAt,
@@ -400,6 +436,7 @@ export function snapshotFromEnvironmentCheck(
     soil_temp: null,
     ppfd: null,
     device_id: null,
+    ...(diary_evidence_ref ? { diary_evidence_ref } : {}),
   };
 }
 

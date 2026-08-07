@@ -80,10 +80,20 @@ are never described as healthy.
 - `src/lib/alerts.ts::saveAlert` accepts an optional
   `originating_timeline_events` list and normalizes it before insert. Default
   is `[]`.
-- `src/pages/AlertDetail.tsx::addAlertToActionQueue` and
-  `src/hooks/useAddAiDoctorSessionSuggestionToActionQueue.ts` insert with
-  `originating_timeline_events: []` because no typed refs are available at
-  those boundaries today. Empty is correct; inference is forbidden.
+- `src/hooks/usePersistEnvironmentAlerts` resolves refs from explicit
+  snapshot provenance only (see #603):
+  1. per-metric `sensor_readings.id` via `snapshot.metric_refs` → type
+     `sensor_snapshot`
+  2. else Environment Check `diary_entries.id` via
+     `snapshot.diary_evidence_ref` → type `diary_entry`
+     Empty remains correct when neither explicit id is available; inference
+     is forbidden.
+- `src/pages/AlertDetail.tsx::addAlertToActionQueue` forwards already-
+  persisted alert refs via `forwardAlertRefsToActionQueue` (never
+  re-infers).
+- `src/hooks/useAddAiDoctorSessionSuggestionToActionQueue.ts` still inserts
+  `originating_timeline_events: []` when no typed refs are available at
+  that boundary today. Empty is correct; inference is forbidden.
 
 ## Safety guarantees
 

@@ -1625,6 +1625,12 @@ async function clickEverySafeInternalHref(
         await assertMeaningfulPage(popup, expectedPathname);
         await popup.close();
       } else {
+        // Captured from the BROWSER, not from the census route spec: a route's
+        // declared `path` may carry a query (e.g. "/daily-check?plantId=…"),
+        // which never equals the bare `expectedPathname` — comparing against
+        // it would leave the fragment assertion below permanently off on
+        // those pages.
+        const pathBeforeClick = new URL(page.url()).pathname;
         await anchor.click();
         await page.waitForLoadState("domcontentloaded");
         await expect
@@ -1632,6 +1638,32 @@ async function clickEverySafeInternalHref(
             message: `${link.href} must finish at its manifest-defined destination`,
           })
           .toBe(expectedPathname);
+        // Same-document fragment link: the pathname assertion above is
+        // trivially true BEFORE the click (the grower never leaves the page),
+        // so without this the census would "pass" the link having proved
+        // nothing. Assert the fragment actually landed — that is the whole
+        // behaviour such a link exists for.
+        //
+        // Both conjuncts matter. `expectedPathname === pathBeforeClick` uses
+        // the browser's real pre-click pathname (route specs may carry a
+        // query). `expectedPathname === classification.pathname` confirms the
+        // destination was NOT rewritten: on the signed-out lane
+        // expectedCensusNavigationPath redirects protected targets to
+        // /welcome, and a fragment link clicked from /welcome would otherwise
+        // look same-page and be asserted for an anchor the redirect never
+        // carries.
+        const expectedHash = link.classification.hash;
+        if (
+          expectedHash &&
+          expectedPathname === pathBeforeClick &&
+          expectedPathname === link.classification.pathname
+        ) {
+          await expect
+            .poll(() => new URL(page.url()).hash, {
+              message: `${link.href} must move the grower to its in-page anchor`,
+            })
+            .toBe(`#${expectedHash}`);
+        }
         await assertMeaningfulPage(page, expectedPathname);
       }
       clicked.push(link.href);

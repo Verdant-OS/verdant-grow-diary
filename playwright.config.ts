@@ -64,6 +64,14 @@ export default defineConfig({
   ],
   use: {
     baseURL: BASE_URL,
+    // Bound every action (click/fill/press). Playwright's default is 0 =
+    // unlimited, so ONE wedged click silently consumes the whole test budget:
+    // the authenticated census burned its full 900s retrying a single click
+    // that an overlay was intercepting, and reported only "Test timeout
+    // exceeded" with no indication of which action died. A finite bound turns
+    // that into an actionable per-action failure with a call log, while
+    // staying well above the slowest legitimate interaction on hosted runners.
+    actionTimeout: 15_000,
     // Debugging artifacts kept only when a test fails (CI uploads them).
     // Screenshots + videos are retained per-attempt when retries fire, so a
     // flake produces `retry1` media alongside the original attempt — both

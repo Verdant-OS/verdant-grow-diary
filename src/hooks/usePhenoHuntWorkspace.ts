@@ -404,7 +404,31 @@ export function usePhenoHuntWorkspace(
   }, [id, status, totalCandidateCount, candidates.length, filters]);
 
   const setFilter = useCallback((patch: Partial<PhenoWorkspaceFilters>) => {
-    setFiltersState((prev) => ({ ...prev, ...patch }));
+    setFiltersState((prev) => {
+      const next = { ...prev, ...patch };
+      // Identity matters here: `filters` is a dependency of the evidence
+      // reset effect, so returning a fresh object for a no-op patch collapses
+      // the page back to "Loading hunt…" and re-runs every read. The mount
+      // debounce in PhenoHuntWorkspace fires setFilter({ text: undefined }) on
+      // EVERY mount, so without this guard each mount forced a full reload —
+      // which also detaches in-page anchors mid-click.
+      // Compare VALUES across the union of keys, not key counts: the mount
+      // debounce sends `{ text: undefined }`, which adds a `text` key to an
+      // empty object. A key present-but-undefined is semantically identical
+      // to an absent key here, and a count check would call that a change —
+      // exactly the no-op this guard exists to absorb.
+      const keys = new Set([...Object.keys(prev), ...Object.keys(next)]) as Set<
+        keyof PhenoWorkspaceFilters
+      >;
+      let changed = false;
+      for (const key of keys) {
+        if (prev[key] !== next[key]) {
+          changed = true;
+          break;
+        }
+      }
+      return changed ? next : prev;
+    });
   }, []);
   const resetFilters = useCallback(() => setFiltersState({}), []);
 

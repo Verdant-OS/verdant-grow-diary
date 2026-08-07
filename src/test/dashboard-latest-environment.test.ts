@@ -156,7 +156,22 @@ describe("useLatestSensorSnapshot hook — source priority and safety", () => {
     // The diary query selects tent_id, and a tent-scoped view only accepts
     // env checks attributed to one of those tents — null/foreign tent_id
     // rows must not surface as the selected tent's evidence.
-    expect(HOOK).toMatch(/\.select\(\s*['"]entry_at,details,tent_id['"]\s*\)/);
+    //
+    // Assert the columns scoping DEPENDS ON rather than an exact column
+    // string. The previous probe pinned "entry_at,details,tent_id" verbatim
+    // and broke the moment an unrelated `id` column was added to the select,
+    // reporting a scoping regression where none existed. `tent_id` is the
+    // load-bearing one — without it the gate below cannot run at all.
+    const diarySelect = /\.select\(\s*['"]([^'"]*)['"]\s*\)/g;
+    const selectedColumnSets = [...HOOK.matchAll(diarySelect)].map((m) =>
+      m[1].split(",").map((c) => c.trim()),
+    );
+    expect(
+      selectedColumnSets.some((cols) =>
+        ["entry_at", "details", "tent_id"].every((c) => cols.includes(c)),
+      ),
+      "the diary_entries select must include entry_at, details and tent_id",
+    ).toBe(true);
     expect(HOOK).toMatch(
       /tentIds\.length === 0 \|\| \(row\.tent_id != null && tentIds\.includes\(row\.tent_id\)\)/,
     );

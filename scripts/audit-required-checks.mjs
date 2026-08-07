@@ -103,6 +103,9 @@ async function resolvePullRequest(sha) {
     number: pr.number,
     headSha: pr.head?.sha ?? "",
     mergedBy: pr.merged_by?.login ?? "",
+    // Load-bearing: evidence is read as of this instant, so a check that
+    // finished after the merge cannot retroactively vouch for it.
+    mergedAt: pr.merged_at ?? null,
   };
 }
 

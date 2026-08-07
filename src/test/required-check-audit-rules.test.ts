@@ -264,44 +264,92 @@ describe("auditRequiredChecks — the failures it exists to catch", () => {
 });
 
 describe("auditRequiredChecks — PR #769 regression (real evidence)", () => {
-  it("would have caught the merge that shipped a red shard onto the deploy branch", () => {
+  const AT_FINAL_STATE = {
+    kind: PR_RESOLUTION.PULL_REQUEST,
+    number: PR_769.pullRequest,
+    headSha: PR_769.headSha,
+  };
+  const AT_MERGE = { ...AT_FINAL_STATE, mergedAt: PR_769.mergedAt };
+
+  it("reading final state alone, flags the red shard and the ungated security gate", () => {
+    // What the audit sees with no merge timestamp: the right outcome, but it
+    // credits results that only landed after the merge.
     const result = auditRequiredChecks({
       pinned: PINNED,
       checkRuns: PR_769.checkRuns,
-      prResolution: {
-        kind: PR_RESOLUTION.PULL_REQUEST,
-        number: PR_769.pullRequest,
-        headSha: PR_769.headSha,
-      },
+      prResolution: AT_FINAL_STATE,
+    });
+    expect(result.verdict).toBe(AUDIT_VERDICT.FAIL);
+    const failing = result.failingFindings.map((f) => f.context);
+    expect(failing).toContain("Full test suite (shard 26/32)");
+    expect(failing).toContain("test:security-regression");
+    expect(result.failingFindings).toHaveLength(2);
+  });
+
+  it("read as of the merge, shows the truth: nothing had finished (Copilot, PR #818)", () => {
+    // #769 merged at 01:42:45Z. Only 3 of 89 runs had completed by then, all
+    // neutral or skipped, and shard 26 did not start until 01:46:15Z. This
+    // merge was not "shipped despite one red shard" — no required check had
+    // finished at all, and the red was recorded minutes later.
+    const result = auditRequiredChecks({
+      pinned: PINNED,
+      checkRuns: PR_769.checkRuns,
+      prResolution: AT_MERGE,
     });
     expect(result.verdict).toBe(AUDIT_VERDICT.FAIL);
 
-    const failing = result.failingFindings.map((f) => f.context);
-    // The bypassed required context.
-    expect(failing).toContain("Full test suite (shard 26/32)");
-    // The gate the repo believes it has and does not.
-    expect(failing).toContain("test:security-regression");
+    const requiredFailures = result.failingFindings.filter((f) => f.provenance === "required");
+    expect(requiredFailures).toHaveLength(35);
 
-    const shard = result.failingFindings.find((f) => f.context === "Full test suite (shard 26/32)");
-    expect(shard?.provenance).toBe("required");
-    expect(shard?.observed).toBe("failure");
+    const shard26 = requiredFailures.find((f) => f.context === "Full test suite (shard 26/32)");
+    expect(shard26?.lateForMerge).toBe(true);
+    expect(shard26?.reason).toContain("had not finished when the merge landed");
 
-    const security = result.failingFindings.find((f) => f.context === "test:security-regression");
-    expect(security?.provenance).toBe("mustBeGreen");
+    // A shard that eventually went green is still a failure — it gated nothing.
+    const shard1 = requiredFailures.find((f) => f.context === "Full test suite (shard 1/32)");
+    expect(shard1?.lateForMerge).toBe(true);
+    expect(shard1?.observed).toBe("success");
+
+    expect(result.counts.lateForMerge).toBeGreaterThanOrEqual(35);
   });
 
-  it("flags only the genuinely broken contexts, not the whole run", () => {
+  it("does not let a post-merge re-run launder a pre-merge red", () => {
+    const observed = normalizeObservedChecks({
+      checkRuns: [
+        {
+          name: "Full test suite (shard 1/32)",
+          status: "completed",
+          conclusion: "failure",
+          id: 1,
+          started_at: "2026-08-07T01:00:00Z",
+          completed_at: "2026-08-07T01:30:00Z",
+        },
+        {
+          name: "Full test suite (shard 1/32)",
+          status: "completed",
+          conclusion: "success",
+          id: 2,
+          started_at: "2026-08-07T02:00:00Z",
+          completed_at: "2026-08-07T02:30:00Z",
+        },
+      ],
+      mergedAt: "2026-08-07T01:42:45Z",
+    });
+    // Newer, but irrelevant: the merge shipped on the red result.
+    expect(observed.get("Full test suite (shard 1/32)")?.status).toBe(CHECK_STATUS.FAIL);
+    expect(observed.get("Full test suite (shard 1/32)")?.observed).toBe("failure");
+  });
+
+  it("still passes a merge whose checks genuinely finished first", () => {
+    // The guard must not turn every merge red. A normal merge-queue merge has
+    // every required context complete before it lands.
     const result = auditRequiredChecks({
       pinned: PINNED,
-      checkRuns: PR_769.checkRuns,
-      prResolution: { kind: PR_RESOLUTION.PULL_REQUEST, number: 769, headSha: PR_769.headSha },
+      checkRuns: allGreen(EVERY_PINNED),
+      prResolution: { ...MERGED, mergedAt: "2026-08-07T02:00:00Z" },
     });
-    // 31 of 32 shards were green; the audit must not smear the failure across them.
-    const failingShards = result.failingFindings.filter((f) =>
-      f.context.startsWith("Full test suite"),
-    );
-    expect(failingShards).toHaveLength(1);
-    expect(result.failingFindings).toHaveLength(2);
+    expect(result.verdict).toBe(AUDIT_VERDICT.PASS);
+    expect(result.counts.lateForMerge).toBe(0);
   });
 });
 
@@ -315,6 +363,37 @@ describe("ruleset drift", () => {
     expect(result.rulesetDrift.status).toBe("BLOCKED");
     // A blocked drift axis must not itself turn the audit red.
     expect(result.verdict).toBe(AUDIT_VERDICT.PASS);
+  });
+
+  it("fails the run on a VERIFIED drift, not just prints it (Copilot, PR #818)", () => {
+    // A context added to the live ruleset but absent from the pin is a context
+    // this audit never checks. Reporting PASS beside that is the false-green
+    // the job exists to prevent.
+    const result = auditRequiredChecks({
+      pinned: PINNED,
+      checkRuns: allGreen(EVERY_PINNED),
+      prResolution: MERGED,
+      rulesetDrift: {
+        status: "FAIL",
+        addedToRuleset: ["Full test suite (shard 33/32)"],
+        removedFromRuleset: [],
+      },
+    });
+    expect(result.verdict).toBe(AUDIT_VERDICT.FAIL);
+    const blocker = result.blockers.find((b) => b.code === "ruleset_drift");
+    expect(blocker?.message).toContain("Full test suite (shard 33/32)");
+    expect(blocker?.message).toContain("never audited");
+  });
+
+  it("keeps a BLOCKED drift advisory — unverified is not the same as wrong", () => {
+    const result = auditRequiredChecks({
+      pinned: PINNED,
+      checkRuns: allGreen(EVERY_PINNED),
+      prResolution: MERGED,
+      rulesetDrift: { status: "BLOCKED", reason: "no token" },
+    });
+    expect(result.verdict).toBe(AUDIT_VERDICT.PASS);
+    expect(result.blockers).toHaveLength(0);
   });
 
   it("detects a context quietly dropped from the live ruleset", () => {
@@ -345,6 +424,46 @@ describe("formatAuditReport", () => {
     expect(report).toContain("Required-check audit — FAIL");
     expect(report).toContain("Full test suite (shard 26/32)");
     expect(report).toContain("#769");
+  });
+
+  it("does not claim everything went green when something was skipped (Copilot, PR #818)", () => {
+    const runs = allGreen(EVERY_PINNED);
+    runs.find((r) => r.name === "test:legal-seo")!.conclusion = "skipped";
+    const result = auditRequiredChecks({ pinned: PINNED, checkRuns: runs, prResolution: MERGED });
+    const report = formatAuditReport(result, { sha: "abc", prNumber: 1 });
+    expect(result.verdict).toBe(AUDIT_VERDICT.PASS);
+    expect(report).not.toContain("Every pinned context ran and went green");
+    expect(report).toContain("No pinned context blocked this merge");
+    expect(report).toContain("1 skipped");
+  });
+
+  it("does not claim everything went green when a must-be-green never reported", () => {
+    const runs = allGreen(EVERY_PINNED).filter((r) => r.name !== "test:security-regression");
+    const result = auditRequiredChecks({ pinned: PINNED, checkRuns: runs, prResolution: MERGED });
+    const report = formatAuditReport(result, { sha: "abc", prNumber: 1 });
+    expect(result.verdict).toBe(AUDIT_VERDICT.PASS);
+    expect(report).toContain("1 never reported");
+  });
+
+  it("says 'went green' only when that is literally true", () => {
+    const result = auditRequiredChecks({
+      pinned: PINNED,
+      checkRuns: allGreen(EVERY_PINNED),
+      prResolution: MERGED,
+    });
+    const report = formatAuditReport(result, { sha: "abc", prNumber: 1 });
+    expect(report).toContain("Every pinned context ran and went green before this merge landed");
+  });
+
+  it("marks an unverified drift axis as unproved in the PASS summary", () => {
+    const result = auditRequiredChecks({
+      pinned: PINNED,
+      checkRuns: allGreen(EVERY_PINNED),
+      prResolution: MERGED,
+    });
+    const report = formatAuditReport(result, { sha: "abc", prNumber: 1 });
+    expect(report).toContain("Ruleset drift is BLOCKED, not PASS");
+    expect(report).toContain("has not been verified");
   });
 
   it("calls out a missing pull request in the header, not just the blocker list", () => {

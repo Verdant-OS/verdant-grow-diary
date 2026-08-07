@@ -88,8 +88,23 @@ function compareObservations(a, b) {
  * Fold raw check-runs and legacy commit statuses into one context -> observation
  * map. Both APIs can report the same required context, so matching only
  * `check_runs` would drop contexts into MISSING and produce a false red.
+ *
+ * When `mergedAt` is supplied the fold is evaluated *as of the merge*, not as
+ * of now. Only an observation that had already completed when the merge landed
+ * is evidence about that merge; anything finishing later is the answer to a
+ * question nobody asked before shipping.
+ *
+ * This is not hypothetical. On PR #769 only 3 of 89 runs had completed at
+ * merge time — all neutral or skipped — and `Full test suite (shard 26/32)`
+ * did not start until 3.5 minutes after the merge. Reading final state alone
+ * reports that merge as "one red shard" when the truth is that nothing had
+ * run at all, and it lets a post-merge re-run launder a pre-merge red.
  */
-export function normalizeObservedChecks({ checkRuns = [], commitStatuses = [] } = {}) {
+export function normalizeObservedChecks({
+  checkRuns = [],
+  commitStatuses = [],
+  mergedAt = null,
+} = {}) {
   const observations = [];
 
   for (const run of Array.isArray(checkRuns) ? checkRuns : []) {
@@ -130,11 +145,38 @@ export function normalizeObservedChecks({ checkRuns = [], commitStatuses = [] } 
     });
   }
 
+  const mergeCutoff = mergedAt ? Date.parse(mergedAt) : Number.NaN;
+  const gateAtMerge = Number.isFinite(mergeCutoff);
+
+  /** True when this observation had finished before the merge landed. */
+  const settledByMerge = (observation) => {
+    if (!gateAtMerge) return true;
+    if (observation.incomplete || !observation.completedAt) return false;
+    const finished = Date.parse(observation.completedAt);
+    return Number.isFinite(finished) && finished <= mergeCutoff;
+  };
+
   const byContext = new Map();
+  const lateByContext = new Map();
   for (const observation of observations) {
-    const existing = byContext.get(observation.context);
+    const bucket = settledByMerge(observation) ? byContext : lateByContext;
+    const existing = bucket.get(observation.context);
     if (!existing || compareObservations(observation, existing) < 0) {
-      byContext.set(observation.context, observation);
+      bucket.set(observation.context, observation);
+    }
+  }
+
+  // A context whose only evidence postdates the merge did not gate anything.
+  // Surface it as a distinct failure rather than crediting the late result.
+  if (gateAtMerge) {
+    for (const [context, late] of lateByContext) {
+      if (byContext.has(context)) continue;
+      byContext.set(context, {
+        ...late,
+        status: CHECK_STATUS.FAIL,
+        lateForMerge: true,
+        observed: late.observed,
+      });
     }
   }
   return byContext;
@@ -148,6 +190,10 @@ function evaluate(contexts, provenance, observed, failOn) {
     let reason = "";
     if (status === CHECK_STATUS.MISSING) {
       reason = "no check run or commit status reported this context";
+    } else if (observation.lateForMerge) {
+      reason =
+        `had not finished when the merge landed — it completed later and ` +
+        `reported ${observation.observed}, which gated nothing`;
     } else if (observation.incomplete) {
       reason = `still ${observation.observed} when the merge landed`;
     } else if (status === CHECK_STATUS.FAIL) {
@@ -162,6 +208,7 @@ function evaluate(contexts, provenance, observed, failOn) {
       reason,
       observed: observation ? observation.observed : null,
       source: observation ? observation.source : null,
+      lateForMerge: Boolean(observation?.lateForMerge),
       failing: failOn.includes(status),
     });
   }
@@ -182,6 +229,9 @@ function evaluate(contexts, provenance, observed, failOn) {
  * A commit with no associated pull request is a FAIL in its own right: the
  * required checks never ran on any PR head, so there is no evidence to audit.
  * Silence here would be indistinguishable from success.
+ *
+ * Evidence is read as of `prResolution.mergedAt` when it is known, so a check
+ * that finished after the merge cannot retroactively vouch for it.
  */
 export function auditRequiredChecks({
   pinned,
@@ -192,7 +242,11 @@ export function auditRequiredChecks({
 } = {}) {
   const required = Array.isArray(pinned?.required) ? pinned.required : [];
   const mustBeGreen = Array.isArray(pinned?.mustBeGreen) ? pinned.mustBeGreen : [];
-  const observed = normalizeObservedChecks({ checkRuns, commitStatuses });
+  const observed = normalizeObservedChecks({
+    checkRuns,
+    commitStatuses,
+    mergedAt: prResolution?.mergedAt ?? null,
+  });
 
   const findings = [
     ...evaluate(required, "required", observed, [CHECK_STATUS.FAIL, CHECK_STATUS.MISSING]),
@@ -210,6 +264,30 @@ export function auditRequiredChecks({
     });
   }
 
+  // Never synthesised. A drift check with no admin token stays BLOCKED.
+  const drift = rulesetDrift ?? {
+    status: "BLOCKED",
+    reason: "no admin token supplied — pinned list could not be compared with the live ruleset",
+  };
+
+  // A verified drift must fail the run, not merely print. A context added to
+  // the live ruleset but absent from the pin is a context this audit does not
+  // check at all — reporting PASS beside that is the false-green the job exists
+  // to prevent. BLOCKED stays advisory: unverified is not the same as wrong.
+  if (drift.status === "FAIL") {
+    blockers.push({
+      code: "ruleset_drift",
+      message:
+        "config/required-status-checks.json no longer matches the live ruleset" +
+        (drift.addedToRuleset?.length
+          ? ` — not pinned, therefore never audited: ${drift.addedToRuleset.join(", ")}`
+          : "") +
+        (drift.removedFromRuleset?.length
+          ? ` — pinned but no longer required: ${drift.removedFromRuleset.join(", ")}`
+          : ""),
+    });
+  }
+
   const failingFindings = findings.filter((f) => f.failing);
   const verdict =
     blockers.length > 0 || failingFindings.length > 0 ? AUDIT_VERDICT.FAIL : AUDIT_VERDICT.PASS;
@@ -220,16 +298,13 @@ export function auditRequiredChecks({
     findings,
     failingFindings,
     blockers,
-    // Never synthesised. A drift check with no admin token stays BLOCKED.
-    rulesetDrift: rulesetDrift ?? {
-      status: "BLOCKED",
-      reason: "no admin token supplied — pinned list could not be compared with the live ruleset",
-    },
+    rulesetDrift: drift,
     counts: {
       required: required.length,
       mustBeGreen: mustBeGreen.length,
       observed: observed.size,
       failing: failingFindings.length,
+      lateForMerge: findings.filter((f) => f.lateForMerge).length,
     },
   };
 }
@@ -261,6 +336,15 @@ export function formatAuditReport(result, { sha = "", prNumber = null } = {}) {
     `- contexts: ${result.counts.required} required, ${result.counts.mustBeGreen} must-be-green, ` +
       `${result.counts.observed} observed`,
   );
+  if (result.prResolution?.mergedAt) {
+    lines.push(`- evidence read as of the merge: \`${result.prResolution.mergedAt}\``);
+  }
+  if (result.counts.lateForMerge) {
+    lines.push(
+      `- **${result.counts.lateForMerge} pinned context(s) finished only after the merge** — ` +
+        "they gated nothing",
+    );
+  }
   lines.push(`- ruleset drift: ${result.rulesetDrift.status}`);
   lines.push("");
 
@@ -289,7 +373,28 @@ export function formatAuditReport(result, { sha = "", prNumber = null } = {}) {
   }
 
   if (result.verdict === AUDIT_VERDICT.PASS) {
-    lines.push("Every pinned context ran and went green on the merged pull request head.");
+    // Say exactly what was proved. A skipped required context and an absent
+    // must-be-green context are both deliberately non-failing, so "everything
+    // ran and went green" would be false in precisely the cases most worth
+    // being honest about.
+    const skipped = result.findings.filter((f) => f.status === CHECK_STATUS.NOT_MEASURED).length;
+    const absent = result.findings.filter((f) => f.status === CHECK_STATUS.MISSING).length;
+    const caveats = [];
+    if (skipped) caveats.push(`${skipped} skipped`);
+    if (absent) caveats.push(`${absent} never reported`);
+    lines.push(
+      caveats.length
+        ? `No pinned context blocked this merge. Not everything was proved, though: ` +
+            `${caveats.join(" and ")} — see above.`
+        : "Every pinned context ran and went green before this merge landed.",
+    );
+    if (result.rulesetDrift.status === "BLOCKED") {
+      lines.push("");
+      lines.push(
+        `Ruleset drift is BLOCKED, not PASS: ${String(result.rulesetDrift.reason).replace(/\.$/, "")}. ` +
+          "The pinned list is assumed current; it has not been verified.",
+      );
+    }
   }
   return lines.join("\n");
 }

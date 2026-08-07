@@ -10,7 +10,8 @@ export type PhenoEvidenceReadSource =
   | "sex_observations"
   | "smoke_tests"
   | "lab_results"
-  | "score_rounds";
+  | "score_rounds"
+  | "male_evaluations";
 
 const READ_ERROR_MESSAGES: Record<PhenoEvidenceReadSource, string> = {
   candidate_scores: "Could not load candidate scores.",
@@ -19,6 +20,7 @@ const READ_ERROR_MESSAGES: Record<PhenoEvidenceReadSource, string> = {
   smoke_tests: "Could not load smoke tests.",
   lab_results: "Could not load lab results.",
   score_rounds: "Could not load this scoring round.",
+  male_evaluations: "Could not load this male evaluation.",
 };
 
 export class PhenoEvidenceReadError extends Error {

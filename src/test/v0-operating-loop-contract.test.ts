@@ -17,6 +17,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { isSnapshotPersistable, selectPersistableAlerts } from "@/lib/environmentAlertPersistence";
+import { MANUAL_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
 import type { EnvironmentAlert } from "@/lib/environmentAlerts";
 import type { SensorSnapshot } from "@/lib/sensorSnapshot";
 import type { SensorQuality } from "@/lib/sensorQuality";
@@ -35,6 +36,7 @@ const ROOT = resolve(__dirname, "../..");
 const read = (rel: string) => readFileSync(resolve(ROOT, rel), "utf8");
 
 const ALERT_DETAIL = read("src/pages/AlertDetail.tsx");
+const ACTION_QUEUE_CREATE_SERVICE = read("src/lib/actionQueueCreateService.ts");
 const ACTION_DETAIL = read("src/pages/ActionDetail.tsx");
 const ACTION_QUEUE = read("src/pages/ActionQueue.tsx");
 const DASHBOARD = read("src/pages/Dashboard.tsx");
@@ -102,10 +104,15 @@ describe("V0 loop · manual readings count as real input", () => {
         isDemoData: true,
       }),
     ).toBe(false);
-    // stale
+    // Stale. This fixture is a MANUAL snapshot, and staleness is source-aware
+    // (see sensorTruthCanon: live = 15 minutes, manual/diary = 24 hours), so
+    // the age must exceed the MANUAL window to be rejected. The previous 60
+    // minutes predated cb98fe4e4, when isSnapshotPersistable called isStale
+    // without a source and every snapshot got the flat live window. Derived
+    // from the canon constant rather than hardcoded so the two cannot drift.
     const stale = {
       ...fresh,
-      ts: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+      ts: new Date(Date.now() - (MANUAL_CURRENT_STATE_STALE_MS + 60 * 60 * 1000)).toISOString(),
     };
     expect(isSnapshotPersistable({ snapshot: stale, quality: "good" })).toBe(false);
   });
@@ -209,15 +216,45 @@ describe("V0 loop · action drafts are safe by construction", () => {
     expect(buildActionQueueDraftFromAlert({ ...alert, metric: "" }).ok).toBe(false);
   });
 
-  it("AlertDetail insert payload omits user_id", () => {
-    // Static check: the action_queue insert object passed in AlertDetail must
-    // not set user_id (DB default auth.uid() owns it).
-    const insertIdx = ALERT_DETAIL.indexOf(".insert({");
-    expect(insertIdx).toBeGreaterThan(-1);
-    // Capture the immediate insert payload object.
-    const block = ALERT_DETAIL.slice(insertIdx, insertIdx + 800);
-    expect(block).toMatch(/grow_id\s*:/);
-    expect(block).not.toMatch(/\buser_id\s*:/);
+  it("AlertDetail action-queue payload omits user_id", () => {
+    // The client must never send an owner field; the DB default auth.uid()
+    // owns it. dc29093b5 (#586) replaced AlertDetail's inline
+    // `.insert({...})` with the action_queue_create RPC, so the payload is
+    // now assembled in TWO places and both must stay owner-free. Scanning
+    // only the call site would miss the service injecting user_id on the way
+    // to the RPC — which is exactly the gap the old single-anchor scan left
+    // once it stopped matching anything.
+    const callIdx = ALERT_DETAIL.indexOf("createActionQueueItem({");
+    expect(
+      callIdx,
+      "AlertDetail no longer calls createActionQueueItem({ — re-point this scan at the current write path",
+    ).toBeGreaterThan(-1);
+    const callBlock = ALERT_DETAIL.slice(callIdx, callIdx + 800);
+    expect(callBlock).toMatch(/grow_id\s*:/);
+    expect(callBlock).not.toMatch(/\buser_id\s*:/);
+    expect(callBlock).not.toMatch(/\btarget_device\s*:/);
+
+    // The service maps the draft onto an explicit p_* allowlist. Assert the
+    // allowlist itself, so a future field added there cannot smuggle an owner
+    // or device column through.
+    const rpcIdx = ACTION_QUEUE_CREATE_SERVICE.indexOf("const rpcArgs = {");
+    expect(
+      rpcIdx,
+      "actionQueueCreateService no longer builds `const rpcArgs = {` — re-point this scan",
+    ).toBeGreaterThan(-1);
+    const rpcEnd = ACTION_QUEUE_CREATE_SERVICE.indexOf("};", rpcIdx);
+    expect(rpcEnd).toBeGreaterThan(rpcIdx);
+    const rpcBlock = ACTION_QUEUE_CREATE_SERVICE.slice(rpcIdx, rpcEnd);
+    expect(rpcBlock).toMatch(/p_grow_id\s*:/);
+    expect(rpcBlock).not.toMatch(/user_id/);
+    expect(rpcBlock).not.toMatch(/target_device/);
+
+    // And the service must reach the queue only through the RPC — never a
+    // direct client insert that would bypass the server-side dedupe/audit.
+    expect(ACTION_QUEUE_CREATE_SERVICE).toMatch(/\.rpc\(\s*["']action_queue_create["']/);
+    expect(ACTION_QUEUE_CREATE_SERVICE).not.toMatch(
+      /\.from\(\s*["']action_queue["']\s*\)[\s\S]{0,40}\.insert\(/,
+    );
   });
 });
 

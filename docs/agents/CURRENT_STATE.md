@@ -1,7 +1,8 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-07-31
-**Updated by:** Claude (Knowledge Library & Product Specification Architect)
+**Last updated:** 2026-08-07
+**Updated by:** Claude (implementation task on Cheek's direct assignment — outside the
+Knowledge Library role's default scope; see `docs/agents/roles/claude.md`)
 
 This is the shift report. It changes often. Permanent rules live in `/AGENTS.md` and must
 not be edited to record operational detail.
@@ -109,3 +110,23 @@ Grok's research feeds step 6, not step 1.
 `build/07-skill-evaluation-harness`. CI green at `22d9054d3`. Five findings open. This is
 internal AI-skill infrastructure and does not touch public content, SEO, or the routes
 above. Do not conflate the two workstreams.
+
+---
+
+## Unrelated work resolved
+
+`PR #779` — Quick Log v2: asserts the retry success path (`applyQuickLogV2Refresh` +
+`verdant:entry-created` dispatch) fires exactly once, and stays silent on a half-committed
+retry. Test-only, **merged to `main`** at `b6d74794` (2026-08-07).
+
+A companion fix, `PR #777`, was opened for what looked like a live duplicate-save-on-retry
+bug, then found redundant: `main` already carried a more complete fix in `PR #317`
+(`11adbd4e1`, merged 2026-07-18 — `committedMainLogRef` + `saveInFlightRef`, which also
+closes a concurrent-double-tap race #777 only flagged as deferred). `#777` was closed
+without merging. `#779` salvaged the one real coverage gap #317's own tests missed.
+
+Neither PR touches public content, SEO, or the routes above — do not conflate with the
+slice tracked in this file. Local full-parallel `vitest` closure runs on the implementing
+agent's machine were noisy (nondeterministic 5000ms timeouts, zero assertion failures) —
+a known local-only artifact, not a regression. The isolated single-file run and GitHub
+Actions CI (8 shards, green) are the trustworthy signals, not the noisy parallel run.

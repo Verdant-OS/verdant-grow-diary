@@ -42,7 +42,7 @@ export default function EcowittBridgeDebug() {
           <a
             href={LOCAL_FORWARDING_STATUS_URL}
             target="_blank"
-            rel="noreferrer"
+            rel="noopener noreferrer"
             className="underline"
             data-testid="ecowitt-bridge-debug-forwarding-status-link"
           >
@@ -76,7 +76,7 @@ export default function EcowittBridgeDebug() {
               <a
                 href={LOCAL_FORWARDING_ERROR_REPORT_URL}
                 target="_blank"
-                rel="noreferrer"
+                rel="noopener noreferrer"
                 className="underline"
                 data-testid="ecowitt-bridge-debug-forwarding-error-report-link"
               >

@@ -71,6 +71,10 @@ import {
 } from "@/lib/plantsPageAsyncStateRules";
 import { isOneTentActivationIntent } from "@/lib/connectedOneTentActivationRules";
 import {
+  readFastAddParam,
+  fastAddPickerBannerCopy,
+} from "@/lib/fastAddActionRules";
+import {
   buildPlantQuickLogPrefill,
   PLANT_QUICKLOG_PREFILL_EVENT,
 } from "@/lib/plantQuickLogPrefillRules";
@@ -89,6 +93,7 @@ function formatPlantHealthAriaLabel(health: string | null | undefined): string {
 
 export default function Plants() {
   const [searchParams] = useSearchParams();
+  const pendingFastAdd = readFastAddParam(searchParams.toString());
   const { user } = useAuth();
   const { urlGrowId, scopedGrowName, isValidScopedGrow, backHref } = useScopedGrow();
   const navigate = useNavigate();
@@ -327,6 +332,15 @@ export default function Plants() {
           ) : null
         }
       />
+      {pendingFastAdd ? (
+        <p
+          role="status"
+          data-testid="fast-add-picker-banner"
+          className="mb-4 rounded-xl border border-border/60 bg-muted/40 px-4 py-3 text-sm text-muted-foreground"
+        >
+          {fastAddPickerBannerCopy("plant", pendingFastAdd)}
+        </p>
+      ) : null}
     </>
   );
 

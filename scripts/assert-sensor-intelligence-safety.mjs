@@ -287,15 +287,12 @@ if (isMain) {
   const v = scanRepository();
   if (v.length === 0) {
     if (!quiet) {
-      // eslint-disable-next-line no-console
       console.log("✓ sensor-intelligence safety scan: 0 violations");
     }
     process.exit(0);
   }
-  // eslint-disable-next-line no-console
   console.error(`✗ sensor-intelligence safety scan: ${v.length} violation(s)`);
   for (const item of v) {
-    // eslint-disable-next-line no-console
     console.error(`  - [${item.rule}] ${item.message}`);
   }
   process.exit(1);

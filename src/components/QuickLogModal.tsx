@@ -181,7 +181,6 @@ export default function QuickLogModal({
         try {
           await supabase.storage.from("diary-photos").remove([uploadedPath]);
         } catch (cleanupErr) {
-          // eslint-disable-next-line no-console
           console.error("QuickLog photo cleanup failed:", cleanupErr);
         }
       }

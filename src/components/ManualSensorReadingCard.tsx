@@ -157,7 +157,6 @@ export default function ManualSensorReadingCard({
       const msg = mapManualSaveErrorToUserMessage(err);
       toast.error(msg);
       // Developer-safe diagnostic: console only, not in UI.
-      // eslint-disable-next-line no-console
       console.warn("[manual-sensor-save] failed");
     }
   }

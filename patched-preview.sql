@@ -1,0 +1,186 @@
+-- Security hardening follow-up: a live production Security Advisor sweep
+-- (2026-08-05) found several anon-privilege gaps. Cross-checked against
+-- this repo's migration history before writing anything: most of what the
+-- sweep flagged (quicklog_save_manual's other 7 sibling functions,
+-- customer_feedback, contact_messages, leads) already has a correctly
+-- scoped REVOKE committed in an earlier migration (see 20260804091142,
+-- 20260804091217, 20260728060547, 20260714190000). Those are NOT
+-- re-authored here to avoid duplicate/conflicting DDL -- if the live sweep
+-- still shows them wide open, the gap is application (migration committed
+-- but not run on prod), not authorship, and needs to be confirmed via the
+-- migration ledger rather than more SQL.
+--
+-- Three things below ARE genuine, previously-unaddressed gaps:
+--
+-- 1. lovable_paddle_events was deliberately shipped with RLS-deny-by-
+--    default as its ONLY protection ("Deliberately no policies: with RLS
+--    enabled and zero policies, authenticated/anon get zero rows" --
+--    20260709083556). That's fragile: one future permissive policy, or one
+--    accidental RLS disable, and it's wide open. Sibling tables
+--    (paddle_events, paddle_event_processing, ai_credit_grants) already
+--    had these grants explicitly stripped; this brings this table to the
+--    same posture.
+--
+-- 2. lead_events grants SELECT/INSERT to `authenticated` only via policy
+--    (see 20260521011859), but the table-level default grant to `anon`
+--    was never explicitly revoked -- RLS currently denies anon by
+--    omission (no anon policy), not by grant. Narrowed to exactly what
+--    the existing policies allow.
+--
+-- 3. ALTER DEFAULT PRIVILEGES has never been used anywhere in this
+--    project's migration history (verified: zero matches repo-wide). That
+--    is a real contributor to the recurring "we revoked anon and it came
+--    back" pattern this project has hit before -- but the mechanism is
+--    narrower than an earlier draft of this migration claimed. A bare
+--    `CREATE OR REPLACE FUNCTION` on an UNCHANGED signature preserves the
+--    function's existing owner and ACL; it does NOT reacquire schema
+--    defaults. What DOES reacquire the schema's default ACL is genuine
+--    new-object creation -- `DROP FUNCTION` + `CREATE FUNCTION`, or a
+--    brand new overload. That is exactly this repo's own convention for
+--    every quicklog_save_manual signature change (every parameter
+--    addition is a DROP FUNCTION IF EXISTS + CREATE FUNCTION pair, never
+--    a bare CREATE OR REPLACE), which is why each new parameter has
+--    repeatedly resurrected anon's default EXECUTE. Postgres also grants
+--    EXECUTE on new functions to PUBLIC by default (tables get no such
+--    built-in default) -- so a REVOKE that only names `anon` leaves
+--    PUBLIC's grant in effect and anon inherits EXECUTE right back through
+--    it. The quicklog_save_manual REVOKE below targets PUBLIC explicitly
+--    for that reason.
+--
+--    This changes the schema default going forward so future function and
+--    table objects are born already narrow -- it does not touch any
+--    existing object's current grants (those are handled explicitly
+--    below). Caveat: default privileges bind to the ROLE that issues this
+--    statement, for objects THAT ROLE creates. Supabase's documented
+--    convention is that the migration runner applies changes as the
+--    `postgres` role, so this is asserted both as the invoking role
+--    (covers whatever role actually runs this file) and explicitly
+--    `FOR ROLE postgres` (covers the case where a superuser applies this
+--    but `postgres` is the role that actually owns newly created
+--    objects). Verify after the next function recreate with:
+--      select rolname from pg_roles
+--       where oid = (select proowner from pg_proc
+--                     where proname = 'quicklog_save_manual' limit 1);
+--    If it names a role other than the current user or `postgres`, re-run
+--    with "FOR ROLE <that role>".
+
+BEGIN;
+
+-- 1. lovable_paddle_events: match paddle_events / ai_credit_grants posture.
+REVOKE ALL ON TABLE public.lovable_paddle_events FROM PUBLIC, anon, authenticated;
+
+-- 2. lead_events: narrow to exactly what RLS already permits.
+REVOKE ALL ON TABLE public.lead_events FROM PUBLIC, anon, authenticated;
+GRANT SELECT, INSERT ON TABLE public.lead_events TO authenticated;
+
+-- 3. Root-cause fix: stop future objects from being born with anon/PUBLIC
+-- access. Functions default-grant EXECUTE to PUBLIC in vanilla Postgres;
+-- tables carry no such built-in default, but this project's hosted
+-- instance is grandfathered on its own bootstrap default-privilege grants
+-- to anon/authenticated (see supabase/seed.sql's "LOCAL-STACK PROD-PARITY
+-- GRANTS" header for the documented evidence), so both object types are
+-- revoked defensively, from both PUBLIC and anon.
+ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON FUNCTIONS FROM PUBLIC, anon;
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON FUNCTIONS FROM PUBLIC, anon;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM PUBLIC, anon;
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON TABLES FROM PUBLIC, anon;
+
+-- 4. quicklog_save_manual: the one finding independently reconfirmed live
+-- against production (anon still had EXECUTE) moments before this was
+-- written, not just inferred from migration history. Revokes from PUBLIC
+-- as well as anon -- see the root-cause note above for why FROM anon alone
+-- is insufficient -- and explicitly re-affirms authenticated/service_role
+-- so this statement is self-contained regardless of what already landed.
+REVOKE EXECUTE ON FUNCTION public.quicklog_save_manual(
+  text, uuid, text, numeric, text, numeric, numeric, numeric, timestamptz, jsonb, text, text
+) FROM PUBLIC, anon;
+
+GRANT EXECUTE ON FUNCTION public.quicklog_save_manual(
+  text, uuid, text, numeric, text, numeric, numeric, numeric, timestamptz, jsonb, text, text
+) TO authenticated;
+
+GRANT EXECUTE ON FUNCTION public.quicklog_save_manual(
+  text, uuid, text, numeric, text, numeric, numeric, numeric, timestamptz, jsonb, text, text
+) TO service_role;
+
+-- Postcondition assertions. Modeled on the reviewed audit-lane contract at
+-- supabase/contract-migrations/quicklog_save_manual_revoke_anon_execute.sql:
+-- fail the whole transaction (RAISE EXCEPTION, not a NOTICE) rather than
+-- silently leaving a gap, and verify with has_function_privilege /
+-- has_table_privilege so PUBLIC-inherited grants are correctly accounted
+-- for (checking pg_proc.proacl / pg_class.relacl directly would miss
+-- those -- the exact class of bug this migration exists to close).
+DO $$
+DECLARE
+  bad RECORD;
+  overload_count INT;
+  test_fn_oid OID;
+BEGIN
+  -- 4a. quicklog_save_manual: every overload, not just the 12-arg one in
+  -- question -- a stray overload must not silently retain anon EXECUTE.
+  SELECT COUNT(*) INTO overload_count
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+   WHERE n.nspname = 'public' AND p.proname = 'quicklog_save_manual';
+
+  IF overload_count = 0 THEN
+    RAISE EXCEPTION 'quicklog_save_manual missing -- refuse to leave a hole';
+  END IF;
+
+  FOR bad IN
+    SELECT p.oid,
+           has_function_privilege('anon',          p.oid, 'EXECUTE') AS anon_exec,
+           has_function_privilege('authenticated', p.oid, 'EXECUTE') AS auth_exec,
+           has_function_privilege('service_role',  p.oid, 'EXECUTE') AS svc_exec
+      FROM pg_proc p
+      JOIN pg_namespace n ON n.oid = p.pronamespace
+     WHERE n.nspname = 'public' AND p.proname = 'quicklog_save_manual'
+  LOOP
+    IF bad.anon_exec THEN
+      RAISE EXCEPTION 'quicklog_save_manual oid=% still executable by anon', bad.oid;
+    END IF;
+    IF NOT bad.auth_exec THEN
+      RAISE EXCEPTION 'quicklog_save_manual oid=% not executable by authenticated', bad.oid;
+    END IF;
+    IF NOT bad.svc_exec THEN
+      RAISE EXCEPTION 'quicklog_save_manual oid=% not executable by service_role', bad.oid;
+    END IF;
+  END LOOP;
+
+  -- 4b. lovable_paddle_events / lead_events: effective anon/authenticated
+  -- table privileges.
+  IF has_table_privilege('anon', 'public.lovable_paddle_events', 'SELECT')
+     OR has_table_privilege('anon', 'public.lovable_paddle_events', 'INSERT')
+     OR has_table_privilege('anon', 'public.lovable_paddle_events', 'UPDATE')
+     OR has_table_privilege('anon', 'public.lovable_paddle_events', 'DELETE') THEN
+    RAISE EXCEPTION 'lovable_paddle_events still has an anon table privilege';
+  END IF;
+  IF has_table_privilege('authenticated', 'public.lovable_paddle_events', 'SELECT')
+     OR has_table_privilege('authenticated', 'public.lovable_paddle_events', 'INSERT')
+     OR has_table_privilege('authenticated', 'public.lovable_paddle_events', 'UPDATE')
+     OR has_table_privilege('authenticated', 'public.lovable_paddle_events', 'DELETE') THEN
+    RAISE EXCEPTION 'lovable_paddle_events still has an authenticated table privilege';
+  END IF;
+
+  IF has_table_privilege('anon', 'public.lead_events', 'SELECT')
+     OR has_table_privilege('anon', 'public.lead_events', 'INSERT')
+     OR has_table_privilege('anon', 'public.lead_events', 'UPDATE')
+     OR has_table_privilege('anon', 'public.lead_events', 'DELETE') THEN
+    RAISE EXCEPTION 'lead_events still has an anon table privilege';
+  END IF;
+  IF NOT has_table_privilege('authenticated', 'public.lead_events', 'SELECT') THEN
+    RAISE EXCEPTION 'lead_events lost the authenticated SELECT this migration is supposed to preserve';
+  END IF;
+  IF NOT has_table_privilege('authenticated', 'public.lead_events', 'INSERT') THEN
+    RAISE EXCEPTION 'lead_events lost the authenticated INSERT this migration is supposed to preserve';
+  END IF;
+
+  -- 4c. removed for local-replay-only compatibility: see
+  -- config/local-supabase-replay-compatibility.json compatibility_patches
+  -- entry for this migration. This published file is unpatched; only the
+  -- disposable CI replay copy skips this self-test.
+END $;
+
+COMMIT;
+
+NOTIFY pgrst, 'reload schema';

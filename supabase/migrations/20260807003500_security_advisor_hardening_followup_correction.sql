@@ -54,17 +54,27 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON FUNCTI
 -- grant in effect and anon inherits EXECUTE right back through it -- and
 -- explicitly re-affirms authenticated/service_role so this statement is
 -- self-contained regardless of what already landed.
-REVOKE EXECUTE ON FUNCTION public.quicklog_save_manual(
-  text, uuid, text, numeric, text, numeric, numeric, numeric, timestamptz, jsonb, text, text
-) FROM PUBLIC, anon;
-
-GRANT EXECUTE ON FUNCTION public.quicklog_save_manual(
-  text, uuid, text, numeric, text, numeric, numeric, numeric, timestamptz, jsonb, text, text
-) TO authenticated;
-
-GRANT EXECUTE ON FUNCTION public.quicklog_save_manual(
-  text, uuid, text, numeric, text, numeric, numeric, numeric, timestamptz, jsonb, text, text
-) TO service_role;
+-- Applied to EVERY overload, discovered dynamically, not just the 12-arg
+-- signature. A static single-signature REVOKE paired with the loop below
+-- (which asserts across all overloads) would turn a stray overload into a
+-- RAISE EXCEPTION -- rolling back this entire transaction and recreating
+-- the exact failure mode of 20260805090000 that this file exists to undo.
+-- Fix the grant rather than fail on it.
+DO $$
+DECLARE
+  fn RECORD;
+BEGIN
+  FOR fn IN
+    SELECT p.oid::regprocedure AS sig
+      FROM pg_proc p
+      JOIN pg_namespace n ON n.oid = p.pronamespace
+     WHERE n.nspname = 'public' AND p.proname = 'quicklog_save_manual'
+  LOOP
+    EXECUTE format('REVOKE EXECUTE ON FUNCTION %s FROM PUBLIC, anon', fn.sig);
+    EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO authenticated', fn.sig);
+    EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO service_role', fn.sig);
+  END LOOP;
+END $$;
 
 -- Postcondition assertions -- checks on EXISTING objects only (no
 -- throwaway object creation this time). Modeled on the reviewed

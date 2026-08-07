@@ -100,28 +100,29 @@ describe("security-advisor-hardening-followup-correction migration contract", ()
     );
   });
 
-  it("revokes quicklog_save_manual EXECUTE from PUBLIC and anon, not just anon", () => {
-    const revokeMatches = executable.match(
-      /REVOKE\s+EXECUTE\s+ON\s+FUNCTION\s+public\.quicklog_save_manual\s*\(([\s\S]*?)\)/gi,
-    );
-    expect(revokeMatches, "expected at least one REVOKE EXECUTE").toBeTruthy();
-    for (const stmt of revokeMatches ?? []) {
-      expect(stmt).toContain(QLM_ARGS);
-    }
+  it("revokes quicklog_save_manual EXECUTE from PUBLIC and anon across EVERY overload", () => {
+    // The grants are applied dynamically (EXECUTE format(...) over every
+    // discovered overload) rather than as one static 12-arg signature.
+    // A static single-signature REVOKE would leave a stray overload
+    // anon-executable, which the postcondition loop then raises on --
+    // rolling back the whole transaction exactly like 20260805090000 did.
+    // So pin the dynamic discovery, not a literal argument list.
+    expect(executable).toMatch(/FROM\s+pg_proc\s+p[\s\S]*?proname\s*=\s*'quicklog_save_manual'/i);
+    expect(executable).toMatch(/p\.oid::regprocedure/i);
     expect(executable).toMatch(
-      /REVOKE\s+EXECUTE\s+ON\s+FUNCTION\s+public\.quicklog_save_manual[\s\S]*?FROM\s+PUBLIC\s*,\s*anon/i,
+      /format\(\s*'REVOKE\s+EXECUTE\s+ON\s+FUNCTION\s+%s\s+FROM\s+PUBLIC\s*,\s*anon'/i,
     );
   });
 
   it("preserves quicklog_save_manual EXECUTE for authenticated and service_role", () => {
     expect(executable).toMatch(
-      /GRANT\s+EXECUTE\s+ON\s+FUNCTION\s+public\.quicklog_save_manual[\s\S]*?TO\s+authenticated/i,
+      /format\(\s*'GRANT\s+EXECUTE\s+ON\s+FUNCTION\s+%s\s+TO\s+authenticated'/i,
     );
     expect(executable).toMatch(
-      /GRANT\s+EXECUTE\s+ON\s+FUNCTION\s+public\.quicklog_save_manual[\s\S]*?TO\s+service_role/i,
+      /format\(\s*'GRANT\s+EXECUTE\s+ON\s+FUNCTION\s+%s\s+TO\s+service_role'/i,
     );
     expect(executable).not.toMatch(
-      /GRANT\s+EXECUTE\s+ON\s+FUNCTION\s+public\.quicklog_save_manual[\s\S]*?TO\s+(anon|PUBLIC)\b/i,
+      /GRANT\s+EXECUTE\s+ON\s+FUNCTION\s+[\s\S]*?TO\s+(anon|PUBLIC)\b/i,
     );
   });
 

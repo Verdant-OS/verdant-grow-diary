@@ -135,14 +135,16 @@ describe("Coach.tsx — AI Doctor wiring (static contract)", () => {
   it("addDoctorSuggestionToQueue pins approval-required + ai_doctor source", () => {
     expect(COACH).toMatch(/async\s+function\s+addDoctorSuggestionToQueue/);
     const block = COACH.split("addDoctorSuggestionToQueue")[1] ?? "";
-    expect(block).toMatch(/status\s*:\s*["']pending_approval["']/);
     expect(block).toMatch(/ACTION_QUEUE_SOURCE_VALUES\.AI_DOCTOR/);
-    // No client-provided user_id.
-    const insertMatch = block.match(
-      /\.from\(\s*["']action_queue["']\s*\)\s*\.insert\(\s*\{([\s\S]*?)\}\s*\)/,
-    );
-    expect(insertMatch).not.toBeNull();
-    expect(insertMatch![1]).not.toMatch(/\buser_id\s*:/);
+    // #809: the dual-insert became the atomic `action_queue_create` RPC, which
+    // pins status server-side. The payload assertions below are the same fence
+    // as before, applied to the call that now exists — plus `status`, which the
+    // client must NOT send at all now that the server owns it.
+    const createMatch = block.match(/createActionQueueItem\(\s*\{([\s\S]*?)\}\s*\)/);
+    expect(createMatch).not.toBeNull();
+    expect(createMatch![1]).not.toMatch(/\buser_id\s*:/);
+    expect(createMatch![1]).not.toMatch(/\bstatus\s*:/);
+    expect(createMatch![1]).not.toMatch(/\btarget_device\s*:/);
   });
 
   it("queues only from an explicit click handler, not from useEffect", () => {

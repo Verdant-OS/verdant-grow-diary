@@ -5,9 +5,19 @@
  * No I/O. No React. No writes.
  *
  * Sensor sources allowed: live | manual | csv | demo | stale | invalid.
- * Anything else normalizes to "invalid" — never to a healthy label.
+ *
+ * Fail-closed strategy (Sensor Truth):
+ *  - Unknown / non-string / free-text sources normalize to "invalid".
+ *  - We never invent "live" or "manual" from loose labels (mqtt, device, …).
+ *  - Only an explicit allowlisted source can later be treated as trusted.
+ *  - "invalid" is untrusted and is never presented as a healthy reading.
  */
 
+/**
+ * Closed vocabulary for comparison sensor provenance.
+ * Single source of truth for the PhenoComparisonSensorSource union and for
+ * normalizePhenoSensorSource's allowlist — keep them in lockstep.
+ */
 export const PHENO_COMPARISON_SENSOR_SOURCES = [
   "live",
   "manual",
@@ -19,12 +29,17 @@ export const PHENO_COMPARISON_SENSOR_SOURCES = [
 
 export type PhenoComparisonSensorSource = (typeof PHENO_COMPARISON_SENSOR_SOURCES)[number];
 
+/**
+ * Sources that may count as real evidence for comparison confidence.
+ * Everything else (including normalized "invalid") stays untrusted.
+ */
 export const PHENO_COMPARISON_TRUSTED_SOURCES: ReadonlySet<PhenoComparisonSensorSource> = new Set([
   "live",
   "manual",
   "csv",
 ]);
 
+/** Explicit untrusted partition — demo fixtures, aged reads, and fail-closed junk. */
 export const PHENO_COMPARISON_UNTRUSTED_SOURCES: ReadonlySet<PhenoComparisonSensorSource> = new Set(
   ["demo", "stale", "invalid"],
 );
@@ -38,9 +53,22 @@ const SOURCE_LABEL: Record<PhenoComparisonSensorSource, string> = {
   invalid: "Invalid",
 };
 
+/**
+ * Coerce hostile/loose provenance into the closed source union.
+ *
+ * Fail closed at every exit:
+ *  1. Non-strings → "invalid" (do not call string ops on null/objects).
+ *  2. Trim + lowercase only — no synonym map, no partial match.
+ *  3. Exact allowlist hit → that label; otherwise → "invalid".
+ *
+ * Callers must already pass "stale" when age is known; this function does not
+ * recompute freshness. Downstream trust is isPhenoSensorSourceTrusted only.
+ */
 export function normalizePhenoSensorSource(input: unknown): PhenoComparisonSensorSource {
+  // Fail closed: non-strings are never promoted to a trusted source.
   if (typeof input !== "string") return "invalid";
   const v = input.trim().toLowerCase();
+  // Fail closed: exact allowlist only — unknown tokens become "invalid", not "live".
   if ((PHENO_COMPARISON_SENSOR_SOURCES as readonly string[]).includes(v)) {
     return v as PhenoComparisonSensorSource;
   }
@@ -51,6 +79,11 @@ export function phenoSensorSourceLabel(source: PhenoComparisonSensorSource): str
   return SOURCE_LABEL[source];
 }
 
+/**
+ * Trust is set membership only (fail closed): live | manual | csv.
+ * Requires a value already produced by normalizePhenoSensorSource — never
+ * pass raw payload strings here without normalizing first.
+ */
 export function isPhenoSensorSourceTrusted(source: PhenoComparisonSensorSource): boolean {
   return PHENO_COMPARISON_TRUSTED_SOURCES.has(source);
 }

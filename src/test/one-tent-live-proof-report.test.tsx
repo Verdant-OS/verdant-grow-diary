@@ -14,11 +14,18 @@ import {
   buildOneTentLiveProofReport,
   PROOF_REPORT_TITLE,
 } from "@/lib/oneTentLiveProofViewModel";
-import { STALE_THRESHOLD_MS, type SensorSnapshot } from "@/lib/sensorSnapshot";
+import { type SensorSnapshot } from "@/lib/sensorSnapshot";
+import { MANUAL_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
 
 const NOW = Date.parse("2026-06-23T12:00:00Z");
 const FRESH_TS = new Date(NOW - 5 * 60_000).toISOString();
-const STALE_TS = new Date(NOW - STALE_THRESHOLD_MS - 60_000).toISOString();
+// The only consumer of STALE_TS is a `source: "manual"` snapshot, and Sensor
+// Truth Canon gives manual readings a 24h current-state window. Deriving this
+// from the live 15m threshold left the fixture ~16 minutes old — still current
+// for manual — so step 2 was satisfied, `missingEvidence` came back null, and
+// `.toMatch(null)` threw a TypeError. Derive it from the manual window so the
+// fixture tracks the constant instead of a hardcoded age.
+const STALE_TS = new Date(NOW - MANUAL_CURRENT_STATE_STALE_MS - 60_000).toISOString();
 
 function snap(
   o: Partial<SensorSnapshot> & {

@@ -48,9 +48,16 @@ describe("Dashboard Environment Snapshot · empty / stale / invalid states", () 
     expect(DASH).toMatch(/Latest reading looks invalid/);
   });
 
-  it("uses source-aware Dashboard quality + isStale to drive the banner (no JSX-local thresholds)", () => {
+  it("uses source-aware Dashboard quality + isSnapshotStale to drive the banner (no JSX-local thresholds)", () => {
     expect(DASH).toMatch(/evaluateDashboardSensorQuality\s*\(/);
-    expect(DASH).toMatch(/isStale\s*\(/);
+    // Dashboard reaches staleness through `isSnapshotStale(snapshot)`, the
+    // source-aware canon helper, not a bare `isStale(ts, now)`. `isStale(` is
+    // not a substring of `isSnapshotStale(`, so the old probe silently stopped
+    // matching and this guard verified nothing. Sibling of the same repair in
+    // dashboard-environment-sensor-truth-states.test.tsx; pin the import too so
+    // a future rename fails loudly instead of orphaning the scan again.
+    expect(DASH).toMatch(/isSnapshotStale\b/);
+    expect(DASH).toMatch(/isSnapshotStale\s*\(/);
     // No inline 15-minute or millisecond freshness thresholds in JSX.
     expect(DASH).not.toMatch(/30\s*\*\s*60\s*\*\s*1000/);
   });

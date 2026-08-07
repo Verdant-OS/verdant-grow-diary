@@ -15,10 +15,20 @@ import {
   PROOF_REPORT_TITLE,
 } from "@/lib/oneTentLiveProofViewModel";
 import { STALE_THRESHOLD_MS, type SensorSnapshot } from "@/lib/sensorSnapshot";
+import { MANUAL_SNAPSHOT_CURRENT_STALE_HOURS } from "@/constants/sensorTiming";
 
 const NOW = Date.parse("2026-06-23T12:00:00Z");
 const FRESH_TS = new Date(NOW - 5 * 60_000).toISOString();
 const STALE_TS = new Date(NOW - STALE_THRESHOLD_MS - 60_000).toISOString();
+// Freshness is SOURCE-AWARE since the #592 sensor-truth canon: STALE_THRESHOLD_MS
+// is the LIVE window (15m), while a grower-typed manual reading stays current
+// context for MANUAL_SNAPSHOT_CURRENT_STALE_HOURS (24h). A manual fixture must
+// therefore be aged past the MANUAL window to actually read as stale — using
+// the live threshold left it comfortably fresh and the assertion stopped
+// proving anything.
+const MANUAL_STALE_TS = new Date(
+  NOW - MANUAL_SNAPSHOT_CURRENT_STALE_HOURS * 60 * 60_000 - 60_000,
+).toISOString();
 
 function snap(
   o: Partial<SensorSnapshot> & {
@@ -82,10 +92,20 @@ describe("missing-evidence breakdown (view-model)", () => {
     });
     expect(vm.steps[1].missingEvidence).toMatch(/fresh manual\/live snapshot/i);
   });
-  it("step 2 missing evidence for stale snapshot", () => {
+  it("step 2 missing evidence for a stale MANUAL snapshot (past the 24h manual window)", () => {
     const vm = buildOneTentLiveProofViewModel(CTX, {
       ...EMPTY_SIGNALS,
-      snapshot: snap({ source: "manual", ts: STALE_TS }),
+      snapshot: snap({ source: "manual", ts: MANUAL_STALE_TS }),
+    });
+    expect(vm.steps[1].missingEvidence).toMatch(/fresh manual\/live snapshot/i);
+  });
+
+  it("step 2 missing evidence for a stale LIVE snapshot (past the tighter 15m live window)", () => {
+    // The live window is the safety-critical one: the same age that is still
+    // current for a hand-typed reading must NOT count as fresh live telemetry.
+    const vm = buildOneTentLiveProofViewModel(CTX, {
+      ...EMPTY_SIGNALS,
+      snapshot: snap({ source: "live", ts: STALE_TS }),
     });
     expect(vm.steps[1].missingEvidence).toMatch(/fresh manual\/live snapshot/i);
   });

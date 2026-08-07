@@ -32,44 +32,94 @@ jobs:
         id: codegen
         shell: bash
         run: |
-          set -euo pipefail
+          set -uo pipefail
+          mkdir -p artifacts
           rm -f .lovable/mcp/manifest.json
           set +e
-          bunx vite build
-          status=$?
+          bunx vite build 2>&1 | tee artifacts/vite-build.log
+          status=${PIPESTATUS[0]}
           set -e
           echo "vite_status=$status" >> "$GITHUB_OUTPUT"
-          test "$status" -eq 0
-          test -s .lovable/mcp/manifest.json
-          test -s supabase/functions/mcp/index.ts
-          grep -q 'list_grow_walk_targets' .lovable/mcp/manifest.json
-          grep -q 'get_grow_walk_context' .lovable/mcp/manifest.json
-          grep -q 'list_grow_walk_targets' supabase/functions/mcp/index.ts
-          grep -q 'get_grow_walk_context' supabase/functions/mcp/index.ts
+          exit 0
 
-      - name: Record generated diff
+      - name: Inspect generated artifacts
+        id: inspect
+        if: always()
         shell: bash
         run: |
-          set -euo pipefail
-          mkdir -p artifacts
+          set -uo pipefail
+          manifest_exists=0
+          bundle_exists=0
+          manifest_targets=0
+          manifest_context=0
+          bundle_targets=0
+          bundle_context=0
+
+          test -s .lovable/mcp/manifest.json && manifest_exists=1
+          test -s supabase/functions/mcp/index.ts && bundle_exists=1
+          if [[ "$manifest_exists" == "1" ]]; then
+            grep -q 'list_grow_walk_targets' .lovable/mcp/manifest.json && manifest_targets=1
+            grep -q 'get_grow_walk_context' .lovable/mcp/manifest.json && manifest_context=1
+          fi
+          if [[ "$bundle_exists" == "1" ]]; then
+            grep -q 'list_grow_walk_targets' supabase/functions/mcp/index.ts && bundle_targets=1
+            grep -q 'get_grow_walk_context' supabase/functions/mcp/index.ts && bundle_context=1
+          fi
+
+          {
+            echo "vite_status=${{ steps.codegen.outputs.vite_status }}"
+            echo "manifest_exists=$manifest_exists"
+            echo "bundle_exists=$bundle_exists"
+            echo "manifest_targets=$manifest_targets"
+            echo "manifest_context=$manifest_context"
+            echo "bundle_targets=$bundle_targets"
+            echo "bundle_context=$bundle_context"
+          } | tee artifacts/codegen-status.txt
+
+          if [[ "$manifest_exists" == "1" ]]; then
+            node -e 'const m=require("./.lovable/mcp/manifest.json"); console.log((m.mcp?.tools??[]).map(t=>t.name).sort().join("\n"))' > artifacts/manifest-tool-names.txt
+          else
+            echo "manifest missing" > artifacts/manifest-tool-names.txt
+          fi
+
           git diff -- .lovable/mcp/manifest.json supabase/functions/mcp/index.ts > artifacts/grow-walk-mcp-generated.diff
           {
             echo "### Grow Walk MCP codegen"
             echo
-            echo "Vite exit: ${{ steps.codegen.outputs.vite_status }}"
+            echo '```text'
+            cat artifacts/codegen-status.txt
+            echo '```'
             echo
+            echo "Manifest tools:"
+            echo '```text'
+            cat artifacts/manifest-tool-names.txt
+            echo '```'
+            echo
+            echo "Generated diff:"
             echo '```text'
             git diff --stat -- .lovable/mcp/manifest.json supabase/functions/mcp/index.ts
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Upload generated files
+          [[ "${{ steps.codegen.outputs.vite_status }}" == "0" ]]
+          [[ "$manifest_exists" == "1" ]]
+          [[ "$bundle_exists" == "1" ]]
+          [[ "$manifest_targets" == "1" ]]
+          [[ "$manifest_context" == "1" ]]
+          [[ "$bundle_targets" == "1" ]]
+          [[ "$bundle_context" == "1" ]]
+
+      - name: Upload generated files and diagnostics
+        if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: grow-walk-mcp-generated
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 1
           path: |
             .lovable/mcp/manifest.json
             supabase/functions/mcp/index.ts
             artifacts/grow-walk-mcp-generated.diff
+            artifacts/vite-build.log
+            artifacts/codegen-status.txt
+            artifacts/manifest-tool-names.txt

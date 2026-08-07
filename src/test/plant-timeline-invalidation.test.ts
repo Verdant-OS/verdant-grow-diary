@@ -22,6 +22,7 @@ function src(rel: string): string {
 const QUICK_LOG = "src/components/QuickLog.tsx";
 const PLANT_QUICK_LOG = "src/components/PlantQuickLog.tsx";
 const REFRESH_RULES = "src/lib/quickLogV2RefreshRules.ts";
+const PLANT_ENTRY_WRITER = "src/lib/writeQuickLogPlantEntry.ts";
 
 describe("plant timeline invalidation — QuickLog (mobile FAB)", () => {
   it("calls applyQuickLogV2Refresh on successful save", () => {
@@ -83,13 +84,21 @@ describe("plant timeline invalidation — PlantQuickLog (plant detail button)", 
 
   it("still writes only to diary_entries and diary-photos (no new table writes)", () => {
     const body = src(PLANT_QUICK_LOG);
-    expect(body).toMatch(/from\(["']diary_entries["']\)/);
+    const writer = src(PLANT_ENTRY_WRITER);
+    // The diary row moved to the sanctioned lib writer; the presenter keeps
+    // only the photo bucket. Assert against both so the contract retains a
+    // real subject on each side rather than silently losing one.
     expect(body).toMatch(/from\(["']diary-photos["']\)/);
-    expect(body).not.toMatch(/from\(["']grow_events["']\)/);
-    expect(body).not.toMatch(/from\(["']alerts["']\)/);
-    expect(body).not.toMatch(/from\(["']action_queue["']\)/);
-    expect(body).not.toMatch(/from\(["']sensor_readings["']\)/);
-    expect(body).not.toMatch(/functions\.invoke/);
+    expect(body).toMatch(/writeQuickLogPlantEntry/);
+    expect(body).not.toMatch(/supabase\s*\.\s*from\s*\(/);
+    expect(writer).toMatch(/from\(\s*["']diary_entries["']\s*\)/);
+    for (const source of [body, writer]) {
+      expect(source).not.toMatch(/from\(["']grow_events["']\)/);
+      expect(source).not.toMatch(/from\(["']alerts["']\)/);
+      expect(source).not.toMatch(/from\(["']action_queue["']\)/);
+      expect(source).not.toMatch(/from\(["']sensor_readings["']\)/);
+      expect(source).not.toMatch(/functions\.invoke/);
+    }
   });
 });
 

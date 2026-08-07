@@ -49,16 +49,39 @@ describe("pheno_hunts parent_hunt_id migration safety", () => {
     expect(sql).toMatch(/WHERE parent_hunt_id IS NOT NULL/);
   });
 
-  it("changes no policies, grants, or triggers (inherits pheno_hunts RLS)", () => {
+  // This assertion originally forbade CREATE TRIGGER and REVOKE outright, to
+  // pin "additive column, no security-posture change". That was the wrong
+  // fence: a foreign key proves the parent EXISTS, never that the caller owns
+  // it, and `pheno_hunts` grants UPDATE to `authenticated`. The pin was
+  // therefore forbidding the only control that closes a cross-tenant write.
+  // It now pins the posture POSITIVELY — the ownership trigger must be present
+  // — while still forbidding the things that would actually widen access.
+  it("enforces same-owner parentage in the database, not just referential existence", () => {
+    expect(sql).toMatch(/CREATE TRIGGER pheno_hunts_parent_hunt_same_owner/);
+    expect(sql).toMatch(/BEFORE INSERT OR UPDATE/i);
+    // The check must compare ownership explicitly, not rely on the parent being
+    // invisible under RLS — that would not hold for service_role or the owner.
+    expect(sql).toMatch(/parent\.user_id\s*=\s*NEW\.user_id/);
+    expect(sql).toMatch(/RAISE EXCEPTION/i);
+  });
+
+  it("widens no access: no policy change, no new grant, no anon, no definer rights", () => {
     expect(sql).not.toMatch(/CREATE POLICY/i);
     expect(sql).not.toMatch(/DROP POLICY/i);
     expect(sql).not.toMatch(/ALTER POLICY/i);
     expect(sql).not.toMatch(/^\s*GRANT /im);
-    expect(sql).not.toMatch(/^\s*REVOKE /im);
-    expect(sql).not.toMatch(/CREATE TRIGGER/i);
+    // SECURITY INVOKER only: a DEFINER function here would run as the table
+    // owner and bypass the RLS the rest of this table depends on.
     expect(sql).not.toMatch(/SECURITY DEFINER/i);
+    expect(sql).toMatch(/SECURITY INVOKER/i);
     expect(sql).not.toMatch(/TO anon/i);
     expect(sql).not.toMatch(/ENABLE ROW LEVEL SECURITY/i);
+    // The only REVOKE permitted is the narrowing one on the new function.
+    const revokes = sql.match(/^\s*REVOKE .*/gim) ?? [];
+    expect(revokes).toHaveLength(1);
+    expect(revokes[0]).toMatch(
+      /REVOKE EXECUTE ON FUNCTION public\.pheno_hunts_assert_parent_same_owner\(\) FROM PUBLIC, anon;/,
+    );
   });
 
   it("never bakes a ranking or quality claim into the schema", () => {

@@ -19,7 +19,12 @@ import {
   type GenerationHuntInput,
 } from "@/lib/phenoObjectiveGenerationRules";
 
-const MAX_CANDIDATES_PER_GENERATION = 500;
+/**
+ * Hard ceiling per generation. Not a sampling cap — the loader paginates up to
+ * this and REFUSES rather than reporting a truncated cohort as a whole one.
+ */
+const MAX_CANDIDATES_PER_GENERATION = 2000;
+const CANDIDATE_PAGE_SIZE = 500;
 
 interface RawHuntRow {
   id: string;
@@ -49,16 +54,42 @@ async function readHunt(huntId: string): Promise<RawHuntRow | null> {
   };
 }
 
-/** Candidate plant ids for a hunt, bounded. */
+/**
+ * Every candidate plant id for a hunt.
+ *
+ * Paginated deliberately: the share that met the bar is presented as the
+ * generation's WHOLE cohort, so a silently sampled subset would misreport it —
+ * omitting unscored candidates inflates the percentage, and an unordered
+ * sample makes repeated reads disagree with each other.
+ *
+ * Throws on read failure and on exceeding the safety ceiling. A caller must
+ * never receive a short list it cannot distinguish from a small hunt: unknown
+ * is not the same as empty, and the hook hides the model rather than reporting
+ * a cohort it could not actually count.
+ */
 async function candidatePlantIds(huntId: string): Promise<string[]> {
-  const { data, error } = await phenoDb
-    .from("plants")
-    .select("id")
-    .eq("pheno_hunt_id", huntId)
-    .eq("is_archived", false)
-    .limit(MAX_CANDIDATES_PER_GENERATION);
-  if (error || !data) return [];
-  return data.map((r) => r.id).filter((v): v is string => typeof v === "string" && v !== "");
+  const ids: string[] = [];
+  for (let from = 0; from < MAX_CANDIDATES_PER_GENERATION; from += CANDIDATE_PAGE_SIZE) {
+    const to = Math.min(from + CANDIDATE_PAGE_SIZE, MAX_CANDIDATES_PER_GENERATION) - 1;
+    const { data, error } = await phenoDb
+      .from("plants")
+      .select("id")
+      .eq("pheno_hunt_id", huntId)
+      .eq("is_archived", false)
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (error || !data) {
+      throw new Error(`pheno generation: candidate read failed for hunt ${huntId}`);
+    }
+    for (const row of data) {
+      if (typeof row.id === "string" && row.id !== "") ids.push(row.id);
+    }
+    if (data.length < to - from + 1) return ids; // exhausted
+  }
+  throw new Error(
+    `pheno generation: hunt ${huntId} exceeds ${MAX_CANDIDATES_PER_GENERATION} candidates; ` +
+      "refusing to present a truncated cohort as a complete share",
+  );
 }
 
 /**
@@ -89,14 +120,14 @@ export async function loadGenerationChain(
     const plantIds = await candidatePlantIds(row.id);
     let traitsByPlant: Record<string, { traits: Record<string, number> }> = {};
     if (plantIds.length > 0) {
-      try {
-        traitsByPlant = (await listCandidateScoresForHunt(row.id, plantIds)) as Record<
-          string,
-          { traits: Record<string, number> }
-        >;
-      } catch {
-        traitsByPlant = {}; // best-effort: unscored, never fabricated
-      }
+      // Deliberately NOT caught. A failed score read is unknown evidence, and
+      // swallowing it here would render every candidate as "not yet scored" —
+      // a factual claim the data does not support, which then feeds a trend.
+      // Let it propagate so the hook hides the model instead.
+      traitsByPlant = (await listCandidateScoresForHunt(row.id, plantIds)) as Record<
+        string,
+        { traits: Record<string, number> }
+      >;
     }
 
     out[row.id] = {

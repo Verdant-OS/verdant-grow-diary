@@ -104,14 +104,15 @@ export async function loadGrowOutPlantDetails(
     .map((r) => ({ plantId: r.id as string, huntId: r.pheno_hunt_id as string }));
   let traitsByPlant: Record<string, { traits: Record<string, number> }> = {};
   if (scoreRefs.length > 0) {
-    try {
-      traitsByPlant = (await listCandidateScoresForPlants(scoreRefs)) as Record<
-        string,
-        { traits: Record<string, number> }
-      >;
-    } catch {
-      traitsByPlant = {}; // best-effort: no evidence rather than a broken page
-    }
+    // Deliberately NOT caught. Swallowing a failed score read here would make
+    // the handoff card state "no recorded trait scores" — a claim about the
+    // grower's data that the failed read cannot support — and would let them
+    // accept an evidence-free run whose source plant is then permanently
+    // de-duplicated. An unreadable page is better than a confident wrong one.
+    traitsByPlant = (await listCandidateScoresForPlants(scoreRefs)) as Record<
+      string,
+      { traits: Record<string, number> }
+    >;
   }
 
   const out: Record<string, GrowOutPlantInput> = {};

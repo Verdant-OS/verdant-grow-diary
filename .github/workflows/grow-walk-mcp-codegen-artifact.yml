@@ -46,7 +46,8 @@ jobs:
       - name: Record generated diff
         shell: bash
         run: |
-          git diff -- .lovable/mcp/manifest.json supabase/functions/mcp/index.ts > /tmp/grow-walk-mcp-generated.diff
+          mkdir -p artifacts
+          git diff -- .lovable/mcp/manifest.json supabase/functions/mcp/index.ts > artifacts/grow-walk-mcp-generated.diff
           {
             echo "### Grow Walk MCP codegen"
             echo
@@ -58,7 +59,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload generated files
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: grow-walk-mcp-generated
           if-no-files-found: error
@@ -66,4 +67,4 @@ jobs:
           path: |
             .lovable/mcp/manifest.json
             supabase/functions/mcp/index.ts
-            /tmp/grow-walk-mcp-generated.diff
+            artifacts/grow-walk-mcp-generated.diff

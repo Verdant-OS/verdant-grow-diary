@@ -22,6 +22,11 @@ import EvidenceLinkageBadges from "@/components/EvidenceLinkageBadges";
 import { ALERT_REVIEW_EVIDENCE_NOT_LINKED_COPY } from "@/lib/originatingTimelineEventRules";
 import { adaptOriginatingTimelineEventsFromRow } from "@/lib/originatingTimelineEventAdapter";
 import { forwardAlertRefsToActionQueue } from "@/lib/originatingTimelineEventForwardRules";
+import { createActionQueueItem } from "@/lib/actionQueueCreateService";
+import {
+  actionQueueCreateFailureCopy,
+  buildEnvironmentAlertDedupeKey,
+} from "@/lib/actionQueueCreateRules";
 import { LinkedActionCountBadge } from "@/components/LinkedActionCountBadge";
 import { useAlertsLinkedActionCounts } from "@/hooks/useAlertsLinkedActionCounts";
 
@@ -345,94 +350,74 @@ export default function AlertDetail() {
     }
     setQueuing(true);
     const { draft } = draftResult;
-    // SECURITY: never send user_id from the client. DB default (auth.uid()) wins.
-    const { data: inserted, error: insErr } = await supabase
-      .from("action_queue")
-      .insert({
-        grow_id: draft.grow_id,
-        tent_id: draft.tent_id,
-        plant_id: draft.plant_id,
-        action_type: draft.action_type,
-        target_metric: draft.target_metric,
-        suggested_change: draft.suggested_change,
-        reason: draft.reason,
-        risk_level: draft.risk_level,
-        source: draft.source,
-        status: draft.status,
-        // Evidence Ref Population v1: forward the source alert's already-
-        // sanitized, persisted refs into the derived action_queue row via the
-        // shared adapter. If the alert has no refs, an explicit empty array
-        // is persisted — never inferred from prose, timestamps, plant/tent,
-        // alert id, or metric name.
-        originating_timeline_events: forwardAlertRefsToActionQueue(alert) as unknown as never,
-      })
-      .select("id,grow_id")
-      .single();
-    if (insErr) {
+    // Atomic create + created audit event via action_queue_create (#586).
+    // Never sends user_id or target_device. Server dedupe_key blocks races.
+    const result = await createActionQueueItem({
+      grow_id: draft.grow_id,
+      tent_id: draft.tent_id,
+      plant_id: draft.plant_id,
+      action_type: draft.action_type,
+      target_metric: draft.target_metric,
+      suggested_change: draft.suggested_change,
+      reason: draft.reason,
+      risk_level: draft.risk_level,
+      source: draft.source,
+      dedupe_key: buildEnvironmentAlertDedupeKey(alert.id),
+      audit_note: draft.audit_note,
+      // Evidence Ref Population v1: forward already-sanitized alert refs only.
+      originating_timeline_events: forwardAlertRefsToActionQueue(alert),
+    });
+    if (!result.ok) {
       setQueuing(false);
-      const msg = (insErr.message || "").toLowerCase();
       if (
-        insErr.code === "42501" ||
-        msg.includes("row-level security") ||
-        msg.includes("violates")
+        result.reason === "plant_not_in_grow" ||
+        result.reason === "tent_not_in_grow" ||
+        result.reason === "forbidden"
       ) {
         toast.error("This action cannot be queued until the plant/tent is assigned to this grow.", {
           description: "Open Lineage Repair to assign tents to this grow.",
         });
         return;
       }
-      toast.error(insErr.message);
+      toast.error(actionQueueCreateFailureCopy(result.reason));
       return;
     }
-    if (inserted?.id) {
-      setExistingActionId(inserted.id);
-      // Reflect the new row in the dedupe pool so a fast follow-up click
-      // is blocked by `decideAddButtonState` before any insert.
-      setExistingActionRows((rows) => [
-        ...rows,
+    const insertedId = result.action_queue_id;
+    const insertedGrowId = result.grow_id || draft.grow_id;
+    setExistingActionId(insertedId);
+    // Reflect the new row in the dedupe pool so a fast follow-up click
+    // is blocked by `decideAddButtonState` before any insert.
+    setExistingActionRows((rows) => [
+      ...rows,
+      {
+        id: insertedId,
+        grow_id: insertedGrowId,
+        source: "environment_alert",
+        status: "pending_approval",
+        reason: draft.reason,
+      },
+    ]);
+    setRelatedActions((rows) => {
+      if (rows.some((row) => row.id === insertedId)) return rows;
+      return [
         {
-          id: inserted.id as string,
-          grow_id: (inserted.grow_id as string | null) ?? draft.grow_id,
-          source: "environment_alert",
-          status: "pending_approval",
+          id: insertedId,
+          grow_id: insertedGrowId,
+          source: draft.source,
           reason: draft.reason,
+          status: draft.status,
+          risk_level: draft.risk_level,
+          suggested_change: draft.suggested_change,
+          action_type: draft.action_type,
+          created_at: new Date().toISOString(),
         },
-      ]);
-      setRelatedActions((rows) => {
-        if (rows.some((row) => row.id === inserted.id)) return rows;
-        return [
-          {
-            id: inserted.id as string,
-            grow_id: (inserted.grow_id as string | null) ?? draft.grow_id,
-            source: draft.source,
-            reason: draft.reason,
-            status: draft.status,
-            risk_level: draft.risk_level,
-            suggested_change: draft.suggested_change,
-            action_type: draft.action_type,
-            created_at: new Date().toISOString(),
-          },
-          ...rows,
-        ];
-      });
-      const { error: auditError } = await supabase.from("action_queue_events").insert({
-        action_queue_id: inserted.id,
-        grow_id: inserted.grow_id ?? draft.grow_id,
-        event_type: "created",
-        previous_status: null,
-        new_status: "pending_approval",
-        note: draft.audit_note,
-      });
-      if (auditError) {
-        setQueuing(false);
-        toast.warning("Action queued, but audit log failed.", {
-          description: auditError.message,
-        });
-        return;
-      }
-    }
+        ...rows,
+      ];
+    });
     setQueuing(false);
-    toast.success("Action queued for approval.");
+    toast.success(
+      result.reused ? "Action already in queue for approval." : "Action queued for approval.",
+    );
   }
 
   const derivedSensorSource = useMemo(() => deriveAlertReadingSource(alert), [alert]);

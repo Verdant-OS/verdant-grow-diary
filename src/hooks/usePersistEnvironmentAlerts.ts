@@ -1,3 +1,4 @@
+import { sanitizedMetricsFromSensorSnapshot } from "@/lib/actionQueueEvidenceSnapshotRules";
 /**
  * usePersistEnvironmentAlerts — promotes derived Environment Alerts into
  * persistent rows in `public.alerts` (+ a 'created' audit event in
@@ -79,6 +80,7 @@ export function resolveEnvironmentAlertEvidenceRefs(
       captured_at: metricRef.captured_at,
       source: metricRef.source,
       metric: alert.metric,
+      sanitized_metrics: sanitizedMetricsFromSensorSnapshot(snapshot),
     });
   }
   const diaryRef = snapshot?.diary_evidence_ref;

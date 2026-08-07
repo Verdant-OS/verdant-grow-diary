@@ -28,6 +28,10 @@ import {
   type OriginatingTimelineEventRef,
 } from "@/lib/originatingTimelineEventRules";
 import { FORBIDDEN_REF_FIELDS } from "@/lib/originatingTimelineEventAdapter";
+import {
+  sanitizeRefMetrics,
+  type SanitizedRefMetrics,
+} from "@/lib/actionQueueEvidenceSnapshotRules";
 
 /** Narrow shape accepted by the helper. Extra fields are tolerated but the
  * presence of any {@link FORBIDDEN_REF_FIELDS} key rejects the entry. */
@@ -37,6 +41,11 @@ export interface SensorSnapshotEvidenceInput {
   source?: unknown;
   /** Optional metric hint for a safer label ("vpd"|"temp"|"rh"|"co2"|...). */
   metric?: unknown;
+  /**
+   * Optional allowlisted numeric metrics for Action Queue evidence quality.
+   * Never raw payloads — only finite temperature_c / humidity_pct / …
+   */
+  sanitized_metrics?: SanitizedRefMetrics | null;
 }
 
 /** Honest, deterministic label. No diagnosis. No certainty. */
@@ -105,12 +114,14 @@ export function buildSensorSnapshotEvidenceRefs(
 
     // Route through the shared normalizer so source labels and sort/dedupe
     // semantics stay in lock-step with the persistence/adapter layer.
+    const metrics = sanitizeRefMetrics(input.sanitized_metrics);
     return normalizeOriginatingTimelineEvents([
       {
         id,
         type: "sensor_snapshot",
         occurred_at,
         source: rawSource,
+        ...(metrics ? { sanitized_metrics: metrics } : {}),
       },
     ]);
   } catch {

@@ -161,10 +161,15 @@ describe("Plant Detail wiring", () => {
   it("panel shows the no-open-alerts empty state copy", () => {
     expect(PANEL).toContain("No open alerts for this assigned tent.");
   });
-  it("hook queries the existing alerts source scoped to grow + open status", () => {
+  it("hook queries the existing alerts source scoped to grow, without narrowing status", () => {
     expect(HOOK).toContain("useAlertsList");
-    expect(HOOK).toMatch(/status:\s*["']open["']/);
     expect(HOOK).toMatch(/growId/);
+    // Status filtering belongs to buildAssignedTentAlerts, which keeps
+    // acknowledged alerts alongside open ones. Narrowing the query here turns
+    // into an `.eq(...)` on the status column and drops acknowledged rows
+    // before the rules layer runs — the defect this anchor now guards against.
+    expect(HOOK).not.toMatch(/status:\s*["']open["']/);
+    expect(HOOK).toMatch(/status:\s*["']all["']/);
   });
 });
 

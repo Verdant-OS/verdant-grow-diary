@@ -38,6 +38,13 @@
       "scanner": "SEARCH_PATH_MUTABLE",
       "migration": "20260707153206_email_infra.sql",
       "subject": "public.enqueue_email"
+    },
+    {
+      "fingerprint": "0ab953bcd1232e3b",
+      "scanner": "TABLE_WITHOUT_RLS",
+      "migration": "20260805090000_security_advisor_hardening_followup.sql",
+      "subject": "public.__default_privilege_selftest_tbl",
+      "_reason": "Already published (append-only history, cannot be edited) and cannot be fixed by adding RLS: the migration's own postcondition DO block RAISE EXCEPTIONs on every apply attempt (a same-transaction self-test that always fails -- see 20260807003500_security_advisor_hardening_followup_correction.sql), so the entire transaction -- including this CREATE TABLE -- always rolls back and this table is never actually created anywhere. Genuinely unreachable, not a live gap."
     }
   ]
 }

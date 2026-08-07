@@ -136,10 +136,16 @@ describe("One-Tent Loop E2E smoke", () => {
     ).toBe(false);
   });
 
-  it("stale snapshot is NEVER persistable", () => {
+  // Freshness is SOURCE-AWARE since the #592 sensor-truth canon: a live feed
+  // goes stale at 15 minutes, while a grower-typed manual reading stays valid
+  // current context for 24 hours. This snapshot is `source: "manual"`, so the
+  // stale case must use a genuinely-stale MANUAL timestamp — the previous
+  // 90-minute value encoded the older single 30-minute window and stopped
+  // proving anything once the canon split the two.
+  it("stale MANUAL snapshot is NEVER persistable (past the 24h manual window)", () => {
     const staleSnap = {
       ...snapshot!,
-      ts: new Date(NOW_MS - 90 * 60_000).toISOString(),
+      ts: new Date(NOW_MS - 25 * 60 * 60_000).toISOString(),
     };
     expect(
       isSnapshotPersistable({
@@ -148,6 +154,32 @@ describe("One-Tent Loop E2E smoke", () => {
         now: NOW_MS,
       }),
     ).toBe(false);
+  });
+
+  it("a manual snapshot INSIDE the 24h window is still persistable", () => {
+    // Guards the other direction: the fence must not creep back to a window
+    // so tight that ordinary manual logging stops counting as current.
+    const recentManual = {
+      ...snapshot!,
+      ts: new Date(NOW_MS - 90 * 60_000).toISOString(),
+    };
+    expect(isSnapshotPersistable({ snapshot: recentManual, quality: "good", now: NOW_MS })).toBe(
+      true,
+    );
+  });
+
+  it("stale LIVE snapshot is NEVER persistable (past the tighter 15m live window)", () => {
+    // The live window is the safety-critical one — a 20-minute-old live feed
+    // must not back a persisted alert, even though the same age is fine for
+    // a manual reading.
+    const staleLive = {
+      ...snapshot!,
+      source: "live" as const,
+      ts: new Date(NOW_MS - 20 * 60_000).toISOString(),
+    };
+    expect(isSnapshotPersistable({ snapshot: staleLive, quality: "good", now: NOW_MS })).toBe(
+      false,
+    );
   });
 
   it("invalid (unavailable quality) snapshot is NEVER persistable", () => {

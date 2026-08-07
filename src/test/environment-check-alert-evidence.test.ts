@@ -138,8 +138,13 @@ describe("alert-persistence eligibility (#596)", () => {
     ).toBe(true);
   });
 
-  it("a stale env-check snapshot is not persistable", () => {
-    const snap = snapshotFromEnvironmentCheck(minutesAgoIso(31), envelope());
+  // Env-check snapshots are labelled `manual`, and the #592 canon widened the
+  // manual current-state window from 6h to 24h. A 31-minute-old check is now
+  // deliberately current, so age this past the manual window — and keep an
+  // inside-window case so the boundary is proven from both directions rather
+  // than the assertion quietly ceasing to test staleness.
+  it("a stale env-check snapshot (past the 24h manual window) is not persistable", () => {
+    const snap = snapshotFromEnvironmentCheck(minutesAgoIso(25 * 60), envelope());
     expect(snap).not.toBeNull();
     expect(
       isSnapshotPersistable({
@@ -149,6 +154,19 @@ describe("alert-persistence eligibility (#596)", () => {
         now: NOW,
       }),
     ).toBe(false);
+  });
+
+  it("an env-check snapshot inside the 24h manual window is still persistable", () => {
+    const snap = snapshotFromEnvironmentCheck(minutesAgoIso(23 * 60), envelope());
+    expect(snap).not.toBeNull();
+    expect(
+      isSnapshotPersistable({
+        snapshot: snap,
+        quality: "watch",
+        isDemoData: false,
+        now: NOW,
+      }),
+    ).toBe(true);
   });
 
   it("the diary fence is unchanged: sensor_snapshot blobs stay diary and non-persistable", () => {

@@ -123,12 +123,23 @@ describe("AlertDetail — static safety", () => {
     expect(ALERT_DETAIL).toMatch(/existingActionId/);
   });
 
-  it("does NOT include user_id in client insert payload", () => {
-    const match = ALERT_DETAIL.match(
-      /\.from\(\s*["']action_queue["']\s*\)\s*\.insert\(\s*\{([\s\S]*?)\}\s*\)/,
-    );
-    expect(match).not.toBeNull();
-    expect(match![1]).not.toMatch(/\buser_id\s*:/);
+  it("does NOT include user_id in the client creation payload", () => {
+    // Creation moved to the atomic `action_queue_create` RPC (#586), so the
+    // old `.from("action_queue").insert({...})` shape this used to scan no
+    // longer exists — the assertion was matching nothing. The invariant is
+    // unchanged (and now server-enforced: the RPC derives the owner), so it
+    // is re-pointed at the real call site rather than dropped.
+    const callIdx = ALERT_DETAIL.indexOf("createActionQueueItem({");
+    expect(callIdx, "AlertDetail must create via the action_queue_create RPC").toBeGreaterThan(-1);
+    const payload = ALERT_DETAIL.slice(callIdx, callIdx + 1500);
+    expect(payload).not.toMatch(/\buser_id\s*:/);
+    expect(payload).not.toMatch(/\btarget_device\s*:/);
+  });
+
+  it("no client-side action_queue INSERT path remains (creation is RPC-only)", () => {
+    // The direct-insert path is gone; keep it gone. A reintroduced client
+    // insert would bypass the RPC's owner derivation and dedupe_key.
+    expect(ALERT_DETAIL).not.toMatch(/\.from\(\s*["']action_queue["']\s*\)\s*\.insert\(/);
   });
 
   it("pins status='pending_approval' and source='environment_alert'", () => {

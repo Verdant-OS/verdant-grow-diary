@@ -10,7 +10,7 @@
  *
  * ## Why this exists separately from `STALE_THRESHOLD_MS`
  *
- * `STALE_THRESHOLD_MS` (30 minutes, `src/lib/sensorSnapshot.ts`) is an
+ * `STALE_THRESHOLD_MS` (15 minutes, `src/lib/sensorSnapshot.ts`) is an
  * *alert-usability* window: it answers "is this reading recent enough to base
  * an alert on?" That is the right question for alerting and the wrong question
  * for liveness. Under that single threshold a feed running 31 minutes late and

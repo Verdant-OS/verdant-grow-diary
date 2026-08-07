@@ -26,6 +26,7 @@
 import { isDiagnosticSensorProvenanceRow } from "@/lib/sensorProvenanceFenceRules";
 
 import { DEFAULT_AI_SENSOR_STALE_THRESHOLD_MS } from "../constants/sensorTiming";
+import { resolveCurrentStateStaleWindowMs } from "@/lib/sensorTruthCanon";
 export type AiSensorSnapshotSource =
   "live" | "manual" | "csv" | "demo" | "stale" | "invalid" | "unknown";
 
@@ -249,13 +250,19 @@ export function buildAiSensorSnapshotContext(
   }
 
   const now = options.now ?? new Date();
-  const threshold = options.staleThresholdMs ?? DEFAULT_AI_SENSOR_STALE_THRESHOLD_MS;
   const rawSourceStr = pickString(snapshot, ["source", "data_source", "sensor_source"]);
   // Raw provenance is classification-only and is never copied into the
   // returned context. A canonical stored source=live cannot override an
   // explicit Windows diagnostic lineage marker.
   const source = isDiagnosticSensorProvenanceRow(snapshot) ? "demo" : normalizeSource(rawSourceStr);
   const captured = parseCapturedAt(snapshot);
+  const threshold =
+    options.staleThresholdMs ??
+    (source === "manual"
+      ? resolveCurrentStateStaleWindowMs("manual")
+      : source === "live"
+        ? resolveCurrentStateStaleWindowMs("live")
+        : DEFAULT_AI_SENSOR_STALE_THRESHOLD_MS);
 
   // Demo / invalid / unknown / explicit-stale: fixed-message paths.
   if (source === "demo") {

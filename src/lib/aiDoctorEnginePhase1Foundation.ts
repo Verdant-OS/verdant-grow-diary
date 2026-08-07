@@ -26,6 +26,8 @@
  *   - Never emits executable device commands in `action_queue_suggestion`.
  */
 
+import { MANUAL_SNAPSHOT_CURRENT_STALE_HOURS } from "@/constants/sensorTiming";
+import { resolveCurrentStateStaleWindowMs } from "@/lib/sensorTruthCanon";
 import { isDiagnosticSensorProvenanceRow } from "./sensorProvenanceFenceRules";
 
 // ---------------------------------------------------------------------------
@@ -236,16 +238,16 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const LOG_WINDOW_DAYS = 14;
 const SENSOR_WINDOW_DAYS = 7;
 /**
- * Sensor freshness window in hours. A reading whose age exceeds this
- * window (strictly greater than) is treated as stale-by-time. A reading
- * whose age is exactly equal to the window is still considered fresh.
+ * Coarse sensor freshness window in hours (manual current-context).
+ * Live readings use the 15-minute Sensor Truth Canon window via
+ * {@link resolveCurrentStateStaleWindowMs}. Prefer that helper for
+ * source-aware age checks; this constant remains the exported upper
+ * bound used by tests and documentation.
  */
-export const AI_DOCTOR_SENSOR_STALENESS_WINDOW_HOURS = 6;
+export const AI_DOCTOR_SENSOR_STALENESS_WINDOW_HOURS = MANUAL_SNAPSHOT_CURRENT_STALE_HOURS;
 /** Same window expressed in milliseconds; derived, do not duplicate. */
 export const AI_DOCTOR_SENSOR_STALENESS_WINDOW_MS =
   AI_DOCTOR_SENSOR_STALENESS_WINDOW_HOURS * 60 * 60 * 1000;
-/** Internal alias kept for readability in the compiler. */
-const SENSOR_FRESH_MAX_AGE_MS = AI_DOCTOR_SENSOR_STALENESS_WINDOW_MS;
 
 function parseTime(iso: string): number | null {
   const t = Date.parse(iso);
@@ -404,7 +406,8 @@ export function compileAiDoctorContextPayloadFromRows(
     const latest = forMetric[0]!;
     const isInvalid = latest.source === "invalid";
     const ageMs = nowMs - latest.capturedMs;
-    const isStale = latest.source === "stale" || ageMs > SENSOR_FRESH_MAX_AGE_MS;
+    const freshMaxMs = resolveCurrentStateStaleWindowMs(latest.source);
+    const isStale = latest.source === "stale" || ageMs > freshMaxMs;
     const isDegraded = !TRUSTWORTHY_SOURCES.has(latest.source) || isStale || isInvalid;
     return {
       metric,

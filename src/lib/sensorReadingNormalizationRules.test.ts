@@ -201,7 +201,7 @@ describe("isReadingStale", () => {
 
   it("custom threshold works", () => {
     const fiveMinAgo = new Date(NOW - 5 * 60 * 1000).toISOString();
-    // Not stale with 30min threshold
+    // Not stale with the live window threshold
     expect(isReadingStale(fiveMinAgo, NOW, STALE_THRESHOLD_MS)).toBe(false);
     // Stale with 1min threshold
     expect(isReadingStale(fiveMinAgo, NOW, 60 * 1000)).toBe(true);

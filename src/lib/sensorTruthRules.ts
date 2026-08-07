@@ -21,11 +21,7 @@
  *     and exposes per-field reasons.
  */
 
-import {
-  EMPTY_SNAPSHOT,
-  isStale as isSnapshotStale,
-  type SensorSnapshot,
-} from "@/lib/sensorSnapshot";
+import { EMPTY_SNAPSHOT, isSnapshotStale, type SensorSnapshot } from "@/lib/sensorSnapshot";
 import { tempFFromC } from "@/lib/temperatureUnits";
 
 // ---------------------------------------------------------------------------
@@ -275,7 +271,7 @@ export function classifySnapshotTruth(
     cleaned.soil_temp = null;
   }
 
-  const stale = isSnapshotStale(snapshot.ts, now);
+  const stale = isSnapshotStale(snapshot, now);
   if (stale) codes.push("stale_reading");
 
   // Dedupe codes preserving order.

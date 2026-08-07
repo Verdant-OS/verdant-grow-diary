@@ -3,11 +3,13 @@ import {
   PROOF_SAFETY_BADGES,
   buildOneTentLiveProofViewModel,
 } from "@/lib/oneTentLiveProofViewModel";
-import { STALE_THRESHOLD_MS, type SensorSnapshot } from "@/lib/sensorSnapshot";
+import { type SensorSnapshot } from "@/lib/sensorSnapshot";
+import { LIVE_CURRENT_STATE_STALE_MS, MANUAL_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
 
 const NOW = Date.parse("2026-06-23T12:00:00Z");
 const FRESH_TS = new Date(NOW - 5 * 60_000).toISOString();
-const STALE_TS = new Date(NOW - STALE_THRESHOLD_MS - 60_000).toISOString();
+const STALE_MANUAL_TS = new Date(NOW - MANUAL_CURRENT_STATE_STALE_MS - 60_000).toISOString();
+const STALE_LIVE_TS = new Date(NOW - LIVE_CURRENT_STATE_STALE_MS - 60_000).toISOString();
 
 function snap(
   overrides: Partial<SensorSnapshot> & {
@@ -71,7 +73,14 @@ describe("buildOneTentLiveProofViewModel — step derivation", () => {
   it("stale manual snapshot → step 2 stale", () => {
     const vm = buildOneTentLiveProofViewModel(FULL_CTX, {
       ...EMPTY_SIGNALS,
-      snapshot: snap({ source: "manual", ts: STALE_TS }),
+      snapshot: snap({ source: "manual", ts: STALE_MANUAL_TS }),
+    });
+    expect(vm.steps[1].status).toBe("stale");
+  });
+  it("stale live snapshot → step 2 stale past the 15-minute window", () => {
+    const vm = buildOneTentLiveProofViewModel(FULL_CTX, {
+      ...EMPTY_SIGNALS,
+      snapshot: snap({ source: "live", ts: STALE_LIVE_TS }),
     });
     expect(vm.steps[1].status).toBe("stale");
   });

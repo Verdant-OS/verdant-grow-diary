@@ -58,40 +58,73 @@ function basePlant(
 // ---------------------------------------------------------------------------
 
 describe("AI_DOCTOR_SENSOR_STALENESS_WINDOW_* exported constants", () => {
-  it("hours constant is 6 and ms constant is the derived 6h value", () => {
-    expect(AI_DOCTOR_SENSOR_STALENESS_WINDOW_HOURS).toBe(6);
-    expect(AI_DOCTOR_SENSOR_STALENESS_WINDOW_MS).toBe(6 * 60 * 60 * 1000);
+  it("hours constant is 24 (manual current-context) and ms is derived", () => {
+    expect(AI_DOCTOR_SENSOR_STALENESS_WINDOW_HOURS).toBe(24);
+    expect(AI_DOCTOR_SENSOR_STALENESS_WINDOW_MS).toBe(24 * 60 * 60 * 1000);
   });
 
-  it("compiler honors the exported window: age > 6h is stale; age === 6h is fresh", () => {
-    const exactly = compileAiDoctorContextPayloadFromRows(
+  it("compiler honors source-aware windows: live 15m, manual 24h", () => {
+    const liveExactly = compileAiDoctorContextPayloadFromRows(
+      basePlant({
+        sensorReadings: [
+          {
+            metric: "temperature_c",
+            value: 22,
+            captured_at: iso(15 * 60 * 1000),
+            source: "live",
+          },
+        ],
+      }),
+    );
+    const liveJustOver = compileAiDoctorContextPayloadFromRows(
+      basePlant({
+        sensorReadings: [
+          {
+            metric: "temperature_c",
+            value: 22,
+            captured_at: iso(15 * 60 * 1000 + 1),
+            source: "live",
+          },
+        ],
+      }),
+    );
+    expect(liveExactly.sensor_summary.find((m) => m.metric === "temperature_c")!.is_stale).toBe(
+      false,
+    );
+    expect(liveJustOver.sensor_summary.find((m) => m.metric === "temperature_c")!.is_stale).toBe(
+      true,
+    );
+
+    const manualExactly = compileAiDoctorContextPayloadFromRows(
       basePlant({
         sensorReadings: [
           {
             metric: "temperature_c",
             value: 22,
             captured_at: iso(AI_DOCTOR_SENSOR_STALENESS_WINDOW_MS),
-            source: "live",
+            source: "manual",
           },
         ],
       }),
     );
-    const justOver = compileAiDoctorContextPayloadFromRows(
+    const manualJustOver = compileAiDoctorContextPayloadFromRows(
       basePlant({
         sensorReadings: [
           {
             metric: "temperature_c",
             value: 22,
-            captured_at: iso(AI_DOCTOR_SENSOR_STALENESS_WINDOW_MS + 1000),
-            source: "live",
+            captured_at: iso(AI_DOCTOR_SENSOR_STALENESS_WINDOW_MS + 1),
+            source: "manual",
           },
         ],
       }),
     );
-    const tExact = exactly.sensor_summary.find((m) => m.metric === "temperature_c")!;
-    const tOver = justOver.sensor_summary.find((m) => m.metric === "temperature_c")!;
-    expect(tExact.is_stale).toBe(false);
-    expect(tOver.is_stale).toBe(true);
+    expect(manualExactly.sensor_summary.find((m) => m.metric === "temperature_c")!.is_stale).toBe(
+      false,
+    );
+    expect(manualJustOver.sensor_summary.find((m) => m.metric === "temperature_c")!.is_stale).toBe(
+      true,
+    );
   });
 });
 

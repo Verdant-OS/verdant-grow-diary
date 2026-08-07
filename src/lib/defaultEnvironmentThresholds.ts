@@ -108,7 +108,7 @@ export function buildDefaultThresholdAlerts(args: BuildArgs): EnvironmentAlert[]
   if (!snapshot) return [];
   if (snapshot.source !== "live" && snapshot.source !== "manual") return [];
   const now = args.now ?? Date.now();
-  if (isStale(snapshot.ts, now)) return [];
+  if (isStale(snapshot.ts, now, undefined, snapshot.source)) return [];
 
   const createdAt = args.createdAt ?? new Date(now).toISOString();
   const out: EnvironmentAlert[] = [];

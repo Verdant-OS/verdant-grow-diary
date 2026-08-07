@@ -2,7 +2,7 @@
  * useNowTick — shared minute-tick clock for freshness-sensitive presenters.
  *
  * Pins: returns the current time on mount, re-evaluates on the interval
- * (so an open tab crosses the 30-minute stale boundary without new data
+ * (so an open tab crosses the 15-minute stale boundary without new data
  * or a refetch), and tears the timer down on unmount.
  */
 import { describe, it, expect, vi, afterEach } from "vitest";

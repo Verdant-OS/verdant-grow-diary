@@ -15,6 +15,7 @@ import {
   type AuditRowLike,
   type SnapshotStatus,
 } from "@/lib/sensorSnapshotStatusContract";
+import { LIVE_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
 
 const NOW = new Date("2026-05-23T12:00:00Z");
 const minutesAgo = (m: number) => new Date(NOW.getTime() - m * 60_000).toISOString();
@@ -158,7 +159,8 @@ describe("resolveStaleWindowMs", () => {
     expect(classifyAuditRow(row, { now: NOW }).status).toBe("stale");
 
     delete PER_SOURCE_STALE_WINDOW_MS.ecowitt;
-    expect(resolveStaleWindowMs("ecowitt")).toBe(DEFAULT_STALE_WINDOW_MS);
+    // Named live-transport aliases fall back to the Sensor Truth Canon live window.
+    expect(resolveStaleWindowMs("ecowitt")).toBe(LIVE_CURRENT_STATE_STALE_MS);
   });
 });
 

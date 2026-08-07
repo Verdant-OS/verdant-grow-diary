@@ -147,8 +147,8 @@ const TENTS_SRC = readFileSync(resolve(__dirname, "../pages/Tents.tsx"), "utf8")
 
 const NOW = new Date("2026-07-16T12:00:00Z").getTime();
 const FRESH_TS = "2026-07-16T11:55:00Z";
-const NEWEST_TS = "2026-07-16T08:00:00Z"; // > 30 min old → stale
-const OLDEST_TS = "2026-07-16T06:00:00Z";
+const NEWEST_TS = "2026-07-15T08:00:00Z"; // > 24h old → stale for manual (and live)
+const OLDEST_TS = "2026-07-15T06:00:00Z";
 
 function row(over: Partial<BuildTentSnapshotInput>): BuildTentSnapshotInput {
   return {
@@ -580,14 +580,19 @@ describe("Tents list sensor truth — rendered page (walkthrough regression)", (
     );
   });
 
-  it("an open tab flips fresh labels to Stale once the boundary passes", () => {
+  it("an open tab flips fresh live labels to Stale once the 15-minute boundary passes", () => {
     vi.useFakeTimers();
-    // 29 minutes old at first paint — inside the 30-minute fresh window.
-    const nearBoundaryTs = new Date(Date.now() - 29 * 60_000).toISOString();
+    // Live source, 14 minutes old at first paint — inside the live fresh window.
+    // Manual uses a 24h window, so this boundary test must pin live provenance.
+    const nearBoundaryTs = new Date(Date.now() - 14 * 60_000).toISOString();
+    const liveRaw = (ts: string, metric: string, value: number) => ({
+      ...H.raw(ts, metric, value),
+      source: "live",
+    });
     H.hookState.byTent = {
       [H.TENT_ID]: [
-        H.raw(nearBoundaryTs, "temperature_c", 21.78),
-        H.raw(nearBoundaryTs, "humidity_pct", 56),
+        liveRaw(nearBoundaryTs, "temperature_c", 21.78),
+        liveRaw(nearBoundaryTs, "humidity_pct", 56),
       ],
     };
     H.hookState.statusByTent = { [H.TENT_ID]: "success" };
@@ -597,10 +602,10 @@ describe("Tents list sensor truth — rendered page (walkthrough regression)", (
       </MemoryRouter>,
     );
     const source = screen.getByTestId(`tents-list-sensor-source-${H.TENT_ID}`);
-    expect(source).toHaveTextContent("Manual");
+    expect(source).toHaveTextContent("Live");
     expect(source).not.toHaveTextContent("Stale");
 
-    // Cross the 30-minute boundary with NO new data — the minute tick must
+    // Cross the 15-minute live boundary with NO new data — the minute tick must
     // re-evaluate freshness without a re-fetch.
     act(() => {
       vi.advanceTimersByTime(2 * 60_000);

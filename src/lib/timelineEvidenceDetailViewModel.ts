@@ -10,6 +10,7 @@
  * URLs and similar secrets MUST NEVER appear in the returned model.
  */
 
+import { LIVE_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
 export type TimelineEvidenceSource =
   "manual" | "live" | "csv" | "demo" | "stale" | "invalid" | "unknown";
 
@@ -71,7 +72,7 @@ const SAFE_DETAIL_KEYS: ReadonlySet<string> = new Set([
   "outcome",
 ]);
 
-const TIMELINE_DETAIL_STALE_MS = 30 * 60 * 1000;
+const TIMELINE_DETAIL_STALE_MS = LIVE_CURRENT_STATE_STALE_MS;
 
 export interface TimelineEvidenceDetailInput {
   id: string;

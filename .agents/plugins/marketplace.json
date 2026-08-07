@@ -1,0 +1,20 @@
+{
+  "name": "verdant-repo-plugins",
+  "interface": {
+    "displayName": "Verdant Repo Plugins"
+  },
+  "plugins": [
+    {
+      "name": "verdant-grow-walk",
+      "source": {
+        "source": "local",
+        "path": "./plugins/verdant-grow-walk"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

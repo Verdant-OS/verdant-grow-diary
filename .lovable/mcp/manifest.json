@@ -101,6 +101,83 @@
           "$schema": "http://json-schema.org/draft-07/schema#"
         },
         "outputSchema": null
+      },
+      {
+        "name": "list_grow_walk_targets",
+        "title": "List Grow Walk targets",
+        "description": "List the signed-in Verdant grower's own tents and plants within one owned grow, ordered by deterministic physical-inspection priority. Results preserve missing evidence and source limits; priority is scouting guidance, not a diagnosis. Read-only.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "growId": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Owned grow id whose tents and plants should be listed."
+            },
+            "includeInactivePlants": {
+              "type": "boolean",
+              "description": "Include archived or inactive plant records. Defaults to false."
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "description": "Maximum targets to return (1–100). Defaults to 50."
+            }
+          },
+          "required": [
+            "growId"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "get_grow_walk_context",
+        "title": "Get Grow Walk context",
+        "description": "Fetch bounded, source-labeled evidence for one tent or plant the signed-in grower owns. Photo rows are metadata only, sensor evidence keeps source/quality/freshness labels, and partial lanes are named explicitly. The result supports physical inspection and does not diagnose, approve actions, or control equipment. Read-only.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "targetType": {
+              "type": "string",
+              "enum": [
+                "tent",
+                "plant"
+              ],
+              "description": "Whether the owned target is a tent or plant."
+            },
+            "targetId": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Owned tent or plant id to review."
+            },
+            "lookbackHours": {
+              "type": "integer",
+              "minimum": 24,
+              "maximum": 168,
+              "description": "Bounded history window in hours (24–168). Defaults to 72."
+            }
+          },
+          "required": [
+            "targetType",
+            "targetId"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
       }
     ]
   }

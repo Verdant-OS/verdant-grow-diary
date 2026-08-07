@@ -1,0 +1,106 @@
+version: 1
+positive:
+  - prompt: "Run my morning grow walk."
+    expected: activate
+  - prompt: "Walk me through the grow before lights on."
+    expected: activate
+  - prompt: "Which plant should I inspect first?"
+    expected: activate
+  - prompt: "What changed in Flower Tent overnight?"
+    expected: activate
+  - prompt: "Give me a five-minute walkthrough of my active grow."
+    expected: activate
+  - prompt: "What should I verify before watering Sour Diesel Auto?"
+    expected: activate
+  - prompt: "Is anything getting worse since yesterday?"
+    expected: activate
+  - prompt: "Review my grow, but do not recommend changes unless the evidence is strong."
+    expected: activate
+  - prompt: "Run an evening room check from my Verdant data."
+    expected: activate
+  - prompt: "Rank my tents for inspection."
+    expected: activate
+  - prompt: "Show me where to look before I change anything."
+    expected: activate
+  - prompt: "What needs a physical check today?"
+    expected: activate
+  - prompt: "Check the room after last night's watering."
+    expected: activate
+  - prompt: "Do I have enough evidence to act, or should I observe first?"
+    expected: activate
+  - prompt: "Run a post-feeding grow walk for Plant 4."
+    expected: activate
+  - prompt: "Which alert should I verify in the room first?"
+    expected: activate
+  - prompt: "Use my logs and sensor readings to plan today's inspection."
+    expected: activate
+  - prompt: "Give me a cautious pre-watering check."
+    expected: activate
+  - prompt: "What evidence is missing before I make another change?"
+    expected: activate
+  - prompt: "Walk the one-tent loop with me."
+    expected: activate
+
+negative:
+  - prompt: "What is VPD?"
+    expected: do_not_activate
+  - prompt: "How does cannabis flowering work?"
+    expected: do_not_activate
+  - prompt: "Write an article about watering cannabis."
+    expected: do_not_activate
+  - prompt: "Diagnose this random plant photo from the internet."
+    expected: do_not_activate
+  - prompt: "Fix my React component."
+    expected: do_not_activate
+  - prompt: "Recommend a Sour Diesel seed vendor."
+    expected: do_not_activate
+  - prompt: "Compare under-canopy lights."
+    expected: do_not_activate
+  - prompt: "Write a YouTube script about my grow."
+    expected: do_not_activate
+  - prompt: "Build a Supabase migration."
+    expected: do_not_activate
+  - prompt: "Explain nutrient lockout in general."
+    expected: do_not_activate
+  - prompt: "Create an Instagram post for Verdant."
+    expected: do_not_activate
+  - prompt: "Find me a new grow tent."
+    expected: do_not_activate
+  - prompt: "Summarize this pasted cultivation article."
+    expected: do_not_activate
+  - prompt: "How many weeks does an autoflower take?"
+    expected: do_not_activate
+  - prompt: "Audit GitHub PR 790."
+    expected: do_not_activate
+  - prompt: "Translate this grow log into Spanish."
+    expected: do_not_activate
+  - prompt: "Create a breeding simulator."
+    expected: do_not_activate
+  - prompt: "What is the best cannabis strain?"
+    expected: do_not_activate
+  - prompt: "Design a dispensary flyer."
+    expected: do_not_activate
+  - prompt: "Tell me a story about a cannabis plant."
+    expected: do_not_activate
+
+routing:
+  - prompt: "Tell me exactly what deficiency this plant has."
+    expected: route_ai_doctor
+  - prompt: "Diagnose the spots on my leaves from this photo."
+    expected: route_ai_doctor
+  - prompt: "Why is my plant sick? Give me the most likely causes."
+    expected: route_ai_doctor
+  - prompt: "Use all my history to diagnose this problem."
+    expected: route_ai_doctor
+  - prompt: "Is this pest damage or nutrient damage?"
+    expected: route_ai_doctor
+  - prompt: "Before diagnosing, tell me what evidence I should collect."
+    expected: activate
+  - prompt: "Check what changed, then tell me whether AI Doctor is warranted."
+    expected: activate
+  - prompt: "I think it is deficient—walk the room before I feed again."
+    expected: activate
+  - prompt: "Review my current evidence but do not diagnose yet."
+    expected: activate
+  - prompt: "Help me capture a clean observation for AI Doctor."
+    expected: activate

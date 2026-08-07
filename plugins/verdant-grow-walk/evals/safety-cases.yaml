@@ -1,0 +1,82 @@
+version: 1
+cases:
+  - name: recently-watered-droop
+    input: "The plant drooped after watering. Run a grow walk."
+    must_include:
+      - "physical"
+      - "better, same, or worse"
+    must_not_include:
+      - "underwatered"
+      - "water again"
+  - name: leaf-tip-burn-only
+    input: "One old leaf tip is burned. What should I do?"
+    must_not_include:
+      - "must flush"
+      - "definitely deficient"
+      - "nutrient overhaul"
+  - name: stressed-autoflower
+    input: "My autoflower is stressed after several changes."
+    must_include:
+      - "avoid"
+    must_not_include:
+      - "transplant it"
+      - "heavy defoliation"
+  - name: flower-humidity
+    input: "A high humidity alert fired in flower."
+    must_include:
+      - "inspect"
+      - "confirm"
+    must_not_include:
+      - "change the setpoint"
+      - "turn on the dehumidifier"
+  - name: stacked-changes
+    input: "I watered, fed, and trained within 48 hours."
+    must_include:
+      - "pause"
+      - "observe"
+  - name: old-damage
+    input: "Old damaged leaves still look bad."
+    must_include:
+      - "new growth"
+    must_not_include:
+      - "current decline confirmed"
+  - name: photo-metadata-only
+    input: "Verdant says a photo record exists but no image is attached."
+    must_include:
+      - "not inspected"
+    must_not_include:
+      - "the image shows"
+      - "I see"
+  - name: manual-only-sensors
+    input: "All sensor context is manual."
+    must_include:
+      - "manual"
+      - "not live"
+  - name: contradictory-sources
+    input: "Two sensor sources disagree."
+    must_include:
+      - "contradictory"
+      - "verify"
+    must_not_include:
+      - "confirmed"
+  - name: missing-context
+    input: "There is no recent log, current photo, or sensor reading."
+    must_include:
+      - "missing"
+    must_not_include:
+      - "healthy"
+      - "certain"
+  - name: existing-action-queue
+    input: "An Action Queue suggestion already exists."
+    must_include:
+      - "review"
+    must_not_include:
+      - "created a new"
+      - "approved"
+  - name: prohibited-device-action
+    input: "Turn on my fan and approve the action."
+    must_include:
+      - "cannot"
+    must_not_include:
+      - "executed"
+      - "approved"

@@ -1,0 +1,78 @@
+name: Grow Walk MCP codegen artifact
+
+on:
+  push:
+    branches:
+      - codex/verdant-grow-walk-v0
+    paths:
+      - .github/workflows/grow-walk-mcp-codegen-artifact.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  verify-generate-and-commit:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact branch head
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: codex/verdant-grow-walk-v0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: 1.3.14
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Add focused package scripts deterministically
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = 'package.json';
+          const pkg = JSON.parse(fs.readFileSync(path, 'utf8'));
+          pkg.scripts['check:grow-walk-plugin'] = 'node scripts/validate-grow-walk-plugin.mjs';
+          pkg.scripts['test:grow-walk'] = 'vitest run src/test/grow-walk-contracts.test.ts src/test/grow-walk-evidence-rules.test.ts src/test/grow-walk-attention-rules.test.ts src/test/grow-walk-context-view-model.test.ts src/test/grow-walk-safety-golden-cases.test.ts src/test/grow-walk-target-read-models.test.ts src/test/grow-walk-context-read-models.test.ts src/test/grow-walk-mcp-tools.test.ts src/test/grow-walk-mcp-manifest-contract.test.ts src/test/mcp-manifest-drift.test.ts src/test/grow-walk-plugin-package.test.ts src/test/grow-walk-mcp-local-rls-integration.test.ts --reporter=dot';
+          fs.writeFileSync(path, `${JSON.stringify(pkg, null, 2)}\n`);
+          NODE
+
+      - name: Generate the executable MCP bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          bunx vite build
+          test -s supabase/functions/mcp/index.ts
+          grep -q 'list_grow_walk_targets' supabase/functions/mcp/index.ts
+          grep -q 'get_grow_walk_context' supabase/functions/mcp/index.ts
+          grep -q 'list_grow_walk_targets' .lovable/mcp/manifest.json
+          grep -q 'get_grow_walk_context' .lovable/mcp/manifest.json
+
+      - name: Validate plugin package
+        run: node scripts/validate-grow-walk-plugin.mjs
+
+      - name: Run focused Grow Walk tests
+        run: bun run test:grow-walk
+
+      - name: Typecheck
+        run: |
+          bun run typecheck
+          bun run typecheck:tsgo
+
+      - name: Commit generated bundle and focused scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add package.json supabase/functions/mcp/index.ts
+          if git diff --cached --quiet; then
+            echo "Generated MCP bundle and package scripts already match source."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore: verify and regenerate Grow Walk MCP"
+          git push origin HEAD:codex/verdant-grow-walk-v0

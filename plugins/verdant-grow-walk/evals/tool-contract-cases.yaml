@@ -1,0 +1,67 @@
+version: 1
+tools:
+  list_grows:
+    order: 1
+    required_inputs: []
+    forbidden_inputs:
+      - user_id
+      - sql
+      - raw_filter
+    expected_use: "Resolve an owned active grow before any Grow Walk target call."
+  list_grow_walk_targets:
+    order: 2
+    required_inputs:
+      - growId
+    optional_inputs:
+      - includeInactivePlants
+      - limit
+    forbidden_inputs:
+      - user_id
+      - sort
+      - sql
+      - storage_path
+    expected_use: "Return owned tent and plant targets in deterministic physical-inspection order."
+  get_grow_walk_context:
+    order: 3
+    required_inputs:
+      - targetType
+      - targetId
+    optional_inputs:
+      - lookbackHours
+    forbidden_inputs:
+      - user_id
+      - now
+      - sql
+      - raw_payload
+      - signed_url
+    expected_use: "Return bounded, source-labeled evidence for one exact owned target."
+contracts:
+  - name: single-active-grow
+    calls:
+      - list_grows
+      - list_grow_walk_targets
+      - get_grow_walk_context
+    maximum_context_targets: 3
+  - name: ambiguous-grow
+    calls:
+      - list_grows
+    stop_before:
+      - list_grow_walk_targets
+      - get_grow_walk_context
+    expected: "Ask the grower to choose among returned owned grows."
+  - name: foreign-target
+    calls:
+      - get_grow_walk_context
+    expected: "Fail closed without revealing whether another account owns the identifier."
+  - name: partial-sensor-lane
+    calls:
+      - get_grow_walk_context
+    expected: "Preserve sensors in partialLanes and lower confidence; never render an empty healthy lane."
+  - name: no-write-surface
+    forbidden_tools:
+      - quicklog_save_manual
+      - quicklog_save_event
+      - create_action_queue_item
+      - transition_action_queue
+      - execute_device_command
+      - ai_doctor_review

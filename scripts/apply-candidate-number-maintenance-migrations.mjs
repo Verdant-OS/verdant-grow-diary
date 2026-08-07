@@ -203,20 +203,40 @@ export function buildApplyStepSql(migration) {
  * version+name match), or "collision"/"mixed" (anything else, including a
  * partial match or a version/name claimed by different content).
  */
+/**
+ * Classify the ledger per-migration, in PINNED_MIGRATIONS' own dependency
+ * order (20260806230021's VALIDATE CONSTRAINT requires
+ * 20260806230020's ADD CONSTRAINT to already exist — the pair is ordered,
+ * not independent).
+ *
+ * Because each migration now commits in its OWN transaction
+ * (buildApplyStepSql / the two-phase apply fix), a step-2 failure after
+ * step 1 already committed — e.g. hitting the 4s lock_timeout — is an
+ * EXPECTED, safe-to-resume outcome, not just a corruption signal. This
+ * classifier distinguishes that specific shape — an exact-match PREFIX
+ * followed by an absent SUFFIX, and nothing else — from every other
+ * partial state, which remains a genuine anomaly (e.g. step 2 present
+ * while step 1 is absent is structurally impossible under normal
+ * operation, since step 2 cannot validate a constraint step 1 never
+ * added) and still refuses outright.
+ *
+ * status: "apply" (all absent) | "verify_only" (all exact) |
+ * "resume" (exact prefix, absent suffix — apply pendingIndexes only) |
+ * "collision" | "mixed" | "invalid" (refuse; nothing is safely inferable).
+ */
 export function classifyTargetLedger(targets) {
   if (!Array.isArray(targets) || targets.length !== PINNED_MIGRATIONS.length) {
     return { status: "invalid", reason: "target_count" };
   }
 
-  let absent = 0;
-  let exact = 0;
+  const perMigration = [];
   for (const expected of PINNED_MIGRATIONS) {
     const row = targets.find((candidate) => candidate?.version === expected.version);
     if (!row || !Array.isArray(row.matches)) {
       return { status: "invalid", reason: `target_missing:${expected.version}` };
     }
     if (row.matches.length === 0) {
-      absent++;
+      perMigration.push("absent");
       continue;
     }
     if (
@@ -224,14 +244,31 @@ export function classifyTargetLedger(targets) {
       row.matches[0]?.version === expected.version &&
       row.matches[0]?.name === expected.name
     ) {
-      exact++;
+      perMigration.push("exact");
       continue;
     }
     return { status: "collision", reason: `target_collision:${expected.version}` };
   }
 
-  if (absent === PINNED_MIGRATIONS.length) return { status: "apply" };
-  if (exact === PINNED_MIGRATIONS.length) return { status: "verify_only" };
+  if (perMigration.every((s) => s === "absent")) {
+    return { status: "apply", pendingIndexes: perMigration.map((_, i) => i) };
+  }
+  if (perMigration.every((s) => s === "exact")) {
+    return { status: "verify_only", pendingIndexes: [] };
+  }
+
+  const firstAbsent = perMigration.indexOf("absent");
+  const isCleanOrderedPrefix =
+    firstAbsent !== -1 &&
+    perMigration.slice(0, firstAbsent).every((s) => s === "exact") &&
+    perMigration.slice(firstAbsent).every((s) => s === "absent");
+  if (isCleanOrderedPrefix) {
+    return {
+      status: "resume",
+      pendingIndexes: perMigration.flatMap((s, i) => (s === "absent" ? [i] : [])),
+    };
+  }
+
   return { status: "mixed", reason: "partial_target_application" };
 }
 
@@ -507,15 +544,22 @@ export function runApplyCandidateNumberMaintenanceMigrations({
   }
 
   if (ledger.status === "collision" || ledger.status === "mixed" || ledger.status === "invalid") {
+    // The one safe partial state — an exact-match prefix followed by an
+    // absent suffix, matching PINNED_MIGRATIONS' own dependency order — is
+    // handled separately as ledger.status === "resume", below. Reaching
+    // here means the partial state does NOT match that shape: e.g. step 2
+    // present while step 1 is absent, which cannot happen from a normal
+    // partial apply since step 2 depends on step 1. That is a genuine
+    // anomaly, not an expected retry, and still refuses outright.
     logger.error(`Production ledger state is not safely actionable (${ledger.status}).`);
     writeReport("BLOCKED - migration ledger drift", [
-      "The two pinned versions were partially applied, or a version/name is already claimed by different content. Nothing was written.",
+      "The ledger state does not match either a clean unapplied state or a clean resumable partial apply (an exact-match prefix followed by an absent suffix). A version/name may be claimed by different content, or the migrations are present out of their dependency order. Nothing was written.",
     ]);
     writeAudit("ledger_drift", { ...auditBase, ledgerState: ledger.status, note: ledger.reason });
     return EXIT.LEDGER_DRIFT;
   }
 
-  if (ledger.status === "apply") {
+  if (ledger.status === "apply" || ledger.status === "resume") {
     // Each migration is its own --single-transaction psql invocation, run
     // SEQUENTIALLY — never bundled into one call. 20260806230020's ACCESS
     // EXCLUSIVE lock (from ADD CONSTRAINT NOT VALID) must be released at
@@ -527,7 +571,19 @@ export function runApplyCandidateNumberMaintenanceMigrations({
     // rollback a single combined transaction would have guaranteed — the
     // report below says so explicitly so an operator investigates the
     // actual ledger state rather than assuming an all-or-nothing outcome.
-    for (let stepIndex = 0; stepIndex < validatedMigrations.length; stepIndex++) {
+    //
+    // Only ledger.pendingIndexes are applied — for "resume" that is the
+    // absent SUFFIX after an already-committed exact-match prefix (e.g. a
+    // prior run's step 2 failed on the 4s lock_timeout after step 1
+    // committed fine); classifyTargetLedger already proved that prefix is
+    // clean before returning "resume", so skipping it here is not a
+    // collision risk.
+    if (ledger.status === "resume") {
+      logger.log(
+        `Resuming a partial prior apply: ${PINNED_MIGRATIONS.length - ledger.pendingIndexes.length} migration(s) already committed, applying the remaining ${ledger.pendingIndexes.length}.`,
+      );
+    }
+    for (const stepIndex of ledger.pendingIndexes) {
       const migration = validatedMigrations[stepIndex];
       const temporaryRoot = mkdtempSync(
         join(env.RUNNER_TEMP || env.TEMP || env.TMP || tmpdir(), "verdant-candidate-number-apply-"),
@@ -537,16 +593,19 @@ export function runApplyCandidateNumberMaintenanceMigrations({
         writeFileSync(applyPath, buildApplyStepSql(migration), { encoding: "utf8", mode: 0o600 });
         const applyResult = runPsqlFile({ path: applyPath, childEnv, spawnImpl });
         if (!applyResult.ok) {
-          const isFirstStep = stepIndex === 0;
+          const isFirstPendingStep = stepIndex === ledger.pendingIndexes[0];
+          const priorlyCommitted = PINNED_MIGRATIONS.length - ledger.pendingIndexes.length;
           logger.error(
             `Migration ${migration.version} failed and was rolled back` +
-              (isFirstStep ? "; no earlier step ran." : "; the earlier step(s) already committed."),
+              (isFirstPendingStep && priorlyCommitted === 0
+                ? "; no earlier step ran."
+                : "; earlier step(s) already committed."),
           );
-          writeReport(`FAILED - ${migration.version} rolled back`, [
+          writeReport(`FAIL - ${migration.version} rolled back`, [
             `psql returned a failure while applying ${migration.version} in its own transaction.`,
-            isFirstStep
+            isFirstPendingStep && priorlyCommitted === 0
               ? "No earlier migration in this run committed."
-              : `${stepIndex} earlier migration(s) in this run already committed and are NOT rolled back. Check the exact ledger state with scripts/verify-candidate-number-migration-history.mjs before retrying.`,
+              : `Earlier migration(s) (from this run, an earlier run, or both) already committed and are NOT rolled back. Check the exact ledger state with scripts/verify-candidate-number-migration-history.mjs before retrying — re-dispatching will resume from the remaining suffix automatically.`,
           ]);
           writeAudit("apply_failed", {
             ...auditBase,
@@ -569,7 +628,7 @@ export function runApplyCandidateNumberMaintenanceMigrations({
   const postflight = runPsqlQuery({ sql: HISTORY_VERIFY_SQL, childEnv, spawnImpl });
   if (!postflight.ok) {
     logger.error("Postflight verification did not complete.");
-    writeReport("FAILED - postflight unavailable", [
+    writeReport("FAIL - postflight unavailable", [
       "The workflow cannot prove the final production contract. Treat the deployment as unverified.",
     ]);
     writeAudit("postflight_failed", { ...auditBase, ledgerState: ledger.status, note: postflight.kind });
@@ -581,13 +640,13 @@ export function runApplyCandidateNumberMaintenanceMigrations({
   } catch (error) {
     const reason = error instanceof Error ? error.message : "postflight_parse_failed";
     logger.error(`Postflight result could not be parsed (${reason}).`);
-    writeReport("FAILED - postflight malformed", ["The postflight query did not return the expected shape."]);
+    writeReport("FAIL - postflight malformed", ["The postflight query did not return the expected shape."]);
     writeAudit("postflight_failed", { ...auditBase, ledgerState: ledger.status, note: reason });
     return EXIT.POSTFLIGHT_FAILED;
   }
   if (!history.allVersionsPresent || !history.schemaEffectLive) {
     logger.error("Postflight contract verification failed.");
-    writeReport("FAILED - postflight contract mismatch", [
+    writeReport("FAIL - postflight contract mismatch", [
       `Missing exact versions: ${history.missingVersions.join(", ") || "(none)"}.`,
       `Mismatched ledger rows (right version, wrong name, or vice versa): ${history.mismatchedVersions.join(", ") || "(none)"}.`,
       `Schema effect live: ${history.schemaEffectLive}.`,
@@ -596,16 +655,25 @@ export function runApplyCandidateNumberMaintenanceMigrations({
     return EXIT.POSTFLIGHT_CONTRACT_FAILED;
   }
 
-  const outcome = ledger.status === "verify_only" ? "already_applied_verified" : "applied_verified";
+  const outcome =
+    ledger.status === "verify_only"
+      ? "already_applied_verified"
+      : ledger.status === "resume"
+        ? "resumed_verified"
+        : "applied_verified";
   logger.log(
     ledger.status === "verify_only"
       ? "Candidate-number migrations were already applied and are verified."
-      : "Candidate-number migrations applied and verified.",
+      : ledger.status === "resume"
+        ? "Resumed a partial prior apply and both migrations are now verified."
+        : "Candidate-number migrations applied and verified.",
   );
   writeReport("PASS", [
     ledger.status === "verify_only"
       ? "Both exact target ledger rows already existed; no persistent write was attempted."
-      : "Each migration committed in its own separate transaction (deliberately not bundled — see buildApplyStepSql), each recording its own filename-derived ledger row.",
+      : ledger.status === "resume"
+        ? `${PINNED_MIGRATIONS.length - ledger.pendingIndexes.length} migration(s) were already committed from a prior run; this run applied only the remaining ${ledger.pendingIndexes.length}, each in its own separate transaction.`
+        : "Each migration committed in its own separate transaction (deliberately not bundled — see buildApplyStepSql), each recording its own filename-derived ledger row.",
     "Both expected version strings are present in the ledger, and the guard fix + validated constraint are live.",
   ]);
   writeAudit(outcome, { ...auditBase, ledgerState: ledger.status });

@@ -327,7 +327,7 @@ export function runVerifyCandidateNumberMigrationHistory({
     logger.error(
       `  guard_has_fix=${classification.guardHasFix} constraint_present=${classification.constraintPresent} constraint_validated=${classification.constraintValidated}`,
     );
-    writeReport("FAILED - schema effect not live", [
+    writeReport("FAIL - schema effect not live", [
       "| Fact | Value |",
       "| --- | --- |",
       `| Guard function has the fix | ${classification.guardHasFix} |`,
@@ -355,7 +355,7 @@ export function runVerifyCandidateNumberMigrationHistory({
     logger.error(
       "This is a ledger anomaly, not a missing apply — investigate supabase_migrations.schema_migrations by hand before doing anything else. Do not re-apply; the apply script's own collision guard would refuse it for the same reason.",
     );
-    writeReport(`FAILED - ${classification.mismatchedVersions.length} mismatched ledger row(s)`, [
+    writeReport(`FAIL - ${classification.mismatchedVersions.length} mismatched ledger row(s)`, [
       "The schema effect (guard fix + validated constraint) IS live, but at least one expected version is claimed by a row whose version/name pair does not match exactly:",
       "",
       ...classification.mismatchedVersions.map((v) => `- \`${v}\``),
@@ -386,7 +386,7 @@ export function runVerifyCandidateNumberMigrationHistory({
         ? "Re-apply via `scripts/apply-candidate-number-maintenance-migrations.mjs`, which records the exact expected ledger rows."
         : "This PR ships no automated sandbox repair path — the apply script is intentionally production-only and will refuse any other TARGET_ENV. Record the exact ledger rows manually against the sandbox database, or extend the apply script with its own sandbox confirmation gate before dispatching it here.";
     logger.error(repairLine);
-    writeReport(`FAILED - ${classification.missingVersions.length} exact version(s) missing`, [
+    writeReport(`FAIL - ${classification.missingVersions.length} exact version(s) missing`, [
       "The schema effect (guard fix + validated constraint) IS live, but the migration ledger does not record the exact expected version string(s):",
       "",
       ...classification.missingVersions.map((v) => `- \`${v}\``),
@@ -402,7 +402,7 @@ export function runVerifyCandidateNumberMigrationHistory({
   logger.log(
     "Both expected migration versions are present in the ledger and the schema effect is live.",
   );
-  writeReport("PASSED", [
+  writeReport("PASS", [
     "Both `20260806230020` and `20260806230021` are present in `supabase_migrations.schema_migrations`, and the schema effect (guard fix + validated constraint) is live.",
   ]);
   writeAudit("verified", classification);

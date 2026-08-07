@@ -225,7 +225,7 @@ export function runCandidateNumberMembershipPreflight({
       ? "No orphan rows; plants_candidate_number_requires_hunt_chk is already present and validated."
       : "No orphan rows; safe to apply plants_candidate_number_requires_hunt_chk.",
   );
-  writeReport("PASSED", [
+  writeReport("PASS", [
     already
       ? "The constraint is already present and validated. No orphan rows exist."
       : "No orphan rows exist. The migration is safe to apply.",

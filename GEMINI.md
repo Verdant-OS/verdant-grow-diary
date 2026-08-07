@@ -1,6 +1,6 @@
 # Verdant Sentinel Code
 
-**Sentinel-Version: 2026-08-01.7**
+**Sentinel-Version: 2026-08-01.8**
 
 `AGENTS.md` remains canonical. The exact mirrored constitution is delimited below so CI
 can reject content drift as well as version drift.
@@ -9,7 +9,7 @@ can reject content drift as well as version drift.
 
 # Verdant Agent Constitution
 
-**Sentinel-Version: 2026-08-01.7**
+**Sentinel-Version: 2026-08-01.8**
 
 This is Verdant's universal Sentinel Code. Every agent inherits these durable product,
 engineering, data, safety, and release rules. Platform-specific bootstraps live at the
@@ -591,7 +591,7 @@ Use these values literally. Never turn a blocked or unmeasured verification into
 | `NO_BASELINE`    | No earlier measurement exists for comparison                         |
 | `NO_DATA`        | The authorized source was reachable but returned no data             |
 | `NOT_MEASURED`   | The metric was not measured; this is never a perfect score           |
-| `SKIPPED`        | The check was intentionally not run; report its reason separately   |
+| `SKIPPED`        | The check was intentionally not run; report its reason separately    |
 | `NOT_APPLICABLE` | The check does not apply to this target                              |
 
 Never invent search volume, traffic, keyword difficulty, CPC, domain rating, backlink
@@ -664,11 +664,20 @@ snapshots can differ.
   `/quick-log` (Quick Log
   starter — saves a draft locally), `/tools/vpd-calculator`, `/pheno-comparison`,
   `/welcome`, and `/internal/demo-proof-walkthrough`.
-- **Governance edit gate.** If you change **any** governance file (`AGENTS.md`,
-  `CLAUDE.md`, `GEMINI.md`, `.grok/rules/**`, `docs/agents/**`) you must bump
-  `Sentinel-Version` in **all** of them in the same commit — the
-  `sentinel-version-parity` CI gate enforces both PARITY (all versions equal) and BUMP
-  (changed content requires a new version).
+- **Governance edit gate.** If you change any of the **twelve versioned governance
+  files** — `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.grok/rules/verdant-grok-role.md`,
+  `docs/agents/README.md`, `docs/agents/HANDOFF_PROTOCOL.md`, and the six
+  `docs/agents/roles/*.md` — you must bump `Sentinel-Version` in **all twelve** in the
+  same commit. The `sentinel-version-parity` CI gate enforces PARITY (all versions
+  equal), MIRROR (GEMINI.md's embedded constitution stays byte-equivalent to
+  `AGENTS.md`), and BUMP (changed content requires a new version).
+  **`docs/agents/CURRENT_STATE.md` is exempt.** It carries no `Sentinel-Version` at all
+  and is not one of the twelve: it is the changing shift report, revised several times a
+  day, and `scripts/check-sentinel-version-parity.mjs` treats it as existence-only.
+  Editing it alone requires no bump — see merged precedent #729 (`1ae167764`) and #746
+  (`a0c30e565`), each a single-file `CURRENT_STATE.md` change with no version change.
+  An earlier wording of this bullet said `docs/agents/**`, which over-stated the rule
+  against the gate that supposedly enforced it.
 
 <!-- SENTINEL-CORE:END -->
 

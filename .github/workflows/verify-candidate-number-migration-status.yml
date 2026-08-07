@@ -22,7 +22,7 @@ concurrency:
 jobs:
   verify-sandbox:
     name: Check pinned Verdant sandbox
-    if: ${{ inputs.target_env == 'sandbox' }}
+    if: ${{ github.ref == 'refs/heads/verdant-grow-diary' && inputs.target_env == 'sandbox' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: verdant-sandbox
@@ -65,7 +65,7 @@ jobs:
 
   verify-production:
     name: Check pinned Verdant production
-    if: ${{ inputs.target_env == 'production' }}
+    if: ${{ github.ref == 'refs/heads/verdant-grow-diary' && inputs.target_env == 'production' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: verdant-production

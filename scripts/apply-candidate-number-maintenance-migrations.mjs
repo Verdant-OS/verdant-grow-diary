@@ -297,13 +297,27 @@ function runPsqlQuery({ sql, childEnv, spawnImpl }) {
   return { ok: true, stdout: result.stdout };
 }
 
+// --single-transaction is load-bearing, not cosmetic: buildApplySql's SET
+// LOCAL and LOCK TABLE statements are only legal inside a transaction block,
+// and psql's default is autocommit (each top-level statement its own
+// implicit transaction) unless this flag wraps the whole file in one
+// BEGIN/COMMIT. Without it psql rejects LOCK TABLE immediately ("LOCK TABLE
+// can only be used in transaction blocks") before any SQL runs — fail-safe,
+// but the apply would never succeed. Verified empirically against a
+// throwaway Postgres: with the flag, the ledger-guard DO block, both
+// migration bodies, and the final ledger insert commit atomically; a
+// mid-batch failure rolls back everything already applied in that run.
 function runPsqlFile({ path, childEnv, spawnImpl }) {
   let result;
   try {
-    result = spawnImpl("psql", ["-X", "-v", "ON_ERROR_STOP=1", "-f", path], {
-      encoding: "utf8",
-      env: childEnv,
-    });
+    result = spawnImpl(
+      "psql",
+      ["-X", "-q", "-v", "ON_ERROR_STOP=1", "--single-transaction", "--file", path],
+      {
+        encoding: "utf8",
+        env: childEnv,
+      },
+    );
   } catch {
     return { ok: false, kind: "not_invocable" };
   }

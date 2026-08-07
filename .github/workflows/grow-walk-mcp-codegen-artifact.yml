@@ -32,10 +32,14 @@ jobs:
         id: codegen
         shell: bash
         run: |
+          set -euo pipefail
+          rm -f .lovable/mcp/manifest.json
           set +e
           bunx vite build
           status=$?
+          set -e
           echo "vite_status=$status" >> "$GITHUB_OUTPUT"
+          test "$status" -eq 0
           test -s .lovable/mcp/manifest.json
           test -s supabase/functions/mcp/index.ts
           grep -q 'list_grow_walk_targets' .lovable/mcp/manifest.json
@@ -46,6 +50,7 @@ jobs:
       - name: Record generated diff
         shell: bash
         run: |
+          set -euo pipefail
           mkdir -p artifacts
           git diff -- .lovable/mcp/manifest.json supabase/functions/mcp/index.ts > artifacts/grow-walk-mcp-generated.diff
           {

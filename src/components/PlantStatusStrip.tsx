@@ -37,7 +37,7 @@ export default function PlantStatusStrip({ tentId, tentName, growId }: Props) {
   );
   const env = buildPlantTentEnvironmentView(hasTent ? (readings ?? []) : []);
 
-  const { rows: alertRows, status: alertStatus } = usePlantAssignedTentAlerts(
+  const { openCount: openAlertCount, status: alertStatus } = usePlantAssignedTentAlerts(
     hasTent ? (tentId ?? null) : null,
     growId ?? null,
   );
@@ -58,7 +58,9 @@ export default function PlantStatusStrip({ tentId, tentName, growId }: Props) {
           : (env.sourceLabel ?? "Unknown");
 
   const alertsKnown = hasTent && alertStatus === "ok";
-  const alertCount = alertsKnown ? alertRows.length : null;
+  // openCount, not rows.length — the hook's rows include acknowledged alerts
+  // and are capped for display; this count renders under an "open" label.
+  const alertCount = alertsKnown ? openAlertCount : null;
   const actionsKnown = hasTent && !actionsLoading;
   const actionCount = actionsKnown ? actionRows.length : null;
 

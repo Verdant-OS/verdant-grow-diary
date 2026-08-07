@@ -21,7 +21,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import {
   EMPTY_SNAPSHOT,
-  isStale,
+  isSnapshotStale,
   type SensorSnapshot,
   snapshotFromDiary,
   snapshotFromEnvironmentCheck,
@@ -93,7 +93,7 @@ export function useLatestSensorSnapshot(
                 raw_payload: (r as { raw_payload?: unknown }).raw_payload,
               })),
             );
-            if (snap && !isStale(snap.ts)) return snap;
+            if (snap && !isSnapshotStale(snap)) return snap;
             staleSensorCandidate = snap;
           }
         }

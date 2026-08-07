@@ -14,6 +14,12 @@ import {
 import { summarizeCsvVendor } from "@/lib/sensorReadingVendorLineage";
 import { isSensorTestbenchRow } from "@/lib/sensorTestbenchIndicatorRules";
 import { resolveSensorObservationTime } from "@/lib/sensorObservationTimeRules";
+import {
+  isCurrentStateStale,
+  LIVE_CURRENT_STATE_STALE_MS,
+  resolveCurrentStateStaleWindowMs,
+} from "@/lib/sensorTruthCanon";
+import { isVerifiedSnapshotLiveRowSource } from "@/lib/sensorLiveMembership";
 
 import { SENSOR_SNAPSHOT_STALE_THRESHOLD_MS } from "../constants/sensorTiming";
 export type SnapshotSource =
@@ -142,18 +148,37 @@ export const SOURCE_LABEL: Record<SnapshotSource, string> = {
   unverified: "Unverified source",
 };
 
-/** Default stale threshold (30 minutes). */
+/** Default stale threshold for live current-state (15 minutes). Prefer isSnapshotStale when source is known. */
 export const STALE_THRESHOLD_MS = SENSOR_SNAPSHOT_STALE_THRESHOLD_MS;
 
+export { isCurrentStateStale, LIVE_CURRENT_STATE_STALE_MS, resolveCurrentStateStaleWindowMs };
+
+/**
+ * Age-only stale check. Default threshold is the live window (15 minutes).
+ * Pass `source` for Sensor Truth Canon source-aware windows (manual = 24h).
+ * An explicit non-default `thresholdMs` always wins over source resolution.
+ */
 export function isStale(
   ts: string | null,
   now: number = Date.now(),
   thresholdMs: number = STALE_THRESHOLD_MS,
+  source?: string | null,
 ): boolean {
-  if (!ts) return false;
-  const t = new Date(ts).getTime();
-  if (!Number.isFinite(t)) return false;
-  return now - t > thresholdMs;
+  if (thresholdMs !== STALE_THRESHOLD_MS) {
+    return isCurrentStateStale(ts, { now, thresholdMs });
+  }
+  if (source !== undefined) {
+    return isCurrentStateStale(ts, { now, source });
+  }
+  return isCurrentStateStale(ts, { now, thresholdMs: STALE_THRESHOLD_MS });
+}
+
+/** Source-aware stale check for a snapshot that already carries provenance. */
+export function isSnapshotStale(
+  snapshot: Pick<SensorSnapshot, "ts" | "source">,
+  now: number = Date.now(),
+): boolean {
+  return isCurrentStateStale(snapshot.ts, { now, source: snapshot.source });
 }
 
 export interface SensorReadingLike {
@@ -238,9 +263,7 @@ export function snapshotFromReadings(rows: SensorReadingLike[]): SensorSnapshot 
   // promotion, and this card must not be looser than it.
   const allLive =
     latest.length > 0 &&
-    latest.every(
-      (r) => (r.source === "live" || r.source === "pi_bridge") && !isSensorTestbenchRow(r),
-    );
+    latest.every((r) => isVerifiedSnapshotLiveRowSource(r.source) && !isSensorTestbenchRow(r));
   // CSV history must never be promoted to "live". If every row at the
   // latest timestamp is CSV, classify as "csv". If CSV is mixed with
   // non-live sources but no manual, still prefer csv over live so

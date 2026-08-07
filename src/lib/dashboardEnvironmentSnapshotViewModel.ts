@@ -228,7 +228,9 @@ export function buildTentSnapshotView(
   const flaggedInvalid = latestRows.some((r) => explicitRowFlag(r) === "invalid");
   const flaggedStale = latestRows.some((r) => explicitRowFlag(r) === "stale");
   const flaggedDegraded = latestRows.some((r) => explicitRowFlag(r) === "degraded");
-  const stale = flaggedStale || (!!capturedAt && isStale(capturedAt, now));
+  const stale =
+    flaggedStale ||
+    (!!capturedAt && isStale(capturedAt, now, undefined, canonicalSource ?? provenance));
   // Beyond explicit flags, "Invalid" is reserved for present-but-implausible
   // values. evaluateSensorQuality also marks an absent VPD as suspicious
   // (review hint for the quality card), but a missing metric is

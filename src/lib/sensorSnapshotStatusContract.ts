@@ -17,6 +17,7 @@
  */
 
 import { DEFAULT_STALE_WINDOW_MS } from "../constants/sensorTiming";
+import { resolveCurrentStateStaleWindowMs } from "@/lib/sensorTruthCanon";
 // ============================================================================
 // Canonical contract (new spec)
 // ============================================================================
@@ -56,6 +57,8 @@ export function resolveStaleWindowMs(source?: string | null): number {
   if (typeof source === "string" && source.length > 0) {
     const v = PER_SOURCE_STALE_WINDOW_MS[source];
     if (typeof v === "number" && Number.isFinite(v) && v > 0) return v;
+    // Sensor Truth Canon: live 15m / manual 24h (and strict live default for unknown labels).
+    return resolveCurrentStateStaleWindowMs(source);
   }
   return DEFAULT_STALE_WINDOW_MS;
 }

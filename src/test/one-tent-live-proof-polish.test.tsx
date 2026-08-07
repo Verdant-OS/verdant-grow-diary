@@ -6,11 +6,12 @@ import {
   buildOneTentLiveProofViewModel,
   proofActionDetailHref,
 } from "@/lib/oneTentLiveProofViewModel";
-import { STALE_THRESHOLD_MS, type SensorSnapshot } from "@/lib/sensorSnapshot";
+import { type SensorSnapshot } from "@/lib/sensorSnapshot";
+import { MANUAL_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
 
 const NOW = Date.parse("2026-06-23T12:00:00Z");
 const FRESH_TS = new Date(NOW - 5 * 60_000).toISOString();
-const STALE_TS = new Date(NOW - STALE_THRESHOLD_MS - 60_000).toISOString();
+const STALE_TS = new Date(NOW - MANUAL_CURRENT_STATE_STALE_MS - 60_000).toISOString();
 
 function snap(
   o: Partial<SensorSnapshot> & {
@@ -189,9 +190,16 @@ vi.mock("@/integrations/supabase/client", () => ({
           eq: () => ({
             order: () => ({
               limit: () => {
-                const __c: any = {
+                type ThenableChain = {
+                  abortSignal: () => ThenableChain;
+                  then: (
+                    onfulfilled?: ((value: { data: never[]; error: null }) => unknown) | null,
+                    onrejected?: ((reason: unknown) => unknown) | null,
+                  ) => Promise<unknown>;
+                };
+                const __c: ThenableChain = {
                   abortSignal: () => __c,
-                  then: (r: any, j?: any) => Promise.resolve({ data: [], error: null }).then(r, j),
+                  then: (r, j) => Promise.resolve({ data: [], error: null }).then(r, j),
                 };
                 return __c;
               },

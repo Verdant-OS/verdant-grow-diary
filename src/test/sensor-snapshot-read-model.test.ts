@@ -41,6 +41,7 @@ function truth(overrides: Partial<SensorTruthAssessment> = {}): SensorTruthAsses
     suspiciousFields: [],
     stale: false,
     hasInvalid: false,
+    timestampInvalid: false,
     reasonChips: [],
     reasonCodes: [],
     ...overrides,

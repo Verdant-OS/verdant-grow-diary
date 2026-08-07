@@ -1,3 +1,4 @@
+import { LIVE_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import TimelineEmptyState from "@/components/TimelineEmptyState";
 import TimelineLightingGuideCard from "@/components/TimelineLightingGuideCard";
@@ -207,7 +208,7 @@ import {
   type TimelineSupplementalReadSource,
 } from "@/lib/timelinePageReadStateRules";
 
-const TIMELINE_SNAPSHOT_STALE_MS = 30 * 60 * 1000;
+const TIMELINE_SNAPSHOT_STALE_MS = LIVE_CURRENT_STATE_STALE_MS;
 
 // URL query params mirroring the Pro date-range filter, matching the
 // ?start/?end convention of the environment summary report.

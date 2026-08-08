@@ -46,6 +46,44 @@ connection string resolves only to an **AAAA** (IPv6) address, `psql` on CI
 will hang or exit **2** even when the password and project ref are correct.
 Identity can still pass (URL shape + pinned ref) before the TCP session fails.
 
+### DNS address families (A vs AAAA)
+
+| Record   | Family | Example shape |
+| -------- | ------ | ------------- |
+| **A**    | IPv4   | `1.2.3.4`     |
+| **AAAA** | IPv6   | `2001:db8::1` |
+
+A hostname may publish either family or both. **DNS success is not the same as
+connectivity:** an AAAA-only name is fine on dual-stack laptops and useless on
+IPv4-only runners.
+
+### Happy Eyeballs (why laptops “just work”)
+
+[Happy Eyeballs](https://www.rfc-editor.org/rfc/rfc8305) (RFC 8305) is how modern
+**dual-stack** clients (OS network stack, browsers, many apps) connect when DNS
+returns **both** A and AAAA:
+
+1. Resolve the hostname → collect IPv6 and IPv4 candidates.
+2. Prefer starting an **IPv6** attempt first (policy can vary slightly by OS).
+3. After a short delay (tens of milliseconds, not a multi-second timeout), also
+   start an **IPv4** attempt in parallel if IPv6 has not won yet.
+4. Use the **first successful** TCP connection; cancel the slower attempt.
+
+Effects that matter for this gate:
+
+- On a dual-stack machine, a **broken or slow IPv6 path** does not strand you:
+  IPv4 often wins via Happy Eyeballs, so `psql` / Dashboard “works locally.”
+- Happy Eyeballs **cannot invent IPv4**. If DNS returns **only AAAA**, there is
+  no second family to race — IPv4-only clients fail immediately after resolution.
+- GitHub-hosted `ubuntu-latest` runners are **not dual-stack** for outbound DB
+  traffic: they effectively have **no IPv6**. Happy Eyeballs does not apply; if
+  the only addresses are AAAA, connection fails with the same `psql` status **2**
+  pattern (identity OK, session never usable).
+
+So: local success on a dual-stack laptop is **not** proof that CI can use a
+direct `db.<ref>.supabase.co` URI. Always check for a published **A** record
+(or use the pooler fallback below).
+
 ### Detect IPv6-only direct host
 
 From a dual-stack machine (your laptop), with the project ref substituted:

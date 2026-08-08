@@ -27,6 +27,7 @@ import { buildPhenoHuntActivityEntries } from "@/lib/phenoHuntActivityViewModel"
 import PhenoTimelineEntries from "@/components/PhenoTimelineEntries";
 import PhenoStabilityLedger from "@/components/PhenoStabilityLedger";
 import { buildCloneTreeRows } from "@/lib/phenoCloneTreeViewModel";
+import { phenoHuntShowcasePath, phenoHuntWorkspacePath } from "@/lib/routes";
 
 /** Depth → indent class (capped) so the clone lineage nests without inline styles. */
 const CLONE_INDENT = ["pl-0", "pl-3", "pl-6", "pl-9", "pl-12"] as const;
@@ -306,13 +307,26 @@ export default function PhenoKeepersPage() {
           Preserve a keeper as clones and record breeding crosses. Recording anything here changes
           nothing on its own — Verdant never starts a grow or acts for you.
         </p>
-        <Link
-          to={`/pheno-hunts/${id}/showcase`}
-          data-testid="pheno-keepers-walk-link"
-          className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600 hover:underline dark:text-emerald-400"
-        >
-          Walk this hunt — pack, contenders, fight night &amp; family tree →
-        </Link>
+        <div className="flex flex-col items-start gap-1 pt-1">
+          {id ? (
+            <Link
+              to={phenoHuntWorkspacePath(id)}
+              data-testid="pheno-keepers-workspace-link"
+              className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:underline"
+            >
+              ← Back to hunt workspace
+            </Link>
+          ) : null}
+          {id ? (
+            <Link
+              to={phenoHuntShowcasePath(id)}
+              data-testid="pheno-keepers-walk-link"
+              className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600 hover:underline dark:text-emerald-400"
+            >
+              Walk this hunt — pack, contenders, fight night & family tree →
+            </Link>
+          ) : null}
+        </div>
       </header>
 
       {/* Promote a candidate to keeper */}

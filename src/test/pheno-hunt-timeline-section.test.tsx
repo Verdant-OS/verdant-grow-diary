@@ -1,5 +1,6 @@
 /**
  * Pheno Hunt timeline section — candidate plant links + two-step delete.
+ * #568: every hunt on the grow is listed (not only newest).
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
@@ -30,35 +31,32 @@ vi.mock("sonner", () => ({
   },
 }));
 
-// The read-only activity hook is exercised via its own view-model + hook wiring;
-// here we mock it so the section test stays deterministic and offline.
 const activityMock = vi.fn((..._a: unknown[]) => ({ status: "ok", entries: [] as unknown[] }));
 vi.mock("@/hooks/usePhenoHuntActivity", () => ({
   usePhenoHuntActivity: (...a: unknown[]) => activityMock(...a),
 }));
 
 interface SetupOpts {
-  hunt?: { id: string; name: string } | null;
-  candidates?: {
-    id: string;
-    name: string;
-    strain: string | null;
-    candidate_label: string | null;
-    tent_id: string | null;
-  }[];
+  hunts?: { id: string; name: string }[];
+  candidatesByHunt?: Record<
+    string,
+    {
+      id: string;
+      name: string;
+      strain: string | null;
+      candidate_label: string | null;
+      tent_id: string | null;
+    }[]
+  >;
 }
 
-function setup({ hunt = { id: "h1", name: "Hunt A" }, candidates = [] }: SetupOpts) {
+function setup({ hunts = [{ id: "h1", name: "Hunt A" }], candidatesByHunt = {} }: SetupOpts = {}) {
   fromMock.mockImplementation((table: string) => {
     if (table === "pheno_hunts") {
       return {
         select: () => ({
           eq: () => ({
-            order: () => ({
-              limit: () => ({
-                maybeSingle: async () => ({ data: hunt, error: null }),
-              }),
-            }),
+            order: async () => ({ data: hunts, error: null }),
           }),
         }),
         delete: () => ({ eq: async () => ({ error: null }) }),
@@ -67,8 +65,11 @@ function setup({ hunt = { id: "h1", name: "Hunt A" }, candidates = [] }: SetupOp
     if (table === "plants") {
       return {
         select: () => ({
-          eq: () => ({
-            order: async () => ({ data: candidates, error: null }),
+          eq: (_col: string, huntId: string) => ({
+            order: async () => ({
+              data: candidatesByHunt[huntId] ?? [],
+              error: null,
+            }),
           }),
         }),
       };
@@ -97,15 +98,17 @@ describe("PhenoHuntTimelineSection", () => {
 
   it("renders candidate plant links pointing to plant detail routes", async () => {
     setup({
-      candidates: [
-        {
-          id: "p1",
-          name: "Blueberry Auto",
-          strain: "Blueberry",
-          candidate_label: "#1",
-          tent_id: "t1",
-        },
-      ],
+      candidatesByHunt: {
+        h1: [
+          {
+            id: "p1",
+            name: "Blueberry Auto",
+            strain: "Blueberry",
+            candidate_label: "#1",
+            tent_id: "t1",
+          },
+        ],
+      },
     });
     renderSection();
     const link = (await screen.findByTestId("pheno-hunt-candidate-link-p1")) as HTMLAnchorElement;
@@ -114,20 +117,48 @@ describe("PhenoHuntTimelineSection", () => {
     expect(link.textContent).toContain("Blueberry Auto");
   });
 
-  it("requires two-step confirmation before deleting", async () => {
-    setup({ candidates: [] });
+  it("lists every hunt on the grow, not only the newest (#568)", async () => {
+    setup({
+      hunts: [
+        { id: "h-new", name: "Newer Hunt" },
+        { id: "h-old", name: "Older Hunt" },
+      ],
+      candidatesByHunt: {
+        "h-new": [],
+        "h-old": [
+          {
+            id: "p-old",
+            name: "Legacy Plant",
+            strain: null,
+            candidate_label: "#1",
+            tent_id: null,
+          },
+        ],
+      },
+    });
     renderSection();
-    fireEvent.click(await screen.findByTestId("pheno-hunt-delete-btn"));
-    expect(screen.getByTestId("pheno-hunt-delete-confirm")).toBeInTheDocument();
+    const section = await screen.findByTestId("pheno-hunt-timeline-section");
+    expect(section.getAttribute("data-hunt-count")).toBe("2");
+    expect(await screen.findByTestId("pheno-hunt-timeline-hunt-h-new")).toBeInTheDocument();
+    expect(screen.getByTestId("pheno-hunt-timeline-hunt-h-old")).toBeInTheDocument();
+    expect(screen.getByTestId("pheno-hunt-name-h-old")).toHaveTextContent("Older Hunt");
+    expect(screen.getByTestId("pheno-hunt-candidate-link-p-old")).toBeInTheDocument();
+  });
+
+  it("requires two-step confirmation before deleting", async () => {
+    setup();
+    renderSection();
+    fireEvent.click(await screen.findByTestId("pheno-hunt-delete-btn-h1"));
+    expect(screen.getByTestId("pheno-hunt-delete-confirm-h1")).toBeInTheDocument();
     expect(deleteHuntMock).not.toHaveBeenCalled();
   });
 
   it("cancel exits the confirmation without calling delete", async () => {
-    setup({ candidates: [] });
+    setup();
     renderSection();
-    fireEvent.click(await screen.findByTestId("pheno-hunt-delete-btn"));
-    fireEvent.click(screen.getByTestId("pheno-hunt-delete-cancel-btn"));
-    expect(screen.queryByTestId("pheno-hunt-delete-confirm")).toBeNull();
+    fireEvent.click(await screen.findByTestId("pheno-hunt-delete-btn-h1"));
+    fireEvent.click(screen.getByTestId("pheno-hunt-delete-cancel-btn-h1"));
+    expect(screen.queryByTestId("pheno-hunt-delete-confirm-h1")).toBeNull();
     expect(deleteHuntMock).not.toHaveBeenCalled();
   });
 
@@ -136,10 +167,10 @@ describe("PhenoHuntTimelineSection", () => {
       huntId: "h1",
       untaggedPlantIds: [],
     });
-    setup({ candidates: [] });
+    setup();
     renderSection();
-    fireEvent.click(await screen.findByTestId("pheno-hunt-delete-btn"));
-    fireEvent.click(screen.getByTestId("pheno-hunt-delete-confirm-btn"));
+    fireEvent.click(await screen.findByTestId("pheno-hunt-delete-btn-h1"));
+    fireEvent.click(screen.getByTestId("pheno-hunt-delete-confirm-btn-h1"));
     await waitFor(() => expect(deleteHuntMock).toHaveBeenCalledTimes(1));
     expect(deleteHuntMock).toHaveBeenCalledWith({ huntId: "h1" });
     await waitFor(() =>
@@ -149,10 +180,10 @@ describe("PhenoHuntTimelineSection", () => {
 
   it("shows failure copy when delete throws", async () => {
     deleteHuntMock.mockRejectedValueOnce(new Error("denied"));
-    setup({ candidates: [] });
+    setup();
     renderSection();
-    fireEvent.click(await screen.findByTestId("pheno-hunt-delete-btn"));
-    fireEvent.click(screen.getByTestId("pheno-hunt-delete-confirm-btn"));
+    fireEvent.click(await screen.findByTestId("pheno-hunt-delete-btn-h1"));
+    fireEvent.click(screen.getByTestId("pheno-hunt-delete-confirm-btn-h1"));
     await waitFor(() =>
       expect(toastError).toHaveBeenCalledWith(expect.stringMatching(/Could not delete/i)),
     );
@@ -172,24 +203,23 @@ describe("PhenoHuntTimelineSection", () => {
         },
       ],
     });
-    setup({ candidates: [] });
+    setup();
     renderSection();
-    // The activity block appears once the hunt resolves...
-    const block = await screen.findByTestId("pheno-hunt-activity");
+    const block = await screen.findByTestId("pheno-hunt-activity-h1");
     expect(block).toHaveTextContent(/Cross recorded/);
     expect(screen.getByTestId("pheno-timeline-entry-cross:x1")).toBeInTheDocument();
-    // ...and the hook is scoped to the resolved hunt id, not the grow id.
     await waitFor(() => expect(activityMock).toHaveBeenCalledWith("h1"));
   });
 
   it("omits the activity block when the hunt has no pheno activity", async () => {
     activityMock.mockReturnValue({ status: "ok", entries: [] });
     setup({
-      candidates: [{ id: "p1", name: "Plant", strain: null, candidate_label: "#1", tent_id: null }],
+      candidatesByHunt: {
+        h1: [{ id: "p1", name: "Plant", strain: null, candidate_label: "#1", tent_id: null }],
+      },
     });
     renderSection();
-    // Wait for the section to render (candidate link present), then assert no activity.
     await screen.findByTestId("pheno-hunt-candidate-link-p1");
-    expect(screen.queryByTestId("pheno-hunt-activity")).toBeNull();
+    expect(screen.queryByTestId("pheno-hunt-activity-h1")).toBeNull();
   });
 });

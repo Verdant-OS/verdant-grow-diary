@@ -183,9 +183,15 @@ async function deleteHuntViaTimeline(page: Page, growId: string) {
   await page.goto(`${BASE_URL}/timeline?growId=${growId}`);
   const section = page.getByTestId("pheno-hunt-timeline-section");
   if (!(await section.isVisible({ timeout: 20_000 }).catch(() => false))) return;
-  await page.getByTestId("pheno-hunt-delete-btn").click();
-  await expect(page.getByTestId("pheno-hunt-delete-confirm")).toBeVisible();
-  await page.getByTestId("pheno-hunt-delete-confirm-btn").click();
+  await page
+    .getByTestId(/^pheno-hunt-delete-btn-/)
+    .first()
+    .click();
+  await expect(page.getByTestId(/^pheno-hunt-delete-confirm-/).first()).toBeVisible();
+  await page
+    .getByTestId(/^pheno-hunt-delete-confirm-btn-/)
+    .first()
+    .click();
   await expect(section).toHaveCount(0, { timeout: 20_000 });
 }
 

@@ -40,7 +40,7 @@ function makeFakeClient(
       call.filters.push({ kind: "select", args: [cols] });
       return chain;
     };
-    for (const kind of ["eq", "is", "in"]) {
+    for (const kind of ["eq", "is", "in", "limit", "order"]) {
       chain[kind] = (...args: unknown[]) => {
         call.filters.push({ kind, args });
         return chain;

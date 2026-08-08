@@ -82,7 +82,18 @@ export async function performSafeSignOut(
   const redirectTo = resolveSignOutRedirect(requestedRedirect);
   let ok = true;
   try {
-    await deps.signOut();
+    const result = await deps.signOut();
+    // Supabase-style failures resolve as `{ error }` without throwing. Treat
+    // any truthy `.error` as sign-out failure so callers that pass through
+    // the raw client response are still observed (#588).
+    if (
+      result &&
+      typeof result === "object" &&
+      "error" in result &&
+      (result as { error: unknown }).error
+    ) {
+      ok = false;
+    }
   } catch {
     // Never re-throw, never log: the error may carry token/session strings.
     ok = false;

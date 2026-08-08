@@ -113,6 +113,8 @@ Manual owner steps (no automation against real diary rows):
 
 ## 8. Automated garden rotation (CLI)
 
+Shared denylist: `scripts/e2e/real-grow-denylist.mjs` (also re-exported by `e2e/lib/fixtureSafety.ts`)
+
 Pure planner: `scripts/e2e/e2e-fixture-rotation-core.mjs`  
 CLI: `scripts/e2e/rotate-e2e-fixture.mjs`
 

@@ -10,7 +10,19 @@
  *
  * NEVER service_role. NEVER bulk-delete unmarked diary. NEVER touch
  * forbidden/unmarked grows (account contaminated → block).
+ *
+ * Denylist helpers live in ./real-grow-denylist.mjs (shared with fixtureSafety).
  */
+
+import {
+  REAL_GROW_NAME_DENYLIST,
+  isE2eOrTestMarker,
+  isForbiddenRealGrowName,
+  buildE2eHuntName,
+} from "./real-grow-denylist.mjs";
+
+// Re-export shared denylist helpers (single source: real-grow-denylist.mjs).
+export { REAL_GROW_NAME_DENYLIST, isE2eOrTestMarker, isForbiddenRealGrowName, buildE2eHuntName };
 
 /** Exact garden names (must match e2e/FIXTURE_SETUP.md). */
 export const E2E_GARDEN_NAMES = Object.freeze({
@@ -20,15 +32,6 @@ export const E2E_GARDEN_NAMES = Object.freeze({
   grow: "E2E Test Grow",
 });
 
-/**
- * Grow names that must never appear on a write-fixture account without
- * E2E/Test markers. Keep in sync with e2e/lib/fixtureSafety.ts denylist.
- */
-export const REAL_GROW_NAME_DENYLIST = Object.freeze([
-  /\bProject\s+McDonald\b/i,
-  /\bStarter\s+Grow\b/i,
-]);
-
 /** Note/text prefixes allowed for optional diary prune (fixture plants only). */
 export const E2E_DIARY_NOTE_PATTERNS = Object.freeze([
   /^E2E\b/i,
@@ -37,17 +40,6 @@ export const E2E_DIARY_NOTE_PATTERNS = Object.freeze([
 ]);
 
 export const E2E_FIXTURE_ROTATION_JSON_PREFIX = "E2E_FIXTURE_ROTATION_JSON=";
-
-export function isE2eOrTestMarker(name) {
-  return typeof name === "string" && /e2e|test/i.test(name);
-}
-
-export function isForbiddenRealGrowName(name) {
-  const t = (name ?? "").trim();
-  if (!t) return false;
-  if (isE2eOrTestMarker(t)) return false;
-  return REAL_GROW_NAME_DENYLIST.some((rx) => rx.test(t));
-}
 
 /**
  * Hunt names safe to prune.
@@ -74,16 +66,6 @@ export function isE2eDiaryNote(note) {
   const t = (note ?? "").trim();
   if (!t) return false;
   return E2E_DIARY_NOTE_PATTERNS.some((rx) => rx.test(t));
-}
-
-export function buildE2eHuntName(purpose, now = new Date()) {
-  const purposeClean =
-    String(purpose ?? "")
-      .trim()
-      .replace(/\s+/g, " ")
-      .slice(0, 48) || "hunt";
-  const day = now.toISOString().slice(0, 10);
-  return `E2E ${purposeClean} ${day}`;
 }
 
 // ---------------------------------------------------------------------------

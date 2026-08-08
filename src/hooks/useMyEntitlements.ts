@@ -13,6 +13,11 @@
  * entitling BYO row was backfilled into public.subscriptions there.
  * Environment is derived from the client token prefix (test_ → sandbox,
  * otherwise live) and passed EXPLICITLY into the adapter.
+ *
+ * Soft revalidation (#564): token refresh gives a new `user` object with the
+ * same id. Reloading must NOT flip `loading` back to true for that id, or
+ * PhenoTrackerUpgradeGate (and similar gates) unmount entitled children and
+ * discard unsaved wizard/workspace input. Identity changes still hard-load.
  */
 
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
@@ -48,6 +53,9 @@ const FREE_NOW = (): ResolvedEntitlement => resolveEntitlements(null, new Date()
 
 export function useMyEntitlements(): UseMyEntitlementsResult {
   const { user, loading: authLoading } = useAuth();
+  // Key loads on user id, never the session user object reference. TOKEN_REFRESHED
+  // replaces the user object while keeping the same id (#564).
+  const userId = user?.id ?? null;
   const [loading, setLoading] = useState<boolean>(true);
   const [lookupFailed, setLookupFailed] = useState(false);
   const [entitlement, setEntitlement] = useState<ResolvedEntitlement>(() => FREE_NOW());
@@ -57,6 +65,8 @@ export function useMyEntitlements(): UseMyEntitlementsResult {
   // The subscription reads race unmount (route change, test teardown):
   // never setState after unmount.
   const mountedRef = useRef(true);
+  /** Last user id for which we completed a load (soft-refresh marker). */
+  const settledUserIdRef = useRef<string | null>(null);
   useEffect(() => {
     mountedRef.current = true;
     return () => {
@@ -70,15 +80,25 @@ export function useMyEntitlements(): UseMyEntitlementsResult {
   // Free for presentation, so a caller that merely awaits completion would
   // otherwise read "we couldn't check" as "you are not entitled".
   const doLoad = useCallback(async (): Promise<boolean> => {
-    if (!user) {
+    if (!userId) {
       if (!mountedRef.current) return false;
+      settledUserIdRef.current = null;
       setEntitlement(FREE_NOW());
       setLookupFailed(false);
       setLoading(false);
       return false;
     }
-    setLoading(true);
+
+    // Soft revalidate same identity: keep prior entitlement + loading=false so
+    // upgrade gates do not unmount children mid-edit (pheno wizard/workspace).
+    // Hard load on identity change: clear stale plan and show loading.
+    const softRefresh = settledUserIdRef.current === userId;
+    if (!softRefresh) {
+      setEntitlement(FREE_NOW());
+      setLoading(true);
+    }
     setLookupFailed(false);
+
     // All reads are RLS-protected (select-own) and PRESENTATION-ONLY.
     // Subscription reads use bounded newest-first WINDOWS, not limit(1):
     // public.subscriptions is unique per paddle_subscription_id, so a newer
@@ -89,7 +109,7 @@ export function useMyEntitlements(): UseMyEntitlementsResult {
       supabase
         .from("subscriptions")
         .select("*")
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .eq("environment", environment)
         // created_at is not unique; paddle_subscription_id is — without the
         // tiebreak, equal timestamps make the window order (and therefore
@@ -111,7 +131,7 @@ export function useMyEntitlements(): UseMyEntitlementsResult {
       supabase
         .from("user_roles")
         .select("role")
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .eq("role", "staff")
         .maybeSingle(),
     ]);
@@ -152,9 +172,10 @@ export function useMyEntitlements(): UseMyEntitlementsResult {
         opts: { isStaff },
       }),
     );
+    settledUserIdRef.current = userId;
     setLoading(false);
     return lookupFailed;
-  }, [user, expectedBillingEnvironment]);
+  }, [userId, expectedBillingEnvironment]);
 
   useEffect(() => {
     if (authLoading) return;

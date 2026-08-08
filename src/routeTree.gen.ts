@@ -1,5 +1,3 @@
-/* eslint-disable */
-
 // @ts-nocheck
 
 // noinspection JSUnusedGlobalSymbols
@@ -8,2893 +6,2888 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
-import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
-import { Route as SplatRouteImport } from './routes/$'
-import { Route as AppRouteImport } from './routes/_app'
-import { Route as AiDoctorReadinessCheckRouteImport } from './routes/ai-doctor-readiness-check'
-import { Route as AuthRouteImport } from './routes/auth'
-import { Route as BreederBetaRouteImport } from './routes/breeder-beta'
-import { Route as ContactRouteImport } from './routes/contact'
-import { Route as CreatorBetaRouteImport } from './routes/creator-beta'
-import { Route as DemoRouteImport } from './routes/demo'
-import { Route as FeaturesRouteImport } from './routes/features'
-import { Route as FeedbackRouteImport } from './routes/feedback'
-import { Route as FounderRouteImport } from './routes/founder'
-import { Route as GlossaryRouteImport } from './routes/glossary'
-import { Route as HardwareIntegrationsRouteImport } from './routes/hardware-integrations'
-import { Route as HowAiDoctorWorksRouteImport } from './routes/how-ai-doctor-works'
-import { Route as LoginRouteImport } from './routes/login'
-import { Route as PhenoComparisonRouteImport } from './routes/pheno-comparison'
-import { Route as PhenoExpressionShowcaseRouteImport } from './routes/pheno-expression-showcase'
-import { Route as PricingRouteImport } from './routes/pricing'
-import { Route as PrivacyRouteImport } from './routes/privacy'
-import { Route as PrivacyPolicyRouteImport } from './routes/privacy-policy'
-import { Route as QuickLogRouteImport } from './routes/quick-log'
-import { Route as RefundRouteImport } from './routes/refund'
-import { Route as RefundPolicyRouteImport } from './routes/refund-policy'
-import { Route as RefundsRouteImport } from './routes/refunds'
-import { Route as RegisterRouteImport } from './routes/register'
-import { Route as ResetPasswordRouteImport } from './routes/reset-password'
-import { Route as SignupRouteImport } from './routes/signup'
-import { Route as TermsRouteImport } from './routes/terms'
-import { Route as TermsOfServiceRouteImport } from './routes/terms-of-service'
-import { Route as UnsubscribeRouteImport } from './routes/unsubscribe'
-import { Route as UpgradeRouteImport } from './routes/upgrade'
-import { Route as WelcomeRouteImport } from './routes/welcome'
-import { Route as AppOperatorRouteImport } from './routes/_app/_operator'
-import { Route as AppActionQueueRouteImport } from './routes/_app/action-queue'
-import { Route as AppActionsRouteImport } from './routes/_app/actions'
-import { Route as AppAiDoctorRouteImport } from './routes/_app/ai-doctor'
-import { Route as AppAlertsRouteImport } from './routes/_app/alerts'
-import { Route as AppBreedingRouteImport } from './routes/_app/breeding'
-import { Route as AppDailyCheckRouteImport } from './routes/_app/daily-check'
-import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
-import { Route as AppDoctorRouteImport } from './routes/_app/doctor'
-import { Route as AppGeneticsRouteImport } from './routes/_app/genetics'
-import { Route as AppGrowLineageRouteImport } from './routes/_app/grow-lineage'
-import { Route as AppGrowRoomRouteImport } from './routes/_app/grow-room'
-import { Route as AppGrowsRouteImport } from './routes/_app/grows'
-import { Route as AppHealthRouteImport } from './routes/_app/health'
-import { Route as AppInviteRouteImport } from './routes/_app/invite'
-import { Route as AppLogsRouteImport } from './routes/_app/logs'
-import { Route as AppOnboardingRouteImport } from './routes/_app/onboarding'
-import { Route as AppPhenoHuntsRouteImport } from './routes/_app/pheno-hunts'
-import { Route as AppPlantsRouteImport } from './routes/_app/plants'
-import { Route as AppReportsRouteImport } from './routes/_app/reports'
-import { Route as AppSensorsRouteImport } from './routes/_app/sensors'
-import { Route as AppSettingsRouteImport } from './routes/_app/settings'
-import { Route as AppStartRoomRouteImport } from './routes/_app/start-room'
-import { Route as AppTasksRouteImport } from './routes/_app/tasks'
-import { Route as AppTentsRouteImport } from './routes/_app/tents'
-import { Route as AppTimelineRouteImport } from './routes/_app/timeline'
-import { Route as BillingPlanRouteImport } from './routes/billing.$plan'
-import { Route as CheckoutCancelRouteImport } from './routes/checkout.cancel'
-import { Route as CheckoutSuccessRouteImport } from './routes/checkout.success'
-import { Route as CultivarsIndexRouteImport } from './routes/cultivars.index'
-import { Route as CultivarsSlugRouteImport } from './routes/cultivars.$slug'
-import { Route as DocsMcpApiRouteImport } from './routes/docs.mcp-api'
-import { Route as GuidesIndexRouteImport } from './routes/guides.index'
-import { Route as GuidesSlugRouteImport } from './routes/guides.$slug'
-import { Route as GuidesGrowStageCareGuideRouteImport } from './routes/guides.grow-stage-care-guide'
-import { Route as InternalContextualPhenoComparisonDemoRouteImport } from './routes/internal.contextual-pheno-comparison-demo'
-import { Route as InternalDemoProofWalkthroughRouteImport } from './routes/internal.demo-proof-walkthrough'
-import { Route as InternalPhenoHuntDemoRouteImport } from './routes/internal.pheno-hunt-demo'
-import { Route as PartnersCsvPreviewRouteImport } from './routes/partners.csv-preview'
-import { Route as SensorsCsvPreviewRouteImport } from './routes/sensors.csv-preview'
-import { Route as StrainsIndexRouteImport } from './routes/strains.index'
-import { Route as StrainsSlugRouteImport } from './routes/strains.$slug'
-import { Route as ToolsVpdCalculatorRouteImport } from './routes/tools.vpd-calculator'
-import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
-import { Route as AppOperatorDiagnosticsRouteImport } from './routes/_app/_operator/diagnostics'
-import { Route as AppOperatorDiagnosticsSeoArtifactsRouteImport } from './routes/_app/_operator/diagnostics-seo-artifacts'
-import { Route as AppOperatorIngestInspectorRouteImport } from './routes/_app/_operator/ingest-inspector'
-import { Route as AppOperatorLeadsRouteImport } from './routes/_app/_operator/leads'
-import { Route as AppOperatorOneTentLoopProofRouteImport } from './routes/_app/_operator/one-tent-loop-proof'
-import { Route as AppOperatorPiIngestStatusRouteImport } from './routes/_app/_operator/pi-ingest-status'
-import { Route as AppAccountPreferencesRouteImport } from './routes/_app/account.preferences'
-import { Route as AppActionsActionIdRouteImport } from './routes/_app/actions_.$actionId'
-import { Route as AppAlertsAlertIdRouteImport } from './routes/_app/alerts_.$alertId'
-import { Route as AppBreedingProgramIdRouteImport } from './routes/_app/breeding_.$programId'
-import { Route as AppBreedingNewRouteImport } from './routes/_app/breeding_.new'
-import { Route as AppDiaryEnvironmentSummaryRouteImport } from './routes/_app/diary.environment-summary'
-import { Route as AppDiaryPhenoExpressionComparisonRouteImport } from './routes/_app/diary.pheno-expression-comparison'
-import { Route as AppDoctorSessionsRouteImport } from './routes/_app/doctor_.sessions'
-import { Route as AppGeneticsIndexRouteImport } from './routes/_app/genetics.index'
-import { Route as AppGrowsGrowIdRouteImport } from './routes/_app/grows_.$growId'
-import { Route as AppPhenoHuntsNewRouteImport } from './routes/_app/pheno-hunts_.new'
-import { Route as AppPlantsIdRouteImport } from './routes/_app/plants_.$id'
-import { Route as AppReportsDiaryRangeRouteImport } from './routes/_app/reports_.diary-range'
-import { Route as AppSettingsAgentIntegrationsRouteImport } from './routes/_app/settings_.agent-integrations'
-import { Route as AppSettingsAnalyticsRouteImport } from './routes/_app/settings_.analytics'
-import { Route as AppTentsIdRouteImport } from './routes/_app/tents_.$id'
-import { Route as CustomerGuideOreozVsGelonadeComparisonRouteImport } from './routes/customer.guide.oreoz-vs-gelonade-comparison'
-import { Route as PhenoHuntsIdCompareRouteImport } from './routes/pheno-hunts.$id.compare'
-import { Route as PhenoHuntsIdShowcaseRouteImport } from './routes/pheno-hunts.$id.showcase'
-import { Route as AppOperatorAdminLeadsRouteImport } from './routes/_app/_operator/admin.leads'
-import { Route as AppOperatorDemoOneTentLiveProofRouteImport } from './routes/_app/_operator/demo.one-tent-live-proof'
-import { Route as AppOperatorInternalAiDoctorConfidenceAuditRouteImport } from './routes/_app/_operator/internal.ai-doctor-confidence-audit'
-import { Route as AppOperatorInternalAiDoctorPhase1PreviewRouteImport } from './routes/_app/_operator/internal.ai-doctor-phase1-preview'
-import { Route as AppOperatorInternalOneTentLoopProofRouteImport } from './routes/_app/_operator/internal.one-tent-loop-proof'
-import { Route as AppOperatorInternalSensorTruthAuditRouteImport } from './routes/_app/_operator/internal.sensor-truth-audit'
-import { Route as AppOperatorOperatorAiDoctorPhase1RouteImport } from './routes/_app/_operator/operator.ai-doctor-phase1'
-import { Route as AppOperatorOperatorBillingEntitlementResolutionRouteImport } from './routes/_app/_operator/operator.billing-entitlement-resolution'
-import { Route as AppOperatorOperatorBillingSubscriptionUpdatesRouteImport } from './routes/_app/_operator/operator.billing-subscription-updates'
-import { Route as AppOperatorOperatorCreditsAuditRouteImport } from './routes/_app/_operator/operator.credits-audit'
-import { Route as AppOperatorOperatorDemoPreviewRouteImport } from './routes/_app/_operator/operator.demo-preview'
-import { Route as AppOperatorOperatorEcowittRouteImport } from './routes/_app/_operator/operator.ecowitt'
-import { Route as AppOperatorOperatorEcowittBridgeDebugRouteImport } from './routes/_app/_operator/operator.ecowitt-bridge-debug'
-import { Route as AppOperatorOperatorEcowittBridgeStatusRouteImport } from './routes/_app/_operator/operator.ecowitt-bridge-status'
-import { Route as AppOperatorOperatorEcowittLiveBringupRouteImport } from './routes/_app/_operator/operator.ecowitt-live-bringup'
-import { Route as AppOperatorOperatorEcowittTentPreviewRouteImport } from './routes/_app/_operator/operator.ecowitt-tent-preview'
-import { Route as AppOperatorOperatorEdgeAlertsRouteImport } from './routes/_app/_operator/operator.edge-alerts'
-import { Route as AppOperatorOperatorEdgeMetricsRouteImport } from './routes/_app/_operator/operator.edge-metrics'
-import { Route as AppOperatorOperatorModeRouteImport } from './routes/_app/_operator/operator.mode'
-import { Route as AppOperatorOperatorOneTentLiveProofRouteImport } from './routes/_app/_operator/operator.one-tent-live-proof'
-import { Route as AppOperatorOperatorOneTentLoopSmokeTestRouteImport } from './routes/_app/_operator/operator.one-tent-loop-smoke-test'
-import { Route as AppOperatorOperatorOneTentProofRecordRouteImport } from './routes/_app/_operator/operator.one-tent-proof-record'
-import { Route as AppOperatorOperatorPaddleProcessingAuditRouteImport } from './routes/_app/_operator/operator.paddle-processing-audit'
-import { Route as AppOperatorOperatorPostGrowReflectionDryRunRouteImport } from './routes/_app/_operator/operator.post-grow-reflection-dry-run'
-import { Route as AppOperatorOperatorReleaseReadinessRouteImport } from './routes/_app/_operator/operator.release-readiness'
-import { Route as AppOperatorOperatorSchemaAuditRouteImport } from './routes/_app/_operator/operator.schema-audit'
-import { Route as AppOperatorOperatorSubscriberGrowthRouteImport } from './routes/_app/_operator/operator.subscriber-growth'
-import { Route as AppOperatorOperatorSupportInboxRouteImport } from './routes/_app/_operator/operator.support-inbox'
-import { Route as AppOperatorSensorsEcowittAuditRouteImport } from './routes/_app/_operator/sensors.ecowitt-audit'
-import { Route as AppOperatorSensorsIngestNormalizerRouteImport } from './routes/_app/_operator/sensors.ingest-normalizer'
-import { Route as AppBreedingLogNewRouteImport } from './routes/_app/breeding_.log.new'
-import { Route as AppDiaryStrainsSlugRouteImport } from './routes/_app/diary.strains.$slug'
-import { Route as AppDoctorSessionsSessionIdRouteImport } from './routes/_app/doctor_.sessions_.$sessionId'
-import { Route as AppGeneticsAccessionsIdRouteImport } from './routes/_app/genetics.accessions.$id'
-import { Route as AppGeneticsBatchesIdRouteImport } from './routes/_app/genetics.batches.$id'
-import { Route as AppGrowsGrowIdLearningRouteImport } from './routes/_app/grows_.$growId_.learning'
-import { Route as AppPhenoHuntsIdKeepersRouteImport } from './routes/_app/pheno-hunts_.$id.keepers'
-import { Route as AppPhenoHuntsIdWorkspaceRouteImport } from './routes/_app/pheno-hunts_.$id.workspace'
-import { Route as AppReportsPostGrowGrowIdRouteImport } from './routes/_app/reports_.post-grow.$growId'
-import { Route as AppGeneticsHealthKindIdRouteImport } from './routes/_app/genetics.health.$kind.$id'
-import { Route as AppGeneticsTraceKindIdRouteImport } from './routes/_app/genetics.trace.$kind.$id'
+import { Route as rootRouteImport } from "./routes/__root";
+import { Route as IndexRouteImport } from "./routes/index";
+import { Route as SplatRouteImport } from "./routes/$";
+import { Route as AppRouteImport } from "./routes/_app";
+import { Route as AiDoctorReadinessCheckRouteImport } from "./routes/ai-doctor-readiness-check";
+import { Route as AuthRouteImport } from "./routes/auth";
+import { Route as BreederBetaRouteImport } from "./routes/breeder-beta";
+import { Route as ContactRouteImport } from "./routes/contact";
+import { Route as CreatorBetaRouteImport } from "./routes/creator-beta";
+import { Route as DemoRouteImport } from "./routes/demo";
+import { Route as FeaturesRouteImport } from "./routes/features";
+import { Route as FeedbackRouteImport } from "./routes/feedback";
+import { Route as FounderRouteImport } from "./routes/founder";
+import { Route as GlossaryRouteImport } from "./routes/glossary";
+import { Route as HardwareIntegrationsRouteImport } from "./routes/hardware-integrations";
+import { Route as HowAiDoctorWorksRouteImport } from "./routes/how-ai-doctor-works";
+import { Route as LoginRouteImport } from "./routes/login";
+import { Route as PhenoComparisonRouteImport } from "./routes/pheno-comparison";
+import { Route as PhenoExpressionShowcaseRouteImport } from "./routes/pheno-expression-showcase";
+import { Route as PricingRouteImport } from "./routes/pricing";
+import { Route as PrivacyRouteImport } from "./routes/privacy";
+import { Route as PrivacyPolicyRouteImport } from "./routes/privacy-policy";
+import { Route as QuickLogRouteImport } from "./routes/quick-log";
+import { Route as RefundRouteImport } from "./routes/refund";
+import { Route as RefundPolicyRouteImport } from "./routes/refund-policy";
+import { Route as RefundsRouteImport } from "./routes/refunds";
+import { Route as RegisterRouteImport } from "./routes/register";
+import { Route as ResetPasswordRouteImport } from "./routes/reset-password";
+import { Route as SignupRouteImport } from "./routes/signup";
+import { Route as TermsRouteImport } from "./routes/terms";
+import { Route as TermsOfServiceRouteImport } from "./routes/terms-of-service";
+import { Route as UnsubscribeRouteImport } from "./routes/unsubscribe";
+import { Route as UpgradeRouteImport } from "./routes/upgrade";
+import { Route as WelcomeRouteImport } from "./routes/welcome";
+import { Route as AppOperatorRouteImport } from "./routes/_app/_operator";
+import { Route as AppActionQueueRouteImport } from "./routes/_app/action-queue";
+import { Route as AppActionsRouteImport } from "./routes/_app/actions";
+import { Route as AppAiDoctorRouteImport } from "./routes/_app/ai-doctor";
+import { Route as AppAlertsRouteImport } from "./routes/_app/alerts";
+import { Route as AppBreedingRouteImport } from "./routes/_app/breeding";
+import { Route as AppDailyCheckRouteImport } from "./routes/_app/daily-check";
+import { Route as AppDashboardRouteImport } from "./routes/_app/dashboard";
+import { Route as AppDoctorRouteImport } from "./routes/_app/doctor";
+import { Route as AppGeneticsRouteImport } from "./routes/_app/genetics";
+import { Route as AppGrowLineageRouteImport } from "./routes/_app/grow-lineage";
+import { Route as AppGrowRoomRouteImport } from "./routes/_app/grow-room";
+import { Route as AppGrowsRouteImport } from "./routes/_app/grows";
+import { Route as AppHealthRouteImport } from "./routes/_app/health";
+import { Route as AppInviteRouteImport } from "./routes/_app/invite";
+import { Route as AppLogsRouteImport } from "./routes/_app/logs";
+import { Route as AppOnboardingRouteImport } from "./routes/_app/onboarding";
+import { Route as AppPhenoHuntsRouteImport } from "./routes/_app/pheno-hunts";
+import { Route as AppPlantsRouteImport } from "./routes/_app/plants";
+import { Route as AppReportsRouteImport } from "./routes/_app/reports";
+import { Route as AppSensorsRouteImport } from "./routes/_app/sensors";
+import { Route as AppSettingsRouteImport } from "./routes/_app/settings";
+import { Route as AppStartRoomRouteImport } from "./routes/_app/start-room";
+import { Route as AppTasksRouteImport } from "./routes/_app/tasks";
+import { Route as AppTentsRouteImport } from "./routes/_app/tents";
+import { Route as AppTimelineRouteImport } from "./routes/_app/timeline";
+import { Route as BillingPlanRouteImport } from "./routes/billing.$plan";
+import { Route as CheckoutCancelRouteImport } from "./routes/checkout.cancel";
+import { Route as CheckoutSuccessRouteImport } from "./routes/checkout.success";
+import { Route as CultivarsIndexRouteImport } from "./routes/cultivars.index";
+import { Route as CultivarsSlugRouteImport } from "./routes/cultivars.$slug";
+import { Route as DocsMcpApiRouteImport } from "./routes/docs.mcp-api";
+import { Route as GuidesIndexRouteImport } from "./routes/guides.index";
+import { Route as GuidesSlugRouteImport } from "./routes/guides.$slug";
+import { Route as GuidesGrowStageCareGuideRouteImport } from "./routes/guides.grow-stage-care-guide";
+import { Route as InternalContextualPhenoComparisonDemoRouteImport } from "./routes/internal.contextual-pheno-comparison-demo";
+import { Route as InternalDemoProofWalkthroughRouteImport } from "./routes/internal.demo-proof-walkthrough";
+import { Route as InternalPhenoHuntDemoRouteImport } from "./routes/internal.pheno-hunt-demo";
+import { Route as PartnersCsvPreviewRouteImport } from "./routes/partners.csv-preview";
+import { Route as SensorsCsvPreviewRouteImport } from "./routes/sensors.csv-preview";
+import { Route as StrainsIndexRouteImport } from "./routes/strains.index";
+import { Route as StrainsSlugRouteImport } from "./routes/strains.$slug";
+import { Route as ToolsVpdCalculatorRouteImport } from "./routes/tools.vpd-calculator";
+import { Route as DotlovableOauthConsentRouteImport } from "./routes/[.]lovable.oauth.consent";
+import { Route as AppOperatorDiagnosticsRouteImport } from "./routes/_app/_operator/diagnostics";
+import { Route as AppOperatorDiagnosticsLightingMeasurementRouteImport } from "./routes/_app/_operator/diagnostics-lighting-measurement";
+import { Route as AppOperatorDiagnosticsSeoArtifactsRouteImport } from "./routes/_app/_operator/diagnostics-seo-artifacts";
+import { Route as AppOperatorIngestInspectorRouteImport } from "./routes/_app/_operator/ingest-inspector";
+import { Route as AppOperatorLeadsRouteImport } from "./routes/_app/_operator/leads";
+import { Route as AppOperatorOneTentLoopProofRouteImport } from "./routes/_app/_operator/one-tent-loop-proof";
+import { Route as AppOperatorPiIngestStatusRouteImport } from "./routes/_app/_operator/pi-ingest-status";
+import { Route as AppAccountPreferencesRouteImport } from "./routes/_app/account.preferences";
+import { Route as AppActionsActionIdRouteImport } from "./routes/_app/actions_.$actionId";
+import { Route as AppAlertsAlertIdRouteImport } from "./routes/_app/alerts_.$alertId";
+import { Route as AppBreedingProgramIdRouteImport } from "./routes/_app/breeding_.$programId";
+import { Route as AppBreedingNewRouteImport } from "./routes/_app/breeding_.new";
+import { Route as AppDiaryEnvironmentSummaryRouteImport } from "./routes/_app/diary.environment-summary";
+import { Route as AppDiaryPhenoExpressionComparisonRouteImport } from "./routes/_app/diary.pheno-expression-comparison";
+import { Route as AppDoctorSessionsRouteImport } from "./routes/_app/doctor_.sessions";
+import { Route as AppGeneticsIndexRouteImport } from "./routes/_app/genetics.index";
+import { Route as AppGrowsGrowIdRouteImport } from "./routes/_app/grows_.$growId";
+import { Route as AppPhenoHuntsNewRouteImport } from "./routes/_app/pheno-hunts_.new";
+import { Route as AppPlantsIdRouteImport } from "./routes/_app/plants_.$id";
+import { Route as AppReportsDiaryRangeRouteImport } from "./routes/_app/reports_.diary-range";
+import { Route as AppSettingsAgentIntegrationsRouteImport } from "./routes/_app/settings_.agent-integrations";
+import { Route as AppSettingsAnalyticsRouteImport } from "./routes/_app/settings_.analytics";
+import { Route as AppTentsIdRouteImport } from "./routes/_app/tents_.$id";
+import { Route as CustomerGuideOreozVsGelonadeComparisonRouteImport } from "./routes/customer.guide.oreoz-vs-gelonade-comparison";
+import { Route as PhenoHuntsIdCompareRouteImport } from "./routes/pheno-hunts.$id.compare";
+import { Route as PhenoHuntsIdShowcaseRouteImport } from "./routes/pheno-hunts.$id.showcase";
+import { Route as AppOperatorAdminLeadsRouteImport } from "./routes/_app/_operator/admin.leads";
+import { Route as AppOperatorDemoOneTentLiveProofRouteImport } from "./routes/_app/_operator/demo.one-tent-live-proof";
+import { Route as AppOperatorInternalAiDoctorConfidenceAuditRouteImport } from "./routes/_app/_operator/internal.ai-doctor-confidence-audit";
+import { Route as AppOperatorInternalAiDoctorPhase1PreviewRouteImport } from "./routes/_app/_operator/internal.ai-doctor-phase1-preview";
+import { Route as AppOperatorInternalOneTentLoopProofRouteImport } from "./routes/_app/_operator/internal.one-tent-loop-proof";
+import { Route as AppOperatorInternalSensorTruthAuditRouteImport } from "./routes/_app/_operator/internal.sensor-truth-audit";
+import { Route as AppOperatorOperatorAiDoctorPhase1RouteImport } from "./routes/_app/_operator/operator.ai-doctor-phase1";
+import { Route as AppOperatorOperatorBillingEntitlementResolutionRouteImport } from "./routes/_app/_operator/operator.billing-entitlement-resolution";
+import { Route as AppOperatorOperatorBillingSubscriptionUpdatesRouteImport } from "./routes/_app/_operator/operator.billing-subscription-updates";
+import { Route as AppOperatorOperatorCreditsAuditRouteImport } from "./routes/_app/_operator/operator.credits-audit";
+import { Route as AppOperatorOperatorDemoPreviewRouteImport } from "./routes/_app/_operator/operator.demo-preview";
+import { Route as AppOperatorOperatorEcowittRouteImport } from "./routes/_app/_operator/operator.ecowitt";
+import { Route as AppOperatorOperatorEcowittBridgeDebugRouteImport } from "./routes/_app/_operator/operator.ecowitt-bridge-debug";
+import { Route as AppOperatorOperatorEcowittBridgeStatusRouteImport } from "./routes/_app/_operator/operator.ecowitt-bridge-status";
+import { Route as AppOperatorOperatorEcowittLiveBringupRouteImport } from "./routes/_app/_operator/operator.ecowitt-live-bringup";
+import { Route as AppOperatorOperatorEcowittTentPreviewRouteImport } from "./routes/_app/_operator/operator.ecowitt-tent-preview";
+import { Route as AppOperatorOperatorEdgeAlertsRouteImport } from "./routes/_app/_operator/operator.edge-alerts";
+import { Route as AppOperatorOperatorEdgeMetricsRouteImport } from "./routes/_app/_operator/operator.edge-metrics";
+import { Route as AppOperatorOperatorModeRouteImport } from "./routes/_app/_operator/operator.mode";
+import { Route as AppOperatorOperatorOneTentLiveProofRouteImport } from "./routes/_app/_operator/operator.one-tent-live-proof";
+import { Route as AppOperatorOperatorOneTentLoopSmokeTestRouteImport } from "./routes/_app/_operator/operator.one-tent-loop-smoke-test";
+import { Route as AppOperatorOperatorOneTentProofRecordRouteImport } from "./routes/_app/_operator/operator.one-tent-proof-record";
+import { Route as AppOperatorOperatorPaddleProcessingAuditRouteImport } from "./routes/_app/_operator/operator.paddle-processing-audit";
+import { Route as AppOperatorOperatorPostGrowReflectionDryRunRouteImport } from "./routes/_app/_operator/operator.post-grow-reflection-dry-run";
+import { Route as AppOperatorOperatorReleaseReadinessRouteImport } from "./routes/_app/_operator/operator.release-readiness";
+import { Route as AppOperatorOperatorSchemaAuditRouteImport } from "./routes/_app/_operator/operator.schema-audit";
+import { Route as AppOperatorOperatorSubscriberGrowthRouteImport } from "./routes/_app/_operator/operator.subscriber-growth";
+import { Route as AppOperatorOperatorSupportInboxRouteImport } from "./routes/_app/_operator/operator.support-inbox";
+import { Route as AppOperatorSensorsEcowittAuditRouteImport } from "./routes/_app/_operator/sensors.ecowitt-audit";
+import { Route as AppOperatorSensorsIngestNormalizerRouteImport } from "./routes/_app/_operator/sensors.ingest-normalizer";
+import { Route as AppBreedingLogNewRouteImport } from "./routes/_app/breeding_.log.new";
+import { Route as AppDiaryStrainsSlugRouteImport } from "./routes/_app/diary.strains.$slug";
+import { Route as AppDoctorSessionsSessionIdRouteImport } from "./routes/_app/doctor_.sessions_.$sessionId";
+import { Route as AppGeneticsAccessionsIdRouteImport } from "./routes/_app/genetics.accessions.$id";
+import { Route as AppGeneticsBatchesIdRouteImport } from "./routes/_app/genetics.batches.$id";
+import { Route as AppGrowsGrowIdLearningRouteImport } from "./routes/_app/grows_.$growId_.learning";
+import { Route as AppPhenoHuntsIdKeepersRouteImport } from "./routes/_app/pheno-hunts_.$id.keepers";
+import { Route as AppPhenoHuntsIdWorkspaceRouteImport } from "./routes/_app/pheno-hunts_.$id.workspace";
+import { Route as AppReportsPostGrowGrowIdRouteImport } from "./routes/_app/reports_.post-grow.$growId";
+import { Route as AppGeneticsHealthKindIdRouteImport } from "./routes/_app/genetics.health.$kind.$id";
+import { Route as AppGeneticsTraceKindIdRouteImport } from "./routes/_app/genetics.trace.$kind.$id";
 
 const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+  id: "/",
+  path: "/",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const SplatRoute = SplatRouteImport.update({
-  id: '/$',
-  path: '/$',
+  id: "/$",
+  path: "/$",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const AppRoute = AppRouteImport.update({
-  id: '/_app',
+  id: "/_app",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const AiDoctorReadinessCheckRoute = AiDoctorReadinessCheckRouteImport.update({
-  id: '/ai-doctor-readiness-check',
-  path: '/ai-doctor-readiness-check',
+  id: "/ai-doctor-readiness-check",
+  path: "/ai-doctor-readiness-check",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const AuthRoute = AuthRouteImport.update({
-  id: '/auth',
-  path: '/auth',
+  id: "/auth",
+  path: "/auth",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const BreederBetaRoute = BreederBetaRouteImport.update({
-  id: '/breeder-beta',
-  path: '/breeder-beta',
+  id: "/breeder-beta",
+  path: "/breeder-beta",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const ContactRoute = ContactRouteImport.update({
-  id: '/contact',
-  path: '/contact',
+  id: "/contact",
+  path: "/contact",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const CreatorBetaRoute = CreatorBetaRouteImport.update({
-  id: '/creator-beta',
-  path: '/creator-beta',
+  id: "/creator-beta",
+  path: "/creator-beta",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const DemoRoute = DemoRouteImport.update({
-  id: '/demo',
-  path: '/demo',
+  id: "/demo",
+  path: "/demo",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const FeaturesRoute = FeaturesRouteImport.update({
-  id: '/features',
-  path: '/features',
+  id: "/features",
+  path: "/features",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const FeedbackRoute = FeedbackRouteImport.update({
-  id: '/feedback',
-  path: '/feedback',
+  id: "/feedback",
+  path: "/feedback",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const FounderRoute = FounderRouteImport.update({
-  id: '/founder',
-  path: '/founder',
+  id: "/founder",
+  path: "/founder",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const GlossaryRoute = GlossaryRouteImport.update({
-  id: '/glossary',
-  path: '/glossary',
+  id: "/glossary",
+  path: "/glossary",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const HardwareIntegrationsRoute = HardwareIntegrationsRouteImport.update({
-  id: '/hardware-integrations',
-  path: '/hardware-integrations',
+  id: "/hardware-integrations",
+  path: "/hardware-integrations",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const HowAiDoctorWorksRoute = HowAiDoctorWorksRouteImport.update({
-  id: '/how-ai-doctor-works',
-  path: '/how-ai-doctor-works',
+  id: "/how-ai-doctor-works",
+  path: "/how-ai-doctor-works",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const LoginRoute = LoginRouteImport.update({
-  id: '/login',
-  path: '/login',
+  id: "/login",
+  path: "/login",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const PhenoComparisonRoute = PhenoComparisonRouteImport.update({
-  id: '/pheno-comparison',
-  path: '/pheno-comparison',
+  id: "/pheno-comparison",
+  path: "/pheno-comparison",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const PhenoExpressionShowcaseRoute = PhenoExpressionShowcaseRouteImport.update({
-  id: '/pheno-expression-showcase',
-  path: '/pheno-expression-showcase',
+  id: "/pheno-expression-showcase",
+  path: "/pheno-expression-showcase",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const PricingRoute = PricingRouteImport.update({
-  id: '/pricing',
-  path: '/pricing',
+  id: "/pricing",
+  path: "/pricing",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const PrivacyRoute = PrivacyRouteImport.update({
-  id: '/privacy',
-  path: '/privacy',
+  id: "/privacy",
+  path: "/privacy",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const PrivacyPolicyRoute = PrivacyPolicyRouteImport.update({
-  id: '/privacy-policy',
-  path: '/privacy-policy',
+  id: "/privacy-policy",
+  path: "/privacy-policy",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const QuickLogRoute = QuickLogRouteImport.update({
-  id: '/quick-log',
-  path: '/quick-log',
+  id: "/quick-log",
+  path: "/quick-log",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const RefundRoute = RefundRouteImport.update({
-  id: '/refund',
-  path: '/refund',
+  id: "/refund",
+  path: "/refund",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const RefundPolicyRoute = RefundPolicyRouteImport.update({
-  id: '/refund-policy',
-  path: '/refund-policy',
+  id: "/refund-policy",
+  path: "/refund-policy",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const RefundsRoute = RefundsRouteImport.update({
-  id: '/refunds',
-  path: '/refunds',
+  id: "/refunds",
+  path: "/refunds",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const RegisterRoute = RegisterRouteImport.update({
-  id: '/register',
-  path: '/register',
+  id: "/register",
+  path: "/register",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
-  id: '/reset-password',
-  path: '/reset-password',
+  id: "/reset-password",
+  path: "/reset-password",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const SignupRoute = SignupRouteImport.update({
-  id: '/signup',
-  path: '/signup',
+  id: "/signup",
+  path: "/signup",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const TermsRoute = TermsRouteImport.update({
-  id: '/terms',
-  path: '/terms',
+  id: "/terms",
+  path: "/terms",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const TermsOfServiceRoute = TermsOfServiceRouteImport.update({
-  id: '/terms-of-service',
-  path: '/terms-of-service',
+  id: "/terms-of-service",
+  path: "/terms-of-service",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const UnsubscribeRoute = UnsubscribeRouteImport.update({
-  id: '/unsubscribe',
-  path: '/unsubscribe',
+  id: "/unsubscribe",
+  path: "/unsubscribe",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const UpgradeRoute = UpgradeRouteImport.update({
-  id: '/upgrade',
-  path: '/upgrade',
+  id: "/upgrade",
+  path: "/upgrade",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const WelcomeRoute = WelcomeRouteImport.update({
-  id: '/welcome',
-  path: '/welcome',
+  id: "/welcome",
+  path: "/welcome",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const AppOperatorRoute = AppOperatorRouteImport.update({
-  id: '/_operator',
+  id: "/_operator",
   getParentRoute: () => AppRoute,
-} as any)
+} as any);
 const AppActionQueueRoute = AppActionQueueRouteImport.update({
-  id: '/action-queue',
-  path: '/action-queue',
+  id: "/action-queue",
+  path: "/action-queue",
   getParentRoute: () => AppRoute,
-} as any)
+} as any);
 const AppActionsRoute = AppActionsRouteImport.update({
-  id: '/actions',
-  path: '/actions',
+  id: "/actions",
+  path: "/actions",
   getParentRoute: () => AppRoute,
-} as any)
+} as any);
 const AppAiDoctorRoute = AppAiDoctorRouteImport.update({
-  id: '/ai-doctor',
-  path: '/ai-doctor',
+  id: "/ai-doctor",
+  path: "/ai-doctor",
   getParentRoute: () => AppRoute,
-} as any)
+} as any);
 const AppAlertsRoute = AppAlertsRouteImport.update({
-  id: '/alerts',
-  path: '/alerts',
+  id: "/alerts",
+  path: "/alerts",
   getParentRoute: () => AppRoute,
-} as any)
+} as any);
 const AppBreedingRoute = AppBreedingRouteImport.update({
-  id: '/breeding',
-  path: '/breeding',
+  id: "/breeding",
+  path: "/breeding",
   getParentRoute: () => AppRoute,
-} as any)
+} as any);
 const AppDailyCheckRoute = AppDailyCheckRouteImport.update({
-  id: '/daily-check',
-  path: '/daily-check',
+  id: "/daily-check",
+  path: "/daily-check",
   getParentRoute: () => AppRoute,
-} as any)
+} as any);
 const AppDashboardRoute = AppDashboardRouteImport.update({
-  id: '/dashboard',
-  path: '/dashboard',
+  id: "/dashboard",
+  path: "/dashboard",
   getParentRoute: () => AppRoute,
-} as any)
+} as any);
 const AppDoctorRoute = AppDoctorRouteImport.update({
-  id: '/doctor',
-  path: '/doctor',
+  id: "/doctor",
+  path: "/doctor",
   getParentRoute: () => AppRoute,
-} as any)
+} as any);
 const AppGeneticsRoute = AppGeneticsRouteImport.update({
-  id: '/genetics',
-  path: '/genetics',
+  id: "/genetics",
+  path: "/genetics",
   getParentRoute: () => AppRoute,
-} as any)
+} as any);
 const AppGrowLineageRoute = AppGrowLineageRouteImport.update({
-  id: '/grow-lineage',
-  path: '/grow-lineage',
+  id: "/grow-lineage",
+  path: "/grow-lineage",
   getParentRoute: () => AppRoute,
-} as any)
+} as any);
 const AppGrowRoomRoute = AppGrowRoomRouteImport.update({
-  id: '/grow-room',
-  path: '/grow-room',
+  id: "/grow-room",
+  path: "/grow-room",
   getParentRoute: () => AppRoute,
-} as any)
+} as any);
 const AppGrowsRoute = AppGrowsRouteImport.update({
-  id: '/grows',
-  path: '/grows',
+  id: "/grows",
+  path: "/grows",
   getParentRoute: () => AppRoute,
-} as any)
+} as any);
 const AppHealthRoute = AppHealthRouteImport.update({
-  id: '/health',
-  path: '/health',
+  id: "/health",
+  path: "/health",
   getParentRoute: () => AppRoute,
-} as any)
+} as any);
 const AppInviteRoute = AppInviteRouteImport.update({
-  id: '/invite',
-  path: '/invite',
+  id: "/invite",
+  path: "/invite",
   getParentRoute: () => AppRoute,
-} as any)
+} as any);
 const AppLogsRoute = AppLogsRouteImport.update({
-  id: '/logs',
-  path: '/logs',
+  id: "/logs",
+  path: "/logs",
   getParentRoute: () => AppRoute,
-} as any)
+} as any);
 const AppOnboardingRoute = AppOnboardingRouteImport.update({
-  id: '/onboarding',
-  path: '/onboarding',
+  id: "/onboarding",
+  path: "/onboarding",
   getParentRoute: () => AppRoute,
-} as any)
+} as any);
 const AppPhenoHuntsRoute = AppPhenoHuntsRouteImport.update({
-  id: '/pheno-hunts',
-  path: '/pheno-hunts',
+  id: "/pheno-hunts",
+  path: "/pheno-hunts",
   getParentRoute: () => AppRoute,
-} as any)
+} as any);
 const AppPlantsRoute = AppPlantsRouteImport.update({
-  id: '/plants',
-  path: '/plants',
+  id: "/plants",
+  path: "/plants",
   getParentRoute: () => AppRoute,
-} as any)
+} as any);
 const AppReportsRoute = AppReportsRouteImport.update({
-  id: '/reports',
-  path: '/reports',
+  id: "/reports",
+  path: "/reports",
   getParentRoute: () => AppRoute,
-} as any)
+} as any);
 const AppSensorsRoute = AppSensorsRouteImport.update({
-  id: '/sensors',
-  path: '/sensors',
+  id: "/sensors",
+  path: "/sensors",
   getParentRoute: () => AppRoute,
-} as any)
+} as any);
 const AppSettingsRoute = AppSettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
+  id: "/settings",
+  path: "/settings",
   getParentRoute: () => AppRoute,
-} as any)
+} as any);
 const AppStartRoomRoute = AppStartRoomRouteImport.update({
-  id: '/start-room',
-  path: '/start-room',
+  id: "/start-room",
+  path: "/start-room",
   getParentRoute: () => AppRoute,
-} as any)
+} as any);
 const AppTasksRoute = AppTasksRouteImport.update({
-  id: '/tasks',
-  path: '/tasks',
+  id: "/tasks",
+  path: "/tasks",
   getParentRoute: () => AppRoute,
-} as any)
+} as any);
 const AppTentsRoute = AppTentsRouteImport.update({
-  id: '/tents',
-  path: '/tents',
+  id: "/tents",
+  path: "/tents",
   getParentRoute: () => AppRoute,
-} as any)
+} as any);
 const AppTimelineRoute = AppTimelineRouteImport.update({
-  id: '/timeline',
-  path: '/timeline',
+  id: "/timeline",
+  path: "/timeline",
   getParentRoute: () => AppRoute,
-} as any)
+} as any);
 const BillingPlanRoute = BillingPlanRouteImport.update({
-  id: '/billing/$plan',
-  path: '/billing/$plan',
+  id: "/billing/$plan",
+  path: "/billing/$plan",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const CheckoutCancelRoute = CheckoutCancelRouteImport.update({
-  id: '/checkout/cancel',
-  path: '/checkout/cancel',
+  id: "/checkout/cancel",
+  path: "/checkout/cancel",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const CheckoutSuccessRoute = CheckoutSuccessRouteImport.update({
-  id: '/checkout/success',
-  path: '/checkout/success',
+  id: "/checkout/success",
+  path: "/checkout/success",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const CultivarsIndexRoute = CultivarsIndexRouteImport.update({
-  id: '/cultivars/',
-  path: '/cultivars/',
+  id: "/cultivars/",
+  path: "/cultivars/",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const CultivarsSlugRoute = CultivarsSlugRouteImport.update({
-  id: '/cultivars/$slug',
-  path: '/cultivars/$slug',
+  id: "/cultivars/$slug",
+  path: "/cultivars/$slug",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const DocsMcpApiRoute = DocsMcpApiRouteImport.update({
-  id: '/docs/mcp-api',
-  path: '/docs/mcp-api',
+  id: "/docs/mcp-api",
+  path: "/docs/mcp-api",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const GuidesIndexRoute = GuidesIndexRouteImport.update({
-  id: '/guides/',
-  path: '/guides/',
+  id: "/guides/",
+  path: "/guides/",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const GuidesSlugRoute = GuidesSlugRouteImport.update({
-  id: '/guides/$slug',
-  path: '/guides/$slug',
+  id: "/guides/$slug",
+  path: "/guides/$slug",
   getParentRoute: () => rootRouteImport,
-} as any)
-const GuidesGrowStageCareGuideRoute =
-  GuidesGrowStageCareGuideRouteImport.update({
-    id: '/guides/grow-stage-care-guide',
-    path: '/guides/grow-stage-care-guide',
-    getParentRoute: () => rootRouteImport,
-  } as any)
+} as any);
+const GuidesGrowStageCareGuideRoute = GuidesGrowStageCareGuideRouteImport.update({
+  id: "/guides/grow-stage-care-guide",
+  path: "/guides/grow-stage-care-guide",
+  getParentRoute: () => rootRouteImport,
+} as any);
 const InternalContextualPhenoComparisonDemoRoute =
   InternalContextualPhenoComparisonDemoRouteImport.update({
-    id: '/internal/contextual-pheno-comparison-demo',
-    path: '/internal/contextual-pheno-comparison-demo',
+    id: "/internal/contextual-pheno-comparison-demo",
+    path: "/internal/contextual-pheno-comparison-demo",
     getParentRoute: () => rootRouteImport,
-  } as any)
-const InternalDemoProofWalkthroughRoute =
-  InternalDemoProofWalkthroughRouteImport.update({
-    id: '/internal/demo-proof-walkthrough',
-    path: '/internal/demo-proof-walkthrough',
-    getParentRoute: () => rootRouteImport,
-  } as any)
+  } as any);
+const InternalDemoProofWalkthroughRoute = InternalDemoProofWalkthroughRouteImport.update({
+  id: "/internal/demo-proof-walkthrough",
+  path: "/internal/demo-proof-walkthrough",
+  getParentRoute: () => rootRouteImport,
+} as any);
 const InternalPhenoHuntDemoRoute = InternalPhenoHuntDemoRouteImport.update({
-  id: '/internal/pheno-hunt-demo',
-  path: '/internal/pheno-hunt-demo',
+  id: "/internal/pheno-hunt-demo",
+  path: "/internal/pheno-hunt-demo",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const PartnersCsvPreviewRoute = PartnersCsvPreviewRouteImport.update({
-  id: '/partners/csv-preview',
-  path: '/partners/csv-preview',
+  id: "/partners/csv-preview",
+  path: "/partners/csv-preview",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const SensorsCsvPreviewRoute = SensorsCsvPreviewRouteImport.update({
-  id: '/sensors/csv-preview',
-  path: '/sensors/csv-preview',
+  id: "/sensors/csv-preview",
+  path: "/sensors/csv-preview",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const StrainsIndexRoute = StrainsIndexRouteImport.update({
-  id: '/strains/',
-  path: '/strains/',
+  id: "/strains/",
+  path: "/strains/",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const StrainsSlugRoute = StrainsSlugRouteImport.update({
-  id: '/strains/$slug',
-  path: '/strains/$slug',
+  id: "/strains/$slug",
+  path: "/strains/$slug",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const ToolsVpdCalculatorRoute = ToolsVpdCalculatorRouteImport.update({
-  id: '/tools/vpd-calculator',
-  path: '/tools/vpd-calculator',
+  id: "/tools/vpd-calculator",
+  path: "/tools/vpd-calculator",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const DotlovableOauthConsentRoute = DotlovableOauthConsentRouteImport.update({
-  id: '/.lovable/oauth/consent',
-  path: '/.lovable/oauth/consent',
+  id: "/.lovable/oauth/consent",
+  path: "/.lovable/oauth/consent",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const AppOperatorDiagnosticsRoute = AppOperatorDiagnosticsRouteImport.update({
-  id: '/diagnostics',
-  path: '/diagnostics',
+  id: "/diagnostics",
+  path: "/diagnostics",
   getParentRoute: () => AppOperatorRoute,
-} as any)
+} as any);
+const AppOperatorDiagnosticsLightingMeasurementRoute =
+  AppOperatorDiagnosticsLightingMeasurementRouteImport.update({
+    id: "/diagnostics-lighting-measurement",
+    path: "/diagnostics-lighting-measurement",
+    getParentRoute: () => AppOperatorRoute,
+  } as any);
 const AppOperatorDiagnosticsSeoArtifactsRoute =
   AppOperatorDiagnosticsSeoArtifactsRouteImport.update({
-    id: '/diagnostics-seo-artifacts',
-    path: '/diagnostics-seo-artifacts',
+    id: "/diagnostics-seo-artifacts",
+    path: "/diagnostics-seo-artifacts",
     getParentRoute: () => AppOperatorRoute,
-  } as any)
-const AppOperatorIngestInspectorRoute =
-  AppOperatorIngestInspectorRouteImport.update({
-    id: '/ingest-inspector',
-    path: '/ingest-inspector',
-    getParentRoute: () => AppOperatorRoute,
-  } as any)
-const AppOperatorLeadsRoute = AppOperatorLeadsRouteImport.update({
-  id: '/leads',
-  path: '/leads',
+  } as any);
+const AppOperatorIngestInspectorRoute = AppOperatorIngestInspectorRouteImport.update({
+  id: "/ingest-inspector",
+  path: "/ingest-inspector",
   getParentRoute: () => AppOperatorRoute,
-} as any)
-const AppOperatorOneTentLoopProofRoute =
-  AppOperatorOneTentLoopProofRouteImport.update({
-    id: '/one-tent-loop-proof',
-    path: '/one-tent-loop-proof',
-    getParentRoute: () => AppOperatorRoute,
-  } as any)
-const AppOperatorPiIngestStatusRoute =
-  AppOperatorPiIngestStatusRouteImport.update({
-    id: '/pi-ingest-status',
-    path: '/pi-ingest-status',
-    getParentRoute: () => AppOperatorRoute,
-  } as any)
+} as any);
+const AppOperatorLeadsRoute = AppOperatorLeadsRouteImport.update({
+  id: "/leads",
+  path: "/leads",
+  getParentRoute: () => AppOperatorRoute,
+} as any);
+const AppOperatorOneTentLoopProofRoute = AppOperatorOneTentLoopProofRouteImport.update({
+  id: "/one-tent-loop-proof",
+  path: "/one-tent-loop-proof",
+  getParentRoute: () => AppOperatorRoute,
+} as any);
+const AppOperatorPiIngestStatusRoute = AppOperatorPiIngestStatusRouteImport.update({
+  id: "/pi-ingest-status",
+  path: "/pi-ingest-status",
+  getParentRoute: () => AppOperatorRoute,
+} as any);
 const AppAccountPreferencesRoute = AppAccountPreferencesRouteImport.update({
-  id: '/account/preferences',
-  path: '/account/preferences',
+  id: "/account/preferences",
+  path: "/account/preferences",
   getParentRoute: () => AppRoute,
-} as any)
+} as any);
 const AppActionsActionIdRoute = AppActionsActionIdRouteImport.update({
-  id: '/actions_/$actionId',
-  path: '/actions/$actionId',
+  id: "/actions_/$actionId",
+  path: "/actions/$actionId",
   getParentRoute: () => AppRoute,
-} as any)
+} as any);
 const AppAlertsAlertIdRoute = AppAlertsAlertIdRouteImport.update({
-  id: '/alerts_/$alertId',
-  path: '/alerts/$alertId',
+  id: "/alerts_/$alertId",
+  path: "/alerts/$alertId",
   getParentRoute: () => AppRoute,
-} as any)
+} as any);
 const AppBreedingProgramIdRoute = AppBreedingProgramIdRouteImport.update({
-  id: '/breeding_/$programId',
-  path: '/breeding/$programId',
+  id: "/breeding_/$programId",
+  path: "/breeding/$programId",
   getParentRoute: () => AppRoute,
-} as any)
+} as any);
 const AppBreedingNewRoute = AppBreedingNewRouteImport.update({
-  id: '/breeding_/new',
-  path: '/breeding/new',
+  id: "/breeding_/new",
+  path: "/breeding/new",
   getParentRoute: () => AppRoute,
-} as any)
-const AppDiaryEnvironmentSummaryRoute =
-  AppDiaryEnvironmentSummaryRouteImport.update({
-    id: '/diary/environment-summary',
-    path: '/diary/environment-summary',
-    getParentRoute: () => AppRoute,
-  } as any)
-const AppDiaryPhenoExpressionComparisonRoute =
-  AppDiaryPhenoExpressionComparisonRouteImport.update({
-    id: '/diary/pheno-expression-comparison',
-    path: '/diary/pheno-expression-comparison',
-    getParentRoute: () => AppRoute,
-  } as any)
+} as any);
+const AppDiaryEnvironmentSummaryRoute = AppDiaryEnvironmentSummaryRouteImport.update({
+  id: "/diary/environment-summary",
+  path: "/diary/environment-summary",
+  getParentRoute: () => AppRoute,
+} as any);
+const AppDiaryPhenoExpressionComparisonRoute = AppDiaryPhenoExpressionComparisonRouteImport.update({
+  id: "/diary/pheno-expression-comparison",
+  path: "/diary/pheno-expression-comparison",
+  getParentRoute: () => AppRoute,
+} as any);
 const AppDoctorSessionsRoute = AppDoctorSessionsRouteImport.update({
-  id: '/doctor_/sessions',
-  path: '/doctor/sessions',
+  id: "/doctor_/sessions",
+  path: "/doctor/sessions",
   getParentRoute: () => AppRoute,
-} as any)
+} as any);
 const AppGeneticsIndexRoute = AppGeneticsIndexRouteImport.update({
-  id: '/',
-  path: '/',
+  id: "/",
+  path: "/",
   getParentRoute: () => AppGeneticsRoute,
-} as any)
+} as any);
 const AppGrowsGrowIdRoute = AppGrowsGrowIdRouteImport.update({
-  id: '/grows_/$growId',
-  path: '/grows/$growId',
+  id: "/grows_/$growId",
+  path: "/grows/$growId",
   getParentRoute: () => AppRoute,
-} as any)
+} as any);
 const AppPhenoHuntsNewRoute = AppPhenoHuntsNewRouteImport.update({
-  id: '/pheno-hunts_/new',
-  path: '/pheno-hunts/new',
+  id: "/pheno-hunts_/new",
+  path: "/pheno-hunts/new",
   getParentRoute: () => AppRoute,
-} as any)
+} as any);
 const AppPlantsIdRoute = AppPlantsIdRouteImport.update({
-  id: '/plants_/$id',
-  path: '/plants/$id',
+  id: "/plants_/$id",
+  path: "/plants/$id",
   getParentRoute: () => AppRoute,
-} as any)
+} as any);
 const AppReportsDiaryRangeRoute = AppReportsDiaryRangeRouteImport.update({
-  id: '/reports_/diary-range',
-  path: '/reports/diary-range',
+  id: "/reports_/diary-range",
+  path: "/reports/diary-range",
   getParentRoute: () => AppRoute,
-} as any)
-const AppSettingsAgentIntegrationsRoute =
-  AppSettingsAgentIntegrationsRouteImport.update({
-    id: '/settings_/agent-integrations',
-    path: '/settings/agent-integrations',
-    getParentRoute: () => AppRoute,
-  } as any)
+} as any);
+const AppSettingsAgentIntegrationsRoute = AppSettingsAgentIntegrationsRouteImport.update({
+  id: "/settings_/agent-integrations",
+  path: "/settings/agent-integrations",
+  getParentRoute: () => AppRoute,
+} as any);
 const AppSettingsAnalyticsRoute = AppSettingsAnalyticsRouteImport.update({
-  id: '/settings_/analytics',
-  path: '/settings/analytics',
+  id: "/settings_/analytics",
+  path: "/settings/analytics",
   getParentRoute: () => AppRoute,
-} as any)
+} as any);
 const AppTentsIdRoute = AppTentsIdRouteImport.update({
-  id: '/tents_/$id',
-  path: '/tents/$id',
+  id: "/tents_/$id",
+  path: "/tents/$id",
   getParentRoute: () => AppRoute,
-} as any)
+} as any);
 const CustomerGuideOreozVsGelonadeComparisonRoute =
   CustomerGuideOreozVsGelonadeComparisonRouteImport.update({
-    id: '/customer/guide/oreoz-vs-gelonade-comparison',
-    path: '/customer/guide/oreoz-vs-gelonade-comparison',
+    id: "/customer/guide/oreoz-vs-gelonade-comparison",
+    path: "/customer/guide/oreoz-vs-gelonade-comparison",
     getParentRoute: () => rootRouteImport,
-  } as any)
+  } as any);
 const PhenoHuntsIdCompareRoute = PhenoHuntsIdCompareRouteImport.update({
-  id: '/pheno-hunts/$id/compare',
-  path: '/pheno-hunts/$id/compare',
+  id: "/pheno-hunts/$id/compare",
+  path: "/pheno-hunts/$id/compare",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const PhenoHuntsIdShowcaseRoute = PhenoHuntsIdShowcaseRouteImport.update({
-  id: '/pheno-hunts/$id/showcase',
-  path: '/pheno-hunts/$id/showcase',
+  id: "/pheno-hunts/$id/showcase",
+  path: "/pheno-hunts/$id/showcase",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const AppOperatorAdminLeadsRoute = AppOperatorAdminLeadsRouteImport.update({
-  id: '/admin/leads',
-  path: '/admin/leads',
+  id: "/admin/leads",
+  path: "/admin/leads",
   getParentRoute: () => AppOperatorRoute,
-} as any)
-const AppOperatorDemoOneTentLiveProofRoute =
-  AppOperatorDemoOneTentLiveProofRouteImport.update({
-    id: '/demo/one-tent-live-proof',
-    path: '/demo/one-tent-live-proof',
-    getParentRoute: () => AppOperatorRoute,
-  } as any)
+} as any);
+const AppOperatorDemoOneTentLiveProofRoute = AppOperatorDemoOneTentLiveProofRouteImport.update({
+  id: "/demo/one-tent-live-proof",
+  path: "/demo/one-tent-live-proof",
+  getParentRoute: () => AppOperatorRoute,
+} as any);
 const AppOperatorInternalAiDoctorConfidenceAuditRoute =
   AppOperatorInternalAiDoctorConfidenceAuditRouteImport.update({
-    id: '/internal/ai-doctor-confidence-audit',
-    path: '/internal/ai-doctor-confidence-audit',
+    id: "/internal/ai-doctor-confidence-audit",
+    path: "/internal/ai-doctor-confidence-audit",
     getParentRoute: () => AppOperatorRoute,
-  } as any)
+  } as any);
 const AppOperatorInternalAiDoctorPhase1PreviewRoute =
   AppOperatorInternalAiDoctorPhase1PreviewRouteImport.update({
-    id: '/internal/ai-doctor-phase1-preview',
-    path: '/internal/ai-doctor-phase1-preview',
+    id: "/internal/ai-doctor-phase1-preview",
+    path: "/internal/ai-doctor-phase1-preview",
     getParentRoute: () => AppOperatorRoute,
-  } as any)
+  } as any);
 const AppOperatorInternalOneTentLoopProofRoute =
   AppOperatorInternalOneTentLoopProofRouteImport.update({
-    id: '/internal/one-tent-loop-proof',
-    path: '/internal/one-tent-loop-proof',
+    id: "/internal/one-tent-loop-proof",
+    path: "/internal/one-tent-loop-proof",
     getParentRoute: () => AppOperatorRoute,
-  } as any)
+  } as any);
 const AppOperatorInternalSensorTruthAuditRoute =
   AppOperatorInternalSensorTruthAuditRouteImport.update({
-    id: '/internal/sensor-truth-audit',
-    path: '/internal/sensor-truth-audit',
+    id: "/internal/sensor-truth-audit",
+    path: "/internal/sensor-truth-audit",
     getParentRoute: () => AppOperatorRoute,
-  } as any)
-const AppOperatorOperatorAiDoctorPhase1Route =
-  AppOperatorOperatorAiDoctorPhase1RouteImport.update({
-    id: '/operator/ai-doctor-phase1',
-    path: '/operator/ai-doctor-phase1',
-    getParentRoute: () => AppOperatorRoute,
-  } as any)
+  } as any);
+const AppOperatorOperatorAiDoctorPhase1Route = AppOperatorOperatorAiDoctorPhase1RouteImport.update({
+  id: "/operator/ai-doctor-phase1",
+  path: "/operator/ai-doctor-phase1",
+  getParentRoute: () => AppOperatorRoute,
+} as any);
 const AppOperatorOperatorBillingEntitlementResolutionRoute =
   AppOperatorOperatorBillingEntitlementResolutionRouteImport.update({
-    id: '/operator/billing-entitlement-resolution',
-    path: '/operator/billing-entitlement-resolution',
+    id: "/operator/billing-entitlement-resolution",
+    path: "/operator/billing-entitlement-resolution",
     getParentRoute: () => AppOperatorRoute,
-  } as any)
+  } as any);
 const AppOperatorOperatorBillingSubscriptionUpdatesRoute =
   AppOperatorOperatorBillingSubscriptionUpdatesRouteImport.update({
-    id: '/operator/billing-subscription-updates',
-    path: '/operator/billing-subscription-updates',
+    id: "/operator/billing-subscription-updates",
+    path: "/operator/billing-subscription-updates",
     getParentRoute: () => AppOperatorRoute,
-  } as any)
-const AppOperatorOperatorCreditsAuditRoute =
-  AppOperatorOperatorCreditsAuditRouteImport.update({
-    id: '/operator/credits-audit',
-    path: '/operator/credits-audit',
-    getParentRoute: () => AppOperatorRoute,
-  } as any)
-const AppOperatorOperatorDemoPreviewRoute =
-  AppOperatorOperatorDemoPreviewRouteImport.update({
-    id: '/operator/demo-preview',
-    path: '/operator/demo-preview',
-    getParentRoute: () => AppOperatorRoute,
-  } as any)
-const AppOperatorOperatorEcowittRoute =
-  AppOperatorOperatorEcowittRouteImport.update({
-    id: '/operator/ecowitt',
-    path: '/operator/ecowitt',
-    getParentRoute: () => AppOperatorRoute,
-  } as any)
+  } as any);
+const AppOperatorOperatorCreditsAuditRoute = AppOperatorOperatorCreditsAuditRouteImport.update({
+  id: "/operator/credits-audit",
+  path: "/operator/credits-audit",
+  getParentRoute: () => AppOperatorRoute,
+} as any);
+const AppOperatorOperatorDemoPreviewRoute = AppOperatorOperatorDemoPreviewRouteImport.update({
+  id: "/operator/demo-preview",
+  path: "/operator/demo-preview",
+  getParentRoute: () => AppOperatorRoute,
+} as any);
+const AppOperatorOperatorEcowittRoute = AppOperatorOperatorEcowittRouteImport.update({
+  id: "/operator/ecowitt",
+  path: "/operator/ecowitt",
+  getParentRoute: () => AppOperatorRoute,
+} as any);
 const AppOperatorOperatorEcowittBridgeDebugRoute =
   AppOperatorOperatorEcowittBridgeDebugRouteImport.update({
-    id: '/operator/ecowitt-bridge-debug',
-    path: '/operator/ecowitt-bridge-debug',
+    id: "/operator/ecowitt-bridge-debug",
+    path: "/operator/ecowitt-bridge-debug",
     getParentRoute: () => AppOperatorRoute,
-  } as any)
+  } as any);
 const AppOperatorOperatorEcowittBridgeStatusRoute =
   AppOperatorOperatorEcowittBridgeStatusRouteImport.update({
-    id: '/operator/ecowitt-bridge-status',
-    path: '/operator/ecowitt-bridge-status',
+    id: "/operator/ecowitt-bridge-status",
+    path: "/operator/ecowitt-bridge-status",
     getParentRoute: () => AppOperatorRoute,
-  } as any)
+  } as any);
 const AppOperatorOperatorEcowittLiveBringupRoute =
   AppOperatorOperatorEcowittLiveBringupRouteImport.update({
-    id: '/operator/ecowitt-live-bringup',
-    path: '/operator/ecowitt-live-bringup',
+    id: "/operator/ecowitt-live-bringup",
+    path: "/operator/ecowitt-live-bringup",
     getParentRoute: () => AppOperatorRoute,
-  } as any)
+  } as any);
 const AppOperatorOperatorEcowittTentPreviewRoute =
   AppOperatorOperatorEcowittTentPreviewRouteImport.update({
-    id: '/operator/ecowitt-tent-preview',
-    path: '/operator/ecowitt-tent-preview',
+    id: "/operator/ecowitt-tent-preview",
+    path: "/operator/ecowitt-tent-preview",
     getParentRoute: () => AppOperatorRoute,
-  } as any)
-const AppOperatorOperatorEdgeAlertsRoute =
-  AppOperatorOperatorEdgeAlertsRouteImport.update({
-    id: '/operator/edge-alerts',
-    path: '/operator/edge-alerts',
-    getParentRoute: () => AppOperatorRoute,
-  } as any)
-const AppOperatorOperatorEdgeMetricsRoute =
-  AppOperatorOperatorEdgeMetricsRouteImport.update({
-    id: '/operator/edge-metrics',
-    path: '/operator/edge-metrics',
-    getParentRoute: () => AppOperatorRoute,
-  } as any)
-const AppOperatorOperatorModeRoute = AppOperatorOperatorModeRouteImport.update({
-  id: '/operator/mode',
-  path: '/operator/mode',
+  } as any);
+const AppOperatorOperatorEdgeAlertsRoute = AppOperatorOperatorEdgeAlertsRouteImport.update({
+  id: "/operator/edge-alerts",
+  path: "/operator/edge-alerts",
   getParentRoute: () => AppOperatorRoute,
-} as any)
+} as any);
+const AppOperatorOperatorEdgeMetricsRoute = AppOperatorOperatorEdgeMetricsRouteImport.update({
+  id: "/operator/edge-metrics",
+  path: "/operator/edge-metrics",
+  getParentRoute: () => AppOperatorRoute,
+} as any);
+const AppOperatorOperatorModeRoute = AppOperatorOperatorModeRouteImport.update({
+  id: "/operator/mode",
+  path: "/operator/mode",
+  getParentRoute: () => AppOperatorRoute,
+} as any);
 const AppOperatorOperatorOneTentLiveProofRoute =
   AppOperatorOperatorOneTentLiveProofRouteImport.update({
-    id: '/operator/one-tent-live-proof',
-    path: '/operator/one-tent-live-proof',
+    id: "/operator/one-tent-live-proof",
+    path: "/operator/one-tent-live-proof",
     getParentRoute: () => AppOperatorRoute,
-  } as any)
+  } as any);
 const AppOperatorOperatorOneTentLoopSmokeTestRoute =
   AppOperatorOperatorOneTentLoopSmokeTestRouteImport.update({
-    id: '/operator/one-tent-loop-smoke-test',
-    path: '/operator/one-tent-loop-smoke-test',
+    id: "/operator/one-tent-loop-smoke-test",
+    path: "/operator/one-tent-loop-smoke-test",
     getParentRoute: () => AppOperatorRoute,
-  } as any)
+  } as any);
 const AppOperatorOperatorOneTentProofRecordRoute =
   AppOperatorOperatorOneTentProofRecordRouteImport.update({
-    id: '/operator/one-tent-proof-record',
-    path: '/operator/one-tent-proof-record',
+    id: "/operator/one-tent-proof-record",
+    path: "/operator/one-tent-proof-record",
     getParentRoute: () => AppOperatorRoute,
-  } as any)
+  } as any);
 const AppOperatorOperatorPaddleProcessingAuditRoute =
   AppOperatorOperatorPaddleProcessingAuditRouteImport.update({
-    id: '/operator/paddle-processing-audit',
-    path: '/operator/paddle-processing-audit',
+    id: "/operator/paddle-processing-audit",
+    path: "/operator/paddle-processing-audit",
     getParentRoute: () => AppOperatorRoute,
-  } as any)
+  } as any);
 const AppOperatorOperatorPostGrowReflectionDryRunRoute =
   AppOperatorOperatorPostGrowReflectionDryRunRouteImport.update({
-    id: '/operator/post-grow-reflection-dry-run',
-    path: '/operator/post-grow-reflection-dry-run',
+    id: "/operator/post-grow-reflection-dry-run",
+    path: "/operator/post-grow-reflection-dry-run",
     getParentRoute: () => AppOperatorRoute,
-  } as any)
+  } as any);
 const AppOperatorOperatorReleaseReadinessRoute =
   AppOperatorOperatorReleaseReadinessRouteImport.update({
-    id: '/operator/release-readiness',
-    path: '/operator/release-readiness',
+    id: "/operator/release-readiness",
+    path: "/operator/release-readiness",
     getParentRoute: () => AppOperatorRoute,
-  } as any)
-const AppOperatorOperatorSchemaAuditRoute =
-  AppOperatorOperatorSchemaAuditRouteImport.update({
-    id: '/operator/schema-audit',
-    path: '/operator/schema-audit',
-    getParentRoute: () => AppOperatorRoute,
-  } as any)
+  } as any);
+const AppOperatorOperatorSchemaAuditRoute = AppOperatorOperatorSchemaAuditRouteImport.update({
+  id: "/operator/schema-audit",
+  path: "/operator/schema-audit",
+  getParentRoute: () => AppOperatorRoute,
+} as any);
 const AppOperatorOperatorSubscriberGrowthRoute =
   AppOperatorOperatorSubscriberGrowthRouteImport.update({
-    id: '/operator/subscriber-growth',
-    path: '/operator/subscriber-growth',
+    id: "/operator/subscriber-growth",
+    path: "/operator/subscriber-growth",
     getParentRoute: () => AppOperatorRoute,
-  } as any)
-const AppOperatorOperatorSupportInboxRoute =
-  AppOperatorOperatorSupportInboxRouteImport.update({
-    id: '/operator/support-inbox',
-    path: '/operator/support-inbox',
-    getParentRoute: () => AppOperatorRoute,
-  } as any)
-const AppOperatorSensorsEcowittAuditRoute =
-  AppOperatorSensorsEcowittAuditRouteImport.update({
-    id: '/sensors/ecowitt-audit',
-    path: '/sensors/ecowitt-audit',
-    getParentRoute: () => AppOperatorRoute,
-  } as any)
+  } as any);
+const AppOperatorOperatorSupportInboxRoute = AppOperatorOperatorSupportInboxRouteImport.update({
+  id: "/operator/support-inbox",
+  path: "/operator/support-inbox",
+  getParentRoute: () => AppOperatorRoute,
+} as any);
+const AppOperatorSensorsEcowittAuditRoute = AppOperatorSensorsEcowittAuditRouteImport.update({
+  id: "/sensors/ecowitt-audit",
+  path: "/sensors/ecowitt-audit",
+  getParentRoute: () => AppOperatorRoute,
+} as any);
 const AppOperatorSensorsIngestNormalizerRoute =
   AppOperatorSensorsIngestNormalizerRouteImport.update({
-    id: '/sensors/ingest-normalizer',
-    path: '/sensors/ingest-normalizer',
+    id: "/sensors/ingest-normalizer",
+    path: "/sensors/ingest-normalizer",
     getParentRoute: () => AppOperatorRoute,
-  } as any)
+  } as any);
 const AppBreedingLogNewRoute = AppBreedingLogNewRouteImport.update({
-  id: '/breeding_/log/new',
-  path: '/breeding/log/new',
+  id: "/breeding_/log/new",
+  path: "/breeding/log/new",
   getParentRoute: () => AppRoute,
-} as any)
+} as any);
 const AppDiaryStrainsSlugRoute = AppDiaryStrainsSlugRouteImport.update({
-  id: '/diary/strains/$slug',
-  path: '/diary/strains/$slug',
+  id: "/diary/strains/$slug",
+  path: "/diary/strains/$slug",
   getParentRoute: () => AppRoute,
-} as any)
-const AppDoctorSessionsSessionIdRoute =
-  AppDoctorSessionsSessionIdRouteImport.update({
-    id: '/doctor_/sessions_/$sessionId',
-    path: '/doctor/sessions/$sessionId',
-    getParentRoute: () => AppRoute,
-  } as any)
+} as any);
+const AppDoctorSessionsSessionIdRoute = AppDoctorSessionsSessionIdRouteImport.update({
+  id: "/doctor_/sessions_/$sessionId",
+  path: "/doctor/sessions/$sessionId",
+  getParentRoute: () => AppRoute,
+} as any);
 const AppGeneticsAccessionsIdRoute = AppGeneticsAccessionsIdRouteImport.update({
-  id: '/accessions/$id',
-  path: '/accessions/$id',
+  id: "/accessions/$id",
+  path: "/accessions/$id",
   getParentRoute: () => AppGeneticsRoute,
-} as any)
+} as any);
 const AppGeneticsBatchesIdRoute = AppGeneticsBatchesIdRouteImport.update({
-  id: '/batches/$id',
-  path: '/batches/$id',
+  id: "/batches/$id",
+  path: "/batches/$id",
   getParentRoute: () => AppGeneticsRoute,
-} as any)
+} as any);
 const AppGrowsGrowIdLearningRoute = AppGrowsGrowIdLearningRouteImport.update({
-  id: '/grows_/$growId_/learning',
-  path: '/grows/$growId/learning',
+  id: "/grows_/$growId_/learning",
+  path: "/grows/$growId/learning",
   getParentRoute: () => AppRoute,
-} as any)
+} as any);
 const AppPhenoHuntsIdKeepersRoute = AppPhenoHuntsIdKeepersRouteImport.update({
-  id: '/pheno-hunts_/$id/keepers',
-  path: '/pheno-hunts/$id/keepers',
+  id: "/pheno-hunts_/$id/keepers",
+  path: "/pheno-hunts/$id/keepers",
   getParentRoute: () => AppRoute,
-} as any)
-const AppPhenoHuntsIdWorkspaceRoute =
-  AppPhenoHuntsIdWorkspaceRouteImport.update({
-    id: '/pheno-hunts_/$id/workspace',
-    path: '/pheno-hunts/$id/workspace',
-    getParentRoute: () => AppRoute,
-  } as any)
-const AppReportsPostGrowGrowIdRoute =
-  AppReportsPostGrowGrowIdRouteImport.update({
-    id: '/reports_/post-grow/$growId',
-    path: '/reports/post-grow/$growId',
-    getParentRoute: () => AppRoute,
-  } as any)
+} as any);
+const AppPhenoHuntsIdWorkspaceRoute = AppPhenoHuntsIdWorkspaceRouteImport.update({
+  id: "/pheno-hunts_/$id/workspace",
+  path: "/pheno-hunts/$id/workspace",
+  getParentRoute: () => AppRoute,
+} as any);
+const AppReportsPostGrowGrowIdRoute = AppReportsPostGrowGrowIdRouteImport.update({
+  id: "/reports_/post-grow/$growId",
+  path: "/reports/post-grow/$growId",
+  getParentRoute: () => AppRoute,
+} as any);
 const AppGeneticsHealthKindIdRoute = AppGeneticsHealthKindIdRouteImport.update({
-  id: '/health/$kind/$id',
-  path: '/health/$kind/$id',
+  id: "/health/$kind/$id",
+  path: "/health/$kind/$id",
   getParentRoute: () => AppGeneticsRoute,
-} as any)
+} as any);
 const AppGeneticsTraceKindIdRoute = AppGeneticsTraceKindIdRouteImport.update({
-  id: '/trace/$kind/$id',
-  path: '/trace/$kind/$id',
+  id: "/trace/$kind/$id",
+  path: "/trace/$kind/$id",
   getParentRoute: () => AppGeneticsRoute,
-} as any)
+} as any);
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
-  '/$': typeof SplatRoute
-  '/ai-doctor-readiness-check': typeof AiDoctorReadinessCheckRoute
-  '/auth': typeof AuthRoute
-  '/breeder-beta': typeof BreederBetaRoute
-  '/contact': typeof ContactRoute
-  '/creator-beta': typeof CreatorBetaRoute
-  '/demo': typeof DemoRoute
-  '/features': typeof FeaturesRoute
-  '/feedback': typeof FeedbackRoute
-  '/founder': typeof FounderRoute
-  '/glossary': typeof GlossaryRoute
-  '/hardware-integrations': typeof HardwareIntegrationsRoute
-  '/how-ai-doctor-works': typeof HowAiDoctorWorksRoute
-  '/login': typeof LoginRoute
-  '/pheno-comparison': typeof PhenoComparisonRoute
-  '/pheno-expression-showcase': typeof PhenoExpressionShowcaseRoute
-  '/pricing': typeof PricingRoute
-  '/privacy': typeof PrivacyRoute
-  '/privacy-policy': typeof PrivacyPolicyRoute
-  '/quick-log': typeof QuickLogRoute
-  '/refund': typeof RefundRoute
-  '/refund-policy': typeof RefundPolicyRoute
-  '/refunds': typeof RefundsRoute
-  '/register': typeof RegisterRoute
-  '/reset-password': typeof ResetPasswordRoute
-  '/signup': typeof SignupRoute
-  '/terms': typeof TermsRoute
-  '/terms-of-service': typeof TermsOfServiceRoute
-  '/unsubscribe': typeof UnsubscribeRoute
-  '/upgrade': typeof UpgradeRoute
-  '/welcome': typeof WelcomeRoute
-  '/action-queue': typeof AppActionQueueRoute
-  '/actions': typeof AppActionsRoute
-  '/ai-doctor': typeof AppAiDoctorRoute
-  '/alerts': typeof AppAlertsRoute
-  '/breeding': typeof AppBreedingRoute
-  '/daily-check': typeof AppDailyCheckRoute
-  '/dashboard': typeof AppDashboardRoute
-  '/doctor': typeof AppDoctorRoute
-  '/genetics': typeof AppGeneticsRouteWithChildren
-  '/grow-lineage': typeof AppGrowLineageRoute
-  '/grow-room': typeof AppGrowRoomRoute
-  '/grows': typeof AppGrowsRoute
-  '/health': typeof AppHealthRoute
-  '/invite': typeof AppInviteRoute
-  '/logs': typeof AppLogsRoute
-  '/onboarding': typeof AppOnboardingRoute
-  '/pheno-hunts': typeof AppPhenoHuntsRoute
-  '/plants': typeof AppPlantsRoute
-  '/reports': typeof AppReportsRoute
-  '/sensors': typeof AppSensorsRoute
-  '/settings': typeof AppSettingsRoute
-  '/start-room': typeof AppStartRoomRoute
-  '/tasks': typeof AppTasksRoute
-  '/tents': typeof AppTentsRoute
-  '/timeline': typeof AppTimelineRoute
-  '/billing/$plan': typeof BillingPlanRoute
-  '/checkout/cancel': typeof CheckoutCancelRoute
-  '/checkout/success': typeof CheckoutSuccessRoute
-  '/cultivars/$slug': typeof CultivarsSlugRoute
-  '/docs/mcp-api': typeof DocsMcpApiRoute
-  '/guides/$slug': typeof GuidesSlugRoute
-  '/guides/grow-stage-care-guide': typeof GuidesGrowStageCareGuideRoute
-  '/internal/contextual-pheno-comparison-demo': typeof InternalContextualPhenoComparisonDemoRoute
-  '/internal/demo-proof-walkthrough': typeof InternalDemoProofWalkthroughRoute
-  '/internal/pheno-hunt-demo': typeof InternalPhenoHuntDemoRoute
-  '/partners/csv-preview': typeof PartnersCsvPreviewRoute
-  '/sensors/csv-preview': typeof SensorsCsvPreviewRoute
-  '/strains/$slug': typeof StrainsSlugRoute
-  '/tools/vpd-calculator': typeof ToolsVpdCalculatorRoute
-  '/cultivars/': typeof CultivarsIndexRoute
-  '/guides/': typeof GuidesIndexRoute
-  '/strains/': typeof StrainsIndexRoute
-  '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
-  '/diagnostics': typeof AppOperatorDiagnosticsRoute
-  '/diagnostics-seo-artifacts': typeof AppOperatorDiagnosticsSeoArtifactsRoute
-  '/ingest-inspector': typeof AppOperatorIngestInspectorRoute
-  '/leads': typeof AppOperatorLeadsRoute
-  '/one-tent-loop-proof': typeof AppOperatorOneTentLoopProofRoute
-  '/pi-ingest-status': typeof AppOperatorPiIngestStatusRoute
-  '/account/preferences': typeof AppAccountPreferencesRoute
-  '/actions/$actionId': typeof AppActionsActionIdRoute
-  '/alerts/$alertId': typeof AppAlertsAlertIdRoute
-  '/breeding/$programId': typeof AppBreedingProgramIdRoute
-  '/breeding/new': typeof AppBreedingNewRoute
-  '/diary/environment-summary': typeof AppDiaryEnvironmentSummaryRoute
-  '/diary/pheno-expression-comparison': typeof AppDiaryPhenoExpressionComparisonRoute
-  '/doctor/sessions': typeof AppDoctorSessionsRoute
-  '/grows/$growId': typeof AppGrowsGrowIdRoute
-  '/pheno-hunts/new': typeof AppPhenoHuntsNewRoute
-  '/plants/$id': typeof AppPlantsIdRoute
-  '/reports/diary-range': typeof AppReportsDiaryRangeRoute
-  '/settings/agent-integrations': typeof AppSettingsAgentIntegrationsRoute
-  '/settings/analytics': typeof AppSettingsAnalyticsRoute
-  '/tents/$id': typeof AppTentsIdRoute
-  '/customer/guide/oreoz-vs-gelonade-comparison': typeof CustomerGuideOreozVsGelonadeComparisonRoute
-  '/pheno-hunts/$id/compare': typeof PhenoHuntsIdCompareRoute
-  '/pheno-hunts/$id/showcase': typeof PhenoHuntsIdShowcaseRoute
-  '/genetics/': typeof AppGeneticsIndexRoute
-  '/admin/leads': typeof AppOperatorAdminLeadsRoute
-  '/demo/one-tent-live-proof': typeof AppOperatorDemoOneTentLiveProofRoute
-  '/internal/ai-doctor-confidence-audit': typeof AppOperatorInternalAiDoctorConfidenceAuditRoute
-  '/internal/ai-doctor-phase1-preview': typeof AppOperatorInternalAiDoctorPhase1PreviewRoute
-  '/internal/one-tent-loop-proof': typeof AppOperatorInternalOneTentLoopProofRoute
-  '/internal/sensor-truth-audit': typeof AppOperatorInternalSensorTruthAuditRoute
-  '/operator/ai-doctor-phase1': typeof AppOperatorOperatorAiDoctorPhase1Route
-  '/operator/billing-entitlement-resolution': typeof AppOperatorOperatorBillingEntitlementResolutionRoute
-  '/operator/billing-subscription-updates': typeof AppOperatorOperatorBillingSubscriptionUpdatesRoute
-  '/operator/credits-audit': typeof AppOperatorOperatorCreditsAuditRoute
-  '/operator/demo-preview': typeof AppOperatorOperatorDemoPreviewRoute
-  '/operator/ecowitt': typeof AppOperatorOperatorEcowittRoute
-  '/operator/ecowitt-bridge-debug': typeof AppOperatorOperatorEcowittBridgeDebugRoute
-  '/operator/ecowitt-bridge-status': typeof AppOperatorOperatorEcowittBridgeStatusRoute
-  '/operator/ecowitt-live-bringup': typeof AppOperatorOperatorEcowittLiveBringupRoute
-  '/operator/ecowitt-tent-preview': typeof AppOperatorOperatorEcowittTentPreviewRoute
-  '/operator/edge-alerts': typeof AppOperatorOperatorEdgeAlertsRoute
-  '/operator/edge-metrics': typeof AppOperatorOperatorEdgeMetricsRoute
-  '/operator/mode': typeof AppOperatorOperatorModeRoute
-  '/operator/one-tent-live-proof': typeof AppOperatorOperatorOneTentLiveProofRoute
-  '/operator/one-tent-loop-smoke-test': typeof AppOperatorOperatorOneTentLoopSmokeTestRoute
-  '/operator/one-tent-proof-record': typeof AppOperatorOperatorOneTentProofRecordRoute
-  '/operator/paddle-processing-audit': typeof AppOperatorOperatorPaddleProcessingAuditRoute
-  '/operator/post-grow-reflection-dry-run': typeof AppOperatorOperatorPostGrowReflectionDryRunRoute
-  '/operator/release-readiness': typeof AppOperatorOperatorReleaseReadinessRoute
-  '/operator/schema-audit': typeof AppOperatorOperatorSchemaAuditRoute
-  '/operator/subscriber-growth': typeof AppOperatorOperatorSubscriberGrowthRoute
-  '/operator/support-inbox': typeof AppOperatorOperatorSupportInboxRoute
-  '/sensors/ecowitt-audit': typeof AppOperatorSensorsEcowittAuditRoute
-  '/sensors/ingest-normalizer': typeof AppOperatorSensorsIngestNormalizerRoute
-  '/breeding/log/new': typeof AppBreedingLogNewRoute
-  '/diary/strains/$slug': typeof AppDiaryStrainsSlugRoute
-  '/doctor/sessions/$sessionId': typeof AppDoctorSessionsSessionIdRoute
-  '/genetics/accessions/$id': typeof AppGeneticsAccessionsIdRoute
-  '/genetics/batches/$id': typeof AppGeneticsBatchesIdRoute
-  '/grows/$growId/learning': typeof AppGrowsGrowIdLearningRoute
-  '/pheno-hunts/$id/keepers': typeof AppPhenoHuntsIdKeepersRoute
-  '/pheno-hunts/$id/workspace': typeof AppPhenoHuntsIdWorkspaceRoute
-  '/reports/post-grow/$growId': typeof AppReportsPostGrowGrowIdRoute
-  '/genetics/health/$kind/$id': typeof AppGeneticsHealthKindIdRoute
-  '/genetics/trace/$kind/$id': typeof AppGeneticsTraceKindIdRoute
+  "/": typeof IndexRoute;
+  "/$": typeof SplatRoute;
+  "/ai-doctor-readiness-check": typeof AiDoctorReadinessCheckRoute;
+  "/auth": typeof AuthRoute;
+  "/breeder-beta": typeof BreederBetaRoute;
+  "/contact": typeof ContactRoute;
+  "/creator-beta": typeof CreatorBetaRoute;
+  "/demo": typeof DemoRoute;
+  "/features": typeof FeaturesRoute;
+  "/feedback": typeof FeedbackRoute;
+  "/founder": typeof FounderRoute;
+  "/glossary": typeof GlossaryRoute;
+  "/hardware-integrations": typeof HardwareIntegrationsRoute;
+  "/how-ai-doctor-works": typeof HowAiDoctorWorksRoute;
+  "/login": typeof LoginRoute;
+  "/pheno-comparison": typeof PhenoComparisonRoute;
+  "/pheno-expression-showcase": typeof PhenoExpressionShowcaseRoute;
+  "/pricing": typeof PricingRoute;
+  "/privacy": typeof PrivacyRoute;
+  "/privacy-policy": typeof PrivacyPolicyRoute;
+  "/quick-log": typeof QuickLogRoute;
+  "/refund": typeof RefundRoute;
+  "/refund-policy": typeof RefundPolicyRoute;
+  "/refunds": typeof RefundsRoute;
+  "/register": typeof RegisterRoute;
+  "/reset-password": typeof ResetPasswordRoute;
+  "/signup": typeof SignupRoute;
+  "/terms": typeof TermsRoute;
+  "/terms-of-service": typeof TermsOfServiceRoute;
+  "/unsubscribe": typeof UnsubscribeRoute;
+  "/upgrade": typeof UpgradeRoute;
+  "/welcome": typeof WelcomeRoute;
+  "/action-queue": typeof AppActionQueueRoute;
+  "/actions": typeof AppActionsRoute;
+  "/ai-doctor": typeof AppAiDoctorRoute;
+  "/alerts": typeof AppAlertsRoute;
+  "/breeding": typeof AppBreedingRoute;
+  "/daily-check": typeof AppDailyCheckRoute;
+  "/dashboard": typeof AppDashboardRoute;
+  "/doctor": typeof AppDoctorRoute;
+  "/genetics": typeof AppGeneticsRouteWithChildren;
+  "/grow-lineage": typeof AppGrowLineageRoute;
+  "/grow-room": typeof AppGrowRoomRoute;
+  "/grows": typeof AppGrowsRoute;
+  "/health": typeof AppHealthRoute;
+  "/invite": typeof AppInviteRoute;
+  "/logs": typeof AppLogsRoute;
+  "/onboarding": typeof AppOnboardingRoute;
+  "/pheno-hunts": typeof AppPhenoHuntsRoute;
+  "/plants": typeof AppPlantsRoute;
+  "/reports": typeof AppReportsRoute;
+  "/sensors": typeof AppSensorsRoute;
+  "/settings": typeof AppSettingsRoute;
+  "/start-room": typeof AppStartRoomRoute;
+  "/tasks": typeof AppTasksRoute;
+  "/tents": typeof AppTentsRoute;
+  "/timeline": typeof AppTimelineRoute;
+  "/billing/$plan": typeof BillingPlanRoute;
+  "/checkout/cancel": typeof CheckoutCancelRoute;
+  "/checkout/success": typeof CheckoutSuccessRoute;
+  "/cultivars/$slug": typeof CultivarsSlugRoute;
+  "/docs/mcp-api": typeof DocsMcpApiRoute;
+  "/guides/$slug": typeof GuidesSlugRoute;
+  "/guides/grow-stage-care-guide": typeof GuidesGrowStageCareGuideRoute;
+  "/internal/contextual-pheno-comparison-demo": typeof InternalContextualPhenoComparisonDemoRoute;
+  "/internal/demo-proof-walkthrough": typeof InternalDemoProofWalkthroughRoute;
+  "/internal/pheno-hunt-demo": typeof InternalPhenoHuntDemoRoute;
+  "/partners/csv-preview": typeof PartnersCsvPreviewRoute;
+  "/sensors/csv-preview": typeof SensorsCsvPreviewRoute;
+  "/strains/$slug": typeof StrainsSlugRoute;
+  "/tools/vpd-calculator": typeof ToolsVpdCalculatorRoute;
+  "/cultivars/": typeof CultivarsIndexRoute;
+  "/guides/": typeof GuidesIndexRoute;
+  "/strains/": typeof StrainsIndexRoute;
+  "/.lovable/oauth/consent": typeof DotlovableOauthConsentRoute;
+  "/diagnostics": typeof AppOperatorDiagnosticsRoute;
+  "/diagnostics-lighting-measurement": typeof AppOperatorDiagnosticsLightingMeasurementRoute;
+  "/diagnostics-seo-artifacts": typeof AppOperatorDiagnosticsSeoArtifactsRoute;
+  "/ingest-inspector": typeof AppOperatorIngestInspectorRoute;
+  "/leads": typeof AppOperatorLeadsRoute;
+  "/one-tent-loop-proof": typeof AppOperatorOneTentLoopProofRoute;
+  "/pi-ingest-status": typeof AppOperatorPiIngestStatusRoute;
+  "/account/preferences": typeof AppAccountPreferencesRoute;
+  "/actions/$actionId": typeof AppActionsActionIdRoute;
+  "/alerts/$alertId": typeof AppAlertsAlertIdRoute;
+  "/breeding/$programId": typeof AppBreedingProgramIdRoute;
+  "/breeding/new": typeof AppBreedingNewRoute;
+  "/diary/environment-summary": typeof AppDiaryEnvironmentSummaryRoute;
+  "/diary/pheno-expression-comparison": typeof AppDiaryPhenoExpressionComparisonRoute;
+  "/doctor/sessions": typeof AppDoctorSessionsRoute;
+  "/grows/$growId": typeof AppGrowsGrowIdRoute;
+  "/pheno-hunts/new": typeof AppPhenoHuntsNewRoute;
+  "/plants/$id": typeof AppPlantsIdRoute;
+  "/reports/diary-range": typeof AppReportsDiaryRangeRoute;
+  "/settings/agent-integrations": typeof AppSettingsAgentIntegrationsRoute;
+  "/settings/analytics": typeof AppSettingsAnalyticsRoute;
+  "/tents/$id": typeof AppTentsIdRoute;
+  "/customer/guide/oreoz-vs-gelonade-comparison": typeof CustomerGuideOreozVsGelonadeComparisonRoute;
+  "/pheno-hunts/$id/compare": typeof PhenoHuntsIdCompareRoute;
+  "/pheno-hunts/$id/showcase": typeof PhenoHuntsIdShowcaseRoute;
+  "/genetics/": typeof AppGeneticsIndexRoute;
+  "/admin/leads": typeof AppOperatorAdminLeadsRoute;
+  "/demo/one-tent-live-proof": typeof AppOperatorDemoOneTentLiveProofRoute;
+  "/internal/ai-doctor-confidence-audit": typeof AppOperatorInternalAiDoctorConfidenceAuditRoute;
+  "/internal/ai-doctor-phase1-preview": typeof AppOperatorInternalAiDoctorPhase1PreviewRoute;
+  "/internal/one-tent-loop-proof": typeof AppOperatorInternalOneTentLoopProofRoute;
+  "/internal/sensor-truth-audit": typeof AppOperatorInternalSensorTruthAuditRoute;
+  "/operator/ai-doctor-phase1": typeof AppOperatorOperatorAiDoctorPhase1Route;
+  "/operator/billing-entitlement-resolution": typeof AppOperatorOperatorBillingEntitlementResolutionRoute;
+  "/operator/billing-subscription-updates": typeof AppOperatorOperatorBillingSubscriptionUpdatesRoute;
+  "/operator/credits-audit": typeof AppOperatorOperatorCreditsAuditRoute;
+  "/operator/demo-preview": typeof AppOperatorOperatorDemoPreviewRoute;
+  "/operator/ecowitt": typeof AppOperatorOperatorEcowittRoute;
+  "/operator/ecowitt-bridge-debug": typeof AppOperatorOperatorEcowittBridgeDebugRoute;
+  "/operator/ecowitt-bridge-status": typeof AppOperatorOperatorEcowittBridgeStatusRoute;
+  "/operator/ecowitt-live-bringup": typeof AppOperatorOperatorEcowittLiveBringupRoute;
+  "/operator/ecowitt-tent-preview": typeof AppOperatorOperatorEcowittTentPreviewRoute;
+  "/operator/edge-alerts": typeof AppOperatorOperatorEdgeAlertsRoute;
+  "/operator/edge-metrics": typeof AppOperatorOperatorEdgeMetricsRoute;
+  "/operator/mode": typeof AppOperatorOperatorModeRoute;
+  "/operator/one-tent-live-proof": typeof AppOperatorOperatorOneTentLiveProofRoute;
+  "/operator/one-tent-loop-smoke-test": typeof AppOperatorOperatorOneTentLoopSmokeTestRoute;
+  "/operator/one-tent-proof-record": typeof AppOperatorOperatorOneTentProofRecordRoute;
+  "/operator/paddle-processing-audit": typeof AppOperatorOperatorPaddleProcessingAuditRoute;
+  "/operator/post-grow-reflection-dry-run": typeof AppOperatorOperatorPostGrowReflectionDryRunRoute;
+  "/operator/release-readiness": typeof AppOperatorOperatorReleaseReadinessRoute;
+  "/operator/schema-audit": typeof AppOperatorOperatorSchemaAuditRoute;
+  "/operator/subscriber-growth": typeof AppOperatorOperatorSubscriberGrowthRoute;
+  "/operator/support-inbox": typeof AppOperatorOperatorSupportInboxRoute;
+  "/sensors/ecowitt-audit": typeof AppOperatorSensorsEcowittAuditRoute;
+  "/sensors/ingest-normalizer": typeof AppOperatorSensorsIngestNormalizerRoute;
+  "/breeding/log/new": typeof AppBreedingLogNewRoute;
+  "/diary/strains/$slug": typeof AppDiaryStrainsSlugRoute;
+  "/doctor/sessions/$sessionId": typeof AppDoctorSessionsSessionIdRoute;
+  "/genetics/accessions/$id": typeof AppGeneticsAccessionsIdRoute;
+  "/genetics/batches/$id": typeof AppGeneticsBatchesIdRoute;
+  "/grows/$growId/learning": typeof AppGrowsGrowIdLearningRoute;
+  "/pheno-hunts/$id/keepers": typeof AppPhenoHuntsIdKeepersRoute;
+  "/pheno-hunts/$id/workspace": typeof AppPhenoHuntsIdWorkspaceRoute;
+  "/reports/post-grow/$growId": typeof AppReportsPostGrowGrowIdRoute;
+  "/genetics/health/$kind/$id": typeof AppGeneticsHealthKindIdRoute;
+  "/genetics/trace/$kind/$id": typeof AppGeneticsTraceKindIdRoute;
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
-  '/$': typeof SplatRoute
-  '/ai-doctor-readiness-check': typeof AiDoctorReadinessCheckRoute
-  '/auth': typeof AuthRoute
-  '/breeder-beta': typeof BreederBetaRoute
-  '/contact': typeof ContactRoute
-  '/creator-beta': typeof CreatorBetaRoute
-  '/demo': typeof DemoRoute
-  '/features': typeof FeaturesRoute
-  '/feedback': typeof FeedbackRoute
-  '/founder': typeof FounderRoute
-  '/glossary': typeof GlossaryRoute
-  '/hardware-integrations': typeof HardwareIntegrationsRoute
-  '/how-ai-doctor-works': typeof HowAiDoctorWorksRoute
-  '/login': typeof LoginRoute
-  '/pheno-comparison': typeof PhenoComparisonRoute
-  '/pheno-expression-showcase': typeof PhenoExpressionShowcaseRoute
-  '/pricing': typeof PricingRoute
-  '/privacy': typeof PrivacyRoute
-  '/privacy-policy': typeof PrivacyPolicyRoute
-  '/quick-log': typeof QuickLogRoute
-  '/refund': typeof RefundRoute
-  '/refund-policy': typeof RefundPolicyRoute
-  '/refunds': typeof RefundsRoute
-  '/register': typeof RegisterRoute
-  '/reset-password': typeof ResetPasswordRoute
-  '/signup': typeof SignupRoute
-  '/terms': typeof TermsRoute
-  '/terms-of-service': typeof TermsOfServiceRoute
-  '/unsubscribe': typeof UnsubscribeRoute
-  '/upgrade': typeof UpgradeRoute
-  '/welcome': typeof WelcomeRoute
-  '/action-queue': typeof AppActionQueueRoute
-  '/actions': typeof AppActionsRoute
-  '/ai-doctor': typeof AppAiDoctorRoute
-  '/alerts': typeof AppAlertsRoute
-  '/breeding': typeof AppBreedingRoute
-  '/daily-check': typeof AppDailyCheckRoute
-  '/dashboard': typeof AppDashboardRoute
-  '/doctor': typeof AppDoctorRoute
-  '/grow-lineage': typeof AppGrowLineageRoute
-  '/grow-room': typeof AppGrowRoomRoute
-  '/grows': typeof AppGrowsRoute
-  '/health': typeof AppHealthRoute
-  '/invite': typeof AppInviteRoute
-  '/logs': typeof AppLogsRoute
-  '/onboarding': typeof AppOnboardingRoute
-  '/pheno-hunts': typeof AppPhenoHuntsRoute
-  '/plants': typeof AppPlantsRoute
-  '/reports': typeof AppReportsRoute
-  '/sensors': typeof AppSensorsRoute
-  '/settings': typeof AppSettingsRoute
-  '/start-room': typeof AppStartRoomRoute
-  '/tasks': typeof AppTasksRoute
-  '/tents': typeof AppTentsRoute
-  '/timeline': typeof AppTimelineRoute
-  '/billing/$plan': typeof BillingPlanRoute
-  '/checkout/cancel': typeof CheckoutCancelRoute
-  '/checkout/success': typeof CheckoutSuccessRoute
-  '/cultivars/$slug': typeof CultivarsSlugRoute
-  '/docs/mcp-api': typeof DocsMcpApiRoute
-  '/guides/$slug': typeof GuidesSlugRoute
-  '/guides/grow-stage-care-guide': typeof GuidesGrowStageCareGuideRoute
-  '/internal/contextual-pheno-comparison-demo': typeof InternalContextualPhenoComparisonDemoRoute
-  '/internal/demo-proof-walkthrough': typeof InternalDemoProofWalkthroughRoute
-  '/internal/pheno-hunt-demo': typeof InternalPhenoHuntDemoRoute
-  '/partners/csv-preview': typeof PartnersCsvPreviewRoute
-  '/sensors/csv-preview': typeof SensorsCsvPreviewRoute
-  '/strains/$slug': typeof StrainsSlugRoute
-  '/tools/vpd-calculator': typeof ToolsVpdCalculatorRoute
-  '/cultivars': typeof CultivarsIndexRoute
-  '/guides': typeof GuidesIndexRoute
-  '/strains': typeof StrainsIndexRoute
-  '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
-  '/diagnostics': typeof AppOperatorDiagnosticsRoute
-  '/diagnostics-seo-artifacts': typeof AppOperatorDiagnosticsSeoArtifactsRoute
-  '/ingest-inspector': typeof AppOperatorIngestInspectorRoute
-  '/leads': typeof AppOperatorLeadsRoute
-  '/one-tent-loop-proof': typeof AppOperatorOneTentLoopProofRoute
-  '/pi-ingest-status': typeof AppOperatorPiIngestStatusRoute
-  '/account/preferences': typeof AppAccountPreferencesRoute
-  '/actions/$actionId': typeof AppActionsActionIdRoute
-  '/alerts/$alertId': typeof AppAlertsAlertIdRoute
-  '/breeding/$programId': typeof AppBreedingProgramIdRoute
-  '/breeding/new': typeof AppBreedingNewRoute
-  '/diary/environment-summary': typeof AppDiaryEnvironmentSummaryRoute
-  '/diary/pheno-expression-comparison': typeof AppDiaryPhenoExpressionComparisonRoute
-  '/doctor/sessions': typeof AppDoctorSessionsRoute
-  '/grows/$growId': typeof AppGrowsGrowIdRoute
-  '/pheno-hunts/new': typeof AppPhenoHuntsNewRoute
-  '/plants/$id': typeof AppPlantsIdRoute
-  '/reports/diary-range': typeof AppReportsDiaryRangeRoute
-  '/settings/agent-integrations': typeof AppSettingsAgentIntegrationsRoute
-  '/settings/analytics': typeof AppSettingsAnalyticsRoute
-  '/tents/$id': typeof AppTentsIdRoute
-  '/customer/guide/oreoz-vs-gelonade-comparison': typeof CustomerGuideOreozVsGelonadeComparisonRoute
-  '/pheno-hunts/$id/compare': typeof PhenoHuntsIdCompareRoute
-  '/pheno-hunts/$id/showcase': typeof PhenoHuntsIdShowcaseRoute
-  '/genetics': typeof AppGeneticsIndexRoute
-  '/admin/leads': typeof AppOperatorAdminLeadsRoute
-  '/demo/one-tent-live-proof': typeof AppOperatorDemoOneTentLiveProofRoute
-  '/internal/ai-doctor-confidence-audit': typeof AppOperatorInternalAiDoctorConfidenceAuditRoute
-  '/internal/ai-doctor-phase1-preview': typeof AppOperatorInternalAiDoctorPhase1PreviewRoute
-  '/internal/one-tent-loop-proof': typeof AppOperatorInternalOneTentLoopProofRoute
-  '/internal/sensor-truth-audit': typeof AppOperatorInternalSensorTruthAuditRoute
-  '/operator/ai-doctor-phase1': typeof AppOperatorOperatorAiDoctorPhase1Route
-  '/operator/billing-entitlement-resolution': typeof AppOperatorOperatorBillingEntitlementResolutionRoute
-  '/operator/billing-subscription-updates': typeof AppOperatorOperatorBillingSubscriptionUpdatesRoute
-  '/operator/credits-audit': typeof AppOperatorOperatorCreditsAuditRoute
-  '/operator/demo-preview': typeof AppOperatorOperatorDemoPreviewRoute
-  '/operator/ecowitt': typeof AppOperatorOperatorEcowittRoute
-  '/operator/ecowitt-bridge-debug': typeof AppOperatorOperatorEcowittBridgeDebugRoute
-  '/operator/ecowitt-bridge-status': typeof AppOperatorOperatorEcowittBridgeStatusRoute
-  '/operator/ecowitt-live-bringup': typeof AppOperatorOperatorEcowittLiveBringupRoute
-  '/operator/ecowitt-tent-preview': typeof AppOperatorOperatorEcowittTentPreviewRoute
-  '/operator/edge-alerts': typeof AppOperatorOperatorEdgeAlertsRoute
-  '/operator/edge-metrics': typeof AppOperatorOperatorEdgeMetricsRoute
-  '/operator/mode': typeof AppOperatorOperatorModeRoute
-  '/operator/one-tent-live-proof': typeof AppOperatorOperatorOneTentLiveProofRoute
-  '/operator/one-tent-loop-smoke-test': typeof AppOperatorOperatorOneTentLoopSmokeTestRoute
-  '/operator/one-tent-proof-record': typeof AppOperatorOperatorOneTentProofRecordRoute
-  '/operator/paddle-processing-audit': typeof AppOperatorOperatorPaddleProcessingAuditRoute
-  '/operator/post-grow-reflection-dry-run': typeof AppOperatorOperatorPostGrowReflectionDryRunRoute
-  '/operator/release-readiness': typeof AppOperatorOperatorReleaseReadinessRoute
-  '/operator/schema-audit': typeof AppOperatorOperatorSchemaAuditRoute
-  '/operator/subscriber-growth': typeof AppOperatorOperatorSubscriberGrowthRoute
-  '/operator/support-inbox': typeof AppOperatorOperatorSupportInboxRoute
-  '/sensors/ecowitt-audit': typeof AppOperatorSensorsEcowittAuditRoute
-  '/sensors/ingest-normalizer': typeof AppOperatorSensorsIngestNormalizerRoute
-  '/breeding/log/new': typeof AppBreedingLogNewRoute
-  '/diary/strains/$slug': typeof AppDiaryStrainsSlugRoute
-  '/doctor/sessions/$sessionId': typeof AppDoctorSessionsSessionIdRoute
-  '/genetics/accessions/$id': typeof AppGeneticsAccessionsIdRoute
-  '/genetics/batches/$id': typeof AppGeneticsBatchesIdRoute
-  '/grows/$growId/learning': typeof AppGrowsGrowIdLearningRoute
-  '/pheno-hunts/$id/keepers': typeof AppPhenoHuntsIdKeepersRoute
-  '/pheno-hunts/$id/workspace': typeof AppPhenoHuntsIdWorkspaceRoute
-  '/reports/post-grow/$growId': typeof AppReportsPostGrowGrowIdRoute
-  '/genetics/health/$kind/$id': typeof AppGeneticsHealthKindIdRoute
-  '/genetics/trace/$kind/$id': typeof AppGeneticsTraceKindIdRoute
+  "/": typeof IndexRoute;
+  "/$": typeof SplatRoute;
+  "/ai-doctor-readiness-check": typeof AiDoctorReadinessCheckRoute;
+  "/auth": typeof AuthRoute;
+  "/breeder-beta": typeof BreederBetaRoute;
+  "/contact": typeof ContactRoute;
+  "/creator-beta": typeof CreatorBetaRoute;
+  "/demo": typeof DemoRoute;
+  "/features": typeof FeaturesRoute;
+  "/feedback": typeof FeedbackRoute;
+  "/founder": typeof FounderRoute;
+  "/glossary": typeof GlossaryRoute;
+  "/hardware-integrations": typeof HardwareIntegrationsRoute;
+  "/how-ai-doctor-works": typeof HowAiDoctorWorksRoute;
+  "/login": typeof LoginRoute;
+  "/pheno-comparison": typeof PhenoComparisonRoute;
+  "/pheno-expression-showcase": typeof PhenoExpressionShowcaseRoute;
+  "/pricing": typeof PricingRoute;
+  "/privacy": typeof PrivacyRoute;
+  "/privacy-policy": typeof PrivacyPolicyRoute;
+  "/quick-log": typeof QuickLogRoute;
+  "/refund": typeof RefundRoute;
+  "/refund-policy": typeof RefundPolicyRoute;
+  "/refunds": typeof RefundsRoute;
+  "/register": typeof RegisterRoute;
+  "/reset-password": typeof ResetPasswordRoute;
+  "/signup": typeof SignupRoute;
+  "/terms": typeof TermsRoute;
+  "/terms-of-service": typeof TermsOfServiceRoute;
+  "/unsubscribe": typeof UnsubscribeRoute;
+  "/upgrade": typeof UpgradeRoute;
+  "/welcome": typeof WelcomeRoute;
+  "/action-queue": typeof AppActionQueueRoute;
+  "/actions": typeof AppActionsRoute;
+  "/ai-doctor": typeof AppAiDoctorRoute;
+  "/alerts": typeof AppAlertsRoute;
+  "/breeding": typeof AppBreedingRoute;
+  "/daily-check": typeof AppDailyCheckRoute;
+  "/dashboard": typeof AppDashboardRoute;
+  "/doctor": typeof AppDoctorRoute;
+  "/grow-lineage": typeof AppGrowLineageRoute;
+  "/grow-room": typeof AppGrowRoomRoute;
+  "/grows": typeof AppGrowsRoute;
+  "/health": typeof AppHealthRoute;
+  "/invite": typeof AppInviteRoute;
+  "/logs": typeof AppLogsRoute;
+  "/onboarding": typeof AppOnboardingRoute;
+  "/pheno-hunts": typeof AppPhenoHuntsRoute;
+  "/plants": typeof AppPlantsRoute;
+  "/reports": typeof AppReportsRoute;
+  "/sensors": typeof AppSensorsRoute;
+  "/settings": typeof AppSettingsRoute;
+  "/start-room": typeof AppStartRoomRoute;
+  "/tasks": typeof AppTasksRoute;
+  "/tents": typeof AppTentsRoute;
+  "/timeline": typeof AppTimelineRoute;
+  "/billing/$plan": typeof BillingPlanRoute;
+  "/checkout/cancel": typeof CheckoutCancelRoute;
+  "/checkout/success": typeof CheckoutSuccessRoute;
+  "/cultivars/$slug": typeof CultivarsSlugRoute;
+  "/docs/mcp-api": typeof DocsMcpApiRoute;
+  "/guides/$slug": typeof GuidesSlugRoute;
+  "/guides/grow-stage-care-guide": typeof GuidesGrowStageCareGuideRoute;
+  "/internal/contextual-pheno-comparison-demo": typeof InternalContextualPhenoComparisonDemoRoute;
+  "/internal/demo-proof-walkthrough": typeof InternalDemoProofWalkthroughRoute;
+  "/internal/pheno-hunt-demo": typeof InternalPhenoHuntDemoRoute;
+  "/partners/csv-preview": typeof PartnersCsvPreviewRoute;
+  "/sensors/csv-preview": typeof SensorsCsvPreviewRoute;
+  "/strains/$slug": typeof StrainsSlugRoute;
+  "/tools/vpd-calculator": typeof ToolsVpdCalculatorRoute;
+  "/cultivars": typeof CultivarsIndexRoute;
+  "/guides": typeof GuidesIndexRoute;
+  "/strains": typeof StrainsIndexRoute;
+  "/.lovable/oauth/consent": typeof DotlovableOauthConsentRoute;
+  "/diagnostics": typeof AppOperatorDiagnosticsRoute;
+  "/diagnostics-lighting-measurement": typeof AppOperatorDiagnosticsLightingMeasurementRoute;
+  "/diagnostics-seo-artifacts": typeof AppOperatorDiagnosticsSeoArtifactsRoute;
+  "/ingest-inspector": typeof AppOperatorIngestInspectorRoute;
+  "/leads": typeof AppOperatorLeadsRoute;
+  "/one-tent-loop-proof": typeof AppOperatorOneTentLoopProofRoute;
+  "/pi-ingest-status": typeof AppOperatorPiIngestStatusRoute;
+  "/account/preferences": typeof AppAccountPreferencesRoute;
+  "/actions/$actionId": typeof AppActionsActionIdRoute;
+  "/alerts/$alertId": typeof AppAlertsAlertIdRoute;
+  "/breeding/$programId": typeof AppBreedingProgramIdRoute;
+  "/breeding/new": typeof AppBreedingNewRoute;
+  "/diary/environment-summary": typeof AppDiaryEnvironmentSummaryRoute;
+  "/diary/pheno-expression-comparison": typeof AppDiaryPhenoExpressionComparisonRoute;
+  "/doctor/sessions": typeof AppDoctorSessionsRoute;
+  "/grows/$growId": typeof AppGrowsGrowIdRoute;
+  "/pheno-hunts/new": typeof AppPhenoHuntsNewRoute;
+  "/plants/$id": typeof AppPlantsIdRoute;
+  "/reports/diary-range": typeof AppReportsDiaryRangeRoute;
+  "/settings/agent-integrations": typeof AppSettingsAgentIntegrationsRoute;
+  "/settings/analytics": typeof AppSettingsAnalyticsRoute;
+  "/tents/$id": typeof AppTentsIdRoute;
+  "/customer/guide/oreoz-vs-gelonade-comparison": typeof CustomerGuideOreozVsGelonadeComparisonRoute;
+  "/pheno-hunts/$id/compare": typeof PhenoHuntsIdCompareRoute;
+  "/pheno-hunts/$id/showcase": typeof PhenoHuntsIdShowcaseRoute;
+  "/genetics": typeof AppGeneticsIndexRoute;
+  "/admin/leads": typeof AppOperatorAdminLeadsRoute;
+  "/demo/one-tent-live-proof": typeof AppOperatorDemoOneTentLiveProofRoute;
+  "/internal/ai-doctor-confidence-audit": typeof AppOperatorInternalAiDoctorConfidenceAuditRoute;
+  "/internal/ai-doctor-phase1-preview": typeof AppOperatorInternalAiDoctorPhase1PreviewRoute;
+  "/internal/one-tent-loop-proof": typeof AppOperatorInternalOneTentLoopProofRoute;
+  "/internal/sensor-truth-audit": typeof AppOperatorInternalSensorTruthAuditRoute;
+  "/operator/ai-doctor-phase1": typeof AppOperatorOperatorAiDoctorPhase1Route;
+  "/operator/billing-entitlement-resolution": typeof AppOperatorOperatorBillingEntitlementResolutionRoute;
+  "/operator/billing-subscription-updates": typeof AppOperatorOperatorBillingSubscriptionUpdatesRoute;
+  "/operator/credits-audit": typeof AppOperatorOperatorCreditsAuditRoute;
+  "/operator/demo-preview": typeof AppOperatorOperatorDemoPreviewRoute;
+  "/operator/ecowitt": typeof AppOperatorOperatorEcowittRoute;
+  "/operator/ecowitt-bridge-debug": typeof AppOperatorOperatorEcowittBridgeDebugRoute;
+  "/operator/ecowitt-bridge-status": typeof AppOperatorOperatorEcowittBridgeStatusRoute;
+  "/operator/ecowitt-live-bringup": typeof AppOperatorOperatorEcowittLiveBringupRoute;
+  "/operator/ecowitt-tent-preview": typeof AppOperatorOperatorEcowittTentPreviewRoute;
+  "/operator/edge-alerts": typeof AppOperatorOperatorEdgeAlertsRoute;
+  "/operator/edge-metrics": typeof AppOperatorOperatorEdgeMetricsRoute;
+  "/operator/mode": typeof AppOperatorOperatorModeRoute;
+  "/operator/one-tent-live-proof": typeof AppOperatorOperatorOneTentLiveProofRoute;
+  "/operator/one-tent-loop-smoke-test": typeof AppOperatorOperatorOneTentLoopSmokeTestRoute;
+  "/operator/one-tent-proof-record": typeof AppOperatorOperatorOneTentProofRecordRoute;
+  "/operator/paddle-processing-audit": typeof AppOperatorOperatorPaddleProcessingAuditRoute;
+  "/operator/post-grow-reflection-dry-run": typeof AppOperatorOperatorPostGrowReflectionDryRunRoute;
+  "/operator/release-readiness": typeof AppOperatorOperatorReleaseReadinessRoute;
+  "/operator/schema-audit": typeof AppOperatorOperatorSchemaAuditRoute;
+  "/operator/subscriber-growth": typeof AppOperatorOperatorSubscriberGrowthRoute;
+  "/operator/support-inbox": typeof AppOperatorOperatorSupportInboxRoute;
+  "/sensors/ecowitt-audit": typeof AppOperatorSensorsEcowittAuditRoute;
+  "/sensors/ingest-normalizer": typeof AppOperatorSensorsIngestNormalizerRoute;
+  "/breeding/log/new": typeof AppBreedingLogNewRoute;
+  "/diary/strains/$slug": typeof AppDiaryStrainsSlugRoute;
+  "/doctor/sessions/$sessionId": typeof AppDoctorSessionsSessionIdRoute;
+  "/genetics/accessions/$id": typeof AppGeneticsAccessionsIdRoute;
+  "/genetics/batches/$id": typeof AppGeneticsBatchesIdRoute;
+  "/grows/$growId/learning": typeof AppGrowsGrowIdLearningRoute;
+  "/pheno-hunts/$id/keepers": typeof AppPhenoHuntsIdKeepersRoute;
+  "/pheno-hunts/$id/workspace": typeof AppPhenoHuntsIdWorkspaceRoute;
+  "/reports/post-grow/$growId": typeof AppReportsPostGrowGrowIdRoute;
+  "/genetics/health/$kind/$id": typeof AppGeneticsHealthKindIdRoute;
+  "/genetics/trace/$kind/$id": typeof AppGeneticsTraceKindIdRoute;
 }
 export interface FileRoutesById {
-  __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
-  '/$': typeof SplatRoute
-  '/_app': typeof AppRouteWithChildren
-  '/ai-doctor-readiness-check': typeof AiDoctorReadinessCheckRoute
-  '/auth': typeof AuthRoute
-  '/breeder-beta': typeof BreederBetaRoute
-  '/contact': typeof ContactRoute
-  '/creator-beta': typeof CreatorBetaRoute
-  '/demo': typeof DemoRoute
-  '/features': typeof FeaturesRoute
-  '/feedback': typeof FeedbackRoute
-  '/founder': typeof FounderRoute
-  '/glossary': typeof GlossaryRoute
-  '/hardware-integrations': typeof HardwareIntegrationsRoute
-  '/how-ai-doctor-works': typeof HowAiDoctorWorksRoute
-  '/login': typeof LoginRoute
-  '/pheno-comparison': typeof PhenoComparisonRoute
-  '/pheno-expression-showcase': typeof PhenoExpressionShowcaseRoute
-  '/pricing': typeof PricingRoute
-  '/privacy': typeof PrivacyRoute
-  '/privacy-policy': typeof PrivacyPolicyRoute
-  '/quick-log': typeof QuickLogRoute
-  '/refund': typeof RefundRoute
-  '/refund-policy': typeof RefundPolicyRoute
-  '/refunds': typeof RefundsRoute
-  '/register': typeof RegisterRoute
-  '/reset-password': typeof ResetPasswordRoute
-  '/signup': typeof SignupRoute
-  '/terms': typeof TermsRoute
-  '/terms-of-service': typeof TermsOfServiceRoute
-  '/unsubscribe': typeof UnsubscribeRoute
-  '/upgrade': typeof UpgradeRoute
-  '/welcome': typeof WelcomeRoute
-  '/_app/_operator': typeof AppOperatorRouteWithChildren
-  '/_app/action-queue': typeof AppActionQueueRoute
-  '/_app/actions': typeof AppActionsRoute
-  '/_app/ai-doctor': typeof AppAiDoctorRoute
-  '/_app/alerts': typeof AppAlertsRoute
-  '/_app/breeding': typeof AppBreedingRoute
-  '/_app/daily-check': typeof AppDailyCheckRoute
-  '/_app/dashboard': typeof AppDashboardRoute
-  '/_app/doctor': typeof AppDoctorRoute
-  '/_app/genetics': typeof AppGeneticsRouteWithChildren
-  '/_app/grow-lineage': typeof AppGrowLineageRoute
-  '/_app/grow-room': typeof AppGrowRoomRoute
-  '/_app/grows': typeof AppGrowsRoute
-  '/_app/health': typeof AppHealthRoute
-  '/_app/invite': typeof AppInviteRoute
-  '/_app/logs': typeof AppLogsRoute
-  '/_app/onboarding': typeof AppOnboardingRoute
-  '/_app/pheno-hunts': typeof AppPhenoHuntsRoute
-  '/_app/plants': typeof AppPlantsRoute
-  '/_app/reports': typeof AppReportsRoute
-  '/_app/sensors': typeof AppSensorsRoute
-  '/_app/settings': typeof AppSettingsRoute
-  '/_app/start-room': typeof AppStartRoomRoute
-  '/_app/tasks': typeof AppTasksRoute
-  '/_app/tents': typeof AppTentsRoute
-  '/_app/timeline': typeof AppTimelineRoute
-  '/billing/$plan': typeof BillingPlanRoute
-  '/checkout/cancel': typeof CheckoutCancelRoute
-  '/checkout/success': typeof CheckoutSuccessRoute
-  '/cultivars/$slug': typeof CultivarsSlugRoute
-  '/docs/mcp-api': typeof DocsMcpApiRoute
-  '/guides/$slug': typeof GuidesSlugRoute
-  '/guides/grow-stage-care-guide': typeof GuidesGrowStageCareGuideRoute
-  '/internal/contextual-pheno-comparison-demo': typeof InternalContextualPhenoComparisonDemoRoute
-  '/internal/demo-proof-walkthrough': typeof InternalDemoProofWalkthroughRoute
-  '/internal/pheno-hunt-demo': typeof InternalPhenoHuntDemoRoute
-  '/partners/csv-preview': typeof PartnersCsvPreviewRoute
-  '/sensors/csv-preview': typeof SensorsCsvPreviewRoute
-  '/strains/$slug': typeof StrainsSlugRoute
-  '/tools/vpd-calculator': typeof ToolsVpdCalculatorRoute
-  '/cultivars/': typeof CultivarsIndexRoute
-  '/guides/': typeof GuidesIndexRoute
-  '/strains/': typeof StrainsIndexRoute
-  '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
-  '/_app/_operator/diagnostics': typeof AppOperatorDiagnosticsRoute
-  '/_app/_operator/diagnostics-seo-artifacts': typeof AppOperatorDiagnosticsSeoArtifactsRoute
-  '/_app/_operator/ingest-inspector': typeof AppOperatorIngestInspectorRoute
-  '/_app/_operator/leads': typeof AppOperatorLeadsRoute
-  '/_app/_operator/one-tent-loop-proof': typeof AppOperatorOneTentLoopProofRoute
-  '/_app/_operator/pi-ingest-status': typeof AppOperatorPiIngestStatusRoute
-  '/_app/account/preferences': typeof AppAccountPreferencesRoute
-  '/_app/actions_/$actionId': typeof AppActionsActionIdRoute
-  '/_app/alerts_/$alertId': typeof AppAlertsAlertIdRoute
-  '/_app/breeding_/$programId': typeof AppBreedingProgramIdRoute
-  '/_app/breeding_/new': typeof AppBreedingNewRoute
-  '/_app/diary/environment-summary': typeof AppDiaryEnvironmentSummaryRoute
-  '/_app/diary/pheno-expression-comparison': typeof AppDiaryPhenoExpressionComparisonRoute
-  '/_app/doctor_/sessions': typeof AppDoctorSessionsRoute
-  '/_app/grows_/$growId': typeof AppGrowsGrowIdRoute
-  '/_app/pheno-hunts_/new': typeof AppPhenoHuntsNewRoute
-  '/_app/plants_/$id': typeof AppPlantsIdRoute
-  '/_app/reports_/diary-range': typeof AppReportsDiaryRangeRoute
-  '/_app/settings_/agent-integrations': typeof AppSettingsAgentIntegrationsRoute
-  '/_app/settings_/analytics': typeof AppSettingsAnalyticsRoute
-  '/_app/tents_/$id': typeof AppTentsIdRoute
-  '/customer/guide/oreoz-vs-gelonade-comparison': typeof CustomerGuideOreozVsGelonadeComparisonRoute
-  '/pheno-hunts/$id/compare': typeof PhenoHuntsIdCompareRoute
-  '/pheno-hunts/$id/showcase': typeof PhenoHuntsIdShowcaseRoute
-  '/_app/genetics/': typeof AppGeneticsIndexRoute
-  '/_app/_operator/admin/leads': typeof AppOperatorAdminLeadsRoute
-  '/_app/_operator/demo/one-tent-live-proof': typeof AppOperatorDemoOneTentLiveProofRoute
-  '/_app/_operator/internal/ai-doctor-confidence-audit': typeof AppOperatorInternalAiDoctorConfidenceAuditRoute
-  '/_app/_operator/internal/ai-doctor-phase1-preview': typeof AppOperatorInternalAiDoctorPhase1PreviewRoute
-  '/_app/_operator/internal/one-tent-loop-proof': typeof AppOperatorInternalOneTentLoopProofRoute
-  '/_app/_operator/internal/sensor-truth-audit': typeof AppOperatorInternalSensorTruthAuditRoute
-  '/_app/_operator/operator/ai-doctor-phase1': typeof AppOperatorOperatorAiDoctorPhase1Route
-  '/_app/_operator/operator/billing-entitlement-resolution': typeof AppOperatorOperatorBillingEntitlementResolutionRoute
-  '/_app/_operator/operator/billing-subscription-updates': typeof AppOperatorOperatorBillingSubscriptionUpdatesRoute
-  '/_app/_operator/operator/credits-audit': typeof AppOperatorOperatorCreditsAuditRoute
-  '/_app/_operator/operator/demo-preview': typeof AppOperatorOperatorDemoPreviewRoute
-  '/_app/_operator/operator/ecowitt': typeof AppOperatorOperatorEcowittRoute
-  '/_app/_operator/operator/ecowitt-bridge-debug': typeof AppOperatorOperatorEcowittBridgeDebugRoute
-  '/_app/_operator/operator/ecowitt-bridge-status': typeof AppOperatorOperatorEcowittBridgeStatusRoute
-  '/_app/_operator/operator/ecowitt-live-bringup': typeof AppOperatorOperatorEcowittLiveBringupRoute
-  '/_app/_operator/operator/ecowitt-tent-preview': typeof AppOperatorOperatorEcowittTentPreviewRoute
-  '/_app/_operator/operator/edge-alerts': typeof AppOperatorOperatorEdgeAlertsRoute
-  '/_app/_operator/operator/edge-metrics': typeof AppOperatorOperatorEdgeMetricsRoute
-  '/_app/_operator/operator/mode': typeof AppOperatorOperatorModeRoute
-  '/_app/_operator/operator/one-tent-live-proof': typeof AppOperatorOperatorOneTentLiveProofRoute
-  '/_app/_operator/operator/one-tent-loop-smoke-test': typeof AppOperatorOperatorOneTentLoopSmokeTestRoute
-  '/_app/_operator/operator/one-tent-proof-record': typeof AppOperatorOperatorOneTentProofRecordRoute
-  '/_app/_operator/operator/paddle-processing-audit': typeof AppOperatorOperatorPaddleProcessingAuditRoute
-  '/_app/_operator/operator/post-grow-reflection-dry-run': typeof AppOperatorOperatorPostGrowReflectionDryRunRoute
-  '/_app/_operator/operator/release-readiness': typeof AppOperatorOperatorReleaseReadinessRoute
-  '/_app/_operator/operator/schema-audit': typeof AppOperatorOperatorSchemaAuditRoute
-  '/_app/_operator/operator/subscriber-growth': typeof AppOperatorOperatorSubscriberGrowthRoute
-  '/_app/_operator/operator/support-inbox': typeof AppOperatorOperatorSupportInboxRoute
-  '/_app/_operator/sensors/ecowitt-audit': typeof AppOperatorSensorsEcowittAuditRoute
-  '/_app/_operator/sensors/ingest-normalizer': typeof AppOperatorSensorsIngestNormalizerRoute
-  '/_app/breeding_/log/new': typeof AppBreedingLogNewRoute
-  '/_app/diary/strains/$slug': typeof AppDiaryStrainsSlugRoute
-  '/_app/doctor_/sessions_/$sessionId': typeof AppDoctorSessionsSessionIdRoute
-  '/_app/genetics/accessions/$id': typeof AppGeneticsAccessionsIdRoute
-  '/_app/genetics/batches/$id': typeof AppGeneticsBatchesIdRoute
-  '/_app/grows_/$growId_/learning': typeof AppGrowsGrowIdLearningRoute
-  '/_app/pheno-hunts_/$id/keepers': typeof AppPhenoHuntsIdKeepersRoute
-  '/_app/pheno-hunts_/$id/workspace': typeof AppPhenoHuntsIdWorkspaceRoute
-  '/_app/reports_/post-grow/$growId': typeof AppReportsPostGrowGrowIdRoute
-  '/_app/genetics/health/$kind/$id': typeof AppGeneticsHealthKindIdRoute
-  '/_app/genetics/trace/$kind/$id': typeof AppGeneticsTraceKindIdRoute
+  __root__: typeof rootRouteImport;
+  "/": typeof IndexRoute;
+  "/$": typeof SplatRoute;
+  "/_app": typeof AppRouteWithChildren;
+  "/ai-doctor-readiness-check": typeof AiDoctorReadinessCheckRoute;
+  "/auth": typeof AuthRoute;
+  "/breeder-beta": typeof BreederBetaRoute;
+  "/contact": typeof ContactRoute;
+  "/creator-beta": typeof CreatorBetaRoute;
+  "/demo": typeof DemoRoute;
+  "/features": typeof FeaturesRoute;
+  "/feedback": typeof FeedbackRoute;
+  "/founder": typeof FounderRoute;
+  "/glossary": typeof GlossaryRoute;
+  "/hardware-integrations": typeof HardwareIntegrationsRoute;
+  "/how-ai-doctor-works": typeof HowAiDoctorWorksRoute;
+  "/login": typeof LoginRoute;
+  "/pheno-comparison": typeof PhenoComparisonRoute;
+  "/pheno-expression-showcase": typeof PhenoExpressionShowcaseRoute;
+  "/pricing": typeof PricingRoute;
+  "/privacy": typeof PrivacyRoute;
+  "/privacy-policy": typeof PrivacyPolicyRoute;
+  "/quick-log": typeof QuickLogRoute;
+  "/refund": typeof RefundRoute;
+  "/refund-policy": typeof RefundPolicyRoute;
+  "/refunds": typeof RefundsRoute;
+  "/register": typeof RegisterRoute;
+  "/reset-password": typeof ResetPasswordRoute;
+  "/signup": typeof SignupRoute;
+  "/terms": typeof TermsRoute;
+  "/terms-of-service": typeof TermsOfServiceRoute;
+  "/unsubscribe": typeof UnsubscribeRoute;
+  "/upgrade": typeof UpgradeRoute;
+  "/welcome": typeof WelcomeRoute;
+  "/_app/_operator": typeof AppOperatorRouteWithChildren;
+  "/_app/action-queue": typeof AppActionQueueRoute;
+  "/_app/actions": typeof AppActionsRoute;
+  "/_app/ai-doctor": typeof AppAiDoctorRoute;
+  "/_app/alerts": typeof AppAlertsRoute;
+  "/_app/breeding": typeof AppBreedingRoute;
+  "/_app/daily-check": typeof AppDailyCheckRoute;
+  "/_app/dashboard": typeof AppDashboardRoute;
+  "/_app/doctor": typeof AppDoctorRoute;
+  "/_app/genetics": typeof AppGeneticsRouteWithChildren;
+  "/_app/grow-lineage": typeof AppGrowLineageRoute;
+  "/_app/grow-room": typeof AppGrowRoomRoute;
+  "/_app/grows": typeof AppGrowsRoute;
+  "/_app/health": typeof AppHealthRoute;
+  "/_app/invite": typeof AppInviteRoute;
+  "/_app/logs": typeof AppLogsRoute;
+  "/_app/onboarding": typeof AppOnboardingRoute;
+  "/_app/pheno-hunts": typeof AppPhenoHuntsRoute;
+  "/_app/plants": typeof AppPlantsRoute;
+  "/_app/reports": typeof AppReportsRoute;
+  "/_app/sensors": typeof AppSensorsRoute;
+  "/_app/settings": typeof AppSettingsRoute;
+  "/_app/start-room": typeof AppStartRoomRoute;
+  "/_app/tasks": typeof AppTasksRoute;
+  "/_app/tents": typeof AppTentsRoute;
+  "/_app/timeline": typeof AppTimelineRoute;
+  "/billing/$plan": typeof BillingPlanRoute;
+  "/checkout/cancel": typeof CheckoutCancelRoute;
+  "/checkout/success": typeof CheckoutSuccessRoute;
+  "/cultivars/$slug": typeof CultivarsSlugRoute;
+  "/docs/mcp-api": typeof DocsMcpApiRoute;
+  "/guides/$slug": typeof GuidesSlugRoute;
+  "/guides/grow-stage-care-guide": typeof GuidesGrowStageCareGuideRoute;
+  "/internal/contextual-pheno-comparison-demo": typeof InternalContextualPhenoComparisonDemoRoute;
+  "/internal/demo-proof-walkthrough": typeof InternalDemoProofWalkthroughRoute;
+  "/internal/pheno-hunt-demo": typeof InternalPhenoHuntDemoRoute;
+  "/partners/csv-preview": typeof PartnersCsvPreviewRoute;
+  "/sensors/csv-preview": typeof SensorsCsvPreviewRoute;
+  "/strains/$slug": typeof StrainsSlugRoute;
+  "/tools/vpd-calculator": typeof ToolsVpdCalculatorRoute;
+  "/cultivars/": typeof CultivarsIndexRoute;
+  "/guides/": typeof GuidesIndexRoute;
+  "/strains/": typeof StrainsIndexRoute;
+  "/.lovable/oauth/consent": typeof DotlovableOauthConsentRoute;
+  "/_app/_operator/diagnostics": typeof AppOperatorDiagnosticsRoute;
+  "/_app/_operator/diagnostics-lighting-measurement": typeof AppOperatorDiagnosticsLightingMeasurementRoute;
+  "/_app/_operator/diagnostics-seo-artifacts": typeof AppOperatorDiagnosticsSeoArtifactsRoute;
+  "/_app/_operator/ingest-inspector": typeof AppOperatorIngestInspectorRoute;
+  "/_app/_operator/leads": typeof AppOperatorLeadsRoute;
+  "/_app/_operator/one-tent-loop-proof": typeof AppOperatorOneTentLoopProofRoute;
+  "/_app/_operator/pi-ingest-status": typeof AppOperatorPiIngestStatusRoute;
+  "/_app/account/preferences": typeof AppAccountPreferencesRoute;
+  "/_app/actions_/$actionId": typeof AppActionsActionIdRoute;
+  "/_app/alerts_/$alertId": typeof AppAlertsAlertIdRoute;
+  "/_app/breeding_/$programId": typeof AppBreedingProgramIdRoute;
+  "/_app/breeding_/new": typeof AppBreedingNewRoute;
+  "/_app/diary/environment-summary": typeof AppDiaryEnvironmentSummaryRoute;
+  "/_app/diary/pheno-expression-comparison": typeof AppDiaryPhenoExpressionComparisonRoute;
+  "/_app/doctor_/sessions": typeof AppDoctorSessionsRoute;
+  "/_app/grows_/$growId": typeof AppGrowsGrowIdRoute;
+  "/_app/pheno-hunts_/new": typeof AppPhenoHuntsNewRoute;
+  "/_app/plants_/$id": typeof AppPlantsIdRoute;
+  "/_app/reports_/diary-range": typeof AppReportsDiaryRangeRoute;
+  "/_app/settings_/agent-integrations": typeof AppSettingsAgentIntegrationsRoute;
+  "/_app/settings_/analytics": typeof AppSettingsAnalyticsRoute;
+  "/_app/tents_/$id": typeof AppTentsIdRoute;
+  "/customer/guide/oreoz-vs-gelonade-comparison": typeof CustomerGuideOreozVsGelonadeComparisonRoute;
+  "/pheno-hunts/$id/compare": typeof PhenoHuntsIdCompareRoute;
+  "/pheno-hunts/$id/showcase": typeof PhenoHuntsIdShowcaseRoute;
+  "/_app/genetics/": typeof AppGeneticsIndexRoute;
+  "/_app/_operator/admin/leads": typeof AppOperatorAdminLeadsRoute;
+  "/_app/_operator/demo/one-tent-live-proof": typeof AppOperatorDemoOneTentLiveProofRoute;
+  "/_app/_operator/internal/ai-doctor-confidence-audit": typeof AppOperatorInternalAiDoctorConfidenceAuditRoute;
+  "/_app/_operator/internal/ai-doctor-phase1-preview": typeof AppOperatorInternalAiDoctorPhase1PreviewRoute;
+  "/_app/_operator/internal/one-tent-loop-proof": typeof AppOperatorInternalOneTentLoopProofRoute;
+  "/_app/_operator/internal/sensor-truth-audit": typeof AppOperatorInternalSensorTruthAuditRoute;
+  "/_app/_operator/operator/ai-doctor-phase1": typeof AppOperatorOperatorAiDoctorPhase1Route;
+  "/_app/_operator/operator/billing-entitlement-resolution": typeof AppOperatorOperatorBillingEntitlementResolutionRoute;
+  "/_app/_operator/operator/billing-subscription-updates": typeof AppOperatorOperatorBillingSubscriptionUpdatesRoute;
+  "/_app/_operator/operator/credits-audit": typeof AppOperatorOperatorCreditsAuditRoute;
+  "/_app/_operator/operator/demo-preview": typeof AppOperatorOperatorDemoPreviewRoute;
+  "/_app/_operator/operator/ecowitt": typeof AppOperatorOperatorEcowittRoute;
+  "/_app/_operator/operator/ecowitt-bridge-debug": typeof AppOperatorOperatorEcowittBridgeDebugRoute;
+  "/_app/_operator/operator/ecowitt-bridge-status": typeof AppOperatorOperatorEcowittBridgeStatusRoute;
+  "/_app/_operator/operator/ecowitt-live-bringup": typeof AppOperatorOperatorEcowittLiveBringupRoute;
+  "/_app/_operator/operator/ecowitt-tent-preview": typeof AppOperatorOperatorEcowittTentPreviewRoute;
+  "/_app/_operator/operator/edge-alerts": typeof AppOperatorOperatorEdgeAlertsRoute;
+  "/_app/_operator/operator/edge-metrics": typeof AppOperatorOperatorEdgeMetricsRoute;
+  "/_app/_operator/operator/mode": typeof AppOperatorOperatorModeRoute;
+  "/_app/_operator/operator/one-tent-live-proof": typeof AppOperatorOperatorOneTentLiveProofRoute;
+  "/_app/_operator/operator/one-tent-loop-smoke-test": typeof AppOperatorOperatorOneTentLoopSmokeTestRoute;
+  "/_app/_operator/operator/one-tent-proof-record": typeof AppOperatorOperatorOneTentProofRecordRoute;
+  "/_app/_operator/operator/paddle-processing-audit": typeof AppOperatorOperatorPaddleProcessingAuditRoute;
+  "/_app/_operator/operator/post-grow-reflection-dry-run": typeof AppOperatorOperatorPostGrowReflectionDryRunRoute;
+  "/_app/_operator/operator/release-readiness": typeof AppOperatorOperatorReleaseReadinessRoute;
+  "/_app/_operator/operator/schema-audit": typeof AppOperatorOperatorSchemaAuditRoute;
+  "/_app/_operator/operator/subscriber-growth": typeof AppOperatorOperatorSubscriberGrowthRoute;
+  "/_app/_operator/operator/support-inbox": typeof AppOperatorOperatorSupportInboxRoute;
+  "/_app/_operator/sensors/ecowitt-audit": typeof AppOperatorSensorsEcowittAuditRoute;
+  "/_app/_operator/sensors/ingest-normalizer": typeof AppOperatorSensorsIngestNormalizerRoute;
+  "/_app/breeding_/log/new": typeof AppBreedingLogNewRoute;
+  "/_app/diary/strains/$slug": typeof AppDiaryStrainsSlugRoute;
+  "/_app/doctor_/sessions_/$sessionId": typeof AppDoctorSessionsSessionIdRoute;
+  "/_app/genetics/accessions/$id": typeof AppGeneticsAccessionsIdRoute;
+  "/_app/genetics/batches/$id": typeof AppGeneticsBatchesIdRoute;
+  "/_app/grows_/$growId_/learning": typeof AppGrowsGrowIdLearningRoute;
+  "/_app/pheno-hunts_/$id/keepers": typeof AppPhenoHuntsIdKeepersRoute;
+  "/_app/pheno-hunts_/$id/workspace": typeof AppPhenoHuntsIdWorkspaceRoute;
+  "/_app/reports_/post-grow/$growId": typeof AppReportsPostGrowGrowIdRoute;
+  "/_app/genetics/health/$kind/$id": typeof AppGeneticsHealthKindIdRoute;
+  "/_app/genetics/trace/$kind/$id": typeof AppGeneticsTraceKindIdRoute;
 }
 export interface FileRouteTypes {
-  fileRoutesByFullPath: FileRoutesByFullPath
+  fileRoutesByFullPath: FileRoutesByFullPath;
   fullPaths:
-    | '/'
-    | '/$'
-    | '/ai-doctor-readiness-check'
-    | '/auth'
-    | '/breeder-beta'
-    | '/contact'
-    | '/creator-beta'
-    | '/demo'
-    | '/features'
-    | '/feedback'
-    | '/founder'
-    | '/glossary'
-    | '/hardware-integrations'
-    | '/how-ai-doctor-works'
-    | '/login'
-    | '/pheno-comparison'
-    | '/pheno-expression-showcase'
-    | '/pricing'
-    | '/privacy'
-    | '/privacy-policy'
-    | '/quick-log'
-    | '/refund'
-    | '/refund-policy'
-    | '/refunds'
-    | '/register'
-    | '/reset-password'
-    | '/signup'
-    | '/terms'
-    | '/terms-of-service'
-    | '/unsubscribe'
-    | '/upgrade'
-    | '/welcome'
-    | '/action-queue'
-    | '/actions'
-    | '/ai-doctor'
-    | '/alerts'
-    | '/breeding'
-    | '/daily-check'
-    | '/dashboard'
-    | '/doctor'
-    | '/genetics'
-    | '/grow-lineage'
-    | '/grow-room'
-    | '/grows'
-    | '/health'
-    | '/invite'
-    | '/logs'
-    | '/onboarding'
-    | '/pheno-hunts'
-    | '/plants'
-    | '/reports'
-    | '/sensors'
-    | '/settings'
-    | '/start-room'
-    | '/tasks'
-    | '/tents'
-    | '/timeline'
-    | '/billing/$plan'
-    | '/checkout/cancel'
-    | '/checkout/success'
-    | '/cultivars/$slug'
-    | '/docs/mcp-api'
-    | '/guides/$slug'
-    | '/guides/grow-stage-care-guide'
-    | '/internal/contextual-pheno-comparison-demo'
-    | '/internal/demo-proof-walkthrough'
-    | '/internal/pheno-hunt-demo'
-    | '/partners/csv-preview'
-    | '/sensors/csv-preview'
-    | '/strains/$slug'
-    | '/tools/vpd-calculator'
-    | '/cultivars/'
-    | '/guides/'
-    | '/strains/'
-    | '/.lovable/oauth/consent'
-    | '/diagnostics'
-    | '/diagnostics-seo-artifacts'
-    | '/ingest-inspector'
-    | '/leads'
-    | '/one-tent-loop-proof'
-    | '/pi-ingest-status'
-    | '/account/preferences'
-    | '/actions/$actionId'
-    | '/alerts/$alertId'
-    | '/breeding/$programId'
-    | '/breeding/new'
-    | '/diary/environment-summary'
-    | '/diary/pheno-expression-comparison'
-    | '/doctor/sessions'
-    | '/grows/$growId'
-    | '/pheno-hunts/new'
-    | '/plants/$id'
-    | '/reports/diary-range'
-    | '/settings/agent-integrations'
-    | '/settings/analytics'
-    | '/tents/$id'
-    | '/customer/guide/oreoz-vs-gelonade-comparison'
-    | '/pheno-hunts/$id/compare'
-    | '/pheno-hunts/$id/showcase'
-    | '/genetics/'
-    | '/admin/leads'
-    | '/demo/one-tent-live-proof'
-    | '/internal/ai-doctor-confidence-audit'
-    | '/internal/ai-doctor-phase1-preview'
-    | '/internal/one-tent-loop-proof'
-    | '/internal/sensor-truth-audit'
-    | '/operator/ai-doctor-phase1'
-    | '/operator/billing-entitlement-resolution'
-    | '/operator/billing-subscription-updates'
-    | '/operator/credits-audit'
-    | '/operator/demo-preview'
-    | '/operator/ecowitt'
-    | '/operator/ecowitt-bridge-debug'
-    | '/operator/ecowitt-bridge-status'
-    | '/operator/ecowitt-live-bringup'
-    | '/operator/ecowitt-tent-preview'
-    | '/operator/edge-alerts'
-    | '/operator/edge-metrics'
-    | '/operator/mode'
-    | '/operator/one-tent-live-proof'
-    | '/operator/one-tent-loop-smoke-test'
-    | '/operator/one-tent-proof-record'
-    | '/operator/paddle-processing-audit'
-    | '/operator/post-grow-reflection-dry-run'
-    | '/operator/release-readiness'
-    | '/operator/schema-audit'
-    | '/operator/subscriber-growth'
-    | '/operator/support-inbox'
-    | '/sensors/ecowitt-audit'
-    | '/sensors/ingest-normalizer'
-    | '/breeding/log/new'
-    | '/diary/strains/$slug'
-    | '/doctor/sessions/$sessionId'
-    | '/genetics/accessions/$id'
-    | '/genetics/batches/$id'
-    | '/grows/$growId/learning'
-    | '/pheno-hunts/$id/keepers'
-    | '/pheno-hunts/$id/workspace'
-    | '/reports/post-grow/$growId'
-    | '/genetics/health/$kind/$id'
-    | '/genetics/trace/$kind/$id'
-  fileRoutesByTo: FileRoutesByTo
+    | "/"
+    | "/$"
+    | "/ai-doctor-readiness-check"
+    | "/auth"
+    | "/breeder-beta"
+    | "/contact"
+    | "/creator-beta"
+    | "/demo"
+    | "/features"
+    | "/feedback"
+    | "/founder"
+    | "/glossary"
+    | "/hardware-integrations"
+    | "/how-ai-doctor-works"
+    | "/login"
+    | "/pheno-comparison"
+    | "/pheno-expression-showcase"
+    | "/pricing"
+    | "/privacy"
+    | "/privacy-policy"
+    | "/quick-log"
+    | "/refund"
+    | "/refund-policy"
+    | "/refunds"
+    | "/register"
+    | "/reset-password"
+    | "/signup"
+    | "/terms"
+    | "/terms-of-service"
+    | "/unsubscribe"
+    | "/upgrade"
+    | "/welcome"
+    | "/action-queue"
+    | "/actions"
+    | "/ai-doctor"
+    | "/alerts"
+    | "/breeding"
+    | "/daily-check"
+    | "/dashboard"
+    | "/doctor"
+    | "/genetics"
+    | "/grow-lineage"
+    | "/grow-room"
+    | "/grows"
+    | "/health"
+    | "/invite"
+    | "/logs"
+    | "/onboarding"
+    | "/pheno-hunts"
+    | "/plants"
+    | "/reports"
+    | "/sensors"
+    | "/settings"
+    | "/start-room"
+    | "/tasks"
+    | "/tents"
+    | "/timeline"
+    | "/billing/$plan"
+    | "/checkout/cancel"
+    | "/checkout/success"
+    | "/cultivars/$slug"
+    | "/docs/mcp-api"
+    | "/guides/$slug"
+    | "/guides/grow-stage-care-guide"
+    | "/internal/contextual-pheno-comparison-demo"
+    | "/internal/demo-proof-walkthrough"
+    | "/internal/pheno-hunt-demo"
+    | "/partners/csv-preview"
+    | "/sensors/csv-preview"
+    | "/strains/$slug"
+    | "/tools/vpd-calculator"
+    | "/cultivars/"
+    | "/guides/"
+    | "/strains/"
+    | "/.lovable/oauth/consent"
+    | "/diagnostics"
+    | "/diagnostics-lighting-measurement"
+    | "/diagnostics-seo-artifacts"
+    | "/ingest-inspector"
+    | "/leads"
+    | "/one-tent-loop-proof"
+    | "/pi-ingest-status"
+    | "/account/preferences"
+    | "/actions/$actionId"
+    | "/alerts/$alertId"
+    | "/breeding/$programId"
+    | "/breeding/new"
+    | "/diary/environment-summary"
+    | "/diary/pheno-expression-comparison"
+    | "/doctor/sessions"
+    | "/grows/$growId"
+    | "/pheno-hunts/new"
+    | "/plants/$id"
+    | "/reports/diary-range"
+    | "/settings/agent-integrations"
+    | "/settings/analytics"
+    | "/tents/$id"
+    | "/customer/guide/oreoz-vs-gelonade-comparison"
+    | "/pheno-hunts/$id/compare"
+    | "/pheno-hunts/$id/showcase"
+    | "/genetics/"
+    | "/admin/leads"
+    | "/demo/one-tent-live-proof"
+    | "/internal/ai-doctor-confidence-audit"
+    | "/internal/ai-doctor-phase1-preview"
+    | "/internal/one-tent-loop-proof"
+    | "/internal/sensor-truth-audit"
+    | "/operator/ai-doctor-phase1"
+    | "/operator/billing-entitlement-resolution"
+    | "/operator/billing-subscription-updates"
+    | "/operator/credits-audit"
+    | "/operator/demo-preview"
+    | "/operator/ecowitt"
+    | "/operator/ecowitt-bridge-debug"
+    | "/operator/ecowitt-bridge-status"
+    | "/operator/ecowitt-live-bringup"
+    | "/operator/ecowitt-tent-preview"
+    | "/operator/edge-alerts"
+    | "/operator/edge-metrics"
+    | "/operator/mode"
+    | "/operator/one-tent-live-proof"
+    | "/operator/one-tent-loop-smoke-test"
+    | "/operator/one-tent-proof-record"
+    | "/operator/paddle-processing-audit"
+    | "/operator/post-grow-reflection-dry-run"
+    | "/operator/release-readiness"
+    | "/operator/schema-audit"
+    | "/operator/subscriber-growth"
+    | "/operator/support-inbox"
+    | "/sensors/ecowitt-audit"
+    | "/sensors/ingest-normalizer"
+    | "/breeding/log/new"
+    | "/diary/strains/$slug"
+    | "/doctor/sessions/$sessionId"
+    | "/genetics/accessions/$id"
+    | "/genetics/batches/$id"
+    | "/grows/$growId/learning"
+    | "/pheno-hunts/$id/keepers"
+    | "/pheno-hunts/$id/workspace"
+    | "/reports/post-grow/$growId"
+    | "/genetics/health/$kind/$id"
+    | "/genetics/trace/$kind/$id";
+  fileRoutesByTo: FileRoutesByTo;
   to:
-    | '/'
-    | '/$'
-    | '/ai-doctor-readiness-check'
-    | '/auth'
-    | '/breeder-beta'
-    | '/contact'
-    | '/creator-beta'
-    | '/demo'
-    | '/features'
-    | '/feedback'
-    | '/founder'
-    | '/glossary'
-    | '/hardware-integrations'
-    | '/how-ai-doctor-works'
-    | '/login'
-    | '/pheno-comparison'
-    | '/pheno-expression-showcase'
-    | '/pricing'
-    | '/privacy'
-    | '/privacy-policy'
-    | '/quick-log'
-    | '/refund'
-    | '/refund-policy'
-    | '/refunds'
-    | '/register'
-    | '/reset-password'
-    | '/signup'
-    | '/terms'
-    | '/terms-of-service'
-    | '/unsubscribe'
-    | '/upgrade'
-    | '/welcome'
-    | '/action-queue'
-    | '/actions'
-    | '/ai-doctor'
-    | '/alerts'
-    | '/breeding'
-    | '/daily-check'
-    | '/dashboard'
-    | '/doctor'
-    | '/grow-lineage'
-    | '/grow-room'
-    | '/grows'
-    | '/health'
-    | '/invite'
-    | '/logs'
-    | '/onboarding'
-    | '/pheno-hunts'
-    | '/plants'
-    | '/reports'
-    | '/sensors'
-    | '/settings'
-    | '/start-room'
-    | '/tasks'
-    | '/tents'
-    | '/timeline'
-    | '/billing/$plan'
-    | '/checkout/cancel'
-    | '/checkout/success'
-    | '/cultivars/$slug'
-    | '/docs/mcp-api'
-    | '/guides/$slug'
-    | '/guides/grow-stage-care-guide'
-    | '/internal/contextual-pheno-comparison-demo'
-    | '/internal/demo-proof-walkthrough'
-    | '/internal/pheno-hunt-demo'
-    | '/partners/csv-preview'
-    | '/sensors/csv-preview'
-    | '/strains/$slug'
-    | '/tools/vpd-calculator'
-    | '/cultivars'
-    | '/guides'
-    | '/strains'
-    | '/.lovable/oauth/consent'
-    | '/diagnostics'
-    | '/diagnostics-seo-artifacts'
-    | '/ingest-inspector'
-    | '/leads'
-    | '/one-tent-loop-proof'
-    | '/pi-ingest-status'
-    | '/account/preferences'
-    | '/actions/$actionId'
-    | '/alerts/$alertId'
-    | '/breeding/$programId'
-    | '/breeding/new'
-    | '/diary/environment-summary'
-    | '/diary/pheno-expression-comparison'
-    | '/doctor/sessions'
-    | '/grows/$growId'
-    | '/pheno-hunts/new'
-    | '/plants/$id'
-    | '/reports/diary-range'
-    | '/settings/agent-integrations'
-    | '/settings/analytics'
-    | '/tents/$id'
-    | '/customer/guide/oreoz-vs-gelonade-comparison'
-    | '/pheno-hunts/$id/compare'
-    | '/pheno-hunts/$id/showcase'
-    | '/genetics'
-    | '/admin/leads'
-    | '/demo/one-tent-live-proof'
-    | '/internal/ai-doctor-confidence-audit'
-    | '/internal/ai-doctor-phase1-preview'
-    | '/internal/one-tent-loop-proof'
-    | '/internal/sensor-truth-audit'
-    | '/operator/ai-doctor-phase1'
-    | '/operator/billing-entitlement-resolution'
-    | '/operator/billing-subscription-updates'
-    | '/operator/credits-audit'
-    | '/operator/demo-preview'
-    | '/operator/ecowitt'
-    | '/operator/ecowitt-bridge-debug'
-    | '/operator/ecowitt-bridge-status'
-    | '/operator/ecowitt-live-bringup'
-    | '/operator/ecowitt-tent-preview'
-    | '/operator/edge-alerts'
-    | '/operator/edge-metrics'
-    | '/operator/mode'
-    | '/operator/one-tent-live-proof'
-    | '/operator/one-tent-loop-smoke-test'
-    | '/operator/one-tent-proof-record'
-    | '/operator/paddle-processing-audit'
-    | '/operator/post-grow-reflection-dry-run'
-    | '/operator/release-readiness'
-    | '/operator/schema-audit'
-    | '/operator/subscriber-growth'
-    | '/operator/support-inbox'
-    | '/sensors/ecowitt-audit'
-    | '/sensors/ingest-normalizer'
-    | '/breeding/log/new'
-    | '/diary/strains/$slug'
-    | '/doctor/sessions/$sessionId'
-    | '/genetics/accessions/$id'
-    | '/genetics/batches/$id'
-    | '/grows/$growId/learning'
-    | '/pheno-hunts/$id/keepers'
-    | '/pheno-hunts/$id/workspace'
-    | '/reports/post-grow/$growId'
-    | '/genetics/health/$kind/$id'
-    | '/genetics/trace/$kind/$id'
+    | "/"
+    | "/$"
+    | "/ai-doctor-readiness-check"
+    | "/auth"
+    | "/breeder-beta"
+    | "/contact"
+    | "/creator-beta"
+    | "/demo"
+    | "/features"
+    | "/feedback"
+    | "/founder"
+    | "/glossary"
+    | "/hardware-integrations"
+    | "/how-ai-doctor-works"
+    | "/login"
+    | "/pheno-comparison"
+    | "/pheno-expression-showcase"
+    | "/pricing"
+    | "/privacy"
+    | "/privacy-policy"
+    | "/quick-log"
+    | "/refund"
+    | "/refund-policy"
+    | "/refunds"
+    | "/register"
+    | "/reset-password"
+    | "/signup"
+    | "/terms"
+    | "/terms-of-service"
+    | "/unsubscribe"
+    | "/upgrade"
+    | "/welcome"
+    | "/action-queue"
+    | "/actions"
+    | "/ai-doctor"
+    | "/alerts"
+    | "/breeding"
+    | "/daily-check"
+    | "/dashboard"
+    | "/doctor"
+    | "/grow-lineage"
+    | "/grow-room"
+    | "/grows"
+    | "/health"
+    | "/invite"
+    | "/logs"
+    | "/onboarding"
+    | "/pheno-hunts"
+    | "/plants"
+    | "/reports"
+    | "/sensors"
+    | "/settings"
+    | "/start-room"
+    | "/tasks"
+    | "/tents"
+    | "/timeline"
+    | "/billing/$plan"
+    | "/checkout/cancel"
+    | "/checkout/success"
+    | "/cultivars/$slug"
+    | "/docs/mcp-api"
+    | "/guides/$slug"
+    | "/guides/grow-stage-care-guide"
+    | "/internal/contextual-pheno-comparison-demo"
+    | "/internal/demo-proof-walkthrough"
+    | "/internal/pheno-hunt-demo"
+    | "/partners/csv-preview"
+    | "/sensors/csv-preview"
+    | "/strains/$slug"
+    | "/tools/vpd-calculator"
+    | "/cultivars"
+    | "/guides"
+    | "/strains"
+    | "/.lovable/oauth/consent"
+    | "/diagnostics"
+    | "/diagnostics-lighting-measurement"
+    | "/diagnostics-seo-artifacts"
+    | "/ingest-inspector"
+    | "/leads"
+    | "/one-tent-loop-proof"
+    | "/pi-ingest-status"
+    | "/account/preferences"
+    | "/actions/$actionId"
+    | "/alerts/$alertId"
+    | "/breeding/$programId"
+    | "/breeding/new"
+    | "/diary/environment-summary"
+    | "/diary/pheno-expression-comparison"
+    | "/doctor/sessions"
+    | "/grows/$growId"
+    | "/pheno-hunts/new"
+    | "/plants/$id"
+    | "/reports/diary-range"
+    | "/settings/agent-integrations"
+    | "/settings/analytics"
+    | "/tents/$id"
+    | "/customer/guide/oreoz-vs-gelonade-comparison"
+    | "/pheno-hunts/$id/compare"
+    | "/pheno-hunts/$id/showcase"
+    | "/genetics"
+    | "/admin/leads"
+    | "/demo/one-tent-live-proof"
+    | "/internal/ai-doctor-confidence-audit"
+    | "/internal/ai-doctor-phase1-preview"
+    | "/internal/one-tent-loop-proof"
+    | "/internal/sensor-truth-audit"
+    | "/operator/ai-doctor-phase1"
+    | "/operator/billing-entitlement-resolution"
+    | "/operator/billing-subscription-updates"
+    | "/operator/credits-audit"
+    | "/operator/demo-preview"
+    | "/operator/ecowitt"
+    | "/operator/ecowitt-bridge-debug"
+    | "/operator/ecowitt-bridge-status"
+    | "/operator/ecowitt-live-bringup"
+    | "/operator/ecowitt-tent-preview"
+    | "/operator/edge-alerts"
+    | "/operator/edge-metrics"
+    | "/operator/mode"
+    | "/operator/one-tent-live-proof"
+    | "/operator/one-tent-loop-smoke-test"
+    | "/operator/one-tent-proof-record"
+    | "/operator/paddle-processing-audit"
+    | "/operator/post-grow-reflection-dry-run"
+    | "/operator/release-readiness"
+    | "/operator/schema-audit"
+    | "/operator/subscriber-growth"
+    | "/operator/support-inbox"
+    | "/sensors/ecowitt-audit"
+    | "/sensors/ingest-normalizer"
+    | "/breeding/log/new"
+    | "/diary/strains/$slug"
+    | "/doctor/sessions/$sessionId"
+    | "/genetics/accessions/$id"
+    | "/genetics/batches/$id"
+    | "/grows/$growId/learning"
+    | "/pheno-hunts/$id/keepers"
+    | "/pheno-hunts/$id/workspace"
+    | "/reports/post-grow/$growId"
+    | "/genetics/health/$kind/$id"
+    | "/genetics/trace/$kind/$id";
   id:
-    | '__root__'
-    | '/'
-    | '/$'
-    | '/_app'
-    | '/ai-doctor-readiness-check'
-    | '/auth'
-    | '/breeder-beta'
-    | '/contact'
-    | '/creator-beta'
-    | '/demo'
-    | '/features'
-    | '/feedback'
-    | '/founder'
-    | '/glossary'
-    | '/hardware-integrations'
-    | '/how-ai-doctor-works'
-    | '/login'
-    | '/pheno-comparison'
-    | '/pheno-expression-showcase'
-    | '/pricing'
-    | '/privacy'
-    | '/privacy-policy'
-    | '/quick-log'
-    | '/refund'
-    | '/refund-policy'
-    | '/refunds'
-    | '/register'
-    | '/reset-password'
-    | '/signup'
-    | '/terms'
-    | '/terms-of-service'
-    | '/unsubscribe'
-    | '/upgrade'
-    | '/welcome'
-    | '/_app/_operator'
-    | '/_app/action-queue'
-    | '/_app/actions'
-    | '/_app/ai-doctor'
-    | '/_app/alerts'
-    | '/_app/breeding'
-    | '/_app/daily-check'
-    | '/_app/dashboard'
-    | '/_app/doctor'
-    | '/_app/genetics'
-    | '/_app/grow-lineage'
-    | '/_app/grow-room'
-    | '/_app/grows'
-    | '/_app/health'
-    | '/_app/invite'
-    | '/_app/logs'
-    | '/_app/onboarding'
-    | '/_app/pheno-hunts'
-    | '/_app/plants'
-    | '/_app/reports'
-    | '/_app/sensors'
-    | '/_app/settings'
-    | '/_app/start-room'
-    | '/_app/tasks'
-    | '/_app/tents'
-    | '/_app/timeline'
-    | '/billing/$plan'
-    | '/checkout/cancel'
-    | '/checkout/success'
-    | '/cultivars/$slug'
-    | '/docs/mcp-api'
-    | '/guides/$slug'
-    | '/guides/grow-stage-care-guide'
-    | '/internal/contextual-pheno-comparison-demo'
-    | '/internal/demo-proof-walkthrough'
-    | '/internal/pheno-hunt-demo'
-    | '/partners/csv-preview'
-    | '/sensors/csv-preview'
-    | '/strains/$slug'
-    | '/tools/vpd-calculator'
-    | '/cultivars/'
-    | '/guides/'
-    | '/strains/'
-    | '/.lovable/oauth/consent'
-    | '/_app/_operator/diagnostics'
-    | '/_app/_operator/diagnostics-seo-artifacts'
-    | '/_app/_operator/ingest-inspector'
-    | '/_app/_operator/leads'
-    | '/_app/_operator/one-tent-loop-proof'
-    | '/_app/_operator/pi-ingest-status'
-    | '/_app/account/preferences'
-    | '/_app/actions_/$actionId'
-    | '/_app/alerts_/$alertId'
-    | '/_app/breeding_/$programId'
-    | '/_app/breeding_/new'
-    | '/_app/diary/environment-summary'
-    | '/_app/diary/pheno-expression-comparison'
-    | '/_app/doctor_/sessions'
-    | '/_app/grows_/$growId'
-    | '/_app/pheno-hunts_/new'
-    | '/_app/plants_/$id'
-    | '/_app/reports_/diary-range'
-    | '/_app/settings_/agent-integrations'
-    | '/_app/settings_/analytics'
-    | '/_app/tents_/$id'
-    | '/customer/guide/oreoz-vs-gelonade-comparison'
-    | '/pheno-hunts/$id/compare'
-    | '/pheno-hunts/$id/showcase'
-    | '/_app/genetics/'
-    | '/_app/_operator/admin/leads'
-    | '/_app/_operator/demo/one-tent-live-proof'
-    | '/_app/_operator/internal/ai-doctor-confidence-audit'
-    | '/_app/_operator/internal/ai-doctor-phase1-preview'
-    | '/_app/_operator/internal/one-tent-loop-proof'
-    | '/_app/_operator/internal/sensor-truth-audit'
-    | '/_app/_operator/operator/ai-doctor-phase1'
-    | '/_app/_operator/operator/billing-entitlement-resolution'
-    | '/_app/_operator/operator/billing-subscription-updates'
-    | '/_app/_operator/operator/credits-audit'
-    | '/_app/_operator/operator/demo-preview'
-    | '/_app/_operator/operator/ecowitt'
-    | '/_app/_operator/operator/ecowitt-bridge-debug'
-    | '/_app/_operator/operator/ecowitt-bridge-status'
-    | '/_app/_operator/operator/ecowitt-live-bringup'
-    | '/_app/_operator/operator/ecowitt-tent-preview'
-    | '/_app/_operator/operator/edge-alerts'
-    | '/_app/_operator/operator/edge-metrics'
-    | '/_app/_operator/operator/mode'
-    | '/_app/_operator/operator/one-tent-live-proof'
-    | '/_app/_operator/operator/one-tent-loop-smoke-test'
-    | '/_app/_operator/operator/one-tent-proof-record'
-    | '/_app/_operator/operator/paddle-processing-audit'
-    | '/_app/_operator/operator/post-grow-reflection-dry-run'
-    | '/_app/_operator/operator/release-readiness'
-    | '/_app/_operator/operator/schema-audit'
-    | '/_app/_operator/operator/subscriber-growth'
-    | '/_app/_operator/operator/support-inbox'
-    | '/_app/_operator/sensors/ecowitt-audit'
-    | '/_app/_operator/sensors/ingest-normalizer'
-    | '/_app/breeding_/log/new'
-    | '/_app/diary/strains/$slug'
-    | '/_app/doctor_/sessions_/$sessionId'
-    | '/_app/genetics/accessions/$id'
-    | '/_app/genetics/batches/$id'
-    | '/_app/grows_/$growId_/learning'
-    | '/_app/pheno-hunts_/$id/keepers'
-    | '/_app/pheno-hunts_/$id/workspace'
-    | '/_app/reports_/post-grow/$growId'
-    | '/_app/genetics/health/$kind/$id'
-    | '/_app/genetics/trace/$kind/$id'
-  fileRoutesById: FileRoutesById
+    | "__root__"
+    | "/"
+    | "/$"
+    | "/_app"
+    | "/ai-doctor-readiness-check"
+    | "/auth"
+    | "/breeder-beta"
+    | "/contact"
+    | "/creator-beta"
+    | "/demo"
+    | "/features"
+    | "/feedback"
+    | "/founder"
+    | "/glossary"
+    | "/hardware-integrations"
+    | "/how-ai-doctor-works"
+    | "/login"
+    | "/pheno-comparison"
+    | "/pheno-expression-showcase"
+    | "/pricing"
+    | "/privacy"
+    | "/privacy-policy"
+    | "/quick-log"
+    | "/refund"
+    | "/refund-policy"
+    | "/refunds"
+    | "/register"
+    | "/reset-password"
+    | "/signup"
+    | "/terms"
+    | "/terms-of-service"
+    | "/unsubscribe"
+    | "/upgrade"
+    | "/welcome"
+    | "/_app/_operator"
+    | "/_app/action-queue"
+    | "/_app/actions"
+    | "/_app/ai-doctor"
+    | "/_app/alerts"
+    | "/_app/breeding"
+    | "/_app/daily-check"
+    | "/_app/dashboard"
+    | "/_app/doctor"
+    | "/_app/genetics"
+    | "/_app/grow-lineage"
+    | "/_app/grow-room"
+    | "/_app/grows"
+    | "/_app/health"
+    | "/_app/invite"
+    | "/_app/logs"
+    | "/_app/onboarding"
+    | "/_app/pheno-hunts"
+    | "/_app/plants"
+    | "/_app/reports"
+    | "/_app/sensors"
+    | "/_app/settings"
+    | "/_app/start-room"
+    | "/_app/tasks"
+    | "/_app/tents"
+    | "/_app/timeline"
+    | "/billing/$plan"
+    | "/checkout/cancel"
+    | "/checkout/success"
+    | "/cultivars/$slug"
+    | "/docs/mcp-api"
+    | "/guides/$slug"
+    | "/guides/grow-stage-care-guide"
+    | "/internal/contextual-pheno-comparison-demo"
+    | "/internal/demo-proof-walkthrough"
+    | "/internal/pheno-hunt-demo"
+    | "/partners/csv-preview"
+    | "/sensors/csv-preview"
+    | "/strains/$slug"
+    | "/tools/vpd-calculator"
+    | "/cultivars/"
+    | "/guides/"
+    | "/strains/"
+    | "/.lovable/oauth/consent"
+    | "/_app/_operator/diagnostics"
+    | "/_app/_operator/diagnostics-lighting-measurement"
+    | "/_app/_operator/diagnostics-seo-artifacts"
+    | "/_app/_operator/ingest-inspector"
+    | "/_app/_operator/leads"
+    | "/_app/_operator/one-tent-loop-proof"
+    | "/_app/_operator/pi-ingest-status"
+    | "/_app/account/preferences"
+    | "/_app/actions_/$actionId"
+    | "/_app/alerts_/$alertId"
+    | "/_app/breeding_/$programId"
+    | "/_app/breeding_/new"
+    | "/_app/diary/environment-summary"
+    | "/_app/diary/pheno-expression-comparison"
+    | "/_app/doctor_/sessions"
+    | "/_app/grows_/$growId"
+    | "/_app/pheno-hunts_/new"
+    | "/_app/plants_/$id"
+    | "/_app/reports_/diary-range"
+    | "/_app/settings_/agent-integrations"
+    | "/_app/settings_/analytics"
+    | "/_app/tents_/$id"
+    | "/customer/guide/oreoz-vs-gelonade-comparison"
+    | "/pheno-hunts/$id/compare"
+    | "/pheno-hunts/$id/showcase"
+    | "/_app/genetics/"
+    | "/_app/_operator/admin/leads"
+    | "/_app/_operator/demo/one-tent-live-proof"
+    | "/_app/_operator/internal/ai-doctor-confidence-audit"
+    | "/_app/_operator/internal/ai-doctor-phase1-preview"
+    | "/_app/_operator/internal/one-tent-loop-proof"
+    | "/_app/_operator/internal/sensor-truth-audit"
+    | "/_app/_operator/operator/ai-doctor-phase1"
+    | "/_app/_operator/operator/billing-entitlement-resolution"
+    | "/_app/_operator/operator/billing-subscription-updates"
+    | "/_app/_operator/operator/credits-audit"
+    | "/_app/_operator/operator/demo-preview"
+    | "/_app/_operator/operator/ecowitt"
+    | "/_app/_operator/operator/ecowitt-bridge-debug"
+    | "/_app/_operator/operator/ecowitt-bridge-status"
+    | "/_app/_operator/operator/ecowitt-live-bringup"
+    | "/_app/_operator/operator/ecowitt-tent-preview"
+    | "/_app/_operator/operator/edge-alerts"
+    | "/_app/_operator/operator/edge-metrics"
+    | "/_app/_operator/operator/mode"
+    | "/_app/_operator/operator/one-tent-live-proof"
+    | "/_app/_operator/operator/one-tent-loop-smoke-test"
+    | "/_app/_operator/operator/one-tent-proof-record"
+    | "/_app/_operator/operator/paddle-processing-audit"
+    | "/_app/_operator/operator/post-grow-reflection-dry-run"
+    | "/_app/_operator/operator/release-readiness"
+    | "/_app/_operator/operator/schema-audit"
+    | "/_app/_operator/operator/subscriber-growth"
+    | "/_app/_operator/operator/support-inbox"
+    | "/_app/_operator/sensors/ecowitt-audit"
+    | "/_app/_operator/sensors/ingest-normalizer"
+    | "/_app/breeding_/log/new"
+    | "/_app/diary/strains/$slug"
+    | "/_app/doctor_/sessions_/$sessionId"
+    | "/_app/genetics/accessions/$id"
+    | "/_app/genetics/batches/$id"
+    | "/_app/grows_/$growId_/learning"
+    | "/_app/pheno-hunts_/$id/keepers"
+    | "/_app/pheno-hunts_/$id/workspace"
+    | "/_app/reports_/post-grow/$growId"
+    | "/_app/genetics/health/$kind/$id"
+    | "/_app/genetics/trace/$kind/$id";
+  fileRoutesById: FileRoutesById;
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
-  SplatRoute: typeof SplatRoute
-  AppRoute: typeof AppRouteWithChildren
-  AiDoctorReadinessCheckRoute: typeof AiDoctorReadinessCheckRoute
-  AuthRoute: typeof AuthRoute
-  BreederBetaRoute: typeof BreederBetaRoute
-  ContactRoute: typeof ContactRoute
-  CreatorBetaRoute: typeof CreatorBetaRoute
-  DemoRoute: typeof DemoRoute
-  FeaturesRoute: typeof FeaturesRoute
-  FeedbackRoute: typeof FeedbackRoute
-  FounderRoute: typeof FounderRoute
-  GlossaryRoute: typeof GlossaryRoute
-  HardwareIntegrationsRoute: typeof HardwareIntegrationsRoute
-  HowAiDoctorWorksRoute: typeof HowAiDoctorWorksRoute
-  LoginRoute: typeof LoginRoute
-  PhenoComparisonRoute: typeof PhenoComparisonRoute
-  PhenoExpressionShowcaseRoute: typeof PhenoExpressionShowcaseRoute
-  PricingRoute: typeof PricingRoute
-  PrivacyRoute: typeof PrivacyRoute
-  PrivacyPolicyRoute: typeof PrivacyPolicyRoute
-  QuickLogRoute: typeof QuickLogRoute
-  RefundRoute: typeof RefundRoute
-  RefundPolicyRoute: typeof RefundPolicyRoute
-  RefundsRoute: typeof RefundsRoute
-  RegisterRoute: typeof RegisterRoute
-  ResetPasswordRoute: typeof ResetPasswordRoute
-  SignupRoute: typeof SignupRoute
-  TermsRoute: typeof TermsRoute
-  TermsOfServiceRoute: typeof TermsOfServiceRoute
-  UnsubscribeRoute: typeof UnsubscribeRoute
-  UpgradeRoute: typeof UpgradeRoute
-  WelcomeRoute: typeof WelcomeRoute
-  BillingPlanRoute: typeof BillingPlanRoute
-  CheckoutCancelRoute: typeof CheckoutCancelRoute
-  CheckoutSuccessRoute: typeof CheckoutSuccessRoute
-  CultivarsSlugRoute: typeof CultivarsSlugRoute
-  DocsMcpApiRoute: typeof DocsMcpApiRoute
-  GuidesSlugRoute: typeof GuidesSlugRoute
-  GuidesGrowStageCareGuideRoute: typeof GuidesGrowStageCareGuideRoute
-  InternalContextualPhenoComparisonDemoRoute: typeof InternalContextualPhenoComparisonDemoRoute
-  InternalDemoProofWalkthroughRoute: typeof InternalDemoProofWalkthroughRoute
-  InternalPhenoHuntDemoRoute: typeof InternalPhenoHuntDemoRoute
-  PartnersCsvPreviewRoute: typeof PartnersCsvPreviewRoute
-  SensorsCsvPreviewRoute: typeof SensorsCsvPreviewRoute
-  StrainsSlugRoute: typeof StrainsSlugRoute
-  ToolsVpdCalculatorRoute: typeof ToolsVpdCalculatorRoute
-  CultivarsIndexRoute: typeof CultivarsIndexRoute
-  GuidesIndexRoute: typeof GuidesIndexRoute
-  StrainsIndexRoute: typeof StrainsIndexRoute
-  DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
-  CustomerGuideOreozVsGelonadeComparisonRoute: typeof CustomerGuideOreozVsGelonadeComparisonRoute
-  PhenoHuntsIdCompareRoute: typeof PhenoHuntsIdCompareRoute
-  PhenoHuntsIdShowcaseRoute: typeof PhenoHuntsIdShowcaseRoute
+  IndexRoute: typeof IndexRoute;
+  SplatRoute: typeof SplatRoute;
+  AppRoute: typeof AppRouteWithChildren;
+  AiDoctorReadinessCheckRoute: typeof AiDoctorReadinessCheckRoute;
+  AuthRoute: typeof AuthRoute;
+  BreederBetaRoute: typeof BreederBetaRoute;
+  ContactRoute: typeof ContactRoute;
+  CreatorBetaRoute: typeof CreatorBetaRoute;
+  DemoRoute: typeof DemoRoute;
+  FeaturesRoute: typeof FeaturesRoute;
+  FeedbackRoute: typeof FeedbackRoute;
+  FounderRoute: typeof FounderRoute;
+  GlossaryRoute: typeof GlossaryRoute;
+  HardwareIntegrationsRoute: typeof HardwareIntegrationsRoute;
+  HowAiDoctorWorksRoute: typeof HowAiDoctorWorksRoute;
+  LoginRoute: typeof LoginRoute;
+  PhenoComparisonRoute: typeof PhenoComparisonRoute;
+  PhenoExpressionShowcaseRoute: typeof PhenoExpressionShowcaseRoute;
+  PricingRoute: typeof PricingRoute;
+  PrivacyRoute: typeof PrivacyRoute;
+  PrivacyPolicyRoute: typeof PrivacyPolicyRoute;
+  QuickLogRoute: typeof QuickLogRoute;
+  RefundRoute: typeof RefundRoute;
+  RefundPolicyRoute: typeof RefundPolicyRoute;
+  RefundsRoute: typeof RefundsRoute;
+  RegisterRoute: typeof RegisterRoute;
+  ResetPasswordRoute: typeof ResetPasswordRoute;
+  SignupRoute: typeof SignupRoute;
+  TermsRoute: typeof TermsRoute;
+  TermsOfServiceRoute: typeof TermsOfServiceRoute;
+  UnsubscribeRoute: typeof UnsubscribeRoute;
+  UpgradeRoute: typeof UpgradeRoute;
+  WelcomeRoute: typeof WelcomeRoute;
+  BillingPlanRoute: typeof BillingPlanRoute;
+  CheckoutCancelRoute: typeof CheckoutCancelRoute;
+  CheckoutSuccessRoute: typeof CheckoutSuccessRoute;
+  CultivarsSlugRoute: typeof CultivarsSlugRoute;
+  DocsMcpApiRoute: typeof DocsMcpApiRoute;
+  GuidesSlugRoute: typeof GuidesSlugRoute;
+  GuidesGrowStageCareGuideRoute: typeof GuidesGrowStageCareGuideRoute;
+  InternalContextualPhenoComparisonDemoRoute: typeof InternalContextualPhenoComparisonDemoRoute;
+  InternalDemoProofWalkthroughRoute: typeof InternalDemoProofWalkthroughRoute;
+  InternalPhenoHuntDemoRoute: typeof InternalPhenoHuntDemoRoute;
+  PartnersCsvPreviewRoute: typeof PartnersCsvPreviewRoute;
+  SensorsCsvPreviewRoute: typeof SensorsCsvPreviewRoute;
+  StrainsSlugRoute: typeof StrainsSlugRoute;
+  ToolsVpdCalculatorRoute: typeof ToolsVpdCalculatorRoute;
+  CultivarsIndexRoute: typeof CultivarsIndexRoute;
+  GuidesIndexRoute: typeof GuidesIndexRoute;
+  StrainsIndexRoute: typeof StrainsIndexRoute;
+  DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute;
+  CustomerGuideOreozVsGelonadeComparisonRoute: typeof CustomerGuideOreozVsGelonadeComparisonRoute;
+  PhenoHuntsIdCompareRoute: typeof PhenoHuntsIdCompareRoute;
+  PhenoHuntsIdShowcaseRoute: typeof PhenoHuntsIdShowcaseRoute;
 }
 
-declare module '@tanstack/react-router' {
+declare module "@tanstack/react-router" {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/$': {
-      id: '/$'
-      path: '/$'
-      fullPath: '/$'
-      preLoaderRoute: typeof SplatRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_app': {
-      id: '/_app'
-      path: ''
-      fullPath: '/'
-      preLoaderRoute: typeof AppRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/ai-doctor-readiness-check': {
-      id: '/ai-doctor-readiness-check'
-      path: '/ai-doctor-readiness-check'
-      fullPath: '/ai-doctor-readiness-check'
-      preLoaderRoute: typeof AiDoctorReadinessCheckRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/auth': {
-      id: '/auth'
-      path: '/auth'
-      fullPath: '/auth'
-      preLoaderRoute: typeof AuthRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/breeder-beta': {
-      id: '/breeder-beta'
-      path: '/breeder-beta'
-      fullPath: '/breeder-beta'
-      preLoaderRoute: typeof BreederBetaRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/contact': {
-      id: '/contact'
-      path: '/contact'
-      fullPath: '/contact'
-      preLoaderRoute: typeof ContactRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/creator-beta': {
-      id: '/creator-beta'
-      path: '/creator-beta'
-      fullPath: '/creator-beta'
-      preLoaderRoute: typeof CreatorBetaRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/demo': {
-      id: '/demo'
-      path: '/demo'
-      fullPath: '/demo'
-      preLoaderRoute: typeof DemoRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/features': {
-      id: '/features'
-      path: '/features'
-      fullPath: '/features'
-      preLoaderRoute: typeof FeaturesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/feedback': {
-      id: '/feedback'
-      path: '/feedback'
-      fullPath: '/feedback'
-      preLoaderRoute: typeof FeedbackRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/founder': {
-      id: '/founder'
-      path: '/founder'
-      fullPath: '/founder'
-      preLoaderRoute: typeof FounderRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/glossary': {
-      id: '/glossary'
-      path: '/glossary'
-      fullPath: '/glossary'
-      preLoaderRoute: typeof GlossaryRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/hardware-integrations': {
-      id: '/hardware-integrations'
-      path: '/hardware-integrations'
-      fullPath: '/hardware-integrations'
-      preLoaderRoute: typeof HardwareIntegrationsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/how-ai-doctor-works': {
-      id: '/how-ai-doctor-works'
-      path: '/how-ai-doctor-works'
-      fullPath: '/how-ai-doctor-works'
-      preLoaderRoute: typeof HowAiDoctorWorksRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/pheno-comparison': {
-      id: '/pheno-comparison'
-      path: '/pheno-comparison'
-      fullPath: '/pheno-comparison'
-      preLoaderRoute: typeof PhenoComparisonRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/pheno-expression-showcase': {
-      id: '/pheno-expression-showcase'
-      path: '/pheno-expression-showcase'
-      fullPath: '/pheno-expression-showcase'
-      preLoaderRoute: typeof PhenoExpressionShowcaseRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/pricing': {
-      id: '/pricing'
-      path: '/pricing'
-      fullPath: '/pricing'
-      preLoaderRoute: typeof PricingRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/privacy': {
-      id: '/privacy'
-      path: '/privacy'
-      fullPath: '/privacy'
-      preLoaderRoute: typeof PrivacyRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/privacy-policy': {
-      id: '/privacy-policy'
-      path: '/privacy-policy'
-      fullPath: '/privacy-policy'
-      preLoaderRoute: typeof PrivacyPolicyRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/quick-log': {
-      id: '/quick-log'
-      path: '/quick-log'
-      fullPath: '/quick-log'
-      preLoaderRoute: typeof QuickLogRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/refund': {
-      id: '/refund'
-      path: '/refund'
-      fullPath: '/refund'
-      preLoaderRoute: typeof RefundRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/refund-policy': {
-      id: '/refund-policy'
-      path: '/refund-policy'
-      fullPath: '/refund-policy'
-      preLoaderRoute: typeof RefundPolicyRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/refunds': {
-      id: '/refunds'
-      path: '/refunds'
-      fullPath: '/refunds'
-      preLoaderRoute: typeof RefundsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/register': {
-      id: '/register'
-      path: '/register'
-      fullPath: '/register'
-      preLoaderRoute: typeof RegisterRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/reset-password': {
-      id: '/reset-password'
-      path: '/reset-password'
-      fullPath: '/reset-password'
-      preLoaderRoute: typeof ResetPasswordRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/signup': {
-      id: '/signup'
-      path: '/signup'
-      fullPath: '/signup'
-      preLoaderRoute: typeof SignupRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/terms': {
-      id: '/terms'
-      path: '/terms'
-      fullPath: '/terms'
-      preLoaderRoute: typeof TermsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/terms-of-service': {
-      id: '/terms-of-service'
-      path: '/terms-of-service'
-      fullPath: '/terms-of-service'
-      preLoaderRoute: typeof TermsOfServiceRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/unsubscribe': {
-      id: '/unsubscribe'
-      path: '/unsubscribe'
-      fullPath: '/unsubscribe'
-      preLoaderRoute: typeof UnsubscribeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/upgrade': {
-      id: '/upgrade'
-      path: '/upgrade'
-      fullPath: '/upgrade'
-      preLoaderRoute: typeof UpgradeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/welcome': {
-      id: '/welcome'
-      path: '/welcome'
-      fullPath: '/welcome'
-      preLoaderRoute: typeof WelcomeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_app/_operator': {
-      id: '/_app/_operator'
-      path: ''
-      fullPath: '/'
-      preLoaderRoute: typeof AppOperatorRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/action-queue': {
-      id: '/_app/action-queue'
-      path: '/action-queue'
-      fullPath: '/action-queue'
-      preLoaderRoute: typeof AppActionQueueRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/actions': {
-      id: '/_app/actions'
-      path: '/actions'
-      fullPath: '/actions'
-      preLoaderRoute: typeof AppActionsRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/ai-doctor': {
-      id: '/_app/ai-doctor'
-      path: '/ai-doctor'
-      fullPath: '/ai-doctor'
-      preLoaderRoute: typeof AppAiDoctorRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/alerts': {
-      id: '/_app/alerts'
-      path: '/alerts'
-      fullPath: '/alerts'
-      preLoaderRoute: typeof AppAlertsRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/breeding': {
-      id: '/_app/breeding'
-      path: '/breeding'
-      fullPath: '/breeding'
-      preLoaderRoute: typeof AppBreedingRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/daily-check': {
-      id: '/_app/daily-check'
-      path: '/daily-check'
-      fullPath: '/daily-check'
-      preLoaderRoute: typeof AppDailyCheckRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/dashboard': {
-      id: '/_app/dashboard'
-      path: '/dashboard'
-      fullPath: '/dashboard'
-      preLoaderRoute: typeof AppDashboardRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/doctor': {
-      id: '/_app/doctor'
-      path: '/doctor'
-      fullPath: '/doctor'
-      preLoaderRoute: typeof AppDoctorRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/genetics': {
-      id: '/_app/genetics'
-      path: '/genetics'
-      fullPath: '/genetics'
-      preLoaderRoute: typeof AppGeneticsRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/grow-lineage': {
-      id: '/_app/grow-lineage'
-      path: '/grow-lineage'
-      fullPath: '/grow-lineage'
-      preLoaderRoute: typeof AppGrowLineageRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/grow-room': {
-      id: '/_app/grow-room'
-      path: '/grow-room'
-      fullPath: '/grow-room'
-      preLoaderRoute: typeof AppGrowRoomRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/grows': {
-      id: '/_app/grows'
-      path: '/grows'
-      fullPath: '/grows'
-      preLoaderRoute: typeof AppGrowsRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/health': {
-      id: '/_app/health'
-      path: '/health'
-      fullPath: '/health'
-      preLoaderRoute: typeof AppHealthRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/invite': {
-      id: '/_app/invite'
-      path: '/invite'
-      fullPath: '/invite'
-      preLoaderRoute: typeof AppInviteRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/logs': {
-      id: '/_app/logs'
-      path: '/logs'
-      fullPath: '/logs'
-      preLoaderRoute: typeof AppLogsRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/onboarding': {
-      id: '/_app/onboarding'
-      path: '/onboarding'
-      fullPath: '/onboarding'
-      preLoaderRoute: typeof AppOnboardingRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/pheno-hunts': {
-      id: '/_app/pheno-hunts'
-      path: '/pheno-hunts'
-      fullPath: '/pheno-hunts'
-      preLoaderRoute: typeof AppPhenoHuntsRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/plants': {
-      id: '/_app/plants'
-      path: '/plants'
-      fullPath: '/plants'
-      preLoaderRoute: typeof AppPlantsRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/reports': {
-      id: '/_app/reports'
-      path: '/reports'
-      fullPath: '/reports'
-      preLoaderRoute: typeof AppReportsRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/sensors': {
-      id: '/_app/sensors'
-      path: '/sensors'
-      fullPath: '/sensors'
-      preLoaderRoute: typeof AppSensorsRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/settings': {
-      id: '/_app/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof AppSettingsRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/start-room': {
-      id: '/_app/start-room'
-      path: '/start-room'
-      fullPath: '/start-room'
-      preLoaderRoute: typeof AppStartRoomRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/tasks': {
-      id: '/_app/tasks'
-      path: '/tasks'
-      fullPath: '/tasks'
-      preLoaderRoute: typeof AppTasksRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/tents': {
-      id: '/_app/tents'
-      path: '/tents'
-      fullPath: '/tents'
-      preLoaderRoute: typeof AppTentsRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/timeline': {
-      id: '/_app/timeline'
-      path: '/timeline'
-      fullPath: '/timeline'
-      preLoaderRoute: typeof AppTimelineRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/billing/$plan': {
-      id: '/billing/$plan'
-      path: '/billing/$plan'
-      fullPath: '/billing/$plan'
-      preLoaderRoute: typeof BillingPlanRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/checkout/cancel': {
-      id: '/checkout/cancel'
-      path: '/checkout/cancel'
-      fullPath: '/checkout/cancel'
-      preLoaderRoute: typeof CheckoutCancelRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/checkout/success': {
-      id: '/checkout/success'
-      path: '/checkout/success'
-      fullPath: '/checkout/success'
-      preLoaderRoute: typeof CheckoutSuccessRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/cultivars/': {
-      id: '/cultivars/'
-      path: '/cultivars'
-      fullPath: '/cultivars/'
-      preLoaderRoute: typeof CultivarsIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/cultivars/$slug': {
-      id: '/cultivars/$slug'
-      path: '/cultivars/$slug'
-      fullPath: '/cultivars/$slug'
-      preLoaderRoute: typeof CultivarsSlugRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/docs/mcp-api': {
-      id: '/docs/mcp-api'
-      path: '/docs/mcp-api'
-      fullPath: '/docs/mcp-api'
-      preLoaderRoute: typeof DocsMcpApiRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/guides/': {
-      id: '/guides/'
-      path: '/guides'
-      fullPath: '/guides/'
-      preLoaderRoute: typeof GuidesIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/guides/$slug': {
-      id: '/guides/$slug'
-      path: '/guides/$slug'
-      fullPath: '/guides/$slug'
-      preLoaderRoute: typeof GuidesSlugRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/guides/grow-stage-care-guide': {
-      id: '/guides/grow-stage-care-guide'
-      path: '/guides/grow-stage-care-guide'
-      fullPath: '/guides/grow-stage-care-guide'
-      preLoaderRoute: typeof GuidesGrowStageCareGuideRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/internal/contextual-pheno-comparison-demo': {
-      id: '/internal/contextual-pheno-comparison-demo'
-      path: '/internal/contextual-pheno-comparison-demo'
-      fullPath: '/internal/contextual-pheno-comparison-demo'
-      preLoaderRoute: typeof InternalContextualPhenoComparisonDemoRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/internal/demo-proof-walkthrough': {
-      id: '/internal/demo-proof-walkthrough'
-      path: '/internal/demo-proof-walkthrough'
-      fullPath: '/internal/demo-proof-walkthrough'
-      preLoaderRoute: typeof InternalDemoProofWalkthroughRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/internal/pheno-hunt-demo': {
-      id: '/internal/pheno-hunt-demo'
-      path: '/internal/pheno-hunt-demo'
-      fullPath: '/internal/pheno-hunt-demo'
-      preLoaderRoute: typeof InternalPhenoHuntDemoRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/partners/csv-preview': {
-      id: '/partners/csv-preview'
-      path: '/partners/csv-preview'
-      fullPath: '/partners/csv-preview'
-      preLoaderRoute: typeof PartnersCsvPreviewRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/sensors/csv-preview': {
-      id: '/sensors/csv-preview'
-      path: '/sensors/csv-preview'
-      fullPath: '/sensors/csv-preview'
-      preLoaderRoute: typeof SensorsCsvPreviewRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/strains/': {
-      id: '/strains/'
-      path: '/strains'
-      fullPath: '/strains/'
-      preLoaderRoute: typeof StrainsIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/strains/$slug': {
-      id: '/strains/$slug'
-      path: '/strains/$slug'
-      fullPath: '/strains/$slug'
-      preLoaderRoute: typeof StrainsSlugRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/tools/vpd-calculator': {
-      id: '/tools/vpd-calculator'
-      path: '/tools/vpd-calculator'
-      fullPath: '/tools/vpd-calculator'
-      preLoaderRoute: typeof ToolsVpdCalculatorRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/.lovable/oauth/consent': {
-      id: '/.lovable/oauth/consent'
-      path: '/.lovable/oauth/consent'
-      fullPath: '/.lovable/oauth/consent'
-      preLoaderRoute: typeof DotlovableOauthConsentRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_app/_operator/diagnostics': {
-      id: '/_app/_operator/diagnostics'
-      path: '/diagnostics'
-      fullPath: '/diagnostics'
-      preLoaderRoute: typeof AppOperatorDiagnosticsRouteImport
-      parentRoute: typeof AppOperatorRoute
-    }
-    '/_app/_operator/diagnostics-seo-artifacts': {
-      id: '/_app/_operator/diagnostics-seo-artifacts'
-      path: '/diagnostics-seo-artifacts'
-      fullPath: '/diagnostics-seo-artifacts'
-      preLoaderRoute: typeof AppOperatorDiagnosticsSeoArtifactsRouteImport
-      parentRoute: typeof AppOperatorRoute
-    }
-    '/_app/_operator/ingest-inspector': {
-      id: '/_app/_operator/ingest-inspector'
-      path: '/ingest-inspector'
-      fullPath: '/ingest-inspector'
-      preLoaderRoute: typeof AppOperatorIngestInspectorRouteImport
-      parentRoute: typeof AppOperatorRoute
-    }
-    '/_app/_operator/leads': {
-      id: '/_app/_operator/leads'
-      path: '/leads'
-      fullPath: '/leads'
-      preLoaderRoute: typeof AppOperatorLeadsRouteImport
-      parentRoute: typeof AppOperatorRoute
-    }
-    '/_app/_operator/one-tent-loop-proof': {
-      id: '/_app/_operator/one-tent-loop-proof'
-      path: '/one-tent-loop-proof'
-      fullPath: '/one-tent-loop-proof'
-      preLoaderRoute: typeof AppOperatorOneTentLoopProofRouteImport
-      parentRoute: typeof AppOperatorRoute
-    }
-    '/_app/_operator/pi-ingest-status': {
-      id: '/_app/_operator/pi-ingest-status'
-      path: '/pi-ingest-status'
-      fullPath: '/pi-ingest-status'
-      preLoaderRoute: typeof AppOperatorPiIngestStatusRouteImport
-      parentRoute: typeof AppOperatorRoute
-    }
-    '/_app/account/preferences': {
-      id: '/_app/account/preferences'
-      path: '/account/preferences'
-      fullPath: '/account/preferences'
-      preLoaderRoute: typeof AppAccountPreferencesRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/actions_/$actionId': {
-      id: '/_app/actions_/$actionId'
-      path: '/actions/$actionId'
-      fullPath: '/actions/$actionId'
-      preLoaderRoute: typeof AppActionsActionIdRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/alerts_/$alertId': {
-      id: '/_app/alerts_/$alertId'
-      path: '/alerts/$alertId'
-      fullPath: '/alerts/$alertId'
-      preLoaderRoute: typeof AppAlertsAlertIdRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/breeding_/$programId': {
-      id: '/_app/breeding_/$programId'
-      path: '/breeding/$programId'
-      fullPath: '/breeding/$programId'
-      preLoaderRoute: typeof AppBreedingProgramIdRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/breeding_/new': {
-      id: '/_app/breeding_/new'
-      path: '/breeding/new'
-      fullPath: '/breeding/new'
-      preLoaderRoute: typeof AppBreedingNewRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/diary/environment-summary': {
-      id: '/_app/diary/environment-summary'
-      path: '/diary/environment-summary'
-      fullPath: '/diary/environment-summary'
-      preLoaderRoute: typeof AppDiaryEnvironmentSummaryRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/diary/pheno-expression-comparison': {
-      id: '/_app/diary/pheno-expression-comparison'
-      path: '/diary/pheno-expression-comparison'
-      fullPath: '/diary/pheno-expression-comparison'
-      preLoaderRoute: typeof AppDiaryPhenoExpressionComparisonRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/doctor_/sessions': {
-      id: '/_app/doctor_/sessions'
-      path: '/doctor/sessions'
-      fullPath: '/doctor/sessions'
-      preLoaderRoute: typeof AppDoctorSessionsRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/genetics/': {
-      id: '/_app/genetics/'
-      path: '/'
-      fullPath: '/genetics/'
-      preLoaderRoute: typeof AppGeneticsIndexRouteImport
-      parentRoute: typeof AppGeneticsRoute
-    }
-    '/_app/grows_/$growId': {
-      id: '/_app/grows_/$growId'
-      path: '/grows/$growId'
-      fullPath: '/grows/$growId'
-      preLoaderRoute: typeof AppGrowsGrowIdRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/pheno-hunts_/new': {
-      id: '/_app/pheno-hunts_/new'
-      path: '/pheno-hunts/new'
-      fullPath: '/pheno-hunts/new'
-      preLoaderRoute: typeof AppPhenoHuntsNewRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/plants_/$id': {
-      id: '/_app/plants_/$id'
-      path: '/plants/$id'
-      fullPath: '/plants/$id'
-      preLoaderRoute: typeof AppPlantsIdRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/reports_/diary-range': {
-      id: '/_app/reports_/diary-range'
-      path: '/reports/diary-range'
-      fullPath: '/reports/diary-range'
-      preLoaderRoute: typeof AppReportsDiaryRangeRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/settings_/agent-integrations': {
-      id: '/_app/settings_/agent-integrations'
-      path: '/settings/agent-integrations'
-      fullPath: '/settings/agent-integrations'
-      preLoaderRoute: typeof AppSettingsAgentIntegrationsRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/settings_/analytics': {
-      id: '/_app/settings_/analytics'
-      path: '/settings/analytics'
-      fullPath: '/settings/analytics'
-      preLoaderRoute: typeof AppSettingsAnalyticsRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/tents_/$id': {
-      id: '/_app/tents_/$id'
-      path: '/tents/$id'
-      fullPath: '/tents/$id'
-      preLoaderRoute: typeof AppTentsIdRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/customer/guide/oreoz-vs-gelonade-comparison': {
-      id: '/customer/guide/oreoz-vs-gelonade-comparison'
-      path: '/customer/guide/oreoz-vs-gelonade-comparison'
-      fullPath: '/customer/guide/oreoz-vs-gelonade-comparison'
-      preLoaderRoute: typeof CustomerGuideOreozVsGelonadeComparisonRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/pheno-hunts/$id/compare': {
-      id: '/pheno-hunts/$id/compare'
-      path: '/pheno-hunts/$id/compare'
-      fullPath: '/pheno-hunts/$id/compare'
-      preLoaderRoute: typeof PhenoHuntsIdCompareRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/pheno-hunts/$id/showcase': {
-      id: '/pheno-hunts/$id/showcase'
-      path: '/pheno-hunts/$id/showcase'
-      fullPath: '/pheno-hunts/$id/showcase'
-      preLoaderRoute: typeof PhenoHuntsIdShowcaseRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_app/_operator/admin/leads': {
-      id: '/_app/_operator/admin/leads'
-      path: '/admin/leads'
-      fullPath: '/admin/leads'
-      preLoaderRoute: typeof AppOperatorAdminLeadsRouteImport
-      parentRoute: typeof AppOperatorRoute
-    }
-    '/_app/_operator/demo/one-tent-live-proof': {
-      id: '/_app/_operator/demo/one-tent-live-proof'
-      path: '/demo/one-tent-live-proof'
-      fullPath: '/demo/one-tent-live-proof'
-      preLoaderRoute: typeof AppOperatorDemoOneTentLiveProofRouteImport
-      parentRoute: typeof AppOperatorRoute
-    }
-    '/_app/_operator/internal/ai-doctor-confidence-audit': {
-      id: '/_app/_operator/internal/ai-doctor-confidence-audit'
-      path: '/internal/ai-doctor-confidence-audit'
-      fullPath: '/internal/ai-doctor-confidence-audit'
-      preLoaderRoute: typeof AppOperatorInternalAiDoctorConfidenceAuditRouteImport
-      parentRoute: typeof AppOperatorRoute
-    }
-    '/_app/_operator/internal/ai-doctor-phase1-preview': {
-      id: '/_app/_operator/internal/ai-doctor-phase1-preview'
-      path: '/internal/ai-doctor-phase1-preview'
-      fullPath: '/internal/ai-doctor-phase1-preview'
-      preLoaderRoute: typeof AppOperatorInternalAiDoctorPhase1PreviewRouteImport
-      parentRoute: typeof AppOperatorRoute
-    }
-    '/_app/_operator/internal/one-tent-loop-proof': {
-      id: '/_app/_operator/internal/one-tent-loop-proof'
-      path: '/internal/one-tent-loop-proof'
-      fullPath: '/internal/one-tent-loop-proof'
-      preLoaderRoute: typeof AppOperatorInternalOneTentLoopProofRouteImport
-      parentRoute: typeof AppOperatorRoute
-    }
-    '/_app/_operator/internal/sensor-truth-audit': {
-      id: '/_app/_operator/internal/sensor-truth-audit'
-      path: '/internal/sensor-truth-audit'
-      fullPath: '/internal/sensor-truth-audit'
-      preLoaderRoute: typeof AppOperatorInternalSensorTruthAuditRouteImport
-      parentRoute: typeof AppOperatorRoute
-    }
-    '/_app/_operator/operator/ai-doctor-phase1': {
-      id: '/_app/_operator/operator/ai-doctor-phase1'
-      path: '/operator/ai-doctor-phase1'
-      fullPath: '/operator/ai-doctor-phase1'
-      preLoaderRoute: typeof AppOperatorOperatorAiDoctorPhase1RouteImport
-      parentRoute: typeof AppOperatorRoute
-    }
-    '/_app/_operator/operator/billing-entitlement-resolution': {
-      id: '/_app/_operator/operator/billing-entitlement-resolution'
-      path: '/operator/billing-entitlement-resolution'
-      fullPath: '/operator/billing-entitlement-resolution'
-      preLoaderRoute: typeof AppOperatorOperatorBillingEntitlementResolutionRouteImport
-      parentRoute: typeof AppOperatorRoute
-    }
-    '/_app/_operator/operator/billing-subscription-updates': {
-      id: '/_app/_operator/operator/billing-subscription-updates'
-      path: '/operator/billing-subscription-updates'
-      fullPath: '/operator/billing-subscription-updates'
-      preLoaderRoute: typeof AppOperatorOperatorBillingSubscriptionUpdatesRouteImport
-      parentRoute: typeof AppOperatorRoute
-    }
-    '/_app/_operator/operator/credits-audit': {
-      id: '/_app/_operator/operator/credits-audit'
-      path: '/operator/credits-audit'
-      fullPath: '/operator/credits-audit'
-      preLoaderRoute: typeof AppOperatorOperatorCreditsAuditRouteImport
-      parentRoute: typeof AppOperatorRoute
-    }
-    '/_app/_operator/operator/demo-preview': {
-      id: '/_app/_operator/operator/demo-preview'
-      path: '/operator/demo-preview'
-      fullPath: '/operator/demo-preview'
-      preLoaderRoute: typeof AppOperatorOperatorDemoPreviewRouteImport
-      parentRoute: typeof AppOperatorRoute
-    }
-    '/_app/_operator/operator/ecowitt': {
-      id: '/_app/_operator/operator/ecowitt'
-      path: '/operator/ecowitt'
-      fullPath: '/operator/ecowitt'
-      preLoaderRoute: typeof AppOperatorOperatorEcowittRouteImport
-      parentRoute: typeof AppOperatorRoute
-    }
-    '/_app/_operator/operator/ecowitt-bridge-debug': {
-      id: '/_app/_operator/operator/ecowitt-bridge-debug'
-      path: '/operator/ecowitt-bridge-debug'
-      fullPath: '/operator/ecowitt-bridge-debug'
-      preLoaderRoute: typeof AppOperatorOperatorEcowittBridgeDebugRouteImport
-      parentRoute: typeof AppOperatorRoute
-    }
-    '/_app/_operator/operator/ecowitt-bridge-status': {
-      id: '/_app/_operator/operator/ecowitt-bridge-status'
-      path: '/operator/ecowitt-bridge-status'
-      fullPath: '/operator/ecowitt-bridge-status'
-      preLoaderRoute: typeof AppOperatorOperatorEcowittBridgeStatusRouteImport
-      parentRoute: typeof AppOperatorRoute
-    }
-    '/_app/_operator/operator/ecowitt-live-bringup': {
-      id: '/_app/_operator/operator/ecowitt-live-bringup'
-      path: '/operator/ecowitt-live-bringup'
-      fullPath: '/operator/ecowitt-live-bringup'
-      preLoaderRoute: typeof AppOperatorOperatorEcowittLiveBringupRouteImport
-      parentRoute: typeof AppOperatorRoute
-    }
-    '/_app/_operator/operator/ecowitt-tent-preview': {
-      id: '/_app/_operator/operator/ecowitt-tent-preview'
-      path: '/operator/ecowitt-tent-preview'
-      fullPath: '/operator/ecowitt-tent-preview'
-      preLoaderRoute: typeof AppOperatorOperatorEcowittTentPreviewRouteImport
-      parentRoute: typeof AppOperatorRoute
-    }
-    '/_app/_operator/operator/edge-alerts': {
-      id: '/_app/_operator/operator/edge-alerts'
-      path: '/operator/edge-alerts'
-      fullPath: '/operator/edge-alerts'
-      preLoaderRoute: typeof AppOperatorOperatorEdgeAlertsRouteImport
-      parentRoute: typeof AppOperatorRoute
-    }
-    '/_app/_operator/operator/edge-metrics': {
-      id: '/_app/_operator/operator/edge-metrics'
-      path: '/operator/edge-metrics'
-      fullPath: '/operator/edge-metrics'
-      preLoaderRoute: typeof AppOperatorOperatorEdgeMetricsRouteImport
-      parentRoute: typeof AppOperatorRoute
-    }
-    '/_app/_operator/operator/mode': {
-      id: '/_app/_operator/operator/mode'
-      path: '/operator/mode'
-      fullPath: '/operator/mode'
-      preLoaderRoute: typeof AppOperatorOperatorModeRouteImport
-      parentRoute: typeof AppOperatorRoute
-    }
-    '/_app/_operator/operator/one-tent-live-proof': {
-      id: '/_app/_operator/operator/one-tent-live-proof'
-      path: '/operator/one-tent-live-proof'
-      fullPath: '/operator/one-tent-live-proof'
-      preLoaderRoute: typeof AppOperatorOperatorOneTentLiveProofRouteImport
-      parentRoute: typeof AppOperatorRoute
-    }
-    '/_app/_operator/operator/one-tent-loop-smoke-test': {
-      id: '/_app/_operator/operator/one-tent-loop-smoke-test'
-      path: '/operator/one-tent-loop-smoke-test'
-      fullPath: '/operator/one-tent-loop-smoke-test'
-      preLoaderRoute: typeof AppOperatorOperatorOneTentLoopSmokeTestRouteImport
-      parentRoute: typeof AppOperatorRoute
-    }
-    '/_app/_operator/operator/one-tent-proof-record': {
-      id: '/_app/_operator/operator/one-tent-proof-record'
-      path: '/operator/one-tent-proof-record'
-      fullPath: '/operator/one-tent-proof-record'
-      preLoaderRoute: typeof AppOperatorOperatorOneTentProofRecordRouteImport
-      parentRoute: typeof AppOperatorRoute
-    }
-    '/_app/_operator/operator/paddle-processing-audit': {
-      id: '/_app/_operator/operator/paddle-processing-audit'
-      path: '/operator/paddle-processing-audit'
-      fullPath: '/operator/paddle-processing-audit'
-      preLoaderRoute: typeof AppOperatorOperatorPaddleProcessingAuditRouteImport
-      parentRoute: typeof AppOperatorRoute
-    }
-    '/_app/_operator/operator/post-grow-reflection-dry-run': {
-      id: '/_app/_operator/operator/post-grow-reflection-dry-run'
-      path: '/operator/post-grow-reflection-dry-run'
-      fullPath: '/operator/post-grow-reflection-dry-run'
-      preLoaderRoute: typeof AppOperatorOperatorPostGrowReflectionDryRunRouteImport
-      parentRoute: typeof AppOperatorRoute
-    }
-    '/_app/_operator/operator/release-readiness': {
-      id: '/_app/_operator/operator/release-readiness'
-      path: '/operator/release-readiness'
-      fullPath: '/operator/release-readiness'
-      preLoaderRoute: typeof AppOperatorOperatorReleaseReadinessRouteImport
-      parentRoute: typeof AppOperatorRoute
-    }
-    '/_app/_operator/operator/schema-audit': {
-      id: '/_app/_operator/operator/schema-audit'
-      path: '/operator/schema-audit'
-      fullPath: '/operator/schema-audit'
-      preLoaderRoute: typeof AppOperatorOperatorSchemaAuditRouteImport
-      parentRoute: typeof AppOperatorRoute
-    }
-    '/_app/_operator/operator/subscriber-growth': {
-      id: '/_app/_operator/operator/subscriber-growth'
-      path: '/operator/subscriber-growth'
-      fullPath: '/operator/subscriber-growth'
-      preLoaderRoute: typeof AppOperatorOperatorSubscriberGrowthRouteImport
-      parentRoute: typeof AppOperatorRoute
-    }
-    '/_app/_operator/operator/support-inbox': {
-      id: '/_app/_operator/operator/support-inbox'
-      path: '/operator/support-inbox'
-      fullPath: '/operator/support-inbox'
-      preLoaderRoute: typeof AppOperatorOperatorSupportInboxRouteImport
-      parentRoute: typeof AppOperatorRoute
-    }
-    '/_app/_operator/sensors/ecowitt-audit': {
-      id: '/_app/_operator/sensors/ecowitt-audit'
-      path: '/sensors/ecowitt-audit'
-      fullPath: '/sensors/ecowitt-audit'
-      preLoaderRoute: typeof AppOperatorSensorsEcowittAuditRouteImport
-      parentRoute: typeof AppOperatorRoute
-    }
-    '/_app/_operator/sensors/ingest-normalizer': {
-      id: '/_app/_operator/sensors/ingest-normalizer'
-      path: '/sensors/ingest-normalizer'
-      fullPath: '/sensors/ingest-normalizer'
-      preLoaderRoute: typeof AppOperatorSensorsIngestNormalizerRouteImport
-      parentRoute: typeof AppOperatorRoute
-    }
-    '/_app/breeding_/log/new': {
-      id: '/_app/breeding_/log/new'
-      path: '/breeding/log/new'
-      fullPath: '/breeding/log/new'
-      preLoaderRoute: typeof AppBreedingLogNewRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/diary/strains/$slug': {
-      id: '/_app/diary/strains/$slug'
-      path: '/diary/strains/$slug'
-      fullPath: '/diary/strains/$slug'
-      preLoaderRoute: typeof AppDiaryStrainsSlugRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/doctor_/sessions_/$sessionId': {
-      id: '/_app/doctor_/sessions_/$sessionId'
-      path: '/doctor/sessions/$sessionId'
-      fullPath: '/doctor/sessions/$sessionId'
-      preLoaderRoute: typeof AppDoctorSessionsSessionIdRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/genetics/accessions/$id': {
-      id: '/_app/genetics/accessions/$id'
-      path: '/accessions/$id'
-      fullPath: '/genetics/accessions/$id'
-      preLoaderRoute: typeof AppGeneticsAccessionsIdRouteImport
-      parentRoute: typeof AppGeneticsRoute
-    }
-    '/_app/genetics/batches/$id': {
-      id: '/_app/genetics/batches/$id'
-      path: '/batches/$id'
-      fullPath: '/genetics/batches/$id'
-      preLoaderRoute: typeof AppGeneticsBatchesIdRouteImport
-      parentRoute: typeof AppGeneticsRoute
-    }
-    '/_app/grows_/$growId_/learning': {
-      id: '/_app/grows_/$growId_/learning'
-      path: '/grows/$growId/learning'
-      fullPath: '/grows/$growId/learning'
-      preLoaderRoute: typeof AppGrowsGrowIdLearningRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/pheno-hunts_/$id/keepers': {
-      id: '/_app/pheno-hunts_/$id/keepers'
-      path: '/pheno-hunts/$id/keepers'
-      fullPath: '/pheno-hunts/$id/keepers'
-      preLoaderRoute: typeof AppPhenoHuntsIdKeepersRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/pheno-hunts_/$id/workspace': {
-      id: '/_app/pheno-hunts_/$id/workspace'
-      path: '/pheno-hunts/$id/workspace'
-      fullPath: '/pheno-hunts/$id/workspace'
-      preLoaderRoute: typeof AppPhenoHuntsIdWorkspaceRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/reports_/post-grow/$growId': {
-      id: '/_app/reports_/post-grow/$growId'
-      path: '/reports/post-grow/$growId'
-      fullPath: '/reports/post-grow/$growId'
-      preLoaderRoute: typeof AppReportsPostGrowGrowIdRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/genetics/health/$kind/$id': {
-      id: '/_app/genetics/health/$kind/$id'
-      path: '/health/$kind/$id'
-      fullPath: '/genetics/health/$kind/$id'
-      preLoaderRoute: typeof AppGeneticsHealthKindIdRouteImport
-      parentRoute: typeof AppGeneticsRoute
-    }
-    '/_app/genetics/trace/$kind/$id': {
-      id: '/_app/genetics/trace/$kind/$id'
-      path: '/trace/$kind/$id'
-      fullPath: '/genetics/trace/$kind/$id'
-      preLoaderRoute: typeof AppGeneticsTraceKindIdRouteImport
-      parentRoute: typeof AppGeneticsRoute
-    }
+    "/": {
+      id: "/";
+      path: "/";
+      fullPath: "/";
+      preLoaderRoute: typeof IndexRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/$": {
+      id: "/$";
+      path: "/$";
+      fullPath: "/$";
+      preLoaderRoute: typeof SplatRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/_app": {
+      id: "/_app";
+      path: "";
+      fullPath: "/";
+      preLoaderRoute: typeof AppRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/ai-doctor-readiness-check": {
+      id: "/ai-doctor-readiness-check";
+      path: "/ai-doctor-readiness-check";
+      fullPath: "/ai-doctor-readiness-check";
+      preLoaderRoute: typeof AiDoctorReadinessCheckRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/auth": {
+      id: "/auth";
+      path: "/auth";
+      fullPath: "/auth";
+      preLoaderRoute: typeof AuthRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/breeder-beta": {
+      id: "/breeder-beta";
+      path: "/breeder-beta";
+      fullPath: "/breeder-beta";
+      preLoaderRoute: typeof BreederBetaRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/contact": {
+      id: "/contact";
+      path: "/contact";
+      fullPath: "/contact";
+      preLoaderRoute: typeof ContactRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/creator-beta": {
+      id: "/creator-beta";
+      path: "/creator-beta";
+      fullPath: "/creator-beta";
+      preLoaderRoute: typeof CreatorBetaRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/demo": {
+      id: "/demo";
+      path: "/demo";
+      fullPath: "/demo";
+      preLoaderRoute: typeof DemoRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/features": {
+      id: "/features";
+      path: "/features";
+      fullPath: "/features";
+      preLoaderRoute: typeof FeaturesRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/feedback": {
+      id: "/feedback";
+      path: "/feedback";
+      fullPath: "/feedback";
+      preLoaderRoute: typeof FeedbackRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/founder": {
+      id: "/founder";
+      path: "/founder";
+      fullPath: "/founder";
+      preLoaderRoute: typeof FounderRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/glossary": {
+      id: "/glossary";
+      path: "/glossary";
+      fullPath: "/glossary";
+      preLoaderRoute: typeof GlossaryRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/hardware-integrations": {
+      id: "/hardware-integrations";
+      path: "/hardware-integrations";
+      fullPath: "/hardware-integrations";
+      preLoaderRoute: typeof HardwareIntegrationsRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/how-ai-doctor-works": {
+      id: "/how-ai-doctor-works";
+      path: "/how-ai-doctor-works";
+      fullPath: "/how-ai-doctor-works";
+      preLoaderRoute: typeof HowAiDoctorWorksRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/login": {
+      id: "/login";
+      path: "/login";
+      fullPath: "/login";
+      preLoaderRoute: typeof LoginRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/pheno-comparison": {
+      id: "/pheno-comparison";
+      path: "/pheno-comparison";
+      fullPath: "/pheno-comparison";
+      preLoaderRoute: typeof PhenoComparisonRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/pheno-expression-showcase": {
+      id: "/pheno-expression-showcase";
+      path: "/pheno-expression-showcase";
+      fullPath: "/pheno-expression-showcase";
+      preLoaderRoute: typeof PhenoExpressionShowcaseRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/pricing": {
+      id: "/pricing";
+      path: "/pricing";
+      fullPath: "/pricing";
+      preLoaderRoute: typeof PricingRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/privacy": {
+      id: "/privacy";
+      path: "/privacy";
+      fullPath: "/privacy";
+      preLoaderRoute: typeof PrivacyRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/privacy-policy": {
+      id: "/privacy-policy";
+      path: "/privacy-policy";
+      fullPath: "/privacy-policy";
+      preLoaderRoute: typeof PrivacyPolicyRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/quick-log": {
+      id: "/quick-log";
+      path: "/quick-log";
+      fullPath: "/quick-log";
+      preLoaderRoute: typeof QuickLogRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/refund": {
+      id: "/refund";
+      path: "/refund";
+      fullPath: "/refund";
+      preLoaderRoute: typeof RefundRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/refund-policy": {
+      id: "/refund-policy";
+      path: "/refund-policy";
+      fullPath: "/refund-policy";
+      preLoaderRoute: typeof RefundPolicyRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/refunds": {
+      id: "/refunds";
+      path: "/refunds";
+      fullPath: "/refunds";
+      preLoaderRoute: typeof RefundsRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/register": {
+      id: "/register";
+      path: "/register";
+      fullPath: "/register";
+      preLoaderRoute: typeof RegisterRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/reset-password": {
+      id: "/reset-password";
+      path: "/reset-password";
+      fullPath: "/reset-password";
+      preLoaderRoute: typeof ResetPasswordRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/signup": {
+      id: "/signup";
+      path: "/signup";
+      fullPath: "/signup";
+      preLoaderRoute: typeof SignupRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/terms": {
+      id: "/terms";
+      path: "/terms";
+      fullPath: "/terms";
+      preLoaderRoute: typeof TermsRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/terms-of-service": {
+      id: "/terms-of-service";
+      path: "/terms-of-service";
+      fullPath: "/terms-of-service";
+      preLoaderRoute: typeof TermsOfServiceRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/unsubscribe": {
+      id: "/unsubscribe";
+      path: "/unsubscribe";
+      fullPath: "/unsubscribe";
+      preLoaderRoute: typeof UnsubscribeRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/upgrade": {
+      id: "/upgrade";
+      path: "/upgrade";
+      fullPath: "/upgrade";
+      preLoaderRoute: typeof UpgradeRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/welcome": {
+      id: "/welcome";
+      path: "/welcome";
+      fullPath: "/welcome";
+      preLoaderRoute: typeof WelcomeRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/_app/_operator": {
+      id: "/_app/_operator";
+      path: "";
+      fullPath: "/";
+      preLoaderRoute: typeof AppOperatorRouteImport;
+      parentRoute: typeof AppRoute;
+    };
+    "/_app/action-queue": {
+      id: "/_app/action-queue";
+      path: "/action-queue";
+      fullPath: "/action-queue";
+      preLoaderRoute: typeof AppActionQueueRouteImport;
+      parentRoute: typeof AppRoute;
+    };
+    "/_app/actions": {
+      id: "/_app/actions";
+      path: "/actions";
+      fullPath: "/actions";
+      preLoaderRoute: typeof AppActionsRouteImport;
+      parentRoute: typeof AppRoute;
+    };
+    "/_app/ai-doctor": {
+      id: "/_app/ai-doctor";
+      path: "/ai-doctor";
+      fullPath: "/ai-doctor";
+      preLoaderRoute: typeof AppAiDoctorRouteImport;
+      parentRoute: typeof AppRoute;
+    };
+    "/_app/alerts": {
+      id: "/_app/alerts";
+      path: "/alerts";
+      fullPath: "/alerts";
+      preLoaderRoute: typeof AppAlertsRouteImport;
+      parentRoute: typeof AppRoute;
+    };
+    "/_app/breeding": {
+      id: "/_app/breeding";
+      path: "/breeding";
+      fullPath: "/breeding";
+      preLoaderRoute: typeof AppBreedingRouteImport;
+      parentRoute: typeof AppRoute;
+    };
+    "/_app/daily-check": {
+      id: "/_app/daily-check";
+      path: "/daily-check";
+      fullPath: "/daily-check";
+      preLoaderRoute: typeof AppDailyCheckRouteImport;
+      parentRoute: typeof AppRoute;
+    };
+    "/_app/dashboard": {
+      id: "/_app/dashboard";
+      path: "/dashboard";
+      fullPath: "/dashboard";
+      preLoaderRoute: typeof AppDashboardRouteImport;
+      parentRoute: typeof AppRoute;
+    };
+    "/_app/doctor": {
+      id: "/_app/doctor";
+      path: "/doctor";
+      fullPath: "/doctor";
+      preLoaderRoute: typeof AppDoctorRouteImport;
+      parentRoute: typeof AppRoute;
+    };
+    "/_app/genetics": {
+      id: "/_app/genetics";
+      path: "/genetics";
+      fullPath: "/genetics";
+      preLoaderRoute: typeof AppGeneticsRouteImport;
+      parentRoute: typeof AppRoute;
+    };
+    "/_app/grow-lineage": {
+      id: "/_app/grow-lineage";
+      path: "/grow-lineage";
+      fullPath: "/grow-lineage";
+      preLoaderRoute: typeof AppGrowLineageRouteImport;
+      parentRoute: typeof AppRoute;
+    };
+    "/_app/grow-room": {
+      id: "/_app/grow-room";
+      path: "/grow-room";
+      fullPath: "/grow-room";
+      preLoaderRoute: typeof AppGrowRoomRouteImport;
+      parentRoute: typeof AppRoute;
+    };
+    "/_app/grows": {
+      id: "/_app/grows";
+      path: "/grows";
+      fullPath: "/grows";
+      preLoaderRoute: typeof AppGrowsRouteImport;
+      parentRoute: typeof AppRoute;
+    };
+    "/_app/health": {
+      id: "/_app/health";
+      path: "/health";
+      fullPath: "/health";
+      preLoaderRoute: typeof AppHealthRouteImport;
+      parentRoute: typeof AppRoute;
+    };
+    "/_app/invite": {
+      id: "/_app/invite";
+      path: "/invite";
+      fullPath: "/invite";
+      preLoaderRoute: typeof AppInviteRouteImport;
+      parentRoute: typeof AppRoute;
+    };
+    "/_app/logs": {
+      id: "/_app/logs";
+      path: "/logs";
+      fullPath: "/logs";
+      preLoaderRoute: typeof AppLogsRouteImport;
+      parentRoute: typeof AppRoute;
+    };
+    "/_app/onboarding": {
+      id: "/_app/onboarding";
+      path: "/onboarding";
+      fullPath: "/onboarding";
+      preLoaderRoute: typeof AppOnboardingRouteImport;
+      parentRoute: typeof AppRoute;
+    };
+    "/_app/pheno-hunts": {
+      id: "/_app/pheno-hunts";
+      path: "/pheno-hunts";
+      fullPath: "/pheno-hunts";
+      preLoaderRoute: typeof AppPhenoHuntsRouteImport;
+      parentRoute: typeof AppRoute;
+    };
+    "/_app/plants": {
+      id: "/_app/plants";
+      path: "/plants";
+      fullPath: "/plants";
+      preLoaderRoute: typeof AppPlantsRouteImport;
+      parentRoute: typeof AppRoute;
+    };
+    "/_app/reports": {
+      id: "/_app/reports";
+      path: "/reports";
+      fullPath: "/reports";
+      preLoaderRoute: typeof AppReportsRouteImport;
+      parentRoute: typeof AppRoute;
+    };
+    "/_app/sensors": {
+      id: "/_app/sensors";
+      path: "/sensors";
+      fullPath: "/sensors";
+      preLoaderRoute: typeof AppSensorsRouteImport;
+      parentRoute: typeof AppRoute;
+    };
+    "/_app/settings": {
+      id: "/_app/settings";
+      path: "/settings";
+      fullPath: "/settings";
+      preLoaderRoute: typeof AppSettingsRouteImport;
+      parentRoute: typeof AppRoute;
+    };
+    "/_app/start-room": {
+      id: "/_app/start-room";
+      path: "/start-room";
+      fullPath: "/start-room";
+      preLoaderRoute: typeof AppStartRoomRouteImport;
+      parentRoute: typeof AppRoute;
+    };
+    "/_app/tasks": {
+      id: "/_app/tasks";
+      path: "/tasks";
+      fullPath: "/tasks";
+      preLoaderRoute: typeof AppTasksRouteImport;
+      parentRoute: typeof AppRoute;
+    };
+    "/_app/tents": {
+      id: "/_app/tents";
+      path: "/tents";
+      fullPath: "/tents";
+      preLoaderRoute: typeof AppTentsRouteImport;
+      parentRoute: typeof AppRoute;
+    };
+    "/_app/timeline": {
+      id: "/_app/timeline";
+      path: "/timeline";
+      fullPath: "/timeline";
+      preLoaderRoute: typeof AppTimelineRouteImport;
+      parentRoute: typeof AppRoute;
+    };
+    "/billing/$plan": {
+      id: "/billing/$plan";
+      path: "/billing/$plan";
+      fullPath: "/billing/$plan";
+      preLoaderRoute: typeof BillingPlanRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/checkout/cancel": {
+      id: "/checkout/cancel";
+      path: "/checkout/cancel";
+      fullPath: "/checkout/cancel";
+      preLoaderRoute: typeof CheckoutCancelRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/checkout/success": {
+      id: "/checkout/success";
+      path: "/checkout/success";
+      fullPath: "/checkout/success";
+      preLoaderRoute: typeof CheckoutSuccessRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/cultivars/": {
+      id: "/cultivars/";
+      path: "/cultivars";
+      fullPath: "/cultivars/";
+      preLoaderRoute: typeof CultivarsIndexRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/cultivars/$slug": {
+      id: "/cultivars/$slug";
+      path: "/cultivars/$slug";
+      fullPath: "/cultivars/$slug";
+      preLoaderRoute: typeof CultivarsSlugRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/docs/mcp-api": {
+      id: "/docs/mcp-api";
+      path: "/docs/mcp-api";
+      fullPath: "/docs/mcp-api";
+      preLoaderRoute: typeof DocsMcpApiRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/guides/": {
+      id: "/guides/";
+      path: "/guides";
+      fullPath: "/guides/";
+      preLoaderRoute: typeof GuidesIndexRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/guides/$slug": {
+      id: "/guides/$slug";
+      path: "/guides/$slug";
+      fullPath: "/guides/$slug";
+      preLoaderRoute: typeof GuidesSlugRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/guides/grow-stage-care-guide": {
+      id: "/guides/grow-stage-care-guide";
+      path: "/guides/grow-stage-care-guide";
+      fullPath: "/guides/grow-stage-care-guide";
+      preLoaderRoute: typeof GuidesGrowStageCareGuideRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/internal/contextual-pheno-comparison-demo": {
+      id: "/internal/contextual-pheno-comparison-demo";
+      path: "/internal/contextual-pheno-comparison-demo";
+      fullPath: "/internal/contextual-pheno-comparison-demo";
+      preLoaderRoute: typeof InternalContextualPhenoComparisonDemoRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/internal/demo-proof-walkthrough": {
+      id: "/internal/demo-proof-walkthrough";
+      path: "/internal/demo-proof-walkthrough";
+      fullPath: "/internal/demo-proof-walkthrough";
+      preLoaderRoute: typeof InternalDemoProofWalkthroughRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/internal/pheno-hunt-demo": {
+      id: "/internal/pheno-hunt-demo";
+      path: "/internal/pheno-hunt-demo";
+      fullPath: "/internal/pheno-hunt-demo";
+      preLoaderRoute: typeof InternalPhenoHuntDemoRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/partners/csv-preview": {
+      id: "/partners/csv-preview";
+      path: "/partners/csv-preview";
+      fullPath: "/partners/csv-preview";
+      preLoaderRoute: typeof PartnersCsvPreviewRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/sensors/csv-preview": {
+      id: "/sensors/csv-preview";
+      path: "/sensors/csv-preview";
+      fullPath: "/sensors/csv-preview";
+      preLoaderRoute: typeof SensorsCsvPreviewRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/strains/": {
+      id: "/strains/";
+      path: "/strains";
+      fullPath: "/strains/";
+      preLoaderRoute: typeof StrainsIndexRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/strains/$slug": {
+      id: "/strains/$slug";
+      path: "/strains/$slug";
+      fullPath: "/strains/$slug";
+      preLoaderRoute: typeof StrainsSlugRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/tools/vpd-calculator": {
+      id: "/tools/vpd-calculator";
+      path: "/tools/vpd-calculator";
+      fullPath: "/tools/vpd-calculator";
+      preLoaderRoute: typeof ToolsVpdCalculatorRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/.lovable/oauth/consent": {
+      id: "/.lovable/oauth/consent";
+      path: "/.lovable/oauth/consent";
+      fullPath: "/.lovable/oauth/consent";
+      preLoaderRoute: typeof DotlovableOauthConsentRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/_app/_operator/diagnostics": {
+      id: "/_app/_operator/diagnostics";
+      path: "/diagnostics";
+      fullPath: "/diagnostics";
+      preLoaderRoute: typeof AppOperatorDiagnosticsRouteImport;
+      parentRoute: typeof AppOperatorRoute;
+    };
+    "/_app/_operator/diagnostics-lighting-measurement": {
+      id: "/_app/_operator/diagnostics-lighting-measurement";
+      path: "/diagnostics-lighting-measurement";
+      fullPath: "/diagnostics-lighting-measurement";
+      preLoaderRoute: typeof AppOperatorDiagnosticsLightingMeasurementRouteImport;
+      parentRoute: typeof AppOperatorRoute;
+    };
+    "/_app/_operator/diagnostics-seo-artifacts": {
+      id: "/_app/_operator/diagnostics-seo-artifacts";
+      path: "/diagnostics-seo-artifacts";
+      fullPath: "/diagnostics-seo-artifacts";
+      preLoaderRoute: typeof AppOperatorDiagnosticsSeoArtifactsRouteImport;
+      parentRoute: typeof AppOperatorRoute;
+    };
+    "/_app/_operator/ingest-inspector": {
+      id: "/_app/_operator/ingest-inspector";
+      path: "/ingest-inspector";
+      fullPath: "/ingest-inspector";
+      preLoaderRoute: typeof AppOperatorIngestInspectorRouteImport;
+      parentRoute: typeof AppOperatorRoute;
+    };
+    "/_app/_operator/leads": {
+      id: "/_app/_operator/leads";
+      path: "/leads";
+      fullPath: "/leads";
+      preLoaderRoute: typeof AppOperatorLeadsRouteImport;
+      parentRoute: typeof AppOperatorRoute;
+    };
+    "/_app/_operator/one-tent-loop-proof": {
+      id: "/_app/_operator/one-tent-loop-proof";
+      path: "/one-tent-loop-proof";
+      fullPath: "/one-tent-loop-proof";
+      preLoaderRoute: typeof AppOperatorOneTentLoopProofRouteImport;
+      parentRoute: typeof AppOperatorRoute;
+    };
+    "/_app/_operator/pi-ingest-status": {
+      id: "/_app/_operator/pi-ingest-status";
+      path: "/pi-ingest-status";
+      fullPath: "/pi-ingest-status";
+      preLoaderRoute: typeof AppOperatorPiIngestStatusRouteImport;
+      parentRoute: typeof AppOperatorRoute;
+    };
+    "/_app/account/preferences": {
+      id: "/_app/account/preferences";
+      path: "/account/preferences";
+      fullPath: "/account/preferences";
+      preLoaderRoute: typeof AppAccountPreferencesRouteImport;
+      parentRoute: typeof AppRoute;
+    };
+    "/_app/actions_/$actionId": {
+      id: "/_app/actions_/$actionId";
+      path: "/actions/$actionId";
+      fullPath: "/actions/$actionId";
+      preLoaderRoute: typeof AppActionsActionIdRouteImport;
+      parentRoute: typeof AppRoute;
+    };
+    "/_app/alerts_/$alertId": {
+      id: "/_app/alerts_/$alertId";
+      path: "/alerts/$alertId";
+      fullPath: "/alerts/$alertId";
+      preLoaderRoute: typeof AppAlertsAlertIdRouteImport;
+      parentRoute: typeof AppRoute;
+    };
+    "/_app/breeding_/$programId": {
+      id: "/_app/breeding_/$programId";
+      path: "/breeding/$programId";
+      fullPath: "/breeding/$programId";
+      preLoaderRoute: typeof AppBreedingProgramIdRouteImport;
+      parentRoute: typeof AppRoute;
+    };
+    "/_app/breeding_/new": {
+      id: "/_app/breeding_/new";
+      path: "/breeding/new";
+      fullPath: "/breeding/new";
+      preLoaderRoute: typeof AppBreedingNewRouteImport;
+      parentRoute: typeof AppRoute;
+    };
+    "/_app/diary/environment-summary": {
+      id: "/_app/diary/environment-summary";
+      path: "/diary/environment-summary";
+      fullPath: "/diary/environment-summary";
+      preLoaderRoute: typeof AppDiaryEnvironmentSummaryRouteImport;
+      parentRoute: typeof AppRoute;
+    };
+    "/_app/diary/pheno-expression-comparison": {
+      id: "/_app/diary/pheno-expression-comparison";
+      path: "/diary/pheno-expression-comparison";
+      fullPath: "/diary/pheno-expression-comparison";
+      preLoaderRoute: typeof AppDiaryPhenoExpressionComparisonRouteImport;
+      parentRoute: typeof AppRoute;
+    };
+    "/_app/doctor_/sessions": {
+      id: "/_app/doctor_/sessions";
+      path: "/doctor/sessions";
+      fullPath: "/doctor/sessions";
+      preLoaderRoute: typeof AppDoctorSessionsRouteImport;
+      parentRoute: typeof AppRoute;
+    };
+    "/_app/genetics/": {
+      id: "/_app/genetics/";
+      path: "/";
+      fullPath: "/genetics/";
+      preLoaderRoute: typeof AppGeneticsIndexRouteImport;
+      parentRoute: typeof AppGeneticsRoute;
+    };
+    "/_app/grows_/$growId": {
+      id: "/_app/grows_/$growId";
+      path: "/grows/$growId";
+      fullPath: "/grows/$growId";
+      preLoaderRoute: typeof AppGrowsGrowIdRouteImport;
+      parentRoute: typeof AppRoute;
+    };
+    "/_app/pheno-hunts_/new": {
+      id: "/_app/pheno-hunts_/new";
+      path: "/pheno-hunts/new";
+      fullPath: "/pheno-hunts/new";
+      preLoaderRoute: typeof AppPhenoHuntsNewRouteImport;
+      parentRoute: typeof AppRoute;
+    };
+    "/_app/plants_/$id": {
+      id: "/_app/plants_/$id";
+      path: "/plants/$id";
+      fullPath: "/plants/$id";
+      preLoaderRoute: typeof AppPlantsIdRouteImport;
+      parentRoute: typeof AppRoute;
+    };
+    "/_app/reports_/diary-range": {
+      id: "/_app/reports_/diary-range";
+      path: "/reports/diary-range";
+      fullPath: "/reports/diary-range";
+      preLoaderRoute: typeof AppReportsDiaryRangeRouteImport;
+      parentRoute: typeof AppRoute;
+    };
+    "/_app/settings_/agent-integrations": {
+      id: "/_app/settings_/agent-integrations";
+      path: "/settings/agent-integrations";
+      fullPath: "/settings/agent-integrations";
+      preLoaderRoute: typeof AppSettingsAgentIntegrationsRouteImport;
+      parentRoute: typeof AppRoute;
+    };
+    "/_app/settings_/analytics": {
+      id: "/_app/settings_/analytics";
+      path: "/settings/analytics";
+      fullPath: "/settings/analytics";
+      preLoaderRoute: typeof AppSettingsAnalyticsRouteImport;
+      parentRoute: typeof AppRoute;
+    };
+    "/_app/tents_/$id": {
+      id: "/_app/tents_/$id";
+      path: "/tents/$id";
+      fullPath: "/tents/$id";
+      preLoaderRoute: typeof AppTentsIdRouteImport;
+      parentRoute: typeof AppRoute;
+    };
+    "/customer/guide/oreoz-vs-gelonade-comparison": {
+      id: "/customer/guide/oreoz-vs-gelonade-comparison";
+      path: "/customer/guide/oreoz-vs-gelonade-comparison";
+      fullPath: "/customer/guide/oreoz-vs-gelonade-comparison";
+      preLoaderRoute: typeof CustomerGuideOreozVsGelonadeComparisonRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/pheno-hunts/$id/compare": {
+      id: "/pheno-hunts/$id/compare";
+      path: "/pheno-hunts/$id/compare";
+      fullPath: "/pheno-hunts/$id/compare";
+      preLoaderRoute: typeof PhenoHuntsIdCompareRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/pheno-hunts/$id/showcase": {
+      id: "/pheno-hunts/$id/showcase";
+      path: "/pheno-hunts/$id/showcase";
+      fullPath: "/pheno-hunts/$id/showcase";
+      preLoaderRoute: typeof PhenoHuntsIdShowcaseRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/_app/_operator/admin/leads": {
+      id: "/_app/_operator/admin/leads";
+      path: "/admin/leads";
+      fullPath: "/admin/leads";
+      preLoaderRoute: typeof AppOperatorAdminLeadsRouteImport;
+      parentRoute: typeof AppOperatorRoute;
+    };
+    "/_app/_operator/demo/one-tent-live-proof": {
+      id: "/_app/_operator/demo/one-tent-live-proof";
+      path: "/demo/one-tent-live-proof";
+      fullPath: "/demo/one-tent-live-proof";
+      preLoaderRoute: typeof AppOperatorDemoOneTentLiveProofRouteImport;
+      parentRoute: typeof AppOperatorRoute;
+    };
+    "/_app/_operator/internal/ai-doctor-confidence-audit": {
+      id: "/_app/_operator/internal/ai-doctor-confidence-audit";
+      path: "/internal/ai-doctor-confidence-audit";
+      fullPath: "/internal/ai-doctor-confidence-audit";
+      preLoaderRoute: typeof AppOperatorInternalAiDoctorConfidenceAuditRouteImport;
+      parentRoute: typeof AppOperatorRoute;
+    };
+    "/_app/_operator/internal/ai-doctor-phase1-preview": {
+      id: "/_app/_operator/internal/ai-doctor-phase1-preview";
+      path: "/internal/ai-doctor-phase1-preview";
+      fullPath: "/internal/ai-doctor-phase1-preview";
+      preLoaderRoute: typeof AppOperatorInternalAiDoctorPhase1PreviewRouteImport;
+      parentRoute: typeof AppOperatorRoute;
+    };
+    "/_app/_operator/internal/one-tent-loop-proof": {
+      id: "/_app/_operator/internal/one-tent-loop-proof";
+      path: "/internal/one-tent-loop-proof";
+      fullPath: "/internal/one-tent-loop-proof";
+      preLoaderRoute: typeof AppOperatorInternalOneTentLoopProofRouteImport;
+      parentRoute: typeof AppOperatorRoute;
+    };
+    "/_app/_operator/internal/sensor-truth-audit": {
+      id: "/_app/_operator/internal/sensor-truth-audit";
+      path: "/internal/sensor-truth-audit";
+      fullPath: "/internal/sensor-truth-audit";
+      preLoaderRoute: typeof AppOperatorInternalSensorTruthAuditRouteImport;
+      parentRoute: typeof AppOperatorRoute;
+    };
+    "/_app/_operator/operator/ai-doctor-phase1": {
+      id: "/_app/_operator/operator/ai-doctor-phase1";
+      path: "/operator/ai-doctor-phase1";
+      fullPath: "/operator/ai-doctor-phase1";
+      preLoaderRoute: typeof AppOperatorOperatorAiDoctorPhase1RouteImport;
+      parentRoute: typeof AppOperatorRoute;
+    };
+    "/_app/_operator/operator/billing-entitlement-resolution": {
+      id: "/_app/_operator/operator/billing-entitlement-resolution";
+      path: "/operator/billing-entitlement-resolution";
+      fullPath: "/operator/billing-entitlement-resolution";
+      preLoaderRoute: typeof AppOperatorOperatorBillingEntitlementResolutionRouteImport;
+      parentRoute: typeof AppOperatorRoute;
+    };
+    "/_app/_operator/operator/billing-subscription-updates": {
+      id: "/_app/_operator/operator/billing-subscription-updates";
+      path: "/operator/billing-subscription-updates";
+      fullPath: "/operator/billing-subscription-updates";
+      preLoaderRoute: typeof AppOperatorOperatorBillingSubscriptionUpdatesRouteImport;
+      parentRoute: typeof AppOperatorRoute;
+    };
+    "/_app/_operator/operator/credits-audit": {
+      id: "/_app/_operator/operator/credits-audit";
+      path: "/operator/credits-audit";
+      fullPath: "/operator/credits-audit";
+      preLoaderRoute: typeof AppOperatorOperatorCreditsAuditRouteImport;
+      parentRoute: typeof AppOperatorRoute;
+    };
+    "/_app/_operator/operator/demo-preview": {
+      id: "/_app/_operator/operator/demo-preview";
+      path: "/operator/demo-preview";
+      fullPath: "/operator/demo-preview";
+      preLoaderRoute: typeof AppOperatorOperatorDemoPreviewRouteImport;
+      parentRoute: typeof AppOperatorRoute;
+    };
+    "/_app/_operator/operator/ecowitt": {
+      id: "/_app/_operator/operator/ecowitt";
+      path: "/operator/ecowitt";
+      fullPath: "/operator/ecowitt";
+      preLoaderRoute: typeof AppOperatorOperatorEcowittRouteImport;
+      parentRoute: typeof AppOperatorRoute;
+    };
+    "/_app/_operator/operator/ecowitt-bridge-debug": {
+      id: "/_app/_operator/operator/ecowitt-bridge-debug";
+      path: "/operator/ecowitt-bridge-debug";
+      fullPath: "/operator/ecowitt-bridge-debug";
+      preLoaderRoute: typeof AppOperatorOperatorEcowittBridgeDebugRouteImport;
+      parentRoute: typeof AppOperatorRoute;
+    };
+    "/_app/_operator/operator/ecowitt-bridge-status": {
+      id: "/_app/_operator/operator/ecowitt-bridge-status";
+      path: "/operator/ecowitt-bridge-status";
+      fullPath: "/operator/ecowitt-bridge-status";
+      preLoaderRoute: typeof AppOperatorOperatorEcowittBridgeStatusRouteImport;
+      parentRoute: typeof AppOperatorRoute;
+    };
+    "/_app/_operator/operator/ecowitt-live-bringup": {
+      id: "/_app/_operator/operator/ecowitt-live-bringup";
+      path: "/operator/ecowitt-live-bringup";
+      fullPath: "/operator/ecowitt-live-bringup";
+      preLoaderRoute: typeof AppOperatorOperatorEcowittLiveBringupRouteImport;
+      parentRoute: typeof AppOperatorRoute;
+    };
+    "/_app/_operator/operator/ecowitt-tent-preview": {
+      id: "/_app/_operator/operator/ecowitt-tent-preview";
+      path: "/operator/ecowitt-tent-preview";
+      fullPath: "/operator/ecowitt-tent-preview";
+      preLoaderRoute: typeof AppOperatorOperatorEcowittTentPreviewRouteImport;
+      parentRoute: typeof AppOperatorRoute;
+    };
+    "/_app/_operator/operator/edge-alerts": {
+      id: "/_app/_operator/operator/edge-alerts";
+      path: "/operator/edge-alerts";
+      fullPath: "/operator/edge-alerts";
+      preLoaderRoute: typeof AppOperatorOperatorEdgeAlertsRouteImport;
+      parentRoute: typeof AppOperatorRoute;
+    };
+    "/_app/_operator/operator/edge-metrics": {
+      id: "/_app/_operator/operator/edge-metrics";
+      path: "/operator/edge-metrics";
+      fullPath: "/operator/edge-metrics";
+      preLoaderRoute: typeof AppOperatorOperatorEdgeMetricsRouteImport;
+      parentRoute: typeof AppOperatorRoute;
+    };
+    "/_app/_operator/operator/mode": {
+      id: "/_app/_operator/operator/mode";
+      path: "/operator/mode";
+      fullPath: "/operator/mode";
+      preLoaderRoute: typeof AppOperatorOperatorModeRouteImport;
+      parentRoute: typeof AppOperatorRoute;
+    };
+    "/_app/_operator/operator/one-tent-live-proof": {
+      id: "/_app/_operator/operator/one-tent-live-proof";
+      path: "/operator/one-tent-live-proof";
+      fullPath: "/operator/one-tent-live-proof";
+      preLoaderRoute: typeof AppOperatorOperatorOneTentLiveProofRouteImport;
+      parentRoute: typeof AppOperatorRoute;
+    };
+    "/_app/_operator/operator/one-tent-loop-smoke-test": {
+      id: "/_app/_operator/operator/one-tent-loop-smoke-test";
+      path: "/operator/one-tent-loop-smoke-test";
+      fullPath: "/operator/one-tent-loop-smoke-test";
+      preLoaderRoute: typeof AppOperatorOperatorOneTentLoopSmokeTestRouteImport;
+      parentRoute: typeof AppOperatorRoute;
+    };
+    "/_app/_operator/operator/one-tent-proof-record": {
+      id: "/_app/_operator/operator/one-tent-proof-record";
+      path: "/operator/one-tent-proof-record";
+      fullPath: "/operator/one-tent-proof-record";
+      preLoaderRoute: typeof AppOperatorOperatorOneTentProofRecordRouteImport;
+      parentRoute: typeof AppOperatorRoute;
+    };
+    "/_app/_operator/operator/paddle-processing-audit": {
+      id: "/_app/_operator/operator/paddle-processing-audit";
+      path: "/operator/paddle-processing-audit";
+      fullPath: "/operator/paddle-processing-audit";
+      preLoaderRoute: typeof AppOperatorOperatorPaddleProcessingAuditRouteImport;
+      parentRoute: typeof AppOperatorRoute;
+    };
+    "/_app/_operator/operator/post-grow-reflection-dry-run": {
+      id: "/_app/_operator/operator/post-grow-reflection-dry-run";
+      path: "/operator/post-grow-reflection-dry-run";
+      fullPath: "/operator/post-grow-reflection-dry-run";
+      preLoaderRoute: typeof AppOperatorOperatorPostGrowReflectionDryRunRouteImport;
+      parentRoute: typeof AppOperatorRoute;
+    };
+    "/_app/_operator/operator/release-readiness": {
+      id: "/_app/_operator/operator/release-readiness";
+      path: "/operator/release-readiness";
+      fullPath: "/operator/release-readiness";
+      preLoaderRoute: typeof AppOperatorOperatorReleaseReadinessRouteImport;
+      parentRoute: typeof AppOperatorRoute;
+    };
+    "/_app/_operator/operator/schema-audit": {
+      id: "/_app/_operator/operator/schema-audit";
+      path: "/operator/schema-audit";
+      fullPath: "/operator/schema-audit";
+      preLoaderRoute: typeof AppOperatorOperatorSchemaAuditRouteImport;
+      parentRoute: typeof AppOperatorRoute;
+    };
+    "/_app/_operator/operator/subscriber-growth": {
+      id: "/_app/_operator/operator/subscriber-growth";
+      path: "/operator/subscriber-growth";
+      fullPath: "/operator/subscriber-growth";
+      preLoaderRoute: typeof AppOperatorOperatorSubscriberGrowthRouteImport;
+      parentRoute: typeof AppOperatorRoute;
+    };
+    "/_app/_operator/operator/support-inbox": {
+      id: "/_app/_operator/operator/support-inbox";
+      path: "/operator/support-inbox";
+      fullPath: "/operator/support-inbox";
+      preLoaderRoute: typeof AppOperatorOperatorSupportInboxRouteImport;
+      parentRoute: typeof AppOperatorRoute;
+    };
+    "/_app/_operator/sensors/ecowitt-audit": {
+      id: "/_app/_operator/sensors/ecowitt-audit";
+      path: "/sensors/ecowitt-audit";
+      fullPath: "/sensors/ecowitt-audit";
+      preLoaderRoute: typeof AppOperatorSensorsEcowittAuditRouteImport;
+      parentRoute: typeof AppOperatorRoute;
+    };
+    "/_app/_operator/sensors/ingest-normalizer": {
+      id: "/_app/_operator/sensors/ingest-normalizer";
+      path: "/sensors/ingest-normalizer";
+      fullPath: "/sensors/ingest-normalizer";
+      preLoaderRoute: typeof AppOperatorSensorsIngestNormalizerRouteImport;
+      parentRoute: typeof AppOperatorRoute;
+    };
+    "/_app/breeding_/log/new": {
+      id: "/_app/breeding_/log/new";
+      path: "/breeding/log/new";
+      fullPath: "/breeding/log/new";
+      preLoaderRoute: typeof AppBreedingLogNewRouteImport;
+      parentRoute: typeof AppRoute;
+    };
+    "/_app/diary/strains/$slug": {
+      id: "/_app/diary/strains/$slug";
+      path: "/diary/strains/$slug";
+      fullPath: "/diary/strains/$slug";
+      preLoaderRoute: typeof AppDiaryStrainsSlugRouteImport;
+      parentRoute: typeof AppRoute;
+    };
+    "/_app/doctor_/sessions_/$sessionId": {
+      id: "/_app/doctor_/sessions_/$sessionId";
+      path: "/doctor/sessions/$sessionId";
+      fullPath: "/doctor/sessions/$sessionId";
+      preLoaderRoute: typeof AppDoctorSessionsSessionIdRouteImport;
+      parentRoute: typeof AppRoute;
+    };
+    "/_app/genetics/accessions/$id": {
+      id: "/_app/genetics/accessions/$id";
+      path: "/accessions/$id";
+      fullPath: "/genetics/accessions/$id";
+      preLoaderRoute: typeof AppGeneticsAccessionsIdRouteImport;
+      parentRoute: typeof AppGeneticsRoute;
+    };
+    "/_app/genetics/batches/$id": {
+      id: "/_app/genetics/batches/$id";
+      path: "/batches/$id";
+      fullPath: "/genetics/batches/$id";
+      preLoaderRoute: typeof AppGeneticsBatchesIdRouteImport;
+      parentRoute: typeof AppGeneticsRoute;
+    };
+    "/_app/grows_/$growId_/learning": {
+      id: "/_app/grows_/$growId_/learning";
+      path: "/grows/$growId/learning";
+      fullPath: "/grows/$growId/learning";
+      preLoaderRoute: typeof AppGrowsGrowIdLearningRouteImport;
+      parentRoute: typeof AppRoute;
+    };
+    "/_app/pheno-hunts_/$id/keepers": {
+      id: "/_app/pheno-hunts_/$id/keepers";
+      path: "/pheno-hunts/$id/keepers";
+      fullPath: "/pheno-hunts/$id/keepers";
+      preLoaderRoute: typeof AppPhenoHuntsIdKeepersRouteImport;
+      parentRoute: typeof AppRoute;
+    };
+    "/_app/pheno-hunts_/$id/workspace": {
+      id: "/_app/pheno-hunts_/$id/workspace";
+      path: "/pheno-hunts/$id/workspace";
+      fullPath: "/pheno-hunts/$id/workspace";
+      preLoaderRoute: typeof AppPhenoHuntsIdWorkspaceRouteImport;
+      parentRoute: typeof AppRoute;
+    };
+    "/_app/reports_/post-grow/$growId": {
+      id: "/_app/reports_/post-grow/$growId";
+      path: "/reports/post-grow/$growId";
+      fullPath: "/reports/post-grow/$growId";
+      preLoaderRoute: typeof AppReportsPostGrowGrowIdRouteImport;
+      parentRoute: typeof AppRoute;
+    };
+    "/_app/genetics/health/$kind/$id": {
+      id: "/_app/genetics/health/$kind/$id";
+      path: "/health/$kind/$id";
+      fullPath: "/genetics/health/$kind/$id";
+      preLoaderRoute: typeof AppGeneticsHealthKindIdRouteImport;
+      parentRoute: typeof AppGeneticsRoute;
+    };
+    "/_app/genetics/trace/$kind/$id": {
+      id: "/_app/genetics/trace/$kind/$id";
+      path: "/trace/$kind/$id";
+      fullPath: "/genetics/trace/$kind/$id";
+      preLoaderRoute: typeof AppGeneticsTraceKindIdRouteImport;
+      parentRoute: typeof AppGeneticsRoute;
+    };
   }
 }
 
 interface AppOperatorRouteChildren {
-  AppOperatorDiagnosticsRoute: typeof AppOperatorDiagnosticsRoute
-  AppOperatorDiagnosticsSeoArtifactsRoute: typeof AppOperatorDiagnosticsSeoArtifactsRoute
-  AppOperatorIngestInspectorRoute: typeof AppOperatorIngestInspectorRoute
-  AppOperatorLeadsRoute: typeof AppOperatorLeadsRoute
-  AppOperatorOneTentLoopProofRoute: typeof AppOperatorOneTentLoopProofRoute
-  AppOperatorPiIngestStatusRoute: typeof AppOperatorPiIngestStatusRoute
-  AppOperatorAdminLeadsRoute: typeof AppOperatorAdminLeadsRoute
-  AppOperatorDemoOneTentLiveProofRoute: typeof AppOperatorDemoOneTentLiveProofRoute
-  AppOperatorInternalAiDoctorConfidenceAuditRoute: typeof AppOperatorInternalAiDoctorConfidenceAuditRoute
-  AppOperatorInternalAiDoctorPhase1PreviewRoute: typeof AppOperatorInternalAiDoctorPhase1PreviewRoute
-  AppOperatorInternalOneTentLoopProofRoute: typeof AppOperatorInternalOneTentLoopProofRoute
-  AppOperatorInternalSensorTruthAuditRoute: typeof AppOperatorInternalSensorTruthAuditRoute
-  AppOperatorOperatorAiDoctorPhase1Route: typeof AppOperatorOperatorAiDoctorPhase1Route
-  AppOperatorOperatorBillingEntitlementResolutionRoute: typeof AppOperatorOperatorBillingEntitlementResolutionRoute
-  AppOperatorOperatorBillingSubscriptionUpdatesRoute: typeof AppOperatorOperatorBillingSubscriptionUpdatesRoute
-  AppOperatorOperatorCreditsAuditRoute: typeof AppOperatorOperatorCreditsAuditRoute
-  AppOperatorOperatorDemoPreviewRoute: typeof AppOperatorOperatorDemoPreviewRoute
-  AppOperatorOperatorEcowittRoute: typeof AppOperatorOperatorEcowittRoute
-  AppOperatorOperatorEcowittBridgeDebugRoute: typeof AppOperatorOperatorEcowittBridgeDebugRoute
-  AppOperatorOperatorEcowittBridgeStatusRoute: typeof AppOperatorOperatorEcowittBridgeStatusRoute
-  AppOperatorOperatorEcowittLiveBringupRoute: typeof AppOperatorOperatorEcowittLiveBringupRoute
-  AppOperatorOperatorEcowittTentPreviewRoute: typeof AppOperatorOperatorEcowittTentPreviewRoute
-  AppOperatorOperatorEdgeAlertsRoute: typeof AppOperatorOperatorEdgeAlertsRoute
-  AppOperatorOperatorEdgeMetricsRoute: typeof AppOperatorOperatorEdgeMetricsRoute
-  AppOperatorOperatorModeRoute: typeof AppOperatorOperatorModeRoute
-  AppOperatorOperatorOneTentLiveProofRoute: typeof AppOperatorOperatorOneTentLiveProofRoute
-  AppOperatorOperatorOneTentLoopSmokeTestRoute: typeof AppOperatorOperatorOneTentLoopSmokeTestRoute
-  AppOperatorOperatorOneTentProofRecordRoute: typeof AppOperatorOperatorOneTentProofRecordRoute
-  AppOperatorOperatorPaddleProcessingAuditRoute: typeof AppOperatorOperatorPaddleProcessingAuditRoute
-  AppOperatorOperatorPostGrowReflectionDryRunRoute: typeof AppOperatorOperatorPostGrowReflectionDryRunRoute
-  AppOperatorOperatorReleaseReadinessRoute: typeof AppOperatorOperatorReleaseReadinessRoute
-  AppOperatorOperatorSchemaAuditRoute: typeof AppOperatorOperatorSchemaAuditRoute
-  AppOperatorOperatorSubscriberGrowthRoute: typeof AppOperatorOperatorSubscriberGrowthRoute
-  AppOperatorOperatorSupportInboxRoute: typeof AppOperatorOperatorSupportInboxRoute
-  AppOperatorSensorsEcowittAuditRoute: typeof AppOperatorSensorsEcowittAuditRoute
-  AppOperatorSensorsIngestNormalizerRoute: typeof AppOperatorSensorsIngestNormalizerRoute
+  AppOperatorDiagnosticsRoute: typeof AppOperatorDiagnosticsRoute;
+  AppOperatorDiagnosticsLightingMeasurementRoute: typeof AppOperatorDiagnosticsLightingMeasurementRoute;
+  AppOperatorDiagnosticsSeoArtifactsRoute: typeof AppOperatorDiagnosticsSeoArtifactsRoute;
+  AppOperatorIngestInspectorRoute: typeof AppOperatorIngestInspectorRoute;
+  AppOperatorLeadsRoute: typeof AppOperatorLeadsRoute;
+  AppOperatorOneTentLoopProofRoute: typeof AppOperatorOneTentLoopProofRoute;
+  AppOperatorPiIngestStatusRoute: typeof AppOperatorPiIngestStatusRoute;
+  AppOperatorAdminLeadsRoute: typeof AppOperatorAdminLeadsRoute;
+  AppOperatorDemoOneTentLiveProofRoute: typeof AppOperatorDemoOneTentLiveProofRoute;
+  AppOperatorInternalAiDoctorConfidenceAuditRoute: typeof AppOperatorInternalAiDoctorConfidenceAuditRoute;
+  AppOperatorInternalAiDoctorPhase1PreviewRoute: typeof AppOperatorInternalAiDoctorPhase1PreviewRoute;
+  AppOperatorInternalOneTentLoopProofRoute: typeof AppOperatorInternalOneTentLoopProofRoute;
+  AppOperatorInternalSensorTruthAuditRoute: typeof AppOperatorInternalSensorTruthAuditRoute;
+  AppOperatorOperatorAiDoctorPhase1Route: typeof AppOperatorOperatorAiDoctorPhase1Route;
+  AppOperatorOperatorBillingEntitlementResolutionRoute: typeof AppOperatorOperatorBillingEntitlementResolutionRoute;
+  AppOperatorOperatorBillingSubscriptionUpdatesRoute: typeof AppOperatorOperatorBillingSubscriptionUpdatesRoute;
+  AppOperatorOperatorCreditsAuditRoute: typeof AppOperatorOperatorCreditsAuditRoute;
+  AppOperatorOperatorDemoPreviewRoute: typeof AppOperatorOperatorDemoPreviewRoute;
+  AppOperatorOperatorEcowittRoute: typeof AppOperatorOperatorEcowittRoute;
+  AppOperatorOperatorEcowittBridgeDebugRoute: typeof AppOperatorOperatorEcowittBridgeDebugRoute;
+  AppOperatorOperatorEcowittBridgeStatusRoute: typeof AppOperatorOperatorEcowittBridgeStatusRoute;
+  AppOperatorOperatorEcowittLiveBringupRoute: typeof AppOperatorOperatorEcowittLiveBringupRoute;
+  AppOperatorOperatorEcowittTentPreviewRoute: typeof AppOperatorOperatorEcowittTentPreviewRoute;
+  AppOperatorOperatorEdgeAlertsRoute: typeof AppOperatorOperatorEdgeAlertsRoute;
+  AppOperatorOperatorEdgeMetricsRoute: typeof AppOperatorOperatorEdgeMetricsRoute;
+  AppOperatorOperatorModeRoute: typeof AppOperatorOperatorModeRoute;
+  AppOperatorOperatorOneTentLiveProofRoute: typeof AppOperatorOperatorOneTentLiveProofRoute;
+  AppOperatorOperatorOneTentLoopSmokeTestRoute: typeof AppOperatorOperatorOneTentLoopSmokeTestRoute;
+  AppOperatorOperatorOneTentProofRecordRoute: typeof AppOperatorOperatorOneTentProofRecordRoute;
+  AppOperatorOperatorPaddleProcessingAuditRoute: typeof AppOperatorOperatorPaddleProcessingAuditRoute;
+  AppOperatorOperatorPostGrowReflectionDryRunRoute: typeof AppOperatorOperatorPostGrowReflectionDryRunRoute;
+  AppOperatorOperatorReleaseReadinessRoute: typeof AppOperatorOperatorReleaseReadinessRoute;
+  AppOperatorOperatorSchemaAuditRoute: typeof AppOperatorOperatorSchemaAuditRoute;
+  AppOperatorOperatorSubscriberGrowthRoute: typeof AppOperatorOperatorSubscriberGrowthRoute;
+  AppOperatorOperatorSupportInboxRoute: typeof AppOperatorOperatorSupportInboxRoute;
+  AppOperatorSensorsEcowittAuditRoute: typeof AppOperatorSensorsEcowittAuditRoute;
+  AppOperatorSensorsIngestNormalizerRoute: typeof AppOperatorSensorsIngestNormalizerRoute;
 }
 
 const AppOperatorRouteChildren: AppOperatorRouteChildren = {
   AppOperatorDiagnosticsRoute: AppOperatorDiagnosticsRoute,
-  AppOperatorDiagnosticsSeoArtifactsRoute:
-    AppOperatorDiagnosticsSeoArtifactsRoute,
+  AppOperatorDiagnosticsLightingMeasurementRoute: AppOperatorDiagnosticsLightingMeasurementRoute,
+  AppOperatorDiagnosticsSeoArtifactsRoute: AppOperatorDiagnosticsSeoArtifactsRoute,
   AppOperatorIngestInspectorRoute: AppOperatorIngestInspectorRoute,
   AppOperatorLeadsRoute: AppOperatorLeadsRoute,
   AppOperatorOneTentLoopProofRoute: AppOperatorOneTentLoopProofRoute,
   AppOperatorPiIngestStatusRoute: AppOperatorPiIngestStatusRoute,
   AppOperatorAdminLeadsRoute: AppOperatorAdminLeadsRoute,
   AppOperatorDemoOneTentLiveProofRoute: AppOperatorDemoOneTentLiveProofRoute,
-  AppOperatorInternalAiDoctorConfidenceAuditRoute:
-    AppOperatorInternalAiDoctorConfidenceAuditRoute,
-  AppOperatorInternalAiDoctorPhase1PreviewRoute:
-    AppOperatorInternalAiDoctorPhase1PreviewRoute,
-  AppOperatorInternalOneTentLoopProofRoute:
-    AppOperatorInternalOneTentLoopProofRoute,
-  AppOperatorInternalSensorTruthAuditRoute:
-    AppOperatorInternalSensorTruthAuditRoute,
-  AppOperatorOperatorAiDoctorPhase1Route:
-    AppOperatorOperatorAiDoctorPhase1Route,
+  AppOperatorInternalAiDoctorConfidenceAuditRoute: AppOperatorInternalAiDoctorConfidenceAuditRoute,
+  AppOperatorInternalAiDoctorPhase1PreviewRoute: AppOperatorInternalAiDoctorPhase1PreviewRoute,
+  AppOperatorInternalOneTentLoopProofRoute: AppOperatorInternalOneTentLoopProofRoute,
+  AppOperatorInternalSensorTruthAuditRoute: AppOperatorInternalSensorTruthAuditRoute,
+  AppOperatorOperatorAiDoctorPhase1Route: AppOperatorOperatorAiDoctorPhase1Route,
   AppOperatorOperatorBillingEntitlementResolutionRoute:
     AppOperatorOperatorBillingEntitlementResolutionRoute,
   AppOperatorOperatorBillingSubscriptionUpdatesRoute:
@@ -2902,48 +2895,35 @@ const AppOperatorRouteChildren: AppOperatorRouteChildren = {
   AppOperatorOperatorCreditsAuditRoute: AppOperatorOperatorCreditsAuditRoute,
   AppOperatorOperatorDemoPreviewRoute: AppOperatorOperatorDemoPreviewRoute,
   AppOperatorOperatorEcowittRoute: AppOperatorOperatorEcowittRoute,
-  AppOperatorOperatorEcowittBridgeDebugRoute:
-    AppOperatorOperatorEcowittBridgeDebugRoute,
-  AppOperatorOperatorEcowittBridgeStatusRoute:
-    AppOperatorOperatorEcowittBridgeStatusRoute,
-  AppOperatorOperatorEcowittLiveBringupRoute:
-    AppOperatorOperatorEcowittLiveBringupRoute,
-  AppOperatorOperatorEcowittTentPreviewRoute:
-    AppOperatorOperatorEcowittTentPreviewRoute,
+  AppOperatorOperatorEcowittBridgeDebugRoute: AppOperatorOperatorEcowittBridgeDebugRoute,
+  AppOperatorOperatorEcowittBridgeStatusRoute: AppOperatorOperatorEcowittBridgeStatusRoute,
+  AppOperatorOperatorEcowittLiveBringupRoute: AppOperatorOperatorEcowittLiveBringupRoute,
+  AppOperatorOperatorEcowittTentPreviewRoute: AppOperatorOperatorEcowittTentPreviewRoute,
   AppOperatorOperatorEdgeAlertsRoute: AppOperatorOperatorEdgeAlertsRoute,
   AppOperatorOperatorEdgeMetricsRoute: AppOperatorOperatorEdgeMetricsRoute,
   AppOperatorOperatorModeRoute: AppOperatorOperatorModeRoute,
-  AppOperatorOperatorOneTentLiveProofRoute:
-    AppOperatorOperatorOneTentLiveProofRoute,
-  AppOperatorOperatorOneTentLoopSmokeTestRoute:
-    AppOperatorOperatorOneTentLoopSmokeTestRoute,
-  AppOperatorOperatorOneTentProofRecordRoute:
-    AppOperatorOperatorOneTentProofRecordRoute,
-  AppOperatorOperatorPaddleProcessingAuditRoute:
-    AppOperatorOperatorPaddleProcessingAuditRoute,
+  AppOperatorOperatorOneTentLiveProofRoute: AppOperatorOperatorOneTentLiveProofRoute,
+  AppOperatorOperatorOneTentLoopSmokeTestRoute: AppOperatorOperatorOneTentLoopSmokeTestRoute,
+  AppOperatorOperatorOneTentProofRecordRoute: AppOperatorOperatorOneTentProofRecordRoute,
+  AppOperatorOperatorPaddleProcessingAuditRoute: AppOperatorOperatorPaddleProcessingAuditRoute,
   AppOperatorOperatorPostGrowReflectionDryRunRoute:
     AppOperatorOperatorPostGrowReflectionDryRunRoute,
-  AppOperatorOperatorReleaseReadinessRoute:
-    AppOperatorOperatorReleaseReadinessRoute,
+  AppOperatorOperatorReleaseReadinessRoute: AppOperatorOperatorReleaseReadinessRoute,
   AppOperatorOperatorSchemaAuditRoute: AppOperatorOperatorSchemaAuditRoute,
-  AppOperatorOperatorSubscriberGrowthRoute:
-    AppOperatorOperatorSubscriberGrowthRoute,
+  AppOperatorOperatorSubscriberGrowthRoute: AppOperatorOperatorSubscriberGrowthRoute,
   AppOperatorOperatorSupportInboxRoute: AppOperatorOperatorSupportInboxRoute,
   AppOperatorSensorsEcowittAuditRoute: AppOperatorSensorsEcowittAuditRoute,
-  AppOperatorSensorsIngestNormalizerRoute:
-    AppOperatorSensorsIngestNormalizerRoute,
-}
+  AppOperatorSensorsIngestNormalizerRoute: AppOperatorSensorsIngestNormalizerRoute,
+};
 
-const AppOperatorRouteWithChildren = AppOperatorRoute._addFileChildren(
-  AppOperatorRouteChildren,
-)
+const AppOperatorRouteWithChildren = AppOperatorRoute._addFileChildren(AppOperatorRouteChildren);
 
 interface AppGeneticsRouteChildren {
-  AppGeneticsIndexRoute: typeof AppGeneticsIndexRoute
-  AppGeneticsAccessionsIdRoute: typeof AppGeneticsAccessionsIdRoute
-  AppGeneticsBatchesIdRoute: typeof AppGeneticsBatchesIdRoute
-  AppGeneticsHealthKindIdRoute: typeof AppGeneticsHealthKindIdRoute
-  AppGeneticsTraceKindIdRoute: typeof AppGeneticsTraceKindIdRoute
+  AppGeneticsIndexRoute: typeof AppGeneticsIndexRoute;
+  AppGeneticsAccessionsIdRoute: typeof AppGeneticsAccessionsIdRoute;
+  AppGeneticsBatchesIdRoute: typeof AppGeneticsBatchesIdRoute;
+  AppGeneticsHealthKindIdRoute: typeof AppGeneticsHealthKindIdRoute;
+  AppGeneticsTraceKindIdRoute: typeof AppGeneticsTraceKindIdRoute;
 }
 
 const AppGeneticsRouteChildren: AppGeneticsRouteChildren = {
@@ -2952,61 +2932,59 @@ const AppGeneticsRouteChildren: AppGeneticsRouteChildren = {
   AppGeneticsBatchesIdRoute: AppGeneticsBatchesIdRoute,
   AppGeneticsHealthKindIdRoute: AppGeneticsHealthKindIdRoute,
   AppGeneticsTraceKindIdRoute: AppGeneticsTraceKindIdRoute,
-}
+};
 
-const AppGeneticsRouteWithChildren = AppGeneticsRoute._addFileChildren(
-  AppGeneticsRouteChildren,
-)
+const AppGeneticsRouteWithChildren = AppGeneticsRoute._addFileChildren(AppGeneticsRouteChildren);
 
 interface AppRouteChildren {
-  AppOperatorRoute: typeof AppOperatorRouteWithChildren
-  AppActionQueueRoute: typeof AppActionQueueRoute
-  AppActionsRoute: typeof AppActionsRoute
-  AppAiDoctorRoute: typeof AppAiDoctorRoute
-  AppAlertsRoute: typeof AppAlertsRoute
-  AppBreedingRoute: typeof AppBreedingRoute
-  AppDailyCheckRoute: typeof AppDailyCheckRoute
-  AppDashboardRoute: typeof AppDashboardRoute
-  AppDoctorRoute: typeof AppDoctorRoute
-  AppGeneticsRoute: typeof AppGeneticsRouteWithChildren
-  AppGrowLineageRoute: typeof AppGrowLineageRoute
-  AppGrowRoomRoute: typeof AppGrowRoomRoute
-  AppGrowsRoute: typeof AppGrowsRoute
-  AppHealthRoute: typeof AppHealthRoute
-  AppInviteRoute: typeof AppInviteRoute
-  AppLogsRoute: typeof AppLogsRoute
-  AppOnboardingRoute: typeof AppOnboardingRoute
-  AppPhenoHuntsRoute: typeof AppPhenoHuntsRoute
-  AppPlantsRoute: typeof AppPlantsRoute
-  AppReportsRoute: typeof AppReportsRoute
-  AppSensorsRoute: typeof AppSensorsRoute
-  AppSettingsRoute: typeof AppSettingsRoute
-  AppStartRoomRoute: typeof AppStartRoomRoute
-  AppTasksRoute: typeof AppTasksRoute
-  AppTentsRoute: typeof AppTentsRoute
-  AppTimelineRoute: typeof AppTimelineRoute
-  AppAccountPreferencesRoute: typeof AppAccountPreferencesRoute
-  AppActionsActionIdRoute: typeof AppActionsActionIdRoute
-  AppAlertsAlertIdRoute: typeof AppAlertsAlertIdRoute
-  AppBreedingProgramIdRoute: typeof AppBreedingProgramIdRoute
-  AppBreedingNewRoute: typeof AppBreedingNewRoute
-  AppDiaryEnvironmentSummaryRoute: typeof AppDiaryEnvironmentSummaryRoute
-  AppDiaryPhenoExpressionComparisonRoute: typeof AppDiaryPhenoExpressionComparisonRoute
-  AppDoctorSessionsRoute: typeof AppDoctorSessionsRoute
-  AppGrowsGrowIdRoute: typeof AppGrowsGrowIdRoute
-  AppPhenoHuntsNewRoute: typeof AppPhenoHuntsNewRoute
-  AppPlantsIdRoute: typeof AppPlantsIdRoute
-  AppReportsDiaryRangeRoute: typeof AppReportsDiaryRangeRoute
-  AppSettingsAgentIntegrationsRoute: typeof AppSettingsAgentIntegrationsRoute
-  AppSettingsAnalyticsRoute: typeof AppSettingsAnalyticsRoute
-  AppTentsIdRoute: typeof AppTentsIdRoute
-  AppBreedingLogNewRoute: typeof AppBreedingLogNewRoute
-  AppDiaryStrainsSlugRoute: typeof AppDiaryStrainsSlugRoute
-  AppDoctorSessionsSessionIdRoute: typeof AppDoctorSessionsSessionIdRoute
-  AppGrowsGrowIdLearningRoute: typeof AppGrowsGrowIdLearningRoute
-  AppPhenoHuntsIdKeepersRoute: typeof AppPhenoHuntsIdKeepersRoute
-  AppPhenoHuntsIdWorkspaceRoute: typeof AppPhenoHuntsIdWorkspaceRoute
-  AppReportsPostGrowGrowIdRoute: typeof AppReportsPostGrowGrowIdRoute
+  AppOperatorRoute: typeof AppOperatorRouteWithChildren;
+  AppActionQueueRoute: typeof AppActionQueueRoute;
+  AppActionsRoute: typeof AppActionsRoute;
+  AppAiDoctorRoute: typeof AppAiDoctorRoute;
+  AppAlertsRoute: typeof AppAlertsRoute;
+  AppBreedingRoute: typeof AppBreedingRoute;
+  AppDailyCheckRoute: typeof AppDailyCheckRoute;
+  AppDashboardRoute: typeof AppDashboardRoute;
+  AppDoctorRoute: typeof AppDoctorRoute;
+  AppGeneticsRoute: typeof AppGeneticsRouteWithChildren;
+  AppGrowLineageRoute: typeof AppGrowLineageRoute;
+  AppGrowRoomRoute: typeof AppGrowRoomRoute;
+  AppGrowsRoute: typeof AppGrowsRoute;
+  AppHealthRoute: typeof AppHealthRoute;
+  AppInviteRoute: typeof AppInviteRoute;
+  AppLogsRoute: typeof AppLogsRoute;
+  AppOnboardingRoute: typeof AppOnboardingRoute;
+  AppPhenoHuntsRoute: typeof AppPhenoHuntsRoute;
+  AppPlantsRoute: typeof AppPlantsRoute;
+  AppReportsRoute: typeof AppReportsRoute;
+  AppSensorsRoute: typeof AppSensorsRoute;
+  AppSettingsRoute: typeof AppSettingsRoute;
+  AppStartRoomRoute: typeof AppStartRoomRoute;
+  AppTasksRoute: typeof AppTasksRoute;
+  AppTentsRoute: typeof AppTentsRoute;
+  AppTimelineRoute: typeof AppTimelineRoute;
+  AppAccountPreferencesRoute: typeof AppAccountPreferencesRoute;
+  AppActionsActionIdRoute: typeof AppActionsActionIdRoute;
+  AppAlertsAlertIdRoute: typeof AppAlertsAlertIdRoute;
+  AppBreedingProgramIdRoute: typeof AppBreedingProgramIdRoute;
+  AppBreedingNewRoute: typeof AppBreedingNewRoute;
+  AppDiaryEnvironmentSummaryRoute: typeof AppDiaryEnvironmentSummaryRoute;
+  AppDiaryPhenoExpressionComparisonRoute: typeof AppDiaryPhenoExpressionComparisonRoute;
+  AppDoctorSessionsRoute: typeof AppDoctorSessionsRoute;
+  AppGrowsGrowIdRoute: typeof AppGrowsGrowIdRoute;
+  AppPhenoHuntsNewRoute: typeof AppPhenoHuntsNewRoute;
+  AppPlantsIdRoute: typeof AppPlantsIdRoute;
+  AppReportsDiaryRangeRoute: typeof AppReportsDiaryRangeRoute;
+  AppSettingsAgentIntegrationsRoute: typeof AppSettingsAgentIntegrationsRoute;
+  AppSettingsAnalyticsRoute: typeof AppSettingsAnalyticsRoute;
+  AppTentsIdRoute: typeof AppTentsIdRoute;
+  AppBreedingLogNewRoute: typeof AppBreedingLogNewRoute;
+  AppDiaryStrainsSlugRoute: typeof AppDiaryStrainsSlugRoute;
+  AppDoctorSessionsSessionIdRoute: typeof AppDoctorSessionsSessionIdRoute;
+  AppGrowsGrowIdLearningRoute: typeof AppGrowsGrowIdLearningRoute;
+  AppPhenoHuntsIdKeepersRoute: typeof AppPhenoHuntsIdKeepersRoute;
+  AppPhenoHuntsIdWorkspaceRoute: typeof AppPhenoHuntsIdWorkspaceRoute;
+  AppReportsPostGrowGrowIdRoute: typeof AppReportsPostGrowGrowIdRoute;
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -3042,8 +3020,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppBreedingProgramIdRoute: AppBreedingProgramIdRoute,
   AppBreedingNewRoute: AppBreedingNewRoute,
   AppDiaryEnvironmentSummaryRoute: AppDiaryEnvironmentSummaryRoute,
-  AppDiaryPhenoExpressionComparisonRoute:
-    AppDiaryPhenoExpressionComparisonRoute,
+  AppDiaryPhenoExpressionComparisonRoute: AppDiaryPhenoExpressionComparisonRoute,
   AppDoctorSessionsRoute: AppDoctorSessionsRoute,
   AppGrowsGrowIdRoute: AppGrowsGrowIdRoute,
   AppPhenoHuntsNewRoute: AppPhenoHuntsNewRoute,
@@ -3059,9 +3036,9 @@ const AppRouteChildren: AppRouteChildren = {
   AppPhenoHuntsIdKeepersRoute: AppPhenoHuntsIdKeepersRoute,
   AppPhenoHuntsIdWorkspaceRoute: AppPhenoHuntsIdWorkspaceRoute,
   AppReportsPostGrowGrowIdRoute: AppReportsPostGrowGrowIdRoute,
-}
+};
 
-const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
+const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren);
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
@@ -3104,8 +3081,7 @@ const rootRouteChildren: RootRouteChildren = {
   DocsMcpApiRoute: DocsMcpApiRoute,
   GuidesSlugRoute: GuidesSlugRoute,
   GuidesGrowStageCareGuideRoute: GuidesGrowStageCareGuideRoute,
-  InternalContextualPhenoComparisonDemoRoute:
-    InternalContextualPhenoComparisonDemoRoute,
+  InternalContextualPhenoComparisonDemoRoute: InternalContextualPhenoComparisonDemoRoute,
   InternalDemoProofWalkthroughRoute: InternalDemoProofWalkthroughRoute,
   InternalPhenoHuntDemoRoute: InternalPhenoHuntDemoRoute,
   PartnersCsvPreviewRoute: PartnersCsvPreviewRoute,
@@ -3116,21 +3092,10 @@ const rootRouteChildren: RootRouteChildren = {
   GuidesIndexRoute: GuidesIndexRoute,
   StrainsIndexRoute: StrainsIndexRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
-  CustomerGuideOreozVsGelonadeComparisonRoute:
-    CustomerGuideOreozVsGelonadeComparisonRoute,
+  CustomerGuideOreozVsGelonadeComparisonRoute: CustomerGuideOreozVsGelonadeComparisonRoute,
   PhenoHuntsIdCompareRoute: PhenoHuntsIdCompareRoute,
   PhenoHuntsIdShowcaseRoute: PhenoHuntsIdShowcaseRoute,
-}
+};
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
-  ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
+  ._addFileTypes<FileRouteTypes>();

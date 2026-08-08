@@ -1,5 +1,7 @@
 # Lighting analytics owner setup checklist
 
+> **2026-08-07 lead note:** PR #834 (Arguments dataLayer push) is **merged** to `verdant-grow-diary` as `df7f7c58` and tagged `v2026.08.07-df7f7c58ff5b`, but production still serves `a21afd5`. Collection remains dark until Lovable publishes. Day 0 stays **UNSET**.
+
 **Last reconciled against production (UTC):** 2026-08-02T02:55:07.852Z
 
 **Production host:** `https://verdantgrowdiary.com`

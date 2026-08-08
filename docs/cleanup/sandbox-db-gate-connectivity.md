@@ -30,14 +30,88 @@ Last known green sandbox core/money remote jobs: **2026-08-07 ~19:10 UTC**.
    - Prefer **Session pooler** host (`aws-…pooler.supabase.com`, port 5432)
    - Username form **`postgres.<project-ref>`** (or Dashboard “Session mode” copy)
    - Password: database password (rotate if unsure)
-   - GitHub-hosted runners are **IPv4-only** — avoid direct `db.<ref>.supabase.co`
-     if that host is IPv6-only for your project
+   - GitHub-hosted runners are **IPv4-only** — see **IPv6 fallback** below if the
+     direct host is IPv6-only
 3. Confirm the URI is **sandbox**, not production (`knkwiiywfkbqznbxwqfh`).
 4. Re-run:
    - Actions → **Required core schema present** → Run workflow (`sandbox`)
    - Actions → **Required money-critical migrations present** → Run workflow (`sandbox`)
 5. Both jobs should report verified / applied, not `schema_query_failed` /
    `tracker_query_failed`.
+
+## IPv6 fallback (GitHub-hosted runners)
+
+GitHub-hosted Actions runners are **IPv4-only**. If the Dashboard “direct”
+connection string resolves only to an **AAAA** (IPv6) address, `psql` on CI
+will hang or exit **2** even when the password and project ref are correct.
+Identity can still pass (URL shape + pinned ref) before the TCP session fails.
+
+### Detect IPv6-only direct host
+
+From a dual-stack machine (your laptop), with the project ref substituted:
+
+```bash
+# Direct host — if this prints only AAAA and no A, CI cannot dial it.
+dig +short A    db.bzatgtgjvuojpoxcknaa.supabase.co
+dig +short AAAA db.bzatgtgjvuojpoxcknaa.supabase.co
+
+# Pooler host — should show A (IPv4). Prefer this for CI secrets.
+dig +short A    aws-0-us-east-1.pooler.supabase.com   # region as shown in Dashboard
+```
+
+Interpretation:
+
+| Direct `A` | Direct `AAAA` | CI outlook                                                                 |
+| ---------- | ------------- | -------------------------------------------------------------------------- |
+| present    | any           | Direct URI may work on runners                                             |
+| empty      | present       | **IPv6-only** — do **not** put direct `db.<ref>.supabase.co` in CI secrets |
+| empty      | empty         | DNS / wrong host — fix Dashboard copy before rotating the secret           |
+
+### Fallback URI for CI (preferred)
+
+When direct is IPv6-only (or you want CI to stay on the path identity already
+accepts), store a **Session pooler** URI in `SUPABASE_DB_URL_SANDBOX`:
+
+1. Supabase Dashboard → project **`bzatgtgjvuojpoxcknaa`** → **Project Settings →
+   Database → Connection string**.
+2. Choose **Session mode** (port **5432**) on the **pooler** host
+   (`aws-<n>-<region>.pooler.supabase.com`), **not** “Direct connection”.
+3. Username must be **`postgres.bzatgtgjvuojpoxcknaa`** (or the Dashboard
+   Session-mode form). Do not use bare `postgres` on the shared pooler.
+4. Paste the full `postgres://…` / `postgresql://…` URI (password filled in) into
+   the **`verdant-sandbox`** environment secret **`SUPABASE_DB_URL_SANDBOX`**.
+5. Optional local smoke (never commit the URL):
+
+   ```bash
+   # Must exit 0 and print a version row; use the same URI you will store as the secret.
+   export SUPABASE_DB_URL='postgresql://postgres.bzatgtgjvuojpoxcknaa:…@aws-….pooler.supabase.com:5432/postgres'
+   export TARGET_ENV=sandbox
+   psql -X -A -t -v ON_ERROR_STOP=1 -c 'select 1'
+   # Then re-run the gate scripts against that env if you have psql + the repo checked out.
+   ```
+
+Identity gate notes (already enforced in code):
+
+- Shared pooler URLs are bound to the pinned project via the username rewrite
+  (`postgres.<project-ref>`).
+- Direct hosts must be `db.<project-ref>.supabase.co` on 5432/6543 with user
+  `postgres`.
+
+### If you must keep a direct URI
+
+Only if `dig +short A db.<ref>.supabase.co` returns at least one **IPv4**
+address for sandbox. Otherwise CI will keep failing with `psql` status 2 and
+no schema verdict. There is no runner-side IPv6 toggle for standard
+`ubuntu-latest` hosted runners.
+
+### After rotating for IPv6
+
+1. Re-run **Required core schema present** and **Required money-critical
+   migrations present** on `verdant-grow-diary` (workflow_dispatch → sandbox).
+2. Confirm logs show identity verified and **not** `schema_query_failed` /
+   `tracker_query_failed`.
+3. Optionally re-check production secrets the same way before a live dispatch
+   (`SUPABASE_DB_URL` on **`verdant-production`**, project `knkwiiywfkbqznbxwqfh`).
 
 ## Related
 

@@ -87,6 +87,7 @@ import { Route as StrainsSlugRouteImport } from './routes/strains.$slug'
 import { Route as ToolsVpdCalculatorRouteImport } from './routes/tools.vpd-calculator'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 import { Route as AppOperatorDiagnosticsRouteImport } from './routes/_app/_operator/diagnostics'
+import { Route as AppOperatorDiagnosticsLightingMeasurementRouteImport } from './routes/_app/_operator/diagnostics-lighting-measurement'
 import { Route as AppOperatorDiagnosticsSeoArtifactsRouteImport } from './routes/_app/_operator/diagnostics-seo-artifacts'
 import { Route as AppOperatorIngestInspectorRouteImport } from './routes/_app/_operator/ingest-inspector'
 import { Route as AppOperatorLeadsRouteImport } from './routes/_app/_operator/leads'
@@ -544,6 +545,12 @@ const AppOperatorDiagnosticsRoute = AppOperatorDiagnosticsRouteImport.update({
   path: '/diagnostics',
   getParentRoute: () => AppOperatorRoute,
 } as any)
+const AppOperatorDiagnosticsLightingMeasurementRoute =
+  AppOperatorDiagnosticsLightingMeasurementRouteImport.update({
+    id: '/diagnostics-lighting-measurement',
+    path: '/diagnostics-lighting-measurement',
+    getParentRoute: () => AppOperatorRoute,
+  } as any)
 const AppOperatorDiagnosticsSeoArtifactsRoute =
   AppOperatorDiagnosticsSeoArtifactsRouteImport.update({
     id: '/diagnostics-seo-artifacts',
@@ -986,6 +993,7 @@ export interface FileRoutesByFullPath {
   '/strains/': typeof StrainsIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/diagnostics': typeof AppOperatorDiagnosticsRoute
+  '/diagnostics-lighting-measurement': typeof AppOperatorDiagnosticsLightingMeasurementRoute
   '/diagnostics-seo-artifacts': typeof AppOperatorDiagnosticsSeoArtifactsRoute
   '/ingest-inspector': typeof AppOperatorIngestInspectorRoute
   '/leads': typeof AppOperatorLeadsRoute
@@ -1128,6 +1136,7 @@ export interface FileRoutesByTo {
   '/strains': typeof StrainsIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/diagnostics': typeof AppOperatorDiagnosticsRoute
+  '/diagnostics-lighting-measurement': typeof AppOperatorDiagnosticsLightingMeasurementRoute
   '/diagnostics-seo-artifacts': typeof AppOperatorDiagnosticsSeoArtifactsRoute
   '/ingest-inspector': typeof AppOperatorIngestInspectorRoute
   '/leads': typeof AppOperatorLeadsRoute
@@ -1274,6 +1283,7 @@ export interface FileRoutesById {
   '/strains/': typeof StrainsIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/_app/_operator/diagnostics': typeof AppOperatorDiagnosticsRoute
+  '/_app/_operator/diagnostics-lighting-measurement': typeof AppOperatorDiagnosticsLightingMeasurementRoute
   '/_app/_operator/diagnostics-seo-artifacts': typeof AppOperatorDiagnosticsSeoArtifactsRoute
   '/_app/_operator/ingest-inspector': typeof AppOperatorIngestInspectorRoute
   '/_app/_operator/leads': typeof AppOperatorLeadsRoute
@@ -1419,6 +1429,7 @@ export interface FileRouteTypes {
     | '/strains/'
     | '/.lovable/oauth/consent'
     | '/diagnostics'
+    | '/diagnostics-lighting-measurement'
     | '/diagnostics-seo-artifacts'
     | '/ingest-inspector'
     | '/leads'
@@ -1561,6 +1572,7 @@ export interface FileRouteTypes {
     | '/strains'
     | '/.lovable/oauth/consent'
     | '/diagnostics'
+    | '/diagnostics-lighting-measurement'
     | '/diagnostics-seo-artifacts'
     | '/ingest-inspector'
     | '/leads'
@@ -1706,6 +1718,7 @@ export interface FileRouteTypes {
     | '/strains/'
     | '/.lovable/oauth/consent'
     | '/_app/_operator/diagnostics'
+    | '/_app/_operator/diagnostics-lighting-measurement'
     | '/_app/_operator/diagnostics-seo-artifacts'
     | '/_app/_operator/ingest-inspector'
     | '/_app/_operator/leads'
@@ -2378,6 +2391,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppOperatorDiagnosticsRouteImport
       parentRoute: typeof AppOperatorRoute
     }
+    '/_app/_operator/diagnostics-lighting-measurement': {
+      id: '/_app/_operator/diagnostics-lighting-measurement'
+      path: '/diagnostics-lighting-measurement'
+      fullPath: '/diagnostics-lighting-measurement'
+      preLoaderRoute: typeof AppOperatorDiagnosticsLightingMeasurementRouteImport
+      parentRoute: typeof AppOperatorRoute
+    }
     '/_app/_operator/diagnostics-seo-artifacts': {
       id: '/_app/_operator/diagnostics-seo-artifacts'
       path: '/diagnostics-seo-artifacts'
@@ -2838,6 +2858,7 @@ declare module '@tanstack/react-router' {
 
 interface AppOperatorRouteChildren {
   AppOperatorDiagnosticsRoute: typeof AppOperatorDiagnosticsRoute
+  AppOperatorDiagnosticsLightingMeasurementRoute: typeof AppOperatorDiagnosticsLightingMeasurementRoute
   AppOperatorDiagnosticsSeoArtifactsRoute: typeof AppOperatorDiagnosticsSeoArtifactsRoute
   AppOperatorIngestInspectorRoute: typeof AppOperatorIngestInspectorRoute
   AppOperatorLeadsRoute: typeof AppOperatorLeadsRoute
@@ -2877,6 +2898,8 @@ interface AppOperatorRouteChildren {
 
 const AppOperatorRouteChildren: AppOperatorRouteChildren = {
   AppOperatorDiagnosticsRoute: AppOperatorDiagnosticsRoute,
+  AppOperatorDiagnosticsLightingMeasurementRoute:
+    AppOperatorDiagnosticsLightingMeasurementRoute,
   AppOperatorDiagnosticsSeoArtifactsRoute:
     AppOperatorDiagnosticsSeoArtifactsRoute,
   AppOperatorIngestInspectorRoute: AppOperatorIngestInspectorRoute,

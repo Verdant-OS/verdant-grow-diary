@@ -8,17 +8,26 @@
  * Response contract (see orchestrator.ts for the full state machine):
  *   - non-POST                        → 405
  *   - bad env query param             → 400
- *   - invalid Paddle signature        → 400
+ *   - webhook secret not configured   → 500 (fail closed)
+ *   - invalid / stale Paddle signature→ 400 / 401
+ *   - invalid JSON after verify       → 400
  *   - event durably recorded + write  → 200
  *   - duplicate already processed     → 200 (no-op)
  *   - duplicate previously failed     → reprocess, 200/500 per result
  *   - any DB failure before durable
  *     success                         → 500 so Paddle retries
  *
+ * Signature: pure HMAC via verifyPaymentsWebhookRequest (same algorithm as
+ * BYO paddle-webhook). Secrets: PAYMENTS_{SANDBOX|LIVE}_WEBHOOK_SECRET.
+ *
  * Does NOT touch entitlements, gates, or the BYO paddle-webhook stack.
  */
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { verifyWebhook, getPaddleClient, type PaddleEnv } from "../_shared/paddle.ts";
+import {
+  verifyPaymentsWebhookRequest,
+  getPaddleClient,
+  type PaddleEnv,
+} from "../_shared/paddle.ts";
 import { handleVerifiedEvent, type Deps, type EventLikeWithId } from "./orchestrator.ts";
 import { insertPaddleEventLog } from "./eventLogInsert.ts";
 import { maybeSendPurchaseConfirmation } from "./sendPurchaseConfirmation.ts";
@@ -40,6 +49,48 @@ function safeParseJson(s: string): unknown {
   } catch {
     return { _raw: s.slice(0, 4000) };
   }
+}
+
+/**
+ * Map raw Paddle notification JSON (snake_case) to the EventLike shape the
+ * pure processor expects (camelCase eventId/eventType). Only after HMAC verify.
+ */
+function normalizeVerifiedPaddleEvent(raw: unknown): EventLikeWithId | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  const eventId =
+    typeof o.eventId === "string"
+      ? o.eventId
+      : typeof o.event_id === "string"
+        ? o.event_id
+        : undefined;
+  const eventType =
+    typeof o.eventType === "string"
+      ? o.eventType
+      : typeof o.event_type === "string"
+        ? o.event_type
+        : undefined;
+  if (!eventType) return null;
+  return {
+    ...(o as object),
+    eventId,
+    eventType,
+    data: o.data,
+  } as EventLikeWithId;
+}
+
+function mapVerifyFailure(reason: string): { status: number; body: string } {
+  if (reason === "webhook_secret_not_configured") {
+    return { status: 500, body: "webhook_secret_not_configured" };
+  }
+  if (
+    reason === "missing_header" ||
+    reason === "invalid_signature_header" ||
+    reason === "invalid_json"
+  ) {
+    return { status: 400, body: reason };
+  }
+  return { status: 401, body: reason };
 }
 
 function buildDeps(): Deps {
@@ -258,22 +309,28 @@ Deno.serve(async (req) => {
     return new Response("Invalid env", { status: 400 });
   }
 
-  // Clone before verifyWebhook consumes the body — we persist the raw
-  // payload for audit.
-  const cloned = req.clone();
-  const rawBody = await cloned.text();
+  // Pure HMAC on exact raw body — fail closed. No SDK required for verify.
+  const verified = await verifyPaymentsWebhookRequest(req, env);
+  if (!verified.ok) {
+    const { status, body } = mapVerifyFailure(verified.reason);
+    console.error("payments-webhook signature verification failed:", verified.reason);
+    return new Response(body, { status });
+  }
 
-  let event: EventLikeWithId;
-  try {
-    event = (await verifyWebhook(req, env)) as EventLikeWithId;
-  } catch (e) {
-    console.error("paddle signature verification failed:", String(e));
-    return new Response("Invalid signature", { status: 400 });
+  const event = normalizeVerifiedPaddleEvent(verified.event);
+  if (!event) {
+    return new Response("invalid_event_shape", { status: 400 });
   }
 
   let result;
   try {
-    result = await handleVerifiedEvent(buildDeps(), event, env, new Date(), safeParseJson(rawBody));
+    result = await handleVerifiedEvent(
+      buildDeps(),
+      event,
+      env,
+      new Date(),
+      safeParseJson(verified.rawBody),
+    );
   } catch (e) {
     console.error("handleVerifiedEvent threw:", String(e));
     // Uncaught throw → treat as transient, ask Paddle to retry.

@@ -26,6 +26,17 @@ Because of this:
 - No automatic data cleanup, deletion, or mutation of existing grow data
   happens outside the intentional Quick Log save flow itself.
 
+## Write-risk playbook
+
+For the full strategy (read vs write split, fixture garden, create/delete,
+denylist, and #570 residue prune), see:
+
+**[`docs/cleanup/e2e-test-data-management.md`](../docs/cleanup/e2e-test-data-management.md)**
+
+Write-producing **pheno** smokes (`e2e:pheno-journey`, workspace integrity)
+call `assertPhenoWriteFixtureEnv` + `assertGrowAllowedForWriteSmoke` and name
+hunts with `buildE2eHuntName` (never append to the wizard prefill).
+
 ## Safety guarantees
 
 - No app-level auth bypass.

@@ -3,6 +3,7 @@ import { useLocation } from "@/lib/react-router-compat";
 import { GOOGLE_ANALYTICS_MEASUREMENT_ID } from "@/constants/analytics";
 import { buildSafeAnalyticsPageLocation, sanitizePagePath } from "@/lib/analyticsPageViewRules";
 import { readAnalyticsConsent, subscribeToAnalyticsConsent } from "@/lib/analyticsConsent";
+import { loadGoogleAnalytics } from "@/lib/googleAnalyticsLoader";
 
 export { sanitizePagePath } from "@/lib/analyticsPageViewRules";
 
@@ -20,6 +21,11 @@ function trackPageView(path: string, title: string) {
   if (typeof window === "undefined") return;
   // Consent gate: no analytics call may run before an explicit "granted".
   if (readAnalyticsConsent() !== "granted") return;
+  // Ensure the consent-gated loader has installed the gtag stub. AnalyticsShell
+  // also loads on decision==="granted", but that hook intentionally starts as
+  // "unset" for hydration, so cold loads with pre-granted consent used to hit
+  // this path before window.gtag existed and silently dropped the first view.
+  loadGoogleAnalytics();
   if (typeof window.gtag !== "function") return;
   const safePath = sanitizePagePath(path);
   // Send an explicit page_view EVENT, not a repeat `config` call. The root route
@@ -46,9 +52,14 @@ function trackPageView(path: string, title: string) {
 export function useGoogleAnalyticsPageViews() {
   const location = useLocation();
 
-  // Re-run when consent flips so the first view is sent right after Accept.
+  // Match useAnalyticsConsent: start from storage when available, then re-hydrate
+  // in an effect so SSR "unset" catches up to a pre-granted local decision and
+  // the cold-load page_view is not skipped forever.
   const [consent, setConsent] = useState(() => readAnalyticsConsent());
-  useEffect(() => subscribeToAnalyticsConsent(() => setConsent(readAnalyticsConsent())), []);
+  useEffect(() => {
+    setConsent(readAnalyticsConsent());
+    return subscribeToAnalyticsConsent(() => setConsent(readAnalyticsConsent()));
+  }, []);
 
   useEffect(() => {
     if (consent !== "granted") return;

@@ -250,6 +250,8 @@
     "e2e:verify-fixture": "playwright test e2e/fixture-safety.spec.ts --project=chromium-authed",
     "e2e:bootstrap-fixture": "playwright test e2e/fixture-bootstrap.spec.ts --project=chromium-authed",
     "e2e:fixture-checklist": "bun run e2e/scripts/print-fixture-config-checklist.ts",
+    "e2e:fixture:rotate:dry": "node scripts/e2e/rotate-e2e-fixture.mjs --dry-run",
+    "e2e:fixture:rotate": "node scripts/e2e/rotate-e2e-fixture.mjs --execute --confirm-fixture-rotation",
     "e2e:quicklog-smoke": "playwright test e2e/quicklog-smoke.spec.ts --project=chromium-authed",
     "e2e:pheno-journey": "playwright test e2e/pheno-paid-journey.spec.ts --project=chromium-authed",
     "e2e:quicklog-smoke:headed": "playwright test e2e/quicklog-smoke.spec.ts --project=chromium-authed --headed",

@@ -133,6 +133,18 @@ full checklist in [`e2e/FIXTURE_SETUP.md`](./FIXTURE_SETUP.md) and the
 > For the end-to-end fixture setup, screenshot guidance, and account
 > rotation steps, see [`e2e/FIXTURE_SETUP.md`](./FIXTURE_SETUP.md).
 
+### Garden rotation CLI
+
+Prune **E2E-prefixed pheno hunts** on a clean fixture account (dry-run by default):
+
+```bash
+bun run e2e:fixture:rotate:dry
+bun run e2e:fixture:rotate   # requires --execute --confirm (wired in script)
+```
+
+Requires fixture user JWT + Supabase URL/anon. Contaminated accounts (real grows)
+are **blocked**. See `docs/cleanup/e2e-test-data-management.md` §8.
+
 ## Rotate or recreate the disposable E2E account
 
 There are **no hardcoded credentials** in this repository. The test

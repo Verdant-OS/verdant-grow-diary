@@ -113,7 +113,8 @@ export default function PhenoHuntNew() {
       if (cancelled) return;
       if (growRow) {
         setGrow({ id: growRow.id, name: growRow.name });
-        setName(defaultHuntName(growRow.name));
+        // Do not overwrite a grower-edited name if this effect re-runs (#564).
+        setName((prev) => (prev.trim().length > 0 ? prev : defaultHuntName(growRow.name)));
       }
       setPlants(
         (plantRows ?? []).map((p) => ({

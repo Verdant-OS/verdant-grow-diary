@@ -79,7 +79,7 @@
     "src/lib/quickLogHardwareReadingsRules.ts": "fd1d82e904a19eb0bdbe94d54e74e2f9db292c661f2bb431ed38ca99a9d7a3ac",
     "src/lib/rootZoneManualObservationRules.ts": "c594853f2ee05f9aff3ee4b5492544c2f693e06e57b47f6c75679eb4469d4b69",
     "src/lib/rootZoneObservationRules.ts": "9b8e24c016a2b39b66ee7b94f54fcf8e577e128184d5c5fcb1e631f9e3305532",
-    "src/lib/routes.ts": "f79861d2648ad1a321242b2330d3a30c13aa6a595669fa0031335168242b59cb",
+    "src/lib/routes.ts": "4872018fdde89722e570756e10f933d65bba353b2bde6eb3215cdbc675ffd4af",
     "src/lib/sensorIngestNormalizationRules.ts": "71b300b5b516b971e51f4413a27eca0ffb298f9b4f63116312627fa84d6efd34",
     "src/lib/sensorLiveMembership.ts": "70c6015fa284b89bad2d577dd31f34dc5b93b8538219b9d62cfff6e77424e9c6",
     "src/lib/sensorObservationTimeRules.ts": "9eed9614c03b761a837586b84058f82986e540b6ccdb4430535847de4cb5d932",

@@ -51,6 +51,10 @@ export class PhenoHuntError extends Error {
 export const PHENO_TRACKER_PRO_REQUIRED_MESSAGE =
   "Pheno Tracker is a Pro feature. Upgrade to Pro to start a hunt.";
 
+/** One-hunt-per-grow product rule (#567) — surface on create, not only in index copy. */
+export const PHENO_ONE_HUNT_PER_GROW_MESSAGE =
+  "This grow already has a pheno hunt. Open it from Pheno Hunts, or delete it before starting another.";
+
 function errorText(candidate: unknown): string {
   if (typeof candidate === "string") return candidate;
   if (
@@ -173,6 +177,24 @@ export async function createPhenoHunt(
   if (!input.growId) throw new PhenoHuntError("Grow is required.");
   if (input.plantIds.length === 0) {
     throw new PhenoHuntError("Select at least one candidate plant.");
+  }
+
+  // #567 — product rule: one hunt per grow. Check before insert so the index
+  // copy and create path agree. A DB unique constraint would be a follow-up;
+  // this client guard stops the silent multi-hunt Timeline hide (#568).
+  const { data: existingHunts, error: existingErr } = await client
+    .from("pheno_hunts")
+    .select("id")
+    .eq("grow_id", input.growId)
+    .limit(1);
+  if (existingErr) {
+    throw new PhenoHuntError(
+      existingErr.message ?? "Could not verify existing hunts for this grow.",
+      existingErr,
+    );
+  }
+  if ((existingHunts?.length ?? 0) > 0) {
+    throw new PhenoHuntError(PHENO_ONE_HUNT_PER_GROW_MESSAGE);
   }
 
   // Sanitize evidence goals into a bounded list of short text keys — never

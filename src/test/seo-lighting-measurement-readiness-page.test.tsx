@@ -8,14 +8,18 @@ import {
   GA4_VERIFIED_AT_KEY,
   GSC_VERIFIED_AT_KEY,
 } from "@/lib/seoLightingMeasurementReadinessStorage";
+import {
+  clearLocalStorageForTest,
+  getLocalStorageItemForTest,
+} from "./helpers/localStorageTestHelper";
 
 describe("LightingMeasurementReadiness page", () => {
   beforeEach(() => {
-    localStorage.clear();
+    clearLocalStorageForTest();
   });
   afterEach(() => {
     vi.restoreAllMocks();
-    localStorage.clear();
+    clearLocalStorageForTest();
   });
 
   it("renders sticky Ready/Blocked summary and two launch pages", () => {
@@ -50,8 +54,8 @@ describe("LightingMeasurementReadiness page", () => {
     fireEvent.click(screen.getByTestId("ga4-gate-mark-verified"));
     fireEvent.click(screen.getByTestId("gsc-gate-mark-verified"));
 
-    expect(localStorage.getItem(GA4_VERIFIED_AT_KEY)).toBe("2026-08-08T20:15:30.000Z");
-    expect(localStorage.getItem(GSC_VERIFIED_AT_KEY)).toBe("2026-08-08T20:15:30.000Z");
+    expect(getLocalStorageItemForTest(GA4_VERIFIED_AT_KEY)).toBe("2026-08-08T20:15:30.000Z");
+    expect(getLocalStorageItemForTest(GSC_VERIFIED_AT_KEY)).toBe("2026-08-08T20:15:30.000Z");
 
     const ga4Times = screen.getByTestId("ga4-gate-timestamps");
     expect(ga4Times.textContent).toMatch(/2026-08-08T20:15:30/);

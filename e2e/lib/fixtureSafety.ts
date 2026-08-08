@@ -278,3 +278,102 @@ export async function validateQuickLogFixturePage(
 
   return envCheck;
 }
+
+// ---------------------------------------------------------------------------
+// Write-smoke fixture gates (pheno + shared) — see docs/cleanup/e2e-test-data-management.md
+// ---------------------------------------------------------------------------
+
+/**
+ * Grow names that must NEVER be write-smoke targets when they lack E2E/Test
+ * markers. Extend when a real grow is accidentally used again (#570).
+ */
+export const REAL_GROW_NAME_DENYLIST: readonly RegExp[] = [
+  /\bProject\s+McDonald\b/i,
+  /\bStarter\s+Grow\b/i,
+];
+
+/**
+ * True when `name` looks like a real grower grow (denylist hit without
+ * E2E/Test markers). Names containing E2E|Test are always allowed.
+ */
+export function isForbiddenRealGrowName(name: string | null | undefined): boolean {
+  const t = (name ?? "").trim();
+  if (!t) return false;
+  if (/e2e|test/i.test(t)) return false;
+  return REAL_GROW_NAME_DENYLIST.some((rx) => rx.test(t));
+}
+
+/**
+ * Canonical hunt name for write-producing pheno smokes.
+ * Always prefixes E2E + date so leftovers are obvious and greppable (#569/#570).
+ * Callers must fill (replace) the name field — never append to the prefill.
+ */
+export function buildE2eHuntName(purpose: string, now: Date = new Date()): string {
+  const purposeClean = (purpose ?? "").trim().replace(/\s+/g, " ").slice(0, 48) || "hunt";
+  const day = now.toISOString().slice(0, 10);
+  return `E2E ${purposeClean} ${day}`;
+}
+
+export type PhenoWriteFixtureEnv = FixtureSafetyEnv & {
+  /** When true, E2E_GROW_1_PLANT_URL may be blank (pheno discovers grow via /grows). */
+  allowMissingPlantUrl?: boolean;
+};
+
+/**
+ * Env gate for write-producing pheno smokes (create hunt, score, archive).
+ * Same fixture-mode + name-marker rules as Quick Log; plant URL is optional
+ * when the suite discovers the grow from the fixture account's /grows list.
+ */
+export function validatePhenoWriteFixtureEnv(
+  env: PhenoWriteFixtureEnv = {
+    E2E_FIXTURE_MODE: process.env.E2E_FIXTURE_MODE,
+    E2E_GROW_1_PLANT_URL: process.env.E2E_GROW_1_PLANT_URL,
+    E2E_FIXTURE_EXPECTED_GROW_NAME: process.env.E2E_FIXTURE_EXPECTED_GROW_NAME,
+    E2E_FIXTURE_EXPECTED_TENT_NAME: process.env.E2E_FIXTURE_EXPECTED_TENT_NAME,
+    E2E_FIXTURE_EXPECTED_PLANT_NAME: process.env.E2E_FIXTURE_EXPECTED_PLANT_NAME,
+    E2E_FIXTURE_EXPECTED_ACCOUNT_HINT: process.env.E2E_FIXTURE_EXPECTED_ACCOUNT_HINT,
+    allowMissingPlantUrl: true,
+  },
+): FixtureEnvValidation {
+  const allowMissing = env.allowMissingPlantUrl !== false;
+  if (allowMissing && !(env.E2E_GROW_1_PLANT_URL ?? "").trim()) {
+    // Reuse validateFixtureEnv rules without requiring plant URL.
+    return validateFixtureEnv({
+      ...env,
+      E2E_GROW_1_PLANT_URL: "http://127.0.0.1/e2e-placeholder-not-used",
+    });
+  }
+  return validateFixtureEnv(env);
+}
+
+/**
+ * Throw if env is not a disposable write fixture. Call at the start of every
+ * write-producing pheno test (before create/save).
+ */
+export function assertPhenoWriteFixtureEnv(env?: PhenoWriteFixtureEnv): FixtureEnvValidation {
+  const result = validatePhenoWriteFixtureEnv(env);
+  if (!result.ok) {
+    throw new Error(
+      `Pheno write-smoke fixture env gate failed (see docs/cleanup/e2e-test-data-management.md):\n - ${result.errors.join("\n - ")}`,
+    );
+  }
+  return result;
+}
+
+/**
+ * Throw if a discovered grow label is on the real-grow denylist.
+ * Use after reading a grow name from /grows or the wizard "Linked grow" line.
+ */
+export function assertGrowAllowedForWriteSmoke(growName: string | null | undefined): void {
+  if (isForbiddenRealGrowName(growName)) {
+    throw new Error(
+      `Write-smoke refused: grow name '${(growName ?? "").trim()}' matches the real-grow denylist without E2E/Test markers (#570). Point the fixture account at E2E Test Grow / Tent only.`,
+    );
+  }
+  const t = (growName ?? "").trim();
+  if (t && !/e2e|test/i.test(t)) {
+    throw new Error(
+      `Write-smoke refused: grow name '${t}' lacks E2E/Test markers. Write smokes must use the disposable fixture garden only.`,
+    );
+  }
+}

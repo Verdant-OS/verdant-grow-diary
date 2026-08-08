@@ -110,3 +110,36 @@ Manual owner steps (no automation against real diary rows):
 - [ ] Hunt names use `buildE2eHuntName` + full `.fill()`
 - [ ] Cleanup deletes hunts you created when possible
 - [ ] No evidence Quick Log on non-fixture plants
+
+## 8. Automated garden rotation (CLI)
+
+Pure planner: `scripts/e2e/e2e-fixture-rotation-core.mjs`  
+CLI: `scripts/e2e/rotate-e2e-fixture.mjs`
+
+```bash
+# Dry-run (default) — discover + plan only
+export VITE_SUPABASE_URL=...
+export VITE_SUPABASE_PUBLISHABLE_KEY=...
+export E2E_ROTATION_ACCESS_TOKEN=...   # fixture user JWT
+# optional pin:
+# export LOVABLE_E2E_TARGET_PROJECT_REF=...
+
+bun run e2e:fixture:rotate:dry
+
+# Delete only E2E-prefixed pheno hunts (dual confirm)
+bun run e2e:fixture:rotate
+
+# Then verify before write smokes
+bun run e2e:verify-fixture
+```
+
+**Behavior**
+
+| Situation                                             | Result                                              |
+| ----------------------------------------------------- | --------------------------------------------------- |
+| Grow named Project McDonald / Starter Grow / unmarked | **BLOCKED** — rotate account, do not wipe           |
+| Clean garden with `E2E …` hunts                       | Plans/deletes those hunts only                      |
+| Missing `E2E Test Tent` / plant                       | Reports `seed_missing` (create via UI or bootstrap) |
+| Diary residue                                         | **Never** bulk-deleted                              |
+
+Receipt line: `E2E_FIXTURE_ROTATION_JSON={...}` (no tokens/emails).

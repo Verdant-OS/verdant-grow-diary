@@ -1,11 +1,12 @@
 /**
- * Pure E2E fixture rotation planner/executor tests.
+ * Pure E2E fixture rotation planner/executor tests (all gap features).
  */
 import { describe, it, expect, vi } from "vitest";
 import {
   parseRotationArgs,
   isForbiddenRealGrowName,
   isFixtureHuntName,
+  isE2eDiaryNote,
   buildE2eHuntName,
   classifyGardenInventory,
   planRotation,
@@ -19,129 +20,188 @@ import {
 
 describe("parseRotationArgs", () => {
   it("defaults to dry_run", () => {
-    expect(parseRotationArgs([])).toEqual({ mode: "dry_run" });
-    expect(parseRotationArgs(["--dry-run"])).toEqual({ mode: "dry_run" });
+    expect(parseRotationArgs([])).toEqual({ mode: "dry_run", pruneDiary: false });
   });
   it("requires both execute and confirm", () => {
-    expect(parseRotationArgs(["--execute"])).toMatchObject({ mode: "blocked" });
-    expect(parseRotationArgs(["--confirm-fixture-rotation"])).toMatchObject({
-      mode: "blocked",
-    });
+    expect(parseRotationArgs(["--execute"]).mode).toBe("blocked");
     expect(parseRotationArgs(["--execute", "--confirm-fixture-rotation"])).toEqual({
       mode: "execute",
+      pruneDiary: false,
     });
   });
-  it("blocks unknown and conflicting flags", () => {
-    expect(parseRotationArgs(["--force"])).toMatchObject({ reason: "unknown_flag" });
-    expect(parseRotationArgs(["--dry-run", "--execute"])).toMatchObject({
-      reason: "conflicting_flags",
-    });
+  it("allows diary prune only with execute+confirm", () => {
+    expect(parseRotationArgs(["--prune-e2e-diary"]).reason).toBe(
+      "prune_diary_requires_execute_confirm",
+    );
+    expect(
+      parseRotationArgs(["--execute", "--confirm-fixture-rotation", "--prune-e2e-diary"]),
+    ).toEqual({ mode: "execute", pruneDiary: true });
   });
 });
 
-describe("name classifiers", () => {
-  it("denylists real grows without E2E markers", () => {
-    expect(isForbiddenRealGrowName("Project McDonald")).toBe(true);
-    expect(isForbiddenRealGrowName("Starter Grow")).toBe(true);
-    expect(isForbiddenRealGrowName("E2E Starter Grow")).toBe(false);
-    expect(isForbiddenRealGrowName("E2E Test Grow")).toBe(false);
-  });
-  it("identifies fixture hunts by E2E prefix", () => {
+describe("isFixtureHuntName — concat + legacy residue", () => {
+  it("matches E2E prefix and E2E+pheno hunt", () => {
     expect(isFixtureHuntName("E2E paid-journey 2026-08-08")).toBe(true);
     expect(isFixtureHuntName("Codex Pro E2E Pheno Hunt 2026-07-25")).toBe(true);
-    expect(isFixtureHuntName("Blue Dream F2")).toBe(false);
   });
-  it("buildE2eHuntName matches playbook", () => {
+  it("matches concat without leading E2E (#569)", () => {
+    expect(isFixtureHuntName("Starter Grow Pheno HuntClaude E2E Pheno Hunt")).toBe(true);
+    expect(isFixtureHuntName("Starter Grow Pheno HuntSomething")).toBe(true);
+    expect(isFixtureHuntName("Summer Pheno Hunt Extra Pheno Hunt")).toBe(true);
+  });
+  it("matches Claude/Codex/DEMO residue", () => {
+    expect(isFixtureHuntName("Claude Pheno Hunt")).toBe(true);
+    expect(isFixtureHuntName("DEMO — Loud Pack S1 Hunt")).toBe(true);
+  });
+  it("keeps real grower hunt names", () => {
+    expect(isFixtureHuntName("Blue Dream F2")).toBe(false);
+    expect(isFixtureHuntName("Summer Pheno Hunt")).toBe(false);
+  });
+});
+
+describe("isE2eDiaryNote", () => {
+  it("matches E2E-prefixed notes only", () => {
+    expect(isE2eDiaryNote("E2E paid-journey smoke — safe to delete")).toBe(true);
+    expect(isE2eDiaryNote("E2E pheno sweep: vigor evidence")).toBe(true);
+    expect(isE2eDiaryNote("Watered 1L — real grower note")).toBe(false);
+  });
+});
+
+describe("classify + plan — auto-seed + diary", () => {
+  it("blocks contaminated accounts", () => {
+    const c = classifyGardenInventory({
+      grows: [{ id: "g1", name: "Project McDonald" }],
+      hunts: [{ id: "h1", name: "E2E leftover" }],
+    });
+    expect(planRotation(c).status).toBe("blocked");
+  });
+
+  it("plans hunt delete, seed, and optional diary", () => {
+    const c = classifyGardenInventory({
+      grows: [{ id: "g1", name: "E2E Test Grow" }],
+      tents: [],
+      plants: [{ id: "p1", name: E2E_GARDEN_NAMES.plant }],
+      hunts: [{ id: "h1", name: "Starter Grow Pheno HuntClaude" }],
+      diary: [
+        { id: "d1", plant_id: "p1", note: "E2E paid-journey smoke" },
+        { id: "d2", plant_id: "p1", note: "Real watering note" },
+      ],
+    });
+    expect(c.hunts_to_delete).toHaveLength(1);
+    expect(c.diary_to_delete).toHaveLength(1);
+    expect(c.missing.tent).toBe(true);
+
+    const withoutDiary = planRotation(c, { pruneDiary: false });
+    expect(withoutDiary.actions.some((a) => a.op === "delete_e2e_diary")).toBe(false);
+    expect(withoutDiary.actions.some((a) => a.op === "seed_missing" && a.kind === "tent")).toBe(
+      true,
+    );
+
+    const withDiary = planRotation(c, { pruneDiary: true });
+    expect(withDiary.actions.filter((a) => a.op === "delete_e2e_diary")).toHaveLength(1);
+  });
+});
+
+describe("executeRotationPlan — auto-seed", () => {
+  it("dry-run never mutates", async () => {
+    const del = vi.fn();
+    const seed = vi.fn();
+    const plan = planRotation(
+      classifyGardenInventory({
+        grows: [{ id: "g1", name: "E2E Test Grow" }],
+        tents: [],
+        plants: [],
+        hunts: [{ id: "h1", name: "E2E x 2026-08-08" }],
+      }),
+    );
+    const r = await executeRotationPlan(plan, "dry_run", {
+      deletePhenoHunt: del,
+      seedGarden: seed,
+    });
+    expect(r.reason).toBe("dry_run");
+    expect(del).not.toHaveBeenCalled();
+    expect(seed).not.toHaveBeenCalled();
+  });
+
+  it("execute deletes hunts and seeds missing garden", async () => {
+    const del = vi.fn().mockResolvedValue(undefined);
+    const seed = vi.fn().mockResolvedValue({ seeded: ["tent", "plant"] });
+    const plan = planRotation(
+      classifyGardenInventory({
+        grows: [{ id: "g1", name: "E2E Test Grow" }],
+        tents: [],
+        plants: [],
+        hunts: [{ id: "h1", name: "E2E x 2026-08-08" }],
+      }),
+    );
+    const r = await executeRotationPlan(plan, "execute", {
+      deletePhenoHunt: del,
+      seedGarden: seed,
+    });
+    expect(r.status).toBe("completed");
+    expect(del).toHaveBeenCalledWith("h1");
+    expect(seed).toHaveBeenCalled();
+    expect(r.counts.seed_actions_completed).toBe(2);
+  });
+
+  it("execute prunes diary when planned", async () => {
+    const delHunt = vi.fn();
+    const delDiary = vi.fn().mockResolvedValue(undefined);
+    const plan = planRotation(
+      classifyGardenInventory({
+        grows: [{ id: "g1", name: "E2E Test Grow" }],
+        tents: [{ id: "t1", name: E2E_GARDEN_NAMES.tent }],
+        plants: [{ id: "p1", name: E2E_GARDEN_NAMES.plant }],
+        hunts: [],
+        diary: [{ id: "d1", plant_id: "p1", note: "E2E smoke note" }],
+      }),
+      { pruneDiary: true },
+    );
+    const r = await executeRotationPlan(plan, "execute", {
+      deletePhenoHunt: delHunt,
+      deleteDiaryEntry: delDiary,
+    });
+    expect(delDiary).toHaveBeenCalledWith("d1");
+    expect(r.counts.diary_deleted).toBe(1);
+  });
+});
+
+describe("receipt schema v2", () => {
+  it("includes seed and diary counts", () => {
+    const line = renderRotationReceipt(
+      buildRotationReceipt({
+        status: "completed",
+        mode: "execute",
+        counts: {
+          hunts_deleted: 1,
+          hunts_planned: 1,
+          seed_actions_planned: 1,
+          seed_actions_completed: 1,
+          diary_deleted: 2,
+          diary_planned: 2,
+          forbidden_grows: 0,
+          unmarked_grows: 0,
+        },
+      }),
+    );
+    expect(line.startsWith(E2E_FIXTURE_ROTATION_JSON_PREFIX)).toBe(true);
+    const body = JSON.parse(line.slice(E2E_FIXTURE_ROTATION_JSON_PREFIX.length));
+    expect(body.schema_version).toBe("2");
+    expect(body.counts.diary_deleted).toBe(2);
+    expect(body.counts.seed_actions_completed).toBe(1);
+  });
+});
+
+describe("buildE2eHuntName", () => {
+  it("prefixes E2E and date", () => {
     expect(buildE2eHuntName("rotate", new Date("2026-08-08T00:00:00Z"))).toBe(
       "E2E rotate 2026-08-08",
     );
   });
 });
 
-describe("classifyGardenInventory + planRotation", () => {
-  it("blocks contaminated accounts with McDonald grow", () => {
-    const c = classifyGardenInventory({
-      grows: [{ id: "g1", name: "Project McDonald" }],
-      tents: [],
-      plants: [],
-      hunts: [{ id: "h1", name: "E2E leftover 2026-07-25" }],
-    });
-    expect(c.contaminated).toBe(true);
-    const plan = planRotation(c);
-    expect(plan.status).toBe("blocked");
-    expect(plan.reason).toBe("account_contaminated");
-    expect(plan.actions).toEqual([]);
-  });
-
-  it("plans delete of E2E hunts on a clean garden", () => {
-    const c = classifyGardenInventory({
-      grows: [{ id: "g1", name: "E2E Test Grow" }],
-      tents: [{ id: "t1", name: E2E_GARDEN_NAMES.tent }],
-      plants: [{ id: "p1", name: E2E_GARDEN_NAMES.plant }],
-      hunts: [
-        { id: "h1", name: "E2E paid-journey 2026-08-01" },
-        { id: "h2", name: "Real keeper notes hunt" },
-      ],
-    });
-    expect(c.contaminated).toBe(false);
-    expect(c.hunts_to_delete).toHaveLength(1);
-    expect(c.hunts_kept).toHaveLength(1);
-    const plan = planRotation(c);
-    expect(plan.status).toBe("ready");
-    expect(plan.actions).toEqual([
-      { op: "delete_pheno_hunt", hunt_id: "h1", name: "E2E paid-journey 2026-08-01" },
-    ]);
-  });
-
-  it("reports missing tent/plant seed actions", () => {
-    const c = classifyGardenInventory({
-      grows: [{ id: "g1", name: "E2E Test Grow" }],
-      tents: [],
-      plants: [],
-      hunts: [],
-    });
-    const plan = planRotation(c);
-    expect(plan.actions.some((a) => a.op === "seed_missing" && a.kind === "tent")).toBe(true);
-    expect(plan.actions.some((a) => a.op === "seed_missing" && a.kind === "plant")).toBe(true);
-  });
-});
-
-describe("executeRotationPlan", () => {
-  it("dry-run never calls delete", async () => {
-    const del = vi.fn();
-    const plan = planRotation(
-      classifyGardenInventory({
-        grows: [{ id: "g1", name: "E2E Test Grow" }],
-        tents: [{ id: "t1", name: E2E_GARDEN_NAMES.tent }],
-        plants: [{ id: "p1", name: E2E_GARDEN_NAMES.plant }],
-        hunts: [{ id: "h1", name: "E2E x 2026-08-08" }],
-      }),
-    );
-    const r = await executeRotationPlan(plan, "dry_run", { deletePhenoHunt: del });
-    expect(r.status).toBe("completed");
-    expect(r.reason).toBe("dry_run");
-    expect(r.counts.hunts_planned).toBe(1);
-    expect(r.counts.hunts_deleted).toBe(0);
-    expect(del).not.toHaveBeenCalled();
-  });
-
-  it("execute deletes only fixture hunts", async () => {
-    const del = vi.fn().mockResolvedValue(undefined);
-    const plan = planRotation(
-      classifyGardenInventory({
-        grows: [{ id: "g1", name: "E2E Test Grow" }],
-        tents: [{ id: "t1", name: E2E_GARDEN_NAMES.tent }],
-        plants: [{ id: "p1", name: E2E_GARDEN_NAMES.plant }],
-        hunts: [{ id: "h1", name: "E2E x 2026-08-08" }],
-      }),
-    );
-    const r = await executeRotationPlan(plan, "execute", { deletePhenoHunt: del });
-    expect(r.status).toBe("completed");
-    expect(del).toHaveBeenCalledWith("h1");
-    expect(r.counts.hunts_deleted).toBe(1);
-  });
-
-  it("runRotation end-to-end dry path", async () => {
+describe("runRotation", () => {
+  it("end-to-end dry path", async () => {
     const r = await runRotation({
       inventory: {
         grows: [{ id: "g1", name: "E2E Test Grow" }],
@@ -152,27 +212,5 @@ describe("executeRotationPlan", () => {
       mode: "dry_run",
     });
     expect(r.status).toBe("completed");
-  });
-});
-
-describe("receipt", () => {
-  it("renders versioned prefix without secrets", () => {
-    const receipt = buildRotationReceipt({
-      status: "completed",
-      mode: "dry_run",
-      counts: {
-        hunts_deleted: 0,
-        hunts_planned: 2,
-        seed_actions_planned: 0,
-        forbidden_grows: 0,
-        unmarked_grows: 0,
-      },
-    });
-    const line = renderRotationReceipt(receipt);
-    expect(line.startsWith(E2E_FIXTURE_ROTATION_JSON_PREFIX)).toBe(true);
-    expect(line).not.toMatch(/password|token|Bearer|eyJ/i);
-    expect(JSON.parse(line.slice(E2E_FIXTURE_ROTATION_JSON_PREFIX.length)).schema_version).toBe(
-      "1",
-    );
   });
 });

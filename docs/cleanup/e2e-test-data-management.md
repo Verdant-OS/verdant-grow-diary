@@ -116,30 +116,50 @@ Manual owner steps (no automation against real diary rows):
 Pure planner: `scripts/e2e/e2e-fixture-rotation-core.mjs`  
 CLI: `scripts/e2e/rotate-e2e-fixture.mjs`
 
-```bash
-# Dry-run (default) — discover + plan only
-export VITE_SUPABASE_URL=...
-export VITE_SUPABASE_PUBLISHABLE_KEY=...
-export E2E_ROTATION_ACCESS_TOKEN=...   # fixture user JWT
-# optional pin:
-# export LOVABLE_E2E_TARGET_PROJECT_REF=...
+### Required env
 
+| Variable                                                                  | Role                                          |
+| ------------------------------------------------------------------------- | --------------------------------------------- |
+| `VITE_SUPABASE_URL`                                                       | Supabase project URL                          |
+| `VITE_SUPABASE_PUBLISHABLE_KEY`                                           | Anon key                                      |
+| `E2E_ROTATION_ACCESS_TOKEN` (or managed session JSON)                     | Fixture user JWT                              |
+| `E2E_ROTATION_TARGET_PROJECT_REF` **or** `LOVABLE_E2E_TARGET_PROJECT_REF` | **Required** project pin (must match URL ref) |
+
+### Commands
+
+```bash
+export VITE_SUPABASE_URL=https://<ref>.supabase.co
+export VITE_SUPABASE_PUBLISHABLE_KEY=...
+export E2E_ROTATION_ACCESS_TOKEN=...
+export E2E_ROTATION_TARGET_PROJECT_REF=<ref>
+
+# Dry-run (default) — discover + plan only
 bun run e2e:fixture:rotate:dry
 
-# Delete only E2E-prefixed pheno hunts (dual confirm)
+# Prune fixture hunts + auto-seed missing E2E Test Tent/Plant
 bun run e2e:fixture:rotate
 
-# Then verify before write smokes
+# Also prune E2E-prefixed diary notes on fixture plants only
+bun run e2e:fixture:rotate:with-diary
+
 bun run e2e:verify-fixture
 ```
 
-**Behavior**
+### Behavior
 
-| Situation                                             | Result                                              |
-| ----------------------------------------------------- | --------------------------------------------------- |
-| Grow named Project McDonald / Starter Grow / unmarked | **BLOCKED** — rotate account, do not wipe           |
-| Clean garden with `E2E …` hunts                       | Plans/deletes those hunts only                      |
-| Missing `E2E Test Tent` / plant                       | Reports `seed_missing` (create via UI or bootstrap) |
-| Diary residue                                         | **Never** bulk-deleted                              |
+| Situation                                                                                  | Result                                               |
+| ------------------------------------------------------------------------------------------ | ---------------------------------------------------- |
+| Missing project pin / pin mismatch                                                         | **BLOCKED**                                          |
+| Grow named Project McDonald / Starter Grow / unmarked                                      | **BLOCKED** — rotate account                         |
+| Clean garden with fixture hunts (E2E prefix, Claude/Codex/DEMO residue, concat Pheno Hunt) | Plans/deletes those hunts                            |
+| Missing `E2E Test Tent` / plant                                                            | **Auto-seeds** exact names on execute                |
+| Diary on fixture plant with `E2E…` note                                                    | Listed always; deleted only with `--prune-e2e-diary` |
+| Grower diary notes                                                                         | Never deleted                                        |
 
-Receipt line: `E2E_FIXTURE_ROTATION_JSON={...}` (no tokens/emails).
+Receipt: `E2E_FIXTURE_ROTATION_JSON={...}` schema_version **2** (no tokens/emails).
+
+### CI
+
+Manual only: `.github/workflows/e2e-fixture-garden-rotation.yml`  
+`workflow_dispatch` with `mode=dry-run` (default) or `execute` / `execute-with-diary`.  
+Never on push/schedule.

@@ -1,20 +1,15 @@
 /**
  * E2E fixture garden rotation — pure planner + executor.
  *
- * Scope (intentionally narrow — see docs/cleanup/e2e-test-data-management.md):
- *   - Classify grows/tents/plants/hunts as fixture | forbidden | other
- *   - BLOCK if any forbidden grow is present (account contaminated → full
- *     account rotate, not scripted wipe)
- *   - Plan delete of pheno_hunts whose names are E2E-prefixed (or match the
- *     buildE2eHuntName pattern)
- *   - Report missing garden pieces (tent/plant expected names)
- *   - NEVER bulk-delete diary entries
- *   - NEVER use service_role (caller injects user-scoped adapter)
+ * Features (see docs/cleanup/e2e-test-data-management.md §8):
+ *   1. Auto-seed missing E2E Test Tent / Plant (execute mode, exact names only)
+ *   2. Project pin required at CLI (this core stays pure)
+ *   3. Fixture hunt detection includes E2E prefix, legacy markers, concat residue
+ *   4. Optional diary prune for notes matching E2E prefixes on fixture plants
+ *   5. Dry-run default; dual confirm for mutate; third flag for diary
  *
- * Defaults to dry-run. Destruction requires BOTH:
- *   --execute --confirm-fixture-rotation
- *
- * This module is pure: no process.env, no I/O, no Supabase import.
+ * NEVER service_role. NEVER bulk-delete unmarked diary. NEVER touch
+ * forbidden/unmarked grows (account contaminated → block).
  */
 
 /** Exact garden names (must match e2e/FIXTURE_SETUP.md). */
@@ -34,6 +29,13 @@ export const REAL_GROW_NAME_DENYLIST = Object.freeze([
   /\bStarter\s+Grow\b/i,
 ]);
 
+/** Note/text prefixes allowed for optional diary prune (fixture plants only). */
+export const E2E_DIARY_NOTE_PATTERNS = Object.freeze([
+  /^E2E\b/i,
+  /\bE2E\s+(paid-journey|pheno|smoke|workspace|fixture)\b/i,
+  /^E2E\s+pheno\s+sweep/i,
+]);
+
 export const E2E_FIXTURE_ROTATION_JSON_PREFIX = "E2E_FIXTURE_ROTATION_JSON=";
 
 export function isE2eOrTestMarker(name) {
@@ -47,14 +49,31 @@ export function isForbiddenRealGrowName(name) {
   return REAL_GROW_NAME_DENYLIST.some((rx) => rx.test(t));
 }
 
-/** Hunt names safe to prune: start with "E2E " or exact garden-style marker. */
+/**
+ * Hunt names safe to prune.
+ * - Leading `E2E `
+ * - Contains E2E + "pheno hunt"
+ * - Known agent residue (Claude / Codex / DEMO) with pheno hunt
+ * - Concatenated defaults: "Pheno Hunt" appears twice (e.g. #569)
+ * - Starter Grow prefill concat even without E2E token
+ */
 export function isFixtureHuntName(name) {
   const t = (name ?? "").trim();
   if (!t) return false;
   if (/^E2E\s+/i.test(t)) return true;
-  // Historical e2e leftovers that still mark themselves as E2E.
   if (/\bE2E\b/i.test(t) && /pheno\s*hunt/i.test(t)) return true;
+  if (/pheno\s*hunt/i.test(t) && /\b(claude|codex|demo)\b/i.test(t)) return true;
+  if (/^DEMO\s*[—\-]/u.test(t)) return true;
+  if ((t.match(/pheno\s*hunt/gi) || []).length >= 2) return true;
+  // Prefill residue: defaultHuntName("Starter Grow") + typed suffix without clear
+  if (/starter\s+grow\s+pheno\s*hunt/i.test(t)) return true;
   return false;
+}
+
+export function isE2eDiaryNote(note) {
+  const t = (note ?? "").trim();
+  if (!t) return false;
+  return E2E_DIARY_NOTE_PATTERNS.some((rx) => rx.test(t));
 }
 
 export function buildE2eHuntName(purpose, now = new Date()) {
@@ -71,25 +90,39 @@ export function buildE2eHuntName(purpose, now = new Date()) {
 // CLI args
 // ---------------------------------------------------------------------------
 
+/**
+ * @returns {{ mode: 'dry_run'|'execute'|'blocked', reason?: string, pruneDiary: boolean }}
+ */
 export function parseRotationArgs(argv) {
-  const known = new Set(["--dry-run", "--execute", "--confirm-fixture-rotation"]);
+  const known = new Set([
+    "--dry-run",
+    "--execute",
+    "--confirm-fixture-rotation",
+    "--prune-e2e-diary",
+  ]);
   const flags = new Set();
   for (const arg of argv) {
     if (!known.has(arg)) {
-      return { mode: "blocked", reason: "unknown_flag" };
+      return { mode: "blocked", reason: "unknown_flag", pruneDiary: false };
     }
     flags.add(arg);
   }
   const dryRun = flags.has("--dry-run");
   const execute = flags.has("--execute");
   const confirm = flags.has("--confirm-fixture-rotation");
-  if (dryRun && (execute || confirm)) {
-    return { mode: "blocked", reason: "conflicting_flags" };
+  const pruneDiary = flags.has("--prune-e2e-diary");
+
+  if (dryRun && (execute || confirm || pruneDiary)) {
+    return { mode: "blocked", reason: "conflicting_flags", pruneDiary: false };
   }
-  if (execute && confirm) return { mode: "execute" };
-  if (execute) return { mode: "blocked", reason: "missing_confirm_flag" };
-  if (confirm) return { mode: "blocked", reason: "missing_execute_flag" };
-  return { mode: "dry_run" };
+  if (pruneDiary && !(execute && confirm)) {
+    // Diary prune is destructive; never alone or with dry-run.
+    return { mode: "blocked", reason: "prune_diary_requires_execute_confirm", pruneDiary: false };
+  }
+  if (execute && confirm) return { mode: "execute", pruneDiary };
+  if (execute) return { mode: "blocked", reason: "missing_confirm_flag", pruneDiary: false };
+  if (confirm) return { mode: "blocked", reason: "missing_execute_flag", pruneDiary: false };
+  return { mode: "dry_run", pruneDiary: false };
 }
 
 // ---------------------------------------------------------------------------
@@ -97,14 +130,11 @@ export function parseRotationArgs(argv) {
 // ---------------------------------------------------------------------------
 
 /**
- * @param {{ id: string, name: string }[]} grows
- * @param {{ id: string, name: string, grow_id?: string|null }[]} tents
- * @param {{ id: string, name: string, grow_id?: string|null, tent_id?: string|null }[]} plants
- * @param {{ id: string, name: string, grow_id?: string|null }[]} hunts
- * @param {{ tent: string, plant: string, plant2?: string, grow?: string }} expected
+ * @param inventory grows/tents/plants/hunts + optional diary_entries
+ *   diary: { id, note, plant_id }[]
  */
 export function classifyGardenInventory(
-  { grows = [], tents = [], plants = [], hunts = [] },
+  { grows = [], tents = [], plants = [], hunts = [], diary = [] },
   expected = E2E_GARDEN_NAMES,
 ) {
   const forbiddenGrows = grows.filter((g) => isForbiddenRealGrowName(g.name));
@@ -116,13 +146,18 @@ export function classifyGardenInventory(
   const fixturePlants = plants.filter(
     (p) => p.name === expected.plant || p.name === (expected.plant2 ?? E2E_GARDEN_NAMES.plant2),
   );
+  const fixturePlantIds = new Set(fixturePlants.map((p) => p.id));
   const fixtureHunts = hunts.filter((h) => isFixtureHuntName(h.name));
   const otherHunts = hunts.filter((h) => !isFixtureHuntName(h.name));
+
+  const diaryToDelete = diary.filter(
+    (d) => d.plant_id && fixturePlantIds.has(d.plant_id) && isE2eDiaryNote(d.note),
+  );
 
   const missing = {
     tent: fixtureTents.length === 0,
     plant: !plants.some((p) => p.name === expected.plant),
-    plant2: false, // optional
+    plant2: false,
   };
 
   const contaminated = forbiddenGrows.length > 0 || unmarkedGrows.length > 0;
@@ -135,6 +170,11 @@ export function classifyGardenInventory(
     fixture_plants: fixturePlants.map((p) => ({ id: p.id, name: p.name })),
     hunts_to_delete: fixtureHunts.map((h) => ({ id: h.id, name: h.name })),
     hunts_kept: otherHunts.map((h) => ({ id: h.id, name: h.name })),
+    diary_to_delete: diaryToDelete.map((d) => ({
+      id: d.id,
+      plant_id: d.plant_id,
+      note: String(d.note ?? "").slice(0, 80),
+    })),
     missing,
     counts: {
       grows: grows.length,
@@ -142,6 +182,7 @@ export function classifyGardenInventory(
       plants: plants.length,
       hunts: hunts.length,
       hunts_to_delete: fixtureHunts.length,
+      diary_to_delete: diaryToDelete.length,
       forbidden_grows: forbiddenGrows.length,
       unmarked_grows: unmarkedGrows.length,
     },
@@ -149,10 +190,12 @@ export function classifyGardenInventory(
 }
 
 /**
- * Build a rotation plan from classified inventory.
- * @returns {{ status: 'ready'|'blocked', reason: string|null, actions: object[], classification: object }}
+ * @param classification
+ * @param {{ pruneDiary?: boolean }} options
  */
-export function planRotation(classification) {
+export function planRotation(classification, options = {}) {
+  const pruneDiary = options.pruneDiary === true;
+
   if (classification.contaminated) {
     return {
       status: "blocked",
@@ -179,6 +222,16 @@ export function planRotation(classification) {
   if (classification.missing.plant) {
     actions.push({ op: "seed_missing", kind: "plant", name: E2E_GARDEN_NAMES.plant });
   }
+  if (pruneDiary) {
+    for (const d of classification.diary_to_delete) {
+      actions.push({
+        op: "delete_e2e_diary",
+        entry_id: d.id,
+        plant_id: d.plant_id,
+        note_preview: d.note,
+      });
+    }
+  }
 
   return {
     status: "ready",
@@ -190,8 +243,8 @@ export function planRotation(classification) {
         ? ["Garden already clean — run bun run e2e:verify-fixture."]
         : [
             "Review dry-run plan.",
-            "Re-run with --execute --confirm-fixture-rotation to delete E2E hunts.",
-            "Create missing tent/plant via UI or e2e:bootstrap-fixture if listed.",
+            "Re-run with --execute --confirm-fixture-rotation to apply hunt prune + auto-seed.",
+            "Add --prune-e2e-diary only when you also want E2E-prefixed diary notes on fixture plants removed.",
             "bun run e2e:verify-fixture before write smokes.",
           ],
   };
@@ -206,6 +259,9 @@ export function zeroRotationCounts() {
     hunts_deleted: 0,
     hunts_planned: 0,
     seed_actions_planned: 0,
+    seed_actions_completed: 0,
+    diary_deleted: 0,
+    diary_planned: 0,
     forbidden_grows: 0,
     unmarked_grows: 0,
   };
@@ -221,7 +277,7 @@ export function buildRotationReceipt({
   next_steps = [],
 }) {
   return {
-    schema_version: "1",
+    schema_version: "2",
     status,
     reason,
     mode,
@@ -231,6 +287,9 @@ export function buildRotationReceipt({
       hunts_deleted: counts.hunts_deleted ?? 0,
       hunts_planned: counts.hunts_planned ?? 0,
       seed_actions_planned: counts.seed_actions_planned ?? 0,
+      seed_actions_completed: counts.seed_actions_completed ?? 0,
+      diary_deleted: counts.diary_deleted ?? 0,
+      diary_planned: counts.diary_planned ?? 0,
       forbidden_grows: counts.forbidden_grows ?? 0,
       unmarked_grows: counts.unmarked_grows ?? 0,
     },
@@ -243,13 +302,17 @@ export function renderRotationReceipt(receipt) {
 }
 
 // ---------------------------------------------------------------------------
-// Executor — delete only planned fixture hunts via injected adapter
+// Executor
 // ---------------------------------------------------------------------------
 
 /**
  * @param plan from planRotation
  * @param mode 'dry_run' | 'execute'
- * @param ops { deletePhenoHunt(huntId): Promise<void> }
+ * @param ops {
+ *   deletePhenoHunt?(huntId): Promise<void>,
+ *   seedGarden?(kinds: ('tent'|'plant')[]): Promise<{ seeded: string[] }>,
+ *   deleteDiaryEntry?(entryId): Promise<void>,
+ * }
  */
 export async function executeRotationPlan(plan, mode, ops = {}) {
   const counts = zeroRotationCounts();
@@ -257,6 +320,7 @@ export async function executeRotationPlan(plan, mode, ops = {}) {
   counts.unmarked_grows = plan.classification?.counts?.unmarked_grows ?? 0;
   counts.hunts_planned = plan.actions.filter((a) => a.op === "delete_pheno_hunt").length;
   counts.seed_actions_planned = plan.actions.filter((a) => a.op === "seed_missing").length;
+  counts.diary_planned = plan.actions.filter((a) => a.op === "delete_e2e_diary").length;
 
   if (plan.status === "blocked") {
     return {
@@ -276,48 +340,86 @@ export async function executeRotationPlan(plan, mode, ops = {}) {
     };
   }
 
-  if (typeof ops.deletePhenoHunt !== "function") {
-    return {
-      status: "blocked",
-      reason: "missing_delete_adapter",
-      counts,
-      next_steps: ["Provide an authenticated deletePhenoHunt adapter."],
-    };
-  }
-
+  // --- Hunts ---
   let deleted = 0;
-  for (const action of plan.actions) {
-    if (action.op !== "delete_pheno_hunt") continue;
-    // Defense in depth: never delete unless name still classifies as fixture.
-    if (!isFixtureHuntName(action.name)) {
+  const huntActions = plan.actions.filter((a) => a.op === "delete_pheno_hunt");
+  if (huntActions.length > 0) {
+    if (typeof ops.deletePhenoHunt !== "function") {
       return {
-        status: "failed",
-        reason: "hunt_name_not_fixture",
-        counts: { ...counts, hunts_deleted: deleted },
-        next_steps: ["Aborted: a planned hunt failed the fixture name check."],
+        status: "blocked",
+        reason: "missing_delete_adapter",
+        counts,
+        next_steps: ["Provide an authenticated deletePhenoHunt adapter."],
       };
     }
-    await ops.deletePhenoHunt(action.hunt_id);
-    deleted += 1;
+    for (const action of huntActions) {
+      if (!isFixtureHuntName(action.name)) {
+        return {
+          status: "failed",
+          reason: "hunt_name_not_fixture",
+          counts: { ...counts, hunts_deleted: deleted },
+          next_steps: ["Aborted: a planned hunt failed the fixture name check."],
+        };
+      }
+      await ops.deletePhenoHunt(action.hunt_id);
+      deleted += 1;
+    }
+  }
+  counts.hunts_deleted = deleted;
+
+  // --- Auto-seed tent/plant ---
+  const seedKinds = plan.actions
+    .filter((a) => a.op === "seed_missing")
+    .map((a) => a.kind)
+    .filter((k) => k === "tent" || k === "plant");
+  if (seedKinds.length > 0) {
+    if (typeof ops.seedGarden !== "function") {
+      return {
+        status: "failed",
+        reason: "missing_seed_adapter",
+        counts,
+        next_steps: [
+          "Hunts may have been deleted; seed adapter missing — create tent/plant via UI.",
+        ],
+      };
+    }
+    const result = await ops.seedGarden(seedKinds);
+    counts.seed_actions_completed = Array.isArray(result?.seeded) ? result.seeded.length : 0;
   }
 
-  counts.hunts_deleted = deleted;
+  // --- Optional diary prune ---
+  const diaryActions = plan.actions.filter((a) => a.op === "delete_e2e_diary");
+  let diaryDeleted = 0;
+  if (diaryActions.length > 0) {
+    if (typeof ops.deleteDiaryEntry !== "function") {
+      return {
+        status: "failed",
+        reason: "missing_diary_adapter",
+        counts: { ...counts, diary_deleted: 0 },
+        next_steps: ["Diary prune requested but adapter missing."],
+      };
+    }
+    for (const action of diaryActions) {
+      // Defense: only IDs from the plan; adapter must still scope by user RLS.
+      await ops.deleteDiaryEntry(action.entry_id);
+      diaryDeleted += 1;
+    }
+  }
+  counts.diary_deleted = diaryDeleted;
+
   return {
     status: "completed",
     reason: null,
     counts,
     next_steps: [
-      "Seed missing tent/plant if reported (UI or bootstrap).",
       "bun run e2e:verify-fixture",
+      "Update E2E_GROW_1_PLANT_URL if plant was recreated.",
     ],
   };
 }
 
-/**
- * End-to-end pure path: classify → plan → execute (or dry-run).
- */
-export async function runRotation({ inventory, expected, mode, ops }) {
+export async function runRotation({ inventory, expected, mode, ops, pruneDiary = false }) {
   const classification = classifyGardenInventory(inventory, expected ?? E2E_GARDEN_NAMES);
-  const plan = planRotation(classification);
+  const plan = planRotation(classification, { pruneDiary });
   return executeRotationPlan(plan, mode, ops);
 }

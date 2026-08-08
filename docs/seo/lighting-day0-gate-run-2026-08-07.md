@@ -96,3 +96,29 @@ Required before Day 0:
 ## Machine-readable matrix
 
 `artifacts/seo/lighting-collection-matrix-2026-08-07.json`
+
+
+## Post-merge status — 2026-08-07 (lead)
+
+| Step | Status |
+| --- | --- |
+| PR #834 required CI | PASS |
+| Squash merge | PASS — `df7f7c58ff5bcc01c87e3e84056421b03ab69477` |
+| Auto-tag | PASS — `v2026.08.07-df7f7c58ff5b` |
+| Lovable production publish | **BLOCKED** — live still `a21afd5c1e44` |
+| Post-publish matrix re-run | WAITING |
+| Enhanced Measurement owner change | WAITING |
+| Authenticated GA4 baseline | BLOCKED |
+| Authenticated GSC baseline | BLOCKED |
+| Day 0 | **UNSET** |
+
+### Latest matrix reconfirm (pre-publish)
+
+- Timestamp: `2026-08-08T00:00:50.592Z`
+- Loader still Array-push: `function i(...e){r.push(e)}`
+- dataLayer entry types: `[object Array]` for js/config
+- Collect requests: 0 / 9 states
+- Transmitted: 0
+- Verdict: `FAIL_COLLECTION_DARK_ARRAY_PUSH`
+
+Publish `df7f7c58` to production, then re-run the matrix before any Day 0 stamp.

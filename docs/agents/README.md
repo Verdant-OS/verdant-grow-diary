@@ -1,6 +1,6 @@
 # Verdant Agent Governance
 
-**Sentinel-Version: 2026-08-01.8**
+**Sentinel-Version: 2026-08-09.1**
 
 Multi-agent work on Verdant runs under one shared constitution plus a small
 platform-specific bootstrap per agent. A single file cannot reach every AI platform
@@ -22,6 +22,7 @@ ROLE DOCUMENTS
 OPERATING STATE
   docs/agents/CURRENT_STATE.md   the changing shift report
   docs/agents/HANDOFF_PROTOCOL.md  handoff format and rules
+  docs/agents/merge-queue.md       deploy-branch merge queue + snapshot script
 
 HISTORICAL — never active instructions
   docs/archive/legacy/verdant-master-prompt-legacy.md

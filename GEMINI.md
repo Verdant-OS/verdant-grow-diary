@@ -1,6 +1,6 @@
 # Verdant Sentinel Code
 
-**Sentinel-Version: 2026-08-01.8**
+**Sentinel-Version: 2026-08-09.1**
 
 `AGENTS.md` remains canonical. The exact mirrored constitution is delimited below so CI
 can reject content drift as well as version drift.
@@ -9,7 +9,7 @@ can reject content drift as well as version drift.
 
 # Verdant Agent Constitution
 
-**Sentinel-Version: 2026-08-01.8**
+**Sentinel-Version: 2026-08-09.1**
 
 This is Verdant's universal Sentinel Code. Every agent inherits these durable product,
 engineering, data, safety, and release rules. Platform-specific bootstraps live at the

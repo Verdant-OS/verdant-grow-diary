@@ -91,6 +91,53 @@
       }
     ]
   },
+  "current_production_recheck": {
+    "status": "FAIL",
+    "observed_at": "2026-08-10T22:08:22.645Z",
+    "observed_at_chicago": "2026-08-10T17:08:22.652-05:00",
+    "evidence_method": "PUBLIC_VERSION_JSON_GITHUB_COMMIT_API_AND_COMPARE_API",
+    "production_manifest_commit": "aa39cf3d29b6f61ffba29425ac496c6909057164",
+    "production_ref": "__orphan__",
+    "production_commit_time": "2026-08-10T18:45:44Z",
+    "production_build_time": "2026-08-10T18:46:56.582Z",
+    "deploy_branch": "verdant-grow-diary",
+    "deploy_branch_head": "04807bb225c453fb75539513b8c1966ecbe8cde4",
+    "deploy_branch_head_is_direct_parent": true,
+    "comparison_relation": "AHEAD",
+    "commits_ahead_of_deploy_branch": 7,
+    "commits_behind_deploy_branch": 0,
+    "changed_paths": [
+      "bun.lock",
+      "package.json",
+      "src/test/payments-webhook-raw-payload-normalization.test.ts",
+      "supabase/functions/mcp/index.ts",
+      "supabase/functions/payments-webhook/index.ts",
+      "supabase/functions/payments-webhook/normalizePaddleEvent.ts"
+    ],
+    "associated_pull_requests": 0,
+    "check_runs_total": 0,
+    "commit_status_contexts_total": 0,
+    "lighting_pages": [
+      {
+        "path": "/guides/cannabis-grow-light-distance-and-schedule",
+        "http_status": 200,
+        "canonical_match": true,
+        "sitemap_occurrences": 1
+      },
+      {
+        "path": "/guides/cannabis-light-stress-light-burn-bleaching-or-heat",
+        "http_status": 200,
+        "canonical_match": true,
+        "sitemap_occurrences": 1
+      }
+    ],
+    "sitemap_url_count": 55,
+    "release_identity_status": "FAIL",
+    "lighting_release_content_match_status": "PASS",
+    "analytics_identity_reverification_status": "NOT_MEASURED",
+    "day_0_status": "UNSET",
+    "required_owner_action": "Either publish the reviewed verdant-grow-diary release intentionally or review, test, merge, and obtain CI for the seven-commit production chain; then rerun the controlled analytics matrix and authenticated GA4/GSC baselines."
+  },
   "release_evidence": {
     "lighting_pull_request": "https://github.com/Verdant-OS/verdant-grow-diary/pull/595",
     "lighting_status": "LIVE",

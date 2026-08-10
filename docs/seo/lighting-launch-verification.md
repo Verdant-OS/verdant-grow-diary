@@ -37,6 +37,33 @@ The owner-confirmed GA4 production stream is `Verdant Grow Diary`, stream URL
 Production loads and targets that exact measurement ID. This closes stream identity only; the
 numeric property ID and authenticated reporting baseline remain unavailable to Codex.
 
+## Current production recheck — 2026-08-10
+
+At `2026-08-10T22:08:22.645Z`, the public production manifest reported commit
+`aa39cf3d29b6f61ffba29425ac496c6909057164`, ref `__orphan__`, commit time
+`2026-08-10T18:45:44Z`, and build time `2026-08-10T18:46:56.582Z`. The repository's
+`verdant-grow-diary` branch remains at `04807bb225c453fb75539513b8c1966ecbe8cde4`.
+
+GitHub's commit and compare evidence shows that the production commit has the deploy-branch head
+as a direct parent but is **seven commits ahead** of that branch. It has no associated pull request,
+zero check runs, and zero legacy commit-status contexts. The unmerged production chain touches
+`supabase/functions/mcp`, `supabase/functions/payments-webhook`, and its dependencies, so its
+broader release status cannot be inferred from the green checks on `04807bb…`.
+
+The two lighting pages still return HTTP 200, retain their absolute self-canonicals, and appear once
+each in the 55-URL public sitemap. This proves the current lighting content surface remains sound;
+it does **not** prove that the full orphan production release is reviewed or CI-verified.
+
+**Current production release identity: FAIL — unverified orphan release ahead of deploy branch**
+
+**Current lighting release-content match: PASS — lighting guides only**
+
+Before Day 0 can start, the owner must either intentionally publish the reviewed
+`verdant-grow-diary` release or review, test, merge, and obtain CI for the seven-commit production
+chain. Then repeat the controlled analytics matrix and the authenticated GA4/GSC baseline capture.
+The historical `2026-08-02` analytics evidence below remains a point-in-time record; this recheck
+does not claim current analytics verification.
+
 ## Publication and release evidence
 
 - `https://verdantgrowdiary.com/version.json` identifies production build commit

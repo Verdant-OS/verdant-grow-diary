@@ -177,6 +177,49 @@ describe("SEO readiness status artifact", () => {
     );
   });
 
+  it("fails closed when current production is an unverified orphan ahead of deploy", () => {
+    const recheck = READINESS.current_production_recheck as Record<string, unknown>;
+    expect(recheck).toMatchObject({
+      status: "FAIL",
+      production_manifest_commit: "aa39cf3d29b6f61ffba29425ac496c6909057164",
+      production_ref: "__orphan__",
+      deploy_branch: "verdant-grow-diary",
+      deploy_branch_head: "04807bb225c453fb75539513b8c1966ecbe8cde4",
+      deploy_branch_head_is_direct_parent: true,
+      comparison_relation: "AHEAD",
+      commits_ahead_of_deploy_branch: 7,
+      commits_behind_deploy_branch: 0,
+      associated_pull_requests: 0,
+      check_runs_total: 0,
+      commit_status_contexts_total: 0,
+      sitemap_url_count: 55,
+      release_identity_status: "FAIL",
+      lighting_release_content_match_status: "PASS",
+      analytics_identity_reverification_status: "NOT_MEASURED",
+      day_0_status: "UNSET",
+    });
+    expect(Number.isNaN(Date.parse(String(recheck.observed_at)))).toBe(false);
+    expect(recheck.lighting_pages).toEqual([
+      expect.objectContaining({
+        path: "/guides/cannabis-grow-light-distance-and-schedule",
+        http_status: 200,
+        canonical_match: true,
+        sitemap_occurrences: 1,
+      }),
+      expect.objectContaining({
+        path: "/guides/cannabis-light-stress-light-burn-bleaching-or-heat",
+        http_status: 200,
+        canonical_match: true,
+        sitemap_occurrences: 1,
+      }),
+    ]);
+    expect(LAUNCH_VERIFICATION).toContain(
+      "Current production release identity: FAIL — unverified orphan release ahead of deploy branch",
+    );
+    expect(LAUNCH_VERIFICATION).toContain(String(recheck.production_manifest_commit));
+    expect(LAUNCH_VERIFICATION).toContain(String(recheck.deploy_branch_head));
+  });
+
   it("records the deployed route-runtime structured-data repair as production verified", () => {
     expect(READINESS.technical_seo_status).toBe("PASS");
     expect(READINESS.technical_seo).toMatchObject({

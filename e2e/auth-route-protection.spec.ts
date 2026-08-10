@@ -16,9 +16,11 @@ const PRIVATE_TABLES = [
   "diary_entries",
   "sensor_readings",
   "action_queue",
+  "pheno_hunts",
+  "pheno_keepers",
 ];
 
-const PROTECTED_TABLES = [...PRIVATE_TABLES, "pheno_hunts", "pheno_keepers"];
+const PROTECTED_TABLES = PRIVATE_TABLES;
 
 const PROTECTED_DESKTOP_ROUTES = [
   "/sensors",
@@ -169,6 +171,11 @@ test.describe("Auth route-protection (mocked, 1280x800)", () => {
     "/hardware-integrations",
     "/partners/csv-preview",
     "/sensors/csv-preview",
+    "/internal/contextual-pheno-comparison-demo",
+    "/internal/demo-proof-walkthrough",
+    "/internal/pheno-hunt-demo",
+    "/pheno-comparison",
+    "/pheno-expression-showcase",
   ]) {
     test(`public route ${path} renders signed-out without private fetches`, async ({
       page,

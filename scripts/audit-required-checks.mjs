@@ -131,6 +131,7 @@ async function resolvePullRequest(sha) {
     kind: PR_RESOLUTION.PULL_REQUEST,
     number: pr.number,
     headSha: pr.head?.sha ?? "",
+    landedSha: sha,
     mergedBy: pr.merged_by?.login ?? "",
     // Load-bearing: evidence is read as of this instant, so a check that
     // finished after the merge cannot retroactively vouch for it.
@@ -153,13 +154,16 @@ async function resolveRulesetDrift(pinned) {
     });
     const rule = (ruleset?.rules ?? []).find((r) => r.type === "required_status_checks");
     const live = (rule?.parameters?.required_status_checks ?? []).map((c) => c.context);
-    // The context names are not the whole contract. `strict` is what forces a
-    // head to be up to date with its base before those checks count; turning
-    // it off silently admits results proven against a stale base, and the
-    // context list would still match exactly.
+    // The context names are not the whole contract. `strict`, enforcement,
+    // and ref-name conditions decide whether the contexts can actually gate
+    // the audited deploy branch.
     return diffPinnedAgainstRuleset(pinned.required, live, {
       pinnedStrict: pinned.strictRequiredStatusChecksPolicy,
       liveStrict: rule?.parameters?.strict_required_status_checks_policy,
+      pinnedEnforcement: pinned.enforcement,
+      liveEnforcement: ruleset?.enforcement,
+      pinnedRefNameConditions: pinned.refNameConditions,
+      liveRefNameConditions: ruleset?.conditions?.ref_name,
     });
   } catch (error) {
     // A 404 is not an inability to verify — it is a verified answer. The
@@ -174,6 +178,8 @@ async function resolveRulesetDrift(pinned) {
         addedToRuleset: [],
         removedFromRuleset: [],
         strictPolicy: null,
+        enforcement: null,
+        refNameConditions: null,
         reason:
           `ruleset ${pinned.rulesetId} does not exist (404) — the pinned required ` +
           "contexts are not enforced by anything",
@@ -207,10 +213,9 @@ async function main() {
   //
   // Reading only the head would let an older green pull_request run vouch for
   // a queued merge whose merge-group run was red or unfinished. Reading only
-  // the landed sha would miss direct merges entirely. So collect both and let
-  // the merge-time cutoff discard whatever had not finished — for a direct
-  // merge the landed sha carries post-merge `push` runs, which the cutoff
-  // correctly refuses to credit.
+  // the landed sha would miss direct merges entirely. So collect both. The
+  // pure rules prefer landed evidence whenever it existed before the merge,
+  // otherwise they use the PR-head evidence for a direct merge.
   const evidenceShas = [SHA];
   if (prResolution.kind === PR_RESOLUTION.PULL_REQUEST && prResolution.headSha) {
     if (!evidenceShas.includes(prResolution.headSha)) evidenceShas.push(prResolution.headSha);

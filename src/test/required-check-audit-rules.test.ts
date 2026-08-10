@@ -30,6 +30,7 @@ const PINNED = JSON.parse(
 const PR_769 = JSON.parse(
   readFileSync(resolve(ROOT, "src/test/fixtures/pr-769-check-runs.json"), "utf8"),
 );
+const AUDIT_SCRIPT = readFileSync(resolve(ROOT, "scripts/audit-required-checks.mjs"), "utf8");
 
 const MERGED = { kind: PR_RESOLUTION.PULL_REQUEST, number: 1, headSha: "abc", mergedBy: "x" };
 
@@ -54,6 +55,11 @@ describe("config/required-status-checks.json", () => {
   it("pins the 35 contexts of ruleset 20421416 and targets the deploy branch", () => {
     expect(PINNED.rulesetId).toBe(20421416);
     expect(PINNED.branch).toBe("verdant-grow-diary");
+    expect(PINNED.enforcement).toBe("active");
+    expect(PINNED.refNameConditions).toEqual({
+      include: ["refs/heads/verdant-grow-diary"],
+      exclude: [],
+    });
     expect(PINNED.required).toHaveLength(35);
     expect(PINNED.strictRequiredStatusChecksPolicy).toBe(true);
     // 32 sharded full-suite contexts plus three named gates.
@@ -179,6 +185,103 @@ describe("normalizeObservedChecks", () => {
     });
     expect(observed.get("a")?.status).toBe(CHECK_STATUS.FAIL);
     expect(observed.get("a")?.incomplete).toBe(true);
+  });
+
+  it("fails a rerun that was already in flight at the merge despite an older success", () => {
+    const observed = normalizeObservedChecks({
+      checkRuns: [
+        {
+          name: "a",
+          status: "completed",
+          conclusion: "success",
+          id: 1,
+          started_at: "2026-08-07T01:00:00Z",
+          completed_at: "2026-08-07T01:05:00Z",
+        },
+        {
+          name: "a",
+          status: "in_progress",
+          conclusion: null,
+          id: 2,
+          started_at: "2026-08-07T01:10:00Z",
+        },
+      ],
+      mergedAt: "2026-08-07T01:15:00Z",
+    });
+    expect(observed.get("a")?.status).toBe(CHECK_STATUS.FAIL);
+    expect(observed.get("a")?.unfinishedAtMerge).toBe(true);
+    expect(observed.get("a")?.lateForMerge).toBeUndefined();
+  });
+
+  it("fails a rerun that finished after the merge but started before it", () => {
+    const observed = normalizeObservedChecks({
+      checkRuns: [
+        {
+          name: "a",
+          status: "completed",
+          conclusion: "success",
+          id: 1,
+          started_at: "2026-08-07T01:00:00Z",
+          completed_at: "2026-08-07T01:05:00Z",
+        },
+        {
+          name: "a",
+          status: "completed",
+          conclusion: "success",
+          id: 2,
+          started_at: "2026-08-07T01:10:00Z",
+          completed_at: "2026-08-07T01:20:00Z",
+        },
+      ],
+      mergedAt: "2026-08-07T01:15:00Z",
+    });
+    expect(observed.get("a")?.status).toBe(CHECK_STATUS.FAIL);
+    expect(observed.get("a")?.incomplete).toBe(false);
+    expect(observed.get("a")?.unfinishedAtMerge).toBe(true);
+  });
+
+  it("fails closed when an unfinished attempt has no usable start timestamp", () => {
+    const observed = normalizeObservedChecks({
+      checkRuns: [
+        {
+          name: "a",
+          status: "completed",
+          conclusion: "success",
+          id: 1,
+          started_at: "2026-08-07T01:00:00Z",
+          completed_at: "2026-08-07T01:05:00Z",
+        },
+        { name: "a", status: "in_progress", conclusion: null, id: 2 },
+      ],
+      mergedAt: "2026-08-07T01:15:00Z",
+    });
+    expect(observed.get("a")?.status).toBe(CHECK_STATUS.FAIL);
+    expect(observed.get("a")?.unfinishedAtMerge).toBe(true);
+  });
+
+  it("ignores a rerun that began only after the merge", () => {
+    const observed = normalizeObservedChecks({
+      checkRuns: [
+        {
+          name: "a",
+          status: "completed",
+          conclusion: "success",
+          id: 1,
+          started_at: "2026-08-07T01:00:00Z",
+          completed_at: "2026-08-07T01:05:00Z",
+        },
+        {
+          name: "a",
+          status: "in_progress",
+          conclusion: null,
+          id: 2,
+          started_at: "2026-08-07T01:20:00Z",
+        },
+      ],
+      mergedAt: "2026-08-07T01:15:00Z",
+    });
+    expect(observed.get("a")?.status).toBe(CHECK_STATUS.PASS);
+    expect(observed.get("a")?.unfinishedAtMerge).toBeUndefined();
   });
 
   it("survives null, undefined and nameless junk without throwing", () => {
@@ -391,6 +494,82 @@ describe("auditRequiredChecks — the failures it exists to catch", () => {
     expect(observed.get("Full test suite (shard 1/32)")?.sha).toBe("landed");
   });
 
+  it("uses green landed merge-group evidence over a stale PR-head failure", () => {
+    const observed = normalizeObservedChecks({
+      landedSha: "landed",
+      checkRuns: [
+        {
+          name: "a",
+          head_sha: "landed",
+          status: "completed",
+          conclusion: "success",
+          id: 1,
+          started_at: "2026-08-07T01:00:00Z",
+          completed_at: "2026-08-07T01:05:00Z",
+        },
+        {
+          name: "a",
+          head_sha: "prhead",
+          status: "completed",
+          conclusion: "failure",
+          id: 2,
+          started_at: "2026-08-07T01:00:00Z",
+          completed_at: "2026-08-07T01:05:00Z",
+        },
+      ],
+      mergedAt: "2026-08-07T01:15:00Z",
+    });
+    expect(observed.get("a")?.status).toBe(CHECK_STATUS.PASS);
+    expect(observed.get("a")?.sha).toBe("landed");
+  });
+
+  it("does not let PR-head evidence fill a missing queued-merge context", () => {
+    const result = auditRequiredChecks({
+      pinned: { required: ["a", "b"], mustBeGreen: [] },
+      checkRuns: [
+        {
+          name: "a",
+          head_sha: "landed",
+          status: "completed",
+          conclusion: "success",
+          id: 1,
+          started_at: "2026-08-07T01:00:00Z",
+          completed_at: "2026-08-07T01:05:00Z",
+        },
+        {
+          name: "a",
+          head_sha: "prhead",
+          status: "completed",
+          conclusion: "success",
+          id: 2,
+          started_at: "2026-08-07T01:00:00Z",
+          completed_at: "2026-08-07T01:05:00Z",
+        },
+        {
+          name: "b",
+          head_sha: "prhead",
+          status: "completed",
+          conclusion: "success",
+          id: 3,
+          started_at: "2026-08-07T01:00:00Z",
+          completed_at: "2026-08-07T01:05:00Z",
+        },
+      ],
+      prResolution: {
+        kind: PR_RESOLUTION.PULL_REQUEST,
+        number: 1,
+        headSha: "prhead",
+        landedSha: "landed",
+        mergedAt: "2026-08-07T01:15:00Z",
+      },
+      rulesetDrift: { status: "PASS" },
+    });
+    expect(result.verdict).toBe(AUDIT_VERDICT.FAIL);
+    expect(result.failingFindings.find((finding) => finding.context === "b")?.status).toBe(
+      CHECK_STATUS.MISSING,
+    );
+  });
+
   it("still passes when the same context is green on both SHAs", () => {
     const observed = normalizeObservedChecks({
       checkRuns: [
@@ -592,6 +771,61 @@ describe("ruleset drift", () => {
     expect(drift.strictPolicy).toEqual({ pinned: true, live: false, changed: true });
   });
 
+  it("fails when ruleset enforcement or deploy-branch conditions drift", () => {
+    const drift = diffPinnedAgainstRuleset(["a"], ["a"], {
+      pinnedStrict: true,
+      liveStrict: true,
+      pinnedEnforcement: "active",
+      liveEnforcement: "disabled",
+      pinnedRefNameConditions: {
+        include: ["refs/heads/verdant-grow-diary"],
+        exclude: [],
+      },
+      liveRefNameConditions: {
+        include: ["refs/heads/main"],
+        exclude: [],
+      },
+    });
+    expect(drift.status).toBe("FAIL");
+    expect(drift.enforcement).toEqual({ pinned: "active", live: "disabled", changed: true });
+    expect(drift.refNameConditions?.changed).toBe(true);
+  });
+
+  it("fails closed when a pinned enforcement or ref-name value is absent from live evidence", () => {
+    const drift = diffPinnedAgainstRuleset(["a"], ["a"], {
+      pinnedEnforcement: "active",
+      pinnedRefNameConditions: {
+        include: ["refs/heads/verdant-grow-diary"],
+        exclude: [],
+      },
+    });
+    expect(drift.status).toBe("FAIL");
+    expect(drift.enforcement).toEqual({ pinned: "active", live: null, changed: true });
+    expect(drift.refNameConditions).toEqual({
+      pinned: { include: ["refs/heads/verdant-grow-diary"], exclude: [] },
+      live: null,
+      changed: true,
+    });
+  });
+
+  it("passes when enforcement and ref-name conditions still match, regardless of list order", () => {
+    const drift = diffPinnedAgainstRuleset(["a"], ["a"], {
+      pinnedEnforcement: "active",
+      liveEnforcement: "active",
+      pinnedRefNameConditions: {
+        include: ["refs/heads/b", "refs/heads/a"],
+        exclude: ["refs/heads/legacy"],
+      },
+      liveRefNameConditions: {
+        include: ["refs/heads/a", "refs/heads/b"],
+        exclude: ["refs/heads/legacy"],
+      },
+    });
+    expect(drift.status).toBe("PASS");
+    expect(drift.enforcement?.changed).toBe(false);
+    expect(drift.refNameConditions?.changed).toBe(false);
+  });
+
   it("passes when the strict policy still matches", () => {
     const drift = diffPinnedAgainstRuleset(["a"], ["a"], { pinnedStrict: true, liveStrict: true });
     expect(drift.status).toBe("PASS");
@@ -641,6 +875,36 @@ describe("ruleset drift", () => {
     expect(result.verdict).toBe(AUDIT_VERDICT.FAIL);
     const blocker = result.blockers.find((b) => b.code === "ruleset_drift");
     expect(blocker?.message).toContain("stale base");
+  });
+
+  it("names enforcement and branch-scope drift in the blocker message", () => {
+    const result = auditRequiredChecks({
+      pinned: PINNED,
+      checkRuns: allGreen(EVERY_PINNED),
+      prResolution: MERGED,
+      rulesetDrift: {
+        status: "FAIL",
+        addedToRuleset: [],
+        removedFromRuleset: [],
+        enforcement: { pinned: "active", live: "disabled", changed: true },
+        refNameConditions: {
+          pinned: { include: ["refs/heads/verdant-grow-diary"], exclude: [] },
+          live: { include: ["refs/heads/main"], exclude: [] },
+          changed: true,
+        },
+      },
+    });
+    const blocker = result.blockers.find((b) => b.code === "ruleset_drift");
+    expect(blocker?.message).toContain("ruleset enforcement is now disabled");
+    expect(blocker?.message).toContain("ref_name conditions are now include [refs/heads/main]");
+  });
+
+  it("wires the landed SHA and full ruleset policy into the post-merge IO boundary", () => {
+    expect(AUDIT_SCRIPT).toContain("landedSha: sha");
+    expect(AUDIT_SCRIPT).toContain("pinnedEnforcement: pinned.enforcement");
+    expect(AUDIT_SCRIPT).toContain("liveEnforcement: ruleset?.enforcement");
+    expect(AUDIT_SCRIPT).toContain("pinnedRefNameConditions: pinned.refNameConditions");
+    expect(AUDIT_SCRIPT).toContain("liveRefNameConditions: ruleset?.conditions?.ref_name");
   });
 });
 

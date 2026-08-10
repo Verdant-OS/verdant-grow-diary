@@ -104,6 +104,7 @@ export function normalizeObservedChecks({
   checkRuns = [],
   commitStatuses = [],
   mergedAt = null,
+  landedSha = "",
 } = {}) {
   const observations = [];
 
@@ -161,6 +162,19 @@ export function normalizeObservedChecks({
     return Number.isFinite(finished) && finished <= mergeCutoff;
   };
 
+  /**
+   * A run which started before a merge but completed afterward was in flight at
+   * the cutoff. GitHub would have kept the merge blocked, even when an older
+   * completed attempt for the same context was green. Missing timestamps cannot
+   * prove a post-merge start, so the audit fails closed rather than crediting
+   * the older result.
+   */
+  const unfinishedAtMerge = (observation) => {
+    if (!gateAtMerge || settledByMerge(observation)) return false;
+    const started = Date.parse(observation.startedAt);
+    return !Number.isFinite(started) || started <= mergeCutoff;
+  };
+
   // Resolve per (context, source, sha), not per context. Two independent
   // reasons the key has to be that wide:
   //
@@ -175,18 +189,64 @@ export function normalizeObservedChecks({
   // Collapsing either dimension early lets one observation overwrite another
   // before the worst-first rule below ever sees it.
   const settled = new Map();
+  const inFlight = new Map();
   const late = new Map();
   for (const observation of observations) {
     const key = `${observation.source} ${observation.sha ?? ""} ${observation.context}`;
-    const bucket = settledByMerge(observation) ? settled : late;
+    const bucket = settledByMerge(observation)
+      ? settled
+      : unfinishedAtMerge(observation)
+        ? inFlight
+        : late;
     const existing = bucket.get(key);
     if (!existing || compareObservations(observation, existing) < 0) {
       bucket.set(key, observation);
     }
   }
 
-  // A context whose evidence ALL postdates the merge gated nothing. Promote it
-  // to a failure rather than crediting the late result.
+  // Merge-queue checks run on the landed merge-group SHA. If any evidence on
+  // that SHA existed at merge time, it is authoritative for the whole merge:
+  // a same-named PR-head failure/success is not the check that gated the
+  // queued commit. Direct merges have no such landed evidence before merging,
+  // so they fall back to the PR-head evidence gathered above.
+  const authoritativeLandedSha = asString(landedSha);
+  const useLandedEvidence = Boolean(
+    gateAtMerge &&
+    authoritativeLandedSha &&
+    [...settled.values(), ...inFlight.values()].some(
+      (observation) => observation.sha === authoritativeLandedSha,
+    ),
+  );
+  const isRelevantEvidence = (observation) =>
+    !useLandedEvidence || observation.sha === authoritativeLandedSha;
+
+  const selected = new Map();
+  const select = (key, observation) => {
+    const existing = selected.get(key);
+    if (
+      !existing ||
+      (observation.unfinishedAtMerge && !existing.unfinishedAtMerge) ||
+      (observation.unfinishedAtMerge === existing.unfinishedAtMerge &&
+        compareObservations(observation, existing) < 0)
+    ) {
+      selected.set(key, observation);
+    }
+  };
+
+  for (const [key, observation] of settled) {
+    if (isRelevantEvidence(observation)) select(key, observation);
+  }
+  for (const [key, observation] of inFlight) {
+    if (!isRelevantEvidence(observation)) continue;
+    select(key, {
+      ...observation,
+      status: CHECK_STATUS.FAIL,
+      unfinishedAtMerge: true,
+    });
+  }
+
+  // A context whose evidence ALL started after the merge gated nothing. Promote
+  // it to a failure rather than crediting the late result.
   //
   // The test is per context, not per key. Now that the key carries the sha, a
   // direct merge's landed commit accumulates post-merge `push` runs under
@@ -196,11 +256,12 @@ export function normalizeObservedChecks({
   // before this was scoped to the context.
   if (gateAtMerge) {
     const contextsWithSettledEvidence = new Set(
-      [...settled.values()].map((observation) => observation.context),
+      [...selected.values()].map((observation) => observation.context),
     );
     for (const [key, observation] of late) {
+      if (!isRelevantEvidence(observation)) continue;
       if (contextsWithSettledEvidence.has(observation.context)) continue;
-      settled.set(key, { ...observation, status: CHECK_STATUS.FAIL, lateForMerge: true });
+      select(key, { ...observation, status: CHECK_STATUS.FAIL, lateForMerge: true });
     }
   }
 
@@ -208,7 +269,7 @@ export function normalizeObservedChecks({
   // first: any red source makes the context red regardless of what the other
   // source said, and only then does recency decide.
   const byContext = new Map();
-  for (const observation of settled.values()) {
+  for (const observation of selected.values()) {
     const existing = byContext.get(observation.context);
     if (!existing) {
       byContext.set(observation.context, observation);
@@ -267,8 +328,13 @@ function evaluate(contexts, provenance, observed, failOn) {
       reason = "no check run or commit status reported this context";
     } else if (observation.lateForMerge) {
       reason =
-        `had not finished when the merge landed — it completed later and ` +
-        `reported ${observation.observed}, which gated nothing`;
+        `had not finished when the merge landed — it started later and reported ` +
+        `${observation.observed}, which gated nothing`;
+    } else if (observation.unfinishedAtMerge) {
+      reason = observation.incomplete
+        ? `was still ${observation.observed} when the merge landed`
+        : `had started but not finished when the merge landed — it completed later and ` +
+          `reported ${observation.observed}`;
     } else if (observation.incomplete) {
       reason = `still ${observation.observed} when the merge landed`;
     } else if (status === CHECK_STATUS.FAIL) {
@@ -321,6 +387,7 @@ export function auditRequiredChecks({
     checkRuns,
     commitStatuses,
     mergedAt: prResolution?.mergedAt ?? null,
+    landedSha: prResolution?.landedSha ?? "",
   });
 
   // An always-on entry must report as well as be green: absent or skipped is
@@ -385,6 +452,15 @@ export function auditRequiredChecks({
         (drift.strictPolicy?.changed
           ? ` — strict_required_status_checks_policy is now ${drift.strictPolicy.live}, ` +
             `pinned as ${drift.strictPolicy.pinned}: checks may now count against a stale base`
+          : "") +
+        (drift.enforcement?.changed
+          ? ` — ruleset enforcement is now ${drift.enforcement.live ?? "(missing)"}, ` +
+            `pinned as ${drift.enforcement.pinned}: the ruleset may not enforce anything`
+          : "") +
+        (drift.refNameConditions?.changed
+          ? ` — ref_name conditions are now ${formatRefNameConditions(
+              drift.refNameConditions.live,
+            )}, pinned as ${formatRefNameConditions(drift.refNameConditions.pinned)}`
           : ""),
     });
   }
@@ -406,6 +482,7 @@ export function auditRequiredChecks({
       observed: observed.size,
       failing: failingFindings.length,
       lateForMerge: findings.filter((f) => f.lateForMerge).length,
+      unfinishedAtMerge: findings.filter((f) => f.unfinishedAtMerge).length,
     },
   };
 }
@@ -414,6 +491,39 @@ export function auditRequiredChecks({
  * Compare the pinned list with the live ruleset. Only called when an admin
  * token was available; absence of a token is BLOCKED, resolved by the caller.
  */
+function normalizeStringList(value) {
+  return [
+    ...new Set((Array.isArray(value) ? value : []).filter((entry) => typeof entry === "string")),
+  ]
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .sort();
+}
+
+function normalizeRefNameConditions(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return {
+    include: normalizeStringList(value.include),
+    exclude: normalizeStringList(value.exclude),
+  };
+}
+
+function sameRefNameConditions(a, b) {
+  return (
+    a !== null &&
+    b !== null &&
+    a.include.join("\u0000") === b.include.join("\u0000") &&
+    a.exclude.join("\u0000") === b.exclude.join("\u0000")
+  );
+}
+
+function formatRefNameConditions(conditions) {
+  if (!conditions) return "(missing)";
+  const include = conditions.include.length ? conditions.include.join(", ") : "(none)";
+  const exclude = conditions.exclude.length ? conditions.exclude.join(", ") : "(none)";
+  return `include [${include}], exclude [${exclude}]`;
+}
+
 export function diffPinnedAgainstRuleset(pinnedRequired, liveContexts, policy = {}) {
   const pinnedSet = new Set(Array.isArray(pinnedRequired) ? pinnedRequired : []);
   const liveSet = new Set(Array.isArray(liveContexts) ? liveContexts : []);
@@ -429,13 +539,46 @@ export function diffPinnedAgainstRuleset(pinnedRequired, liveContexts, policy = 
   const strictComparable = typeof pinnedStrict === "boolean" && typeof liveStrict === "boolean";
   const strictChanged = strictComparable && pinnedStrict !== liveStrict;
 
+  // Disabled enforcement or a ref-name retarget leaves the context list intact
+  // while removing it from the audited deploy branch. Keep those pins beside
+  // the list and strict flag so an admin-token-backed audit catches all three.
+  const pinnedEnforcement = asString(policy.pinnedEnforcement).trim();
+  const liveEnforcement = asString(policy.liveEnforcement).trim();
+  const enforcementPinned = Boolean(pinnedEnforcement);
+  const enforcementChanged =
+    enforcementPinned && (!liveEnforcement || pinnedEnforcement !== liveEnforcement);
+
+  const pinnedRefNameConditions = normalizeRefNameConditions(policy.pinnedRefNameConditions);
+  const liveRefNameConditions = normalizeRefNameConditions(policy.liveRefNameConditions);
+  const refNameConditionsChanged =
+    pinnedRefNameConditions !== null &&
+    !sameRefNameConditions(pinnedRefNameConditions, liveRefNameConditions);
+
   return {
-    status: removedFromRuleset.length || addedToRuleset.length || strictChanged ? "FAIL" : "PASS",
+    status:
+      removedFromRuleset.length ||
+      addedToRuleset.length ||
+      strictChanged ||
+      enforcementChanged ||
+      refNameConditionsChanged
+        ? "FAIL"
+        : "PASS",
     removedFromRuleset,
     addedToRuleset,
     strictPolicy: strictComparable
       ? { pinned: pinnedStrict, live: liveStrict, changed: strictChanged }
       : null,
+    enforcement: enforcementPinned
+      ? { pinned: pinnedEnforcement, live: liveEnforcement || null, changed: enforcementChanged }
+      : null,
+    refNameConditions:
+      pinnedRefNameConditions !== null
+        ? {
+            pinned: pinnedRefNameConditions,
+            live: liveRefNameConditions,
+            changed: refNameConditionsChanged,
+          }
+        : null,
   };
 }
 
@@ -455,8 +598,14 @@ export function formatAuditReport(result, { sha = "", prNumber = null } = {}) {
   }
   if (result.counts.lateForMerge) {
     lines.push(
-      `- **${result.counts.lateForMerge} pinned context(s) finished only after the merge** — ` +
+      `- **${result.counts.lateForMerge} pinned context(s) started only after the merge** — ` +
         "they gated nothing",
+    );
+  }
+  if (result.counts.unfinishedAtMerge) {
+    lines.push(
+      `- **${result.counts.unfinishedAtMerge} pinned context(s) were still in flight at the merge** — ` +
+        "an older result cannot vouch for the newer attempt",
     );
   }
   lines.push(`- ruleset drift: ${result.rulesetDrift.status}`);

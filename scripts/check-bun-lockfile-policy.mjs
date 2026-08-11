@@ -32,6 +32,9 @@ export const PACKAGE_LOCK_SECURITY_FLOORS = Object.freeze({
   rollup: "4.59.0",
   vitest: "3.2.6",
 });
+export const BUN_LOCK_SECURITY_FLOORS = Object.freeze({
+  esbuild: "0.28.1",
+});
 export const PACKAGE_LOCK_MAJOR_SECURITY_FLOORS = Object.freeze({
   "brace-expansion": Object.freeze({
     1: "1.1.18",
@@ -483,6 +486,19 @@ export function evaluatePolicy({
                 `is ${resolvedVersion ?? "missing"}.`,
             );
           }
+        }
+      }
+
+      for (const [packageName, minimum] of Object.entries(BUN_LOCK_SECURITY_FLOORS)) {
+        const versions = resolvedVersionInBunLock(bunLockText, packageName);
+        if (
+          !versions ||
+          versions.some((resolvedVersion) => !versionAtLeast(resolvedVersion, minimum))
+        ) {
+          errors.push(
+            `bun.lock security floor for ${packageName} is ${minimum}; ` +
+              `found ${versions?.join(", ") || "none"}.`,
+          );
         }
       }
 

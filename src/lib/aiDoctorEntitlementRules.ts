@@ -62,6 +62,8 @@ export interface AiDoctorEntitlementView {
   isFounder: boolean;
   /** True for effective Pro access or any Founder identity. */
   isPaidViewer: boolean;
+  /** Paid plan that supplies neutral denial copy, or null for Free/unknown viewers. */
+  paidPlanId: Exclude<PlanId, "free"> | null;
   /** True when the viewer should bypass premium upsell prompts. */
   bypassesUpsell: boolean;
   /** Human-readable, NON-IDENTIFYING reason for the resolved view. */
@@ -80,6 +82,7 @@ export function resolveAiDoctorEntitlementView(
     return {
       isFounder: false,
       isPaidViewer: false,
+      paidPlanId: null,
       bypassesUpsell: false,
       reason: "free_or_unknown_viewer",
     };
@@ -100,6 +103,7 @@ export function resolveAiDoctorEntitlementView(
     return {
       isFounder: true,
       isPaidViewer: true,
+      paidPlanId: "founder_lifetime",
       bypassesUpsell: true,
       reason: "founder_bypass",
     };
@@ -108,6 +112,7 @@ export function resolveAiDoctorEntitlementView(
     return {
       isFounder: false,
       isPaidViewer: true,
+      paidPlanId: effective as Exclude<PlanId, "free">,
       bypassesUpsell: true,
       reason: "paid_plan_bypass",
     };
@@ -115,6 +120,7 @@ export function resolveAiDoctorEntitlementView(
   return {
     isFounder: false,
     isPaidViewer: false,
+    paidPlanId: null,
     bypassesUpsell: false,
     reason: "free_or_unknown_viewer",
   };
@@ -137,8 +143,8 @@ export function reconcileAiCreditDenialPlanId(args: {
 }): string | null | undefined {
   const { denialPlanId, view } = args;
   if (!view.bypassesUpsell) return denialPlanId ?? null;
-  if (denialPlanId === "free") {
-    return view.isFounder ? "founder_lifetime" : "pro_monthly";
+  if (denialPlanId === "free" && view.paidPlanId) {
+    return view.paidPlanId;
   }
   return denialPlanId ?? null;
 }

@@ -103,6 +103,7 @@ describe("resolveAiDoctorEntitlementView", () => {
       expect(v.isPaidViewer).toBe(true);
       expect(v.bypassesUpsell).toBe(true);
       expect(v.reason).toBe("paid_plan_bypass");
+      expect(reconcileAiCreditDenialPlanId({ denialPlanId: "free", view: v })).toBe(plan);
 
       const vm = buildAiCreditLimitNoticeViewModel({
         credit: denial("free"),
@@ -110,6 +111,7 @@ describe("resolveAiDoctorEntitlementView", () => {
       });
       expect(vm.kind).toBe("wait");
       expect(vm.paywallVm).toBeUndefined();
+      expect(vm.title).toContain("300");
     },
   );
 

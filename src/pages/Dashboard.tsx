@@ -192,6 +192,14 @@ export default function Dashboard() {
   const targetsState = useGrowTargets(scopedGrowId ?? null);
   const [targetsEditorOpen, setTargetsEditorOpen] = useState(false);
   const currentSensorSnapshot = sensorState.status === "ok" ? sensorState.snapshot : null;
+  // Tent attribution for a manually saved alert, taken from the same snapshot
+  // the alert was derived from. Null when the current view spans several tents
+  // — inventing a winner there would pin a real breach on an arbitrary tent.
+  // Hoisted rather than inlined at the saveAlert call simply to keep that
+  // deeply-indented payload readable; nothing depends on its width any more
+  // (alert-events.test.ts used to scan a fixed 2000-char window here — this
+  // PR re-anchored it to the handler's content, so the constraint is gone).
+  const manualAlertTentId = currentSensorSnapshot?.tent_id ?? null;
   // Unverified/simulated snapshots remain visible with their honest source
   // label, but they cannot drive green quality, target, stage, alert, or
   // persistence semantics.
@@ -239,6 +247,9 @@ export default function Dashboard() {
   // user-scoped via RLS. Not automation; not device control.
   usePersistEnvironmentAlerts({
     growId: scopedGrowId ?? null,
+    // Sourced from the SAME snapshot being alerted on, so attribution can
+    // never describe different evidence. Null while the view spans tents.
+    tentId: dashboardHealthSnapshot?.tent_id ?? null,
     snapshot: dashboardHealthSnapshot,
     quality: dashboardSensorQuality,
     targets: compareSnapshotToTargets(
@@ -1407,6 +1418,7 @@ export default function Dashboard() {
                                     try {
                                       const saved = await saveAlert({
                                         grow_id: scopedGrowId,
+                                        tent_id: manualAlertTentId,
                                         severity: a.severity,
                                         title: a.title,
                                         reason: a.reason,

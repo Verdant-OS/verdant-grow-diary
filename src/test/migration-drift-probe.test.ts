@@ -163,6 +163,27 @@ describe("migration drift probe — never publishes credentials", () => {
     expect(SRC).toContain("const warn = (line) => console.error(redactDbUrl(line, dbUrl));");
   });
 
+  it("still opens an issue when the probe never ran at all", () => {
+    // If a step BEFORE the probe fails (checkout, node, the psql install, the
+    // secret guard), exit_code is never set. Gating on that output alone means
+    // the run goes merely red and opens NO issue — so a rotated secret could
+    // leave production unmeasured indefinitely, which is precisely the
+    // low-visibility failure this workflow exists to prevent. outcome is
+    // unambiguous where an unset output is not.
+    const workflow = readFileSync(
+      resolve(ROOT, ".github/workflows/migration-drift-probe.yml"),
+      "utf8",
+    );
+    expect(workflow).toContain("steps.probe.outcome != 'success'");
+    // The bare output-only gate must not come back.
+    expect(workflow).not.toMatch(
+      /if: always\(\) && steps\.probe\.outputs\.exit_code != '0'\s*$/m,
+    );
+    // And the issue must say which of the two happened.
+    expect(workflow).toContain("probeNeverRan");
+    expect(workflow).toContain("PROBE_OUTCOME");
+  });
+
   it("finds the tracking issue on any page, and never matches a pull request", () => {
     // A single listForRepo page caps at 100. Once the drift issue falls off
     // page one the dedupe stops finding it and opens a NEW issue daily, which

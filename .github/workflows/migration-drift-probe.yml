@@ -137,15 +137,40 @@ jobs:
 
       # Runs whether the probe found drift (1) or could not check (2). Both
       # need a human; only a clean 0 is silent.
+      #
+      # Gate on the step OUTCOME, not on the output alone. If anything before
+      # the probe fails -- checkout, setup-node, the apt-get install, or the
+      # required-secret guard -- the probe never runs and never sets
+      # exit_code. Whether an unset output then compares equal to '0' depends
+      # on whether Actions treats it as an empty string (string compare, not
+      # equal) or as null (coerced to the number 0, equal). The documented
+      # casting table does not say which, and betting on the wrong one means
+      # the job goes merely red and opens NO issue -- a rotated secret could
+      # leave production unmeasured indefinitely, which is the exact
+      # low-visibility failure this whole workflow exists to prevent.
+      #
+      # outcome != 'success' is unambiguous under either reading: the probe
+      # step exits with the probe's own code, so it is 'success' only on a
+      # clean 0. Kept alongside the output check so the two must BOTH say
+      # "clean" for the alert to stay silent -- a monitor should fail toward
+      # alerting.
       - name: Open or update the drift tracking issue
-        if: always() && steps.probe.outputs.exit_code != '0'
+        if: always() && (steps.probe.outcome != 'success' || steps.probe.outputs.exit_code != '0')
         uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea
         env:
           PROBE_EXIT: ${{ steps.probe.outputs.exit_code }}
+          PROBE_OUTCOME: ${{ steps.probe.outcome }}
         with:
           script: |
             const fs = require("fs");
             const exitCode = process.env.PROBE_EXIT;
+            // 'skipped' (or anything but success/failure) means a step BEFORE
+            // the probe failed, so no measurement was even attempted. Say so
+            // plainly: "could not reach the database" and "never got as far as
+            // trying" need different fixes, and a rotated secret looks like
+            // the former if the issue does not distinguish them.
+            const probeOutcome = process.env.PROBE_OUTCOME || "unknown";
+            const probeNeverRan = probeOutcome !== "success" && probeOutcome !== "failure";
             const read = (p) => { try { return fs.readFileSync(p, "utf8").trim(); } catch { return ""; } };
             // In --json mode the probe writes BOTH its drift report and its
             // could-not-probe diagnostic to stdout (drift.json); drift.err is
@@ -170,9 +195,11 @@ jobs:
             const detail = redact(read("drift.json") || read("drift.err"));
             const title = "Migration drift: production is not running every committed migration";
             const body = [
-              exitCode === "1"
-                ? "The drift probe found migrations committed to the repository that production has **not** applied."
-                : "The drift probe **could not check** production. Nothing was verified — this is not a pass.",
+              probeNeverRan
+                ? `The drift probe **never ran** (step outcome: \`${probeOutcome}\`). A step before it failed — checkout, Node setup, the psql install, or the required-secret guard. Nothing was verified, and nothing will be until that is fixed.`
+                : exitCode === "1"
+                  ? "The drift probe found migrations committed to the repository that production has **not** applied."
+                  : "The drift probe **could not check** production. Nothing was verified — this is not a pass.",
               "",
               "```",
               detail.trim().slice(0, 4000) || "(no detail captured)",

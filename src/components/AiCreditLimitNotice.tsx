@@ -91,9 +91,9 @@ export default function AiCreditLimitNotice({
         {vm.title}
       </h3>
       <p className="mt-2 text-sm text-muted-foreground">{vm.body}</p>
-      {vm.kind === "wait" ? (
+      {vm.kind === "wait" && vm.packHref ? (
         <Link
-          to="/pricing#buy-credits"
+          to={vm.packHref}
           data-testid={`${testId}-buy-credits`}
           className="mt-3 inline-flex text-sm font-medium text-primary underline underline-offset-4"
           onClick={onBuyCreditsClick}

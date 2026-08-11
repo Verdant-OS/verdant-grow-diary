@@ -41,8 +41,8 @@ const SLICES: Array<{ name: string; slice: string; requiredSelectors: string[] }
     ],
   },
   {
-    name: "C3. Canceled/expired",
-    slice: sliceBetween("C3. Canceled/expired blocked", "D–F. Missing-evidence hunt"),
+    name: "C4. Canceled/expired",
+    slice: sliceBetween("C4. Canceled/expired blocked", "D–F. Missing-evidence hunt"),
     requiredSelectors: [
       'getByTestId("pheno-tracker-upgrade-gate")',
       'getByTestId("pheno-hunt-onboarding")',
@@ -97,6 +97,18 @@ describe("live smoke assertion contract — required assertions stay affirmative
   it("Spec A skips (never runs anonymously) when the Free session is absent", () => {
     const sliceA = SLICES[0].slice;
     expect(sliceA).toContain("test.skip(!FREE_SESSION.path");
+  });
+
+  it("keeps distinct Pro Monthly and Pro Annual sessions with affirmative paid-workspace assertions", () => {
+    const monthly = sliceBetween("C. Pro Monthly access", "C2. Pro Annual access");
+    expect(monthly).toContain("test.skip(!PRO_SESSION.path");
+    expect(monthly).toContain('getByTestId("pheno-hunt-onboarding")');
+    expect(monthly).toContain('getByTestId("pheno-tracker-upgrade-gate")');
+
+    expect(source).toContain('resolveSession("E2E_PHENO_PRO_ANNUAL_SESSION_FILE")');
+    const annual = sliceBetween("C2. Pro Annual access", "C3. Founder Lifetime access");
+    expect(annual).toMatch(/test\.skip\(\s*!PRO_ANNUAL_SESSION\.path/);
+    expect(annual).toContain('getByTestId("pheno-hunt-onboarding")');
   });
 
   it("pins the exact disabled-reason copy from the readiness view model", () => {

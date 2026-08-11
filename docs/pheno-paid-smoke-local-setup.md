@@ -58,10 +58,11 @@ grower accounts. The seeder resolves the owner via
 | -------- | ----------------------------- | ------------------------------- |
 | Free     | `pheno-free@example.test`     | none                            |
 | Pro      | `pheno-pro@example.test`      | active Pro subscription         |
+| Pro Annual | `pheno-pro-annual@example.test` | active annual Pro subscription  |
 | Founder  | `pheno-founder@example.test`  | Founder Lifetime (optional)     |
 | Canceled | `pheno-canceled@example.test` | canceled/expired billing record |
 
-Give the Pro / Founder accounts the appropriate `billing_subscriptions`
+Give the Pro / Pro Annual / Founder accounts the appropriate `billing_subscriptions`
 rows in your local DB (see `docs/e2e-tests.md` for the shape).
 
 ---
@@ -90,6 +91,9 @@ export E2E_PHENO_FREE_PASSWORD="<local test password>"
 
 export E2E_PHENO_PRO_EMAIL="pheno-pro@example.test"
 export E2E_PHENO_PRO_PASSWORD="<local test password>"
+
+export E2E_PHENO_PRO_ANNUAL_EMAIL="pheno-pro-annual@example.test"
+export E2E_PHENO_PRO_ANNUAL_PASSWORD="<local test password>"
 
 export E2E_PHENO_FOUNDER_EMAIL="pheno-founder@example.test"
 export E2E_PHENO_FOUNDER_PASSWORD="<local test password>"
@@ -122,6 +126,9 @@ $env:E2E_PHENO_FREE_PASSWORD="<local test password>"
 
 $env:E2E_PHENO_PRO_EMAIL="pheno-pro@example.test"
 $env:E2E_PHENO_PRO_PASSWORD="<local test password>"
+
+$env:E2E_PHENO_PRO_ANNUAL_EMAIL="pheno-pro-annual@example.test"
+$env:E2E_PHENO_PRO_ANNUAL_PASSWORD="<local test password>"
 
 $env:E2E_PHENO_FOUNDER_EMAIL="pheno-founder@example.test"
 $env:E2E_PHENO_FOUNDER_PASSWORD="<local test password>"

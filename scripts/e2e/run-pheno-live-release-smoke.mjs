@@ -3,7 +3,7 @@
  * Pheno Tracker Pro — live release smoke runner.
  *
  * Runs the existing paid-user Playwright smoke against the production domain
- * using dedicated Free / Pro / Founder / Canceled credentials and existing
+ * using dedicated Free / Pro Monthly / Pro Annual / Founder / Canceled credentials and existing
  * production-safe fixture hunts. It never seeds production and never prints
  * credentials, sessions, cookies, tokens, or fixture ids.
  *
@@ -11,7 +11,7 @@
  *   E2E_PHENO_LIVE_SMOKE_CONFIRM=RUN_LIVE_PHENO_SMOKE
  *
  * Required credentials:
- *   E2E_PHENO_{FREE,PRO,FOUNDER,CANCELED}_{EMAIL,PASSWORD}
+ *   E2E_PHENO_{FREE,PRO,PRO_ANNUAL,FOUNDER,CANCELED}_{EMAIL,PASSWORD}
  *
  * Required fixtures:
  *   E2E_PHENO_HUNT_ID_MISSING_EVIDENCE
@@ -41,6 +41,7 @@ const SUMMARY_MD_PATH = path.join(ARTIFACT_DIR, "live-smoke-summary.md");
 const SESSION_FILES = {
   E2E_PHENO_FREE_SESSION_FILE: "e2e/.auth/pheno-free.json",
   E2E_PHENO_PRO_SESSION_FILE: "e2e/.auth/pheno-pro.json",
+  E2E_PHENO_PRO_ANNUAL_SESSION_FILE: "e2e/.auth/pheno-pro-annual.json",
   E2E_PHENO_FOUNDER_SESSION_FILE: "e2e/.auth/pheno-founder.json",
   E2E_PHENO_CANCELED_SESSION_FILE: "e2e/.auth/pheno-canceled.json",
 };

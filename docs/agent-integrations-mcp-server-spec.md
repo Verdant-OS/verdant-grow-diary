@@ -156,18 +156,39 @@ never exposes `raw_payload` or secret material.
    `.lovable/mcp/manifest.json` are **generated** — never hand-edit the bundle.
 2. Any tool addition/rename/removal must update the **full pinned surface**,
    not just one mirror — each of these hard-codes the tool set and will fail
-   or go stale otherwise (`established fact`, read from source):
-   - `src/lib/mcp/manifestView.ts` — presenter-safe manifest mirror;
+   or go stale otherwise (`established fact`, read from source at the audited
+   ref):
+
+   *Manifest mirrors:*
+   - `src/lib/mcp/manifestView.ts` — presenter-safe manifest mirror.
+
+   *Tests pinning the exact tool list:*
    - `src/test/mcp-manifest-drift.test.ts` — pins `SOURCE_TOOLS` and the
-     exact tool-name list (lines 24/76/104 at the audited ref);
+     exact tool-name list (lines 24/76/104);
    - `src/test/mcp-local-rls-integration.test.ts` — imports each tool
      handler explicitly for the local RLS harness (its pagination/filter
      cases are manifest-driven, but the handler list is not);
+   - `src/test/agent-integrations-page.test.tsx` (≈lines 137–144) and
+     `src/test/agent-integrations-manifest-copy.test.tsx` (≈lines 103–109)
+     — both assert exactly the three shipped tool names;
+   - `e2e/agent-integrations-smoke.spec.ts` (≈lines 137–140) — asserts
+     "Tools advertised: 3" and the three exact names.
+
+   *UI / documentation surfaces:*
+   - `src/components/mcp/McpToolExplorer.tsx` — a `ToolName` union type of
+     the three names plus one hand-built card per tool;
    - `src/pages/McpApiReference.tsx` — hand-authored public reference at
-     `/docs/mcp-api`, including the tool list in its meta description;
+     `/docs/mcp-api`, including the tool list in its meta description.
+
+   *Automatic (satisfy by construction, no list edit):*
    - `src/test/mcp-tools-source-safety.test.ts` — picks up new files in
-     `src/lib/mcp/tools/` automatically, but new tools must satisfy its
-     assertions by construction (§5.3).
+     `src/lib/mcp/tools/` automatically; new tools must pass its
+     assertions (§5.3).
+
+   Line numbers drift; the binding rule is: **before shipping a tool change,
+   search the repo for the existing tool names** (`list_grows`,
+   `list_recent_diary_entries`, `get_latest_sensor_snapshot`) — every file
+   naming them is part of the pinned surface and must be reconciled.
    Per the Lovable doc (`source claim`), users must refresh their connector
    after such changes, and the app must be **re-published** for tool changes
    to go live (status moves through "Not published" until then).

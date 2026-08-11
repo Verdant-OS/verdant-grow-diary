@@ -423,14 +423,27 @@ function grantAnonQuicklogExecute(dbUrl: string): { ok: boolean; detail?: string
 // direct anon grant)? Asserted separately so the negative control proves it
 // re-created the production privilege path, not merely "some" anon access.
 function publicHasQuicklogExecute(dbUrl: string): boolean | null {
+  // PUBLIC is a pseudo-role (ACL grantee OID 0), not a row in pg_roles, so
+  // it cannot be resolved by name the way a real role can. Read the ACL
+  // directly instead.
+  //
+  // COALESCE(proacl, acldefault('f', proowner)) matters: a function that has
+  // never had an explicit GRANT/REVOKE carries proacl = NULL, and NULL means
+  // "the built-in default" -- which for functions INCLUDES EXECUTE to PUBLIC.
+  // Reading bare proacl would return no rows there and wrongly report the
+  // hole closed on exactly the freshly-created-overload case this whole
+  // migration exists to defend against.
   const out = psqlScalar(
     dbUrl,
     `SELECT EXISTS (
-       SELECT 1 FROM pg_proc p
-       JOIN pg_namespace n ON n.oid = p.pronamespace
-       WHERE n.nspname = 'public'
-         AND p.proname = 'quicklog_save_manual'
-         AND has_function_privilege('public', p.oid, 'EXECUTE')
+       SELECT 1
+         FROM pg_proc p
+         JOIN pg_namespace n ON n.oid = p.pronamespace
+         CROSS JOIN LATERAL aclexplode(COALESCE(p.proacl, acldefault('f', p.proowner))) a
+        WHERE n.nspname = 'public'
+          AND p.proname = 'quicklog_save_manual'
+          AND a.grantee = 0
+          AND a.privilege_type = 'EXECUTE'
      );`,
   );
   if (out === null) return null;

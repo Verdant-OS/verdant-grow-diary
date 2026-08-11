@@ -78,7 +78,23 @@ describe("security-advisor-hardening-followup DB security harness wiring", () =>
     // leaving a real default-ACL overload anonymously executable.
     expect(harness).toMatch(/GRANT\s+EXECUTE\s+ON\s+FUNCTION\s+%s\s+TO\s+PUBLIC/i);
     expect(harness).toContain("function publicHasQuicklogExecute(");
-    expect(harness).toContain("has_function_privilege('public', p.oid, 'EXECUTE')");
+  });
+
+  it("reads the PUBLIC ACL by grantee OID 0, never by resolving 'public' as a role", () => {
+    // PUBLIC is a pseudo-role and has no pg_roles row, so name resolution
+    // errors rather than answering the question.
+    expect(harness).toContain("aclexplode(");
+    expect(harness).toMatch(/a\.grantee\s*=\s*0/);
+    expect(harness).not.toContain("has_function_privilege('public'");
+  });
+
+  it("treats a NULL proacl as the built-in default (PUBLIC holds EXECUTE)", () => {
+    // A function that never had an explicit GRANT/REVOKE has proacl = NULL,
+    // which means the default ACL — and for functions that INCLUDES PUBLIC
+    // EXECUTE. Reading bare proacl would report the hole closed on exactly
+    // the freshly-created-overload case this migration defends against.
+    expect(harness).toContain("acldefault('f', p.proowner)");
+    expect(harness).toMatch(/COALESCE\(\s*p\.proacl/i);
   });
 
   it("asserts the migration revokes PUBLIC too, not just anon", () => {

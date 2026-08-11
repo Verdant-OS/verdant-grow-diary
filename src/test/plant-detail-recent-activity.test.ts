@@ -186,6 +186,45 @@ describe("buildPlantRecentActivity (pure)", () => {
     expect(row.isManualEntry).toBe(true);
   });
 
+  it("flags quicklog_save_event-authored Training/Photo entries as manual too (quick_log_version marker)", () => {
+    // quicklog_save_event's diary companion carries its own real activity as
+    // event_type (not the literal "quick_log" tag), so isManualEntry must
+    // also recognize its own unconditional markers
+    // (...trust_boundary_hardening.sql:284-294).
+    const [row] = buildPlantRecentActivity(
+      [
+        entry({
+          event_type: undefined,
+          details: { event_type: "training", technique: "lst", quick_log_version: 2 },
+        }),
+      ],
+      { plantId: "p1", now: NOW },
+    );
+    expect(row.eventType).toBe("training");
+    expect(row.isManualEntry).toBe(true);
+  });
+
+  it("flags via linked_grow_event_id alone when quick_log_version is absent", () => {
+    const [row] = buildPlantRecentActivity(
+      [
+        entry({
+          event_type: undefined,
+          details: { event_type: "photo", linked_grow_event_id: "evt-1" },
+        }),
+      ],
+      { plantId: "p1", now: NOW },
+    );
+    expect(row.isManualEntry).toBe(true);
+  });
+
+  it("does not flag a non-QuickLog diary row as manual just because it has some other event_type", () => {
+    const [row] = buildPlantRecentActivity(
+      [entry({ event_type: "tent_move", details: {} })],
+      { plantId: "p1", now: NOW },
+    );
+    expect(row.isManualEntry).toBe(false);
+  });
+
   it("recovers eventType from details.event_type when no top-level field exists (QuickLog Training/Photo saves)", () => {
     // diary_entries has no top-level event_type column; quicklog_save_event's
     // Training saves only carry it inside details (sanitizeQuickLogActivityDetails).

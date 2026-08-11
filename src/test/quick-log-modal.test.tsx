@@ -247,3 +247,29 @@ describe("QuickLogModal — Training detail requires a technique before save", (
     expect(screen.getByTestId("qlm-photo-detail")).toBeTruthy();
   });
 });
+
+describe("QuickLogModal — Caption length is constrained, not silently truncated", () => {
+  it("caption input has maxLength matching the server-enforced limit", () => {
+    renderModal();
+    fireEvent.click(screen.getByRole("button", { name: "Photo" }));
+    const input = screen.getByTestId("qlm-caption") as HTMLInputElement;
+    expect(input.maxLength).toBe(200);
+  });
+
+  it("typing beyond the limit does not silently drop content into state past 200 chars", () => {
+    renderModal();
+    fireEvent.click(screen.getByRole("button", { name: "Photo" }));
+    const input = screen.getByTestId("qlm-caption") as HTMLInputElement;
+    const long = "a".repeat(250);
+    fireEvent.change(input, { target: { value: long } });
+    expect(input.value.length).toBe(200);
+  });
+
+  it("shows a live character counter so the grower can see the remaining room", () => {
+    renderModal();
+    fireEvent.click(screen.getByRole("button", { name: "Photo" }));
+    const input = screen.getByTestId("qlm-caption") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "week 6 flower" } });
+    expect(screen.getByTestId("qlm-caption-count").textContent).toBe("13/200");
+  });
+});

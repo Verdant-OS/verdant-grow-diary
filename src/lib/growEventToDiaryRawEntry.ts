@@ -70,8 +70,13 @@ export interface DiaryCompanionForEnrichment {
   details?: Record<string, unknown> | null;
 }
 
-export interface EnrichedRecentLaneRawEntry extends RecentLaneRawEntry {
+export interface EnrichedRecentLaneRawEntry extends Omit<RecentLaneRawEntry, "details"> {
   photo_url: string | null;
+  // event_type/source stay guaranteed (the mapper always sets them); the
+  // companion's own detail keys (subject, caption, technique, ...) are
+  // merged in on top and are inherently open-ended, matching what
+  // sanitizeQuickLogActivityDetails can produce for any activity.
+  details: RecentLaneRawEntry["details"] & Record<string, unknown>;
 }
 
 /**

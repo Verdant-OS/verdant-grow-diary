@@ -30,6 +30,7 @@ import type { QuickLogSensorSnapshot } from "@/lib/quick-log/createQuickLogEvent
 import {
   getQuickLogActivityDetailFields,
   sanitizeQuickLogActivityDetails,
+  QUICK_LOG_DETAIL_TEXT_MAX,
 } from "@/lib/quick-log/quickLogActivityDetailFields";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
@@ -367,10 +368,17 @@ export default function QuickLogModal({
                   data-testid="qlm-caption"
                   type="text"
                   value={caption}
-                  onChange={(e) => setCaption(e.target.value)}
+                  onChange={(e) => setCaption(e.target.value.slice(0, QUICK_LOG_DETAIL_TEXT_MAX))}
+                  maxLength={QUICK_LOG_DETAIL_TEXT_MAX}
                   placeholder="What this photo shows"
                   className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                 />
+                <p
+                  className="mt-1 text-[11px] text-muted-foreground text-right"
+                  data-testid="qlm-caption-count"
+                >
+                  {caption.length}/{QUICK_LOG_DETAIL_TEXT_MAX}
+                </p>
               </div>
             </div>
           )}

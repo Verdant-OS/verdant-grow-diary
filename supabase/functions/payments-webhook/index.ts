@@ -331,8 +331,8 @@ Deno.serve(async (req) => {
       new Date(),
       safeParseJson(verified.rawBody),
     );
-  } catch (e) {
-    console.error("handleVerifiedEvent threw:", String(e));
+  } catch {
+    console.error("payments-webhook handler failed", { reason: "unexpected_handler_error" });
     // Uncaught throw → treat as transient, ask Paddle to retry.
     return new Response(JSON.stringify({ error: "internal" }), {
       status: 500,
@@ -340,7 +340,10 @@ Deno.serve(async (req) => {
     });
   }
 
-  console.log("payments-webhook result:", result.reason);
+  console.log("payments-webhook result", {
+    httpStatus: result.httpStatus,
+    outcome: result.reason.split(/[:;]/, 1)[0] || "unknown",
+  });
 
   // Best-effort order-confirmation email. Fires only for durably-processed
   // transaction.completed events. Never blocks or fails the webhook —
@@ -360,8 +363,9 @@ Deno.serve(async (req) => {
     emailReason = dispatch.reason;
   }
 
+  const publicStatus = result.httpStatus === 200 ? result.reason : "processing_failed";
   return new Response(
-    JSON.stringify({ status: result.reason, email: emailReason ?? "not_attempted" }),
+    JSON.stringify({ status: publicStatus, email: emailReason ?? "not_attempted" }),
     {
       status: result.httpStatus,
       headers: { "Content-Type": "application/json" },

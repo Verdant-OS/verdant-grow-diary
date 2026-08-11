@@ -23,6 +23,7 @@ import PhenoFightNight from "@/components/PhenoFightNight";
 import PhenoCureTimeline from "@/components/PhenoCureTimeline";
 import PhenoFamilyTree from "@/components/PhenoFamilyTree";
 import { usePhenoHuntView } from "@/hooks/usePhenoHuntView";
+import { useHydrated } from "@/hooks/useHydrated";
 import {
   buildContenders,
   contenderScore,
@@ -136,6 +137,7 @@ function LivePackCard({ c, ranked }: { c: ContenderInput; ranked: boolean }) {
 export default function PhenoHuntShowcase() {
   const { id } = useParams<{ id: string }>();
   const { status, source, meta, data, cloneRowsByKeeperId, retry } = usePhenoHuntView(id);
+  const hydrated = useHydrated();
 
   const board = useMemo(() => buildContenders(data.contenders), [data.contenders]);
   const pedigree = useMemo(
@@ -155,7 +157,11 @@ export default function PhenoHuntShowcase() {
 
   const isDemo = source === "demo";
 
-  if (status === "loading") {
+  // SSR cannot read the browser session, so it renders the loading state. A
+  // warm signed-out client can resolve that session before this lazy route
+  // hydrates; keep the first client tree identical and reveal the demo or
+  // live read only after hydration rather than regenerating the SSR markup.
+  if (!hydrated || status === "loading") {
     return (
       <main
         data-testid="pheno-hunt-showcase-page"

@@ -163,6 +163,25 @@ describe("migration drift probe — never publishes credentials", () => {
     expect(SRC).toContain("const warn = (line) => console.error(redactDbUrl(line, dbUrl));");
   });
 
+  it("finds the tracking issue on any page, and never matches a pull request", () => {
+    // A single listForRepo page caps at 100. Once the drift issue falls off
+    // page one the dedupe stops finding it and opens a NEW issue daily, which
+    // buries the real signal under noise — the same alert-fatigue failure the
+    // probe's design notes argue against elsewhere. The endpoint also returns
+    // pull requests, so a PR sharing the title would be commented on instead.
+    const workflow = readFileSync(
+      resolve(ROOT, ".github/workflows/migration-drift-probe.yml"),
+      "utf8",
+    );
+    expect(workflow).toContain("github.paginate(github.rest.issues.listForRepo");
+    // The regression guard that matters: the unpaginated call form is
+    // `listForRepo({`, the paginated one is `listForRepo,`. Reverting to a
+    // single page reintroduces the bug silently, since it works fine until
+    // the repo crosses 100 open issues.
+    expect(workflow).not.toContain("github.rest.issues.listForRepo({");
+    expect(workflow).toContain("!i.pull_request");
+  });
+
   it("keeps the workflow's second redaction layer in sync with this module", () => {
     // The workflow inlines the same pattern in its github-script step, as an
     // independent layer at the boundary that actually publishes. Two

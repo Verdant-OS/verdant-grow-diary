@@ -209,10 +209,22 @@ jobs:
 
             // Match on title rather than label, so a lost/renamed label can
             // never cause duplicate issues to pile up daily.
-            const existing = await github.rest.issues.listForRepo({
+            //
+            // Paginate: a single listForRepo page caps at 100, and once this
+            // repo carries more open issues than that, the drift issue would
+            // eventually fall off page one. The dedupe would then silently
+            // stop finding it and open a NEW issue every single day -- turning
+            // the alert channel into noise, which is how a real drift alert
+            // gets ignored. Latent today (well under 100 open), so fix it
+            // while it is cheap.
+            //
+            // Also drop pull requests: this endpoint returns them alongside
+            // issues, so without the filter a PR sharing the title would be
+            // commented on instead of the tracking issue.
+            const existing = await github.paginate(github.rest.issues.listForRepo, {
               owner, repo, state: "open", per_page: 100,
             });
-            const hit = existing.data.find((i) => i.title === title);
+            const hit = existing.find((i) => !i.pull_request && i.title === title);
             if (hit) {
               await github.rest.issues.createComment({
                 owner, repo, issue_number: hit.number, body,

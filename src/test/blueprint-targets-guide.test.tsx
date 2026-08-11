@@ -98,9 +98,30 @@ describe("BlueprintTargetsGuide", () => {
   it("offers a plan-neutral signup CTA and makes no tier claim", () => {
     render(<BlueprintTargetsGuide />);
     const cta = screen.getByTestId("blueprint-targets-cta");
-    expect(within(cta).getByTestId("blueprint-targets-signup")).toHaveAttribute("href", "/auth");
     // Craft is not purchasable-verified yet, so this page must not sell it.
     expect(cta.textContent ?? "").not.toMatch(/craft/i);
     expect(cta.textContent ?? "").not.toMatch(/\bpro\b/i);
+  });
+
+  it("sends the CTA to attributed signup, not the sign-in tab", () => {
+    render(<BlueprintTargetsGuide />);
+    const href =
+      screen.getByTestId("blueprint-targets-signup").getAttribute("href") ?? "";
+    // Bare /auth resolves to mode "signin" and skips the signup page-view path.
+    expect(href).toContain("mode=signup");
+    expect(href).toContain("utm_source=blueprint_targets");
+    expect(href).not.toBe("/auth");
+  });
+
+  it("names the medium on feed EC and pH so soil growers are not misled", () => {
+    // SOP feed figures are soilless/hydro; soil buffers pH and runs ~6.0-6.8.
+    const rows = buildStageMetricRows(SOP_BLUEPRINT_TARGETS.veg);
+    const ph = rows.find((r) => r.key === "ph");
+    const ec = rows.find((r) => r.key === "ec");
+    expect(ph?.note ?? "").toMatch(/soilless or hydro/i);
+    expect(ph?.note ?? "").toMatch(/6\.0.*6\.8/);
+    expect(ec?.note ?? "").toMatch(/soilless or hydro/i);
+    // Environment metrics are not medium-specific and must stay unqualified.
+    expect(rows.find((r) => r.key === "rh")?.note).toBeUndefined();
   });
 });

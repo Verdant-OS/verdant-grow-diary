@@ -45,7 +45,7 @@ All items below are `established fact`, read from source at `433b7fe38ec8`:
 | Settings page | `src/pages/AgentIntegrations.tsx`, route `src/routes/_app/settings_.agent-integrations.tsx` | Includes a verify-access panel (`src/lib/mcp/verifyMcpToolAccess.ts`) |
 | Public API reference page | `src/pages/McpApiReference.tsx` at `/docs/mcp-api` | Publishes the endpoint URL and OAuth discovery hint |
 | OAuth consent page | `src/pages/OAuthConsent.tsx`, consent path `/.lovable/oauth/consent` | Per manifest mirror |
-| Safety regression tests | `src/test/mcp-tools-source-safety.test.ts` | **Textual source scan** of tool files: requires a `supabaseForUser(` call and unauthenticated short-circuit, requires `readOnlyHint`, rejects service-role/bridge-token/Action-Queue/device references. Scope caveats: helper files (`_supabase.ts`) are excluded from the scan, and presence of `supabaseForUser(` does not prove it is the client actually used for queries — the runtime proof is `mcp-local-rls-integration.test.ts` |
+| Safety regression tests | `src/test/mcp-tools-source-safety.test.ts` | **Textual source scan** of tool files: requires a `supabaseForUser(` call and unauthenticated short-circuit, requires `readOnlyHint`, rejects service-role/bridge-token/Action-Queue/device references. Scope caveats: helper files (`_supabase.ts`) are excluded from the scan, and presence of `supabaseForUser(` does not prove it is the client actually used for queries. Runtime cross-user isolation coverage exists in `mcp-local-rls-integration.test.ts`, but it is **opt-in**: the CI lane (`.github/workflows/mcp-local-rls-integration.yml`) runs only via `workflow_dispatch` or the `ENABLE_MCP_RLS_LANE` repo variable, and the suite `describe.skip`s without three `LOCAL_SUPABASE_*` env vars. Its status at this audited ref is `SKIPPED` — no enabled run is cited here, so on a default PR the textual scan is the only green fence |
 | Manifest drift test | `src/test/mcp-manifest-drift.test.ts` | Fails loudly if the TS mirror drifts from `.lovable/mcp/manifest.json` |
 | Page/a11y/copy tests | `src/test/agent-integrations-*.test.tsx` (5 files) | Page, a11y, manifest copy, verify panel, browser-probe regression |
 | E2E smoke | `e2e/agent-integrations-smoke.spec.ts` | Credential-aware smoke |
@@ -71,7 +71,9 @@ Walk plugin", draft), is a different surface — no collision with this document
   `_supabase.ts` helper (verified by direct read this session — the helper
   builds its client from the anon key plus the caller's forwarded bearer
   token). Note the helper sits outside the scan's file filter, so future
-  helper changes are covered only by review and the runtime RLS harness.
+  helper changes are covered only by review and the **opt-in** runtime RLS
+  harness — which is `SKIPPED` unless its CI lane or local env is explicitly
+  enabled (§2.1), so review is the sole always-on control for the helper.
 - `list_recent_diary_entries` additionally verifies grow ownership before
   reading, because `diary_entries` carries an operator-wide SELECT policy that
   RLS alone would not fence for operator-role callers. `get_latest_sensor_snapshot`
@@ -318,7 +320,8 @@ source-safety-tested, with in-app documentation and consent surfaces. Two
 qualifications keep this verdict honest: the sensor tool deviates from the
 Sensor Truth contract in two recorded ways (no confidence field; verbatim
 noncanonical legacy source labels — §4.3), and the safety fences are textual
-scans plus a runtime harness, not exhaustive gates (§2.1, §4). The remaining
+scans plus an opt-in runtime harness that is `SKIPPED` in default CI runs —
+not exhaustive, always-on gates (§2.1, §4). The remaining
 publication risk is not code but **unverified live state**: nothing in this
 session could confirm the endpoint is published and answering. Confidence in
 the repo-side posture is high with those stated limits; confidence in the

@@ -36,6 +36,7 @@ export default function PhenoBreedingObjectiveEditor({
 }: PhenoBreedingObjectiveEditorProps) {
   const [draft, setDraft] = useState<BreedingObjectiveTarget[]>(() => [...targets]);
   const [dirty, setDirty] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // The hunt (and its saved targets) can still be loading when this mounts,
@@ -80,6 +81,7 @@ export default function PhenoBreedingObjectiveEditor({
   function syncFromSaved(next: readonly BreedingObjectiveTarget[]) {
     setDraft([...next]);
     setDirty(false);
+    setSaved(false);
   }
 
   function addTarget() {
@@ -91,6 +93,7 @@ export default function PhenoBreedingObjectiveEditor({
       return;
     }
     setError(null);
+    setSaved(false);
     setDraft((prev) => [
       ...prev,
       { axisKey: axis.key, comparator: pendingComparator, threshold: n },
@@ -107,14 +110,20 @@ export default function PhenoBreedingObjectiveEditor({
   function removeTarget(axisKey: string) {
     setDraft((prev) => prev.filter((t) => t.axisKey !== axisKey));
     setDirty(true);
+    setSaved(false);
     setError(null);
   }
 
   async function handleSave() {
     setError(null);
+    setSaved(false);
     const ok = await onSave(draft);
-    if (ok) setDirty(false);
-    else setError("Could not save your breeding objective. You can try again.");
+    if (ok) {
+      setDirty(false);
+      setSaved(true);
+    } else {
+      setError("Could not save your breeding objective. You can try again.");
+    }
   }
 
   return (
@@ -235,6 +244,15 @@ export default function PhenoBreedingObjectiveEditor({
         </Button>
         {dirty && !saving && (
           <span className="text-[11px] text-muted-foreground">Unsaved changes</span>
+        )}
+        {saved && !dirty && !saving && (
+          <span
+            role="status"
+            data-testid="pheno-breeding-objective-saved"
+            className="text-[11px] text-emerald-600"
+          >
+            Saved objective
+          </span>
         )}
       </div>
 

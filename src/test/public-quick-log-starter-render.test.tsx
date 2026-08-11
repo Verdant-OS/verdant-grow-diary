@@ -8,7 +8,7 @@
  * lets guides link here.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { render, screen, fireEvent, within } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import QuickLogStarter from "@/pages/QuickLogStarter";
 import { APP_ROUTES } from "@/lib/appRouteManifest";
@@ -16,6 +16,7 @@ import { PUBLIC_QUICK_LOG_STARTER_COPY as COPY } from "@/constants/publicQuickLo
 import { PUBLIC_QUICK_LOG_STARTER_DRAFT_KEY } from "@/lib/publicQuickLogStarterRules";
 import { clearPublicQuickLogStarterDraft } from "@/lib/publicQuickLogStarterDraftStore";
 import {
+  ensureLocalStorageForTest,
   getLocalStorageItemForTest,
   setLocalStorageItemForTest,
 } from "./helpers/localStorageTestHelper";
@@ -28,7 +29,13 @@ function renderStarter(search = "") {
   );
 }
 
-function saveMinimalDraft() {
+async function waitForStarterControls() {
+  const saveButton = await screen.findByTestId("starter-save-draft");
+  await waitFor(() => expect(saveButton).toBeEnabled());
+}
+
+async function saveMinimalDraft() {
+  await waitForStarterControls();
   fireEvent.change(screen.getByTestId("starter-plant-nickname"), {
     target: { value: "Blue Dream #1" },
   });
@@ -67,10 +74,10 @@ describe("anonymous render", () => {
 });
 
 describe("draft lifecycle through the real store", () => {
-  it("save persists the draft to the versioned key and shows the saved card", () => {
+  it("save persists the draft to the versioned key and shows the saved card", async () => {
     renderStarter();
     expect(screen.queryByTestId("starter-saved-draft")).toBeNull();
-    saveMinimalDraft();
+    await saveMinimalDraft();
     expect(screen.getByTestId("starter-saved-draft")).toBeInTheDocument();
     expect(screen.getByTestId("starter-saved-nickname")).toHaveTextContent("Blue Dream #1");
     const raw = getLocalStorageItemForTest(PUBLIC_QUICK_LOG_STARTER_DRAFT_KEY);
@@ -84,9 +91,9 @@ describe("draft lifecycle through the real store", () => {
     });
   });
 
-  it("captures allow-listed UTM attribution into the draft (never the URL junk)", () => {
+  it("captures allow-listed UTM attribution into the draft (never the URL junk)", async () => {
     renderStarter("?utm_source=organic_guide&utm_medium=owned&ref=evil");
-    saveMinimalDraft();
+    await saveMinimalDraft();
     const raw = getLocalStorageItemForTest(PUBLIC_QUICK_LOG_STARTER_DRAFT_KEY);
     expect(JSON.parse(raw!).attribution).toEqual({
       utm_source: "organic_guide",
@@ -94,16 +101,18 @@ describe("draft lifecycle through the real store", () => {
     });
   });
 
-  it("validation errors render inline and nothing persists", () => {
+  it("validation errors render inline and nothing persists", async () => {
     renderStarter();
+    await waitForStarterControls();
     fireEvent.click(screen.getByTestId("starter-save-draft"));
     expect(screen.getAllByRole("alert").length).toBeGreaterThan(0);
     expect(getLocalStorageItemForTest(PUBLIC_QUICK_LOG_STARTER_DRAFT_KEY)).toBeNull();
     expect(screen.queryByTestId("starter-saved-draft")).toBeNull();
   });
 
-  it("watering requires a volume and stores it", () => {
+  it("watering requires a volume and stores it", async () => {
     renderStarter();
+    await waitForStarterControls();
     fireEvent.change(screen.getByTestId("starter-plant-nickname"), {
       target: { value: "Blue Dream #1" },
     });
@@ -155,12 +164,20 @@ describe("storage-failure honesty", () => {
     vi.restoreAllMocks();
   });
 
-  it("a failed storage write shows the honest error instead of a saved card", () => {
-    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+  it("a failed storage write shows the honest error instead of a saved card", async () => {
+    // The Windows/Node test environment may use the helper's in-memory
+    // Storage shim (own method), while native jsdom storage can return a
+    // wrapper whose setter lives on its prototype. Spy on the real method
+    // owner so the write path is rejected in both environments.
+    const storage = ensureLocalStorageForTest();
+    const storageSetItemOwner = Object.prototype.hasOwnProperty.call(storage, "setItem")
+      ? storage
+      : Object.getPrototypeOf(storage);
+    vi.spyOn(storageSetItemOwner, "setItem").mockImplementation(() => {
       throw new Error("QuotaExceededError");
     });
     renderStarter();
-    saveMinimalDraft();
+    await saveMinimalDraft();
     expect(screen.getByTestId("starter-storage-error")).toHaveTextContent(COPY.storageErrorLine);
     expect(screen.queryByTestId("starter-saved-draft")).toBeNull();
   });

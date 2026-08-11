@@ -19,6 +19,7 @@ import {
   type AiDoctorEntitlementView,
 } from "@/lib/aiDoctorEntitlementRules";
 import { sanitizeCheckoutReturnTo } from "@/lib/checkoutReturnTo";
+import { isKnownPlanId, PLAN_CATALOG } from "@/lib/entitlements/planCatalog";
 import { SUBSCRIPTION_PLAN_IDS } from "@/lib/paidPlanAllowlist";
 import type { ResolvedEntitlement } from "@/lib/entitlements/types";
 
@@ -61,9 +62,9 @@ const PAID_PLAN_IDS: ReadonlySet<string> = new Set(SUBSCRIPTION_PLAN_IDS);
 
 interface SurfaceCopy {
   featureTitle: string;
+  waitTitleFeature: string;
   upsellTitle: string;
   upsellBody: string;
-  waitTitle: string;
   waitBody: string;
   unknownTitle: string;
   unknownBody: string;
@@ -71,10 +72,10 @@ interface SurfaceCopy {
 
 const DOCTOR_COPY: SurfaceCopy = {
   featureTitle: "AI Doctor",
+  waitTitleFeature: "AI Doctor",
   upsellTitle: "You've used your AI Doctor checks for this grow.",
   upsellBody:
     "Free grows include 3 AI Doctor checks. Pro gives you 100 AI checks per month across every grow. This request was not charged.",
-  waitTitle: "You've used your 100 AI Doctor checks this month.",
   waitBody:
     "Your monthly allowance resets on the 1st of the month (UTC). This request was not charged. Existing analyses stay available.",
   unknownTitle: "You've reached an AI Doctor limit.",
@@ -83,10 +84,10 @@ const DOCTOR_COPY: SurfaceCopy = {
 
 const COACH_COPY: SurfaceCopy = {
   featureTitle: "AI Coach",
+  waitTitleFeature: "AI",
   upsellTitle: "You've used your AI Coach checks for this grow.",
   upsellBody:
     "Free grows include 3 AI checks. Pro gives you 100 AI checks per month across every grow. This request was not charged.",
-  waitTitle: "You've used your 100 AI checks this month.",
   waitBody:
     "Your monthly allowance resets on the 1st of the month (UTC). This request was not charged. Existing notes stay available.",
   unknownTitle: "You've reached an AI Coach limit.",
@@ -95,6 +96,18 @@ const COACH_COPY: SurfaceCopy = {
 
 function copyFor(surface: AiCreditLimitNoticeSurface): SurfaceCopy {
   return surface === "coach" ? COACH_COPY : DOCTOR_COPY;
+}
+
+function paidMonthlyCreditAllowance(planId: string): number | null {
+  if (!isKnownPlanId(planId) || planId === "free") return null;
+  const allowance = PLAN_CATALOG[planId].aiMonthlyCredits;
+  return typeof allowance === "number" && Number.isSafeInteger(allowance) && allowance > 0
+    ? allowance
+    : null;
+}
+
+function paidWaitTitle(copy: SurfaceCopy, allowance: number): string {
+  return `You've used your ${allowance} ${copy.waitTitleFeature} checks this month.`;
 }
 
 export interface AiCreditLimitNoticeInput {
@@ -177,10 +190,20 @@ export function buildAiCreditLimitNoticeViewModel(
   }
 
   if (typeof planId === "string" && PAID_PLAN_IDS.has(planId)) {
+    const allowance = paidMonthlyCreditAllowance(planId);
+    if (allowance == null) {
+      return {
+        kind: "unknown",
+        surface,
+        title: copy.unknownTitle,
+        body: copy.unknownBody,
+        charged: false,
+      };
+    }
     return {
       kind: "wait",
       surface,
-      title: copy.waitTitle,
+      title: paidWaitTitle(copy, allowance),
       body: copy.waitBody,
       charged: false,
     };

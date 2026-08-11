@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { deletePhenoHunt, PhenoHuntError } from "@/lib/phenoHuntService";
 import { usePhenoHuntActivity } from "@/hooks/usePhenoHuntActivity";
 import PhenoTimelineEntries from "@/components/PhenoTimelineEntries";
-import { plantDetailPath } from "@/lib/routes";
+import { phenoHuntWorkspacePath, plantDetailPath } from "@/lib/routes";
 import { toast } from "sonner";
 
 interface PhenoHuntRow {
@@ -30,21 +30,15 @@ interface Props {
 /**
  * Read-only Pheno Hunt timeline section.
  *
- * Lists tagged candidate plants as links to plant detail. Adds an
- * owner-initiated, two-step delete that untags linked plants and then
- * removes the hunt row. Editing is intentionally out of scope.
+ * Lists every hunt on the grow (#568 — not only the newest). Each hunt shows
+ * tagged candidates and optional pheno activity. Owner-initiated two-step
+ * delete untags linked plants then removes that hunt row.
  */
 export default function PhenoHuntTimelineSection({ growId }: Props) {
-  const [hunt, setHunt] = useState<PhenoHuntRow | null>(null);
-  const [candidates, setCandidates] = useState<CandidateRow[]>([]);
+  const [hunts, setHunts] = useState<PhenoHuntRow[]>([]);
+  const [candidatesByHunt, setCandidatesByHunt] = useState<Record<string, CandidateRow[]>>({});
   const [loading, setLoading] = useState(true);
-  const [confirming, setConfirming] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [removed, setRemoved] = useState(false);
-
-  // Read-only pheno activity (sex reveals, keeper decisions, reversals, crosses)
-  // for the resolved hunt. Stays idle until the hunt id is known.
-  const activity = usePhenoHuntActivity(hunt?.id ?? null);
+  const [removedIds, setRemovedIds] = useState<ReadonlySet<string>>(() => new Set());
 
   useEffect(() => {
     let cancelled = false;
@@ -53,40 +47,45 @@ export default function PhenoHuntTimelineSection({ growId }: Props) {
         setLoading(false);
         return;
       }
-      const { data: huntRow } = await supabase
+      const { data: huntRows } = await supabase
         .from("pheno_hunts")
         .select("id,name")
         .eq("grow_id", growId)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .order("created_at", { ascending: false });
 
       if (cancelled) return;
 
-      if (!huntRow) {
-        setHunt(null);
-        setCandidates([]);
+      const list = (huntRows ?? []).map((h) => ({ id: h.id, name: h.name }));
+      if (list.length === 0) {
+        setHunts([]);
+        setCandidatesByHunt({});
         setLoading(false);
         return;
       }
-      setHunt({ id: huntRow.id, name: huntRow.name });
+      setHunts(list);
 
-      const { data: plantRows } = await supabase
-        .from("plants")
-        .select("id,name,strain,candidate_label,tent_id")
-        .eq("pheno_hunt_id", huntRow.id)
-        .order("candidate_label", { ascending: true });
-
-      if (cancelled) return;
-      setCandidates(
-        (plantRows ?? []).map((p) => ({
-          id: p.id,
-          name: p.name,
-          strain: p.strain ?? null,
-          candidate_label: p.candidate_label ?? null,
-          tent_id: p.tent_id ?? null,
-        })),
+      // Load candidates per hunt in parallel (bounded by hunt count per grow).
+      const pairs = await Promise.all(
+        list.map(async (h) => {
+          const { data: plantRows } = await supabase
+            .from("plants")
+            .select("id,name,strain,candidate_label,tent_id")
+            .eq("pheno_hunt_id", h.id)
+            .order("candidate_label", { ascending: true });
+          const candidates = (plantRows ?? []).map((p) => ({
+            id: p.id,
+            name: p.name,
+            strain: p.strain ?? null,
+            candidate_label: p.candidate_label ?? null,
+            tent_id: p.tent_id ?? null,
+          }));
+          return [h.id, candidates] as const;
+        }),
       );
+      if (cancelled) return;
+      const map: Record<string, CandidateRow[]> = {};
+      for (const [id, rows] of pairs) map[id] = rows;
+      setCandidatesByHunt(map);
       setLoading(false);
     })();
     return () => {
@@ -94,15 +93,50 @@ export default function PhenoHuntTimelineSection({ growId }: Props) {
     };
   }, [growId]);
 
-  if (loading || !hunt || removed) return null;
+  const visible = hunts.filter((h) => !removedIds.has(h.id));
+  if (loading || visible.length === 0) return null;
+
+  return (
+    <section
+      className="space-y-4 mt-4"
+      aria-label="Pheno Hunts"
+      data-testid="pheno-hunt-timeline-section"
+      data-hunt-count={visible.length}
+    >
+      {visible.map((hunt) => (
+        <PhenoHuntTimelineHuntCard
+          key={hunt.id}
+          hunt={hunt}
+          candidates={candidatesByHunt[hunt.id] ?? []}
+          multi={visible.length > 1}
+          onRemoved={(id) => setRemovedIds((prev) => new Set([...prev, id]))}
+        />
+      ))}
+    </section>
+  );
+}
+
+function PhenoHuntTimelineHuntCard({
+  hunt,
+  candidates,
+  multi,
+  onRemoved,
+}: {
+  hunt: PhenoHuntRow;
+  candidates: CandidateRow[];
+  multi: boolean;
+  onRemoved: (huntId: string) => void;
+}) {
+  const [confirming, setConfirming] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const activity = usePhenoHuntActivity(hunt.id);
 
   const onConfirmDelete = async () => {
-    if (!hunt) return;
     setDeleting(true);
     try {
       await deletePhenoHunt({ huntId: hunt.id });
       toast.success("Pheno Hunt deleted. Linked plants were untagged.");
-      setRemoved(true);
+      onRemoved(hunt.id);
     } catch (err) {
       const msg =
         err instanceof PhenoHuntError
@@ -115,30 +149,37 @@ export default function PhenoHuntTimelineSection({ growId }: Props) {
   };
 
   return (
-    <section
-      className="glass rounded-2xl p-4 mt-4"
-      aria-label="Pheno Hunt"
-      data-testid="pheno-hunt-timeline-section"
+    <div
+      className="glass rounded-2xl p-4"
+      aria-label={multi ? `Pheno Hunt: ${hunt.name}` : "Pheno Hunt"}
+      data-testid={`pheno-hunt-timeline-hunt-${hunt.id}`}
     >
-      <div className="flex items-center gap-2 mb-3">
+      <div className="flex items-center gap-2 mb-3 flex-wrap">
         <Sprout className="h-4 w-4 text-primary" />
         <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
           Pheno Hunt
         </h2>
-        <Badge variant="outline" className="text-[10px] ml-1">
+        <Badge variant="outline" className="text-[10px]" data-testid={`pheno-hunt-name-${hunt.id}`}>
           {hunt.name}
         </Badge>
-        <Badge variant="outline" className="text-[10px] ml-auto">
+        <Badge variant="outline" className="text-[10px]">
           {candidates.length} candidates
         </Badge>
+        <Link
+          to={phenoHuntWorkspacePath(hunt.id)}
+          className="text-xs font-medium text-primary hover:underline"
+          data-testid={`pheno-hunt-workspace-link-${hunt.id}`}
+        >
+          Open workspace
+        </Link>
         {!confirming && (
           <Button
             size="sm"
             variant="ghost"
-            className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
+            className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive ml-auto"
             onClick={() => setConfirming(true)}
-            data-testid="pheno-hunt-delete-btn"
-            aria-label="Delete Pheno Hunt"
+            data-testid={`pheno-hunt-delete-btn-${hunt.id}`}
+            aria-label={`Delete Pheno Hunt ${hunt.name}`}
           >
             <Trash2 className="h-3.5 w-3.5 mr-1" />
             Delete
@@ -149,7 +190,7 @@ export default function PhenoHuntTimelineSection({ growId }: Props) {
       {confirming && (
         <div
           className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 mb-3"
-          data-testid="pheno-hunt-delete-confirm"
+          data-testid={`pheno-hunt-delete-confirm-${hunt.id}`}
           role="alertdialog"
           aria-label="Delete this Pheno Hunt?"
         >
@@ -164,7 +205,7 @@ export default function PhenoHuntTimelineSection({ growId }: Props) {
               variant="destructive"
               onClick={onConfirmDelete}
               disabled={deleting}
-              data-testid="pheno-hunt-delete-confirm-btn"
+              data-testid={`pheno-hunt-delete-confirm-btn-${hunt.id}`}
             >
               {deleting ? "Deleting…" : "Delete Pheno Hunt"}
             </Button>
@@ -173,7 +214,7 @@ export default function PhenoHuntTimelineSection({ growId }: Props) {
               variant="ghost"
               onClick={() => setConfirming(false)}
               disabled={deleting}
-              data-testid="pheno-hunt-delete-cancel-btn"
+              data-testid={`pheno-hunt-delete-cancel-btn-${hunt.id}`}
             >
               Cancel
             </Button>
@@ -209,13 +250,16 @@ export default function PhenoHuntTimelineSection({ growId }: Props) {
       )}
 
       {activity.entries.length > 0 && (
-        <div className="mt-4 border-t border-border/40 pt-3" data-testid="pheno-hunt-activity">
+        <div
+          className="mt-4 border-t border-border/40 pt-3"
+          data-testid={`pheno-hunt-activity-${hunt.id}`}
+        >
           <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
             Pheno activity
           </h3>
           <PhenoTimelineEntries entries={activity.entries} />
         </div>
       )}
-    </section>
+    </div>
   );
 }

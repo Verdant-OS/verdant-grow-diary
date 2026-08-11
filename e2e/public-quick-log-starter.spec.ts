@@ -81,6 +81,10 @@ test.describe("Public Quick Log Starter (anonymous, zero writes)", () => {
     // No app chrome, no sign-in wall.
     await expect(page.getByTestId("app-shell")).toHaveCount(0);
     await expect(page.getByLabel(/^password$/i)).toHaveCount(0);
+    // The SSR shell is visible before React can safely retain interactions.
+    // A ready control is the public-surface contract: no keystroke or click
+    // may look accepted and then disappear during hydration.
+    await expect(page.getByTestId("starter-save-draft")).toBeEnabled();
 
     // Fill and save the minimal draft.
     await page.getByTestId("starter-plant-nickname").fill("Blue Dream #1");
@@ -123,6 +127,7 @@ test.describe("Public Quick Log Starter (anonymous, zero writes)", () => {
     const traffic = watchTraffic(page);
 
     await page.goto("/quick-log");
+    await expect(page.getByTestId("starter-save-draft")).toBeEnabled();
     await page.getByTestId("starter-plant-nickname").fill("Blue Dream #1");
     await page.getByTestId("starter-log-type-watering").click();
     await page.getByTestId("starter-save-draft").click();

@@ -105,7 +105,14 @@ export function AuthProvider({ children, onBeforeAuthIdentityChange }: AuthProvi
         session,
         loading,
         signOut: async () => {
-          await supabase.auth.signOut();
+          // supabase.auth.signOut() resolves with `{ error }` and does not throw
+          // on the common failure path. Propagate so performSafeSignOut can
+          // return ok:false + SIGN_OUT_FAILURE_MESSAGE (auth hardening #588).
+          // Never rethrow the raw error object — it may carry token/session text.
+          const { error } = await supabase.auth.signOut();
+          if (error) {
+            throw new Error("sign_out_failed");
+          }
         },
       }}
     >

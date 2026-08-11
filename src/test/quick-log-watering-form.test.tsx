@@ -62,4 +62,28 @@ describe("QuickLogWateringForm", () => {
     fireEvent.click(screen.getByRole("button", { name: "Light" }));
     expect(screen.getByRole("button", { name: "Light" })).toHaveAttribute("aria-pressed", "false");
   });
+
+  it("fills volume from a preset chip and toggles clear on second press", () => {
+    render(<Harness />);
+    const volume = screen.getByLabelText("Volume (ml)") as HTMLInputElement;
+    const chip = screen.getByTestId("qlv2-volume-preset-1500");
+    fireEvent.click(chip);
+    expect(volume.value).toBe("1500");
+    expect(chip).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(chip);
+    expect(volume.value).toBe("");
+    expect(chip).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("switches between presets without requiring a clear step", () => {
+    render(<Harness />);
+    const volume = screen.getByLabelText("Volume (ml)") as HTMLInputElement;
+    fireEvent.click(screen.getByTestId("qlv2-volume-preset-500"));
+    expect(volume.value).toBe("500");
+    fireEvent.click(screen.getByTestId("qlv2-volume-preset-2000"));
+    expect(volume.value).toBe("2000");
+    expect(screen.getByTestId("qlv2-volume-preset-500")).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByTestId("qlv2-volume-preset-2000")).toHaveAttribute("aria-pressed", "true");
+  });
+
 });

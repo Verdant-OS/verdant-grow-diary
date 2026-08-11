@@ -6,7 +6,10 @@ import { GOOGLE_ANALYTICS_MEASUREMENT_ID } from "@/constants/analytics";
 
 const ROOT = resolve(__dirname, "../..");
 const ARTIFACT_PATH = resolve(ROOT, "artifacts/seo/seo-readiness-status.json");
-const RAW_ARTIFACT = readFileSync(ARTIFACT_PATH, "utf8");
+// Git may materialize text files with CRLF on Windows. The artifact contract
+// owns canonical JSON structure and a trailing newline, not checkout-specific
+// line-ending bytes.
+const RAW_ARTIFACT = readFileSync(ARTIFACT_PATH, "utf8").replace(/\r\n/g, "\n");
 const READINESS = JSON.parse(RAW_ARTIFACT) as Record<string, unknown>;
 const RAW_BASELINE = readFileSync(
   resolve(ROOT, "artifacts/seo/lighting-launch-baseline.json"),

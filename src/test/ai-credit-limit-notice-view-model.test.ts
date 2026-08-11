@@ -42,6 +42,19 @@ describe("aiCreditLimitNoticeViewModel — branching by credit.plan_id", () => {
     },
   );
 
+  it.each(["craft_monthly", "craft_annual"])(
+    "%s → wait copy reports the Craft 300-credit monthly allowance",
+    (plan) => {
+      const vm = buildAiCreditLimitNoticeViewModel({
+        credit: { ...baseDenial(plan), scope_limit: 300 },
+      });
+
+      expect(vm.kind).toBe("wait");
+      expect(vm.title).toContain("300");
+      expect(vm.title).not.toContain("100");
+    },
+  );
+
   it.each([null, undefined, "mystery_plan"])(
     "%s plan_id → unknown, NO paywallVm, charged=false",
     (plan) => {

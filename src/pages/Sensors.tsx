@@ -18,6 +18,7 @@ import SensorsTestbenchPanel from "@/components/SensorsTestbenchPanel";
 import { useGrowTents, useGrowSensorReadings } from "@/hooks/useGrowData";
 import GrowDataLoadError, { GrowDataLoadingState } from "@/components/GrowDataLoadError";
 import { useSoilMoistureCalibrations } from "@/hooks/useSoilMoistureCalibrations";
+import SoilMoistureCalibrationCaptureCard from "@/components/SoilMoistureCalibrationCaptureCard";
 import { classifyGrowDataSource } from "@/lib/growDataSourceLabelRules";
 import { VPD_STAGE_HELPER_TEXT, normalizeVpdStage } from "@/lib/vpdStageTargetRules";
 import {
@@ -645,6 +646,15 @@ export default function Sensors() {
             </div>
           );
         })}
+      </div>
+      <div className="mt-4 max-w-xl" data-testid="sensors-soil-calibration-capture-anchor">
+        <SoilMoistureCalibrationCaptureCard
+          growId={selectedGrowId}
+          tentId={activeTentId}
+          tentName={selectedTent?.name ?? null}
+          latestRawSoilMoisture={recentSoilValues[0] ?? null}
+          calibrations={soilMoistureCalibrations}
+        />
       </div>
       <div
         id="manual-reading"

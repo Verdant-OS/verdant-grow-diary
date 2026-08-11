@@ -210,7 +210,8 @@ describe("PhenoHuntNew onboarding flow", () => {
     expect(screen.getByTestId("pheno-evidence-goals-toggle-post_cure")).toBeDefined();
 
     // Packet preview.
-    fireEvent.click(screen.getByTestId("pheno-onboarding-stepper-step-packet_preview"));
+    fireEvent.click(screen.getByTestId("pheno-onboarding-stepper-step-packet-preview"));
+    expect(screen.queryByTestId("pheno-onboarding-stepper-step-packet_preview")).toBeNull();
     expect(screen.getByTestId("pheno-evidence-packet-map")).toBeDefined();
     // Cells default to Not recorded and are marked disabled.
     const cell = screen.getByTestId("pheno-evidence-packet-map-cell-p1-structure");

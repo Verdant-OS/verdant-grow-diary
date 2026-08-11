@@ -27,12 +27,15 @@ export default function PhenoHuntOnboardingStepper({
       {steps.map((s, idx) => {
         const isCurrent = s.id === currentStepId;
         const Icon = s.complete ? CheckCircle2 : Circle;
+        // Step ids are domain keys (for example `packet_preview`), while
+        // test ids stay consistently kebab-cased with their mounted panels.
+        const testIdSegment = s.id.replace(/_/g, "-");
         return (
           <li key={s.id} className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => onStepSelect?.(s.id)}
-              data-testid={`${testId}-step-${s.id}`}
+              data-testid={`${testId}-step-${testIdSegment}`}
               data-current={isCurrent ? "true" : "false"}
               data-complete={s.complete ? "true" : "false"}
               className={

@@ -99,7 +99,9 @@ jobs:
               echo "**COULD NOT PROBE** — nothing was verified. This is not a pass."
               echo ""
               echo '```'
-              cat drift.err
+              # --json sends the could-not-probe diagnostic to stdout, so read
+              # drift.json first; drift.err only carries a pre-JSON crash.
+              if [ -s drift.json ]; then cat drift.json; else cat drift.err; fi
               echo '```'
             fi
           } >> "$GITHUB_STEP_SUMMARY"
@@ -116,8 +118,14 @@ jobs:
           script: |
             const fs = require("fs");
             const exitCode = process.env.PROBE_EXIT;
-            const read = (p) => { try { return fs.readFileSync(p, "utf8"); } catch { return ""; } };
-            const detail = exitCode === "1" ? read("drift.json") : read("drift.err");
+            const read = (p) => { try { return fs.readFileSync(p, "utf8").trim(); } catch { return ""; } };
+            // In --json mode the probe writes BOTH its drift report and its
+            // could-not-probe diagnostic to stdout (drift.json); drift.err is
+            // empty on exit 2. Reading only stderr there produced "(no detail
+            // captured)" for precisely the case that most needs detail.
+            // Prefer stdout, fall back to stderr for a hard crash before any
+            // JSON was emitted.
+            const detail = read("drift.json") || read("drift.err");
             const title = "Migration drift: production is not running every committed migration";
             const body = [
               exitCode === "1"

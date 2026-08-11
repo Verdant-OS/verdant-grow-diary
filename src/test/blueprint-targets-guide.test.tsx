@@ -9,7 +9,7 @@
  * Bands are asserted against SOP_BLUEPRINT_TARGETS rather than hardcoded, so
  * a change to the source of truth cannot silently desync the public page.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import BlueprintTargetsGuide, { buildStageMetricRows } from "@/pages/BlueprintTargetsGuide";
 import { SOP_BLUEPRINT_TARGETS } from "@/constants/blueprintTargets";

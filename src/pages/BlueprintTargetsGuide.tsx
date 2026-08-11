@@ -42,8 +42,16 @@ import {
   buildFaqPageJsonLd,
   safeJsonLdStringify,
 } from "@/lib/seoStructuredData";
+import { buildAttributedSignupPath } from "@/lib/signupAcquisitionRules";
 
 const PAGE_URL = `${VERDANT_SITE_ORIGIN}/tools/blueprint-targets`;
+
+/**
+ * Bare "/auth" opens the SIGN-IN tab (Auth resolves mode to "signin" unless
+ * ?mode=signup is present) and skips the signup page-view path, so the
+ * canonical attributed builder is used instead of a hand-written href.
+ */
+const SIGNUP_PATH = buildAttributedSignupPath({ source: "blueprint_targets" });
 
 /** Display order. Matches the order a plant actually moves through. */
 const STAGE_ORDER: ReadonlyArray<BlueprintTargetStage> = [
@@ -137,16 +145,26 @@ export function buildStageMetricRows(bands: BlueprintStageBands): MetricRow[] {
   if (bands.rh) {
     rows.push({ key: "rh", label: "Relative humidity", value: `${bands.rh.min}–${bands.rh.max} %` });
   }
+  // EC and pH are medium-specific. These SOP figures are soilless/hydro
+  // values; soil buffers pH and runs materially higher (roughly 6.0–6.8, per
+  // the grow-stage care guide). Publishing them unqualified would push a soil
+  // grower outside their own correct range, so the medium is named on the row
+  // rather than left implicit.
   if (bands.ec) {
     rows.push({
       key: "ec",
       label: "Feed EC",
       value: `${bands.ec.min}–${bands.ec.max} mS/cm`,
-      note: "Nutrient solution or runoff",
+      note: "Soilless or hydro — nutrient solution or runoff",
     });
   }
   if (bands.ph) {
-    rows.push({ key: "ph", label: "Feed pH", value: `${bands.ph.min}–${bands.ph.max}` });
+    rows.push({
+      key: "ph",
+      label: "Feed pH",
+      value: `${bands.ph.min}–${bands.ph.max}`,
+      note: "Soilless or hydro. In soil, aim for roughly 6.0–6.8",
+    });
   }
   if (bands.ppfd) {
     rows.push({ key: "ppfd", label: "PPFD", value: `${bands.ppfd.min}–${bands.ppfd.max} µmol/m²/s` });
@@ -173,6 +191,11 @@ const FAQ = [
     question: "Why are there no light or feed targets for dry and cure?",
     answer:
       "Once the plant is cut it no longer takes up nutrients or photosynthesises, so EC, pH, PPFD and DLI stop applying. Only air temperature and humidity matter, and both are held tight to control the drying rate.",
+  },
+  {
+    question: "Do the EC and pH targets apply to soil?",
+    answer:
+      "No — the feed EC and pH ranges above are soilless and hydro figures. Soil buffers pH, so soil growers should aim for roughly 6.0–6.8 rather than the high-5s shown here. Air temperature, humidity and light targets are not medium-specific and apply either way.",
   },
   {
     question: "Are these targets the same for every cultivar?",
@@ -300,7 +323,7 @@ export default function BlueprintTargetsGuide() {
           </p>
           <div className="mt-5 flex flex-wrap gap-3">
             <Link
-              to="/auth"
+              to={SIGNUP_PATH}
               className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
               data-testid="blueprint-targets-signup"
             >

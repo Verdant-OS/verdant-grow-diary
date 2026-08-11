@@ -7,7 +7,9 @@
  *
  * Blast-radius sweep (2026-08-11): 27 test files that statically read
  * QuickLog.tsx or any lib touched by #780/#781 were executed at deploy head
- * (44220ad32); all pass — 0 stale pin siblings found.
+ * (c09b33d95, the head at sweep time); all pass — 0 stale pin siblings found.
+ * hyper-log-handoff-polish-safety.test.ts is included in the 27 as a
+ * quickLogDraftPreviewViewModel.ts reader (touched by #780), not omitted.
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";

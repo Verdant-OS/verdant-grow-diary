@@ -186,6 +186,21 @@ describe("buildPlantRecentActivity (pure)", () => {
     expect(row.isManualEntry).toBe(true);
   });
 
+  it("recovers eventType from details.event_type when no top-level field exists (QuickLog Training/Photo saves)", () => {
+    // diary_entries has no top-level event_type column; quicklog_save_event's
+    // Training saves only carry it inside details (sanitizeQuickLogActivityDetails).
+    const [row] = buildPlantRecentActivity(
+      [
+        entry({
+          event_type: undefined,
+          details: { event_type: "training", technique: "defoliation", intensity: "light" },
+        }),
+      ],
+      { plantId: "p1", now: NOW },
+    );
+    expect(row.eventType).toBe("training");
+  });
+
   it("does not flag non-quick_log entries as manual entries", () => {
     const rows = buildPlantRecentActivity(
       [

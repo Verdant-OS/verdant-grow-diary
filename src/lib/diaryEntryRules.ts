@@ -403,8 +403,25 @@ export function normalizeDiaryEntry(
   const plantId = nonBlankString(pickFirst(r.plant_id, r.plantId));
   const tentId = nonBlankString(pickFirst(r.tent_id, r.tentId));
   const stage = nonBlankString(pickFirst(r.stage, r.plant_stage, r.plantStage));
+  // diary_entries has no top-level event_type column -- QuickLog-authored
+  // rows (e.g. quicklog_save_event's Training/Photo saves, see
+  // quickLogActivityDetailFields.ts) only carry it inside `details`. Checked
+  // last, after every real top-level candidate, so rows that already have a
+  // genuine top-level field are unaffected -- this only replaces the "note"
+  // default for rows that would otherwise have nothing.
+  const rDetails =
+    r.details && typeof r.details === "object" && !Array.isArray(r.details)
+      ? (r.details as Record<string, unknown>)
+      : null;
   const eventTypeRaw = nonBlankString(
-    pickFirst(r.entry_type, r.entryType, r.event_type, r.eventType, r.type),
+    pickFirst(
+      r.entry_type,
+      r.entryType,
+      r.event_type,
+      r.eventType,
+      r.type,
+      rDetails?.event_type,
+    ),
   );
   const eventType = eventTypeRaw ?? "note";
   if (!eventTypeRaw) warnings.push("event-type:missing");

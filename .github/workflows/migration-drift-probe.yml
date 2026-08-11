@@ -104,8 +104,12 @@ jobs:
           code=$?
           set -e
           echo "exit_code=$code" >> "$GITHUB_OUTPUT"
-          # Never echo the report raw into logs before masking review; the
-          # probe emits only version identifiers and filenames, no secrets.
+          # The probe redacts connection strings from everything it emits
+          # (scripts/lib/redactDbUrl.mjs). It did NOT always: a psql failure
+          # that wrote no stderr fell back to String(error), whose command text
+          # carries the URL passed as argv. Actions masks registered secrets in
+          # log output, but that masking does not reach the issue body this
+          # same file is copied into -- so redaction happens at the source.
           cat drift.json 2>/dev/null || true
           cat drift.err  2>/dev/null || true
           {
@@ -149,7 +153,14 @@ jobs:
             // captured)" for precisely the case that most needs detail.
             // Prefer stdout, fall back to stderr for a hard crash before any
             // JSON was emitted.
-            const detail = read("drift.json") || read("drift.err");
+            // Second, independent redaction layer. The probe already strips
+            // connection strings from its own output; this repeats it at the
+            // trust boundary that actually matters, because an issue body is
+            // published and is NOT covered by Actions secret masking. If a
+            // future probe bug re-opens the hole, this still holds.
+            const redact = (s) =>
+              String(s).replace(/postgres(?:ql)?:\/\/[^\s"'`<>]+/gi, "[redacted-db-url]");
+            const detail = redact(read("drift.json") || read("drift.err"));
             const title = "Migration drift: production is not running every committed migration";
             const body = [
               exitCode === "1"

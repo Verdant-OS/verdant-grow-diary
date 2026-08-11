@@ -35,13 +35,30 @@ on:
       - "package.json"
       - "bun.lock"
       - "bun.lockb"
+  # Push paths mirror the pull_request allowlist exactly, so a direct push
+  # or admin-bypassed merge touching any covered dependency still runs the
+  # post-merge gate.
   push:
     branches: [verdant-grow-diary]
     paths:
       - "e2e/operator-edge-alerts-dispatch-history.spec.ts"
+      - "e2e/utils/analyticsConsent.ts"
       - "src/pages/OperatorEdgeAlerts.tsx"
       - "src/components/EdgeAlertsBreachDrilldownDialog.tsx"
+      - "src/components/EdgeAlertsDryRunDialog.tsx"
+      - "src/components/RequireOperatorRole.tsx"
+      - "src/hooks/useHasRole.ts"
+      - "src/routes/_app/_operator.tsx"
+      - "src/routes/_app/_operator/operator.edge-alerts.tsx"
+      - "src/components/ui/dialog.tsx"
+      - "src/components/ui/table.tsx"
+      - "src/components/ui/button.tsx"
+      - "src/components/ui/card.tsx"
+      - "playwright.config.ts"
       - ".github/workflows/dispatch-history-e2e.yml"
+      - "package.json"
+      - "bun.lock"
+      - "bun.lockb"
   workflow_dispatch:
 
 # Read-only token: the job only checks out code and uploads artifacts.

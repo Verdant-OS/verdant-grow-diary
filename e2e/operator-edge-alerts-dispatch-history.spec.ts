@@ -431,7 +431,11 @@ test.describe("Operator edge-alerts dispatch history (mocked, non-destructive)",
       const audit = await openDispatchHistory(page);
       await expect(attemptsTable(page)).toBeVisible();
 
-      const functionCallsBeforeOpen = audit.functionRequests.length;
+      const readsBeforeOpen = {
+        functions: audit.functionRequests.length,
+        dispatches: audit.dispatchReads,
+        attempts: audit.attemptReads,
+      };
 
       // A SPECIFIC attempt row: PAIR_A's attempt 2 (the 502 transient retry).
       const attemptTwoRow = attemptsTable(page)
@@ -454,8 +458,10 @@ test.describe("Operator edge-alerts dispatch history (mocked, non-destructive)",
       await expect(dialog.locator("tbody tr td:nth-child(2)")).toHaveText(["3", "2", "1"]);
 
       // The drilldown is presentation-only: opening it must not have issued
-      // any new Edge calls or REST mutations.
-      expect(audit.functionRequests.length).toBe(functionCallsBeforeOpen);
+      // any new Edge calls, dispatch/attempt reads, or REST mutations.
+      expect(audit.functionRequests.length).toBe(readsBeforeOpen.functions);
+      expect(audit.dispatchReads).toBe(readsBeforeOpen.dispatches);
+      expect(audit.attemptReads).toBe(readsBeforeOpen.attempts);
       expect(audit.restMutations).toEqual([]);
 
       // Close cleanly (accessible Close button), then reopen from a DIFFERENT

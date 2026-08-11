@@ -42,16 +42,22 @@ import {
   buildFaqPageJsonLd,
   safeJsonLdStringify,
 } from "@/lib/seoStructuredData";
-import { buildAttributedSignupPath } from "@/lib/signupAcquisitionRules";
-
 const PAGE_URL = `${VERDANT_SITE_ORIGIN}/tools/blueprint-targets`;
 
 /**
- * Bare "/auth" opens the SIGN-IN tab (Auth resolves mode to "signin" unless
- * ?mode=signup is present) and skips the signup page-view path, so the
- * canonical attributed builder is used instead of a hand-written href.
+ * Bare "/auth" opens the SIGN-IN tab — Auth resolves mode to "signin" unless
+ * ?mode=signup is present — and skips the signup page-view path, so the CTA
+ * must carry the mode explicitly.
+ *
+ * No utm_* attribution source is attached on purpose. A new source is only
+ * measurable once it is added to the server-side allowlists in
+ * handle_new_user, the OAuth attribution RPC, and the signup-to-paid
+ * snapshot; until such a migration is applied, an unrecognized source is
+ * mapped to NULL for email signups and rejected for OAuth, which reads as
+ * working while recording nothing. Signups from this page therefore land in
+ * the "unattributed" bucket by design rather than by accident.
  */
-const SIGNUP_PATH = buildAttributedSignupPath({ source: "blueprint_targets" });
+const SIGNUP_PATH = "/auth?mode=signup";
 
 /** Display order. Matches the order a plant actually moves through. */
 const STAGE_ORDER: ReadonlyArray<BlueprintTargetStage> = [

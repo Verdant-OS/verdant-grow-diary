@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-08-07T16:32:46.871Z",
+  "generated_at": "2026-08-11T20:49:57.772Z",
   "_notes": "Fingerprints of accepted historical Supabase migration safety findings. Do not edit by hand except to remove an item after the underlying SQL is truly fixed. Never add a NEW finding to this file to silence CI — fix the migration instead.",
   "accepted": [
     {
@@ -16,6 +16,18 @@
       "subject": "public.move_to_dlq"
     },
     {
+      "fingerprint": "b6d5e45e0731795e",
+      "scanner": "APPLY_TIME_SELFTEST",
+      "migration": "20260805090000_security_advisor_hardening_followup.sql",
+      "subject": "public.__default_privilege_selftest_fn"
+    },
+    {
+      "fingerprint": "b6d5e45e0731795e",
+      "scanner": "APPLY_TIME_SELFTEST",
+      "migration": "20260805090000_security_advisor_hardening_followup.sql",
+      "subject": "public.__default_privilege_selftest_tbl"
+    },
+    {
       "fingerprint": "b6f95cdce7ec2fff",
       "scanner": "PERMISSIVE_POLICY",
       "migration": "20260719044601_4a9e443b-d980-4890-b85e-5ae6549a907f.sql",
@@ -26,6 +38,12 @@
       "scanner": "SEARCH_PATH_MUTABLE",
       "migration": "20260707153206_email_infra.sql",
       "subject": "public.read_email_batch"
+    },
+    {
+      "fingerprint": "e82093e134c88af3",
+      "scanner": "APPLY_TIME_SELFTEST",
+      "migration": "20260807133000_global_default_privilege_hardening.sql",
+      "subject": "public.__global_default_privilege_selftest_fn"
     },
     {
       "fingerprint": "f613b27872a87fb7",

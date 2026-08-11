@@ -29,8 +29,13 @@ export const REDACTION_PLACEHOLDER = "[redacted-db-url]";
  * Any libpq connection URL embedded in surrounding text. Stops at whitespace
  * and at the quoting/markup characters that would normally delimit a URL, so a
  * URL at the end of a sentence or inside a fence is still fully consumed.
+ *
+ * Exported because .github/workflows/migration-drift-probe.yml inlines this
+ * same pattern as a second, independent layer at the publishing boundary, and
+ * a test pins the two together. Two hand-maintained copies of a security regex
+ * drift apart; a pinned one cannot.
  */
-const CONNECTION_URL = /postgres(?:ql)?:\/\/[^\s"'`<>]+/gi;
+export const CONNECTION_URL = /postgres(?:ql)?:\/\/[^\s"'`<>]+/gi;
 
 /**
  * A password shorter than this is not redacted on its own. Real credentials

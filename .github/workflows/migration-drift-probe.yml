@@ -158,6 +158,13 @@ jobs:
             // trust boundary that actually matters, because an issue body is
             // published and is NOT covered by Actions secret masking. If a
             // future probe bug re-opens the hole, this still holds.
+            //
+            // Deliberately URL-pattern-only, unlike the module: the exact-URL
+            // and password passes need the secret in hand, and feeding the
+            // credential into this step purely to redact it would widen the
+            // exposure this layer exists to narrow. The pattern below is
+            // pinned to scripts/lib/redactDbUrl.mjs by a test, so the two
+            // copies cannot drift apart.
             const redact = (s) =>
               String(s).replace(/postgres(?:ql)?:\/\/[^\s"'`<>]+/gi, "[redacted-db-url]");
             const detail = redact(read("drift.json") || read("drift.err"));

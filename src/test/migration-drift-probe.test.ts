@@ -18,7 +18,11 @@ import { execFileSync } from "node:child_process";
 import { readFileSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve, join } from "node:path";
-import { redactDbUrl, REDACTION_PLACEHOLDER } from "../../scripts/lib/redactDbUrl.mjs";
+import {
+  redactDbUrl,
+  REDACTION_PLACEHOLDER,
+  CONNECTION_URL,
+} from "../../scripts/lib/redactDbUrl.mjs";
 
 const ROOT = resolve(__dirname, "../..");
 const PROBE = "scripts/probe-migration-drift.mjs";
@@ -157,6 +161,20 @@ describe("migration drift probe — never publishes credentials", () => {
     expect(rawConsoleCalls).toHaveLength(2); // only the two redacting helpers
     expect(SRC).toContain("const say = (line) => console.log(redactDbUrl(line, dbUrl));");
     expect(SRC).toContain("const warn = (line) => console.error(redactDbUrl(line, dbUrl));");
+  });
+
+  it("keeps the workflow's second redaction layer in sync with this module", () => {
+    // The workflow inlines the same pattern in its github-script step, as an
+    // independent layer at the boundary that actually publishes. Two
+    // hand-maintained copies of a security regex drift apart — this repo has
+    // been bitten by exactly that with the _shared helper copies — so pin the
+    // inline one to the module's own source.
+    const workflow = readFileSync(
+      resolve(ROOT, ".github/workflows/migration-drift-probe.yml"),
+      "utf8",
+    );
+    expect(workflow).toContain(CONNECTION_URL.source);
+    expect(workflow).toContain(REDACTION_PLACEHOLDER);
   });
 
   it("catches an uncaught throw instead of letting a raw stack reach stderr", () => {

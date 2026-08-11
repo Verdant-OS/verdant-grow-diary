@@ -98,6 +98,27 @@ describe("normalizeDiaryEntries", () => {
     expect(e.warnings).toContain("event-type:missing");
   });
 
+  it("falls back to details.photo_url when no top-level photo_url exists (quicklog_save_event Photo saves)", () => {
+    // quicklog_save_event's diary companion row never sets the top-level
+    // photo_url column -- only details.photo_url (see
+    // ...trust_boundary_hardening.sql:290).
+    const row = baseRow({
+      photo_url: undefined,
+      details: { event_type: "photo", photo_url: "user1/grow1/123.jpg", subject: "buds" },
+    });
+    const [e] = normalizeDiaryEntries({ rawEntries: [row] });
+    expect(e.photoUrl).toBe("user1/grow1/123.jpg");
+  });
+
+  it("a genuine top-level photo_url still wins over details.photo_url", () => {
+    const row = baseRow({
+      photo_url: "https://signed.example.com/real.jpg",
+      details: { photo_url: "user1/grow1/stale.jpg" },
+    });
+    const [e] = normalizeDiaryEntries({ rawEntries: [row] });
+    expect(e.photoUrl).toBe("https://signed.example.com/real.jpg");
+  });
+
   it("derives day/week of grow only from valid dates", () => {
     const [e] = normalizeDiaryEntries({
       rawEntries: [baseRow()],

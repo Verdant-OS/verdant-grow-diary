@@ -64,3 +64,37 @@ export function mapGrowEventsToRecentRawEntries(
     .filter((r) => r && r.id && r.occurred_at && r.is_deleted !== true)
     .map(mapGrowEventToRecentRawEntry);
 }
+
+export interface DiaryCompanionForEnrichment {
+  photo_url?: string | null;
+  details?: Record<string, unknown> | null;
+}
+
+export interface EnrichedRecentLaneRawEntry extends RecentLaneRawEntry {
+  photo_url: string | null;
+}
+
+/**
+ * `mergeTimelineSources` deliberately keeps the `grow_events` row when it
+ * logically deduplicates against a `diary_entries` mirror (grow_events is
+ * the live entry path) -- but `grow_events` has no `photo_url` or JSONB
+ * `details` column, so a Photo/Training save's structured payload would
+ * otherwise vanish the moment its diary companion is suppressed as a
+ * duplicate. This carries the companion's photo_url and details onto the
+ * surviving mapped entry, so callers downstream of the merge (e.g. the
+ * Recent Quick Logs panel) still see what the grower actually captured.
+ *
+ * The mapper's own `event_type`/`source` keys stay authoritative (spread
+ * last) -- the companion's details fill in underneath, never override them.
+ */
+export function enrichRecentRawEntryWithDiaryCompanion(
+  mapped: RecentLaneRawEntry,
+  companion: DiaryCompanionForEnrichment | null | undefined,
+): EnrichedRecentLaneRawEntry {
+  if (!companion) return { ...mapped, photo_url: null };
+  return {
+    ...mapped,
+    photo_url: companion.photo_url ?? null,
+    details: { ...(companion.details ?? {}), ...mapped.details },
+  };
+}

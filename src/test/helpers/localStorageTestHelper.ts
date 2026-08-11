@@ -82,3 +82,23 @@ export function removeLocalStorageItemForTest(key: string): void {
 export function ensureLocalStorageForTest(): Storage {
   return ensureLocalStorage();
 }
+
+/**
+ * Resolve the object that owns a storage method in this test runtime.
+ *
+ * The in-memory fallback owns its methods directly, while some native/jsdom
+ * Storage implementations expose a wrapper object whose methods live on its
+ * prototype. Tests that need a controlled storage rejection must spy on this
+ * owner so the production access path cannot bypass the spy.
+ */
+export function getLocalStorageMethodOwnerForTest(
+  storage: Storage,
+  method: "getItem" | "setItem",
+): Storage {
+  if (Object.prototype.hasOwnProperty.call(storage, method)) return storage;
+  const prototype = Object.getPrototypeOf(storage);
+  if (!prototype || typeof prototype[method] !== "function") {
+    throw new Error(`[localStorageTestHelper] Storage method ${method} is unavailable.`);
+  }
+  return prototype as Storage;
+}

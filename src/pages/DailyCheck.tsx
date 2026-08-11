@@ -1122,6 +1122,16 @@ export default function DailyCheck() {
                 tentId={effectiveTentId || null}
                 tentName={selectedTent?.name ?? null}
                 growId={growId}
+                // Plant-scoped shortcut ONLY when the tent under review is
+                // that plant's own assignment. `effectiveTentId` already
+                // derives from the selected plant, so this is belt-and-braces
+                // — asserted rather than assumed so a future change to that
+                // derivation cannot silently point the CTA at another plant.
+                plantId={
+                  selectedPlant && effectiveTentId && effectiveTentId === selectedPlantTentId
+                    ? selectedPlant.id
+                    : null
+                }
               />
               <PlantAssignedTentActionsPanel
                 tentId={effectiveTentId || null}

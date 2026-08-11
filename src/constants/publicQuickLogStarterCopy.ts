@@ -20,6 +20,7 @@ export const PUBLIC_QUICK_LOG_STARTER_COPY = {
   valueLine:
     "No account needed. Nickname a plant, jot what you did or saw, and the draft stays on this device until you decide to keep it.",
   formHeading: "Your first quick log",
+  hydrationPendingLine: "Preparing your on-device draft…",
   draftSavedTitle: "Draft saved on this device",
   /**
    * THE truth line. Pinned verbatim by the starter's static-safety test —

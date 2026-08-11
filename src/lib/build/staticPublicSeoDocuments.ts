@@ -483,6 +483,12 @@ const CORE_ACQUISITION_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> = [
     imageAlt: "Verdant grow-stage care guide",
     bodyFallbackHtml: buildStaticGrowStageCareBodyFallback(),
   }),
+  publicDocument("/tools/blueprint-targets", {
+    title: "Grow stage target bands | Temperature, humidity, EC, pH, PPFD | Verdant",
+    description:
+      "Per-stage target ranges for air temperature, relative humidity, feed EC, pH, PPFD and DLI — from seedling through flower to dry and cure.",
+    imageAlt: "Verdant grow stage target bands",
+  }),
   publicDocument("/tools/vpd-calculator", {
     title: "Free Cannabis VPD Calculator by Growth Stage | Verdant",
     description:

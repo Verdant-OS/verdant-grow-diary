@@ -262,3 +262,122 @@ test("runner safety fence: a 'collision' ledger submits NO apply file at all —
   assert.equal(exitCode, EXIT.LEDGER_DRIFT);
   assert.equal(psqlFileCalls.length, 0, "a collision must never reach the apply step");
 });
+
+test("runner safety fence: a 'resume' ledger whose already-committed prefix has drifted schema is BLOCKED before submitting the remaining suffix", () => {
+  // Regression for review comment 3738441595: the first ledger row is
+  // exact (a clean row was written for FIRST), but if the guard function or
+  // constraint it's supposed to describe has since drifted (e.g. dropped
+  // and re-added under the same name as a no-op `CHECK (true)`), applying
+  // only the remaining suffix would run a bare VALIDATE CONSTRAINT against
+  // whatever now carries that name — "validating" a no-op and then
+  // recording a second exact ledger row on top of it. That produces a
+  // ledger that reads "verify_only" with a broken schema on the very next
+  // dispatch, a state this script cannot repair. It must refuse here,
+  // before submitting any SQL, not discover the drift at postflight.
+  const membershipPreflightStdout = `${JSON.stringify({
+    orphan_count: 0,
+    constraint_present: true,
+    constraint_validated: true,
+  })}\n`;
+  const ledgerStdout = `${JSON.stringify([
+    { version: FIRST.version, matches: [{ version: FIRST.version, name: FIRST.name }] },
+    { version: SECOND.version, matches: [] },
+  ])}\n`;
+  // The resume-prefix schema preflight (reusing HISTORY_VERIFY_SQL) reports
+  // a constraint body that no longer matches the pinned definition.
+  const resumePrefixStdout = `${JSON.stringify({
+    migrations: PINNED_MIGRATIONS.map((m) => ({
+      version: m.version,
+      exact_match: m.version === FIRST.version,
+      mismatch: false,
+    })),
+    guard_functiondef_md5: "f80bd729ca8721780c01c4740cd3a7d6",
+    constraint_def: "CHECK (true)",
+    constraint_validated: false,
+  })}\n`;
+
+  const psqlFileCalls = [];
+  let queryCallIndex = 0;
+  const spawnImpl = (cmd, args) => {
+    if (args.includes("--file")) {
+      psqlFileCalls.push(args[args.indexOf("--file") + 1]);
+      return { status: 0, stdout: "", stderr: "" };
+    }
+    // -c query calls happen in order: membership preflight, ledger query,
+    // resume-prefix schema preflight. No further calls should occur — the
+    // script must return before reaching the apply loop or postflight.
+    queryCallIndex += 1;
+    if (queryCallIndex === 1) return { status: 0, stdout: membershipPreflightStdout, stderr: "" };
+    if (queryCallIndex === 2) return { status: 0, stdout: ledgerStdout, stderr: "" };
+    if (queryCallIndex === 3) return { status: 0, stdout: resumePrefixStdout, stderr: "" };
+    throw new Error(`unexpected extra psql query call #${queryCallIndex}`);
+  };
+
+  const exitCode = runApplyCandidateNumberMaintenanceMigrations({
+    env: baseEnv(),
+    spawnImpl,
+    readFile: realReadFileSync,
+    logger: { log: () => {}, error: () => {} },
+    now: () => new Date("2026-08-07T00:00:00.000Z"),
+  });
+
+  assert.equal(exitCode, EXIT.RESUME_PREFIX_SCHEMA_DRIFT);
+  assert.equal(psqlFileCalls.length, 0, "drifted resume prefix must never reach the apply step");
+});
+
+test("runner safety fence: a 'resume' ledger whose prefix schema is intact (not yet validated) proceeds normally", () => {
+  // The prefix migration only adds the constraint NOT VALID — validation
+  // is exactly what the pending suffix is about to do. The resume-prefix
+  // check must NOT require constraint_validated, or it would block every
+  // legitimate resume.
+  const membershipPreflightStdout = `${JSON.stringify({
+    orphan_count: 0,
+    constraint_present: true,
+    constraint_validated: true,
+  })}\n`;
+  const ledgerStdout = `${JSON.stringify([
+    { version: FIRST.version, matches: [{ version: FIRST.version, name: FIRST.name }] },
+    { version: SECOND.version, matches: [] },
+  ])}\n`;
+  const resumePrefixStdout = `${JSON.stringify({
+    migrations: PINNED_MIGRATIONS.map((m) => ({
+      version: m.version,
+      exact_match: m.version === FIRST.version,
+      mismatch: false,
+    })),
+    guard_functiondef_md5: "f80bd729ca8721780c01c4740cd3a7d6",
+    constraint_def: "CHECK (((candidate_number IS NULL) OR (pheno_hunt_id IS NOT NULL)))",
+    constraint_validated: false,
+  })}\n`;
+  const postflightStdout = `${JSON.stringify({
+    migrations: PINNED_MIGRATIONS.map((m) => ({ version: m.version, exact_match: true, mismatch: false })),
+    guard_functiondef_md5: "f80bd729ca8721780c01c4740cd3a7d6",
+    constraint_def: "CHECK (((candidate_number IS NULL) OR (pheno_hunt_id IS NOT NULL)))",
+    constraint_validated: true,
+  })}\n`;
+
+  const psqlFileCalls = [];
+  let queryCallIndex = 0;
+  const spawnImpl = (cmd, args) => {
+    if (args.includes("--file")) {
+      psqlFileCalls.push(args[args.indexOf("--file") + 1]);
+      return { status: 0, stdout: "", stderr: "" };
+    }
+    queryCallIndex += 1;
+    if (queryCallIndex === 1) return { status: 0, stdout: membershipPreflightStdout, stderr: "" };
+    if (queryCallIndex === 2) return { status: 0, stdout: ledgerStdout, stderr: "" };
+    if (queryCallIndex === 3) return { status: 0, stdout: resumePrefixStdout, stderr: "" };
+    return { status: 0, stdout: postflightStdout, stderr: "" };
+  };
+
+  const exitCode = runApplyCandidateNumberMaintenanceMigrations({
+    env: baseEnv(),
+    spawnImpl,
+    readFile: realReadFileSync,
+    logger: { log: () => {}, error: () => {} },
+    now: () => new Date("2026-08-07T00:00:00.000Z"),
+  });
+
+  assert.equal(exitCode, EXIT.OK);
+  assert.equal(psqlFileCalls.length, 1, "an intact-but-unvalidated prefix must still resume the remaining suffix");
+});

@@ -91,9 +91,9 @@ const STAGE_COPY: Record<BlueprintTargetStage, { label: string; blurb: string }>
       "Peak light and feed, with humidity held down to protect dense buds from rot.",
   },
   late_flower: {
-    label: "Late flower / flush",
+    label: "Late flower",
     blurb:
-      "Cooler and drier still, with feed pulled back for the flush ahead of harvest.",
+      "Cooler and drier still. Any taper or flush should follow evidence — runoff EC, leaf-tip burn, visible salt stress — rather than the calendar; a plant still building tissue should not be starved.",
   },
   harvest: {
     label: "Dry & cure",
@@ -151,25 +151,30 @@ export function buildStageMetricRows(bands: BlueprintStageBands): MetricRow[] {
   if (bands.rh) {
     rows.push({ key: "rh", label: "Relative humidity", value: `${bands.rh.min}–${bands.rh.max} %` });
   }
-  // EC and pH are medium-specific. These SOP figures are soilless/hydro
-  // values; soil buffers pH and runs materially higher (roughly 6.0–6.8, per
-  // the grow-stage care guide). Publishing them unqualified would push a soil
-  // grower outside their own correct range, so the medium is named on the row
-  // rather than left implicit.
+  // EC and pH carry two qualifiers that are load-bearing for safety.
+  //
+  // 1. INPUT ONLY. These are targets for the solution the grower mixes, never
+  //    for collected runoff — see blueprintFeedingInput, which reads
+  //    inputEcMsCm/inputPh precisely because runoff is excluded. Runoff EC
+  //    normally reads higher as salts accumulate, so presenting an input band
+  //    as a runoff target would invite a feeding change on a number that was
+  //    never comparable.
+  // 2. MEDIUM. These are soilless/hydro figures; soil buffers pH and runs
+  //    materially higher (roughly 6.0–6.8, per the grow-stage care guide).
   if (bands.ec) {
     rows.push({
       key: "ec",
-      label: "Feed EC",
+      label: "Input feed EC",
       value: `${bands.ec.min}–${bands.ec.max} mS/cm`,
-      note: "Soilless or hydro — nutrient solution or runoff",
+      note: "Soilless or hydro, nutrient solution as mixed — not runoff",
     });
   }
   if (bands.ph) {
     rows.push({
       key: "ph",
-      label: "Feed pH",
+      label: "Input feed pH",
       value: `${bands.ph.min}–${bands.ph.max}`,
-      note: "Soilless or hydro. In soil, aim for roughly 6.0–6.8",
+      note: "Soilless or hydro, as mixed — not runoff. In soil, aim for roughly 6.0–6.8",
     });
   }
   if (bands.ppfd) {
@@ -202,6 +207,16 @@ const FAQ = [
     question: "Do the EC and pH targets apply to soil?",
     answer:
       "No — the feed EC and pH ranges above are soilless and hydro figures. Soil buffers pH, so soil growers should aim for roughly 6.0–6.8 rather than the high-5s shown here. Air temperature, humidity and light targets are not medium-specific and apply either way.",
+  },
+  {
+    question: "Are the EC and pH targets for input feed or runoff?",
+    answer:
+      "Input only — the solution as you mix it, before it reaches the medium. Runoff normally reads higher than input because salts accumulate in the root zone, so runoff should be read against your own input and root-zone history rather than against these numbers. Comparing runoff directly to an input band will make a healthy feed look wrong.",
+  },
+  {
+    question: "Should I flush at the end of flower?",
+    answer:
+      "Not automatically. Base any taper or flush on evidence — runoff EC, leaf-tip burn, or visible salt stress — rather than on the calendar. Aggressive late-stage flushing can weaken a plant that is still filling out.",
   },
   {
     question: "Are these targets the same for every cultivar?",

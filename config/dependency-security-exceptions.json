@@ -9,9 +9,9 @@
       "expectedNpmAdvisoryUrl": "https://github.com/advisories/GHSA-g7r4-m6w7-qqqr",
       "expectedNpmVulnerableRange": ">=0.27.3 <0.28.1",
       "owner": "Verdant dependency security",
-      "reason": "esbuild@0.27.7 is the single hoisted resolution shared by the exact @lovable.dev/mcp-js pin, vite@8.2.0 (peer ^0.27.0 || ^0.28.0), the vite@7.3.6 copies under vitest/vite-node, and unplugin. The fixed esbuild 0.28.1 cannot be adopted until the exact upstream @lovable.dev/mcp-js pin and the nested vite 7 toolchain move to it.",
+      "reason": "esbuild@0.27.7 is the single hoisted resolution shared by the exact @lovable.dev/mcp-js pin, vite@8.2.0 (peer ^0.27.0 || ^0.28.0), the vite@7.3.6 copies under vitest/vite-node, and unplugin. The fixed esbuild 0.28.1 cannot be adopted until the exact upstream @lovable.dev/mcp-js pin and the nested vite 7 toolchain move to it. Rechecked 2026-08-11: latest @lovable.dev/mcp-js@0.26.2 still declares esbuild ^0.27.0.",
       "reachability": "esbuild is build-time tooling only; no production source imports it and the source-import fence stays empty. The advisory concerns esbuild's development server; Verdant development uses Vite's loopback dev server and CI builds run non-interactively.",
-      "recheckOn": "2026-08-08",
+      "recheckOn": "2026-08-18",
       "expiresOn": "2026-08-25",
       "expectedLockResolutions": [
         {

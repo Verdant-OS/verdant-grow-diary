@@ -460,10 +460,18 @@ export default function Timeline() {
   const recentLaneRawEntries = useMemo(() => {
     const diaryInputs = entries.map((e) => {
       const details = (e.details ?? null) as Record<string, unknown> | null;
+      // quicklog_save_event mirrors its back-pointer as `linked_grow_event_id`
+      // (not `grow_event_id`, which is the quicklog_save_manual convention) —
+      // fall back to it so a diary companion row created by quicklog_save_event
+      // (any save with photo_url, a sensor snapshot, or non-empty p_details)
+      // still logically dedups against its grow_events twin instead of
+      // showing as two rows in the Recent Quick Logs panel.
       const grow_event_id =
         details && typeof details["grow_event_id"] === "string"
           ? (details["grow_event_id"] as string)
-          : null;
+          : details && typeof details["linked_grow_event_id"] === "string"
+            ? (details["linked_grow_event_id"] as string)
+            : null;
       return {
         id: e.id,
         entry_at: e.entry_at,
@@ -1083,6 +1091,13 @@ export default function Timeline() {
                             "sensor",
                             "sensor_snapshot",
                             "remind_at",
+                            // Training/photo structured detail fields — rendered as
+                            // labeled badges elsewhere, not as raw key:value chips
+                            // here. See quickLogActivityDetailFields.ts.
+                            "technique",
+                            "intensity",
+                            "subject",
+                            "caption",
                           ];
                           const extra = Object.entries(e.details || {}).filter(
                             ([k]) => !HIDDEN.includes(k),

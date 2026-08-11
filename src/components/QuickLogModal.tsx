@@ -21,11 +21,16 @@ import {
   Sprout,
   Utensils,
   Loader2,
+  Scissors,
 } from "lucide-react";
 
 import { createQuickLogEvent, type QuickLogEventType } from "@/lib/quick-log/createQuickLogEvent";
 import { fetchLatestSensorSnapshot } from "@/lib/quick-log/fetchLatestSensorSnapshot";
 import type { QuickLogSensorSnapshot } from "@/lib/quick-log/createQuickLogEvent";
+import {
+  getQuickLogActivityDetailFields,
+  sanitizeQuickLogActivityDetails,
+} from "@/lib/quick-log/quickLogActivityDetailFields";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import MetricChip from "@/components/MetricChip";
@@ -56,7 +61,12 @@ const EVENT_TYPES: {
   { type: "feed", label: "Feed", icon: <Utensils className="h-4 w-4" />, variant: "outline" },
   { type: "photo", label: "Photo", icon: <Camera className="h-4 w-4" />, variant: "outline" },
   { type: "note", label: "Note", icon: <FileText className="h-4 w-4" />, variant: "outline" },
+  { type: "training", label: "Training", icon: <Scissors className="h-4 w-4" />, variant: "outline" },
 ];
+
+const TRAINING_TECHNIQUE_FIELD = getQuickLogActivityDetailFields("training")[0];
+const TRAINING_INTENSITY_FIELD = getQuickLogActivityDetailFields("training")[1];
+const PHOTO_SUBJECT_FIELD = getQuickLogActivityDetailFields("photo")[0];
 
 export default function QuickLogModal({
   open,
@@ -79,6 +89,10 @@ export default function QuickLogModal({
   const [saving, setSaving] = useState(false);
   const [sensorSnapshot, setSensorSnapshot] = useState<QuickLogSensorSnapshot | null>(null);
   const [sensorLoading, setSensorLoading] = useState(false);
+  const [technique, setTechnique] = useState("");
+  const [intensity, setIntensity] = useState("");
+  const [subject, setSubject] = useState("");
+  const [caption, setCaption] = useState("");
 
   const resetForm = useCallback(() => {
     setEventType("observe");
@@ -88,9 +102,22 @@ export default function QuickLogModal({
     setPhotoPreview(null);
     setSensorSnapshot(null);
     setSensorLoading(false);
+    setTechnique("");
+    setIntensity("");
+    setSubject("");
+    setCaption("");
     if (cameraRef.current) cameraRef.current.value = "";
     if (libraryRef.current) libraryRef.current.value = "";
   }, []);
+
+  // Intensity only applies to technique="defoliation" (see
+  // quickLogActivityDetailFields.ts's dependsOn gate) — clear it whenever the
+  // grower picks a different technique so a prior selection can never leak
+  // into a save it doesn't apply to. The sanitizer drops a mismatched pair
+  // defensively too; this just keeps the visible form state honest.
+  useEffect(() => {
+    if (technique !== "defoliation" && intensity !== "") setIntensity("");
+  }, [technique, intensity]);
 
   // Reset form when modal opens and fetch sensor snapshot
   useEffect(() => {
@@ -159,6 +186,13 @@ export default function QuickLogModal({
         }
       }
 
+      const extraDetails = sanitizeQuickLogActivityDetails(eventType, {
+        technique,
+        intensity,
+        subject,
+        caption,
+      });
+
       await createQuickLogEvent({
         growId,
         tentId,
@@ -167,6 +201,7 @@ export default function QuickLogModal({
         note: note.trim() || undefined,
         photoUrl: uploadedPath ?? undefined,
         idempotencyKey,
+        extraDetails,
       });
 
       toast.success("Log saved");
@@ -195,6 +230,11 @@ export default function QuickLogModal({
 
 
   const selectedPlantName = plants.find((p) => p.id === plantId)?.name ?? null;
+
+  // Technique is required for a training save to mean anything — mirrors
+  // quickLogTypedEventPayloadRules.ts's own technique:missing invariant for
+  // the same concept.
+  const missingRequiredDetail = eventType === "training" && !technique;
 
   const metricChips = useMemo(() => {
     if (!sensorSnapshot?.metrics) return [];
@@ -267,6 +307,73 @@ export default function QuickLogModal({
               ))}
             </div>
           </div>
+
+          {/* Training detail */}
+          {eventType === "training" && TRAINING_TECHNIQUE_FIELD && TRAINING_INTENSITY_FIELD && (
+            <div className="rounded-md border border-border p-3" data-testid="qlm-training-detail">
+              <Label htmlFor="qlm-technique">{TRAINING_TECHNIQUE_FIELD.label}</Label>
+              <Select value={technique} onValueChange={setTechnique}>
+                <SelectTrigger id="qlm-technique" data-testid="qlm-technique">
+                  <SelectValue placeholder="Select a technique" />
+                </SelectTrigger>
+                <SelectContent>
+                  {TRAINING_TECHNIQUE_FIELD.options?.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {technique === "defoliation" && (
+                <div className="mt-3">
+                  <Label htmlFor="qlm-intensity">{TRAINING_INTENSITY_FIELD.label}</Label>
+                  <Select value={intensity} onValueChange={setIntensity}>
+                    <SelectTrigger id="qlm-intensity" data-testid="qlm-intensity">
+                      <SelectValue placeholder="Select an amount" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TRAINING_INTENSITY_FIELD.options?.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Photo detail */}
+          {eventType === "photo" && PHOTO_SUBJECT_FIELD && (
+            <div className="rounded-md border border-border p-3" data-testid="qlm-photo-detail">
+              <Label htmlFor="qlm-subject">{PHOTO_SUBJECT_FIELD.label}</Label>
+              <Select value={subject} onValueChange={setSubject}>
+                <SelectTrigger id="qlm-subject" data-testid="qlm-subject">
+                  <SelectValue placeholder="Select a subject" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PHOTO_SUBJECT_FIELD.options?.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <div className="mt-3">
+                <Label htmlFor="qlm-caption">Caption</Label>
+                <input
+                  id="qlm-caption"
+                  data-testid="qlm-caption"
+                  type="text"
+                  value={caption}
+                  onChange={(e) => setCaption(e.target.value)}
+                  placeholder="What this photo shows"
+                  className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                />
+              </div>
+            </div>
+          )}
 
           {/* Sensor snapshot */}
           <div className="rounded-md border border-border p-3" data-testid="qlm-sensor-snapshot">
@@ -361,7 +468,7 @@ export default function QuickLogModal({
               type="button"
               className="flex-1 gradient-leaf text-primary-foreground"
               onClick={handleSave}
-              disabled={saving}
+              disabled={saving || missingRequiredDetail}
               data-testid="qlm-save"
             >
               {saving ? (

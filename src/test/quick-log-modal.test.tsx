@@ -226,3 +226,24 @@ describe("QuickLogModal — save flow hardening", () => {
     expect(toastSuccess).not.toHaveBeenCalled();
   });
 });
+
+describe("QuickLogModal — Training detail requires a technique before save", () => {
+  it("disables Save after switching to Training with no technique chosen", async () => {
+    renderModal();
+    const saveBtn = screen.getByTestId("qlm-save") as HTMLButtonElement;
+    expect(saveBtn.disabled).toBe(false);
+
+    fireEvent.click(screen.getByRole("button", { name: "Training" }));
+
+    await waitFor(() => expect(saveBtn.disabled).toBe(true));
+    expect(screen.getByTestId("qlm-training-detail")).toBeTruthy();
+  });
+
+  it("does not disable Save for non-training event types", async () => {
+    renderModal();
+    fireEvent.click(screen.getByRole("button", { name: "Photo" }));
+    const saveBtn = screen.getByTestId("qlm-save") as HTMLButtonElement;
+    expect(saveBtn.disabled).toBe(false);
+    expect(screen.getByTestId("qlm-photo-detail")).toBeTruthy();
+  });
+});

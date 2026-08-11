@@ -79,6 +79,8 @@ export const EXIT = Object.freeze({
   APPLY_FAILED: 10,
   POSTFLIGHT_FAILED: 11,
   POSTFLIGHT_CONTRACT_FAILED: 12,
+  RESUME_PREFIX_PREFLIGHT_FAILED: 13,
+  RESUME_PREFIX_SCHEMA_DRIFT: 14,
 });
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -582,6 +584,73 @@ export function runApplyCandidateNumberMaintenanceMigrations({
       logger.log(
         `Resuming a partial prior apply: ${PINNED_MIGRATIONS.length - ledger.pendingIndexes.length} migration(s) already committed, applying the remaining ${ledger.pendingIndexes.length}.`,
       );
+
+      // The ledger row for the committed prefix being exact only proves a
+      // row was written under the right version/name — it says nothing
+      // about whether the schema object that row is supposed to describe
+      // is still intact. If the guard function or constraint drifted after
+      // that commit (e.g. a same-named constraint re-added as `CHECK
+      // (true)` outside this tooling), submitting only the remaining
+      // suffix would run a bare `VALIDATE CONSTRAINT` against whatever now
+      // carries that name — trivially "validating" a no-op check and
+      // recording a second exact ledger row on top of it. That produces
+      // the exact dead end this preflight exists to prevent: postflight
+      // then fails with both rows present, which classifyTargetLedger
+      // reads as "verify_only" — a state this script cannot repair (see
+      // buildSchemaRepairGuidance). So verify the prefix's schema effect
+      // BEFORE submitting any SQL, not after. Do not check
+      // constraint_validated here — the prefix migration only creates the
+      // constraint NOT VALID; validation is exactly what the pending
+      // suffix is about to do.
+      const resumePrefixPreflight = runPsqlQuery({ sql: HISTORY_VERIFY_SQL, childEnv, spawnImpl });
+      if (!resumePrefixPreflight.ok) {
+        logger.error("Read-only resume-prefix schema preflight did not complete.");
+        writeReport("BLOCKED - resume prefix schema preflight failed", [
+          "No migration SQL was submitted. Inspect database connectivity.",
+        ]);
+        writeAudit("resume_prefix_preflight_failed", {
+          ...auditBase,
+          ledgerState: ledger.status,
+          note: resumePrefixPreflight.kind,
+        });
+        return resumePrefixPreflight.kind === "not_invocable"
+          ? EXIT.PSQL_NOT_INVOCABLE
+          : EXIT.RESUME_PREFIX_PREFLIGHT_FAILED;
+      }
+      let resumePrefixHistory;
+      try {
+        resumePrefixHistory = classifyHistory(parseVerifyStdout(resumePrefixPreflight.stdout));
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : "resume_prefix_parse_failed";
+        logger.error(`Resume-prefix schema result could not be parsed (${reason}).`);
+        writeReport("BLOCKED - resume prefix schema malformed", [
+          "The prefix-schema query did not return the expected shape. No migration SQL was submitted.",
+        ]);
+        writeAudit("resume_prefix_preflight_failed", { ...auditBase, ledgerState: ledger.status, note: reason });
+        return EXIT.RESUME_PREFIX_PREFLIGHT_FAILED;
+      }
+      if (!(resumePrefixHistory.guardFunctionMatches && resumePrefixHistory.constraintDefMatches)) {
+        logger.error(
+          "The already-committed prefix migration's schema effect no longer matches its pinned definition.",
+        );
+        logger.error(
+          "Refusing to submit the remaining suffix: it would only VALIDATE whatever now carries that constraint's name, not repair it.",
+        );
+        writeReport("BLOCKED - resume prefix schema drift", [
+          "| Fact | Value |",
+          "| --- | --- |",
+          `| Guard function matches pinned fingerprint | ${resumePrefixHistory.guardFunctionMatches} |`,
+          `| Constraint definition matches pinned text | ${resumePrefixHistory.constraintDefMatches} |`,
+          "",
+          "The ledger row for the already-committed migration is exact, but its actual schema effect has drifted from the pinned definition — most likely a manual `ALTER`/`DROP` outside this tooling after the prior partial apply committed. No migration SQL was submitted. Resuming here would run only the remaining `VALIDATE CONSTRAINT` step, which would validate whatever object now carries that name rather than repair it. Restore the schema object by hand (re-run the first migration's body directly), or delete its stale ledger row so this script treats it as fully unapplied and re-applies both migrations from scratch, then re-dispatch.",
+        ]);
+        writeAudit("resume_prefix_schema_drift", {
+          ...auditBase,
+          ledgerState: ledger.status,
+          ...resumePrefixHistory,
+        });
+        return EXIT.RESUME_PREFIX_SCHEMA_DRIFT;
+      }
     }
     for (const stepIndex of ledger.pendingIndexes) {
       const migration = validatedMigrations[stepIndex];

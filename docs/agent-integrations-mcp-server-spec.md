@@ -154,11 +154,23 @@ never exposes `raw_payload` or secret material.
 
 1. Tool source lives in `src/lib/mcp/tools/*.ts`; the edge bundle and
    `.lovable/mcp/manifest.json` are **generated** — never hand-edit the bundle.
-2. Any tool addition/rename/removal must update `src/lib/mcp/manifestView.ts`;
-   the drift test fails otherwise. Per the Lovable doc (`source claim`), users
-   must refresh their connector after such changes, and the app must be
-   **re-published** for tool changes to go live (status moves through
-   "Not published" until then).
+2. Any tool addition/rename/removal must update the **full pinned surface**,
+   not just one mirror — each of these hard-codes the tool set and will fail
+   or go stale otherwise (`established fact`, read from source):
+   - `src/lib/mcp/manifestView.ts` — presenter-safe manifest mirror;
+   - `src/test/mcp-manifest-drift.test.ts` — pins `SOURCE_TOOLS` and the
+     exact tool-name list (lines 24/76/104 at the audited ref);
+   - `src/test/mcp-local-rls-integration.test.ts` — imports each tool
+     handler explicitly for the local RLS harness (its pagination/filter
+     cases are manifest-driven, but the handler list is not);
+   - `src/pages/McpApiReference.tsx` — hand-authored public reference at
+     `/docs/mcp-api`, including the tool list in its meta description;
+   - `src/test/mcp-tools-source-safety.test.ts` — picks up new files in
+     `src/lib/mcp/tools/` automatically, but new tools must satisfy its
+     assertions by construction (§5.3).
+   Per the Lovable doc (`source claim`), users must refresh their connector
+   after such changes, and the app must be **re-published** for tool changes
+   to go live (status moves through "Not published" until then).
 3. Every new tool must pass the source-safety scan by construction: import
    `supabaseForUser` (never the app singleton or service role), short-circuit
    unauthenticated calls, carry `readOnlyHint` where true, and never reference
@@ -189,7 +201,9 @@ dashboards or from an unproxied network:
 4. **Connect a real assistant** (Claude or ChatGPT custom connector), complete
    the app sign-in + consent screens, and exercise all three tools against a
    real account. Record results here or in `docs/agents/CURRENT_STATE.md` as
-   `PASS`/`FAIL` with dates. Until then the live surface is `NOT_MEASURED`.
+   `PASS`/`FAIL` with dates. Until an authorized network/dashboard path
+   exists, the live surface stays `BLOCKED` (per the status vocabulary,
+   `NOT_MEASURED` is reserved for a reachable check that was not run).
 5. Review Lovable's publish-time **automated security check** output.
 
 ---
@@ -218,9 +232,10 @@ approved by this document.
 - Whether Lovable's generated integration state (enabled/disabled) matches the
   committed code: `missing evidence` — repo code proves the server is defined,
   not that Lovable currently serves it.
-- Author attribution for the original #253 implementation: `NOT_MEASURED`
-  (squash-merge history; consistent with the CURRENT_STATE precedent that
-  authoring agents are not always determinable from git).
+- Author attribution for the original #253 implementation: `missing evidence`
+  — git history was checked but squash merges erase it (consistent with the
+  CURRENT_STATE precedent that authoring agents are not always determinable
+  from git).
 
 ---
 

@@ -42,6 +42,21 @@ jobs:
   probe:
     name: Probe production migration drift
     runs-on: ubuntu-latest
+    # Trusted-ref gate, matching prefix-diff-sarif.yml and
+    # required-money-migrations.yml.
+    #
+    # workflow_dispatch accepts a --ref, and this job checks out that ref and
+    # then executes ITS copy of scripts/probe-migration-drift.mjs and its
+    # copy of the local ./.github/actions/require-ci-secret -- with
+    # SUPABASE_DB_URL_LIVE in the environment. Without this guard, dispatching
+    # from a modified branch would run attacker-editable code holding the
+    # production database credential, which is a credential-exfiltration path
+    # regardless of what the probe itself does.
+    #
+    # Safe for the schedule too: scheduled runs only ever fire from the
+    # repository default branch, which IS verdant-grow-diary here, so this
+    # gate never blocks the cron it exists to protect.
+    if: github.ref == 'refs/heads/verdant-grow-diary'
     # Holds SUPABASE_DB_URL_LIVE. If this environment stops resolving, the
     # secret guard below fails the job loudly rather than skipping green.
     environment: verdant-production

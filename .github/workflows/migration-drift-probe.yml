@@ -84,10 +84,30 @@ jobs:
         with:
           node-version: "24"
 
+      # Hardened because a failure here is no longer merely a red run: the
+      # tracking-issue step now fires whenever the probe does not complete, so
+      # a transient package-mirror hiccup would file a false "production
+      # unmeasured" alert. Observed on this repo's runners on 2026-08-11 --
+      # apt-get update returned 403 Forbidden for the third-party
+      # packages.microsoft.com azure-cli repo, which this job does not use, and
+      # apt-get fails the whole command when ANY configured source errors.
+      #
+      # So: tolerate update errors, and retry the install, which is the only
+      # load-bearing part. A genuinely unavailable postgresql-client still
+      # fails the step after three attempts, and still raises the alert.
       - name: Install psql client
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends postgresql-client
+          sudo apt-get update -qq || echo "apt-get update reported errors; continuing to install"
+          for attempt in 1 2 3; do
+            if sudo apt-get install -y --no-install-recommends postgresql-client; then
+              echo "postgresql-client installed (attempt $attempt)"
+              exit 0
+            fi
+            echo "install attempt $attempt failed; retrying in 10s"
+            sleep 10
+          done
+          echo "could not install postgresql-client after 3 attempts" >&2
+          exit 1
 
       # Hard-fail on a missing secret instead of letting the probe report
       # "could not check" into a void.

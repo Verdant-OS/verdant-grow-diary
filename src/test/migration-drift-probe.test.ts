@@ -168,6 +168,21 @@ describe("migration drift probe — never publishes credentials", () => {
     expect(SRC).toContain("const warn = (line) => console.error(redactDbUrl(line, dbUrl));");
   });
 
+  it("does not raise a false alert when the package mirror hiccups", () => {
+    // Since the alert now fires whenever the probe fails to complete, a
+    // transient apt failure would file a false "production unmeasured" issue.
+    // Observed for real: apt-get update returned 403 for a third-party repo
+    // this job does not use, and apt-get fails the command when ANY source
+    // errors. The install is the only load-bearing part, and it must still
+    // fail loudly if psql is genuinely unavailable.
+    const workflow = readFileSync(
+      resolve(ROOT, ".github/workflows/migration-drift-probe.yml"),
+      "utf8",
+    );
+    expect(workflow).toContain("apt-get update -qq || echo");
+    expect(workflow).toContain("could not install postgresql-client after 3 attempts");
+  });
+
   it("closes the tracking issue after a clean run, from a single shared title", () => {
     // The title is present tense, so an issue left open after recovery asserts
     // something false and an operator cannot tell active drift from a stale

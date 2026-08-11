@@ -5,9 +5,9 @@
 //  - No real account creation.
 //  - No real reset email.
 //  - No real credentials.
-//  - All Supabase /auth/v1/** traffic is intercepted via page.route().
-//  - The default route returns a benign 200/{} so a stray click can never
-//    hit production Supabase.
+//  - All Supabase /auth/v1/** and /rest/v1/** traffic is intercepted via page.route().
+//  - Default handlers return benign empty responses so a stray request can
+//    never hit production Supabase.
 //  - The reset-password flow seeds a synthetic session into sessionStorage
 //    via page.addInitScript so the UI can render the form WITHOUT a real
 //    recovery token exchange. The mocked PUT /auth/v1/user request is what
@@ -54,13 +54,20 @@ function holdAndCount(page: Page, pathFragment: RegExp, responseBody: unknown, s
 }
 
 test.beforeEach(async ({ page }) => {
-  // Default safety net: any /auth/v1/** that escapes test-specific routing
-  // is fulfilled locally with an empty 200 — never reaches Supabase.
+  // Default safety net: any Supabase auth or data request that escapes
+  // test-specific routing is fulfilled locally — never reaches Supabase.
   await page.route(/\/auth\/v1\//, (route) =>
     route.fulfill({
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({}),
+    }),
+  );
+  await page.route(/\/rest\/v1\//, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify([]),
     }),
   );
 });
@@ -159,9 +166,16 @@ test.describe("Auth loading/disabled smoke (mocked)", () => {
   test("Reset password: loading label, disable, double-submit blocked, re-enable on error", async ({
     page,
   }) => {
+    const growRefreshErrors: string[] = [];
+    page.on("console", (message) => {
+      if (message.type() === "error" && message.text().includes("GrowsProvider.refresh error:")) {
+        growRefreshErrors.push(message.text());
+      }
+    });
+
     // Seed a SYNTHETIC session into sessionStorage before any app code runs.
     // The session is local-only test fiction; we never present it to a real
-    // Supabase endpoint (the PUT /auth/v1/user call is intercepted below).
+    // Supabase endpoint (the Auth and REST calls are intercepted below).
     await page.addInitScript(
       ({ key }) => {
         const encodeSegment = (value: object) =>
@@ -221,6 +235,10 @@ test.describe("Auth loading/disabled smoke (mocked)", () => {
     await expect(page.getByRole("button", { name: /^update password$/i })).toBeEnabled();
     await expect(page.getByRole("alert")).toContainText(/expired|new reset email/i);
     expect(gate.count()).toBe(1);
+    // Let the synthetic session's provider refresh settle before asserting it
+    // did not surface an unrelated grow-read error.
+    await page.waitForTimeout(300);
+    expect(growRefreshErrors).toEqual([]);
   });
 });
 

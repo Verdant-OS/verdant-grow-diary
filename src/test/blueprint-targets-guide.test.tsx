@@ -103,14 +103,16 @@ describe("BlueprintTargetsGuide", () => {
     expect(cta.textContent ?? "").not.toMatch(/\bpro\b/i);
   });
 
-  it("sends the CTA to attributed signup, not the sign-in tab", () => {
+  it("sends the CTA to signup mode, not the sign-in tab", () => {
     render(<BlueprintTargetsGuide />);
     const href =
       screen.getByTestId("blueprint-targets-signup").getAttribute("href") ?? "";
     // Bare /auth resolves to mode "signin" and skips the signup page-view path.
     expect(href).toContain("mode=signup");
-    expect(href).toContain("utm_source=blueprint_targets");
     expect(href).not.toBe("/auth");
+    // No utm_* source: an attribution source only records once it is in the
+    // server-side allowlists, so claiming one here would measure nothing.
+    expect(href).not.toContain("utm_source");
   });
 
   it("names the medium on feed EC and pH so soil growers are not misled", () => {

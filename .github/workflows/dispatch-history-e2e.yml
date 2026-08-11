@@ -44,6 +44,10 @@ on:
       - ".github/workflows/dispatch-history-e2e.yml"
   workflow_dispatch:
 
+# Read-only token: the job only checks out code and uploads artifacts.
+permissions:
+  contents: read
+
 jobs:
   dispatch-history-e2e:
     name: Dispatch history Playwright (mocked / non-destructive)

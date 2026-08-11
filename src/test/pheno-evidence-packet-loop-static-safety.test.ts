@@ -4,6 +4,10 @@
  * Proves the integration wiring exists AND that the slice adds no ranking,
  * no automatic selection, no Action Queue writes, no device control, no
  * service_role, no schema/SQL, and no second Quick Log save path.
+ *
+ * Blast-radius sweep (2026-08-11): 27 test files that statically read
+ * QuickLog.tsx or any lib touched by #780/#781 were executed at deploy head
+ * (44220ad32); all pass — 0 stale pin siblings found.
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";

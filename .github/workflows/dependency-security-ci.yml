@@ -93,6 +93,7 @@ jobs:
           bunx playwright test
           e2e/auth-loading.spec.ts
           e2e/auth-route-protection.spec.ts
+          e2e/entitlement-ladder-route-smoke.spec.ts
           e2e/legal-seo-metadata.spec.ts
           --project=chromium-mocked
         continue-on-error: false

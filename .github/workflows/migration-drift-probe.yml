@@ -59,6 +59,15 @@ jobs:
     if: github.ref == 'refs/heads/verdant-grow-diary'
     # Holds SUPABASE_DB_URL_LIVE. If this environment stops resolving, the
     # secret guard below fails the job loudly rather than skipping green.
+    #
+    # OPERATIONAL CAVEAT: if a REQUIRED REVIEWER is ever added to
+    # verdant-production, every scheduled run will park awaiting deployment
+    # approval and this monitor silently stops monitoring -- no runner, no
+    # probe, no issue. Verified at authoring time that this environment has
+    # only a branch_policy rule and zero reviewers, so the cron does run
+    # today. If approval rules are added later, move this job to a separate
+    # read-only monitoring environment whose protection rules permit
+    # unattended scheduled runs.
     environment: verdant-production
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
@@ -160,21 +169,42 @@ jobs:
               "that never ran and the live schema is in a state nobody authored.",
             ].join("\n");
 
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const LABEL = "migration-drift";
+
+            // Provision the label first. Creating an issue with a label that
+            // does not exist fails validation, which would swallow the alert
+            // entirely -- the precise silent-failure mode this probe exists
+            // to eliminate. Matches scripts/notify-edge-shared-drift.mjs.
+            try {
+              await github.rest.issues.createLabel({
+                owner, repo, name: LABEL, color: "b60205",
+                description: "Production has not applied every committed migration",
+              });
+            } catch (e) {
+              // 422 = already exists, which is the expected steady state.
+              if (e.status !== 422) {
+                core.warning(`could not ensure ${LABEL} label: ${e.message}`);
+              }
+            }
+
+            // Match on title rather than label, so a lost/renamed label can
+            // never cause duplicate issues to pile up daily.
             const existing = await github.rest.issues.listForRepo({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              state: "open",
-              labels: "migration-drift",
+              owner, repo, state: "open", per_page: 100,
             });
             const hit = existing.data.find((i) => i.title === title);
             if (hit) {
               await github.rest.issues.createComment({
-                owner: context.repo.owner, repo: context.repo.repo,
-                issue_number: hit.number, body,
+                owner, repo, issue_number: hit.number, body,
               });
-            } else {
-              await github.rest.issues.create({
-                owner: context.repo.owner, repo: context.repo.repo,
-                title, body, labels: ["migration-drift"],
-              });
+              return;
+            }
+            try {
+              await github.rest.issues.create({ owner, repo, title, body, labels: [LABEL] });
+            } catch (e) {
+              // Last resort: the alert matters more than its label.
+              core.warning(`labelled issue creation failed (${e.message}); retrying unlabelled`);
+              await github.rest.issues.create({ owner, repo, title, body });
             }

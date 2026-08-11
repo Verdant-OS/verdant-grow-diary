@@ -178,8 +178,12 @@ function CandidateReadinessBadge({ readiness }: { readiness: PhenoCandidateReadi
         <span aria-hidden="true">{READINESS_SYMBOL[readiness.readiness]} </span>
         {PHENO_READINESS_LABELS[readiness.readiness]}
       </span>
-      <span className="block text-muted-foreground">
-        {readiness.completedGoalCount}/{readiness.selectedGoalCount} evidence goals
+      <span
+        data-testid={`workspace-readiness-count-${readiness.candidateId}`}
+        className="block text-muted-foreground"
+      >
+        {readiness.completedGoalCount}/{readiness.selectedGoalCount} stage-appropriate readiness
+        checks
       </span>
       {next ? (
         next.anchor ? (

@@ -19,6 +19,7 @@
 //     resolver keeps failing.
 
 import { expect, test, type Page } from "@playwright/test";
+import { denyAnalyticsConsent } from "./utils/analyticsConsent";
 
 const PROJECT_REF = "knkwiiywfkbqznbxwqfh";
 const SESSION_KEY = `sb-${PROJECT_REF}-auth-token`;
@@ -124,6 +125,13 @@ async function mockSupabaseAndPaddle(page: Page) {
     return route.fulfill({ status: 200, contentType: "application/json", body });
   });
 
+  // Any other edge function: silent 404 so nothing else crashes. Register
+  // this broad fallback first: Playwright gives the most recently registered
+  // matching route precedence, so the explicit price mock below must win.
+  await page.route(/\/functions\/v1\//, (route) =>
+    route.fulfill({ status: 404, contentType: "application/json", body: "{}" }),
+  );
+
   // get-paddle-price: force the catalog-unavailable branch so the recovery
   // panel is reached even if the local build ships with a payments token
   // (env=sandbox). If env resolves to "unavailable" instead, the hook
@@ -135,11 +143,6 @@ async function mockSupabaseAndPaddle(page: Page) {
       contentType: "application/json",
       body: JSON.stringify({ error: "price_not_configured" }),
     }),
-  );
-
-  // Any other edge function: silent 404 so nothing else crashes.
-  await page.route(/\/functions\/v1\//, (route) =>
-    route.fulfill({ status: 404, contentType: "application/json", body: "{}" }),
   );
 
   // Paddle CDN: stub `window.Paddle` and swallow the script so we never
@@ -175,11 +178,22 @@ async function openBlockedRecovery(page: Page) {
   // Pin the plan exercised by this contract. Pricing intentionally defaults
   // to annual, while this smoke proves the monthly recovery analytics slug.
   await page.goto("/pricing?plan=pro_monthly");
+  // TanStack Start pre-renders the CTA before React has attached its event
+  // handler. The page-view event is emitted from Pricing's client effect, so
+  // waiting for it makes this a real browser click rather than a lost SSR-era
+  // click on static markup.
+  await expect
+    .poll(() => countAnalyticsEvents(page, "pricing_page_view"), { timeout: 10_000 })
+    .toBeGreaterThan(0);
   return triggerBlockedRecovery(page);
 }
 
 test.describe("Pricing checkout recovery (blocked state)", () => {
   test.beforeEach(async ({ page }) => {
+    // This suite does not test analytics consent. A persisted denial prevents
+    // the fixed banner from intercepting the paid CTA while guaranteeing no
+    // analytics request leaves the hermetic browser.
+    await denyAnalyticsConsent(page);
     await seedFakeSession(page);
     await captureAnalyticsEvents(page);
     await mockSupabaseAndPaddle(page);

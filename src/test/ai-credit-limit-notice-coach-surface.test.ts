@@ -43,16 +43,22 @@ describe("aiCreditLimitNoticeViewModel — Coach surface (S3.2)", () => {
     expect(vm.charged).toBe(false);
   });
 
-  it.each(["pro_monthly", "pro_annual", "craft_monthly", "craft_annual", "founder_lifetime"])(
-    "%s → Coach wait copy, NO paywallVm",
-    (plan) => {
+  it.each([
+    ["pro_monthly", 100],
+    ["pro_annual", 100],
+    ["craft_monthly", 300],
+    ["craft_annual", 300],
+    ["founder_lifetime", 100],
+  ] as const)(
+    "%s → Coach wait copy reports the correct monthly allowance",
+    (plan, expectedAllowance) => {
       const vm = buildAiCreditLimitNoticeViewModel({
         credit: denial(plan),
         surface: "coach",
       });
       expect(vm.kind).toBe("wait");
       expect(vm.surface).toBe("coach");
-      expect(vm.title).toBe("You've used your 100 AI checks this month.");
+      expect(vm.title).toBe(`You've used your ${expectedAllowance} AI checks this month.`);
       expect(vm.body).toBe(
         "Your monthly allowance resets on the 1st of the month (UTC). This request was not charged. Existing notes stay available.",
       );

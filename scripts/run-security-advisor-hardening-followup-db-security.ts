@@ -394,6 +394,14 @@ function anonHasQuicklogExecute(dbUrl: string): boolean | null {
 function grantAnonQuicklogExecute(dbUrl: string): { ok: boolean; detail?: string } {
   // Re-open the hole on every overload, mirroring how it recurs in
   // production (a new signature is born with the schema default ACL).
+  //
+  // Grants to PUBLIC as well as anon, deliberately. PUBLIC is the privilege
+  // path that actually causes this in production: Postgres grants EXECUTE on
+  // new functions to PUBLIC by default and anon inherits through it. A
+  // negative control that only granted anon directly would be satisfied by a
+  // migration that revokes anon while omitting PUBLIC -- which would leave a
+  // real default-ACL overload anonymously executable. Granting both means
+  // the migration must revoke both to pass.
   return psql(
     dbUrl,
     `DO $$
@@ -404,10 +412,29 @@ function grantAnonQuicklogExecute(dbUrl: string): { ok: boolean; detail?: string
          JOIN pg_namespace n ON n.oid = p.pronamespace
          WHERE n.nspname = 'public' AND p.proname = 'quicklog_save_manual'
        LOOP
+         EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO PUBLIC', fn.sig);
          EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO anon', fn.sig);
        END LOOP;
      END $$;`,
   );
+}
+
+// Is EXECUTE reachable specifically THROUGH PUBLIC (rather than via a
+// direct anon grant)? Asserted separately so the negative control proves it
+// re-created the production privilege path, not merely "some" anon access.
+function publicHasQuicklogExecute(dbUrl: string): boolean | null {
+  const out = psqlScalar(
+    dbUrl,
+    `SELECT EXISTS (
+       SELECT 1 FROM pg_proc p
+       JOIN pg_namespace n ON n.oid = p.pronamespace
+       WHERE n.nspname = 'public'
+         AND p.proname = 'quicklog_save_manual'
+         AND has_function_privilege('public', p.oid, 'EXECUTE')
+     );`,
+  );
+  if (out === null) return null;
+  return out === "t";
 }
 
 async function checkMigrationCausesTheTransition(): Promise<void> {
@@ -457,6 +484,18 @@ async function checkMigrationCausesTheTransition(): Promise<void> {
           : "probe reported no anon EXECUTE immediately after granting it",
     );
 
+    // The hole must be open via PUBLIC specifically -- that is the path the
+    // production regression travels, and the one a PUBLIC-omitting REVOKE
+    // would leave behind.
+    const publicPathOpen = publicHasQuicklogExecute(dbUrl);
+    check(
+      "negative control re-creates the PUBLIC privilege path, not just a direct anon grant",
+      publicPathOpen === true,
+      publicPathOpen === null
+        ? "PUBLIC privilege probe failed to run"
+        : "PUBLIC does not hold EXECUTE after granting it",
+    );
+
     // 3. Re-apply ONLY the migration under test.
     const applied = psqlFile(dbUrl, MIGRATION_UNDER_TEST);
     check("migration under test re-applies cleanly", applied.ok, applied.detail);
@@ -469,6 +508,17 @@ async function checkMigrationCausesTheTransition(): Promise<void> {
       stillOpen === null
         ? "privilege probe failed to run"
         : "anon still has EXECUTE after applying the migration",
+    );
+
+    // Closing anon while leaving PUBLIC would be a false pass: anon
+    // re-inherits EXECUTE through PUBLIC the moment anything re-grants it.
+    const publicStillOpen = publicHasQuicklogExecute(dbUrl);
+    check(
+      "migration revokes PUBLIC too, not just anon",
+      publicStillOpen === false,
+      publicStillOpen === null
+        ? "PUBLIC privilege probe failed to run"
+        : "PUBLIC still has EXECUTE after applying the migration — anon can re-inherit it",
     );
   } finally {
     // Restore the intended posture even if an assertion above threw, so a

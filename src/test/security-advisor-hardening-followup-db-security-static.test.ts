@@ -71,6 +71,23 @@ describe("security-advisor-hardening-followup DB security harness wiring", () =>
     expect(harness).toContain("has_function_privilege('anon', p.oid, 'EXECUTE')");
   });
 
+  it("re-creates the hole via PUBLIC, the path the production regression travels", () => {
+    // Postgres grants EXECUTE on new functions to PUBLIC by default and anon
+    // inherits through it. A negative control that granted only anon directly
+    // would be satisfied by a migration revoking anon but omitting PUBLIC --
+    // leaving a real default-ACL overload anonymously executable.
+    expect(harness).toMatch(/GRANT\s+EXECUTE\s+ON\s+FUNCTION\s+%s\s+TO\s+PUBLIC/i);
+    expect(harness).toContain("function publicHasQuicklogExecute(");
+    expect(harness).toContain("has_function_privilege('public', p.oid, 'EXECUTE')");
+  });
+
+  it("asserts the migration revokes PUBLIC too, not just anon", () => {
+    expect(harness).toContain(
+      "negative control re-creates the PUBLIC privilege path, not just a direct anon grant",
+    );
+    expect(harness).toContain("migration revokes PUBLIC too, not just anon");
+  });
+
   it("includes a negative control so the probe cannot pass vacuously", () => {
     // If the probe cannot SEE a genuinely open hole, every other assertion
     // in this harness is unfalsifiable.

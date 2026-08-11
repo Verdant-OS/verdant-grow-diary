@@ -44,4 +44,45 @@ describe("security-advisor-hardening-followup DB security harness wiring", () =>
     expect(harness).toContain("async function teardown()");
     expect(harness).toContain("admin.auth.admin.deleteUser");
   });
+
+  // Copilot review on PR #808: the end-state assertions above are ALSO
+  // satisfied by supabase/seed.sql, which independently performs the same
+  // REVOKE/GRANT after migrations run -- so they passed whether or not the
+  // migration under test executed. These pin the causation phase that
+  // closes that hole.
+  it("proves causation, not just end state: re-opens the hole and re-applies the migration", () => {
+    expect(harness).toContain("async function checkMigrationCausesTheTransition()");
+    // Deliberately re-opens the hole...
+    expect(harness).toMatch(/GRANT\s+SELECT\s+ON\s+TABLE\s+public\.lead_events\s+TO\s+anon/i);
+    // ...re-applies ONLY the migration under test...
+    expect(harness).toContain("20260807150000_quicklog_save_manual_all_overloads.sql");
+    expect(harness).toContain("psqlFile(");
+    // ...and asserts the deny transition is caused by that file.
+    expect(harness).toContain("deny transition caused by THIS file");
+  });
+
+  it("includes a negative control so the probe cannot pass vacuously", () => {
+    // If the probe cannot SEE a genuinely open hole, every other assertion
+    // in this harness is unfalsifiable.
+    expect(harness).toContain("negative control: probe detects the anon hole");
+  });
+
+  it("never mutates grants against a non-loopback database", () => {
+    expect(harness).toContain("function dbUrlOrSkip()");
+    expect(harness).toMatch(/isLoopbackHost\(host\)\s*\?\s*dbUrl\s*:\s*null/);
+  });
+
+  it("reports a missing causation prerequisite as a FAILURE, never a silent skip", () => {
+    // A soft skip here would restore exactly the vacuity this phase exists
+    // to remove.
+    expect(harness).toContain("causation proof ran (needs loopback SUPABASE_DB_URL + psql)");
+    expect(harness).toContain("causation NOT proven");
+  });
+
+  it("restores the intended grant posture even when an assertion fails", () => {
+    expect(harness).toContain("} finally {");
+    expect(harness).toMatch(
+      /REVOKE\s+ALL\s+ON\s+TABLE\s+public\.lead_events\s+FROM\s+PUBLIC,\s*anon/i,
+    );
+  });
 });

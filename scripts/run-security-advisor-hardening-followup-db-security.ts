@@ -36,6 +36,8 @@
  *     (SUPABASE_PUBLISHABLE_KEY or VITE_SUPABASE_ANON_KEY are accepted aliases)
  */
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { execFileSync } from "node:child_process";
+import { existsSync } from "node:fs";
 
 const LOCAL_LANE_FLAG = "--confirm-local-security-lane";
 
@@ -289,10 +291,146 @@ async function checkQuicklogSaveManual(): Promise<void> {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Causation proof (Copilot review on PR #808)
+// ---------------------------------------------------------------------------
+//
+// Everything above asserts an END STATE: anon is denied. That end state is
+// ALSO produced by supabase/seed.sql, which independently performs the same
+// REVOKE/GRANT for lead_events and lovable_paddle_events and runs AFTER
+// migrations in the local lane. So those checks pass whether or not the
+// migration under test ever executed -- they were vacuous as a proof that
+// THIS migration does anything.
+//
+// This phase closes that hole by proving causation rather than correlation:
+//
+//   1. deliberately re-open the hole (GRANT anon back in), undoing whatever
+//      seed.sql/migrations left behind;
+//   2. assert the probes now SEE the hole -- a negative control, which is
+//      what proves the probes are capable of failing at all;
+//   3. re-apply only the migration under test;
+//   4. assert the hole is closed again.
+//
+// Steps 2 and 4 together are the deny/allow transition. If the migration
+// were deleted, step 4 would fail -- which is exactly what the previous
+// shape could not detect.
+//
+// Runs against a loopback DB only (guarded above and re-checked here), via
+// psql rather than a new `pg` dependency (adding one would trip the
+// lockfile-policy gate for a test-only need).
+
+const MIGRATION_UNDER_TEST =
+  "supabase/migrations/20260807150000_quicklog_save_manual_all_overloads.sql";
+
+function dbUrlOrSkip(): string | null {
+  const dbUrl = process.env.SUPABASE_DB_URL;
+  if (!dbUrl) return null;
+  let host: string;
+  try {
+    host = new URL(dbUrl).hostname;
+  } catch {
+    return null;
+  }
+  // Never mutate grants anywhere but a disposable local stack.
+  return isLoopbackHost(host) ? dbUrl : null;
+}
+
+function psql(dbUrl: string, sql: string): { ok: boolean; detail?: string } {
+  try {
+    execFileSync("psql", [dbUrl, "-v", "ON_ERROR_STOP=1", "-c", sql], {
+      stdio: ["ignore", "ignore", "pipe"],
+      encoding: "utf8",
+    });
+    return { ok: true };
+  } catch (error) {
+    const stderr = (error as { stderr?: string }).stderr;
+    return { ok: false, detail: (stderr ?? safeError(error) ?? "psql failed").slice(0, 400) };
+  }
+}
+
+function psqlFile(dbUrl: string, file: string): { ok: boolean; detail?: string } {
+  try {
+    execFileSync("psql", [dbUrl, "-v", "ON_ERROR_STOP=1", "-f", file], {
+      stdio: ["ignore", "ignore", "pipe"],
+      encoding: "utf8",
+    });
+    return { ok: true };
+  } catch (error) {
+    const stderr = (error as { stderr?: string }).stderr;
+    return { ok: false, detail: (stderr ?? safeError(error) ?? "psql failed").slice(0, 400) };
+  }
+}
+
+async function anonCanReadLeadEvents(): Promise<boolean> {
+  const { error } = await anonymous.from("lead_events").select("id").limit(1);
+  // Reachable (no grant-layer denial) == the hole is open.
+  return !isPermissionDenied(error);
+}
+
+async function checkMigrationCausesTheTransition(): Promise<void> {
+  console.log("→ causation: this migration (not seed.sql) closes the anon hole");
+
+  const dbUrl = dbUrlOrSkip();
+  if (!dbUrl) {
+    // Explicitly reported, never a silent pass. Without a loopback DB URL
+    // this phase cannot run, and the suite must not imply it proved
+    // causation when it did not.
+    check(
+      "causation proof ran (needs loopback SUPABASE_DB_URL + psql)",
+      false,
+      "SUPABASE_DB_URL absent or non-loopback — causation NOT proven; end-state checks alone are satisfiable by seed.sql",
+    );
+    return;
+  }
+
+  if (!existsSync(MIGRATION_UNDER_TEST)) {
+    check("migration under test exists", false, `${MIGRATION_UNDER_TEST} not found`);
+    return;
+  }
+
+  // 1. Re-open the hole.
+  const opened = psql(dbUrl, "GRANT SELECT ON TABLE public.lead_events TO anon;");
+  if (!opened.ok) {
+    check("could re-open the anon hole for the negative control", false, opened.detail);
+    return;
+  }
+
+  try {
+    // 2. Negative control: the probe must SEE the hole. If this fails, the
+    //    probe is incapable of detecting a real regression.
+    const holeVisible = await anonCanReadLeadEvents();
+    check(
+      "negative control: probe detects the anon hole when it is genuinely open",
+      holeVisible,
+      holeVisible ? undefined : "probe reported denial while anon demonstrably had SELECT",
+    );
+
+    // 3. Re-apply ONLY the migration under test.
+    const applied = psqlFile(dbUrl, MIGRATION_UNDER_TEST);
+    check("migration under test re-applies cleanly", applied.ok, applied.detail);
+
+    // 4. The transition: the hole must now be closed BY that migration.
+    const holeClosed = !(await anonCanReadLeadEvents());
+    check(
+      "migration closes the anon hole (deny transition caused by THIS file)",
+      holeClosed,
+      holeClosed ? undefined : "anon still reachable after applying the migration",
+    );
+  } finally {
+    // Restore the intended posture even if an assertion above threw, so a
+    // failure here can never leave the local stack permissively granted.
+    const restored = psql(dbUrl, "REVOKE ALL ON TABLE public.lead_events FROM PUBLIC, anon;");
+    if (!restored.ok) {
+      console.log(`  ! could not restore lead_events grants: ${restored.detail}`);
+    }
+  }
+}
+
 async function main(): Promise<void> {
   await checkLovablePaddleEvents();
   await checkLeadEvents();
   await checkQuicklogSaveManual();
+  await checkMigrationCausesTheTransition();
 }
 
 async function cleanupStep(

@@ -43,7 +43,7 @@ All items below are `established fact`, read from source at `433b7fe38ec8`:
 | Settings page | `src/pages/AgentIntegrations.tsx`, route `src/routes/_app/settings_.agent-integrations.tsx` | Includes a verify-access panel (`src/lib/mcp/verifyMcpToolAccess.ts`) |
 | Public API reference page | `src/pages/McpApiReference.tsx` at `/docs/mcp-api` | Publishes the endpoint URL and OAuth discovery hint |
 | OAuth consent page | `src/pages/OAuthConsent.tsx`, consent path `/.lovable/oauth/consent` | Per manifest mirror |
-| Safety regression tests | `src/test/mcp-tools-source-safety.test.ts` | Enforces RLS-scoped client, unauthenticated short-circuit, `readOnlyHint`, no service-role/bridge-token/Action-Queue/device references in any tool |
+| Safety regression tests | `src/test/mcp-tools-source-safety.test.ts` | **Textual source scan** of tool files: requires a `supabaseForUser(` call and unauthenticated short-circuit, requires `readOnlyHint`, rejects service-role/bridge-token/Action-Queue/device references. Scope caveats: helper files (`_supabase.ts`) are excluded from the scan, and presence of `supabaseForUser(` does not prove it is the client actually used for queries — the runtime proof is `mcp-local-rls-integration.test.ts` |
 | Manifest drift test | `src/test/mcp-manifest-drift.test.ts` | Fails loudly if the TS mirror drifts from `.lovable/mcp/manifest.json` |
 | Page/a11y/copy tests | `src/test/agent-integrations-*.test.tsx` (5 files) | Page, a11y, manifest copy, verify panel, browser-probe regression |
 | E2E smoke | `e2e/agent-integrations-smoke.spec.ts` | Credential-aware smoke |
@@ -65,8 +65,11 @@ Walk plugin", draft), is a different surface — no collision with this document
   (`ctx.isAuthenticated()` guard returning an `isError` result).
 - Every query runs through a per-request Supabase client that forwards the
   caller's OAuth bearer token, so **RLS executes as the signed-in user**. No
-  service-role key appears in any tool path (enforced by the source-safety
-  test).
+  service-role key appears in any tool file (textual scan) or in the
+  `_supabase.ts` helper (verified by direct read this session — the helper
+  builds its client from the anon key plus the caller's forwarded bearer
+  token). Note the helper sits outside the scan's file filter, so future
+  helper changes are covered only by review and the runtime RLS harness.
 - `list_recent_diary_entries` additionally verifies grow ownership before
   reading, because `diary_entries` carries an operator-wide SELECT policy that
   RLS alone would not fence for operator-role callers. `get_latest_sensor_snapshot`
@@ -102,7 +105,7 @@ session's egress proxy returns 403 CONNECT for `*.supabase.co` and
 | MCP link available after publish | `BLOCKED` | Endpoint URL `https://knkwiiywfkbqznbxwqfh.supabase.co/functions/v1/mcp` is committed app copy at `src/pages/McpApiReference.tsx:19` (`established fact` about the copy; `missing evidence` that the live endpoint answers) |
 | Access configuration reviewed | `PASS` | Sign-in required across the whole integration (§2.2) |
 | Tools reviewed before publish | `PASS` (repo layer) | §4 below; per-tool review checklist satisfied at the source level |
-| Automated security checks at publish | `NOT_MEASURED` | Runs inside Lovable's publish pipeline; not observable from the repository |
+| Automated security checks at publish | `BLOCKED` | Runs inside Lovable's publish pipeline; output is visible only in the owner's Lovable dashboard (§6.5), which no agent path can reach |
 
 **No claim is made here that the MCP endpoint is currently live or that any
 assistant can currently connect.** That is exactly the owner verification in §6.
@@ -143,10 +146,18 @@ terms (`established fact`).
 - **Access:** tent-ownership check first, then RLS as caller.
 - **Retry safety:** idempotent read; deterministic tie-breakers (`ts DESC, created_at DESC, id DESC`) so equal timestamps cannot flip the snapshot between calls.
 
-**Server-level guarantees** (stated in `src/lib/mcp/index.ts` instructions and
-enforced by `mcp-tools-source-safety.test.ts`): the server never writes, never
-approves Action Queue items, never controls devices, never calls AI models, and
-never exposes `raw_payload` or secret material.
+**Server-level guarantees** — precisely scoped (`practical observation` about
+current source, not an exhaustive gate): the server's stated contract
+(`src/lib/mcp/index.ts` instructions) is that it never writes, never approves
+Action Queue items, never controls devices, never calls AI models, and never
+exposes `raw_payload` or secret material. The source-safety scan **partially**
+fences this: it rejects `ai[_-]?doctor` references, `functions.invoke`, and
+Action-Queue/device/service-role strings in tool files, but it would **not**
+catch a future tool calling a model through `fetch`, an SDK, or the `ai_coach`
+surface by other names. The governing control for AI invocation is therefore
+the §7 **REJECT** gate plus review — any slice that ever revisits it must ship
+a gate covering every model entry point before the "no AI calls" claim can be
+called enforced.
 
 ---
 

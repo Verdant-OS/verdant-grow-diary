@@ -5,11 +5,11 @@
  * no automatic selection, no Action Queue writes, no device control, no
  * service_role, no schema/SQL, and no second Quick Log save path.
  *
- * Blast-radius sweep (2026-08-11): 27 test files that statically read
- * QuickLog.tsx or any lib touched by #780/#781 were executed at deploy head
- * (c09b33d95, the head at sweep time); all pass — 0 stale pin siblings found.
- * hyper-log-handoff-polish-safety.test.ts is included in the 27 as a
- * quickLogDraftPreviewViewModel.ts reader (touched by #780), not omitted.
+ * Blast-radius sweep (2026-08-11): 28 test files that statically read
+ * QuickLog.tsx or any lib touched by #780/#781 were executed at sweep
+ * checkout c09b33d95 (27 QuickLog.tsx static readers + hyper-log-handoff-
+ * polish-safety.test.ts via quickLogDraftPreviewViewModel.ts); all pass —
+ * 0 stale pin siblings found.
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";

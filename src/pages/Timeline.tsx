@@ -91,6 +91,7 @@ import {
   PHOTO_NON_DIAGNOSTIC_TESTID,
   shouldShowPhotoNonDiagnosticLabel,
 } from "@/lib/photoEventNonDiagnosticLabelRules";
+import { describeQuickLogDetailsFromExtras } from "@/lib/quick-log/quickLogActivityDetailFields";
 import TimelineEvidenceDetailDrawer from "@/components/TimelineEvidenceDetailDrawer";
 import { buildTimelineEvidenceDetailViewModel } from "@/lib/timelineEvidenceDetailViewModel";
 import TimelineSensorSourceBadge from "@/components/TimelineSensorSourceBadge";
@@ -1102,6 +1103,7 @@ export default function Timeline() {
                           const extra = Object.entries(e.details || {}).filter(
                             ([k]) => !HIDDEN.includes(k),
                           );
+                          const detailLines = describeQuickLogDetailsFromExtras(e.details);
                           return (
                             <>
                               <div className="flex items-center gap-2 mb-2 text-xs text-muted-foreground flex-wrap">
@@ -1249,6 +1251,22 @@ export default function Timeline() {
                                     </div>
                                   );
                                 })()}
+                              {detailLines.length > 0 && (
+                                <div
+                                  className="mt-2 flex flex-wrap gap-1.5"
+                                  data-testid="timeline-quicklog-detail-lines"
+                                >
+                                  {detailLines.map((line) => (
+                                    <span
+                                      key={line.key}
+                                      data-testid={`timeline-quicklog-detail-${line.key}`}
+                                      className="text-[11px] px-2 py-0.5 rounded-full bg-secondary/60 border border-border/40"
+                                    >
+                                      {line.label}: {line.value}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
                               {extra.length > 0 && (
                                 <div className="mt-2 flex flex-wrap gap-1.5">
                                   {extra.map(([k, v]) => (

@@ -70,12 +70,17 @@ describe("migration drift probe — cannot silently pass", () => {
     expect(code).toBe(2);
   });
 
+  // Timeout raised from the 5s default: this test spawns three node
+  // subprocesses, measured at 430ms idle but 1.2s under load, and this file
+  // spawns more of them than it used to. Observed failing once on a busy
+  // machine. A flake here reads as "the probe can pass vacuously", which is
+  // alarming for entirely the wrong reason.
   it("never exits 0 on any failure path", () => {
     // Exit 0 must be reachable ONLY by a real, successful comparison.
     expect(runProbe([]).code).not.toBe(0);
     expect(runProbe(["--json"]).code).not.toBe(0);
     expect(runProbe(["--url", "postgresql://nobody@127.0.0.1:1/nope"]).code).not.toBe(0);
-  });
+  }, 20_000);
 });
 
 describe("migration drift probe — detection contract", () => {
@@ -163,6 +168,27 @@ describe("migration drift probe — never publishes credentials", () => {
     expect(SRC).toContain("const warn = (line) => console.error(redactDbUrl(line, dbUrl));");
   });
 
+  it("closes the tracking issue after a clean run, from a single shared title", () => {
+    // The title is present tense, so an issue left open after recovery asserts
+    // something false and an operator cannot tell active drift from a stale
+    // alert. A channel that cannot go quiet stops being read at all — which is
+    // the habit that let six days pass unnoticed.
+    const workflow = readFileSync(
+      resolve(ROOT, ".github/workflows/migration-drift-probe.yml"),
+      "utf8",
+    );
+    expect(workflow).toContain("Close the drift tracking issue after a clean run");
+    expect(workflow).toContain('state_reason: "completed"');
+    // Both steps must match on ONE title. Two hand-copied literals would drift
+    // and the close step would silently never find the issue.
+    expect(workflow).toContain("DRIFT_ISSUE_TITLE:");
+    const literalTitles = workflow.match(
+      /"Migration drift: production is not running every committed migration"/g,
+    );
+    expect(literalTitles).toHaveLength(1); // the env definition, and nowhere else
+    expect(workflow.match(/process\.env\.DRIFT_ISSUE_TITLE/g)).toHaveLength(2);
+  });
+
   it("still opens an issue when the probe never ran at all", () => {
     // If a step BEFORE the probe fails (checkout, node, the psql install, the
     // secret guard), exit_code is never set. Gating on that output alone means
@@ -176,9 +202,7 @@ describe("migration drift probe — never publishes credentials", () => {
     );
     expect(workflow).toContain("steps.probe.outcome != 'success'");
     // The bare output-only gate must not come back.
-    expect(workflow).not.toMatch(
-      /if: always\(\) && steps\.probe\.outputs\.exit_code != '0'\s*$/m,
-    );
+    expect(workflow).not.toMatch(/if: always\(\) && steps\.probe\.outputs\.exit_code != '0'\s*$/m);
     // And the issue must say which of the two happened.
     expect(workflow).toContain("probeNeverRan");
     expect(workflow).toContain("PROBE_OUTCOME");

@@ -38,6 +38,14 @@ concurrency:
   group: migration-drift-probe
   cancel-in-progress: false
 
+env:
+  # Defined once because two steps match on it -- the one that opens/updates
+  # the tracking issue and the one that closes it after a clean run. Two
+  # hand-copied title literals would drift, and the failure would be silent:
+  # the close step simply would not find the issue, leaving a stale alert open
+  # forever while appearing to work.
+  DRIFT_ISSUE_TITLE: "Migration drift: production is not running every committed migration"
+
 jobs:
   probe:
     name: Probe production migration drift
@@ -193,7 +201,7 @@ jobs:
             const redact = (s) =>
               String(s).replace(/postgres(?:ql)?:\/\/[^\s"'`<>]+/gi, "[redacted-db-url]");
             const detail = redact(read("drift.json") || read("drift.err"));
-            const title = "Migration drift: production is not running every committed migration";
+            const title = process.env.DRIFT_ISSUE_TITLE;
             const body = [
               probeNeverRan
                 ? `The drift probe **never ran** (step outcome: \`${probeOutcome}\`). A step before it failed — checkout, Node setup, the psql install, or the required-secret guard. Nothing was verified, and nothing will be until that is fixed.`
@@ -265,3 +273,46 @@ jobs:
               core.warning(`labelled issue creation failed (${e.message}); retrying unlabelled`);
               await github.rest.issues.create({ owner, repo, title, body });
             }
+
+      # An alert channel that cannot go quiet again stops carrying information.
+      # The issue title is present tense -- "production is not running every
+      # committed migration" -- so leaving it open after recovery asserts
+      # something false, and an operator cannot tell active drift from a stale
+      # alert without re-deriving the answer by hand. That is the same habit of
+      # ignoring the channel that let six days pass unnoticed.
+      #
+      # Requires BOTH signals to agree the run was clean: closing is the
+      # direction where being wrong hides a real problem, so it should be the
+      # conservative one.
+      - name: Close the drift tracking issue after a clean run
+        if: always() && steps.probe.outcome == 'success' && steps.probe.outputs.exit_code == '0'
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea
+        with:
+          script: |
+            const title = process.env.DRIFT_ISSUE_TITLE;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            // Same pagination reasoning as the opening step: page one is not
+            // the whole list, and this endpoint returns pull requests too.
+            const existing = await github.paginate(github.rest.issues.listForRepo, {
+              owner, repo, state: "open", per_page: 100,
+            });
+            const hit = existing.find((i) => !i.pull_request && i.title === title);
+            if (!hit) return;
+
+            await github.rest.issues.createComment({
+              owner, repo, issue_number: hit.number,
+              body: [
+                "Resolved — a later probe run found every committed migration recorded applied.",
+                "",
+                `Verified by: ${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`,
+                "",
+                "Closing so this channel stays meaningful. If drift returns, the next",
+                "failing run reopens a fresh issue rather than appending to a stale one.",
+              ].join("\n"),
+            });
+            await github.rest.issues.update({
+              owner, repo, issue_number: hit.number,
+              state: "closed", state_reason: "completed",
+            });

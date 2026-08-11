@@ -52,13 +52,23 @@ describe("security-advisor-hardening-followup DB security harness wiring", () =>
   // closes that hole.
   it("proves causation, not just end state: re-opens the hole and re-applies the migration", () => {
     expect(harness).toContain("async function checkMigrationCausesTheTransition()");
-    // Deliberately re-opens the hole...
-    expect(harness).toMatch(/GRANT\s+SELECT\s+ON\s+TABLE\s+public\.lead_events\s+TO\s+anon/i);
+    // Deliberately re-opens the hole ON THE OBJECT THIS MIGRATION CHANGES.
+    // Probing a different object (an earlier draft used lead_events, whose
+    // grants belong to 20260807003500) makes the close step unsatisfiable.
+    expect(harness).toContain("function grantAnonQuicklogExecute(");
+    expect(harness).toMatch(/GRANT\s+EXECUTE\s+ON\s+FUNCTION\s+%s\s+TO\s+anon/i);
     // ...re-applies ONLY the migration under test...
     expect(harness).toContain("20260807150000_quicklog_save_manual_all_overloads.sql");
     expect(harness).toContain("psqlFile(");
     // ...and asserts the deny transition is caused by that file.
     expect(harness).toContain("deny transition caused by THIS file");
+  });
+
+  it("probes the privilege directly rather than invoking the RPC", () => {
+    // Calling quicklog_save_manual to answer a grant question would run real
+    // business logic as a side effect of a privilege check.
+    expect(harness).toContain("function anonHasQuicklogExecute(");
+    expect(harness).toContain("has_function_privilege('anon', p.oid, 'EXECUTE')");
   });
 
   it("includes a negative control so the probe cannot pass vacuously", () => {
@@ -81,8 +91,6 @@ describe("security-advisor-hardening-followup DB security harness wiring", () =>
 
   it("restores the intended grant posture even when an assertion fails", () => {
     expect(harness).toContain("} finally {");
-    expect(harness).toMatch(
-      /REVOKE\s+ALL\s+ON\s+TABLE\s+public\.lead_events\s+FROM\s+PUBLIC,\s*anon/i,
-    );
+    expect(harness).toMatch(/REVOKE\s+EXECUTE\s+ON\s+FUNCTION\s+%s\s+FROM\s+PUBLIC,\s*anon/i);
   });
 });

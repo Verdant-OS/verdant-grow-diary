@@ -361,10 +361,53 @@ function psqlFile(dbUrl: string, file: string): { ok: boolean; detail?: string }
   }
 }
 
-async function anonCanReadLeadEvents(): Promise<boolean> {
-  const { error } = await anonymous.from("lead_events").select("id").limit(1);
-  // Reachable (no grant-layer denial) == the hole is open.
-  return !isPermissionDenied(error);
+function psqlScalar(dbUrl: string, sql: string): string | null {
+  try {
+    return execFileSync("psql", [dbUrl, "-tAc", sql], {
+      stdio: ["ignore", "pipe", "pipe"],
+      encoding: "utf8",
+    }).trim();
+  } catch {
+    return null;
+  }
+}
+
+// Probe the exact thing 20260807150000 changes: anon EXECUTE on ANY
+// quicklog_save_manual overload. Read via has_function_privilege rather
+// than by calling the RPC -- calling it would execute real business logic
+// for a privilege question, and the point here is the grant, not behavior.
+function anonHasQuicklogExecute(dbUrl: string): boolean | null {
+  const out = psqlScalar(
+    dbUrl,
+    `SELECT EXISTS (
+       SELECT 1 FROM pg_proc p
+       JOIN pg_namespace n ON n.oid = p.pronamespace
+       WHERE n.nspname = 'public'
+         AND p.proname = 'quicklog_save_manual'
+         AND has_function_privilege('anon', p.oid, 'EXECUTE')
+     );`,
+  );
+  if (out === null) return null;
+  return out === "t";
+}
+
+function grantAnonQuicklogExecute(dbUrl: string): { ok: boolean; detail?: string } {
+  // Re-open the hole on every overload, mirroring how it recurs in
+  // production (a new signature is born with the schema default ACL).
+  return psql(
+    dbUrl,
+    `DO $$
+     DECLARE fn RECORD;
+     BEGIN
+       FOR fn IN
+         SELECT p.oid::regprocedure AS sig FROM pg_proc p
+         JOIN pg_namespace n ON n.oid = p.pronamespace
+         WHERE n.nspname = 'public' AND p.proname = 'quicklog_save_manual'
+       LOOP
+         EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO anon', fn.sig);
+       END LOOP;
+     END $$;`,
+  );
 }
 
 async function checkMigrationCausesTheTransition(): Promise<void> {
@@ -388,8 +431,13 @@ async function checkMigrationCausesTheTransition(): Promise<void> {
     return;
   }
 
-  // 1. Re-open the hole.
-  const opened = psql(dbUrl, "GRANT SELECT ON TABLE public.lead_events TO anon;");
+  // 1. Re-open the hole -- on the object THIS migration actually changes.
+  //    (An earlier draft opened lead_events instead and this phase caught
+  //    it: 20260807150000 revokes quicklog_save_manual EXECUTE only; the
+  //    table grants belong to 20260807003500. Probing the wrong object made
+  //    step 4 unsatisfiable, which is exactly the failure a non-vacuous
+  //    harness should produce.)
+  const opened = grantAnonQuicklogExecute(dbUrl);
   if (!opened.ok) {
     check("could re-open the anon hole for the negative control", false, opened.detail);
     return;
@@ -398,11 +446,15 @@ async function checkMigrationCausesTheTransition(): Promise<void> {
   try {
     // 2. Negative control: the probe must SEE the hole. If this fails, the
     //    probe is incapable of detecting a real regression.
-    const holeVisible = await anonCanReadLeadEvents();
+    const holeVisible = anonHasQuicklogExecute(dbUrl);
     check(
       "negative control: probe detects the anon hole when it is genuinely open",
-      holeVisible,
-      holeVisible ? undefined : "probe reported denial while anon demonstrably had SELECT",
+      holeVisible === true,
+      holeVisible === null
+        ? "privilege probe failed to run"
+        : holeVisible
+          ? undefined
+          : "probe reported no anon EXECUTE immediately after granting it",
     );
 
     // 3. Re-apply ONLY the migration under test.
@@ -410,18 +462,33 @@ async function checkMigrationCausesTheTransition(): Promise<void> {
     check("migration under test re-applies cleanly", applied.ok, applied.detail);
 
     // 4. The transition: the hole must now be closed BY that migration.
-    const holeClosed = !(await anonCanReadLeadEvents());
+    const stillOpen = anonHasQuicklogExecute(dbUrl);
     check(
       "migration closes the anon hole (deny transition caused by THIS file)",
-      holeClosed,
-      holeClosed ? undefined : "anon still reachable after applying the migration",
+      stillOpen === false,
+      stillOpen === null
+        ? "privilege probe failed to run"
+        : "anon still has EXECUTE after applying the migration",
     );
   } finally {
     // Restore the intended posture even if an assertion above threw, so a
     // failure here can never leave the local stack permissively granted.
-    const restored = psql(dbUrl, "REVOKE ALL ON TABLE public.lead_events FROM PUBLIC, anon;");
+    const restored = psql(
+      dbUrl,
+      `DO $$
+       DECLARE fn RECORD;
+       BEGIN
+         FOR fn IN
+           SELECT p.oid::regprocedure AS sig FROM pg_proc p
+           JOIN pg_namespace n ON n.oid = p.pronamespace
+           WHERE n.nspname = 'public' AND p.proname = 'quicklog_save_manual'
+         LOOP
+           EXECUTE format('REVOKE EXECUTE ON FUNCTION %s FROM PUBLIC, anon', fn.sig);
+         END LOOP;
+       END $$;`,
+    );
     if (!restored.ok) {
-      console.log(`  ! could not restore lead_events grants: ${restored.detail}`);
+      console.log(`  ! could not restore quicklog_save_manual grants: ${restored.detail}`);
     }
   }
 }

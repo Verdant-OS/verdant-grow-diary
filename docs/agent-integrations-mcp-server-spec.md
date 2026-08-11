@@ -19,7 +19,9 @@ literally.
 
 The Verdant MCP server **already exists, is OAuth-protected, read-only, and
 test-fenced** on the deploy branch. No new implementation is required to satisfy
-the "publish as MCP server" request at its current scope. What remains is
+the "publish as MCP server" request at its current scope, though the audit
+records two sensor-contract gaps (§4.3) as specified-but-unapproved follow-up
+slices rather than publication blockers. What remains for publication is
 **owner-side verification** (live endpoint reachability, Lovable publish state,
 MCP link distribution) that cannot be performed from an agent session, plus this
 document as the durable contract. Do **not** commission a second implementation;
@@ -145,6 +147,27 @@ terms (`established fact`).
   the tool description itself so connecting assistants inherit the contract.
 - **Access:** tent-ownership check first, then RLS as caller.
 - **Retry safety:** idempotent read; deterministic tie-breakers (`ts DESC, created_at DESC, id DESC`) so equal timestamps cannot flip the snapshot between calls.
+
+**Recorded sensor-contract gaps** (`established fact`, read from
+`src/lib/operatorAccountReadModels.ts` at the audited ref — deviations from
+the constitution's Sensor Truth rules, recorded here rather than certified
+away):
+
+1. **No `confidence` field.** `McpSensorReading` carries `quality`, `source`,
+   timestamps, `freshness`, and `current_live`, but no confidence — and no
+   confidence column for `sensor_readings` was found in migrations. The
+   Sensor Truth rules say every reading should include confidence. This is a
+   repository-layer gap that predates this audit; closing it is a schema +
+   read-model slice, out of this document's scope (§9).
+2. **Noncanonical legacy `source` labels pass through verbatim.** The tool's
+   own description admits legacy rows may carry `sim` or vendor bridge names —
+   outside the six allowed labels (live/manual/csv/demo/stale/invalid).
+   Trust stays deny-by-default (`current_live` is false for them), but
+   connecting assistants still receive out-of-vocabulary provenance. The
+   specified treatment for a future slice: normalize unrecognized labels to
+   the invalid/unverified presentation at the publication boundary while
+   preserving the original string in an explicitly legacy-named field, so no
+   provenance is silently rewritten.
 
 **Server-level guarantees** — precisely scoped (`practical observation` about
 current source, not an exhaustive gate): the server's stated contract
@@ -273,9 +296,13 @@ approved by this document.
 
 ## 9. Handoff
 
-- **To Codex:** no implementation work is required for current scope. If Cheek
-  approves the §7 PASS tranche, implement per §5 change control with targeted
-  tests mirroring `mcp-tools-source-safety.test.ts` expectations.
+- **To Codex:** no implementation work is required for **publication** at
+  current scope. Two follow-up slices are specified but not approved here,
+  each needing Cheek's sign-off: (a) the §4.3 sensor-contract gaps —
+  confidence surfacing (schema + read-model) and publication-boundary
+  normalization of noncanonical source labels; (b) if Cheek approves the §7
+  PASS tranche, implement per §5 change control with targeted tests
+  mirroring `mcp-tools-source-safety.test.ts` expectations.
 - **To Cheek (owner):** execute §6 and record outcomes.
 - **To CURRENT_STATE:** on the next governance handoff, record the live
   verification outcomes; this document intentionally records none.
@@ -287,9 +314,14 @@ approved by this document.
 The "publish the app as an MCP server" request is, at the repository layer,
 **already satisfied and well-fenced** — protected-by-default OAuth, three
 read-only RLS-scoped tools with sensor-truth labeling, drift- and
-source-safety-tested, with in-app documentation and consent surfaces. The
-remaining risk is not code but **unverified live state**: nothing in this
+source-safety-tested, with in-app documentation and consent surfaces. Two
+qualifications keep this verdict honest: the sensor tool deviates from the
+Sensor Truth contract in two recorded ways (no confidence field; verbatim
+noncanonical legacy source labels — §4.3), and the safety fences are textual
+scans plus a runtime harness, not exhaustive gates (§2.1, §4). The remaining
+publication risk is not code but **unverified live state**: nothing in this
 session could confirm the endpoint is published and answering. Confidence in
-the repo-side posture is high; confidence in the live surface is deliberately
-withheld until the §6 owner checks run. The correct next step is owner
-verification, not new implementation.
+the repo-side posture is high with those stated limits; confidence in the
+live surface is deliberately withheld until the §6 owner checks run. The
+correct next step is owner verification plus a Cheek decision on the §4.3
+follow-up slices — not a rebuild.

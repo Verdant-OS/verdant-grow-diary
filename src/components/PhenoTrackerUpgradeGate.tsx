@@ -57,9 +57,11 @@ function buildUpgradeHref(pathname: string, search: string): string {
     typeof pathname === "string" && (typeof search === "string" ? search : "").startsWith("?")
       ? `${pathname}${search}`
       : pathname;
+  // The gate pitches Pro by name ("Pro feature" / "Upgrade to Pro"), so
+  // preselect the Pro card. `?plan=` never auto-opens checkout.
   const safe = sanitizeCheckoutReturnTo(candidate);
-  if (!safe) return "/pricing";
-  const params = new URLSearchParams({ returnTo: safe });
+  const params = new URLSearchParams({ plan: "pro_annual" });
+  if (safe) params.set("returnTo", safe);
   return `/pricing?${params.toString()}`;
 }
 

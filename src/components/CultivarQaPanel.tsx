@@ -64,7 +64,7 @@ export default function CultivarQaPanel({ cultivar }: Props) {
           sensors always stay authoritative.
         </p>
         <Link
-          to="/pricing"
+          to="/pricing?plan=pro_annual"
           data-testid="cultivar-qa-upgrade-cta"
           className="mt-4 inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
         >

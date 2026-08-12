@@ -24,7 +24,7 @@ describe("aiCreditLimitNoticeViewModel — branching by credit.plan_id", () => {
     expect(vm.kind).toBe("upsell");
     expect(vm.paywallVm).toBeDefined();
     expect(vm.charged).toBe(false);
-    expect(vm.paywallVm?.primaryCtaHref).toBe("/pricing");
+    expect(vm.paywallVm?.primaryCtaHref).toBe("/pricing?plan=pro_annual");
   });
 
   it.each(["pro_monthly", "pro_annual", "craft_monthly", "craft_annual", "founder_lifetime"])(

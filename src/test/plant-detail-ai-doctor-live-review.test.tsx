@@ -295,7 +295,7 @@ describe("PlantDetailAiDoctorLiveReview", () => {
     const link = screen.getByTestId("plant-ai-doctor-post-value-upgrade-link");
     expect(link).toHaveAttribute(
       "href",
-      "/pricing?returnTo=%2Fdoctor%2Fsessions%2Fsession-final-free",
+      "/pricing?plan=pro_annual&returnTo=%2Fdoctor%2Fsessions%2Fsession-final-free",
     );
 
     const beforeClick = trackFunnelEvent.mock.calls.filter(([name]) =>
@@ -461,7 +461,7 @@ describe("PlantDetailAiDoctorLiveReview", () => {
     expect(await screen.findByTestId("plant-ai-doctor-post-value-upgrade")).toBeTruthy();
     expect(screen.getByTestId("plant-ai-doctor-post-value-upgrade-link")).toHaveAttribute(
       "href",
-      "/pricing?returnTo=%2Fdoctor%2Fsessions%2Fsession-after-retry",
+      "/pricing?plan=pro_annual&returnTo=%2Fdoctor%2Fsessions%2Fsession-after-retry",
     );
     expect(
       trackFunnelEvent.mock.calls.filter(([name]) => name === "ai_doctor_session_saved"),

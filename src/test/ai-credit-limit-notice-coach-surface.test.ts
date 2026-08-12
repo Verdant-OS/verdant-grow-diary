@@ -38,7 +38,7 @@ describe("aiCreditLimitNoticeViewModel — Coach surface (S3.2)", () => {
       "Free grows include 3 AI checks. Pro gives you 100 AI checks per month across every grow. This request was not charged.",
     );
     expect(vm.paywallVm).toBeDefined();
-    expect(vm.paywallVm?.primaryCtaHref).toBe("/pricing");
+    expect(vm.paywallVm?.primaryCtaHref).toBe("/pricing?plan=pro_annual");
     expect(vm.paywallVm?.primaryCtaLabel).toBe("See plans");
     expect(vm.charged).toBe(false);
   });

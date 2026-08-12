@@ -54,7 +54,8 @@ export const PLANT_LOG_TEASER_COPY =
   "This plant's memory is building. Pro keeps unlimited plant history and adds AI Doctor review.";
 
 export const PLANT_LOG_TEASER_CTA_LABEL = "See plans";
-export const PLANT_LOG_TEASER_HREF = "/pricing";
+// Copy pitches Pro by name; preselect the Pro card (annual = Pricing default).
+export const PLANT_LOG_TEASER_HREF = "/pricing?plan=pro_annual";
 
 const MS_PER_DAY = 86_400_000;
 

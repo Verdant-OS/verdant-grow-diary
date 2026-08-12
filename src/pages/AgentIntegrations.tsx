@@ -30,7 +30,7 @@ import {
 } from "@/lib/mcp/connectionStatusExport";
 import { getIssuerSetupGuideLink } from "@/lib/mcp/issuerSetupGuide";
 import { readLocalToolPreferences, setLocalToolPreference } from "@/lib/mcp/localToolPreferences";
-import { readLastOAuthAttempt } from "@/lib/mcp/oauthAttemptLog";
+import { readLastOAuthAttempt, type OAuthAttemptRecord } from "@/lib/mcp/oauthAttemptLog";
 import { hasStoredToken } from "@/lib/mcp/browserOAuthClient";
 import {
   verifyMcpToolAccess,
@@ -162,6 +162,10 @@ export default function AgentIntegrations({
 
   const setupGuide = getIssuerSetupGuideLink(oauthStatus);
 
+  // Mirror of the connect panel's displayed attempt record, so the
+  // export matches the page even when a localStorage write failed.
+  const [panelAttempt, setPanelAttempt] = useState<OAuthAttemptRecord | null>(null);
+
   type ExportState = { status: "idle" | "done" | "failed"; message: string };
   const [exportState, setExportState] = useState<ExportState>({ status: "idle", message: "" });
   const onExport = useCallback(() => {
@@ -172,8 +176,11 @@ export default function AgentIntegrations({
         issuerContext: oauthStatus,
         manifestFingerprint,
         connectedInThisBrowser: hasStoredToken(),
-        localToolPreferences: readLocalToolPreferences(),
-        lastOAuthAttempt: readLastOAuthAttempt(),
+        // Export the ACTIVE in-memory state — the same values the
+        // switches and the panel display — not a fresh storage read,
+        // which can diverge after a quota/privacy-mode write failure.
+        localToolPreferences: toolPrefs,
+        lastOAuthAttempt: panelAttempt ?? readLastOAuthAttempt(),
         exportedAt: new Date().toISOString(),
       });
       const serialized = serializeConnectionStatusExport(exportObj);
@@ -200,7 +207,7 @@ export default function AgentIntegrations({
         message: "Export failed in this browser. Use Copy connection details instead.",
       });
     }
-  }, [supabaseOrigin, appOrigin, oauthStatus, manifestFingerprint]);
+  }, [supabaseOrigin, appOrigin, oauthStatus, manifestFingerprint, toolPrefs, panelAttempt]);
 
   // The panel's probe calls exactly this tool; keep the gate wired to a
   // named constant so a future rename fails loudly here, not silently open.
@@ -407,7 +414,10 @@ export default function AgentIntegrations({
           </p>
         </section>
 
-        <BrowserConnectPanel probeToolEnabled={toolPrefs[PROBE_TOOL_NAME] !== false} />
+        <BrowserConnectPanel
+          probeToolEnabled={toolPrefs[PROBE_TOOL_NAME] !== false}
+          onLastAttemptChange={setPanelAttempt}
+        />
 
         {harnessUsable ? (
           <section

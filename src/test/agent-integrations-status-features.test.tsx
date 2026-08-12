@@ -191,6 +191,48 @@ describe("per-tool local enable/disable controls", () => {
   });
 });
 
+describe("export reflects in-memory state when storage writes fail", () => {
+  it("keeps the export consistent with the visible switch after a quota failure", async () => {
+    let capturedBlob: Blob | null = null;
+    vi.stubGlobal(
+      "URL",
+      Object.assign(URL, {
+        createObjectURL: vi.fn((blob: Blob) => {
+          capturedBlob = blob;
+          return "blob:mock-export";
+        }),
+        revokeObjectURL: vi.fn(),
+      }),
+    );
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+
+    renderPage();
+    // Simulate quota/privacy-mode: every storage write now throws. The
+    // toggle still updates in-memory state (the helpers swallow write
+    // failures by design), and the export must match what the UI shows.
+    const setItemSpy = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("QuotaExceededError");
+    });
+    try {
+      fireEvent.click(screen.getByTestId("tool-toggle-list_grows"));
+      await waitFor(() => {
+        expect(screen.getByTestId("tool-toggle-list_grows").getAttribute("aria-checked")).toBe(
+          "false",
+        );
+      });
+      fireEvent.click(screen.getByTestId("export-connection-status"));
+      await waitFor(() => expect(capturedBlob).not.toBeNull());
+    } finally {
+      setItemSpy.mockRestore();
+    }
+    const parsed = JSON.parse(
+      await blobToText(capturedBlob as unknown as Blob),
+    ) as ConnectionStatusExport;
+    const grows = parsed.tools.find((t) => t.name === "list_grows");
+    expect(grows?.enabledInThisBrowser).toBe(false);
+  });
+});
+
 describe("last OAuth attempt display", () => {
   it("shows a placeholder when no attempt is recorded", () => {
     renderPage();
@@ -247,8 +289,13 @@ describe("last OAuth attempt display", () => {
     expect(screen.getByTestId("oauth-last-attempt-reason").textContent).toMatch(/access_denied/);
     const stored = JSON.parse(getLocalStorageItemForTest(OAUTH_ATTEMPT_LOG_KEY) ?? "null") as {
       outcome?: string;
+      reason?: string;
     } | null;
     expect(stored?.outcome).toBe("failed");
+    // Provider-controlled error_description is NEVER persisted or
+    // rendered — only the shape-checked error code.
+    expect(stored?.reason).toBe("Authorization error: access_denied");
+    expect(screen.getByTestId("oauth-last-attempt-reason").textContent).not.toMatch(/User denied/);
     // The pending authorization was consumed by the error callback.
     expect(window.sessionStorage.getItem(PKCE_KEY)).toBeNull();
   });
@@ -354,6 +401,16 @@ describe("issuer-context override reaches the badge, guide link, and export", ()
 });
 
 describe("probe gating by local tool preference", () => {
+  it("describes the skipped probe honestly before the browser is connected", () => {
+    setLocalStorageItemForTest(LOCAL_TOOL_PREFS_KEY, JSON.stringify({ list_grows: false }));
+    renderPage();
+    // Notice visible pre-connect, and the intro no longer promises the call.
+    expect(screen.getByTestId("browser-connect-probe-disabled")).toBeTruthy();
+    const panel = screen.getByTestId("browser-connect-panel");
+    expect(panel.textContent).not.toMatch(/then calls/);
+    expect(panel.textContent).toMatch(/check is skipped/i);
+  });
+
   it("disables the probe with an explanation when list_grows is locally disabled", () => {
     // Seed a live-looking browser token so the probe button renders at all.
     window.sessionStorage.setItem(

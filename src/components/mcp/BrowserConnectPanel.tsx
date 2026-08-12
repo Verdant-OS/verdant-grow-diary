@@ -62,10 +62,17 @@ export type BrowserConnectPanelProps = {
    * server itself still allows the call for any connected assistant.
    */
   probeToolEnabled?: boolean;
+  /**
+   * Mirrors the panel's displayed last-attempt record to the parent so
+   * the support export can use the SAME in-memory state the UI shows —
+   * a storage-write failure must not make the export contradict the page.
+   */
+  onLastAttemptChange?: (record: OAuthAttemptRecord | null) => void;
 };
 
 export default function BrowserConnectPanel({
   probeToolEnabled = true,
+  onLastAttemptChange,
 }: BrowserConnectPanelProps = {}) {
   const { user } = useAuth();
   const [params] = useSearchParams();
@@ -86,6 +93,12 @@ export default function BrowserConnectPanel({
   useEffect(() => {
     probeToolEnabledRef.current = probeToolEnabled;
   }, [probeToolEnabled]);
+
+  // Keep the parent's copy of the attempt record in lockstep with what
+  // this panel displays (see onLastAttemptChange).
+  useEffect(() => {
+    onLastAttemptChange?.(lastAttempt);
+  }, [lastAttempt, onLastAttemptChange]);
 
   // Initial mount: refresh token + last-attempt state, surface an OAuth
   // error callback (?error=access_denied) if present, and if we came
@@ -110,11 +123,14 @@ export default function BrowserConnectPanel({
       const pendingState = getPendingAuthorizationState();
       if (!pending || !cbError.state || cbError.state !== pendingState) return;
       clearPendingAuthorization();
-      const reason = sanitizeAttemptReason(
-        cbError.errorDescription
-          ? `Authorization error: ${cbError.error} — ${cbError.errorDescription}`
-          : `Authorization error: ${cbError.error}`,
-      );
+      // Persist ONLY a shape-checked error code. error_description is
+      // provider-controlled free text that can echo emails, codes, or
+      // other sensitive values no blocklist can enumerate — it is never
+      // stored, rendered, or exported.
+      const errorCode = /^[A-Za-z0-9_.-]{1,64}$/.test(cbError.error)
+        ? cbError.error
+        : "unknown_error";
+      const reason = `Authorization error: ${errorCode}`;
       setLastAttempt(recordOAuthAttemptFailure(reason));
       setError(reason);
       // Clean the query string so a refresh doesn't re-report the error.
@@ -215,9 +231,18 @@ export default function BrowserConnectPanel({
       <p className="text-sm text-muted-foreground">
         Runs the real OAuth 2.1 flow against the Verdant MCP server as{" "}
         <span className="font-medium text-foreground">{user?.email ?? "the signed-in grower"}</span>
-        , then calls <code className="font-mono">list_grows</code> to confirm tools are reachable
-        for your account. The access token lives only in this browser tab's memory and is never
-        displayed.
+        {probeToolEnabled ? (
+          <>
+            , then calls <code className="font-mono">list_grows</code> to confirm tools are
+            reachable for your account.
+          </>
+        ) : (
+          <>
+            . The automatic <code className="font-mono">list_grows</code> check is skipped while
+            that tool is disabled in this browser.
+          </>
+        )}{" "}
+        The access token lives only in this browser tab's memory and is never displayed.
       </p>
 
       {showPreauthWarning ? (
@@ -270,7 +295,7 @@ export default function BrowserConnectPanel({
         )}
       </div>
 
-      {connected && !probeToolEnabled ? (
+      {!probeToolEnabled ? (
         <p className="text-xs text-muted-foreground" data-testid="browser-connect-probe-disabled">
           The probe is off because <code className="font-mono">list_grows</code> is disabled in this
           browser (a local preference). Re-enable it in the tool list below to run the probe. The

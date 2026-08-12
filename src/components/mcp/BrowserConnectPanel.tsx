@@ -146,6 +146,14 @@ export default function BrowserConnectPanel({
       navigate(REDIRECT_PATH, { replace: true });
       return;
     }
+    if (cb.state !== getPendingAuthorizationState()) {
+      // Stale or crafted ?code= for a flow this browser did not start.
+      // Don't run the exchange (its "state mismatch" throw would be
+      // recorded as a failed attempt); keep the genuine pending
+      // authorization alive and just clean the callback URL.
+      navigate(REDIRECT_PATH, { replace: true });
+      return;
+    }
     (async () => {
       setPhase("exchanging");
       setError(null);

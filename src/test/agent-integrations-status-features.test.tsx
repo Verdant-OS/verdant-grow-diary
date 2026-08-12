@@ -335,6 +335,24 @@ describe("last OAuth attempt display", () => {
     expect(getLocalStorageItemForTest(OAUTH_ATTEMPT_LOG_KEY)).toBeNull();
     expect(window.sessionStorage.getItem(PKCE_KEY)).not.toBeNull();
   });
+
+  it("ignores a ?code= callback whose state does not match the pending authorization", async () => {
+    seedPendingAuthorization(); // pending state is "test-state"
+    window.history.replaceState(
+      {},
+      "",
+      "/settings/agent-integrations?code=forged-code&state=attacker-state",
+    );
+    renderPage();
+    // No exchange attempted, so no "OAuth state mismatch" failure is
+    // recorded; the genuine pending authorization stays alive.
+    await waitFor(() => {
+      expect(screen.getByTestId("oauth-last-attempt").getAttribute("data-outcome")).toBe("none");
+    });
+    expect(getLocalStorageItemForTest(OAUTH_ATTEMPT_LOG_KEY)).toBeNull();
+    expect(window.sessionStorage.getItem(PKCE_KEY)).not.toBeNull();
+    expect(screen.queryByTestId("browser-connect-error")).toBeNull();
+  });
 });
 
 describe("local tool preference gates the docs-page tool explorer", () => {

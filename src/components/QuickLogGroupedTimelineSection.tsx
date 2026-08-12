@@ -54,6 +54,10 @@ import {
   isReviewableQuickLogEntry,
   reviewTriggerLabel,
 } from "@/lib/quickLogGroupedReviewViewModel";
+import QuickLogEntryIntegrityControls, {
+  QuickLogEditedBadge,
+} from "@/components/QuickLogEntryIntegrityControls";
+import { useQuickLogRevisionBadges } from "@/hooks/useQuickLogRevisionBadges";
 
 export interface DemoQuickLogTimelineEntry {
   entry: QuickLogTimelineEntry;
@@ -137,9 +141,11 @@ function ActionDetails({
 interface EntryItemProps {
   entry: QuickLogTimelineEntry;
   demoVariant?: "demo" | "sample";
+  /** Correction/retraction affordances (issue #786). Absent for demo rows. */
+  correctionCount?: number;
 }
 
-function EntryItem({ entry, demoVariant }: EntryItemProps) {
+function EntryItem({ entry, demoVariant, correctionCount }: EntryItemProps) {
   const isDemo = !!demoVariant;
   const sourceLabel = isDemo
     ? demoVariant === "demo"
@@ -184,6 +190,21 @@ function EntryItem({ entry, demoVariant }: EntryItemProps) {
     entry.kind === "action" || entry.kind === "grouped"
       ? (entry.action.phenoEvidenceReceipt ?? null)
       : null;
+
+  const integrityControls =
+    !isDemo && (entry.kind === "action" || entry.kind === "grouped") ? (
+      <>
+        <QuickLogEditedBadge correctionCount={correctionCount ?? 0} />
+        <QuickLogEntryIntegrityControls
+          handle={{ growEventId: entry.action.id }}
+          currentNote={entry.action.noteText ?? null}
+          currentOccurredAt={entry.action.occurredAt}
+          currentPlantId={entry.action.plantId}
+          plantId={entry.action.plantId}
+          tentId={entry.action.tentId}
+        />
+      </>
+    ) : null;
 
   if (phenoReceipt && (entry.kind === "action" || entry.kind === "grouped")) {
     return (
@@ -270,7 +291,8 @@ function EntryItem({ entry, demoVariant }: EntryItemProps) {
               <ManualSnapshotTimelineCard card={entry.environmentCard} />
             </>
           )}
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {integrityControls}
             {auditable && (
               <Button
                 type="button"
@@ -390,6 +412,9 @@ function EntryItem({ entry, demoVariant }: EntryItemProps) {
           >
             {MISSING_SNAPSHOT_NOTE_LABEL}
           </p>
+          {integrityControls && (
+            <div className="flex flex-wrap items-center gap-2">{integrityControls}</div>
+          )}
         </CardContent>
       </Card>
     );
@@ -463,6 +488,17 @@ export default function QuickLogGroupedTimelineSection(props: Props) {
     () => wrapped.filter((w) => filterQuickLogGroupedTimelineEntries([w.entry], filter).length > 0),
     [wrapped, filter],
   );
+
+  // "edited" badge data (issue #786) for the real (non-demo) action cards.
+  const actionRootIds = useMemo(
+    () =>
+      entries
+        .filter((e) => e.kind === "action" || e.kind === "grouped")
+        .map((e) => (e.kind === "action" || e.kind === "grouped" ? e.action.id : ""))
+        .filter((id) => id.length > 0),
+    [entries],
+  );
+  const { badges: revisionBadges } = useQuickLogRevisionBadges(actionRootIds);
 
   const hasAnyEntries = wrapped.length > 0;
   const aiDoctorResultsHref = aiDoctorResultsHrefFor(props);
@@ -602,9 +638,18 @@ export default function QuickLogGroupedTimelineSection(props: Props) {
                 entry.kind === "environment"
                   ? `env:${entry.environment.id}:${i}`
                   : `act:${entry.action.id}:${i}`;
+              const actionId =
+                entry.kind === "action" || entry.kind === "grouped" ? entry.action.id : null;
+              const correctionCount = actionId
+                ? (revisionBadges.get(actionId)?.correctionCount ?? 0)
+                : 0;
               return (
                 <li key={key}>
-                  <EntryItem entry={entry} demoVariant={w.demoVariant} />
+                  <EntryItem
+                    entry={entry}
+                    demoVariant={w.demoVariant}
+                    correctionCount={correctionCount}
+                  />
                 </li>
               );
             })}

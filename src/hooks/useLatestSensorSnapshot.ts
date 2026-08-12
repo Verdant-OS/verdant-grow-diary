@@ -113,6 +113,7 @@ export function useLatestSensorSnapshot(
         const { data: diaryRows, error: diaryErr } = await supabase
           .from("diary_entries")
           .select("id,entry_at,details,tent_id")
+          .is("retracted_at", null)
           .eq("grow_id", growId)
           .order("entry_at", { ascending: false })
           .limit(20);

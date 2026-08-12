@@ -613,6 +613,7 @@ export default function Timeline() {
           count: "exact",
         })
         .eq("grow_id", activeGrowId)
+        .is("retracted_at", null)
         .order("entry_at", { ascending: false })
         .limit(100);
       if (timelineDateRangeBounds.startIso)
@@ -825,6 +826,7 @@ export default function Timeline() {
         .from("diary_entries")
         .select("id,note,photo_url,stage,details,entry_at,plant_id,tent_id")
         .eq("grow_id", requestedGrowId)
+        .is("retracted_at", null)
         .lt("entry_at", cursor)
         .order("entry_at", { ascending: false })
         .limit(100);
@@ -2007,7 +2009,11 @@ export default function Timeline() {
           lanes. Action Queue / Alert event logs are surfaced at the
           bottom so Quick Log entries are not buried. */}
       <div className="mt-4">
-        <RecentQuickLogActivityPanel rawEntries={recentLaneRawEntries} limit={10} />
+        <RecentQuickLogActivityPanel
+          rawEntries={recentLaneRawEntries}
+          limit={10}
+          growId={activeGrowId ?? null}
+        />
       </div>
 
       <div className="mt-4">

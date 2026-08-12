@@ -40,6 +40,13 @@ export interface RawPhenoEvidenceDiaryRow {
   entry_at: string;
   photo_url?: string | null;
   details: unknown;
+  /**
+   * Quick Log retraction marker (issue #786). Readers filter retracted rows
+   * at the query, but this parser is the coverage choke point, so it rejects
+   * them too: a retracted receipt must never count toward evidence coverage.
+   * Legacy rows and readers that did not select the column stay accepted.
+   */
+  retracted_at?: string | null;
 }
 
 export type PhenoEvidenceFreshness = "fresh" | "stale" | "invalid" | "unknown";
@@ -169,6 +176,9 @@ export function parsePhenoEvidenceReceiptRow(
   expected: { huntId: string; plantId: string },
 ): ParsedPhenoEvidenceReceipt | null {
   if (!row || boundedId(row.id) === null) return null;
+  if (typeof row.retracted_at === "string" && row.retracted_at.length > 0) {
+    return null;
+  }
   const entryAt = normalizedIso(row.entry_at);
   if (!entryAt) return null;
   const details = objectRecord(row.details);

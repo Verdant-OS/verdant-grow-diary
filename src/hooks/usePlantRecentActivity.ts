@@ -18,6 +18,7 @@ export function usePlantRecentActivity(plantId: string | null | undefined) {
         .from("diary_entries")
         .select("*")
         .eq("plant_id", plantId as string)
+        .is("retracted_at", null)
         .order("entry_at", { ascending: false })
         .limit(PLANT_RECENT_ACTIVITY_LIMIT);
       if (error) throw error;

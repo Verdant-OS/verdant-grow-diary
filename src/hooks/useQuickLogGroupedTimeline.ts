@@ -108,6 +108,7 @@ async function fetchTimelineDiaryRows(
   let q = supabase
     .from("diary_entries")
     .select(DIARY_SELECT)
+    .is("retracted_at", null)
     .in(
       "details->>kind" as never,
       [AI_DOCTOR_PHASE1_TIMELINE_KIND, PHENO_EVIDENCE_RECEIPT_KIND] as never,
@@ -140,6 +141,7 @@ async function fetchQuickLogCompanionRows(
   let q = supabase
     .from("diary_entries")
     .select(DIARY_SELECT)
+    .is("retracted_at", null)
     .not("details->>linked_grow_event_id" as never, "is", null);
 
   if (scope.kind === "plant") {

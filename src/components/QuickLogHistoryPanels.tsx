@@ -26,6 +26,16 @@ import {
   exportGrowDiaryReportAsPdf,
   type BuildGrowDiaryReportInput,
 } from "@/lib/growDiaryPdfExport";
+import {
+  buildQuickLogEntryHandleIndex,
+  handleRootId,
+  type QuickLogEntryHandleRef,
+} from "@/lib/quick-log/quickLogRevisionRules";
+import { useQuickLogRevisionBadges } from "@/hooks/useQuickLogRevisionBadges";
+import QuickLogEntryIntegrityControls, {
+  QuickLogEditedBadge,
+} from "@/components/QuickLogEntryIntegrityControls";
+import RetractedQuickLogPanel from "@/components/RetractedQuickLogPanel";
 import { cn } from "@/lib/utils";
 
 type Builder = (entries: ReturnType<typeof normalizeDiaryEntries>) => QuickLogHistoryRow[];
@@ -154,7 +164,15 @@ function ManualReadingsChips({ row }: { row: QuickLogHistoryRow }) {
   );
 }
 
-function Row({ row }: { row: QuickLogHistoryRow }) {
+function Row({
+  row,
+  integrityHandle,
+  correctionCount,
+}: {
+  row: QuickLogHistoryRow;
+  integrityHandle?: QuickLogEntryHandleRef | null;
+  correctionCount?: number;
+}) {
   const et = getEventType(row.eventType);
   const Icon = et.icon;
   return (
@@ -177,7 +195,18 @@ function Row({ row }: { row: QuickLogHistoryRow }) {
           <span className="text-foreground/90 font-medium">
             {fmtDate(row.occurredAt, row.occurredAtLabel)}
           </span>
+          <QuickLogEditedBadge correctionCount={correctionCount ?? 0} />
         </div>
+        {integrityHandle && (
+          <QuickLogEntryIntegrityControls
+            handle={integrityHandle}
+            currentNote={row.noteBody || null}
+            currentOccurredAt={row.occurredAt}
+            currentPlantId={row.plantId}
+            plantId={row.plantId}
+            tentId={row.tentId}
+          />
+        )}
         {row.warnings.length > 0 && (
           <span
             className="inline-flex items-center gap-1 rounded-full border border-yellow-500/30 bg-yellow-500/10 px-2 py-1 text-xs text-yellow-300"
@@ -247,6 +276,24 @@ function QuickLogHistorySection({
     return builder(normalized).slice(0, Math.max(0, limit));
   }, [rawEntries, builder, limit]);
 
+  // Correction/retraction handles (issue #786): resolved from the raw
+  // entries so only identifiable Quick Log rows get controls; legacy rows
+  // without a handle render exactly as before, badge-free.
+  const handleIndex = useMemo(() => buildQuickLogEntryHandleIndex(rawEntries), [rawEntries]);
+  const rootIds = useMemo(
+    () =>
+      [
+        ...new Set(
+          rows
+            .map((r) => handleIndex.get(r.id))
+            .filter((h): h is NonNullable<typeof h> => !!h)
+            .map(handleRootId),
+        ),
+      ].filter((id) => id.length > 0),
+    [rows, handleIndex],
+  );
+  const { badges } = useQuickLogRevisionBadges(rootIds);
+
   return (
     <section
       className={"glass rounded-2xl p-4 " + (className ?? "")}
@@ -272,9 +319,18 @@ function QuickLogHistorySection({
         </div>
       ) : (
         <ul className="space-y-2">
-          {rows.map((r) => (
-            <Row key={r.id} row={r} />
-          ))}
+          {rows.map((r) => {
+            const handle = handleIndex.get(r.id) ?? null;
+            const badge = handle ? badges.get(handleRootId(handle)) : undefined;
+            return (
+              <Row
+                key={r.id}
+                row={r}
+                integrityHandle={handle}
+                correctionCount={badge?.correctionCount ?? 0}
+              />
+            );
+          })}
         </ul>
       )}
     </section>
@@ -284,9 +340,12 @@ function QuickLogHistorySection({
 export function RecentQuickLogActivityPanel({
   rawEntries,
   limit = 10,
+  growId = null,
 }: {
   rawEntries: NormalizeDiaryInput["rawEntries"];
   limit?: number;
+  /** Enables the retracted-entries audit disclosure below the lane. */
+  growId?: string | null;
 }) {
   const handleExport = () => {
     const result = exportGrowDiaryReportAsPdf(buildRecentDiaryPdfInput(rawEntries, limit));
@@ -298,28 +357,31 @@ export function RecentQuickLogActivityPanel({
   };
 
   return (
-    <QuickLogHistorySection
-      rawEntries={rawEntries}
-      title="Recent Quick Logs"
-      laneKey="recent"
-      icon={<Activity className="h-3.5 w-3.5 text-primary" />}
-      builder={(entries) => buildRecentQuickLogActivity(entries, limit)}
-      emptyTitle="No Quick Log entries yet"
-      emptyHelp="Open Quick Log to capture a note, watering, photo, or manual reading."
-      limit={limit}
-      headerAction={
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={handleExport}
-          data-testid="quicklog-history-export-diary-pdf"
-        >
-          <FileDown className="h-3.5 w-3.5" aria-hidden="true" />
-          Export diary PDF
-        </Button>
-      }
-    />
+    <div className="space-y-3">
+      <QuickLogHistorySection
+        rawEntries={rawEntries}
+        title="Recent Quick Logs"
+        laneKey="recent"
+        icon={<Activity className="h-3.5 w-3.5 text-primary" />}
+        builder={(entries) => buildRecentQuickLogActivity(entries, limit)}
+        emptyTitle="No Quick Log entries yet"
+        emptyHelp="Open Quick Log to capture a note, watering, photo, or manual reading."
+        limit={limit}
+        headerAction={
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleExport}
+            data-testid="quicklog-history-export-diary-pdf"
+          >
+            <FileDown className="h-3.5 w-3.5" aria-hidden="true" />
+            Export diary PDF
+          </Button>
+        }
+      />
+      <RetractedQuickLogPanel growId={growId} />
+    </div>
   );
 }
 

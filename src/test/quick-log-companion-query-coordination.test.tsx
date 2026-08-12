@@ -72,6 +72,7 @@ vi.mock("@/integrations/supabase/client", () => {
     const q: Record<string, unknown> = {};
     q.select = () => q;
     q.eq = () => q;
+    q.is = () => q;
     q.or = () => q;
     q.in = (column: string, values: unknown[]) => {
       if (table === "grow_events" && column === "id") {

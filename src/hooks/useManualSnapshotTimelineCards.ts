@@ -30,6 +30,7 @@ async function fetchPlantRows(plantId: string, limit: number): Promise<ManualSna
   const { data, error } = await supabase
     .from("diary_entries")
     .select("id, plant_id, tent_id, entry_at, note, details")
+    .is("retracted_at", null)
     .eq("plant_id", plantId)
     .order("entry_at", { ascending: false })
     .limit(limit);
@@ -41,6 +42,7 @@ async function fetchTentRows(tentId: string, limit: number): Promise<ManualSnaps
   const { data, error } = await supabase
     .from("diary_entries")
     .select("id, plant_id, tent_id, entry_at, note, details")
+    .is("retracted_at", null)
     .eq("tent_id", tentId)
     .order("entry_at", { ascending: false })
     .limit(limit);

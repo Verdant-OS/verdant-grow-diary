@@ -24,6 +24,7 @@ export function usePlantLogDays(plantId: string | null | undefined) {
         .from("diary_entries")
         .select("entry_at")
         .eq("plant_id", plantId as string)
+        .is("retracted_at", null)
         .order("entry_at", { ascending: false })
         .limit(PLANT_LOG_DAYS_WINDOW);
       if (error) throw error;

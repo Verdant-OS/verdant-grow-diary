@@ -77,7 +77,7 @@ export const BLUEPRINT_TARGET_STAGE_COPY: Readonly<
   harvest: {
     label: "Dry & cure",
     blurb:
-      "A dark, cool room held to a narrow band, with gentle airflow — stagnant air lets damp pockets form even when the average reads right. Light, feed and pH targets no longer apply once the plant is cut.",
+      "These bands describe the drying room: dark, cool, held to a narrow band, with gentle airflow — stagnant air lets damp pockets form even when the room average reads right. Curing is a different measurement: once the material is in jars or bags the humidity that matters is the one inside the container, which a safe room reading tells you nothing about. Light, feed and pH targets no longer apply once the plant is cut.",
   },
 });
 
@@ -125,7 +125,22 @@ export function buildStageMetricRows(
   }
 
   if (bands.rh) {
-    rows.push({ key: "rh", label: "Relative humidity", value: `${bands.rh.min}–${bands.rh.max} %` });
+    // plants.stage collapses harvest and cure into one normalized stage, but
+    // they are measured in different places: drying is a ROOM reading, while
+    // curing happens in jars and the app records jar_or_bag_rh from inside the
+    // container. A safe room average can sit alongside unsafe moisture in a
+    // sealed jar, so the location is named rather than left implied.
+    const isDryRoom = stage === "harvest";
+    rows.push({
+      key: "rh",
+      label: isDryRoom ? "Relative humidity (drying room)" : "Relative humidity",
+      value: `${bands.rh.min}–${bands.rh.max} %`,
+      ...(isDryRoom
+        ? {
+            note: "Ambient reading while drying. Once the material is jarred, the equivalent figure is measured inside the container, not in the room",
+          }
+        : {}),
+    });
   }
 
   // EC and pH carry two qualifiers that are load-bearing for safety.

@@ -82,34 +82,43 @@ export default function PlantDetailPhotoStrip({
   // failure. retryNonce lets the shared Retry button force a fresh signing
   // attempt independent of whether useDiaryEntries() actually refetches.
   const [signingError, setSigningError] = useState(false);
-  // The diary query finishing does not mean the strip is ready -- a
-  // companion-only photo still needs its signing round-trip. Without this,
-  // the gap between isLoading turning false and the signing promise
-  // resolving falls through to the empty state and tells the grower there
-  // are no photos when there may well be one still loading.
-  const [signingInProgress, setSigningInProgress] = useState(false);
   const [signingRetryNonce, setSigningRetryNonce] = useState(0);
 
+  // Computed synchronously during render, from plain plantRawRows (already
+  // available on the very first render, cache or not) rather than an
+  // effect-set state flag -- an effect only runs after that first render
+  // (and can run after the browser paints), so a companion-only photo on
+  // an already-cached diary query would flash "No photos yet" for one
+  // frame before an effect-driven flag caught up. A stale signingError
+  // from a previous attempt takes precedence over "pending" until the
+  // retry's own effect run resolves; that's fine, since the error banner
+  // (not the empty state) is what's shown in that window either way.
+  const pendingSignPaths = useMemo(
+    () =>
+      collectUnsignedDiaryPhotoPaths(
+        plantRawRows as Array<{ photo_url?: unknown; details?: unknown }>,
+      ),
+    [plantRawRows],
+  );
+  const signingInProgress =
+    pendingSignPaths.length > 0 &&
+    !signingError &&
+    pendingSignPaths.some((p) => !signedUrlByPath.has(p));
+
   useEffect(() => {
-    const paths = collectUnsignedDiaryPhotoPaths(
-      plantRawRows as Array<{ photo_url?: unknown; details?: unknown }>,
-    );
-    if (paths.length === 0) {
+    if (pendingSignPaths.length === 0) {
       setSigningError(false);
-      setSigningInProgress(false);
       setSignedUrlByPath((prev) => (prev.size === 0 ? prev : new Map()));
       return;
     }
     let cancelled = false;
-    setSigningInProgress(true);
     supabase.storage
       .from("diary-photos")
-      .createSignedUrls(paths, 3600)
+      .createSignedUrls(pendingSignPaths, 3600)
       .then(({ data, error }) => {
         if (cancelled) return;
         if (error || !data) {
           setSigningError(true);
-          setSigningInProgress(false);
           return;
         }
         // The Supabase contract allows an overall-successful response whose
@@ -137,20 +146,18 @@ export default function PlantDetailPhotoStrip({
             map.set(path, signedUrl);
           }
         }
-        const anyFailed = paths.some((p) => !map.has(p));
+        const anyFailed = pendingSignPaths.some((p) => !map.has(p));
         setSigningError(anyFailed);
         setSignedUrlByPath(map);
-        setSigningInProgress(false);
       })
       .catch(() => {
         if (cancelled) return;
         setSigningError(true);
-        setSigningInProgress(false);
       });
     return () => {
       cancelled = true;
     };
-  }, [plantRawRows, signingRetryNonce]);
+  }, [pendingSignPaths, signingRetryNonce]);
 
   const handleRetry = () => {
     setSigningRetryNonce((n) => n + 1);

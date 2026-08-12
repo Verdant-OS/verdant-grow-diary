@@ -87,7 +87,12 @@ function mapCanonicalSource(snapshot: SensorSnapshot): SensorReadingSource | nul
     case "diary":
       return "manual";
     case "sim":
+    case "demo":
       return "demo";
+    case "stale":
+      return "stale";
+    case "invalid":
+      return "invalid";
     case "unavailable":
     default:
       return null;

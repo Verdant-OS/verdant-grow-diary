@@ -128,7 +128,17 @@ export function buildTentSnapshotView(
   // Source resolution: derive from the actual contributing rows so an
   // unknown/garbage source can never be silently promoted to "live" by
   // `snapshotFromReadings`'s heuristic default.
-  const RECOGNISED = new Set(["manual", "live", "csv", "import", "sim", "diary"]);
+  const RECOGNISED = new Set([
+    "manual",
+    "live",
+    "csv",
+    "import",
+    "sim",
+    "diary",
+    "demo",
+    "stale",
+    "invalid",
+  ]);
   const hasRecognised = latestRows.some(
     (r) => typeof r.source === "string" && RECOGNISED.has(r.source),
   );
@@ -139,8 +149,12 @@ export function buildTentSnapshotView(
     canonicalSource = "csv";
   } else if (snap.source === "manual" || snap.source === "diary") {
     canonicalSource = "manual";
-  } else if (snap.source === "sim") {
+  } else if (snap.source === "sim" || snap.source === "demo") {
     canonicalSource = "demo";
+  } else if (snap.source === "stale") {
+    canonicalSource = "stale";
+  } else if (snap.source === "invalid") {
+    canonicalSource = "invalid";
   } else if (snap.source === "live") {
     canonicalSource = "live";
   }

@@ -68,11 +68,11 @@ describe("sensorSnapshot pure helpers", () => {
   it("snapshotFromReadings folds latest-ts metrics and labels source", () => {
     const ts = "2026-05-20T11:55:00Z";
     const snap = snapshotFromReadings([
-      { ts, metric: "temperature_c", value: 24.1, source: "pi_bridge" },
-      { ts, metric: "humidity_pct", value: "55.2", source: "pi_bridge" },
-      { ts, metric: "vpd_kpa", value: 1.1, source: "pi_bridge" },
+      { ts, metric: "temperature_c", value: 24.1, source: "live" },
+      { ts, metric: "humidity_pct", value: "55.2", source: "live" },
+      { ts, metric: "vpd_kpa", value: 1.1, source: "live" },
       // earlier ts must be ignored
-      { ts: "2026-05-20T10:00:00Z", metric: "co2_ppm", value: 800, source: "pi_bridge" },
+      { ts: "2026-05-20T10:00:00Z", metric: "co2_ppm", value: 800, source: "live" },
     ]);
     expect(snap).not.toBeNull();
     expect(snap!.source).toBe("live");
@@ -89,6 +89,51 @@ describe("sensorSnapshot pure helpers", () => {
       { ts, metric: "temperature_c", value: 22, source: "manual" },
     ]);
     expect(snap!.source).toBe("manual");
+  });
+
+  it("snapshotFromReadings never classifies unknown/legacy alias sources as live", () => {
+    const ts = "2026-05-20T11:55:00Z";
+    for (const source of ["pi_bridge", "ecowitt", "garbage", "", null, undefined]) {
+      const snap = snapshotFromReadings([
+        { ts, metric: "temperature_c", value: 24, source },
+      ]);
+      expect(snap!.source).toBe("invalid");
+      expect(snap!.source).not.toBe("live");
+    }
+  });
+
+  it("snapshotFromReadings preserves persisted demo/stale/invalid quality labels", () => {
+    const ts = "2026-05-20T11:55:00Z";
+    for (const source of ["demo", "stale", "invalid"] as const) {
+      const snap = snapshotFromReadings([
+        { ts, metric: "temperature_c", value: 24, source },
+      ]);
+      expect(snap!.source).toBe(source);
+      expect(snap!.source).not.toBe("live");
+    }
+  });
+
+  it("snapshotFromReadings never resolves mixed live+demo batches to live", () => {
+    const ts = "2026-05-20T11:55:00Z";
+    const snap = snapshotFromReadings([
+      { ts, metric: "temperature_c", value: 24, source: "live" },
+      { ts, metric: "humidity_pct", value: 55, source: "demo" },
+    ]);
+    expect(snap!.source).toBe("demo");
+  });
+
+  it("snapshotFromReadings carries captured_at (capture time beats ingest ts)", () => {
+    const ts = "2026-05-20T11:55:00Z"; // fresh ingest timestamp
+    const capturedAt = "2026-05-19T08:00:00Z"; // much older actual capture
+    const snap = snapshotFromReadings([
+      { ts, metric: "temperature_c", value: 24, source: "live", captured_at: capturedAt },
+    ]);
+    expect(snap!.captured_at).toBe(capturedAt);
+    // No captured_at selected → stays null; callers may fall back to ts.
+    const noCapture = snapshotFromReadings([
+      { ts, metric: "temperature_c", value: 24, source: "live" },
+    ]);
+    expect(noCapture!.captured_at).toBeNull();
   });
 
   it("snapshotFromReadings returns null for empty input (no faking)", () => {

@@ -128,6 +128,46 @@ describe("samplesFromReadings", () => {
     expect(samplesFromReadings(null)).toEqual([]);
     expect(samplesFromReadings(undefined)).toEqual([]);
   });
+
+  it("preserves persisted csv/demo/stale/invalid sources — never promotes to live", () => {
+    const ts = "2026-05-20T11:00:00Z";
+    for (const source of ["csv", "demo", "stale", "invalid"] as const) {
+      const samples = samplesFromReadings([
+        { ts, metric: "temperature_c", value: 24, tent_id: "t1", source },
+      ]);
+      expect(samples[0].source).toBe(source);
+      expect(samples[0].source).not.toBe("live");
+    }
+  });
+
+  it("classifies unknown/missing/legacy alias sources as invalid, never live", () => {
+    const ts = "2026-05-20T11:00:00Z";
+    for (const source of ["ecowitt", "pi_bridge", "junk", null, undefined]) {
+      const samples = samplesFromReadings([
+        { ts, metric: "temperature_c", value: 24, tent_id: "t1", source },
+      ]);
+      expect(samples[0].source).toBe("invalid");
+    }
+  });
+
+  it("never resolves a mixed live+demo group to live", () => {
+    const ts = "2026-05-20T11:00:00Z";
+    const samples = samplesFromReadings([
+      { ts, metric: "temperature_c", value: 24, tent_id: "t1", source: "live" },
+      { ts, metric: "humidity_pct", value: 55, tent_id: "t1", source: "demo" },
+    ]);
+    expect(samples).toHaveLength(1);
+    expect(samples[0].source).toBe("demo");
+  });
+
+  it("keeps all-live groups classified as live", () => {
+    const ts = "2026-05-20T11:00:00Z";
+    const samples = samplesFromReadings([
+      { ts, metric: "temperature_c", value: 24, tent_id: "t1", source: "live" },
+      { ts, metric: "humidity_pct", value: 55, tent_id: "t1", source: "live" },
+    ]);
+    expect(samples[0].source).toBe("live");
+  });
 });
 
 describe("samplesFromDiary", () => {

@@ -292,7 +292,13 @@ function classifySource(
   const s = (source ?? "").toLowerCase();
   if (s === "csv") return "csv";
   if (s === "manual") return "manual";
-  return "live";
+  if (s === "stale") return "stale";
+  // "ecowitt" is this layer's pinned live vendor transport (the quality
+  // flag above carries the stale/invalid dimension for those rows).
+  if (s === "live" || s === "ecowitt") return "live";
+  // Unknown/legacy alias/demo sources must never be tagged live — this
+  // legacy union has no demo tag, so anything non-canonical is invalid.
+  return "invalid";
 }
 
 function avg(nums: number[]): number | null {

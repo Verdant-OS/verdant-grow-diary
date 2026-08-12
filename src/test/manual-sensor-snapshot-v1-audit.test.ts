@@ -81,12 +81,19 @@ describe("Sensor Context — source labeling", () => {
     expect(SOURCE_LABEL[snap.source]).not.toBe("Live sensor");
   });
 
-  it("Live source label is reserved for pi_bridge/live rows only", () => {
-    const snap = snapshotFromReadings([
+  it("Live source label is reserved for canonical live rows only", () => {
+    const live = snapshotFromReadings([
+      { ts: "2025-01-01T00:00:00Z", metric: "temperature_c", value: 24, source: "live" },
+    ])!;
+    expect(live.source).toBe("live");
+    expect(SOURCE_LABEL[live.source]).toBe("Live sensor");
+    // Legacy transport aliases are not canonical sources and must never
+    // be promoted to live (Sensor Truth: unknown telemetry ≠ healthy).
+    const alias = snapshotFromReadings([
       { ts: "2025-01-01T00:00:00Z", metric: "temperature_c", value: 24, source: "pi_bridge" },
     ])!;
-    expect(snap.source).toBe("live");
-    expect(SOURCE_LABEL[snap.source]).toBe("Live sensor");
+    expect(alias.source).toBe("invalid");
+    expect(SOURCE_LABEL[alias.source]).not.toBe("Live sensor");
   });
 
   it("(7) stale readings beyond threshold are flagged stale", () => {

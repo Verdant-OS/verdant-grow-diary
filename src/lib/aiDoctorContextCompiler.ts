@@ -264,7 +264,13 @@ function classifySource(row: SensorReadingRowLike): SensorSourceTag {
   if (source === "manual" || source === "manual_snapshot") return "manual";
   if (source === "csv" || source === "csv_import" || source === "import")
     return "csv";
-  return "live";
+  if (source === "sim") return "demo";
+  // "ecowitt" is this layer's pinned live vendor transport (quality/state
+  // flags above carry the stale/invalid dimension for those rows).
+  if (source === "live" || source === "ecowitt") return "live";
+  // Unknown/legacy alias sources (e.g. "pi_bridge", empty) must never be
+  // tagged live — the trustworthy-evidence gates key off "live".
+  return "invalid";
 }
 
 function toFiniteNumber(v: unknown): number | null {

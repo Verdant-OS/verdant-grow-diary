@@ -24,6 +24,7 @@ import {
   type EcowittSnapshotViewModel,
 } from "@/lib/ecowittReadingViewModel";
 import type { EcowittSensorReadingRow } from "@/lib/ecowittLatestSnapshotFilter";
+import type { SensorReadingSource } from "@/mock";
 
 export interface DiaryEntryLike {
   id: string;
@@ -192,8 +193,21 @@ export function buildEcowittTimelineContext(
     }
 
     const src = (best.row.source ?? "").trim().toLowerCase();
-    const candidateSource =
-      src === "manual" ? "manual" : src === "demo" ? "demo" : "live";
+    // Canonical sources pass through unchanged. The legacy "ecowitt"
+    // listener tag stays a live-transport candidate (the snapshot
+    // view-model demotes it to stale past the freshness window). Any
+    // other/unknown source must never be presented as live.
+    const candidateSource: SensorReadingSource =
+      src === "live" ||
+      src === "manual" ||
+      src === "csv" ||
+      src === "demo" ||
+      src === "stale" ||
+      src === "invalid"
+        ? src
+        : src === "ecowitt"
+          ? "live"
+          : "invalid";
 
     const candidate: EcowittCandidate = {
       payload: raw,

@@ -116,6 +116,9 @@ const BASE_SOURCE_LABELS: Record<string, string> = {
   manual: MANUAL_READING_LABEL,
   sim: "Simulated",
   diary: "Diary snapshot",
+  demo: "Demo data",
+  stale: "Stale",
+  invalid: "Invalid",
   unavailable: "Unavailable",
   // V1 webhook ingest sources. None of these are "live" by default —
   // freshness is derived on read; UI must still apply the stale guard.

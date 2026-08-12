@@ -142,11 +142,16 @@ export function useReportsHubData(growId: string | null | undefined): ReportsHub
           .select("id", { count: "exact", head: true })
           .eq("grow_id", growId)
           .gte("entry_at", sevenDaysAgo),
+        // Synthetic rows (demo / legacy sim) must never present as real
+        // sensor activity; null-source legacy rows still count. Note: rows
+        // are not deduped per capture — if a capture ever persists dual
+        // quality rows (e.g. live + stale), the count includes both.
         tentIds.length > 0
           ? supabase
               .from("sensor_readings")
               .select("ts")
               .in("tent_id", tentIds)
+              .or("source.is.null,source.not.in.(demo,sim)")
               .order("ts", { ascending: false })
               .limit(1)
           : Promise.resolve({ data: [], error: null } as { data: { ts: string }[]; error: null }),
@@ -155,6 +160,7 @@ export function useReportsHubData(growId: string | null | undefined): ReportsHub
               .from("sensor_readings")
               .select("id", { count: "exact", head: true })
               .in("tent_id", tentIds)
+              .or("source.is.null,source.not.in.(demo,sim)")
               .gte("ts", sevenDaysAgo)
           : Promise.resolve({ count: 0, error: null } as { count: number; error: null }),
         supabase

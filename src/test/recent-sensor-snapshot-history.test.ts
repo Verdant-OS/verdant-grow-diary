@@ -78,6 +78,30 @@ describe("buildRecentSensorSnapshotHistory", () => {
     expect(SOURCE_LABEL[out[0].source]).not.toBe("Live sensor");
   });
 
+  it("labels csv rows as 'CSV history', never 'Live sensor'", () => {
+    const rows = [row("2026-05-24T11:00:00Z", "temperature_c", 24, "csv")];
+    const out = buildRecentSensorSnapshotHistory(rows, { now: NOW });
+    expect(out[0].source).toBe("csv");
+    expect(SOURCE_LABEL[out[0].source]).toBe("CSV history");
+  });
+
+  it("preserves persisted demo/stale/invalid labels — never live", () => {
+    for (const source of ["demo", "stale", "invalid"] as const) {
+      const rows = [row("2026-05-24T11:00:00Z", "temperature_c", 24, source)];
+      const out = buildRecentSensorSnapshotHistory(rows, { now: NOW });
+      expect(out[0].source).toBe(source);
+      expect(out[0].source).not.toBe("live");
+    }
+  });
+
+  it("classifies unknown/missing sources as invalid, never live", () => {
+    for (const source of ["ecowitt", "junk", null]) {
+      const rows = [row("2026-05-24T11:00:00Z", "temperature_c", 24, source)];
+      const out = buildRecentSensorSnapshotHistory(rows, { now: NOW });
+      expect(out[0].source).toBe("invalid");
+    }
+  });
+
   it("flags stale rows", () => {
     const stale = new Date(NOW - 60 * 60 * 1000).toISOString();
     const fresh = new Date(NOW - 60 * 1000).toISOString();

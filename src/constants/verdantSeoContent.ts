@@ -2110,7 +2110,7 @@ export const VERDANT_BLUEPRINT_TARGETS_FAQ: ReadonlyArray<FaqEntry> = [
   {
     question: "What are grow stage target bands?",
     answer:
-      "A target band is the range a given environmental or feed metric should sit inside for a specific grow stage — for example 40–50 % relative humidity during flower. Bands are ranges rather than single numbers because plants tolerate variation; what matters is staying inside the range for that stage.",
+      "A target band is the range a given environmental or feed metric typically sits in for a specific grow stage — for example 40–50 % relative humidity during flower. They are ranges rather than single numbers because plants tolerate variation, and they are contextual baselines to compare your own readings against rather than a pass/fail test. Cultivar, canopy position, and how the plant is actually responding all shift what is right for a given room, so a healthy plant sitting outside a band is a reason to look, not automatically a reason to change something.",
   },
   {
     question: "Why do temperature targets differ between lights on and lights off?",

@@ -28,14 +28,58 @@ Repo-only green tests are **not** production proof.
 
 ### 1.1 Status-code contract (do not confuse)
 
+#### What 301 and 308 both mean
+
+Both are **permanent** redirects: the resource has a new canonical URL; clients and
+crawlers should stop using the old path and prefer the `Location` target.
+
+| Code | Name | Permanent? | Request method on redirect follow | Typical host default |
+| --- | --- | --- | --- | --- |
+| **301** | Moved Permanently | Yes | Historically ambiguous: some clients may change **POST → GET** on follow | Cloudflare Redirect Rules / Bulk Redirects “permanent” |
+| **308** | Permanent Redirect | Yes | **Method and body preserved** (POST stays POST) | Vercel `vercel.json` `"permanent": true` |
+
+Related temporary codes (not used for this legacy-alias table):
+
+| Code | Name | Permanent? | Method |
+| --- | --- | --- | --- |
+| **302** | Found | No | Often treated as temporary; method may change |
+| **307** | Temporary Redirect | No | Method preserved — Vercel `"permanent": false` |
+
+#### Why both appear in this runbook
+
+- **Repo / Vercel path:** `"permanent": true` without `statusCode` → expect **308**.
+- **Cloudflare absolute-URL mirror:** “Permanent” rules usually emit **301**.
+- **SEO (GET HTML pages):** Google treats **301 and 308 as permanent redirects**.
+  Either consolidates ranking signals to the target when the chain is clean. Prefer
+  one consistent code per edge; do **not** fail a probe solely because Vercel
+  returned 308 and Cloudflare returned 301.
+- **When 308 matters more than 301:** non-GET APIs or form POSTs that must not be
+  rewritten to GET. This public marketing-alias table is GET-only in practice, so
+  301 vs 308 is **not** a product differentiator for Verdant crawl honesty.
+
+#### Platform mapping
+
 | Platform / knob | Expected status | Notes |
 | --- | --- | --- |
-| Vercel `vercel.json` `"permanent": true` | **308** Permanent Redirect | Platform default for permanent in-app redirects (method/body preserved). Search engines treat 308 as a permanent redirect. |
-| Vercel `"permanent": false` | **307** Temporary Redirect | Not used for this table. |
-| Vercel explicit `"statusCode": 301` | **301** | Only if you opt in; **not** in current repo snippet — leave default 308 unless SEO tooling requires 301. |
-| Cloudflare Redirect Rules / Bulk Redirects “permanent” | Usually **301** | Accept 301 as PASS on Cloudflare; still require correct `Location`. |
+| Vercel `vercel.json` `"permanent": true` | **308** | Default permanent in-app redirect. Method/body preserved. |
+| Vercel `"permanent": false` | **307** | Temporary — **not** for §2 aliases. |
+| Vercel explicit `"statusCode": 301` | **301** | Opt-in only; **not** in current repo snippet. Leave 308 unless an owner deliberately requires 301 for a tool that still mishandles 308. |
+| Cloudflare Redirect Rules / Bulk Redirects “permanent” | Usually **301** | PASS if `Location` is correct. |
 
-Probe PASS = **301 or 308** with correct `Location`. FAIL = **200** (current defect) or wrong destination.
+#### Probe verdict (Verdant)
+
+| Result | Verdict |
+| --- | --- |
+| **308** + correct `Location` (Vercel path) | **PASS** |
+| **301** + correct `Location` (Cloudflare path) | **PASS** |
+| Mix of 301 and 308 across aliases on the **same** edge | Prefer one code for consistency; still **PASS** for crawl honesty if destinations are correct |
+| **302** / **307** on these permanent aliases | **FAIL** (wrong permanence signal) |
+| **200** soft SPA shell (no `Location`) | **FAIL** — current production defect |
+| Redirect to wrong host/path | **FAIL** |
+
+**Summary:** 301 and 308 are both permanent. This runbook accepts **either**. It does
+**not** require forcing Vercel to 301 or Cloudflare to 308. The defect to fix is
+**200 without redirect**, not “wrong permanent code.”
 
 ---
 

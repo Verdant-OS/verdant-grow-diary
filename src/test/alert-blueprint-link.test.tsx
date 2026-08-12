@@ -114,6 +114,17 @@ describe("tent alerts · Target Band link", () => {
     expect(new URL(href, "http://plant-detail.local").hash).toBe(`#${PLANT_BLUEPRINT_ANCHOR_ID}`);
   });
 
+  it("presents itself as reference navigation, never as the cause of the breach", () => {
+    // An alert can breach a CUSTOM grow target while the same reading sits
+    // inside the SOP band, and the persisted row carries no provenance to
+    // tell those apart. So the visible label must name the destination, not
+    // claim "this is the band you broke".
+    renderPanel("plant-1");
+    const label = screen.getByTestId(BAND).textContent?.trim() ?? "";
+    expect(label).toBe("Stage Targets");
+    expect(label).not.toMatch(/breach|broke|violat/i);
+  });
+
   it("renders alongside the Ask AI Doctor CTA, not instead of it", () => {
     renderPanel("plant-1");
     expect(screen.getByTestId("plant-assigned-tent-alert-ask-doctor")).toBeInTheDocument();

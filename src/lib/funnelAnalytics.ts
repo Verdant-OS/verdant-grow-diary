@@ -43,6 +43,12 @@ export const FUNNEL_EVENTS = [
   "historical_ai_review_started",
   "ai_doctor_result_received",
   "ai_doctor_session_saved",
+  // Blueprint entry intent. Tier-agnostic — Craft clicks land on live
+  // scoring, everyone else on the free preview — so deliberately NOT a
+  // paywall event: counting a Craft grower's navigation as an upgrade
+  // impression would inflate that funnel. It sits before paywall_viewed
+  // because for a non-Craft clicker that is literally the next step.
+  "blueprint_cta_clicked",
   "paywall_viewed",
   "paywall_cta_clicked",
   // Top-up funnel. Deliberately NOT the paywall events: these fire for a
@@ -96,6 +102,14 @@ export const FUNNEL_PARAM_KEYS = [
    * Never carries or approximates the raw rejected value.
    */
   "length_bucket",
+  /**
+   * Fixed-vocabulary alert metric token ("temp" | "rh" | "vpd" | "ppfd").
+   * Call sites are gated on the alert→Blueprint mapping, so only mapped
+   * tokens can reach here — never an id, a reading value, or grower input.
+   */
+  "metric",
+  /** Alert severity bucket ("critical" | "warning" | "watch"). Never an id. */
+  "severity",
 ] as const;
 
 type FunnelParamKey = (typeof FUNNEL_PARAM_KEYS)[number];

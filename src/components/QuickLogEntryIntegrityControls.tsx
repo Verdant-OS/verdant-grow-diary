@@ -56,7 +56,10 @@ import {
   retractQuickLogEntry,
   type QuickLogEntryHandle,
 } from "@/lib/quickLogRevisionService";
-import { buildQuickLogRevisionInvalidationKeys } from "@/lib/quickLogRevisionInvalidationRules";
+import {
+  QUICKLOG_REVISION_INVALIDATION_KEY_CONTAINS,
+  buildQuickLogRevisionInvalidationKeys,
+} from "@/lib/quickLogRevisionInvalidationRules";
 import { cn } from "@/lib/utils";
 
 export interface QuickLogEntryIntegrityControlsProps {
@@ -175,6 +178,17 @@ export default function QuickLogEntryIntegrityControls({
         plantId,
         tentId,
         growId,
+      });
+      // Owner-prefixed keys (buildPrivateGrowQueryKey) cannot be matched by
+      // prefix from pure code; match them by contained token instead so the
+      // mounted root-zone/AI-context queries refresh too.
+      void queryClient.invalidateQueries({
+        predicate: (query) =>
+          query.queryKey.some(
+            (part) =>
+              typeof part === "string" &&
+              QUICKLOG_REVISION_INVALIDATION_KEY_CONTAINS.includes(part),
+          ),
       });
       for (const key of keys) {
         void queryClient.invalidateQueries({ queryKey: key as unknown[] });

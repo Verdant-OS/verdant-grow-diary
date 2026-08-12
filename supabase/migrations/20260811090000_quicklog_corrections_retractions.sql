@@ -241,7 +241,12 @@ BEGIN
   END IF;
   FOREACH v_path SLICE 1 IN ARRAY ARRAY[
     ARRAY['sensor_snapshot', 'captured_at'],
-    ARRAY['sensor', 'captured_at']
+    ARRAY['sensor', 'captured_at'],
+    -- Root-zone manual observation envelope: readers reject it once its
+    -- observed_at drifts outside the allowed skew from the event time.
+    ARRAY['root_zone_manual_observation_v1', 'observed_at'],
+    -- Maturity evidence envelope (advisory-only display timestamp).
+    ARRAY['maturity_evidence', 'observed_at']
   ] LOOP
     v_raw := v_details #>> v_path;
     IF v_raw IS NULL THEN

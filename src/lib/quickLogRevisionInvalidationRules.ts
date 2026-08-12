@@ -48,3 +48,17 @@ export function buildQuickLogRevisionInvalidationKeys(meta: QuickLogRevisionMeta
   keys.push(["grow_events"]);
   return keys;
 }
+
+/**
+ * Key SUBSTRING matches for queries whose keys are prefixed with an
+ * owner-scoped segment (buildPrivateGrowQueryKey) and therefore cannot be
+ * matched by a plain prefix from pure code. The component invalidates any
+ * mounted query whose key contains one of these tokens.
+ *
+ * root_zone_observations: mounted on Plant Detail, filters tombstoned spine
+ * rows, and otherwise refreshes only on the Quick Log save window event —
+ * which revision writes do not dispatch.
+ */
+export const QUICKLOG_REVISION_INVALIDATION_KEY_CONTAINS: readonly string[] = [
+  "root_zone_observations",
+];

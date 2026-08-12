@@ -5,6 +5,7 @@
  * the pure rules layer. No writes. No action_queue handoff from this panel.
  * Recommendations are never invented — only fields already stored render.
  */
+import { useEffect, useRef } from "react";
 import { Link } from "@/lib/react-router-compat";
 import {
   ArrowRight,
@@ -29,6 +30,10 @@ import { alertsPath } from "@/lib/routes";
 import { buildPlantAiDoctorReviewPath } from "@/lib/aiDoctorEntryRules";
 import { buildPlantBlueprintPath } from "@/lib/plantDetailQuickActions";
 import { resolveAlertBlueprintMetric } from "@/lib/alertBlueprintLinkRules";
+import {
+  ALERT_DOCTOR_CREDIT_GATE_SURFACE,
+  type AlertDoctorCreditGateView,
+} from "@/lib/alertDoctorCreditGateRules";
 import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 
 interface Props {
@@ -42,6 +47,15 @@ interface Props {
    * than pointing the grower at an unrelated plant.
    */
   plantId?: string | null;
+  /**
+   * Out-of-credits interception for the doctor CTA, computed by the CALLER
+   * from presentation-only entitlement + usage reads (the panel itself
+   * stays hook-free/presenter-only). When absent or intercept=false the
+   * doctor CTA behaves exactly as before — callers that do not resolve
+   * credit state simply omit it. Never gates access: the server-side
+   * ai_credit_spend check remains the only spend authority.
+   */
+  doctorCreditGate?: AlertDoctorCreditGateView | null;
 }
 
 function severityClass(sev: PlantAssignedTentAlertRow["severity"]): string {
@@ -75,10 +89,12 @@ function AlertRowItem({
   row,
   plantId,
   tentId,
+  creditGate,
 }: {
   row: PlantAssignedTentAlertRow;
   plantId?: string | null;
   tentId?: string | null;
+  creditGate?: AlertDoctorCreditGateView | null;
 }) {
   // Deep-links into the plant's existing cautious-review section via the
   // shared helper (same href five other surfaces already use). Navigation
@@ -129,7 +145,34 @@ function AlertRowItem({
           </Badge>
         </div>
         <div className="flex items-center gap-1">
-          {doctorHref ? (
+          {doctorHref && creditGate?.intercept ? (
+            // Honest interception: this grow's free AI Doctor allotment is
+            // spent, so the review section could only show the server-side
+            // quota denial. The row action routes to plans instead; the
+            // reason renders once at panel level (credits note) and in this
+            // link's title. Impression (paywall_viewed) also fires at panel
+            // level, deduped — never per row.
+            <Button
+              asChild
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 gap-1"
+              data-testid="plant-assigned-tent-alert-doctor-plans"
+            >
+              <Link
+                to={creditGate.href}
+                title={creditGate.note}
+                onClick={() =>
+                  // Id-free by construction: a fixed surface token only.
+                  trackFunnelEvent("paywall_cta_clicked", {
+                    surface: ALERT_DOCTOR_CREDIT_GATE_SURFACE,
+                  })
+                }
+              >
+                <Sparkles className="h-3.5 w-3.5" /> {creditGate.ctaLabel}
+              </Link>
+            </Button>
+          ) : doctorHref ? (
             <Button
               asChild
               variant="ghost"
@@ -212,9 +255,30 @@ function AlertRowItem({
   );
 }
 
-export default function PlantAssignedTentAlertsPanel({ tentId, tentName, growId, plantId }: Props) {
+export default function PlantAssignedTentAlertsPanel({
+  tentId,
+  tentName,
+  growId,
+  plantId,
+  doctorCreditGate,
+}: Props) {
   const enabled = !!tentId;
   const { status, rows } = usePlantAssignedTentAlerts(tentId ?? null, growId ?? null);
+
+  // The credits note (and the swapped row CTAs it explains) only exist when
+  // the caller resolved an exhausted free allotment AND alert rows actually
+  // render — the same condition gates the paywall impression below, so the
+  // impression can never be broader than what the grower saw.
+  const showCreditsNote =
+    doctorCreditGate?.intercept === true && enabled && status === "ready" && rows.length > 0;
+
+  // One impression per mount, only when the gated state actually rendered.
+  const paywallTrackedRef = useRef(false);
+  useEffect(() => {
+    if (!showCreditsNote || paywallTrackedRef.current) return;
+    paywallTrackedRef.current = true;
+    trackFunnelEvent("paywall_viewed", { surface: ALERT_DOCTOR_CREDIT_GATE_SURFACE });
+  }, [showCreditsNote]);
 
   return (
     <Card data-testid="plant-assigned-tent-alerts-panel" className="mt-4">
@@ -258,11 +322,27 @@ export default function PlantAssignedTentAlertsPanel({ tentId, tentName, growId,
             No open alerts for this assigned tent.
           </p>
         ) : (
-          <ul className="space-y-2" data-testid="plant-assigned-tent-alerts-list">
-            {rows.map((r) => (
-              <AlertRowItem key={r.id} row={r} plantId={plantId ?? null} tentId={tentId ?? null} />
-            ))}
-          </ul>
+          <>
+            {showCreditsNote ? (
+              <p
+                className="mb-2 text-xs text-muted-foreground"
+                data-testid="plant-assigned-tent-alerts-credits-note"
+              >
+                {doctorCreditGate!.note}
+              </p>
+            ) : null}
+            <ul className="space-y-2" data-testid="plant-assigned-tent-alerts-list">
+              {rows.map((r) => (
+                <AlertRowItem
+                  key={r.id}
+                  row={r}
+                  plantId={plantId ?? null}
+                  tentId={tentId ?? null}
+                  creditGate={doctorCreditGate ?? null}
+                />
+              ))}
+            </ul>
+          </>
         )}
       </CardContent>
     </Card>

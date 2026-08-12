@@ -73,6 +73,9 @@ import {
 } from "@/lib/archivedPlantVisibilityRules";
 import { Button } from "@/components/ui/button";
 import { useGrowPlant, useGrowTent, getGrowDataMeta } from "@/hooks/useGrowData";
+import { useMyEntitlements } from "@/hooks/useMyEntitlements";
+import { useAiDoctorGrowCreditsUsed } from "@/hooks/useAiDoctorGrowCreditsUsed";
+import { buildAlertDoctorCreditGate } from "@/lib/alertDoctorCreditGateRules";
 import { useAuth } from "@/store/auth";
 import { format, formatDistanceToNow } from "date-fns";
 
@@ -260,6 +263,26 @@ export default function PlantDetail() {
   const plantGalleryPhotoCount = usePlantGalleryPhotoCount(plant?.id ?? null);
   const plantMeta = getGrowDataMeta(["grow", "plant", id ?? null], user?.id);
   const tentMeta = getGrowDataMeta(["grow", "tent", plant?.tentId ?? null], user?.id);
+
+  // Presentation-only reads for the tent-alerts doctor-CTA credit gate.
+  // The usage query is enabled ONLY once the entitlement resolved to a
+  // per-grow-allotment (free-taste) plan — monthly-pool viewers never pay
+  // the read. Unresolved/failed lookups fail open inside the rules module.
+  const {
+    loading: entitlementLoading,
+    lookupFailed: entitlementLookupFailed,
+    entitlement,
+  } = useMyEntitlements();
+  const entitlementReady = !entitlementLoading && !entitlementLookupFailed;
+  const perGrowAiCredits = entitlement.capabilities.aiCreditsPerGrow;
+  const { data: doctorCreditsUsed } = useAiDoctorGrowCreditsUsed(
+    entitlementReady && typeof perGrowAiCredits === "number" ? (plant?.growId ?? null) : null,
+  );
+  const doctorCreditGate = buildAlertDoctorCreditGate({
+    aiCreditsPerGrow: perGrowAiCredits,
+    entitlementReady,
+    creditsUsed: doctorCreditsUsed,
+  });
 
   // Bounded-loading guard: if the plant query never settles (slow network,
   // hung Supabase request, etc.) we must not leave the grower on a blank
@@ -769,6 +792,7 @@ export default function PlantDetail() {
             tentName={tent?.name ?? null}
             growId={plant.growId ?? null}
             plantId={plant.id}
+            doctorCreditGate={doctorCreditGate}
           />
         </div>
         <div

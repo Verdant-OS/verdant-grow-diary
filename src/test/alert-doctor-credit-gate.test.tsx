@@ -1,0 +1,323 @@
+/**
+ * alert_doctor_credit gate — out-of-credits interception on the tent-alerts
+ * "Ask AI Doctor" row action.
+ *
+ * When a FREE grow's fixed AI Doctor allotment is spent, the doctor CTA is
+ * a dead end (the review section can only show the server-side quota
+ * denial), so the row action swaps — honestly labeled — to the pricing
+ * surface, with one calm reason line at panel level. These tests pin:
+ *
+ *  - the pure gate rules: fail-open on every unresolved input, free-plan
+ *    eligibility via the aiCreditsPerGrow capability (never a plan-string
+ *    comparison), and "low" state deliberately NOT intercepting;
+ *  - the swap itself: doctor CTA replaced by a /pricing link, reason note
+ *    rendered, both id-free;
+ *  - the funnel wiring: paywall_cta_clicked on click and ONE deduped
+ *    paywall_viewed impression per mount, only when the gated state
+ *    actually rendered;
+ *  - the fallback: no gate prop / intercept=false → the panel behaves
+ *    exactly as before (alert_doctor_cta_clicked path untouched);
+ *  - PlantDetail wiring: gate computed from presentation-only reads, with
+ *    the usage query enabled only for resolved per-grow-allotment plans.
+ */
+import type { ReactNode } from "react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { render, screen, fireEvent } from "@testing-library/react";
+import { MemoryRouter } from "@/lib/react-router-compat";
+
+const spies = vi.hoisted(() => ({ track: vi.fn() }));
+
+vi.mock("@/lib/funnelAnalytics", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/lib/funnelAnalytics")>();
+  return { ...real, trackFunnelEvent: spies.track };
+});
+
+import {
+  ALERT_DOCTOR_CREDIT_GATE_SURFACE,
+  buildAlertDoctorCreditGate,
+  type AlertDoctorCreditGateView,
+} from "@/lib/alertDoctorCreditGateRules";
+import {
+  AI_DOCTOR_CREDITS_TEASER_COPY,
+  AI_DOCTOR_CREDITS_TEASER_CTA_LABEL,
+} from "@/lib/aiDoctorCreditsExhaustedTeaserRules";
+import { paywallCtaHasBannedWords } from "@/lib/paywallCtaViewModel";
+import { sanitizeFunnelParams } from "@/lib/funnelAnalytics";
+import { enforceFunnelEventSchema } from "@/lib/funnelEventSchema";
+
+const mocks = vi.hoisted(() => ({ rows: [] as unknown[] }));
+
+vi.mock("@/hooks/usePlantAssignedTentAlerts", () => ({
+  usePlantAssignedTentAlerts: () => ({ status: "ready", rows: mocks.rows }),
+}));
+
+vi.mock("@/components/ui/card", () => {
+  const P = ({ children, ...r }: { children?: ReactNode; [k: string]: unknown }) => (
+    <div {...r}>{children}</div>
+  );
+  return { Card: P, CardContent: P, CardHeader: P, CardTitle: P };
+});
+
+import PlantAssignedTentAlertsPanel from "@/components/PlantAssignedTentAlertsPanel";
+
+const ROOT = resolve(__dirname, "../..");
+const read = (p: string) => readFileSync(resolve(ROOT, p), "utf8");
+
+const ROW = {
+  id: "alert-1",
+  title: "Temperature high",
+  reason: "28.4C above the flower band",
+  severity: "warning" as const,
+  severityLabel: "Warning",
+  metric: "temp",
+  status: "open" as const,
+  lastSeenAt: null,
+};
+
+const INTERCEPT_GATE: AlertDoctorCreditGateView = buildAlertDoctorCreditGate({
+  aiCreditsPerGrow: 3,
+  entitlementReady: true,
+  creditsUsed: 3,
+});
+
+function renderPanel(gate: AlertDoctorCreditGateView | null | undefined) {
+  return render(
+    <MemoryRouter initialEntries={["/plants/plant-1"]}>
+      <PlantAssignedTentAlertsPanel
+        tentId="tent-1"
+        tentName="Flower Tent"
+        growId="grow-1"
+        plantId="plant-1"
+        doctorCreditGate={gate}
+      />
+    </MemoryRouter>,
+  );
+}
+
+beforeEach(() => {
+  spies.track.mockClear();
+  mocks.rows = [ROW];
+});
+
+describe("buildAlertDoctorCreditGate — pure rules", () => {
+  it("intercepts exactly when a resolved free allotment is exhausted", () => {
+    expect(INTERCEPT_GATE.intercept).toBe(true);
+    expect(INTERCEPT_GATE.href).toBe("/pricing");
+    expect(INTERCEPT_GATE.note).toBe(AI_DOCTOR_CREDITS_TEASER_COPY);
+    expect(INTERCEPT_GATE.ctaLabel).toBe(AI_DOCTOR_CREDITS_TEASER_CTA_LABEL);
+  });
+
+  it("intercepts when usage overshot a since-reduced allotment", () => {
+    const v = buildAlertDoctorCreditGate({
+      aiCreditsPerGrow: 3,
+      entitlementReady: true,
+      creditsUsed: 5,
+    });
+    expect(v.intercept).toBe(true);
+  });
+
+  it("does NOT intercept on the LOW state — a remaining credit keeps a working CTA", () => {
+    const v = buildAlertDoctorCreditGate({
+      aiCreditsPerGrow: 3,
+      entitlementReady: true,
+      creditsUsed: 2,
+    });
+    expect(v.intercept).toBe(false);
+  });
+
+  it("fails open while the entitlement is unresolved or failed", () => {
+    const v = buildAlertDoctorCreditGate({
+      aiCreditsPerGrow: 3,
+      entitlementReady: false,
+      creditsUsed: 3,
+    });
+    expect(v.intercept).toBe(false);
+  });
+
+  it("fails open while usage has not loaded", () => {
+    const v = buildAlertDoctorCreditGate({
+      aiCreditsPerGrow: 3,
+      entitlementReady: true,
+      creditsUsed: undefined,
+    });
+    expect(v.intercept).toBe(false);
+  });
+
+  it("never intercepts monthly-pool plans (aiCreditsPerGrow null)", () => {
+    const v = buildAlertDoctorCreditGate({
+      aiCreditsPerGrow: null,
+      entitlementReady: true,
+      creditsUsed: 999,
+    });
+    expect(v.intercept).toBe(false);
+  });
+
+  it("treats a zero/negative allotment as unresolved, not as exhausted", () => {
+    expect(
+      buildAlertDoctorCreditGate({
+        aiCreditsPerGrow: 0,
+        entitlementReady: true,
+        creditsUsed: 0,
+      }).intercept,
+    ).toBe(false);
+  });
+
+  it("is deterministic", () => {
+    const a = buildAlertDoctorCreditGate({
+      aiCreditsPerGrow: 3,
+      entitlementReady: true,
+      creditsUsed: 3,
+    });
+    const b = buildAlertDoctorCreditGate({
+      aiCreditsPerGrow: 3,
+      entitlementReady: true,
+      creditsUsed: 3,
+    });
+    expect(a).toEqual(b);
+  });
+
+  it("gate copy and CTA label are calm — no banned marketing words", () => {
+    expect(paywallCtaHasBannedWords(INTERCEPT_GATE.note)).toBe(false);
+    expect(paywallCtaHasBannedWords(INTERCEPT_GATE.ctaLabel)).toBe(false);
+  });
+
+  it("the funnel surface token survives the real sanitizer chain on both events", () => {
+    // Vacuity check: a surface token that the sanitizer or per-event schema
+    // rejected would silently strip, leaving impressions with empty props.
+    for (const event of ["paywall_viewed", "paywall_cta_clicked"] as const) {
+      const out = enforceFunnelEventSchema(
+        event,
+        sanitizeFunnelParams({ surface: ALERT_DOCTOR_CREDIT_GATE_SURFACE }),
+      );
+      expect(out).toEqual({ surface: ALERT_DOCTOR_CREDIT_GATE_SURFACE });
+    }
+  });
+});
+
+describe("panel interception — behavior", () => {
+  it("swaps the doctor CTA for the plans link and renders the reason note", () => {
+    renderPanel(INTERCEPT_GATE);
+    expect(screen.queryByTestId("plant-assigned-tent-alert-ask-doctor")).toBeNull();
+    const plans = screen.getByTestId("plant-assigned-tent-alert-doctor-plans");
+    expect(plans.getAttribute("href")).toBe("/pricing");
+    expect(plans.textContent).toContain(AI_DOCTOR_CREDITS_TEASER_CTA_LABEL);
+    expect(screen.getByTestId("plant-assigned-tent-alerts-credits-note").textContent).toBe(
+      AI_DOCTOR_CREDITS_TEASER_COPY,
+    );
+    // The row's other affordances are untouched.
+    expect(screen.getByTestId("plant-assigned-tent-alert-view")).toBeInTheDocument();
+    expect(screen.getByTestId("plant-assigned-tent-alert-target-band")).toBeInTheDocument();
+  });
+
+  it("reports the click as paywall_cta_clicked with the fixed id-free surface", () => {
+    renderPanel(INTERCEPT_GATE);
+    fireEvent.click(screen.getByTestId("plant-assigned-tent-alert-doctor-plans"));
+    const clicks = spies.track.mock.calls.filter(([name]) => name === "paywall_cta_clicked");
+    expect(clicks).toHaveLength(1);
+    expect(clicks[0][1]).toEqual({ surface: ALERT_DOCTOR_CREDIT_GATE_SURFACE });
+    // Never the doctor navigation event — the grower did not reach the review.
+    expect(spies.track.mock.calls.map(([n]) => n)).not.toContain("alert_doctor_cta_clicked");
+    const serialized = JSON.stringify(spies.track.mock.calls);
+    expect(serialized).not.toContain("alert-1");
+    expect(serialized).not.toContain("plant-1");
+    expect(serialized).not.toContain("tent-1");
+    expect(serialized).not.toContain("grow-1");
+  });
+
+  it("fires ONE paywall_viewed impression per mount, only when rows rendered", () => {
+    const view = renderPanel(INTERCEPT_GATE);
+    const impressions = () => spies.track.mock.calls.filter(([name]) => name === "paywall_viewed");
+    expect(impressions()).toHaveLength(1);
+    expect(impressions()[0][1]).toEqual({ surface: ALERT_DOCTOR_CREDIT_GATE_SURFACE });
+    // Re-render must not double-count the impression.
+    view.rerender(
+      <MemoryRouter initialEntries={["/plants/plant-1"]}>
+        <PlantAssignedTentAlertsPanel
+          tentId="tent-1"
+          tentName="Flower Tent"
+          growId="grow-1"
+          plantId="plant-1"
+          doctorCreditGate={INTERCEPT_GATE}
+        />
+      </MemoryRouter>,
+    );
+    expect(impressions()).toHaveLength(1);
+  });
+
+  it("no impression when there are no alert rows to gate", () => {
+    mocks.rows = [];
+    renderPanel(INTERCEPT_GATE);
+    expect(spies.track.mock.calls.map(([n]) => n)).not.toContain("paywall_viewed");
+    expect(screen.queryByTestId("plant-assigned-tent-alerts-credits-note")).toBeNull();
+  });
+
+  it("intercept=false leaves the panel exactly as before — doctor CTA and its event intact", () => {
+    const openGate = buildAlertDoctorCreditGate({
+      aiCreditsPerGrow: 3,
+      entitlementReady: true,
+      creditsUsed: 1,
+    });
+    renderPanel(openGate);
+    expect(screen.queryByTestId("plant-assigned-tent-alert-doctor-plans")).toBeNull();
+    expect(screen.queryByTestId("plant-assigned-tent-alerts-credits-note")).toBeNull();
+    fireEvent.click(screen.getByTestId("plant-assigned-tent-alert-ask-doctor"));
+    const names = spies.track.mock.calls.map(([n]) => n);
+    expect(names).toContain("alert_doctor_cta_clicked");
+    expect(names).not.toContain("paywall_viewed");
+    expect(names).not.toContain("paywall_cta_clicked");
+  });
+
+  it("an omitted gate prop keeps today's behavior for callers that do not resolve credits", () => {
+    renderPanel(undefined);
+    expect(screen.getByTestId("plant-assigned-tent-alert-ask-doctor")).toBeInTheDocument();
+    expect(screen.queryByTestId("plant-assigned-tent-alert-doctor-plans")).toBeNull();
+    expect(spies.track.mock.calls.map(([n]) => n)).not.toContain("paywall_viewed");
+  });
+
+  it("Stage Targets keeps its own event while the doctor CTA is intercepted", () => {
+    renderPanel(INTERCEPT_GATE);
+    fireEvent.click(screen.getByTestId("plant-assigned-tent-alert-target-band"));
+    const names = spies.track.mock.calls.map(([n]) => n);
+    expect(names).toContain("blueprint_cta_clicked");
+    expect(names).not.toContain("paywall_cta_clicked");
+  });
+});
+
+describe("wiring guardrails", () => {
+  const PANEL = read("src/components/PlantAssignedTentAlertsPanel.tsx");
+  const PLANT_DETAIL = read("src/pages/PlantDetail.tsx");
+
+  it("PlantDetail computes the gate from presentation-only reads and passes it to the panel", () => {
+    expect(PLANT_DETAIL).toMatch(/useMyEntitlements\(\)/);
+    expect(PLANT_DETAIL).toMatch(/buildAlertDoctorCreditGate\(\{/);
+    expect(PLANT_DETAIL).toMatch(/doctorCreditGate=\{doctorCreditGate\}/);
+    // The usage read is enabled ONLY once the entitlement resolved to a
+    // per-grow-allotment plan — monthly-pool viewers never pay the query.
+    expect(PLANT_DETAIL).toMatch(
+      /useAiDoctorGrowCreditsUsed\(\s*entitlementReady && typeof perGrowAiCredits === "number"\s*\?\s*\(plant\?\.growId \?\? null\)\s*:\s*null,?\s*\)/,
+    );
+    expect(PLANT_DETAIL).toMatch(
+      /const entitlementReady = !entitlementLoading && !entitlementLookupFailed;/,
+    );
+  });
+
+  it("the panel stays hook-free of data reads — the gate arrives as a prop", () => {
+    expect(PANEL).not.toMatch(/useMyEntitlements|useAiDoctorGrowCreditsUsed|useQuery\(/);
+    expect(PANEL).toMatch(/doctorCreditGate\?: AlertDoctorCreditGateView \| null/);
+  });
+
+  it("no plan-string gate anywhere in the slice — capability field only", () => {
+    const RULES = read("src/lib/alertDoctorCreditGateRules.ts");
+    for (const src of [PANEL, RULES]) {
+      expect(src).not.toMatch(/effectivePlanId\s*===|plan\s*===\s*["']/);
+    }
+    expect(RULES).toMatch(/typeof input\.aiCreditsPerGrow === "number"/);
+  });
+
+  it("the panel still writes nothing", () => {
+    expect(PANEL).not.toMatch(/\.insert\(|\.update\(|\.upsert\(|\.delete\(/);
+    expect(PANEL).not.toMatch(/functions\.invoke/);
+  });
+});

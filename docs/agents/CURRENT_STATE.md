@@ -113,11 +113,17 @@ Branch `claude/ecowitt-sensor-verify-98f1bd` (based on `main`). Records:
 `docs/ecowitt-real-ingest-phase-1-8-grounding-audit.md` (deploy-branch-verified; corrects
 stale schema claims in the earlier two).
 
+Phase 1.8 specification drafted: `docs/ecowitt-real-ingest-phase-1-8-specification.md`,
+verdict `HOLD — approvable`. Blocked on owner decisions D2 (channel identity), D3
+(fail-open live default), D4 (stale persistence), and verification items V1–V4 (two need
+live-project access). Recommends ratifying the shipped dedupe index as the sole
+idempotency mechanism; no new schema.
+
 | Phase 2 gate item                             | Status                                    |
 | --------------------------------------------- | ----------------------------------------- |
 | 1. Wrapper tests pass                         | `PASS` — 22/22 targeted tests, 2026-08-07 |
 | 2. Token storage/rotation/revocation policy   | `BLOCKED` — Cheek (owner-only)            |
-| 3. Schema/RLS/idempotency audit (= Phase 1.8) | `NOT_STARTED`                             |
+| 3. Schema/RLS/idempotency audit (= Phase 1.8) | `HOLD` — spec drafted, see below          |
 | 4. Live-label fencing policy                  | `BLOCKED` — Cheek (owner-only)            |
 
 Persistence remains blocked. **`source='live'` is unreachable at Phase 1.7 by design** — the

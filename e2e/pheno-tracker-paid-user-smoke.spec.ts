@@ -253,7 +253,7 @@ test.describe("C2. Pro Annual access", () => {
   });
 });
 
-// ─── C3. Founder Lifetime can reach paid workspace ────────────────────────
+// ─── C3. Craft Monthly can reach paid workspace ──────────────────────────
 test.describe("C3. Craft Monthly access", () => {
   test.skip(!CRAFT_SESSION.path, CRAFT_SESSION.skipReason ?? "SKIPPED: no Craft session.");
   bindRoleSession(CRAFT_SESSION);

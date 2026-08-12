@@ -22,6 +22,7 @@ import PlantStatusStrip from "@/components/PlantStatusStrip";
 import QuickLogV2Fab from "@/components/QuickLogV2Fab";
 import PlantQuickStatusStrip from "@/components/PlantQuickStatusStrip";
 import PlantLogStreakMarker from "@/components/PlantLogStreakMarker";
+import PlantLabResultsPanel from "@/components/PlantLabResultsPanel";
 import AiDoctorCreditsExhaustedTeaser from "@/components/AiDoctorCreditsExhaustedTeaser";
 import PlantDetailQuickActions from "@/components/PlantDetailQuickActions";
 import PlantGrowContextRescueCard from "@/components/PlantGrowContextRescueCard";
@@ -213,6 +214,10 @@ function ArchivedTimelineReadOnlyView({
           <ManualSnapshotTimelineSection scope="plant" plantId={plant.id} />
           <QuickLogGroupedTimelineSection scope="plant" plantId={plant.id} tentId={plant.tentId} />
           <TimelineMemorySection scope="plant" plantId={plant.id} />
+          {/* Saved COA evidence stays reachable after archiving; add/delete
+              controls are suppressed in this read-only view. Keyed by plant
+              so a cached-route switch can never carry state across plants. */}
+          <PlantLabResultsPanel key={plant.id} plantId={plant.id} readOnly />
         </div>
       </div>
     </div>
@@ -759,6 +764,16 @@ export default function PlantDetail() {
             className="scroll-mt-16 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
           >
             <PlantAiDoctorSessionsPanel plantId={plant.id} />
+          </div>
+          <div
+            tabIndex={-1}
+            aria-label="Plant lab results section"
+            className="scroll-mt-16 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
+          >
+            {/* Keyed by plant: navigating between cached plant routes must
+                remount the panel so an open add-dialog draft for plant A can
+                never be saved under plant B. */}
+            <PlantLabResultsPanel key={plant.id} plantId={plant.id} />
           </div>
         </div>
       </div>

@@ -180,7 +180,13 @@ describe("diff-money-migration-prefixes.mjs — DB diff mode (exit 0)", () => {
     expect(invocation).toBeDefined();
     expect(invocation?.args.join(" ")).not.toContain(dbUrl);
     expect(invocation?.args.join(" ")).not.toContain("argv-canary-secret");
-    expect(invocation?.env).toEqual({ PGDATABASE: dbUrl });
+    expect(invocation?.env).toEqual({
+      PGHOST: "db.example",
+      PGUSER: "money_user",
+      PGPASSWORD: "argv-canary-secret",
+      PGDATABASE: "verdant",
+      PGGSSENCMODE: "disable",
+    });
   });
 });
 

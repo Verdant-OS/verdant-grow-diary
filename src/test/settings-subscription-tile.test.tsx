@@ -48,6 +48,13 @@ vi.mock("@/store/auth", () => ({
   useAuth: () => ({ user: { id: "u1", email: "u@example.com" }, signOut: vi.fn() }),
 }));
 
+// This suite owns the subscription tile. Keep the unrelated referral-code
+// fetch out of its render lifecycle so asynchronous referral state updates do
+// not obscure subscription assertions with React act warnings.
+vi.mock("@/components/RewardedReferralCard", () => ({
+  default: () => null,
+}));
+
 // The portal session is minted by the edge function via the supabase
 // client; mock the client so the ONLY sanctioned billing path is visible
 // to assertions (and the fetch guard below still catches any other call).

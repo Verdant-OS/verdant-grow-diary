@@ -18,8 +18,13 @@
   "rulesetId": 20421416,
   "rulesetName": "verdant-grow-diary merge queue",
   "branch": "verdant-grow-diary",
+  "enforcement": "active",
+  "refNameConditions": {
+    "include": ["refs/heads/verdant-grow-diary"],
+    "exclude": []
+  },
   "strictRequiredStatusChecksPolicy": true,
-  "capturedAt": "2026-08-07",
+  "capturedAt": "2026-08-10",
   "required": [
     "Full test suite (shard 1/32)",
     "Full test suite (shard 10/32)",

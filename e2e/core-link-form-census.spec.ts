@@ -37,6 +37,10 @@ import {
 } from "./lib/coreLinkFormCensus";
 
 const MOCKED_PROJECT = "chromium-mocked";
+// The census preserves exact hrefs before revisiting them. Keep the browser
+// clock stable so date-derived report links cannot change at midnight midway
+// through the exhaustive authenticated lane.
+const CORE_CENSUS_FIXED_TIME = "2026-08-11T12:00:00.000Z";
 const APP_ORIGIN = new URL(process.env.E2E_BASE_URL?.trim() || "http://localhost:5173").origin;
 // The exhaustive authenticated lane cold-boots the Vite-served app hundreds of
 // times. Late-lane boots can exceed 15 seconds on hosted runners even when the
@@ -1711,11 +1715,12 @@ async function runLaneCensus(
 }
 
 test.describe("core link and form census", () => {
-  test.beforeEach(() => {
+  test.beforeEach(async ({ page }) => {
     test.skip(
       test.info().project.name !== MOCKED_PROJECT,
       `core census runs once, under the ${MOCKED_PROJECT} project`,
     );
+    await page.clock.setFixedTime(CORE_CENSUS_FIXED_TIME);
   });
 
   test("audits every scheduled public page, visible field, and safe internal link", async ({

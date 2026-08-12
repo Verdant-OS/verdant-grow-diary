@@ -13,21 +13,23 @@ The smoke test covers:
 - `/compare` disabled until required evidence is present
 - `/compare` enabled once the hunt is comparison-ready
 
-Every scenario is env-gated: missing inputs skip cleanly with a printed
-reason. Nothing is faked.
+Every scenario is env-gated. When local Supabase runtime values are present
+but role credentials are absent, the orchestrator creates five disposable
+login-capable users and canonical subscription rows, then deletes them on
+every normal exit. Nothing is faked and hosted projects are always refused.
 
 ---
 
 ## Status vocabulary
 
-| Status     | Meaning                                                        |
-| ---------- | -------------------------------------------------------------- |
-| `PASS`     | Full paid-user smoke completed successfully.                   |
-| `FAIL`     | A stage failed (test, product, or configuration).              |
-| `BLOCKED`  | Fixture present but adapter/readiness cannot confirm hydration.|
-| `SKIPPED`  | Required local dependencies missing. Nothing was faked.        |
-| `SEEDABLE` | Local env present, fixture not seeded yet.                     |
-| `HYDRATED` | Comparison-ready fixture verified through real adapter code.   |
+| Status     | Meaning                                                         |
+| ---------- | --------------------------------------------------------------- |
+| `PASS`     | Full paid-user smoke completed successfully.                    |
+| `FAIL`     | A stage failed (test, product, or configuration).               |
+| `BLOCKED`  | Fixture present but adapter/readiness cannot confirm hydration. |
+| `SKIPPED`  | Required local dependencies missing. Nothing was faked.         |
+| `SEEDABLE` | Local env present, fixture not seeded yet.                      |
+| `HYDRATED` | Comparison-ready fixture verified through real adapter code.    |
 
 ## Safety rules
 
@@ -48,21 +50,30 @@ reason. Nothing is faked.
   `scoop install supabase`, or `npm i -g supabase`).
 - Repo dependencies installed with `bun install`.
 
-## B. Create local test accounts
+## B. Disposable role accounts (recommended)
 
-Sign up (via the app's `/auth` page, pointed at the local stack) four
-grower accounts. The seeder resolves the owner via
-`public.profiles.email`, so the address used to sign up must match.
+Do not create or store shared role credentials for the normal local or CI
+path. With `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` pointed at the
+loopback stack, `test:pheno-paid-smoke:local` automatically creates these
+five roles:
 
-| Role     | Suggested email               | Entitlement                     |
-| -------- | ----------------------------- | ------------------------------- |
-| Free     | `pheno-free@example.test`     | none                            |
-| Pro      | `pheno-pro@example.test`      | active Pro subscription         |
-| Founder  | `pheno-founder@example.test`  | Founder Lifetime (optional)     |
-| Canceled | `pheno-canceled@example.test` | canceled/expired billing record |
+| Role       | Suggested email                 | Entitlement                     |
+| ---------- | ------------------------------- | ------------------------------- |
+| Free       | `pheno-free@example.test`       | none                            |
+| Pro        | `pheno-pro@example.test`        | active Pro subscription         |
+| Pro Annual | `pheno-pro-annual@example.test` | active annual Pro subscription  |
+| Founder    | `pheno-founder@example.test`    | Founder Lifetime (optional)     |
+| Canceled   | `pheno-canceled@example.test`   | canceled/expired billing record |
 
-Give the Pro / Founder accounts the appropriate `billing_subscriptions`
-rows in your local DB (see `docs/e2e-tests.md` for the shape).
+Paid roles receive canonical `public.subscriptions` rows. Free receives no
+subscription row. Canceled receives an expired canceled row. The credentials
+exist only in the gitignored
+`e2e/.fixtures/pheno-paid-smoke-roles.env` file for the duration of the run;
+cleanup deletes the auth users and cascading application rows.
+
+Supplying the `E2E_PHENO_*_EMAIL` and `E2E_PHENO_*_PASSWORD` variables is
+still supported as an advanced debugging override. Those externally supplied
+accounts are never deleted by the orchestrator.
 
 ---
 
@@ -83,20 +94,6 @@ export SUPABASE_URL="http://127.0.0.1:54321"
 export SUPABASE_ANON_KEY="<local anon key from supabase status>"
 export SUPABASE_SERVICE_ROLE_KEY="<local service-role key from supabase status>"
 
-export E2E_PHENO_OWNER_EMAIL="pheno-owner@example.test"
-
-export E2E_PHENO_FREE_EMAIL="pheno-free@example.test"
-export E2E_PHENO_FREE_PASSWORD="<local test password>"
-
-export E2E_PHENO_PRO_EMAIL="pheno-pro@example.test"
-export E2E_PHENO_PRO_PASSWORD="<local test password>"
-
-export E2E_PHENO_FOUNDER_EMAIL="pheno-founder@example.test"
-export E2E_PHENO_FOUNDER_PASSWORD="<local test password>"
-
-export E2E_PHENO_CANCELED_EMAIL="pheno-canceled@example.test"
-export E2E_PHENO_CANCELED_PASSWORD="<local test password>"
-
 bun run test:pheno-paid-smoke:local
 ```
 
@@ -115,26 +112,13 @@ $env:SUPABASE_URL="http://127.0.0.1:54321"
 $env:SUPABASE_ANON_KEY="<local anon key from supabase status>"
 $env:SUPABASE_SERVICE_ROLE_KEY="<local service-role key from supabase status>"
 
-$env:E2E_PHENO_OWNER_EMAIL="pheno-owner@example.test"
-
-$env:E2E_PHENO_FREE_EMAIL="pheno-free@example.test"
-$env:E2E_PHENO_FREE_PASSWORD="<local test password>"
-
-$env:E2E_PHENO_PRO_EMAIL="pheno-pro@example.test"
-$env:E2E_PHENO_PRO_PASSWORD="<local test password>"
-
-$env:E2E_PHENO_FOUNDER_EMAIL="pheno-founder@example.test"
-$env:E2E_PHENO_FOUNDER_PASSWORD="<local test password>"
-
-$env:E2E_PHENO_CANCELED_EMAIL="pheno-canceled@example.test"
-$env:E2E_PHENO_CANCELED_PASSWORD="<local test password>"
-
 bun run test:pheno-paid-smoke:local
 ```
 
-The orchestrator runs seven stages: initial preflight → seed → load
-generated fixture env → post-seed hydration verify → session creation →
-Playwright smoke → final summary. Exit codes: **0** = PASS, **1** =
+The orchestrator provisions disposable roles when needed, then runs seven
+stages: initial preflight → seed → load generated fixture env → post-seed
+hydration verify → session creation → Playwright smoke → cleanup and final
+summary. Exit codes: **0** = PASS, **1** =
 FAIL, **2** = SKIPPED / BLOCKED (Playwright is not launched).
 
 ---
@@ -204,10 +188,10 @@ functions and refuses to advance if the fixture cannot resolve to
 
 ## F. Troubleshooting
 
-| Symptom                              | Fix                                               |
-| ------------------------------------ | ------------------------------------------------- |
-| Preflight prints `SKIPPED`           | Export the listed env vars.                       |
-| Seeder prints `REFUSED`              | You pointed at a hosted host. Use `127.0.0.1`.    |
-| Hydration verify prints `BLOCKED`    | Re-run the seeder; check owner email resolves.    |
-| Session generator prints `FAIL`      | Verify the account exists and can sign in via `/auth`. |
-| Playwright can't reach `/pheno-hunts`| Confirm `bun run dev` is serving `localhost:8080`.|
+| Symptom                               | Fix                                                    |
+| ------------------------------------- | ------------------------------------------------------ |
+| Preflight prints `SKIPPED`            | Export the listed env vars.                            |
+| Seeder prints `REFUSED`               | You pointed at a hosted host. Use `127.0.0.1`.         |
+| Hydration verify prints `BLOCKED`     | Re-run the seeder; check owner email resolves.         |
+| Session generator prints `FAIL`       | Verify the account exists and can sign in via `/auth`. |
+| Playwright can't reach `/pheno-hunts` | Confirm `bun run dev` is serving `localhost:8080`.     |

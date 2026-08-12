@@ -1,6 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import {
   clearLocalStorageForTest,
+  ensureLocalStorageForTest,
+  getLocalStorageMethodOwnerForTest,
   setLocalStorageItemForTest,
 } from "./helpers/localStorageTestHelper";
 import {
@@ -60,19 +62,20 @@ describe("tentPlantRosterPreferences", () => {
   });
 
   it("swallows storage errors on read and write", () => {
-    const original = window.localStorage.getItem;
-    const setOriginal = window.localStorage.setItem;
-    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
-      throw new Error("boom");
-    });
-    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
-      throw new Error("boom");
-    });
+    const storage = ensureLocalStorageForTest();
+    vi.spyOn(getLocalStorageMethodOwnerForTest(storage, "getItem"), "getItem").mockImplementation(
+      () => {
+        throw new Error("boom");
+      },
+    );
+    vi.spyOn(getLocalStorageMethodOwnerForTest(storage, "setItem"), "setItem").mockImplementation(
+      () => {
+        throw new Error("boom");
+      },
+    );
     expect(() => writeTentPlantRosterIncludeArchived("tent-a", true)).not.toThrow();
     expect(readTentPlantRosterIncludeArchived("tent-a")).toBe(false);
     vi.restoreAllMocks();
-    void original;
-    void setOriginal;
   });
 
   it("uses the documented per-tent key shape", () => {

@@ -84,6 +84,7 @@ import { Route as PartnersCsvPreviewRouteImport } from './routes/partners.csv-pr
 import { Route as SensorsCsvPreviewRouteImport } from './routes/sensors.csv-preview'
 import { Route as StrainsIndexRouteImport } from './routes/strains.index'
 import { Route as StrainsSlugRouteImport } from './routes/strains.$slug'
+import { Route as ToolsBlueprintTargetsRouteImport } from './routes/tools.blueprint-targets'
 import { Route as ToolsVpdCalculatorRouteImport } from './routes/tools.vpd-calculator'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 import { Route as AppOperatorDiagnosticsRouteImport } from './routes/_app/_operator/diagnostics'
@@ -528,6 +529,11 @@ const StrainsIndexRoute = StrainsIndexRouteImport.update({
 const StrainsSlugRoute = StrainsSlugRouteImport.update({
   id: '/strains/$slug',
   path: '/strains/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ToolsBlueprintTargetsRoute = ToolsBlueprintTargetsRouteImport.update({
+  id: '/tools/blueprint-targets',
+  path: '/tools/blueprint-targets',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ToolsVpdCalculatorRoute = ToolsVpdCalculatorRouteImport.update({
@@ -987,6 +993,7 @@ export interface FileRoutesByFullPath {
   '/partners/csv-preview': typeof PartnersCsvPreviewRoute
   '/sensors/csv-preview': typeof SensorsCsvPreviewRoute
   '/strains/$slug': typeof StrainsSlugRoute
+  '/tools/blueprint-targets': typeof ToolsBlueprintTargetsRoute
   '/tools/vpd-calculator': typeof ToolsVpdCalculatorRoute
   '/cultivars/': typeof CultivarsIndexRoute
   '/guides/': typeof GuidesIndexRoute
@@ -1130,6 +1137,7 @@ export interface FileRoutesByTo {
   '/partners/csv-preview': typeof PartnersCsvPreviewRoute
   '/sensors/csv-preview': typeof SensorsCsvPreviewRoute
   '/strains/$slug': typeof StrainsSlugRoute
+  '/tools/blueprint-targets': typeof ToolsBlueprintTargetsRoute
   '/tools/vpd-calculator': typeof ToolsVpdCalculatorRoute
   '/cultivars': typeof CultivarsIndexRoute
   '/guides': typeof GuidesIndexRoute
@@ -1277,6 +1285,7 @@ export interface FileRoutesById {
   '/partners/csv-preview': typeof PartnersCsvPreviewRoute
   '/sensors/csv-preview': typeof SensorsCsvPreviewRoute
   '/strains/$slug': typeof StrainsSlugRoute
+  '/tools/blueprint-targets': typeof ToolsBlueprintTargetsRoute
   '/tools/vpd-calculator': typeof ToolsVpdCalculatorRoute
   '/cultivars/': typeof CultivarsIndexRoute
   '/guides/': typeof GuidesIndexRoute
@@ -1423,6 +1432,7 @@ export interface FileRouteTypes {
     | '/partners/csv-preview'
     | '/sensors/csv-preview'
     | '/strains/$slug'
+    | '/tools/blueprint-targets'
     | '/tools/vpd-calculator'
     | '/cultivars/'
     | '/guides/'
@@ -1566,6 +1576,7 @@ export interface FileRouteTypes {
     | '/partners/csv-preview'
     | '/sensors/csv-preview'
     | '/strains/$slug'
+    | '/tools/blueprint-targets'
     | '/tools/vpd-calculator'
     | '/cultivars'
     | '/guides'
@@ -1712,6 +1723,7 @@ export interface FileRouteTypes {
     | '/partners/csv-preview'
     | '/sensors/csv-preview'
     | '/strains/$slug'
+    | '/tools/blueprint-targets'
     | '/tools/vpd-calculator'
     | '/cultivars/'
     | '/guides/'
@@ -1833,6 +1845,7 @@ export interface RootRouteChildren {
   PartnersCsvPreviewRoute: typeof PartnersCsvPreviewRoute
   SensorsCsvPreviewRoute: typeof SensorsCsvPreviewRoute
   StrainsSlugRoute: typeof StrainsSlugRoute
+  ToolsBlueprintTargetsRoute: typeof ToolsBlueprintTargetsRoute
   ToolsVpdCalculatorRoute: typeof ToolsVpdCalculatorRoute
   CultivarsIndexRoute: typeof CultivarsIndexRoute
   GuidesIndexRoute: typeof GuidesIndexRoute
@@ -2368,6 +2381,13 @@ declare module '@tanstack/react-router' {
       path: '/strains/$slug'
       fullPath: '/strains/$slug'
       preLoaderRoute: typeof StrainsSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tools/blueprint-targets': {
+      id: '/tools/blueprint-targets'
+      path: '/tools/blueprint-targets'
+      fullPath: '/tools/blueprint-targets'
+      preLoaderRoute: typeof ToolsBlueprintTargetsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/tools/vpd-calculator': {
@@ -3134,6 +3154,7 @@ const rootRouteChildren: RootRouteChildren = {
   PartnersCsvPreviewRoute: PartnersCsvPreviewRoute,
   SensorsCsvPreviewRoute: SensorsCsvPreviewRoute,
   StrainsSlugRoute: StrainsSlugRoute,
+  ToolsBlueprintTargetsRoute: ToolsBlueprintTargetsRoute,
   ToolsVpdCalculatorRoute: ToolsVpdCalculatorRoute,
   CultivarsIndexRoute: CultivarsIndexRoute,
   GuidesIndexRoute: GuidesIndexRoute,

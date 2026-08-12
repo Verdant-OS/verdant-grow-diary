@@ -90,6 +90,38 @@ export function sanitizeCheckoutReturnTo(value: string | null | undefined): stri
   }
 }
 
+/**
+ * Query param carrying a credit-pack buyer's origin. Deliberately NOT
+ * `returnTo`.
+ *
+ * /checkout/success auto-redirects on `returnTo` as soon as an active paid
+ * plan is confirmed — but that signal is ALREADY true for every pack buyer,
+ * because holding a paid plan is precisely what makes someone eligible to buy
+ * a pack. The page's bounded "confirming…" poll offers no protection either: a
+ * pack credits a separate grant ledger asynchronously and never changes
+ * subscription state, so the condition being polled is satisfied on arrival.
+ *
+ * Reusing `returnTo` would therefore bounce the buyer straight back to the
+ * credit wall before their purchase landed, where an immediate retry is denied
+ * despite payment — and, with `replace: true`, without the confirmation page
+ * left in history. Under a separate param the buyer lands on the confirmation
+ * page and returns by their own click instead.
+ */
+export const CREDIT_PACK_RETURN_TO_PARAM = "packReturnTo";
+
+/**
+ * Success URL for a one-time credit-pack purchase. Same sanitization as every
+ * other return path; only the param name differs.
+ */
+export function buildCreditPackSuccessUrl(
+  origin: string,
+  returnTo: string | null | undefined,
+): string {
+  const base = `${origin}/checkout/success`;
+  const safe = sanitizeCheckoutReturnTo(returnTo);
+  return safe ? `${base}?${CREDIT_PACK_RETURN_TO_PARAM}=${encodeURIComponent(safe)}` : base;
+}
+
 /** Convenience: returns sanitized path or the caller-supplied fallback. */
 export function resolveCheckoutReturnTo(
   value: string | null | undefined,

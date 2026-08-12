@@ -31,7 +31,10 @@
  *   2 = BLOCKED
  */
 import { adaptPhenoHuntCandidates } from "../../src/lib/phenoHuntCandidateAdapter";
-import { derivePhenoCompareReadinessFromCandidates } from "../../src/lib/phenoComparisonActionState";
+import {
+  buildPhenoComparisonActionState,
+  derivePhenoCompareReadinessFromCandidates,
+} from "../../src/lib/phenoComparisonActionState";
 
 const SUPABASE_URL_ENVS = ["E2E_SUPABASE_URL", "SUPABASE_URL"];
 const SERVICE_ROLE_ENVS = ["SUPABASE_SERVICE_ROLE_KEY", "E2E_SUPABASE_SERVICE_ROLE_KEY"];
@@ -79,6 +82,7 @@ export interface VerifyRows {
     is_archived: boolean;
   }[];
   readonly scores: readonly { plant_id: string; traits: unknown; note: string | null }[];
+  readonly decisions?: readonly { plant_id: string; decision: string | null }[];
   readonly smoke: readonly {
     plant_id: string;
     flavor_descriptors: unknown;
@@ -189,14 +193,29 @@ export function verifyComparisonReadyRows(huntId: string, rows: VerifyRows): Ver
   });
 
   const candidatesWithExpression = candidates.filter((c) => !!c.expression).length;
-  const state = derivePhenoCompareReadinessFromCandidates(huntId, candidates);
+  const adapterState = derivePhenoCompareReadinessFromCandidates(huntId, candidates);
+  const workspaceState = buildPhenoComparisonActionState({
+    huntId,
+    candidateCount: candidates.length,
+    goalsSelected: 1,
+    allCandidatesHavePhenotypeNote: candidatesWithExpression === candidates.length,
+    anyPostHarvestObservation: (rows.decisions ?? []).some(
+      (row) => typeof row.decision === "string" && row.decision !== "undecided",
+    ),
+    anyPostCureObservation: rows.smoke.some(
+      (row) =>
+        (typeof row.verdict === "string" && row.verdict.trim().length > 0) ||
+        (Array.isArray(row.flavor_descriptors) && row.flavor_descriptors.length > 0) ||
+        (Array.isArray(row.effect_descriptors) && row.effect_descriptors.length > 0),
+    ),
+  });
 
   if (candidates.length < 2) {
     return {
       status: "BLOCKED",
       candidateCount: candidates.length,
       candidatesWithExpression,
-      readiness: state.readiness,
+      readiness: workspaceState.readiness,
       reason: "fewer than 2 candidates",
     };
   }
@@ -205,24 +224,33 @@ export function verifyComparisonReadyRows(huntId: string, rows: VerifyRows): Ver
       status: "BLOCKED",
       candidateCount: candidates.length,
       candidatesWithExpression,
-      readiness: state.readiness,
+      readiness: workspaceState.readiness,
       reason: "candidate has empty expression",
     };
   }
-  if (state.readiness !== "comparison_ready") {
+  if (adapterState.readiness !== "comparison_ready") {
     return {
       status: "BLOCKED",
       candidateCount: candidates.length,
       candidatesWithExpression,
-      readiness: state.readiness,
-      reason: `readiness=${state.readiness}`,
+      readiness: adapterState.readiness,
+      reason: `adapter_readiness=${adapterState.readiness}`,
+    };
+  }
+  if (workspaceState.readiness !== "comparison_ready") {
+    return {
+      status: "BLOCKED",
+      candidateCount: candidates.length,
+      candidatesWithExpression,
+      readiness: workspaceState.readiness,
+      reason: `workspace_readiness=${workspaceState.readiness}`,
     };
   }
   return {
     status: "HYDRATED",
     candidateCount: candidates.length,
     candidatesWithExpression,
-    readiness: state.readiness,
+    readiness: workspaceState.readiness,
     reason: null,
   };
 }
@@ -281,10 +309,15 @@ async function main() {
     finish("BLOCKED", lines);
   }
 
-  const [scoresRes, smokeRes, labsRes] = await Promise.all([
+  const [scoresRes, decisionsRes, smokeRes, labsRes] = await Promise.all([
     db
       .from("pheno_candidate_scores")
       .select("plant_id, traits, note")
+      .eq("hunt_id", huntId!)
+      .in("plant_id", plantIds),
+    db
+      .from("pheno_keeper_decisions")
+      .select("plant_id, decision")
       .eq("hunt_id", huntId!)
       .in("plant_id", plantIds),
     db
@@ -300,7 +333,7 @@ async function main() {
       .eq("hunt_id", huntId!)
       .in("plant_id", plantIds),
   ]);
-  if (scoresRes.error || smokeRes.error || labsRes.error) {
+  if (scoresRes.error || decisionsRes.error || smokeRes.error || labsRes.error) {
     lines.push("  FAIL  could not load evidence tables");
     finish("FAIL", lines);
   }
@@ -308,6 +341,7 @@ async function main() {
   const outcome = verifyComparisonReadyRows(huntId!, {
     plants,
     scores: (scoresRes.data ?? []) as VerifyRows["scores"],
+    decisions: (decisionsRes.data ?? []) as NonNullable<VerifyRows["decisions"]>,
     smoke: (smokeRes.data ?? []) as VerifyRows["smoke"],
     labs: (labsRes.data ?? []) as VerifyRows["labs"],
   });

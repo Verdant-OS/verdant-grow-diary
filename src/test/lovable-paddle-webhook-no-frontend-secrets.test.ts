@@ -33,20 +33,20 @@ function walk(dir: string, out: string[] = []): string[] {
 }
 
 describe("no server-only paddle secrets appear in src/", () => {
-  const files = walk("src");
+  // Read each eligible source file exactly once while Vitest registers this
+  // suite. The six assertions below then search an in-memory snapshot rather
+  // than competing for disk I/O six times during a full parallel run.
+  const files = walk("src")
+    .filter(
+      (file) =>
+        !/no-?frontend-secrets|paddle-readiness|no-secrets|client-secret|server-billing-env-trust/i.test(
+          file,
+        ),
+    )
+    .map((file) => ({ file, source: readFileSync(file, "utf8") }));
   for (const forbidden of FORBIDDEN) {
     it(`no src/ file references ${forbidden}`, () => {
-      const hits = files.filter((f) => {
-        // Static-scan tests themselves list the secret names as strings —
-        // exclude any test file that is itself a secret-boundary scan.
-        if (
-          /no-?frontend-secrets|paddle-readiness|no-secrets|client-secret|server-billing-env-trust/i.test(
-            f,
-          )
-        )
-          return false;
-        return readFileSync(f, "utf8").includes(forbidden);
-      });
+      const hits = files.filter(({ source }) => source.includes(forbidden)).map(({ file }) => file);
       expect(hits).toEqual([]);
     });
   }

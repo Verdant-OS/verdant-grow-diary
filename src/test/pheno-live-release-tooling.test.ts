@@ -45,6 +45,10 @@ const ROOT = process.cwd();
 const PREFLIGHT_SCRIPT = path.join(ROOT, "scripts/e2e/check-pheno-live-smoke-env.mjs");
 const RECEIPT_SCRIPT = path.join(ROOT, "scripts/releases/write-pheno-release-receipt.mjs");
 const RUNNER_SCRIPT = path.join(ROOT, "scripts/e2e/run-pheno-live-release-smoke.mjs");
+const SESSION_GENERATOR_SCRIPT = path.join(
+  ROOT,
+  "scripts/e2e/create-pheno-paid-smoke-sessions.mjs",
+);
 
 const SECRET_PASSWORD = "hunter2-super-secret-value";
 const SECRET_EMAIL = "pheno-live-test@example.com";
@@ -83,7 +87,10 @@ describe("live-smoke preflight (check-pheno-live-smoke-env.mjs)", () => {
   it("pins the fixed production target and confirmation phrase", () => {
     expect(PHENO_LIVE_URL).toBe("https://verdantgrowdiary.com");
     expect(PHENO_LIVE_CONFIRM_VALUE).toBe("RUN_LIVE_PHENO_SMOKE");
-    expect(PHENO_LIVE_REQUIRED_ENV).toHaveLength(11);
+    expect(PHENO_LIVE_REQUIRED_ENV).toHaveLength(13);
+    expect(PHENO_LIVE_REQUIRED_ENV).toEqual(
+      expect.arrayContaining(["E2E_PHENO_PRO_ANNUAL_EMAIL", "E2E_PHENO_PRO_ANNUAL_PASSWORD"]),
+    );
   });
 
   it("returns BLOCKED with exit 2 when every required input is missing", () => {
@@ -310,7 +317,14 @@ describe("live-smoke report module (pheno-live-smoke-report.mjs)", () => {
                 "Free user sees the upgrade gate on /pheno-hunts/new and the CTA returnTo round-trips to /pricing",
               tests: [{ status: "unexpected" }],
             },
-            { title: "Pro user can load /pheno-hunts/new", tests: [{ status: "skipped" }] },
+            {
+              title: "Pro Monthly user can load /pheno-hunts/new",
+              tests: [{ status: "skipped" }],
+            },
+            {
+              title: "Pro Annual user can load /pheno-hunts/new",
+              tests: [{ status: "skipped" }],
+            },
           ],
         },
       ],
@@ -700,6 +714,17 @@ describe("live release smoke runner (run-pheno-live-release-smoke.mjs)", () => {
   it("runs the live smoke with the authed project — never the mocked one", () => {
     expect(source).toContain("--project=chromium-authed");
     expect(source).not.toContain("chromium-mocked");
+  });
+
+  it("mints and passes a distinct Pro Annual session to the live smoke", () => {
+    expect(source).toContain(
+      'E2E_PHENO_PRO_ANNUAL_SESSION_FILE: "e2e/.auth/pheno-pro-annual.json"',
+    );
+    const sessionGenerator = fs.readFileSync(SESSION_GENERATOR_SCRIPT, "utf8");
+    expect(sessionGenerator).toContain('key: "pro-annual"');
+    expect(sessionGenerator).toContain('emailEnv: "E2E_PHENO_PRO_ANNUAL_EMAIL"');
+    expect(sessionGenerator).toContain('passEnv: "E2E_PHENO_PRO_ANNUAL_PASSWORD"');
+    expect(sessionGenerator).toContain('out: "pheno-pro-annual.json"');
   });
 
   it("pins the production target and never seeds production", () => {

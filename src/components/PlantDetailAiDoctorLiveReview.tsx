@@ -518,6 +518,21 @@ function PlantDetailAiDoctorLiveReviewScope({
     }
   }, [creditNoticeKind]);
 
+  // Top-up impression. "wait" is exactly the branch that renders the pack
+  // link — the view model sets packHref unconditionally there — so this
+  // counts CTAs actually shown, not denials in general. Kept separate from
+  // paywall_viewed above because this viewer already pays; counting them as
+  // an upgrade impression would inflate the upgrade funnel.
+  useEffect(() => {
+    if (creditNoticeKind === "wait") {
+      trackFunnelEvent("credit_pack_cta_viewed", { surface: "ai_doctor_limit" });
+    }
+  }, [creditNoticeKind]);
+
+  const handleBuyCreditsClick = useCallback(() => {
+    trackFunnelEvent("credit_pack_cta_clicked", { surface: "ai_doctor_limit" });
+  }, []);
+
   // This is intentionally an explicit CTA-intent marker, not a checkout or
   // entitlement signal. AiCreditLimitNotice attaches it only to the Free
   // denial's rendered pricing CTA; paid/founder/unknown notices have no CTA.
@@ -837,6 +852,7 @@ function PlantDetailAiDoctorLiveReviewScope({
             surface="doctor"
             returnTo={reviewReturnTo}
             onUpsellCtaClick={handleCreditLimitPlansClick}
+            onBuyCreditsClick={handleBuyCreditsClick}
             data-testid="plant-ai-doctor-live-review-credit-denied"
           />
         ) : review.reason === "upstream_credit_exhausted" ? (

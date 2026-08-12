@@ -166,13 +166,27 @@ export async function getAlertById(id: string): Promise<AlertRow | null> {
 export interface AlertsQuery {
   growId?: string | null;
   status?: AlertStatusRow | "all";
+  /**
+   * Match any one of several statuses (server-side `.in(...)`).
+   *
+   * Exists so a caller that treats more than one status as "still active" can
+   * say so in the query instead of fetching every row and discarding most of
+   * them client-side. Filtering server-side also keeps the result set from
+   * being crowded out by closed rows if the server caps returned rows.
+   *
+   * Takes precedence over `status` when both are supplied. An empty array is
+   * ignored (it would match nothing, which is never what a caller means).
+   */
+  statuses?: readonly AlertStatusRow[];
   severity?: AlertSeverityRow | "all";
 }
 
 export async function listAlerts(query: AlertsQuery = {}): Promise<AlertRow[]> {
   let q = alertsTable().select("*").order("first_seen_at", { ascending: false });
   if (query.growId) q = q.eq("grow_id", query.growId);
-  if (query.status && query.status !== "all") q = q.eq("status", query.status);
+  if (query.statuses && query.statuses.length > 0) {
+    q = q.in("status", [...query.statuses]);
+  } else if (query.status && query.status !== "all") q = q.eq("status", query.status);
   if (query.severity && query.severity !== "all") {
     q = q.eq("severity", query.severity);
   }

@@ -1,10 +1,11 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-07 UTC / 2026-08-07 America/Chicago
-**Updated by:** Claude (operating-state refresh: branch topology, deploy-head tip
-movement, and agent assignment re-verified against `git fetch origin` on 2026-08-07.
-SEO/analytics facts below retain their 2026-08-02 verification dates, and release
-identity its 2026-08-05 date; none of them were re-measured in this refresh)
+**Last updated:** 2026-08-11 UTC / 2026-08-11 America/Chicago
+**Updated by:** Claude (records merged out-of-slice #885 — the agent-integrations
+MCP publication audit doc — and refreshes the deploy-head row against
+`git fetch origin` on 2026-08-11. `main`, SEO/analytics facts, and release
+identity retain their earlier verification dates; none were re-measured in
+this update)
 
 This is the changing shift report. Permanent rules live in `/AGENTS.md`; do not edit
 that constitution to record branch, deployment, blocker, or assignment changes.
@@ -19,7 +20,7 @@ inside the active governance handoff.
 
 | Branch               | Role                                             | Verified head                                                                                                                                                               |
 | -------------------- | ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `verdant-grow-diary` | **Deploy branch. Production ships from here.**   | `c09b33d95ed2290c3364e54c77d5d980eb4e714a` (#814), verified 2026-08-07 after `git fetch origin`; the queue advances it several times daily — re-verify before relying on it |
+| `verdant-grow-diary` | **Deploy branch. Production ships from here.**   | `1a9082bb1` (#885), verified 2026-08-11 after `git fetch origin`; the queue advances it several times daily — re-verify before relying on it |
 | `main`               | Integration branch. It is not production parity. | `b6d747941948ce68157185a2b0847acea6970d44` (#779), verified 2026-08-07                                                                                                      |
 
 `main` and `verdant-grow-diary` are divergent. Do not infer production behavior from
@@ -182,6 +183,27 @@ observation and carries no implication about production.
 `scripts/apply-pinned-production-migrations.mjs` is SHA-pinned to three 2026-07-28 files
 and does not cover these two.
 
+**Completed, out of slice (recorded 2026-08-11):** #885 agent-integrations MCP
+publication audit.
+[PR #885](https://github.com/Verdant-OS/verdant-grow-diary/pull/885) merged
+2026-08-11 via the merge queue as squash `1a9082bb1`. Documentation only — it adds
+`docs/agent-integrations-mcp-server-spec.md` and changes no runtime, tool, schema,
+or manifest code. Authoring agent **is** determinable for this one: Claude, in a
+Claude Code session tasked with Lovable's "publish your app as an MCP server" flow,
+while this file listed Claude as Unassigned. The audit found the MCP server itself
+already shipped (PR #253, fixes #255/#256/#363) and needed no new implementation;
+the doc records the three read-only tool contracts, the OAuth access model, the
+pinned-surface change-control rule (repo-wide search for existing tool names before
+any tool change), PASS/HOLD/REJECT expansion gates (Action Queue mutation, device
+control, and no-login access all REJECT), and two sensor-contract gaps recorded as
+specified-but-unapproved follow-up slices: `McpSensorReading` carries no
+`confidence` field, and noncanonical legacy `source` labels (`sim`, vendor names)
+pass through verbatim to connecting assistants. Live publication state (Lovable
+Active status, OAuth 2.1 dashboard setting, endpoint reachability) remains
+`BLOCKED` from agent sessions — the doc's §6 lists the owner actions. Five rounds
+of automated (Codex-connector) inline review were verified against source and
+addressed pre-merge. This entry records the work; it does not open a new slice.
+
 In scope — these bullets scope the **Mode A SEO parent program above**, not the completed
 #809 entry:
 
@@ -281,7 +303,7 @@ write is approved by this state file.
 | Agent             | Assignment                                                   |
 | ----------------- | ------------------------------------------------------------ |
 | Codex             | Standing SEO measurement readiness and analytics integrity   |
-| Claude            | Unassigned — see completed out-of-slice #586/#809/#812 above |
+| Claude            | Unassigned — see completed out-of-slice #586/#809/#812 and #885 above |
 | Grok              | Unassigned                                                   |
 | Security reviewer | Unassigned                                                   |
 | Gemini            | Unassigned                                                   |

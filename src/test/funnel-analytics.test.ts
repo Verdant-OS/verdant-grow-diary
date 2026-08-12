@@ -41,6 +41,11 @@ describe("event name contract", () => {
       "ai_doctor_session_saved",
       "paywall_viewed",
       "paywall_cta_clicked",
+      // Top-up funnel, deliberately distinct from the paywall pair above: it
+      // fires for a grower who already pays, so folding it into the upgrade
+      // events would inflate that funnel with existing subscribers.
+      "credit_pack_cta_viewed",
+      "credit_pack_cta_clicked",
       "checkout_started",
       // Catalog / recovery funnel. A buyer who reached checkout and could not
       // complete it is a distinct, revenue-relevant drop-off from one who

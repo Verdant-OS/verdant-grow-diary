@@ -38,12 +38,18 @@ export function useOtherGrowPendingActionCount(
   scopedGrowId: string | null | undefined,
 ): OtherGrowPendingState {
   const { user } = useAuth();
+  // Depend on the id, never the user object. Auth stores (and test mocks in
+  // particular) hand back a fresh object each render; keying `load` off that
+  // identity gives the effect a new dependency every render, which refires it,
+  // sets state, re-renders, and loops forever — hanging any test that mounts
+  // this component rather than failing it.
+  const userId = user?.id ?? null;
   const [state, setState] = useState<OtherGrowPendingState>({ status: "idle" });
 
   const load = useCallback(async () => {
     // With no grow in scope the queue is already showing every grow the user
     // can see, so "other grows" is not a meaningful question.
-    if (!user || !scopedGrowId) {
+    if (!userId || !scopedGrowId) {
       setState({ status: "idle" });
       return;
     }
@@ -70,7 +76,7 @@ export function useOtherGrowPendingActionCount(
     } catch {
       setState({ status: "unavailable" });
     }
-  }, [user, scopedGrowId]);
+  }, [userId, scopedGrowId]);
 
   useEffect(() => {
     void load();

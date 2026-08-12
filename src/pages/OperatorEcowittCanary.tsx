@@ -586,7 +586,6 @@ export function CloudCanaryPreviewPanel() {
       window.setTimeout(() => setCopied(false), 1500);
     } catch (e) {
       toast.error("Could not copy JSON to clipboard.");
-      // eslint-disable-next-line no-console
       console.warn("[cloud-canary-preview] copy failed", e);
     }
   };
@@ -1334,7 +1333,6 @@ export default function OperatorEcowittCanary() {
       toast.success("Redacted JSON copied.");
     } catch (e) {
       toast.error("Could not copy JSON to clipboard.");
-      // eslint-disable-next-line no-console
       console.warn("[operator-ecowitt] copy JSON failed", e);
     }
   };

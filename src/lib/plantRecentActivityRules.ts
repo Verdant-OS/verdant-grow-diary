@@ -82,9 +82,19 @@ function toRow(
     // QuickLog does not currently persist a source label on the snapshot.
     // We never invent one — leave null unless future writers store it.
     snapshotSourceLabel: null,
-    // Quick Log entries are the only manual diary writers today. We rely on
-    // the deterministic event_type tag from quickLogRules.QUICK_LOG_EVENT_TYPE.
-    isManualEntry: entry.eventType === "quick_log",
+    // Quick Log entries are the only manual diary writers today. The legacy
+    // PlantQuickLog path tags rows with the deterministic event_type from
+    // quickLogRules.QUICK_LOG_EVENT_TYPE ("quick_log"), but
+    // quicklog_save_event's companion rows (Training/Photo/etc.) carry their
+    // own real activity as event_type instead -- checking for its own
+    // markers (quick_log_version, linked_grow_event_id, both set
+    // unconditionally by that RPC's diary mirror, see
+    // ...trust_boundary_hardening.sql:284-294) keeps those rows correctly
+    // badged without weakening the existing "quick_log" signal.
+    isManualEntry:
+      entry.eventType === "quick_log" ||
+      entry.details.extras?.quick_log_version != null ||
+      entry.details.extras?.linked_grow_event_id != null,
     warnings: entry.warnings,
     hasHardwareReadings: split.hasHardwareBlock,
     hardwareReadingLines: split.hardwareLines,

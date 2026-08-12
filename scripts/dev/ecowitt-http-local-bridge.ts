@@ -240,7 +240,6 @@ export async function handleRequest(
   const msg = buildMqttMessage(parsed, flags.topic, now);
 
   if (flags.showRaw) {
-    // eslint-disable-next-line no-console
     console.warn(
       "[ecowitt-http-bridge] WARNING --show-raw is enabled. Raw payload may contain device identifiers. Local debugging only.",
     );
@@ -285,7 +284,6 @@ function safeLog(event: string, fields: Record<string, unknown>): void {
     else if (typeof v === "string" && /^(vbt_|sk_|sbp_)/.test(v)) safe[k] = "(redacted)";
     else safe[k] = v;
   }
-  // eslint-disable-next-line no-console
   console.log(`[ecowitt-http-bridge] ${event}`, safe);
 }
 

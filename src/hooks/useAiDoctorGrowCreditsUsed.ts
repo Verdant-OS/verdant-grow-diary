@@ -21,11 +21,23 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 
+/**
+ * Single source of truth for this query's cache key, so a successful spend
+ * elsewhere (see useAiDoctorLiveReview) can invalidate the exact same key
+ * instead of hand-typing a copy that can drift out of sync.
+ */
+export function aiDoctorGrowCreditsUsedQueryKey(
+  userId: string | null | undefined,
+  growId: string | null | undefined,
+) {
+  return ["ai_credit_spends", "grow_used", userId ?? null, growId ?? null] as const;
+}
+
 export function useAiDoctorGrowCreditsUsed(growId: string | null | undefined) {
   const { user } = useAuth();
 
   return useQuery<number>({
-    queryKey: ["ai_credit_spends", "grow_used", user?.id ?? null, growId ?? null],
+    queryKey: aiDoctorGrowCreditsUsedQueryKey(user?.id, growId),
     enabled: !!user && !!growId,
     queryFn: async () => {
       const { data, error } = await supabase

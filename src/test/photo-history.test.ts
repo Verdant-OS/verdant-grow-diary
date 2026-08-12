@@ -134,6 +134,26 @@ describe("buildPhotoHistory", () => {
     expect(rows[0].caption).toBe("");
   });
 
+  it("prefers the structured Photo caption (details.caption) over the general note", () => {
+    const e = {
+      ...validPhoto,
+      id: "cap1",
+      note: "general log note, not the photo caption",
+      details: { caption: "trichome close-up, checking amber %", subject: "trichomes" },
+    };
+    const rows = buildPhotoHistory(normalize([e]));
+    expect(rows).toHaveLength(1);
+    expect(rows[0].caption).toBe("trichome close-up, checking amber %");
+  });
+
+  it("falls back to the note when details.caption is absent or blank", () => {
+    const absent = { ...validPhoto, id: "cap2", details: { subject: "leaves" } };
+    const blank = { ...validPhoto, id: "cap3", details: { caption: "   " } };
+    const rows = buildPhotoHistory(normalize([absent, blank]));
+    expect(rows.find((r) => r.id === "cap2")?.caption).toContain("frosty");
+    expect(rows.find((r) => r.id === "cap3")?.caption).toContain("frosty");
+  });
+
   it("orders rows newest-first deterministically", () => {
     const a = { ...validPhoto, id: "a", entry_at: "2025-05-01T00:00:00Z" };
     const b = { ...validPhoto, id: "b", entry_at: "2025-05-03T00:00:00Z" };

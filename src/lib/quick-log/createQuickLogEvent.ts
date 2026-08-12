@@ -15,7 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { validateQuickLogSensorSnapshot } from "./quickLogSensorSnapshotValidation";
 import { fetchLatestSensorSnapshot } from "./fetchLatestSensorSnapshot";
 
-export type QuickLogEventType = "observe" | "water" | "feed" | "photo" | "note";
+export type QuickLogEventType = "observe" | "water" | "feed" | "photo" | "note" | "training";
 
 export interface CreateQuickLogInput {
   growId: string;
@@ -26,6 +26,13 @@ export interface CreateQuickLogInput {
   photoUrl?: string;
   /** Required for dedupe. Generate once per save attempt (reuse on retry). */
   idempotencyKey: string;
+  /**
+   * Sanitized activity-specific fields (e.g. training technique/intensity,
+   * photo subject/caption). Caller must already have run raw form values
+   * through sanitizeQuickLogActivityDetails — this function does not
+   * validate or sanitize extraDetails itself.
+   */
+  extraDetails?: Record<string, unknown> | null;
 }
 
 /**
@@ -44,6 +51,7 @@ export const QUICK_LOG_EVENT_TYPE_MAP: Record<QuickLogEventType, string> = {
   feed: "feeding",
   photo: "photo",
   note: "observation",
+  training: "training",
 };
 
 /** Quick Log UI event types that are stored as observations + kind tag. */
@@ -95,7 +103,13 @@ export async function createQuickLogEvent(
   }
   const sensorSnapshot = snapshotValidation.snapshot;
 
-  const details = buildQuickLogDetails(input.eventType);
+  // extraDetails spread last: if a future caller ever supplied both a
+  // note-kind tag and activity-specific fields, the richer extraDetails wins.
+  const mergedDetails = {
+    ...(buildQuickLogDetails(input.eventType) ?? {}),
+    ...(input.extraDetails ?? {}),
+  };
+  const details = Object.keys(mergedDetails).length > 0 ? mergedDetails : null;
 
   const { data, error } = await supabase.rpc(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

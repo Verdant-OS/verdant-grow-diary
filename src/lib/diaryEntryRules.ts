@@ -403,15 +403,42 @@ export function normalizeDiaryEntry(
   const plantId = nonBlankString(pickFirst(r.plant_id, r.plantId));
   const tentId = nonBlankString(pickFirst(r.tent_id, r.tentId));
   const stage = nonBlankString(pickFirst(r.stage, r.plant_stage, r.plantStage));
+  // diary_entries has no top-level event_type column -- QuickLog-authored
+  // rows (e.g. quicklog_save_event's Training/Photo saves, see
+  // quickLogActivityDetailFields.ts) only carry it inside `details`. Checked
+  // last, after every real top-level candidate, so rows that already have a
+  // genuine top-level field are unaffected -- this only replaces the "note"
+  // default for rows that would otherwise have nothing.
+  const rDetails =
+    r.details && typeof r.details === "object" && !Array.isArray(r.details)
+      ? (r.details as Record<string, unknown>)
+      : null;
   const eventTypeRaw = nonBlankString(
-    pickFirst(r.entry_type, r.entryType, r.event_type, r.eventType, r.type),
+    pickFirst(
+      r.entry_type,
+      r.entryType,
+      r.event_type,
+      r.eventType,
+      r.type,
+      rDetails?.event_type,
+    ),
   );
   const eventType = eventTypeRaw ?? "note";
   if (!eventTypeRaw) warnings.push("event-type:missing");
 
   const note = nonBlankString(pickFirst(r.note, r.body, r.text)) ?? "";
 
-  const photoUrl = nonBlankString(pickFirst(r.photo_url, r.photoUrl));
+  // Same gap as event_type: quicklog_save_event's diary companion row only
+  // ever sets details.photo_url, never the top-level column
+  // (...trust_boundary_hardening.sql:290). Callers that pre-resolve/sign the
+  // path onto the top-level field (e.g. Timeline.tsx's load()) make this
+  // fallback a no-op; callers that don't (e.g. usePlantRecentActivity) still
+  // recover the raw path here rather than silently losing it. A recovered
+  // raw (unsigned) path still fails downstream URL validation the same way
+  // an already-missing one would -- this fixes the miss, not the signing.
+  const photoUrl = nonBlankString(
+    pickFirst(r.photo_url, r.photoUrl, rDetails?.photo_url),
+  );
 
   const createdParsed = parseDateIso(
     pickFirst(r.entry_at, r.entryAt, r.created_at, r.createdAt, r.at),

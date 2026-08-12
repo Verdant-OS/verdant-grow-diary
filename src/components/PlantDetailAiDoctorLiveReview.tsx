@@ -10,11 +10,9 @@
  *  - Failure / timeout / invalid / missing-config all render the same
  *    calm failure copy. Fail closed.
  */
-import { useMemo } from "react";
-import {
-  useTimelineMemory,
-  TIMELINE_MEMORY_DEFAULT_LIMIT,
-} from "@/hooks/useTimelineMemory";
+import { useEffect, useMemo } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useTimelineMemory, TIMELINE_MEMORY_DEFAULT_LIMIT } from "@/hooks/useTimelineMemory";
 import {
   evaluateAiDoctorContextFromSources,
   type AiDoctorContextPlantSource,
@@ -27,23 +25,21 @@ import AiCreditRemainingBadge from "@/components/AiCreditRemainingBadge";
 import AiCreditServiceDegradedNotice from "@/components/AiCreditServiceDegradedNotice";
 import { useSensorBridgeHealth } from "@/hooks/useSensorBridgeHealth";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
+import { useAuth } from "@/store/auth";
+import { aiDoctorGrowCreditsUsedQueryKey } from "@/hooks/useAiDoctorGrowCreditsUsed";
 import {
   classificationFromStatusResult,
   type Classification,
 } from "@/lib/sensorSnapshotStatusContract";
 
-export const AI_DOCTOR_LIVE_REVIEW_LOADING_COPY =
-  "Preparing cautious AI Doctor review…";
+export const AI_DOCTOR_LIVE_REVIEW_LOADING_COPY = "Preparing cautious AI Doctor review…";
 export const AI_DOCTOR_LIVE_REVIEW_FAILURE_COPY =
   "AI Doctor review could not be safely displayed. Add more context or try again later.";
 export const AI_DOCTOR_LIVE_REVIEW_PARTIAL_COPY =
   "Context is partial — review may have limited confidence.";
-export const AI_DOCTOR_LIVE_REVIEW_STRONG_COPY =
-  "Context is strong enough for a cautious review.";
-export const AI_DOCTOR_LIVE_REVIEW_VALIDATED_LABEL =
-  "Validated AI Doctor review.";
-export const AI_DOCTOR_LIVE_REVIEW_START_LABEL =
-  "Run cautious AI Doctor review";
+export const AI_DOCTOR_LIVE_REVIEW_STRONG_COPY = "Context is strong enough for a cautious review.";
+export const AI_DOCTOR_LIVE_REVIEW_VALIDATED_LABEL = "Validated AI Doctor review.";
+export const AI_DOCTOR_LIVE_REVIEW_START_LABEL = "Run cautious AI Doctor review";
 export const AI_DOCTOR_LIVE_REVIEW_RETRY_LABEL = "Try once more";
 
 export interface PlantDetailAiDoctorLiveReviewProps {
@@ -69,10 +65,7 @@ export default function PlantDetailAiDoctorLiveReview({
   persist,
   sensorClassificationOverride,
 }: PlantDetailAiDoctorLiveReviewProps) {
-  const { items } = useTimelineMemory(
-    { kind: "plant", plantId },
-    TIMELINE_MEMORY_DEFAULT_LIMIT,
-  );
+  const { items } = useTimelineMemory({ kind: "plant", plantId }, TIMELINE_MEMORY_DEFAULT_LIMIT);
   const { data: bridgeHealth } = useSensorBridgeHealth();
 
   const context = useMemo(
@@ -84,8 +77,7 @@ export default function PlantDetailAiDoctorLiveReview({
     [plant, items],
   );
 
-  const allowed =
-    context.readiness === "partial" || context.readiness === "strong";
+  const allowed = context.readiness === "partial" || context.readiness === "strong";
 
   const packet = useMemo(
     () =>
@@ -123,6 +115,20 @@ export default function PlantDetailAiDoctorLiveReview({
   });
 
   const { entitlement } = useMyEntitlements();
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  // A successful run means the server just accepted a real spend. The
+  // Plant Detail credits-remaining teaser reads a separate cached query
+  // (useAiDoctorGrowCreditsUsed) that has no other way to learn a spend
+  // happened this session — refresh it so "low"/"exhausted" can't be missed
+  // until an unrelated refetch (focus/remount) happens to occur later.
+  useEffect(() => {
+    if (review.status !== "result" || !growId) return;
+    void queryClient.invalidateQueries({
+      queryKey: aiDoctorGrowCreditsUsedQueryKey(user?.id, growId),
+    });
+  }, [review.status, growId, user?.id, queryClient]);
 
   if (!allowed) return null;
 
@@ -205,7 +211,8 @@ export default function PlantDetailAiDoctorLiveReview({
               You've reached an AI Doctor limit.
             </h3>
             <p className="mt-2 text-sm text-muted-foreground">
-              This request was not charged. Existing analyses stay available — please try again later.
+              This request was not charged. Existing analyses stay available — please try again
+              later.
             </p>
           </section>
         ) : review.reason === "upstream_credit_exhausted" ? (
@@ -239,10 +246,7 @@ export default function PlantDetailAiDoctorLiveReview({
               data-testid="plant-ai-doctor-live-review-credit-remaining"
             />
           ) : null}
-          <AiDoctorReviewResultPreview
-            result={review.result}
-            testIdPrefix="plant-detail-live"
-          />
+          <AiDoctorReviewResultPreview result={review.result} testIdPrefix="plant-detail-live" />
         </div>
       ) : null}
     </section>

@@ -226,3 +226,73 @@ describe("QuickLogModal — save flow hardening", () => {
     expect(toastSuccess).not.toHaveBeenCalled();
   });
 });
+
+describe("QuickLogModal — Training detail requires a technique before save", () => {
+  it("disables Save after switching to Training with no technique chosen", async () => {
+    renderModal();
+    const saveBtn = screen.getByTestId("qlm-save") as HTMLButtonElement;
+    expect(saveBtn.disabled).toBe(false);
+
+    fireEvent.click(screen.getByRole("button", { name: "Training" }));
+
+    await waitFor(() => expect(saveBtn.disabled).toBe(true));
+    expect(screen.getByTestId("qlm-training-detail")).toBeTruthy();
+  });
+
+  it("does not disable Save for event types with no required detail", async () => {
+    renderModal();
+    fireEvent.click(screen.getByRole("button", { name: "Water" }));
+    const saveBtn = screen.getByTestId("qlm-save") as HTMLButtonElement;
+    expect(saveBtn.disabled).toBe(false);
+  });
+});
+
+describe("QuickLogModal — Photo detail requires an attached photo before save", () => {
+  it("disables Save after switching to Photo with no file attached", async () => {
+    renderModal();
+    const saveBtn = screen.getByTestId("qlm-save") as HTMLButtonElement;
+    expect(saveBtn.disabled).toBe(false);
+
+    fireEvent.click(screen.getByRole("button", { name: "Photo" }));
+
+    await waitFor(() => expect(saveBtn.disabled).toBe(true));
+    expect(screen.getByTestId("qlm-photo-detail")).toBeTruthy();
+  });
+
+  it("enables Save once a photo is attached for a Photo entry", async () => {
+    renderModal();
+    fireEvent.click(screen.getByRole("button", { name: "Photo" }));
+    const saveBtn = screen.getByTestId("qlm-save") as HTMLButtonElement;
+    await waitFor(() => expect(saveBtn.disabled).toBe(true));
+
+    attachPhoto();
+
+    await waitFor(() => expect(saveBtn.disabled).toBe(false));
+  });
+});
+
+describe("QuickLogModal — Caption length is constrained, not silently truncated", () => {
+  it("caption input has maxLength matching the server-enforced limit", () => {
+    renderModal();
+    fireEvent.click(screen.getByRole("button", { name: "Photo" }));
+    const input = screen.getByTestId("qlm-caption") as HTMLInputElement;
+    expect(input.maxLength).toBe(200);
+  });
+
+  it("typing beyond the limit does not silently drop content into state past 200 chars", () => {
+    renderModal();
+    fireEvent.click(screen.getByRole("button", { name: "Photo" }));
+    const input = screen.getByTestId("qlm-caption") as HTMLInputElement;
+    const long = "a".repeat(250);
+    fireEvent.change(input, { target: { value: long } });
+    expect(input.value.length).toBe(200);
+  });
+
+  it("shows a live character counter so the grower can see the remaining room", () => {
+    renderModal();
+    fireEvent.click(screen.getByRole("button", { name: "Photo" }));
+    const input = screen.getByTestId("qlm-caption") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "week 6 flower" } });
+    expect(screen.getByTestId("qlm-caption-count").textContent).toBe("13/200");
+  });
+});

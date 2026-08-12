@@ -212,6 +212,13 @@ describe("each funnel event fires from its canonical seam", () => {
       /trackFunnelEvent\("paywall_viewed",\s*\{\s*surface:\s*"ai_doctor_limit"\s*\}\)/,
     );
     expect(aiDoctor).toContain("surface: AI_DOCTOR_POST_VALUE_UPGRADE_SURFACE");
+    const blueprintSection = read("src/components/PlantBlueprintOverlaySection.tsx");
+    expect(blueprintSection).toMatch(
+      /trackFunnelEvent\("paywall_viewed",\s*\{\s*surface:\s*"blueprint_locked"\s*\}\)/,
+    );
+    // The impression must be stricter than the render: the locked branch also
+    // shows on lookupFailed, but an unverified viewer may be entitled.
+    expect(blueprintSection).toMatch(/!entLoading && !lookupFailed && !canUseCapability/);
   });
 
   it("paywall_cta_clicked is wired only to explicit AI Doctor pricing actions", () => {

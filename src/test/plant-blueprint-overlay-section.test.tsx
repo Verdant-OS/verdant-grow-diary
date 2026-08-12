@@ -21,6 +21,12 @@ vi.mock("@/hooks/useRootZoneObservations", () => ({
   useRootZoneObservations: () => rootZoneMock(),
 }));
 
+const trackSpy = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/funnelAnalytics", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/lib/funnelAnalytics")>();
+  return { ...real, trackFunnelEvent: trackSpy };
+});
+
 import { PlantBlueprintOverlaySection } from "@/components/PlantBlueprintOverlaySection";
 import { EMPTY_SNAPSHOT } from "@/lib/sensorSnapshot";
 import {
@@ -50,6 +56,7 @@ beforeEach(() => {
   clearTemperatureUnitPreference();
   snapshotMock.mockReturnValue({ status: "ok", snapshot: EMPTY_SNAPSHOT });
   rootZoneMock.mockReturnValue({ observations: [] });
+  trackSpy.mockClear();
 });
 
 describe("PlantBlueprintOverlaySection", () => {
@@ -116,5 +123,71 @@ describe("PlantBlueprintOverlaySection", () => {
     expect(screen.queryByTestId("pro-blueprint-overlay")).toBeNull();
     expect(screen.queryByTestId("pro-blueprint-paywall")).toBeNull();
     expect(container.textContent).toBe("");
+  });
+});
+
+describe("paywall impression (surface: blueprint_locked)", () => {
+  // Entry clicks are counted (blueprint_cta_clicked, #929); this impression is
+  // the denominator: how many verified non-Craft growers actually see the
+  // teaser + paywall after arriving.
+
+  it("fires once, id-free, for a settled verified viewer without the capability", () => {
+    entitlementsMock.mockReturnValue(entitlement(false));
+    renderSection();
+    expect(trackSpy).toHaveBeenCalledTimes(1);
+    expect(trackSpy).toHaveBeenCalledWith("paywall_viewed", { surface: "blueprint_locked" });
+    // No plant/grow/tent ids in the payload.
+    expect(JSON.stringify(trackSpy.mock.calls[0])).not.toMatch(/p1|g1|t1/);
+  });
+
+  it("dedupes across an entitlement flicker — one mount, one impression", () => {
+    // A refetch can flip the gate locked -> loading -> locked within one
+    // mount, re-running the effect (its dep changed twice). Without the ref
+    // that would double-count the same viewer on the same page view.
+    entitlementsMock.mockReturnValue(entitlement(false));
+    const { rerender } = renderSection();
+    // Fresh JSX per rerender — a reused element reference makes React bail
+    // out of re-rendering the subtree entirely, and the flicker never happens.
+    entitlementsMock.mockReturnValue(entitlement(false, { loading: true }));
+    rerender(
+      <MemoryRouter>
+        <PlantBlueprintOverlaySection growId="g1" tentId="t1" plantId="p1" stage="veg" />
+      </MemoryRouter>,
+    );
+    entitlementsMock.mockReturnValue(entitlement(false));
+    rerender(
+      <MemoryRouter>
+        <PlantBlueprintOverlaySection growId="g1" tentId="t1" plantId="p1" stage="veg" />
+      </MemoryRouter>,
+    );
+    expect(trackSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("never fires while entitlements are loading", () => {
+    entitlementsMock.mockReturnValue(entitlement(false, { loading: true }));
+    renderSection();
+    expect(trackSpy).not.toHaveBeenCalled();
+  });
+
+  it("never fires on an unverified entitlement, even though the paywall renders", () => {
+    // STRICTER than the render on purpose: on lookupFailed the section still
+    // shows the (safe) teaser + CTA, but the viewer may well be Craft with a
+    // failed plan read — counting them would inflate the upgrade funnel.
+    // The capability-ABSENT case is the trap: it looks exactly like a real
+    // impression, and only the lookupFailed guard keeps it out.
+    entitlementsMock.mockReturnValue(entitlement(false, { lookupFailed: true }));
+    renderSection();
+    expect(screen.getByTestId("pro-blueprint-paywall")).toBeTruthy();
+    expect(trackSpy).not.toHaveBeenCalled();
+
+    entitlementsMock.mockReturnValue(entitlement(true, { lookupFailed: true }));
+    renderSection();
+    expect(trackSpy).not.toHaveBeenCalled();
+  });
+
+  it("never fires for a Craft grower", () => {
+    entitlementsMock.mockReturnValue(entitlement(true));
+    renderSection();
+    expect(trackSpy).not.toHaveBeenCalled();
   });
 });

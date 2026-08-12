@@ -13,7 +13,9 @@
  * Only alerts derived from REAL, VALID sensor readings are eligible:
  *   - snapshot must exist
  *   - snapshot.source must be "live" or "manual" (never "sim", "diary", "unavailable")
- *   - snapshot must not be stale
+ *   - snapshot must not be stale, measured against the LIVE window for every
+ *     source — deliberately tighter than source-aware display freshness
+ *     (see isSnapshotPersistable)
  *   - quality must not be "unavailable"
  *   - the alert must not itself be a "data unavailable / stale / missing
  *     targets" synthetic signal (those describe missing data, not real
@@ -50,7 +52,16 @@ export function isSnapshotPersistable(ctx: PersistenceContext): boolean {
   if (snapshot.source !== "live" && snapshot.source !== "manual") return false;
   if (quality === "unavailable") return false;
   const now = ctx.now ?? Date.now();
-  if (isStale(snapshot.ts, now, undefined, snapshot.source)) return false;
+  // Persistence uses the LIVE window for every source — deliberately tighter
+  // than source-aware DISPLAY freshness. Sensor Truth Canon lets a manual
+  // reading read as "current" for 24h on read-only surfaces, but writing an
+  // `alerts` row is a stronger claim than rendering a value: the row asserts
+  // this problem is happening NOW. `alerts.first_seen_at` defaults to now()
+  // and saveAlert does not override it, so a day-old manual reading would
+  // mint a row stamped as brand new. `snapshot.source` is therefore
+  // intentionally NOT forwarded to isStale here.
+  // Regression fence: src/test/environment-alert-persistence-live-window.test.ts
+  if (isStale(snapshot.ts, now)) return false;
   return true;
 }
 

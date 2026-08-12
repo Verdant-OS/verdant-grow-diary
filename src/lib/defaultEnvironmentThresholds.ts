@@ -108,7 +108,11 @@ export function buildDefaultThresholdAlerts(args: BuildArgs): EnvironmentAlert[]
   if (!snapshot) return [];
   if (snapshot.source !== "live" && snapshot.source !== "manual") return [];
   const now = args.now ?? Date.now();
-  if (isStale(snapshot.ts, now, undefined, snapshot.source)) return [];
+  // These alerts are persisted (see the `source: "default_thresholds"` note
+  // above), so this gate is persistence-class and uses the LIVE window for
+  // every source — matching isSnapshotPersistable rather than source-aware
+  // display freshness. `snapshot.source` is intentionally not forwarded.
+  if (isStale(snapshot.ts, now)) return [];
 
   const createdAt = args.createdAt ?? new Date(now).toISOString();
   const out: EnvironmentAlert[] = [];

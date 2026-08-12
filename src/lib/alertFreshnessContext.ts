@@ -4,8 +4,12 @@
  *
  * Hard rules:
  *   - Pure: no I/O, no React, no Supabase, no time, no randomness.
- *   - Single source of truth for the alert-persistence freshness window:
- *     Sensor Truth Canon via `isStale(..., source)` (live 15m / manual 24h).
+ *   - Single source of truth for the alert-persistence freshness window: the
+ *     LIVE window (15m) for EVERY source, mirroring isSnapshotPersistable.
+ *     This is deliberately tighter than source-aware DISPLAY freshness, where
+ *     Sensor Truth Canon keeps a manual reading current for 24h. Because this
+ *     module's copy promises "eligible for alert persistence", a 24h manual
+ *     label here would advertise persistence for snapshots the gate rejects.
  *   - Never relabels demo/stale/invalid/csv/diary/unknown telemetry as
  *     healthy or persistable.
  *   - Operator-facing copy must mirror `alertsCanPersist`. We never imply
@@ -23,11 +27,12 @@ import {
   type TemperatureUnitPreference,
 } from "@/lib/temperatureUnitPreference";
 
-/** Live freshness window, in minutes, for operator-facing copy (manual uses 24h). */
+/** Freshness window, in minutes, for operator-facing copy (all sources). */
 export const STALE_THRESHOLD_MINUTES = Math.round(STALE_THRESHOLD_MS / 60_000);
 
-/** Short human label for the alert persistence window (Sensor Truth Canon). */
-export const FRESHNESS_WINDOW_LABEL = "15-minute live / 24-hour manual alert window";
+/** Short human label for the alert persistence window. Every source is held to
+ * the live window here, so this label carries no manual-specific carve-out. */
+export const FRESHNESS_WINDOW_LABEL = "15-minute alert window";
 
 export type LatestSnapshotFreshness = "fresh" | "stale" | "missing" | "unavailable";
 
@@ -57,7 +62,7 @@ export function classifyLatestSnapshotFreshness(
   const snap = args.snapshot;
   if (!snap || snap.source === "unavailable" || !snap.ts) return "missing";
   const now = args.now ?? Date.now();
-  const stale = isStale(snap.ts, now, undefined, snap.source);
+  const stale = isStale(snap.ts, now);
   if (stale) return "stale";
   if (snap.source === "live" || snap.source === "manual") return "fresh";
   // sim / diary / csv: not eligible for persistence even when "fresh".
@@ -74,7 +79,7 @@ export function hasRecentManualSnapshot(args: ClassifyLatestSnapshotArgs): boole
   const snap = args.snapshot;
   if (!snap || snap.source !== "manual" || !snap.ts) return false;
   const now = args.now ?? Date.now();
-  return !isStale(snap.ts, now, undefined, snap.source);
+  return !isStale(snap.ts, now);
 }
 
 /**
@@ -88,7 +93,7 @@ export function snapshotAlertsCanPersist(args: ClassifyLatestSnapshotArgs): bool
   if (!snap || !snap.ts) return false;
   if (snap.source !== "live" && snap.source !== "manual") return false;
   const now = args.now ?? Date.now();
-  return !isStale(snap.ts, now, undefined, snap.source);
+  return !isStale(snap.ts, now);
 }
 
 /**
@@ -106,7 +111,7 @@ export function describeLatestSnapshotForAlerts(args: ClassifyLatestSnapshotArgs
   if (!persistableSource) {
     return "Latest snapshot is for context only. Alerts persist only from fresh manual or live readings.";
   }
-  const stale = isStale(snap.ts, args.now ?? Date.now(), undefined, snap.source);
+  const stale = isStale(snap.ts, args.now ?? Date.now());
   const sourceWord = snap.source === "live" ? "live" : "manual";
   if (stale) {
     return `Latest ${sourceWord} snapshot is stale. Enter a new manual snapshot inside the ${FRESHNESS_WINDOW_LABEL}.`;
@@ -301,7 +306,7 @@ export function buildLatestSnapshotDetail(
   const now = args.now ?? Date.now();
   const ms = Date.parse(snap.ts);
   const capturedAgoText = formatCapturedAgo(Number.isFinite(ms) ? ms : null, now);
-  const stale = isStale(snap.ts, now, undefined, snap.source);
+  const stale = isStale(snap.ts, now);
   const insideWindow = !stale;
   const persistableSource = snap.source === "live" || snap.source === "manual";
   const canPersist = persistableSource && insideWindow;
@@ -448,7 +453,7 @@ export function buildSourceChip(args: ClassifyLatestSnapshotArgs): SourceChipVie
       canPersist: false,
     };
   }
-  const stale = isStale(snap.ts, args.now ?? Date.now(), undefined, snap.source);
+  const stale = isStale(snap.ts, args.now ?? Date.now());
   const label = SOURCE_LABELS[snap.source] ?? "Unknown";
   if (snap.source === "manual" || snap.source === "live") {
     if (stale) {
@@ -511,7 +516,7 @@ export function emptyStateSnapshotCta(
       kind: "context-only",
     };
   }
-  const stale = isStale(snap.ts, args.now ?? Date.now(), undefined, snap.source);
+  const stale = isStale(snap.ts, args.now ?? Date.now());
   if (stale) {
     return {
       message: `Latest snapshot is outside the ${FRESHNESS_WINDOW_LABEL}. Enter a fresh manual snapshot to check alerts.`,

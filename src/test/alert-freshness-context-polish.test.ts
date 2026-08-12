@@ -74,17 +74,20 @@ describe("buildSourceChip", () => {
       expect(c.qualifier).toBe("stale");
     }
   });
-  // The other half of the source-aware boundary: an age that is stale for live
-  // must remain current for manual, or the widened manual window is not real.
-  it("a live-stale age is still current for manual", () => {
+  // This chip advertises alert-persistence eligibility, so it tracks the
+  // PERSISTENCE bar (live window, every source), not source-aware display
+  // freshness. A manual reading past the live window is still "current" on
+  // read-only surfaces, but it cannot back an `alerts` row — so promising
+  // "eligible" here would be a lie the gate then refuses to honour.
+  it("a live-stale manual age is NOT eligible, even though display still calls it current", () => {
     const c = buildSourceChip({
       status: "ok",
       snapshot: snap({ source: "manual", ts: STALE_TS }),
       now: NOW,
     });
-    expect(c.tone).toBe("eligible");
-    expect(c.canPersist).toBe(true);
-    expect(c.qualifier).toBe("fresh");
+    expect(c.tone).toBe("warning");
+    expect(c.canPersist).toBe(false);
+    expect(c.qualifier).toBe("stale");
   });
   it("csv / diary / sim → context tone, never eligible", () => {
     for (const source of ["csv", "diary", "sim"] as const) {

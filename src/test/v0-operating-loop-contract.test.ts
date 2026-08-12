@@ -102,10 +102,10 @@ describe("V0 loop · manual readings count as real input", () => {
         isDemoData: true,
       }),
     ).toBe(false);
-    // stale — source-aware since the #592 canon: manual 24h, live 15m. The old
-    // single 1-hour fixture is now current for manual by design, so age each
-    // source past its own window and keep an inside-window manual case so this
-    // assertion still proves staleness rather than quietly passing.
+    // stale — PERSISTENCE holds every source to the live window (15m), which is
+    // tighter than the #592 canon's source-aware DISPLAY windows (manual 24h).
+    // Both sides of the boundary are pinned so this assertion keeps proving
+    // staleness rather than quietly passing.
     const staleManual = {
       ...fresh,
       ts: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString(),
@@ -117,11 +117,20 @@ describe("V0 loop · manual readings count as real input", () => {
       ts: new Date(Date.now() - 20 * 60 * 1000).toISOString(),
     };
     expect(isSnapshotPersistable({ snapshot: staleLive, quality: "good" })).toBe(false);
-    const currentManual = {
+    // Current for DISPLAY (inside the 24h manual window) but NOT persistable:
+    // an alerts row is stamped first_seen_at = now(), so a day-old manual
+    // reading would present as a brand-new problem.
+    const displayCurrentManual = {
       ...fresh,
       ts: new Date(Date.now() - 23 * 60 * 60 * 1000).toISOString(),
     };
-    expect(isSnapshotPersistable({ snapshot: currentManual, quality: "good" })).toBe(true);
+    expect(isSnapshotPersistable({ snapshot: displayCurrentManual, quality: "good" })).toBe(false);
+    // Inside the live window, a manual reading is persistable.
+    const liveWindowManual = {
+      ...fresh,
+      ts: new Date(Date.now() - 60 * 1000).toISOString(),
+    };
+    expect(isSnapshotPersistable({ snapshot: liveWindowManual, quality: "good" })).toBe(true);
   });
 });
 

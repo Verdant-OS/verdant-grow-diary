@@ -2115,12 +2115,12 @@ export const VERDANT_BLUEPRINT_TARGETS_FAQ: ReadonlyArray<FaqEntry> = [
   {
     question: "Why do temperature targets differ between lights on and lights off?",
     answer:
-      "Partly because the room simply cools when the lamps are off, and partly because a deliberate night drop slows respiration and helps keep stretch in check. It is not a VPD control on its own: VPD depends on temperature and humidity together — and ideally on leaf temperature — so at a fixed humidity a cooler night lowers VPD rather than holding it steady. Work out VPD separately for lights-on and lights-off rather than assuming one figure covers both.",
+      "Mainly because the room cools once the lamps are off, so lights-on and lights-off are genuinely different environments and each needs its own target rather than one averaged figure. The split is not a VPD control on its own: VPD depends on temperature and humidity together — and ideally on leaf temperature — so at a fixed humidity a cooler night lowers VPD rather than holding it steady. Work VPD out separately for each part of the cycle.",
   },
   {
     question: "Why are there no light or feed targets for dry and cure?",
     answer:
-      "Once the plant is cut it no longer takes up nutrients or photosynthesises, so EC, pH, PPFD and DLI stop applying. Only air temperature and humidity matter, and both are held tight to control the drying rate.",
+      "Once the plant is cut it no longer takes up nutrients or photosynthesises, so EC, pH, PPFD and DLI stop applying. Temperature and humidity are the only numeric targets left, and both are held tight to control the drying rate — but they are not the whole picture. A drying space should also be dark and gently ventilated: stagnant air lets damp pockets form around dense material even when the room average reads correctly.",
   },
   {
     question: "Do the EC and pH targets apply to soil?",

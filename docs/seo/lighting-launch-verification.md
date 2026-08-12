@@ -1,30 +1,36 @@
 # Lighting launch verification
 
-**Generated:** 2026-07-31T23:10:32.9711027Z
+**Generated:** 2026-08-01T02:08:00.4849365Z
 **Production host:** https://verdantgrowdiary.com
 **Merged PR:** [#595](https://github.com/Verdant-OS/verdant-grow-diary/pull/595)
 **Merge commit:** `1223c56c9db586160a2798d017c2e78d1de1dd5a`
 **Measurement repair:** [#597](https://github.com/Verdant-OS/verdant-grow-diary/pull/597),
 commit `51363737ca97e74f861558f082b849bbbd389aa2`
 **Lovable project:** `66255e7b-892c-4be5-8686-ab1cfc3666db`
-**Production build manifest commit:** `0c61cc572de32a8a7af975ace14659dfb77a0a43`
-**Deploy branch head:** `0c61cc572de32a8a7af975ace14659dfb77a0a43`
+**Production build manifest commit:** `2560d83a6b740cb9d6c4521bc6edc083977d51fc`
+**Deploy branch head:** `2560d83a6b740cb9d6c4521bc6edc083977d51fc`
 **Production deployment ID:** not exposed by the current production response
 
 ## Launch verdict
 
-**BLOCKED — GA4/GSC OWNER SETUP REQUIRED**
+**NOT READY — ANALYTICS INSTRUMENTATION DEFECT FOUND**
 
 Both pages are published, publicly reachable, technically indexable, and match the content merged
-in PR #595. The page-identity repair from PR #597 is also live: the intercepted production browser
-verification at `2026-07-31T17:14:59.0979608Z` observed each exact guide path and title, no
-duplicate page views, and protected-ID masking. The collection requests were intercepted, so no
-verification events were transmitted to GA4.
+in PR #595. Their exact paths and route-specific titles still pass intercepted production browser
+verification. The collection requests were blocked, so no verification events were transmitted to
+GA4.
 
-No release-blocking production defect remains. Day 0 has not started because authenticated GA4
-reporting and authenticated Search Console inspection are unavailable. Observed collection
-payloads and public crawl checks prove implementation behavior, but they are not reporting
-baselines.
+A P0 analytics privacy defect is present in production. An unauthenticated visit to a protected
+plant route containing a synthetic email-like path sentinel queued the literal protected pathname
+before the authentication redirect. The query string was not included in `page_path`, but the
+path segment itself was not masked. A two-file route-shape sanitizer repair on
+`codex/fix-protected-analytics-paths` is locally validated and masks that shape to `/plants/:id`;
+it is **not merged or deployed** at this snapshot. Unknown routes are also reduced to `/:unknown`
+by the local repair.
+
+Day 0 has not started because the P0 production defect remains and authenticated GA4 reporting
+and Search Console inspection are unavailable. Observed collection payloads and public crawl
+checks prove implementation behavior, but they are not reporting baselines.
 
 The owner-confirmed GA4 production stream is `Verdant Grow Diary`, stream URL
 `https://verdantgrowdiary.com`, stream ID `15065867361`, and measurement ID `G-B3QRSZEM9S`.
@@ -34,23 +40,24 @@ numeric property ID and authenticated reporting baseline remain unavailable to C
 ## Publication and release evidence
 
 - `https://verdantgrowdiary.com/version.json` identifies production build commit
-  `0c61cc572de32a8a7af975ace14659dfb77a0a43`, built at
-  `2026-07-31T22:57:00.211Z`.
+  `2560d83a6b740cb9d6c4521bc6edc083977d51fc`, built at
+  `2026-08-01T01:40:18.366Z`.
 - Repository ancestry proves the PR #595 merge commit and PR #597 repair commit are ancestors of
   that production manifest commit.
 - The production manifest exactly matches deploy head
-  `0c61cc572de32a8a7af975ace14659dfb77a0a43`; there is no pending public-app publish. Its only
-  delta after the prior `d9bf8e71…` production build is the generated read-only MCP Edge Function
-  bundle created after Lovable research chats. No public app runtime, sitemap, robots, or guide
-  content changed, and release content still matches production.
+  `2560d83a6b740cb9d6c4521bc6edc083977d51fc`. Release content matches production, but the local
+  protected-route sanitizer repair is a source-only change and still requires a PR, merge,
+  production publish, and intercepted production re-verification.
 - The current production response does not expose a Lovable deployment ID, so none is inferred.
 - Both release-specific URLs, titles, descriptions, H1s, Article/FAQ schema, sitemap entries, and
   cross-links are present in production.
-- The public probe at `2026-07-31T23:10:32.9711027Z` returned HTTP 200 for `version.json`, both
+- The current public probe returned HTTP 200 for `version.json`, both
   lighting guides, `sitemap.xml`, and `robots.txt`. The sitemap contains 51 URLs and each lighting
   route exactly once; robots declares the production sitemap and protects app prefixes.
 
 **Release content match: PASS**
+
+**Analytics privacy readiness: FAIL in production**
 
 ## Exact lighting pages
 
@@ -151,7 +158,7 @@ mixed into the GA4 repair.
 
 ## Measurement repair verification
 
-Production now emits explicit `page_view` events for the two pages with:
+Production still emits explicit `page_view` events for the two public lighting pages with:
 
 ```text
 page_location = https://verdantgrowdiary.com/guides/cannabis-grow-light-distance-and-schedule
@@ -163,36 +170,49 @@ page_path = /guides/cannabis-light-stress-light-burn-bleaching-or-heat
 page_title = Cannabis Light Stress: Burn, Bleaching, or Heat? | Verdant
 ```
 
-The browser verification fulfilled the collection endpoint locally, so the inspected payloads did
-not add verification traffic to the production property. Protected token-bearing paths remained
-masked, and no duplicate page views were observed.
+The browser verification blocked the collection endpoint, so the inspected payloads did not add
+verification traffic to the production property. The two lighting routes retained their exact
+path and title identities with no duplicate page views. However, the protected synthetic
+email-like plant path queued its literal pathname before redirect, which is a P0 production
+privacy failure.
 
-**GA4 page identity repair: PASS**
+**GA4 public lighting identity: PASS**
+
+**GA4 protected-route masking: FAIL in production**
+
+The local source repair is `FIXED_LOCALLY_VALIDATED_AWAITING_PR_PRODUCTION`. Its focused validation
+is 90 passing tests, plus passing typecheck, production build, postbuild, and intercepted local
+browser proof. This is not production evidence and does not close the P0.
 
 ## Authenticated access and monitoring status
 
-- **GA4 baseline:** BLOCKED — AUTHENTICATED ACCESS UNAVAILABLE.
-- **GSC baseline:** BLOCKED — AUTHENTICATED ACCESS UNAVAILABLE.
+- **GA4 BASELINE: BLOCKED — AUTHENTICATED ACCESS UNAVAILABLE**
+- **GSC BASELINE: BLOCKED — AUTHENTICATED ACCESS UNAVAILABLE**
+- **MEASUREMENT DAY 0: UNSET**
+- **FOUR-WEEK CLOCK: NOT STARTED**
 - **GA4 production stream identity:** PASS — owner-confirmed values match the deployed host and tag.
-- At `2026-07-31T23:10:32.9711027Z`, name-only GitHub secret listings found none of the expected GA4
+- Name-only GitHub secret listings found none of the expected GA4
   or GSC reporting secrets configured at repository scope or in the `verdant-production`,
   `verdant-sandbox`, and `copilot` environments; `.seo/gsc-token.local.json` is also absent. The
   workflow and documentation reference the expected `GSC_*` names, but no credential value was
   read or recorded in this verification.
-- The latest SEO workflow on deploy head `0c61cc57…`
-  ([run 30671654959](https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30671654959))
+- The latest SEO workflow on deploy head `2560d83a…`
+  ([run 30678528505](https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30678528505))
   succeeded and evaluated all 51 sitemap URLs. Its GSC operation was `SKIPPED`, access was
   `BLOCKED`, execution was `SKIPPED`, OAuth was not configured, and it made 0 GSC API attempts.
   Workflow success is not an authenticated GSC baseline.
+- The checked-in `artifacts/seo/seo-job-summary.json` and `.md` files are stale July 2 snapshots.
+  The uploaded artifact from run 30678528505 is authoritative for this checkpoint.
 - Owner handoff: complete the status-marked steps in the
   [lighting analytics owner setup checklist](./analytics-owner-setup-checklist.md) without sending
   credentials through chat or committing them.
 - Machine-readable handoff: the current blocked state is recorded in
   [`artifacts/seo/seo-readiness-status.json`](../../artifacts/seo/seo-readiness-status.json).
 
-The current bounded slice is `P2 GA4_PRODUCTION_STREAM_IDENTITY`, complete at this snapshot. The
-next highest-priority unblocked slice is `P1 LIGHTING_DUPLICATE_HYDRATED_JSON_LD`. Fixing it will
-improve structured-data hygiene but will not change the current access verdict.
+The current bounded slice is `P0 PROTECTED_ANALYTICS_PATH_REDACTION`. Its source repair is locally
+validated but awaits PR, merge, production publish, and intercepted production proof. The existing
+`P1 LIGHTING_DUPLICATE_HYDRATED_JSON_LD` defect remains unresolved and is next only after the P0 is
+closed in production.
 
-Day 0 remains `UNSET`, and the four-week clock remains `NOT_STARTED`, until both authenticated
-baselines are recorded.
+Day 0 remains `UNSET`, and the four-week clock remains `NOT_STARTED`, until the P0 is verified
+closed in production and both authenticated baselines are recorded.

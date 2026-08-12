@@ -1,8 +1,10 @@
 # Lighting four-week measurement plan
 
-**Verdict:** BLOCKED — GA4/GSC OWNER SETUP REQUIRED
-**Day 0:** UNSET
-**Four-week clock:** NOT_STARTED
+**Verdict:** NOT READY — ANALYTICS INSTRUMENTATION DEFECT FOUND
+**GA4 BASELINE:** BLOCKED — AUTHENTICATED ACCESS UNAVAILABLE
+**GSC BASELINE:** BLOCKED — AUTHENTICATED ACCESS UNAVAILABLE
+**MEASUREMENT DAY 0:** UNSET
+**FOUR-WEEK CLOCK:** NOT STARTED
 **Timezone:** America/Chicago
 **Pages:** the two lighting guides published through PR #595
 
@@ -41,28 +43,40 @@ recorded.
 
 ## Current blockers
 
-The production and measurement-contract gates are complete:
+The public lighting-page gates remain complete, but the production analytics contract is not:
 
 - PR #597 is merged and live in production manifest
-  `0c61cc572de32a8a7af975ace14659dfb77a0a43`.
-- Intercepted browser evidence preserves each exact lighting-guide path and page-specific title,
-  reports no duplicate views, keeps protected IDs masked, and transmitted no verification events.
+  `2560d83a6b740cb9d6c4521bc6edc083977d51fc`, built at
+  `2026-08-01T01:40:18.366Z`.
+- Intercepted production browser evidence preserves each exact lighting-guide path and
+  page-specific title and reports no duplicate lighting-page views. Analytics transmission was
+  blocked during verification.
+- A P0 production privacy defect is open: a protected `/plants/<synthetic-email-like-sentinel>`
+  pathname was queued literally before the authentication redirect. Only synthetic evidence was
+  used; no real user or plant identifier is recorded here.
+- The source repair on `codex/fix-protected-analytics-paths` maps the protected shape to
+  `/plants/:id` and unknown routes to `/:unknown`. It has 90 focused passing tests, passing
+  typecheck/build/postbuild, and intercepted local browser proof, but it is not merged or deployed.
 - The owner-confirmed GA4 production stream is `Verdant Grow Diary`, stream URL
   `https://verdantgrowdiary.com`, stream ID `15065867361`, and measurement ID `G-B3QRSZEM9S`;
   production loads and targets that exact measurement ID. The property ID is still unconfirmed.
 - The current public probe returns HTTP 200 for both guides, the sitemap, robots, and version
   manifest. The 51-URL sitemap contains each lighting route exactly once, and robots protects app
   prefixes.
-- Workflow [30671654959](https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30671654959)
+- Workflow [30678528505](https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30678528505)
   succeeded across all 51 URLs, but its GSC operation was `SKIPPED`, access was `BLOCKED`,
   execution was `SKIPPED`, OAuth was not configured, and it made 0 API attempts.
-- Deploy head `0c61cc572de32a8a7af975ace14659dfb77a0a43` exactly matches the production manifest. There is
-  no pending public-app publish, and release content match remains `PASS`.
+- Deploy head `2560d83a6b740cb9d6c4521bc6edc083977d51fc` exactly matches the production manifest. Lighting
+  release content match remains `PASS`; the local P0 repair is not included in that build.
 - Direct-load indexability remains `PASS`, but cross-guide client navigation leaves conflicting
   prior-route/current-route page-level JSON-LD in the hydrated DOM. This is the next P1 technical
   SEO repair and is not treated as an authenticated reporting baseline or a reason to backdate Day 0.
 
-Two owner access gates remain:
+The immediate P0 gate is to open, merge, publish, and intercept-verify the local protected-route
+sanitizer repair. The existing P1 duplicate hydrated JSON-LD defect is next after that production
+privacy gate closes.
+
+Two owner access gates also remain:
 
 1. Confirm the existing Verdant GA4 property identity and provide read-only authenticated
    reporting access. The production stream identity itself is complete.
@@ -71,8 +85,11 @@ Two owner access gates remain:
 
 Use the [analytics owner setup checklist](./analytics-owner-setup-checklist.md). Do not send
 credentials through chat or commit them. Day 0 must remain unset until both authenticated
-baselines are recorded. Observed GA4 collection payloads and successful public/static checks are
-implementation evidence, not reporting baselines.
+baselines are recorded and the P0 production analytics defect is closed. Observed GA4 collection
+payloads and successful public/static checks are implementation evidence, not reporting baselines.
+
+The checked-in `artifacts/seo/seo-job-summary.json` and `.md` files remain stale July 2 snapshots.
+The uploaded artifact from workflow run 30678528505 is authoritative for the latest SEO run.
 
 ## Review source contract
 

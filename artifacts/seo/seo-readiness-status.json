@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "scope": "LIGHTING_LAUNCH_MEASUREMENT",
-  "generated_at": "2026-07-31T23:10:32.9711027Z",
-  "generated_at_chicago": "2026-07-31T18:10:32.9711027-05:00",
+  "generated_at": "2026-08-01T02:08:00.4849365Z",
+  "generated_at_chicago": "2026-07-31T21:08:00.4849365-05:00",
   "timezone": "America/Chicago",
   "artifact_semantics": "POINT_IN_TIME_EVIDENCE_SNAPSHOT",
   "operating_mode": "MODE_A_ACCESS_BLOCKED_READINESS_WORK",
-  "verdict": "BLOCKED — GA4/GSC OWNER SETUP REQUIRED",
+  "verdict": "NOT READY — ANALYTICS INSTRUMENTATION DEFECT FOUND",
   "status_vocabulary": [
     "PASS",
     "FAIL",
@@ -16,32 +16,38 @@
     "SKIPPED",
     "NOT_APPLICABLE"
   ],
-  "production_status": "PASS",
-  "analytics_identity_status": "PASS",
+  "production_status": "FAIL",
+  "analytics_identity_status": "FAIL",
   "technical_seo_status": "FAIL",
   "ga4_access_status": "BLOCKED",
   "gsc_access_status": "BLOCKED",
   "day_0_status": "UNSET",
   "four_week_clock_status": "NOT_STARTED",
+  "mandatory_status_labels": {
+    "ga4_baseline": "GA4 BASELINE: BLOCKED — AUTHENTICATED ACCESS UNAVAILABLE",
+    "gsc_baseline": "GSC BASELINE: BLOCKED — AUTHENTICATED ACCESS UNAVAILABLE",
+    "measurement_day_0": "MEASUREMENT DAY 0: UNSET",
+    "four_week_clock": "FOUR-WEEK CLOCK: NOT STARTED"
+  },
   "run_context": {
     "repository": "Verdant-OS/verdant-grow-diary",
-    "branch": "codex/ga4-stream-identity",
-    "head": "0c61cc572de32a8a7af975ace14659dfb77a0a43",
+    "branch": "codex/fix-protected-analytics-paths",
+    "head": "2560d83a6b740cb9d6c4521bc6edc083977d51fc",
     "deploy_branch": "verdant-grow-diary",
-    "deploy_branch_head": "0c61cc572de32a8a7af975ace14659dfb77a0a43",
+    "deploy_branch_head": "2560d83a6b740cb9d6c4521bc6edc083977d51fc",
     "head_equals_deploy_branch_head": true,
-    "working_tree_status": "DIRTY_READINESS_WORK"
+    "working_tree_status": "DIRTY_LOCAL_ANALYTICS_PRIVACY_REPAIR_AND_READINESS_WORK"
   },
   "production": {
     "host": "https://verdantgrowdiary.com",
-    "observed_at": "2026-07-31T23:10:32.9711027Z",
+    "observed_at": "2026-08-01T02:08:00.4849365Z",
     "version_url": "https://verdantgrowdiary.com/version.json",
-    "manifest_commit": "0c61cc572de32a8a7af975ace14659dfb77a0a43",
-    "build_time": "2026-07-31T22:57:00.211Z",
+    "manifest_commit": "2560d83a6b740cb9d6c4521bc6edc083977d51fc",
+    "build_time": "2026-08-01T01:40:18.366Z",
     "matches_deploy_branch_head": true,
     "manifest_is_ancestor_of_deploy_branch_head": true,
-    "source_delta_since_manifest": "NONE",
-    "production_publish_required": false,
+    "source_delta_since_manifest": "LOCAL_UNCOMMITTED_ANALYTICS_PRIVACY_REPAIR",
+    "production_publish_required": true,
     "release_content_match": "PASS",
     "sitemap_url_count": 51,
     "robots_declares_production_sitemap": true,
@@ -75,10 +81,11 @@
     "lighting_pull_request": "https://github.com/Verdant-OS/verdant-grow-diary/pull/595",
     "lighting_status": "LIVE",
     "analytics_repair_pull_request": "https://github.com/Verdant-OS/verdant-grow-diary/pull/597",
-    "analytics_repair_status": "LIVE"
+    "analytics_repair_status": "PR_597_LIVE_BUT_NEW_P0_PROTECTED_PATH_DEFECT_OPEN",
+    "protected_path_repair_status": "FIXED_LOCALLY_VALIDATED_AWAITING_PR_PRODUCTION"
   },
   "analytics_identity": {
-    "last_full_verified_at": "2026-07-31T17:14:59.0979608Z",
+    "last_full_verified_at": "2026-08-01T02:08:00.4849365Z",
     "verification_method": "INTERCEPTED_BROWSER_COLLECTION_REQUESTS",
     "test_events_transmitted": false,
     "stream_identity_status": "PASS",
@@ -93,12 +100,15 @@
     "guide_page_identity": "PASS",
     "route_specific_titles": "PASS",
     "duplicate_page_views": "PASS",
-    "protected_id_masking": "PASS",
+    "protected_id_masking": "FAIL_IN_PRODUCTION",
+    "production_failure_evidence": "A protected plant route containing a synthetic email-like path sentinel queued the literal pathname before authentication redirect; analytics transmission was blocked.",
+    "local_repair_status": "FIXED_LOCALLY_VALIDATED_AWAITING_PR_PRODUCTION",
+    "local_repair_evidence": "The route-shape sanitizer maps the protected route to /plants/:id and unknown routes to /:unknown; 90 focused tests, typecheck, build, postbuild, and intercepted local browser proof pass.",
     "evidence": "docs/seo/lighting-launch-verification.md"
   },
   "technical_seo": {
-    "last_http_verified_at": "2026-07-31T23:10:32.9711027Z",
-    "lighting_pages": "FAIL",
+    "last_http_verified_at": "2026-08-01T02:08:00.4849365Z",
+    "lighting_pages": "PASS",
     "direct_load_indexability": "PASS",
     "route_runtime_structured_data": "FAIL",
     "robots": "PASS",
@@ -107,7 +117,7 @@
     "evidence": "docs/seo/lighting-launch-verification.md"
   },
   "reporting_access_configuration": {
-    "observed_at": "2026-07-31T23:10:32.9711027Z",
+    "observed_at": "2026-08-01T02:08:00.4849365Z",
     "audit_method": "GITHUB_SECRET_NAME_LISTING",
     "configured_scopes_checked": [
       "repository",
@@ -131,7 +141,7 @@
     "status": "BLOCKED",
     "reason": "AUTHENTICATED_ACCESS_UNAVAILABLE",
     "baseline_status": "BLOCKED",
-    "collection_contract_status": "PASS",
+    "collection_contract_status": "FAIL_PROTECTED_ROUTE_MASKING",
     "stream_identity_status": "PASS",
     "property_identity_status": "BLOCKED",
     "stream": {
@@ -150,7 +160,7 @@
     "baseline_status": "BLOCKED",
     "authenticated_reporting_available": false,
     "local_oauth_token_available": false,
-    "latest_workflow_run": "https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30671654959",
+    "latest_workflow_run": "https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30678528505",
     "latest_workflow_status": "PASS",
     "operation_status": "SKIPPED",
     "access_status": "BLOCKED",
@@ -171,6 +181,14 @@
   },
   "open_blockers": [
     {
+      "id": "PROTECTED_ANALYTICS_PATH_REDACTION",
+      "priority": "P0",
+      "status": "FIXED_LOCALLY_VALIDATED_AWAITING_PR_PRODUCTION",
+      "owner": "CODEX_RELEASE_HANDOFF",
+      "reason": "PRODUCTION_PROTECTED_PATH_MASKING_FAILURE",
+      "required_action": "Open and merge the scoped sanitizer repair, publish it, and repeat intercepted production verification before closing the defect."
+    },
+    {
       "id": "GA4_AUTHENTICATED_ACCESS",
       "status": "BLOCKED",
       "owner": "OWNER",
@@ -186,6 +204,21 @@
     }
   ],
   "verified_defects": [
+    {
+      "id": "PROTECTED_ANALYTICS_PATH_REDACTION",
+      "priority": "P0",
+      "status": "FIXED_LOCALLY_VALIDATED_AWAITING_PR_PRODUCTION",
+      "production_status": "FAIL",
+      "evidence": "A protected plant path containing a synthetic email-like sentinel queued the literal pathname before authentication redirect. No real identifier was used and the collection request was blocked.",
+      "local_repair": "Protected route shapes are reduced to /plants/:id and unknown paths to /:unknown.",
+      "focused_tests_passed": 90,
+      "typecheck": "PASS",
+      "build": "PASS",
+      "postbuild": "PASS",
+      "local_intercepted_browser_proof": "PASS",
+      "merged": false,
+      "deployed": false
+    },
     {
       "id": "SEO_MONITORING_STALE_TERMINAL_SUMMARY",
       "priority": "P3",
@@ -210,15 +243,20 @@
     }
   ],
   "current_slice": {
-    "priority": "P2",
-    "id": "GA4_PRODUCTION_STREAM_IDENTITY",
-    "status": "COMPLETE_AT_GENERATION",
-    "evidence": "Owner-confirmed stream values match the deployed production tag and canonical host; property identity and reporting access remain blocked."
+    "priority": "P0",
+    "id": "PROTECTED_ANALYTICS_PATH_REDACTION",
+    "status": "FIXED_LOCALLY_VALIDATED_AWAITING_PR_PRODUCTION",
+    "evidence": "The scoped local repair and its 90 focused tests, typecheck, build, postbuild, and intercepted browser proof pass; production still leaks the synthetic protected path sentinel."
   },
   "next_slice": {
-    "priority": "P1",
-    "id": "LIGHTING_DUPLICATE_HYDRATED_JSON_LD",
-    "status": "NOT_STARTED"
+    "priority": "P0",
+    "id": "PROTECTED_ANALYTICS_PATH_RELEASE_AND_PRODUCTION_REVERIFICATION",
+    "status": "NOT_STARTED",
+    "after_p0": {
+      "priority": "P1",
+      "id": "LIGHTING_DUPLICATE_HYDRATED_JSON_LD",
+      "status": "VERIFIED_UNFIXED"
+    }
   },
   "monitoring_repair": {
     "status": "MERGED_AND_POST_MERGE_VERIFIED",
@@ -234,8 +272,20 @@
       "urls_evaluated": 51,
       "gsc_api_attempts": 0
     },
-    "production_publish_required": false,
-    "production_publish_reason": "Production manifest and deploy head match; no pending public app release exists."
+    "latest_authoritative_workflow": {
+      "url": "https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/30678528505",
+      "status": "PASS",
+      "operation_status": "SKIPPED",
+      "gsc_access_status": "BLOCKED",
+      "gsc_execution_status": "SKIPPED",
+      "oauth_configured": false,
+      "urls_evaluated": 51,
+      "gsc_api_attempts": 0
+    },
+    "checked_in_summary_status": "STALE_JULY_2_SNAPSHOT",
+    "authoritative_summary_source": "UPLOADED_WORKFLOW_ARTIFACT_RUN_30678528505",
+    "production_publish_required": true,
+    "production_publish_reason": "The production manifest matches deploy head, but the local P0 analytics privacy repair is not merged or published."
   },
   "artifact_paths": {
     "readiness_status": "artifacts/seo/seo-readiness-status.json",
@@ -252,6 +302,8 @@
     "credentials_included": false,
     "private_routes_included": false,
     "private_ids_included": false,
+    "production_reproduction_used_synthetic_identifier_only": true,
+    "analytics_transmission_blocked_during_verification": true,
     "unavailable_metrics_are_null": true
   }
 }

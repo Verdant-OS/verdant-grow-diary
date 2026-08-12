@@ -15,10 +15,44 @@ declare global {
   }
 }
 
+/**
+ * Returns the current canonical pathname only when the document exposes
+ * exactly one clean, same-origin http(s) canonical. Anything ambiguous or
+ * cross-origin fails closed so it cannot authorize a literal analytics slug.
+ */
+function readTrustedCanonicalPathname(): string | null {
+  const canonicalLinks = Array.from(
+    document.head.querySelectorAll<HTMLLinkElement>("link[rel]"),
+  ).filter((link) => link.rel.toLowerCase().split(/\s+/).includes("canonical"));
+  if (canonicalLinks.length !== 1) return null;
+
+  const href = canonicalLinks[0].getAttribute("href")?.trim();
+  if (!href) return null;
+
+  try {
+    const currentOrigin = new URL(window.location.origin);
+    const canonical = new URL(href, currentOrigin);
+    const isHttpOrigin = currentOrigin.protocol === "http:" || currentOrigin.protocol === "https:";
+    const isHttpCanonical = canonical.protocol === "http:" || canonical.protocol === "https:";
+
+    if (!isHttpOrigin || !isHttpCanonical || canonical.origin !== currentOrigin.origin) {
+      return null;
+    }
+    if (canonical.username || canonical.password || canonical.search || canonical.hash) {
+      return null;
+    }
+
+    return canonical.pathname;
+  } catch {
+    return null;
+  }
+}
+
 function trackPageView(path: string, title: string) {
   if (typeof window === "undefined") return;
   if (typeof window.gtag !== "function") return;
-  const safePath = sanitizePagePath(path);
+  const trustedCanonicalPathname = readTrustedCanonicalPathname();
+  const safePath = sanitizePagePath(path, trustedCanonicalPathname);
   // Send an explicit page_view EVENT, not a repeat `config` call. index.html
   // bootstraps this measurement id with `send_page_view: false` so the initial
   // automatic hit can never fire with an unsanitized URL. Settings passed to
@@ -30,7 +64,11 @@ function trackPageView(path: string, title: string) {
   window.gtag("event", "page_view", {
     send_to: GOOGLE_ANALYTICS_MEASUREMENT_ID,
     page_path: safePath,
-    page_location: buildSafeAnalyticsPageLocation(window.location.origin, safePath),
+    page_location: buildSafeAnalyticsPageLocation(
+      window.location.origin,
+      path,
+      trustedCanonicalPathname,
+    ),
     page_title: title,
   });
 }

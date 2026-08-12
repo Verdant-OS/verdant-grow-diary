@@ -13,6 +13,8 @@ import { describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import BlueprintTargetsGuide, { buildStageMetricRows } from "@/pages/BlueprintTargetsGuide";
 import { SOP_BLUEPRINT_TARGETS } from "@/constants/blueprintTargets";
+import { staticRouteHead } from "@/lib/build/staticRouteHead";
+import { VERDANT_BLUEPRINT_TARGETS_FAQ } from "@/constants/verdantSeoContent";
 
 vi.mock("@/hooks/usePageSeo", () => ({ usePageSeo: () => {} }));
 
@@ -170,5 +172,44 @@ describe("BlueprintTargetsGuide", () => {
     // The care guide is explicit that a flush is not automatic.
     expect(text).toMatch(/runoff EC|leaf-tip burn|salt stress/i);
     expect(text).not.toMatch(/for the flush ahead of harvest/i);
+  });
+});
+
+describe("BlueprintTargetsGuide structured data", () => {
+  it("emits FAQPage and BreadcrumbList in the SERVER-rendered head", () => {
+    // Previously these were injected from a useEffect, so they existed only
+    // after hydration — a crawler reading the SSR response saw the tables but
+    // no schema at all. They are registered on the static public document now.
+    const head = staticRouteHead("/tools/blueprint-targets");
+    const types = head.scripts.map((s) => JSON.parse(s.children)["@type"]);
+    expect(types).toContain("WebPage");
+    expect(types).toContain("FAQPage");
+    expect(types).toContain("BreadcrumbList");
+  });
+
+  it("renders the same questions it publishes as schema", () => {
+    // One shared constant feeds both, so the visible <dl> and the FAQPage
+    // node cannot drift apart.
+    const head = staticRouteHead("/tools/blueprint-targets");
+    const faqNode = head.scripts
+      .map((s) => JSON.parse(s.children))
+      .find((n) => n["@type"] === "FAQPage");
+    const schemaQuestions = (faqNode?.mainEntity ?? []).map(
+      (e: { name: string }) => e.name,
+    );
+    expect(schemaQuestions).toEqual(VERDANT_BLUEPRINT_TARGETS_FAQ.map((f) => f.question));
+
+    render(<BlueprintTargetsGuide />);
+    for (const entry of VERDANT_BLUEPRINT_TARGETS_FAQ) {
+      expect(screen.getByText(entry.question)).toBeInTheDocument();
+    }
+  });
+
+  it("scopes the higher-runoff claim to EC, since pH can drift either way", () => {
+    const answer =
+      VERDANT_BLUEPRINT_TARGETS_FAQ.find((f) => f.question.includes("input feed or runoff"))
+        ?.answer ?? "";
+    expect(answer).toMatch(/runoff EC normally reads higher/i);
+    expect(answer).toMatch(/drift in either direction/i);
   });
 });

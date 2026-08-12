@@ -55,10 +55,16 @@ describe("calculateDecarbTotal", () => {
     expect(calculateDecarbTotal(null, null)).toBeNull();
   });
 
-  it("applies the decarb factor to the acid form only", () => {
-    expect(calculateDecarbTotal(20, null)).toBeCloseTo(20 * DECARB_FACTOR);
-    expect(calculateDecarbTotal(null, 1.5)).toBeCloseTo(1.5);
-    expect(calculateDecarbTotal(24, 0.5)).toBeCloseTo(24 * DECARB_FACTOR + 0.5);
+  it("applies the decarb factor and flags single-form totals as partial", () => {
+    const acidOnly = calculateDecarbTotal(20, null);
+    expect(acidOnly?.value).toBeCloseTo(20 * DECARB_FACTOR);
+    expect(acidOnly?.partial).toBe(true);
+    const neutralOnly = calculateDecarbTotal(null, 1.5);
+    expect(neutralOnly?.value).toBeCloseTo(1.5);
+    expect(neutralOnly?.partial).toBe(true);
+    const both = calculateDecarbTotal(24, 0.5);
+    expect(both?.value).toBeCloseTo(24 * DECARB_FACTOR + 0.5);
+    expect(both?.partial).toBe(false);
   });
 });
 
@@ -118,6 +124,13 @@ describe("buildLabResultsView", () => {
     // 24 × 0.877 + 0.5 = 21.548 → rounded for display
     expect(card.totalThcLabel).toBe("21.55%");
     expect(card.totalCbdLabel).toBeNull();
+  });
+
+  it("marks a single-form total as a lower bound, never fabricated precision", () => {
+    // THCa reported, THC not listed: the true total is unknown but at least
+    // THCa × 0.877 — the label must say so instead of implying exactness.
+    const view = buildLabResultsView([row({ thcaPercent: 24 })]);
+    expect(view.cards[0].totalThcLabel).toBe("≥ 21.05%");
   });
 
   it("drops invalid terpene entries and sorts by percentage descending", () => {

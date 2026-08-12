@@ -44,6 +44,11 @@ import {
   type SelectionEvidence,
   type TimepointAssessment,
 } from "./phenoSelectionRules";
+import {
+  buildPhenoLabEvidenceView,
+  type PhenoLabEvidenceInput,
+  type PhenoLabEvidenceView,
+} from "./phenoLabEvidenceRules";
 
 // ---------------------------------------------------------------------------
 // Inputs
@@ -94,6 +99,8 @@ export interface PhenoCandidateInput {
   timelineEvents?: readonly PhenoTimelineEventInput[];
   /** Environment telemetry — CONTEXT ONLY, never a selection signal. */
   snapshot?: PhenoSensorSnapshotInput | null;
+  /** Latest grower-entered measured lab result (COA), when one exists. */
+  labEvidence?: PhenoLabEvidenceInput | null;
 }
 
 export interface PhenoComparisonInput {
@@ -179,6 +186,8 @@ export interface PhenoCandidateView {
   selectionCaveats: SelectionCaveat[];
   /** Demoted environment telemetry (context only). */
   environmentContext: PhenoEnvironmentContextView;
+  /** Latest measured lab result, or null (presenter shows the honest gap). */
+  labEvidence: PhenoLabEvidenceView | null;
 }
 
 export interface PhenoComparisonViewModel {
@@ -188,6 +197,13 @@ export interface PhenoComparisonViewModel {
   /** Grades whether the candidates are even comparable. */
   comparability: ComparabilityGrade;
   candidates: PhenoCandidateView[];
+  /**
+   * True when at least one candidate carries measured lab evidence. The
+   * presenter only shows the lab section at all when this is true, so a
+   * comparison with no lab data anywhere (including the sample) stays
+   * uncluttered while a partial one shows honest per-candidate gaps.
+   */
+  hasAnyLabEvidence: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -198,9 +214,7 @@ export interface PhenoComparisonViewModel {
  * Fixed default clock. Keeping this deterministic (rather than Date.now())
  * means fixtures and tests render identically without injecting a clock.
  */
-export const PHENO_COMPARISON_DEFAULT_NOW = Date.parse(
-  "2026-07-01T12:00:00.000Z",
-);
+export const PHENO_COMPARISON_DEFAULT_NOW = Date.parse("2026-07-01T12:00:00.000Z");
 
 const DEFAULT_MAX_QUICK_LOGS = 5;
 const DEFAULT_MAX_TIMELINE_EVENTS = 5;
@@ -253,10 +267,7 @@ function titleCaseKind(kind: string): string {
  *   1. timestamp desc (undated sinks to the bottom)
  *   2. id asc
  */
-function byNewest<T extends { at: string | null; id: string }>(
-  a: T,
-  b: T,
-): number {
+function byNewest<T extends { at: string | null; id: string }>(a: T, b: T): number {
   const ta = parseTs(a.at);
   const tb = parseTs(b.at);
   if (ta !== tb) {
@@ -399,22 +410,21 @@ export function buildPhenoComparisonViewModel(
       postCure,
       selectionCaveats,
       environmentContext,
+      labEvidence: buildPhenoLabEvidenceView(c.labEvidence),
     };
   });
 
-  const comparabilityCandidates: ComparabilityCandidate[] = candidates.map(
-    (c) => ({
-      tentId: c.tentId,
-      growId: c.growId,
-      tentName: c.tentName,
-      growName: c.growName,
-      medium: c.medium,
-      dayOfFlower: c.timepoint.dayOfFlower,
-      replicated: c.replication.replicated,
-      strength: c.selectionEvidence.strength,
-      cured: c.postCure.cured,
-    }),
-  );
+  const comparabilityCandidates: ComparabilityCandidate[] = candidates.map((c) => ({
+    tentId: c.tentId,
+    growId: c.growId,
+    tentName: c.tentName,
+    growName: c.growName,
+    medium: c.medium,
+    dayOfFlower: c.timepoint.dayOfFlower,
+    replicated: c.replication.replicated,
+    strength: c.selectionEvidence.strength,
+    cured: c.postCure.cured,
+  }));
 
   return {
     huntName: nullableText(input.huntName),
@@ -424,5 +434,6 @@ export function buildPhenoComparisonViewModel(
       dayTolerance: opts.dayTolerance,
     }),
     candidates,
+    hasAnyLabEvidence: candidates.some((c) => c.labEvidence !== null),
   };
 }

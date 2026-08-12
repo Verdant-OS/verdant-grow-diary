@@ -64,7 +64,7 @@ export const LAB_RESULTS_EMPTY_COPY =
 
 /** Shown under the cards; states exactly where numbers come from. */
 export const LAB_RESULTS_HONESTY_NOTE =
-  "Entered by you from your lab report. Totals are calculated as acid form × 0.877 + neutral form.";
+  "Entered by you from your lab report. Totals are calculated as acid form × 0.877 + neutral form; when the report lists only one form, the total is shown as at least (≥) that amount.";
 
 export const LAB_RESULTS_ADD_LABEL = "Add lab result";
 
@@ -81,25 +81,46 @@ export function formatPercent(v: number): string {
   return `${rounded}%`;
 }
 
+export interface DecarbTotal {
+  value: number;
+  /**
+   * True when the COA listed only one of the two forms. The computed value is
+   * then a LOWER BOUND (the missing form can only add), never the exact
+   * total — display must say "≥", not a precise figure.
+   */
+  partial: boolean;
+}
+
 /**
  * Total = acid × 0.877 + neutral. Computable when at least one part is
- * present; a missing part contributes 0 (the COA simply didn't list it).
+ * present. With both parts it is the exact calculated total; with one part
+ * it is a partial lower bound and is flagged as such — the honesty doctrine
+ * forbids displaying fabricated precision for an unreported component.
  */
 export function calculateDecarbTotal(
   acidPercent: number | null,
   neutralPercent: number | null,
-): number | null {
+): DecarbTotal | null {
   const hasAcid = isPercent(acidPercent);
   const hasNeutral = isPercent(neutralPercent);
   if (!hasAcid && !hasNeutral) return null;
-  return (hasAcid ? acidPercent * DECARB_FACTOR : 0) + (hasNeutral ? neutralPercent : 0);
+  return {
+    value: (hasAcid ? acidPercent * DECARB_FACTOR : 0) + (hasNeutral ? neutralPercent : 0),
+    partial: !hasAcid || !hasNeutral,
+  };
+}
+
+/** "21.55%" when exact, "≥ 21.05%" when one form was not reported. */
+export function formatDecarbTotal(total: DecarbTotal): string {
+  return total.partial ? `≥ ${formatPercent(total.value)}` : formatPercent(total.value);
 }
 
 /**
+ * Valid terpene entries from a raw jsonb payload, highest percentage first.
  * Entries whose keys trim to the same name (possible only in pre-constraint
  * or tampered data) are deduped deterministically: highest value wins.
  */
-function parseTerpenes(raw: unknown): Array<{ name: string; value: number }> {
+export function parseTerpenes(raw: unknown): Array<{ name: string; value: number }> {
   if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return [];
   const entries: Array<{ name: string; value: number }> = [];
   for (const [name, value] of Object.entries(raw as Record<string, unknown>)) {
@@ -118,13 +139,15 @@ function parseTerpenes(raw: unknown): Array<{ name: string; value: number }> {
 }
 
 /**
+ * "Mar 14, 2026" or "Date not recorded" for a missing/invalid timestamp.
+ *
  * Formatted in UTC on purpose: the draft validator stores the entered
  * date-only value as midnight UTC, so formatting that instant in the
  * browser's LOCAL timezone would shift the recorded COA date back a day for
  * every grower west of UTC. A lab report date is a calendar date, not an
  * instant — UTC formatting preserves it exactly as entered.
  */
-function formatDateLabel(iso: string | null): string {
+export function formatLabDateLabel(iso: string | null): string {
   if (typeof iso !== "string" || iso.length === 0) return "Date not recorded";
   const t = Date.parse(iso);
   if (!Number.isFinite(t)) return "Date not recorded";
@@ -182,14 +205,14 @@ export function buildLabResultsView(
       const totalCbd = calculateDecarbTotal(row.cbdaPercent, row.cbdPercent);
       return {
         id: row.id,
-        dateLabel: formatDateLabel(row.testedAt),
+        dateLabel: formatLabDateLabel(row.testedAt),
         labName:
           typeof row.labName === "string" && row.labName.trim().length > 0
             ? row.labName.trim()
             : null,
         cannabinoids,
-        totalThcLabel: totalThc === null ? null : formatPercent(totalThc),
-        totalCbdLabel: totalCbd === null ? null : formatPercent(totalCbd),
+        totalThcLabel: totalThc === null ? null : formatDecarbTotal(totalThc),
+        totalCbdLabel: totalCbd === null ? null : formatDecarbTotal(totalCbd),
         terpenes: parseTerpenes(row.terpenes).map((t) => ({
           name: t.name,
           valueLabel: formatPercent(t.value),

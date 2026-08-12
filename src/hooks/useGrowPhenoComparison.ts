@@ -33,6 +33,7 @@ import {
 import { snapshotFromReadings } from "@/lib/sensorSnapshot";
 import type { PhenoSensorSnapshotInput } from "@/lib/phenoComparisonRules";
 import type { PhenoComparisonInput } from "@/lib/phenoComparisonViewModel";
+import { latestLabEvidenceByPlant, type PhenoLabEvidenceDbRow } from "@/lib/phenoLabEvidenceRules";
 
 const ACTIVITY_PER_CANDIDATE = 5;
 
@@ -114,7 +115,7 @@ export function useGrowPhenoComparison(growId: string | null | undefined) {
       );
 
       // Grow name + tent names + recent activity + latest photos, in parallel.
-      const [growRes, tentRes, eventRes, photoRes, scoreRes] = await Promise.all([
+      const [growRes, tentRes, eventRes, photoRes, scoreRes, labRes] = await Promise.all([
         supabase.from("grows").select("id,name").eq("id", growId).maybeSingle(),
         tentIds.length > 0
           ? supabase.from("tents").select("id,name").in("id", tentIds)
@@ -133,10 +134,18 @@ export function useGrowPhenoComparison(growId: string | null | undefined) {
           .not("photo_url", "is", null)
           .order("entry_at", { ascending: false })
           .limit(plantIds.length * 3),
+        supabase.from("pheno_candidate_scores").select("plant_id,traits").eq("hunt_id", hunt.id),
         supabase
-          .from("pheno_candidate_scores")
-          .select("plant_id,traits")
-          .eq("hunt_id", hunt.id),
+          .from("lab_tests" as never)
+          .select(
+            "plant_id,tested_at,thca_percent,thc_percent,cbda_percent,cbd_percent,terpenes,lab_name",
+          )
+          .in("plant_id", plantIds)
+          // "Latest per plant" takes the first row seen; same-day tests share
+          // a midnight tested_at, so created_at + id keep the pick stable.
+          .order("tested_at", { ascending: false })
+          .order("created_at", { ascending: false })
+          .order("id", { ascending: true }),
       ]);
       if (growRes.error) throw growRes.error;
       if (tentRes.error) throw tentRes.error;
@@ -150,6 +159,12 @@ export function useGrowPhenoComparison(growId: string | null | undefined) {
       for (const row of scoreRows) {
         if (row.plant_id) scoreTraitsByPlant[row.plant_id] = row.traits;
       }
+      // Lab evidence is enrichment: a failed lab query must never break the
+      // comparison itself (e.g. before the lab_tests migration is applied).
+      const labRows = labRes.error
+        ? []
+        : ((labRes.data ?? []) as unknown as PhenoLabEvidenceDbRow[]);
+      const labEvidenceByPlant = latestLabEvidenceByPlant(labRows);
       // Photo enrichment is best-effort: a failed photo query must never
       // break the comparison itself.
       const photoRows = photoRes.error
@@ -175,12 +190,11 @@ export function useGrowPhenoComparison(growId: string | null | undefined) {
         else toSign.push({ plantId, path: url });
       }
       if (toSign.length > 0) {
-        const { data: signed } = await supabase.storage
-          .from("diary-photos")
-          .createSignedUrls(toSign.map((t) => t.path), 3600);
-        const byPath = new Map(
-          (signed ?? []).map((s) => [s.path as string, s.signedUrl] as const),
+        const { data: signed } = await supabase.storage.from("diary-photos").createSignedUrls(
+          toSign.map((t) => t.path),
+          3600,
         );
+        const byPath = new Map((signed ?? []).map((s) => [s.path as string, s.signedUrl] as const));
         for (const t of toSign) {
           const url = byPath.get(t.path);
           if (url) photoUrlByPlant[t.plantId] = url;
@@ -253,17 +267,16 @@ export function useGrowPhenoComparison(growId: string | null | undefined) {
         photoUrlByPlant,
         snapshotByTent,
         scoreTraitsByPlant,
+        labEvidenceByPlant,
         maxActivityPerCandidate: ACTIVITY_PER_CANDIDATE,
       });
 
       // Scorecard candidate list mirrors the comparison's label order.
-      const scorecardCandidates: PhenoScorecardCandidate[] = input.candidates.map(
-        (c) => ({
-          plantId: c.id,
-          candidateLabel: c.candidateLabel,
-          plantName: c.plantName ?? null,
-        }),
-      );
+      const scorecardCandidates: PhenoScorecardCandidate[] = input.candidates.map((c) => ({
+        plantId: c.id,
+        candidateLabel: c.candidateLabel,
+        plantName: c.plantName ?? null,
+      }));
 
       return {
         huntId: hunt.id,

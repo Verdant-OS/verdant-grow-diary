@@ -24,14 +24,15 @@ Skipped:             full suite, type-check, runtime harness, live Supabase quer
 
 ## Phase 2 gate status
 
-| #   | Gate item                                             | Status                                                                                                                                  | Owner                  |
-| --- | ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
-| 1   | Phase 1.7 wrapper tests pass                          | `PASS`                                                                                                                                  | verified above         |
-| 2   | Token storage / rotation / revocation policy approved | `BLOCKED`                                                                                                                               | Cheek (owner decision) |
-| 3   | Schema / RLS / idempotency audit approves write path  | `BLOCKED` — spec drafted 2026-08-12; approval blocked on its verification items and owner decisions (was unbegun at this record's date) | = Phase 1.8 spec       |
-| 4   | Live-label fencing policy approved                    | `BLOCKED`                                                                                                                               | Cheek (owner decision) |
+| #   | Gate item                                             | Status                                                                                                                                  | Owner                                 |
+| --- | ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| 1   | Phase 1.7 wrapper tests pass                          | `PASS`                                                                                                                                  | verified above                        |
+| 2   | Token storage / rotation / revocation policy approved | `APPROVED` (2026-08-12; was blocked at this record's date)                                                                              | `docs/ecowitt-bridge-token-policy.md` |
+| 3   | Schema / RLS / idempotency audit approves write path  | `BLOCKED` — spec drafted 2026-08-12; approval blocked on its verification items and owner decisions (was unbegun at this record's date) | = Phase 1.8 spec                      |
+| 4   | Live-label fencing policy approved                    | `BLOCKED`                                                                                                                               | Cheek (owner decision)                |
 
-One of four gate items is cleared. Persistence remains blocked.
+Two of four gate items are cleared (1 at this record's date, 2 on 2026-08-12).
+Persistence remains blocked.
 
 ## Finding: `source='live'` is unreachable at Phase 1.7
 

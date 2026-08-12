@@ -284,3 +284,22 @@ describe("BlueprintTargetsGuide late-flower flush band", () => {
     }
   });
 });
+
+describe("BlueprintTargetsGuide PPFD/DLI coherence", () => {
+  it("ties DLI to the photoperiod, since it is not independent of PPFD", () => {
+    // veg PPFD 700 @18h = 45.4 (above the 25-40 band); flower PPFD 700 @12h =
+    // 30.2 (below 35-45). Unqualified, a grower could "fix" a valid setup.
+    const dli = buildStageMetricRows(SOP_BLUEPRINT_TARGETS.veg, "veg").find((r) => r.key === "dli");
+    expect(dli?.note ?? "").toMatch(/photoperiod/i);
+    expect(dli?.note ?? "").toMatch(/light-hours/i);
+  });
+
+  it("frames the bands as baselines to compare against, not a pass/fail test", () => {
+    const definition =
+      VERDANT_BLUEPRINT_TARGETS_FAQ.find((f) => f.question.includes("target bands"))?.answer ?? "";
+    expect(definition).toMatch(/baseline/i);
+    // The page intro and a later answer both call these starting points, not
+    // rules; the definition must not contradict them.
+    expect(definition).not.toMatch(/what matters is staying inside the range/i);
+  });
+});

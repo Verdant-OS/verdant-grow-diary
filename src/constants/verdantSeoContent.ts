@@ -2138,6 +2138,11 @@ export const VERDANT_BLUEPRINT_TARGETS_FAQ: ReadonlyArray<FaqEntry> = [
       "Not automatically. Base any taper or flush on evidence — runoff EC, leaf-tip burn, or visible salt stress — rather than on the calendar. Aggressive late-stage flushing can weaken a plant that is still filling out.",
   },
   {
+    question: "Do the dry and cure numbers mean the same thing?",
+    answer:
+      "No, and the difference matters. The temperature and humidity bands shown describe the drying space — an ambient room reading, taken while the material is hanging or on racks. Curing happens in sealed jars or bags, where the humidity that counts is the one inside the container. A room sitting comfortably in range tells you nothing about a jar holding too much moisture, which is where mould tends to appear, so measure inside the container once the material is packed and burp it on what that reading says.",
+  },
+  {
     question: "Are these targets the same for every cultivar?",
     answer:
       "No. These are a starting point drawn from a standard operating procedure, and cultivars differ — some tolerate more heat, some finish faster. Treat the bands as a default to log against and adjust from, not a rule.",

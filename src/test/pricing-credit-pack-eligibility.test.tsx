@@ -210,7 +210,16 @@ describe("Pricing credit-pack entitlement gate", () => {
     const buyButton = screen.getByTestId("pricing-cta-credit_pack_50");
     expect(buyButton).toBeEnabled();
     await user.click(buyButton);
-    expect(mocks.openCheckout).toHaveBeenCalledWith({ priceId: "credit_pack_50" });
+    // Packs pass an explicit successUrl instead of taking the shared default.
+    // The default forwards `returnTo`, which /checkout/success auto-redirects
+    // on as soon as a paid plan is confirmed — already true for every pack
+    // buyer — so it would bounce them back before the grant landed.
+    expect(mocks.openCheckout).toHaveBeenCalledWith({
+      priceId: "credit_pack_50",
+      successUrl: expect.stringContaining("/checkout/success"),
+    });
+    const [{ successUrl }] = mocks.openCheckout.mock.calls[0] as [{ successUrl: string }];
+    expect(new URL(successUrl).searchParams.get("returnTo")).toBeNull();
   });
 
   it("fails closed while plan lookup is pending", () => {

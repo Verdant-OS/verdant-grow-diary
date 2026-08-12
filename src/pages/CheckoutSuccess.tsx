@@ -8,6 +8,7 @@ import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import {
   buildCheckoutReturnNavigationState,
   classifyCheckoutReturnSurface,
+  CREDIT_PACK_RETURN_TO_PARAM,
   sanitizeCheckoutReturnTo,
   shouldCreateCheckoutReturnCompletionMarker,
 } from "@/lib/checkoutReturnTo";
@@ -68,6 +69,13 @@ export default function CheckoutSuccess() {
   );
   const activation = useMemo(
     () => buildCheckoutActivationViewModel(searchParams.get("returnTo")),
+    [searchParams],
+  );
+  // A credit-pack buyer's origin, carried under its own param precisely so it
+  // does NOT feed the auto-redirect below. Offered as a link they click when
+  // ready rather than a navigation that fires before the grant has landed.
+  const packReturnTo = useMemo(
+    () => sanitizeCheckoutReturnTo(searchParams.get(CREDIT_PACK_RETURN_TO_PARAM)),
     [searchParams],
   );
   const checkoutReturnSurface = useMemo(
@@ -206,6 +214,24 @@ export default function CheckoutSuccess() {
             <div className="mt-4 flex justify-center">
               <AccountPlanBadge entitlement={entitlement} />
             </div>
+            {packReturnTo && (
+              <div
+                className="mt-8 rounded-xl border border-primary/20 bg-primary/5 p-5"
+                data-testid="checkout-success-pack-return"
+              >
+                <p className="text-sm text-muted-foreground">
+                  Top-up credits are added server-side by the billing webhook, usually within a few
+                  seconds.
+                </p>
+                <Link
+                  to={packReturnTo}
+                  className="mt-3 inline-flex text-sm font-medium text-primary underline underline-offset-4"
+                  data-testid="checkout-success-pack-return-link"
+                >
+                  Back to where you left off
+                </Link>
+              </div>
+            )}
             {!safeReturnTo && (
               <div
                 className="mt-8 rounded-xl border border-primary/20 bg-primary/5 p-5 text-left"

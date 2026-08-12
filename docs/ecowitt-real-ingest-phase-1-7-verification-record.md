@@ -67,12 +67,12 @@ which is the exact failure the phase sequencing exists to prevent.
 
 Recorded so the same errors are not re-introduced:
 
-| Claim in guide                                        | Status    | Correct value                                                                         |
-| ----------------------------------------------------- | --------- | ------------------------------------------------------------------------------------- |
-| Supabase project `bzatgtgjvuojpoxcknaa`               | **FAIL**  | `knkwiiywfkbqznbxwqfh` — the guide's ref appears in zero files in this repo           |
-| `~/verdant-testbench` is "your local copy of Verdant" | **FAIL**  | Not a git repository. Contains only `ecowitt_listener.py` and `ecowitt_raw_log.jsonl` |
-| Local listener demonstrates current gateway traffic   | **STALE** | `ecowitt_raw_log.jsonl` last written 2026-06-24 (879 lines); nothing received since   |
-| Confirm `source='live'` to close Phase 1.7            | **FAIL**  | Unreachable by design — see finding above                                             |
+| Claim in guide                                        | Status    | Correct value                                                                                                                                                                                                                                                                             |
+| ----------------------------------------------------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Supabase project `bzatgtgjvuojpoxcknaa`               | **FAIL**  | `knkwiiywfkbqznbxwqfh` — the guide's ref appears in zero repo files. Later identified (2026-08-12, via PR #907 checks) as the repo's Supabase **Preview/sandbox** integration project — not fabricated, but the wrong target: a verification "pass" there proves nothing about production |
+| `~/verdant-testbench` is "your local copy of Verdant" | **FAIL**  | Not a git repository. Contains only `ecowitt_listener.py` and `ecowitt_raw_log.jsonl`                                                                                                                                                                                                     |
+| Local listener demonstrates current gateway traffic   | **STALE** | `ecowitt_raw_log.jsonl` last written 2026-06-24 (879 lines); nothing received since                                                                                                                                                                                                       |
+| Confirm `source='live'` to close Phase 1.7            | **FAIL**  | Unreachable by design — see finding above                                                                                                                                                                                                                                                 |
 
 ## Not verified
 

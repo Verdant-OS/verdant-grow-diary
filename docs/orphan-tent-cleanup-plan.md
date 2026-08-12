@@ -1,8 +1,8 @@
 # Orphan Tent Cleanup Plan (AUDIT / PLAN ONLY)
 
-Status: **RESOLVED.** Option A was executed via commit `bb0d6e302`
-("Restored orphan tent placeholder", 2026-06-06), 14 minutes after this
-plan was last edited. Kept for historical record; no action remains open.
+Status: **IMPLEMENTATION COMMITTED; VERIFICATION PENDING.** Option A was added in
+commit `bb0d6e302` ("Restored orphan tent placeholder", 2026-06-06). Confirm
+that the migration was applied and record the required zero-orphan post-audit before marking this plan resolved.
 Source audit: `src/lib/orphanTentReferenceAudit.ts`, `scripts/run-orphan-tent-audit.ts`.
 
 ## Summary

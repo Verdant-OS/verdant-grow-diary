@@ -124,36 +124,19 @@ export function snapshotFromReadings(
   const allCsv =
     latest.length > 0 && latest.every((r) => r.source === "csv");
   const anyCsv = latest.some((r) => r.source === "csv");
-  const anyImport = latest.some((r) => r.source === "import");
-  const anyDiary = latest.some((r) => r.source === "diary");
-  // Recognised ingest sources that legitimately mean "live". Kept as an
-  // explicit allowlist so a new or unlabeled source can never join it by
-  // default.
-  const anyLive = latest.some(
-    (r) => r.source === "live" || r.source === "pi_bridge",
-  );
   // CSV history must never be promoted to "live". If every row at the
   // latest timestamp is CSV, classify as "csv". If CSV is mixed with
   // non-live sources but no manual, still prefer csv over live so
   // imported history never masquerades as a live reading.
-  //
-  // "live" is claimed only when a row explicitly says so. Anything we cannot
-  // recognise (null, "", or a source we do not model) resolves to
-  // "unavailable", which presents as "Unknown" and fails closed for alert
-  // persistence. The previous catch-all `: "live"` promoted unlabeled and
-  // grower-entered telemetry into "Live" on every surface reading this
-  // snapshot directly — the one claim we must never make without evidence.
   const source: SnapshotSource = anyManual
     ? "manual"
     : allSim
       ? "sim"
-      : allCsv || anyCsv || anyImport
+      : allCsv
         ? "csv"
-        : anyDiary
-          ? "diary"
-          : anyLive
-            ? "live"
-            : "unavailable";
+        : anyCsv
+          ? "csv"
+          : "live";
   // Prefer a device_id from a row matching the resolved source so manual
   // device notes (device_id = "manual:...") are surfaced for manual
   // snapshots; otherwise fall back to any device_id at the latest ts.

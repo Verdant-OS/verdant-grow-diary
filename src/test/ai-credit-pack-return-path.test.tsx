@@ -28,6 +28,13 @@ import {
   type AiCreditDenial,
 } from "@/lib/aiCreditLimitNoticeViewModel";
 import { buildPlantAiDoctorReviewPath } from "@/lib/aiDoctorEntryRules";
+import {
+  buildCreditPackSuccessUrl,
+  CREDIT_PACK_RETURN_TO_PARAM,
+  sanitizeCheckoutReturnTo,
+} from "@/lib/checkoutReturnTo";
+
+const PRICING = readFileSync(resolve(__dirname, "../..", "src/pages/Pricing.tsx"), "utf8");
 
 const NOTICE = readFileSync(
   resolve(__dirname, "../..", "src/components/AiCreditLimitNotice.tsx"),
@@ -116,6 +123,71 @@ describe("credit pack top-up · return path", () => {
     // carry a top-up href, even when a return path was supplied.
     expect(vmFor("free", "/plants/plant-123").packHref).toBeUndefined();
     expect(vmFor(null, "/plants/plant-123").packHref).toBeUndefined();
+  });
+});
+
+describe("credit pack top-up · never auto-redirects a buyer", () => {
+  /**
+   * The regression this guards (Codex P1 on #893):
+   *
+   * /checkout/success auto-redirects on `returnTo` the moment `confirmed` is
+   * true, and `confirmed` is `isActive && effectivePlanId !== "free"` — which
+   * every pack buyer already satisfies on arrival, since paid provenance is
+   * what makes them eligible to buy a pack. The bounded "confirming…" poll
+   * gates on that same signal, so it never waits either. A pack credits a
+   * separate grant ledger asynchronously, so forwarding `returnTo` bounces the
+   * buyer to the credit wall before their credits exist — denied after paying,
+   * with the confirmation page gone from history via `replace: true`.
+   */
+  it("carries the origin under a param that is NOT the redirect trigger", () => {
+    const url = new URL(buildCreditPackSuccessUrl("https://app.example", "/plants/plant-123"));
+    expect(url.pathname).toBe("/checkout/success");
+    // The auto-redirect keys on `returnTo`; this must never populate it.
+    expect(url.searchParams.get("returnTo")).toBeNull();
+    expect(url.searchParams.get(CREDIT_PACK_RETURN_TO_PARAM)).toBe("/plants/plant-123");
+  });
+
+  it("keeps the pack param distinct from the redirect param by name", () => {
+    // If these ever collide the redirect silently reactivates.
+    expect(CREDIT_PACK_RETURN_TO_PARAM).not.toBe("returnTo");
+  });
+
+  it("applies the same sanitization as every other return path", () => {
+    const url = new URL(
+      buildCreditPackSuccessUrl("https://app.example", "https://not-verdant.example/phish"),
+    );
+    expect(url.search).toBe("");
+    expect(url.toString()).not.toContain("not-verdant");
+  });
+
+  it("round-trips the anchored review path a grower reaches from a tent alert", () => {
+    const anchored = buildPlantAiDoctorReviewPath({ plantId: "plant-1", tentId: "tent-1" });
+    const url = new URL(buildCreditPackSuccessUrl("https://app.example", anchored));
+    expect(url.searchParams.get(CREDIT_PACK_RETURN_TO_PARAM)).toBe(anchored);
+    // And the page will re-sanitize it before rendering a link.
+    expect(sanitizeCheckoutReturnTo(url.searchParams.get(CREDIT_PACK_RETURN_TO_PARAM))).toBe(
+      anchored,
+    );
+  });
+
+  it("routes pack checkout through that success URL, not the shared default", () => {
+    // The shared default forwards `returnTo` and would re-arm the redirect.
+    expect(PRICING).toMatch(/return isPack\s*\?\s*buildCreditPackSuccessUrl\(/);
+  });
+
+  it("applies it on the recovery retry too, not just the first attempt", () => {
+    // A retry falling back to the shared default would re-arm the redirect for
+    // exactly the buyer whose first attempt already failed.
+    const both = PRICING.match(/successUrl:\s*packSuccessUrlFor\(/g) ?? [];
+    expect(both.length).toBe(2);
+    expect(PRICING).toMatch(/priceId:\s*rawSku,\s*successUrl:\s*packSuccessUrlFor\(rawSku\)/);
+  });
+
+  it("leaves plan checkouts on the shared default, where returnTo is correct", () => {
+    // Subscriptions SHOULD auto-redirect: `confirmed` genuinely reflects the
+    // thing that was purchased. Only packs need the separate param.
+    expect(PRICING).toMatch(/const isPack = CREDIT_PACKS\.some/);
+    expect(PRICING).toMatch(/:\s*undefined;/);
   });
 });
 

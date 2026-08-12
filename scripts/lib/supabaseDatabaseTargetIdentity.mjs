@@ -27,6 +27,13 @@ const SSL_MODE_STRENGTH = Object.freeze({
   "verify-full": 3,
 });
 
+// Least-privilege login used only by the protected sandbox schema-verification
+// workflows. The role is deliberately unavailable to production and is
+// accepted only with the sandbox project ref embedded in the Supavisor
+// username. Every other shared-pooler username keeps the existing behavior:
+// discard it and bind the credential to postgres.<pinned-ref>.
+export const SANDBOX_SCHEMA_VERIFIER_ROLE = "verdant_ci_schema_verifier";
+
 export class SupabaseDatabaseTargetIdentityError extends Error {
   constructor(code, message) {
     super(message);
@@ -194,7 +201,21 @@ export function sanitizeSupabaseDatabaseUrlForPsql(databaseUrl, targetEnv) {
     // A shared Supavisor host is multi-tenant; its username selects both role
     // and project. Treat the source URL as a password carrier only, and bind
     // every shared credential to the already-pinned Verdant postgres target.
-    url.username = `postgres.${identity.projectRef}`;
+    const sourceUsername = decodeUsername(url.username);
+    const verifierPrefix = `${SANDBOX_SCHEMA_VERIFIER_ROLE}.`;
+    const sandboxVerifierUsername = `${verifierPrefix}${identity.projectRef}`;
+
+    if (sourceUsername.startsWith(verifierPrefix)) {
+      if (targetEnv !== "sandbox" || sourceUsername !== sandboxVerifierUsername) {
+        identityError(
+          "sandbox_verifier_identity_mismatch",
+          "The sandbox schema-verifier credential must target the pinned sandbox project.",
+        );
+      }
+      url.username = sandboxVerifierUsername;
+    } else {
+      url.username = `postgres.${identity.projectRef}`;
+    }
   }
   url.search = "";
   return Object.freeze({
@@ -236,6 +257,20 @@ export function assertSupabaseDatabaseTargetIdentity({ targetEnv, databaseUrl })
       "project_ref_mismatch",
       `Database URL project ref does not match the pinned ${targetEnv} project.`,
     );
+  }
+
+  if (parsed.requiresPinnedProjectBinding) {
+    const sourceUsername = decodeUsername(new URL(databaseUrl).username);
+    const verifierPrefix = `${SANDBOX_SCHEMA_VERIFIER_ROLE}.`;
+    if (
+      sourceUsername.startsWith(verifierPrefix) &&
+      (targetEnv !== "sandbox" || sourceUsername !== `${verifierPrefix}${target.projectRef}`)
+    ) {
+      identityError(
+        "sandbox_verifier_identity_mismatch",
+        "The sandbox schema-verifier credential must target the pinned sandbox project.",
+      );
+    }
   }
 
   return Object.freeze({

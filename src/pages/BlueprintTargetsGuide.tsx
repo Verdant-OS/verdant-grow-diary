@@ -78,12 +78,12 @@ const STAGE_COPY: Record<BlueprintTargetStage, { label: string; blurb: string }>
   veg: {
     label: "Vegetative",
     blurb:
-      "The widest day/night temperature split. Humidity comes down and feed strength climbs as the plant builds structure.",
+      "A pronounced day/night temperature split opens up. Humidity comes down and feed strength climbs as the plant builds structure.",
   },
   preflower: {
     label: "Transition / pre-flower",
     blurb:
-      "The stretch. Humidity drops toward flower levels while feed peaks to support the coming bud sites.",
+      "The stretch. Humidity drops toward flower levels and feed strength ramps up, though it has not yet reached its flower peak.",
   },
   flower: {
     label: "Flower",
@@ -196,7 +196,7 @@ const FAQ = [
   {
     question: "Why do temperature targets differ between lights on and lights off?",
     answer:
-      "Leaf temperature tracks the light. A day/night split keeps vapour pressure deficit stable across the cycle instead of swinging when the lights cut, which is why most stages list separate lights-on and lights-off ranges.",
+      "Partly because the room simply cools when the lamps are off, and partly because a deliberate night drop slows respiration and helps keep stretch in check. It is not a VPD control on its own: VPD depends on temperature and humidity together — and ideally on leaf temperature — so at a fixed humidity a cooler night lowers VPD rather than holding it steady. Work out VPD separately for lights-on and lights-off rather than assuming one figure covers both.",
   },
   {
     question: "Why are there no light or feed targets for dry and cure?",

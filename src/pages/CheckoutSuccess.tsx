@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from "@/lib/react-router-compat";
 import { Button } from "@/components/ui/button";
 import BrandLogo from "@/components/BrandLogo";
 import AccountPlanBadge from "@/components/AccountPlanBadge";
+import CheckoutSuccessFounderNote from "@/components/CheckoutSuccessFounderNote";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import {
@@ -214,6 +215,15 @@ export default function CheckoutSuccess() {
             <div className="mt-4 flex justify-center">
               <AccountPlanBadge entitlement={entitlement} />
             </div>
+            {/* Mounted ONLY for a confirmed Pro subscriber: Craft is a higher
+                tier and Founder already owns lifetime, so neither may see a
+                Founder pitch here (their confirmed views also ban the word
+                "Pro" outright). Availability + calm copy live inside the
+                component; it renders nothing unless slots are verifiably open.
+                Kept a note, not a counter — scarcity seconds after payment
+                invites buyer's remorse. */}
+            {(entitlement.effectivePlanId === "pro_monthly" ||
+              entitlement.effectivePlanId === "pro_annual") && <CheckoutSuccessFounderNote />}
             {packReturnTo && (
               <div
                 className="mt-8 rounded-xl border border-primary/20 bg-primary/5 p-5"

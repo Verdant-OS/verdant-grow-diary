@@ -22,6 +22,7 @@ import PlantStatusStrip from "@/components/PlantStatusStrip";
 import QuickLogV2Fab from "@/components/QuickLogV2Fab";
 import PlantQuickStatusStrip from "@/components/PlantQuickStatusStrip";
 import PlantLogStreakMarker from "@/components/PlantLogStreakMarker";
+import PlantLabResultsPanel from "@/components/PlantLabResultsPanel";
 import AiDoctorCreditsExhaustedTeaser from "@/components/AiDoctorCreditsExhaustedTeaser";
 import PlantDetailQuickActions from "@/components/PlantDetailQuickActions";
 import PlantGrowContextRescueCard from "@/components/PlantGrowContextRescueCard";
@@ -759,6 +760,13 @@ export default function PlantDetail() {
             className="scroll-mt-16 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
           >
             <PlantAiDoctorSessionsPanel plantId={plant.id} />
+          </div>
+          <div
+            tabIndex={-1}
+            aria-label="Plant lab results section"
+            className="scroll-mt-16 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
+          >
+            <PlantLabResultsPanel plantId={plant.id} />
           </div>
         </div>
       </div>

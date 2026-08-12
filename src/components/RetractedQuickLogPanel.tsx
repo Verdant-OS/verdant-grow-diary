@@ -27,7 +27,7 @@ function fmt(iso: string | null): string {
 
 export default function RetractedQuickLogPanel({ growId }: { growId: string | null }) {
   const [open, setOpen] = useState(false);
-  const { entries, isLoading } = useRetractedQuickLogEntries(growId);
+  const { entries, totalCount, isLoading } = useRetractedQuickLogEntries(growId);
 
   if (!growId) return null;
   if (!isLoading && entries.length === 0) return null;
@@ -48,8 +48,12 @@ export default function RetractedQuickLogPanel({ growId }: { growId: string | nu
         {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
         <Archive className="h-3.5 w-3.5" />
         Retracted entries
-        <span className="ml-auto font-normal normal-case">
-          {isLoading ? "…" : `${entries.length} retained in audit trail`}
+        <span className="ml-auto font-normal normal-case" data-testid="quicklog-retracted-count">
+          {isLoading
+            ? "…"
+            : totalCount > entries.length
+              ? `latest ${entries.length} of ${totalCount} retained in audit trail`
+              : `${totalCount} retained in audit trail`}
         </span>
       </button>
       {open && (

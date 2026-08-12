@@ -40,6 +40,7 @@ import AiDoctorImportedHistoryDisclosurePanel from "@/components/AiDoctorImporte
 
 import AiCreditRemainingBadge from "@/components/AiCreditRemainingBadge";
 import AiCreditLimitNotice from "@/components/AiCreditLimitNotice";
+import AiDoctorLowCreditTopUp from "@/components/AiDoctorLowCreditTopUp";
 import AiCreditServiceDegradedNotice from "@/components/AiCreditServiceDegradedNotice";
 import PaywallCta from "@/components/PaywallCta";
 import { useSensorReadingsByTents } from "@/hooks/use-sensor-readings";
@@ -50,6 +51,10 @@ import { aiDoctorSessionDetailPath, plantDetailPath } from "@/lib/routes";
 import { buildPlantAiDoctorReviewPath } from "@/lib/aiDoctorEntryRules";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { buildAiCreditLimitNoticeViewModel } from "@/lib/aiCreditLimitNoticeViewModel";
+import {
+  AI_DOCTOR_LOW_CREDIT_SURFACE,
+  buildAiDoctorLowCreditTopUpViewModel,
+} from "@/lib/aiDoctorLowCreditTopUpViewModel";
 import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 import type { Classification } from "@/lib/sensorSnapshotStatusContract";
 import {
@@ -152,6 +157,7 @@ function PlantDetailAiDoctorLiveReviewScope({
   const trackedResultRef = useRef<unknown>(null);
   const trackedSessionIdRef = useRef<string | null>(null);
   const trackedPostValuePaywallResultRef = useRef<unknown>(null);
+  const trackedLowCreditResultRef = useRef<unknown>(null);
   const pendingAcceptedReviewStartRef = useRef<string | null>(null);
   const historyScopeKey = buildAiDoctorLiveReviewScopeKey(plantId, tentId, growId);
   const [historyOmissionScope, setHistoryOmissionScope] = useState<string | null>(null);
@@ -470,6 +476,27 @@ function PlantDetailAiDoctorLiveReviewScope({
       ? aiDoctorSessionDetailPath(review.persistence.sessionId)
       : null;
 
+  // Paid low-balance top-up. Mutually exclusive with the Free upgrade below by
+  // construction: that one requires effectivePlanId === "free", this one
+  // requires paid billing provenance via creditPackPurchaseEligible.
+  const lowCreditTopUp = useMemo(
+    () =>
+      buildAiDoctorLowCreditTopUpViewModel({
+        credit: review.creditRemaining,
+        viewerEntitlement: entitlement,
+        entitlementLoading,
+        durableSessionSaved: review.persistence.status === "saved",
+        returnTo: savedSessionReturnTo,
+      }),
+    [
+      entitlement,
+      entitlementLoading,
+      review.creditRemaining,
+      review.persistence.status,
+      savedSessionReturnTo,
+    ],
+  );
+
   const postValueUpgrade = useMemo(
     () =>
       buildAiDoctorPostValueUpgradeViewModel({
@@ -588,6 +615,21 @@ function PlantDetailAiDoctorLiveReviewScope({
       surface: AI_DOCTOR_POST_VALUE_UPGRADE_SURFACE,
     });
   }, [activeReviewVisible, postValueUpgrade.visible, review.result, review.status]);
+
+  useEffect(() => {
+    // The paid counterpart, emitted from the PARENT for the same reason the
+    // impression above is: React runs child effects before parent ones, so an
+    // effect inside AiDoctorLowCreditTopUp would fire before
+    // ai_doctor_result_received / ai_doctor_session_saved and report the offer
+    // as preceding the value that earns it. Declared after both milestone
+    // effects, so the ordering holds even when result and persistence settle
+    // in the same render turn.
+    if (!activeReviewVisible || review.status !== "result" || !review.result) return;
+    if (!lowCreditTopUp.visible) return;
+    if (trackedLowCreditResultRef.current === review.result) return;
+    trackedLowCreditResultRef.current = review.result;
+    trackFunnelEvent("credit_pack_cta_viewed", { surface: AI_DOCTOR_LOW_CREDIT_SURFACE });
+  }, [activeReviewVisible, lowCreditTopUp.visible, review.result, review.status]);
 
   const showHistoryOmission = historyRecovery.state === "omitted_by_choice";
   const showHistoryRecovery = historyRecovery.state === "decision_required" || showHistoryOmission;
@@ -939,6 +981,14 @@ function PlantDetailAiDoctorLiveReviewScope({
               data-testid="plant-ai-doctor-live-review-credit-remaining"
             />
           ) : null}
+          {/* Paid counterpart to the Free post-value upgrade below: a paying
+              grower near the end of their monthly allowance needs a pack, not
+              a plan. Sits under the badge that states the balance so the two
+              read as one thought. */}
+          <AiDoctorLowCreditTopUp
+            vm={lowCreditTopUp}
+            data-testid="plant-ai-doctor-live-review-low-credit-topup"
+          />
           <AiDoctorReviewResultPreview result={review.result} testIdPrefix="plant-detail-live" />
           {postValueUpgrade.visible ? (
             <PaywallCta

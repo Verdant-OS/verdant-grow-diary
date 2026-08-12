@@ -23,6 +23,11 @@ import { MCP_MANIFEST, containsSecretLikeValue } from "@/lib/mcp/manifestView";
 import { LOCAL_TOOL_PREFS_KEY } from "@/lib/mcp/localToolPreferences";
 import { OAUTH_ATTEMPT_LOG_KEY } from "@/lib/mcp/oauthAttemptLog";
 import type { ConnectionStatusExport } from "@/lib/mcp/connectionStatusExport";
+import {
+  clearLocalStorageForTest,
+  getLocalStorageItemForTest,
+  setLocalStorageItemForTest,
+} from "@/test/helpers/localStorageTestHelper";
 
 const PKCE_KEY = "verdant.mcp.oauth.pkce.v1";
 
@@ -60,7 +65,7 @@ function renderPage(props: AgentIntegrationsProps = {}) {
 }
 
 beforeEach(() => {
-  window.localStorage.clear();
+  clearLocalStorageForTest();
   window.sessionStorage.clear();
   window.history.replaceState({}, "", "/settings/agent-integrations");
 });
@@ -111,11 +116,11 @@ describe("connection status JSON export", () => {
   });
 
   it("reflects a locally disabled tool and a recorded OAuth attempt in the export", async () => {
-    window.localStorage.setItem(
+    setLocalStorageItemForTest(
       LOCAL_TOOL_PREFS_KEY,
       JSON.stringify({ get_latest_sensor_snapshot: false }),
     );
-    window.localStorage.setItem(
+    setLocalStorageItemForTest(
       OAUTH_ATTEMPT_LOG_KEY,
       JSON.stringify({
         startedAt: "2026-08-12T10:00:00.000Z",
@@ -174,7 +179,7 @@ describe("per-tool local enable/disable controls", () => {
         "false",
       );
     });
-    const stored = JSON.parse(window.localStorage.getItem(LOCAL_TOOL_PREFS_KEY) ?? "{}") as Record<
+    const stored = JSON.parse(getLocalStorageItemForTest(LOCAL_TOOL_PREFS_KEY) ?? "{}") as Record<
       string,
       boolean
     >;
@@ -194,7 +199,7 @@ describe("last OAuth attempt display", () => {
   });
 
   it("shows a failed attempt with its sanitized reason and a retry button", () => {
-    window.localStorage.setItem(
+    setLocalStorageItemForTest(
       OAUTH_ATTEMPT_LOG_KEY,
       JSON.stringify({
         startedAt: "2026-08-12T10:00:00.000Z",
@@ -214,7 +219,7 @@ describe("last OAuth attempt display", () => {
   });
 
   it("shows a successful attempt without a retry button", () => {
-    window.localStorage.setItem(
+    setLocalStorageItemForTest(
       OAUTH_ATTEMPT_LOG_KEY,
       JSON.stringify({
         startedAt: "2026-08-12T10:00:00.000Z",
@@ -240,7 +245,7 @@ describe("last OAuth attempt display", () => {
       expect(screen.getByTestId("oauth-last-attempt").getAttribute("data-outcome")).toBe("failed");
     });
     expect(screen.getByTestId("oauth-last-attempt-reason").textContent).toMatch(/access_denied/);
-    const stored = JSON.parse(window.localStorage.getItem(OAUTH_ATTEMPT_LOG_KEY) ?? "null") as {
+    const stored = JSON.parse(getLocalStorageItemForTest(OAUTH_ATTEMPT_LOG_KEY) ?? "null") as {
       outcome?: string;
     } | null;
     expect(stored?.outcome).toBe("failed");
@@ -259,7 +264,7 @@ describe("last OAuth attempt display", () => {
     // Nothing recorded, nothing rendered from the forged params.
     expect(screen.getByTestId("oauth-last-attempt").textContent).toMatch(/none recorded/i);
     expect(screen.getByTestId("oauth-last-attempt").getAttribute("data-outcome")).toBe("none");
-    expect(window.localStorage.getItem(OAUTH_ATTEMPT_LOG_KEY)).toBeNull();
+    expect(getLocalStorageItemForTest(OAUTH_ATTEMPT_LOG_KEY)).toBeNull();
     expect(screen.queryByTestId("browser-connect-error")).toBeNull();
   });
 
@@ -274,20 +279,20 @@ describe("last OAuth attempt display", () => {
     // Not consumed: no record, no error surfaced, and the real pending
     // authorization is left intact so the genuine callback can finish.
     expect(screen.getByTestId("oauth-last-attempt").getAttribute("data-outcome")).toBe("none");
-    expect(window.localStorage.getItem(OAUTH_ATTEMPT_LOG_KEY)).toBeNull();
+    expect(getLocalStorageItemForTest(OAUTH_ATTEMPT_LOG_KEY)).toBeNull();
     expect(window.sessionStorage.getItem(PKCE_KEY)).not.toBeNull();
 
     // Same for an ?error= that omits state entirely.
     window.history.replaceState({}, "", "/settings/agent-integrations?error=access_denied");
     renderPage();
-    expect(window.localStorage.getItem(OAUTH_ATTEMPT_LOG_KEY)).toBeNull();
+    expect(getLocalStorageItemForTest(OAUTH_ATTEMPT_LOG_KEY)).toBeNull();
     expect(window.sessionStorage.getItem(PKCE_KEY)).not.toBeNull();
   });
 });
 
 describe("local tool preference gates the docs-page tool explorer", () => {
   it("disables only the locally disabled tool's Run button with an honest note", () => {
-    window.localStorage.setItem(LOCAL_TOOL_PREFS_KEY, JSON.stringify({ list_grows: false }));
+    setLocalStorageItemForTest(LOCAL_TOOL_PREFS_KEY, JSON.stringify({ list_grows: false }));
     render(
       <MemoryRouter initialEntries={["/docs/mcp-api"]}>
         <Routes>
@@ -355,7 +360,7 @@ describe("probe gating by local tool preference", () => {
       "verdant.mcp.oauth.token.v1",
       JSON.stringify({ access_token: "test-token", obtained_at: Date.now(), expires_in: 3600 }),
     );
-    window.localStorage.setItem(LOCAL_TOOL_PREFS_KEY, JSON.stringify({ list_grows: false }));
+    setLocalStorageItemForTest(LOCAL_TOOL_PREFS_KEY, JSON.stringify({ list_grows: false }));
     renderPage();
     const probe = screen.getByTestId("browser-connect-probe") as HTMLButtonElement;
     expect(probe.disabled).toBe(true);

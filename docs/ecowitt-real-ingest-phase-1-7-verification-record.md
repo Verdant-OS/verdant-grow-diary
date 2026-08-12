@@ -18,10 +18,8 @@ Targeted tests:      22 passed / 22 (2 files)
                      src/test/ecowitt-real-ingest-edge-http-wrapper.test.ts
                      src/test/ecowitt-real-ingest-edge-wrapper-static-safety.test.ts
 Command:             bunx vitest run <both files> --reporter=dot
-Full suite:          NOT RUN
-Type-check:          NOT RUN
-Runtime harness:     NOT RUN
-Live Supabase query: NOT RUN
+Skipped:             full suite, type-check, runtime harness, live Supabase query
+                     — intentionally out of scope for gate item 1, not BLOCKED
 ```
 
 ## Phase 2 gate status

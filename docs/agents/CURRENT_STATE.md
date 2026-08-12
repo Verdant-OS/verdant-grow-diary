@@ -123,8 +123,10 @@ D4 needs owner re-confirmation on the corrected facts before implementation. See
 spec's D4 correction block. V1 and V4 were authorized and attempted same day: both `BLOCKED` — no `PG*`
 env/`psql` on this machine and the Supabase MCP connection lacks permission on
 `knkwiiywfkbqznbxwqfh`. Unblock paths and an owner-runnable V4 query are in the spec's
-verification attempt record. V2/V3 remain `NOT_RUN`. Spec advances to `APPROVED` only when
-V1–V4 all pass.
+verification attempt record. V2/V3/V6 remain `NOT_STARTED`; V5 is split — V5a
+(invalid-provenance read fences) is mandatory and unconditional, V5b (stale fences)
+conditional on D4. Spec advances to `APPROVED` only when **V1–V6 all pass and the owner
+re-confirms D4** on the corrected facts — verification cannot substitute for that decision.
 
 | Phase 2 gate item                             | Status                                                                                 |
 | --------------------------------------------- | -------------------------------------------------------------------------------------- |

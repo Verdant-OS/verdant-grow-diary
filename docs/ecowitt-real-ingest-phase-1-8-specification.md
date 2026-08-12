@@ -3,8 +3,9 @@
 **Status:** Specification. Paper only — approving this document clears Phase 2 gate item 3
 once its verification items pass. It authorizes **no** code, migration, policy change, or
 deployment. Persistence remains blocked behind gate item 2 (owner-only, unresolved) and
-this spec reaching `APPROVED` via V1–V4; gate 4's policy was ruled 2026-08-12 (see D3/D4),
-with D4 pending owner re-confirmation on corrected facts.
+this spec reaching `APPROVED` via its verification items; gate 4's policy was ruled
+2026-08-12 (see D3/D4), with D4 pending owner re-confirmation on corrected facts — that
+re-confirmation is an independent prerequisite the verification items cannot substitute.
 **Basis:** [Phase 1.8 grounding audit](./ecowitt-real-ingest-phase-1-8-grounding-audit.md)
 (deploy-branch-verified, 2026-08-07). Claims below inherit its evidence labels.
 **Author:** Claude (Knowledge Library & Product Specification Architect)
@@ -14,7 +15,9 @@ with D4 pending owner re-confirmation on corrected facts.
 > **D4 APPROVED** (evidence-only fencing). Fences recorded inline in each section below.
 > V1 and V4 were authorized and attempted the same day; both returned `BLOCKED` on access
 > — see the verification attempt record. Verdict remains `HOLD — approvable`; it must not
-> advance to `APPROVED` until V1–V4 all have recorded passing evidence.
+> advance to `APPROVED` until the verification items all have recorded passing evidence
+> **and** D4 is re-confirmed by the owner on the corrected facts (see the D4 correction
+> block — passing V1–V5 does not clear that decision).
 
 ## Executive recommendation
 
@@ -162,12 +165,13 @@ housekeeping migration — noted, not required for approval.
 
 ## Verification items (all must pass before this spec is marked approved)
 
-| #   | Item                                                                                                        | Method                                                                                                                                                                                                                                                                                                                          | Status    |
-| --- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
-| V1  | Live trigger allow-list matches migration `20260617164759`                                                  | **Authoritative:** read the deployed definition (`pg_get_functiondef`) and compare to the migration byte-for-byte — the committed probe script covers only 2 sources × 5 metrics of the 19-source / 9-metric allow-list and is supplementary behavioral evidence, never a pass by itself. Update the frozen test in the same PR | `BLOCKED` |
-| V2  | Channel-collision behavior of the deployed row builder (does multi-channel drop rows?)                      | Fixture POST with 2 air + 2 soil channels through `buildEcoWittRoutedRows`/`buildEcoWittStoredRows` on the deploy branch; assert emitted row count and index-collision set                                                                                                                                                      | `NOT_RUN` |
-| V3  | Deployed `ecowitt-ingest` matches deploy-branch source (writes `live`, not `ecowitt`)                       | Compare deployed function body via Supabase API to `origin/verdant-grow-diary`                                                                                                                                                                                                                                                  | `NOT_RUN` |
-| V4  | No `source='live'` EcoWitt rows exist that predate gate approval — or they are enumerated and dispositioned | Read-only query, owner-visible output                                                                                                                                                                                                                                                                                           | `BLOCKED` |
+| #   | Item                                                                                                                                                                                                | Method                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Status    |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
+| V1  | Live trigger allow-list matches migration `20260617164759`                                                                                                                                          | **Authoritative:** read the deployed definition (`pg_get_functiondef` on `validate_sensor_reading`) and compare it to the validator's `CREATE OR REPLACE FUNCTION` statement **extracted from** the migration, after canonicalizing both (the migration file is multi-statement with comments and a second function, and `pg_get_functiondef` re-serializes — raw byte comparison can never pass). Decisive semantic criteria: the 9-metric, 4-quality, and 19-source allow-lists, the NaN guard, the +5-minute `captured_at` bound, and the `soil_temp_c` −20..80 bound all match exactly. The committed probe script (2 sources × 5 metrics) is supplementary behavioral evidence, never a pass by itself. Update the frozen test in the same PR | `BLOCKED` |
+| V2  | Channel-collision behavior of the deployed row builder (does multi-channel drop rows?)                                                                                                              | Fixture POST with 2 air + 2 soil channels through `buildEcoWittRoutedRows`/`buildEcoWittStoredRows` on the deploy branch; assert emitted row count and index-collision set                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | `NOT_RUN` |
+| V3  | Deployed `ecowitt-ingest` matches deploy-branch source (writes `live`, not `ecowitt`)                                                                                                               | Compare deployed function body via Supabase API to `origin/verdant-grow-diary`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | `NOT_RUN` |
+| V4  | No `source='live'` EcoWitt rows exist that predate gate approval — or they are enumerated and dispositioned                                                                                         | Read-only query, owner-visible output                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | `BLOCKED` |
+| V5  | Read-model fences for `stale` and dual-row identity — **required before any D4 implementation** (becomes `NOT_APPLICABLE` for spec approval if the owner re-confirms fail-closed rejection instead) | Tests/audits proving: persisted `stale` rows are never classified live in any read model; excluded from latest-healthy state; AI/alert isolation holds; a permitted `live`/`stale` dual row is not double-counted analytically. **Verified counter-evidence at `origin/main`:** `src/lib/environmentTrends.ts` `samplesFromReadings` maps every source except `manual`/`sim` to `live` — so `stale`, `demo`, `csv`, `invalid`, and legacy `ecowitt` rows are promoted **today**, independent of D4 — and `src/hooks/useReportsHubData.ts` counts `sensor_readings` with no source filter or per-capture dedup. That misclassification is a live defect regardless of D4 and is tracked for a dedicated fix                                         | `NOT_RUN` |
 
 ### Verification attempt record — 2026-08-12 (V1, V4: `BLOCKED`)
 
@@ -248,16 +252,20 @@ follows this spec.
 
 ## Handoff
 
-Per `docs/agents/HANDOFF_PROTOCOL.md`: D2/D3/D4 were ruled 2026-08-12, so Codex
-implements nothing until V1–V4 pass and this spec reaches `APPROVED`. First implementable
+Per `docs/agents/HANDOFF_PROTOCOL.md`: D2 and D3 were ruled 2026-08-12; D4's ruling is
+pending owner re-confirmation on corrected facts and is an **independent prerequisite** —
+passing verification items does not clear it. Codex implements nothing until the
+verification items pass, D4 is re-confirmed (either direction), and this spec reaches
+`APPROVED`. First implementable
 slice after approval: D6 consolidation + the D1a contract test (both pure/test-only, no
 schema).
 
 ## Verdict
 
-**HOLD — approvable.** The design is settled, evidence-grounded, and owner-ruled
-(D2/D3/D4, 2026-08-12); approval is now blocked only on the four verification items
-(V1/V4 `BLOCKED` on access, V2/V3 `NOT_RUN`).
+**HOLD — approvable.** The design is settled and evidence-grounded; D2/D3 are owner-ruled
+(2026-08-12). Approval is blocked on the verification items (V1/V4 `BLOCKED` on access,
+V2/V3/V5 `NOT_RUN`) **and, independently, on the owner's D4 re-confirmation** against the
+corrected fail-closed facts — verification cannot substitute for that decision.
 Nothing discovered in the audit requires new schema. The shortest honest path to real
 EcoWitt persistence runs through ratifying what already ships, not extending it.
 

@@ -17,6 +17,12 @@ export interface LabTestRow {
   id: string;
   /** ISO timestamp of the test date as recorded. */
   testedAt: string | null;
+  /**
+   * Row creation timestamp — the sort tie-breaker. Date-only entry gives
+   * every same-day test an identical midnight tested_at, so without this the
+   * card order could flap between refreshes.
+   */
+  createdAt: string | null;
   thcaPercent: number | null;
   thcPercent: number | null;
   cbdaPercent: number | null;
@@ -101,6 +107,13 @@ function parseTerpenes(raw: unknown): Array<{ name: string; value: number }> {
   return entries;
 }
 
+/**
+ * Formatted in UTC on purpose: the draft validator stores the entered
+ * date-only value as midnight UTC, so formatting that instant in the
+ * browser's LOCAL timezone would shift the recorded COA date back a day for
+ * every grower west of UTC. A lab report date is a calendar date, not an
+ * instant — UTC formatting preserves it exactly as entered.
+ */
 function formatDateLabel(iso: string | null): string {
   if (typeof iso !== "string" || iso.length === 0) return "Date not recorded";
   const t = Date.parse(iso);
@@ -109,6 +122,7 @@ function formatDateLabel(iso: string | null): string {
     year: "numeric",
     month: "short",
     day: "numeric",
+    timeZone: "UTC",
   });
 }
 
@@ -122,6 +136,16 @@ const CANNABINOID_FIELDS: Array<{
   { key: "cbdPercent", label: "CBD" },
 ];
 
+/** Newest created first; missing created_at sinks; id is the final tie. */
+function tieBreak(a: LabTestRow, b: LabTestRow): number {
+  const ca = a.createdAt ? Date.parse(a.createdAt) : NaN;
+  const cb = b.createdAt ? Date.parse(b.createdAt) : NaN;
+  if (Number.isFinite(ca) && Number.isFinite(cb) && ca !== cb) return cb - ca;
+  if (Number.isFinite(ca) && !Number.isFinite(cb)) return -1;
+  if (!Number.isFinite(ca) && Number.isFinite(cb)) return 1;
+  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+}
+
 export function buildLabResultsView(
   rows: ReadonlyArray<LabTestRow> | null | undefined,
 ): LabResultsView {
@@ -130,11 +154,14 @@ export function buildLabResultsView(
     .sort((a, b) => {
       const ta = a.testedAt ? Date.parse(a.testedAt) : NaN;
       const tb = b.testedAt ? Date.parse(b.testedAt) : NaN;
-      // Newest first; rows without a valid date sink to the end.
-      if (!Number.isFinite(ta) && !Number.isFinite(tb)) return 0;
+      // Newest first; rows without a valid date sink to the end. Ties (all
+      // same-day tests share midnight) break on created_at then id so the
+      // order is deterministic across refreshes.
+      if (!Number.isFinite(ta) && !Number.isFinite(tb)) return tieBreak(a, b);
       if (!Number.isFinite(ta)) return 1;
       if (!Number.isFinite(tb)) return -1;
-      return tb - ta;
+      if (tb !== ta) return tb - ta;
+      return tieBreak(a, b);
     })
     .map((row) => {
       const cannabinoids = CANNABINOID_FIELDS.flatMap(({ key, label }) => {
@@ -221,8 +248,16 @@ export function validateLabTestDraft(draft: LabTestDraft, now: number): LabTestD
   const testedMs = Date.parse(draft.testedAt);
   if (!Number.isFinite(testedMs)) {
     errors.push("Test date is required.");
-  } else if (testedMs > now) {
-    errors.push("Test date cannot be in the future.");
+  } else {
+    // Compare CALENDAR dates, not instants. The form value is date-only
+    // (parsed as midnight UTC), so an instant comparison would wrongly
+    // reject "today" for growers east of UTC (their local today can be
+    // tomorrow in UTC) — the same timezone class of bug as the display fix.
+    const local = new Date(now);
+    const localToday = `${local.getFullYear()}-${String(local.getMonth() + 1).padStart(2, "0")}-${String(local.getDate()).padStart(2, "0")}`;
+    if (draft.testedAt.slice(0, 10) > localToday) {
+      errors.push("Test date cannot be in the future.");
+    }
   }
 
   const thca = parsePercentField(draft.thcaPercent, "THCa", errors);

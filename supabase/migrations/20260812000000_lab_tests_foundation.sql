@@ -11,6 +11,32 @@
 -- visibility. (The abandoned breeder-mode draft of this table granted
 -- authenticated-wide SELECT — that leak is deliberately not reproduced.)
 
+-- Terpene payload validator, enforced at the database boundary: authenticated
+-- clients have direct INSERT/UPDATE, so app-side draft validation alone cannot
+-- stop a tampered client from persisting malformed evidence. Every entry must
+-- be a named (1-64 char) key with a numeric 0-100 value. IMMUTABLE + plain SQL
+-- (no I/O, no definer rights) so it is legal in a CHECK constraint.
+CREATE FUNCTION public.lab_tests_terpenes_valid(t jsonb)
+RETURNS boolean
+LANGUAGE sql
+IMMUTABLE
+AS $$
+  SELECT jsonb_typeof(t) = 'object'
+    AND NOT EXISTS (
+      SELECT 1
+      FROM jsonb_each(t) AS e(key, value)
+      WHERE char_length(e.key) = 0
+         OR char_length(e.key) > 64
+         OR jsonb_typeof(e.value) <> 'number'
+         -- CASE guards the numeric cast: it must only run for real numbers.
+         OR CASE
+              WHEN jsonb_typeof(e.value) = 'number'
+                THEN (e.value)::text::numeric < 0 OR (e.value)::text::numeric > 100
+              ELSE false
+            END
+    );
+$$;
+
 CREATE TABLE public.lab_tests (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -23,14 +49,24 @@ CREATE TABLE public.lab_tests (
   cbda_percent numeric CHECK (cbda_percent >= 0 AND cbda_percent <= 100),
   cbd_percent numeric CHECK (cbd_percent >= 0 AND cbd_percent <= 100),
   -- Terpene percentages keyed by terpene name, e.g. {"myrcene": 0.8}.
-  -- Object shape enforced below; individual value ranges validated in the app.
+  -- Shape AND entry validity enforced by the CHECK below.
   terpenes jsonb NOT NULL DEFAULT '{}'::jsonb,
   lab_name text,
   note text,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT lab_tests_terpenes_is_object
-    CHECK (jsonb_typeof(terpenes) = 'object')
+  CONSTRAINT lab_tests_terpenes_valid
+    CHECK (public.lab_tests_terpenes_valid(terpenes)),
+  -- A row with no measurement at all is not evidence; mirror the app-side
+  -- "enter at least one measurement" rule at the boundary.
+  CONSTRAINT lab_tests_has_measurement
+    CHECK (
+      thca_percent IS NOT NULL
+      OR thc_percent IS NOT NULL
+      OR cbda_percent IS NOT NULL
+      OR cbd_percent IS NOT NULL
+      OR terpenes <> '{}'::jsonb
+    )
 );
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.lab_tests TO authenticated;

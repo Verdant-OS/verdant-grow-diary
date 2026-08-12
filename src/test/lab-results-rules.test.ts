@@ -25,6 +25,7 @@ import { paywallCtaHasBannedWords } from "@/lib/paywallCtaViewModel";
 const row = (overrides: Partial<LabTestRow>): LabTestRow => ({
   id: "t1",
   testedAt: "2026-08-01T00:00:00.000Z",
+  createdAt: null,
   thcaPercent: null,
   thcPercent: null,
   cbdaPercent: null,
@@ -79,6 +80,35 @@ describe("buildLabResultsView", () => {
     ]);
     expect(view.cards.map((c) => c.id)).toEqual(["new", "old", "undated"]);
     expect(view.cards[2].dateLabel).toBe("Date not recorded");
+  });
+
+  it("breaks same-day ties deterministically: created_at desc, then id", () => {
+    // Date-only entry gives every same-day test identical midnight tested_at.
+    const sameDay = "2026-08-01T00:00:00.000Z";
+    const view = buildLabResultsView([
+      row({ id: "b", testedAt: sameDay, createdAt: "2026-08-01T09:00:00.000Z" }),
+      row({ id: "a", testedAt: sameDay, createdAt: "2026-08-01T17:00:00.000Z" }),
+      row({ id: "z", testedAt: sameDay, createdAt: null }),
+      row({ id: "y", testedAt: sameDay, createdAt: null }),
+    ]);
+    // Newest created first; missing created_at sinks; id orders the rest.
+    expect(view.cards.map((c) => c.id)).toEqual(["a", "b", "y", "z"]);
+    // Input order must not matter.
+    const reversed = buildLabResultsView([
+      row({ id: "y", testedAt: sameDay, createdAt: null }),
+      row({ id: "z", testedAt: sameDay, createdAt: null }),
+      row({ id: "a", testedAt: sameDay, createdAt: "2026-08-01T17:00:00.000Z" }),
+      row({ id: "b", testedAt: sameDay, createdAt: "2026-08-01T09:00:00.000Z" }),
+    ]);
+    expect(reversed.cards.map((c) => c.id)).toEqual(["a", "b", "y", "z"]);
+  });
+
+  it("formats the recorded date in UTC so the entered calendar date never shifts", () => {
+    // Stored as midnight UTC by the validator; a grower west of UTC must
+    // still see Aug 1, not Jul 31. (TZ=UTC in vitest; the timeZone: "UTC"
+    // option is what guarantees this in real browsers — pinned statically.)
+    const view = buildLabResultsView([row({ testedAt: "2026-08-01T00:00:00.000Z" })]);
+    expect(view.cards[0].dateLabel).toContain("Aug 1, 2026");
   });
 
   it("shows only present cannabinoids and labels calculated totals", () => {

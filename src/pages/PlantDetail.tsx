@@ -214,6 +214,9 @@ function ArchivedTimelineReadOnlyView({
           <ManualSnapshotTimelineSection scope="plant" plantId={plant.id} />
           <QuickLogGroupedTimelineSection scope="plant" plantId={plant.id} tentId={plant.tentId} />
           <TimelineMemorySection scope="plant" plantId={plant.id} />
+          {/* Saved COA evidence stays reachable after archiving; add/delete
+              controls are suppressed in this read-only view. */}
+          <PlantLabResultsPanel plantId={plant.id} readOnly />
         </div>
       </div>
     </div>

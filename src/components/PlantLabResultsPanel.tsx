@@ -37,6 +37,12 @@ import { useDeleteLabTest, useSaveLabTest } from "@/hooks/useLabTestMutations";
 
 interface Props {
   plantId: string | null | undefined;
+  /**
+   * Read-only mode for the archived-plant timeline: saved COA evidence stays
+   * visible after archiving, but add/delete controls are suppressed and the
+   * panel disappears entirely when there is nothing to show.
+   */
+  readOnly?: boolean;
 }
 
 const EMPTY_DRAFT: LabTestDraft = {
@@ -57,7 +63,7 @@ const CANNABINOID_INPUTS: Array<{ key: keyof LabTestDraft & string; label: strin
   { key: "cbdPercent", label: "CBD %" },
 ];
 
-export default function PlantLabResultsPanel({ plantId }: Props) {
+export default function PlantLabResultsPanel({ plantId, readOnly = false }: Props) {
   const { data: rows, isLoading } = usePlantLabTests(plantId ?? null);
   const save = useSaveLabTest();
   const remove = useDeleteLabTest();
@@ -71,6 +77,8 @@ export default function PlantLabResultsPanel({ plantId }: Props) {
   // Quietly absent without a plant, while loading, or when the read is
   // unavailable (null = table unreachable, e.g. migration not applied yet).
   if (!plantId || isLoading || rows === undefined || rows === null) return null;
+  // Read-only with nothing recorded: nothing to show and nothing to add.
+  if (readOnly && rows.length === 0) return null;
 
   const view = buildLabResultsView(rows);
 
@@ -120,6 +128,7 @@ export default function PlantLabResultsPanel({ plantId }: Props) {
       aria-labelledby="plant-lab-results-heading"
       data-testid="plant-lab-results-panel"
       data-count={view.count}
+      data-readonly={readOnly ? "true" : "false"}
       className="glass rounded-2xl p-4 my-3 space-y-3"
     >
       <header className="flex items-start justify-between gap-2 flex-wrap">
@@ -130,132 +139,134 @@ export default function PlantLabResultsPanel({ plantId }: Props) {
           <FlaskConical className="h-4 w-4 text-muted-foreground" aria-hidden />
           {LAB_RESULTS_HEADING}
         </h2>
-        <Dialog
-          open={open}
-          onOpenChange={(next) => {
-            setOpen(next);
-            if (!next) setErrors([]);
-          }}
-        >
-          <DialogTrigger asChild>
-            <Button type="button" variant="outline" size="sm" data-testid="plant-lab-results-add">
-              <Plus className="h-3.5 w-3.5" /> {LAB_RESULTS_ADD_LABEL}
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>{LAB_RESULTS_ADD_LABEL}</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-3">
-              <div className="space-y-1">
-                <Label htmlFor="lab-test-date">Test date</Label>
-                <Input
-                  id="lab-test-date"
-                  type="date"
-                  value={draft.testedAt}
-                  onChange={(e) => setField("testedAt", e.target.value)}
-                  data-testid="lab-test-date"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                {CANNABINOID_INPUTS.map(({ key, label }) => (
-                  <div key={key} className="space-y-1">
-                    <Label htmlFor={`lab-test-${key}`}>{label}</Label>
-                    <Input
-                      id={`lab-test-${key}`}
-                      type="number"
-                      inputMode="decimal"
-                      min={0}
-                      max={100}
-                      step="0.01"
-                      placeholder="—"
-                      value={draft[key] as string}
-                      onChange={(e) => setField(key, e.target.value)}
-                      data-testid={`lab-test-${key}`}
-                    />
-                  </div>
-                ))}
-              </div>
-              <div className="space-y-1">
-                <Label>Terpenes (% as printed)</Label>
-                {draft.terpenes.map((t, i) => (
-                  <div key={i} className="flex gap-2">
-                    <Input
-                      aria-label={`Terpene ${i + 1} name`}
-                      placeholder="e.g. myrcene"
-                      value={t.name}
-                      onChange={(e) => setTerpene(i, "name", e.target.value)}
-                    />
-                    <Input
-                      aria-label={`Terpene ${i + 1} percent`}
-                      type="number"
-                      inputMode="decimal"
-                      min={0}
-                      max={100}
-                      step="0.01"
-                      placeholder="%"
-                      className="w-24"
-                      value={t.percent}
-                      onChange={(e) => setTerpene(i, "percent", e.target.value)}
-                    />
-                  </div>
-                ))}
+        {readOnly ? null : (
+          <Dialog
+            open={open}
+            onOpenChange={(next) => {
+              setOpen(next);
+              if (!next) setErrors([]);
+            }}
+          >
+            <DialogTrigger asChild>
+              <Button type="button" variant="outline" size="sm" data-testid="plant-lab-results-add">
+                <Plus className="h-3.5 w-3.5" /> {LAB_RESULTS_ADD_LABEL}
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>{LAB_RESULTS_ADD_LABEL}</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <Label htmlFor="lab-test-date">Test date</Label>
+                  <Input
+                    id="lab-test-date"
+                    type="date"
+                    value={draft.testedAt}
+                    onChange={(e) => setField("testedAt", e.target.value)}
+                    data-testid="lab-test-date"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {CANNABINOID_INPUTS.map(({ key, label }) => (
+                    <div key={key} className="space-y-1">
+                      <Label htmlFor={`lab-test-${key}`}>{label}</Label>
+                      <Input
+                        id={`lab-test-${key}`}
+                        type="number"
+                        inputMode="decimal"
+                        min={0}
+                        max={100}
+                        step="0.01"
+                        placeholder="—"
+                        value={draft[key] as string}
+                        onChange={(e) => setField(key, e.target.value)}
+                        data-testid={`lab-test-${key}`}
+                      />
+                    </div>
+                  ))}
+                </div>
+                <div className="space-y-1">
+                  <Label>Terpenes (% as printed)</Label>
+                  {draft.terpenes.map((t, i) => (
+                    <div key={i} className="flex gap-2">
+                      <Input
+                        aria-label={`Terpene ${i + 1} name`}
+                        placeholder="e.g. myrcene"
+                        value={t.name}
+                        onChange={(e) => setTerpene(i, "name", e.target.value)}
+                      />
+                      <Input
+                        aria-label={`Terpene ${i + 1} percent`}
+                        type="number"
+                        inputMode="decimal"
+                        min={0}
+                        max={100}
+                        step="0.01"
+                        placeholder="%"
+                        className="w-24"
+                        value={t.percent}
+                        onChange={(e) => setTerpene(i, "percent", e.target.value)}
+                      />
+                    </div>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() =>
+                      setDraft((d) => ({
+                        ...d,
+                        terpenes: [...d.terpenes, { name: "", percent: "" }],
+                      }))
+                    }
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Add terpene
+                  </Button>
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="lab-test-lab-name">Lab name (optional)</Label>
+                  <Input
+                    id="lab-test-lab-name"
+                    value={draft.labName}
+                    onChange={(e) => setField("labName", e.target.value)}
+                    data-testid="lab-test-lab-name"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="lab-test-note">Note (optional)</Label>
+                  <Textarea
+                    id="lab-test-note"
+                    rows={2}
+                    value={draft.note}
+                    onChange={(e) => setField("note", e.target.value)}
+                  />
+                </div>
+                {errors.length > 0 ? (
+                  <ul
+                    data-testid="lab-test-errors"
+                    className="list-disc pl-5 text-xs text-destructive space-y-0.5"
+                    role="alert"
+                  >
+                    {errors.map((e) => (
+                      <li key={e}>{e}</li>
+                    ))}
+                  </ul>
+                ) : null}
                 <Button
                   type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() =>
-                    setDraft((d) => ({
-                      ...d,
-                      terpenes: [...d.terpenes, { name: "", percent: "" }],
-                    }))
-                  }
+                  onClick={handleSave}
+                  disabled={save.isPending}
+                  data-testid="lab-test-save"
+                  className="w-full"
                 >
-                  <Plus className="h-3.5 w-3.5" /> Add terpene
+                  {save.isPending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
+                  Save lab result
                 </Button>
               </div>
-              <div className="space-y-1">
-                <Label htmlFor="lab-test-lab-name">Lab name (optional)</Label>
-                <Input
-                  id="lab-test-lab-name"
-                  value={draft.labName}
-                  onChange={(e) => setField("labName", e.target.value)}
-                  data-testid="lab-test-lab-name"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="lab-test-note">Note (optional)</Label>
-                <Textarea
-                  id="lab-test-note"
-                  rows={2}
-                  value={draft.note}
-                  onChange={(e) => setField("note", e.target.value)}
-                />
-              </div>
-              {errors.length > 0 ? (
-                <ul
-                  data-testid="lab-test-errors"
-                  className="list-disc pl-5 text-xs text-destructive space-y-0.5"
-                  role="alert"
-                >
-                  {errors.map((e) => (
-                    <li key={e}>{e}</li>
-                  ))}
-                </ul>
-              ) : null}
-              <Button
-                type="button"
-                onClick={handleSave}
-                disabled={save.isPending}
-                data-testid="lab-test-save"
-                className="w-full"
-              >
-                {save.isPending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
-                Save lab result
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+            </DialogContent>
+          </Dialog>
+        )}
       </header>
 
       {view.hasAny ? (
@@ -275,17 +286,19 @@ export default function PlantLabResultsPanel({ plantId }: Props) {
                     </span>
                   ) : null}
                 </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
-                  onClick={() => handleDelete(card.id)}
-                  data-testid="plant-lab-result-delete"
-                >
-                  <Trash2 className="h-3.5 w-3.5" aria-hidden />
-                  {armedDeleteId === card.id ? "Confirm delete" : null}
-                </Button>
+                {readOnly ? null : (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
+                    onClick={() => handleDelete(card.id)}
+                    data-testid="plant-lab-result-delete"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" aria-hidden />
+                    {armedDeleteId === card.id ? "Confirm delete" : null}
+                  </Button>
+                )}
               </div>
               {card.cannabinoids.length > 0 ? (
                 <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">

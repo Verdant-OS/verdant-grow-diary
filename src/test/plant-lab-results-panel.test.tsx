@@ -19,19 +19,21 @@ function render(ui: ReactElement) {
   return rtlRender(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
 }
 
-// Result the mocked .order() resolves with; set per-test.
+// Result the mocked query chain resolves with; set per-test.
 const queryResult: { current: { data: unknown; error: unknown } } = {
   current: { data: [], error: null },
+};
+
+// Thenable self-returning chain so any number of .order() calls works.
+const chain = {
+  order: () => chain,
+  then: (resolve: (v: unknown) => void) => resolve(queryResult.current),
 };
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: () => ({
-      select: () => ({
-        eq: () => ({
-          order: async () => queryResult.current,
-        }),
-      }),
+      select: () => ({ eq: () => chain }),
       insert: async () => ({ error: null }),
       delete: () => ({ eq: () => ({ eq: async () => ({ error: null }) }) }),
     }),
@@ -101,5 +103,40 @@ describe("PlantLabResultsPanel", () => {
     expect(card.textContent).toContain("myrcene 0.8%");
     expect(card.textContent).toContain("Green Labs");
     expect(screen.getByTestId("plant-lab-results-panel").getAttribute("data-count")).toBe("1");
+  });
+
+  it("readOnly: shows saved evidence without add/delete controls", async () => {
+    queryResult.current = {
+      data: [
+        {
+          id: "t1",
+          tested_at: "2026-08-01T00:00:00.000Z",
+          created_at: "2026-08-02T10:00:00.000Z",
+          thca_percent: 24,
+          thc_percent: null,
+          cbda_percent: null,
+          cbd_percent: null,
+          terpenes: {},
+          lab_name: null,
+          note: null,
+        },
+      ],
+      error: null,
+    };
+    render(<PlantLabResultsPanel plantId="p1" readOnly />);
+    const panel = await screen.findByTestId("plant-lab-results-panel");
+    expect(panel.getAttribute("data-readonly")).toBe("true");
+    expect(screen.getByTestId("plant-lab-result-card")).toBeTruthy();
+    expect(screen.queryByTestId("plant-lab-results-add")).toBeNull();
+    expect(screen.queryByTestId("plant-lab-result-delete")).toBeNull();
+  });
+
+  it("readOnly: renders nothing at all when the plant has no lab results", async () => {
+    queryResult.current = { data: [], error: null };
+    render(<PlantLabResultsPanel plantId="p1" readOnly />);
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50));
+    });
+    expect(screen.queryByTestId("plant-lab-results-panel")).toBeNull();
   });
 });

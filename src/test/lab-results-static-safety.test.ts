@@ -41,7 +41,17 @@ describe("lab results — frontend static safety", () => {
   it("read hook selects explicit columns, never *", () => {
     const src = readStripped("src/hooks/usePlantLabTests.ts");
     expect(src).not.toMatch(/select\(\s*["'`]\s*\*/);
-    expect(src).toMatch(/tested_at, thca_percent/);
+    expect(src).toMatch(/tested_at, created_at, thca_percent/);
+  });
+
+  it("read hook orders deterministically (tested_at, created_at, id)", () => {
+    const src = readStripped("src/hooks/usePlantLabTests.ts");
+    expect(src).toMatch(/order\("tested_at"[\s\S]*order\("created_at"[\s\S]*order\("id"/);
+  });
+
+  it("date labels are formatted in UTC so the entered calendar date never shifts", () => {
+    const src = read("src/lib/labResultsRules.ts");
+    expect(src).toContain('timeZone: "UTC"');
   });
 
   it("panel fails toward hidden while unresolved or unavailable", () => {
@@ -91,5 +101,17 @@ describe("lab results — migration static safety", () => {
   it("insert and update verify the referenced plant belongs to the caller", () => {
     const checks = sql.match(/WHERE p\.id = plant_id AND p\.user_id = auth\.uid\(\)/g) ?? [];
     expect(checks.length).toBe(2);
+  });
+
+  it("terpene validity and at-least-one-measurement are enforced at the DB boundary", () => {
+    // Authenticated clients have direct INSERT/UPDATE, so app-side draft
+    // validation alone cannot stop a tampered client — the database must
+    // reject malformed evidence itself.
+    expect(sql).toContain("CREATE FUNCTION public.lab_tests_terpenes_valid");
+    expect(sql).toContain("CHECK (public.lab_tests_terpenes_valid(terpenes))");
+    expect(sql).toContain("CONSTRAINT lab_tests_has_measurement");
+    // The validator must be IMMUTABLE plain SQL — never SECURITY DEFINER.
+    expect(sql).toMatch(/IMMUTABLE/);
+    expect(sql).not.toMatch(/SECURITY DEFINER/i);
   });
 });

@@ -20,6 +20,7 @@ import type { LabTestRow } from "@/lib/labResultsRules";
 interface LabTestDbRow {
   id: string;
   tested_at: string | null;
+  created_at: string | null;
   thca_percent: number | null;
   thc_percent: number | null;
   cbda_percent: number | null;
@@ -39,14 +40,19 @@ export function usePlantLabTests(plantId: string | null | undefined) {
       const { data, error } = await supabase
         .from("lab_tests" as never)
         .select(
-          "id, tested_at, thca_percent, thc_percent, cbda_percent, cbd_percent, terpenes, lab_name, note",
+          "id, tested_at, created_at, thca_percent, thc_percent, cbda_percent, cbd_percent, terpenes, lab_name, note",
         )
         .eq("plant_id", plantId as string)
-        .order("tested_at", { ascending: false });
+        // Date-only entry makes same-day tests share midnight; created_at
+        // then id keep the order deterministic across refreshes.
+        .order("tested_at", { ascending: false })
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: true });
       if (error) return null; // unavailable — panel stays quietly absent
       return ((data ?? []) as unknown as LabTestDbRow[]).map((r) => ({
         id: r.id,
         testedAt: r.tested_at,
+        createdAt: r.created_at,
         thcaPercent: r.thca_percent,
         thcPercent: r.thc_percent,
         cbdaPercent: r.cbda_percent,

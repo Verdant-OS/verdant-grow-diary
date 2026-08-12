@@ -407,6 +407,41 @@ describe("usePersistEnvironmentAlerts — hook behaviour", () => {
     expect(saveAlertMock).not.toHaveBeenCalled();
   });
 
+  it("regression: passes tentId through to saveAlert as tent_id (was always omitted — see project-plant-assigned-tent-alerts-tent-id-null memory)", async () => {
+    renderHook(() =>
+      usePersistEnvironmentAlerts({
+        growId: "g1",
+        snapshot: liveSnapshot(),
+        quality: okQuality,
+        targets: outOfRangeTargets,
+        enabled: true,
+        tentId: "tent-flower",
+      }),
+    );
+    await waitFor(() => {
+      expect(saveAlertMock).toHaveBeenCalledTimes(1);
+    });
+    const payload = saveAlertMock.mock.calls[0][0];
+    expect(payload.tent_id).toBe("tent-flower");
+  });
+
+  it("defaults tent_id to null when tentId is omitted (unknown/ambiguous tent — same as before this field existed)", async () => {
+    renderHook(() =>
+      usePersistEnvironmentAlerts({
+        growId: "g1",
+        snapshot: liveSnapshot(),
+        quality: okQuality,
+        targets: outOfRangeTargets,
+        enabled: true,
+      }),
+    );
+    await waitFor(() => {
+      expect(saveAlertMock).toHaveBeenCalledTimes(1);
+    });
+    const payload = saveAlertMock.mock.calls[0][0];
+    expect(payload.tent_id).toBeNull();
+  });
+
   it("is disabled when growId is null", async () => {
     renderHook(() =>
       usePersistEnvironmentAlerts({
@@ -436,6 +471,35 @@ const PERSIST_HOOK = readFileSync(
   "utf8",
 );
 const DASHBOARD = readFileSync(resolve(ROOT, "src/pages/Dashboard.tsx"), "utf8");
+const AUTO_PERSIST_FOR_GROW = readFileSync(
+  resolve(ROOT, "src/components/AlertsAutoPersistForGrow.tsx"),
+  "utf8",
+);
+
+describe("regression: both saveAlert call sites wire a tent id (project-plant-assigned-tent-alerts-tent-id-null)", () => {
+  it("usePersistEnvironmentAlerts forwards tentId into the saveAlert payload as tent_id", () => {
+    expect(PERSIST_HOOK).toMatch(/saveAlert\(\{[\s\S]*?tent_id:\s*tentId/);
+  });
+
+  it("AlertsAutoPersistForGrow passes the resolved snapshot tent through", () => {
+    expect(AUTO_PERSIST_FOR_GROW).toMatch(
+      /tentId:\s*sensorState\.status\s*===\s*["']ok["']\s*\?\s*\(sensorState\.tentId\s*\?\?\s*null\)\s*:\s*null/,
+    );
+  });
+
+  it("Dashboard passes the resolved snapshot tent to both the auto-persist hook and the manual Save alert button", () => {
+    // The tent id is resolved once from the snapshot state...
+    expect(DASHBOARD).toMatch(
+      /const\s+snapshotTentId\s*=\s*\n?\s*sensorState\.status\s*===\s*["']ok["']\s*\?\s*\(sensorState\.tentId\s*\?\?\s*null\)\s*:\s*null/,
+    );
+    // ...and threaded into BOTH write paths: the auto-persist hook input
+    // (tentId) and the manual Save alert payload (tent_id). One short
+    // identifier at each call site keeps the Save-alert handler compact
+    // for alert-events.test.ts's content-anchored block scan.
+    expect(DASHBOARD).toMatch(/tentId:\s*snapshotTentId/);
+    expect(DASHBOARD).toMatch(/tent_id:\s*snapshotTentId/);
+  });
+});
 
 describe("environment alert persistence — static safety", () => {
   it("persistence rules lib does not import supabase, ai-coach, action_queue, or service_role", () => {

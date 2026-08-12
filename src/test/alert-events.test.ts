@@ -159,17 +159,20 @@ describe("Dashboard save-alert audit wiring", () => {
   });
 
   it("appends a 'created' event after a successful saveAlert", () => {
-    const idx = DASHBOARD.indexOf("Save alert");
-    expect(idx).toBeGreaterThan(-1);
-    const around = DASHBOARD.slice(Math.max(0, idx - 2000), idx + 200);
-    expect(around).toMatch(/await\s+saveAlert/);
+    // Anchor on the handler's own content — from the saveAlert call to the
+    // "Save alert" button label that closes the block — rather than a fixed
+    // byte window. The previous `idx - 2000` lookback was already at its
+    // edge and broke when one short line was added to the payload.
+    const saveIdx = DASHBOARD.search(/await\s+saveAlert/);
+    expect(saveIdx).toBeGreaterThan(-1);
+    const labelIdx = DASHBOARD.indexOf("Save alert", saveIdx);
+    expect(labelIdx).toBeGreaterThan(saveIdx);
+    const around = DASHBOARD.slice(saveIdx, labelIdx);
+    // Everything matched below necessarily occurs AFTER the saveAlert call,
+    // preserving the original save-before-log ordering assertion.
     expect(around).toMatch(/await\s+logAlertEvent/);
     expect(around).toMatch(/event_type\s*:\s*["']created["']/);
     expect(around).toMatch(/new_status\s*:\s*["']open["']/);
-    // The logAlertEvent call must occur after the saveAlert call, not before.
-    const saveIdx = around.indexOf("saveAlert");
-    const logIdx = around.indexOf("logAlertEvent");
-    expect(logIdx).toBeGreaterThan(saveIdx);
   });
 
   it("shows a warning toast if the audit log fails (status change preserved)", () => {

@@ -356,6 +356,7 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
         createdAt: new Date().toISOString(),
         growEventId: (result as { growEventId?: string | null }).growEventId ?? null,
         source: "quick_log_v2_feed",
+        growId: resolved.growId ?? null,
       });
       onOpenChange(false);
       return;
@@ -478,6 +479,7 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
       createdAt: new Date().toISOString(),
       growEventId: (res as { growEventId?: string | null }).growEventId ?? null,
       source: "quick_log_v2",
+      growId: resolved.growId ?? null,
     });
     committedMainLogRef.current = null;
     resetPhotoSelection();

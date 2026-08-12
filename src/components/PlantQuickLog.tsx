@@ -10,7 +10,9 @@
  *   5) Sticky mobile-safe "Save log" button
  *
  * Safety contract is enforced by src/test/plant-quick-log.test.ts — keep this
- * component a presenter writing only to diary_entries + diary-photos storage.
+ * component a presenter. It touches diary-photos storage directly, but the
+ * diary row itself is built by src/lib/quickLogRules.ts and written by
+ * src/lib/writeQuickLogPlantEntry.ts; no table access belongs in here.
  * Manual sensor values are stored under details.manual_sensor_snapshot with
  * source set to "manual" by the pure helper in src/lib/quickLogRules.ts.
  */
@@ -31,10 +33,10 @@ import { useAuth } from "@/store/auth";
 import { applyQuickLogV2Refresh } from "@/lib/quickLogV2RefreshRules";
 import {
   buildManualSensorSnapshot,
-  buildQuickLogInsertDraft,
   parseOptionalNumber,
   type QuickLogSensorInput,
 } from "@/lib/quickLogRules";
+import { writeQuickLogPlantEntry } from "@/lib/writeQuickLogPlantEntry";
 import {
   computeChronologyDelta,
   type ChronologyDelta,
@@ -51,6 +53,11 @@ import {
   type QuickLogActionChip,
   type ResponseCheckStatus,
 } from "@/lib/tenSecondQuickCheckRules";
+import {
+  buildEntryCreatedScopeDetail,
+  timelineHrefAfterQuickLogSave,
+} from "@/lib/quickLogPostSaveScopeRules";
+import { useGrows } from "@/store/grows";
 
 interface Props {
   open: boolean;
@@ -90,6 +97,7 @@ export default function PlantQuickLog({
 }: Props) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { setActiveGrowId } = useGrows();
   const fileRef = useRef<HTMLInputElement | null>(null);
   const libraryFileRef = useRef<HTMLInputElement | null>(null);
   const { data: logs } = usePlantManualSensorLogs(open ? plantId : null);
@@ -225,7 +233,9 @@ export default function PlantQuickLog({
         uploadedPath = path;
       }
 
-      const result = buildQuickLogInsertDraft({
+      // The diary row is built and written by the sanctioned lib writer —
+      // this presenter holds no table access (static-safety tests enforce it).
+      const written = await writeQuickLogPlantEntry({
         plantId,
         plantName,
         growId,
@@ -234,40 +244,59 @@ export default function PlantQuickLog({
         photoPath: uploadedPath,
         sensors,
       });
-      if (!result.ok) {
+
+      // `written.ok === false` (not `!written.ok`) — the loose-mode compiler
+      // does not narrow this union through negation.
+      if (written.ok === false) {
+        if (written.reason !== "invalid_draft") {
+          console.error("PlantQuickLog diary insert failed", written.reason, written.detail);
+        }
         if (uploadedPath) {
           await supabase.storage
             .from("diary-photos")
             .remove([uploadedPath])
             .catch(() => {});
         }
-        setError("Add what changed, a photo, or a reading before saving.");
+        setError(
+          written.reason === "invalid_draft"
+            ? "Add what changed, a photo, or a reading before saving."
+            : "Could not save this log. Check connection and try again.",
+        );
         return;
       }
 
-      const { error: insErr } = await supabase.from("diary_entries").insert(result.draft as never);
-
-      if (insErr) {
-        console.error("PlantQuickLog diary insert failed", insErr);
-        if (uploadedPath) {
-          await supabase.storage
-            .from("diary-photos")
-            .remove([uploadedPath])
-            .catch(() => {});
-        }
-        setError("Could not save this log. Check connection and try again.");
-        return;
-      }
-
-      toast.success("Log saved to timeline.");
+      toast.success("Log saved to timeline.", {
+        action: timelineHrefAfterQuickLogSave(growId)
+          ? {
+              label: "View timeline",
+              onClick: () => {
+                const href = timelineHrefAfterQuickLogSave(growId);
+                if (href && typeof window !== "undefined") {
+                  window.location.assign(href);
+                }
+              },
+            }
+          : undefined,
+      });
       applyQuickLogV2Refresh(queryClient, {
         targetType: "plant",
         targetId: plantId,
         tentId: tentId ?? null,
       });
+      // Pin active grow before dispatch so Timeline's activeGrowId effect
+      // reloads the scope that received this log.
+      if (growId && typeof setActiveGrowId === "function") {
+        setActiveGrowId(growId);
+      }
       window.dispatchEvent(
         new CustomEvent("verdant:entry-created", {
-          detail: { plantId, createdAt: new Date().toISOString() },
+          detail: buildEntryCreatedScopeDetail({
+            growId,
+            plantId,
+            tentId: tentId ?? null,
+            createdAt: new Date().toISOString(),
+            source: "plant_quick_log",
+          }),
         }),
       );
       resetForm();

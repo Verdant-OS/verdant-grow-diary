@@ -815,6 +815,19 @@ function stableSerialize(value: unknown): string {
 }
 
 /**
+ * Identifies the byte-level behaviour of `serializeSkillContract`.
+ *
+ * Bump this whenever the serializer's OUTPUT changes for any input — key
+ * ordering, undefined handling, number formatting, escaping. Downstream
+ * integrity digests frame this string into the bytes they hash, so a
+ * serializer change without a bump would silently invalidate every stored
+ * digest while still appearing to verify. The version lives here, beside the
+ * behaviour it describes, rather than in the consumer: a constant asserting a
+ * version the serializer never declared is decorative.
+ */
+export const CANONICAL_SERIALIZER_VERSION = "verdant-skill-contract/1" as const;
+
+/**
  * Deterministic JSON serialization for any parsed contract value: object
  * keys sorted recursively, arrays kept in order, undefined-valued keys
  * omitted. Same parsed value always yields the same bytes.

@@ -24,16 +24,17 @@ export interface QuickLogV2EntryCreatedDetail {
   growEventId: string | null;
   /** Sub-source so listeners can distinguish v2 branches if useful. */
   source: "quick_log_v2" | "quick_log_v2_feed";
+  /**
+   * Grow that received the log. GrowsProvider pins active grow to this so
+   * unscoped /logs refetches the correct scope after save.
+   */
+  growId?: string | null;
 }
 
-export function dispatchQuickLogV2EntryCreated(
-  detail: QuickLogV2EntryCreatedDetail,
-): boolean {
+export function dispatchQuickLogV2EntryCreated(detail: QuickLogV2EntryCreatedDetail): boolean {
   if (typeof window === "undefined" || typeof window.dispatchEvent !== "function") {
     return false;
   }
-  window.dispatchEvent(
-    new CustomEvent(QUICK_LOG_V2_ENTRY_CREATED_EVENT, { detail }),
-  );
+  window.dispatchEvent(new CustomEvent(QUICK_LOG_V2_ENTRY_CREATED_EVENT, { detail }));
   return true;
 }

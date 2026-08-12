@@ -82,7 +82,6 @@ export function readEnv(env: NodeJS.ProcessEnv): RuntimeEnv {
 }
 
 function printBanner(): void {
-  // eslint-disable-next-line no-console
   console.log(
     [
       "────────────────────────────────────────────────────────────",
@@ -105,7 +104,6 @@ async function readStdin(): Promise<string> {
 }
 
 function fail(message: string, code = 1): never {
-  // eslint-disable-next-line no-console
   console.error(`refused: ${message}`);
   process.exit(code);
 }
@@ -155,7 +153,6 @@ async function main(): Promise<void> {
   });
 
   if (!plan.ok) {
-    // eslint-disable-next-line no-console
     console.error(
       JSON.stringify(
         { ok: false, reason: plan.reason, details: plan.details ?? null },
@@ -166,7 +163,6 @@ async function main(): Promise<void> {
     process.exit(2);
   }
 
-  // eslint-disable-next-line no-console
   console.log(
     JSON.stringify(
       {
@@ -185,7 +181,6 @@ async function main(): Promise<void> {
   );
 
   if (flags.dryRun) {
-    // eslint-disable-next-line no-console
     console.log("dry-run: no RPC call made");
     return;
   }
@@ -204,12 +199,10 @@ async function main(): Promise<void> {
   });
 
   if (error) {
-    // eslint-disable-next-line no-console
     console.error(`commit failed: ${error.message}`);
     process.exit(3);
   }
 
-  // eslint-disable-next-line no-console
   console.log(JSON.stringify({ committed: data }, null, 2));
 }
 

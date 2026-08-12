@@ -222,14 +222,11 @@ test.describe("Quick Log smoke checklist", () => {
       fs.writeFileSync(REPORT_JSON, json);
       fs.writeFileSync(REPORT_TXT, text);
 
-      // eslint-disable-next-line no-console
       console.log(`\n${text}\n`);
-      // eslint-disable-next-line no-console
       console.log(`Quick Log smoke report: ${path.relative(process.cwd(), REPORT_JSON)}`);
 
       const fail = report.firstFailure();
       if (fail) {
-        // eslint-disable-next-line no-console
         console.log(
           `FAILED step ${fail.step}: ${fail.label}\n  evidence: ${fail.evidence}\n  report: ${path.relative(process.cwd(), REPORT_JSON)}`,
         );

@@ -1,25 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Loader2, Sprout } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { useAuth } from "@/store/auth";
-import {
-  createPhenoHunt,
-  defaultHuntName,
-  validatePhenoHuntDraft,
-} from "@/lib/phenoHuntService";
+import { createPhenoHunt, defaultHuntName, validatePhenoHuntDraft } from "@/lib/phenoHuntService";
+import { loadPhenoHuntCandidates } from "@/lib/phenoHuntCandidateLoader";
+import { phenoHuntEmptyCopy, type PhenoCandidateOption } from "@/lib/phenoHuntCandidateRules";
 import { logsPath } from "@/lib/routes";
-
-interface PlantOption {
-  id: string;
-  name: string;
-  strain: string | null;
-}
 
 interface GrowInfo {
   id: string;
@@ -34,7 +25,8 @@ export default function PhenoHuntNew() {
   const tentId = params.get("tentId");
 
   const [grow, setGrow] = useState<GrowInfo | null>(null);
-  const [plants, setPlants] = useState<PlantOption[]>([]);
+  const [plants, setPlants] = useState<PhenoCandidateOption[]>([]);
+  const [growScopeCount, setGrowScopeCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -47,30 +39,22 @@ export default function PhenoHuntNew() {
         setLoading(false);
         return;
       }
-      const [{ data: growRow }, { data: plantRows }] = await Promise.all([
-        supabase.from("grows").select("id,name").eq("id", growId).maybeSingle(),
-        (() => {
-          let q = supabase
-            .from("plants")
-            .select("id,name,strain,tent_id")
-            .eq("grow_id", growId)
-            .eq("is_archived", false);
-          if (tentId) q = q.eq("tent_id", tentId);
-          return q;
-        })(),
-      ]);
+      const result = await loadPhenoHuntCandidates({
+        growId,
+        tentId: tentId ?? null,
+      });
       if (cancelled) return;
-      if (growRow) {
-        setGrow({ id: growRow.id, name: growRow.name });
-        setName(defaultHuntName(growRow.name));
+      if (result.error) {
+        toast.error(result.error);
       }
-      setPlants(
-        (plantRows ?? []).map((p) => ({
-          id: p.id,
-          name: p.name,
-          strain: p.strain ?? null,
-        })),
-      );
+      if (result.grow) {
+        setGrow(result.grow);
+        setName(defaultHuntName(result.grow.name));
+      } else {
+        setGrow(null);
+      }
+      setPlants(result.candidates);
+      setGrowScopeCount(result.growScopeCandidateCount);
       setLoading(false);
     })();
     return () => {
@@ -84,6 +68,16 @@ export default function PhenoHuntNew() {
     [name, plantIds, growId],
   );
   const canSave = errors.length === 0 && !saving && !!user;
+
+  const emptyCopy = useMemo(
+    () =>
+      phenoHuntEmptyCopy({
+        candidateCount: plants.length,
+        filterTentId: tentId,
+        growPlantCountIgnoringTent: growScopeCount,
+      }),
+    [plants.length, tentId, growScopeCount],
+  );
 
   const toggle = (id: string) => {
     setSelected((prev) => {
@@ -145,7 +139,8 @@ export default function PhenoHuntNew() {
         </div>
         <p className="text-sm text-muted-foreground">
           Tag plants in <span className="font-medium">{grow.name}</span>
-          {tentId ? " (this tent)" : ""} as candidates for this hunt.
+          {tentId ? " (this tent)" : ""} as candidates for this hunt. Plants bound by grow_id or by
+          a tent in this grow both qualify.
         </p>
       </header>
 
@@ -164,25 +159,20 @@ export default function PhenoHuntNew() {
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <Label>Candidate plants</Label>
-            <span className="text-xs text-muted-foreground">
-              {selected.size} selected
+            <span className="text-xs text-muted-foreground" data-testid="ph-selected-count">
+              {selected.size} selected · {plants.length} available
             </span>
           </div>
 
-          {plants.length === 0 ? (
+          {emptyCopy.isEmpty ? (
             <div
               className="rounded-lg border border-dashed p-6 text-center space-y-3"
               data-testid="ph-empty"
             >
-              <h3 className="text-sm font-semibold">
-                No plants in this grow yet
-              </h3>
-              <p className="text-xs text-muted-foreground">
-                Add a plant before starting a Pheno Hunt. Candidates are
-                tagged plants, not separate records.
-              </p>
+              <h3 className="text-sm font-semibold">{emptyCopy.headline}</h3>
+              <p className="text-xs text-muted-foreground">{emptyCopy.body}</p>
               <Button asChild size="sm" data-testid="ph-empty-cta">
-                <Link to={`/grows/${growId}`}>Go to grow to add a plant</Link>
+                <Link to={`/grows/${growId}`}>{emptyCopy.ctaLabel}</Link>
               </Button>
             </div>
           ) : (
@@ -193,6 +183,8 @@ export default function PhenoHuntNew() {
                   <li
                     key={p.id}
                     className="flex items-center gap-3 rounded-md border p-2"
+                    data-testid="ph-plant-option"
+                    data-binding={p.binding}
                   >
                     <Checkbox
                       id={`ph-${p.id}`}
@@ -201,10 +193,15 @@ export default function PhenoHuntNew() {
                       data-testid={`ph-toggle-${p.id}`}
                     />
                     <label htmlFor={`ph-${p.id}`} className="flex-1 min-w-0 cursor-pointer">
-                      <div className="text-sm font-medium truncate">{p.name}</div>
-                      <div className="text-xs text-muted-foreground truncate">
-                        {p.strain ?? "Unknown strain"}
-                      </div>
+                      <span className="block text-sm font-medium truncate">{p.name}</span>
+                      <span className="block text-[11px] text-muted-foreground">
+                        {p.strain ? `${p.strain} · ` : ""}
+                        {p.binding === "grow_id"
+                          ? "Linked by grow"
+                          : p.binding === "tent_grow"
+                            ? "Linked via tent (assign grow on plant for best logs)"
+                            : "Linked by grow + tent"}
+                      </span>
                     </label>
                   </li>
                 );
@@ -237,10 +234,9 @@ function BackLink({ to }: { to: string }) {
   return (
     <Link
       to={to}
-      className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-2"
+      className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
     >
-      <ArrowLeft className="h-4 w-4" />
-      Back
+      <ArrowLeft className="h-4 w-4" /> Back
     </Link>
   );
 }

@@ -47,9 +47,7 @@ describe("parseOptionalNumber", () => {
 
 describe("buildManualSensorSnapshot", () => {
   it("returns null when every field is empty", () => {
-    expect(
-      buildManualSensorSnapshot({ temp: "", humidity: "", ph: "", ec: "" }),
-    ).toBeNull();
+    expect(buildManualSensorSnapshot({ temp: "", humidity: "", ph: "", ec: "" })).toBeNull();
   });
   it("labels source = 'manual' and preserves nulls for empty fields", () => {
     const snap = buildManualSensorSnapshot({ temp: "77.7", humidity: "", ph: "6.2", ec: "" });
@@ -145,10 +143,38 @@ describe("buildQuickLogInsertDraft", () => {
 
 describe("PlantQuickLog presenter — safety contract (source-level)", () => {
   it("writes only to diary_entries + diary-photos storage", () => {
-    const tables = [...COMP.matchAll(/\.from\(["']([a-z_]+)["']\)/g)].map((m) => m[1]);
+    // Hyphens included so storage buckets ("diary-photos") are actually
+    // captured — the old [a-z_]+ class silently skipped them, which meant
+    // this scan had exactly one subject and would go vacuous the moment it
+    // disappeared. Whitespace-tolerant so line wrapping cannot hide a call.
+    const tables = [...COMP.matchAll(/\.\s*from\(\s*["']([a-z_-]+)["']\s*\)/g)].map((m) => m[1]);
+    expect(tables.length).toBeGreaterThan(0);
     for (const t of tables) {
       expect(["diary_entries", "diary-photos"]).toContain(t);
     }
+  });
+
+  it("holds no direct table access — the diary row goes through the lib writer", () => {
+    // The presenter may reach supabase.storage for the photo bucket, but must
+    // never touch a table itself. Whitespace-tolerant: a prettier-wrapped
+    // `supabase\n  .from(` must not slip past this scan.
+    const DIRECT_TABLE_CALL = /supabase\s*\.\s*from\s*\(/;
+    expect(COMP).not.toMatch(DIRECT_TABLE_CALL);
+    expect(COMP).not.toMatch(/supabase\s*\.\s*rpc\s*\(/);
+    expect(COMP).not.toMatch(/functions\s*\.\s*invoke/);
+    // Positive pin: the sanctioned writer is what replaced it.
+    expect(COMP).toMatch(/writeQuickLogPlantEntry/);
+    // Storage access is still expected and must not be caught by the above.
+    expect(COMP).toMatch(/supabase\s*\.\s*storage/);
+  });
+
+  it("direct-table detector catches multi-line formatting (guard self-test)", () => {
+    const DIRECT_TABLE_CALL = /supabase\s*\.\s*from\s*\(/;
+    expect('await supabase\n      .from("diary_entries")\n      .insert({});').toMatch(
+      DIRECT_TABLE_CALL,
+    );
+    expect('supabase.from("diary_entries")').toMatch(DIRECT_TABLE_CALL);
+    expect('supabase.storage\n      .from("diary-photos")').not.toMatch(DIRECT_TABLE_CALL);
   });
   it("never writes user_id in the insert payload", () => {
     expect(COMP).not.toMatch(/user_id\s*:/);

@@ -60,5 +60,4 @@ const checklist = [
   "- Bad, stale, invalid, or unknown telemetry is never treated as healthy live context.",
 ].join("\n");
 
-// eslint-disable-next-line no-console
 console.log(checklist);

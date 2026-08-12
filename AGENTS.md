@@ -1,4 +1,20 @@
-# Verdant Codex Instructions
+# Verdant Agent Constitution
+
+**Sentinel-Version: 2026-08-01.2**
+
+This file is the universal constitution every Verdant agent inherits — Codex, Claude,
+Grok, Gemini, the Security reviewer, and the Council Chair. It was previously titled
+"Verdant Codex Instructions"; the content was already agent-neutral, so only the name
+and the role-routing/startup sections changed.
+
+Your specific role lives in `docs/agents/roles/`. Current operational state — active
+branch, production status, blockers, approved slice — lives in
+`docs/agents/CURRENT_STATE.md`, never here. This file is stable; that one is the
+changing shift report.
+
+> **Naming note.** "Sentinel" is overloaded in this repository. `ggsSentinel*` modules
+> and `docs/v0-sentinel-stop-ship-checklist.md` refer to the GGS sensor smoke-runner and
+> are unrelated to this constitution. Do not conflate them when searching.
 
 ## Product Context
 
@@ -36,8 +52,13 @@ Automation last.
 Default workflow:
 
 ```text
-Build -> Audit -> Fix -> Test -> Publish
+Build -> Audit -> Fix -> Test -> Publish -> Measure
 ```
+
+`Measure` is not optional decoration. A merge is not a release, a green CI run is not
+proof of indexing, a public-web estimate is not first-party analytics, and an unverified
+sensor value is not healthy live data. Work that cannot be measured yet should say so
+and stop, rather than claim an outcome it has not observed.
 
 Use small, scoped changes. Avoid broad rewrites.
 
@@ -57,17 +78,17 @@ Before changing code:
 
 Never violate these:
 
-* No fake live data.
-* No blind automation.
-* No device control unless explicitly approved in a future phase.
-* Action Queue must stay approval-required.
-* Demo/manual/live/stale/invalid data must be clearly labeled.
-* Bad or unknown telemetry must never be shown as healthy.
-* AI Doctor must be cautious and must not pretend certainty from one photo or one reading.
-* Verdant may suggest actions, but the grower decides.
-* Do not recommend aggressive nutrient, irrigation, or equipment changes from weak evidence.
-* Do not expose service role keys, bridge tokens, API keys, webhook secrets, private env values, or internal secrets.
-* Treat user data, sensor data, CSVs, bridge payloads, and AI outputs as untrusted.
+- No fake live data.
+- No blind automation.
+- No device control unless explicitly approved in a future phase.
+- Action Queue must stay approval-required.
+- Demo/manual/live/stale/invalid data must be clearly labeled.
+- Bad or unknown telemetry must never be shown as healthy.
+- AI Doctor must be cautious and must not pretend certainty from one photo or one reading.
+- Verdant may suggest actions, but the grower decides.
+- Do not recommend aggressive nutrient, irrigation, or equipment changes from weak evidence.
+- Do not expose service role keys, bridge tokens, API keys, webhook secrets, private env values, or internal secrets.
+- Treat user data, sensor data, CSVs, bridge payloads, and AI outputs as untrusted.
 
 ---
 
@@ -88,15 +109,15 @@ Preferred layering:
 
 Rules:
 
-* UI components should stay presenter-focused.
-* Do not duplicate rule tables inside JSX.
-* New logic must be typed, deterministic, and null-safe.
-* Keep transforms/selectors out of render bodies when possible.
-* Use stable sorting with explicit tie-breakers.
-* Avoid randomness.
-* Time must be injectable for tests when relevant.
-* Preserve old documents/rows with missing fields.
-* Do not casually change schema, RLS, auth, or edge functions outside the requested scope.
+- UI components should stay presenter-focused.
+- Do not duplicate rule tables inside JSX.
+- New logic must be typed, deterministic, and null-safe.
+- Keep transforms/selectors out of render bodies when possible.
+- Use stable sorting with explicit tie-breakers.
+- Avoid randomness.
+- Time must be injectable for tests when relevant.
+- Preserve old documents/rows with missing fields.
+- Do not casually change schema, RLS, auth, or edge functions outside the requested scope.
 
 ---
 
@@ -104,15 +125,15 @@ Rules:
 
 For schema, RLS, and edge-function work:
 
-* Audit first.
-* Report existing conventions.
-* Do not silently alter existing tables.
-* No anon grants unless explicitly required and justified.
-* Client users must not be able to self-grant access, billing status, roles, credits, device permissions, or admin privileges.
-* Server-side enforcement must not trust client `user_id`.
-* Use `auth.uid()` / verified JWT user server-side.
-* Service role may be used only in server/admin/test setup contexts, never in client code.
-* If a task is tests-only, do not "fix" schema or policies. Stop and report blockers.
+- Audit first.
+- Report existing conventions.
+- Do not silently alter existing tables.
+- No anon grants unless explicitly required and justified.
+- Client users must not be able to self-grant access, billing status, roles, credits, device permissions, or admin privileges.
+- Server-side enforcement must not trust client `user_id`.
+- Use `auth.uid()` / verified JWT user server-side.
+- Service role may be used only in server/admin/test setup contexts, never in client code.
+- If a task is tests-only, do not "fix" schema or policies. Stop and report blockers.
 
 RLS pattern to prefer:
 
@@ -129,12 +150,12 @@ runtime harness for money/security paths
 
 Every sensor reading should include:
 
-* source
-* captured_at / timestamp
-* tent_id
-* plant_id when relevant
-* confidence
-* raw_payload when available
+- source
+- captured_at / timestamp
+- tent_id
+- plant_id when relevant
+- confidence
+- raw_payload when available
 
 Allowed source labels:
 
@@ -149,13 +170,13 @@ invalid
 
 Flag suspicious telemetry:
 
-* Celsius shown as Fahrenheit
-* uS/cm shown as mS/cm
-* humidity stuck at 0 or 100
-* soil moisture stuck at 0 or 100
-* pH outside realistic range
-* old readings shown as current
-* default/demo values presented as live
+- Celsius shown as Fahrenheit
+- uS/cm shown as mS/cm
+- humidity stuck at 0 or 100
+- soil moisture stuck at 0 or 100
+- pH outside realistic range
+- old readings shown as current
+- default/demo values presented as live
 
 Never classify invalid or unknown telemetry as healthy.
 
@@ -165,18 +186,18 @@ Never classify invalid or unknown telemetry as healthy.
 
 AI Doctor should use as much context as available:
 
-* plant stage
-* strain
-* medium
-* pot size
-* recent watering
-* recent feeding
-* sensor snapshots
-* recent photos
-* diary entries
-* alerts
-* grow targets
-* plant history
+- plant stage
+- strain
+- medium
+- pot size
+- recent watering
+- recent feeding
+- sensor snapshots
+- recent photos
+- diary entries
+- alerts
+- grow targets
+- plant history
 
 AI Doctor output should include:
 
@@ -205,13 +226,13 @@ Do not make one-photo diagnoses sound certain.
 
 Current billing foundation:
 
-* `profiles.tier` is XP/gamification only. Never use it as billing.
-* `public.billing_subscriptions` is the billing entitlement source of truth.
-* Absence of a billing row resolves to Free.
-* Client entitlement reads are presentation-only.
-* Server-side checks are authoritative for paid/costly features.
-* Founder Lifetime is Pro-like access with capped AI credits, never unlimited AI.
-* Do not add checkout, webhook, provider SDKs, pricing copy, PaywallCta edits, or UI gating unless specifically requested.
+- `profiles.tier` is XP/gamification only. Never use it as billing.
+- `public.billing_subscriptions` is the billing entitlement source of truth.
+- Absence of a billing row resolves to Free.
+- Client entitlement reads are presentation-only.
+- Server-side checks are authoritative for paid/costly features.
+- Founder Lifetime is Pro-like access with capped AI credits, never unlimited AI.
+- Do not add checkout, webhook, provider SDKs, pricing copy, PaywallCta edits, or UI gating unless specifically requested.
 
 Capability logic belongs in:
 
@@ -230,7 +251,7 @@ if (plan === "pro") ...
 Prefer capability helpers:
 
 ```ts
-canUseCapability(entitlement, "advancedExports")
+canUseCapability(entitlement, "advancedExports");
 ```
 
 ---
@@ -243,17 +264,17 @@ Backend enforcement must happen server-side before model calls.
 
 Rules:
 
-* Meter `ai-doctor-review` and `ai-coach`.
-* Free: 3 AI credits per grow.
-* Pro monthly: 100 AI credits per UTC calendar month.
-* Pro annual: 100 AI credits per UTC calendar month.
-* Founder lifetime: 100 AI credits per UTC calendar month.
-* Founder AI credits are capped, never unlimited.
-* Client cannot set `user_id`, weight, model tier, or plan.
-* Edge functions decide model tier/weight.
-* Refund failed model calls with append-only reversal rows.
-* Use runtime tests for RLS and spend/race behavior.
-* Quota denials should be calm, expected responses, not crashes.
+- Meter `ai-doctor-review` and `ai-coach`.
+- Free: 3 AI credits per grow.
+- Pro monthly: 100 AI credits per UTC calendar month.
+- Pro annual: 100 AI credits per UTC calendar month.
+- Founder lifetime: 100 AI credits per UTC calendar month.
+- Founder AI credits are capped, never unlimited.
+- Client cannot set `user_id`, weight, model tier, or plan.
+- Edge functions decide model tier/weight.
+- Refund failed model calls with append-only reversal rows.
+- Use runtime tests for RLS and spend/race behavior.
+- Quota denials should be calm, expected responses, not crashes.
 
 Do not add UI paywall behavior during backend enforcement slices unless requested.
 
@@ -267,11 +288,11 @@ AI or alerts may suggest actions, but Verdant must not execute device commands b
 
 Action Queue items should include:
 
-* reason
-* risk level
-* related grow/tent/plant/alert when available
-* status
-* audit trail
+- reason
+- risk level
+- related grow/tent/plant/alert when available
+- status
+- audit trail
 
 Do not auto-create action queue items unless the task explicitly asks for it.
 
@@ -285,12 +306,12 @@ Base cultivation guidance on proven horticultural best practices and practical g
 
 Avoid:
 
-* bro-science
-* miracle fixes
-* overconfident photo diagnosis
-* aggressive autoflower recovery advice
-* heavy-stress recommendations for weak plants
-* nutrient/irrigation changes from weak evidence
+- bro-science
+- miracle fixes
+- overconfident photo diagnosis
+- aggressive autoflower recovery advice
+- heavy-stress recommendations for weak plants
+- nutrient/irrigation changes from weak evidence
 
 Default priority:
 
@@ -304,10 +325,10 @@ Default priority:
 
 Autoflowers:
 
-* avoid unnecessary transplant shock
-* avoid heavy defoliation
-* avoid high-stress recovery tactics
-* prioritize stable VPD, watering, root health, and gentle feeding
+- avoid unnecessary transplant shock
+- avoid heavy defoliation
+- avoid high-stress recovery tactics
+- prioritize stable VPD, watering, root health, and gentle feeding
 
 ---
 
@@ -322,11 +343,20 @@ Every logic change should include targeted tests for:
 5. Regression for the specific bug or risk
 6. Safety/fence assertions where relevant
 
+**CI contract hygiene (PR #630 class — primary job can fail with green lint/tsc):**
+
+- New routes: insert into `src/lib/appRouteManifest.ts` in **sorted path order** or the _Route manifest + Alerts quick-link drift_ step fails early.
+- Static source tests that `readFileSync` create dialogs / page wiring are first-class consumers — update them in the **same commit** as behavior changes.
+- New `useGrows` / `useNavigate` (or other provider hooks) in leaf components break shallow unit tests — prefer optional `window` navigation, guard optional store methods, or mock the hook in the same commit.
+- Static copy matchers: use `\s+` across words that Prettier may wrap; allow `\s*` inside multi-line call sites.
+
+Playbook: `.claude/skills/ci-contract-hygiene/SKILL.md` and `docs/testing/ci-contract-hygiene.md`.
+
 For security/billing/RLS:
 
-* static scan tests are useful but not enough
-* add runtime harnesses when possible
-* prove client roles cannot mutate protected tables
+- static scan tests are useful but not enough
+- add runtime harnesses when possible
+- prove client roles cannot mutate protected tables
 
 Report:
 
@@ -407,18 +437,18 @@ Prefer partial, safe completion over broad risky completion.
 
 Do not:
 
-* Reuse `profiles.tier` for billing.
-* Add `requiredTier` routing unless explicitly requested.
-* Add checkout/webhook/provider SDKs inside entitlement foundation work.
-* Add service_role to client code.
-* Treat demo data as live.
-* Create hidden automation.
-* Execute device commands.
-* Auto-write action queue items from alerts unless requested.
-* Change existing public copy during backend/security slices.
-* Add broad rewrites to fix narrow bugs.
-* Hide skipped validation.
-* Report "all green" unless all relevant validation actually passed.
+- Reuse `profiles.tier` for billing.
+- Add `requiredTier` routing unless explicitly requested.
+- Add checkout/webhook/provider SDKs inside entitlement foundation work.
+- Add service_role to client code.
+- Treat demo data as live.
+- Create hidden automation.
+- Execute device commands.
+- Auto-write action queue items from alerts unless requested.
+- Change existing public copy during backend/security slices.
+- Add broad rewrites to fix narrow bugs.
+- Hide skipped validation.
+- Report "all green" unless all relevant validation actually passed.
 
 ---
 
@@ -426,15 +456,119 @@ Do not:
 
 Prefer:
 
-* Small PRs.
-* Pure helpers first.
-* Presenter-only UI.
-* RLS-first data design.
-* Runtime harnesses for sensitive permissions.
-* Append-only ledgers for billing/credits/audit trails.
-* Cautious AI.
-* Source-labeled telemetry.
-* Clear rollback notes.
-* Exact pass/fail counts.
+- Small PRs.
+- Pure helpers first.
+- Presenter-only UI.
+- RLS-first data design.
+- Runtime harnesses for sensitive permissions.
+- Append-only ledgers for billing/credits/audit trails.
+- Cautious AI.
+- Source-labeled telemetry.
+- Clear rollback notes.
+- Exact pass/fail counts.
 
 Every change should make Verdant more trustworthy.
+
+---
+
+## Agent Role Routing
+
+Before changing files, identify your assigned role and read its file.
+
+Reading that file is explicitly permitted before the startup gate below — see
+**Context acquisition** there. Most agents do not auto-load their role or the current
+state, so acquiring context necessarily requires a read.
+
+| Agent           | Role file                            |
+| --------------- | ------------------------------------ |
+| Codex           | `docs/agents/roles/codex.md`         |
+| Claude          | `docs/agents/roles/claude.md`        |
+| Grok            | `docs/agents/roles/grok.md`          |
+| Gemini          | `docs/agents/roles/gemini.md`        |
+| Security review | `docs/agents/roles/security.md`      |
+| Council Chair   | `docs/agents/roles/council-chair.md` |
+
+Do not adopt another agent's responsibilities unless Cheek explicitly reassigns them.
+
+Operating order is sequential, not parallel:
+
+```text
+Research -> Architecture -> Build -> Security Review -> QA Audit -> Council -> Cheek approval
+```
+
+All agents implementing at once is the failure mode this routing exists to prevent.
+Handoffs follow `docs/agents/HANDOFF_PROTOCOL.md`.
+
+---
+
+## Mandatory Startup Gate
+
+Before analysis, research, edits, writes, outreach, deployment, or recommendations,
+return:
+
+```text
+SENTINEL_ACK
+agent:
+assigned_role:
+sentinel_version:
+files_read:
+current_task:
+scope:
+out_of_scope:
+conflicts_found:
+data_access_status:
+write_permission:
+```
+
+If a required file is missing or instructions conflict, return:
+
+```text
+STATUS: BLOCKED — AGENT CONTEXT INCOMPLETE
+```
+
+### Context acquisition — permitted before the ACK
+
+Only Claude auto-loads its role and the current state (via `CLAUDE.md` imports). Codex,
+Grok, Gemini, Security, and the Council Chair must read those files with a tool or
+command. So **read-only commands whose sole purpose is acquiring the context this gate
+requires you to cite are explicitly permitted before the ACK**, specifically:
+
+- reading `AGENTS.md`, `docs/agents/CURRENT_STATE.md`, and your own role file
+- listing or reading files solely to locate the above
+- `grok inspect`, or an equivalent command that reports which context files loaded
+
+Nothing else. No edits, no writes, no network calls, no analysis or recommendation, and
+no reading of application code — those wait for the ACK.
+
+The gate exists to stop an agent _acting_ unscoped, not to stop it _learning its scope_.
+Forbidding the reads would leave every non-Claude agent with two options: block
+immediately, or claim in `files_read:` to have read files it could not open. A rule whose
+only compliant outcomes are deadlock or a false statement is worse than no rule.
+
+`files_read:` must list exactly what you actually read. If a required file could not be
+read, that is `STATUS: BLOCKED — AGENT CONTEXT INCOMPLETE`, never an ACK that names it.
+
+Do not continue until the context issue is resolved.
+
+This is a visible checkpoint. An agent that begins work without the acknowledgment has
+violated the operating procedure, and its output should be treated as unscoped.
+
+### Status vocabulary
+
+Use these exact values. They are not interchangeable, and a blocked verification is
+never reported as a passing one.
+
+| Status           | Meaning                                                      |
+| ---------------- | ------------------------------------------------------------ |
+| `PASS`           | Verified by direct evidence the agent actually observed      |
+| `FAIL`           | Verified defect                                              |
+| `BLOCKED`        | Could not verify — access, permission, or dependency missing |
+| `NO_BASELINE`    | No prior measurement exists to compare against               |
+| `NO_DATA`        | Source reachable but returned nothing                        |
+| `NOT_MEASURED`   | Metric has no applicable cases; never report this as 100%    |
+| `NOT_APPLICABLE` | Check does not apply to this target                          |
+
+Never convert `BLOCKED` into `PASS`. Never invent a number to clear a gate: no search
+volume, traffic, keyword difficulty, CPC, domain rating, backlink count, conversion
+rate, or audience size may be stated unless an authorized source supplied it and the
+provenance is recorded.

@@ -766,6 +766,15 @@ export default function DailyCheck() {
                 tentId={tentId || null}
                 tentName={selectedTent?.name ?? null}
                 growId={growId}
+                // Plant scope only when the reviewed tent IS the plant's
+                // actual assignment — the plant-needs-tent flow can show a
+                // tent unrelated to the selected plant, and the Ask AI
+                // Doctor action must not claim that plant for its alerts.
+                plantId={
+                  selectedPlant && selectedPlant.tent_id === tentId
+                    ? selectedPlant.id
+                    : null
+                }
               />
               <PlantAssignedTentActionsPanel
                 tentId={tentId || null}

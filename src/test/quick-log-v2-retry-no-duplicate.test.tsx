@@ -75,16 +75,26 @@ vi.mock("sonner", () => ({
 }));
 
 import QuickLogV2Sheet from "@/components/QuickLogV2Sheet";
+import { QUICK_LOG_V2_ENTRY_CREATED_EVENT } from "@/lib/quickLogV2EntryCreatedEvent";
 
 function renderSheet(onOpenChange: (v: boolean) => void) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });
-  return render(
+  // Spy on the post-save refresh without changing its behavior — the wrapper
+  // delegates to the real invalidateQueries.
+  const invalidateSpy = vi.fn();
+  const origInvalidate = client.invalidateQueries.bind(client);
+  client.invalidateQueries = ((opts: unknown) => {
+    invalidateSpy(opts);
+    return origInvalidate(opts as Parameters<typeof origInvalidate>[0]);
+  }) as typeof client.invalidateQueries;
+  const utils = render(
     <QueryClientProvider client={client}>
       <QuickLogV2Sheet open onOpenChange={onOpenChange} defaultTargetKey="plant:plant-1" />
     </QueryClientProvider>,
   );
+  return { ...utils, invalidateSpy };
 }
 
 function makeImage(name = "gallery.jpg"): File {
@@ -150,6 +160,49 @@ describe("QuickLogV2Sheet — no duplicate main log on retry", () => {
     expect(insertCallCount).toBe(2);
     // ...but the main log RPC was invoked exactly ONCE across both attempts.
     expect(rpcMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("publishes the timeline refresh and entry-created event once, only on the succeeding attempt", async () => {
+    // The main log commits on the first attempt but its companion photo does
+    // not, so the sheet stays open on a Retry. Two things must hold across
+    // that window: listeners must NOT be told an entry exists while only half
+    // the write landed, and the eventual success must publish once — not once
+    // per attempt.
+    insertFailFirst = true;
+    const onOpenChange = vi.fn();
+    const entryCreated: Event[] = [];
+    const listener = (e: Event) => entryCreated.push(e);
+    window.addEventListener(QUICK_LOG_V2_ENTRY_CREATED_EVENT, listener);
+
+    try {
+      const { invalidateSpy } = renderSheet(onOpenChange);
+      await attachPhotoAndNote();
+
+      // First attempt: main log committed, companion insert failed.
+      fireEvent.click(screen.getByTestId("qlv2-save"));
+      await waitFor(() => {
+        expect(screen.getByTestId("qlv2-save-retry")).toBeTruthy();
+      });
+      // Nothing published yet — the committed log is not complete.
+      expect(entryCreated).toHaveLength(0);
+      expect(invalidateSpy).not.toHaveBeenCalled();
+
+      // Retry: the companion insert succeeds and the sheet closes.
+      fireEvent.click(screen.getByTestId("qlv2-save-retry"));
+      await waitFor(() => {
+        expect(onOpenChange).toHaveBeenCalledWith(false);
+      });
+
+      // Exactly one entry-created dispatch across the failure + retry.
+      expect(entryCreated).toHaveLength(1);
+      // ...and the grouped timeline was actually refreshed (not a vacuous pass).
+      const keys = invalidateSpy.mock.calls.map((c) =>
+        JSON.stringify((c[0] as { queryKey: unknown }).queryKey),
+      );
+      expect(keys).toContain(JSON.stringify(["quick_log_grouped_timeline"]));
+    } finally {
+      window.removeEventListener(QUICK_LOG_V2_ENTRY_CREATED_EVENT, listener);
+    }
   });
 });
 

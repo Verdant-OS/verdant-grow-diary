@@ -234,8 +234,12 @@ export default function QuickLogModal({
 
   // Technique is required for a training save to mean anything — mirrors
   // quickLogTypedEventPayloadRules.ts's own technique:missing invariant for
-  // the same concept.
-  const missingRequiredDetail = eventType === "training" && !technique;
+  // the same concept. A Photo save with no attached file is the same class
+  // of problem: sanitizeQuickLogActivityDetails still stamps
+  // event_type: "photo" onto the row with no photo_url, so History renders
+  // a missing-image card for a photo that was never taken.
+  const missingRequiredDetail =
+    (eventType === "training" && !technique) || (eventType === "photo" && !photoFile);
 
   const metricChips = useMemo(() => {
     if (!sensorSnapshot?.metrics) return [];

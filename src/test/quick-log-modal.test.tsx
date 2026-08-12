@@ -239,12 +239,35 @@ describe("QuickLogModal — Training detail requires a technique before save", (
     expect(screen.getByTestId("qlm-training-detail")).toBeTruthy();
   });
 
-  it("does not disable Save for non-training event types", async () => {
+  it("does not disable Save for event types with no required detail", async () => {
+    renderModal();
+    fireEvent.click(screen.getByRole("button", { name: "Water" }));
+    const saveBtn = screen.getByTestId("qlm-save") as HTMLButtonElement;
+    expect(saveBtn.disabled).toBe(false);
+  });
+});
+
+describe("QuickLogModal — Photo detail requires an attached photo before save", () => {
+  it("disables Save after switching to Photo with no file attached", async () => {
+    renderModal();
+    const saveBtn = screen.getByTestId("qlm-save") as HTMLButtonElement;
+    expect(saveBtn.disabled).toBe(false);
+
+    fireEvent.click(screen.getByRole("button", { name: "Photo" }));
+
+    await waitFor(() => expect(saveBtn.disabled).toBe(true));
+    expect(screen.getByTestId("qlm-photo-detail")).toBeTruthy();
+  });
+
+  it("enables Save once a photo is attached for a Photo entry", async () => {
     renderModal();
     fireEvent.click(screen.getByRole("button", { name: "Photo" }));
     const saveBtn = screen.getByTestId("qlm-save") as HTMLButtonElement;
-    expect(saveBtn.disabled).toBe(false);
-    expect(screen.getByTestId("qlm-photo-detail")).toBeTruthy();
+    await waitFor(() => expect(saveBtn.disabled).toBe(true));
+
+    attachPhoto();
+
+    await waitFor(() => expect(saveBtn.disabled).toBe(false));
   });
 });
 

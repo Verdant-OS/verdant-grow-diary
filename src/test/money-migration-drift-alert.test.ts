@@ -124,6 +124,41 @@ describe("money migration drift alert — cannot conclude healthy by accident", 
   });
 });
 
+describe("money migration drift alert — never claims more than it measured", () => {
+  // Only `verified` and `missing_migrations` involve a real tracker query.
+  // malformed_filename carries an `expected` array whose applied flags were
+  // never determined, and target_identity_rejected / tracker_query_failed /
+  // psql_not_invocable / no_db_connection carry none at all — whose counts
+  // serialise to 0. Presenting either as a finding turns a blocked
+  // verification into an apparent production defect.
+  it("uses a title that does not assert an unproven production defect", () => {
+    const title = /MONEY_DRIFT_ISSUE_TITLE: "([^"]+)"/.exec(WORKFLOW)?.[1] ?? "";
+    expect(title).not.toBe("");
+    // Most outcomes under this one title mean production was never queried.
+    expect(title).not.toMatch(/is missing|missing billing|drift:/i);
+  });
+
+  it("shows counts only for outcomes that actually queried production", () => {
+    expect(script).toContain(
+      'const measured = outcome === "verified" || outcome === "missing_migrations";',
+    );
+    // An unguarded body publishes "Required: 0 · applied: 0 · missing: 0" for
+    // outcomes that never measured, which reads as zero drift.
+    expect(script).toContain("Counts unavailable");
+    expect(script).toMatch(/measured && audit\s*\?/);
+  });
+
+  it("names specific migrations only when a query established they are absent", () => {
+    expect(script).toMatch(/const missingList =\s*\n?\s*outcome === "missing_migrations"/);
+  });
+
+  it("surfaces the checker's own note, so unmeasured outcomes are actionable", () => {
+    // Without it, those bodies say only "nothing was verified" and give the
+    // reader nowhere to start.
+    expect(script).toContain("audit?.note");
+  });
+});
+
 describe("money migration drift alert — does not fork the source of truth", () => {
   it("reuses the existing checker rather than reimplementing detection", () => {
     expect(WORKFLOW).toContain("node scripts/assert-required-money-migrations-applied.mjs");

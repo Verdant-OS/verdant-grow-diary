@@ -57,7 +57,19 @@ env:
   # One definition, read by the single reconcile step below. Deliberately
   # distinct from migration-drift-probe.yml's title so the two alert channels
   # can never match each other's issues.
-  MONEY_DRIFT_ISSUE_TITLE: "Money migration drift: production is missing billing-critical migrations"
+  #
+  # NEUTRAL ON PURPOSE. This one title covers every non-healthy outcome, and
+  # most of them -- target_identity_rejected, tracker_query_failed,
+  # psql_not_invocable, no_db_connection -- mean production was never queried.
+  # A title asserting "production is missing billing-critical migrations" would
+  # state as fact something no query established, turning a blocked
+  # verification into an apparent production defect in the issue list. The body
+  # carries the specific finding; the title must not outrun the evidence.
+  #
+  # A single stable title is also what keeps deduplication working: an
+  # outcome-dependent title would open a second issue whenever the outcome
+  # changed, and the close step matches on exactly one title.
+  MONEY_DRIFT_ISSUE_TITLE: "Money migration check (production) requires attention"
 
 jobs:
   verify:
@@ -234,10 +246,32 @@ jobs:
                 "**The checker produced no readable audit**, so its outcome is unknown. Nothing may be concluded about production.",
             };
 
-            const missingList = (audit?.expected ?? [])
-              .filter((e) => !e.applied)
-              .map((e) => `- \`${e.file}\` (version ${e.version ?? "unknown"})`)
-              .join("\n");
+            // Only these two outcomes involved an actual tracker query, so only
+            // they may present counts or name specific migrations.
+            //
+            // malformed_filename carries an `expected` array whose applied
+            // flags were never determined (production was deliberately not
+            // touched), and the four unqueried outcomes carry no `expected` at
+            // all -- whose counts serialise to 0, so an unguarded body would
+            // publish "Required: 0 · applied: 0 · missing: 0" and read as a
+            // zero-drift result on a run that measured nothing.
+            const measured = outcome === "verified" || outcome === "missing_migrations";
+
+            const countsLine =
+              measured && audit
+                ? `Required: ${audit.expected_count}  ·  applied: ${audit.applied_count}  ·  missing: ${audit.missing_count}`
+                : "Counts unavailable — production was not queried on this run.";
+
+            // Naming files under "Not applied in production" is only truthful
+            // when a query established that. For every other outcome this stays
+            // empty rather than restating unverified rows as findings.
+            const missingList =
+              outcome === "missing_migrations"
+                ? (audit?.expected ?? [])
+                    .filter((e) => !e.applied)
+                    .map((e) => `- \`${e.file}\` (version ${e.version ?? "unknown"})`)
+                    .join("\n")
+                : "";
 
             const headline = checkerNeverRan
               ? `**The money-migration checker never ran** (step outcome: \`${stepOutcome}\`). A step before it failed — checkout, Node setup, the psql install, or the required-secret guard. Nothing about production was verified, and nothing will be until that is fixed.`
@@ -248,9 +282,12 @@ jobs:
               headline,
               "",
               `Outcome: \`${outcome}\`  ·  checker step: \`${stepOutcome}\``,
-              audit
-                ? `Required: ${audit.expected_count}  ·  applied: ${audit.applied_count}  ·  missing: ${audit.missing_count}`
-                : "No audit payload was produced.",
+              audit ? countsLine : "No audit payload was produced.",
+              // The checker's own note names the concrete cause for the
+              // outcomes that cannot show counts, e.g. which identity check
+              // rejected the target. Without it those bodies say only "nothing
+              // was verified" and give the reader nowhere to start.
+              ...(audit?.note ? ["", `Checker note: ${audit.note}`] : []),
               ...(missingList ? ["", "Not applied in production:", "", missingList] : []),
               "",
               `Run: ${runUrl}`,

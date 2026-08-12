@@ -24,12 +24,12 @@ Skipped:             full suite, type-check, runtime harness, live Supabase quer
 
 ## Phase 2 gate status
 
-| #   | Gate item                                             | Status                                                       | Owner                  |
-| --- | ----------------------------------------------------- | ------------------------------------------------------------ | ---------------------- |
-| 1   | Phase 1.7 wrapper tests pass                          | `PASS`                                                       | verified above         |
-| 2   | Token storage / rotation / revocation policy approved | `BLOCKED`                                                    | Cheek (owner decision) |
-| 3   | Schema / RLS / idempotency audit approves write path  | `HOLD` (as of 2026-08-12; was unbegun at this record's date) | = Phase 1.8 spec       |
-| 4   | Live-label fencing policy approved                    | `BLOCKED`                                                    | Cheek (owner decision) |
+| #   | Gate item                                             | Status                                                                                                                                  | Owner                  |
+| --- | ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
+| 1   | Phase 1.7 wrapper tests pass                          | `PASS`                                                                                                                                  | verified above         |
+| 2   | Token storage / rotation / revocation policy approved | `BLOCKED`                                                                                                                               | Cheek (owner decision) |
+| 3   | Schema / RLS / idempotency audit approves write path  | `BLOCKED` — spec drafted 2026-08-12; approval blocked on its verification items and owner decisions (was unbegun at this record's date) | = Phase 1.8 spec       |
+| 4   | Live-label fencing policy approved                    | `BLOCKED`                                                                                                                               | Cheek (owner decision) |
 
 One of four gate items is cleared. Persistence remains blocked.
 
@@ -50,7 +50,11 @@ Phase 1.7 ships a validation-only endpoint. It has no database client in its mod
 
 Therefore, at this phase:
 
-> An EcoWitt row carrying `source='live'` would be a **defect**, not a pass signal.
+> An EcoWitt row carrying `source='live'` **that claims to come from the Phase 1.7
+> `ecowitt-real-ingest` endpoint** would be a **defect**, not a pass signal.
+> (Scoping added 2026-08-12: the separately deployed, bearer-authenticated
+> `ecowitt-ingest` path legitimately writes freshness-approved canonical `live` rows —
+> those are not defects.)
 
 It could only originate from demo data mislabelled as live, or from a persistence path
 that bypassed the gate. Either is a Sensor Truth violation under `AGENTS.md`.

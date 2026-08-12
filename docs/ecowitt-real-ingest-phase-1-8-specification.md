@@ -169,8 +169,9 @@ limited to `manual`/`csv` with tent-ownership check; no client UPDATE/DELETE; Ec
 writes exclusively via service-role Edge upsert. The runtime-harness assertions are **V6, a pre-approval verification item**, not
 deferred-to-implementation work: (1) authenticated client cannot insert `source='live'`;
 (2) client cannot insert into another user's tent; (3) no UPDATE path can mutate `source`
-post-insert; (4) operator role cannot read `sensor_readings` (known asymmetry — confirm it
-holds). Two duplicate validation triggers should be collapsed to one in some later
+post-insert; (4) an operator (application
+role) cannot read another user's `sensor_readings` rows — owner-read of their own rows is
+intended policy and must pass. Two duplicate validation triggers should be collapsed to one in some later
 housekeeping migration — noted, not required for approval.
 
 ## Verification items (all must pass before this spec is marked approved)

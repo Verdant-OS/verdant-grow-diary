@@ -130,12 +130,12 @@ conditional on D4. Spec advances to `APPROVED` only when **V1–V4, V5a, and V6 
 resolves `NOT_APPLICABLE` (fail-closed re-confirmation), and the owner re-confirms D4**
 on the corrected facts — verification cannot substitute for that decision.
 
-| Phase 2 gate item                             | Status                                                                                 |
-| --------------------------------------------- | -------------------------------------------------------------------------------------- |
-| 1. Wrapper tests pass                         | `PASS` — 22/22 targeted tests, 2026-08-07                                              |
-| 2. Token storage/rotation/revocation policy   | `BLOCKED` — Cheek (owner-only)                                                         |
-| 3. Schema/RLS/idempotency audit (= Phase 1.8) | `HOLD` — spec drafted, see below                                                       |
-| 4. Live-label fencing policy                  | `HOLD` — D3 approved 2026-08-12; D4 awaiting owner re-confirmation (premise corrected) |
+| Phase 2 gate item                             | Status                                                                                         |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| 1. Wrapper tests pass                         | `PASS` — 22/22 targeted tests, 2026-08-07                                                      |
+| 2. Token storage/rotation/revocation policy   | `BLOCKED` — Cheek (owner-only)                                                                 |
+| 3. Schema/RLS/idempotency audit (= Phase 1.8) | `BLOCKED` — spec drafted; approval blocked on verification items + owner decisions (see below) |
+| 4. Live-label fencing policy                  | `BLOCKED` — D3 approved 2026-08-12; D4 re-confirmation outstanding (premise corrected)         |
 
 Persistence remains blocked **on the Phase 1.7 path**: `source='live'` is unreachable via
 the validation-only `ecowitt-real-ingest` wrapper by design — it has no database client. A

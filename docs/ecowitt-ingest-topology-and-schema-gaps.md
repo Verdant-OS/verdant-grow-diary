@@ -116,8 +116,11 @@ return "live";
   transport label receives the **most trusted** stored source. `AGENTS.md` states bad or
   unknown telemetry must never be shown as healthy; a fail-closed default (`invalid`, or
   reject) would match that rule. This is a **gate 4 (live-label fencing) decision**, and it is
-  concrete, not hypothetical: the only fence between an authenticated webhook POST and a
-  `source='live'` row today is possession of the bridge token.
+  a real default in the helper — though **deploy-verified 2026-08-12: currently
+  unreachable hardening on that branch**, because the upstream validator
+  (`webhookIngest.ts:277-282`) structurally rejects empty/unknown `source` before
+  `buildStoredRow` runs. D3 aligns the helper's default so a refactor cannot resurrect
+  fail-open; it does not close a presently open path.
 - A caller-supplied canonical label passes through unchanged — a body claiming `demo` stays
   `demo`, and a body claiming `live` stays `live`.
 

@@ -14,6 +14,7 @@
  */
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
 import {
   groupQuickLogTimelineEntries,
   type QuickLogTimelineEntry,
@@ -105,22 +106,22 @@ async function fetchTimelineDiaryRows(
   scope: QuickLogGroupedTimelineScope,
   limit: number,
 ): Promise<TimelineDiaryRow[]> {
-  let q = supabase
-    .from("diary_entries")
-    .select(DIARY_SELECT)
-    .is("retracted_at", null)
-    .in(
-      "details->>kind" as never,
-      [AI_DOCTOR_PHASE1_TIMELINE_KIND, PHENO_EVIDENCE_RECEIPT_KIND] as never,
-    );
-
-  if (scope.kind === "plant") {
-    q = q.eq("plant_id", scope.plantId);
-  } else {
-    q = q.eq("tent_id", scope.tentId);
-  }
-
-  const { data, error } = await q.order("entry_at", { ascending: false }).limit(limit);
+  const { data, error } = await selectWithRetractionCompat((withRetractionFilter) => {
+    let q = supabase
+      .from("diary_entries")
+      .select(DIARY_SELECT)
+      .in(
+        "details->>kind" as never,
+        [AI_DOCTOR_PHASE1_TIMELINE_KIND, PHENO_EVIDENCE_RECEIPT_KIND] as never,
+      );
+    if (withRetractionFilter) q = q.is("retracted_at", null);
+    if (scope.kind === "plant") {
+      q = q.eq("plant_id", scope.plantId);
+    } else {
+      q = q.eq("tent_id", scope.tentId);
+    }
+    return q.order("entry_at", { ascending: false }).limit(limit);
+  });
   if (error) {
     // Enrichment failure must never break the timeline. Return empty.
     return [];
@@ -138,22 +139,22 @@ async function fetchQuickLogCompanionRows(
   scope: QuickLogGroupedTimelineScope,
   limit: number,
 ): Promise<QuickLogCompanionSnapshotDiaryRow[]> {
-  let q = supabase
-    .from("diary_entries")
-    .select(DIARY_SELECT)
-    .is("retracted_at", null)
-    .not("details->>linked_grow_event_id" as never, "is", null);
-
-  if (scope.kind === "plant") {
-    q =
-      scope.tentId && scope.tentId.length > 0
-        ? q.or(`plant_id.eq.${scope.plantId},and(plant_id.is.null,tent_id.eq.${scope.tentId})`)
-        : q.eq("plant_id", scope.plantId);
-  } else {
-    q = q.eq("tent_id", scope.tentId);
-  }
-
-  const { data, error } = await q.order("entry_at", { ascending: false }).limit(limit);
+  const { data, error } = await selectWithRetractionCompat((withRetractionFilter) => {
+    let q = supabase
+      .from("diary_entries")
+      .select(DIARY_SELECT)
+      .not("details->>linked_grow_event_id" as never, "is", null);
+    if (withRetractionFilter) q = q.is("retracted_at", null);
+    if (scope.kind === "plant") {
+      q =
+        scope.tentId && scope.tentId.length > 0
+          ? q.or(`plant_id.eq.${scope.plantId},and(plant_id.is.null,tent_id.eq.${scope.tentId})`)
+          : q.eq("plant_id", scope.plantId);
+    } else {
+      q = q.eq("tent_id", scope.tentId);
+    }
+    return q.order("entry_at", { ascending: false }).limit(limit);
+  });
   if (error) return [];
   return (data ?? []) as unknown as QuickLogCompanionSnapshotDiaryRow[];
 }

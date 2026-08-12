@@ -35,8 +35,12 @@ CREATE TABLE public.quicklog_entry_revisions (
   reason_note TEXT CHECK (reason_note IS NULL OR char_length(reason_note) <= 500),
   previous_state JSONB NOT NULL DEFAULT '{}'::jsonb,
   new_state JSONB,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  CHECK (grow_event_id IS NOT NULL OR diary_entry_id IS NOT NULL)
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  -- No "at least one FK set" CHECK: the FKs are ON DELETE SET NULL, so the
+  -- pre-existing hard-delete path for diary rows must be able to null
+  -- diary_entry_id on a diary-only revision without violating a constraint.
+  -- root_id (NOT NULL) carries provenance; the RPCs always set at least one
+  -- FK at insert time.
 );
 
 -- Deterministic ordering per root; also the concurrency backstop under the
@@ -206,6 +210,57 @@ AS $$
 $$;
 
 REVOKE ALL ON FUNCTION public.quicklog_revision_sibling_env_ids(UUID, public.grow_events)
+  FROM PUBLIC, anon, authenticated;
+
+-- Time corrections must keep timestamp-bearing evidence envelopes coherent:
+-- the Quick Log writers stamp details.sensor_snapshot.captured_at (and the
+-- pheno receipt's details.sensor.captured_at) from the event time, and the
+-- snapshot readers prefer that embedded value over entry_at. Rebase an
+-- embedded captured_at to the corrected time ONLY when it exactly equals the
+-- previous event time (i.e. it was derived); a genuinely distinct capture
+-- time is real provenance and stays untouched.
+CREATE OR REPLACE FUNCTION public.quicklog_revision_rebase_captured_at(
+  p_details JSONB,
+  p_old TIMESTAMPTZ,
+  p_new TIMESTAMPTZ
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+IMMUTABLE
+SET search_path TO 'public', 'pg_temp'
+AS $$
+DECLARE
+  v_details JSONB := p_details;
+  v_path TEXT[];
+  v_raw TEXT;
+  v_parsed TIMESTAMPTZ;
+BEGIN
+  IF v_details IS NULL OR jsonb_typeof(v_details) <> 'object'
+     OR p_old IS NULL OR p_new IS NULL THEN
+    RETURN p_details;
+  END IF;
+  FOREACH v_path SLICE 1 IN ARRAY ARRAY[
+    ARRAY['sensor_snapshot', 'captured_at'],
+    ARRAY['sensor', 'captured_at']
+  ] LOOP
+    v_raw := v_details #>> v_path;
+    IF v_raw IS NULL THEN
+      CONTINUE;
+    END IF;
+    BEGIN
+      v_parsed := v_raw::timestamptz;
+    EXCEPTION WHEN OTHERS THEN
+      CONTINUE;
+    END;
+    IF v_parsed = p_old THEN
+      v_details := jsonb_set(v_details, v_path, to_jsonb(p_new), false);
+    END IF;
+  END LOOP;
+  RETURN v_details;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.quicklog_revision_rebase_captured_at(JSONB, TIMESTAMPTZ, TIMESTAMPTZ)
   FROM PUBLIC, anon, authenticated;
 
 -- ---------------------------------------------------------------------------
@@ -575,6 +630,9 @@ BEGIN
       UPDATE public.diary_entries
          SET note = CASE WHEN v_has_note THEN COALESCE(NULLIF(v_note, ''), '(quick log)') ELSE note END,
              entry_at = CASE WHEN v_has_time THEN v_time ELSE entry_at END,
+             details = CASE WHEN v_has_time
+               THEN public.quicklog_revision_rebase_captured_at(details, entry_at, v_time)
+               ELSE details END,
              grow_id = CASE WHEN v_has_target THEN v_new_grow ELSE grow_id END,
              tent_id = CASE WHEN v_has_target THEN v_new_tent ELSE tent_id END,
              plant_id = CASE WHEN v_has_target THEN v_new_plant ELSE plant_id END
@@ -616,6 +674,9 @@ BEGIN
     UPDATE public.diary_entries
        SET note = CASE WHEN v_has_note THEN COALESCE(NULLIF(v_note, ''), '(quick log)') ELSE note END,
            entry_at = CASE WHEN v_has_time THEN v_time ELSE entry_at END,
+           details = CASE WHEN v_has_time
+             THEN public.quicklog_revision_rebase_captured_at(details, entry_at, v_time)
+             ELSE details END,
            grow_id = CASE WHEN v_has_target THEN v_new_grow ELSE grow_id END,
            tent_id = CASE WHEN v_has_target THEN v_new_tent ELSE tent_id END,
            plant_id = CASE WHEN v_has_target THEN v_new_plant ELSE plant_id END

@@ -56,10 +56,15 @@ rows), `EcowittIngestAudit`, and `useRetractedQuickLogEntries` (the disclosure r
 
 1. Merge the PR; CI replays the migration in the Security DB Local lane.
 2. **Apply the migration to production** (it is additive: one table, one nullable
-   column, one index family, three functions — no rewrite of existing rows, no
-   downtime expected). Until it is applied, the UI controls fail calmly with
-   "The change could not be saved" (`rpc_unavailable` / missing-column paths return
-   errors that the client maps to fixed copy) and all existing behavior is unchanged.
+   column, one index family, four functions — no rewrite of existing rows, no
+   downtime expected). Pre-migration behavior if the client ships first: the UI
+   controls fail calmly with "The change could not be saved"; the page-critical
+   readers (Timeline core reads, timeline memory / AI Doctor context, grouped
+   timeline) detect the missing `retracted_at` column (42703) via
+   `selectWithRetractionCompat` and retry unfiltered, so those pages keep their
+   previous behavior; the remaining filtered readers surface their normal
+   error/empty states until the migration is applied. Apply-before-merge is still
+   the recommended order.
 3. Regenerate Supabase types when convenient (`supabase gen types`) — the committed
    `types.ts` was hand-extended with the new table/column/RPCs in the generated style.
 4. Run the runtime harness against a real stack:
@@ -81,6 +86,21 @@ rows), `EcowittIngestAudit`, and `useRetractedQuickLogEntries` (the disclosure r
 - Data written by the feature is recoverable by construction: every correction and
   retraction retains the prior values in `quicklog_entry_revisions.previous_state`
   (plus `diary_entry_audit_log`), and retraction is a marker, not a delete.
+
+## Review-round hardening (2026-08-12, Codex review on PR #921)
+
+- Time corrections rebase embedded `details.sensor_snapshot.captured_at` /
+  `details.sensor.captured_at` to the corrected time **only when they exactly
+  equal the previous event time** (writer-derived); genuinely distinct capture
+  times are preserved as real provenance.
+- The ledger's "at least one FK set" CHECK was removed: both FKs are
+  `ON DELETE SET NULL`, and the pre-existing hard-delete path for diary rows
+  must be able to null `diary_entry_id` on a diary-only revision. `root_id`
+  (NOT NULL) carries provenance.
+- `useRecentFeedingsForDefaults` (diary fallback) and
+  `PlantSensorSourceBreakdownCard` also filter retracted rows now.
+- Timeline threads `onEntryChanged` from the history panels back into its local
+  `load()`, so corrections/retractions refresh the page state immediately.
 
 ## Known limitations
 

@@ -52,6 +52,8 @@ interface QuickLogHistorySectionProps {
   limit?: number;
   className?: string;
   headerAction?: ReactNode;
+  /** Notifies the owner (e.g. Timeline local state) after a correction/retraction. */
+  onEntryChanged?: () => void;
 }
 
 function fmtDate(iso: string | null, fallback: string): string {
@@ -168,10 +170,12 @@ function Row({
   row,
   integrityHandle,
   correctionCount,
+  onEntryChanged,
 }: {
   row: QuickLogHistoryRow;
   integrityHandle?: QuickLogEntryHandleRef | null;
   correctionCount?: number;
+  onEntryChanged?: () => void;
 }) {
   const et = getEventType(row.eventType);
   const Icon = et.icon;
@@ -205,6 +209,7 @@ function Row({
             currentPlantId={row.plantId}
             plantId={row.plantId}
             tentId={row.tentId}
+            onChanged={onEntryChanged}
           />
         )}
         {row.warnings.length > 0 && (
@@ -269,6 +274,7 @@ function QuickLogHistorySection({
   limit = 20,
   className,
   headerAction,
+  onEntryChanged,
 }: QuickLogHistorySectionProps) {
   const rows = useMemo(() => {
     const lifted = liftEntries(rawEntries);
@@ -328,6 +334,7 @@ function QuickLogHistorySection({
                 row={r}
                 integrityHandle={handle}
                 correctionCount={badge?.correctionCount ?? 0}
+                onEntryChanged={onEntryChanged}
               />
             );
           })}
@@ -341,11 +348,13 @@ export function RecentQuickLogActivityPanel({
   rawEntries,
   limit = 10,
   growId = null,
+  onEntryChanged,
 }: {
   rawEntries: NormalizeDiaryInput["rawEntries"];
   limit?: number;
   /** Enables the retracted-entries audit disclosure below the lane. */
   growId?: string | null;
+  onEntryChanged?: () => void;
 }) {
   const handleExport = () => {
     const result = exportGrowDiaryReportAsPdf(buildRecentDiaryPdfInput(rawEntries, limit));
@@ -388,9 +397,11 @@ export function RecentQuickLogActivityPanel({
 export function PestDiseaseHistoryPanel({
   rawEntries,
   limit,
+  onEntryChanged,
 }: {
   rawEntries: NormalizeDiaryInput["rawEntries"];
   limit?: number;
+  onEntryChanged?: () => void;
 }) {
   return (
     <QuickLogHistorySection
@@ -402,6 +413,7 @@ export function PestDiseaseHistoryPanel({
       emptyTitle="No pest or disease entries yet"
       emptyHelp="Log a Pest / Disease event from Quick Log to see it here."
       limit={limit}
+      onEntryChanged={onEntryChanged}
     />
   );
 }
@@ -409,9 +421,11 @@ export function PestDiseaseHistoryPanel({
 export function TrainingHistoryPanel({
   rawEntries,
   limit,
+  onEntryChanged,
 }: {
   rawEntries: NormalizeDiaryInput["rawEntries"];
   limit?: number;
+  onEntryChanged?: () => void;
 }) {
   return (
     <QuickLogHistorySection
@@ -423,6 +437,7 @@ export function TrainingHistoryPanel({
       emptyTitle="No training or pruning entries yet"
       emptyHelp="Log a Training event from Quick Log to see it here."
       limit={limit}
+      onEntryChanged={onEntryChanged}
     />
   );
 }
@@ -430,9 +445,11 @@ export function TrainingHistoryPanel({
 export function MeasurementHistoryPanel({
   rawEntries,
   limit,
+  onEntryChanged,
 }: {
   rawEntries: NormalizeDiaryInput["rawEntries"];
   limit?: number;
+  onEntryChanged?: () => void;
 }) {
   return (
     <QuickLogHistorySection
@@ -444,6 +461,7 @@ export function MeasurementHistoryPanel({
       emptyTitle="No manual handheld readings yet"
       emptyHelp="Add manual readings in Quick Log. These are not live sensor data."
       limit={limit}
+      onEntryChanged={onEntryChanged}
     />
   );
 }
@@ -451,9 +469,11 @@ export function MeasurementHistoryPanel({
 export function ObservationHistoryPanel({
   rawEntries,
   limit,
+  onEntryChanged,
 }: {
   rawEntries: NormalizeDiaryInput["rawEntries"];
   limit?: number;
+  onEntryChanged?: () => void;
 }) {
   return (
     <QuickLogHistorySection
@@ -465,6 +485,7 @@ export function ObservationHistoryPanel({
       emptyTitle="No observation notes yet"
       emptyHelp="Log an Observation from Quick Log to see it here."
       limit={limit}
+      onEntryChanged={onEntryChanged}
     />
   );
 }

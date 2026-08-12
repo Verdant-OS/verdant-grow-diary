@@ -19,16 +19,17 @@
  * present or absent is legitimate and untouched — that is what source
  * scanning is actually good at.
  *
- * EXPLICIT EXCEPTION: some claims about a config are only answerable from its
- * source — "imports package X, and NOT the X-swc variant" cannot be read off
- * the resolved object, because the resolved plugin does not carry its origin
- * package. Such a test declares
+ * EXPLICIT EXCEPTION: sometimes resolving is genuinely impossible. Importing
+ * `vitest.config` from inside this suite fails under jsdom on esbuild's
+ * TextEncoder invariant, and under `@vitest-environment node` on the shared
+ * setup's `window.scrollTo` (both verified 2026-08-07) — so its guard scans
+ * source. Such a test declares
  *
  *   @source-scan-justified: <reason>
  *
- * in a comment. The exception is then visible in the diff and reviewable,
- * rather than silently absent. A justification with no reason text is
- * rejected.
+ * in a comment, naming the blocker actually hit rather than a plausible one.
+ * The exception is then visible in the diff, and printed on every run, rather
+ * than silently absent. A justification with no reason text is rejected.
  *
  * Exit 0 = compliant. Exit 1 = a config guard asserts on text only.
  */

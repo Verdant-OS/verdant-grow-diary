@@ -427,6 +427,15 @@ guard `playwright.config.ts` / `vitest.config.ts`. `src/test/playwright-config-r
 is the reference implementation: `await import()` the config, assert on the
 object.
 
+Where resolving is genuinely impossible, the test declares
+`@source-scan-justified: <reason>` so the exception is visible in the diff
+rather than silently absent, and the checker prints it on every run. State
+the blocker you actually hit — not a plausible one. The single current
+exception is `vitest-config-react-plugin-contract`: importing `vitest.config`
+under jsdom trips esbuild's TextEncoder invariant, and `@vitest-environment
+node` instead breaks the shared `src/test/setup.ts` (it defines
+`window.scrollTo`). An empty reason is rejected.
+
 Source-text scanning remains correct for what it is actually good at —
 proving a string, pattern, or forbidden construct is absent from a file
 (secret scans, "no `continue-on-error`", generated-artifact shape). The rule

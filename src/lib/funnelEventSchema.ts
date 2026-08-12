@@ -41,6 +41,9 @@ export const FUNNEL_EVENT_SCHEMA: Readonly<Record<FunnelEventName, ReadonlyArray
     csv_import_started: [],
     csv_import_completed: ["rows"],
     csv_history_ai_doctor_clicked: ["surface"],
+    // Navigation intent only. The metric and severity are normalized to
+    // fixed alert vocabularies by the canonical CTA helper.
+    ai_doctor_cta_clicked: ["surface", "metric", "severity"],
     ai_doctor_review_started: ["surface"],
     historical_ai_review_started: [],
     ai_doctor_result_received: ["surface"],

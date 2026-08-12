@@ -3,11 +3,10 @@
  *
  * The Target Band link is the highest-intent Blueprint entry point (a grower
  * clicking it from a live alert is asking exactly the question Craft answers)
- * and it reported nothing. Notably, mirroring the neighbouring doctor CTA
- * would NOT have fixed that: its CustomEvent has no listener anywhere, so it
- * never reaches a sink. This event routes through trackFunnelEvent -> gtag,
- * keeping the doctor CTA's privacy contract (severity bucket + fixed metric
- * token, never an id).
+ * and it reported nothing. Both this link and the neighbouring doctor CTA now
+ * route distinct click-intent events through trackFunnelEvent -> gtag while
+ * keeping the same privacy contract (severity bucket + fixed metric token,
+ * never an id). Neither click claims that an AI review started.
  *
  * The vacuity risk these tests target: trackFunnelEvent SILENTLY strips any
  * param not in FUNNEL_PARAM_KEYS and not in the event's schema. A test that
@@ -111,11 +110,14 @@ describe("blueprint_cta_clicked · Target Band click", () => {
     expect(serialized).not.toContain("grow-1");
   });
 
-  it("does not fire from the neighbouring doctor CTA", () => {
-    // The doctor CTA keeps its own (CustomEvent) tracker; the funnel event
-    // belongs to Blueprint entry alone.
+  it("does not misclassify the neighbouring doctor CTA as Blueprint intent", () => {
     renderPanel();
     fireEvent.click(screen.getByTestId("plant-assigned-tent-alert-ask-doctor"));
-    expect(spies.track).not.toHaveBeenCalled();
+    expect(spies.track).toHaveBeenCalledWith("ai_doctor_cta_clicked", {
+      surface: "tent_alert_row",
+      metric: "temp",
+      severity: "warning",
+    });
+    expect(spies.track).not.toHaveBeenCalledWith("blueprint_cta_clicked", expect.anything());
   });
 });

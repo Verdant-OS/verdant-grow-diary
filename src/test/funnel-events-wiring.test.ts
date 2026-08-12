@@ -16,6 +16,7 @@
  *   csv_import_completed    → EnvironmentCsvImportLauncher.tsx (success block)
  *   csv_history_ai_doctor_clicked
  *                           → ImportedSensorHistoryAiDoctorHandoff.tsx (grower CTA click)
+ *   ai_doctor_cta_clicked   → plantTentAlertsDoctorCtaTracking.ts (alert CTA click)
  *   ai_doctor_review_started / historical_ai_review_started /
  *   ai_doctor_result_received / ai_doctor_session_saved
  *                           → PlantDetailAiDoctorLiveReview.tsx
@@ -87,6 +88,13 @@ const SEAMS: Array<{ event: string; file: string; extra?: RegExp[] }> = [
     file: "src/components/ImportedSensorHistoryAiDoctorHandoff.tsx",
     extra: [
       /trackFunnelEvent\(\s*"csv_history_ai_doctor_clicked",\s*\{\s*surface:\s*"imported_history",?\s*\}\s*\)/,
+    ],
+  },
+  {
+    event: "ai_doctor_cta_clicked",
+    file: "src/lib/plantTentAlertsDoctorCtaTracking.ts",
+    extra: [
+      /trackFunnelEvent\("ai_doctor_cta_clicked",\s*\{\s*surface:\s*"tent_alert_row",\s*metric:\s*safeMetric,\s*severity:\s*safeSeverity,?\s*\}\)/,
     ],
   },
   {

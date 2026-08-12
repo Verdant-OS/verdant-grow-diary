@@ -17,8 +17,10 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, Plug, PlugZap, RotateCcw, ShieldAlert } from "lucide-react";
 import { useAuth } from "@/store/auth";
 import {
+  clearPendingAuthorization,
   completeAuthorization,
   disconnect,
+  hasPendingAuthorization,
   hasStoredToken,
   probeTools,
   readCallbackErrorParams,
@@ -31,6 +33,7 @@ import {
   recordOAuthAttemptFailure,
   recordOAuthAttemptStart,
   recordOAuthAttemptSuccess,
+  sanitizeAttemptReason,
   type OAuthAttemptRecord,
 } from "@/lib/mcp/oauthAttemptLog";
 import { MCP_MANIFEST, getSupabaseOrigin } from "@/lib/mcp/manifestView";
@@ -78,14 +81,25 @@ export default function BrowserConnectPanel({
   // Initial mount: refresh token + last-attempt state, surface an OAuth
   // error callback (?error=access_denied) if present, and if we came
   // back with ?code=, finish the exchange and auto-probe.
+  //
+  // Callback params are honored ONLY while this browser holds a pending
+  // authorization (the PKCE record written by startAuthorization).
+  // Without that check, a crafted or stale ?error=/?code= link could
+  // fabricate attempt history in localStorage or clobber real history
+  // with a bogus failure (e.g. back-button after a completed exchange).
   useEffect(() => {
     setConnected(hasStoredToken());
     setLastAttempt(readLastOAuthAttempt());
+    const pending = hasPendingAuthorization();
     const cbError = readCallbackErrorParams(window.location.search);
     if (cbError) {
-      const reason = cbError.errorDescription
-        ? `Authorization error: ${cbError.error} — ${cbError.errorDescription}`
-        : `Authorization error: ${cbError.error}`;
+      if (!pending) return; // forged/stale error link — ignore, leave the URL alone
+      clearPendingAuthorization();
+      const reason = sanitizeAttemptReason(
+        cbError.errorDescription
+          ? `Authorization error: ${cbError.error} — ${cbError.errorDescription}`
+          : `Authorization error: ${cbError.error}`,
+      );
       setLastAttempt(recordOAuthAttemptFailure(reason));
       setError(reason);
       // Clean the query string so a refresh doesn't re-report the error.
@@ -94,6 +108,13 @@ export default function BrowserConnectPanel({
     }
     const cb = readCallbackParams(window.location.search);
     if (!cb) return;
+    if (!pending) {
+      // Replayed callback (e.g. back-button after success): the PKCE
+      // verifier is gone, so the exchange cannot succeed. Clean the URL
+      // without overwriting real attempt history with a bogus failure.
+      navigate(REDIRECT_PATH, { replace: true });
+      return;
+    }
     (async () => {
       setPhase("exchanging");
       setError(null);
@@ -103,11 +124,13 @@ export default function BrowserConnectPanel({
         setConnected(true);
         // Clean the query string so a refresh doesn't retry the code.
         navigate(REDIRECT_PATH, { replace: true });
-        setPhase("probing");
-        const r = await probeTools(endpoint);
-        setResult(r);
+        if (probeToolEnabled) {
+          setPhase("probing");
+          const r = await probeTools(endpoint);
+          setResult(r);
+        }
       } catch (e) {
-        const message = (e as Error).message || "OAuth exchange failed";
+        const message = sanitizeAttemptReason((e as Error).message || "OAuth exchange failed");
         setLastAttempt(recordOAuthAttemptFailure(message));
         setError(message);
       } finally {
@@ -125,7 +148,7 @@ export default function BrowserConnectPanel({
       await startAuthorization(issuer, REDIRECT_PATH);
       // startAuthorization navigates away; nothing else to do.
     } catch (e) {
-      const message = (e as Error).message || "Could not start OAuth";
+      const message = sanitizeAttemptReason((e as Error).message || "Could not start OAuth");
       setLastAttempt(recordOAuthAttemptFailure(message));
       setError(message);
       setPhase("idle");
@@ -248,7 +271,7 @@ export default function BrowserConnectPanel({
         {lastAttempt ? (
           <>
             <span>
-              Last OAuth attempt: {formatAttemptTime(lastAttempt)} —{" "}
+              Last OAuth attempt in this browser: {formatAttemptTime(lastAttempt)} —{" "}
               <span
                 className={
                   lastAttempt.outcome === "failed" ? "text-destructive" : "text-foreground"

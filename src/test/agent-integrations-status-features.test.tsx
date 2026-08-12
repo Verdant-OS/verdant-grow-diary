@@ -17,11 +17,27 @@ vi.mock("@/hooks/usePageSeo", () => ({
   usePageSeo: () => undefined,
 }));
 
-import AgentIntegrations from "@/pages/AgentIntegrations";
+import AgentIntegrations, { type AgentIntegrationsProps } from "@/pages/AgentIntegrations";
+import McpToolExplorer from "@/components/mcp/McpToolExplorer";
 import { MCP_MANIFEST, containsSecretLikeValue } from "@/lib/mcp/manifestView";
 import { LOCAL_TOOL_PREFS_KEY } from "@/lib/mcp/localToolPreferences";
 import { OAUTH_ATTEMPT_LOG_KEY } from "@/lib/mcp/oauthAttemptLog";
 import type { ConnectionStatusExport } from "@/lib/mcp/connectionStatusExport";
+
+const PKCE_KEY = "verdant.mcp.oauth.pkce.v1";
+
+/** A pending authorization, as startAuthorization would have written it. */
+function seedPendingAuthorization() {
+  window.sessionStorage.setItem(
+    PKCE_KEY,
+    JSON.stringify({
+      verifier: "test-verifier",
+      state: "test-state",
+      redirect_uri: "http://localhost/settings/agent-integrations",
+      client_id: "test-client",
+    }),
+  );
+}
 
 /** jsdom's Blob has no .text(); FileReader is the portable read path. */
 function blobToText(blob: Blob): Promise<string> {
@@ -33,11 +49,11 @@ function blobToText(blob: Blob): Promise<string> {
   });
 }
 
-function renderPage() {
+function renderPage(props: AgentIntegrationsProps = {}) {
   return render(
     <MemoryRouter initialEntries={["/settings/agent-integrations"]}>
       <Routes>
-        <Route path="/settings/agent-integrations" element={<AgentIntegrations />} />
+        <Route path="/settings/agent-integrations" element={<AgentIntegrations {...props} />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -212,7 +228,8 @@ describe("last OAuth attempt display", () => {
     expect(screen.queryByTestId("oauth-retry")).toBeNull();
   });
 
-  it("records a consent-denied callback (?error=access_denied) as a failed attempt", async () => {
+  it("records a consent-denied callback (?error=access_denied) as a failed attempt when an authorization is pending", async () => {
+    seedPendingAuthorization();
     window.history.replaceState(
       {},
       "",
@@ -227,6 +244,86 @@ describe("last OAuth attempt display", () => {
       outcome?: string;
     } | null;
     expect(stored?.outcome).toBe("failed");
+    // The pending authorization was consumed by the error callback.
+    expect(window.sessionStorage.getItem(PKCE_KEY)).toBeNull();
+  });
+
+  it("ignores a forged ?error= link when no authorization is pending in this browser", async () => {
+    // No seedPendingAuthorization(): this simulates a crafted/stale link.
+    window.history.replaceState(
+      {},
+      "",
+      "/settings/agent-integrations?error=session_expired&error_description=Call+support+now",
+    );
+    renderPage();
+    // Nothing recorded, nothing rendered from the forged params.
+    expect(screen.getByTestId("oauth-last-attempt").textContent).toMatch(/none recorded/i);
+    expect(screen.getByTestId("oauth-last-attempt").getAttribute("data-outcome")).toBe("none");
+    expect(window.localStorage.getItem(OAUTH_ATTEMPT_LOG_KEY)).toBeNull();
+    expect(screen.queryByTestId("browser-connect-error")).toBeNull();
+  });
+});
+
+describe("local tool preference gates the docs-page tool explorer", () => {
+  it("disables only the locally disabled tool's Run button with an honest note", () => {
+    window.localStorage.setItem(LOCAL_TOOL_PREFS_KEY, JSON.stringify({ list_grows: false }));
+    render(
+      <MemoryRouter initialEntries={["/docs/mcp-api"]}>
+        <Routes>
+          <Route path="/docs/mcp-api" element={<McpToolExplorer />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    const disabledRun = screen.getByTestId("tool-explorer-run-list_grows") as HTMLButtonElement;
+    expect(disabledRun.disabled).toBe(true);
+    expect(screen.getByTestId("tool-explorer-local-disabled-list_grows").textContent).toMatch(
+      /local preference/i,
+    );
+    // The other tools carry no disabled note.
+    expect(
+      screen.queryByTestId("tool-explorer-local-disabled-list_recent_diary_entries"),
+    ).toBeNull();
+    expect(
+      screen.queryByTestId("tool-explorer-local-disabled-get_latest_sensor_snapshot"),
+    ).toBeNull();
+  });
+});
+
+describe("issuer-context override reaches the badge, guide link, and export", () => {
+  it("renders the not_configured state end-to-end", async () => {
+    let capturedBlob: Blob | null = null;
+    vi.stubGlobal(
+      "URL",
+      Object.assign(URL, {
+        createObjectURL: vi.fn((blob: Blob) => {
+          capturedBlob = blob;
+          return "blob:mock-export";
+        }),
+        revokeObjectURL: vi.fn(),
+      }),
+    );
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+
+    renderPage({ oauthStatusOverride: "not_configured" });
+    expect(screen.getByTestId("oauth-status").textContent).toMatch(/not configured/i);
+    const link = screen.getByTestId("issuer-setup-guide-link");
+    expect(link.getAttribute("href")).toBe("/docs/mcp-api#issuer-not-configured");
+    expect(link.getAttribute("data-issuer-context")).toBe("not_configured");
+
+    fireEvent.click(screen.getByTestId("export-connection-status"));
+    await waitFor(() => expect(capturedBlob).not.toBeNull());
+    const parsed = JSON.parse(
+      await blobToText(capturedBlob as unknown as Blob),
+    ) as ConnectionStatusExport;
+    expect(parsed.oauth.issuerContext).toBe("not_configured");
+  });
+
+  it("renders the unverified state's guide link", () => {
+    renderPage({ oauthStatusOverride: "unverified" });
+    expect(screen.getByTestId("issuer-setup-guide-link").getAttribute("href")).toBe(
+      "/docs/mcp-api#issuer-unverified",
+    );
+    expect(screen.getByTestId("oauth-status").textContent).toMatch(/unable to verify/i);
   });
 });
 

@@ -53,13 +53,17 @@ export type ConnectionStatusExport = {
   orgContext: {
     /** Supabase project origin the endpoint is built from ("" when unset). */
     supabaseProjectOrigin: string;
-    /** Project ref parsed from the issuer host, or null when unparseable. */
+    /** Supabase project ref from the issuer host; null unless the issuer is a *.supabase.co host. */
     projectRef: string | null;
     /** App origin this export was generated from ("" during SSR). */
     appOrigin: string;
   };
   browserConnection: {
-    /** Whether this browser currently holds a live test-client OAuth token. */
+    /**
+     * Whether this browser holds an unexpired (by local clock)
+     * test-client OAuth token in sessionStorage. Presence is not a
+     * liveness or revocation check against the server.
+     */
     connectedInThisBrowser: boolean;
   };
   tools: Array<{
@@ -94,8 +98,11 @@ export type ConnectionStatusExportInput = {
 export function deriveProjectRef(issuer: string): string | null {
   try {
     const host = new URL(issuer).hostname;
-    const first = host.split(".")[0];
-    return first && first.length > 0 ? first : null;
+    // Only claim a project ref for real Supabase hosts. Localhost, IPs,
+    // and custom domains would otherwise yield confident nonsense
+    // ("127", "localhost") in a support artifact.
+    const match = /^([a-z0-9-]+)\.supabase\.co$/i.exec(host);
+    return match ? match[1].toLowerCase() : null;
   } catch {
     return null;
   }
@@ -151,7 +158,8 @@ export function buildConnectionStatusExport(
     notes: [
       "All tools are read-only and RLS-scoped to the signed-in grower.",
       "Server-side authorization is integration-wide; per-tool toggles above are local to one browser and do not change server access.",
-      "This export contains no tokens, secrets, or credential material.",
+      "issuerContext is derived from the app's committed manifest copy; no live endpoint or issuer verification was performed for this export.",
+      "Built from public metadata and sanitized attempt reasons only; the payload is scanned against known secret patterns and the download is refused on any match.",
     ],
   };
 }

@@ -5,9 +5,12 @@
  * The Verdant MCP OAuth grant is integration-wide — a connected
  * assistant is authorized for every advertised read-only tool at once,
  * and nothing written here changes what the server allows. Disabling a
- * tool here only (a) stops this browser's built-in test client from
- * calling it and (b) marks it disabled in the support export. The UI
- * that renders these toggles must say so explicitly.
+ * tool here only (a) stops this browser's built-in test clients (the
+ * status-page probe and the docs-page tool explorer) from calling it
+ * and (b) marks it disabled in the support export. The UI that renders
+ * these toggles must say so explicitly, and every built-in client that
+ * can call a tool MUST consult these preferences — a toggle that gates
+ * nothing is a dishonest control.
  *
  * Storage is injectable so tests never touch real localStorage.
  */

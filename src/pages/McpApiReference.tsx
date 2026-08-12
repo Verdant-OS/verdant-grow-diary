@@ -167,9 +167,10 @@ Content-Type: application/json`}</Code>
             Issuer configured
           </h3>
           <p className="text-sm text-muted-foreground">
-            The app advertises a valid OAuth issuer. Point your assistant at the endpoint above,
-            complete the consent screen, then confirm the three read-only tools appear. In this
-            browser you can also run the built-in probe from the status page.
+            The app advertises an OAuth issuer that matches the expected pattern (this is a check of
+            the app's own configuration, not a live probe of the issuer). Point your assistant at
+            the endpoint above, complete the consent screen, then confirm the three read-only tools
+            appear. In this browser you can also run the built-in probe from the status page.
           </p>
 
           <h3 className="text-sm font-semibold scroll-mt-24" id="issuer-not-configured">
@@ -178,7 +179,7 @@ Content-Type: application/json`}</Code>
           <p className="text-sm text-muted-foreground">
             No OAuth issuer is advertised, so no assistant can authorize. The project owner must
             enable the OAuth 2.1 authorization server on the connected Supabase project and
-            re-publish; until then, connecting will fail at the consent step and there is nothing a
+            re-publish; until then, connecting cannot complete authorization and there is nothing a
             client-side setting can fix.
           </p>
 

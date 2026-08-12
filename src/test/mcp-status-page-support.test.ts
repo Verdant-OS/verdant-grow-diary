@@ -127,6 +127,15 @@ describe("oauthAttemptLog", () => {
     expect(sanitizeAttemptReason("Consent denied")).toBe("Consent denied");
   });
 
+  it("scans BEFORE truncating so a secret straddling the cut cannot leak a fragment", () => {
+    // The secret starts near the 160-char boundary; truncating first
+    // would leave "Bearer abc" (too short for the pattern) and pass.
+    const straddling = `${"x".repeat(155)} Bearer abcdefghijklmnopqrstuvwxyz012345`;
+    const sanitized = sanitizeAttemptReason(straddling);
+    expect(sanitized).toMatch(/withheld/i);
+    expect(containsSecretLikeValue(sanitized)).toBe(false);
+  });
+
   it("re-sanitizes on read: storage contents are untrusted", () => {
     const storage = fakeStorage({
       [OAUTH_ATTEMPT_LOG_KEY]: JSON.stringify({
@@ -233,12 +242,17 @@ describe("connectionStatusExport", () => {
     expect(serialized.error).toMatch(/blocked/i);
   });
 
-  it("derives the project ref from the issuer host, null when unparseable", () => {
+  it("derives the project ref only for *.supabase.co issuer hosts", () => {
     expect(deriveProjectRef("https://knkwiiywfkbqznbxwqfh.supabase.co/auth/v1")).toBe(
       "knkwiiywfkbqznbxwqfh",
     );
     expect(deriveProjectRef("not a url")).toBeNull();
     expect(deriveProjectRef("")).toBeNull();
+    // Non-Supabase hosts must not yield confident nonsense in a support file.
+    expect(deriveProjectRef("https://localhost:54321/auth/v1")).toBeNull();
+    expect(deriveProjectRef("https://127.0.0.1:54321/auth/v1")).toBeNull();
+    expect(deriveProjectRef("https://auth.example.com/auth/v1")).toBeNull();
+    expect(deriveProjectRef("https://evil.supabase.co.attacker.dev/auth/v1")).toBeNull();
   });
 });
 

@@ -47,9 +47,11 @@ function safeStorage(): PrefStorage | null {
  */
 export function sanitizeAttemptReason(reason: unknown): string {
   if (typeof reason !== "string" || reason.trim().length === 0) return GENERIC_REASON;
-  const trimmed = reason.trim().slice(0, MAX_REASON_LENGTH);
+  const trimmed = reason.trim();
+  // Scan BEFORE truncating: slicing could cut a secret mid-pattern and
+  // let an unrecognizable-but-real fragment through the scan.
   if (containsSecretLikeValue(trimmed)) return GENERIC_REASON;
-  return trimmed;
+  return trimmed.slice(0, MAX_REASON_LENGTH);
 }
 
 function write(record: OAuthAttemptRecord, storage: PrefStorage | null): OAuthAttemptRecord {
@@ -104,9 +106,13 @@ export function readLastOAuthAttempt(
     const raw = storage.getItem(OAUTH_ATTEMPT_LOG_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<OAuthAttemptRecord> | null;
+    // Timestamps longer than any real ISO string are treated as corrupt
+    // so tampered storage cannot push arbitrary text into the UI/export.
+    const MAX_TIMESTAMP_LENGTH = 64;
     if (
       !parsed ||
       typeof parsed.startedAt !== "string" ||
+      parsed.startedAt.length > MAX_TIMESTAMP_LENGTH ||
       (parsed.outcome !== "started" && parsed.outcome !== "success" && parsed.outcome !== "failed")
     ) {
       return null;
@@ -115,7 +121,8 @@ export function readLastOAuthAttempt(
       startedAt: parsed.startedAt,
       outcome: parsed.outcome,
     };
-    if (typeof parsed.completedAt === "string") record.completedAt = parsed.completedAt;
+    if (typeof parsed.completedAt === "string" && parsed.completedAt.length <= MAX_TIMESTAMP_LENGTH)
+      record.completedAt = parsed.completedAt;
     // Re-sanitize on read: storage contents are untrusted input.
     if (typeof parsed.reason === "string") record.reason = sanitizeAttemptReason(parsed.reason);
     return record;

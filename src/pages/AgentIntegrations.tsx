@@ -95,10 +95,18 @@ export type AgentIntegrationsProps = {
    * Tests inject a fake adapter to exercise the four presenter states.
    */
   verifyHarness?: HarnessAdapter;
+  /**
+   * Test-only override for the derived OAuth issuer status. The real
+   * manifest always derives "configured" in the test environment, so
+   * without this the not_configured/unverified presenter states (badge,
+   * setup-guide link, export issuerContext) would be untestable.
+   */
+  oauthStatusOverride?: OAuthStatus;
 };
 
 export default function AgentIntegrations({
   verifyHarness = defaultBrowserHarness,
+  oauthStatusOverride,
 }: AgentIntegrationsProps = {}) {
   usePageSeo({
     title: "Agent integrations — Verdant Grow Diary",
@@ -119,7 +127,7 @@ export default function AgentIntegrations({
   );
   const appOrigin = typeof window !== "undefined" ? window.location.origin : "";
   const consentUrl = `${appOrigin}${MCP_MANIFEST.consentPath}`;
-  const oauthStatus = deriveOAuthStatus();
+  const oauthStatus = oauthStatusOverride ?? deriveOAuthStatus();
 
   const manifestHash = useMemo(() => computeManifestHash(MCP_MANIFEST), []);
   const manifestFingerprint = useMemo(() => shortenManifestHash(manifestHash), [manifestHash]);
@@ -193,6 +201,10 @@ export default function AgentIntegrations({
       });
     }
   }, [supabaseOrigin, appOrigin, oauthStatus, manifestFingerprint]);
+
+  // The panel's probe calls exactly this tool; keep the gate wired to a
+  // named constant so a future rename fails loudly here, not silently open.
+  const PROBE_TOOL_NAME = "list_grows";
 
   const [verifyResult, setVerifyResult] = useState<VerifyMcpToolAccessResult | null>(null);
   const [verifyBusy, setVerifyBusy] = useState(false);
@@ -389,11 +401,13 @@ export default function AgentIntegrations({
           </p>
           <p className="text-xs text-muted-foreground">
             The export contains public connection metadata only (issuer, project context, endpoints,
-            advertised tools, coarse OAuth attempt history) — never tokens or secrets.
+            advertised tools, coarse OAuth attempt history). It records no live endpoint
+            verification, and a secret-pattern scan blocks the download if anything token-like
+            appears in the payload.
           </p>
         </section>
 
-        <BrowserConnectPanel probeToolEnabled={toolPrefs["list_grows"] !== false} />
+        <BrowserConnectPanel probeToolEnabled={toolPrefs[PROBE_TOOL_NAME] !== false} />
 
         {harnessUsable ? (
           <section
@@ -548,9 +562,10 @@ export default function AgentIntegrations({
           <p className="text-xs text-muted-foreground" data-testid="tool-authorization-note">
             <strong>What you actually authorize:</strong> one OAuth consent covers the whole
             read-only tool set — there is no per-tool server-side grant. The switches below are
-            local to this browser: they gate the built-in test probe and are recorded in the support
-            export, but a connected assistant keeps its full read-only grant until you disconnect it
-            or revoke access from your assistant's settings.
+            local to this browser: they gate the built-in test clients (the probe above and the
+            docs-page tool explorer) and are recorded in the support export. A connected assistant
+            keeps its full read-only grant until you revoke access from that assistant's own
+            settings — "Disconnect this browser" above only clears this browser's test session.
           </p>
           <ul className="space-y-4">
             {MCP_MANIFEST.tools.map((tool) => (

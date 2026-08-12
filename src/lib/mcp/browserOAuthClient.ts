@@ -221,6 +221,30 @@ export async function completeAuthorization(issuer: string, params: CallbackPara
   );
 }
 
+/**
+ * Whether THIS browser has a pending authorization (the PKCE record
+ * written by startAuthorization and consumed by completeAuthorization).
+ * OAuth callback params (?code=/?error=) must only be honored while a
+ * pending authorization exists — otherwise crafted or replayed callback
+ * URLs could fabricate attempt outcomes.
+ */
+export function hasPendingAuthorization(): boolean {
+  try {
+    return sessionStorage.getItem(SS_KEYS.pkce) !== null;
+  } catch {
+    return false;
+  }
+}
+
+/** Consume the pending authorization (attempt concluded, e.g. via ?error=). */
+export function clearPendingAuthorization(): void {
+  try {
+    sessionStorage.removeItem(SS_KEYS.pkce);
+  } catch {
+    /* storage unavailable — nothing to clear */
+  }
+}
+
 export function hasStoredToken(): boolean {
   const raw = sessionStorage.getItem(SS_KEYS.token);
   if (!raw) return false;

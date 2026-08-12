@@ -24,12 +24,12 @@ Skipped:             full suite, type-check, runtime harness, live Supabase quer
 
 ## Phase 2 gate status
 
-| #   | Gate item                                             | Status        | Owner                  |
-| --- | ----------------------------------------------------- | ------------- | ---------------------- |
-| 1   | Phase 1.7 wrapper tests pass                          | `PASS`        | verified above         |
-| 2   | Token storage / rotation / revocation policy approved | `BLOCKED`     | Cheek (owner decision) |
-| 3   | Schema / RLS / idempotency audit approves write path  | `NOT_STARTED` | = Phase 1.8            |
-| 4   | Live-label fencing policy approved                    | `BLOCKED`     | Cheek (owner decision) |
+| #   | Gate item                                             | Status                                                       | Owner                  |
+| --- | ----------------------------------------------------- | ------------------------------------------------------------ | ---------------------- |
+| 1   | Phase 1.7 wrapper tests pass                          | `PASS`                                                       | verified above         |
+| 2   | Token storage / rotation / revocation policy approved | `BLOCKED`                                                    | Cheek (owner decision) |
+| 3   | Schema / RLS / idempotency audit approves write path  | `HOLD` (as of 2026-08-12; was unbegun at this record's date) | = Phase 1.8 spec       |
+| 4   | Live-label fencing policy approved                    | `BLOCKED`                                                    | Cheek (owner decision) |
 
 One of four gate items is cleared. Persistence remains blocked.
 

@@ -70,7 +70,9 @@ used as a schema oracle. Deploy-only migrations that matter here:
   "Unknown source" on another. **Relabeling old rows would change dedupe identity** —
   `source` is a column of the unique dedupe index.
 - `sensor-ingest-webhook`'s `mapStoredSourceForTransport` still defaults unknown/empty
-  labels to `live` (fail-open), contradicting `sensor-source-badges.md` ("Unknown /
+  labels to `live` (fail-open) — though on deploy the upstream validator rejects such
+  sources structurally first, making the default unreachable defense-in-depth there —
+  contradicting `sensor-source-badges.md` ("Unknown /
   missing source → invalid"). The deploy version additionally narrows `live → stale` at
   ingest when `captured_at` is outside the freshness window. Gate 4 must resolve the
   fail-open default; the client-INSERT RLS fence (§1) closes only the client path, not the

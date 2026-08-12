@@ -82,12 +82,15 @@ function AlertRowItem({
   // shared helper (same href five other surfaces already use). Navigation
   // only — reaching the anchor never starts a review or spends a credit.
   const doctorHref = plantId ? buildPlantAiDoctorReviewPath({ plantId, tentId }) : null;
-  // Links THIS breached metric to the Blueprint band it scores against —
-  // only when such a band exists (soil-probe and snapshot alerts have none).
-  // Tier-agnostic navigation, deliberately NOT an upsell: Craft growers land
-  // on their live scoring, everyone else on the free targets preview. All
-  // entitlement branching stays inside the Blueprint section itself, so this
-  // panel remains free of plan logic.
+  // Reference navigation to the Blueprint targets for this alert's metric —
+  // only when Blueprint actually bands that metric (soil-probe and snapshot
+  // alerts have none). Deliberately NOT a causal claim: the persisted row
+  // carries no source provenance, and an alert may have breached a CUSTOM
+  // grow target while the same reading sits inside the SOP band — so the
+  // label names the destination ("Stage Targets"), never "the band this
+  // broke". Tier-agnostic and NOT an upsell: Craft growers land on their
+  // live scoring, everyone else on the free targets preview; all entitlement
+  // branching stays inside the Blueprint section itself.
   const bandHref =
     plantId && resolveAlertBlueprintMetric(row.metric) ? buildPlantBlueprintPath(plantId) : null;
   return (
@@ -168,7 +171,7 @@ function AlertRowItem({
                   })
                 }
               >
-                <Gauge className="h-3.5 w-3.5" /> Target Band
+                <Gauge className="h-3.5 w-3.5" /> Stage Targets
               </Link>
             </Button>
           ) : null}

@@ -220,19 +220,23 @@ evidence, not evidence of absence.
 
 No migrations, no Edge deploys, no UI, no alerts, no Action Queue writes, no device
 control, no soil-alert thresholds (remain null/unconfigured), no relabeling of stored
-rows. Gate items 2 (token policy) and 4 (live-label fencing ratification) remain
-owner-only and are prerequisites for any implementation PR that follows this spec.
+rows. Gate item 2 (token policy) remains owner-only and unresolved. Gate 4's policy
+substance was ruled 2026-08-12 (D3/D4, recorded above); its implementation still waits on
+this spec reaching `APPROVED`. Both remain prerequisites for any implementation PR that
+follows this spec.
 
 ## Handoff
 
-Per `docs/agents/HANDOFF_PROTOCOL.md`: Codex implements nothing until Cheek rules on
-D2/D3/D4 and V1–V4 pass. First implementable slice after approval: D6 consolidation + the
-D1a contract test (both pure/test-only, no schema).
+Per `docs/agents/HANDOFF_PROTOCOL.md`: D2/D3/D4 were ruled 2026-08-12, so Codex
+implements nothing until V1–V4 pass and this spec reaches `APPROVED`. First implementable
+slice after approval: D6 consolidation + the D1a contract test (both pure/test-only, no
+schema).
 
 ## Verdict
 
-**HOLD — approvable.** The design is settled and evidence-grounded; approval is blocked
-only on four verification items (two need live-project access) and three owner decisions.
+**HOLD — approvable.** The design is settled, evidence-grounded, and owner-ruled
+(D2/D3/D4, 2026-08-12); approval is now blocked only on the four verification items
+(V1/V4 `BLOCKED` on access, V2/V3 `NOT_RUN`).
 Nothing discovered in the audit requires new schema. The shortest honest path to real
 EcoWitt persistence runs through ratifying what already ships, not extending it.
 

@@ -128,7 +128,7 @@ V1–V4 all pass.
 | 1. Wrapper tests pass                         | `PASS` — 22/22 targeted tests, 2026-08-07 |
 | 2. Token storage/rotation/revocation policy   | `BLOCKED` — Cheek (owner-only)            |
 | 3. Schema/RLS/idempotency audit (= Phase 1.8) | `HOLD` — spec drafted, see below          |
-| 4. Live-label fencing policy                  | `BLOCKED` — Cheek (owner-only)            |
+| 4. Live-label fencing policy                  | `APPROVED` — D3/D4 rulings, 2026-08-12    |
 
 Persistence remains blocked. **`source='live'` is unreachable at Phase 1.7 by design** — the
 Edge wrapper has no database client. A live-labelled EcoWitt row would be a defect, not a

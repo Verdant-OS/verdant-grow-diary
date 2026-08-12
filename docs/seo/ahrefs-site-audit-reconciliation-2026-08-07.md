@@ -209,6 +209,8 @@ Ordered by crawl honesty, not by product ambition:
 1. **Prove or replace host redirects** on the actual production edge so
    `vercel.json` (or Lovable equivalent) 301s match live behavior — then
    re-probe `/demo`, `/features`, `/strains*`.
+   **Runbook:** [`vercel-host-redirect-fix-steps.md`](./vercel-host-redirect-fix-steps.md)
+   (diagnose platform → apply HTTP 301s → probe; repo tests alone are not proof).
 2. **First-byte `/` head parity** with `/welcome` (static head / prerender)
    without reintroducing the React canonical crash on `/`.
 3. **Optional:** emit `noindex` on authenticated shell HTML for private routes
@@ -227,6 +229,8 @@ Ordered by crawl honesty, not by product ambition:
 - It does not claim index counts, rankings, or CTR.
 - It does not authorize deploy, redirect-host changes, or analytics code edits.
 - It does not retire `vercel.json` — it only records that live redirects failed.
+- Fix procedure lives in [`vercel-host-redirect-fix-steps.md`](./vercel-host-redirect-fix-steps.md);
+  this doc stays the defect record.
 
 ---
 

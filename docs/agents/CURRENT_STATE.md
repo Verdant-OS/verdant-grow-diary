@@ -2,8 +2,8 @@
 
 **Last updated:** 2026-08-12 UTC / 2026-08-12 America/Chicago  
 **Updated by:** Grok (public-surface operating-state refresh from the 2026-08-07 SEO
-gate artifacts plus live re-probes on 2026-08-12; adds the public-surface section and
-points at the new home-split decision + Ahrefs-class reconciliation docs. Deploy-head
+gate artifacts plus live re-probes on 2026-08-12; adds the public-surface section,
+home-split decision, Ahrefs-class reconciliation, and Vercel host-redirect fix runbook. Deploy-head
 row re-checked with `git fetch origin` on 2026-08-12. Production release identity and
 GA4/GSC axes were **not** fully re-certified this turn — see Public surface section
 for what was re-measured.)
@@ -48,6 +48,7 @@ after the 2026-08-07 lighting Day 0 gate docs.
 | --- | --- |
 | [`docs/seo/canonical-home-split-decision.md`](../seo/canonical-home-split-decision.md) | Locks `/` vs `/welcome` dual-home policy |
 | [`docs/seo/ahrefs-site-audit-reconciliation-2026-08-07.md`](../seo/ahrefs-site-audit-reconciliation-2026-08-07.md) | Reconciles Ahrefs-class issue types against live 2026-08-12 probes |
+| [`docs/seo/vercel-host-redirect-fix-steps.md`](../seo/vercel-host-redirect-fix-steps.md) | Ordered fix steps so live 301s match `vercel.json` / edge rules |
 
 ### Live host snapshot (unauthenticated probes, 2026-08-12)
 
@@ -75,7 +76,9 @@ after the 2026-08-07 lighting Day 0 gate docs.
 ### Public-surface blockers (crawl honesty)
 
 1. Production does not currently honor the permanent redirects listed in repo
-   `vercel.json` (live soft-200 on aliases). Owner/platform follow-up.
+   `vercel.json` (live soft-200 on aliases). Follow
+   [`docs/seo/vercel-host-redirect-fix-steps.md`](../seo/vercel-host-redirect-fix-steps.md)
+   (identify serving platform → apply HTTP 301s → §5 probe) before claiming PASS.
 2. Apex `/` first-byte head is weaker than `/welcome` (no initial canonical).
 3. Soft-200 private shells still advertise `index, follow` in HTML meta; robots.txt
    Disallow is required and present.
@@ -311,7 +314,8 @@ Out of scope:
 7. **Public crawl (added 2026-08-12):** live host does not apply `vercel.json`
    permanent redirects for `/demo`, `/features`, `/strains`, etc. (soft-200). Treat
    host-redirect fidelity as an owner/platform verification item before citing the
-   redirect table as production behavior.
+   redirect table as production behavior. Fix steps:
+   [`docs/seo/vercel-host-redirect-fix-steps.md`](../seo/vercel-host-redirect-fix-steps.md).
 
 ---
 

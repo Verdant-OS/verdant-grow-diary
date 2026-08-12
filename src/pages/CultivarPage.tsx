@@ -5,8 +5,9 @@
  * write rows, diagnose a plant, create alerts, or generate Action Queue items.
  */
 import { useEffect } from "react";
-import { Link, Navigate, useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import BrandLogo from "@/components/BrandLogo";
+import CultivarCoverageEmptyState from "@/components/CultivarCoverageEmptyState";
 import CultivarBlueprintCrossSell from "@/components/CultivarBlueprintCrossSell";
 import CultivarFollowButton from "@/components/CultivarFollowButton";
 import CultivarPhenoSampleModule from "@/components/CultivarPhenoSampleModule";
@@ -25,10 +26,11 @@ import {
   buildBreadcrumbListJsonLd,
   buildCultivarCollectionJsonLd,
   buildFaqPageJsonLd,
-  safeJsonLdStringify,
 } from "@/lib/seoStructuredData";
 import { buildCultivarSummaryRows } from "@/lib/cultivarReferenceViewModel";
 import { buildCultivarBreadcrumbItems, buildCultivarFaqItems } from "@/lib/cultivarDetailSeo";
+import { mountRuntimePageJsonLd } from "@/lib/runtimePageJsonLd";
+import { buildMissingCultivarCoverageState } from "@/lib/cultivarCoverageEmptyStateRules";
 
 function sectionId(key: CultivarGuideSectionKey): string {
   return `guide-${key.replace(/_/g, "-")}`;
@@ -44,6 +46,7 @@ function formatDate(value: string): string {
 export default function CultivarPage() {
   const { slug } = useParams<{ slug: string }>();
   const cultivar = findCultivarBySlug(slug);
+  const missingCoverage = buildMissingCultivarCoverageState(slug);
   const sections = cultivar ? getCultivarGuideSections(cultivar) : [];
   const sources = cultivar ? getCultivarSources(cultivar) : [];
   const summaryRows = cultivar
@@ -54,11 +57,12 @@ export default function CultivarPage() {
   usePageSeo({
     title: cultivar
       ? `${cultivar.name} Cultivar Grow Guide | Verdant`
-      : "Strain Reference Library | Verdant",
+      : "Cultivar Coverage | Verdant",
     description: cultivar
       ? `${cultivar.name} grow guide: lineage (${cultivar.lineage}), ${cultivar.flowerWeeks} flower, environment ranges by stage, and common issues home growers report.`
-      : "Source-backed cultivar references with reported tendencies, confidence, and missing information.",
+      : "Browse Verdant’s source-backed cultivar references or keep logging what your plant actually does while coverage grows.",
     path: cultivar ? `/cultivars/${cultivar.slug}` : "/cultivars",
+    noindex: !cultivar,
   });
 
   useEffect(() => {
@@ -96,24 +100,46 @@ export default function CultivarPage() {
       siteUrl: VERDANT_SITE_ORIGIN,
     });
 
-    const docs: Array<[string, unknown]> = [
-      [`cultivar-${cultivar.slug}-collection`, jsonLd],
-      [`cultivar-${cultivar.slug}-faq`, faq],
-      [`cultivar-${cultivar.slug}-breadcrumb`, crumbs],
-      [`cultivar-${cultivar.slug}-article`, article],
-    ];
-    const scripts = docs.map(([id, data]) => {
-      const script = document.createElement("script");
-      script.type = "application/ld+json";
-      script.setAttribute("data-page-ldjson", id);
-      script.text = safeJsonLdStringify(data);
-      document.head.appendChild(script);
-      return script;
+    return mountRuntimePageJsonLd({
+      ownedStaticTypes: ["CollectionPage", "FAQPage", "BreadcrumbList", "Article"],
+      documents: [
+        { marker: `cultivar-${cultivar.slug}-collection`, value: jsonLd },
+        { marker: `cultivar-${cultivar.slug}-faq`, value: faq },
+        { marker: `cultivar-${cultivar.slug}-breadcrumb`, value: crumbs },
+        { marker: `cultivar-${cultivar.slug}-article`, value: article },
+      ],
     });
-    return () => scripts.forEach((script) => script.remove());
   }, [cultivar, faqItems]);
 
-  if (!cultivar) return <Navigate to="/cultivars" replace />;
+  if (!cultivar) {
+    return (
+      <main
+        data-testid="cultivar-missing-page"
+        className="min-h-screen bg-background text-foreground"
+      >
+        <header className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-4 gap-y-3 px-4 py-5 sm:px-6">
+          <Link to="/welcome" aria-label="Verdant Grow Diary home">
+            <BrandLogo size="md" showText />
+          </Link>
+          <nav className="flex w-full items-center justify-between gap-4 text-sm sm:w-auto sm:justify-start">
+            <Link to="/cultivars" className="text-muted-foreground hover:text-foreground">
+              Cultivar references
+            </Link>
+            <Link to="/guides" className="text-muted-foreground hover:text-foreground">
+              Guides
+            </Link>
+            <Link to="/pricing" className="text-muted-foreground hover:text-foreground">
+              Pricing
+            </Link>
+          </nav>
+        </header>
+
+        <div className="mx-auto max-w-6xl px-4 pb-16 pt-8 sm:px-6">
+          <CultivarCoverageEmptyState view={missingCoverage} headingLevel={1} />
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main

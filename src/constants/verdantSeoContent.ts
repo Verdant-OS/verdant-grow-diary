@@ -197,6 +197,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       },
     ],
     related: ["grow-log-app-vs-grow-journal", "sensor-truth-grow-room"],
+    modifiedOn: "2026-07-26",
   },
   {
     slug: "grow-log-app-vs-grow-journal",
@@ -233,6 +234,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       },
     ],
     related: ["grow-diary-app", "ai-grow-doctor"],
+    modifiedOn: "2026-07-15",
   },
   {
     slug: "grow-room-vpd-tracker",
@@ -345,6 +347,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       },
     ],
     related: ["spider-farmer-data-logging", "sensor-truth-grow-room"],
+    modifiedOn: "2026-07-15",
   },
   {
     slug: "spider-farmer-data-logging",
@@ -377,6 +380,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       },
     ],
     related: ["ac-infinity-data-logging", "grow-room-vpd-tracker"],
+    modifiedOn: "2026-07-15",
   },
   {
     slug: "sensor-truth-grow-room",
@@ -483,6 +487,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       },
     ],
     related: ["sensor-truth-grow-room", "grow-diary-app"],
+    modifiedOn: "2026-07-26",
   },
   {
     slug: "cannabis-plant-care",
@@ -598,6 +603,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       },
     ],
     related: ["what-to-log-in-a-grow-journal", "daily-grow-log-checklist", "grow-diary-app"],
+    modifiedOn: "2026-07-15",
   },
   {
     slug: "what-to-log-in-a-grow-journal",
@@ -722,6 +728,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       "what-to-log-in-a-grow-journal",
       "grow-log-app-vs-grow-journal",
     ],
+    modifiedOn: "2026-07-15",
   },
   {
     slug: "plant-watering-log",
@@ -763,6 +770,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       },
     ],
     related: ["what-to-log-in-a-grow-journal", "daily-grow-log-checklist", "grow-room-vpd-tracker"],
+    modifiedOn: "2026-07-15",
   },
   {
     slug: "grow-journal-app-without-account",
@@ -804,6 +812,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       },
     ],
     related: ["how-to-start-a-grow-journal", "grow-journal-template", "grow-diary-app"],
+    modifiedOn: "2026-07-15",
   },
   {
     slug: "daily-grow-log-checklist",
@@ -945,6 +954,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       "grow-room-vpd-tracker",
       "ai-grow-doctor",
     ],
+    modifiedOn: "2026-07-20",
   },
   {
     slug: "athena-nutrients-grow-diary",
@@ -1001,6 +1011,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       "grow-room-vpd-tracker",
       "ai-grow-doctor",
     ],
+    modifiedOn: "2026-07-20",
   },
   {
     slug: "jacks-nutrients-grow-diary",
@@ -1057,6 +1068,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       "grow-room-vpd-tracker",
       "ai-grow-doctor",
     ],
+    modifiedOn: "2026-07-20",
   },
   {
     slug: "house-and-garden-nutrients-grow-diary",
@@ -1113,6 +1125,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       "grow-room-vpd-tracker",
       "ai-grow-doctor",
     ],
+    modifiedOn: "2026-07-20",
   },
   {
     slug: "canna-nutrients-grow-diary",
@@ -1169,6 +1182,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       "grow-room-vpd-tracker",
       "ai-grow-doctor",
     ],
+    modifiedOn: "2026-07-20",
   },
   {
     slug: "bud-rot-prevention-identification",
@@ -1270,6 +1284,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       "ai-grow-doctor",
       "what-to-log-in-a-grow-journal",
     ],
+    modifiedOn: "2026-07-26",
   },
   {
     slug: "cannabis-nutrient-schedule",
@@ -1324,6 +1339,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       "what-to-log-in-a-grow-journal",
       "ai-grow-doctor",
     ],
+    modifiedOn: "2026-07-30",
   },
   {
     slug: "cannabis-grow-light-distance-and-schedule",

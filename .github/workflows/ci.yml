@@ -312,6 +312,12 @@ jobs:
       - name: Legal page SEO structured data
         run: bun run test:legal-seo
 
+      # Stop-ship: public/sitemap.xml must be byte-for-byte generated from the
+      # canonical static SEO document registry, and every generated URL must
+      # remain allowed by the exact robots.txt sitemap contract.
+      - name: Generated sitemap + robots crawl contract
+        run: bun run check:sitemap-robots
+
       # Stop-ship: QuickLog RPC static trust-boundary guardrails. Always runs.
       - name: QuickLog RPC static trust-boundary
         run: bun run test:db:quicklog-rpc-static

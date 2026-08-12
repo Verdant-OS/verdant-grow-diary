@@ -49,8 +49,12 @@ describe("Strain Reference Library V1 detail", () => {
     expect(screen.getByText(/equipment commands/i)).toBeInTheDocument();
   });
 
-  it("redirects unknown slugs to the library", () => {
+  it("renders a useful no-profile state for unknown slugs", () => {
     renderPage("not-a-real-cultivar");
-    expect(screen.getByText("Index fallback")).toBeInTheDocument();
+    expect(screen.queryByText("Index fallback")).not.toBeInTheDocument();
+    expect(screen.getByTestId("cultivar-missing-page")).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: /browse published cultivar references/i }),
+    ).toHaveAttribute("href", "/cultivars");
   });
 });

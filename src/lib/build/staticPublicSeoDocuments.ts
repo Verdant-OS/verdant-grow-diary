@@ -35,6 +35,12 @@ export interface StaticPublicSeoDocument {
   readonly path: string;
   /** Vite output path served at `path` by filesystem-first static hosts. */
   readonly fileName: string;
+  /**
+   * Verified content review or modification date used by the sitemap.
+   * Omitted when the route is intentionally outside the sitemap or no
+   * defensible source date exists.
+   */
+  readonly lastModifiedOn?: string;
   readonly metadata: StaticSocialRouteMetadata;
 }
 
@@ -137,11 +143,13 @@ function publicDocument(
   metadata: Omit<StaticSocialRouteMetadata, "url" | "image"> & {
     readonly image?: string;
   },
+  lastModifiedOn?: string,
 ): StaticPublicSeoDocument {
   const url = `${VERDANT_SITE_ORIGIN}${path}`;
   return {
     path,
     fileName: routeFileName(path),
+    lastModifiedOn,
     metadata: {
       ...metadata,
       url,
@@ -184,14 +192,14 @@ const GUIDE_HUB = publicDocument("/guides", {
     }),
     buildBreadcrumbListJsonLd({ items: VERDANT_GUIDES_BREADCRUMB_ITEMS }),
   ],
-});
+}, "2026-07-30");
 
 const CULTIVAR_HUB = publicDocument("/cultivars", {
   title: "Cannabis Cultivar Guides: Oreoz, Do-Si-Dos & More | Verdant",
   description:
     "Evergreen cultivar profiles for serious home growers: environment ranges, flower windows, common issues, and what to compare when pheno-hunting.",
   imageAlt: "Verdant cultivar guides",
-});
+}, "2026-07-27");
 
 const CORE_ACQUISITION_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> = [
   publicDocument("/welcome", {
@@ -199,43 +207,43 @@ const CORE_ACQUISITION_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> = [
     description:
       "See what changed in your grow and decide what to do next. Verdant turns logs, photos, and sensor readings from the gear you already own into one plant timeline.",
     imageAlt: "Verdant Grow Diary",
-  }),
+  }, "2026-07-26"),
   publicDocument("/pricing", {
     title: "Pricing — Free, Pro & Craft | Verdant Grow Diary",
     description:
       "Free grow diary forever. Pro adds multi-tent support, full sensor history and advanced exports. Craft adds the live Pro Blueprint.",
     imageAlt: "Verdant pricing",
-  }),
+  }, "2026-07-30"),
   publicDocument("/guides/grow-stage-care-guide", {
     title: "Grow stage care guide | Seedling, Veg, and Flower checklists | Verdant",
     description:
       "A searchable grow-stage care guide with watering, nutrients, environment, and harvest checklists for seedling, vegetative, and flower stages.",
     imageAlt: "Verdant grow-stage care guide",
-  }),
+  }, "2026-07-27"),
   publicDocument("/tools/vpd-calculator", {
     title: "Free Cannabis VPD Calculator by Growth Stage | Verdant",
     description:
       "Calculate air VPD from manual temperature and humidity inputs, then compare it with a conservative stage-aware range. No upload, live telemetry, diagnosis, or device control.",
     imageAlt: "Verdant VPD calculator",
-  }),
+  }, "2026-07-27"),
   publicDocument("/hardware-integrations", {
     title: "Sensor & Hardware Integrations | Verdant Grow Diary",
     description:
       "Hardware-neutral Grow OS. Connect Ecowitt, ESP32, MQTT, webhook, or Raspberry Pi sensors read-only, or import CSVs. Bring your own gear — the grower stays in control.",
     imageAlt: "Verdant sensor and hardware integrations",
-  }),
+  }, "2026-07-26"),
   publicDocument("/how-ai-doctor-works", {
     title: "How AI Doctor Works | Verdant Grow Diary",
     description:
       "See how Verdant AI Doctor uses logs, photos, source-labeled sensor context, evidence, confidence, and missing information to support grower-approved decisions.",
     imageAlt: "How Verdant AI Doctor works",
-  }),
+  }, "2026-07-26"),
   publicDocument("/ai-doctor-readiness-check", {
     title: "Free AI Doctor Context Check | Verdant Grow Diary",
     description:
       "Check whether you have enough plant stage, medium, pot size, watering, feeding, sensor, photo, target, and history context for a cautious grow review.",
     imageAlt: "Verdant AI Doctor readiness check",
-  }),
+  }, "2026-07-15"),
   publicDocument("/quick-log", {
     title: "Free 30-Second Quick Log Starter | Verdant Grow Diary",
     description:
@@ -257,7 +265,7 @@ const CORE_ACQUISITION_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> = [
         questions: PUBLIC_QUICK_LOG_STARTER_COPY.faq,
       }),
     ],
-  }),
+  }, "2026-07-25"),
   publicDocument("/glossary", {
     title: "Cannabis Cultivation Glossary | Verdant Grow Diary",
     description:
@@ -293,31 +301,31 @@ const CORE_ACQUISITION_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> = [
     description:
       "Privacy Policy for Verdant Grow Diary — what data is collected and why, retention, your rights, and Paddle's role as Merchant of Record payment processor.",
     imageAlt: "Verdant privacy policy",
-  }),
+  }, "2026-07-09"),
   publicDocument("/terms", {
     title: "Terms of Service | Verdant Grow Diary",
     description:
       "Terms of Service for Verdant Grow Diary — seller identity, Paddle Merchant of Record disclosure, acceptable use, and plain-language liability terms.",
     imageAlt: "Verdant terms of service",
-  }),
+  }, "2026-07-09"),
   publicDocument("/refund", {
     title: "Refund Policy | Verdant Grow Diary",
     description:
       "Verdant Grow Diary refund policy — 30-day money-back guarantee on paid plans, with refunds through Paddle (paddle.net) as Merchant of Record.",
     imageAlt: "Verdant refund policy",
-  }),
+  }, "2026-07-09"),
   publicDocument("/feedback", {
     title: "Customer Feedback | Verdant Grow Diary",
     description:
       "Tell the humans building Verdant what's working and what isn't. Read by real people, no automated replies.",
     imageAlt: "Verdant customer feedback",
-  }),
+  }, "2026-07-28"),
   publicDocument("/contact", {
     title: "Contact Us | Verdant Grow Diary",
     description:
       "Reach the humans building Verdant. Support, bugs, hardware ideas, billing, or questions.",
     imageAlt: "Contact the Verdant team",
-  }),
+  }, "2026-07-28"),
   // Indexable public documentation. Without a pre-rendered doc this route
   // inherits the shell's root canonical and declares itself a duplicate of
   // the homepage to non-JS crawlers. Title/description mirror the page's own
@@ -339,17 +347,19 @@ const GUIDE_DOCUMENTS = VERDANT_SEO_GUIDES.map((guide) =>
     description: guide.description,
     imageAlt: guide.h1,
     jsonLd: buildStaticGuideJsonLd(guide),
-  }),
+  }, guide.modifiedOn ?? guide.publishedOn),
 );
 
-const CULTIVAR_DOCUMENTS = VERDANT_CULTIVARS.map((cultivar) =>
+const CULTIVAR_DOCUMENTS = VERDANT_CULTIVARS
+  .filter((cultivar) => cultivar.publicationStatus === "published")
+  .map((cultivar) =>
   publicDocument(`/cultivars/${cultivar.slug}`, {
     title: `${cultivar.name} Cultivar Grow Guide | Verdant`,
     description: `${cultivar.name} grow guide: lineage (${cultivar.lineage}), ${cultivar.flowerWeeks} flower, environment ranges by stage, and common issues home growers report.`,
     imageAlt: `${cultivar.name} cultivar guide`,
     jsonLd: buildStaticCultivarJsonLd(cultivar),
-  }),
-);
+  }, cultivar.lastVerifiedAt.slice(0, 10)),
+  );
 
 /**
  * Transactional checkout return routes are reachable without JavaScript, but
@@ -378,6 +388,7 @@ export const STATIC_PUBLIC_SEO_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument>
   {
     path: "/founder",
     fileName: routeFileName("/founder"),
+    lastModifiedOn: "2026-07-19",
     metadata: {
       ...FOUNDER_SOCIAL_META,
       image: `${VERDANT_SITE_ORIGIN}/brand/verdant-logo-512.png`,

@@ -373,6 +373,65 @@ describe("Timeline mounted read-state boundary", () => {
     expect(screen.getByTestId("timeline-tent-filter")).not.toHaveTextContent("Tent 6b1faa");
   });
 
+  it("owner-scopes the strain directory and shows one canonical hint on the newest visible row", async () => {
+    const plantId = "plant-cultivar-directory-contract";
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "diary_entries") {
+        return {
+          data: [
+            {
+              ...diaryEntry(
+                "cultivar-newest",
+                "Newest Blue Dream observation",
+                "2026-07-22T12:00:00.000Z",
+              ),
+              plant_id: plantId,
+            },
+            {
+              ...diaryEntry(
+                "cultivar-older",
+                "Older Blue Dream observation",
+                "2026-07-21T12:00:00.000Z",
+              ),
+              plant_id: plantId,
+            },
+          ],
+          error: null,
+          count: 2,
+        };
+      }
+      if (spec.table === "plants") {
+        expect(spec.columns).toBe("id,name,strain");
+        expect(spec.filters.some((filter) => filter.column === "is_archived")).toBe(false);
+        expect(spec.filters).toContainEqual({
+          op: "eq",
+          column: "user_id",
+          value: "owner-1",
+        });
+        return {
+          data: [{ id: plantId, name: "Blue One", strain: "Blue Dream" }],
+          error: null,
+        };
+      }
+      return defaultResult(spec);
+    });
+
+    renderTimeline();
+
+    expect(await screen.findByText("Newest Blue Dream observation")).toBeInTheDocument();
+    expect(screen.getByText("Older Blue Dream observation")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getAllByTestId("timeline-cultivar-reference-hint")).toHaveLength(1),
+    );
+    const hint = screen.getByTestId("timeline-cultivar-reference-hint");
+    expect(hint.closest("li")).toHaveAttribute("id", "timeline-entry-cultivar-newest");
+    expect(screen.getByTestId("plant-cultivar-hint-link")).toHaveAttribute(
+      "href",
+      "/cultivars/blue-dream",
+    );
+    expect(document.querySelector('a[href^="/strains/"]')).toBeNull();
+  });
+
   it("treats a blank URL grow id as absent and reads the active grow", async () => {
     harness.scopedGrowState.urlGrowId = "";
     harness.executeQuery.mockImplementation((spec: QuerySpec) => {

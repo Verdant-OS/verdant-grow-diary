@@ -8,6 +8,7 @@ import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Search } from "lucide-react";
 import BrandLogo from "@/components/BrandLogo";
+import CultivarCoverageEmptyState from "@/components/CultivarCoverageEmptyState";
 import GlobalSearchDialog from "@/components/GlobalSearchDialog";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import {
@@ -18,6 +19,7 @@ import {
   type CultivarVerificationStatus,
 } from "@/constants/verdantCultivars";
 import { buildCultivarsIndexSeo } from "@/lib/cultivarIndexSeoRules";
+import { buildFilteredCultivarCoverageState } from "@/lib/cultivarCoverageEmptyStateRules";
 import { filterCultivarReferenceProfiles } from "@/lib/cultivarReferenceSearchRules";
 
 const DIFFICULTY_OPTIONS: ReadonlyArray<{ value: "all" | CultivarDifficulty; label: string }> = [
@@ -63,11 +65,7 @@ export default function CultivarsIndex() {
     DIFFICULTY_OPTIONS,
     "all",
   );
-  const lifeCycle = validOption(
-    searchParams.get("lifeCycle") ?? "all",
-    LIFE_CYCLE_OPTIONS,
-    "all",
-  );
+  const lifeCycle = validOption(searchParams.get("lifeCycle") ?? "all", LIFE_CYCLE_OPTIONS, "all");
   const verificationStatus = validOption(
     searchParams.get("verification") ?? "all",
     VERIFICATION_OPTIONS,
@@ -180,7 +178,10 @@ export default function CultivarsIndex() {
           onSubmit={(event) => event.preventDefault()}
         >
           <div>
-            <label htmlFor="cultivar-difficulty" className="mb-1 block text-xs uppercase tracking-wide text-muted-foreground">
+            <label
+              htmlFor="cultivar-difficulty"
+              className="mb-1 block text-xs uppercase tracking-wide text-muted-foreground"
+            >
               Difficulty
             </label>
             <select
@@ -198,7 +199,10 @@ export default function CultivarsIndex() {
           </div>
 
           <div>
-            <label htmlFor="cultivar-life-cycle" className="mb-1 block text-xs uppercase tracking-wide text-muted-foreground">
+            <label
+              htmlFor="cultivar-life-cycle"
+              className="mb-1 block text-xs uppercase tracking-wide text-muted-foreground"
+            >
               Life cycle
             </label>
             <select
@@ -216,7 +220,10 @@ export default function CultivarsIndex() {
           </div>
 
           <div>
-            <label htmlFor="cultivar-verification" className="mb-1 block text-xs uppercase tracking-wide text-muted-foreground">
+            <label
+              htmlFor="cultivar-verification"
+              className="mb-1 block text-xs uppercase tracking-wide text-muted-foreground"
+            >
               Evidence state
             </label>
             <select
@@ -255,12 +262,12 @@ export default function CultivarsIndex() {
         </p>
 
         {filtered.length === 0 ? (
-          <div
-            data-testid="cultivars-index-empty"
-            className="rounded-lg border border-dashed border-border/60 p-6 text-sm text-muted-foreground"
-          >
-            No reference profiles match those filters. Try an alias such as “GG4,” clear a filter,
-            or search by lineage.
+          <div data-testid="cultivars-index-empty">
+            <CultivarCoverageEmptyState
+              view={buildFilteredCultivarCoverageState()}
+              headingLevel={2}
+              onClearFilters={() => setSearchParams(new URLSearchParams(), { replace: true })}
+            />
           </div>
         ) : (
           <ul className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -286,8 +293,12 @@ export default function CultivarsIndex() {
                     {cultivar.breeder ? `${cultivar.breeder} · ` : "Breeder/source varies · "}
                     {cultivar.flowerWeeks}
                   </p>
-                  <p className="mt-3 line-clamp-4 text-sm text-muted-foreground">{cultivar.intro}</p>
-                  <p className="mt-auto pt-5 text-xs text-primary/90">Open source and guide evidence →</p>
+                  <p className="mt-3 line-clamp-4 text-sm text-muted-foreground">
+                    {cultivar.intro}
+                  </p>
+                  <p className="mt-auto pt-5 text-xs text-primary/90">
+                    Open source and guide evidence →
+                  </p>
                 </Link>
               </li>
             ))}

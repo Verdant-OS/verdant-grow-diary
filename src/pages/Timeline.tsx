@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import TimelineEmptyState from "@/components/TimelineEmptyState";
 import TimelineLightingGuideCard from "@/components/TimelineLightingGuideCard";
+import PlantCultivarReferenceHint from "@/components/PlantCultivarReferenceHint";
 import {
   resolveTimelineEmptyState,
   TIMELINE_EMPTY_STATE_FALLBACK,
@@ -126,6 +127,7 @@ import {
 } from "@/lib/timelineMissingActionRules";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { useTimelineNameDirectory } from "@/hooks/useTimelineNameDirectory";
+import { selectTimelineCultivarReferencePlacements } from "@/lib/timelineCultivarReferenceRules";
 import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 import { canUseFeature } from "@/lib/featureEntitlements";
 import {
@@ -834,7 +836,7 @@ export default function Timeline() {
   // (includes is_archived rows) keeps filter labels on real names.
   // Gated on a resolved grow scope so a rejected/invalid scope issues
   // no reads at all, matching the page's fail-closed read policy.
-  const { plantNamesById, tentNamesById } = useTimelineNameDirectory(
+  const { plantNamesById, plantStrainsById, tentNamesById } = useTimelineNameDirectory(
     user && activeGrowId ? user : null,
   );
   const plantOptions = useMemo(
@@ -892,6 +894,10 @@ export default function Timeline() {
     effectiveStartDate,
     effectiveEndDate,
   ]);
+  const cultivarReferenceByEntryId = useMemo(
+    () => selectTimelineCultivarReferencePlacements(filtered, plantStrainsById),
+    [filtered, plantStrainsById],
+  );
 
   function clearEvidenceFilters() {
     setSearchQuery("");
@@ -1826,6 +1832,7 @@ export default function Timeline() {
                   const primaryAnchorId =
                     buildTimelineEntryAnchorId(e.id) ?? `timeline-entry-${e.id}`;
                   const linkedGrowEventAnchorId = buildLinkedGrowEventTimelineAnchorId(e.details);
+                  const cultivarReference = cultivarReferenceByEntryId.get(e.id);
                   return (
                     <li
                       key={e.id}
@@ -2020,6 +2027,18 @@ export default function Timeline() {
                                 />
                               </div>
                               <p className="text-sm whitespace-pre-wrap">{e.note}</p>
+                              {cultivarReference ? (
+                                <div
+                                  data-testid="timeline-cultivar-reference-hint"
+                                  onClick={(event) => event.stopPropagation()}
+                                  onKeyDown={(event) => event.stopPropagation()}
+                                >
+                                  <PlantCultivarReferenceHint
+                                    strain={cultivarReference.strain}
+                                    plantId={cultivarReference.plantId}
+                                  />
+                                </div>
+                              ) : null}
                               {lightingGuideByEntryId.has(e.id) ? (
                                 <div
                                   onClick={(event) => event.stopPropagation()}

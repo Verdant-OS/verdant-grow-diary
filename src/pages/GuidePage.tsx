@@ -25,10 +25,10 @@ import {
   buildArticleJsonLd,
   buildBreadcrumbListJsonLd,
   buildFaqPageJsonLd,
-  safeJsonLdStringify,
 } from "@/lib/seoStructuredData";
 import { buildGuideQuickLogStarterHref } from "@/lib/quickLogStarterLinks";
 import { resolveGuideFaqFromHash } from "@/lib/guideFaqHashResolver";
+import { mountRuntimePageJsonLd } from "@/lib/runtimePageJsonLd";
 
 export default function GuidePage() {
   const { slug } = useParams<{ slug: string }>();
@@ -100,28 +100,14 @@ export default function GuidePage() {
           siteUrl: VERDANT_SITE_ORIGIN,
         })
       : null;
-    const faqScript = document.createElement("script");
-    faqScript.type = "application/ld+json";
-    faqScript.setAttribute("data-page-ldjson", `guide-${guide.slug}-faq`);
-    faqScript.text = safeJsonLdStringify(faq);
-    document.head.appendChild(faqScript);
-    const crumbScript = document.createElement("script");
-    crumbScript.type = "application/ld+json";
-    crumbScript.setAttribute("data-page-ldjson", `guide-${guide.slug}-breadcrumb`);
-    crumbScript.text = safeJsonLdStringify(crumbs);
-    document.head.appendChild(crumbScript);
-    const articleScript = article ? document.createElement("script") : null;
-    if (articleScript) {
-      articleScript.type = "application/ld+json";
-      articleScript.setAttribute("data-page-ldjson", `guide-${guide.slug}-article`);
-      articleScript.text = safeJsonLdStringify(article);
-      document.head.appendChild(articleScript);
-    }
-    return () => {
-      faqScript.remove();
-      crumbScript.remove();
-      articleScript?.remove();
-    };
+    return mountRuntimePageJsonLd({
+      ownedStaticTypes: ["FAQPage", "BreadcrumbList", "Article"],
+      documents: [
+        { marker: `guide-${guide.slug}-faq`, value: faq },
+        { marker: `guide-${guide.slug}-breadcrumb`, value: crumbs },
+        ...(article ? [{ marker: `guide-${guide.slug}-article`, value: article }] : []),
+      ],
+    });
   }, [guide]);
 
   if (!guide) {

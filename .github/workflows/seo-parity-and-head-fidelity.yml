@@ -3,12 +3,12 @@ name: SEO parity & head fidelity
 # Blocks PR merges when the sitemap drifts from the pre-rendered
 # route set, or when any pre-rendered dist/*.html <head> diverges
 # from the manifest crawlers must see. Runs on every PR into any
-# branch and on pushes to main so main stays green.
+# branch and on pushes to either maintained branch so both stay green.
 
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, verdant-grow-diary]
 
 concurrency:
   group: seo-parity-${{ github.workflow }}-${{ github.ref }}

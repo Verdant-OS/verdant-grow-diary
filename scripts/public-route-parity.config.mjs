@@ -24,6 +24,11 @@ export const SITEMAP_ONLY_ROUTES = Object.freeze([
   "/", // Homepage served by index.html itself; head baked at build.
 ]);
 
+/** Verified review dates for sitemap-only routes. */
+export const SITEMAP_ONLY_LAST_MODIFIED_ON = Object.freeze({
+  "/": "2026-07-26",
+});
+
 /** STATIC_PUBLIC_SEO_DOCUMENTS paths intentionally excluded from sitemap.xml. */
 export const STATIC_ONLY_ROUTES = Object.freeze([
   "/glossary",

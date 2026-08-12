@@ -21,11 +21,8 @@ import {
   VERDANT_GUIDES_BREADCRUMB_ITEMS,
   VERDANT_SEO_GUIDES,
 } from "@/constants/verdantSeoContent";
-import {
-  buildBreadcrumbListJsonLd,
-  buildFaqPageJsonLd,
-  safeJsonLdStringify,
-} from "@/lib/seoStructuredData";
+import { buildBreadcrumbListJsonLd, buildFaqPageJsonLd } from "@/lib/seoStructuredData";
+import { mountRuntimePageJsonLd } from "@/lib/runtimePageJsonLd";
 
 const PAGE_URL = "https://verdantgrowdiary.com/guides";
 const FEATURED_LIGHTING_GUIDE_SLUGS = new Set([
@@ -49,20 +46,13 @@ export default function GuidesIndex() {
     const crumbs = buildBreadcrumbListJsonLd({
       items: VERDANT_GUIDES_BREADCRUMB_ITEMS,
     });
-    const faqScript = document.createElement("script");
-    faqScript.type = "application/ld+json";
-    faqScript.setAttribute("data-page-ldjson", "guides-index-faq");
-    faqScript.text = safeJsonLdStringify(faq);
-    document.head.appendChild(faqScript);
-    const crumbScript = document.createElement("script");
-    crumbScript.type = "application/ld+json";
-    crumbScript.setAttribute("data-page-ldjson", "guides-index-breadcrumb");
-    crumbScript.text = safeJsonLdStringify(crumbs);
-    document.head.appendChild(crumbScript);
-    return () => {
-      faqScript.remove();
-      crumbScript.remove();
-    };
+    return mountRuntimePageJsonLd({
+      ownedStaticTypes: ["FAQPage", "BreadcrumbList"],
+      documents: [
+        { marker: "guides-index-faq", value: faq },
+        { marker: "guides-index-breadcrumb", value: crumbs },
+      ],
+    });
   }, []);
 
   return (

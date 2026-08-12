@@ -256,6 +256,9 @@ describe("evaluatePolicy", () => {
   });
 
   it.each([
+    ["@hono/node-server", "2.0.9"],
+    ["@modelcontextprotocol/sdk", "1.29.0"],
+    ["hono", "4.12.33"],
     ["postcss", "8.5.6"],
     ["postcss", "8.5.18-rc.0"],
     ["brace-expansion", "1.1.17"],
@@ -269,11 +272,23 @@ describe("evaluatePolicy", () => {
     );
   });
 
-  it("fails when the canonical Bun graph regresses the esbuild security floor", () => {
-    const files = policyFiles();
-    files[at("bun.lock")] = files[at("bun.lock")].replace("esbuild@0.28.1", "esbuild@0.28.0");
-    expect(evaluate(files).errors.join(" ")).toContain("bun.lock security floor for esbuild");
-  });
+  it.each([
+    ["@hono/node-server", "2.0.9"],
+    ["@modelcontextprotocol/sdk", "1.29.0"],
+    ["hono", "4.12.33"],
+    ["esbuild", "0.28.0"],
+  ])(
+    "fails when the canonical Bun graph regresses the %s security floor",
+    (packageName, version) => {
+      const files = policyFiles();
+      const stale = JSON.parse(files[at("bun.lock")]);
+      stale.packages[packageName][0] = `${packageName}@${version}`;
+      files[at("bun.lock")] = JSON.stringify(stale);
+      expect(evaluate(files).errors.join(" ")).toContain(
+        `bun.lock security floor for ${packageName}`,
+      );
+    },
+  );
 
   it.each(["2.1.3", "3.0.5", "4.0.1", "5.0.8"])(
     "fails when brace-expansion regresses to vulnerable release %s",

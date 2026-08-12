@@ -41,6 +41,10 @@ export const FUNNEL_EVENT_SCHEMA: Readonly<Record<FunnelEventName, ReadonlyArray
     csv_import_started: [],
     csv_import_completed: ["rows"],
     csv_history_ai_doctor_clicked: ["surface"],
+    // Same fixed vocabularies as blueprint_cta_clicked below. The metric is
+    // additionally allowlist-gated at the call site because the doctor CTA
+    // renders for every alert row, not just Blueprint-mapped metrics.
+    alert_doctor_cta_clicked: ["surface", "metric", "severity"],
     ai_doctor_review_started: ["surface"],
     historical_ai_review_started: [],
     ai_doctor_result_received: ["surface"],

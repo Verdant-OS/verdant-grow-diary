@@ -15,6 +15,11 @@
  * The href is built by the SHARED `buildPlantAiDoctorReviewPath` helper, the
  * same one five other surfaces use, so this entry point cannot drift from
  * the anchor `AiDoctorReviewAnchorRestorer` listens for.
+ *
+ * Click telemetry routes through the funnel catalog as
+ * `alert_doctor_cta_clicked` (surface + allowlisted metric + severity, never
+ * an id). It replaced the original bespoke CustomEvent dispatch, which had
+ * no listener anywhere and therefore never reached any sink.
  */
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -24,6 +29,8 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import { PLANT_AI_DOCTOR_REVIEW_ANCHOR_ID } from "@/lib/plantDetailQuickActions";
 import { buildPlantAiDoctorReviewPath } from "@/lib/aiDoctorEntryRules";
+import { resolveAlertFunnelMetric } from "@/lib/plantAssignedTentAlertRules";
+import { PRICING_ANALYTICS_EVENT } from "@/lib/pricingAnalytics";
 
 const ROOT = resolve(__dirname, "../..");
 const read = (p: string) => readFileSync(resolve(ROOT, p), "utf8");
@@ -70,6 +77,28 @@ function renderPanel(plantId: string | null) {
   );
 }
 
+type BridgeEvent = { name: string; props: Record<string, unknown> };
+
+/**
+ * Capture `verdant:analytics` bridge dispatches for one funnel event while
+ * `act` runs. The bridge fires with the SAME post-sanitizer, post-schema
+ * props gtag receives, so asserting on it exercises the real pipeline.
+ */
+function captureFunnelBridge(name: string, act: () => void): BridgeEvent[] {
+  const events: BridgeEvent[] = [];
+  const handler = (e: Event) => {
+    const detail = (e as CustomEvent<BridgeEvent>).detail;
+    if (detail?.name === name) events.push(detail);
+  };
+  window.addEventListener(PRICING_ANALYTICS_EVENT, handler);
+  try {
+    act();
+  } finally {
+    window.removeEventListener(PRICING_ANALYTICS_EVENT, handler);
+  }
+  return events;
+}
+
 beforeEach(() => {
   mocks.rows = [ROW];
 });
@@ -97,23 +126,80 @@ describe("tent alerts · Ask AI Doctor on-ramp", () => {
     expect(screen.getByTestId("plant-assigned-tent-alert-view")).toBeInTheDocument();
   });
 
-  it("reports the click id-free", () => {
-    // Analytics carries severity + metric only: never an alert, plant, tent
-    // or user id.
-    const events: CustomEvent[] = [];
-    const handler = (e: Event) => events.push(e as CustomEvent);
-    window.addEventListener("verdant:tent-alerts-doctor-cta", handler);
-    renderPanel("plant-1");
-    fireEvent.click(screen.getByTestId("plant-assigned-tent-alert-ask-doctor"));
-    window.removeEventListener("verdant:tent-alerts-doctor-cta", handler);
+  it("reports the click id-free through the funnel catalog", () => {
+    // Captured off the verdant:analytics mirror, which trackFunnelEvent
+    // dispatches AFTER sanitizeFunnelParams → enforceFunnelEventSchema.
+    // Asserting the exact surviving props (not merely "no ids") is the
+    // vacuity check: a catalog/schema mismatch silently strips params, so a
+    // weaker assertion would keep passing while the event fired empty.
+    const events = captureFunnelBridge("alert_doctor_cta_clicked", () => {
+      renderPanel("plant-1");
+      fireEvent.click(screen.getByTestId("plant-assigned-tent-alert-ask-doctor"));
+    });
 
     expect(events).toHaveLength(1);
-    const detail = events[0].detail as Record<string, unknown>;
-    expect(detail).toEqual({ severity: "warning", metric: "temp" });
-    const serialized = JSON.stringify(detail);
+    expect(events[0].props).toEqual({
+      surface: "tent_alert_row",
+      metric: "temp",
+      severity: "warning",
+    });
+    const serialized = JSON.stringify(events[0].props);
     expect(serialized).not.toContain("alert-1");
     expect(serialized).not.toContain("plant-1");
     expect(serialized).not.toContain("tent-1");
+  });
+
+  it("omits the metric when the persisted token is outside the closed vocabulary", () => {
+    // "compact-id-0f3d" is structurally sanitizer-safe (short, no
+    // whitespace), so only the allowlist gate can be dropping it here —
+    // this is the negative control proving the gate does the work.
+    mocks.rows = [{ ...ROW, metric: "compact-id-0f3d" }];
+    const events = captureFunnelBridge("alert_doctor_cta_clicked", () => {
+      renderPanel("plant-1");
+      fireEvent.click(screen.getByTestId("plant-assigned-tent-alert-ask-doctor"));
+    });
+    expect(events).toHaveLength(1);
+    expect(events[0].props).toEqual({ surface: "tent_alert_row", severity: "warning" });
+  });
+
+  it("does not emit the doctor event from the neighbouring Stage Targets link", () => {
+    const events = captureFunnelBridge("alert_doctor_cta_clicked", () => {
+      renderPanel("plant-1");
+      fireEvent.click(screen.getByTestId("plant-assigned-tent-alert-target-band"));
+    });
+    expect(events).toHaveLength(0);
+  });
+});
+
+describe("resolveAlertFunnelMetric — closed persisted vocabulary", () => {
+  it("passes every canonical token and the two snapshot-level tokens", () => {
+    for (const token of [
+      "temp",
+      "rh",
+      "vpd",
+      "soil",
+      "soil_ec",
+      "soil_temp",
+      "ppfd",
+      "snapshot",
+      "targets",
+    ]) {
+      expect(resolveAlertFunnelMetric(token)).toBe(token);
+    }
+  });
+
+  it("rejects unknown, missing, and free-text-shaped values", () => {
+    expect(resolveAlertFunnelMetric("temperature_c")).toBeNull();
+    expect(resolveAlertFunnelMetric("compact-id-0f3d")).toBeNull();
+    expect(resolveAlertFunnelMetric("looks droopy today")).toBeNull();
+    expect(resolveAlertFunnelMetric("")).toBeNull();
+    expect(resolveAlertFunnelMetric(null)).toBeNull();
+    expect(resolveAlertFunnelMetric(undefined)).toBeNull();
+  });
+
+  it("is deterministic", () => {
+    expect(resolveAlertFunnelMetric("vpd")).toBe(resolveAlertFunnelMetric("vpd"));
+    expect(resolveAlertFunnelMetric("nope")).toBe(resolveAlertFunnelMetric("nope"));
   });
 });
 
@@ -132,6 +218,12 @@ describe("tent alerts · on-ramp wiring guards", () => {
     expect(PANEL).not.toMatch(/\.insert\(|\.update\(|\.upsert\(|\.delete\(/);
     expect(PANEL).not.toMatch(/functions\.invoke/);
     expect(PANEL).not.toMatch(/createActionQueueItem/);
+  });
+
+  it("routes click telemetry through the funnel catalog, not the dead CustomEvent channel", () => {
+    expect(PANEL).toMatch(/trackFunnelEvent\(\s*"alert_doctor_cta_clicked"/);
+    // The bespoke channel had no listener anywhere; it must not come back.
+    expect(PANEL).not.toMatch(/trackTentAlertsDoctorCta|tent-alerts-doctor-cta/);
   });
 
   it("Plant Detail passes its own plant; Daily Check proves tent ownership first", () => {

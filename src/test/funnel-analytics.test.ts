@@ -35,6 +35,10 @@ describe("event name contract", () => {
       "csv_import_started",
       "csv_import_completed",
       "csv_history_ai_doctor_clicked",
+      // Alert-driven AI Doctor entry intent — navigation-only, so it sits
+      // with the other pre-review intent clicks, before the review
+      // lifecycle events.
+      "alert_doctor_cta_clicked",
       "ai_doctor_review_started",
       "historical_ai_review_started",
       "ai_doctor_result_received",

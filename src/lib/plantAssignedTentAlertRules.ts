@@ -11,6 +11,7 @@
  */
 
 import type { AlertRow, AlertSeverityRow, AlertStatusRow } from "@/lib/alerts";
+import { METRIC_LABELS } from "@/lib/environmentTargetComparison";
 
 export interface PlantAssignedTentAlertRow {
   id: string;
@@ -78,6 +79,32 @@ export function countOpenAlerts(
 ): number {
   if (!rows || rows.length === 0) return 0;
   return rows.reduce((n, r) => (r.status === "open" ? n + 1 : n), 0);
+}
+
+/**
+ * Alert metric tokens approved for id-free funnel payloads: the canonical
+ * environment-comparison vocabulary plus the two snapshot-level tokens the
+ * alert writers persist ("snapshot" / "targets").
+ *
+ * `alerts.metric` is an unconstrained text column, so the fence is this
+ * closed allowlist rather than trust in the writers. The doctor CTA renders
+ * for EVERY active alert row — it cannot borrow the alert→Blueprint mapping
+ * gate the Stage Targets link uses — so anything outside the set reports as
+ * absent, never as a raw passthrough.
+ */
+const FUNNEL_SAFE_ALERT_METRICS: ReadonlySet<string> = new Set([
+  ...Object.keys(METRIC_LABELS),
+  "snapshot",
+  "targets",
+]);
+
+/**
+ * The alert's metric token when it belongs to the closed persisted
+ * vocabulary above, or null when it is missing or unrecognized.
+ */
+export function resolveAlertFunnelMetric(metric: string | null | undefined): string | null {
+  if (typeof metric !== "string") return null;
+  return FUNNEL_SAFE_ALERT_METRICS.has(metric) ? metric : null;
 }
 
 function toRow(a: AlertRow): PlantAssignedTentAlertRow {

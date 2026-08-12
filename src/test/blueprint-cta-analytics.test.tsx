@@ -3,11 +3,12 @@
  *
  * The Target Band link is the highest-intent Blueprint entry point (a grower
  * clicking it from a live alert is asking exactly the question Craft answers)
- * and it reported nothing. Notably, mirroring the neighbouring doctor CTA
- * would NOT have fixed that: its CustomEvent has no listener anywhere, so it
- * never reaches a sink. This event routes through trackFunnelEvent -> gtag,
- * keeping the doctor CTA's privacy contract (severity bucket + fixed metric
- * token, never an id).
+ * and it reported nothing. Notably, mirroring the neighbouring doctor CTA as
+ * it originally shipped would NOT have fixed that: its bespoke CustomEvent
+ * had no listener anywhere, so it never reached a sink (that dispatch has
+ * since been replaced by the alert_doctor_cta_clicked funnel event). This
+ * event routes through trackFunnelEvent -> gtag, keeping the same privacy
+ * contract (severity bucket + fixed metric token, never an id).
  *
  * The vacuity risk these tests target: trackFunnelEvent SILENTLY strips any
  * param not in FUNNEL_PARAM_KEYS and not in the event's schema. A test that
@@ -112,10 +113,12 @@ describe("blueprint_cta_clicked · Target Band click", () => {
   });
 
   it("does not fire from the neighbouring doctor CTA", () => {
-    // The doctor CTA keeps its own (CustomEvent) tracker; the funnel event
-    // belongs to Blueprint entry alone.
+    // The doctor CTA reports its own alert_doctor_cta_clicked funnel event;
+    // blueprint_cta_clicked belongs to Blueprint entry alone.
     renderPanel();
     fireEvent.click(screen.getByTestId("plant-assigned-tent-alert-ask-doctor"));
-    expect(spies.track).not.toHaveBeenCalled();
+    const names = spies.track.mock.calls.map(([name]) => name);
+    expect(names).not.toContain("blueprint_cta_clicked");
+    expect(names).toEqual(["alert_doctor_cta_clicked"]);
   });
 });

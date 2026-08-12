@@ -90,6 +90,16 @@ const SEAMS: Array<{ event: string; file: string; extra?: RegExp[] }> = [
     ],
   },
   {
+    event: "alert_doctor_cta_clicked",
+    file: "src/components/PlantAssignedTentAlertsPanel.tsx",
+    extra: [
+      // Fixed vocabularies only, no ids — and the metric must pass the
+      // closed persisted-alert-vocabulary allowlist because this CTA renders
+      // for every alert row, not just Blueprint-mapped metrics.
+      /trackFunnelEvent\("alert_doctor_cta_clicked",\s*\{\s*surface:\s*"tent_alert_row",\s*metric:\s*resolveAlertFunnelMetric\(row\.metric\)\s*\?\?\s*undefined,\s*severity:\s*row\.severity,?\s*\}\)/,
+    ],
+  },
+  {
     event: "ai_doctor_review_started",
     file: "src/components/PlantDetailAiDoctorLiveReview.tsx",
     extra: [/surface:\s*acceptedMode/],

@@ -140,6 +140,8 @@ describe("trackFunnelEvent enforces the per-event schema", () => {
       rows: 3,
       reason: "price_not_configured",
       length_bucket: "1-8",
+      metric: "temp",
+      severity: "warning",
     };
     for (const name of FUNNEL_EVENTS as ReadonlyArray<FunnelEventName>) {
       const allowed = FUNNEL_EVENT_SCHEMA[name];

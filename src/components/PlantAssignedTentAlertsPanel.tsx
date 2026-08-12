@@ -21,12 +21,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatDistanceToNow } from "date-fns";
 import { usePlantAssignedTentAlerts } from "@/hooks/usePlantAssignedTentAlerts";
-import type { PlantAssignedTentAlertRow } from "@/lib/plantAssignedTentAlertRules";
+import {
+  resolveAlertFunnelMetric,
+  type PlantAssignedTentAlertRow,
+} from "@/lib/plantAssignedTentAlertRules";
 import { alertsPath } from "@/lib/routes";
 import { buildPlantAiDoctorReviewPath } from "@/lib/aiDoctorEntryRules";
 import { buildPlantBlueprintPath } from "@/lib/plantDetailQuickActions";
 import { resolveAlertBlueprintMetric } from "@/lib/alertBlueprintLinkRules";
-import { trackTentAlertsDoctorCta } from "@/lib/plantTentAlertsDoctorCtaTracking";
 import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 
 interface Props {
@@ -138,9 +140,16 @@ function AlertRowItem({
               <Link
                 to={doctorHref}
                 onClick={() =>
-                  trackTentAlertsDoctorCta({
+                  // Same funnel sink and privacy contract as the Stage
+                  // Targets click below: severity bucket + fixed metric token
+                  // only, never an id. Unlike that link, this CTA renders for
+                  // EVERY alert row, so the metric passes through the closed
+                  // persisted-vocabulary allowlist instead of relying on the
+                  // Blueprint-mapping render gate.
+                  trackFunnelEvent("alert_doctor_cta_clicked", {
+                    surface: "tent_alert_row",
+                    metric: resolveAlertFunnelMetric(row.metric) ?? undefined,
                     severity: row.severity,
-                    metric: row.metric,
                   })
                 }
               >
@@ -159,8 +168,7 @@ function AlertRowItem({
               <Link
                 to={bandHref}
                 onClick={() =>
-                  // Funnel-sinked (gtag), unlike the doctor CTA's CustomEvent,
-                  // which has no listener. Same privacy contract: severity
+                  // Same privacy contract as the doctor CTA above: severity
                   // bucket + fixed metric token only, never an id. The link is
                   // gated on the alert→Blueprint mapping, so row.metric here
                   // can only be a mapped vocabulary token.

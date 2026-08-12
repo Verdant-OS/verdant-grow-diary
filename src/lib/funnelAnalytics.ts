@@ -39,6 +39,11 @@ export const FUNNEL_EVENTS = [
   "csv_import_started",
   "csv_import_completed",
   "csv_history_ai_doctor_clicked",
+  // Alert-driven AI Doctor entry intent (tent-alerts panel row). Navigation
+  // only — the CTA hands the grower to the plant's cautious-review section
+  // and never starts a review or spends a credit, so it sits with the other
+  // pre-review intent clicks rather than the review lifecycle events below.
+  "alert_doctor_cta_clicked",
   "ai_doctor_review_started",
   "historical_ai_review_started",
   "ai_doctor_result_received",
@@ -103,9 +108,11 @@ export const FUNNEL_PARAM_KEYS = [
    */
   "length_bucket",
   /**
-   * Fixed-vocabulary alert metric token ("temp" | "rh" | "vpd" | "ppfd").
-   * Call sites are gated on the alert→Blueprint mapping, so only mapped
-   * tokens can reach here — never an id, a reading value, or grower input.
+   * Fixed-vocabulary alert metric token (e.g. "temp" | "rh" | "vpd" |
+   * "ppfd"). Every call site is gated on a closed vocabulary — the
+   * alert→Blueprint mapping, or the persisted-alert-metric allowlist in
+   * plantAssignedTentAlertRules for the doctor CTA — never an id, a
+   * reading value, or grower input.
    */
   "metric",
   /** Alert severity bucket ("critical" | "warning" | "watch"). Never an id. */

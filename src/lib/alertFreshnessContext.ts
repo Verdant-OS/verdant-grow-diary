@@ -48,6 +48,12 @@ export interface ClassifyLatestSnapshotArgs {
  * Classify the latest sensor snapshot into a deterministic freshness state
  * for the Alerts page header and stale-badge copy.
  *
+ * This is DISPLAY freshness and is source-aware (manual/diary stay current
+ * for 24h), so it agrees with every other display surface. It deliberately
+ * does NOT answer "can this back an alert row" — that is
+ * {@link snapshotAlertsCanPersist}, which applies the tighter live window.
+ * A manual reading can legitimately be "fresh" here and still not persistable.
+ *
  * Rules:
  *   - status "unavailable" / "loading" / "idle" → "unavailable".
  *   - snapshot null OR source "unavailable" OR ts null → "missing".
@@ -62,7 +68,7 @@ export function classifyLatestSnapshotFreshness(
   const snap = args.snapshot;
   if (!snap || snap.source === "unavailable" || !snap.ts) return "missing";
   const now = args.now ?? Date.now();
-  const stale = isStale(snap.ts, now);
+  const stale = isStale(snap.ts, now, undefined, snap.source);
   if (stale) return "stale";
   if (snap.source === "live" || snap.source === "manual") return "fresh";
   // sim / diary / csv: not eligible for persistence even when "fresh".
@@ -111,10 +117,19 @@ export function describeLatestSnapshotForAlerts(args: ClassifyLatestSnapshotArgs
   if (!persistableSource) {
     return "Latest snapshot is for context only. Alerts persist only from fresh manual or live readings.";
   }
-  const stale = isStale(snap.ts, args.now ?? Date.now());
+  const now = args.now ?? Date.now();
   const sourceWord = snap.source === "live" ? "live" : "manual";
-  if (stale) {
+  // Two independent questions, reported separately so the copy never calls a
+  // reading "stale" when display surfaces still consider it current:
+  //   displayStale   — source-aware; is the telemetry itself out of date?
+  //   outsidePersist — live window; can it back a new alert row?
+  const displayStale = isStale(snap.ts, now, undefined, snap.source);
+  const outsidePersistWindow = isStale(snap.ts, now);
+  if (displayStale) {
     return `Latest ${sourceWord} snapshot is stale. Enter a new manual snapshot inside the ${FRESHNESS_WINDOW_LABEL}.`;
+  }
+  if (outsidePersistWindow) {
+    return `Latest ${sourceWord} snapshot is current, but outside the ${FRESHNESS_WINDOW_LABEL} — enter a new manual snapshot to raise alerts from it.`;
   }
   return `Latest ${sourceWord} snapshot is fresh and can be checked against targets.`;
 }

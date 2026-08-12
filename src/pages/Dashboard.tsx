@@ -78,6 +78,8 @@ import {
   EMPTY_ALERTS_MESSAGE,
   type EnvironmentAlert,
 } from "@/lib/environmentAlerts";
+import { isSnapshotPersistable } from "@/lib/environmentAlertPersistence";
+import { FRESHNESS_WINDOW_LABEL } from "@/lib/alertFreshnessContext";
 import { saveAlert, logAlertEvent } from "@/lib/alerts";
 import { usePersistEnvironmentAlerts } from "@/hooks/usePersistEnvironmentAlerts";
 import { useAlertsList } from "@/hooks/useAlertsList";
@@ -1365,6 +1367,16 @@ export default function Dashboard() {
                 targets: targetsCmp,
                 stage: alertContextStage,
               });
+              // Candidates above are DISPLAY-scoped and stay source-aware, so a
+              // manual reading current for 24h still shows its warning. Saving
+              // one writes a `public.alerts` row stamped first_seen_at = now(),
+              // which is the tighter live-window bar — the same gate the
+              // automatic persistence path uses. Without this, the manual Save
+              // button would bypass the invariant the automatic path enforces.
+              const canPersistAlerts = isSnapshotPersistable({
+                snapshot: snap,
+                quality: quality.quality,
+              });
               const vpdStageMissing =
                 snap?.vpd != null && normalizeVpdStage(alertContextStage) === "unknown";
               return (
@@ -1414,7 +1426,16 @@ export default function Dashboard() {
                                 <Button
                                   size="sm"
                                   variant="outline"
+                                  disabled={!canPersistAlerts}
+                                  title={
+                                    canPersistAlerts
+                                      ? undefined
+                                      : `This reading is outside the ${FRESHNESS_WINDOW_LABEL}, so it cannot raise a new alert. Enter a fresh manual snapshot.`
+                                  }
                                   onClick={async () => {
+                                    // Belt and braces: the disabled state above
+                                    // is UX, this is the invariant.
+                                    if (!canPersistAlerts) return;
                                     try {
                                       const saved = await saveAlert({
                                         grow_id: scopedGrowId,

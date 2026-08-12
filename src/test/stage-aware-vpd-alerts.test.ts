@@ -120,20 +120,14 @@ describe("stage-aware VPD alerts — source filtering", () => {
     const out = buildDefaultThresholdAlerts({ snapshot: s, now: NOW, stage: "flower" });
     expect(out).toEqual([]);
   });
-  // These alerts persist, so the gate is the LIVE window for every source —
-  // not the 24h manual DISPLAY window. A day-old manual reading may render as
-  // current, but it cannot mint an `alerts` row stamped first_seen_at = now().
-  it("7a-iii. manual snapshot inside the 24h DISPLAY window → still no persisted VPD alert", () => {
+  // buildDefaultThresholdAlerts is a CANDIDATE GENERATOR feeding the read-only
+  // Dashboard summary, so it stays source-aware: a manual reading current for
+  // 24h keeps showing its warning. The tighter live-window bar is enforced at
+  // the write boundary (isSnapshotPersistable), covered in
+  // environment-alert-persistence-live-window.test.ts.
+  it("7a-iii. manual snapshot inside the 24h window → VPD candidate still generated", () => {
     const s = snap({
       ts: new Date(NOW - 23 * 60 * 60 * 1000).toISOString(),
-      vpd: 2.4,
-    });
-    const out = buildDefaultThresholdAlerts({ snapshot: s, now: NOW, stage: "flower" });
-    expect(out).toEqual([]);
-  });
-  it("7a-iv. manual snapshot inside the live window → VPD alert generated", () => {
-    const s = snap({
-      ts: new Date(NOW - 60 * 1000).toISOString(),
       vpd: 2.4,
     });
     const out = buildDefaultThresholdAlerts({ snapshot: s, now: NOW, stage: "flower" });

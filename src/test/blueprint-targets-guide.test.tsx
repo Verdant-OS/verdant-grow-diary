@@ -244,3 +244,17 @@ describe("BlueprintTargetsGuide horticultural claims", () => {
     expect(harvest).toMatch(/airflow/i);
   });
 });
+
+describe("BlueprintTargetsGuide capability claims", () => {
+  it("does not promise scoring against every displayed range", () => {
+    // The tables include DLI, but the product cannot score it: the overlay
+    // hardcodes `dli: null` (PlantBlueprintOverlaySection) and the teaser view
+    // model lists it in TEASER_UNSCOREABLE_METRICS, because scoring needs PPFD
+    // samples plus a stored timezone that no column holds. A CTA promising
+    // comparison "against the ranges above" would oversell that.
+    render(<BlueprintTargetsGuide />);
+    const cta = screen.getByTestId("blueprint-targets-cta").textContent ?? "";
+    expect(cta).not.toMatch(/against the ranges above/i);
+    expect(cta).not.toMatch(/\bscore[sd]?\b|\btracked against\b/i);
+  });
+});

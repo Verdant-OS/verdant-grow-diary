@@ -219,6 +219,9 @@ function EntryItem({ entry, demoVariant, correctionCount }: EntryItemProps) {
             noteText={entry.action.noteText ?? null}
           />
           {entry.kind === "grouped" && <ManualSnapshotTimelineCard card={entry.environmentCard} />}
+          {integrityControls && (
+            <div className="flex flex-wrap items-center gap-2">{integrityControls}</div>
+          )}
         </CardContent>
       </Card>
     );
@@ -234,6 +237,9 @@ function EntryItem({ entry, demoVariant, correctionCount }: EntryItemProps) {
         <CardContent className="p-3 space-y-3">
           <AiDoctorPhase1TimelineEvidenceCard viewModel={evidenceViewModel} />
           {entry.kind === "grouped" && <ManualSnapshotTimelineCard card={entry.environmentCard} />}
+          {integrityControls && (
+            <div className="flex flex-wrap items-center gap-2">{integrityControls}</div>
+          )}
         </CardContent>
       </Card>
     );

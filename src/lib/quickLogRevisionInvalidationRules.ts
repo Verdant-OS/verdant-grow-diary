@@ -32,5 +32,19 @@ export function buildQuickLogRevisionInvalidationKeys(meta: QuickLogRevisionMeta
   });
   keys.push(["quicklog_entry_revisions"]);
   keys.push(["quicklog_retracted_entries"]);
+  // Sensor/readiness families from quickLogV2RefreshRules: these queries are
+  // mounted on the same Plant Detail page and filter retracted_at, so a
+  // revision must refresh them too (a retracted snapshot would otherwise
+  // linger in freshness cards and AI Doctor readiness until an unrelated
+  // refetch).
+  keys.push(["plant_manual_sensor_history"]);
+  keys.push(["plant_manual_sensor_logs"]);
+  keys.push(["ai_doctor_context"]);
+  keys.push(["ai_doctor_readiness"]);
+  keys.push(["pheno_evidence_receipts"]);
+  keys.push(["dashboard_memory"]);
+  keys.push(["dashboard_recent_activity"]);
+  keys.push(["tent_recent_activity"]);
+  keys.push(["grow_events"]);
   return keys;
 }

@@ -331,8 +331,10 @@ BEGIN
      WHERE d.user_id = uid
        AND d.retracted_at IS NULL
        AND (
-         d.details ->> 'linked_grow_event_id' = v_spine.id::text
-         OR d.details ->> 'grow_event_id' = v_spine.id::text
+         -- Parse-then-compare so legacy mirrors with non-canonical UUID text
+         -- (e.g. uppercase) still match, exactly like the resolver does.
+         public.quicklog_try_parse_uuid(d.details ->> 'linked_grow_event_id') = v_spine.id
+         OR public.quicklog_try_parse_uuid(d.details ->> 'grow_event_id') = v_spine.id
        );
 
     v_prev := jsonb_build_object(
@@ -584,8 +586,10 @@ BEGIN
       FROM public.diary_entries d
      WHERE d.user_id = uid
        AND (
-         d.details ->> 'linked_grow_event_id' = v_spine.id::text
-         OR d.details ->> 'grow_event_id' = v_spine.id::text
+         -- Parse-then-compare so legacy mirrors with non-canonical UUID text
+         -- (e.g. uppercase) still match, exactly like the resolver does.
+         public.quicklog_try_parse_uuid(d.details ->> 'linked_grow_event_id') = v_spine.id
+         OR public.quicklog_try_parse_uuid(d.details ->> 'grow_event_id') = v_spine.id
        );
 
     v_prev := jsonb_build_object(

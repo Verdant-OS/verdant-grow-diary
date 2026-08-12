@@ -126,12 +126,12 @@ env/`psql` on this machine and the Supabase MCP connection lacks permission on
 verification attempt record. V2/V3 remain `NOT_RUN`. Spec advances to `APPROVED` only when
 V1–V4 all pass.
 
-| Phase 2 gate item                             | Status                                    |
-| --------------------------------------------- | ----------------------------------------- |
-| 1. Wrapper tests pass                         | `PASS` — 22/22 targeted tests, 2026-08-07 |
-| 2. Token storage/rotation/revocation policy   | `BLOCKED` — Cheek (owner-only)            |
-| 3. Schema/RLS/idempotency audit (= Phase 1.8) | `HOLD` — spec drafted, see below          |
-| 4. Live-label fencing policy                  | `APPROVED` — D3/D4 rulings, 2026-08-12    |
+| Phase 2 gate item                             | Status                                                                                 |
+| --------------------------------------------- | -------------------------------------------------------------------------------------- |
+| 1. Wrapper tests pass                         | `PASS` — 22/22 targeted tests, 2026-08-07                                              |
+| 2. Token storage/rotation/revocation policy   | `BLOCKED` — Cheek (owner-only)                                                         |
+| 3. Schema/RLS/idempotency audit (= Phase 1.8) | `HOLD` — spec drafted, see below                                                       |
+| 4. Live-label fencing policy                  | `HOLD` — D3 approved 2026-08-12; D4 awaiting owner re-confirmation (premise corrected) |
 
 Persistence remains blocked **on the Phase 1.7 path**: `source='live'` is unreachable via
 the validation-only `ecowitt-real-ingest` wrapper by design — it has no database client. A

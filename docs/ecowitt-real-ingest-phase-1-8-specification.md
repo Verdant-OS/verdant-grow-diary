@@ -162,12 +162,12 @@ housekeeping migration — noted, not required for approval.
 
 ## Verification items (all must pass before this spec is marked approved)
 
-| #   | Item                                                                                                        | Method                                                                                                                                                                     | Status    |
-| --- | ----------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
-| V1  | Live trigger allow-list matches migration `20260617164759`                                                  | Re-run `scripts/audit-csv-source-allow-list.ts` against `knkwiiywfkbqznbxwqfh`; update the frozen test in the same PR                                                      | `BLOCKED` |
-| V2  | Channel-collision behavior of the deployed row builder (does multi-channel drop rows?)                      | Fixture POST with 2 air + 2 soil channels through `buildEcoWittRoutedRows`/`buildEcoWittStoredRows` on the deploy branch; assert emitted row count and index-collision set | `NOT_RUN` |
-| V3  | Deployed `ecowitt-ingest` matches deploy-branch source (writes `live`, not `ecowitt`)                       | Compare deployed function body via Supabase API to `origin/verdant-grow-diary`                                                                                             | `NOT_RUN` |
-| V4  | No `source='live'` EcoWitt rows exist that predate gate approval — or they are enumerated and dispositioned | Read-only query, owner-visible output                                                                                                                                      | `BLOCKED` |
+| #   | Item                                                                                                        | Method                                                                                                                                                                                                                                                                                                                          | Status    |
+| --- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
+| V1  | Live trigger allow-list matches migration `20260617164759`                                                  | **Authoritative:** read the deployed definition (`pg_get_functiondef`) and compare to the migration byte-for-byte — the committed probe script covers only 2 sources × 5 metrics of the 19-source / 9-metric allow-list and is supplementary behavioral evidence, never a pass by itself. Update the frozen test in the same PR | `BLOCKED` |
+| V2  | Channel-collision behavior of the deployed row builder (does multi-channel drop rows?)                      | Fixture POST with 2 air + 2 soil channels through `buildEcoWittRoutedRows`/`buildEcoWittStoredRows` on the deploy branch; assert emitted row count and index-collision set                                                                                                                                                      | `NOT_RUN` |
+| V3  | Deployed `ecowitt-ingest` matches deploy-branch source (writes `live`, not `ecowitt`)                       | Compare deployed function body via Supabase API to `origin/verdant-grow-diary`                                                                                                                                                                                                                                                  | `NOT_RUN` |
+| V4  | No `source='live'` EcoWitt rows exist that predate gate approval — or they are enumerated and dispositioned | Read-only query, owner-visible output                                                                                                                                                                                                                                                                                           | `BLOCKED` |
 
 ### Verification attempt record — 2026-08-12 (V1, V4: `BLOCKED`)
 
@@ -223,8 +223,12 @@ evidence, not evidence of absence.
        or raw_payload -> 'metadata' ->> 'transport_source' = 'ecowitt'
        or raw_payload ? 'passkey_fingerprint'
      )
-   order by captured_at desc
-   limit 200;
+   order by captured_at desc;
+   -- V4 requires the enumeration to be EXHAUSTIVE: run
+   --   select count(*) from public.sensor_readings where source = 'live' and (...same predicate...);
+   -- first, and page or export the full set until every row is dispositioned. Do not cap
+   -- the result — one gateway sample expands to multiple metric rows, so any LIMIT can
+   -- hide pre-approval rows while V4 reads as complete.
    ```
 
    Also useful context (count only): the same query with `source = 'ecowitt'` for

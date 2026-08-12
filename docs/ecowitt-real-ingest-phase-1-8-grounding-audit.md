@@ -39,9 +39,9 @@ used as a schema oracle. Deploy-only migrations that matter here:
 
 - Long format: one row per (tent, metric, sample). No FK on `tent_id`/`user_id`. No CHECK
   constraints; all value-domain enforcement is the `validate_sensor_reading()` trigger
-  (9 metrics; quality `ok|degraded|stale|invalid`; 18-value source allow-list = 6 canonical
-  - 12 back-compat incl. `ecowitt`; value non-NULL/non-NaN; `captured_at ≤ now()+5min`;
-    `soil_temp_c` −20..80).
+  (9 metrics; quality `ok|degraded|stale|invalid`; 19-value source allow-list = 6 canonical
+  plus 13 back-compat incl. `ecowitt` — earlier drafts of this record miscounted 18/12;
+  value non-NULL/non-NaN; `captured_at ≤ now()+5min`; `soil_temp_c` −20..80).
 - Two trigger objects bind the same function (`trg_sensor_readings_validate` +
   `validate_sensor_reading_trg`) — it runs twice per row. Harmless, wasteful. (inference)
 - Timestamps: `captured_at` = sensor capture time (source of truth for age), `ts` = series

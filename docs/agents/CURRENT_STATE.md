@@ -125,8 +125,9 @@ env/`psql` on this machine and the Supabase MCP connection lacks permission on
 `knkwiiywfkbqznbxwqfh`. Unblock paths and an owner-runnable V4 query are in the spec's
 verification attempt record. V2/V3/V6 remain `NOT_STARTED`; V5 is split — V5a
 (invalid-provenance read fences) is mandatory and unconditional, V5b (stale fences)
-conditional on D4. Spec advances to `APPROVED` only when **V1–V6 all pass and the owner
-re-confirms D4** on the corrected facts — verification cannot substitute for that decision.
+conditional on D4. Spec advances to `APPROVED` only when **V1–V4, V5a, and V6 pass, V5b passes or
+resolves `NOT_APPLICABLE` (fail-closed re-confirmation), and the owner re-confirms D4**
+on the corrected facts — verification cannot substitute for that decision.
 
 | Phase 2 gate item                             | Status                                                                                 |
 | --------------------------------------------- | -------------------------------------------------------------------------------------- |
@@ -139,8 +140,9 @@ Persistence remains blocked **on the Phase 1.7 path**: `source='live'` is unreac
 the validation-only `ecowitt-real-ingest` wrapper by design — it has no database client. A
 live row claiming to come from **that endpoint** would be a defect, and a Sensor Snapshot
 screenshot is not a valid Phase 1.7 exit artifact. This does **not** apply to the
-separately deployed `ecowitt-ingest` custom-upload path, which authenticates, checks
-freshness, and legitimately upserts canonical `source='live'` rows (deploy branch). Do not
+separately deployed `ecowitt-ingest` custom-upload path — bearer-authenticated, so it is
+reached via a bridge hop, never by the gateway alone — which checks freshness and
+legitimately upserts canonical `source='live'` rows (deploy branch). Do not
 classify those as defects when auditing production.
 
 Two cautions for anyone picking this up:

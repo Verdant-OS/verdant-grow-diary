@@ -15,7 +15,8 @@ re-confirmation is an independent prerequisite the verification items cannot sub
 > **D4 APPROVED** (evidence-only fencing). Fences recorded inline in each section below.
 > V1 and V4 were authorized and attempted the same day; both returned `BLOCKED` on access
 > — see the verification attempt record. Verdict remains `HOLD — approvable`; it must not
-> advance to `APPROVED` until the verification items all have recorded passing evidence
+> advance to `APPROVED` until every verification item records passing evidence (V5b may
+> instead resolve `NOT_APPLICABLE` under a fail-closed D4 re-confirmation)
 > **and** D4 is re-confirmed by the owner on the corrected facts (see the D4 correction
 > block — passing V1–V5 does not clear that decision).
 

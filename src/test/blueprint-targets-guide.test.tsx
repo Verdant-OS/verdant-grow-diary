@@ -326,3 +326,19 @@ describe("BlueprintTargetsGuide dry vs cure measurement", () => {
     }
   });
 });
+
+describe("BlueprintTargetsGuide cure FAQ", () => {
+  it("publishes the dry-vs-cure measurement distinction as an answer", () => {
+    // Asserted rather than assumed: an earlier attempt to add this entry
+    // silently no-opped, and nothing caught it because no test referenced it.
+    // Match the exact question: "dry and cure" also appears in the
+    // no-light-or-feed-targets answer, which a loose selector picks up first.
+    const cure =
+      VERDANT_BLUEPRINT_TARGETS_FAQ.find(
+        (f) => f.question === "Do the dry and cure numbers mean the same thing?",
+      )?.answer ?? "";
+    expect(cure).toMatch(/drying space/i);
+    expect(cure).toMatch(/inside the container/i);
+    expect(cure).toMatch(/mould|mold/i);
+  });
+});

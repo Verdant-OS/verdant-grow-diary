@@ -67,13 +67,25 @@ export function readLocalToolPreferences(
  * Persist one tool's local preference. Unknown tool names are ignored
  * (nothing is written) so storage can never accumulate stray keys.
  * Returns the resulting full preference map.
+ *
+ * Pass `current` (the caller's ACTIVE in-memory map) when updating UI
+ * state: it overlays the storage read, so an earlier toggle whose
+ * write failed (quota/privacy mode) is not silently reverted by a
+ * stale re-read — what the user sees stays the source of truth.
  */
 export function setLocalToolPreference(
   name: string,
   enabled: boolean,
   storage: PrefStorage | null = safeStorage(),
+  current?: LocalToolPreferences,
 ): LocalToolPreferences {
   const prefs = readLocalToolPreferences(storage);
+  if (current) {
+    for (const key of Object.keys(prefs)) {
+      const v = current[key];
+      if (typeof v === "boolean") prefs[key] = v;
+    }
+  }
   if (!(name in prefs)) return prefs;
   prefs[name] = enabled;
   if (storage) {

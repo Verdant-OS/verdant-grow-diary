@@ -157,7 +157,10 @@ export default function AgentIntegrations({
   // wide. They gate the in-app test probe and are reflected in exports.
   const [toolPrefs, setToolPrefs] = useState(() => readLocalToolPreferences());
   const onToggleTool = useCallback((name: string, enabled: boolean) => {
-    setToolPrefs(setLocalToolPreference(name, enabled));
+    // Functional setter + threading the previous map keeps earlier
+    // toggles intact even when the storage write fails (quota/privacy
+    // mode) and a fresh read would return stale values.
+    setToolPrefs((prev) => setLocalToolPreference(name, enabled, undefined, prev));
   }, []);
 
   const setupGuide = getIssuerSetupGuideLink(oauthStatus);

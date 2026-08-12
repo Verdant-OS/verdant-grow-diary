@@ -75,6 +75,29 @@ describe("localToolPreferences", () => {
     expect(prefs.list_recent_diary_entries).toBe(false);
   });
 
+  it("threads the caller's in-memory map so a failed write is not reverted by a stale re-read", () => {
+    // Storage that never persists (privacy mode / quota exhausted).
+    const brokenStorage = {
+      getItem: () => null,
+      setItem: () => {
+        throw new Error("QuotaExceededError");
+      },
+    };
+    const afterFirst = setLocalToolPreference("list_grows", false, brokenStorage);
+    expect(afterFirst.list_grows).toBe(false);
+    // Without `current`, the second update would re-read defaults and
+    // silently re-enable list_grows. Threading the map preserves it.
+    const afterSecond = setLocalToolPreference(
+      "get_latest_sensor_snapshot",
+      false,
+      brokenStorage,
+      afterFirst,
+    );
+    expect(afterSecond.list_grows).toBe(false);
+    expect(afterSecond.get_latest_sensor_snapshot).toBe(false);
+    expect(afterSecond.list_recent_diary_entries).toBe(true);
+  });
+
   it("round-trips a preference write and refuses unknown tool names", () => {
     const storage = fakeStorage();
     const afterSet = setLocalToolPreference("list_grows", false, storage);

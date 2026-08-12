@@ -214,11 +214,17 @@ describe("export reflects in-memory state when storage writes fail", () => {
       throw new Error("QuotaExceededError");
     });
     try {
+      // Two sequential toggles: the second must not revert the first
+      // even though neither write reached storage.
       fireEvent.click(screen.getByTestId("tool-toggle-list_grows"));
+      fireEvent.click(screen.getByTestId("tool-toggle-get_latest_sensor_snapshot"));
       await waitFor(() => {
         expect(screen.getByTestId("tool-toggle-list_grows").getAttribute("aria-checked")).toBe(
           "false",
         );
+        expect(
+          screen.getByTestId("tool-toggle-get_latest_sensor_snapshot").getAttribute("aria-checked"),
+        ).toBe("false");
       });
       fireEvent.click(screen.getByTestId("export-connection-status"));
       await waitFor(() => expect(capturedBlob).not.toBeNull());
@@ -229,7 +235,9 @@ describe("export reflects in-memory state when storage writes fail", () => {
       await blobToText(capturedBlob as unknown as Blob),
     ) as ConnectionStatusExport;
     const grows = parsed.tools.find((t) => t.name === "list_grows");
+    const snapshot = parsed.tools.find((t) => t.name === "get_latest_sensor_snapshot");
     expect(grows?.enabledInThisBrowser).toBe(false);
+    expect(snapshot?.enabledInThisBrowser).toBe(false);
   });
 });
 

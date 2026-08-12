@@ -99,6 +99,19 @@ describe("low-credit top-up · shows at the right moment", () => {
     expect(vm.label).not.toMatch(/\b0 AI credits left\b/);
     expect(vm.label).toMatch(/used this month/i);
   });
+
+  it("never promises a finite pack lasts until the reset", () => {
+    // Packs are 50 or 150 credits and are spent only after the monthly
+    // allowance, so a grower can exhaust one before any reset. The copy may
+    // say what a pack ADDS, never what it guarantees.
+    for (const remaining of [0, 1, 2]) {
+      const vm = build({ credit: credit({ remaining }) });
+      expect(vm.visible).toBe(true);
+      if (!vm.visible) continue;
+      expect(vm.label, `remaining=${remaining}`).not.toMatch(/until (they|it) reset/i);
+      expect(vm.label, `remaining=${remaining}`).not.toMatch(/\bcovers\b|\bunlimited\b|\benough\b/i);
+    }
+  });
 });
 
 describe("low-credit top-up · fails closed", () => {

@@ -75,10 +75,13 @@ export function buildAiDoctorLowCreditTopUpViewModel(
   return {
     visible: true,
     remaining,
+    // Says what a pack DOES (adds credits that never expire), never what it
+    // guarantees. Packs are finite — 50 or 150 — so "covers checks until they
+    // reset" would promise coverage a grower can exhaust before the reset.
     label:
       remaining === 0
-        ? "You've used this month's AI credits. A one-time pack covers checks until they reset."
-        : `${remaining} AI credit${remaining === 1 ? "" : "s"} left this month. A one-time pack covers checks until they reset.`,
+        ? "You've used this month's AI credits. A one-time pack adds more without waiting for the reset."
+        : `${remaining} AI credit${remaining === 1 ? "" : "s"} left this month. A one-time pack adds more without waiting for the reset.`,
     href: buildCreditPackHref(input.returnTo),
   };
 }

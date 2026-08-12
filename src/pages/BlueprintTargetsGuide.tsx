@@ -24,7 +24,6 @@
  * preference helper is intentionally not called — it reads localStorage,
  * which does not exist during SSR.
  */
-import { useEffect } from "react";
 import { Link } from "@/lib/react-router-compat";
 import BrandLogo from "@/components/BrandLogo";
 import { usePageSeo } from "@/hooks/usePageSeo";
@@ -33,16 +32,7 @@ import {
   type BlueprintStageBands,
   type BlueprintTargetStage,
 } from "@/constants/blueprintTargets";
-import {
-  VERDANT_GUIDES_BREADCRUMB_ITEMS,
-  VERDANT_SITE_ORIGIN,
-} from "@/constants/verdantSeoContent";
-import {
-  buildBreadcrumbListJsonLd,
-  buildFaqPageJsonLd,
-  safeJsonLdStringify,
-} from "@/lib/seoStructuredData";
-const PAGE_URL = `${VERDANT_SITE_ORIGIN}/tools/blueprint-targets`;
+import { VERDANT_BLUEPRINT_TARGETS_FAQ } from "@/constants/verdantSeoContent";
 
 /**
  * Bare "/auth" opens the SIGN-IN tab — Auth resolves mode to "signin" unless
@@ -187,44 +177,6 @@ export function buildStageMetricRows(bands: BlueprintStageBands): MetricRow[] {
   return rows;
 }
 
-const FAQ = [
-  {
-    question: "What are grow stage target bands?",
-    answer:
-      "A target band is the range a given environmental or feed metric should sit inside for a specific grow stage — for example 40–50 % relative humidity during flower. Bands are ranges rather than single numbers because plants tolerate variation; what matters is staying inside the range for that stage.",
-  },
-  {
-    question: "Why do temperature targets differ between lights on and lights off?",
-    answer:
-      "Partly because the room simply cools when the lamps are off, and partly because a deliberate night drop slows respiration and helps keep stretch in check. It is not a VPD control on its own: VPD depends on temperature and humidity together — and ideally on leaf temperature — so at a fixed humidity a cooler night lowers VPD rather than holding it steady. Work out VPD separately for lights-on and lights-off rather than assuming one figure covers both.",
-  },
-  {
-    question: "Why are there no light or feed targets for dry and cure?",
-    answer:
-      "Once the plant is cut it no longer takes up nutrients or photosynthesises, so EC, pH, PPFD and DLI stop applying. Only air temperature and humidity matter, and both are held tight to control the drying rate.",
-  },
-  {
-    question: "Do the EC and pH targets apply to soil?",
-    answer:
-      "No — the feed EC and pH ranges above are soilless and hydro figures. Soil buffers pH, so soil growers should aim for roughly 6.0–6.8 rather than the high-5s shown here. Air temperature, humidity and light targets are not medium-specific and apply either way.",
-  },
-  {
-    question: "Are the EC and pH targets for input feed or runoff?",
-    answer:
-      "Input only — the solution as you mix it, before it reaches the medium. Runoff normally reads higher than input because salts accumulate in the root zone, so runoff should be read against your own input and root-zone history rather than against these numbers. Comparing runoff directly to an input band will make a healthy feed look wrong.",
-  },
-  {
-    question: "Should I flush at the end of flower?",
-    answer:
-      "Not automatically. Base any taper or flush on evidence — runoff EC, leaf-tip burn, or visible salt stress — rather than on the calendar. Aggressive late-stage flushing can weaken a plant that is still filling out.",
-  },
-  {
-    question: "Are these targets the same for every cultivar?",
-    answer:
-      "No. These are a starting point drawn from a standard operating procedure, and cultivars differ — some tolerate more heat, some finish faster. Treat the bands as a default to log against and adjust from, not a rule.",
-  },
-];
-
 export default function BlueprintTargetsGuide() {
   usePageSeo({
     title: "Grow stage target bands | Temperature, humidity, EC, pH, PPFD | Verdant",
@@ -233,26 +185,6 @@ export default function BlueprintTargetsGuide() {
     path: "/tools/blueprint-targets",
   });
 
-  useEffect(() => {
-    const faq = buildFaqPageJsonLd({ pageUrl: PAGE_URL, questions: FAQ });
-    const crumbs = buildBreadcrumbListJsonLd({
-      items: [...VERDANT_GUIDES_BREADCRUMB_ITEMS, { name: "Grow stage target bands", url: PAGE_URL }],
-    });
-    const faqScript = document.createElement("script");
-    faqScript.type = "application/ld+json";
-    faqScript.setAttribute("data-page-ldjson", "blueprint-targets-faq");
-    faqScript.text = safeJsonLdStringify(faq);
-    document.head.appendChild(faqScript);
-    const crumbScript = document.createElement("script");
-    crumbScript.type = "application/ld+json";
-    crumbScript.setAttribute("data-page-ldjson", "blueprint-targets-breadcrumb");
-    crumbScript.text = safeJsonLdStringify(crumbs);
-    document.head.appendChild(crumbScript);
-    return () => {
-      faqScript.remove();
-      crumbScript.remove();
-    };
-  }, []);
 
   return (
     <main
@@ -365,7 +297,7 @@ export default function BlueprintTargetsGuide() {
             Common questions
           </h2>
           <dl className="mt-6 space-y-6">
-            {FAQ.map((item) => (
+            {VERDANT_BLUEPRINT_TARGETS_FAQ.map((item) => (
               <div key={item.question}>
                 <dt className="font-medium">{item.question}</dt>
                 <dd className="mt-2 text-muted-foreground">{item.answer}</dd>

@@ -153,20 +153,16 @@ async function defaultSubscribe(
 }
 
 async function main(): Promise<void> {
-  // eslint-disable-next-line no-console
   console.log(`[ecowitt-bridge-smoke] starting — ${FAKE_TEST_LABEL}`);
   const result = await runSmoke(
     {},
     { fetchImpl: fetch, subscribe: defaultSubscribe },
   );
   if (result.ok) {
-    // eslint-disable-next-line no-console
     console.log("[ecowitt-bridge-smoke] PASS:", result.reason);
-    // eslint-disable-next-line no-console
     console.log("[ecowitt-bridge-smoke] next: bun run dev:ecowitt-mqtt:dry-run -- --once --write-report");
     process.exit(0);
   } else {
-    // eslint-disable-next-line no-console
     console.error("[ecowitt-bridge-smoke] FAIL:", result.reason);
     process.exit(1);
   }

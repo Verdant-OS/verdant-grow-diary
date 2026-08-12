@@ -249,14 +249,12 @@ async function writeRedactedReport(
     await mkdir(path.dirname(out), { recursive: true });
     const payload = buildRedactedReportJson(report);
     await writeFile(out, JSON.stringify(payload, null, 2), "utf8");
-    // eslint-disable-next-line no-console
     console.log(
       "[ecowitt-mqtt-runner] redacted report written to",
       out,
       "— paste into /operator/ecowitt-bridge-status",
     );
   } catch (e) {
-    // eslint-disable-next-line no-console
     console.warn("[ecowitt-mqtt-runner] could not write redacted report:", e);
   }
 }
@@ -283,7 +281,6 @@ export function buildRedactedReportJson(
 
 function printReport(report: ReturnType<typeof buildIngestAttemptReport>): void {
   const e = report.evidence;
-  // eslint-disable-next-line no-console
   console.log("[ecowitt-mqtt-runner] consumed MQTT message", {
     title: report.title,
     status: report.status,
@@ -309,7 +306,6 @@ async function main(): Promise<void> {
   const flags = parseFlags(process.argv.slice(2));
   const env = readEnv(process.env);
 
-  // eslint-disable-next-line no-console
   console.log("[ecowitt-mqtt-runner] startup", {
     dryRun: flags.dryRun,
     once: flags.once,
@@ -340,7 +336,6 @@ async function main(): Promise<void> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     mqtt = await (Function("m", "return import(m)") as any)("mqtt");
   } catch {
-    // eslint-disable-next-line no-console
     console.error(
       "[ecowitt-mqtt-runner] mqtt package not installed. Run `bun add mqtt` or use --dry-run --sample.",
     );
@@ -354,7 +349,6 @@ async function main(): Promise<void> {
   });
 
   client.on("connect", () => {
-    // eslint-disable-next-line no-console
     console.log("[ecowitt-mqtt-runner] subscribed", env.mqttTopic);
     client.subscribe(env.mqttTopic);
   });

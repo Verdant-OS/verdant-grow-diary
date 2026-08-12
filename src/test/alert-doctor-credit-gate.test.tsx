@@ -258,12 +258,12 @@ describe("panel interception — behavior", () => {
     expect(serialized).not.toContain("grow-1");
   });
 
-  it("fires ONE paywall_viewed impression per mount, only when rows rendered", () => {
+  it("fires ONE paywall_viewed impression per exposure, only when rows rendered", () => {
     const view = renderPanel(INTERCEPT_GATE);
     const impressions = () => spies.track.mock.calls.filter(([name]) => name === "paywall_viewed");
     expect(impressions()).toHaveLength(1);
     expect(impressions()[0][1]).toEqual({ surface: ALERT_DOCTOR_CREDIT_GATE_SURFACE });
-    // Re-render must not double-count the impression.
+    // Re-render of the SAME exposure must not double-count the impression.
     view.rerender(
       <MemoryRouter initialEntries={["/plants/plant-1"]}>
         <PlantAssignedTentAlertsPanel
@@ -276,6 +276,33 @@ describe("panel interception — behavior", () => {
       </MemoryRouter>,
     );
     expect(impressions()).toHaveLength(1);
+  });
+
+  it("a new plant exposure on the reused route component fires a fresh, still id-free impression", () => {
+    // /plants/:id navigations reuse the route component, so the panel is
+    // NOT remounted between plants — the second plant's visibly-rendered
+    // paywall must still count, or the funnel undercounts exactly the
+    // highest-intent repeat exposures.
+    const view = renderPanel(INTERCEPT_GATE);
+    const impressions = () => spies.track.mock.calls.filter(([name]) => name === "paywall_viewed");
+    expect(impressions()).toHaveLength(1);
+    view.rerender(
+      <MemoryRouter initialEntries={["/plants/plant-2"]}>
+        <PlantAssignedTentAlertsPanel
+          tentId="tent-1"
+          tentName="Flower Tent"
+          growId="grow-1"
+          plantId="plant-2"
+          doctorCreditGate={INTERCEPT_GATE}
+        />
+      </MemoryRouter>,
+    );
+    expect(impressions()).toHaveLength(2);
+    // The exposure key stays client-side: every payload is surface-only.
+    for (const call of impressions()) {
+      expect(call[1]).toEqual({ surface: ALERT_DOCTOR_CREDIT_GATE_SURFACE });
+    }
+    expect(JSON.stringify(impressions())).not.toContain("plant-2");
   });
 
   it("no impression when there are no alert rows to gate", () => {

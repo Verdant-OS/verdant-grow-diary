@@ -230,12 +230,15 @@ describe("each funnel event fires from its canonical seam", () => {
     // shows on lookupFailed, but an unverified viewer may be entitled.
     expect(blueprintSection).toMatch(/!entLoading && !lookupFailed && !canUseCapability/);
     // Tent-alerts credit gate: impression fires only when the gated state
-    // actually rendered (intercept + ready rows), deduped per mount.
+    // actually rendered (intercept + ready rows), deduped per EXPOSURE —
+    // the reused /plants/:id route component means a per-mount boolean
+    // would swallow the second plant's visibly-rendered paywall.
     const alertsPanel = read("src/components/PlantAssignedTentAlertsPanel.tsx");
     expect(alertsPanel).toMatch(
       /trackFunnelEvent\("paywall_viewed",\s*\{\s*surface:\s*ALERT_DOCTOR_CREDIT_GATE_SURFACE\s*\}\)/,
     );
-    expect(alertsPanel).toMatch(/if \(!showCreditsNote \|\| paywallTrackedRef\.current\) return;/);
+    expect(alertsPanel).toMatch(/if \(!showCreditsNote\) return;/);
+    expect(alertsPanel).toMatch(/if \(paywallTrackedForRef\.current === exposureKey\) return;/);
   });
 
   it("paywall_cta_clicked is wired only to explicit AI Doctor pricing actions", () => {

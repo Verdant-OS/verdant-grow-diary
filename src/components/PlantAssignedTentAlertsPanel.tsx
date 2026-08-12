@@ -272,13 +272,20 @@ export default function PlantAssignedTentAlertsPanel({
   const showCreditsNote =
     doctorCreditGate?.intercept === true && enabled && status === "ok" && rows.length > 0;
 
-  // One impression per mount, only when the gated state actually rendered.
-  const paywallTrackedRef = useRef(false);
+  // One impression per gated EXPOSURE, only when the gated state actually
+  // rendered. The /plants/:id route component is REUSED across plant-to-
+  // plant navigations, so a plain boolean ref would swallow the second
+  // plant's visibly-rendered paywall and undercount the funnel. The guard
+  // keys on the exposure identity instead; those ids stay client-side —
+  // the payload carries only the fixed surface token.
+  const paywallTrackedForRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!showCreditsNote || paywallTrackedRef.current) return;
-    paywallTrackedRef.current = true;
+    if (!showCreditsNote) return;
+    const exposureKey = `${plantId ?? ""}:${growId ?? ""}:${tentId ?? ""}`;
+    if (paywallTrackedForRef.current === exposureKey) return;
+    paywallTrackedForRef.current = exposureKey;
     trackFunnelEvent("paywall_viewed", { surface: ALERT_DOCTOR_CREDIT_GATE_SURFACE });
-  }, [showCreditsNote]);
+  }, [showCreditsNote, plantId, growId, tentId]);
 
   return (
     <Card data-testid="plant-assigned-tent-alerts-panel" className="mt-4">

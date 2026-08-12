@@ -126,4 +126,26 @@ describe("BlueprintTargetsGuide", () => {
     // Environment metrics are not medium-specific and must stay unqualified.
     expect(rows.find((r) => r.key === "rh")?.note).toBeUndefined();
   });
+
+  it("scopes feed bands to input only, never runoff", () => {
+    // blueprintFeedingInput reads inputEcMsCm/inputPh precisely because runoff
+    // is excluded; runoff reads higher as salts accumulate, so offering these
+    // as a runoff target would invite a feed change on an incomparable number.
+    const rows = buildStageMetricRows(SOP_BLUEPRINT_TARGETS.flower);
+    const ec = rows.find((r) => r.key === "ec");
+    const ph = rows.find((r) => r.key === "ph");
+    expect(ec?.label).toMatch(/input/i);
+    expect(ph?.label).toMatch(/input/i);
+    expect(ec?.note ?? "").toMatch(/not runoff/i);
+    expect(ph?.note ?? "").toMatch(/not runoff/i);
+  });
+
+  it("presents any late-flower taper as evidence-dependent, not automatic", () => {
+    render(<BlueprintTargetsGuide />);
+    const section = screen.getByTestId("blueprint-targets-stage-late_flower");
+    const text = section.textContent ?? "";
+    // The care guide is explicit that a flush is not automatic.
+    expect(text).toMatch(/runoff EC|leaf-tip burn|salt stress/i);
+    expect(text).not.toMatch(/for the flush ahead of harvest/i);
+  });
 });

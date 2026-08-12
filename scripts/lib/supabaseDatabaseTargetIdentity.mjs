@@ -224,6 +224,26 @@ export function sanitizeSupabaseDatabaseUrlForPsql(databaseUrl, targetEnv) {
   });
 }
 
+/**
+ * Convert an already identity-checked URL into explicit libpq fields.
+ *
+ * Supplying credentials as discrete child-process variables avoids libpq URI
+ * parsing differences while keeping every credential out of argv. Callers
+ * must never log the returned object.
+ */
+export function buildLibpqConnectionEnvironment({ databaseUrl, sslMode }) {
+  const url = new URL(databaseUrl);
+  return Object.freeze({
+    PGHOST: url.hostname,
+    ...(url.port ? { PGPORT: url.port } : {}),
+    PGUSER: decodeURIComponent(url.username),
+    PGPASSWORD: decodeURIComponent(url.password),
+    PGDATABASE: decodeURIComponent(url.pathname.slice(1)),
+    ...(sslMode ? { PGSSLMODE: sslMode } : {}),
+    PGGSSENCMODE: "disable",
+  });
+}
+
 export function databaseTargetForEnvironment(targetEnv) {
   if (
     typeof targetEnv !== "string" ||

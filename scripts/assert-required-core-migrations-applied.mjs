@@ -6,8 +6,8 @@
  * - the selected environment is mapped to a pinned Supabase project ref;
  * - the URL identity is proven before psql is invoked;
  * - ambient PG* and DATABASE_URL fallbacks are ignored;
- * - the connection URL is provided to libpq through child-process
- *   PGDATABASE, never through argv;
+ * - the identity-checked connection is provided through discrete child-process
+ *   libpq variables, never through argv;
  * - raw psql stderr and connection strings are never printed or persisted;
  * - only ordinary and partitioned public relations satisfy a requirement.
  */
@@ -17,6 +17,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   assertSupabaseDatabaseTargetIdentity,
+  buildLibpqConnectionEnvironment,
   databaseTargetForEnvironment,
   sanitizeSupabaseDatabaseUrlForPsql,
   SupabaseDatabaseTargetIdentityError,
@@ -102,14 +103,7 @@ export function buildPsqlEnvironment(sourceEnv, databaseUrl, targetEnv) {
     }
   }
   const connection = sanitizeSupabaseDatabaseUrlForPsql(databaseUrl, targetEnv);
-  childEnv.PGDATABASE = connection.databaseUrl;
-  // Never trust ambient PGSSLMODE. Query-free Dashboard URLs default to
-  // require, while an explicit verify-ca/verify-full request is preserved.
-  childEnv.PGSSLMODE = connection.sslMode;
-  // Supavisor speaks TLS directly. Disable libpq's optional GSS encryption
-  // negotiation so GitHub's psql client cannot fail before TLS/authentication.
-  childEnv.PGGSSENCMODE = "disable";
-  return childEnv;
+  return { ...childEnv, ...buildLibpqConnectionEnvironment(connection) };
 }
 
 function createArtifactWriters({ targetEnv, reportPath, auditPath, expected, logger, now }) {

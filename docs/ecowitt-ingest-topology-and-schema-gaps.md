@@ -8,6 +8,16 @@ Every claim below was verified by reading the cited file in this repository. Not
 inferred from external documentation. Companion record:
 [Phase 1.7 verification](./ecowitt-real-ingest-phase-1-7-verification-record.md).
 
+> **Correction (2026-08-07, later same day):** §4 and §5 below were read from an incomplete
+> slice of this worktree and are stale in specifics: the trigger allows **nine** metrics
+> (not five), the table has **12 columns** including `device_id` / `raw_payload` /
+> `captured_at`, a gateway fingerprint registry lives in `tents.hardware_config`, a shipped
+> dedupe unique index exists, and a second deployed Edge function (`ecowitt-ingest`) serves
+> the gateway directly. The corrected, deploy-branch-verified account is
+> [the Phase 1.8 grounding audit](./ecowitt-real-ingest-phase-1-8-grounding-audit.md).
+> Sections 1–3 of this record (the 401 dead end, listener topology, and the fail-open
+> `live` remap) were re-verified and stand.
+
 ## Why this file exists
 
 Several Phase 1.8 design documents were produced by sessions without repository access. They

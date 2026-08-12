@@ -86,6 +86,13 @@ These remain open and are **not** claimed by this record:
 
 ## Note for Phase 1.8
 
+> **Correction (2026-08-07, later same day):** the schema details below were read from the
+> table's CREATE migration only and are stale. The trigger was later redefined six times and
+> allows **nine** metrics, and the table gained `device_id`, `raw_payload`, and
+> `captured_at` (12 columns). See
+> [the Phase 1.8 grounding audit](./ecowitt-real-ingest-phase-1-8-grounding-audit.md) §0–§1
+> for the corrected shape. The long-format point and the natural-key warning below stand.
+
 `public.sensor_readings` is **long format — one row per `(tent, metric, ts)`**
 (`user_id`, `tent_id`, `ts`, `metric`, `value`, `quality`, `source`), with a
 `validate_sensor_reading()` trigger constraining `metric` to five values and `quality` to

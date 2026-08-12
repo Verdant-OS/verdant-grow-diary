@@ -107,8 +107,11 @@ Grok's research feeds step 6, not step 1.
 
 ### EcoWitt real ingest — Phase 1.7 verified, Phase 1.8 not started
 
-Branch `claude/ecowitt-sensor-verify-98f1bd` (based on `main`). Record:
-`docs/ecowitt-real-ingest-phase-1-7-verification-record.md`.
+Branch `claude/ecowitt-sensor-verify-98f1bd` (based on `main`). Records:
+`docs/ecowitt-real-ingest-phase-1-7-verification-record.md`,
+`docs/ecowitt-ingest-topology-and-schema-gaps.md`, and — authoritative for Phase 1.8 —
+`docs/ecowitt-real-ingest-phase-1-8-grounding-audit.md` (deploy-branch-verified; corrects
+stale schema claims in the earlier two).
 
 | Phase 2 gate item                             | Status                                    |
 | --------------------------------------------- | ----------------------------------------- |

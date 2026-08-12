@@ -157,8 +157,13 @@ describe("tent alerts · Blueprint hint placement", () => {
 
   it("keeps the shared alerts panel free of upsell logic", () => {
     // Living inside the panel would force both callers to reason about it.
+    // The panel MAY navigate to the Blueprint section (a tier-agnostic link —
+    // Craft lands on live scoring, everyone else on the free preview), but it
+    // must never itself branch on plan, render upsell copy, or mount the hint.
     expect(PANEL).not.toContain("TentAlertsBlueprintHint");
     expect(PANEL).not.toContain("canUseCapability");
-    expect(PANEL).not.toMatch(/blueprint/i);
+    expect(PANEL).not.toContain("useMyEntitlements");
+    expect(PANEL).not.toContain("PaywallCta");
+    expect(PANEL).not.toMatch(/upgrade|craft_|founder_/i);
   });
 });

@@ -7,6 +7,10 @@ const HARNESS = readFileSync(
   resolve(ROOT, "scripts/run-sensor-readings-source-rls-harness.ts"),
   "utf8",
 );
+const WITH_TRANSPORT_RETRY = HARNESS.slice(
+  HARNESS.indexOf("async function withTransportRetry"),
+  HARNESS.indexOf("\nasync function createUser"),
+);
 
 describe("sensor provenance RLS harness fixture safety", () => {
   it("creates owner-scoped tents through signed-in clients", () => {
@@ -28,8 +32,65 @@ describe("sensor provenance RLS harness fixture safety", () => {
   it("retains the explicit service-role trusted-source assertion", () => {
     expect(HARNESS).toContain('"service-role RLS bypass can INSERT trusted live provenance"');
     expect(HARNESS).toMatch(
-      /admin\s*[\r\n]+\s*\.from\("sensor_readings"\)\s*[\r\n]+\s*\.insert\(serviceRoleRow\)/,
+      /withTransportRetry\(\s*"service-role live INSERT",\s*\(\) => admin\.from\("sensor_readings"\)\.insert\(serviceRoleRow\)/,
     );
+  });
+
+  it("retries only code-less transport failures, loudly and bounded", () => {
+    // A retry may never re-litigate a database verdict: PostgREST and
+    // SQLSTATE rejections always carry an error code and must not retry.
+    expect(HARNESS).toMatch(/return !!error && !error\.code;/);
+    expect(HARNESS).toMatch(/const FIXTURE_TRANSPORT_ATTEMPTS = 3;/);
+    // Pins are scoped to the function body so a purely additive edit
+    // elsewhere cannot smuggle in an extra retry of coded errors: the body
+    // must contain exactly the initial attempt plus the guarded loop retry.
+    expect(WITH_TRANSPORT_RETRY).toMatch(
+      /attempt <= FIXTURE_TRANSPORT_ATTEMPTS && isTransportError\(result\.error\)/,
+    );
+    expect(WITH_TRANSPORT_RETRY).toMatch(
+      /console\.error\(\s*` {2}! transport error on "\$\{label\}"/,
+    );
+    expect(WITH_TRANSPORT_RETRY.split("await run()").length - 1).toBe(2);
+    expect(WITH_TRANSPORT_RETRY.split("isTransportError").length - 1).toBe(1);
+    // A deny check may not report "denied" when the client attempt itself
+    // died at the transport layer: the attempt error must be part of each
+    // ok-condition, not only the detail string.
+    for (const attemptGuard of [
+      "!isTransportError(error) &&",
+      "!isTransportError(crossError) &&",
+      "!isTransportError(forgedError) &&",
+      "!isTransportError(anonError) &&",
+    ]) {
+      expect(HARNESS).toContain(attemptGuard);
+    }
+  });
+
+  it("replays an identical idempotent payload when the ingest RPC retries", () => {
+    // The bridge id and idempotency key are hoisted out of the retried
+    // closure, so a committed-but-lost first attempt dedupes on retry
+    // (inserted=0 fails the check) instead of double-inserting.
+    const rpcCallIndex = HARNESS.search(
+      /withTransportRetry\(\s*"service-role pi_ingest_commit_batch"/,
+    );
+    const idempotencyKeyIndex = HARNESS.indexOf("const rpcIdempotencyKey");
+    const bridgeIdIndex = HARNESS.indexOf("const rpcBridgeId = crypto.randomUUID();");
+    expect(rpcCallIndex).toBeGreaterThan(-1);
+    expect(idempotencyKeyIndex).toBeGreaterThan(-1);
+    expect(bridgeIdIndex).toBeGreaterThan(-1);
+    expect(idempotencyKeyIndex).toBeLessThan(rpcCallIndex);
+    expect(bridgeIdIndex).toBeLessThan(rpcCallIndex);
+    expect(HARNESS).toMatch(/idempotency_key:\s*rpcIdempotencyKey,/);
+    expect(HARNESS).toMatch(/p_bridge_id:\s*rpcBridgeId,/);
+    expect(HARNESS).not.toMatch(/idempotency_key:\s*[^,\r\n]*randomUUID/);
+    expect(HARNESS).not.toMatch(/p_bridge_id:\s*[^,\r\n]*randomUUID/);
+  });
+
+  it("preserves full error evidence in fixture failures", () => {
+    expect(HARNESS).toMatch(/function errorDetail\(/);
+    expect(HARNESS).toMatch(/`code=\$\{error\.code \?\? "none"\}`/);
+    // The old pattern discarded message/details/hint and made transport
+    // failures indistinguishable from database rejections.
+    expect(HARNESS).not.toContain('?.code ?? "failed"');
   });
 
   it("proves both reserved markers are client-denied and the service-role RPC remains valid", () => {

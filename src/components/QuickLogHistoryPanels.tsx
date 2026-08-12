@@ -204,7 +204,7 @@ function Row({
         {integrityHandle && (
           <QuickLogEntryIntegrityControls
             handle={integrityHandle}
-            currentNote={row.noteBody || null}
+            currentNote={row.rawNote || null}
             currentOccurredAt={row.occurredAt}
             currentPlantId={row.plantId}
             plantId={row.plantId}
@@ -371,6 +371,7 @@ export function RecentQuickLogActivityPanel({
         rawEntries={rawEntries}
         title="Recent Quick Logs"
         laneKey="recent"
+        onEntryChanged={onEntryChanged}
         icon={<Activity className="h-3.5 w-3.5 text-primary" />}
         builder={(entries) => buildRecentQuickLogActivity(entries, limit)}
         emptyTitle="No Quick Log entries yet"

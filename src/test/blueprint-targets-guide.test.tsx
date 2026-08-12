@@ -303,3 +303,26 @@ describe("BlueprintTargetsGuide PPFD/DLI coherence", () => {
     expect(definition).not.toMatch(/what matters is staying inside the range/i);
   });
 });
+
+describe("BlueprintTargetsGuide dry vs cure measurement", () => {
+  it("labels the harvest RH band as a drying-room reading", () => {
+    // plants.stage collapses harvest and cure, but the app records
+    // jar_or_bag_rh from INSIDE the container for cure. A safe room average can
+    // coexist with unsafe jar moisture, so the location must be explicit.
+    const rh = buildStageMetricRows(SOP_BLUEPRINT_TARGETS.harvest, "harvest").find(
+      (r) => r.key === "rh",
+    );
+    expect(rh?.label).toMatch(/drying room/i);
+    expect(rh?.note ?? "").toMatch(/inside the container/i);
+  });
+
+  it("leaves RH unqualified for growing stages", () => {
+    for (const stage of ["veg", "flower"] as const) {
+      const rh = buildStageMetricRows(SOP_BLUEPRINT_TARGETS[stage], stage).find(
+        (r) => r.key === "rh",
+      );
+      expect(rh?.label).toBe("Relative humidity");
+      expect(rh?.note).toBeUndefined();
+    }
+  });
+});

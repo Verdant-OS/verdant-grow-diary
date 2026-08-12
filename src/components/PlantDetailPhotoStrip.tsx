@@ -48,6 +48,24 @@ export default function PlantDetailPhotoStrip({
 }: PlantDetailPhotoStripProps) {
   const { data: rawDiary, isLoading, isError, refetch } = useDiaryEntries();
 
+  // Scope to this plant's rows before doing anything else -- useDiaryEntries()
+  // returns the grower's whole unfiltered diary, and requesting/evaluating
+  // signed URLs for other plants' photos would let an unrelated plant's
+  // signing failure (or slow response) block or blank out this plant's
+  // otherwise-fine gallery.
+  const plantRawRows = useMemo(() => {
+    if (!plantId || !rawDiary) return [];
+    return (rawDiary as Array<Record<string, unknown>>).filter((r) => {
+      const rowPlantId =
+        typeof r.plant_id === "string"
+          ? r.plant_id
+          : typeof r.plantId === "string"
+            ? r.plantId
+            : null;
+      return rowPlantId === plantId;
+    });
+  }, [plantId, rawDiary]);
+
   // quicklog_save_event's diary companion row never sets the top-level
   // photo_url column -- it only stores the raw storage path inside
   // details.photo_url. useDiaryEntries() is a shared, cached read with no
@@ -57,34 +75,92 @@ export default function PlantDetailPhotoStrip({
   // written back onto `rawDiary` itself, since that array is the shared
   // React Query cache other components also read.
   const [signedUrlByPath, setSignedUrlByPath] = useState<Map<string, string>>(new Map());
+  // Distinct from the diary fetch's own isError: a failed/rejected signing
+  // call must not read as "no photos" -- unsigned companion paths would
+  // otherwise just get filtered out by buildPlantPhotoStripItems and the
+  // strip would silently render its empty state instead of surfacing the
+  // failure. retryNonce lets the shared Retry button force a fresh signing
+  // attempt independent of whether useDiaryEntries() actually refetches.
+  const [signingError, setSigningError] = useState(false);
+  // The diary query finishing does not mean the strip is ready -- a
+  // companion-only photo still needs its signing round-trip. Without this,
+  // the gap between isLoading turning false and the signing promise
+  // resolving falls through to the empty state and tells the grower there
+  // are no photos when there may well be one still loading.
+  const [signingInProgress, setSigningInProgress] = useState(false);
+  const [signingRetryNonce, setSigningRetryNonce] = useState(0);
 
   useEffect(() => {
     const paths = collectUnsignedDiaryPhotoPaths(
-      (rawDiary ?? []) as Array<{ photo_url?: unknown; details?: unknown }>,
+      plantRawRows as Array<{ photo_url?: unknown; details?: unknown }>,
     );
     if (paths.length === 0) {
+      setSigningError(false);
+      setSigningInProgress(false);
       setSignedUrlByPath((prev) => (prev.size === 0 ? prev : new Map()));
       return;
     }
     let cancelled = false;
+    setSigningInProgress(true);
     supabase.storage
       .from("diary-photos")
       .createSignedUrls(paths, 3600)
-      .then(({ data }) => {
+      .then(({ data, error }) => {
         if (cancelled) return;
-        setSignedUrlByPath(
-          new Map((data ?? []).map((s) => [s.path as string, s.signedUrl])),
-        );
+        if (error || !data) {
+          setSigningError(true);
+          setSigningInProgress(false);
+          return;
+        }
+        // The Supabase contract allows an overall-successful response whose
+        // individual entries still failed (e.g. a missing storage object) --
+        // each carries its own `error`, and either the path or the
+        // signedUrl (or both) may come back null on that entry. Rather than
+        // branching on each item's failure shape (a null path with an error
+        // set was previously skipped before its error was ever inspected),
+        // only accept fully-formed successes into the map, then verify
+        // every path we actually requested made it in. Anything missing --
+        // whatever shape its failure took, including a result item dropped
+        // entirely -- is a failure.
+        const map = new Map<string, string>();
+        for (const item of data as Array<{
+          path?: string | null;
+          signedUrl?: string | null;
+          error?: string | null;
+        }>) {
+          const path = typeof item?.path === "string" ? item.path : null;
+          const signedUrl =
+            typeof item?.signedUrl === "string" && item.signedUrl.length > 0
+              ? item.signedUrl
+              : null;
+          if (path && signedUrl && !item?.error) {
+            map.set(path, signedUrl);
+          }
+        }
+        const anyFailed = paths.some((p) => !map.has(p));
+        setSigningError(anyFailed);
+        setSignedUrlByPath(map);
+        setSigningInProgress(false);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setSigningError(true);
+        setSigningInProgress(false);
       });
     return () => {
       cancelled = true;
     };
-  }, [rawDiary]);
+  }, [plantRawRows, signingRetryNonce]);
+
+  const handleRetry = () => {
+    setSigningRetryNonce((n) => n + 1);
+    void refetch();
+  };
 
   const items = useMemo(() => {
-    if (!plantId || !rawDiary || rawDiary.length === 0) return [];
+    if (!plantId || plantRawRows.length === 0) return [];
     const signed = withSignedDiaryPhotoUrls(
-      rawDiary as Array<{ photo_url?: unknown; details?: unknown }>,
+      plantRawRows as Array<{ photo_url?: unknown; details?: unknown }>,
       signedUrlByPath,
     );
     // Lift details.event_type for normalization parity with PhotoHistoryPanel.
@@ -105,7 +181,7 @@ export default function PlantDetailPhotoStrip({
       rows: photoRows,
       limit: PLANT_PHOTO_STRIP_DEFAULT_LIMIT,
     });
-  }, [plantId, rawDiary, signedUrlByPath]);
+  }, [plantId, plantRawRows, signedUrlByPath]);
 
   const hasPlantContext = !!(plantId && plantId.trim());
   const uploadHref = logsPath(growId ?? null);
@@ -166,7 +242,7 @@ export default function PlantDetailPhotoStrip({
         )}
       </header>
 
-      {isLoading ? (
+      {isLoading || signingInProgress ? (
         <div
           data-testid="plant-detail-photo-strip-loading"
           role="status"
@@ -182,7 +258,7 @@ export default function PlantDetailPhotoStrip({
           ))}
           <span className="sr-only">Loading recent photos…</span>
         </div>
-      ) : isError ? (
+      ) : isError || signingError ? (
         <div
           data-testid="plant-detail-photo-strip-error"
           className="rounded-xl border border-dashed border-border/50 bg-secondary/20 p-3 text-sm text-muted-foreground flex items-center justify-between gap-3"
@@ -196,9 +272,7 @@ export default function PlantDetailPhotoStrip({
             size="sm"
             variant="ghost"
             className="h-7"
-            onClick={() => {
-              void refetch();
-            }}
+            onClick={handleRetry}
             data-testid="plant-detail-photo-strip-retry"
           >
             Retry

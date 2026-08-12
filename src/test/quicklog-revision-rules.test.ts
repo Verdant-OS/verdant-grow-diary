@@ -257,6 +257,30 @@ describe("resolveQuickLogEntryHandle / buildQuickLogEntryHandleIndex", () => {
     expect(
       resolveQuickLogEntryHandle({ id: "de-5", details: { kind: "pheno_evidence_receipt" } }),
     ).toEqual({ diaryEntryId: "de-5" });
+    expect(
+      resolveQuickLogEntryHandle({
+        id: "de-8",
+        details: { event_type: "quicklog_video_attachment" },
+      }),
+    ).toEqual({ diaryEntryId: "de-8" });
+    expect(
+      resolveQuickLogEntryHandle({
+        id: "de-9",
+        details: { event_type: "photo", source: "manual", attached_to_action: "note" },
+      }),
+    ).toEqual({ diaryEntryId: "de-9" });
+  });
+
+  it("does not claim ordinary photo diary rows without the Quick Log envelope", () => {
+    expect(
+      resolveQuickLogEntryHandle({ id: "de-10", details: { event_type: "photo" } }),
+    ).toBeNull();
+    expect(
+      resolveQuickLogEntryHandle({
+        id: "de-11",
+        details: { event_type: "photo", source: "manual" },
+      }),
+    ).toBeNull();
   });
 
   it("returns null for plain diary rows and malformed input (no controls)", () => {

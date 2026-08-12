@@ -295,7 +295,14 @@ export function resolveQuickLogEntryHandle(
   if (
     "quick_log_version" in details ||
     details.event_type === "quicklog_photo_attachment" ||
-    details.kind === "pheno_evidence_receipt"
+    details.event_type === "quicklog_video_attachment" ||
+    details.kind === "pheno_evidence_receipt" ||
+    // Standalone Photo activity writes event_type "photo"; the compound
+    // check keeps ordinary diary photo entries (no Quick Log envelope)
+    // out of scope.
+    (details.event_type === "photo" &&
+      details.source === "manual" &&
+      "attached_to_action" in details)
   ) {
     return { diaryEntryId: id };
   }

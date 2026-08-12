@@ -151,7 +151,16 @@ BEGIN
       IF NOT (
         v_diary.details ? 'quick_log_version'
         OR v_diary.details ->> 'event_type' = 'quicklog_photo_attachment'
+        OR v_diary.details ->> 'event_type' = 'quicklog_video_attachment'
         OR v_diary.details ->> 'kind' = 'pheno_evidence_receipt'
+        -- Standalone Photo activity: event_type 'photo' plus the Quick Log
+        -- envelope keys. Ordinary diary photo entries lack the envelope and
+        -- keep their existing Edit / Remove path.
+        OR (
+          v_diary.details ->> 'event_type' = 'photo'
+          AND v_diary.details ->> 'source' = 'manual'
+          AND v_diary.details ? 'attached_to_action'
+        )
       ) THEN
         out_reason := 'not_quicklog';
         RETURN;
@@ -596,6 +605,18 @@ BEGIN
          public.quicklog_try_parse_uuid(d.details ->> 'linked_grow_event_id') = v_spine.id
          OR public.quicklog_try_parse_uuid(d.details ->> 'grow_event_id') = v_spine.id
        );
+
+    -- Pheno receipts pin plant identity into the receipt contract; a
+    -- re-target of the SPINE would rewrite the linked receipt mirror's
+    -- plant_id and silently transfer breeding evidence and coverage.
+    -- The diary-only branch below has the same guard for unlinked receipts.
+    IF v_has_target AND EXISTS (
+      SELECT 1 FROM public.diary_entries d
+       WHERE d.id = ANY (v_diary_ids)
+         AND d.details ->> 'kind' = 'pheno_evidence_receipt'
+    ) THEN
+      RETURN jsonb_build_object('ok', false, 'reason', 'unsupported_change');
+    END IF;
 
     v_prev := jsonb_build_object(
       'note', v_spine.note,

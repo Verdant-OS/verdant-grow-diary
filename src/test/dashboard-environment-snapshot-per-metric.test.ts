@@ -125,6 +125,36 @@ describe("buildTentSnapshotView · source labels", () => {
     expect(v.sourceLabel).toBe("Ecowitt");
   });
 
+  it("pi_bridge reading is recognised, not dropped to Unknown", () => {
+    // Regression: snapshotFromReadings maps pi_bridge → "live", but the
+    // RECOGNISED allowlist here omitted it, so `hasRecognised` was false and a
+    // genuine Raspberry Pi bridge reading rendered as Unknown — the opposite
+    // mistake to promoting an unlabeled source to Live.
+    const v = buildTentSnapshotView(
+      [
+        row({ source: "pi_bridge" }),
+        row({ metric: "humidity_pct", value: 55, source: "pi_bridge" }),
+        row({ metric: "vpd_kpa", value: 1.1, source: "pi_bridge" }),
+      ],
+      "veg",
+      NOW,
+    );
+    expect(v.hasReading).toBe(true);
+    expect(v.sourceLabel).not.toBe("Unknown");
+
+    // Vendor lineage must survive the mapping, same as a plain live row.
+    const withVendor = buildTentSnapshotView(
+      [
+        row({ source: "pi_bridge", raw_payload: { vendor: "ecowitt" } }),
+        row({ metric: "humidity_pct", value: 55, source: "pi_bridge" }),
+        row({ metric: "vpd_kpa", value: 1.1, source: "pi_bridge" }),
+      ],
+      "veg",
+      NOW,
+    );
+    expect(withVendor.sourceLabel).toBe("Ecowitt");
+  });
+
   it("unknown source resolves to Unknown — never Live", () => {
     const v = buildTentSnapshotView(
       [

@@ -95,7 +95,52 @@ function callsStateSetter(node: ts.Node): boolean {
   return found;
 }
 
-/** Ref handles cleared inside any useEffect/useLayoutEffect in this file. */
+/**
+ * The cleanup function an effect returns, or null when it returns none.
+ *
+ * Only the returned callback runs at unmount. Code in the effect *body* runs on
+ * mount, so scanning the whole effect would accept
+ * `useEffect(() => { clearTimeout(ref.current); }, [])` as unmount cleanup and
+ * let a genuinely leaking ref-held timer through the guard.
+ *
+ * Handles both shapes:
+ *   useEffect(() => () => {...}, [])            — concise body IS the cleanup
+ *   useEffect(() => { ...; return () => {...} }) — returned from a block body
+ */
+function effectCleanupBody(effectCall: ts.CallExpression): ts.Node | null {
+  const cb = effectCall.arguments[0];
+  if (!cb || (!ts.isArrowFunction(cb) && !ts.isFunctionExpression(cb))) {
+    return null;
+  }
+  const body = cb.body;
+  if (ts.isArrowFunction(body) || ts.isFunctionExpression(body)) return body;
+  if (!ts.isBlock(body)) return null;
+
+  let cleanup: ts.Node | null = null;
+  const findReturn = (n: ts.Node) => {
+    if (cleanup) return;
+    // Never descend into a nested function — its `return` belongs to itself,
+    // not to the effect.
+    if (
+      n !== body &&
+      (ts.isArrowFunction(n) ||
+        ts.isFunctionExpression(n) ||
+        ts.isFunctionDeclaration(n))
+    ) {
+      return;
+    }
+    if (ts.isReturnStatement(n) && n.expression) {
+      const e = n.expression;
+      if (ts.isArrowFunction(e) || ts.isFunctionExpression(e)) cleanup = e;
+      return;
+    }
+    ts.forEachChild(n, findReturn);
+  };
+  ts.forEachChild(body, findReturn);
+  return cleanup;
+}
+
+/** Ref handles cleared in the CLEANUP of any effect in this file. */
 function refsClearedInEffects(sf: ts.SourceFile): Set<string> {
   const cleared = new Set<string>();
   const visit = (n: ts.Node) => {
@@ -104,16 +149,19 @@ function refsClearedInEffects(sf: ts.SourceFile): Set<string> {
       ts.isIdentifier(n.expression) &&
       /^use(Effect|LayoutEffect)$/.test(n.expression.text)
     ) {
-      const inner = (m: ts.Node) => {
-        if (ts.isCallExpression(m) && m.arguments[0]) {
-          const name = calleeName(m.expression);
-          if (name && /^clear(Timeout|Interval)$/.test(name)) {
-            cleared.add(m.arguments[0].getText().replace(/\s+/g, ""));
+      const cleanup = effectCleanupBody(n);
+      if (cleanup) {
+        const inner = (m: ts.Node) => {
+          if (ts.isCallExpression(m) && m.arguments[0]) {
+            const name = calleeName(m.expression);
+            if (name && /^clear(Timeout|Interval)$/.test(name)) {
+              cleared.add(m.arguments[0].getText().replace(/\s+/g, ""));
+            }
           }
-        }
-        ts.forEachChild(m, inner);
-      };
-      ts.forEachChild(n, inner);
+          ts.forEachChild(m, inner);
+        };
+        ts.forEachChild(cleanup, inner);
+      }
     }
     ts.forEachChild(n, visit);
   };
@@ -121,7 +169,7 @@ function refsClearedInEffects(sf: ts.SourceFile): Set<string> {
   return cleared;
 }
 
-/** Is this timer lexically inside an effect that clears a timer? */
+/** Is this timer lexically inside an effect whose CLEANUP clears a timer? */
 function insideEffectWithCleanup(node: ts.Node): boolean {
   for (let p: ts.Node | undefined = node.parent; p; p = p.parent) {
     if (
@@ -129,7 +177,8 @@ function insideEffectWithCleanup(node: ts.Node): boolean {
       ts.isIdentifier(p.expression) &&
       /^use(Effect|LayoutEffect)$/.test(p.expression.text)
     ) {
-      return /clear(Timeout|Interval)/.test(p.getText());
+      const cleanup = effectCleanupBody(p);
+      return !!cleanup && /clear(Timeout|Interval)/.test(cleanup.getText());
     }
   }
   return false;

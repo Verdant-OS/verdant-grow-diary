@@ -128,7 +128,19 @@ export function buildTentSnapshotView(
   // Source resolution: derive from the actual contributing rows so an
   // unknown/garbage source can never be silently promoted to "live" by
   // `snapshotFromReadings`'s heuristic default.
-  const RECOGNISED = new Set(["manual", "live", "csv", "import", "sim", "diary"]);
+  // Must stay in step with the ingest sources `snapshotFromReadings` accepts.
+  // `pi_bridge` is the Raspberry Pi ingest source and resolves to "live" there;
+  // omitting it here meant a genuine bridge reading failed the recognised check
+  // and rendered as Unknown — the opposite mistake to promoting garbage.
+  const RECOGNISED = new Set([
+    "manual",
+    "live",
+    "pi_bridge",
+    "csv",
+    "import",
+    "sim",
+    "diary",
+  ]);
   const hasRecognised = latestRows.some(
     (r) => typeof r.source === "string" && RECOGNISED.has(r.source),
   );

@@ -159,19 +159,22 @@ export function readCallbackParams(search: string): CallbackParams | null {
   return { code, state };
 }
 
-export type CallbackErrorParams = { error: string; errorDescription?: string };
+export type CallbackErrorParams = { error: string; errorDescription?: string; state?: string };
 
 /**
  * OAuth error callback (e.g. the grower pressed Deny on the consent
- * screen → `?error=access_denied`). Returns the coarse error code and
- * optional description only — never codes or tokens.
+ * screen → `?error=access_denied`). Returns the coarse error code,
+ * optional description, and the echoed `state` — never codes or
+ * tokens. Callers must require `state` to match the pending
+ * authorization before acting on the error.
  */
 export function readCallbackErrorParams(search: string): CallbackErrorParams | null {
   const sp = new URLSearchParams(search);
   const error = sp.get("error");
   if (!error) return null;
   const errorDescription = sp.get("error_description") ?? undefined;
-  return { error, errorDescription };
+  const state = sp.get("state") ?? undefined;
+  return { error, errorDescription, state };
 }
 
 export async function completeAuthorization(issuer: string, params: CallbackParams): Promise<void> {
@@ -233,6 +236,22 @@ export function hasPendingAuthorization(): boolean {
     return sessionStorage.getItem(SS_KEYS.pkce) !== null;
   } catch {
     return false;
+  }
+}
+
+/**
+ * The pending authorization's CSRF `state`, or null when none is
+ * pending (or storage is unreadable). Used to correlate ?error=
+ * callbacks with the flow this browser actually started.
+ */
+export function getPendingAuthorizationState(): string | null {
+  try {
+    const raw = sessionStorage.getItem(SS_KEYS.pkce);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { state?: unknown };
+    return typeof parsed.state === "string" ? parsed.state : null;
+  } catch {
+    return null;
   }
 }
 

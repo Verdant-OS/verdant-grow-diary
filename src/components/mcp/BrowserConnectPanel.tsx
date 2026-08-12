@@ -10,7 +10,7 @@
  *   surface the signed-in email; the OAuth flow is independent.
  * - Same-origin redirect_uri, validated before use.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "@/lib/react-router-compat";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +20,7 @@ import {
   clearPendingAuthorization,
   completeAuthorization,
   disconnect,
+  getPendingAuthorizationState,
   hasPendingAuthorization,
   hasStoredToken,
   probeTools,
@@ -78,6 +79,14 @@ export default function BrowserConnectPanel({
   const endpoint = `${getSupabaseOrigin()}${MCP_MANIFEST.path}`;
   const issuer = MCP_MANIFEST.oauthIssuer;
 
+  // The auto-probe must honor the preference AT COMPLETION TIME, not the
+  // value captured when the []-deps effect mounted — the grower can flip
+  // the switch while the token exchange is still in flight.
+  const probeToolEnabledRef = useRef(probeToolEnabled);
+  useEffect(() => {
+    probeToolEnabledRef.current = probeToolEnabled;
+  }, [probeToolEnabled]);
+
   // Initial mount: refresh token + last-attempt state, surface an OAuth
   // error callback (?error=access_denied) if present, and if we came
   // back with ?code=, finish the exchange and auto-probe.
@@ -93,7 +102,13 @@ export default function BrowserConnectPanel({
     const pending = hasPendingAuthorization();
     const cbError = readCallbackErrorParams(window.location.search);
     if (cbError) {
-      if (!pending) return; // forged/stale error link — ignore, leave the URL alone
+      // Consume the error ONLY when it carries the pending flow's own
+      // CSRF state. A forged/stale ?error= (no pending flow, missing
+      // state, or a state we never issued) is ignored outright — it
+      // must neither abort a real in-flight authorization nor
+      // fabricate attempt history.
+      const pendingState = getPendingAuthorizationState();
+      if (!pending || !cbError.state || cbError.state !== pendingState) return;
       clearPendingAuthorization();
       const reason = sanitizeAttemptReason(
         cbError.errorDescription
@@ -124,7 +139,7 @@ export default function BrowserConnectPanel({
         setConnected(true);
         // Clean the query string so a refresh doesn't retry the code.
         navigate(REDIRECT_PATH, { replace: true });
-        if (probeToolEnabled) {
+        if (probeToolEnabledRef.current) {
           setPhase("probing");
           const r = await probeTools(endpoint);
           setResult(r);

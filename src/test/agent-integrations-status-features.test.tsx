@@ -228,12 +228,12 @@ describe("last OAuth attempt display", () => {
     expect(screen.queryByTestId("oauth-retry")).toBeNull();
   });
 
-  it("records a consent-denied callback (?error=access_denied) as a failed attempt when an authorization is pending", async () => {
+  it("records a consent-denied callback (?error=access_denied) as a failed attempt when it matches the pending authorization's state", async () => {
     seedPendingAuthorization();
     window.history.replaceState(
       {},
       "",
-      "/settings/agent-integrations?error=access_denied&error_description=User+denied",
+      "/settings/agent-integrations?error=access_denied&error_description=User+denied&state=test-state",
     );
     renderPage();
     await waitFor(() => {
@@ -261,6 +261,27 @@ describe("last OAuth attempt display", () => {
     expect(screen.getByTestId("oauth-last-attempt").getAttribute("data-outcome")).toBe("none");
     expect(window.localStorage.getItem(OAUTH_ATTEMPT_LOG_KEY)).toBeNull();
     expect(screen.queryByTestId("browser-connect-error")).toBeNull();
+  });
+
+  it("ignores an ?error= whose state does not match the pending authorization, keeping the flow alive", async () => {
+    seedPendingAuthorization(); // pending state is "test-state"
+    window.history.replaceState(
+      {},
+      "",
+      "/settings/agent-integrations?error=access_denied&state=attacker-state",
+    );
+    renderPage();
+    // Not consumed: no record, no error surfaced, and the real pending
+    // authorization is left intact so the genuine callback can finish.
+    expect(screen.getByTestId("oauth-last-attempt").getAttribute("data-outcome")).toBe("none");
+    expect(window.localStorage.getItem(OAUTH_ATTEMPT_LOG_KEY)).toBeNull();
+    expect(window.sessionStorage.getItem(PKCE_KEY)).not.toBeNull();
+
+    // Same for an ?error= that omits state entirely.
+    window.history.replaceState({}, "", "/settings/agent-integrations?error=access_denied");
+    renderPage();
+    expect(window.localStorage.getItem(OAUTH_ATTEMPT_LOG_KEY)).toBeNull();
+    expect(window.sessionStorage.getItem(PKCE_KEY)).not.toBeNull();
   });
 });
 

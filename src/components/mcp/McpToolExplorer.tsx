@@ -817,10 +817,13 @@ function FieldError({ id, message }: { id: string; message: string | null }) {
 export default function McpToolExplorer() {
   const [connected, setConnected] = useState<boolean>(false);
   // Local per-tool preferences set on Settings → Agent integrations.
-  // Read on the client only (SSR gets manifest defaults) and refreshed
-  // alongside auth state so "I've connected — refresh" also picks up
-  // toggles changed in another tab.
-  const [localPrefs, setLocalPrefs] = useState(() => readLocalToolPreferences());
+  // Initialize with manifest defaults on BOTH server and client (this
+  // renders on the public SSR'd /docs/mcp-api route, so reading
+  // localStorage in the initializer would produce a hydration
+  // mismatch); real browser values load in the mount effect below and
+  // refresh alongside auth state so "I've connected — refresh" also
+  // picks up toggles changed in another tab.
+  const [localPrefs, setLocalPrefs] = useState(() => readLocalToolPreferences(null));
 
   useEffect(() => {
     setConnected(hasStoredToken());

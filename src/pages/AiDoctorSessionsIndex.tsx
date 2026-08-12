@@ -400,6 +400,7 @@ export default function AiDoctorSessionsIndex() {
 
   const [copyStatus, setCopyStatus] = useState<CopyLinkStatus>("idle");
   const copyResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mountedRef = useRef(true);
   const handleCopyLink = async () => {
     const url = readCurrentShareUrl();
     if (!url) {
@@ -408,14 +409,30 @@ export default function AiDoctorSessionsIndex() {
     }
     try {
       await copyShareLink(url);
-      setCopyStatus("success");
+      // This await can outlive the component.
+      if (mountedRef.current) setCopyStatus("success");
     } catch {
-      setCopyStatus("error");
+      if (mountedRef.current) setCopyStatus("error");
     } finally {
-      if (copyResetRef.current) clearTimeout(copyResetRef.current);
-      copyResetRef.current = setTimeout(() => setCopyStatus("idle"), 2000);
+      // `finally` still runs when the branches above bail out, so the guard is
+      // repeated here: an unmount during the await leaves the cleanup nothing
+      // to clear, and the continuation would then schedule a fresh timer.
+      if (mountedRef.current) {
+        if (copyResetRef.current) clearTimeout(copyResetRef.current);
+        copyResetRef.current = setTimeout(() => setCopyStatus("idle"), 2000);
+      }
     }
   };
+  // Clearing on the next call is not enough: an unmount with the reset still
+  // pending would set state on a torn-down tree. `mountedRef` additionally
+  // covers the post-await paths, where no timer exists yet at unmount.
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (copyResetRef.current) clearTimeout(copyResetRef.current);
+    };
+  }, []);
 
   // --- saved views (localStorage) ---
   const [savedViews, setSavedViews] = useState<SavedView[]>(() => readSavedViews());
@@ -513,14 +530,23 @@ export default function AiDoctorSessionsIndex() {
     const json = exportSavedViewsToJson(savedViews);
     try {
       await copyShareLink(json);
-      setExportStatus("success");
+      // Same post-await guard as handleCopyLink above.
+      if (mountedRef.current) setExportStatus("success");
     } catch {
-      setExportStatus("error");
+      if (mountedRef.current) setExportStatus("error");
     } finally {
-      if (exportResetRef.current) clearTimeout(exportResetRef.current);
-      exportResetRef.current = setTimeout(() => setExportStatus("idle"), 2000);
+      if (mountedRef.current) {
+        if (exportResetRef.current) clearTimeout(exportResetRef.current);
+        exportResetRef.current = setTimeout(() => setExportStatus("idle"), 2000);
+      }
     }
   };
+  useEffect(
+    () => () => {
+      if (exportResetRef.current) clearTimeout(exportResetRef.current);
+    },
+    [],
+  );
 
   const [importOpen, setImportOpen] = useState(false);
   const [importText, setImportText] = useState("");

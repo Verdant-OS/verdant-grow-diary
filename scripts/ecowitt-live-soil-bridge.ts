@@ -222,7 +222,6 @@ const isMain =
 async function runCli(): Promise<void> {
   const env = readBridgeEnv(process.env, process.argv);
   const log = (level: "info" | "warn" | "error", msg: string, extra?: unknown) => {
-    // eslint-disable-next-line no-console
     const fn = level === "error" ? console.error : level === "warn" ? console.warn : console.log;
     if (extra === undefined) fn(`[ecowitt-bridge] ${msg}`);
     else fn(`[ecowitt-bridge] ${msg}`, redactForLog(extra));

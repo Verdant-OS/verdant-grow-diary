@@ -363,6 +363,39 @@ describe("OneTentLiveProof page — refresh sections, shortcuts, print, copy", (
       ).toBeInTheDocument();
     }
   });
+  it("clears the pending refresh timer on unmount", () => {
+    // Regression: the refresh timer used to survive unmount and fire
+    // setRefreshing/setLastRefreshedAt against a torn-down tree. In CI that
+    // surfaced as an unhandled `window is not defined` after the suite passed.
+    // Asserted on the refresh timer specifically — react-query keeps its own
+    // unrelated timers pending, so a bare getTimerCount() is not meaningful.
+    const REFRESH_DELAY_MS = 400;
+    vi.useFakeTimers();
+    const setSpy = vi.spyOn(globalThis, "setTimeout");
+    const clearSpy = vi.spyOn(globalThis, "clearTimeout");
+    try {
+      const { unmount } = renderPage();
+      setSpy.mockClear();
+      fireEvent.click(screen.getByTestId("one-tent-live-proof-refresh"));
+      const refreshTimerIds = setSpy.mock.calls
+        .map((call, i) => ({
+          delay: call[1],
+          id: setSpy.mock.results[i]?.value,
+        }))
+        .filter((t) => t.delay === REFRESH_DELAY_MS)
+        .map((t) => t.id);
+      expect(refreshTimerIds).toHaveLength(1);
+      clearSpy.mockClear();
+      unmount();
+      expect(clearSpy.mock.calls.map((c) => c[0])).toContain(
+        refreshTimerIds[0],
+      );
+    } finally {
+      setSpy.mockRestore();
+      clearSpy.mockRestore();
+      vi.useRealTimers();
+    }
+  });
   it("missing evidence is rendered for incomplete checklist steps", () => {
     // Default mocks above make all 6 complete; render via VM directly with
     // empty signals and ensure presenter exposes the data-testid.

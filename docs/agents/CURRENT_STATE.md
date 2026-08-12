@@ -105,7 +105,7 @@ Grok's research feeds step 6, not step 1.
 
 ## Unrelated work in flight
 
-### EcoWitt real ingest — Phase 1.7 verified, Phase 1.8 not started
+### EcoWitt real ingest — Phase 1.7 verified; Phase 1.8 spec on `HOLD — approvable`
 
 Branch `claude/ecowitt-sensor-verify-98f1bd` (based on `main`). Records:
 `docs/ecowitt-real-ingest-phase-1-7-verification-record.md`,
@@ -133,7 +133,7 @@ on the corrected facts — verification cannot substitute for that decision.
 | Phase 2 gate item                             | Status                                                                                         |
 | --------------------------------------------- | ---------------------------------------------------------------------------------------------- |
 | 1. Wrapper tests pass                         | `PASS` — 22/22 targeted tests, 2026-08-07                                                      |
-| 2. Token storage/rotation/revocation policy   | `BLOCKED` — Cheek (owner-only)                                                                 |
+| 2. Token storage/rotation/revocation policy   | `APPROVED` — 2026-08-12, `docs/ecowitt-bridge-token-policy.md` (T1–T5)                         |
 | 3. Schema/RLS/idempotency audit (= Phase 1.8) | `BLOCKED` — spec drafted; approval blocked on verification items + owner decisions (see below) |
 | 4. Live-label fencing policy                  | `BLOCKED` — D3 approved 2026-08-12; D4 re-confirmation outstanding (premise corrected)         |
 

@@ -2,7 +2,8 @@
 
 **Status:** Specification. Paper only — approving this document clears Phase 2 gate item 3
 once its verification items pass. It authorizes **no** code, migration, policy change, or
-deployment. Persistence remains blocked behind gate item 2 (owner-only, unresolved) and
+deployment. Gate item 2 was approved 2026-08-12 (`docs/ecowitt-bridge-token-policy.md`);
+persistence remains blocked behind
 this spec reaching `APPROVED` via its verification items; gate 4's policy was ruled
 2026-08-12 (see D3/D4), with D4 pending owner re-confirmation on corrected facts — that
 re-confirmation is an independent prerequisite the verification items cannot substitute.
@@ -258,7 +259,8 @@ evidence, not evidence of absence.
 
 No migrations, no Edge deploys, no UI, no alerts, no Action Queue writes, no device
 control, no soil-alert thresholds (remain null/unconfigured), no relabeling of stored
-rows. Gate item 2 (token policy) remains owner-only and unresolved. Gate 4's policy
+rows. Gate item 2 (token policy) was approved 2026-08-12 — see
+`docs/ecowitt-bridge-token-policy.md`. Gate 4's policy
 substance was ruled 2026-08-12 (D3/D4, recorded above); its implementation still waits on
 this spec reaching `APPROVED`. Both remain prerequisites for any implementation PR that
 follows this spec.
@@ -280,6 +282,7 @@ completed:
     against origin/verdant-grow-diary (cb98fe4e4), with self-corrections recorded
   - This specification: D1-D6 with owner rulings D2/D3 recorded; D4 ruled, then
     premise-corrected; verification items V1-V6 defined with pass criteria
+  - Gate 2 token policy APPROVED 2026-08-12 (docs/ecowitt-bridge-token-policy.md)
 
 verified_by:
   - bunx vitest run (both Phase 1.7 test files), 2026-08-07, this worktree
@@ -300,7 +303,6 @@ unknowns:
 blocked:
   - V1/V4/V6: live-project access — owner: Cheek; unblock = MCP SQL grant, PG*
     env + psql, Supabase Studio run, or Lovable handoff (see attempt record)
-  - Gate 2 (token storage/rotation/revocation policy) — owner: Cheek
   - D4 re-confirmation on corrected facts — owner: Cheek; verification cannot
     substitute for it
 

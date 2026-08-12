@@ -57,13 +57,15 @@ path. With `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` pointed at the
 loopback stack, `test:pheno-paid-smoke:local` automatically creates these
 five roles:
 
-| Role       | Suggested email                 | Entitlement                     |
-| ---------- | ------------------------------- | ------------------------------- |
-| Free       | `pheno-free@example.test`       | none                            |
-| Pro        | `pheno-pro@example.test`        | active Pro subscription         |
-| Pro Annual | `pheno-pro-annual@example.test` | active annual Pro subscription  |
-| Founder    | `pheno-founder@example.test`    | Founder Lifetime (optional)     |
-| Canceled   | `pheno-canceled@example.test`   | canceled/expired billing record |
+| Role          | Suggested email                   | Entitlement                       |
+| ------------- | --------------------------------- | --------------------------------- |
+| Free          | `pheno-free@example.test`         | none                              |
+| Pro           | `pheno-pro@example.test`          | active Pro subscription           |
+| Pro Annual    | `pheno-pro-annual@example.test`   | active annual Pro subscription    |
+| Craft Monthly | `pheno-craft@example.test`        | active monthly Craft subscription |
+| Craft Annual  | `pheno-craft-annual@example.test` | active annual Craft subscription  |
+| Founder       | `pheno-founder@example.test`      | Founder Lifetime (optional)       |
+| Canceled      | `pheno-canceled@example.test`     | canceled/expired billing record   |
 
 Paid roles receive canonical `public.subscriptions` rows. Free receives no
 subscription row. Canceled receives an expired canceled row. The credentials

@@ -22,11 +22,21 @@ const browserSmoke = readFileSync(
 
 describe("ephemeral Pheno entitlement-role fixtures", () => {
   it("provisions every release role and refuses hosted Supabase", () => {
-    for (const role of ["FREE", "PRO", "PRO_ANNUAL", "FOUNDER", "CANCELED"]) {
+    for (const role of [
+      "FREE",
+      "PRO",
+      "PRO_ANNUAL",
+      "CRAFT",
+      "CRAFT_ANNUAL",
+      "FOUNDER",
+      "CANCELED",
+    ]) {
       expect(provisioner).toContain(`key: "${role}"`);
     }
     expect(provisioner).toContain('plan: "pro_monthly"');
     expect(provisioner).toContain('plan: "pro_annual"');
+    expect(provisioner).toContain('plan: "craft_monthly"');
+    expect(provisioner).toContain('plan: "craft_annual"');
     expect(provisioner).toContain('plan: "founder_lifetime"');
     expect(provisioner).toContain('status: role.canceled ? "canceled" : "active"');
     expect(provisioner).toContain('environment: "sandbox"');
@@ -57,6 +67,8 @@ describe("ephemeral Pheno entitlement-role fixtures", () => {
       "pheno-free.json",
       "pheno-pro.json",
       "pheno-pro-annual.json",
+      "pheno-craft.json",
+      "pheno-craft-annual.json",
       "pheno-founder.json",
       "pheno-canceled.json",
     ]) {
@@ -72,7 +84,27 @@ describe("ephemeral Pheno entitlement-role fixtures", () => {
   it("proves paid route access without requiring grow-scoped onboarding state", () => {
     expect(
       browserSmoke.match(/getByRole\("heading", \{ name: "Start Pheno Hunt" \}\)/g),
-    ).toHaveLength(3);
+    ).toHaveLength(5);
     expect(browserSmoke).toContain('getByTestId("pheno-tracker-upgrade-gate")).toHaveCount(0)');
+  });
+
+  it("proves the Craft-only Blueprint capability across the full role ladder", () => {
+    expect(browserSmoke.match(/describeBlueprintCapability\(/g)).toHaveLength(8);
+    expect(browserSmoke).toContain(
+      'describeBlueprintCapability("Craft Monthly", CRAFT_SESSION, true)',
+    );
+    expect(browserSmoke).toContain(
+      'describeBlueprintCapability("Craft Annual", CRAFT_ANNUAL_SESSION, true)',
+    );
+    expect(browserSmoke).toContain(
+      'describeBlueprintCapability("Founder Lifetime", FOUNDER_SESSION, true)',
+    );
+    expect(browserSmoke).toContain(
+      'describeBlueprintCapability("Pro Monthly", PRO_SESSION, false)',
+    );
+    expect(browserSmoke).toContain(
+      'describeBlueprintCapability("Canceled", CANCELED_SESSION, false)',
+    );
+    expect(browserSmoke).toContain('toHaveAttribute("data-unlocked", String(expectedUnlocked))');
   });
 });

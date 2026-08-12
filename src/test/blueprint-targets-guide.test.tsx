@@ -258,3 +258,29 @@ describe("BlueprintTargetsGuide capability claims", () => {
     expect(cta).not.toMatch(/\bscore[sd]?\b|\btracked against\b/i);
   });
 });
+
+describe("BlueprintTargetsGuide late-flower flush band", () => {
+  it("presents the reduced EC band as conditional on a flush, not on the stage", () => {
+    // plants.stage has a literal "flush" that normalizes to late_flower, and
+    // the SOP comment says EC is "dropped for the flush" — so 1.0-1.6 already
+    // describes a plant being flushed. Rendered as a plain stage target it
+    // would prompt the calendar-driven taper the blurb and FAQ warn against.
+    const rows = buildStageMetricRows(SOP_BLUEPRINT_TARGETS.late_flower, "late_flower");
+    const ec = rows.find((r) => r.key === "ec");
+    expect(ec?.label).toMatch(/during a flush/i);
+    expect(ec?.note ?? "").toMatch(/once a flush is underway/i);
+    expect(ec?.note ?? "").toMatch(/hold the flower range/i);
+    // The band itself is unchanged: parity with the SOP constant is the point.
+    expect(ec?.value).toBe("1–1.6 mS/cm");
+  });
+
+  it("leaves every other stage's EC row unconditional", () => {
+    for (const stage of ["veg", "preflower", "flower"] as const) {
+      const ec = buildStageMetricRows(SOP_BLUEPRINT_TARGETS[stage], stage).find(
+        (r) => r.key === "ec",
+      );
+      expect(ec?.label).toBe("Input feed EC");
+      expect(ec?.note ?? "").not.toMatch(/flush/i);
+    }
+  });
+});

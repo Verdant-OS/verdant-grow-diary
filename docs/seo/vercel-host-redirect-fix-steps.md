@@ -51,6 +51,42 @@ Do **not** add host redirects for query-transforming or auth-sensitive aliases
 (`/login`→`/auth`, `/billing/:plan`→`/pricing?…`, etc.) without a separate review —
 those are router aliases, not this table.
 
+### 2.1 Authoritative `vercel.json` snippet (copy from repo)
+
+Keep this block as the redirects + SPA rewrite contract. On Vercel, **`redirects`
+run before `rewrites`** — do not fold aliases into the catch-all rewrite or they
+will soft-200 as the SPA shell.
+
+```json
+{
+  "redirects": [
+    { "source": "/strains", "destination": "/cultivars", "permanent": true },
+    { "source": "/strains/:slug", "destination": "/cultivars/:slug", "permanent": true },
+    { "source": "/features", "destination": "/welcome", "permanent": true },
+    { "source": "/demo", "destination": "/welcome", "permanent": true },
+    { "source": "/refunds", "destination": "/refund", "permanent": true },
+    { "source": "/refund-policy", "destination": "/refund", "permanent": true },
+    { "source": "/terms-of-service", "destination": "/terms", "permanent": true },
+    { "source": "/privacy-policy", "destination": "/privacy", "permanent": true }
+  ],
+  "rewrites": [{ "source": "/((?!assets/).*)", "destination": "/" }]
+}
+```
+
+Notes:
+
+- Paths are **path-only** (`/demo`), not full URLs. Vercel issues the redirect on the
+  request host (production apex should be `verdantgrowdiary.com`).
+- `"permanent": true` → **308** on modern Vercel (treat 301 or 308 as PASS in probes).
+- The rewrite is the SPA fallback for real app routes; it must **not** absorb the
+  sources listed under `redirects`.
+- If you edit this table, also update `src/test/public-legacy-host-redirects.test.ts`
+  for any new **static** public legacy row (the `:slug` strain rule is outside that
+  test’s `it.each` list today).
+
+Full file context (framework/build settings, security headers) remains in repo-root
+`vercel.json` — only the redirect/rewrite pair above is required for this defect.
+
 ---
 
 ## 3. Likely failure modes (diagnose before editing)
@@ -90,55 +126,50 @@ Owner checklist (dashboard access required — agent often `BLOCKED`):
 1. Confirm project Root Directory contains this repo’s `vercel.json`.
 2. Confirm Production branch is the deploy branch that carries the redirect table
    (`verdant-grow-diary`, not divergent `main`, unless intentionally unified).
-3. Confirm **Redirects** in the Vercel project UI match §2 (or clear UI overrides
-   that shadow the file).
+3. Confirm **Redirects** in the Vercel project UI match §2.1 (or clear UI overrides
+   that shadow the file). Paste/compare against the snippet — every `source` must
+   appear exactly once with `"permanent": true`.
 4. Confirm no conflicting **Rewrites** in the UI that map aliases to `/` before
-   redirects.
+   redirects. The only catch-all should match:
+   `"source": "/((?!assets/).*)", "destination": "/"`.
 5. Trigger a **Production** redeploy of a commit that includes the intended
    `vercel.json` (empty commit is fine only if the file is already correct).
 6. After deploy, run §5 probe script — all aliases must 301/308.
-
-Config shape to preserve (do not invert order casually):
-
-```json
-{
-  "redirects": [
-    { "source": "/features", "destination": "/welcome", "permanent": true }
-  ],
-  "rewrites": [{ "source": "/((?!assets/).*)", "destination": "/" }]
-}
-```
-
-On Vercel, `redirects` are evaluated before `rewrites`. If live still 200s after a
-clean Production deploy, you are not on this project/domain — return to Step 1.
 
 ### Step 2B — If production is **Cloudflare** (proxy / Pages / Worker)
 
 1. Prefer **Redirect Rules** (or Bulk Redirects) at the zone, **before** the SPA
    worker/pages fallback.
-2. Add one **301** rule per static row in §2 (`/features` →
-   `https://verdantgrowdiary.com/welcome`, etc.).
-3. For `/strains/*` use a dynamic rule:
-   `/strains/:slug` → `https://verdantgrowdiary.com/cultivars/:slug`.
-4. Place SPA “serve index.html for unknown paths” **after** redirects.
-5. Purge cache for the alias paths; re-probe §5.
+2. Mirror §2.1 as absolute HTTPS destinations, e.g.:
+   - `/features` → `https://verdantgrowdiary.com/welcome` (301)
+   - `/demo` → `https://verdantgrowdiary.com/welcome` (301)
+   - `/strains` → `https://verdantgrowdiary.com/cultivars` (301)
+   - `/strains/*` → `https://verdantgrowdiary.com/cultivars/$1` (or platform equivalent)
+   - `/refunds` and `/refund-policy` → `https://verdantgrowdiary.com/refund`
+   - `/terms-of-service` → `https://verdantgrowdiary.com/terms`
+   - `/privacy-policy` → `https://verdantgrowdiary.com/privacy`
+3. Place SPA “serve index.html for unknown paths” **after** redirects.
+4. Purge cache for the alias paths; re-probe §5.
+5. Keep repo `vercel.json` §2.1 in sync so the next Vercel-capable deploy does not
+   regress, **or** document Cloudflare as SoT in CURRENT_STATE if Vercel is retired.
 
 ### Step 2C — If production is **Lovable publish** (or similar)
 
 1. Find Lovable / platform **redirects** or **custom headers** settings for the
    published app (not only repo files).
-2. Enter the same map as §2 as **server** redirects.
+2. Enter the same map as §2.1 as **server** redirects (path → path or full HTTPS URL
+   per platform UI).
 3. If the platform **cannot** do HTTP redirects, stop and escalate — client-only
    router redirects are **not** a fix for this crawl defect.
-4. Optional medium-term: publish the static/edge host through Vercel so
-   `vercel.json` becomes authoritative (separate infra decision).
+4. Optional medium-term: publish the static/edge host through Vercel so the
+   §2.1 `vercel.json` snippet becomes authoritative (separate infra decision).
 
 ### Step 3 — Repo hygiene (after live redirects work)
 
 1. Keep `vercel.json` redirects identical to the live host map (single source of
    truth in git **or** a short note in this file naming the external dashboard as
    SoT — never two silent sources).
-2. Extend `src/test/public-legacy-host-redirects.test.ts` if you add rows.
+2. Extend `src/test/public-legacy-host-redirects.test.ts` if you add static rows.
 3. Optionally add a **live probe** script/CI job (owner-approved network) that fails
    when production returns 200 for `/demo` — do not invent credentials.
 4. Update `docs/agents/CURRENT_STATE.md` Public surface row from `FAIL` → `PASS`
@@ -181,9 +212,11 @@ probe /privacy-policy
 **Pass example:**
 
 ```text
-HTTP/2 301
+HTTP/2 308
 location: https://verdantgrowdiary.com/welcome
 ```
+
+(301 is also PASS.)
 
 **Fail example (current defect):**
 
@@ -210,7 +243,7 @@ bunx vitest run src/test/public-legacy-host-redirects.test.ts
 ## 6. Acceptance checklist (copy into PR / CURRENT_STATE)
 
 - [ ] Serving platform named (Vercel / Cloudflare / Lovable / other)
-- [ ] Rules applied on that platform for every §2 row
+- [ ] Rules applied on that platform for every §2 / §2.1 row
 - [ ] §5 probes show 301/308 + correct `Location` for each static alias
 - [ ] `/version.json` stamp recorded next to the probe date
 - [ ] Cache purge performed if CDN intermediate

@@ -142,8 +142,7 @@ export default function BlueprintTargetsGuide() {
           </h2>
           <p className="mt-2 text-muted-foreground">
             Verdant is a grow diary that keeps your readings, photos and notes in one place, so you
-            can see how a run actually tracked against the ranges above instead of guessing after
-            the fact.
+            can look back at what a run actually did instead of reconstructing it from memory.
           </p>
           <div className="mt-5 flex flex-wrap gap-3">
             <Link

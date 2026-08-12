@@ -1,11 +1,11 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-11 UTC / 2026-08-11 America/Chicago
-**Updated by:** Claude (records merged out-of-slice #885 — the agent-integrations
-MCP publication audit doc — and refreshes the deploy-head row against
-`git fetch origin` on 2026-08-11. `main`, SEO/analytics facts, and release
-identity retain their earlier verification dates; none were re-measured in
-this update)
+**Last updated:** 2026-08-12 UTC / 2026-08-12 America/Chicago
+**Updated by:** Claude (public-surface rows re-measured against the live site — sitemap
+count, root route, indexable-route coverage — from the 2026-08-07 Ahrefs audit
+reconciliation plus a 2026-08-12 live re-count; records Cheek's canonical-home
+Option A decision. GA4/analytics and release-identity facts retain their earlier
+verification dates; none were re-measured in this update)
 
 This is the changing shift report. Permanent rules live in `/AGENTS.md`; do not edit
 that constitution to record branch, deployment, blocker, or assignment changes.
@@ -18,10 +18,10 @@ inside the active governance handoff.
 
 ## Branch topology
 
-| Branch               | Role                                             | Verified head                                                                                                                                                               |
-| -------------------- | ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Branch               | Role                                             | Verified head                                                                                                                                |
+| -------------------- | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | `verdant-grow-diary` | **Deploy branch. Production ships from here.**   | `1a9082bb1` (#885), verified 2026-08-11 after `git fetch origin`; the queue advances it several times daily — re-verify before relying on it |
-| `main`               | Integration branch. It is not production parity. | `b6d747941948ce68157185a2b0847acea6970d44` (#779), verified 2026-08-07                                                                                                      |
+| `main`               | Integration branch. It is not production parity. | `b6d747941948ce68157185a2b0847acea6970d44` (#779), verified 2026-08-07                                                                       |
 
 `main` and `verdant-grow-diary` are divergent. Do not infer production behavior from
 `main`, and do not backport deploy-only governance or data rules without a scoped branch
@@ -37,15 +37,19 @@ changed readiness evidence, artifacts, and tests only; it is **not** deployment 
 
 ## Production status
 
-SEO/analytics axes verified directly on 2026-08-02; release identity re-verified
-2026-08-05:
+Analytics axes verified directly on 2026-08-02; release identity re-verified 2026-08-05;
+public-surface axes (sitemap, root route, indexable-route coverage) re-measured
+2026-08-07 with a live sitemap re-count 2026-08-12. Each row carries its own
+verification date where they differ:
 
 | Axis                                        | Status                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `https://verdantgrowdiary.com/version.json` | `PASS` — HTTP 200 (re-verified 2026-08-05)                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | Production commit                           | `PASS` — verified 2026-08-05 ~22:10Z: production serves real SHA `3f773b680dcc` with the resilient stamp live (`commitSource: "git"`, `treeHash: c8fc076f0011…`, `ref: "__orphan__"`, `dirty: false`); resolver matched the served treeHash to this exact commit via tag annotation. Incident context: the same day's 15:47:45Z build had stamped `commit: "unknown"` (see blocker 6 — resolved and live-verified); single observations remain point-in-time |
 | Production build time                       | `2026-08-05T22:06:15.869Z` at the ~22:10Z verification; earlier that day: 15:47:45Z (degraded), 15:52:18Z (healthy pre-resilience)                                                                                                                                                                                                                                                                                                                           |
-| Public sitemap                              | `PASS` — HTTP 200, 51 `<loc>` entries                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| Public sitemap                              | `PASS` — HTTP 200, **56** `<loc>` entries (live re-count 2026-08-12; supersedes the 51 of 2026-08-02 and the 55 measured 2026-08-07 — `/tools/blueprint-targets` shipped 2026-08-11 via #892). All 55 URLs of the 2026-08-07 set returned HTTP 200 with zero redirects and no `noindex`; the 56th postdates that crawl                                                                                                                                       |
+| Public root route `/`                       | `FAIL` — measured 2026-08-07. The SSR response body is a suspended skeleton (`role="status"` … `Loading…`): 7 body words, no `<h1>`, no `<link rel="canonical">`, zero outgoing links. Every other public route SSRs 250–1500 words. `/` is also orphaned — no internal link targets it; navigation points "home" at `/welcome` (52 incoming). Root cause isolated; decision made — see blocker 7                                                            |
+| Indexable routes outside the sitemap        | `FAIL` — four routes serve HTTP 200 with `robots: index, follow` yet are absent from the sitemap (re-confirmed against the deploy sitemap 2026-08-12): `/glossary`, `/breeder-beta`, `/creator-beta`, `/pheno-comparison`. Two are beta surfaces and one is a preview; none has a recorded eligibility decision — see blocker 8's sibling note                                                                                                               |
 | robots.txt                                  | `PASS` — HTTP 200, production sitemap declared; neither lighting route is disallowed                                                                                                                                                                                                                                                                                                                                                                         |
 | Lighting route technical SEO                | `PASS` — two HTTP 200 routes; page metadata and route-scoped JSON-LD verified                                                                                                                                                                                                                                                                                                                                                                                |
 | GA4 explicit lighting-page identity         | `PASS` — nine exact intercepted SPA page-view events; no test traffic transmitted                                                                                                                                                                                                                                                                                                                                                                            |
@@ -258,6 +262,29 @@ Out of scope:
    items (optional): raise the intermittent history-less sandbox with Lovable;
    retire the stale pre-SSR `vercel.json`.
    See the release-provenance runbook below for how to read and resolve stamps.
+7. **Public root route `/` serves crawlers an empty shell.** Found 2026-08-07 while
+   reconciling the Ahrefs site audit (project `10204962`, crawl `2026-08-07T07:14:05Z`).
+   Root cause isolated 2026-08-12: the deliberate loading-until-hydrated gate in
+   `src/components/RootEntry.tsx` (the fix for a navigation-freezing hydration
+   mismatch), not an SSR defect. `/welcome` renders the identical `Landing` component,
+   SSR'd correctly, and carries the navigation's "home" link plus 52 inbound internal
+   links. **Cheek selected Option A on 2026-08-12** (`/` becomes the canonical home).
+   Slice 1 (SSR the landing surface at `/`, no URL changes) is approved and handed to
+   Codex; slice 2 (the `/welcome` → `/` consolidation, 35 pinned files) remains
+   unapproved until slice 1 verifies live. Spec and handoff:
+   `docs/seo/root-route-canonical-home-spec.md`. Full audit evidence:
+   `docs/seo/ahrefs-site-audit-2026-08-07.md`.
+8. **Ahrefs structured-data findings must be triaged, not bulk-fixed.** All 56
+   `SoftwareApplication` nodes omit `aggregateRating`/`review` **by design** —
+   `scripts/validate-jsonld-rich-results.mjs` records the reason inline ("intentional for
+   Verdant — no fake reviews"). Third-party crawlers score this as a rich-results error on
+   every page; remediating it would fabricate review data and violate the Hard Safety Rule
+   _No fake live data_. Record it as an accepted exception in `config/seo-allowlist.json`.
+   The genuinely fixable defect in the same cluster is `Article.image` on all 17 Article
+   pages pointing at the 512px brand logo rather than article imagery — the local gate
+   cannot see it, because it only checks whether `image` is absent. Sibling note: the four
+   unsitemapped indexable routes in the Production status table repeat the
+   `/cultivars/*`-outside-the-gate pattern and need a sitemap-or-noindex adjudication.
 
 ---
 
@@ -300,11 +327,11 @@ write is approved by this state file.
 
 ## Agents currently assigned
 
-| Agent             | Assignment                                                   |
-| ----------------- | ------------------------------------------------------------ |
-| Codex             | Standing SEO measurement readiness and analytics integrity   |
+| Agent             | Assignment                                                            |
+| ----------------- | --------------------------------------------------------------------- |
+| Codex             | Standing SEO measurement readiness and analytics integrity            |
 | Claude            | Unassigned — see completed out-of-slice #586/#809/#812 and #885 above |
-| Grok              | Unassigned                                                   |
-| Security reviewer | Unassigned                                                   |
-| Gemini            | Unassigned                                                   |
-| Council Chair     | Unassigned                                                   |
+| Grok              | Unassigned                                                            |
+| Security reviewer | Unassigned                                                            |
+| Gemini            | Unassigned                                                            |
+| Council Chair     | Unassigned                                                            |

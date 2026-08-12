@@ -17,9 +17,14 @@ import {
   buildPlantPhotoStripItems,
   PLANT_PHOTO_STRIP_DEFAULT_LIMIT,
 } from "@/lib/plantPhotoPreviewStrip";
+import {
+  collectUnsignedDiaryPhotoPaths,
+  withSignedDiaryPhotoUrls,
+} from "@/lib/diaryPhotoPathResolution";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { logsPath } from "@/lib/routes";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 interface PlantDetailPhotoStripProps {
   plantId: string | null | undefined;
@@ -43,10 +48,47 @@ export default function PlantDetailPhotoStrip({
 }: PlantDetailPhotoStripProps) {
   const { data: rawDiary, isLoading, isError, refetch } = useDiaryEntries();
 
+  // quicklog_save_event's diary companion row never sets the top-level
+  // photo_url column -- it only stores the raw storage path inside
+  // details.photo_url. useDiaryEntries() is a shared, cached read with no
+  // signing step of its own (unlike Timeline.tsx, which does its own
+  // separate fetch and signs there), so resolve + sign those paths here.
+  // Signed URLs are kept in local state and merged in below rather than
+  // written back onto `rawDiary` itself, since that array is the shared
+  // React Query cache other components also read.
+  const [signedUrlByPath, setSignedUrlByPath] = useState<Map<string, string>>(new Map());
+
+  useEffect(() => {
+    const paths = collectUnsignedDiaryPhotoPaths(
+      (rawDiary ?? []) as Array<{ photo_url?: unknown; details?: unknown }>,
+    );
+    if (paths.length === 0) {
+      setSignedUrlByPath((prev) => (prev.size === 0 ? prev : new Map()));
+      return;
+    }
+    let cancelled = false;
+    supabase.storage
+      .from("diary-photos")
+      .createSignedUrls(paths, 3600)
+      .then(({ data }) => {
+        if (cancelled) return;
+        setSignedUrlByPath(
+          new Map((data ?? []).map((s) => [s.path as string, s.signedUrl])),
+        );
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [rawDiary]);
+
   const items = useMemo(() => {
     if (!plantId || !rawDiary || rawDiary.length === 0) return [];
+    const signed = withSignedDiaryPhotoUrls(
+      rawDiary as Array<{ photo_url?: unknown; details?: unknown }>,
+      signedUrlByPath,
+    );
     // Lift details.event_type for normalization parity with PhotoHistoryPanel.
-    const lifted = rawDiary.map((raw) => {
+    const lifted = signed.map((raw) => {
       const r = (raw ?? {}) as Record<string, unknown>;
       if (r.entry_type || r.entryType || r.event_type || r.eventType) return r;
       const det = (r.details ?? null) as Record<string, unknown> | null;
@@ -63,7 +105,7 @@ export default function PlantDetailPhotoStrip({
       rows: photoRows,
       limit: PLANT_PHOTO_STRIP_DEFAULT_LIMIT,
     });
-  }, [plantId, rawDiary]);
+  }, [plantId, rawDiary, signedUrlByPath]);
 
   const hasPlantContext = !!(plantId && plantId.trim());
   const uploadHref = logsPath(growId ?? null);

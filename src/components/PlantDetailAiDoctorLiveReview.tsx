@@ -386,6 +386,11 @@ function PlantDetailAiDoctorLiveReviewScope({
     (_sessionId: string) => {
       void queryClient.invalidateQueries({ queryKey: ["ai_doctor_sessions"] });
       void queryClient.invalidateQueries({ queryKey: ["timeline_memory"] });
+      // A persisted review means a credit spend succeeded — refresh the
+      // tent-alerts doctor-CTA credit gate so a grower who just spent
+      // their last allowance credit is not shown a dead-end doctor CTA
+      // until remount (prefix covers every user/grow key).
+      void queryClient.invalidateQueries({ queryKey: ["ai_credit_gate_reads"] });
     },
     [queryClient],
   );

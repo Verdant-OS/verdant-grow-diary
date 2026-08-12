@@ -1,12 +1,14 @@
 /**
  * AI Doctor credits-exhausted rules — pure math + loader guardrails.
  *
- * Ported from main's #758 slice. On THIS branch the rules module and the
- * `useAiDoctorGrowCreditsUsed` loader back the tent-alerts doctor-CTA
- * credit gate (see alert-doctor-credit-gate.test.tsx); the Plant-Detail
- * teaser COMPONENT itself was not ported, so the original teaser-component
- * wiring pins are intentionally absent here. If that teaser lands on this
- * branch later, restore them from main's copy of this file.
+ * Ported from main's #758 slice. On THIS branch the rules module backs the
+ * tent-alerts doctor-CTA credit gate (see alert-doctor-credit-gate.test.tsx,
+ * which also pins the gate's own loader). The Plant-Detail teaser COMPONENT
+ * and main's `useAiDoctorGrowCreditsUsed` loader were not ported — that
+ * loader's naive SUM(weight) counts pack-funded rows against the allowance,
+ * which the gate's loader corrects — so the original component/loader pins
+ * are intentionally absent here. If the teaser lands on this branch later,
+ * port it against the corrected loader, not main's.
  *
  * These tests pin:
  *  - the exhaustion/low math (limit/used → remaining, malformed input hides);
@@ -145,22 +147,12 @@ describe("buildAiDoctorCreditsExhaustedTeaserView — exhaustion math", () => {
   });
 });
 
-describe("loader guardrails", () => {
-  const HOOK = read("src/hooks/useAiDoctorGrowCreditsUsed.ts");
+describe("rules-module purity", () => {
+  const RULES = read("src/lib/aiDoctorCreditsExhaustedTeaserRules.ts");
 
-  it("loader is read-only, scoped to the caller's own rows, and selects only weight", () => {
-    expect(HOOK).toMatch(/\.from\(\s*["']ai_credit_spends["']\s*\)/);
-    expect(HOOK).toMatch(/\.select\(\s*["']weight["']\s*\)/);
-    expect(HOOK).toMatch(/\.eq\(\s*["']user_id["']\s*,\s*user!?\.id\s*\)/);
-    expect(HOOK).toMatch(/\.eq\(\s*["']grow_id["']\s*,\s*growId/);
-    expect(HOOK).not.toMatch(
-      /\.insert\(|\.update\(|\.delete\(|\.upsert\(|\.rpc\(|functions\.invoke/,
-    );
-    // Never selects `result` — it can carry unrelated AI Doctor payload data.
-    expect(HOOK).not.toMatch(/\.select\([^)]*result/);
-  });
-
-  it("loader is disabled without a signed-in user and a grow id", () => {
-    expect(HOOK).toMatch(/enabled:\s*!!user\s*&&\s*!!growId/);
+  it("stays pure — no React, no Supabase, no I/O, no Date reads", () => {
+    expect(RULES).not.toMatch(/from\s+["']react["']/);
+    expect(RULES).not.toMatch(/supabase|fetch\(|localStorage/);
+    expect(RULES).not.toMatch(/Date\.now|new Date\(/);
   });
 });

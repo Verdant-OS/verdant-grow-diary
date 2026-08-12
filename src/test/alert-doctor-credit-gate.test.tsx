@@ -50,7 +50,7 @@ import { enforceFunnelEventSchema } from "@/lib/funnelEventSchema";
 const mocks = vi.hoisted(() => ({ rows: [] as unknown[] }));
 
 vi.mock("@/hooks/usePlantAssignedTentAlerts", () => ({
-  usePlantAssignedTentAlerts: () => ({ status: "ready", rows: mocks.rows }),
+  usePlantAssignedTentAlerts: () => ({ status: "ok", rows: mocks.rows }),
 }));
 
 vi.mock("@/components/ui/card", () => {
@@ -80,6 +80,7 @@ const INTERCEPT_GATE: AlertDoctorCreditGateView = buildAlertDoctorCreditGate({
   aiCreditsPerGrow: 3,
   entitlementReady: true,
   creditsUsed: 3,
+  hasPackCredits: false,
 });
 
 function renderPanel(gate: AlertDoctorCreditGateView | null | undefined) {
@@ -114,6 +115,7 @@ describe("buildAlertDoctorCreditGate — pure rules", () => {
       aiCreditsPerGrow: 3,
       entitlementReady: true,
       creditsUsed: 5,
+      hasPackCredits: false,
     });
     expect(v.intercept).toBe(true);
   });
@@ -123,6 +125,7 @@ describe("buildAlertDoctorCreditGate — pure rules", () => {
       aiCreditsPerGrow: 3,
       entitlementReady: true,
       creditsUsed: 2,
+      hasPackCredits: false,
     });
     expect(v.intercept).toBe(false);
   });
@@ -132,6 +135,7 @@ describe("buildAlertDoctorCreditGate — pure rules", () => {
       aiCreditsPerGrow: 3,
       entitlementReady: false,
       creditsUsed: 3,
+      hasPackCredits: false,
     });
     expect(v.intercept).toBe(false);
   });
@@ -141,6 +145,7 @@ describe("buildAlertDoctorCreditGate — pure rules", () => {
       aiCreditsPerGrow: 3,
       entitlementReady: true,
       creditsUsed: undefined,
+      hasPackCredits: false,
     });
     expect(v.intercept).toBe(false);
   });
@@ -150,6 +155,7 @@ describe("buildAlertDoctorCreditGate — pure rules", () => {
       aiCreditsPerGrow: null,
       entitlementReady: true,
       creditsUsed: 999,
+      hasPackCredits: false,
     });
     expect(v.intercept).toBe(false);
   });
@@ -160,8 +166,32 @@ describe("buildAlertDoctorCreditGate — pure rules", () => {
         aiCreditsPerGrow: 0,
         entitlementReady: true,
         creditsUsed: 0,
+        hasPackCredits: false,
       }).intercept,
     ).toBe(false);
+  });
+
+  it("never intercepts while pack ownership is unresolved", () => {
+    const v = buildAlertDoctorCreditGate({
+      aiCreditsPerGrow: 3,
+      entitlementReady: true,
+      creditsUsed: 3,
+      hasPackCredits: undefined,
+    });
+    expect(v.intercept).toBe(false);
+  });
+
+  it("never intercepts a pack owner — overflow could fund the spend server-side", () => {
+    // The spend contract lets EVERY plan draw pack credits once the
+    // included allowance is spent, so an exhausted allowance alone never
+    // proves the doctor CTA is a dead end.
+    const v = buildAlertDoctorCreditGate({
+      aiCreditsPerGrow: 3,
+      entitlementReady: true,
+      creditsUsed: 3,
+      hasPackCredits: true,
+    });
+    expect(v.intercept).toBe(false);
   });
 
   it("is deterministic", () => {
@@ -169,11 +199,13 @@ describe("buildAlertDoctorCreditGate — pure rules", () => {
       aiCreditsPerGrow: 3,
       entitlementReady: true,
       creditsUsed: 3,
+      hasPackCredits: false,
     });
     const b = buildAlertDoctorCreditGate({
       aiCreditsPerGrow: 3,
       entitlementReady: true,
       creditsUsed: 3,
+      hasPackCredits: false,
     });
     expect(a).toEqual(b);
   });
@@ -258,6 +290,7 @@ describe("panel interception — behavior", () => {
       aiCreditsPerGrow: 3,
       entitlementReady: true,
       creditsUsed: 1,
+      hasPackCredits: false,
     });
     renderPanel(openGate);
     expect(screen.queryByTestId("plant-assigned-tent-alert-doctor-plans")).toBeNull();
@@ -296,7 +329,7 @@ describe("wiring guardrails", () => {
     // The usage read is enabled ONLY once the entitlement resolved to a
     // per-grow-allotment plan — monthly-pool viewers never pay the query.
     expect(PLANT_DETAIL).toMatch(
-      /useAiDoctorGrowCreditsUsed\(\s*entitlementReady && typeof perGrowAiCredits === "number"\s*\?\s*\(plant\?\.growId \?\? null\)\s*:\s*null,?\s*\)/,
+      /useAlertDoctorCreditGateReads\(\s*entitlementReady && typeof perGrowAiCredits === "number"\s*\?\s*\(plant\?\.growId \?\? null\)\s*:\s*null,?\s*\)/,
     );
     expect(PLANT_DETAIL).toMatch(
       /const entitlementReady = !entitlementLoading && !entitlementLookupFailed;/,
@@ -304,8 +337,45 @@ describe("wiring guardrails", () => {
   });
 
   it("the panel stays hook-free of data reads — the gate arrives as a prop", () => {
-    expect(PANEL).not.toMatch(/useMyEntitlements|useAiDoctorGrowCreditsUsed|useQuery\(/);
+    expect(PANEL).not.toMatch(/useMyEntitlements|useAlertDoctorCreditGateReads|useQuery\(/);
     expect(PANEL).toMatch(/doctorCreditGate\?: AlertDoctorCreditGateView \| null/);
+  });
+
+  it("gate loader mirrors the allowance arm and only detects (never balances) packs", () => {
+    const HOOK = read("src/hooks/useAlertDoctorCreditGateReads.ts");
+    // Read-only, own rows, weight + funded_by marker only — never `result`.
+    expect(HOOK).toMatch(/\.from\(\s*["']ai_credit_spends["']\s*\)/);
+    expect(HOOK).toMatch(/\.select\(\s*["']weight, funded_by:meta->>funded_by["']\s*\)/);
+    expect(HOOK).toMatch(/\.eq\(\s*["']user_id["']\s*,\s*user!?\.id\s*\)/);
+    expect(HOOK).toMatch(/\.eq\(\s*["']grow_id["']\s*,\s*growId/);
+    expect(HOOK).not.toMatch(/\.select\([^)]*result/);
+    expect(HOOK).not.toMatch(
+      /\.insert\(|\.update\(|\.delete\(|\.upsert\(|\.rpc\(|functions\.invoke/,
+    );
+    // Allowance filter happens CLIENT-side so NULL meta rows still count
+    // (PostgREST neq drops NULLs — the trap this pin guards against).
+    expect(HOOK).toMatch(/r\.funded_by === "pack" \? sum : sum \+ \(r\.weight \?\? 0\)/);
+    // Pack arm: presence-only grants read; the balance stays server-owned.
+    expect(HOOK).toMatch(/\.from\(\s*["']ai_credit_grants["']\s*\)/);
+    expect(HOOK).toMatch(/\.select\(\s*["']credits, expires_at["']\s*\)/);
+    expect(HOOK).toMatch(/enabled:\s*!!user\s*&&\s*!!growId/);
+  });
+
+  it("a successful persisted review invalidates the gate reads (no stale dead-end CTA)", () => {
+    const LIVE_REVIEW = read("src/components/PlantDetailAiDoctorLiveReview.tsx");
+    const persisted = LIVE_REVIEW.indexOf("const handlePersisted");
+    const invalidate = LIVE_REVIEW.indexOf(
+      'invalidateQueries({ queryKey: ["ai_credit_gate_reads"] })',
+      persisted,
+    );
+    const callbackEnd = LIVE_REVIEW.indexOf("[queryClient]", persisted);
+    expect(persisted).toBeGreaterThan(-1);
+    expect(invalidate).toBeGreaterThan(persisted);
+    expect(callbackEnd).toBeGreaterThan(invalidate);
+    // The hook's exported key builder shares the same prefix, so the
+    // invalidation above actually hits this cache.
+    const HOOK = read("src/hooks/useAlertDoctorCreditGateReads.ts");
+    expect(HOOK).toMatch(/return \["ai_credit_gate_reads", userId \?\? null, growId \?\? null\]/);
   });
 
   it("no plan-string gate anywhere in the slice — capability field only", () => {

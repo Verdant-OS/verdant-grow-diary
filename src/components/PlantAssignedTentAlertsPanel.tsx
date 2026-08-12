@@ -270,7 +270,7 @@ export default function PlantAssignedTentAlertsPanel({
   // render — the same condition gates the paywall impression below, so the
   // impression can never be broader than what the grower saw.
   const showCreditsNote =
-    doctorCreditGate?.intercept === true && enabled && status === "ready" && rows.length > 0;
+    doctorCreditGate?.intercept === true && enabled && status === "ok" && rows.length > 0;
 
   // One impression per mount, only when the gated state actually rendered.
   const paywallTrackedRef = useRef(false);

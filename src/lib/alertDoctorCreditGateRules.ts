@@ -23,6 +23,11 @@
  *    plans, null on monthly-pool plans), never from a plan id literal.
  *  - The "low" teaser state deliberately does NOT intercept — a grower
  *    with a credit left keeps a working doctor CTA.
+ *  - Pack overflow fails open: the spend contract lets EVERY plan draw
+ *    purchased/granted pack credits once the included allowance is spent
+ *    (ai_credit_pack_portability migration), so an exhausted allowance
+ *    alone never proves the doctor CTA is a dead end. Any sign of pack
+ *    ownership — or an unresolved pack read — suppresses interception.
  */
 import {
   buildAiDoctorCreditsExhaustedTeaserView,
@@ -47,10 +52,17 @@ export interface AlertDoctorCreditGateInput {
   /** True only when the entitlement lookup finished AND did not fail. */
   entitlementReady: boolean;
   /**
-   * Sum of ai_credit_spends.weight for this user + grow (the same figure
-   * the server-side spend check computes); undefined while loading.
+   * ALLOWANCE-funded spend weight for this user + grow — pack-funded rows
+   * excluded, mirroring the server's allowance arm; undefined while
+   * loading.
    */
   creditsUsed: number | null | undefined;
+  /**
+   * True when the user owns any unexpired grant row (any environment) —
+   * pack overflow could still fund a spend, so the gate must not
+   * intercept. Undefined while loading — also fails open.
+   */
+  hasPackCredits: boolean | undefined;
 }
 
 export interface AlertDoctorCreditGateView {
@@ -71,6 +83,9 @@ export function buildAlertDoctorCreditGate(
     href: AI_DOCTOR_CREDITS_TEASER_HREF,
   };
   if (input.entitlementReady !== true) return { intercept: false, ...base };
+  // Strict false only: undefined (still loading) and true (packs owned)
+  // both fail open — pack overflow could fund the spend server-side.
+  if (input.hasPackCredits !== false) return { intercept: false, ...base };
   const view = buildAiDoctorCreditsExhaustedTeaserView({
     isFreePlan: typeof input.aiCreditsPerGrow === "number",
     limit: input.aiCreditsPerGrow,

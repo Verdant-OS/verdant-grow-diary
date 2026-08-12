@@ -74,7 +74,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useGrowPlant, useGrowTent, getGrowDataMeta } from "@/hooks/useGrowData";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
-import { useAiDoctorGrowCreditsUsed } from "@/hooks/useAiDoctorGrowCreditsUsed";
+import { useAlertDoctorCreditGateReads } from "@/hooks/useAlertDoctorCreditGateReads";
 import { buildAlertDoctorCreditGate } from "@/lib/alertDoctorCreditGateRules";
 import { useAuth } from "@/store/auth";
 import { format, formatDistanceToNow } from "date-fns";
@@ -275,13 +275,14 @@ export default function PlantDetail() {
   } = useMyEntitlements();
   const entitlementReady = !entitlementLoading && !entitlementLookupFailed;
   const perGrowAiCredits = entitlement.capabilities.aiCreditsPerGrow;
-  const { data: doctorCreditsUsed } = useAiDoctorGrowCreditsUsed(
+  const { data: doctorCreditReads } = useAlertDoctorCreditGateReads(
     entitlementReady && typeof perGrowAiCredits === "number" ? (plant?.growId ?? null) : null,
   );
   const doctorCreditGate = buildAlertDoctorCreditGate({
     aiCreditsPerGrow: perGrowAiCredits,
     entitlementReady,
-    creditsUsed: doctorCreditsUsed,
+    creditsUsed: doctorCreditReads?.allowanceUsed,
+    hasPackCredits: doctorCreditReads?.hasPackCredits,
   });
 
   // Bounded-loading guard: if the plant query never settles (slow network,

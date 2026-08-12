@@ -8,7 +8,7 @@ name: SEO parity & head fidelity
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, verdant-grow-diary]
 
 concurrency:
   group: seo-parity-${{ github.workflow }}-${{ github.ref }}
@@ -75,7 +75,6 @@ jobs:
           node scripts/validate-static-route-head-fidelity.mjs dist
           node scripts/validate-canonical-singleton.mjs dist
           node scripts/validate-title-description.mjs dist
-
 
       # Preserve the machine- and human-readable diff reports so
       # failed runs are debuggable without re-running the build.

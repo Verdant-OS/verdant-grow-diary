@@ -17,6 +17,7 @@ import { sanitizeSupabaseDatabaseUrlForPsql } from "./supabaseDatabaseTargetIden
 /**
  * Build a minimal, allowlisted child-process environment for psql: only the
  * ambient variables psql/libpq genuinely need, plus PGDATABASE/PGSSLMODE
+ * and a deterministic GSS-encryption policy
  * derived from the identity-checked connection string. Never forwards the
  * full parent environment (which could carry unrelated secrets) or ambient
  * DATABASE_URL/PG* connection variables (which could silently override the
@@ -46,6 +47,11 @@ export function buildPsqlEnvironment(sourceEnv, databaseUrl, targetEnv) {
   const connection = sanitizeSupabaseDatabaseUrlForPsql(databaseUrl, targetEnv);
   childEnv.PGDATABASE = connection.databaseUrl;
   childEnv.PGSSLMODE = connection.sslMode;
+  // Supavisor shared poolers use TLS but do not provide a GSS encryption
+  // endpoint. libpq can otherwise attempt GSS negotiation before TLS and
+  // exit before the SQL is sent. Disable only GSS encryption; PGSSLMODE
+  // remains enforced from the identity-checked URL.
+  childEnv.PGGSSENCMODE = "disable";
   return childEnv;
 }
 

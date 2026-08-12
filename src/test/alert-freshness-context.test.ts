@@ -37,7 +37,10 @@ describe("alertFreshnessContext — shared constants", () => {
   it("derives the minute label from STALE_THRESHOLD_MS and exposes the canon window label", () => {
     expect(STALE_THRESHOLD_MINUTES).toBe(Math.round(STALE_THRESHOLD_MS / 60_000));
     expect(STALE_THRESHOLD_MINUTES).toBe(15);
-    expect(FRESHNESS_WINDOW_LABEL).toBe("15-minute live / 24-hour manual alert window");
+    // Persistence holds every source to the live window, so the operator-facing
+    // label carries no manual carve-out. A "24-hour manual" label here would
+    // promise persistence for snapshots isSnapshotPersistable rejects.
+    expect(FRESHNESS_WINDOW_LABEL).toBe("15-minute alert window");
   });
 });
 

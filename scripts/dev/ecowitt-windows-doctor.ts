@@ -283,7 +283,6 @@ async function main(): Promise<void> {
   const packageJsonFound = existsSync(resolve(cwd, "package.json"));
 
   if (!packageJsonFound) {
-    // eslint-disable-next-line no-console
     console.error(
       "[ecowitt-doctor] preflight FAILED — package.json not found in cwd:",
       cwd,
@@ -298,41 +297,29 @@ async function main(): Promise<void> {
   });
 
   if (wantJson) {
-    // eslint-disable-next-line no-console
     console.log(JSON.stringify(report, null, 2));
   } else {
-    // eslint-disable-next-line no-console
     console.log("[ecowitt-doctor] cwd:", report.cwd);
-    // eslint-disable-next-line no-console
     console.log("[ecowitt-doctor] package.json:", report.packageJsonFound ? "OK" : "MISSING");
-    // eslint-disable-next-line no-console
     console.log("[ecowitt-doctor] bun:", report.bunVersion ?? "(not detected)");
-    // eslint-disable-next-line no-console
     console.log("[ecowitt-doctor] IPv4 candidates:");
     for (const c of report.ips) {
-      // eslint-disable-next-line no-console
       console.log(
         `  - ${c.address}  [${c.iface}]${c.recommended ? "  RECOMMENDED" : ""}${
           c.reason ? `  (${c.reason})` : ""
         }`,
       );
     }
-    // eslint-disable-next-line no-console
     console.log("[ecowitt-doctor] Mosquitto hints:");
     for (const h of report.mosquittoHints) {
-      // eslint-disable-next-line no-console
       console.log(`  - ${h}`);
     }
-    // eslint-disable-next-line no-console
     console.log("[ecowitt-doctor] Ecowitt app settings:");
     for (const [k, v] of Object.entries(report.ecowittAppSettings)) {
-      // eslint-disable-next-line no-console
       console.log(`  - ${k}: ${v}`);
     }
-    // eslint-disable-next-line no-console
     console.log("[ecowitt-doctor] Next commands:");
     for (const c of report.nextCommands) {
-      // eslint-disable-next-line no-console
       console.log(`  ${c}`);
     }
   }
@@ -340,12 +327,10 @@ async function main(): Promise<void> {
   if (wantLaunchers) {
     const outDir = resolve(cwd, "tmp/ecowitt-windows");
     const res = writeLaunchers(outDir, cwd);
-    // eslint-disable-next-line no-console
     console.log(
       `[ecowitt-doctor] launchers: created=${res.created} updated=${res.updated} unchanged=${res.unchanged} refused=${res.refused} dir=${res.outDir}`,
     );
     for (const p of res.written) {
-      // eslint-disable-next-line no-console
       console.log("  -", p);
     }
   }

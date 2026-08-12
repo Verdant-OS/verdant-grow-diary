@@ -171,7 +171,17 @@ export function buildStageMetricRows(
     });
   }
   if (bands.dli) {
-    rows.push({ key: "dli", label: "DLI", value: `${bands.dli.min}–${bands.dli.max} mol/m²/day` });
+    // DLI is PPFD integrated over the photoperiod, so this row and the PPFD
+    // row are not independently satisfiable. At the endpoints they actively
+    // disagree: veg PPFD 700 over 18 h gives 45.4, above the 25-40 band; flower
+    // PPFD 700 over 12 h gives 30.2, below the 35-45 band. Without the formula
+    // a grower could "correct" an intensity or schedule that was already fine.
+    rows.push({
+      key: "dli",
+      label: "DLI",
+      value: `${bands.dli.min}–${bands.dli.max} mol/m²/day`,
+      note: "Depends on your photoperiod — DLI ≈ PPFD × light-hours × 0.0036. Reconcile with the PPFD row for your own schedule rather than hitting both independently",
+    });
   }
 
   return rows;

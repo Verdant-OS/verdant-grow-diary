@@ -88,8 +88,8 @@ describe("buildQuickLogPostSaveMessage", () => {
 
 describe("post-save CTA labels", () => {
   it("exposes stable, human-facing button copy", () => {
-    expect(QUICK_LOG_POST_SAVE_VIEW_LABEL).toBe("View timeline");
+    expect(QUICK_LOG_POST_SAVE_VIEW_LABEL).toBe("View diary");
     expect(QUICK_LOG_POST_SAVE_ANOTHER_LABEL).toBe("Log another");
-    expect(QUICK_LOG_POST_SAVE_CLOSE_LABEL).toBe("Close");
+    expect(QUICK_LOG_POST_SAVE_CLOSE_LABEL).toBe("Dismiss");
   });
 });

@@ -4,7 +4,7 @@
  *  - Jump links move focus to the right control (plant trigger, attach
  *    wrapper, Watering (ml) input).
  *  - Mismatch banner / stale helper text remain non-tabbable on their own.
- *  - Post-save "View {plant}" leaves focus outside the dialog.
+ *  - Post-save "View diary" leaves focus outside the dialog.
  *  - Post-save "Log another for {plant}" preserves the selected plant,
  *    clears post-save + validation state, and focuses the first logical
  *    field (note textarea).
@@ -200,7 +200,7 @@ describe("QuickLog — Review issues region", () => {
   });
 });
 
-describe("QuickLog — post-save View {plant} focus handling", () => {
+describe("QuickLog — post-save View diary focus handling", () => {
   it("calls onOpenChange(false) and clears focus from the link when View is activated", async () => {
     const { useState } = await import("react");
     function Host() {

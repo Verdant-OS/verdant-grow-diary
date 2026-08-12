@@ -552,12 +552,18 @@ describe("Quick Log canonical target contract", () => {
     );
     expect(harness.growUpdate).toHaveBeenCalledWith({ stage: "seedling" });
     expect(harness.growUpdateEq).toHaveBeenCalledWith("id", "g1");
-    expect(screen.getByTestId("quick-log-post-save-description")).toHaveTextContent("Plant One");
-    expect(screen.getByTestId("quick-log-post-save-description")).toHaveTextContent("Tent One");
-    expect(screen.getByTestId("quick-log-post-save-description")).toHaveTextContent("Grow One");
-    expect(screen.getByTestId("quick-log-view-target-plant")).toHaveAttribute(
+    expect(screen.getByTestId("quick-log-post-save-title")).toHaveTextContent("Saved to your diary");
+    expect(screen.getByTestId("quick-log-post-save-description")).toHaveTextContent(
+      "Added to Grow One.",
+    );
+    const diaryLink = screen.getByTestId("quick-log-view-target-plant");
+    expect(diaryLink).toHaveAttribute(
       "data-target-plant-id",
       "p1",
+    );
+    expect(diaryLink).toHaveAttribute(
+      "href",
+      "/timeline?growId=g1&plantId=p1&tentId=t1#timeline-entry-event-1",
     );
     expect(
       JSON.parse(getLocalStorageItemForTest("verdant.quickLog.lastTarget.v1") ?? "{}"),

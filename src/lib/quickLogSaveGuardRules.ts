@@ -20,6 +20,8 @@
  */
 
 export interface QuickLogPostSaveSuccess {
+  /** Verified grow context captured with the successful save, if available. */
+  growId: string | null;
   /** Growth event id returned from the server, when available. */
   growEventId: string | null;
   /** Target the log was attached to. Used for the "View" CTA. */
@@ -34,9 +36,9 @@ export interface QuickLogPostSaveSuccess {
   savedAt: string;
 }
 
-export const QUICK_LOG_POST_SAVE_VIEW_LABEL = "View timeline" as const;
+export const QUICK_LOG_POST_SAVE_VIEW_LABEL = "View diary" as const;
 export const QUICK_LOG_POST_SAVE_ANOTHER_LABEL = "Log another" as const;
-export const QUICK_LOG_POST_SAVE_CLOSE_LABEL = "Close" as const;
+export const QUICK_LOG_POST_SAVE_CLOSE_LABEL = "Dismiss" as const;
 
 /**
  * Rotate the client-side idempotency counter. Called when the grower
@@ -91,7 +93,7 @@ export function buildQuickLogPostSaveMessage(action: string, photoAttached: bool
 // hardcode duplicate strings.
 // -------------------------------------------------------------------
 
-export const QUICK_LOG_POST_SAVE_TITLE = "Saved" as const;
+export const QUICK_LOG_POST_SAVE_TITLE = "Saved to your diary" as const;
 
 /**
  * Practical, non-technical retry guidance. Renders in the dedicated
@@ -102,6 +104,8 @@ export const QUICK_LOG_SAVE_FAILED_MESSAGE =
   "Save failed. Your draft is still here. Check your connection and try again." as const;
 
 export interface QuickLogPostSaveDescriptionInput {
+  /** Preferred current-setup name shown in the confirmation body. */
+  setupName?: string | null;
   /** Human-readable name of the target plant / tent (already trimmed). */
   targetName: string | null;
   /** Optional tent name to append when the target is a plant. */
@@ -115,24 +119,15 @@ export interface QuickLogPostSaveDescriptionInput {
 }
 
 /**
- * Build the description line shown under the "Saved" title in the
- * post-save card. Deterministic. Never claims yield / quality /
- * diagnosis — just confirms what persisted and where.
+ * Build the description line shown under the post-save title. The current
+ * setup name is the only contextual copy we surface; the confirmation does
+ * not infer an action outcome or diagnosis.
  */
 export function buildQuickLogPostSaveDescription(
   input: QuickLogPostSaveDescriptionInput,
 ): string {
-  const verb = (input.action ?? "").trim() || "entry";
-  const withPhoto = input.photoAttached ? " with photo" : "";
-  const target = (input.targetName ?? "").trim();
-  const scopeParts: string[] = [];
-  if (target) scopeParts.push(target);
-  const tent = (input.tentName ?? "").trim();
-  if (tent) scopeParts.push(tent);
-  const grow = (input.growName ?? "").trim();
-  if (grow) scopeParts.push(grow);
-  const scope = scopeParts.length ? ` to ${scopeParts.join(" · ")}` : "";
-  return `Logged ${verb}${withPhoto}${scope} · just now`;
+  const setupName = (input.setupName ?? "").trim() || (input.growName ?? "").trim();
+  return setupName ? `Added to ${setupName}.` : "Added to your diary.";
 }
 
 export interface QuickLogCloseGuardInput {

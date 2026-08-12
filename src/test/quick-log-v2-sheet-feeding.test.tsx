@@ -11,7 +11,10 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import QuickLogV2Sheet from "@/components/QuickLogV2Sheet";
-import { clearTemperatureUnitPreference, saveTemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
+import {
+  clearTemperatureUnitPreference,
+  saveTemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
 
 const rpcMock = vi.fn();
 const storageRemove = vi.fn().mockResolvedValue({ data: null, error: null });
@@ -111,20 +114,15 @@ beforeEach(() => {
 });
 
 describe("QuickLogV2Sheet — structured feeding", () => {
-  it("routes feed confirmations to the real global typed-history anchor", () => {
+  it("keeps the saved feed target and grow context for the canonical Timeline route", () => {
     const source = readFileSync(
       resolve(process.cwd(), "src/components/QuickLogV2Sheet.tsx"),
       "utf8",
     );
     expect(source).toMatch(
-      /showTimelineConfirmation\(FEEDING_SAVE_SUCCESS_MESSAGE,[\s\S]*?targetType:\s*null,[\s\S]*?targetId:\s*null,[\s\S]*?growEventId/,
+      /showTimelineConfirmation\(FEEDING_SAVE_SUCCESS_MESSAGE,[\s\S]*?growId:\s*resolved\.growId[\s\S]*?targetType:\s*resolved\.targetType[\s\S]*?targetId:\s*resolved\.targetId[\s\S]*?tentId:\s*resolved\.tentId[\s\S]*?growEventId/,
     );
-    expect(source).toMatch(/postSave\.action === "feed" \? null : postSave\.targetType/);
-    const feedingPanel = readFileSync(
-      resolve(process.cwd(), "src/components/FeedingHistoryPanel.tsx"),
-      "utf8",
-    );
-    expect(feedingPanel).toContain("id={row.timelineAnchorId ?? undefined}");
+    expect(source).not.toMatch(/postSave\.action === "feed" \? null/);
   });
 
   it("renders the Feed action button", () => {

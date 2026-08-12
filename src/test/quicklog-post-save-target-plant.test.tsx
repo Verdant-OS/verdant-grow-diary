@@ -1,7 +1,7 @@
 /**
- * QuickLog post-save target-plant navigation + keyboard/a11y polish:
- *  - After save the dialog stays open and reveals a "View {plant}" action
- *    pointing at the exact saved target plant id.
+ * QuickLog post-save Timeline navigation + keyboard/a11y polish:
+ *  - After save the dialog stays open and reveals a grow-scoped diary action
+ *    pointing at the exact saved plant/tent context and returned event anchor.
  *  - The action is a keyboard-reachable anchor with focus styling.
  *  - A blocked named target is screen-reader discoverable but not tabbable.
  *  - The stale helper copy includes the formatted captured timestamp and
@@ -88,8 +88,9 @@ beforeEach(() => {
 });
 afterEach(() => cleanup());
 
-describe("QuickLog post-save target plant action", () => {
-  it("reveals a 'View {target plant}' action with the saved plant id after save", async () => {
+describe("QuickLog post-save diary action", () => {
+  it("reveals a grow-scoped diary action with saved target context and the returned event anchor", async () => {
+    rpcMock.mockResolvedValue({ data: { ok: true, grow_event_id: "grow-event-1" }, error: null });
     renderQL({
       open: true,
       onOpenChange: () => {},
@@ -103,12 +104,15 @@ describe("QuickLog post-save target plant action", () => {
     fireEvent.submit(form);
     const link = (await screen.findByTestId("quick-log-view-target-plant")) as HTMLAnchorElement;
     expect(link.tagName).toBe("A");
-    expect(link.getAttribute("href")).toBe("/plants/p2");
+    expect(link.getAttribute("href")).toBe(
+      "/timeline?growId=g1&plantId=p2&tentId=t1#timeline-entry-grow-event-1",
+    );
+    expect(link.getAttribute("href")).not.toContain("/plants/");
     expect(link.getAttribute("data-target-plant-id")).toBe("p2");
-    expect(link.textContent ?? "").toMatch(/View timeline/);
+    expect(link.textContent ?? "").toMatch(/View diary/);
   });
 
-  it("View target plant button is keyboard reachable and focusable", async () => {
+  it("View diary link is keyboard reachable and focusable", async () => {
     renderQL({
       open: true,
       onOpenChange: () => {},

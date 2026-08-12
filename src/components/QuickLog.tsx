@@ -46,6 +46,7 @@ import {
   buildQuickLogPostSaveDescription,
   shouldBlockQuickLogClose,
 } from "@/lib/quickLogSaveGuardRules";
+import { buildQuickLogTimelineNavTarget } from "@/lib/quickLogTimelineNavigationTarget";
 import QuickLogAllActivitiesSection, {
   type QuickLogAllActivitiesSaveTarget,
 } from "@/components/QuickLogAllActivitiesSection";
@@ -111,7 +112,6 @@ import {
   readResponseCheckStatus,
   type ResponseCheckStatus,
 } from "@/lib/tenSecondQuickCheckRules";
-import { plantDetailPath } from "@/lib/routes";
 import {
   EARLY_STAGE_MILESTONES,
   EARLY_STAGE_VIGOR_OPTIONS,
@@ -247,6 +247,12 @@ const QUICK_OBSERVATION_CHIPS = [
 type SavedTarget = {
   id: string;
   name: string;
+  /** Exact resolved grow identity from the completed save. */
+  growId: string | null;
+  /** Exact resolved tent identity from the completed save. */
+  tentId: string | null;
+  /** Server-confirmed event identity, when quicklog_save_manual returned one. */
+  growEventId: string | null;
   tentName: string | null;
   growName: string | null;
   eventType: string;
@@ -405,13 +411,23 @@ export default function QuickLog({
   const plantSelectTriggerRef = useRef<HTMLButtonElement | null>(null);
   const attachWrapperRef = useRef<HTMLLabelElement | null>(null);
   const noteRef = useRef<HTMLTextAreaElement | null>(null);
-  const viewPlantBtnRef = useRef<HTMLAnchorElement | null>(null);
+  const viewTimelineBtnRef = useRef<HTMLAnchorElement | null>(null);
   const hardwareUserTouchedRef = useRef(false);
   const snapshotUserTouchedRef = useRef(false);
   // One synchronous guard shared by the parent form and the all-activities
   // child. Presenter state complements this ref but never replaces it.
   const saveInFlightRef = useRef(false);
   const saveLocked = busy || childSaveBusy;
+  const savedTimelineTarget =
+    savedTarget?.growId
+      ? buildQuickLogTimelineNavTarget({
+          growId: savedTarget.growId,
+          targetType: "plant",
+          targetId: savedTarget.id,
+          tentId: savedTarget.tentId,
+          growEventId: savedTarget.growEventId,
+        })
+      : null;
   const isMainDraftMutationLocked = useCallback(
     () => saveInFlightRef.current || saveLocked,
     [saveLocked],
@@ -1204,6 +1220,9 @@ export default function QuickLog({
       setSavedTarget({
         id: savePlant.id,
         name: plantLabel,
+        growId: saveTarget.growId,
+        tentId: saveTarget.tentId,
+        growEventId: result.growEventId ?? null,
         tentName: saveTent.name ?? null,
         growName: saveGrow?.name ?? null,
         eventType: saveEventType,
@@ -1215,7 +1234,7 @@ export default function QuickLog({
       // confirms a write, and only when storage still has the exact revision
       // the grower reviewed. Failures return before this line and retain it.
       consumeReviewedPublicStarterDraft();
-      setTimeout(() => viewPlantBtnRef.current?.focus(), 0);
+      setTimeout(() => viewTimelineBtnRef.current?.focus(), 0);
       applyQuickLogV2Refresh(queryClient, {
         targetType: "plant",
         targetId: saveTarget.plantId,
@@ -2785,6 +2804,7 @@ export default function QuickLog({
                       data-testid="quick-log-post-save-description"
                     >
                       {buildQuickLogPostSaveDescription({
+                        setupName: savedTarget.growName,
                         targetName: savedTarget.name,
                         tentName: savedTarget.tentName ?? null,
                         growName: savedTarget.growName ?? null,
@@ -2795,26 +2815,38 @@ export default function QuickLog({
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <a
-                    ref={viewPlantBtnRef}
-                    href={plantDetailPath(savedTarget.id)}
-                    data-testid="quick-log-view-target-plant"
-                    data-target-plant-id={savedTarget.id}
-                    className="inline-flex items-center justify-center gap-1.5 rounded-md bg-primary px-3 py-2 text-[13px] font-medium text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                    onClick={() => {
-                      if (typeof document !== "undefined") {
-                        (document.activeElement as HTMLElement | null)?.blur?.();
-                      }
-                      // Match the Dialog wrapper's close path: without reset()
-                      // the component (kept mounted in AppShell) reopens showing
-                      // the stale post-save panel instead of a fresh form.
-                      onOpenChange(false);
-                      reset();
-                    }}
-                  >
-                    {QUICK_LOG_POST_SAVE_VIEW_LABEL}
-                    <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-                  </a>
+                  {savedTimelineTarget ? (
+                    <a
+                      ref={viewTimelineBtnRef}
+                      href={savedTimelineTarget.href}
+                      data-testid="quick-log-view-target-plant"
+                      data-target-plant-id={savedTarget.id}
+                      className="inline-flex items-center justify-center gap-1.5 rounded-md bg-primary px-3 py-2 text-[13px] font-medium text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      onClick={() => {
+                        if (typeof document !== "undefined") {
+                          (document.activeElement as HTMLElement | null)?.blur?.();
+                        }
+                        // Match the Dialog wrapper's close path: without reset()
+                        // the component (kept mounted in AppShell) reopens showing
+                        // the stale post-save panel instead of a fresh form.
+                        onOpenChange(false);
+                        reset();
+                      }}
+                    >
+                      {QUICK_LOG_POST_SAVE_VIEW_LABEL}
+                      <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+                    </a>
+                  ) : (
+                    <Button
+                      type="button"
+                      disabled
+                      data-testid="quick-log-view-target-plant"
+                      data-target-plant-id={savedTarget.id}
+                      title="Saved grow context is unavailable."
+                    >
+                      {QUICK_LOG_POST_SAVE_VIEW_LABEL}
+                    </Button>
+                  )}
                   <Button
                     type="button"
                     variant="outline"

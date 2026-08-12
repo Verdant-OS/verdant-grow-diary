@@ -12,10 +12,10 @@ import {
 
 describe("QUICK_LOG unified post-save copy", () => {
   it("exposes the same title, save-failed copy, and CTA labels", () => {
-    expect(QUICK_LOG_POST_SAVE_TITLE).toBe("Saved");
-    expect(QUICK_LOG_POST_SAVE_VIEW_LABEL).toBe("View timeline");
+    expect(QUICK_LOG_POST_SAVE_TITLE).toBe("Saved to your diary");
+    expect(QUICK_LOG_POST_SAVE_VIEW_LABEL).toBe("View diary");
     expect(QUICK_LOG_POST_SAVE_ANOTHER_LABEL).toBe("Log another");
-    expect(QUICK_LOG_POST_SAVE_CLOSE_LABEL).toBe("Close");
+    expect(QUICK_LOG_POST_SAVE_CLOSE_LABEL).toBe("Dismiss");
     expect(QUICK_LOG_SAVE_FAILED_MESSAGE).toBe(
       "Save failed. Your draft is still here. Check your connection and try again.",
     );
@@ -24,45 +24,39 @@ describe("QUICK_LOG unified post-save copy", () => {
 });
 
 describe("buildQuickLogPostSaveDescription", () => {
-  it("includes verb, target, tent, and grow when supplied", () => {
+  it("uses the current setup name when supplied", () => {
     const desc = buildQuickLogPostSaveDescription({
+      setupName: "Fall 2025",
       targetName: "Skywalker #2",
       tentName: "Tent A",
       growName: "Fall 2025",
       action: "note",
       photoAttached: false,
     });
-    expect(desc).toBe("Logged note to Skywalker #2 · Tent A · Fall 2025 · just now");
+    expect(desc).toBe("Added to Fall 2025.");
   });
 
-  it("mentions photo when a photo was attached", () => {
+  it("uses the legacy grow-name input when a dedicated setup name is absent", () => {
     const desc = buildQuickLogPostSaveDescription({
       targetName: "Skywalker #2",
+      growName: "Tent 3 setup",
       action: "note",
       photoAttached: true,
     });
-    expect(desc).toContain("with photo");
+    expect(desc).toBe("Added to Tent 3 setup.");
   });
 
-  it("falls back to 'entry' when action is blank", () => {
+  it("trims setup copy and falls back to a calm diary confirmation", () => {
     const desc = buildQuickLogPostSaveDescription({
+      setupName: "  ",
       targetName: "Blue Dream",
       action: "",
       photoAttached: false,
     });
-    expect(desc.startsWith("Logged entry ")).toBe(true);
+    expect(desc).toBe("Added to your diary.");
   });
 
-  it("omits scope when no target name is supplied", () => {
-    const desc = buildQuickLogPostSaveDescription({
-      targetName: null,
-      action: "watering",
-      photoAttached: false,
-    });
-    expect(desc).toBe("Logged watering · just now");
-  });
-
-  it("never claims yield / quality / diagnosis", () => {
+  it("never claims an outcome, quality, or diagnosis", () => {
     const desc = buildQuickLogPostSaveDescription({
       targetName: "P1",
       action: "harvest",

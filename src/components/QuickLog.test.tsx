@@ -423,9 +423,10 @@ describe("QuickLog supported save · routes through quicklog_save_manual RPC", (
     },
   );
 
-  it("submits an observation with a note as p_action='note' and closes the dialog", async () => {
+  it("submits an observation with a note and keeps the grow-scoped diary CTA in the dialog", async () => {
     const onOpenChange = vi.fn();
     const onCreated = vi.fn();
+    saveMock.mockResolvedValueOnce({ ok: true, growEventId: "event-1" });
     renderWithClient(
       <QuickLog
         open={true}
@@ -455,11 +456,16 @@ describe("QuickLog supported save · routes through quicklog_save_manual RPC", (
     expect(uploadMock).not.toHaveBeenCalled();
     expect(insertMock).not.toHaveBeenCalled();
 
-    // Post-save behavior changed: the dialog stays open and reveals a
-    // "View {plant}" target action. onOpenChange is no longer auto-fired.
-    await waitFor(() =>
-      expect(document.querySelector('[data-testid="quick-log-view-target-plant"]')).not.toBeNull(),
+    // Post-save behavior keeps the dialog open and exposes the canonical
+    // grow-scoped diary target. onOpenChange is not auto-fired by saving.
+    const diaryLink = (await screen.findByTestId(
+      "quick-log-view-target-plant",
+    )) as HTMLAnchorElement;
+    expect(diaryLink).toHaveAttribute(
+      "href",
+      "/timeline?growId=grow-1&plantId=plant-1&tentId=tent-1#timeline-entry-event-1",
     );
+    expect(diaryLink.getAttribute("href")).not.toContain("/plants/");
     expect(onCreated).toHaveBeenCalled();
     expect(toastSuccess).toHaveBeenCalledWith(
       expect.stringMatching(/^(Saved|Logged) (note|observation|note for|observation for)/),

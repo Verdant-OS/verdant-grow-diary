@@ -8,58 +8,93 @@ import {
 } from "@/lib/quickLogTimelineNavigationTarget";
 
 describe("buildQuickLogTimelineNavTarget", () => {
-  it("plant scope without event id → /plants/<id>#timeline", () => {
+  it("builds the canonical grow-scoped Timeline URL with plant and tent context", () => {
     const t = buildQuickLogTimelineNavTarget({
+      growId: "grow-1",
       targetType: "plant",
       targetId: "plant-1",
+      tentId: "tent-1",
+      growEventId: "ge-abc",
     });
     expect(t).toEqual({
-      path: "/plants/plant-1",
-      hash: "timeline",
-      href: "/plants/plant-1#timeline",
+      path: "/timeline?growId=grow-1&plantId=plant-1&tentId=tent-1",
+      hash: "timeline-entry-ge-abc",
+      href: "/timeline?growId=grow-1&plantId=plant-1&tentId=tent-1#timeline-entry-ge-abc",
     });
   });
 
-  it("tent scope without event id → /tents/<id>#timeline", () => {
+  it("uses a tent target as optional Timeline context", () => {
     const t = buildQuickLogTimelineNavTarget({
+      growId: "grow-1",
       targetType: "tent",
       targetId: "tent-9",
     });
-    expect(t.href).toBe("/tents/tent-9#timeline");
+    expect(t).toEqual({
+      path: "/timeline?growId=grow-1&tentId=tent-9",
+      hash: null,
+      href: "/timeline?growId=grow-1&tentId=tent-9",
+    });
   });
 
-  it("uses stable entry anchor when growEventId is supplied", () => {
+  it("supports explicit plant/tent context and encodes both opaque ids", () => {
     const t = buildQuickLogTimelineNavTarget({
-      targetType: "plant",
-      targetId: "plant-1",
+      growId: "grow / one",
+      plantId: "plant / one",
+      tentId: "tent & two",
+    });
+    expect(t?.path).toBe(
+      "/timeline?growId=grow%20%2F%20one&plantId=plant%20%2F%20one&tentId=tent%20%26%20two",
+    );
+  });
+
+  it("adds an anchor only when the save returned a real grow event id", () => {
+    const t = buildQuickLogTimelineNavTarget({
+      growId: "grow-1",
       growEventId: "ge-abc",
     });
-    expect(t.hash).toBe("timeline-entry-ge-abc");
-    expect(t.href).toBe("/plants/plant-1#timeline-entry-ge-abc");
-  });
-
-  it("falls back to /timeline section when scope is missing", () => {
-    const t = buildQuickLogTimelineNavTarget({
-      targetType: null,
-      targetId: null,
-    });
     expect(t).toEqual({
-      path: "/timeline",
-      hash: "timeline",
-      href: "/timeline#timeline",
+      path: "/timeline?growId=grow-1",
+      hash: "timeline-entry-ge-abc",
+      href: "/timeline?growId=grow-1#timeline-entry-ge-abc",
     });
   });
 
-  it("does not invent an entry anchor when growEventId is blank", () => {
+  it("never creates a synthetic section anchor when the grow event id is missing", () => {
     const t = buildQuickLogTimelineNavTarget({
-      targetType: "plant",
-      targetId: "plant-1",
+      growId: "grow-1",
       growEventId: "   ",
     });
-    expect(t.hash).toBe("timeline");
+    expect(t).toEqual({
+      path: "/timeline?growId=grow-1",
+      hash: null,
+      href: "/timeline?growId=grow-1",
+    });
+    expect(t?.href).not.toContain("#timeline");
+  });
+
+  it("does not turn an unsafe grow event id into a URL fragment", () => {
+    const t = buildQuickLogTimelineNavTarget({
+      growId: "grow-1",
+      growEventId: "bad/event?id",
+    });
+    expect(t).toEqual({
+      path: "/timeline?growId=grow-1",
+      hash: null,
+      href: "/timeline?growId=grow-1",
+    });
+  });
+
+  it.each([null, undefined, "", "   "])("fails closed when growId is %p", (growId) => {
+    expect(
+      buildQuickLogTimelineNavTarget({
+        growId,
+        targetType: "plant",
+        targetId: "plant-1",
+      }),
+    ).toBeNull();
   });
 
   it("exposes a stable, user-facing CTA label", () => {
-    expect(QUICK_LOG_TIMELINE_CTA_LABEL).toBe("View in Timeline");
+    expect(QUICK_LOG_TIMELINE_CTA_LABEL).toBe("View diary");
   });
 });

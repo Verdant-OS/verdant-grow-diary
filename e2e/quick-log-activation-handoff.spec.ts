@@ -317,15 +317,33 @@ test.describe("Public Quick Log → first diary entry activation loop (mocked)",
     expect(world.rpcCalls).toBe(1);
     await expect.poll(async () => storedDraftRaw(page), { timeout: 5_000 }).toBeNull();
 
-    // Close the dialog and verify the REAL Timeline surface shows the entry.
-    await page.getByTestId("quick-log-post-save-close").click();
-    await page.goto(`/timeline?growId=${GROW_ID}`);
+    // Follow the real post-save CTA. It must retain the verified grow/tent/plant
+    // context and point at the exact server-confirmed entry alias.
+    const diaryCta = page.getByTestId("quick-log-view-target-plant");
+    await expect(diaryCta).toHaveAttribute(
+      "href",
+      `/timeline?growId=${GROW_ID}&plantId=${PLANT_ID}&tentId=${TENT_ID}#timeline-entry-${GROW_EVENT_ID}`,
+    );
+    const deepHref = await diaryCta.getAttribute("href");
+    if (!deepHref) throw new Error("post-save diary CTA is missing its deep link");
+    const deepUrl = new URL(deepHref, page.url());
+    await diaryCta.click();
+    await page.waitForURL((url) => url.href === deepUrl.href);
     await acceptReconsentGateIfShown(page);
     await expect(
       page.getByTestId("timeline-entry").filter({ hasText: NOTE_TEXT }).first(),
     ).toBeVisible();
 
-    expect(world.rpcCalls, "still exactly one write after navigation").toBe(1);
+    // A reload of the exact deep link preserves setup context and reads the
+    // same entry without replaying the save.
+    await page.reload();
+    await acceptReconsentGateIfShown(page);
+    expect(page.url()).toBe(deepUrl.href);
+    await expect(
+      page.getByTestId("timeline-entry").filter({ hasText: NOTE_TEXT }).first(),
+    ).toBeVisible();
+
+    expect(world.rpcCalls, "still exactly one write after CTA navigation and reload").toBe(1);
     expect(traffic.forbidden, "forbidden AI/function requests").toEqual([]);
     expect(traffic.pageErrors, "uncaught page errors").toEqual([]);
   });

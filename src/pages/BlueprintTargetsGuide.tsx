@@ -63,7 +63,7 @@ const STAGE_COPY: Record<BlueprintTargetStage, { label: string; blurb: string }>
   seedling: {
     label: "Seedling / propagation",
     blurb:
-      "Warm and humid, with light kept low. Roots are minimal, so the plant leans on humidity rather than uptake.",
+      "Warm and humid, with light kept low while the root system is still developing.",
   },
   veg: {
     label: "Vegetative",
@@ -88,7 +88,7 @@ const STAGE_COPY: Record<BlueprintTargetStage, { label: string; blurb: string }>
   harvest: {
     label: "Dry & cure",
     blurb:
-      "A dark, cool, tightly-held room. Light, feed and pH targets no longer apply once the plant is cut.",
+      "A dark, cool room held to a narrow band, with gentle airflow — stagnant air lets damp pockets form even when the average reads right. Light, feed and pH targets no longer apply once the plant is cut.",
   },
 };
 

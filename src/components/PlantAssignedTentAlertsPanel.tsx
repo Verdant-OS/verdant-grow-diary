@@ -6,7 +6,16 @@
  * Recommendations are never invented — only fields already stored render.
  */
 import { Link } from "@/lib/react-router-compat";
-import { ArrowRight, Bell, AlertCircle, AlertTriangle, Info, Eye, Sparkles } from "lucide-react";
+import {
+  ArrowRight,
+  Bell,
+  AlertCircle,
+  AlertTriangle,
+  Gauge,
+  Info,
+  Eye,
+  Sparkles,
+} from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +24,8 @@ import { usePlantAssignedTentAlerts } from "@/hooks/usePlantAssignedTentAlerts";
 import type { PlantAssignedTentAlertRow } from "@/lib/plantAssignedTentAlertRules";
 import { alertsPath } from "@/lib/routes";
 import { buildPlantAiDoctorReviewPath } from "@/lib/aiDoctorEntryRules";
+import { buildPlantBlueprintPath } from "@/lib/plantDetailQuickActions";
+import { resolveAlertBlueprintMetric } from "@/lib/alertBlueprintLinkRules";
 import { trackTentAlertsDoctorCta } from "@/lib/plantTentAlertsDoctorCtaTracking";
 
 interface Props {
@@ -70,6 +81,14 @@ function AlertRowItem({
   // shared helper (same href five other surfaces already use). Navigation
   // only — reaching the anchor never starts a review or spends a credit.
   const doctorHref = plantId ? buildPlantAiDoctorReviewPath({ plantId, tentId }) : null;
+  // Links THIS breached metric to the Blueprint band it scores against —
+  // only when such a band exists (soil-probe and snapshot alerts have none).
+  // Tier-agnostic navigation, deliberately NOT an upsell: Craft growers land
+  // on their live scoring, everyone else on the free targets preview. All
+  // entitlement branching stays inside the Blueprint section itself, so this
+  // panel remains free of plan logic.
+  const bandHref =
+    plantId && resolveAlertBlueprintMetric(row.metric) ? buildPlantBlueprintPath(plantId) : null;
   return (
     <li
       className="rounded-lg border bg-card/40 p-3 text-sm"
@@ -122,6 +141,19 @@ function AlertRowItem({
                 }
               >
                 <Sparkles className="h-3.5 w-3.5" /> Ask AI Doctor
+              </Link>
+            </Button>
+          ) : null}
+          {bandHref ? (
+            <Button
+              asChild
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 gap-1"
+              data-testid="plant-assigned-tent-alert-target-band"
+            >
+              <Link to={bandHref}>
+                <Gauge className="h-3.5 w-3.5" /> Target Band
               </Link>
             </Button>
           ) : null}

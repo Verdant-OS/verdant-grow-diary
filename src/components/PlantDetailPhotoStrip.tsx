@@ -57,12 +57,21 @@ export default function PlantDetailPhotoStrip({
   // written back onto `rawDiary` itself, since that array is the shared
   // React Query cache other components also read.
   const [signedUrlByPath, setSignedUrlByPath] = useState<Map<string, string>>(new Map());
+  // Distinct from the diary fetch's own isError: a failed/rejected signing
+  // call must not read as "no photos" -- unsigned companion paths would
+  // otherwise just get filtered out by buildPlantPhotoStripItems and the
+  // strip would silently render its empty state instead of surfacing the
+  // failure. retryNonce lets the shared Retry button force a fresh signing
+  // attempt independent of whether useDiaryEntries() actually refetches.
+  const [signingError, setSigningError] = useState(false);
+  const [signingRetryNonce, setSigningRetryNonce] = useState(0);
 
   useEffect(() => {
     const paths = collectUnsignedDiaryPhotoPaths(
       (rawDiary ?? []) as Array<{ photo_url?: unknown; details?: unknown }>,
     );
     if (paths.length === 0) {
+      setSigningError(false);
       setSignedUrlByPath((prev) => (prev.size === 0 ? prev : new Map()));
       return;
     }
@@ -70,16 +79,28 @@ export default function PlantDetailPhotoStrip({
     supabase.storage
       .from("diary-photos")
       .createSignedUrls(paths, 3600)
-      .then(({ data }) => {
+      .then(({ data, error }) => {
         if (cancelled) return;
-        setSignedUrlByPath(
-          new Map((data ?? []).map((s) => [s.path as string, s.signedUrl])),
-        );
+        if (error || !data) {
+          setSigningError(true);
+          return;
+        }
+        setSigningError(false);
+        setSignedUrlByPath(new Map(data.map((s) => [s.path as string, s.signedUrl])));
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setSigningError(true);
       });
     return () => {
       cancelled = true;
     };
-  }, [rawDiary]);
+  }, [rawDiary, signingRetryNonce]);
+
+  const handleRetry = () => {
+    setSigningRetryNonce((n) => n + 1);
+    void refetch();
+  };
 
   const items = useMemo(() => {
     if (!plantId || !rawDiary || rawDiary.length === 0) return [];
@@ -182,7 +203,7 @@ export default function PlantDetailPhotoStrip({
           ))}
           <span className="sr-only">Loading recent photos…</span>
         </div>
-      ) : isError ? (
+      ) : isError || signingError ? (
         <div
           data-testid="plant-detail-photo-strip-error"
           className="rounded-xl border border-dashed border-border/50 bg-secondary/20 p-3 text-sm text-muted-foreground flex items-center justify-between gap-3"
@@ -196,9 +217,7 @@ export default function PlantDetailPhotoStrip({
             size="sm"
             variant="ghost"
             className="h-7"
-            onClick={() => {
-              void refetch();
-            }}
+            onClick={handleRetry}
             data-testid="plant-detail-photo-strip-retry"
           >
             Retry

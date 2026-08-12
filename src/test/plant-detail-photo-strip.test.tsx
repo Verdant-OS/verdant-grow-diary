@@ -351,6 +351,106 @@ describe("PlantDetailPhotoStrip render", () => {
     );
   });
 
+  it("shows the error state (not the empty state) when signing resolves with an error", async () => {
+    createSignedUrlsMock.mockResolvedValue({ data: null, error: { message: "boom" } });
+    const raw = [
+      {
+        id: "companion-1",
+        plant_id: "p1",
+        entry_at: "2026-05-30T10:00:00.000Z",
+        entry_type: "photo",
+        photo_url: null,
+        details: { event_type: "photo", photo_url: "user-1/grow-1/167123.jpg" },
+        note: "",
+      },
+    ];
+    useDiaryEntriesMock.mockReturnValue({
+      data: raw,
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    render(<PlantDetailPhotoStrip plantId="p1" growId={null} />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId("plant-detail-photo-strip-error")).toBeInTheDocument(),
+    );
+    expect(screen.queryByTestId("plant-detail-photo-strip-empty")).not.toBeInTheDocument();
+  });
+
+  it("shows the error state when the signing request rejects", async () => {
+    createSignedUrlsMock.mockRejectedValue(new Error("network down"));
+    const raw = [
+      {
+        id: "companion-1",
+        plant_id: "p1",
+        entry_at: "2026-05-30T10:00:00.000Z",
+        entry_type: "photo",
+        photo_url: null,
+        details: { event_type: "photo", photo_url: "user-1/grow-1/167123.jpg" },
+        note: "",
+      },
+    ];
+    useDiaryEntriesMock.mockReturnValue({
+      data: raw,
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    render(<PlantDetailPhotoStrip plantId="p1" growId={null} />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId("plant-detail-photo-strip-error")).toBeInTheDocument(),
+    );
+    expect(screen.queryByTestId("plant-detail-photo-strip-empty")).not.toBeInTheDocument();
+  });
+
+  it("Retry re-attempts signing after a failure and recovers on success", async () => {
+    createSignedUrlsMock.mockResolvedValueOnce({ data: null, error: { message: "boom" } });
+    const refetch = vi.fn();
+    const raw = [
+      {
+        id: "companion-1",
+        plant_id: "p1",
+        entry_at: "2026-05-30T10:00:00.000Z",
+        entry_type: "photo",
+        photo_url: null,
+        details: { event_type: "photo", photo_url: "user-1/grow-1/167123.jpg" },
+        note: "",
+      },
+    ];
+    useDiaryEntriesMock.mockReturnValue({
+      data: raw,
+      isLoading: false,
+      isError: false,
+      refetch,
+    });
+    render(<PlantDetailPhotoStrip plantId="p1" growId={null} />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId("plant-detail-photo-strip-error")).toBeInTheDocument(),
+    );
+
+    createSignedUrlsMock.mockResolvedValueOnce({
+      data: [
+        {
+          path: "user-1/grow-1/167123.jpg",
+          signedUrl: "https://signed.example.com/167123.jpg?token=retry",
+        },
+      ],
+    });
+    fireEvent.click(screen.getByTestId("plant-detail-photo-strip-retry"));
+
+    expect(refetch).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(createSignedUrlsMock).toHaveBeenCalledTimes(2));
+    await waitFor(() =>
+      expect(screen.getAllByTestId("plant-detail-photo-strip-item")).toHaveLength(1),
+    );
+    expect(
+      screen.queryByTestId("plant-detail-photo-strip-error"),
+    ).not.toBeInTheDocument();
+  });
+
   it("does not call Storage when every photo_url is already http(s)", async () => {
     const raw = [
       {

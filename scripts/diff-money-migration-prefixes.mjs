@@ -351,6 +351,7 @@ if (DB_URL) {
   }
   psqlEnv.PGDATABASE = sanitized.databaseUrl;
   if (sanitized.sslMode) psqlEnv.PGSSLMODE = sanitized.sslMode;
+  psqlEnv.PGGSSENCMODE = "disable";
 }
 
 const result = spawnSync("psql", psqlArgs, { encoding: "utf8", env: psqlEnv });

@@ -658,6 +658,7 @@ describe("remote applied-schema runner safety", () => {
     expect(calls[0].args.join(" ")).not.toContain("argv-secret-sentinel");
     expect(calls[0].env.PGDATABASE).toBe(canonicalUrl);
     expect(calls[0].env.PGSSLMODE).toBe("require");
+    expect(calls[0].env.PGGSSENCMODE).toBe("disable");
     expect(calls[0].env.PGDATABASE).not.toContain("?");
     expect(calls[0].env.PGDATABASE).not.toContain(PRODUCTION_REF);
     expect(calls[0].env.PGHOST).toBeUndefined();
@@ -699,6 +700,7 @@ describe("remote applied-schema runner safety", () => {
     expect(status).toBe(EXIT.OK);
     expect(childEnv?.PGDATABASE).toBe(canonicalUrl);
     expect(childEnv?.PGSSLMODE).toBe("verify-full");
+    expect(childEnv?.PGGSSENCMODE).toBe("disable");
   });
 
   it.each([

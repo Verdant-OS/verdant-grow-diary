@@ -213,3 +213,33 @@ describe("BlueprintTargetsGuide structured data", () => {
     expect(answer).toMatch(/drift in either direction/i);
   });
 });
+
+describe("BlueprintTargetsGuide horticultural claims", () => {
+  const faqText = VERDANT_BLUEPRINT_TARGETS_FAQ.map((f) => f.answer).join(" ");
+
+  it("makes no stretch/elongation claim about the night drop", () => {
+    // Cooler nights INCREASE positive DIF, which generally promotes stem
+    // elongation rather than suppressing it. An earlier draft claimed the
+    // opposite; the claim is removed rather than reversed, because the
+    // question does not need a growth-response mechanism to be answered.
+    expect(faqText).not.toMatch(/stretch/i);
+    expect(faqText).not.toMatch(/elongation/i);
+  });
+
+  it("keeps darkness and airflow in the dry-room guidance", () => {
+    // dryPhaseCheckRules treats stagnant airflow as needs_review, and the care
+    // guide specifies a dark, VENTILATED space. Saying only temperature and
+    // humidity matter would make nominal readings look sufficient while damp
+    // pockets raise mould risk.
+    const dryAnswer =
+      VERDANT_BLUEPRINT_TARGETS_FAQ.find((f) => f.question.includes("dry and cure"))?.answer ?? "";
+    expect(dryAnswer).toMatch(/ventilat|airflow/i);
+    expect(dryAnswer).toMatch(/dark/i);
+    // "only" must be scoped to the numeric targets, never to what matters.
+    expect(dryAnswer).not.toMatch(/only air temperature and humidity matter/i);
+
+    render(<BlueprintTargetsGuide />);
+    const harvest = screen.getByTestId("blueprint-targets-stage-harvest").textContent ?? "";
+    expect(harvest).toMatch(/airflow/i);
+  });
+});

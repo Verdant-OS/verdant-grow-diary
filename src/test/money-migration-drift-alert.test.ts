@@ -110,6 +110,18 @@ describe("money migration drift alert — cannot conclude healthy by accident", 
   it("names an unrecognised outcome instead of silently treating it as fine", () => {
     expect(script).toContain("Unrecognised outcome");
   });
+
+  it("says the checker never ran, rather than blaming its output", () => {
+    // If the psql install or the secret guard fails, the checker never starts
+    // and no audit exists. Reporting that as "produced no readable audit"
+    // sends the reader hunting a broken checker instead of a broken
+    // prerequisite — a different first action.
+    expect(script).toContain("const checkerNeverRan =");
+    expect(script).toContain("never ran");
+    // It must be derived from the step outcome, which is unambiguous, rather
+    // than inferred from a missing file.
+    expect(script).toContain('stepOutcome !== "success" && stepOutcome !== "failure"');
+  });
 });
 
 describe("money migration drift alert — does not fork the source of truth", () => {

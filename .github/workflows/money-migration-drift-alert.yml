@@ -199,6 +199,12 @@ jobs:
 
             const outcome = process.env.AUDIT_OUTCOME || "audit_unreadable";
             const stepOutcome = process.env.PROBE_OUTCOME || "unknown";
+            // Anything other than success/failure means a step BEFORE the
+            // checker failed -- the psql install or the secret guard -- so it
+            // never started. That needs a different first action from "it ran
+            // and produced nothing"; the audit_unreadable copy would send the
+            // reader hunting a broken checker instead of a broken prerequisite.
+            const checkerNeverRan = stepOutcome !== "success" && stepOutcome !== "failure";
             // Only a checker that ran to completion AND reported verified may
             // close. Closing is the direction where being wrong hides missing
             // billing logic, so it takes the conservative gate.
@@ -233,8 +239,13 @@ jobs:
               .map((e) => `- \`${e.file}\` (version ${e.version ?? "unknown"})`)
               .join("\n");
 
+            const headline = checkerNeverRan
+              ? `**The money-migration checker never ran** (step outcome: \`${stepOutcome}\`). A step before it failed — checkout, Node setup, the psql install, or the required-secret guard. Nothing about production was verified, and nothing will be until that is fixed.`
+              : HEADLINES[outcome] ??
+                `**Unrecognised outcome \`${outcome}\`.** Nothing may be concluded.`;
+
             const body = [
-              HEADLINES[outcome] ?? `**Unrecognised outcome \`${outcome}\`.** Nothing may be concluded.`,
+              headline,
               "",
               `Outcome: \`${outcome}\`  ·  checker step: \`${stepOutcome}\``,
               audit

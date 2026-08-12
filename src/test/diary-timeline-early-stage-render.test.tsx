@@ -28,6 +28,7 @@ vi.mock("@/integrations/supabase/client", () => {
     const q: Record<string, unknown> = {};
     q.select = () => q;
     q.eq = () => q;
+    q.is = () => q;
     q.order = () => q;
     q.limit = () => Promise.resolve(nextResponse);
     return q;

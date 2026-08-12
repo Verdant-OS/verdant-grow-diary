@@ -173,7 +173,7 @@ test.describe("A. Free user gate", () => {
     // returnTo is the ONLY query param production adds (URLSearchParams).
     await expect(cta).toHaveAttribute("href", "/pricing?returnTo=%2Fpheno-hunts%2Fnew");
     const originBefore = new URL(page.url()).origin;
-    await cta.click();
+    await cta.click({ noWaitAfter: true });
     await expect(page).toHaveURL(/\/pricing\?returnTo=%2Fpheno-hunts%2Fnew$/);
     expect(new URL(page.url()).origin, "CTA must never leave the app origin").toBe(originBefore);
     await expect(page).not.toHaveURL(/\/auth/);
@@ -219,8 +219,8 @@ test.describe("C. Pro Monthly access", () => {
     await page.goto("/pheno-hunts/new");
     await expect(page).not.toHaveURL(/\/auth/);
     await expect(
-      page.getByTestId("pheno-hunt-onboarding"),
-      "Pro Monthly user must reach the paid onboarding surface",
+      page.getByRole("heading", { name: "Start Pheno Hunt" }),
+      "Pro Monthly user must reach the mounted paid route",
     ).toBeVisible({ timeout: 20_000 });
     await expect(page.getByTestId("pheno-tracker-upgrade-gate")).toHaveCount(0);
     await assertNoForbiddenCopy(page);
@@ -239,8 +239,8 @@ test.describe("C2. Pro Annual access", () => {
     await page.goto("/pheno-hunts/new");
     await expect(page).not.toHaveURL(/\/auth/);
     await expect(
-      page.getByTestId("pheno-hunt-onboarding"),
-      "Pro Annual user must reach the paid onboarding surface",
+      page.getByRole("heading", { name: "Start Pheno Hunt" }),
+      "Pro Annual user must reach the mounted paid route",
     ).toBeVisible({ timeout: 20_000 });
     await expect(page.getByTestId("pheno-tracker-upgrade-gate")).toHaveCount(0);
     await assertNoForbiddenCopy(page);
@@ -254,7 +254,11 @@ test.describe("C3. Founder Lifetime access", () => {
 
   test("Founder user can load /pheno-hunts/new without auth wall", async ({ page }) => {
     await page.goto("/pheno-hunts/new");
-    expect(page.url()).not.toContain("/auth");
+    await expect(page).not.toHaveURL(/\/auth/);
+    await expect(page.getByRole("heading", { name: "Start Pheno Hunt" })).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(page.getByTestId("pheno-tracker-upgrade-gate")).toHaveCount(0);
     await assertNoForbiddenCopy(page);
   });
 });
@@ -358,7 +362,7 @@ test.describe("D–F. Missing-evidence hunt", () => {
     );
     const expectedHash = target.hash;
 
-    await nextSteps.first().click();
+    await nextSteps.first().click({ noWaitAfter: true });
     await expect
       .poll(() => new URL(page.url()).hash, {
         message: "anchor click must update the URL to the workspace anchor hash",
@@ -436,7 +440,7 @@ test.describe("G. Comparison-ready hunt", () => {
       "Compare link must target this hunt's compare route",
     ).toBe(true);
 
-    await compareLink.click();
+    await compareLink.click({ noWaitAfter: true });
     await expect(page).toHaveURL(/\/compare$/);
 
     // Substantive read-only comparison content — not an empty shell.

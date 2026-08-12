@@ -89,6 +89,7 @@ describe("createQuickLogEvent — RPC contract", () => {
       ["feed", "feeding"],
       ["photo", "photo"],
       ["note", "observation"],
+      ["training", "training"],
     ];
     expect(QUICK_LOG_EVENT_TYPE_MAP).toEqual({
       observe: "observation",
@@ -96,6 +97,7 @@ describe("createQuickLogEvent — RPC contract", () => {
       feed: "feeding",
       photo: "photo",
       note: "observation",
+      training: "training",
     });
     for (const [ui, canonical] of cases) {
       rpcSpy.mockClear();
@@ -124,6 +126,27 @@ describe("createQuickLogEvent — RPC contract", () => {
       await createQuickLogEvent({ ...baseInput, eventType: ui });
       expect(getSaveCall()?.p_details).toBeNull();
     }
+  });
+
+  it("merges extraDetails into p_details, and omits p_details when extraDetails is empty/absent", async () => {
+    await createQuickLogEvent({
+      ...baseInput,
+      eventType: "training",
+      extraDetails: { technique: "topping", event_type: "training" },
+    });
+    expect(getSaveCall()?.p_event_type).toBe("training");
+    expect(getSaveCall()?.p_details).toEqual({
+      technique: "topping",
+      event_type: "training",
+    });
+
+    rpcSpy.mockClear();
+    await createQuickLogEvent({ ...baseInput, eventType: "training", extraDetails: null });
+    expect(getSaveCall()?.p_details).toBeNull();
+
+    rpcSpy.mockClear();
+    await createQuickLogEvent({ ...baseInput, eventType: "training", extraDetails: {} });
+    expect(getSaveCall()?.p_details).toBeNull();
   });
 
   it("translates invalid_event_type reason from the RPC", async () => {

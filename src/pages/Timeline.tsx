@@ -67,6 +67,7 @@ import { MEASUREMENT_DETAIL_KEYS } from "@/lib/timelineEntryClassification";
 import { classifyVpdAgainstStage } from "@/lib/vpdStageTargetRules";
 import {
   mapGrowEventsToRecentRawEntries,
+  enrichRecentRawEntryWithDiaryCompanion,
   type GrowEventRowForRecent,
 } from "@/lib/growEventToDiaryRawEntry";
 import { mergeTimelineSources } from "@/lib/timelineMergeRules";
@@ -91,6 +92,7 @@ import {
   PHOTO_NON_DIAGNOSTIC_TESTID,
   shouldShowPhotoNonDiagnosticLabel,
 } from "@/lib/photoEventNonDiagnosticLabelRules";
+import { describeQuickLogDetailsFromExtras } from "@/lib/quick-log/quickLogActivityDetailFields";
 import TimelineEvidenceDetailDrawer from "@/components/TimelineEvidenceDetailDrawer";
 import { buildTimelineEvidenceDetailViewModel } from "@/lib/timelineEvidenceDetailViewModel";
 import TimelineSensorSourceBadge from "@/components/TimelineSensorSourceBadge";
@@ -301,8 +303,20 @@ export default function Timeline() {
       .order("entry_at", { ascending: false })
       .limit(100);
     const rows = (data as Entry[]) || [];
+    // quicklog_save_event's diary companion row never sets the top-level
+    // photo_url column -- it only stores the storage path inside
+    // details.photo_url (...trust_boundary_hardening.sql:290). Resolve that
+    // path here too, alongside the top-level one, so every downstream
+    // consumer (normalizeDiaryEntry's fallback, PhotoHistoryPanel,
+    // recentLaneRawEntries) sees one already-signed value on the top-level
+    // field regardless of which write path produced the row.
+    const detailsPhotoPath = (r: Entry): string | null => {
+      const v = (r.details as Record<string, unknown> | null)?.photo_url;
+      return typeof v === "string" && v.length > 0 ? v : null;
+    };
+    const resolvePhotoPath = (r: Entry): string | null => r.photo_url ?? detailsPhotoPath(r);
     const paths = rows
-      .map((r) => r.photo_url)
+      .map(resolvePhotoPath)
       .filter((p): p is string => !!p && !p.startsWith("http"));
     if (paths.length) {
       const { data: signed } = await supabase.storage
@@ -310,7 +324,8 @@ export default function Timeline() {
         .createSignedUrls(paths, 3600);
       const map = new Map((signed || []).map((s) => [s.path as string, s.signedUrl]));
       rows.forEach((r) => {
-        if (r.photo_url && map.has(r.photo_url)) r.photo_url = map.get(r.photo_url)!;
+        const raw = resolvePhotoPath(r);
+        if (raw && map.has(raw)) r.photo_url = map.get(raw)!;
       });
     }
     setEntries(rows);
@@ -460,10 +475,18 @@ export default function Timeline() {
   const recentLaneRawEntries = useMemo(() => {
     const diaryInputs = entries.map((e) => {
       const details = (e.details ?? null) as Record<string, unknown> | null;
+      // quicklog_save_event mirrors its back-pointer as `linked_grow_event_id`
+      // (not `grow_event_id`, which is the quicklog_save_manual convention) —
+      // fall back to it so a diary companion row created by quicklog_save_event
+      // (any save with photo_url, a sensor snapshot, or non-empty p_details)
+      // still logically dedups against its grow_events twin instead of
+      // showing as two rows in the Recent Quick Logs panel.
       const grow_event_id =
         details && typeof details["grow_event_id"] === "string"
           ? (details["grow_event_id"] as string)
-          : null;
+          : details && typeof details["linked_grow_event_id"] === "string"
+            ? (details["linked_grow_event_id"] as string)
+            : null;
       return {
         id: e.id,
         entry_at: e.entry_at,
@@ -481,17 +504,33 @@ export default function Timeline() {
       growEvents,
     });
     const diaryById = new Map(entries.map((e) => [e.id, e] as const));
+    // mergeTimelineSources deliberately keeps the grow_events side on a
+    // logical dedup (it's the live entry path) -- but grow_events has no
+    // photo_url/details columns, so the companion diary row's photo (and any
+    // structured detail) would otherwise vanish for any save that had one
+    // (e.g. Photo/Training). Reverse-index the diary companions by their
+    // grow_event_id so the surviving grow_events-sourced entry can be
+    // enriched with what the suppressed diary row actually carried.
+    const diaryCompanionByGrowEventId = new Map(
+      diaryInputs.filter((d) => d.grow_event_id).map((d) => [d.grow_event_id as string, d]),
+    );
     const growMappedById = new Map(
       mapGrowEventsToRecentRawEntries(growEvents).map((r) => [r.id, r] as const),
     );
-    const out: Array<Entry | ReturnType<typeof mapGrowEventsToRecentRawEntries>[number]> = [];
+    const out: Array<Entry | ReturnType<typeof enrichRecentRawEntryWithDiaryCompanion>> = [];
     for (const m of merged) {
       if (m.source_table === "diary_entries") {
         const e = diaryById.get(m.source_id);
         if (e) out.push(e);
       } else {
         const g = growMappedById.get(m.source_id);
-        if (g) out.push(g);
+        if (!g) continue;
+        out.push(
+          enrichRecentRawEntryWithDiaryCompanion(
+            g,
+            diaryCompanionByGrowEventId.get(m.source_id),
+          ),
+        );
       }
     }
     return out;
@@ -1083,10 +1122,18 @@ export default function Timeline() {
                             "sensor",
                             "sensor_snapshot",
                             "remind_at",
+                            // Training/photo structured detail fields — rendered as
+                            // labeled badges elsewhere, not as raw key:value chips
+                            // here. See quickLogActivityDetailFields.ts.
+                            "technique",
+                            "intensity",
+                            "subject",
+                            "caption",
                           ];
                           const extra = Object.entries(e.details || {}).filter(
                             ([k]) => !HIDDEN.includes(k),
                           );
+                          const detailLines = describeQuickLogDetailsFromExtras(e.details);
                           return (
                             <>
                               <div className="flex items-center gap-2 mb-2 text-xs text-muted-foreground flex-wrap">
@@ -1234,6 +1281,22 @@ export default function Timeline() {
                                     </div>
                                   );
                                 })()}
+                              {detailLines.length > 0 && (
+                                <div
+                                  className="mt-2 flex flex-wrap gap-1.5"
+                                  data-testid="timeline-quicklog-detail-lines"
+                                >
+                                  {detailLines.map((line) => (
+                                    <span
+                                      key={line.key}
+                                      data-testid={`timeline-quicklog-detail-${line.key}`}
+                                      className="text-[11px] px-2 py-0.5 rounded-full bg-secondary/60 border border-border/40"
+                                    >
+                                      {line.label}: {line.value}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
                               {extra.length > 0 && (
                                 <div className="mt-2 flex flex-wrap gap-1.5">
                                   {extra.map(([k, v]) => (

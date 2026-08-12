@@ -65,6 +65,22 @@ describe("Timeline.tsx — mergeTimelineSources wire-up", () => {
     expect(TIMELINE_SRC).toMatch(/from\(\s*["']diary_entries["']\s*\)/);
     expect(TIMELINE_SRC).toMatch(/from\(\s*["']grow_events["']\s*\)/);
   });
+
+  it("signs quicklog_save_event's details.photo_url path, not just the top-level column", () => {
+    // quicklog_save_event's diary companion row only ever sets
+    // details.photo_url (never the top-level photo_url column) -- the
+    // signed-URL resolution step must consider both, or Photo saves show a
+    // broken/missing image despite a successful upload.
+    expect(TIMELINE_SRC).toMatch(/detailsPhotoPath/);
+    expect(TIMELINE_SRC).toMatch(/resolvePhotoPath/);
+  });
+
+  it("enriches the surviving grow_events-mapped entry with its diary companion via the tested pure helper", () => {
+    expect(TIMELINE_SRC).toMatch(
+      /from\s+["']@\/lib\/growEventToDiaryRawEntry["']/,
+    );
+    expect(TIMELINE_SRC).toMatch(/\benrichRecentRawEntryWithDiaryCompanion\b/);
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -140,6 +140,29 @@ describe("BlueprintTargetsGuide", () => {
     expect(ph?.note ?? "").toMatch(/not runoff/i);
   });
 
+  it("does not claim a superlative for a stage the bands contradict", () => {
+    // Every copy defect found in review so far was prose disagreeing with the
+    // table rendered directly beneath it. Peak feed and peak light are FLOWER
+    // (ec 1.8-2.6, ppfd 700-1000), not pre-flower (1.6-2.0, 600-800), so guard
+    // the superlative mechanically rather than by proofreading.
+    const ecMax = (s: keyof typeof SOP_BLUEPRINT_TARGETS) =>
+      SOP_BLUEPRINT_TARGETS[s].ec?.max ?? 0;
+    expect(ecMax("flower")).toBeGreaterThan(ecMax("preflower"));
+
+    render(<BlueprintTargetsGuide />);
+    const preflower =
+      screen.getByTestId("blueprint-targets-stage-preflower").textContent ?? "";
+    expect(preflower).not.toMatch(/feed peaks|peak feed/i);
+  });
+
+  it("does not present the day/night split as VPD control on its own", () => {
+    // At fixed humidity a cooler night LOWERS VPD; it does not hold it steady.
+    render(<BlueprintTargetsGuide />);
+    const body = document.body.textContent ?? "";
+    expect(body).not.toMatch(/keeps vapou?r pressure deficit stable/i);
+    expect(body).toMatch(/temperature and humidity together/i);
+  });
+
   it("presents any late-flower taper as evidence-dependent, not automatic", () => {
     render(<BlueprintTargetsGuide />);
     const section = screen.getByTestId("blueprint-targets-stage-late_flower");

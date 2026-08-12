@@ -38,6 +38,12 @@ AS $$
                 THEN (e.value)::text::numeric < 0 OR (e.value)::text::numeric > 100
               ELSE false
             END
+    )
+    -- Case variants ("Myrcene" vs "myrcene") are the same terpene and must
+    -- not persist as two measurements.
+    AND NOT EXISTS (
+      SELECT 1 FROM jsonb_object_keys(t) AS k
+      GROUP BY lower(k) HAVING count(*) > 1
     );
 $$;
 
@@ -45,7 +51,10 @@ CREATE TABLE public.lab_tests (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   plant_id uuid NOT NULL REFERENCES public.plants(id) ON DELETE CASCADE,
-  tested_at timestamptz NOT NULL DEFAULT now(),
+  -- No default: a COA date must be stated, never silently stamped with the
+  -- insertion time. Bounded below so a direct write cannot claim a future
+  -- test (+1 day absorbs timezone offsets for growers east of UTC).
+  tested_at timestamptz NOT NULL,
   -- Cannabinoid percentages as printed on the COA. Nullable: labs report
   -- different subsets. Bounds are sanity rails; exact values are the lab's.
   thca_percent numeric CHECK (thca_percent >= 0 AND thca_percent <= 100),
@@ -61,6 +70,8 @@ CREATE TABLE public.lab_tests (
   updated_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT lab_tests_terpenes_valid
     CHECK (public.lab_tests_terpenes_valid(terpenes)),
+  CONSTRAINT lab_tests_tested_at_not_future
+    CHECK (tested_at <= now() + interval '1 day'),
   -- A row with no measurement at all is not evidence; mirror the app-side
   -- "enter at least one measurement" rule at the boundary.
   CONSTRAINT lab_tests_has_measurement

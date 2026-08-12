@@ -110,8 +110,9 @@ function parseTerpenes(raw: unknown): Array<{ name: string; value: number }> {
   entries.sort((a, b) => b.value - a.value || a.name.localeCompare(b.name));
   const seen = new Set<string>();
   return entries.filter((e) => {
-    if (seen.has(e.name)) return false;
-    seen.add(e.name);
+    const key = e.name.toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
     return true;
   });
 }
@@ -293,8 +294,10 @@ export function validateLabTestDraft(draft: LabTestDraft, now: number): LabTestD
       continue;
     }
     // Object keys collapse duplicates silently — a second row with the same
-    // name would overwrite the first measurement unrecoverably. Refuse it.
-    if (name in terpenes) {
+    // name would overwrite the first measurement unrecoverably. Case
+    // variants ("Myrcene" vs "myrcene") are the same terpene. Refuse both.
+    const lower = name.toLowerCase();
+    if (Object.keys(terpenes).some((k) => k.toLowerCase() === lower)) {
       errors.push(`Terpene "${name}" is listed more than once.`);
       continue;
     }

@@ -142,6 +142,11 @@ describe("buildLabResultsView", () => {
     expect(view.cards[0].terpenes).toEqual([{ name: "myrcene", valueLabel: "2%" }]);
   });
 
+  it("dedupes case-variant duplicates — same terpene, highest value wins", () => {
+    const view = buildLabResultsView([row({ terpenes: { Myrcene: 1, myrcene: 2 } })]);
+    expect(view.cards[0].terpenes).toEqual([{ name: "myrcene", valueLabel: "2%" }]);
+  });
+
   it("treats a non-object terpenes payload as empty rather than crashing", () => {
     expect(buildLabResultsView([row({ terpenes: "oops" })]).cards[0].terpenes).toEqual([]);
     expect(buildLabResultsView([row({ terpenes: [1, 2] })]).cards[0].terpenes).toEqual([]);
@@ -188,6 +193,19 @@ describe("validateLabTestDraft", () => {
     );
     expect(result.ok).toBe(false);
     expect(result.errors).toContain('Terpene "myrcene" is listed more than once.');
+
+    // Case variants are the same terpene.
+    const caseVariant = validateLabTestDraft(
+      draft({
+        terpenes: [
+          { name: "Myrcene", percent: "0.8" },
+          { name: "myrcene", percent: "0.3" },
+        ],
+      }),
+      NOW,
+    );
+    expect(caseVariant.ok).toBe(false);
+    expect(caseVariant.errors).toContain('Terpene "myrcene" is listed more than once.');
   });
 
   it("skips fully blank terpene rows but rejects half-filled ones", () => {

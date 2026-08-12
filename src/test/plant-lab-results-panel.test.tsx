@@ -125,7 +125,8 @@ describe("PlantLabResultsPanel", () => {
     };
     render(<PlantLabResultsPanel plantId="p1" />);
     const del = await screen.findByTestId("plant-lab-result-delete");
-    expect(del.getAttribute("aria-label")).toBe("Delete lab result from Aug 1, 2026");
+    // Position keeps the name unique even for multiple same-day results.
+    expect(del.getAttribute("aria-label")).toBe("Delete lab result 1 of 1 (Aug 1, 2026)");
   });
 
   it("readOnly: shows saved evidence without add/delete controls", async () => {

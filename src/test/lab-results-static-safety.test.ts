@@ -114,6 +114,12 @@ describe("lab results — migration static safety", () => {
     // and padded variants would collapse into duplicates at display time.
     expect(sql).toContain("char_length(btrim(e.key)) = 0");
     expect(sql).toContain("e.key <> btrim(e.key)");
+    // Case variants of the same terpene must not persist as two entries.
+    expect(sql).toMatch(/GROUP BY lower\(k\) HAVING count\(\*\) > 1/);
+    // A COA date must be stated (no silent insertion-time default) and can
+    // never be in the future (+1 day absorbs timezone offsets).
+    expect(sql).not.toMatch(/tested_at timestamptz NOT NULL DEFAULT/);
+    expect(sql).toContain("CONSTRAINT lab_tests_tested_at_not_future");
     // The validator must be IMMUTABLE plain SQL — never SECURITY DEFINER.
     expect(sql).toMatch(/IMMUTABLE/);
     expect(sql).not.toMatch(/SECURITY DEFINER/i);

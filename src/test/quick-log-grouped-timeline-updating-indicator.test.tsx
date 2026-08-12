@@ -30,6 +30,7 @@ function buildQueryStub(resolveNow: () => Promise<unknown[]>) {
   const passthrough = () => builder;
   builder.select = passthrough;
   builder.eq = passthrough;
+  builder.is = passthrough;
   builder.not = passthrough;
   builder.in = passthrough;
   builder.or = passthrough;

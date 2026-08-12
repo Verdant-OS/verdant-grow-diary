@@ -61,6 +61,7 @@ vi.mock("@/integrations/supabase/client", () => {
     const q: Record<string, unknown> = {};
     q.select = () => q;
     q.eq = () => q;
+    q.is = () => q;
     q.not = () => q;
     q.in = () => q;
     q.or = () => q;

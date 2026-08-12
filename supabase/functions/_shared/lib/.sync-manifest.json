@@ -6,7 +6,7 @@
     "src/constants/aiDoctorImportedHistory.ts": "f04d998dea22c9e8e7aaa6489a64cf4af44202435982039a1f216ccba9c317a0",
     "src/constants/sensorTiming.ts": "e91479a71bf50dae3902b920d3c5603fdc4449396a18a5624b7a4c54d3c12056",
     "src/constants/sensorTruthRanges.ts": "5662662912cf250db54d82e2135e913f8791099ebd368f0b334dd0bb1f6239a0",
-    "src/integrations/supabase/types.ts": "7be00528e5da2661e5da0744ed6b6fea9d81af1a9db750f2a4878d4dbff19ec9",
+    "src/integrations/supabase/types.ts": "559f482672241f234cbc7dad92ce0bd85a0e00123732633b433852e078b75cbc",
     "src/lib/aiCoachLatestSensorSnapshot.ts": "b37f8baccdf66becef9023a2e632383c3a9cb3bd095d3d5faf813051ae6f32f5",
     "src/lib/aiDoctorContextCompiler.ts": "961834597ad69dce6d9b72cb901dbdc24a5bab891e6589713605750cdb439593",
     "src/lib/aiDoctorContextRules.ts": "35b078c974215cae7ec26a79ef7f57d92a066bd12a97df653d8fce8735d121cd",

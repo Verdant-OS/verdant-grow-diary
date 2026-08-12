@@ -71,9 +71,14 @@ export interface BlueprintStageBands {
   tempC?: DayNightBand;
   /** Relative humidity, %. */
   rh?: MetricBand;
-  /** Nutrient-solution / runoff EC, mS/cm. Sourced from feeding logs. */
+  /**
+   * INPUT nutrient-solution EC, mS/cm — the feed as mixed, from feeding logs.
+   * NOT runoff: runoff reads higher as salts accumulate, so it is interpreted
+   * against input and root-zone history rather than against this band. See
+   * blueprintFeedingInput, which reads `inputEcMsCm` for exactly this reason.
+   */
   ec?: MetricBand;
-  /** Nutrient-solution / runoff pH. Sourced from feeding logs. */
+  /** INPUT nutrient-solution pH — the feed as mixed, from feeding logs. NOT runoff. */
   ph?: MetricBand;
   /** Photosynthetic photon flux density, µmol/m²/s. */
   ppfd?: MetricBand;

@@ -39,6 +39,9 @@ export const FUNNEL_EVENTS = [
   "csv_import_started",
   "csv_import_completed",
   "csv_history_ai_doctor_clicked",
+  // Click-only entry intent. This does not claim that a review started or
+  // consumed a credit; that remains ai_doctor_review_started below.
+  "ai_doctor_cta_clicked",
   "ai_doctor_review_started",
   "historical_ai_review_started",
   "ai_doctor_result_received",
@@ -108,7 +111,7 @@ export const FUNNEL_PARAM_KEYS = [
    * tokens can reach here — never an id, a reading value, or grower input.
    */
   "metric",
-  /** Alert severity bucket ("critical" | "warning" | "watch"). Never an id. */
+  /** Alert severity bucket ("critical" | "warning" | "watch" | "info"). Never an id. */
   "severity",
 ] as const;
 

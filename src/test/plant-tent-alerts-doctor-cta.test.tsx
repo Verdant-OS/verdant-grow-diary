@@ -115,6 +115,43 @@ describe("tent alerts · Ask AI Doctor on-ramp", () => {
     expect(serialized).not.toContain("plant-1");
     expect(serialized).not.toContain("tent-1");
   });
+
+  it("reaches the funnel sink without claiming that a review started", () => {
+    const gtag = vi.fn();
+    (window as unknown as { gtag?: unknown }).gtag = gtag;
+    try {
+      renderPanel("plant-1");
+      fireEvent.click(screen.getByTestId("plant-assigned-tent-alert-ask-doctor"));
+
+      expect(gtag).toHaveBeenCalledWith("event", "ai_doctor_cta_clicked", {
+        surface: "tent_alert_row",
+        metric: "temp",
+        severity: "warning",
+      });
+      expect(gtag).not.toHaveBeenCalledWith("event", "ai_doctor_review_started", expect.anything());
+      expect(JSON.stringify(gtag.mock.calls)).not.toMatch(/alert-1|plant-1|tent-1|grow-1/);
+    } finally {
+      delete (window as unknown as { gtag?: unknown }).gtag;
+    }
+  });
+
+  it("drops an unknown persisted metric from the funnel payload", () => {
+    mocks.rows = [{ ...ROW, metric: "private_identifier" }];
+    const gtag = vi.fn();
+    (window as unknown as { gtag?: unknown }).gtag = gtag;
+    try {
+      renderPanel("plant-1");
+      fireEvent.click(screen.getByTestId("plant-assigned-tent-alert-ask-doctor"));
+
+      expect(gtag).toHaveBeenCalledWith("event", "ai_doctor_cta_clicked", {
+        surface: "tent_alert_row",
+        severity: "warning",
+      });
+      expect(JSON.stringify(gtag.mock.calls)).not.toContain("private_identifier");
+    } finally {
+      delete (window as unknown as { gtag?: unknown }).gtag;
+    }
+  });
 });
 
 describe("tent alerts · on-ramp wiring guards", () => {

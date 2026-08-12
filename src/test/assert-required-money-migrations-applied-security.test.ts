@@ -101,11 +101,12 @@ describe("assert-required-money-migrations-applied process boundary", () => {
     expect(invocation).toBeDefined();
     expect(invocation?.args.join(" ")).not.toContain(dbUrl);
     expect(invocation?.args.join(" ")).not.toContain("argv-canary-secret");
-    const canonical = new URL(dbUrl);
-    canonical.username = `postgres.${SANDBOX_REF}`;
-    canonical.search = "";
     expect(invocation?.env).toEqual({
-      PGDATABASE: canonical.toString(),
+      PGHOST: "aws-0-us-east-1.pooler.supabase.com",
+      PGPORT: "5432",
+      PGUSER: `postgres.${SANDBOX_REF}`,
+      PGPASSWORD: "argv-canary-secret",
+      PGDATABASE: "postgres",
       PGSSLMODE: "require",
       PGGSSENCMODE: "disable",
     });

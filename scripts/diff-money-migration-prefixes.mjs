@@ -34,6 +34,7 @@ import {
   coreTargetEnvironmentForMoney,
   sanitizeMoneyDatabaseUrlForPsql,
 } from "./lib/moneyDatabaseTargetIdentity.mjs";
+import { buildLibpqConnectionEnvironment } from "./lib/supabaseDatabaseTargetIdentity.mjs";
 import { REQUIRED_MONEY_MIGRATIONS, migrationVersion } from "./required-money-migrations.mjs";
 
 const rawArgs = process.argv.slice(2);
@@ -333,9 +334,9 @@ if (DB_URL) {
     finish(2, { toolingError: msg });
   }
 
-  // Keep credentials out of the process argument list. libpq accepts a
-  // connection URI through PGDATABASE, so psql receives the same connection
-  // without exposing it through process listings or command traces. URL mode
+  // Keep credentials out of the process argument list. Pass the sanitized
+  // connection through discrete libpq environment fields so URI parsing cannot
+  // differ between clients. URL mode
   // is authoritative: scrub every ambient libpq/Supabase connection input so
   // a runner-level PGHOSTADDR, PGPASSFILE, service, or URL alias cannot alter
   // which database is queried.
@@ -349,9 +350,7 @@ if (DB_URL) {
       delete psqlEnv[key];
     }
   }
-  psqlEnv.PGDATABASE = sanitized.databaseUrl;
-  if (sanitized.sslMode) psqlEnv.PGSSLMODE = sanitized.sslMode;
-  psqlEnv.PGGSSENCMODE = "disable";
+  Object.assign(psqlEnv, buildLibpqConnectionEnvironment(sanitized));
 }
 
 const result = spawnSync("psql", psqlArgs, { encoding: "utf8", env: psqlEnv });

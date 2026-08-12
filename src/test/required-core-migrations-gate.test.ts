@@ -287,9 +287,7 @@ describe("Supabase database target identity", () => {
     });
 
     expect(status).toBe(EXIT.OK);
-    expect(new URL(childEnv?.PGDATABASE ?? "").username).toBe(
-      `${SANDBOX_SCHEMA_VERIFIER_ROLE}.${SANDBOX_REF}`,
-    );
+    expect(childEnv?.PGUSER).toBe(`${SANDBOX_SCHEMA_VERIFIER_ROLE}.${SANDBOX_REF}`);
   });
 
   it.each([
@@ -656,13 +654,15 @@ describe("remote applied-schema runner safety", () => {
     expect(calls[0].command).toBe("psql");
     expect(calls[0].args.join(" ")).not.toContain(url);
     expect(calls[0].args.join(" ")).not.toContain("argv-secret-sentinel");
-    expect(calls[0].env.PGDATABASE).toBe(canonicalUrl);
+    expect(calls[0].env.PGDATABASE).toBe("postgres");
+    expect(calls[0].env.PGHOST).toBe(`db.${SANDBOX_REF}.supabase.co`);
+    expect(calls[0].env.PGPORT).toBe("5432");
+    expect(calls[0].env.PGUSER).toBe("postgres");
+    expect(calls[0].env.PGPASSWORD).toBe("argv-secret-sentinel");
     expect(calls[0].env.PGSSLMODE).toBe("require");
     expect(calls[0].env.PGGSSENCMODE).toBe("disable");
     expect(calls[0].env.PGDATABASE).not.toContain("?");
-    expect(calls[0].env.PGDATABASE).not.toContain(PRODUCTION_REF);
-    expect(calls[0].env.PGHOST).toBeUndefined();
-    expect(calls[0].env.PGPASSWORD).toBeUndefined();
+    expect(calls[0].env.PGHOST).not.toContain(PRODUCTION_REF);
     expect(calls[0].env.DATABASE_URL).toBeUndefined();
     expect(calls[0].env.OTHER_PROTECTED_SECRET).toBeUndefined();
     const sql = calls[0].args.at(-1) ?? "";
@@ -698,7 +698,8 @@ describe("remote applied-schema runner safety", () => {
     });
 
     expect(status).toBe(EXIT.OK);
-    expect(childEnv?.PGDATABASE).toBe(canonicalUrl);
+    expect(childEnv?.PGDATABASE).toBe("postgres");
+    expect(childEnv?.PGHOST).toBe(`db.${SANDBOX_REF}.supabase.co`);
     expect(childEnv?.PGSSLMODE).toBe("verify-full");
     expect(childEnv?.PGGSSENCMODE).toBe("disable");
   });
@@ -767,13 +768,12 @@ describe("remote applied-schema runner safety", () => {
         logger,
       });
 
-      const expected = new URL(url);
-      expected.username = `postgres.${projectRef}`;
-      expected.search = "";
-
       expect(status).toBe(EXIT.OK);
-      expect(childEnv?.PGDATABASE).toBe(expected.toString());
-      expect(new URL(childEnv?.PGDATABASE ?? "").password).toBe(encodeURIComponent(sentinel));
+      expect(childEnv?.PGHOST).toBe("aws-0-us-east-1.pooler.supabase.com");
+      expect(childEnv?.PGPORT).toBe(String(port));
+      expect(childEnv?.PGUSER).toBe(`postgres.${projectRef}`);
+      expect(childEnv?.PGPASSWORD).toBe(sentinel);
+      expect(childEnv?.PGDATABASE).toBe("postgres");
       expect(childEnv?.PGDATABASE).not.toContain("?");
       expect(childEnv?.PGDATABASE).not.toContain("attacker.invalid");
       expect(childEnv?.PGSSLMODE).toBe("verify-full");

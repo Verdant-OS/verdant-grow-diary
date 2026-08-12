@@ -39,6 +39,22 @@ function previewCaption(note: string): string {
 }
 
 /**
+ * Prefer the dedicated Photo caption (details.extras.caption, captured via
+ * quickLogActivityDetailFields.ts's Photo detail field) over the general
+ * Note text, when present. The two are deliberately distinct fields in
+ * QuickLogModal — Caption is "what this photo shows", Note is the general
+ * log note — but this presenter only has one `caption` slot, so Caption
+ * wins when the grower filled it in.
+ */
+function resolveCaption(entry: NormalizedDiaryEntry): string {
+  const structured = entry.details.extras?.caption;
+  if (typeof structured === "string" && structured.trim() !== "") {
+    return previewCaption(structured);
+  }
+  return previewCaption(entry.note);
+}
+
+/**
  * Accept only http(s) URLs. Reject `javascript:`, `data:`, blank strings,
  * and any non-string value.
  */
@@ -103,7 +119,7 @@ function toRow(entry: NormalizedDiaryEntry): PhotoHistoryRow | null {
     stage: entry.stage,
     eventType: entry.eventType,
     photoUrl: sanitized.url,
-    caption: previewCaption(entry.note),
+    caption: resolveCaption(entry),
     warnings,
     showPhotoNonDiagnosticLabel: shouldShowPhotoNonDiagnosticLabel({
       hasPhoto: sanitized.url !== null,

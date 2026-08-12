@@ -4,6 +4,7 @@
  * Reads from the existing `diary_entries` table (same source QuickLog writes
  * to). No writes. No sensor_readings access. No action_queue / alerts.
  */
+import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, Camera, Gauge, NotebookPen, Wrench } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,13 +21,25 @@ import {
   PHOTO_NON_DIAGNOSTIC_LABEL,
   PHOTO_NON_DIAGNOSTIC_TESTID,
 } from "@/lib/photoEventNonDiagnosticLabelRules";
+import {
+  describeQuickLogDetailsFromExtras,
+  type QuickLogDetailDisplayLine,
+} from "@/lib/quick-log/quickLogActivityDetailFields";
 
 interface Props {
   plantId: string | null | undefined;
   plantName?: string | null;
 }
 
-function EntryRow({ row, plantName }: { row: PlantRecentActivityRow; plantName?: string | null }) {
+function EntryRow({
+  row,
+  plantName,
+  detailLines,
+}: {
+  row: PlantRecentActivityRow;
+  plantName?: string | null;
+  detailLines: readonly QuickLogDetailDisplayLine[];
+}) {
   return (
     <li
       className="rounded-lg border bg-card/40 p-3 text-sm"
@@ -73,8 +86,23 @@ function EntryRow({ row, plantName }: { row: PlantRecentActivityRow; plantName?:
       </div>
       {row.notePreview ? (
         <p className="mt-2 text-sm leading-snug">{row.notePreview}</p>
-      ) : !row.hasHardwareReadings ? (
+      ) : !row.hasHardwareReadings && detailLines.length === 0 ? (
         <p className="mt-2 text-xs text-muted-foreground italic">No note</p>
+      ) : null}
+      {detailLines.length > 0 ? (
+        <ul className="mt-2 flex flex-wrap gap-1.5" data-testid="plant-recent-activity-detail-lines">
+          {detailLines.map((line) => (
+            <li key={line.key}>
+              <Badge
+                variant="outline"
+                className="text-[11px] font-normal"
+                data-testid={`plant-recent-activity-detail-${line.key}`}
+              >
+                {line.label}: {line.value}
+              </Badge>
+            </li>
+          ))}
+        </ul>
       ) : null}
       {row.hasPhoto && row.showPhotoNonDiagnosticLabel ? (
         <div
@@ -127,6 +155,21 @@ export default function PlantRecentActivityPanel({ plantId, plantName }: Props) 
     plantId: plantId ?? null,
   });
 
+  // Structured activity detail (e.g. training technique) is recovered from
+  // the raw stored details here in the presenter — deliberately not in
+  // plantRecentActivityRules.ts, which feeds ~20 other consumers and doesn't
+  // expose raw `details` on PlantRecentActivityRow today. Keyed by entry id
+  // for O(1) lookup.
+  const detailLinesById = useMemo(() => {
+    const map = new Map<string, readonly QuickLogDetailDisplayLine[]>();
+    for (const row of (data ?? []) as Array<{ id?: unknown; details?: unknown }>) {
+      if (typeof row?.id !== "string") continue;
+      const lines = describeQuickLogDetailsFromExtras(row.details);
+      if (lines.length > 0) map.set(row.id, lines);
+    }
+    return map;
+  }, [data]);
+
   return (
     <Card data-testid="plant-recent-activity-panel" className="mt-4">
       <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
@@ -159,7 +202,12 @@ export default function PlantRecentActivityPanel({ plantId, plantName }: Props) 
         ) : (
           <ul className="space-y-2" data-testid="plant-recent-activity-list">
             {rows.map((r) => (
-              <EntryRow key={r.id} row={r} plantName={plantName} />
+              <EntryRow
+                key={r.id}
+                row={r}
+                plantName={plantName}
+                detailLines={detailLinesById.get(r.id) ?? []}
+              />
             ))}
           </ul>
         )}

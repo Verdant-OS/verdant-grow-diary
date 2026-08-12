@@ -69,6 +69,56 @@ describe("normalizeDiaryEntries", () => {
     expect(e.warnings).toEqual([]);
   });
 
+  it("falls back to details.event_type when no top-level event-type field exists (QuickLog-authored diary rows)", () => {
+    // diary_entries has no top-level event_type column; quicklog_save_event's
+    // Training/Photo saves only carry it inside details (see
+    // quickLogActivityDetailFields.ts's sanitizeQuickLogActivityDetails).
+    const row = baseRow({
+      entry_type: undefined,
+      details: { event_type: "training", technique: "defoliation", intensity: "light" },
+    });
+    const [e] = normalizeDiaryEntries({ rawEntries: [row] });
+    expect(e.eventType).toBe("training");
+    expect(e.warnings).not.toContain("event-type:missing");
+  });
+
+  it("a genuine top-level event-type field still wins over details.event_type", () => {
+    const row = baseRow({
+      entry_type: "water",
+      details: { event_type: "training" },
+    });
+    const [e] = normalizeDiaryEntries({ rawEntries: [row] });
+    expect(e.eventType).toBe("water");
+  });
+
+  it("still defaults to note (with the missing warning) when neither top-level nor details carry an event type", () => {
+    const row = baseRow({ entry_type: undefined, details: { custom_x: "keep me" } });
+    const [e] = normalizeDiaryEntries({ rawEntries: [row] });
+    expect(e.eventType).toBe("note");
+    expect(e.warnings).toContain("event-type:missing");
+  });
+
+  it("falls back to details.photo_url when no top-level photo_url exists (quicklog_save_event Photo saves)", () => {
+    // quicklog_save_event's diary companion row never sets the top-level
+    // photo_url column -- only details.photo_url (see
+    // ...trust_boundary_hardening.sql:290).
+    const row = baseRow({
+      photo_url: undefined,
+      details: { event_type: "photo", photo_url: "user1/grow1/123.jpg", subject: "buds" },
+    });
+    const [e] = normalizeDiaryEntries({ rawEntries: [row] });
+    expect(e.photoUrl).toBe("user1/grow1/123.jpg");
+  });
+
+  it("a genuine top-level photo_url still wins over details.photo_url", () => {
+    const row = baseRow({
+      photo_url: "https://signed.example.com/real.jpg",
+      details: { photo_url: "user1/grow1/stale.jpg" },
+    });
+    const [e] = normalizeDiaryEntries({ rawEntries: [row] });
+    expect(e.photoUrl).toBe("https://signed.example.com/real.jpg");
+  });
+
   it("derives day/week of grow only from valid dates", () => {
     const [e] = normalizeDiaryEntries({
       rawEntries: [baseRow()],

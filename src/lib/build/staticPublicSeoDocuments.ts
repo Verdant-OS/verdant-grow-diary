@@ -11,6 +11,7 @@
 
 import { formatVerificationStatus, VERDANT_CULTIVARS } from "../../constants/verdantCultivars";
 import {
+  VERDANT_BLUEPRINT_TARGETS_FAQ,
   VERDANT_GROWER_GUIDE_FAQ,
   VERDANT_GUIDES_BREADCRUMB_ITEMS,
   VERDANT_SEO_GUIDES,
@@ -488,6 +489,30 @@ const CORE_ACQUISITION_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> = [
     description:
       "Per-stage target ranges for air temperature, relative humidity, feed EC, pH, PPFD and DLI — from seedling through flower to dry and cure.",
     imageAlt: "Verdant grow stage target bands",
+    // Registered here, not injected from a useEffect: staticRouteHead emits
+    // these in the route's first SSR response, so a crawler that never
+    // hydrates still receives the FAQPage and BreadcrumbList nodes.
+    jsonLd: [
+      buildStaticWebPageJsonLd({
+        title: "Grow stage target bands | Temperature, humidity, EC, pH, PPFD | Verdant",
+        description:
+          "Per-stage target ranges for air temperature, relative humidity, feed EC, pH, PPFD and DLI — from seedling through flower to dry and cure.",
+        url: `${VERDANT_SITE_ORIGIN}/tools/blueprint-targets`,
+      }),
+      buildFaqPageJsonLd({
+        pageUrl: `${VERDANT_SITE_ORIGIN}/tools/blueprint-targets`,
+        questions: VERDANT_BLUEPRINT_TARGETS_FAQ,
+      }),
+      buildBreadcrumbListJsonLd({
+        items: [
+          ...VERDANT_GUIDES_BREADCRUMB_ITEMS,
+          {
+            name: "Grow stage target bands",
+            url: `${VERDANT_SITE_ORIGIN}/tools/blueprint-targets`,
+          },
+        ],
+      }),
+    ],
   }),
   publicDocument("/tools/vpd-calculator", {
     title: "Free Cannabis VPD Calculator by Growth Stage | Verdant",

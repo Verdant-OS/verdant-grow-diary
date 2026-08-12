@@ -56,7 +56,6 @@ export type DispatchReason =
 
 export interface DispatchResult {
   reason: DispatchReason;
-  detail?: string;
 }
 
 function formatAmount(evt: SdkEventLike): string | undefined {
@@ -88,7 +87,6 @@ function logSkip(result: DispatchResult, evt: SdkEventLike): DispatchResult {
   // doesn't page — these are expected, non-retryable fallbacks.
   console.warn("order-confirmation email skipped", {
     reason: result.reason,
-    detail: result.detail,
     eventType: evt.eventType,
     transactionId: evt.data?.id,
   });
@@ -101,7 +99,7 @@ export async function maybeSendPurchaseConfirmation(
 ): Promise<DispatchResult> {
   try {
     if (!evt?.eventType || !CONFIRMATION_EVENT_TYPES.has(evt.eventType)) {
-      return logSkip({ reason: "skipped:event_type_not_confirmable", detail: evt?.eventType }, evt);
+      return logSkip({ reason: "skipped:event_type_not_confirmable" }, evt);
     }
 
     const userId = pickUserId(evt);
@@ -116,11 +114,11 @@ export async function maybeSendPurchaseConfirmation(
     let userRes: Awaited<ReturnType<typeof supabase.auth.admin.getUserById>>;
     try {
       userRes = await supabase.auth.admin.getUserById(userId);
-    } catch (e) {
-      return logSkip({ reason: "skipped:user_lookup_failed", detail: String(e) }, evt);
+    } catch {
+      return logSkip({ reason: "skipped:user_lookup_failed" }, evt);
     }
     if (userRes.error) {
-      return logSkip({ reason: "skipped:user_lookup_failed", detail: userRes.error.message }, evt);
+      return logSkip({ reason: "skipped:user_lookup_failed" }, evt);
     }
     if (!userRes.data?.user) {
       return logSkip({ reason: "skipped:user_not_found" }, evt);
@@ -156,10 +154,10 @@ export async function maybeSendPurchaseConfirmation(
       }),
     });
     if (!resp.ok) {
-      return logSkip({ reason: "skipped:send_non_2xx", detail: `status=${resp.status}` }, evt);
+      return logSkip({ reason: "skipped:send_non_2xx" }, evt);
     }
     return { reason: "sent" };
-  } catch (err) {
-    return logSkip({ reason: "skipped:dispatch_threw", detail: String(err) }, evt);
+  } catch {
+    return logSkip({ reason: "skipped:dispatch_threw" }, evt);
   }
 }

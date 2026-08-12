@@ -1,0 +1,249 @@
+name: AI-credit service contract effect (production)
+
+# Migration history proves that SQL ran once. This monitor separately proves
+# that the two money-critical service overloads and their privilege boundary
+# still express the forward-reasserted contract now.
+on:
+  schedule:
+    # Run after the 07:30 UTC migration-presence monitor so the two findings
+    # remain separate and operators see history before current effect.
+    - cron: "0 8 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: ai-credit-service-contract-effect-production
+  cancel-in-progress: false
+
+env:
+  CONTRACT_EFFECT_ISSUE_TITLE: "AI-credit service contract check (production) requires attention"
+
+jobs:
+  verify:
+    name: Verify AI-credit service contract remains effective
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/verdant-grow-diary'
+    environment: verdant-production
+    timeout-minutes: 20
+    env:
+      DATABASE_URL: ""
+      PGDATABASE: ""
+      PGHOST: ""
+      PGPASSWORD: ""
+      PGPORT: ""
+      PGSERVICE: ""
+      PGSERVICEFILE: ""
+      PGUSER: ""
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "24"
+
+      - name: Install psql client
+        run: |
+          sudo apt-get update -qq || echo "apt-get update reported errors; continuing to install"
+          for attempt in 1 2 3; do
+            if sudo apt-get install -y --no-install-recommends postgresql-client; then
+              exit 0
+            fi
+            echo "psql install attempt $attempt failed; retrying in 10s"
+            sleep 10
+          done
+          exit 1
+
+      - name: Require SUPABASE_DB_URL_LIVE
+        uses: ./.github/actions/require-ci-secret
+        with:
+          secret-name: SUPABASE_DB_URL_LIVE
+          secret-value: ${{ secrets.SUPABASE_DB_URL_LIVE }}
+          guard-heading: "AI-credit service contract effect cannot reach production"
+          reason-lines-json: >
+            ["Without this protected read path, current function bodies and
+            privileges cannot be compared with the money-path contract. A
+            migration tracker row alone is not effect evidence."]
+
+      - name: Inspect migration history and current service contract
+        id: verify_effect
+        if: always()
+        timeout-minutes: 5
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL_LIVE }}
+          TARGET_ENV: live
+          PGCONNECT_TIMEOUT: "15"
+          AUDIT_PATH: ${{ github.workspace }}/audit/live/effect-audit.json
+          REPORT_PATH: ${{ github.workspace }}/audit/live/effect-report.md
+        run: |
+          mkdir -p audit/live
+          set +e
+          node scripts/verify-ai-credit-service-contract-effect.mjs
+          code=$?
+          set -e
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit "$code"
+
+      - name: Resolve effect-verification evidence
+        id: evidence
+        if: always()
+        run: |
+          mkdir -p audit/live
+          node <<'NODE'
+          const fs = require("fs");
+          const path = "audit/live/effect-audit.json";
+          let audit;
+          try {
+            audit = JSON.parse(fs.readFileSync(path, "utf8"));
+          } catch {
+            audit = {
+              schema_version: 1,
+              tool: "verify-ai-credit-service-contract-effect",
+              target_env: "live",
+              checked_at: new Date().toISOString(),
+              statuses: {
+                migration_applied: null,
+                contract_effective: null,
+                definition_drift_detected: null,
+                verification_blocked: true,
+              },
+              migration: {
+                file: "20260727050000_ai_credit_service_contract_forward_reassert.sql",
+                version: "20260727050000",
+              },
+              functions: [],
+              result_sidecar: { check_count: 0, failed_checks: [] },
+              blocked_reason: "audit_unreadable_or_checker_never_ran",
+            };
+            fs.writeFileSync(path, JSON.stringify(audit, null, 2) + "\n");
+          }
+          const s = audit.statuses ?? {};
+          const healthy =
+            s.migration_applied === true &&
+            s.contract_effective === true &&
+            s.definition_drift_detected === false &&
+            s.verification_blocked === false;
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `healthy=${healthy}\n`);
+          for (const key of [
+            "migration_applied",
+            "contract_effective",
+            "definition_drift_detected",
+            "verification_blocked",
+          ]) {
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, `${key}=${String(s[key] ?? "unknown")}\n`);
+          }
+          NODE
+
+      - name: Append effect report to workflow summary
+        if: always()
+        run: |
+          echo "## AI-credit service contract effect (production)" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          if [ -s audit/live/effect-report.md ]; then
+            cat audit/live/effect-report.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No readable verifier report was produced; verification is blocked." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload effect-verification evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ai-credit-service-contract-effect-live
+          path: audit/live
+          if-no-files-found: error
+
+      - name: Reconcile contract-effect tracking issue
+        if: always()
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea
+        env:
+          EVIDENCE_HEALTHY: ${{ steps.evidence.outputs.healthy }}
+        with:
+          script: |
+            const fs = require("fs");
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const title = process.env.CONTRACT_EFFECT_ISSUE_TITLE;
+            const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+            let audit = null;
+            try {
+              audit = JSON.parse(fs.readFileSync("audit/live/effect-audit.json", "utf8"));
+            } catch {}
+            const statuses = audit?.statuses ?? {
+              migration_applied: null,
+              contract_effective: null,
+              definition_drift_detected: null,
+              verification_blocked: true,
+            };
+            const healthy =
+              process.env.EVIDENCE_HEALTHY === "true" &&
+              statuses.migration_applied === true &&
+              statuses.contract_effective === true &&
+              statuses.definition_drift_detected === false &&
+              statuses.verification_blocked === false;
+
+            const existing = await github.paginate(github.rest.issues.listForRepo, {
+              owner, repo, state: "open", per_page: 100,
+            });
+            const hit = existing.find((item) => !item.pull_request && item.title === title);
+
+            if (healthy) {
+              if (!hit) return;
+              await github.rest.issues.createComment({
+                owner, repo, issue_number: hit.number,
+                body: [
+                  "Resolved — a later read-only production inspection verified both migration history and the current AI-credit service contract.",
+                  "",
+                  `Verified by: ${runUrl}`,
+                ].join("\n"),
+              });
+              await github.rest.issues.update({
+                owner, repo, issue_number: hit.number, state: "closed", state_reason: "completed",
+              });
+              return;
+            }
+
+            const failedChecks = [
+              ...(audit?.functions ?? []).flatMap((fn) =>
+                (fn.failed_checks ?? []).map((check) => `- \`${fn.signature}\`: \`${check.id}\``)
+              ),
+              ...(audit?.result_sidecar?.failed_checks ?? []).map(
+                (check) => `- result sidecar: \`${check.id}\``
+              ),
+            ];
+            const format = (value) => value === null || value === undefined ? "unknown" : String(value);
+            const body = [
+              statuses.verification_blocked
+                ? "**Production effect verification is blocked.** Do not infer that the money contract is healthy."
+                : "**The current production AI-credit service contract is not fully healthy.**",
+              "",
+              `- migration_applied: \`${format(statuses.migration_applied)}\``,
+              `- contract_effective: \`${format(statuses.contract_effective)}\``,
+              `- definition_drift_detected: \`${format(statuses.definition_drift_detected)}\``,
+              `- verification_blocked: \`${format(statuses.verification_blocked)}\``,
+              ...(audit?.blocked_reason ? ["", `Blocked reason: \`${audit.blocked_reason}\``] : []),
+              ...(failedChecks.length ? ["", "Failed checks:", "", ...failedChecks] : []),
+              "",
+              `Run: ${runUrl}`,
+              "",
+              "The artifact contains status, sanitized check identifiers, and normalized-definition hashes only. Raw function bodies and connection material are not persisted.",
+            ].join("\n");
+
+            const ensureLabel = async (name, color, description) => {
+              try {
+                await github.rest.issues.createLabel({ owner, repo, name, color, description });
+              } catch (error) {
+                if (error.status !== 422) core.warning(`could not ensure ${name}: ${error.message}`);
+              }
+            };
+            await ensureLabel("money-contract-check", "B60205", "Production money-contract verification needs attention");
+
+            if (hit) {
+              await github.rest.issues.createComment({ owner, repo, issue_number: hit.number, body });
+            } else {
+              await github.rest.issues.create({
+                owner, repo, title, body, labels: ["money-contract-check"],
+              });
+            }

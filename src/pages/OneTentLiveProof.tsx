@@ -9,7 +9,7 @@
  * Steps that cannot be safely inferred render as
  * "Needs operator confirmation".
  */
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import PageHeader from "@/components/PageHeader";
@@ -92,6 +92,25 @@ export default function OneTentLiveProof() {
 
   const queryClient = useQueryClient();
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const copyStatusTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mountedRef = useRef(true);
+  // Both timers only flip local UI state. Clearing them on the next call is not
+  // enough: if the page unmounts while one is pending, the callback sets state
+  // on a torn-down tree.
+  //
+  // Clearing at unmount alone is also not enough for the copy handler, whose
+  // timer is created only AFTER an await. Unmounting during that await leaves
+  // this cleanup nothing to clear, and the continuation then schedules a fresh
+  // timer the cleanup has already run past — so post-await work checks
+  // `mountedRef` as well.
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (refreshTimer.current) clearTimeout(refreshTimer.current);
+      if (copyStatusTimer.current) clearTimeout(copyStatusTimer.current);
+    };
+  }, []);
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
     try {
@@ -438,14 +457,26 @@ export default function OneTentLiveProof() {
                 navigator.clipboard?.writeText
               ) {
                 await navigator.clipboard.writeText(text);
-                setCopyStatus("copied");
+                // This await can outlive the component.
+                if (mountedRef.current) setCopyStatus("copied");
               } else {
                 setCopyStatus("error");
               }
             } catch {
-              setCopyStatus("error");
+              if (mountedRef.current) setCopyStatus("error");
             } finally {
-              setTimeout(() => setCopyStatus("idle"), 1500);
+              // `finally` still runs when the branches above bail out, so the
+              // guard is repeated here: without it an unmount during the await
+              // would schedule a timer after cleanup had already run.
+              if (mountedRef.current) {
+                if (copyStatusTimer.current) {
+                  clearTimeout(copyStatusTimer.current);
+                }
+                copyStatusTimer.current = setTimeout(
+                  () => setCopyStatus("idle"),
+                  1500,
+                );
+              }
             }
           }}
         >

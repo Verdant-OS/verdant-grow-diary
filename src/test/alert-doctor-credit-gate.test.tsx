@@ -361,6 +361,16 @@ describe("wiring guardrails", () => {
     expect(PLANT_DETAIL).toMatch(
       /const entitlementReady = !entitlementLoading && !entitlementLookupFailed;/,
     );
+    // A failed refresh keeps stale data alongside isError — the caller must
+    // discard cached evidence so the gate fails open rather than keep
+    // intercepting on a balance that may have changed.
+    expect(PLANT_DETAIL).toMatch(/isError:\s*doctorCreditReadsFailed/);
+    expect(PLANT_DETAIL).toMatch(
+      /creditsUsed:\s*doctorCreditReadsFailed \? undefined : doctorCreditReads\?\.allowanceUsed,/,
+    );
+    expect(PLANT_DETAIL).toMatch(
+      /hasPackCredits:\s*doctorCreditReadsFailed \? undefined : doctorCreditReads\?\.hasPackCredits,/,
+    );
   });
 
   it("the panel stays hook-free of data reads — the gate arrives as a prop", () => {

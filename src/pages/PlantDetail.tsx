@@ -275,14 +275,19 @@ export default function PlantDetail() {
   } = useMyEntitlements();
   const entitlementReady = !entitlementLoading && !entitlementLookupFailed;
   const perGrowAiCredits = entitlement.capabilities.aiCreditsPerGrow;
-  const { data: doctorCreditReads } = useAlertDoctorCreditGateReads(
-    entitlementReady && typeof perGrowAiCredits === "number" ? (plant?.growId ?? null) : null,
-  );
+  const { data: doctorCreditReads, isError: doctorCreditReadsFailed } =
+    useAlertDoctorCreditGateReads(
+      entitlementReady && typeof perGrowAiCredits === "number" ? (plant?.growId ?? null) : null,
+    );
+  // A failed REFRESH keeps the prior data alongside isError — cached
+  // evidence must not keep intercepting after the balance may have changed
+  // (e.g. a pack purchase), so an errored read resolves to undefined and
+  // the gate fails open.
   const doctorCreditGate = buildAlertDoctorCreditGate({
     aiCreditsPerGrow: perGrowAiCredits,
     entitlementReady,
-    creditsUsed: doctorCreditReads?.allowanceUsed,
-    hasPackCredits: doctorCreditReads?.hasPackCredits,
+    creditsUsed: doctorCreditReadsFailed ? undefined : doctorCreditReads?.allowanceUsed,
+    hasPackCredits: doctorCreditReadsFailed ? undefined : doctorCreditReads?.hasPackCredits,
   });
 
   // Bounded-loading guard: if the plant query never settles (slow network,

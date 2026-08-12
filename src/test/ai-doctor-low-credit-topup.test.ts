@@ -57,6 +57,9 @@ const credit = (over: Record<string, unknown> = {}) => ({
   scope: "per_month" as const,
   scope_limit: 100,
   plan_id: "pro_monthly",
+  // A CONFIRMED zero. The offer requires proof that no pack credits are held,
+  // so an absent value is not the same as none — see the fail-closed test.
+  pack_balance: 0,
   ...over,
 });
 
@@ -138,6 +141,18 @@ describe("low-credit top-up · fails closed", () => {
 
   it("never asks someone who already holds pack credits", () => {
     expect(build({ credit: credit({ pack_balance: 25 }) }).visible).toBe(false);
+  });
+
+  it("requires a CONFIRMED zero pack balance, not merely an absent one", () => {
+    // Older success envelopes omit pack_balance, and an untrusted response
+    // could supply a malformed one. Treating unknown as zero would solicit a
+    // pack from someone who may already own credits — so unknown stays quiet.
+    expect(build({ credit: credit({ pack_balance: undefined }) }).visible).toBe(false);
+    expect(build({ credit: credit({ pack_balance: null }) }).visible).toBe(false);
+    expect(build({ credit: credit({ pack_balance: "0" }) }).visible).toBe(false);
+    expect(build({ credit: credit({ pack_balance: Number.NaN }) }).visible).toBe(false);
+    // Only a real numeric zero opens the offer.
+    expect(build({ credit: credit({ pack_balance: 0 }) }).visible).toBe(true);
   });
 
   it("ignores the per-grow (Free) scope entirely", () => {

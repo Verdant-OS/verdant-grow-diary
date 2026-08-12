@@ -64,8 +64,15 @@ function lowMonthlyRemaining(credit: AiCreditRemainingInput | null | undefined):
   if ((remaining as number) > AI_DOCTOR_LOW_CREDIT_THRESHOLD) return null;
   // Already holding purchased credits — the allowance is low but they are not
   // actually about to be blocked, so this would be a sale for its own sake.
-  const packBalance = credit.pack_balance;
-  if (typeof packBalance === "number" && packBalance > 0) return null;
+  //
+  // Requires a CONFIRMED numeric zero, so a missing or malformed value hides
+  // the offer rather than assuming none are held. This is deliberately
+  // stricter than the sibling post-value upgrade view model, which tolerates a
+  // missing pack_balance for rollout compatibility: that one upsells a FREE
+  // viewer, who essentially cannot hold pack credits, whereas this one asks a
+  // PAID viewer for money and owning a pack is entirely normal for them. The
+  // cost of being wrong is asymmetric, so the uncertain case stays silent.
+  if (credit.pack_balance !== 0) return null;
   return remaining as number;
 }
 

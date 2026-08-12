@@ -208,13 +208,28 @@ async function main() {
 
     for (const [index, source] of ["manual", "csv"].entries()) {
       const row = reading(ownerFixture.id, ownerTentId, source, index * 1_000);
-      const { data, error } = await withTransportRetry(`authenticated ${source} INSERT`, () =>
-        ownerClient.from("sensor_readings").insert(row).select("id,source"),
+      const { error } = await withTransportRetry(`authenticated ${source} INSERT`, () =>
+        ownerClient.from("sensor_readings").insert(row),
+      );
+      // sensor_readings_dedupe_uidx makes this tuple identify at most one
+      // row, so the service readback decides the verdict: a committed-but-
+      // lost first attempt whose replay hit 23505 still counts as the
+      // allowed row landing exactly once.
+      const { count, error: countError } = await withTransportRetry(
+        `authenticated ${source} INSERT readback`,
+        () =>
+          admin
+            .from("sensor_readings")
+            .select("id", { count: "exact", head: true })
+            .eq("user_id", row.user_id)
+            .eq("tent_id", row.tent_id)
+            .eq("source", source)
+            .eq("captured_at", row.captured_at),
       );
       check(
         `authenticated ${source} INSERT succeeds`,
-        !error && data?.length === 1 && data[0]?.source === source,
-        error ? errorDetail(error) : undefined,
+        !countError && count === 1,
+        error || countError ? errorDetail(error ?? countError) : undefined,
       );
     }
 
@@ -361,14 +376,28 @@ async function main() {
     );
 
     const serviceRoleRow = reading(ownerFixture.id, ownerTentId, "live", 11_000);
-    const { data: serviceRoleData, error: serviceRoleError } = await withTransportRetry(
-      "service-role live INSERT",
-      () => admin.from("sensor_readings").insert(serviceRoleRow).select("id,source"),
+    const { error: serviceRoleError } = await withTransportRetry("service-role live INSERT", () =>
+      admin.from("sensor_readings").insert(serviceRoleRow),
+    );
+    // Readback-decided for the same committed-but-lost reason as the
+    // manual/csv positive controls above.
+    const { count: serviceRoleCount, error: serviceRoleReadError } = await withTransportRetry(
+      "service-role live INSERT readback",
+      () =>
+        admin
+          .from("sensor_readings")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", serviceRoleRow.user_id)
+          .eq("tent_id", serviceRoleRow.tent_id)
+          .eq("source", "live")
+          .eq("captured_at", serviceRoleRow.captured_at),
     );
     check(
       "service-role RLS bypass can INSERT trusted live provenance",
-      !serviceRoleError && serviceRoleData?.length === 1 && serviceRoleData[0]?.source === "live",
-      serviceRoleError ? errorDetail(serviceRoleError) : undefined,
+      !serviceRoleReadError && serviceRoleCount === 1,
+      serviceRoleError || serviceRoleReadError
+        ? errorDetail(serviceRoleError ?? serviceRoleReadError)
+        : undefined,
     );
 
     const rpcCapturedAt = new Date(Date.now() - 30_000).toISOString();
@@ -420,8 +449,12 @@ async function main() {
       "service-role pi_ingest_commit_batch preserves reserved operator attestation",
       !rpcError &&
         !rpcReadError &&
-        rpcCounts?.inserted === 1 &&
-        rpcCounts.rejected === 0 &&
+        // A committed-but-lost first attempt replays the identical payload
+        // and dedupes on (user_id, idempotency_key) as inserted=0/rejected=1;
+        // either shape must still show the row present exactly once with the
+        // reserved markers preserved.
+        ((rpcCounts?.inserted === 1 && rpcCounts.rejected === 0) ||
+          (rpcCounts?.inserted === 0 && rpcCounts.rejected === 1)) &&
         rpcRows?.length === 1 &&
         rpcRows[0]?.source === "manual" &&
         rpcRows[0]?.raw_payload?.provenance === OPERATOR_ATTESTED_PROVENANCE &&

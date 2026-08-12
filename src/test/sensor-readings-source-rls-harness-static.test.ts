@@ -32,8 +32,28 @@ describe("sensor provenance RLS harness fixture safety", () => {
   it("retains the explicit service-role trusted-source assertion", () => {
     expect(HARNESS).toContain('"service-role RLS bypass can INSERT trusted live provenance"');
     expect(HARNESS).toMatch(
-      /withTransportRetry\(\s*"service-role live INSERT",\s*\(\) => admin\.from\("sensor_readings"\)\.insert\(serviceRoleRow\)/,
+      /withTransportRetry\("service-role live INSERT", \(\) =>\s*admin\.from\("sensor_readings"\)\.insert\(serviceRoleRow\)/,
     );
+  });
+
+  it("decides retried positive controls by authoritative readback", () => {
+    // sensor_readings_dedupe_uidx (user_id, tent_id, source, metric,
+    // captured_at) means a committed-but-lost first attempt's replay hits a
+    // coded 23505 the retry correctly refuses to absorb. The verdict for
+    // every positive control must therefore come from the service-role
+    // readback (exactly one row landed), never from the insert response body.
+    expect(HARNESS).toContain("`authenticated ${source} INSERT readback`");
+    expect(HARNESS).toContain("!countError && count === 1");
+    expect(HARNESS).toContain('"service-role live INSERT readback"');
+    expect(HARNESS).toContain("!serviceRoleReadError && serviceRoleCount === 1");
+    expect(HARNESS).not.toContain("serviceRoleData");
+    // The ingest RPC dedupes a replayed (user_id, idempotency_key) as
+    // inserted=0/rejected=1; that shape passes only alongside the readback
+    // proving the row is present exactly once with reserved markers intact.
+    expect(HARNESS).toMatch(
+      /\(\(rpcCounts\?\.inserted === 1 && rpcCounts\.rejected === 0\) \|\|\s*(?:\/\/[^\r\n]*\s*)*\(rpcCounts\?\.inserted === 0 && rpcCounts\.rejected === 1\)\)/,
+    );
+    expect(HARNESS).toContain("rpcRows?.length === 1");
   });
 
   it("retries only code-less transport failures, loudly and bounded", () => {

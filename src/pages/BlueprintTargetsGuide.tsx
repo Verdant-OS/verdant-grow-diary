@@ -13,26 +13,22 @@
  *    access:"public" and the mobile e2e visits it signed-out asserting zero
  *    private-REST traffic. Crawlability comes from SSR, so every band must
  *    render on first paint with no interaction gate.
- * 2. PARITY WITH THE PAID OVERLAY. Bands are read straight from
- *    SOP_BLUEPRINT_TARGETS, the single source the overlay uses. This page
- *    never restates a number in prose.
+ * 2. PARITY WITH THE PAID OVERLAY. Bands come from
+ *    blueprintTargetsViewModel, which reads SOP_BLUEPRINT_TARGETS — the same
+ *    source the paid overlay scores against. This page never restates a
+ *    number in prose.
  * 3. PUBLIC VOICE. BlueprintTeaser is deliberately NOT reused: its copy is
  *    written for a signed-in grower looking at one plant ("your live and
  *    logged readings", "Set this plant's stage") and reads wrong here.
  *
- * Celsius is shown with a Fahrenheit conversion computed inline. The unit
- * preference helper is intentionally not called — it reads localStorage,
- * which does not exist during SSR.
+ * Presenter only: band formatting, unit conversion and stage copy live in
+ * src/lib/blueprintTargetsViewModel.ts, per the repo layering rules.
  */
 import { Link } from "@/lib/react-router-compat";
 import BrandLogo from "@/components/BrandLogo";
 import { usePageSeo } from "@/hooks/usePageSeo";
-import {
-  SOP_BLUEPRINT_TARGETS,
-  type BlueprintStageBands,
-  type BlueprintTargetStage,
-} from "@/constants/blueprintTargets";
 import { VERDANT_BLUEPRINT_TARGETS_FAQ } from "@/constants/verdantSeoContent";
+import { buildBlueprintTargetsViewModel } from "@/lib/blueprintTargetsViewModel";
 
 /**
  * Bare "/auth" opens the SIGN-IN tab — Auth resolves mode to "signin" unless
@@ -49,133 +45,11 @@ import { VERDANT_BLUEPRINT_TARGETS_FAQ } from "@/constants/verdantSeoContent";
  */
 const SIGNUP_PATH = "/auth?mode=signup";
 
-/** Display order. Matches the order a plant actually moves through. */
-const STAGE_ORDER: ReadonlyArray<BlueprintTargetStage> = [
-  "seedling",
-  "veg",
-  "preflower",
-  "flower",
-  "late_flower",
-  "harvest",
-];
-
-const STAGE_COPY: Record<BlueprintTargetStage, { label: string; blurb: string }> = {
-  seedling: {
-    label: "Seedling / propagation",
-    blurb:
-      "Warm and humid, with light kept low while the root system is still developing.",
-  },
-  veg: {
-    label: "Vegetative",
-    blurb:
-      "A pronounced day/night temperature split opens up. Humidity comes down and feed strength climbs as the plant builds structure.",
-  },
-  preflower: {
-    label: "Transition / pre-flower",
-    blurb:
-      "The stretch. Humidity drops toward flower levels and feed strength ramps up, though it has not yet reached its flower peak.",
-  },
-  flower: {
-    label: "Flower",
-    blurb:
-      "Peak light and feed, with humidity held down to protect dense buds from rot.",
-  },
-  late_flower: {
-    label: "Late flower",
-    blurb:
-      "Cooler and drier still. Any taper or flush should follow evidence — runoff EC, leaf-tip burn, visible salt stress — rather than the calendar; a plant still building tissue should not be starved.",
-  },
-  harvest: {
-    label: "Dry & cure",
-    blurb:
-      "A dark, cool room held to a narrow band, with gentle airflow — stagnant air lets damp pockets form even when the average reads right. Light, feed and pH targets no longer apply once the plant is cut.",
-  },
-};
-
-interface MetricRow {
-  key: string;
-  label: string;
-  value: string;
-  note?: string;
-}
-
-function celsiusToFahrenheit(c: number): number {
-  return Math.round(((c * 9) / 5 + 32) * 10) / 10;
-}
-
-function formatTempBand(min: number, max: number): string {
-  return `${min}–${max} °C (${celsiusToFahrenheit(min)}–${celsiusToFahrenheit(max)} °F)`;
-}
-
 /**
- * Flatten one stage's bands into display rows. Metrics with no target for a
- * stage are omitted entirely rather than shown blank — an absent band means
- * "no target", which is meaningful (see the dry-room stage).
+ * Built once at module scope: the view model is pure and input-free, so there
+ * is nothing to recompute per render.
  */
-export function buildStageMetricRows(bands: BlueprintStageBands): MetricRow[] {
-  const rows: MetricRow[] = [];
-
-  if (bands.tempC) {
-    const { day, night } = bands.tempC;
-    const sameDayNight = day.min === night.min && day.max === night.max;
-    if (sameDayNight) {
-      rows.push({
-        key: "tempC",
-        label: "Air temperature",
-        value: formatTempBand(day.min, day.max),
-      });
-    } else {
-      rows.push({
-        key: "tempC-day",
-        label: "Air temperature (lights on)",
-        value: formatTempBand(day.min, day.max),
-      });
-      rows.push({
-        key: "tempC-night",
-        label: "Air temperature (lights off)",
-        value: formatTempBand(night.min, night.max),
-      });
-    }
-  }
-
-  if (bands.rh) {
-    rows.push({ key: "rh", label: "Relative humidity", value: `${bands.rh.min}–${bands.rh.max} %` });
-  }
-  // EC and pH carry two qualifiers that are load-bearing for safety.
-  //
-  // 1. INPUT ONLY. These are targets for the solution the grower mixes, never
-  //    for collected runoff — see blueprintFeedingInput, which reads
-  //    inputEcMsCm/inputPh precisely because runoff is excluded. Runoff EC
-  //    normally reads higher as salts accumulate, so presenting an input band
-  //    as a runoff target would invite a feeding change on a number that was
-  //    never comparable.
-  // 2. MEDIUM. These are soilless/hydro figures; soil buffers pH and runs
-  //    materially higher (roughly 6.0–6.8, per the grow-stage care guide).
-  if (bands.ec) {
-    rows.push({
-      key: "ec",
-      label: "Input feed EC",
-      value: `${bands.ec.min}–${bands.ec.max} mS/cm`,
-      note: "Soilless or hydro, nutrient solution as mixed — not runoff",
-    });
-  }
-  if (bands.ph) {
-    rows.push({
-      key: "ph",
-      label: "Input feed pH",
-      value: `${bands.ph.min}–${bands.ph.max}`,
-      note: "Soilless or hydro, as mixed — not runoff. In soil, aim for roughly 6.0–6.8",
-    });
-  }
-  if (bands.ppfd) {
-    rows.push({ key: "ppfd", label: "PPFD", value: `${bands.ppfd.min}–${bands.ppfd.max} µmol/m²/s` });
-  }
-  if (bands.dli) {
-    rows.push({ key: "dli", label: "DLI", value: `${bands.dli.min}–${bands.dli.max} mol/m²/day` });
-  }
-
-  return rows;
-}
+const SECTIONS = buildBlueprintTargetsViewModel();
 
 export default function BlueprintTargetsGuide() {
   usePageSeo({
@@ -184,7 +58,6 @@ export default function BlueprintTargetsGuide() {
       "Per-stage target ranges for air temperature, relative humidity, feed EC, pH, PPFD and DLI — from seedling through flower to dry and cure.",
     path: "/tools/blueprint-targets",
   });
-
 
   return (
     <main
@@ -219,16 +92,14 @@ export default function BlueprintTargetsGuide() {
         </p>
 
         <section className="mt-12 space-y-10">
-          {STAGE_ORDER.map((stage) => {
-            const rows = buildStageMetricRows(SOP_BLUEPRINT_TARGETS[stage]);
-            const copy = STAGE_COPY[stage];
+          {SECTIONS.map(({ stage, label, blurb, rows }) => {
             return (
               <section key={stage} data-testid={`blueprint-targets-stage-${stage}`}>
-                <h2 className="font-display text-2xl font-semibold tracking-tight">{copy.label}</h2>
-                <p className="mt-2 text-muted-foreground">{copy.blurb}</p>
+                <h2 className="font-display text-2xl font-semibold tracking-tight">{label}</h2>
+                <p className="mt-2 text-muted-foreground">{blurb}</p>
                 <div className="mt-4 overflow-x-auto">
                   <table className="w-full text-sm border-collapse">
-                    <caption className="sr-only">{`Target bands for the ${copy.label} stage`}</caption>
+                    <caption className="sr-only">{`Target bands for the ${label} stage`}</caption>
                     <thead>
                       <tr className="border-b border-border/60 text-left">
                         <th scope="col" className="py-2 pr-4 font-medium">

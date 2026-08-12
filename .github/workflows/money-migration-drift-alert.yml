@@ -88,6 +88,14 @@ jobs:
     # authoring time that the environment has only a branch policy and zero
     # reviewers.
     environment: verdant-production
+    # Bounds the whole job well under the 360-minute default, but deliberately
+    # LARGER than the checker step's own timeout below. That ordering is the
+    # point: a step timeout fails just that step and later `if: always()` steps
+    # still run, so the issue still gets filed. A JOB timeout cancels
+    # everything, including the reconciler -- a stalled query would then leave
+    # no runner, no result, and no issue, which is exactly the silent
+    # scheduled-monitor failure this workflow exists to prevent.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
@@ -132,9 +140,20 @@ jobs:
       # place the money-critical set is defined.
       - name: Verify money migrations applied in production
         id: verify
+        # The checker calls psql through a synchronous spawnSync with no
+        # timeout of its own, so a connection that is accepted and then stalls
+        # would block here indefinitely. Bounded at the step so control returns
+        # to the reconciler below and the stall is REPORTED rather than
+        # swallowed by a cancelled job.
+        timeout-minutes: 5
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL_LIVE }}
           TARGET_ENV: live
+          # Belt and braces for the connect phase specifically. It has to be an
+          # env var: the target sanitizer sets `url.search = ""`, stripping ALL
+          # URL query options, so a connect_timeout in the URL would never
+          # reach libpq. psqlEnv spreads process.env, so this does.
+          PGCONNECT_TIMEOUT: "15"
           AUDIT_PATH: ${{ github.workspace }}/audit/live/applied-audit.json
           REPORT_PATH: ${{ github.workspace }}/audit/live/report.md
         run: |
@@ -199,7 +218,12 @@ jobs:
             const owner = context.repo.owner;
             const repo = context.repo.repo;
             const title = process.env.MONEY_DRIFT_ISSUE_TITLE;
-            const LABEL = "money-migration-drift";
+            // Two labels, for the same reason the title is neutral: filtering
+            // or triaging by label must not present a blocked verification as
+            // a confirmed defect. The base label always applies; the drift
+            // label is attached ONLY when a real query established drift.
+            const BASE_LABEL = "money-migration-check";
+            const DRIFT_LABEL = "money-migration-drift";
             const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
 
             // Pinned to scripts/lib/redactDbUrl.mjs by a test. The audit JSON
@@ -323,29 +347,53 @@ jobs:
               return;
             }
 
+            // Only a real query may claim drift.
+            const confirmedDrift = outcome === "missing_migrations";
+
+            // Provision before use: creating or labelling with a label that
+            // does not exist fails validation, which would swallow the alert
+            // entirely -- the silent-failure mode this workflow exists to end.
+            const ensureLabel = async (name, color, description) => {
+              try {
+                await github.rest.issues.createLabel({ owner, repo, name, color, description });
+              } catch (e) {
+                // 422 = already exists, the expected steady state.
+                if (e.status !== 422) core.warning(`could not ensure ${name} label: ${e.message}`);
+              }
+            };
+
             if (hit) {
               await github.rest.issues.createComment({
                 owner, repo, issue_number: hit.number, body: redact(body),
               });
+              // An issue first opened for a BLOCKED verification must gain the
+              // drift label if a later run actually confirms drift. Without
+              // this the escalation is invisible to anyone filtering by label,
+              // since the issue itself is only ever commented on after
+              // creation.
+              if (confirmedDrift && !hit.labels?.some((l) => (l.name ?? l) === DRIFT_LABEL)) {
+                await ensureLabel(DRIFT_LABEL, "b60205", "Production is confirmed missing billing-critical migrations");
+                try {
+                  await github.rest.issues.addLabels({
+                    owner, repo, issue_number: hit.number, labels: [DRIFT_LABEL],
+                  });
+                } catch (e) {
+                  core.warning(`could not escalate ${DRIFT_LABEL}: ${e.message}`);
+                }
+              }
               return;
             }
 
-            // Provision the label before creating: creating an issue with a
-            // label that does not exist fails validation, which would swallow
-            // the alert entirely.
-            try {
-              await github.rest.issues.createLabel({
-                owner, repo, name: LABEL, color: "b60205",
-                description: "Production is missing billing-critical migrations",
-              });
-            } catch (e) {
-              if (e.status !== 422) core.warning(`could not ensure ${LABEL} label: ${e.message}`);
+            await ensureLabel(BASE_LABEL, "d93f0b", "Money migration check requires attention (drift or blocked verification)");
+            const labels = [BASE_LABEL];
+            if (confirmedDrift) {
+              await ensureLabel(DRIFT_LABEL, "b60205", "Production is confirmed missing billing-critical migrations");
+              labels.push(DRIFT_LABEL);
             }
             try {
-              await github.rest.issues.create({
-                owner, repo, title, body: redact(body), labels: [LABEL],
-              });
+              await github.rest.issues.create({ owner, repo, title, body: redact(body), labels });
             } catch (e) {
+              // Last resort: the alert matters more than its labels.
               core.warning(`labelled issue creation failed (${e.message}); retrying unlabelled`);
               await github.rest.issues.create({ owner, repo, title, body: redact(body) });
             }

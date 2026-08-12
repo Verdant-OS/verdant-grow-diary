@@ -54,6 +54,23 @@ describe("money migration drift alert — runs at all", () => {
     expect(guard.with["secret-name"]).toBe("SUPABASE_DB_URL_LIVE");
   });
 
+  it("bounds the checker so a stalled query still reaches the reconciler", () => {
+    // The checker calls psql through spawnSync with no timeout of its own, so
+    // an accepted-then-stalled connection would block forever. The STEP
+    // timeout must be strictly smaller than the JOB timeout: a step timeout
+    // fails only that step and later `if: always()` steps still run, whereas a
+    // job timeout cancels the reconciler too — leaving no runner, no result
+    // and no issue, which is the silent monitor failure this file exists to
+    // prevent.
+    const verify = job.steps.find((s: { id?: string }) => s.id === "verify");
+    expect(verify["timeout-minutes"]).toBeGreaterThan(0);
+    expect(job["timeout-minutes"]).toBeGreaterThan(verify["timeout-minutes"]);
+    // The connect phase needs an env var, not a URL option: the target
+    // sanitizer sets url.search = "" and strips every query option.
+    expect(verify.env.PGCONNECT_TIMEOUT).toBeTruthy();
+    expect(WORKFLOW).not.toMatch(/connect_timeout=/);
+  });
+
   it("survives a transient package-mirror failure without a false alert", () => {
     // The alert now fires whenever the checker does not complete, so an apt
     // hiccup would otherwise file a false "billing unverified" issue.
@@ -150,6 +167,23 @@ describe("money migration drift alert — never claims more than it measured", (
 
   it("names specific migrations only when a query established they are absent", () => {
     expect(script).toMatch(/const missingList =\s*\n?\s*outcome === "missing_migrations"/);
+  });
+
+  it("labels a blocked verification neutrally, and drift only when confirmed", () => {
+    // Filtering or triaging by label must not present a blocked run as a
+    // verified defect, the same reason the title is neutral.
+    expect(script).toContain('const BASE_LABEL = "money-migration-check"');
+    expect(script).toContain('const confirmedDrift = outcome === "missing_migrations";');
+    // The drift label is conditional, never unconditional on the create path.
+    expect(script).toMatch(/if \(confirmedDrift\) \{\s*\n\s*await ensureLabel\(DRIFT_LABEL/);
+  });
+
+  it("escalates the drift label on an already-open issue", () => {
+    // An issue first opened for a BLOCKED verification is only commented on
+    // afterwards, so without an explicit addLabels the later confirmation of
+    // real drift stays invisible to anyone filtering by label.
+    expect(script).toContain("github.rest.issues.addLabels");
+    expect(script).toMatch(/if \(confirmedDrift && !hit\.labels/);
   });
 
   it("surfaces the checker's own note, so unmeasured outcomes are actionable", () => {

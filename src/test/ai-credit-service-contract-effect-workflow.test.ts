@@ -20,7 +20,8 @@ describe("AI-credit service contract effect workflow trust boundary", () => {
   it("pins all database access to the deploy branch and production environment", () => {
     expect(WORKFLOW).toContain("if: github.ref == 'refs/heads/verdant-grow-diary'");
     expect(WORKFLOW).toContain("environment: verdant-production");
-    expect(WORKFLOW).toContain("SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL_LIVE }}");
+    expect(WORKFLOW).toContain("SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}");
+    expect(WORKFLOW).not.toContain("SUPABASE_DB_URL_LIVE");
     expect(WORKFLOW).not.toContain("SUPABASE_DB_URL_SANDBOX");
     expect(TRIGGERS).not.toContain("pull_request");
   });

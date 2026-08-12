@@ -66,8 +66,9 @@ Examples that must remain distinguishable:
 
 The scheduled workflow `.github/workflows/ai-credit-service-contract-effect.yml` runs at
 08:00 UTC from the trusted deploy branch, after the separate 07:30 migration-presence
-monitor. It uses the protected `verdant-production` environment and
-`SUPABASE_DB_URL_LIVE`.
+monitor. It uses the protected `verdant-production` environment and that environment's
+existing `SUPABASE_DB_URL` secret. The verifier independently pins `TARGET_ENV=live` and
+rejects a connection whose project identity does not match Verdant production.
 
 For an authorized local read:
 

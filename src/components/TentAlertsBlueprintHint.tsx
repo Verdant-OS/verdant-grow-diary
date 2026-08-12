@@ -25,7 +25,7 @@ import { Sparkles } from "lucide-react";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { canUseCapability } from "@/lib/entitlements/capabilityAccess";
 import { buildBlueprintTeaserViewModel } from "@/lib/blueprintTeaserViewModel";
-import { plantDetailPath } from "@/lib/routes";
+import { buildPlantBlueprintPath } from "@/lib/plantDetailQuickActions";
 
 export interface TentAlertsBlueprintHintProps {
   /**
@@ -62,6 +62,12 @@ export default function TentAlertsBlueprintHint({
   const vm = buildBlueprintTeaserViewModel({ stage, isDay: null });
   if (!vm.stageKnown || vm.targetCount === 0) return null;
 
+  // Anchored so the link lands on the Blueprint itself. Built by the shared
+  // helper rather than by hand — a drifted string would fail silently, leaving
+  // the grower at the top of a long page with no sign anything went wrong.
+  const href = buildPlantBlueprintPath(plantId);
+  if (!href) return null;
+
   return (
     <p
       data-testid={testId}
@@ -70,7 +76,7 @@ export default function TentAlertsBlueprintHint({
       <Sparkles className="mr-1 inline h-3 w-3 align-[-1px] text-primary/70" />
       Blueprint scores this plant&rsquo;s readings against {vm.targetCount} {vm.stageLabel} targets.{" "}
       <Link
-        to={plantDetailPath(plantId)}
+        to={href}
         data-testid={`${testId}-link`}
         className="font-medium text-primary underline underline-offset-4"
       >

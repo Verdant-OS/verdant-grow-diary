@@ -23,7 +23,10 @@ import { MemoryRouter } from "@/lib/react-router-compat";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import TentAlertsBlueprintHint from "@/components/TentAlertsBlueprintHint";
-import { plantDetailPath } from "@/lib/routes";
+import {
+  buildPlantBlueprintPath,
+  PLANT_BLUEPRINT_ANCHOR_ID,
+} from "@/lib/plantDetailQuickActions";
 import type { ResolvedEntitlement } from "@/lib/entitlements/types";
 
 const ROOT = resolve(__dirname, "../..");
@@ -83,12 +86,15 @@ describe("tent alerts · Blueprint hint", () => {
     expect(el.textContent).toMatch(/flower/i);
   });
 
-  it("links to the plant, built by the shared route helper", () => {
+  it("links to the Blueprint anchor, built by the shared helper", () => {
     renderHint({ plantId: "plant-1", stage: "flower" });
-    expect(screen.getByTestId(`${HINT}-link`)).toHaveAttribute(
-      "href",
-      plantDetailPath("plant-1"),
-    );
+    const href = screen.getByTestId(`${HINT}-link`).getAttribute("href") ?? "";
+    // Same href the helper builds — not hand-rolled in the component.
+    expect(href).toBe(buildPlantBlueprintPath("plant-1"));
+    // And the hash is asserted against the constant EXACTLY, independently of
+    // the helper. Comparing only to the helper is circular: if the helper
+    // drifts, both sides drift together and the test still passes.
+    expect(new URL(href, "http://plant-detail.local").hash).toBe(`#${PLANT_BLUEPRINT_ANCHOR_ID}`);
   });
 
   it("says nothing when the stage is unknown", () => {

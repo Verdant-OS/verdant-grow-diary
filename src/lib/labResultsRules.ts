@@ -96,10 +96,11 @@ export function calculateDecarbTotal(
 }
 
 /**
+ * Valid terpene entries from a raw jsonb payload, highest percentage first.
  * Entries whose keys trim to the same name (possible only in pre-constraint
  * or tampered data) are deduped deterministically: highest value wins.
  */
-function parseTerpenes(raw: unknown): Array<{ name: string; value: number }> {
+export function parseTerpenes(raw: unknown): Array<{ name: string; value: number }> {
   if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return [];
   const entries: Array<{ name: string; value: number }> = [];
   for (const [name, value] of Object.entries(raw as Record<string, unknown>)) {
@@ -118,13 +119,15 @@ function parseTerpenes(raw: unknown): Array<{ name: string; value: number }> {
 }
 
 /**
+ * "Mar 14, 2026" or "Date not recorded" for a missing/invalid timestamp.
+ *
  * Formatted in UTC on purpose: the draft validator stores the entered
  * date-only value as midnight UTC, so formatting that instant in the
  * browser's LOCAL timezone would shift the recorded COA date back a day for
  * every grower west of UTC. A lab report date is a calendar date, not an
  * instant — UTC formatting preserves it exactly as entered.
  */
-function formatDateLabel(iso: string | null): string {
+export function formatLabDateLabel(iso: string | null): string {
   if (typeof iso !== "string" || iso.length === 0) return "Date not recorded";
   const t = Date.parse(iso);
   if (!Number.isFinite(t)) return "Date not recorded";
@@ -182,7 +185,7 @@ export function buildLabResultsView(
       const totalCbd = calculateDecarbTotal(row.cbdaPercent, row.cbdPercent);
       return {
         id: row.id,
-        dateLabel: formatDateLabel(row.testedAt),
+        dateLabel: formatLabDateLabel(row.testedAt),
         labName:
           typeof row.labName === "string" && row.labName.trim().length > 0
             ? row.labName.trim()

@@ -219,8 +219,8 @@ test.describe("C. Pro Monthly access", () => {
     await page.goto("/pheno-hunts/new");
     await expect(page).not.toHaveURL(/\/auth/);
     await expect(
-      page.getByTestId("pheno-hunt-onboarding"),
-      "Pro Monthly user must reach the paid onboarding surface",
+      page.getByRole("heading", { name: "Start Pheno Hunt" }),
+      "Pro Monthly user must reach the mounted paid route",
     ).toBeVisible({ timeout: 20_000 });
     await expect(page.getByTestId("pheno-tracker-upgrade-gate")).toHaveCount(0);
     await assertNoForbiddenCopy(page);
@@ -239,8 +239,8 @@ test.describe("C2. Pro Annual access", () => {
     await page.goto("/pheno-hunts/new");
     await expect(page).not.toHaveURL(/\/auth/);
     await expect(
-      page.getByTestId("pheno-hunt-onboarding"),
-      "Pro Annual user must reach the paid onboarding surface",
+      page.getByRole("heading", { name: "Start Pheno Hunt" }),
+      "Pro Annual user must reach the mounted paid route",
     ).toBeVisible({ timeout: 20_000 });
     await expect(page.getByTestId("pheno-tracker-upgrade-gate")).toHaveCount(0);
     await assertNoForbiddenCopy(page);
@@ -255,7 +255,9 @@ test.describe("C3. Founder Lifetime access", () => {
   test("Founder user can load /pheno-hunts/new without auth wall", async ({ page }) => {
     await page.goto("/pheno-hunts/new");
     await expect(page).not.toHaveURL(/\/auth/);
-    await expect(page.getByTestId("pheno-hunt-onboarding")).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByRole("heading", { name: "Start Pheno Hunt" })).toBeVisible({
+      timeout: 20_000,
+    });
     await expect(page.getByTestId("pheno-tracker-upgrade-gate")).toHaveCount(0);
     await assertNoForbiddenCopy(page);
   });

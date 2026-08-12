@@ -15,6 +15,10 @@ const workflow = readFileSync(
   resolve(__dirname, "../../.github/workflows/pheno-ephemeral-role-e2e.yml"),
   "utf8",
 );
+const browserSmoke = readFileSync(
+  resolve(__dirname, "../../e2e/pheno-tracker-paid-user-smoke.spec.ts"),
+  "utf8",
+);
 
 describe("ephemeral Pheno entitlement-role fixtures", () => {
   it("provisions every release role and refuses hosted Supabase", () => {
@@ -63,5 +67,12 @@ describe("ephemeral Pheno entitlement-role fixtures", () => {
     );
     expect(orchestrator).toContain('"--project=chromium-mocked"');
     expect(orchestrator).toContain('E2E_TEST_EMAIL: "ephemeral-role-trace-disabled"');
+  });
+
+  it("proves paid route access without requiring grow-scoped onboarding state", () => {
+    expect(
+      browserSmoke.match(/getByRole\("heading", \{ name: "Start Pheno Hunt" \}\)/g),
+    ).toHaveLength(3);
+    expect(browserSmoke).toContain('getByTestId("pheno-tracker-upgrade-gate")).toHaveCount(0)');
   });
 });

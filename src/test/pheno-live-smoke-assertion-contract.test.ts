@@ -102,13 +102,13 @@ describe("live smoke assertion contract — required assertions stay affirmative
   it("keeps distinct Pro Monthly and Pro Annual sessions with affirmative paid-workspace assertions", () => {
     const monthly = sliceBetween("C. Pro Monthly access", "C2. Pro Annual access");
     expect(monthly).toContain("test.skip(!PRO_SESSION.path");
-    expect(monthly).toContain('getByTestId("pheno-hunt-onboarding")');
+    expect(monthly).toContain('getByRole("heading", { name: "Start Pheno Hunt" })');
     expect(monthly).toContain('getByTestId("pheno-tracker-upgrade-gate")');
 
     expect(source).toContain('resolveSession("E2E_PHENO_PRO_ANNUAL_SESSION_FILE")');
     const annual = sliceBetween("C2. Pro Annual access", "C3. Founder Lifetime access");
     expect(annual).toMatch(/test\.skip\(\s*!PRO_ANNUAL_SESSION\.path/);
-    expect(annual).toContain('getByTestId("pheno-hunt-onboarding")');
+    expect(annual).toContain('getByRole("heading", { name: "Start Pheno Hunt" })');
   });
 
   it("pins the exact disabled-reason copy from the readiness view model", () => {

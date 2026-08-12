@@ -70,7 +70,7 @@ export const BLUEPRINT_TARGET_STAGE_COPY: Readonly<
     blurb: "Peak light and feed, with humidity held down to protect dense buds from rot.",
   },
   late_flower: {
-    label: "Late flower",
+    label: "Late flower / flush",
     blurb:
       "Cooler and drier still. Any taper or flush should follow evidence — runoff EC, leaf-tip burn, visible salt stress — rather than the calendar; a plant still building tissue should not be starved.",
   },
@@ -95,7 +95,10 @@ function formatTempBand(min: number, max: number): string {
  * "no target", which is itself meaningful (see the dry-room stage, where feed
  * and light stop applying once the plant is cut).
  */
-export function buildStageMetricRows(bands: BlueprintStageBands): BlueprintTargetRow[] {
+export function buildStageMetricRows(
+  bands: BlueprintStageBands,
+  stage?: BlueprintTargetStage,
+): BlueprintTargetRow[] {
   const rows: BlueprintTargetRow[] = [];
 
   if (bands.tempC) {
@@ -135,11 +138,20 @@ export function buildStageMetricRows(bands: BlueprintStageBands): BlueprintTarge
   // 2. MEDIUM. These are soilless/hydro figures; soil buffers pH and runs
   //    materially higher (roughly 6.0–6.8, per the grow-stage care guide).
   if (bands.ec) {
+    // The late-flower EC band is the FLUSH band: plants.stage has a literal
+    // "flush" value that normalizes to late_flower, and the SOP drops EC for
+    // it. So the lower figure describes a plant already being flushed — a
+    // grower decision — not a target to drop to on reaching late flower.
+    // Rendered unqualified it would prompt exactly the calendar-driven taper
+    // the stage copy and FAQ warn against.
+    const isFlushBand = stage === "late_flower";
     rows.push({
       key: "ec",
-      label: "Input feed EC",
+      label: isFlushBand ? "Input feed EC (during a flush)" : "Input feed EC",
       value: `${bands.ec.min}–${bands.ec.max} mS/cm`,
-      note: "Soilless or hydro, nutrient solution as mixed — not runoff",
+      note: isFlushBand
+        ? "Applies once a flush is underway, not on reaching late flower. Hold the flower range until runoff or leaf evidence says otherwise. Soilless or hydro, as mixed — not runoff"
+        : "Soilless or hydro, nutrient solution as mixed — not runoff",
     });
   }
   if (bands.ph) {
@@ -175,6 +187,6 @@ export function buildBlueprintTargetsViewModel(): BlueprintTargetStageSection[] 
     stage,
     label: BLUEPRINT_TARGET_STAGE_COPY[stage].label,
     blurb: BLUEPRINT_TARGET_STAGE_COPY[stage].blurb,
-    rows: buildStageMetricRows(SOP_BLUEPRINT_TARGETS[stage]),
+    rows: buildStageMetricRows(SOP_BLUEPRINT_TARGETS[stage], stage),
   }));
 }

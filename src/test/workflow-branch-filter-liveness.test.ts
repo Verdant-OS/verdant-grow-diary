@@ -18,6 +18,9 @@
  *  3. The extractor FAILS CLOSED: a push/pull_request block whose branch
  *     filter cannot be confidently parsed fails the test instead of
  *     silently passing — update the extractor, don't loosen the guard.
+ *  4. A non-dormant workflow that explicitly watches stale `main` pushes
+ *     must also watch the real default branch, so post-merge evidence is not
+ *     lost when a PR result is green but the deploy-branch merge is broken.
  */
 import { readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -196,6 +199,25 @@ describe("workflow branch-filter liveness", () => {
         `${file} is registered dormant but carries no "# dormant:" comment explaining why`,
       ).toBe(true);
     }
+  });
+
+  it("keeps default-branch push parity for workflows that still watch main", () => {
+    const missingDefault: string[] = [];
+
+    for (const file of workflowFiles()) {
+      if (file in INTENTIONALLY_DORMANT) continue;
+      const text = readFileSync(join(WORKFLOWS_DIR, file), "utf8");
+      const push = extractTriggerBranches(text).find((trigger) => trigger.trigger === "push");
+      if (!push || push.unparseable || push.branches === null) continue;
+      if (push.branches.includes("main") && !push.branches.includes(DEFAULT_BRANCH)) {
+        missingDefault.push(file);
+      }
+    }
+
+    expect(
+      missingDefault,
+      `workflows watching main pushes without ${DEFAULT_BRANCH}:\n${missingDefault.join("\n")}`,
+    ).toEqual([]);
   });
 
   it("the default branch constant matches the repository", () => {

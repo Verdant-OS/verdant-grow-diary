@@ -64,7 +64,7 @@ export const LAB_RESULTS_EMPTY_COPY =
 
 /** Shown under the cards; states exactly where numbers come from. */
 export const LAB_RESULTS_HONESTY_NOTE =
-  "Entered by you from your lab report. Totals are calculated as acid form × 0.877 + neutral form.";
+  "Entered by you from your lab report. Totals are calculated as acid form × 0.877 + neutral form; when the report lists only one form, the total is shown as at least (≥) that amount.";
 
 export const LAB_RESULTS_ADD_LABEL = "Add lab result";
 
@@ -81,18 +81,38 @@ export function formatPercent(v: number): string {
   return `${rounded}%`;
 }
 
+export interface DecarbTotal {
+  value: number;
+  /**
+   * True when the COA listed only one of the two forms. The computed value is
+   * then a LOWER BOUND (the missing form can only add), never the exact
+   * total — display must say "≥", not a precise figure.
+   */
+  partial: boolean;
+}
+
 /**
  * Total = acid × 0.877 + neutral. Computable when at least one part is
- * present; a missing part contributes 0 (the COA simply didn't list it).
+ * present. With both parts it is the exact calculated total; with one part
+ * it is a partial lower bound and is flagged as such — the honesty doctrine
+ * forbids displaying fabricated precision for an unreported component.
  */
 export function calculateDecarbTotal(
   acidPercent: number | null,
   neutralPercent: number | null,
-): number | null {
+): DecarbTotal | null {
   const hasAcid = isPercent(acidPercent);
   const hasNeutral = isPercent(neutralPercent);
   if (!hasAcid && !hasNeutral) return null;
-  return (hasAcid ? acidPercent * DECARB_FACTOR : 0) + (hasNeutral ? neutralPercent : 0);
+  return {
+    value: (hasAcid ? acidPercent * DECARB_FACTOR : 0) + (hasNeutral ? neutralPercent : 0),
+    partial: !hasAcid || !hasNeutral,
+  };
+}
+
+/** "21.55%" when exact, "≥ 21.05%" when one form was not reported. */
+export function formatDecarbTotal(total: DecarbTotal): string {
+  return total.partial ? `≥ ${formatPercent(total.value)}` : formatPercent(total.value);
 }
 
 /**
@@ -191,8 +211,8 @@ export function buildLabResultsView(
             ? row.labName.trim()
             : null,
         cannabinoids,
-        totalThcLabel: totalThc === null ? null : formatPercent(totalThc),
-        totalCbdLabel: totalCbd === null ? null : formatPercent(totalCbd),
+        totalThcLabel: totalThc === null ? null : formatDecarbTotal(totalThc),
+        totalCbdLabel: totalCbd === null ? null : formatDecarbTotal(totalCbd),
         terpenes: parseTerpenes(row.terpenes).map((t) => ({
           name: t.name,
           valueLabel: formatPercent(t.value),

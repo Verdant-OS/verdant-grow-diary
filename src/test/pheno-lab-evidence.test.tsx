@@ -128,7 +128,8 @@ describe("view-model flow", () => {
   it("carries lab evidence into the candidate view and sets hasAnyLabEvidence", () => {
     const vm = buildPhenoComparisonViewModel(twoCandidates(true));
     expect(vm.hasAnyLabEvidence).toBe(true);
-    expect(vm.candidates[0].labEvidence?.totalThcLabel).toBe("21.05%");
+    // THCa without THC is a partial total — shown as a lower bound.
+    expect(vm.candidates[0].labEvidence?.totalThcLabel).toBe("≥ 21.05%");
     expect(vm.candidates[1].labEvidence).toBeNull();
   });
 

@@ -15,6 +15,7 @@
  */
 import {
   calculateDecarbTotal,
+  formatDecarbTotal,
   formatLabDateLabel,
   formatPercent,
   parseTerpenes,
@@ -73,8 +74,10 @@ export function buildPhenoLabEvidenceView(
   return {
     dateLabel: formatLabDateLabel(input.testedAt),
     labName,
-    totalThcLabel: totalThc === null ? null : formatPercent(totalThc),
-    totalCbdLabel: totalCbd === null ? null : formatPercent(totalCbd),
+    // Partial totals (one form unreported) carry the honest "≥" lower-bound
+    // marker — the comparison must never show fabricated precision.
+    totalThcLabel: totalThc === null ? null : formatDecarbTotal(totalThc),
+    totalCbdLabel: totalCbd === null ? null : formatDecarbTotal(totalCbd),
     topTerpenes: terpenes
       .slice(0, PHENO_LAB_TOP_TERPENES)
       .map((t) => ({ name: t.name, valueLabel: formatPercent(t.value) })),

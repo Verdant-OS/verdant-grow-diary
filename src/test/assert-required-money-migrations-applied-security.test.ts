@@ -107,6 +107,7 @@ describe("assert-required-money-migrations-applied process boundary", () => {
     expect(invocation?.env).toEqual({
       PGDATABASE: canonical.toString(),
       PGSSLMODE: "require",
+      PGGSSENCMODE: "disable",
     });
   });
 

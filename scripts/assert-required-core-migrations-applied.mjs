@@ -106,6 +106,9 @@ export function buildPsqlEnvironment(sourceEnv, databaseUrl, targetEnv) {
   // Never trust ambient PGSSLMODE. Query-free Dashboard URLs default to
   // require, while an explicit verify-ca/verify-full request is preserved.
   childEnv.PGSSLMODE = connection.sslMode;
+  // Supavisor speaks TLS directly. Disable libpq's optional GSS encryption
+  // negotiation so GitHub's psql client cannot fail before TLS/authentication.
+  childEnv.PGGSSENCMODE = "disable";
   return childEnv;
 }
 

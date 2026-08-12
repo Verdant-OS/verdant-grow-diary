@@ -503,6 +503,11 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/terms-of-service", access: "redirect", description: "→ /terms" },
   { path: "/timeline", access: "auth" },
   {
+    path: "/tools/blueprint-targets",
+    access: "public",
+    description: "Public per-stage SOP target bands reference (temp, RH, EC, pH, PPFD, DLI).",
+  },
+  {
     path: "/tools/vpd-calculator",
     access: "public",
     description: "Public manual-input, stage-aware air VPD calculator.",

@@ -47,6 +47,12 @@ export const FUNNEL_EVENT_SCHEMA: Readonly<Record<FunnelEventName, ReadonlyArray
     ai_doctor_session_saved: ["surface"],
     paywall_viewed: ["surface"],
     paywall_cta_clicked: ["surface", "plan"],
+    // "surface" only, never "plan". A pack SKU is not a plan, and letting one
+    // into a param that plan-entitlement code reads is exactly how a pack id
+    // ends up mistaken for a tier. Pricing already reports the SKU via its own
+    // pricing_cta_credit_pack_clicked event.
+    credit_pack_cta_viewed: ["surface"],
+    credit_pack_cta_clicked: ["surface"],
     checkout_started: ["plan"],
     checkout_catalog_unavailable: ["plan", "reason"],
     checkout_recovery_dismissed: ["plan"],

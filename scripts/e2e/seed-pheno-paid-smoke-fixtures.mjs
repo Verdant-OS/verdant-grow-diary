@@ -269,6 +269,24 @@ async function upsertSmokeTest(huntId, plantId, verdict) {
   });
   if (error) throw new Error(`smoke test insert failed: ${error.code}`);
 }
+async function upsertDecision(huntId, plantId, decision) {
+  const existing = await db
+    .from("pheno_keeper_decisions")
+    .select("id")
+    .eq("hunt_id", huntId)
+    .eq("plant_id", plantId)
+    .maybeSingle();
+  if (existing.data?.id) return;
+  const { error } = await db.from("pheno_keeper_decisions").insert({
+    user_id: ownerId,
+    hunt_id: huntId,
+    plant_id: plantId,
+    decision,
+    note: "seeded post-harvest observation",
+    decided_at: new Date().toISOString(),
+  });
+  if (error) throw new Error(`keeper decision insert failed: ${error.code}`);
+}
 async function upsertLab(huntId, plantId, source = "estimate") {
   const existing = await db
     .from("pheno_lab_results")
@@ -329,6 +347,7 @@ try {
     await upsertLab(comparisonReadyId, b);
     await upsertSmokeTest(comparisonReadyId, a, "keeper");
     await upsertSmokeTest(comparisonReadyId, b, "runner_up");
+    await upsertDecision(comparisonReadyId, a, "hold");
   }
 
   const envDir = "e2e/.fixtures";

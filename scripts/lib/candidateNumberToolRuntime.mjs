@@ -12,11 +12,15 @@
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
-import { sanitizeSupabaseDatabaseUrlForPsql } from "./supabaseDatabaseTargetIdentity.mjs";
+import {
+  buildLibpqConnectionEnvironment,
+  sanitizeSupabaseDatabaseUrlForPsql,
+} from "./supabaseDatabaseTargetIdentity.mjs";
 
 /**
  * Build a minimal, allowlisted child-process environment for psql: only the
- * ambient variables psql/libpq genuinely need, plus PGDATABASE/PGSSLMODE
+ * ambient variables psql/libpq genuinely need, plus explicit identity-checked
+ * connection fields and deterministic TLS/GSS policies
  * derived from the identity-checked connection string. Never forwards the
  * full parent environment (which could carry unrelated secrets) or ambient
  * DATABASE_URL/PG* connection variables (which could silently override the
@@ -44,9 +48,7 @@ export function buildPsqlEnvironment(sourceEnv, databaseUrl, targetEnv) {
     if (typeof sourceEnv[key] === "string") childEnv[key] = sourceEnv[key];
   }
   const connection = sanitizeSupabaseDatabaseUrlForPsql(databaseUrl, targetEnv);
-  childEnv.PGDATABASE = connection.databaseUrl;
-  childEnv.PGSSLMODE = connection.sslMode;
-  return childEnv;
+  return { ...childEnv, ...buildLibpqConnectionEnvironment(connection) };
 }
 
 /** Write a sanitized artifact file, never throwing — a failed write degrades to a logged warning. */

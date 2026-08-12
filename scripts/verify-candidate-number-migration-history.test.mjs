@@ -122,7 +122,10 @@ test("buildSchemaRepairGuidance: sandbox always declines to point at the product
     classification: { missingVersions: [FIRST_VERSION, SECOND_VERSION] },
   });
   assert.match(guidance, /no automated sandbox repair path/);
-  assert.doesNotMatch(guidance, /apply-candidate-number-maintenance-migrations\.mjs`, which records/);
+  assert.doesNotMatch(
+    guidance,
+    /apply-candidate-number-maintenance-migrations\.mjs`, which records/,
+  );
 });
 
 test("buildSchemaRepairGuidance: production + verify_only state names the real gap instead of telling the operator to re-apply", () => {
@@ -154,7 +157,10 @@ test("buildSchemaRepairGuidance: production + clean missing state still gives th
     targetEnv: "production",
     classification: { missingVersions: [FIRST_VERSION, SECOND_VERSION] },
   });
-  assert.match(guidance, /^Re-apply via `scripts\/apply-candidate-number-maintenance-migrations\.mjs`, which records/);
+  assert.match(
+    guidance,
+    /^Re-apply via `scripts\/apply-candidate-number-maintenance-migrations\.mjs`, which records/,
+  );
 });
 
 test("end-to-end: a mismatch is reported even when the schema effect is ALSO not live (the ordering bug this fix closes)", () => {
@@ -182,6 +188,29 @@ test("end-to-end: a mismatch is reported even when the schema effect is ALSO not
     logged.some((line) => line.includes("schema effect live: false")),
     `expected a log line surfacing that the schema effect is also not live, got: ${JSON.stringify(logged)}`,
   );
+});
+
+test("psql child disables unsupported GSS negotiation while preserving required TLS", () => {
+  const env = {
+    TARGET_ENV: "production",
+    SUPABASE_DB_URL:
+      "postgres://postgres:pass@db.knkwiiywfkbqznbxwqfh.supabase.co:5432/postgres?sslmode=require",
+  };
+  let childEnv;
+  const spawnImpl = (_command, _args, options) => {
+    childEnv = options.env;
+    return { status: 0, stdout: stdoutFor({}), stderr: "" };
+  };
+
+  const exitCode = runVerifyCandidateNumberMigrationHistory({
+    env,
+    spawnImpl,
+    logger: { log: () => {}, error: () => {} },
+  });
+
+  assert.equal(exitCode, EXIT.OK);
+  assert.equal(childEnv.PGSSLMODE, "require");
+  assert.equal(childEnv.PGGSSENCMODE, "disable");
 });
 
 test("end-to-end: the audit JSON includes mismatched_versions, not just missing_versions, for a pure-mismatch failure", () => {

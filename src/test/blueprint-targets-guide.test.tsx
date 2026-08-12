@@ -11,7 +11,8 @@
  */
 import { describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
-import BlueprintTargetsGuide, { buildStageMetricRows } from "@/pages/BlueprintTargetsGuide";
+import BlueprintTargetsGuide from "@/pages/BlueprintTargetsGuide";
+import { buildStageMetricRows } from "@/lib/blueprintTargetsViewModel";
 import { SOP_BLUEPRINT_TARGETS } from "@/constants/blueprintTargets";
 import { staticRouteHead } from "@/lib/build/staticRouteHead";
 import { VERDANT_BLUEPRINT_TARGETS_FAQ } from "@/constants/verdantSeoContent";

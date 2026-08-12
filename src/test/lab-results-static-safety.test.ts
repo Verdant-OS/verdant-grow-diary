@@ -110,8 +110,10 @@ describe("lab results — migration static safety", () => {
     expect(sql).toContain("CREATE FUNCTION public.lab_tests_terpenes_valid");
     expect(sql).toContain("CHECK (public.lab_tests_terpenes_valid(terpenes))");
     expect(sql).toContain("CONSTRAINT lab_tests_has_measurement");
-    // Whitespace-only keys are as nameless as empty ones — btrim catches both.
+    // Keys must equal their trimmed form: whitespace-only keys are nameless,
+    // and padded variants would collapse into duplicates at display time.
     expect(sql).toContain("char_length(btrim(e.key)) = 0");
+    expect(sql).toContain("e.key <> btrim(e.key)");
     // The validator must be IMMUTABLE plain SQL — never SECURITY DEFINER.
     expect(sql).toMatch(/IMMUTABLE/);
     expect(sql).not.toMatch(/SECURITY DEFINER/i);

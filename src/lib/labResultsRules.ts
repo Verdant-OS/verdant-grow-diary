@@ -95,6 +95,10 @@ export function calculateDecarbTotal(
   return (hasAcid ? acidPercent * DECARB_FACTOR : 0) + (hasNeutral ? neutralPercent : 0);
 }
 
+/**
+ * Entries whose keys trim to the same name (possible only in pre-constraint
+ * or tampered data) are deduped deterministically: highest value wins.
+ */
 function parseTerpenes(raw: unknown): Array<{ name: string; value: number }> {
   if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return [];
   const entries: Array<{ name: string; value: number }> = [];
@@ -104,7 +108,12 @@ function parseTerpenes(raw: unknown): Array<{ name: string; value: number }> {
     entries.push({ name: name.trim(), value });
   }
   entries.sort((a, b) => b.value - a.value || a.name.localeCompare(b.name));
-  return entries;
+  const seen = new Set<string>();
+  return entries.filter((e) => {
+    if (seen.has(e.name)) return false;
+    seen.add(e.name);
+    return true;
+  });
 }
 
 /**

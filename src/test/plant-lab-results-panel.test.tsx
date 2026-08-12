@@ -105,6 +105,29 @@ describe("PlantLabResultsPanel", () => {
     expect(screen.getByTestId("plant-lab-results-panel").getAttribute("data-count")).toBe("1");
   });
 
+  it("delete button carries an accessible name identifying the result", async () => {
+    queryResult.current = {
+      data: [
+        {
+          id: "t1",
+          tested_at: "2026-08-01T00:00:00.000Z",
+          created_at: null,
+          thca_percent: 24,
+          thc_percent: null,
+          cbda_percent: null,
+          cbd_percent: null,
+          terpenes: {},
+          lab_name: null,
+          note: null,
+        },
+      ],
+      error: null,
+    };
+    render(<PlantLabResultsPanel plantId="p1" />);
+    const del = await screen.findByTestId("plant-lab-result-delete");
+    expect(del.getAttribute("aria-label")).toBe("Delete lab result from Aug 1, 2026");
+  });
+
   it("readOnly: shows saved evidence without add/delete controls", async () => {
     queryResult.current = {
       data: [

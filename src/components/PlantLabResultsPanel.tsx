@@ -294,6 +294,11 @@ export default function PlantLabResultsPanel({ plantId, readOnly = false }: Prop
                     className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
                     onClick={() => handleDelete(card.id)}
                     data-testid="plant-lab-result-delete"
+                    aria-label={
+                      armedDeleteId === card.id
+                        ? `Confirm delete lab result from ${card.dateLabel}`
+                        : `Delete lab result from ${card.dateLabel}`
+                    }
                   >
                     <Trash2 className="h-3.5 w-3.5" aria-hidden />
                     {armedDeleteId === card.id ? "Confirm delete" : null}

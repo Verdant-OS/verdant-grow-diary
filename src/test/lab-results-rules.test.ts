@@ -135,6 +135,13 @@ describe("buildLabResultsView", () => {
     expect(view.cards[0].terpenes.map((t) => t.name)).toEqual(["limonene", "myrcene"]);
   });
 
+  it("dedupes padded-key duplicates deterministically — highest value wins", () => {
+    // Pre-constraint or tampered rows can hold {"myrcene": 1, " myrcene ": 2};
+    // both trim to the same display name and must not render twice.
+    const view = buildLabResultsView([row({ terpenes: { myrcene: 1, " myrcene ": 2 } })]);
+    expect(view.cards[0].terpenes).toEqual([{ name: "myrcene", valueLabel: "2%" }]);
+  });
+
   it("treats a non-object terpenes payload as empty rather than crashing", () => {
     expect(buildLabResultsView([row({ terpenes: "oops" })]).cards[0].terpenes).toEqual([]);
     expect(buildLabResultsView([row({ terpenes: [1, 2] })]).cards[0].terpenes).toEqual([]);

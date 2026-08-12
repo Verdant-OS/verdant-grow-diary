@@ -21,6 +21,9 @@ const CRITICAL_PACKAGE = "@lovable.dev/mcp-js";
 const TRANSITION_CONFIG = "config/dependency-lockfile-transition.json";
 const REQUIRED_LOCKFILES = Object.freeze(["bun.lock", "package-lock.json"]);
 export const PACKAGE_LOCK_SECURITY_FLOORS = Object.freeze({
+  "@hono/node-server": "2.0.10",
+  "@modelcontextprotocol/sdk": "1.30.0",
+  hono: "4.12.34",
   vite: "6.4.3",
   postcss: "8.5.18",
   "brace-expansion": "1.1.18",
@@ -33,6 +36,9 @@ export const PACKAGE_LOCK_SECURITY_FLOORS = Object.freeze({
   vitest: "3.2.6",
 });
 export const BUN_LOCK_SECURITY_FLOORS = Object.freeze({
+  "@hono/node-server": "2.0.10",
+  "@modelcontextprotocol/sdk": "1.30.0",
+  hono: "4.12.34",
   esbuild: "0.28.1",
 });
 export const PACKAGE_LOCK_MAJOR_SECURITY_FLOORS = Object.freeze({

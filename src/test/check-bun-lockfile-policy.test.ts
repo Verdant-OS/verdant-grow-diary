@@ -8,6 +8,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import {
+  BUN_LOCK_SECURITY_FLOORS,
   FORBIDDEN_LOCKFILES,
   PACKAGE_LOCK_SECURITY_FLOORS,
   evaluatePolicy,
@@ -47,6 +48,12 @@ function bunLock(manifest = packageJson()) {
     overrides: manifest.overrides,
     packages: {
       [MCP]: [`${MCP}@0.24.0`, "", {}],
+      ...Object.fromEntries(
+        Object.entries(BUN_LOCK_SECURITY_FLOORS).map(([name, version]) => [
+          name,
+          [`${name}@${version}`, "", {}],
+        ]),
+      ),
     },
   });
 }
@@ -260,6 +267,12 @@ describe("evaluatePolicy", () => {
     expect(evaluate(files).errors.join(" ")).toContain(
       `package-lock.json security floor for ${packageName}`,
     );
+  });
+
+  it("fails when the canonical Bun graph regresses the esbuild security floor", () => {
+    const files = policyFiles();
+    files[at("bun.lock")] = files[at("bun.lock")].replace("esbuild@0.28.1", "esbuild@0.28.0");
+    expect(evaluate(files).errors.join(" ")).toContain("bun.lock security floor for esbuild");
   });
 
   it.each(["2.1.3", "3.0.5", "4.0.1", "5.0.8"])(

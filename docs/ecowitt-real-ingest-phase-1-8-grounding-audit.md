@@ -102,6 +102,12 @@ decision (`ecowitt-future-real-ingest-gates.md` §idempotency, all rows still �
 2. **`source` is a mutable member of the dedupe key** — deploy-branch ingest re-derives it
    (`live → stale` on late arrival), so a delayed redelivery can miss the collision and
    store twice. (inference — from source, not reproduced against a database)
+   **Correction 2026-08-12:** this inference is currently moot — both deployed handlers
+   reject stale before any upsert (`sensor-ingest-webhook/index.ts:208-219`, comment:
+   "stale would change that conflict key and create a second row. Fail closed";
+   `ecowitt-ingest/index.ts:336-342`), so the narrowing branch is unreachable for stale.
+   The hazard becomes real only if D4 (stale persistence) is implemented — see the
+   spec's D4 correction block.
 3. **Key #3 does not canonicalize `captured_at`** — `...Z` vs `.000Z` vs `+00:00` are three
    different keys for the same instant (the pi path _does_ normalize; the EcoWitt builder
    does not).

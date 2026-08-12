@@ -2,7 +2,9 @@
 
 **Status:** Specification. Paper only — approving this document clears Phase 2 gate item 3
 once its verification items pass. It authorizes **no** code, migration, policy change, or
-deployment. Persistence remains blocked behind gate items 2 and 4 (owner-only).
+deployment. Persistence remains blocked behind gate item 2 (owner-only, unresolved) and
+this spec reaching `APPROVED` via V1–V4; gate 4's policy was ruled 2026-08-12 (see D3/D4),
+with D4 pending owner re-confirmation on corrected facts.
 **Basis:** [Phase 1.8 grounding audit](./ecowitt-real-ingest-phase-1-8-grounding-audit.md)
 (deploy-branch-verified, 2026-08-07). Claims below inherit its evidence labels.
 **Author:** Claude (Knowledge Library & Product Specification Architect)
@@ -97,13 +99,17 @@ client path; this closes the token path.
 ### D4 — May `stale` be persisted? — decider: **Cheek (owner)**
 
 Three docs say "no unless explicitly approved" and no approval is recorded — so the
-current answer is **no**. But the deploy-branch webhook already narrows `live → stale` at
-ingest and stores the row, which is a de-facto yes on that path. **Recommendation:**
-approve stale persistence explicitly (it preserves evidence and the freshness resolver
-already fences display), and note the D1 interaction: a late redelivery re-labeled `stale`
-misses the `live` row's index entry and stores twice. If approved, the duplicate is
-tolerable and honest (two rows, two labels, same instant, display layer prefers neither as
-current); if rejected, the webhook's narrowing branch is a defect to fix at gate 4.
+current answer is **no**. ~~But the deploy-branch webhook already narrows `live → stale`
+at ingest and stores the row, which is a de-facto yes on that path.~~ **This premise was
+wrong — corrected 2026-08-12, verified against deploy tip `cb98fe4e4`:** both handlers
+reject stale **before** any upsert. `sensor-ingest-webhook/index.ts:208-219` fails closed
+with `reason: "timestamp_stale"`, its comment stating the reason explicitly ("stale would
+change that conflict key and create a second row. Fail closed"), and
+`ecowitt-ingest/index.ts:336-342` does the same ("so stale packets can never become
+live"). The `storageMapping` narrowing branch the grounding audit flagged is unreachable
+for stale in practice — the guard rejects first. There is **no** de-facto stale storage,
+and the dual `live`/`stale` row hazard is currently prevented by a deliberate, shipped
+safeguard.
 
 > **RULED 2026-08-12 — APPROVED, with evidence-only fencing.** `stale` readings may be
 > persisted as append-only historical evidence. Owner fences: preserve the original sensor
@@ -115,6 +121,17 @@ current); if rejected, the webhook's narrowing branch is a defect to fix at gate
 > dual `live`/`stale` identity for one capture instant is acceptable **for this phase
 > only** if freshness and analytical read models do not double-count the measurement. No
 > dedupe-index migration is authorized in Phase 1.8.
+
+> **RULING PREMISE CORRECTED 2026-08-12 — owner re-confirmation required before
+> implementation.** The ruling above was informed by this spec's incorrect claim that the
+> deploy webhook already stores narrowed stale rows. It does not: both deployed handlers
+> deliberately fail closed on stale (see correction above), and the dual-identity clause
+> in the ruling tolerates a scenario the shipped guards currently prevent. Implementing
+> D4 as ruled therefore **removes an existing, intentional fail-closed safeguard** rather
+> than ratifying existing behavior. The decision remains the owner's; it must be
+> re-confirmed against these corrected facts before any implementation PR touches the
+> stale guards. Until then, the effective behavior stays fail-closed (stale rejected, not
+> stored).
 
 ### D5 — V0 contract vs schema (`plant_id`, `confidence`) — decider: audit (this doc)
 

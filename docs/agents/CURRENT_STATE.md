@@ -117,7 +117,10 @@ Phase 1.8 specification: `docs/ecowitt-real-ingest-phase-1-8-specification.md`, 
 `HOLD — approvable`. **Owner ruled 2026-08-12** (at frozen head `15e161885`): D2 APPROVED
 (designated channel now, per-plant binding later), D3 APPROVED (fail-closed unknown
 transport → `invalid`), D4 APPROVED (stale persists as evidence only) — fences recorded in
-the spec. V1 and V4 were authorized and attempted same day: both `BLOCKED` — no `PG*`
+the spec. **D4 premise corrected later same day:** both deployed handlers already fail
+closed on stale (reject before upsert, deliberately — verified at deploy tip `cb98fe4e4`);
+D4 needs owner re-confirmation on the corrected facts before implementation. See the
+spec's D4 correction block. V1 and V4 were authorized and attempted same day: both `BLOCKED` — no `PG*`
 env/`psql` on this machine and the Supabase MCP connection lacks permission on
 `knkwiiywfkbqznbxwqfh`. Unblock paths and an owner-runnable V4 query are in the spec's
 verification attempt record. V2/V3 remain `NOT_RUN`. Spec advances to `APPROVED` only when
@@ -130,9 +133,13 @@ V1–V4 all pass.
 | 3. Schema/RLS/idempotency audit (= Phase 1.8) | `HOLD` — spec drafted, see below          |
 | 4. Live-label fencing policy                  | `APPROVED` — D3/D4 rulings, 2026-08-12    |
 
-Persistence remains blocked. **`source='live'` is unreachable at Phase 1.7 by design** — the
-Edge wrapper has no database client. A live-labelled EcoWitt row would be a defect, not a
-pass signal, and a Sensor Snapshot screenshot is not a valid Phase 1.7 exit artifact.
+Persistence remains blocked **on the Phase 1.7 path**: `source='live'` is unreachable via
+the validation-only `ecowitt-real-ingest` wrapper by design — it has no database client. A
+live row claiming to come from **that endpoint** would be a defect, and a Sensor Snapshot
+screenshot is not a valid Phase 1.7 exit artifact. This does **not** apply to the
+separately deployed `ecowitt-ingest` custom-upload path, which authenticates, checks
+freshness, and legitimately upserts canonical `source='live'` rows (deploy branch). Do not
+classify those as defects when auditing production.
 
 Two cautions for anyone picking this up:
 

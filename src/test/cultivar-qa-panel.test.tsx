@@ -52,7 +52,7 @@ describe("CultivarQaPanel", () => {
     entitlementState = { isActive: true, effectivePlanId: "free" };
     renderPanel();
     expect(screen.getByTestId("cultivar-qa-upsell")).toBeInTheDocument();
-    expect(screen.getByTestId("cultivar-qa-upgrade-cta")).toHaveAttribute("href", "/pricing");
+    expect(screen.getByTestId("cultivar-qa-upgrade-cta")).toHaveAttribute("href", "/pricing?plan=pro_annual");
     expect(screen.queryByTestId("cultivar-qa-input")).toBeNull();
   });
 

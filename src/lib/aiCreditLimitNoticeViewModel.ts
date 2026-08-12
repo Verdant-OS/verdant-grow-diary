@@ -141,10 +141,15 @@ export interface AiCreditLimitNoticeInput {
 }
 
 function buildPricingHref(returnTo: string | null | undefined): string {
+  // The upsell pitches Pro by name ("Pro gives you 100 AI checks…"), so land
+  // the grower on the Pro card preselected instead of the generic four-plan
+  // page they would have to re-navigate. Annual is the Pricing default and
+  // highest LTV — the same call the Blueprint paywall makes for Craft.
+  // `?plan=` is the canonical preselect and NEVER auto-opens checkout.
+  const params = new URLSearchParams({ plan: "pro_annual" });
   const safeReturnTo = sanitizeCheckoutReturnTo(returnTo);
-  return safeReturnTo
-    ? `/pricing?${new URLSearchParams({ returnTo: safeReturnTo }).toString()}`
-    : "/pricing";
+  if (safeReturnTo) params.set("returnTo", safeReturnTo);
+  return `/pricing?${params.toString()}`;
 }
 
 /** Anchor Pricing scrolls to for the one-time credit-pack section. */
@@ -164,7 +169,15 @@ const CREDIT_PACK_HASH = "#buy-credits";
  * pins stay byte-for-byte identical.
  */
 export function buildCreditPackHref(returnTo: string | null | undefined): string {
-  return `${buildPricingHref(returnTo)}${CREDIT_PACK_HASH}`;
+  // Deliberately NOT built on buildPricingHref: that helper now preselects
+  // the Pro plan for the Free upsell, and a PAID grower's top-up link must
+  // not carry a plan pitch — a Craft subscriber buying a pack has nothing to
+  // preselect. Packs are not plans.
+  const safeReturnTo = sanitizeCheckoutReturnTo(returnTo);
+  const base = safeReturnTo
+    ? `/pricing?${new URLSearchParams({ returnTo: safeReturnTo }).toString()}`
+    : "/pricing";
+  return `${base}${CREDIT_PACK_HASH}`;
 }
 
 export function buildAiCreditLimitNoticeViewModel(

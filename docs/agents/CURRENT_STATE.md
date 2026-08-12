@@ -1,11 +1,12 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-11 UTC / 2026-08-11 America/Chicago
-**Updated by:** Claude (records merged out-of-slice #885 — the agent-integrations
-MCP publication audit doc — and refreshes the deploy-head row against
-`git fetch origin` on 2026-08-11. `main`, SEO/analytics facts, and release
-identity retain their earlier verification dates; none were re-measured in
-this update)
+**Last updated:** 2026-08-12 UTC / 2026-08-12 America/Chicago  
+**Updated by:** Grok (public-surface operating-state refresh from the 2026-08-07 SEO
+gate artifacts plus live re-probes on 2026-08-12; adds the public-surface section and
+points at the new home-split decision + Ahrefs-class reconciliation docs. Deploy-head
+row re-checked with `git fetch origin` on 2026-08-12. Production release identity and
+GA4/GSC axes were **not** fully re-certified this turn — see Public surface section
+for what was re-measured.)
 
 This is the changing shift report. Permanent rules live in `/AGENTS.md`; do not edit
 that constitution to record branch, deployment, blocker, or assignment changes.
@@ -20,7 +21,7 @@ inside the active governance handoff.
 
 | Branch               | Role                                             | Verified head                                                                                                                                                               |
 | -------------------- | ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `verdant-grow-diary` | **Deploy branch. Production ships from here.**   | `1a9082bb1` (#885), verified 2026-08-11 after `git fetch origin`; the queue advances it several times daily — re-verify before relying on it |
+| `verdant-grow-diary` | **Deploy branch. Production ships from here.**   | `aef850acf` (#905), verified 2026-08-12 after `git fetch origin`; the queue advances it several times daily — re-verify before relying on it |
 | `main`               | Integration branch. It is not production parity. | `b6d747941948ce68157185a2b0847acea6970d44` (#779), verified 2026-08-07                                                                                                      |
 
 `main` and `verdant-grow-diary` are divergent. Do not infer production behavior from
@@ -35,21 +36,70 @@ changed readiness evidence, artifacts, and tests only; it is **not** deployment 
 
 ---
 
+## Public surface operating state (refreshed 2026-08-12)
+
+This section is the **public crawl / acquisition** shift report. It does not replace
+the Mode A measurement blockers below; it records what was re-probed on the live host
+after the 2026-08-07 lighting Day 0 gate docs.
+
+### Decision docs (new)
+
+| Doc | Purpose |
+| --- | --- |
+| [`docs/seo/canonical-home-split-decision.md`](../seo/canonical-home-split-decision.md) | Locks `/` vs `/welcome` dual-home policy |
+| [`docs/seo/ahrefs-site-audit-reconciliation-2026-08-07.md`](../seo/ahrefs-site-audit-reconciliation-2026-08-07.md) | Reconciles Ahrefs-class issue types against live 2026-08-12 probes |
+
+### Live host snapshot (unauthenticated probes, 2026-08-12)
+
+| Check | Status | Evidence |
+| --- | --- | --- |
+| Host responds | `PASS` | `https://verdantgrowdiary.com` HTTP 200 on public paths |
+| `/version.json` | `PASS` (point-in-time) | HTTP 200; stamp `commit: 8fe3c3551b20…`, `buildTime: 2026-08-12T07:02:35.575Z`, `dirty: true`, `ref: "__orphan__"` — **not** claimed identical to deploy-branch tip |
+| `robots.txt` | `PASS` | HTTP 200; private prefixes Disallow; sitemap declared |
+| `sitemap.xml` | `PASS` | HTTP 200; **56** `<loc>` entries (counts of 51/55 in older rows are stale) |
+| `/welcome` acquisition document | `PASS` | Self-canonical, indexable title/description in first HTML |
+| `/` apex first-byte SEO | `DRIFT` | Shell title `Verdant Grow Diary`; **no** first-HTML canonical; client Landing owns head after paint for signed-out users (`RootEntry`) |
+| Declared host redirects (`/demo`, `/features`, `/strains`, …) | `FAIL` vs `vercel.json` intent | Live returned **HTTP 200** soft shells, not 301/308 |
+| Private path soft-200 | `DRIFT` (known SPA shape) | `/dashboard`, `/tents`, `/doctor`, etc. HTTP 200 + shell `index, follow`; robots.txt Disallow is the active fence |
+| Checkout noindex | `PASS` | `/checkout/success` and `/checkout/cancel` emit `noindex, follow` |
+| GA4 collection / Day 0 | `UNSET` / not re-run | Still governed by `docs/seo/lighting-day0-gate-run-2026-08-07.md` (dark Array `dataLayer.push` on that gate) |
+| GSC / Ahrefs authenticated export | `BLOCKED` | No credentials in agent session; reconciliation is issue-class + live HTTP only |
+
+### Canonical home split (product truth)
+
+- Signed-out `/` → public `Landing` with `canonicalPath="/"`.
+- Signed-in `/` → Dashboard inside `AppShell`.
+- `/welcome` → same Landing with `canonicalPath="/welcome"` (stable acquisition URL).
+- **Do not** 301 one onto the other without a new decision — see the decision spec.
+
+### Public-surface blockers (crawl honesty)
+
+1. Production does not currently honor the permanent redirects listed in repo
+   `vercel.json` (live soft-200 on aliases). Owner/platform follow-up.
+2. Apex `/` first-byte head is weaker than `/welcome` (no initial canonical).
+3. Soft-200 private shells still advertise `index, follow` in HTML meta; robots.txt
+   Disallow is required and present.
+4. Day 0 measurement clock remains `NOT_STARTED` until analytics loader + EM +
+   authenticated baselines clear (unchanged Mode A gate).
+
+---
+
 ## Production status
 
 SEO/analytics axes verified directly on 2026-08-02; release identity re-verified
-2026-08-05:
+2026-08-05; **public crawl probes re-run 2026-08-12** (see Public surface section).
+Authenticated GA4/GSC baselines remain blocked.
 
 | Axis                                        | Status                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `https://verdantgrowdiary.com/version.json` | `PASS` — HTTP 200 (re-verified 2026-08-05)                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| Production commit                           | `PASS` — verified 2026-08-05 ~22:10Z: production serves real SHA `3f773b680dcc` with the resilient stamp live (`commitSource: "git"`, `treeHash: c8fc076f0011…`, `ref: "__orphan__"`, `dirty: false`); resolver matched the served treeHash to this exact commit via tag annotation. Incident context: the same day's 15:47:45Z build had stamped `commit: "unknown"` (see blocker 6 — resolved and live-verified); single observations remain point-in-time |
-| Production build time                       | `2026-08-05T22:06:15.869Z` at the ~22:10Z verification; earlier that day: 15:47:45Z (degraded), 15:52:18Z (healthy pre-resilience)                                                                                                                                                                                                                                                                                                                           |
-| Public sitemap                              | `PASS` — HTTP 200, 51 `<loc>` entries                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| robots.txt                                  | `PASS` — HTTP 200, production sitemap declared; neither lighting route is disallowed                                                                                                                                                                                                                                                                                                                                                                         |
-| Lighting route technical SEO                | `PASS` — two HTTP 200 routes; page metadata and route-scoped JSON-LD verified                                                                                                                                                                                                                                                                                                                                                                                |
-| GA4 explicit lighting-page identity         | `PASS` — nine exact intercepted SPA page-view events; no test traffic transmitted                                                                                                                                                                                                                                                                                                                                                                            |
-| GA4 page-view singleton contract            | `FAIL` — five automatic tag-generated events observed beside explicit application events                                                                                                                                                                                                                                                                                                                                                                     |
+| `https://verdantgrowdiary.com/version.json` | `PASS` — HTTP 200 (re-verified 2026-08-12; stamp details in Public surface — prior 2026-08-05 identity row is historical)                                                                                                                                                                                                                                                                                                                                    |
+| Production commit                           | `PASS` — verified 2026-08-05 ~22:10Z: production serves real SHA `3f773b680dcc` with the resilient stamp live (`commitSource: "git"`, `treeHash: c8fc076f0011…`, `ref: "__orphan__"`, `dirty: false`); resolver matched the served treeHash to this exact commit via tag annotation. **2026-08-12 re-probe saw a different dirty orphan stamp (`8fe3c3551b20`) — do not treat the 08-05 SHA as still live.** |
+| Production build time                       | Historical 2026-08-05 row retained for resilience story; live buildTime on 2026-08-12 re-probe: `2026-08-12T07:02:35.575Z`                                                                                                                                                                                                                                                                                                                                   |
+| Public sitemap                              | `PASS` — HTTP 200, **56** `<loc>` entries (re-counted 2026-08-12)                                                                                                                                                                                                                                                                                                                                                                                            |
+| robots.txt                                  | `PASS` — HTTP 200, production sitemap declared; private prefixes Disallow repeated per agent group                                                                                                                                                                                                                                                                                                                                                           |
+| Lighting route technical SEO                | `PASS` (historical 2026-08-07 gate docs) — not re-opened this turn                                                                                                                                                                                                                                                                                                                                                                                           |
+| GA4 explicit lighting-page identity         | Historical PASS on 2026-08-02 matrix era; **2026-08-07 gate found dark collection** — do not claim current collection health without a new matrix                                                                                                                                                                                                                                                                                                             |
+| GA4 page-view singleton contract            | `FAIL` historically (EM double-count); re-measure blocked while collection dark / EM owner change pending                                                                                                                                                                                                                                                                                                                                                    |
 | GA4 authenticated baseline                  | `BLOCKED` — authenticated access unavailable                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | GSC authenticated baseline                  | `BLOCKED` — authenticated access unavailable                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | Measurement Day 0                           | `UNSET`                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
@@ -258,6 +308,10 @@ Out of scope:
    items (optional): raise the intermittent history-less sandbox with Lovable;
    retire the stale pre-SSR `vercel.json`.
    See the release-provenance runbook below for how to read and resolve stamps.
+7. **Public crawl (added 2026-08-12):** live host does not apply `vercel.json`
+   permanent redirects for `/demo`, `/features`, `/strains`, etc. (soft-200). Treat
+   host-redirect fidelity as an owner/platform verification item before citing the
+   redirect table as production behavior.
 
 ---
 
@@ -304,7 +358,7 @@ write is approved by this state file.
 | ----------------- | ------------------------------------------------------------ |
 | Codex             | Standing SEO measurement readiness and analytics integrity   |
 | Claude            | Unassigned — see completed out-of-slice #586/#809/#812 and #885 above |
-| Grok              | Unassigned                                                   |
+| Grok              | Public-surface docs refresh (home-split + Ahrefs-class reconciliation) — this handoff |
 | Security reviewer | Unassigned                                                   |
 | Gemini            | Unassigned                                                   |
 | Council Chair     | Unassigned                                                   |

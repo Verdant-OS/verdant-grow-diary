@@ -113,11 +113,15 @@ Branch `claude/ecowitt-sensor-verify-98f1bd` (based on `main`). Records:
 `docs/ecowitt-real-ingest-phase-1-8-grounding-audit.md` (deploy-branch-verified; corrects
 stale schema claims in the earlier two).
 
-Phase 1.8 specification drafted: `docs/ecowitt-real-ingest-phase-1-8-specification.md`,
-verdict `HOLD — approvable`. Blocked on owner decisions D2 (channel identity), D3
-(fail-open live default), D4 (stale persistence), and verification items V1–V4 (two need
-live-project access). Recommends ratifying the shipped dedupe index as the sole
-idempotency mechanism; no new schema.
+Phase 1.8 specification: `docs/ecowitt-real-ingest-phase-1-8-specification.md`, verdict
+`HOLD — approvable`. **Owner ruled 2026-08-12** (at frozen head `15e161885`): D2 APPROVED
+(designated channel now, per-plant binding later), D3 APPROVED (fail-closed unknown
+transport → `invalid`), D4 APPROVED (stale persists as evidence only) — fences recorded in
+the spec. V1 and V4 were authorized and attempted same day: both `BLOCKED` — no `PG*`
+env/`psql` on this machine and the Supabase MCP connection lacks permission on
+`knkwiiywfkbqznbxwqfh`. Unblock paths and an owner-runnable V4 query are in the spec's
+verification attempt record. V2/V3 remain `NOT_RUN`. Spec advances to `APPROVED` only when
+V1–V4 all pass.
 
 | Phase 2 gate item                             | Status                                    |
 | --------------------------------------------- | ----------------------------------------- |

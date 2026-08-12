@@ -68,6 +68,7 @@ function resolveSession(envName: string): { path?: string; skipReason?: string }
 
 const FREE_SESSION = resolveSession("E2E_PHENO_FREE_SESSION_FILE");
 const PRO_SESSION = resolveSession("E2E_PHENO_PRO_SESSION_FILE");
+const PRO_ANNUAL_SESSION = resolveSession("E2E_PHENO_PRO_ANNUAL_SESSION_FILE");
 const FOUNDER_SESSION = resolveSession("E2E_PHENO_FOUNDER_SESSION_FILE");
 const CANCELED_SESSION = resolveSession("E2E_PHENO_CANCELED_SESSION_FILE");
 
@@ -113,16 +114,18 @@ function bindRoleSession(session: { path?: string }) {
 const MISSING_EVIDENCE_HUNT = process.env.E2E_PHENO_HUNT_ID_MISSING_EVIDENCE;
 const COMPARISON_READY_HUNT = process.env.E2E_PHENO_HUNT_ID_COMPARISON_READY;
 
-// Pick a Pro-capable session for the paid workspace scenarios: prefer Pro,
-// fall back to Founder. Missing → scenarios in that block skip cleanly.
+// Pick a Pro-capable session for the paid workspace scenarios: prefer Pro
+// monthly, then annual, then Founder. Missing → scenarios in that block skip
+// cleanly.
 const PAID_SESSION = PRO_SESSION.path
   ? PRO_SESSION
-  : FOUNDER_SESSION.path
-    ? FOUNDER_SESSION
-    : {
-        skipReason:
-          "SKIPPED: neither E2E_PHENO_PRO_SESSION_FILE nor E2E_PHENO_FOUNDER_SESSION_FILE is set.",
-      };
+  : PRO_ANNUAL_SESSION.path
+    ? PRO_ANNUAL_SESSION
+    : FOUNDER_SESSION.path
+      ? FOUNDER_SESSION
+      : {
+          skipReason: "SKIPPED: no Pro monthly, Pro annual, or Founder session is set.",
+        };
 
 async function assertNoForbiddenCopy(page: Page) {
   const body = (await page.locator("body").innerText()).toLowerCase();
@@ -212,15 +215,40 @@ test.describe("C. Pro Monthly access", () => {
   test.skip(!PRO_SESSION.path, PRO_SESSION.skipReason ?? "SKIPPED: no Pro session.");
   bindRoleSession(PRO_SESSION);
 
-  test("Pro user can load /pheno-hunts/new without auth wall", async ({ page }) => {
+  test("Pro Monthly user can load /pheno-hunts/new without auth wall", async ({ page }) => {
     await page.goto("/pheno-hunts/new");
-    expect(page.url()).not.toContain("/auth");
+    await expect(page).not.toHaveURL(/\/auth/);
+    await expect(
+      page.getByTestId("pheno-hunt-onboarding"),
+      "Pro Monthly user must reach the paid onboarding surface",
+    ).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByTestId("pheno-tracker-upgrade-gate")).toHaveCount(0);
     await assertNoForbiddenCopy(page);
   });
 });
 
-// ─── C2. Founder Lifetime can reach paid workspace ────────────────────────
-test.describe("C2. Founder Lifetime access", () => {
+// ─── C2. Pro Annual can reach paid workspace ──────────────────────────────
+test.describe("C2. Pro Annual access", () => {
+  test.skip(
+    !PRO_ANNUAL_SESSION.path,
+    PRO_ANNUAL_SESSION.skipReason ?? "SKIPPED: no Pro Annual session.",
+  );
+  bindRoleSession(PRO_ANNUAL_SESSION);
+
+  test("Pro Annual user can load /pheno-hunts/new without auth wall", async ({ page }) => {
+    await page.goto("/pheno-hunts/new");
+    await expect(page).not.toHaveURL(/\/auth/);
+    await expect(
+      page.getByTestId("pheno-hunt-onboarding"),
+      "Pro Annual user must reach the paid onboarding surface",
+    ).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByTestId("pheno-tracker-upgrade-gate")).toHaveCount(0);
+    await assertNoForbiddenCopy(page);
+  });
+});
+
+// ─── C3. Founder Lifetime can reach paid workspace ────────────────────────
+test.describe("C3. Founder Lifetime access", () => {
   test.skip(!FOUNDER_SESSION.path, FOUNDER_SESSION.skipReason ?? "SKIPPED: no Founder session.");
   bindRoleSession(FOUNDER_SESSION);
 
@@ -231,8 +259,8 @@ test.describe("C2. Founder Lifetime access", () => {
   });
 });
 
-// ─── C3. Canceled/expired user is blocked ─────────────────────────────────
-test.describe("C3. Canceled/expired blocked from paid pheno workspace", () => {
+// ─── C4. Canceled/expired user is blocked ─────────────────────────────────
+test.describe("C4. Canceled/expired blocked from paid pheno workspace", () => {
   test.skip(!CANCELED_SESSION.path, CANCELED_SESSION.skipReason ?? "SKIPPED: no Canceled session.");
   bindRoleSession(CANCELED_SESSION);
 

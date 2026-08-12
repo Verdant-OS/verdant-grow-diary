@@ -163,7 +163,7 @@ const CREDIT_PACK_HASH = "#buy-credits";
  * the link was before it could carry one — so existing call sites and their
  * pins stay byte-for-byte identical.
  */
-function buildCreditPackHref(returnTo: string | null | undefined): string {
+export function buildCreditPackHref(returnTo: string | null | undefined): string {
   return `${buildPricingHref(returnTo)}${CREDIT_PACK_HASH}`;
 }
 

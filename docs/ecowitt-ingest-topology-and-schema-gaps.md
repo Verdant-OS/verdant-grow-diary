@@ -12,8 +12,9 @@ inferred from external documentation. Companion record:
 > slice of this worktree and are stale in specifics: the trigger allows **nine** metrics
 > (not five), the table has **12 columns** including `device_id` / `raw_payload` /
 > `captured_at`, a gateway fingerprint registry lives in `tents.hardware_config`, a shipped
-> dedupe unique index exists, and a second deployed Edge function (`ecowitt-ingest`) serves
-> the gateway directly. The corrected, deploy-branch-verified account is
+> dedupe unique index exists, and a second deployed Edge function (`ecowitt-ingest`) speaks
+> the gateway's custom-upload protocol — behind the same mandatory bearer-authenticated
+> bridge hop as every other path (it 401s a bare gateway; §1 applies to it too). The corrected, deploy-branch-verified account is
 > [the Phase 1.8 grounding audit](./ecowitt-real-ingest-phase-1-8-grounding-audit.md).
 > Sections 1–3 of this record (the 401 dead end, listener topology, and the fail-open
 > `live` remap) were re-verified and stand.

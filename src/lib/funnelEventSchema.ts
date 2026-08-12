@@ -45,6 +45,10 @@ export const FUNNEL_EVENT_SCHEMA: Readonly<Record<FunnelEventName, ReadonlyArray
     historical_ai_review_started: [],
     ai_doctor_result_received: ["surface"],
     ai_doctor_session_saved: ["surface"],
+    // "metric"/"severity" are fixed alert vocabularies, never ids or values.
+    // Tier-agnostic navigation intent — kept out of the paywall pair so a
+    // Craft grower's click never counts as an upgrade impression.
+    blueprint_cta_clicked: ["surface", "metric", "severity"],
     paywall_viewed: ["surface"],
     paywall_cta_clicked: ["surface", "plan"],
     // "surface" only, never "plan". A pack SKU is not a plan, and letting one

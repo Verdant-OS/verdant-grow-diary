@@ -27,6 +27,7 @@ import { buildPlantAiDoctorReviewPath } from "@/lib/aiDoctorEntryRules";
 import { buildPlantBlueprintPath } from "@/lib/plantDetailQuickActions";
 import { resolveAlertBlueprintMetric } from "@/lib/alertBlueprintLinkRules";
 import { trackTentAlertsDoctorCta } from "@/lib/plantTentAlertsDoctorCtaTracking";
+import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 
 interface Props {
   tentId: string | null | undefined;
@@ -152,7 +153,21 @@ function AlertRowItem({
               className="h-7 px-2 gap-1"
               data-testid="plant-assigned-tent-alert-target-band"
             >
-              <Link to={bandHref}>
+              <Link
+                to={bandHref}
+                onClick={() =>
+                  // Funnel-sinked (gtag), unlike the doctor CTA's CustomEvent,
+                  // which has no listener. Same privacy contract: severity
+                  // bucket + fixed metric token only, never an id. The link is
+                  // gated on the alert→Blueprint mapping, so row.metric here
+                  // can only be a mapped vocabulary token.
+                  trackFunnelEvent("blueprint_cta_clicked", {
+                    surface: "tent_alert_row",
+                    metric: row.metric ?? undefined,
+                    severity: row.severity,
+                  })
+                }
+              >
                 <Gauge className="h-3.5 w-3.5" /> Target Band
               </Link>
             </Button>

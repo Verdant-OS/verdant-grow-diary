@@ -39,6 +39,11 @@ describe("event name contract", () => {
       "historical_ai_review_started",
       "ai_doctor_result_received",
       "ai_doctor_session_saved",
+      // Blueprint entry intent — tier-agnostic navigation, kept out of the
+      // paywall pair so a Craft grower's click never inflates the upgrade
+      // funnel. Sits before paywall_viewed because for a non-Craft clicker
+      // the teaser+paywall is literally the next step on the page.
+      "blueprint_cta_clicked",
       "paywall_viewed",
       "paywall_cta_clicked",
       // Top-up funnel, deliberately distinct from the paywall pair above: it
@@ -76,6 +81,10 @@ describe("event name contract", () => {
       "rows",
       "reason",
       "length_bucket",
+      // Fixed alert vocabularies (metric token / severity bucket), never ids
+      // or reading values; call sites are gated on the alert→Blueprint map.
+      "metric",
+      "severity",
     ]);
   });
 });

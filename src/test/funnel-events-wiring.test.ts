@@ -110,6 +110,23 @@ const SEAMS: Array<{ event: string; file: string; extra?: RegExp[] }> = [
     extra: [/trackFunnelEvent\("ai_doctor_session_saved",\s*\{\s*surface\s*\}\)/],
   },
   {
+    event: "blueprint_cta_clicked",
+    file: "src/components/PlantAssignedTentAlertsPanel.tsx",
+    extra: [
+      // Both fixed-vocabulary fields, no ids — and the metric can only be a
+      // mapped token because the link itself is gated on the mapping.
+      /trackFunnelEvent\("blueprint_cta_clicked",\s*\{\s*surface:\s*"tent_alert_row",\s*metric:\s*row\.metric \?\? undefined,\s*severity:\s*row\.severity,?\s*\}\)/,
+    ],
+  },
+  {
+    event: "blueprint_cta_clicked",
+    file: "src/components/TentAlertsBlueprintHint.tsx",
+    extra: [
+      // The Daily Check hint is stage-level: no metric, no severity.
+      /trackFunnelEvent\("blueprint_cta_clicked",\s*\{\s*surface:\s*"daily_check_hint",?\s*\}\)/,
+    ],
+  },
+  {
     event: "credit_pack_cta_viewed",
     file: "src/components/PlantDetailAiDoctorLiveReview.tsx",
     extra: [

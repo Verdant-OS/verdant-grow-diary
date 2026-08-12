@@ -26,6 +26,7 @@ import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { canUseCapability } from "@/lib/entitlements/capabilityAccess";
 import { buildBlueprintTeaserViewModel } from "@/lib/blueprintTeaserViewModel";
 import { buildPlantBlueprintPath } from "@/lib/plantDetailQuickActions";
+import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 
 export interface TentAlertsBlueprintHintProps {
   /**
@@ -79,6 +80,13 @@ export default function TentAlertsBlueprintHint({
         to={href}
         data-testid={`${testId}-link`}
         className="font-medium text-primary underline underline-offset-4"
+        onClick={() =>
+          // Same event as the panel's Target Band action so blueprint-entry
+          // intent is counted across BOTH production surfaces — an event that
+          // fires from only one systematically undercounts the CTA. This
+          // surface is stage-level: no metric, no severity to report.
+          trackFunnelEvent("blueprint_cta_clicked", { surface: "daily_check_hint" })
+        }
       >
         See the targets
       </Link>

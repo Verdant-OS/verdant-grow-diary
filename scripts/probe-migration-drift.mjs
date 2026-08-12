@@ -45,6 +45,7 @@ import { execFileSync } from "node:child_process";
 import { readdirSync, existsSync } from "node:fs";
 import { resolve, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { redactDbUrl } from "./lib/redactDbUrl.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const MIGRATIONS_DIR = join(ROOT, "supabase", "migrations");
@@ -58,13 +59,32 @@ const dbUrl =
   process.env.SUPABASE_DB_URL_LIVE ??
   process.env.DATABASE_URL;
 
+// Every byte this script emits goes through one of these two. The connection
+// string is an argv element of the psql child, so a failure diagnostic can
+// quote it back at us -- and this output is not merely logged, it is published
+// verbatim into a GitHub issue body by the scheduled workflow.
+const say = (line) => console.log(redactDbUrl(line, dbUrl));
+const warn = (line) => console.error(redactDbUrl(line, dbUrl));
+
 function bail(message, detail) {
   if (asJson) {
-    console.log(JSON.stringify({ status: "could_not_probe", message, detail }, null, 2));
+    // Redact the fields before serialising rather than the serialised string,
+    // so the placeholder can never disturb the JSON the workflow parses.
+    say(
+      JSON.stringify(
+        {
+          status: "could_not_probe",
+          message: redactDbUrl(message, dbUrl),
+          detail: redactDbUrl(detail, dbUrl),
+        },
+        null,
+        2,
+      ),
+    );
   } else {
-    console.error(`[migration-drift] COULD NOT PROBE — ${message}`);
-    if (detail) console.error(`  ${detail}`);
-    console.error("  This is NOT a pass. Nothing was verified.");
+    warn(`[migration-drift] COULD NOT PROBE — ${message}`);
+    if (detail) warn(`  ${detail}`);
+    warn("  This is NOT a pass. Nothing was verified.");
   }
   process.exit(2);
 }
@@ -84,8 +104,7 @@ function repoVersions() {
 
 /** Applied versions, read-only, one SELECT. */
 function appliedVersions(url) {
-  const sql =
-    "SELECT version FROM supabase_migrations.schema_migrations ORDER BY version;";
+  const sql = "SELECT version FROM supabase_migrations.schema_migrations ORDER BY version;";
   let raw;
   try {
     raw = execFileSync("psql", [url, "-tAc", sql], {
@@ -154,7 +173,7 @@ function main() {
   const gaps = maxApplied ? unapplied.filter((v) => v < maxApplied) : [];
 
   if (asJson) {
-    console.log(
+    say(
       JSON.stringify(
         {
           status: unapplied.length === 0 ? "current" : "drift",
@@ -175,44 +194,44 @@ function main() {
     process.exit(unapplied.length === 0 ? 0 : 1);
   }
 
-  console.log("[migration-drift]");
-  console.log(`  newest in repo:   ${newestRepo ?? "(none)"}`);
-  console.log(`  max applied:      ${maxApplied ?? "(none)"}`);
-  console.log(`  unapplied:        ${unapplied.length}`);
+  say("[migration-drift]");
+  say(`  newest in repo:   ${newestRepo ?? "(none)"}`);
+  say(`  max applied:      ${maxApplied ?? "(none)"}`);
+  say(`  unapplied:        ${unapplied.length}`);
 
   if (unapplied.length === 0) {
-    console.log("\nOK — every repo migration is recorded applied.");
+    say("\nOK — every repo migration is recorded applied.");
     process.exit(0);
   }
 
   const oldest = unapplied[0];
   const age = ageInDays(oldest);
-  console.log(
+  say(
     `\nDRIFT — ${unapplied.length} migration(s) not applied.` +
       (age !== null ? ` Oldest pending is ${age} day(s) old.` : ""),
   );
-  console.log("\n  Unapplied:");
+  say("\n  Unapplied:");
   for (const v of unapplied) {
-    console.log(`    ${v}  ${repo.get(v)}${gaps.includes(v) ? "   <-- GAP" : ""}`);
+    say(`    ${v}  ${repo.get(v)}${gaps.includes(v) ? "   <-- GAP" : ""}`);
   }
 
   if (gaps.length > 0) {
-    console.log(
-      `\n  ${gaps.length} of these are GAPS (older than the newest applied version).`,
-    );
-    console.log(
-      "  The runner moved past them, so the live schema is in a state nobody authored.",
-    );
+    say(`\n  ${gaps.length} of these are GAPS (older than the newest applied version).`);
+    say("  The runner moved past them, so the live schema is in a state nobody authored.");
   } else {
-    console.log(
-      "\n  These form a contiguous tail — consistent with the runner having STOPPED",
-    );
-    console.log(
-      `  at ${oldest}. If that migration fails on every apply, everything behind it`,
-    );
-    console.log("  is frozen until it is fixed or skipped.");
+    say("\n  These form a contiguous tail — consistent with the runner having STOPPED");
+    say(`  at ${oldest}. If that migration fails on every apply, everything behind it`);
+    say("  is frozen until it is fixed or skipped.");
   }
   process.exit(1);
 }
 
-main();
+try {
+  main();
+} catch (error) {
+  // An uncaught throw would print a raw stack straight to stderr, routing
+  // around every redaction above -- and the scheduled workflow reads that
+  // stderr file into the tracking issue body when the JSON one is empty. Any
+  // throw site holding the connection string would have published it.
+  bail("unexpected failure", String((error && error.stack) || error));
+}

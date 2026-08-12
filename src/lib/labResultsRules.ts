@@ -283,6 +283,12 @@ export function validateLabTestDraft(draft: LabTestDraft, now: number): LabTestD
       errors.push(`Terpene "${name}" needs a percentage between 0 and 100.`);
       continue;
     }
+    // Object keys collapse duplicates silently — a second row with the same
+    // name would overwrite the first measurement unrecoverably. Refuse it.
+    if (name in terpenes) {
+      errors.push(`Terpene "${name}" is listed more than once.`);
+      continue;
+    }
     terpenes[name] = v;
   }
 

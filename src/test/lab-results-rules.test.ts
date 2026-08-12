@@ -169,6 +169,20 @@ describe("validateLabTestDraft", () => {
     expect(result.errors).toContain("Enter at least one measurement from the report.");
   });
 
+  it("rejects duplicate terpene names instead of silently overwriting", () => {
+    const result = validateLabTestDraft(
+      draft({
+        terpenes: [
+          { name: "myrcene", percent: "0.8" },
+          { name: " myrcene ", percent: "0.3" },
+        ],
+      }),
+      NOW,
+    );
+    expect(result.ok).toBe(false);
+    expect(result.errors).toContain('Terpene "myrcene" is listed more than once.');
+  });
+
   it("skips fully blank terpene rows but rejects half-filled ones", () => {
     const blankOk = validateLabTestDraft(
       draft({ thcPercent: "1", terpenes: [{ name: "", percent: "" }] }),

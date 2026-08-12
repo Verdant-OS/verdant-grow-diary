@@ -25,7 +25,9 @@ AS $$
     AND NOT EXISTS (
       SELECT 1
       FROM jsonb_each(t) AS e(key, value)
-      WHERE char_length(e.key) = 0
+      -- btrim: a whitespace-only key ("   ") is as nameless as an empty one,
+      -- and would satisfy has_measurement while displaying nothing.
+      WHERE char_length(btrim(e.key)) = 0
          OR char_length(e.key) > 64
          OR jsonb_typeof(e.value) <> 'number'
          -- CASE guards the numeric cast: it must only run for real numbers.

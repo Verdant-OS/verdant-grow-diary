@@ -19,6 +19,14 @@ import { MemoryRouter } from "@/lib/react-router-compat";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { FounderSlotsState } from "@/hooks/useFounderSlotsRemaining";
+import {
+  CHECKOUT_CONTEXT_MAX_AGE_MS,
+  CHECKOUT_KIND_STORAGE_KEY,
+  CHECKOUT_STARTED_STORAGE_KEY,
+  clearCheckoutStarted,
+  markCheckoutStarted,
+  readFreshCheckoutKind,
+} from "@/lib/checkoutContextRules";
 
 const slots = vi.hoisted(() => ({
   value: {
@@ -97,12 +105,60 @@ describe("founder note · claims availability only when verified", () => {
 });
 
 describe("founder note · mount gating on CheckoutSuccess", () => {
-  it("is mounted only for a confirmed Pro subscriber", () => {
-    // Craft would be pitched a DOWNGRADE and Founder already owns it; their
-    // confirmed views ban the word "Pro" (truth-copy test), so a gating
-    // regression here would also trip that ban.
+  it("requires plan-checkout PROVENANCE, not merely a Pro entitlement", () => {
+    // effectivePlanId alone is who the viewer IS, not what this visit IS:
+    // every existing Pro subscriber satisfies it on a direct visit, and a
+    // pack buyer lands here seconds after an unrelated purchase. The gate
+    // must additionally require the same-device plan-checkout marker and
+    // the absence of the pack flow's return param.
     expect(CHECKOUT_SUCCESS).toMatch(
-      /effectivePlanId === "pro_monthly"[\s\S]{0,120}effectivePlanId === "pro_annual"[\s\S]{0,80}<CheckoutSuccessFounderNote \/>/,
+      /effectivePlanId === "pro_monthly"[\s\S]{0,160}effectivePlanId === "pro_annual"[\s\S]{0,160}freshCheckoutKind === "plan"[\s\S]{0,80}!packReturnTo[\s\S]{0,40}<CheckoutSuccessFounderNote \/>/,
     );
+    // And the kind is read once on mount, before the confirmed-clear effect
+    // removes the marker.
+    expect(CHECKOUT_SUCCESS).toMatch(
+      /useState\(\(\) => readFreshCheckoutKind\(Date\.now\(\)\)\)/,
+    );
+  });
+});
+
+describe("founder note · checkout-kind provenance rules", () => {
+  function memoryStorage() {
+    const m = new Map<string, string>();
+    return {
+      getItem: (k: string) => m.get(k) ?? null,
+      setItem: (k: string, v: string) => void m.set(k, v),
+      removeItem: (k: string) => void m.delete(k),
+    };
+  }
+
+  it("a plan checkout proves plan provenance; a pack checkout never does", () => {
+    const s = memoryStorage();
+    markCheckoutStarted(1_000, "plan", s);
+    expect(readFreshCheckoutKind(2_000, s)).toBe("plan");
+    markCheckoutStarted(3_000, "pack", s);
+    expect(readFreshCheckoutKind(4_000, s)).toBe("pack");
+  });
+
+  it("a legacy marker without a kind reads null — never assumed to be a plan", () => {
+    // Sessions from before the kind key exist: timestamp present, kind absent.
+    const s = memoryStorage();
+    s.setItem(CHECKOUT_STARTED_STORAGE_KEY, "1000");
+    expect(readFreshCheckoutKind(2_000, s)).toBeNull();
+  });
+
+  it("a stale or absent marker reads null regardless of stored kind", () => {
+    const s = memoryStorage();
+    expect(readFreshCheckoutKind(1_000, s)).toBeNull();
+    markCheckoutStarted(1_000, "plan", s);
+    expect(readFreshCheckoutKind(1_000 + CHECKOUT_CONTEXT_MAX_AGE_MS + 1, s)).toBeNull();
+  });
+
+  it("clearing removes the kind too — no orphaned provenance", () => {
+    const s = memoryStorage();
+    markCheckoutStarted(1_000, "plan", s);
+    clearCheckoutStarted(s);
+    expect(readFreshCheckoutKind(1_500, s)).toBeNull();
+    expect(s.getItem(CHECKOUT_KIND_STORAGE_KEY)).toBeNull();
   });
 });

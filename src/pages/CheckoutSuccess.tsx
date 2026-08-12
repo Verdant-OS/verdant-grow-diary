@@ -17,6 +17,7 @@ import { buildCheckoutActivationViewModel } from "@/lib/checkoutActivationRules"
 import {
   clearCheckoutStarted,
   hasFreshCheckoutContext,
+  readFreshCheckoutKind,
   resolveCheckoutSuccessView,
 } from "@/lib/checkoutContextRules";
 import { trackFunnelEvent } from "@/lib/funnelAnalytics";
@@ -88,6 +89,11 @@ export default function CheckoutSuccess() {
   // post-checkout return ("confirming…") from a direct visit ("no checkout
   // context") — the page never claims a completed checkout without evidence.
   const [hasCheckoutContext] = useState(() => hasFreshCheckoutContext(Date.now()));
+  // Read once on mount, like the context flag above — the confirmed-clear
+  // effect removes the marker, so a render-time read would race it. "plan"
+  // is the ONLY value that proves this visit follows a plan checkout;
+  // pack checkouts write "pack", legacy/absent markers read null.
+  const [freshCheckoutKind] = useState(() => readFreshCheckoutKind(Date.now()));
   const view = resolveCheckoutSuccessView({
     confirmed,
     lookupFailed,
@@ -215,15 +221,23 @@ export default function CheckoutSuccess() {
             <div className="mt-4 flex justify-center">
               <AccountPlanBadge entitlement={entitlement} />
             </div>
-            {/* Mounted ONLY for a confirmed Pro subscriber: Craft is a higher
-                tier and Founder already owns lifetime, so neither may see a
-                Founder pitch here (their confirmed views also ban the word
-                "Pro" outright). Availability + calm copy live inside the
-                component; it renders nothing unless slots are verifiably open.
-                Kept a note, not a counter — scarcity seconds after payment
-                invites buyer's remorse. */}
+            {/* Mounted ONLY when this VISIT provably follows a fresh PLAN
+                checkout by a Pro subscriber. effectivePlanId alone is not
+                provenance — every existing Pro subscriber satisfies it on a
+                direct visit, and a pack buyer lands here seconds after an
+                unrelated purchase. freshCheckoutKind === "plan" requires the
+                same-device marker written when the plan overlay opened (pack
+                checkouts write "pack"; legacy/absent markers read null and
+                fail toward silence); !packReturnTo is belt-and-braces for the
+                pack flow's own return param. Craft and Founder stay excluded
+                (their confirmed views also ban the word "Pro" outright).
+                Availability + calm copy live inside the component; it renders
+                nothing unless slots are verifiably open. A note, not a
+                counter — scarcity seconds after payment invites remorse. */}
             {(entitlement.effectivePlanId === "pro_monthly" ||
-              entitlement.effectivePlanId === "pro_annual") && <CheckoutSuccessFounderNote />}
+              entitlement.effectivePlanId === "pro_annual") &&
+              freshCheckoutKind === "plan" &&
+              !packReturnTo && <CheckoutSuccessFounderNote />}
             {packReturnTo && (
               <div
                 className="mt-8 rounded-xl border border-primary/20 bg-primary/5 p-5"

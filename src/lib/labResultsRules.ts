@@ -288,6 +288,11 @@ export function validateLabTestDraft(draft: LabTestDraft, now: number): LabTestD
       errors.push("Terpene names must be 64 characters or fewer.");
       continue;
     }
+    // Mirrors the DB validator: a name needs at least one letter or number.
+    if (!/[\p{L}\p{N}]/u.test(name)) {
+      errors.push("Terpene names need at least one letter or number.");
+      continue;
+    }
     const v = Number(rawValue);
     if (rawValue.length === 0 || !Number.isFinite(v) || v < 0 || v > 100) {
       errors.push(`Terpene "${name}" needs a percentage between 0 and 100.`);

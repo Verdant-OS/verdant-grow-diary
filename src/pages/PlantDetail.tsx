@@ -215,8 +215,9 @@ function ArchivedTimelineReadOnlyView({
           <QuickLogGroupedTimelineSection scope="plant" plantId={plant.id} tentId={plant.tentId} />
           <TimelineMemorySection scope="plant" plantId={plant.id} />
           {/* Saved COA evidence stays reachable after archiving; add/delete
-              controls are suppressed in this read-only view. */}
-          <PlantLabResultsPanel plantId={plant.id} readOnly />
+              controls are suppressed in this read-only view. Keyed by plant
+              so a cached-route switch can never carry state across plants. */}
+          <PlantLabResultsPanel key={plant.id} plantId={plant.id} readOnly />
         </div>
       </div>
     </div>
@@ -769,7 +770,10 @@ export default function PlantDetail() {
             aria-label="Plant lab results section"
             className="scroll-mt-16 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
           >
-            <PlantLabResultsPanel plantId={plant.id} />
+            {/* Keyed by plant: navigating between cached plant routes must
+                remount the panel so an open add-dialog draft for plant A can
+                never be saved under plant B. */}
+            <PlantLabResultsPanel key={plant.id} plantId={plant.id} />
           </div>
         </div>
       </div>

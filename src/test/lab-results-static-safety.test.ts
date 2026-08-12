@@ -66,10 +66,14 @@ describe("lab results — frontend static safety", () => {
     expect(src).toContain("if (error) return null;");
   });
 
-  it("PlantDetail mounts the panel", () => {
+  it("PlantDetail mounts the panel keyed by plant (active + archived views)", () => {
+    // The key forces a remount on plant change so an open add-dialog draft
+    // for plant A can never be saved under plant B via cached-route reuse.
     const src = read("src/pages/PlantDetail.tsx");
-    expect(src).toContain("PlantLabResultsPanel");
-    expect(src).toMatch(/<PlantLabResultsPanel plantId=\{plant\.id\} \/>/);
+    expect(src).toMatch(/<PlantLabResultsPanel key=\{plant\.id\} plantId=\{plant\.id\} \/>/);
+    expect(src).toMatch(
+      /<PlantLabResultsPanel key=\{plant\.id\} plantId=\{plant\.id\} readOnly \/>/,
+    );
   });
 });
 
@@ -110,10 +114,10 @@ describe("lab results — migration static safety", () => {
     expect(sql).toContain("CREATE FUNCTION public.lab_tests_terpenes_valid");
     expect(sql).toContain("CHECK (public.lab_tests_terpenes_valid(terpenes))");
     expect(sql).toContain("CONSTRAINT lab_tests_has_measurement");
-    // Keys must equal their trimmed form: whitespace-only keys are nameless,
-    // and padded variants would collapse into duplicates at display time.
-    expect(sql).toContain("char_length(btrim(e.key)) = 0");
-    expect(sql).toContain("e.key <> btrim(e.key)");
+    // A key needs a real name (letter/digit — rejects empty, tab/newline, and
+    // punctuation-only keys) and no padding whitespace of any kind.
+    expect(sql).toContain("e.key !~ '[[:alnum:]]'");
+    expect(sql).toContain(String.raw`e.key ~ '^\s|\s$'`);
     // Case variants of the same terpene must not persist as two entries.
     expect(sql).toMatch(/GROUP BY lower\(k\) HAVING count\(\*\) > 1/);
     // A COA date must be stated (no silent insertion-time default) and can

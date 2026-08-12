@@ -208,6 +208,12 @@ describe("validateLabTestDraft", () => {
     expect(caseVariant.errors).toContain('Terpene "myrcene" is listed more than once.');
   });
 
+  it("rejects terpene names with no letter or number (mirrors DB validator)", () => {
+    const result = validateLabTestDraft(draft({ terpenes: [{ name: "—", percent: "0.5" }] }), NOW);
+    expect(result.ok).toBe(false);
+    expect(result.errors).toContain("Terpene names need at least one letter or number.");
+  });
+
   it("skips fully blank terpene rows but rejects half-filled ones", () => {
     const blankOk = validateLabTestDraft(
       draft({ thcPercent: "1", terpenes: [{ name: "", percent: "" }] }),

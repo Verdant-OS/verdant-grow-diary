@@ -25,11 +25,13 @@ AS $$
     AND NOT EXISTS (
       SELECT 1
       FROM jsonb_each(t) AS e(key, value)
-      -- Keys must equal their trimmed form: a whitespace-only key ("   ") is
-      -- as nameless as an empty one, and a padded variant (" myrcene ") would
-      -- collapse into a duplicate of "myrcene" at display time.
-      WHERE char_length(btrim(e.key)) = 0
-         OR e.key <> btrim(e.key)
+      -- A key must contain a real name — at least one letter or digit, so
+      -- empty, whitespace-only (including tabs/newlines, which one-argument
+      -- btrim would miss), and punctuation-only keys are all rejected — and
+      -- must carry no leading/trailing whitespace of any kind, or a padded
+      -- variant (" myrcene ") would collapse into a duplicate at display time.
+      WHERE e.key !~ '[[:alnum:]]'
+         OR e.key ~ '^\s|\s$'
          OR char_length(e.key) > 64
          OR jsonb_typeof(e.value) <> 'number'
          -- CASE guards the numeric cast: it must only run for real numbers.

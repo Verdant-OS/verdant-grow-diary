@@ -29,7 +29,14 @@ export const CHECKPOINT_TEST_MAP = [
     label: "Upgrade return path",
     titles: ["the CTA returnTo round-trips to /pricing", "unsafe returnTo is rejected"],
   },
-  { id: 3, label: "Pro access and onboarding", titles: ["Pro user can load /pheno-hunts/new"] },
+  {
+    id: 3,
+    label: "Pro monthly and annual access",
+    titles: [
+      "Pro Monthly user can load /pheno-hunts/new",
+      "Pro Annual user can load /pheno-hunts/new",
+    ],
+  },
   { id: 4, label: "Founder access", titles: ["Founder user can load /pheno-hunts/new"] },
   {
     id: 5,

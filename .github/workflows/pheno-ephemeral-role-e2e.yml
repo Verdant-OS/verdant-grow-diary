@@ -1,0 +1,109 @@
+name: Pheno role ladder E2E (disposable local)
+
+# Credential-free, hosted-data-free entitlement proof. This job boots a
+# loopback-only Supabase stack, creates disposable login-capable role users,
+# runs the real browser surfaces, and deletes the users before shutdown.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [verdant-grow-diary]
+    paths:
+      - "e2e/pheno-tracker-paid-user-smoke.spec.ts"
+      - "scripts/e2e/**pheno-paid-smoke*"
+      - "scripts/e2e/provision-pheno-paid-smoke-roles.mjs"
+      - ".github/workflows/pheno-ephemeral-role-e2e.yml"
+      - "src/test/pheno-ephemeral-role-fixtures.test.ts"
+
+permissions:
+  contents: read
+
+jobs:
+  role-ladder:
+    name: Free / Pro Monthly / Pro Annual / Founder / Canceled
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CI: "true"
+      E2E_BASE_URL: http://127.0.0.1:8080
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf # v2.1.1
+        with:
+          version: 2.109.1
+
+      - name: Prepare immutable local replay
+        run: |
+          set -eo pipefail
+          REPLAY_WORKDIR="${RUNNER_TEMP}/verdant-pheno-role-replay"
+          bun run test:local-supabase-replay
+          node scripts/prepare-local-supabase-replay.mjs --output="${REPLAY_WORKDIR}" --json
+          echo "SUPABASE_REPLAY_WORKDIR=${REPLAY_WORKDIR}" >> "$GITHUB_ENV"
+
+      - name: Start disposable local Supabase
+        run: supabase start --workdir "$SUPABASE_REPLAY_WORKDIR"
+
+      - name: Export local-only runtime values
+        run: |
+          set -e
+          STATUS_JSON="$(supabase status --workdir "$SUPABASE_REPLAY_WORKDIR" -o json)"
+          SUPABASE_URL="$(echo "$STATUS_JSON" | jq -r '.API_URL // .api_url // empty')"
+          SUPABASE_ANON_KEY="$(echo "$STATUS_JSON" | jq -r '.ANON_KEY // .anon_key // empty')"
+          SUPABASE_SERVICE_ROLE_KEY="$(echo "$STATUS_JSON" | jq -r '.SERVICE_ROLE_KEY // .service_role_key // empty')"
+          test -n "$SUPABASE_URL" && test -n "$SUPABASE_ANON_KEY" && test -n "$SUPABASE_SERVICE_ROLE_KEY"
+          echo "::add-mask::$SUPABASE_ANON_KEY"
+          echo "::add-mask::$SUPABASE_SERVICE_ROLE_KEY"
+          echo "SUPABASE_URL=$SUPABASE_URL" >> "$GITHUB_ENV"
+          echo "SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY" >> "$GITHUB_ENV"
+          echo "SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_SERVICE_ROLE_KEY" >> "$GITHUB_ENV"
+          echo "VITE_SUPABASE_URL=$SUPABASE_URL" >> "$GITHUB_ENV"
+          echo "VITE_SUPABASE_PUBLISHABLE_KEY=$SUPABASE_ANON_KEY" >> "$GITHUB_ENV"
+
+      - name: Apply complete migration history
+        run: supabase db reset --workdir "$SUPABASE_REPLAY_WORKDIR"
+
+      - name: Install Chromium
+        run: bunx playwright install --with-deps chromium
+
+      - name: Start Verdant against disposable Supabase
+        run: |
+          bunx vite --host 127.0.0.1 --port 8080 --strictPort > "$RUNNER_TEMP/verdant-vite.log" 2>&1 &
+          echo "VITE_PID=$!" >> "$GITHUB_ENV"
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:8080/auth >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          echo "Verdant dev server did not become ready." >&2
+          exit 1
+
+      - name: Run role-separated browser smoke
+        run: bun run test:pheno-paid-smoke:local
+
+      - name: Clean disposable role accounts and local auth artifacts
+        if: always()
+        run: |
+          node scripts/e2e/provision-pheno-paid-smoke-roles.mjs --cleanup
+          rm -f e2e/.fixtures/pheno-paid-smoke.env
+          rm -f e2e/.auth/pheno-*.json
+
+      - name: Assert no credential or session artifacts survived
+        if: always()
+        run: |
+          test ! -f e2e/.fixtures/pheno-paid-smoke-roles.env
+          ! find e2e/.auth -maxdepth 1 -type f -name 'pheno-*.json' -print -quit | grep -q .
+
+      - name: Stop disposable services
+        if: always()
+        run: |
+          if [ -n "${VITE_PID:-}" ]; then kill "$VITE_PID" 2>/dev/null || true; fi
+          supabase stop --workdir "$SUPABASE_REPLAY_WORKDIR" --no-backup || true

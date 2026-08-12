@@ -110,6 +110,23 @@ const SEAMS: Array<{ event: string; file: string; extra?: RegExp[] }> = [
     extra: [/trackFunnelEvent\("ai_doctor_session_saved",\s*\{\s*surface\s*\}\)/],
   },
   {
+    event: "credit_pack_cta_viewed",
+    file: "src/components/PlantDetailAiDoctorLiveReview.tsx",
+    extra: [
+      /trackFunnelEvent\("credit_pack_cta_viewed",\s*\{\s*surface:\s*"ai_doctor_limit"\s*\}\)/,
+      // Must key on the branch that actually renders the link.
+      /creditNoticeKind === "wait"/,
+    ],
+  },
+  {
+    event: "credit_pack_cta_clicked",
+    file: "src/components/PlantDetailAiDoctorLiveReview.tsx",
+    extra: [
+      /trackFunnelEvent\("credit_pack_cta_clicked",\s*\{\s*surface:\s*"ai_doctor_limit"\s*\}\)/,
+      /onBuyCreditsClick=\{handleBuyCreditsClick\}/,
+    ],
+  },
+  {
     event: "checkout_started",
     file: "src/hooks/usePaddleCheckout.ts",
     extra: [/plan:\s*options\.priceId/],

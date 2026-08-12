@@ -45,6 +45,15 @@ export const FUNNEL_EVENTS = [
   "ai_doctor_session_saved",
   "paywall_viewed",
   "paywall_cta_clicked",
+  // Top-up funnel. Deliberately NOT the paywall events: these fire for a
+  // PAYING grower who exhausted a monthly allowance, and paid denials must
+  // never register as an upgrade opportunity. Folding them into
+  // paywall_viewed / paywall_cta_clicked would inflate the upgrade funnel
+  // with people who already upgraded. They sit here because a top-up is the
+  // other pre-checkout intent surface, and both paths lead to
+  // checkout_started next.
+  "credit_pack_cta_viewed",
+  "credit_pack_cta_clicked",
   "checkout_started",
   "checkout_catalog_unavailable",
   "checkout_recovery_dismissed",

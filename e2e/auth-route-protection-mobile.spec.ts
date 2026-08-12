@@ -137,6 +137,9 @@ const PUBLIC_MOBILE_ROUTES: string[] = [
   "/contact",
   "/feedback",
   "/tools/vpd-calculator",
+  // Public per-stage target-band reference: renders static constants only,
+  // no Supabase fetch — must render signed-out with zero private-table hits.
+  "/tools/blueprint-targets",
   // Public MCP API reference docs page: static content only, no Supabase
   // fetch — must render signed-out with zero private-table fetches.
   "/docs/mcp-api",

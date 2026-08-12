@@ -12,6 +12,9 @@ const read = (p: string) => readFileSync(resolve(ROOT, p), "utf8");
 const WEBHOOK = read("supabase/functions/payments-webhook/index.ts");
 const SHARED = read("supabase/functions/_shared/paddle.ts");
 const PURE = read("supabase/functions/paddle-webhook/verifyPaddleSignature.ts");
+const PURCHASE_CONFIRMATION = read(
+  "supabase/functions/payments-webhook/sendPurchaseConfirmation.ts",
+);
 
 describe("payments-webhook pure signature verification", () => {
   it("routes through verifyPaymentsWebhookRequest", () => {
@@ -41,5 +44,17 @@ describe("payments-webhook pure signature verification", () => {
   it("never logs or returns secret material paths in failure body", () => {
     expect(WEBHOOK).not.toMatch(/PAYMENTS_.*WEBHOOK_SECRET\}/);
     expect(WEBHOOK).not.toMatch(/console\.(log|error)\([^)]*secret/i);
+  });
+
+  it("uses reason codes rather than raw caught errors in logs and non-200 responses", () => {
+    expect(WEBHOOK).not.toMatch(/console\.error\([^)]*String\(e\)/);
+    expect(WEBHOOK).not.toMatch(/console\.log\("payments-webhook result:",\s*result\.reason\)/);
+    expect(WEBHOOK).toMatch(
+      /result\.httpStatus\s*===\s*200\s*\?\s*result\.reason\s*:\s*"processing_failed"/,
+    );
+    expect(PURCHASE_CONFIRMATION).not.toMatch(
+      /detail:\s*(?:String\([^)]*\)|userRes\.error\.message)/,
+    );
+    expect(PURCHASE_CONFIRMATION).not.toMatch(/detail:\s*result\.detail/);
   });
 });

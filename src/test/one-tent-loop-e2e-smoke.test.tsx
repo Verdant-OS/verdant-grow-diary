@@ -156,14 +156,27 @@ describe("One-Tent Loop E2E smoke", () => {
     ).toBe(false);
   });
 
-  it("a manual snapshot INSIDE the 24h window is still persistable", () => {
-    // Guards the other direction: the fence must not creep back to a window
-    // so tight that ordinary manual logging stops counting as current.
+  it("a manual snapshot inside the 24h DISPLAY window is NOT persistable", () => {
+    // Persistence holds every source to the live window. 90 minutes still reads
+    // as "current" on display surfaces, but an `alerts` row asserts the problem
+    // is happening now and is stamped first_seen_at = now().
     const recentManual = {
       ...snapshot!,
       ts: new Date(NOW_MS - 90 * 60_000).toISOString(),
     };
     expect(isSnapshotPersistable({ snapshot: recentManual, quality: "good", now: NOW_MS })).toBe(
+      false,
+    );
+  });
+
+  it("a manual snapshot inside the LIVE window is persistable", () => {
+    // The other direction: the fence must not creep so tight that a manual
+    // reading just entered by the grower stops counting as current.
+    const freshManual = {
+      ...snapshot!,
+      ts: new Date(NOW_MS - 60_000).toISOString(),
+    };
+    expect(isSnapshotPersistable({ snapshot: freshManual, quality: "good", now: NOW_MS })).toBe(
       true,
     );
   });

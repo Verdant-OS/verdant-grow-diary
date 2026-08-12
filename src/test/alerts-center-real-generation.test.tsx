@@ -165,14 +165,17 @@ describe("alert persistence — source-truth guards", () => {
     ).toBe(false);
   });
 
-  it("still persists from a manual snapshot inside the 24-hour window", () => {
+  // Persistence holds every source to the LIVE window. A manual reading inside
+  // the 24h DISPLAY window still reads as current on read-only surfaces, but it
+  // cannot back an `alerts` row (which is stamped first_seen_at = now()).
+  it("does NOT persist from a manual snapshot that is only inside the 24-hour display window", () => {
     const snap = manualSnap({ ts: MANUAL_CURRENT, rh: 65 });
     expect(
       isSnapshotPersistable({
         snapshot: snap,
         quality: "good",
       }),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it("never persists demo/fallback snapshots", () => {

@@ -2094,3 +2094,57 @@ export const VERDANT_GUIDES_BREADCRUMB_ITEMS: ReadonlyArray<{
  * share a single source and cannot drift.
  */
 export const VERDANT_CUSTOMER_MODE_GROWER_FAQ = VERDANT_GROWER_GUIDE_FAQ;
+
+/* ------------------------------------------------------------------- */
+/* Grow stage target bands FAQ                                          */
+/* (visible on /tools/blueprint-targets + its FAQPage JSON-LD)          */
+/* ------------------------------------------------------------------- */
+
+/**
+ * Shared so the rendered <dl> and the server-emitted FAQPage node cannot
+ * drift. The JSON-LD is registered on the static public document rather
+ * than injected from a useEffect, so it exists in the first SSR response
+ * for crawlers that never hydrate.
+ */
+export const VERDANT_BLUEPRINT_TARGETS_FAQ: ReadonlyArray<FaqEntry> = [
+  {
+    question: "What are grow stage target bands?",
+    answer:
+      "A target band is the range a given environmental or feed metric typically sits in for a specific grow stage — for example 40–50 % relative humidity during flower. They are ranges rather than single numbers because plants tolerate variation, and they are contextual baselines to compare your own readings against rather than a pass/fail test. Cultivar, canopy position, and how the plant is actually responding all shift what is right for a given room, so a healthy plant sitting outside a band is a reason to look, not automatically a reason to change something.",
+  },
+  {
+    question: "Why do temperature targets differ between lights on and lights off?",
+    answer:
+      "Mainly because the room cools once the lamps are off, so lights-on and lights-off are genuinely different environments and each needs its own target rather than one averaged figure. The split is not a VPD control on its own: VPD depends on temperature and humidity together — and ideally on leaf temperature — so at a fixed humidity a cooler night lowers VPD rather than holding it steady. Work VPD out separately for each part of the cycle.",
+  },
+  {
+    question: "Why are there no light or feed targets for dry and cure?",
+    answer:
+      "Once the plant is cut it no longer takes up nutrients or photosynthesises, so EC, pH, PPFD and DLI stop applying. Temperature and humidity are the only numeric targets left, and both are held tight to control the drying rate — but they are not the whole picture. A drying space should also be dark and gently ventilated: stagnant air lets damp pockets form around dense material even when the room average reads correctly.",
+  },
+  {
+    question: "Do the EC and pH targets apply to soil?",
+    answer:
+      "No — the feed EC and pH ranges above are soilless and hydro figures. Soil buffers pH, so soil growers should aim for roughly 6.0–6.8 rather than the high-5s shown here. Air temperature, humidity and light targets are not medium-specific and apply either way.",
+  },
+  {
+    question: "Are the EC and pH targets for input feed or runoff?",
+    answer:
+      "Input only — the solution as you mix it, before it reaches the medium. Runoff EC normally reads higher than input because salts accumulate in the root zone. Runoff pH is different: it can drift in either direction, so a downward drift is just as meaningful as an upward one. Read both against your own input and root-zone history rather than against these bands.",
+  },
+  {
+    question: "Should I flush at the end of flower?",
+    answer:
+      "Not automatically. Base any taper or flush on evidence — runoff EC, leaf-tip burn, or visible salt stress — rather than on the calendar. Aggressive late-stage flushing can weaken a plant that is still filling out.",
+  },
+  {
+    question: "Do the dry and cure numbers mean the same thing?",
+    answer:
+      "No, and the difference matters. The temperature and humidity bands shown describe the drying space — an ambient room reading, taken while the material is hanging or on racks. Curing happens in sealed jars or bags, where the humidity that counts is the one inside the container. A room sitting comfortably in range tells you nothing about a jar holding too much moisture, which is where mould tends to appear, so measure inside the container once the material is packed and burp it on what that reading says.",
+  },
+  {
+    question: "Are these targets the same for every cultivar?",
+    answer:
+      "No. These are a starting point drawn from a standard operating procedure, and cultivars differ — some tolerate more heat, some finish faster. Treat the bands as a default to log against and adjust from, not a rule.",
+  },
+];

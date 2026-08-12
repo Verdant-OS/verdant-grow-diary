@@ -156,6 +156,24 @@ describe("Dashboard save-alert audit wiring", () => {
     return DASHBOARD.slice(start, labelIdx + 200);
   }
 
+  it("the manual Save alert path is gated by the persistence window, not just the automatic path", () => {
+    // Regression fence. The automatic path (usePersistEnvironmentAlerts →
+    // selectPersistableAlerts) enforces the live-window bar, but this button
+    // calls saveAlert directly. Left ungated it would write a `public.alerts`
+    // row — stamped first_seen_at = now() — from a reading the automatic path
+    // refuses, silently reopening the exact hole the gate exists to close.
+    expect(DASHBOARD).toMatch(/import\s*\{[^}]*isSnapshotPersistable[^}]*\}\s*from/);
+    // The gate result must be computed and bound to the button's disabled state.
+    expect(DASHBOARD).toMatch(/canPersistAlerts\s*=\s*isSnapshotPersistable\(/);
+    expect(DASHBOARD).toMatch(/disabled=\{!canPersistAlerts\}/);
+    // ...and re-checked inside the handler, so a re-enabled button cannot write.
+    const around = saveAlertHandler();
+    const guardIdx = DASHBOARD.lastIndexOf("if (!canPersistAlerts) return;", DASHBOARD.indexOf(around));
+    expect(guardIdx, "the Save alert handler must re-check the gate before writing").toBeGreaterThan(
+      -1,
+    );
+  });
+
   it("appends a 'created' event after a successful saveAlert", () => {
     const around = saveAlertHandler();
     expect(around).toMatch(/await\s+saveAlert/);

@@ -49,6 +49,11 @@ export interface AiCreditLimitNoticeViewModel {
   charged: false;
   /** Only populated on `upsell`. Never set on wait/unknown. */
   paywallVm?: PaywallCtaViewModel;
+  /**
+   * Top-up destination. Only populated on `wait` — the branch whose viewer is
+   * actually allowed to buy a pack. Never set on upsell/unknown.
+   */
+  packHref?: string;
 }
 
 /**
@@ -142,6 +147,26 @@ function buildPricingHref(returnTo: string | null | undefined): string {
     : "/pricing";
 }
 
+/** Anchor Pricing scrolls to for the one-time credit-pack section. */
+const CREDIT_PACK_HASH = "#buy-credits";
+
+/**
+ * Top-up destination for the paid `wait` notice.
+ *
+ * The hash stays LAST, after any query, because the two halves are read by
+ * different consumers: Pricing scrolls on `location.hash`, while the checkout
+ * hook reads `returnTo` out of `location.search` to build the post-purchase
+ * landing. Putting the return path in the fragment would scroll correctly and
+ * then silently strand the buyer, which is the exact bug this closes.
+ *
+ * With no safe return path this yields the bare `/pricing#buy-credits` — what
+ * the link was before it could carry one — so existing call sites and their
+ * pins stay byte-for-byte identical.
+ */
+function buildCreditPackHref(returnTo: string | null | undefined): string {
+  return `${buildPricingHref(returnTo)}${CREDIT_PACK_HASH}`;
+}
+
 export function buildAiCreditLimitNoticeViewModel(
   input: AiCreditLimitNoticeInput,
 ): AiCreditLimitNoticeViewModel {
@@ -206,6 +231,7 @@ export function buildAiCreditLimitNoticeViewModel(
       title: paidWaitTitle(copy, allowance),
       body: copy.waitBody,
       charged: false,
+      packHref: buildCreditPackHref(input.returnTo),
     };
   }
 

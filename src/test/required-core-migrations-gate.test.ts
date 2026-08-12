@@ -6,6 +6,7 @@ import {
   assertSupabaseDatabaseTargetIdentity,
   databaseTargetForEnvironment,
   parseSupabaseDatabaseUrl,
+  SANDBOX_SCHEMA_VERIFIER_ROLE,
   SUPABASE_DATABASE_TARGETS,
 } from "../../scripts/lib/supabaseDatabaseTargetIdentity.mjs";
 import {
@@ -261,6 +262,57 @@ describe("Supabase database target identity", () => {
       connectionMode: "shared-supavisor-transaction",
       requiresPinnedProjectBinding: true,
     });
+  });
+
+  it("preserves only the exact sandbox read-only verifier identity", () => {
+    const url = genericSharedUrl(5432, PASSWORD, `${SANDBOX_SCHEMA_VERIFIER_ROLE}.${SANDBOX_REF}`);
+    let childEnv: Record<string, string | undefined> | undefined;
+    const { logger } = captureLogger();
+
+    const status = runRequiredCoreMigrationsApplied({
+      env: {
+        TARGET_ENV: "sandbox",
+        SUPABASE_DB_URL: url,
+        PATH: process.env.PATH,
+      },
+      spawnImpl: (_command, _args, options) => {
+        childEnv = { ...options.env };
+        return {
+          status: 0,
+          stdout: REQUIRED_CORE_SCHEMA.map(schemaKey).join("\n"),
+          stderr: "",
+        };
+      },
+      logger,
+    });
+
+    expect(status).toBe(EXIT.OK);
+    expect(new URL(childEnv?.PGDATABASE ?? "").username).toBe(
+      `${SANDBOX_SCHEMA_VERIFIER_ROLE}.${SANDBOX_REF}`,
+    );
+  });
+
+  it.each([
+    ["wrong sandbox ref", "sandbox", `${SANDBOX_SCHEMA_VERIFIER_ROLE}.${PRODUCTION_REF}`],
+    ["production target", "production", `${SANDBOX_SCHEMA_VERIFIER_ROLE}.${PRODUCTION_REF}`],
+  ])("rejects the sandbox verifier on %s", (_label, targetEnv, username) => {
+    let psqlCalls = 0;
+    const { logger } = captureLogger();
+    const status = runRequiredCoreMigrationsApplied({
+      env: {
+        TARGET_ENV: targetEnv,
+        SUPABASE_DB_URL: genericSharedUrl(5432, PASSWORD, username),
+        PATH: process.env.PATH,
+      },
+      spawnImpl: () => {
+        psqlCalls += 1;
+        return { status: 0, stdout: "", stderr: "" };
+      },
+      logger,
+    });
+
+    expect(status).toBe(EXIT.TARGET_IDENTITY_INVALID);
+    expect(psqlCalls).toBe(0);
   });
 
   it("returns only non-secret identity metadata", () => {

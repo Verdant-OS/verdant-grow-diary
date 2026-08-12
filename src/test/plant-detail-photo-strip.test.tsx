@@ -9,7 +9,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import React from "react";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 
 vi.mock("react-router-dom", () => ({
   Link: ({
@@ -31,6 +31,17 @@ vi.mock("react-router-dom", () => ({
 const useDiaryEntriesMock = vi.fn();
 vi.mock("@/hooks/use-diary-entries", () => ({
   useDiaryEntries: () => useDiaryEntriesMock(),
+}));
+
+const createSignedUrlsMock = vi.fn();
+vi.mock("@/integrations/supabase/client", () => ({
+  supabase: {
+    storage: {
+      from: () => ({
+        createSignedUrls: (...a: unknown[]) => createSignedUrlsMock(...a),
+      }),
+    },
+  },
 }));
 
 import {
@@ -209,6 +220,8 @@ describe("buildPlantPhotoStripItems", () => {
 describe("PlantDetailPhotoStrip render", () => {
   beforeEach(() => {
     useDiaryEntriesMock.mockReset();
+    createSignedUrlsMock.mockReset();
+    createSignedUrlsMock.mockResolvedValue({ data: [] });
   });
 
   it("renders heading", () => {
@@ -294,6 +307,72 @@ describe("PlantDetailPhotoStrip render", () => {
       expect(img.getAttribute("alt") ?? "").toMatch(/^Plant photo/);
       expect(img.getAttribute("src") ?? "").not.toContain("other.jpg");
     }
+  });
+
+  it("signs and renders a Photo entry whose path only lives in details.photo_url", async () => {
+    createSignedUrlsMock.mockResolvedValue({
+      data: [
+        {
+          path: "user-1/grow-1/167123.jpg",
+          signedUrl: "https://signed.example.com/167123.jpg?token=abc",
+        },
+      ],
+    });
+    const raw = [
+      {
+        id: "companion-1",
+        plant_id: "p1",
+        entry_at: "2026-05-30T10:00:00.000Z",
+        entry_type: "photo",
+        photo_url: null,
+        details: { event_type: "photo", photo_url: "user-1/grow-1/167123.jpg" },
+        note: "",
+      },
+    ];
+    useDiaryEntriesMock.mockReturnValue({
+      data: raw,
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    render(<PlantDetailPhotoStrip plantId="p1" growId={null} />);
+
+    await waitFor(() => expect(createSignedUrlsMock).toHaveBeenCalledTimes(1));
+    expect(createSignedUrlsMock).toHaveBeenCalledWith(
+      ["user-1/grow-1/167123.jpg"],
+      3600,
+    );
+    await waitFor(() =>
+      expect(screen.getAllByTestId("plant-detail-photo-strip-item")).toHaveLength(1),
+    );
+    const img = screen.getByRole("img");
+    expect(img.getAttribute("src")).toBe(
+      "https://signed.example.com/167123.jpg?token=abc",
+    );
+  });
+
+  it("does not call Storage when every photo_url is already http(s)", async () => {
+    const raw = [
+      {
+        id: "r1",
+        plant_id: "p1",
+        entry_at: "2026-05-30T10:00:00.000Z",
+        entry_type: "photo",
+        photo_url: "https://example.com/a.jpg",
+        note: "",
+      },
+    ];
+    useDiaryEntriesMock.mockReturnValue({
+      data: raw,
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    render(<PlantDetailPhotoStrip plantId="p1" growId={null} />);
+    await waitFor(() =>
+      expect(screen.getAllByTestId("plant-detail-photo-strip-item")).toHaveLength(1),
+    );
+    expect(createSignedUrlsMock).not.toHaveBeenCalled();
   });
 
   it("upload CTA invokes onUploadPhoto and does NOT navigate to /logs", () => {

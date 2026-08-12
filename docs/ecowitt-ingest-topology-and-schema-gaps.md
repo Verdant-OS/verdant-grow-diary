@@ -78,14 +78,45 @@ markers. Tent binding comes from the `VERDANT_TENT_ID` environment variable, **n
 payload — so device-identity-by-PASSKEY, as external drafts model it, is not how this path
 resolves scope.
 
-## 3. Open question: `source = "ecowitt"`
+## 3. Resolved: `source = "ecowitt"` is remapped — but it remaps to `live`, fail-open
 
 `ecowitt_listener.py` sets `WEBHOOK_TRANSPORT_SOURCE = "ecowitt"` and emits it as `source` in
-the forwarded body. `ecowitt` is **not** one of the six canonical labels
-(`live | manual | csv | demo | stale | invalid`). Whether this is a vendor/provider field that
-gets remapped downstream in `sensor-ingest-webhook`, or a genuine mislabel on a path that
-already writes to the database, is **UNRESOLVED** in this record. It must be settled in
-Phase 1.8, because it sits on the live write path.
+the forwarded body. This is **not** a stored mislabel:
+`supabase/functions/sensor-ingest-webhook/storageMapping.ts` remaps every incoming transport
+label to a canonical stored source before insert, preserving the original as
+`raw_payload.metadata.transport_source` and `raw_payload.vendor`, and stamps `user_id` from the
+authenticated identity, never the body. The design is sound.
+
+The mapping's destination is the finding:
+
+```ts
+// mapStoredSourceForTransport
+if (typeof incoming !== "string" || incoming.length === 0) return "live";
+// canonical labels pass through unchanged
+// Known transport/vendor labels that must collapse to canonical "live".
+return "live";
+```
+
+- `"ecowitt"` → **`live`**. The webhook path — the one that already writes to
+  `sensor_readings` — stores EcoWitt rows as `source='live'`.
+- **Unknown or empty inputs also default to `live`.** The code comment justifies this
+  ("never quarantined accidentally; per-row quality classification is the source of truth for
+  stale/invalid"), but the direction is fail-open: a garbled, missing, or unrecognized
+  transport label receives the **most trusted** stored source. `AGENTS.md` states bad or
+  unknown telemetry must never be shown as healthy; a fail-closed default (`invalid`, or
+  reject) would match that rule. This is a **gate 4 (live-label fencing) decision**, and it is
+  concrete, not hypothetical: the only fence between an authenticated webhook POST and a
+  `source='live'` row today is possession of the bridge token.
+- A caller-supplied canonical label passes through unchanged — a body claiming `demo` stays
+  `demo`, and a body claiming `live` stays `live`.
+
+Whether any `source='live'` EcoWitt rows exist in the live project (the listener last received
+gateway traffic 2026-06-24; whether forwarding was enabled with a valid token is unknown) is a
+live-row-state question this record does not answer.
+
+Note for Phase 1.8: `buildStoredRow` also folds an `Idempotency-Key` into `raw_payload` when
+supplied — an idempotency mechanism already exists on this path and must be audited before any
+new key design is invented.
 
 ## 4. The storage schema is long format
 
@@ -172,13 +203,14 @@ decided how many rows a POST produces or what distinguishes them. Order:
 
 1. Resolve soil channel cardinality (§5) — owner decision
 2. Resolve unmapped-metric policy (§5) — owner decision
-3. Resolve `source = "ecowitt"` (§3) — audit `sensor-ingest-webhook`
-4. Then idempotency, against a known row shape
+3. Decide the fail-open `live` default in `mapStoredSourceForTransport` (§3) — gate 4, owner
+   decision
+4. Then idempotency, starting from the existing `Idempotency-Key` mechanism (§3), against a
+   known row shape
 5. Then RLS review of the resulting write path
 
 ## 7. Not verified in this record
 
-- Whether `sensor-ingest-webhook` remaps `source` before insert — **audit in progress**
 - Whether `ecowitt-real-ingest` is deployed to `knkwiiywfkbqznbxwqfh`
 - Whether any of this differs on the deploy branch (`verdant-grow-diary`); this was read from a
   worktree based on `main`

@@ -14,24 +14,55 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "@/lib/react-router-compat";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Plug, PlugZap, ShieldAlert } from "lucide-react";
+import { Loader2, Plug, PlugZap, RotateCcw, ShieldAlert } from "lucide-react";
 import { useAuth } from "@/store/auth";
 import {
   completeAuthorization,
   disconnect,
   hasStoredToken,
   probeTools,
+  readCallbackErrorParams,
   readCallbackParams,
   startAuthorization,
   type ProbeResult,
 } from "@/lib/mcp/browserOAuthClient";
+import {
+  readLastOAuthAttempt,
+  recordOAuthAttemptFailure,
+  recordOAuthAttemptStart,
+  recordOAuthAttemptSuccess,
+  type OAuthAttemptRecord,
+} from "@/lib/mcp/oauthAttemptLog";
 import { MCP_MANIFEST, getSupabaseOrigin } from "@/lib/mcp/manifestView";
 
 const REDIRECT_PATH = "/settings/agent-integrations";
 
 type Phase = "idle" | "authorizing" | "exchanging" | "probing";
 
-export default function BrowserConnectPanel() {
+function formatAttemptTime(record: OAuthAttemptRecord): string {
+  const iso = record.completedAt ?? record.startedAt;
+  const parsed = new Date(iso);
+  return Number.isNaN(parsed.getTime()) ? iso : parsed.toLocaleString();
+}
+
+function attemptOutcomeLabel(record: OAuthAttemptRecord): string {
+  if (record.outcome === "success") return "Success";
+  if (record.outcome === "failed") return "Failed";
+  return "Incomplete (did not return from consent)";
+}
+
+export type BrowserConnectPanelProps = {
+  /**
+   * Local (this-browser) preference for the probe tool `list_grows`.
+   * When false, the live probe is disabled with an explanation — the
+   * server itself still allows the call for any connected assistant.
+   */
+  probeToolEnabled?: boolean;
+};
+
+export default function BrowserConnectPanel({
+  probeToolEnabled = true,
+}: BrowserConnectPanelProps = {}) {
   const { user } = useAuth();
   const [params] = useSearchParams();
   const navigate = useNavigate();
@@ -39,14 +70,28 @@ export default function BrowserConnectPanel() {
   const [phase, setPhase] = useState<Phase>("idle");
   const [result, setResult] = useState<ProbeResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [lastAttempt, setLastAttempt] = useState<OAuthAttemptRecord | null>(null);
 
   const endpoint = `${getSupabaseOrigin()}${MCP_MANIFEST.path}`;
   const issuer = MCP_MANIFEST.oauthIssuer;
 
-  // Initial mount: refresh token state, and if we came back with ?code=,
-  // finish the exchange and auto-probe.
+  // Initial mount: refresh token + last-attempt state, surface an OAuth
+  // error callback (?error=access_denied) if present, and if we came
+  // back with ?code=, finish the exchange and auto-probe.
   useEffect(() => {
     setConnected(hasStoredToken());
+    setLastAttempt(readLastOAuthAttempt());
+    const cbError = readCallbackErrorParams(window.location.search);
+    if (cbError) {
+      const reason = cbError.errorDescription
+        ? `Authorization error: ${cbError.error} — ${cbError.errorDescription}`
+        : `Authorization error: ${cbError.error}`;
+      setLastAttempt(recordOAuthAttemptFailure(reason));
+      setError(reason);
+      // Clean the query string so a refresh doesn't re-report the error.
+      navigate(REDIRECT_PATH, { replace: true });
+      return;
+    }
     const cb = readCallbackParams(window.location.search);
     if (!cb) return;
     (async () => {
@@ -54,6 +99,7 @@ export default function BrowserConnectPanel() {
       setError(null);
       try {
         await completeAuthorization(issuer, cb);
+        setLastAttempt(recordOAuthAttemptSuccess());
         setConnected(true);
         // Clean the query string so a refresh doesn't retry the code.
         navigate(REDIRECT_PATH, { replace: true });
@@ -61,7 +107,9 @@ export default function BrowserConnectPanel() {
         const r = await probeTools(endpoint);
         setResult(r);
       } catch (e) {
-        setError((e as Error).message || "OAuth exchange failed");
+        const message = (e as Error).message || "OAuth exchange failed";
+        setLastAttempt(recordOAuthAttemptFailure(message));
+        setError(message);
       } finally {
         setPhase("idle");
       }
@@ -72,11 +120,14 @@ export default function BrowserConnectPanel() {
   const onConnect = useCallback(async () => {
     setError(null);
     setPhase("authorizing");
+    setLastAttempt(recordOAuthAttemptStart());
     try {
       await startAuthorization(issuer, REDIRECT_PATH);
       // startAuthorization navigates away; nothing else to do.
     } catch (e) {
-      setError((e as Error).message || "Could not start OAuth");
+      const message = (e as Error).message || "Could not start OAuth";
+      setLastAttempt(recordOAuthAttemptFailure(message));
+      setError(message);
       setPhase("idle");
     }
   }, [issuer]);
@@ -144,7 +195,11 @@ export default function BrowserConnectPanel() {
       <div className="flex flex-wrap items-center gap-3">
         {connected ? (
           <>
-            <Button onClick={onProbe} disabled={busy} data-testid="browser-connect-probe">
+            <Button
+              onClick={onProbe}
+              disabled={busy || !probeToolEnabled}
+              data-testid="browser-connect-probe"
+            >
               {phase === "probing" ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
               ) : (
@@ -174,6 +229,53 @@ export default function BrowserConnectPanel() {
             )}
             Connect this browser
           </Button>
+        )}
+      </div>
+
+      {connected && !probeToolEnabled ? (
+        <p className="text-xs text-muted-foreground" data-testid="browser-connect-probe-disabled">
+          The probe is off because <code className="font-mono">list_grows</code> is disabled in this
+          browser (a local preference). Re-enable it in the tool list below to run the probe. The
+          server itself still allows this read-only tool for connected assistants.
+        </p>
+      ) : null}
+
+      <div
+        className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground"
+        data-testid="oauth-last-attempt"
+        data-outcome={lastAttempt?.outcome ?? "none"}
+      >
+        {lastAttempt ? (
+          <>
+            <span>
+              Last OAuth attempt: {formatAttemptTime(lastAttempt)} —{" "}
+              <span
+                className={
+                  lastAttempt.outcome === "failed" ? "text-destructive" : "text-foreground"
+                }
+                data-testid="oauth-last-attempt-outcome"
+              >
+                {attemptOutcomeLabel(lastAttempt)}
+              </span>
+              {lastAttempt.outcome === "failed" && lastAttempt.reason ? (
+                <span data-testid="oauth-last-attempt-reason"> ({lastAttempt.reason})</span>
+              ) : null}
+            </span>
+            {lastAttempt.outcome === "failed" ? (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={onConnect}
+                disabled={busy || showPreauthWarning}
+                data-testid="oauth-retry"
+              >
+                <RotateCcw className="mr-1 h-3 w-3" aria-hidden />
+                Retry OAuth
+              </Button>
+            ) : null}
+          </>
+        ) : (
+          <span>Last OAuth attempt: none recorded in this browser.</span>
         )}
       </div>
 

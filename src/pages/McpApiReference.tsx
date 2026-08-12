@@ -154,6 +154,45 @@ Content-Type: application/json`}</Code>
           </ul>
         </Section>
 
+        <Section id="issuer-contexts" title="Set up by issuer status">
+          <p className="text-sm text-muted-foreground">
+            The status page at{" "}
+            <Link to="/settings/agent-integrations" className="underline">
+              Settings → Agent integrations
+            </Link>{" "}
+            shows one of three OAuth issuer states and links here to the matching steps.
+          </p>
+
+          <h3 className="text-sm font-semibold scroll-mt-24" id="issuer-configured">
+            Issuer configured
+          </h3>
+          <p className="text-sm text-muted-foreground">
+            The app advertises a valid OAuth issuer. Point your assistant at the endpoint above,
+            complete the consent screen, then confirm the three read-only tools appear. In this
+            browser you can also run the built-in probe from the status page.
+          </p>
+
+          <h3 className="text-sm font-semibold scroll-mt-24" id="issuer-not-configured">
+            Issuer not configured
+          </h3>
+          <p className="text-sm text-muted-foreground">
+            No OAuth issuer is advertised, so no assistant can authorize. The project owner must
+            enable the OAuth 2.1 authorization server on the connected Supabase project and
+            re-publish; until then, connecting will fail at the consent step and there is nothing a
+            client-side setting can fix.
+          </p>
+
+          <h3 className="text-sm font-semibold scroll-mt-24" id="issuer-unverified">
+            Issuer could not be verified
+          </h3>
+          <p className="text-sm text-muted-foreground">
+            The advertised issuer did not match the expected pattern, so the status page will not
+            claim it is configured. Compare the issuer shown on the status page with the one in the
+            Endpoint &amp; auth section above; if they differ, treat the connection as untrusted and
+            do not complete consent until the owner reconciles them.
+          </p>
+        </Section>
+
         <Section id="safety" title="Safety invariants">
           <p className="text-sm text-muted-foreground">
             These properties hold for every tool below and are enforced in the server, not by

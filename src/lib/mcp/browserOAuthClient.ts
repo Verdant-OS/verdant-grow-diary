@@ -159,6 +159,21 @@ export function readCallbackParams(search: string): CallbackParams | null {
   return { code, state };
 }
 
+export type CallbackErrorParams = { error: string; errorDescription?: string };
+
+/**
+ * OAuth error callback (e.g. the grower pressed Deny on the consent
+ * screen → `?error=access_denied`). Returns the coarse error code and
+ * optional description only — never codes or tokens.
+ */
+export function readCallbackErrorParams(search: string): CallbackErrorParams | null {
+  const sp = new URLSearchParams(search);
+  const error = sp.get("error");
+  if (!error) return null;
+  const errorDescription = sp.get("error_description") ?? undefined;
+  return { error, errorDescription };
+}
+
 export async function completeAuthorization(issuer: string, params: CallbackParams): Promise<void> {
   const raw = sessionStorage.getItem(SS_KEYS.pkce);
   if (!raw) throw new Error("No pending authorization in this browser");

@@ -361,17 +361,31 @@ describe("wiring guardrails", () => {
     expect(HOOK).toMatch(/enabled:\s*!!user\s*&&\s*!!growId/);
   });
 
-  it("a successful persisted review invalidates the gate reads (no stale dead-end CTA)", () => {
+  it("a CONCLUDED review attempt invalidates the gate reads (no stale dead-end CTA)", () => {
     const LIVE_REVIEW = read("src/components/PlantDetailAiDoctorLiveReview.tsx");
-    const persisted = LIVE_REVIEW.indexOf("const handlePersisted");
+    // The refresh keys on the review-status transition — result AND error
+    // both settle credit state (spend / refund / revealed denial) — and
+    // must NOT be coupled to session persistence, which is optional and
+    // can fail independently while the spend stays consumed.
+    const dedupe = LIVE_REVIEW.indexOf("if (review.status === prev) return;");
+    const terminalGate = LIVE_REVIEW.indexOf(
+      'if (review.status !== "result" && review.status !== "error") return;',
+      dedupe,
+    );
     const invalidate = LIVE_REVIEW.indexOf(
       'invalidateQueries({ queryKey: ["ai_credit_gate_reads"] })',
-      persisted,
+      terminalGate,
     );
-    const callbackEnd = LIVE_REVIEW.indexOf("[queryClient]", persisted);
+    expect(dedupe).toBeGreaterThan(-1);
+    expect(terminalGate).toBeGreaterThan(dedupe);
+    expect(invalidate).toBeGreaterThan(terminalGate);
+    // Decoupled from persistence: handlePersisted's callback body carries
+    // no gate invalidation.
+    const persisted = LIVE_REVIEW.indexOf("const handlePersisted");
+    const reviewBinding = LIVE_REVIEW.indexOf("const review = useAiDoctorLiveReview");
     expect(persisted).toBeGreaterThan(-1);
-    expect(invalidate).toBeGreaterThan(persisted);
-    expect(callbackEnd).toBeGreaterThan(invalidate);
+    expect(reviewBinding).toBeGreaterThan(persisted);
+    expect(LIVE_REVIEW.slice(persisted, reviewBinding)).not.toContain("ai_credit_gate_reads");
     // The hook's exported key builder shares the same prefix, so the
     // invalidation above actually hits this cache.
     const HOOK = read("src/hooks/useAlertDoctorCreditGateReads.ts");

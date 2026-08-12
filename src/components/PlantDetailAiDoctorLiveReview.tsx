@@ -386,11 +386,6 @@ function PlantDetailAiDoctorLiveReviewScope({
     (_sessionId: string) => {
       void queryClient.invalidateQueries({ queryKey: ["ai_doctor_sessions"] });
       void queryClient.invalidateQueries({ queryKey: ["timeline_memory"] });
-      // A persisted review means a credit spend succeeded — refresh the
-      // tent-alerts doctor-CTA credit gate so a grower who just spent
-      // their last allowance credit is not shown a dead-end doctor CTA
-      // until remount (prefix covers every user/grow key).
-      void queryClient.invalidateQueries({ queryKey: ["ai_credit_gate_reads"] });
     },
     [queryClient],
   );
@@ -635,6 +630,22 @@ function PlantDetailAiDoctorLiveReviewScope({
     trackedLowCreditResultRef.current = review.result;
     trackFunnelEvent("credit_pack_cta_viewed", { surface: AI_DOCTOR_LOW_CREDIT_SURFACE });
   }, [activeReviewVisible, lowCreditTopUp.visible, review.result, review.status]);
+
+  // Credit-gate freshness: a review attempt CONCLUDING is the moment credit
+  // state may have changed — a credited result consumes allowance, a failed
+  // model call appends a refund row, and a denial reveals exhaustion the
+  // pre-flight read missed. Keyed on the status transition rather than on
+  // persistence (which is optional and can fail independently of the spend)
+  // so the tent-alerts doctor-CTA gate never serves a stale answer after
+  // any of those outcomes.
+  const prevCreditGateReviewStatusRef = useRef<string | null>(null);
+  useEffect(() => {
+    const prev = prevCreditGateReviewStatusRef.current;
+    prevCreditGateReviewStatusRef.current = review.status;
+    if (review.status === prev) return;
+    if (review.status !== "result" && review.status !== "error") return;
+    void queryClient.invalidateQueries({ queryKey: ["ai_credit_gate_reads"] });
+  }, [queryClient, review.status]);
 
   const showHistoryOmission = historyRecovery.state === "omitted_by_choice";
   const showHistoryRecovery = historyRecovery.state === "decision_required" || showHistoryOmission;

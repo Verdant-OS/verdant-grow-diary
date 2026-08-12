@@ -2,7 +2,8 @@
 /**
  * Local session-state generator for the Pheno Tracker paid-user smoke.
  *
- * For each role (Free / Pro Monthly / Pro Annual / Founder / Canceled) that has both an email
+ * For each role (Free / Pro Monthly / Pro Annual / Craft Monthly / Craft
+ * Annual / Founder / Canceled) that has both an email
  * and password env var, drives the real /auth UI in a headless Chromium
  * and writes a Playwright storageState file under e2e/.auth/.
  *
@@ -39,6 +40,18 @@ const ROLES = [
     emailEnv: "E2E_PHENO_PRO_ANNUAL_EMAIL",
     passEnv: "E2E_PHENO_PRO_ANNUAL_PASSWORD",
     out: "pheno-pro-annual.json",
+  },
+  {
+    key: "craft",
+    emailEnv: "E2E_PHENO_CRAFT_EMAIL",
+    passEnv: "E2E_PHENO_CRAFT_PASSWORD",
+    out: "pheno-craft.json",
+  },
+  {
+    key: "craft-annual",
+    emailEnv: "E2E_PHENO_CRAFT_ANNUAL_EMAIL",
+    passEnv: "E2E_PHENO_CRAFT_ANNUAL_PASSWORD",
+    out: "pheno-craft-annual.json",
   },
   {
     key: "founder",

@@ -2,8 +2,8 @@
 /**
  * Provision disposable Pheno role accounts in local Supabase only.
  *
- * Creates login-capable Free, Pro Monthly, Pro Annual, Founder Lifetime,
- * and canceled users, then writes their credentials plus cleanup ids to one
+ * Creates login-capable Free, Pro Monthly, Pro Annual, Craft Monthly, Craft
+ * Annual, Founder Lifetime, and canceled users, then writes their credentials plus cleanup ids to one
  * gitignored env file. `--cleanup` deletes the auth users (application rows
  * cascade) and removes the file. Nothing is printed except status labels.
  */
@@ -100,6 +100,8 @@ const roles = [
   { key: "FREE", slug: "free", plan: null },
   { key: "PRO", slug: "pro-monthly", plan: "pro_monthly" },
   { key: "PRO_ANNUAL", slug: "pro-annual", plan: "pro_annual" },
+  { key: "CRAFT", slug: "craft-monthly", plan: "craft_monthly" },
+  { key: "CRAFT_ANNUAL", slug: "craft-annual", plan: "craft_annual" },
   { key: "FOUNDER", slug: "founder", plan: "founder_lifetime" },
   { key: "CANCELED", slug: "canceled", plan: "pro_monthly", canceled: true },
 ];
@@ -157,7 +159,9 @@ try {
     "",
   ];
   fs.writeFileSync(ENV_PATH, lines.join("\n"), { mode: 0o600 });
-  console.log("PASS: 5 disposable local roles provisioned (Free/Pro/Annual/Founder/Canceled).");
+  console.log(
+    "PASS: 7 disposable local roles provisioned (Free/Pro monthly/Pro annual/Craft monthly/Craft annual/Founder/Canceled).",
+  );
 } catch (error) {
   for (const role of created) await admin.auth.admin.deleteUser(role.userId);
   fs.rmSync(ENV_PATH, { force: true });

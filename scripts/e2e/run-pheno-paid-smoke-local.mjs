@@ -32,6 +32,8 @@ const REQUIRED_ROLE_CREDS = [
   ["Free", "E2E_PHENO_FREE_EMAIL", "E2E_PHENO_FREE_PASSWORD"],
   ["Pro Monthly", "E2E_PHENO_PRO_EMAIL", "E2E_PHENO_PRO_PASSWORD"],
   ["Pro Annual", "E2E_PHENO_PRO_ANNUAL_EMAIL", "E2E_PHENO_PRO_ANNUAL_PASSWORD"],
+  ["Craft Monthly", "E2E_PHENO_CRAFT_EMAIL", "E2E_PHENO_CRAFT_PASSWORD"],
+  ["Craft Annual", "E2E_PHENO_CRAFT_ANNUAL_EMAIL", "E2E_PHENO_CRAFT_ANNUAL_PASSWORD"],
   ["Founder", "E2E_PHENO_FOUNDER_EMAIL", "E2E_PHENO_FOUNDER_PASSWORD"],
   ["Canceled", "E2E_PHENO_CANCELED_EMAIL", "E2E_PHENO_CANCELED_PASSWORD"],
 ];
@@ -96,6 +98,10 @@ function finish(code, finalStatus) {
       "e2e/.auth/pheno-pro.session-storage.json",
       "e2e/.auth/pheno-pro-annual.json",
       "e2e/.auth/pheno-pro-annual.session-storage.json",
+      "e2e/.auth/pheno-craft.json",
+      "e2e/.auth/pheno-craft.session-storage.json",
+      "e2e/.auth/pheno-craft-annual.json",
+      "e2e/.auth/pheno-craft-annual.session-storage.json",
       "e2e/.auth/pheno-founder.json",
       "e2e/.auth/pheno-founder.session-storage.json",
       "e2e/.auth/pheno-canceled.json",
@@ -234,6 +240,8 @@ Object.assign(process.env, {
   E2E_PHENO_FREE_SESSION_FILE: "e2e/.auth/pheno-free.json",
   E2E_PHENO_PRO_SESSION_FILE: "e2e/.auth/pheno-pro.json",
   E2E_PHENO_PRO_ANNUAL_SESSION_FILE: "e2e/.auth/pheno-pro-annual.json",
+  E2E_PHENO_CRAFT_SESSION_FILE: "e2e/.auth/pheno-craft.json",
+  E2E_PHENO_CRAFT_ANNUAL_SESSION_FILE: "e2e/.auth/pheno-craft-annual.json",
   E2E_PHENO_FOUNDER_SESSION_FILE: "e2e/.auth/pheno-founder.json",
   E2E_PHENO_CANCELED_SESSION_FILE: "e2e/.auth/pheno-canceled.json",
 });

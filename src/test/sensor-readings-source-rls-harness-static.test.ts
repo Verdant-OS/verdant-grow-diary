@@ -51,7 +51,7 @@ describe("sensor provenance RLS harness fixture safety", () => {
     // inserted=0/rejected=1; that shape passes only alongside the readback
     // proving the row is present exactly once with reserved markers intact.
     expect(HARNESS).toMatch(
-      /\(\(rpcCounts\?\.inserted === 1 && rpcCounts\.rejected === 0\) \|\|\s*(?:\/\/[^\r\n]*\s*)*\(rpcCounts\?\.inserted === 0 && rpcCounts\.rejected === 1\)\)/,
+      /\(\(rpcCounts\?\.inserted === 1 && rpcCounts\.rejected === 0\) \|\|\s*\(rpcCounts\?\.inserted === 0 && rpcCounts\.rejected === 1\)\)/,
     );
     expect(HARNESS).toContain("rpcRows?.length === 1");
   });

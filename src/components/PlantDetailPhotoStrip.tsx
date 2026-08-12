@@ -114,11 +114,15 @@ export default function PlantDetailPhotoStrip({
         }
         // The Supabase contract allows an overall-successful response whose
         // individual entries still failed (e.g. a missing storage object) --
-        // each carries its own `error` and a null signedUrl. Treating those
-        // as "signed" would silently drop the row the same way an
-        // unhandled promise rejection would.
+        // each carries its own `error`, and either the path or the
+        // signedUrl (or both) may come back null on that entry. Rather than
+        // branching on each item's failure shape (a null path with an error
+        // set was previously skipped before its error was ever inspected),
+        // only accept fully-formed successes into the map, then verify
+        // every path we actually requested made it in. Anything missing --
+        // whatever shape its failure took, including a result item dropped
+        // entirely -- is a failure.
         const map = new Map<string, string>();
-        let anyFailed = false;
         for (const item of data as Array<{
           path?: string | null;
           signedUrl?: string | null;
@@ -129,13 +133,11 @@ export default function PlantDetailPhotoStrip({
             typeof item?.signedUrl === "string" && item.signedUrl.length > 0
               ? item.signedUrl
               : null;
-          if (!path) continue;
-          if (item.error || !signedUrl) {
-            anyFailed = true;
-            continue;
+          if (path && signedUrl && !item?.error) {
+            map.set(path, signedUrl);
           }
-          map.set(path, signedUrl);
         }
+        const anyFailed = paths.some((p) => !map.has(p));
         setSigningError(anyFailed);
         setSignedUrlByPath(map);
         setSigningInProgress(false);

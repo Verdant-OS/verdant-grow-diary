@@ -592,6 +592,66 @@ describe("PlantDetailPhotoStrip render", () => {
     expect(screen.queryByTestId("plant-detail-photo-strip-empty")).not.toBeInTheDocument();
   });
 
+  it("treats a null-path signing result as a failure, not a silently dropped photo", async () => {
+    // Supabase's createSignedUrls contract allows a failed entry to come
+    // back with path: null alongside its error, not just signedUrl: null.
+    createSignedUrlsMock.mockResolvedValue({
+      data: [{ path: null, signedUrl: null, error: "Object not found" }],
+    });
+    const raw = [
+      {
+        id: "companion-1",
+        plant_id: "p1",
+        entry_at: "2026-05-30T10:00:00.000Z",
+        entry_type: "photo",
+        photo_url: null,
+        details: { event_type: "photo", photo_url: "u/g/1.jpg" },
+        note: "",
+      },
+    ];
+    useDiaryEntriesMock.mockReturnValue({
+      data: raw,
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    render(<PlantDetailPhotoStrip plantId="p1" growId={null} />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId("plant-detail-photo-strip-error")).toBeInTheDocument(),
+    );
+    expect(screen.queryByTestId("plant-detail-photo-strip-empty")).not.toBeInTheDocument();
+  });
+
+  it("treats a requested path missing from the response entirely as a failure", async () => {
+    // A response array shorter than the request (e.g. one entry dropped)
+    // must still be caught -- not just entries present with bad shapes.
+    createSignedUrlsMock.mockResolvedValue({ data: [] });
+    const raw = [
+      {
+        id: "companion-1",
+        plant_id: "p1",
+        entry_at: "2026-05-30T10:00:00.000Z",
+        entry_type: "photo",
+        photo_url: null,
+        details: { event_type: "photo", photo_url: "u/g/1.jpg" },
+        note: "",
+      },
+    ];
+    useDiaryEntriesMock.mockReturnValue({
+      data: raw,
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    render(<PlantDetailPhotoStrip plantId="p1" growId={null} />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId("plant-detail-photo-strip-error")).toBeInTheDocument(),
+    );
+    expect(screen.queryByTestId("plant-detail-photo-strip-empty")).not.toBeInTheDocument();
+  });
+
   it("does not call Storage when every photo_url is already http(s)", async () => {
     const raw = [
       {

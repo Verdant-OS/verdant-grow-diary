@@ -6,10 +6,15 @@
  *
  * This is NOT a paywall. The viewer already pays; the correct action is a
  * one-time pack, and offering an upgrade here would be both wrong and
- * insulting. The impression and click therefore report as credit_pack_cta_*,
- * never paywall_* — paid growers must not enter the upgrade funnel.
+ * insulting. The click reports as credit_pack_cta_clicked, never paywall_* —
+ * paid growers must not enter the upgrade funnel.
+ *
+ * The IMPRESSION is deliberately emitted by the parent, not here. React runs
+ * child effects before parent ones, so an effect in this component would fire
+ * before ai_doctor_result_received / ai_doctor_session_saved and record the
+ * offer as preceding the value that earns it. The click is safe to own here
+ * because it is user-initiated and therefore already after both.
  */
-import { useEffect } from "react";
 import { Link } from "@/lib/react-router-compat";
 import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 import {
@@ -24,13 +29,6 @@ export interface AiDoctorLowCreditTopUpProps {
 
 export default function AiDoctorLowCreditTopUp({ vm, ...rest }: AiDoctorLowCreditTopUpProps) {
   const testId = rest["data-testid"] ?? "ai-doctor-low-credit-topup";
-  const visible = vm.visible;
-
-  // Hook runs unconditionally; the effect body is what is conditional.
-  useEffect(() => {
-    if (!visible) return;
-    trackFunnelEvent("credit_pack_cta_viewed", { surface: AI_DOCTOR_LOW_CREDIT_SURFACE });
-  }, [visible]);
 
   if (!vm.visible) return null;
 

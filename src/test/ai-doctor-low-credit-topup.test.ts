@@ -144,6 +144,16 @@ describe("low-credit top-up · fails closed", () => {
     expect(build({ credit: credit({ scope: "per_grow" }) }).visible).toBe(false);
   });
 
+  it("rejects a replayed receipt, which may describe a spent month", () => {
+    // useAiDoctorLiveReview reuses the idempotency key across retries, so the
+    // spend RPC can return its immutable prior receipt. If that retry crossed
+    // the UTC month boundary the balance belongs to an allowance that has
+    // since reset, and soliciting a pack from it would be wrong.
+    expect(build({ credit: credit({ replayed: true }) }).visible).toBe(false);
+    // A fresh receipt is unaffected.
+    expect(build({ credit: credit({ replayed: false }) }).visible).toBe(true);
+  });
+
   it("fails closed on malformed or missing balances", () => {
     expect(build({ credit: credit({ remaining: 1.5 }) }).visible).toBe(false);
     expect(build({ credit: credit({ remaining: -1 }) }).visible).toBe(false);
@@ -188,13 +198,43 @@ describe("low-credit top-up · cannot collide with the Free upgrade", () => {
 describe("low-credit top-up · funnel hygiene", () => {
   it("reports as a credit-pack CTA, never as a paywall", () => {
     // A paying grower entering the upgrade funnel would corrupt it — the
-    // same invariant AiCreditLimitNotice enforces for denials.
-    expect(COMPONENT).toMatch(/trackFunnelEvent\("credit_pack_cta_viewed"/);
+    // same invariant AiCreditLimitNotice enforces for denials. The click
+    // lives here; the impression lives in the parent (see ordering test).
     expect(COMPONENT).toMatch(/trackFunnelEvent\("credit_pack_cta_clicked"/);
     expect(COMPONENT).not.toMatch(/paywall_viewed|paywall_cta_clicked/);
+
+    const parent = readFileSync(
+      resolve(ROOT, "src/components/PlantDetailAiDoctorLiveReview.tsx"),
+      "utf8",
+    );
+    expect(parent).toMatch(
+      /trackFunnelEvent\("credit_pack_cta_viewed", \{ surface: AI_DOCTOR_LOW_CREDIT_SURFACE \}\)/,
+    );
   });
 
   it("uses its own surface so it is separable from the denial CTA", () => {
     expect(COMPONENT).toMatch(/AI_DOCTOR_LOW_CREDIT_SURFACE/);
+  });
+
+  it("emits the impression from the parent, after the value milestones", () => {
+    // React runs child effects BEFORE parent effects, so an impression effect
+    // inside the child would report the offer as preceding the result/saved
+    // milestones that earn it. The child owns only the click, which is
+    // user-initiated and therefore already after both.
+    expect(COMPONENT).not.toMatch(/useEffect/);
+    expect(COMPONENT).not.toMatch(/credit_pack_cta_viewed/);
+
+    const parent = readFileSync(
+      resolve(ROOT, "src/components/PlantDetailAiDoctorLiveReview.tsx"),
+      "utf8",
+    );
+    const saved = parent.indexOf('trackFunnelEvent("ai_doctor_session_saved"');
+    const impression = parent.indexOf('trackFunnelEvent("credit_pack_cta_viewed", { surface: AI_DOCTOR_LOW_CREDIT_SURFACE }');
+    expect(saved).toBeGreaterThan(-1);
+    expect(impression).toBeGreaterThan(-1);
+    // Declared after the milestone effect, mirroring the post-value paywall.
+    expect(impression).toBeGreaterThan(saved);
+    // And deduplicated per result, so a re-render cannot double-count it.
+    expect(parent).toMatch(/trackedLowCreditResultRef\.current === review\.result/);
   });
 });

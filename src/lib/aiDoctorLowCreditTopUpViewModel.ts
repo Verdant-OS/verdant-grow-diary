@@ -48,6 +48,13 @@ const HIDDEN: AiDoctorLowCreditTopUpViewModel = Object.freeze({ visible: false }
 
 function lowMonthlyRemaining(credit: AiCreditRemainingInput | null | undefined): number | null {
   if (!credit) return null;
+  // A replayed receipt is the server returning its immutable prior result for
+  // a reused idempotency key. If the retry crossed the UTC month boundary that
+  // receipt describes LAST month's allowance, which has since reset — so it
+  // would solicit a pack the grower no longer needs. Rejecting the replay
+  // keeps this pure: dating the receipt would require a clock, and a stale
+  // balance is exactly the input we cannot safely reason about.
+  if (credit.replayed === true) return null;
   // Paid allowances are the monthly bucket. A per-grow scope is the Free
   // contract, which the post-value upgrade view model owns instead.
   if (credit.scope !== "per_month") return null;

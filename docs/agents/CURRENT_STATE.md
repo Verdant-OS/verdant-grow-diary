@@ -1,6 +1,6 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-07-31
+**Last updated:** 2026-08-07
 **Updated by:** Claude (Knowledge Library & Product Specification Architect)
 
 This is the shift report. It changes often. Permanent rules live in `/AGENTS.md` and must
@@ -94,16 +94,72 @@ Grok's research feeds step 6, not step 1.
 
 ## Agents currently assigned
 
-| Agent  | Status                                                       |
-| ------ | ------------------------------------------------------------ |
-| Claude | Architecture delivered — verdict `HOLD` on library expansion |
-| Codex  | Not yet started — awaiting slice 1                           |
-| Grok   | Not yet started — research feeds slice 6                     |
-| Others | Not yet engaged                                              |
+| Agent  | Status                                                                               |
+| ------ | ------------------------------------------------------------------------------------ |
+| Claude | SEO: architecture delivered, verdict `HOLD`. EcoWitt: Phase 1.7 verified (see below) |
+| Codex  | Not yet started — awaiting slice 1                                                   |
+| Grok   | Not yet started — research feeds slice 6                                             |
+| Others | Not yet engaged                                                                      |
 
 ---
 
 ## Unrelated work in flight
+
+### EcoWitt real ingest — Phase 1.7 verified, Phase 1.8 not started
+
+Branch `claude/ecowitt-sensor-verify-98f1bd` (based on `main`). Records:
+`docs/ecowitt-real-ingest-phase-1-7-verification-record.md`,
+`docs/ecowitt-ingest-topology-and-schema-gaps.md`, and — authoritative for Phase 1.8 —
+`docs/ecowitt-real-ingest-phase-1-8-grounding-audit.md` (deploy-branch-verified; corrects
+stale schema claims in the earlier two).
+
+Phase 1.8 specification: `docs/ecowitt-real-ingest-phase-1-8-specification.md`, verdict
+`HOLD — approvable`. **Owner ruled 2026-08-12** (at frozen head `15e161885`): D2 APPROVED
+(designated channel now, per-plant binding later), D3 APPROVED (fail-closed unknown
+transport → `invalid`), D4 APPROVED (stale persists as evidence only) — fences recorded in
+the spec. **D4 premise corrected later same day:** both deployed handlers already fail
+closed on stale (reject before upsert, deliberately — verified at deploy tip `cb98fe4e4`);
+D4 needs owner re-confirmation on the corrected facts before implementation. See the
+spec's D4 correction block. V1 and V4 were authorized and attempted same day: both `BLOCKED` — no `PG*`
+env/`psql` on this machine and the Supabase MCP connection lacks permission on
+`knkwiiywfkbqznbxwqfh`. Unblock paths and an owner-runnable V4 query are in the spec's
+verification attempt record. V6 is `BLOCKED` on the same access denial as V1/V4;
+V2/V3 and V5a/V5b are pending with no verification result yet. V5 is split — V5a
+(invalid-provenance read fences) is mandatory and unconditional, V5b (stale fences)
+conditional on D4. Spec advances to `APPROVED` only when **V1–V4, V5a, and V6 pass, V5b passes or
+resolves `NOT_APPLICABLE` (fail-closed re-confirmation), and the owner re-confirms D4**
+on the corrected facts — verification cannot substitute for that decision.
+
+| Phase 2 gate item                             | Status                                                                                         |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| 1. Wrapper tests pass                         | `PASS` — 22/22 targeted tests, 2026-08-07                                                      |
+| 2. Token storage/rotation/revocation policy   | `BLOCKED` — Cheek (owner-only)                                                                 |
+| 3. Schema/RLS/idempotency audit (= Phase 1.8) | `BLOCKED` — spec drafted; approval blocked on verification items + owner decisions (see below) |
+| 4. Live-label fencing policy                  | `BLOCKED` — D3 approved 2026-08-12; D4 re-confirmation outstanding (premise corrected)         |
+
+Persistence remains blocked **on the Phase 1.7 path**: `source='live'` is unreachable via
+the validation-only `ecowitt-real-ingest` wrapper by design — it has no database client. A
+live row claiming to come from **that endpoint** would be a defect, and a Sensor Snapshot
+screenshot is not a valid Phase 1.7 exit artifact. This does **not** apply to the
+separately deployed `ecowitt-ingest` custom-upload path — bearer-authenticated, so it is
+reached via a bridge hop, never by the gateway alone — which checks freshness and
+legitimately upserts canonical `source='live'` rows (deploy branch). Do not
+classify those as defects when auditing production.
+
+Two cautions for anyone picking this up:
+
+- A verification guide circulating outside the repo names Supabase project
+  `bzatgtgjvuojpoxcknaa`. That ref exists in **no** file here. The project is
+  `knkwiiywfkbqznbxwqfh`. The same guide describes `~/verdant-testbench` as a copy of
+  Verdant; it is not a git repository.
+- Phase 1.8 idempotency drafts produced without repo access assume a wide
+  one-row-per-sample table. `public.sensor_readings` is **long format — one row per
+  `(tent, metric, ts)`**. Start 1.8 from the real cardinality.
+
+**This is not the approved slice.** The approved slice above remains SEO repair and
+measurement. Whether EcoWitt supersedes it is Cheek's call, not an agent's.
+
+### Skill Runtime v1
 
 `PR #616` — Skill Runtime v1 Build 7 (evaluation harness), branch
 `build/07-skill-evaluation-harness`. CI green at `22d9054d3`. Five findings open. This is

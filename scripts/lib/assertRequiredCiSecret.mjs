@@ -20,7 +20,7 @@ import { dirname } from "node:path";
 
 /**
  * @typedef {object} AssertRequiredCiSecretInput
- * @property {string} secretName            Repository secret name, e.g. "SUPABASE_DB_URL_LIVE".
+ * @property {string} secretName            Protected secret name, e.g. "SUPABASE_DB_URL".
  * @property {string | undefined} secretValue Raw value injected by the workflow (`${{ secrets.X }}`).
  * @property {string} [guardHeading]        Heading for logs + markdown report. Defaults to a generic guard label.
  * @property {string[]} [fixSteps]          Ordered fix steps rendered as a numbered list. Sensible default if omitted.

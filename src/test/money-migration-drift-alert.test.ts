@@ -51,7 +51,9 @@ describe("money migration drift alert — runs at all", () => {
       String(s.uses ?? "").includes("require-ci-secret"),
     );
     expect(guard).toBeTruthy();
-    expect(guard.with["secret-name"]).toBe("SUPABASE_DB_URL_LIVE");
+    expect(guard.with["secret-name"]).toBe("SUPABASE_DB_URL");
+    expect(guard.with["secret-value"]).toBe("${{ secrets.SUPABASE_DB_URL }}");
+    expect(WORKFLOW).not.toContain("SUPABASE_DB_URL_LIVE");
   });
 
   it("bounds the checker so a stalled query still reaches the reconciler", () => {

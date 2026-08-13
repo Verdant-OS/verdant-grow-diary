@@ -171,7 +171,7 @@ Lint errors: PASS — `eslint . --quiet` exit 0
 Runtime harness: SKIPPED locally. Security DB Local PASS on CI push 31684203364
 Static safety: PASS — 8 files / 183 tests
 Security static: PASS — scanner self-tests + repo scan
-EcoWitt-only: PASS — 6084 files, no SwitchBot
+EcoWitt-only: PASS — 6084 files, no retired-brand references
 Live `/` and version.json: PASS (curl 2026-08-13)
 Skipped: authenticated One-Tent e2e (no session); billing/AI-credit RLS harnesses;
   production schema apply of AQ RPC (MCP sandbox); GA4/GSC

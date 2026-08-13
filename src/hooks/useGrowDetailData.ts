@@ -172,7 +172,10 @@ export function useGrowDetailData(): UseGrowDetailData {
     setGrow(data as GrowRow);
 
     // Read-only count queries. Any failure degrades to "unavailable".
-    type CountQuery = { eq: (col: string, val: unknown) => CountQuery } & PromiseLike<{
+    type CountQuery = {
+      eq: (col: string, val: unknown) => CountQuery;
+      is: (col: string, val: unknown) => CountQuery;
+    } & PromiseLike<{
       count: number | null;
       error: unknown;
     }>;
@@ -240,7 +243,7 @@ export function useGrowDetailData(): UseGrowDetailData {
     ] = await Promise.all([
       countGrowScopedPlants(),
       countFrom("tents"),
-      countFrom("diary_entries"),
+      countFrom("diary_entries", (q) => q.is("retracted_at", null)),
       countFrom("grow_events", (q) => q.eq("source", "manual").eq("is_deleted", false)),
       countFrom("action_queue", (q) => q.eq("status", "pending_approval")),
       countFrom("action_queue"),

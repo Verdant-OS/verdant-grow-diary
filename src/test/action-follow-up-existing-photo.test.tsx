@@ -238,12 +238,23 @@ describe("isAcceptedActionFollowUpPhotoReference", () => {
 // Candidate query
 // ---------------------------------------------------------------------------
 
-function makeSupabaseMock(rows: Array<Record<string, unknown>>, error: unknown = null) {
+function makeSupabaseMock(
+  rows: Array<Record<string, unknown>>,
+  error: unknown = null,
+  calls?: Array<{ method: string; args: unknown[] }>,
+) {
+  const record =
+    (method: string) =>
+    (...args: unknown[]) => {
+      calls?.push({ method, args });
+      return chain;
+    };
   const chain: Record<string, unknown> = {};
   Object.assign(chain, {
-    select: () => chain,
-    eq: () => chain,
-    not: () => chain,
+    select: record("select"),
+    eq: record("eq"),
+    is: record("is"),
+    not: record("not"),
     limit: () => {
       const __c: any = {
         abortSignal: () => __c,
@@ -285,13 +296,17 @@ describe("loadActionFollowUpExistingPhotoCandidates", () => {
         photo_url: "http://ext/photo.jpg",
       },
     ];
+    const calls: Array<{ method: string; args: unknown[] }> = [];
     const res = await loadActionFollowUpExistingPhotoCandidates(CTX, {
-      supabase: makeSupabaseMock(rows),
+      supabase: makeSupabaseMock(rows, null, calls),
     });
     expect(res.status).toBe("loaded");
     if (res.status !== "loaded") return;
     expect(res.candidates).toHaveLength(1);
     expect(res.candidates[0].durableReference).toBe(REF_PLANT);
+    // Quick Log retractions (#786): a retracted photo must never be offered
+    // as new Action Queue follow-up evidence.
+    expect(calls).toContainEqual({ method: "is", args: ["retracted_at", null] });
   });
 
   it("returns sanitized failure on provider error", async () => {

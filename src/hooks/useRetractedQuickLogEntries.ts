@@ -32,16 +32,22 @@ export function buildRetractedQuickLogEntriesQueryKey(growId: string | null) {
   return ["quicklog_retracted_entries", growId ?? "none"] as const;
 }
 
-const RETRACTED_DISCLOSURE_LIMIT = 25;
+export const RETRACTED_DISCLOSURE_LIMIT = 25;
+
+export interface RetractedQuickLogEntriesResult {
+  entries: RetractedQuickLogEntry[];
+  /** Exact total of retained retractions for this grow (may exceed entries.length). */
+  totalCount: number;
+}
 
 export function useRetractedQuickLogEntries(growId: string | null | undefined) {
   const query = useQuery({
     queryKey: buildRetractedQuickLogEntriesQueryKey(growId ?? null),
     enabled: typeof growId === "string" && growId.length > 0,
-    queryFn: async (): Promise<RetractedQuickLogEntry[]> => {
-      const { data, error } = await supabase
+    queryFn: async (): Promise<RetractedQuickLogEntriesResult> => {
+      const { data, error, count } = await supabase
         .from("diary_entries")
-        .select("id, note, entry_at, retracted_at, plant_id, tent_id")
+        .select("id, note, entry_at, retracted_at, plant_id, tent_id", { count: "exact" })
         .eq("grow_id", growId as string)
         .not("retracted_at", "is", null)
         .order("retracted_at", { ascending: false })
@@ -51,7 +57,8 @@ export function useRetractedQuickLogEntries(growId: string | null | undefined) {
         (r): r is typeof r & { retracted_at: string } =>
           typeof r.retracted_at === "string" && r.retracted_at.length > 0,
       );
-      if (rows.length === 0) return [];
+      const totalCount = typeof count === "number" ? count : rows.length;
+      if (rows.length === 0) return { entries: [], totalCount };
 
       const ids = rows.map((r) => r.id);
       const { data: revData } = await supabase
@@ -70,19 +77,23 @@ export function useRetractedQuickLogEntries(growId: string | null | undefined) {
         byDiaryId.set(rev.rootId, byDiaryId.get(rev.rootId) ?? rev);
       }
 
-      return rows.map((r) => ({
-        diaryEntryId: r.id,
-        note: r.note,
-        entryAt: r.entry_at ?? null,
-        retractedAt: r.retracted_at,
-        plantId: r.plant_id ?? null,
-        tentId: r.tent_id ?? null,
-        retraction: byDiaryId.get(r.id) ?? null,
-      }));
+      return {
+        entries: rows.map((r) => ({
+          diaryEntryId: r.id,
+          note: r.note,
+          entryAt: r.entry_at ?? null,
+          retractedAt: r.retracted_at,
+          plantId: r.plant_id ?? null,
+          tentId: r.tent_id ?? null,
+          retraction: byDiaryId.get(r.id) ?? null,
+        })),
+        totalCount,
+      };
     },
   });
   return {
-    entries: query.data ?? [],
+    entries: query.data?.entries ?? [],
+    totalCount: query.data?.totalCount ?? 0,
     isLoading: query.isLoading,
     isError: query.isError,
   };

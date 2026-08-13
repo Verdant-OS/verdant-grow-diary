@@ -125,7 +125,7 @@ DECLARE
   v_marketing_opt_in boolean;
   v_ref_code text;
   v_referrer uuid;
-BEGIN                                        -- <== OUTER BLOCK OPENS
+BEGIN
   v_signup_source := CASE
     WHEN NEW.raw_user_meta_data->>'verdant_signup_source' IN (
       'landing_page','pricing_page','founder_page','founder_share',
@@ -155,10 +155,10 @@ BEGIN                                        -- <== OUTER BLOCK OPENS
   IF v_signup_source IS NOT NULL THEN
     INSERT INTO public.signup_acquisition_attributions (user_id, source, created_at)
     VALUES (NEW.id, v_signup_source, COALESCE(NEW.created_at, now()))
-    ON CONFLICT (user_id) DO NOTHING;      -- <== THE FAILING STATEMENT. Still in the
-  END IF;                                  --     OUTER block. No handler covers it.
+    ON CONFLICT (user_id) DO NOTHING;
+  END IF;
 
-  BEGIN                                    -- <== INNER BLOCK OPENS, AFTER the INSERT
+  BEGIN
     v_ref_code := lower(btrim(NEW.raw_user_meta_data->>'verdant_ref_code'));
     IF v_ref_code IS NOT NULL AND v_ref_code ~ '^[a-z0-9]{6,16}$' THEN
       SELECT p.user_id INTO v_referrer
@@ -174,14 +174,43 @@ BEGIN                                        -- <== OUTER BLOCK OPENS
         );
       END IF;
     END IF;
-  EXCEPTION WHEN OTHERS THEN                -- <== THE ONLY HANDLER. Pairs with the INNER
-    NULL;                                   --     BEGIN above, so it covers ONLY the
-  END;                                      --     referral logic.
+  EXCEPTION WHEN OTHERS THEN
+    NULL;
+  END;
 
   RETURN NEW;
-END;                                        -- <== OUTER BLOCK CLOSES. It never had an
-$function$                                  --     EXCEPTION clause at all.
+END;
+$function$
 ```
+
+Compute `md5` over exactly the block above and you get
+`d67b343a174e86b5ba9ee065c43545ed` (2177 bytes) — it is the unmodified
+`pg_get_functiondef` output, with nothing added. That is what makes it an authenticable
+receipt rather than a paraphrase, so **do not annotate it in place.**
+
+The structure, annotated **separately** so the receipt above stays verifiable:
+
+```text
+BEGIN                                   <== OUTER block opens
+  ...
+  INSERT INTO public.profiles ...
+  IF v_signup_source IS NOT NULL THEN
+    INSERT INTO public.signup_acquisition_attributions ...   <== THE FAILING STATEMENT
+  END IF;                                                    <== still in the OUTER block
+
+  BEGIN                                 <== INNER block opens, AFTER the failing INSERT
+    ... referral / convert_referral ...
+  EXCEPTION WHEN OTHERS THEN            <== the ONLY handler; pairs with the INNER BEGIN,
+    NULL;                                   so it covers the referral logic and nothing else
+  END;                                  <== INNER block closes
+
+  RETURN NEW;
+END;                                    <== OUTER block closes with NO exception clause
+```
+
+The attribution INSERT sits in the outer block. The outer block reaches its `END` without
+an `EXCEPTION` clause. So the `42P01` is unhandled and propagates out of the trigger,
+aborting the `auth.users` INSERT.
 
 Read directly: the sole `EXCEPTION` clause pairs with the inner `BEGIN` that opens *after*
 the attribution INSERT and closes immediately before `RETURN NEW`. It wraps only the
@@ -193,13 +222,24 @@ whether the intervening `BEGIN` is still **open** at the handler — i.e. whethe
 block-closing `END` occurs between them. `END IF` is not one:
 
 ```sql
+-- Self-contained: re-declares its own CTEs. (An earlier revision of this runbook
+-- referenced a `spans` CTE from the query above; CTE scope ends at that query's
+-- semicolon, so run standalone it failed with: relation "spans" does not exist.)
+WITH d AS (
+  SELECT pg_get_functiondef(oid) AS def FROM pg_proc WHERE proname = 'handle_new_user' LIMIT 1
+), spans AS (
+  SELECT def,
+         position('signup_acquisition_attributions' IN def) AS ins,
+         position('EXCEPTION' IN def) AS exc
+  FROM d
+)
+SELECT (SELECT count(*) FROM regexp_matches(substr(def, ins, exc - ins), '\\mBEGIN\\M',  'g')) AS begins_between,
+       (SELECT count(*) FROM regexp_matches(substr(def, ins, exc - ins), '\\mEND\\M',    'g')) AS ends_between,
+       (SELECT count(*) FROM regexp_matches(substr(def, ins, exc - ins), '\\mEND IF\\M', 'g')) AS end_ifs_between
+FROM spans;
 -- => begins_between=1, ends_between=3, end_ifs_between=3
 --    block-closing ENDs = ends_between - end_ifs_between = 0
 --    therefore the intervening BEGIN is still open at EXCEPTION, and pairs with it.
-SELECT (SELECT count(*) FROM regexp_matches(substr(def, ins, exc - ins), '\mBEGIN\M',  'g')) AS begins_between,
-       (SELECT count(*) FROM regexp_matches(substr(def, ins, exc - ins), '\mEND\M',    'g')) AS ends_between,
-       (SELECT count(*) FROM regexp_matches(substr(def, ins, exc - ins), '\mEND IF\M', 'g')) AS end_ifs_between
-FROM spans;
 ```
 
 Under the safe shape this rules out, the closed inner block would contribute a
@@ -299,18 +339,30 @@ proven to have been exercised — do not claim lost signups, and do not call it 
 rolls back and leaves no row, so *"nobody tried"* and *"everyone who tried failed"* are
 indistinguishable from the table.
 
-**Falsifier, if you ever want to re-check.** Any `auth.users` row carrying one of the ten
-live-allowlisted sources and created *after* `20260721194325` was applied would disprove the
-mechanism outright, because the `INSERT` must once have succeeded. Zero rows proves nothing
-on its own.
+**There is no sound database falsifier — do not let the obvious query fool you.** An
+earlier revision of this runbook proposed grouping `auth.users` by
+`raw_user_meta_data->>'verdant_signup_source'` and treating any allowlisted value created
+after 2026-07-21 as disproof. **That query is not valid as a falsifier**, for a reason that
+is easy to miss: `raw_user_meta_data` is **client-editable**, and the query observes the
+value *now*, not the value the trigger saw at creation time. Someone who signed up through
+an unaffected path — Google OAuth, say — could later set that key to an allowlisted value,
+producing a row that appears to disprove the outage while the mechanism remains entirely
+intact. It measures the wrong thing at the wrong time.
 
-```sql
-SELECT raw_user_meta_data->>'verdant_signup_source' AS src,
-       count(*), min(created_at), max(created_at)
-FROM auth.users
-WHERE raw_user_meta_data->>'verdant_signup_source' IS NOT NULL
-GROUP BY 1 ORDER BY 1;
-```
+Sound evidence has to be **immutable and server-side**. The candidates:
+
+| Source | What it would show | Caveat |
+| --- | --- | --- |
+| Postgres error logs | `42P01` on `public.signup_acquisition_attributions` at signup time — direct proof the path was exercised | Subject to the retention window; absence past retention proves nothing |
+| GA4 `signup_failed` | Client-side count of failed signups since 2026-07-21 | Consent-gated and currently unreadable (baseline `BLOCKED`); see "Why nothing alerted" |
+| `public.signup_acquisition_attributions` rows | Trigger-written and not client-editable — the ideal evidence | **The table does not exist**, which is the outage itself. Available only *after* the apply |
+
+Note the structural bind: the one trustworthy database record is the very table whose
+absence causes the failure. **Until the migration is applied, no immutable database evidence
+of this outage can exist** — a failed signup rolls back and leaves nothing behind. That is
+why the diagnosis rests on the mechanism (proven above against the live function) rather
+than on a count of victims.
+
 
 ---
 

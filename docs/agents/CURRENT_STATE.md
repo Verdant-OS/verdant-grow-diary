@@ -127,7 +127,10 @@ verification attempt record. V3 and V6 are `BLOCKED` on the same access denial a
 V1/V4 (re-attempted later 2026-08-12). **V2 passed 2026-08-12**: channel collision
 reproduced against deploy-branch modules — a tent with two channels of one class loses
 half its rows to `ignoreDuplicates`; safe at ≤1 channel per class per tent, which D2
-Option A must enforce. V5a/V5b remain pending with no verification result yet. V5 is split — V5a
+Option A must enforce. **V5a passed 2026-08-13** — PR #917 merged (`e077a0ba0`): fold
+helpers eliminate every else→`live` fallthrough across 11+ read models with pinning
+tests; active-writer transport tags (`pi_bridge`, `ecowitt`) map to `live` deliberately
+via an explicit compat set. V5 is split — V5a
 (invalid-provenance read fences) is mandatory and unconditional, V5b (stale fences)
 conditional on D4. Spec advances to `APPROVED` only when **V1–V4, V5a, and V6 pass, V5b passes or
 resolves `NOT_APPLICABLE` (fail-closed re-confirmation), and the owner re-confirms D4**

@@ -39,6 +39,30 @@ describe("buildQuickLogSnapshotStrip — captured_at beats ingest ts", () => {
 });
 
 describe("buildQuickLogSnapshotStrip", () => {
+  it("matches the save gate when live capture time is 16 minutes old", () => {
+    const capturedAt = minutesAgo(16);
+    const v = buildQuickLogSnapshotStrip({
+      snapshot: snap({
+        source: "live",
+        ts: minutesAgo(1),
+        captured_at: capturedAt,
+      }),
+      hasTent: true,
+      now: NOW,
+    });
+
+    expect(v).toMatchObject({
+      status: "stale",
+      capturedAt,
+      description: "Refresh before saving for better AI Doctor context.",
+      classification: {
+        status: "stale",
+        reason: "outside_stale_window",
+        isHealthyEvidence: false,
+      },
+    });
+  });
+
   it("no_data — exact copy, labels, and navigation when there is no tent", () => {
     const v = buildQuickLogSnapshotStrip({ snapshot: snap({}), hasTent: false, now: NOW });
     expect(v.status).toBe("no_data");

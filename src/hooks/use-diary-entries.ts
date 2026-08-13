@@ -8,6 +8,7 @@ export const useDiaryEntries = () =>
       const { data, error } = await supabase
         .from("diary_entries")
         .select("*")
+        .is("retracted_at", null)
         .order("entry_at", { ascending: false });
 
       if (error) throw error;

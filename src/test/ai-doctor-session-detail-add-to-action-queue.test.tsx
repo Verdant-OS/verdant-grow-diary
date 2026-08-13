@@ -4,7 +4,7 @@
  * Verifies the presenter wrapping over `useAddAiDoctorSessionSuggestionToActionQueue`:
  *   - Eligible suggestion renders the button.
  *   - Ineligible suggestion does NOT render the button (no extra DOM noise).
- *   - Click flows through to a single `action_queue` insert and shows the
+ *   - Click flows through to a single `action_queue_create` RPC and shows the
  *     success/duplicate/error labels.
  *   - Result links to the created/existing Action Queue item.
  *   - UI never leaks the raw `[session:<id>]` token or mentions `target_device`.
@@ -74,15 +74,16 @@ function makeFixture(diagnosis: Diagnosis): AiDoctorSessionRow {
 
 let currentFixture: AiDoctorSessionRow = makeFixture(makeDiagnosis());
 let actionQueueProbeRows: Array<Record<string, unknown>> = [];
-let nextActionQueueInsertError: { message: string } | null = null;
-const actionQueueInsertCalls: Array<Record<string, unknown>> = [];
+let nextActionQueueCreateError: { message: string; code?: string } | null = null;
+const actionQueueCreateCalls: Array<Record<string, unknown>> = [];
 const actionQueueEventInsertCalls: Array<Record<string, unknown>> = [];
 
 const forbidden = {
   update: vi.fn(),
   upsert: vi.fn(),
   delete: vi.fn(),
-  rpc: vi.fn(),
+  /** Non-allowlisted RPCs only. action_queue_create is the approved write path (#586). */
+  otherRpc: vi.fn(),
   functionsInvoke: vi.fn(),
 };
 
@@ -136,21 +137,11 @@ vi.mock("@/integrations/supabase/client", () => {
   });
 
   const actionQueueBuilder = () => {
-    const filters: Record<string, unknown> = {};
     const chain: Record<string, unknown> = {
       select: () => chain,
-      eq: (col: string, value: unknown) => {
-        filters[col] = value;
-        return chain;
-      },
-      in: (col: string, value: unknown) => {
-        filters[col] = value;
-        return chain;
-      },
-      like: (col: string, value: unknown) => {
-        filters[`like_${col}`] = value;
-        return chain;
-      },
+      eq: () => chain,
+      in: () => chain,
+      like: () => chain,
       limit: () => {
         const __c: any = {
           abortSignal: () => __c,
@@ -159,24 +150,8 @@ vi.mock("@/integrations/supabase/client", () => {
         };
         return __c;
       },
-      insert: (payload: Record<string, unknown>) => {
-        actionQueueInsertCalls.push(payload);
-        if (nextActionQueueInsertError) {
-          return {
-            select: () => ({
-              single: () => Promise.resolve({ data: null, error: nextActionQueueInsertError }),
-            }),
-          };
-        }
-        return {
-          select: () => ({
-            single: () =>
-              Promise.resolve({
-                data: { id: "aq-new-1", grow_id: payload.grow_id },
-                error: null,
-              }),
-          }),
-        };
+      insert: () => {
+        throw new Error("action_queue.insert is no longer the create path");
       },
     };
     return chain;
@@ -209,9 +184,26 @@ vi.mock("@/integrations/supabase/client", () => {
             };
         }
       },
-      rpc: (...args: unknown[]) => {
-        forbidden.rpc(...args);
-        return Promise.resolve({ data: null, error: null });
+      rpc: (name: string, args: Record<string, unknown>) => {
+        if (name === "action_queue_create") {
+          actionQueueCreateCalls.push(args);
+          if (nextActionQueueCreateError) {
+            return Promise.resolve({ data: null, error: nextActionQueueCreateError });
+          }
+          return Promise.resolve({
+            data: {
+              ok: true,
+              action_queue_id: "aq-new-1",
+              grow_id: args.p_grow_id,
+              status: "pending_approval",
+              event_id: "event-new-1",
+              reused: false,
+            },
+            error: null,
+          });
+        }
+        forbidden.otherRpc(name, args);
+        return Promise.resolve({ data: null, error: { message: `unknown rpc ${name}` } });
       },
       functions: {
         invoke: (...args: unknown[]) => {
@@ -244,9 +236,9 @@ function renderDetail() {
 beforeEach(() => {
   currentFixture = makeFixture(makeDiagnosis());
   actionQueueProbeRows = [];
-  actionQueueInsertCalls.length = 0;
+  actionQueueCreateCalls.length = 0;
   actionQueueEventInsertCalls.length = 0;
-  nextActionQueueInsertError = null;
+  nextActionQueueCreateError = null;
   Object.values(forbidden).forEach((fn) => fn.mockClear());
 });
 
@@ -277,18 +269,20 @@ describe("AiDoctorSessionDetail — Add to Action Queue button", () => {
     expect(screen.queryByTestId("ai-doctor-session-detail-add-to-action-queue-button")).toBeNull();
   });
 
-  it("click inserts exactly one pending_approval ai_doctor action and shows success label", async () => {
+  it("click creates exactly one pending_approval ai_doctor action via RPC and shows success label", async () => {
     renderDetail();
     const btn = await screen.findByTestId("ai-doctor-session-detail-add-to-action-queue-button");
     await act(async () => {
       fireEvent.click(btn);
     });
-    await waitFor(() => expect(actionQueueInsertCalls.length).toBe(1));
-    const payload = actionQueueInsertCalls[0];
-    expect(payload.source).toBe("ai_doctor");
-    expect(payload.status).toBe("pending_approval");
+    await waitFor(() => expect(actionQueueCreateCalls.length).toBe(1));
+    const payload = actionQueueCreateCalls[0];
+    expect(payload.p_source).toBe("ai_doctor");
+    expect("p_user_id" in payload).toBe(false);
     expect("user_id" in payload).toBe(false);
+    expect("p_target_device" in payload).toBe(false);
     expect("target_device" in payload).toBe(false);
+    expect(typeof payload.p_dedupe_key).toBe("string");
     await waitFor(() => expect(btn.textContent).toContain("Added to Action Queue"));
   });
 
@@ -336,13 +330,13 @@ describe("AiDoctorSessionDetail — Add to Action Queue button", () => {
       fireEvent.click(btn);
     });
     await waitFor(() => expect(btn.textContent).toContain("Already in Action Queue"));
-    expect(actionQueueInsertCalls.length).toBe(0);
+    expect(actionQueueCreateCalls.length).toBe(0);
     const link = screen.getByTestId("ai-doctor-session-detail-add-to-action-queue-link");
     expect(link.getAttribute("data-action-queue-id")).toBe("aq-existing-7");
   });
 
   it("shows safe no-equipment-change error copy when the insert fails (RLS)", async () => {
-    nextActionQueueInsertError = {
+    nextActionQueueCreateError = {
       message: "new row violates row-level security policy",
     };
     renderDetail();
@@ -361,7 +355,7 @@ describe("AiDoctorSessionDetail — Add to Action Queue button", () => {
     await act(async () => {
       fireEvent.click(btn);
     });
-    await waitFor(() => expect(actionQueueInsertCalls.length).toBe(1));
+    await waitFor(() => expect(actionQueueCreateCalls.length).toBe(1));
     const root = screen.getByTestId("ai-doctor-session-detail-add-to-action-queue");
     expect(root.textContent ?? "").not.toContain(`[session:${SESSION_ID}]`);
     expect(root.textContent ?? "").not.toContain(SESSION_ID);
@@ -374,18 +368,19 @@ describe("AiDoctorSessionDetail — Add to Action Queue button", () => {
     expect((root.textContent ?? "").toLowerCase()).not.toContain("device");
   });
 
-  it("never calls update / upsert / delete / rpc / functions.invoke during click", async () => {
+  it("never calls update / upsert / delete / non-create rpc / functions.invoke during click", async () => {
     renderDetail();
     const btn = await screen.findByTestId("ai-doctor-session-detail-add-to-action-queue-button");
     await act(async () => {
       fireEvent.click(btn);
     });
-    await waitFor(() => expect(actionQueueInsertCalls.length).toBe(1));
+    await waitFor(() => expect(actionQueueCreateCalls.length).toBe(1));
     expect(forbidden.update).not.toHaveBeenCalled();
     expect(forbidden.upsert).not.toHaveBeenCalled();
     expect(forbidden.delete).not.toHaveBeenCalled();
-    expect(forbidden.rpc).not.toHaveBeenCalled();
+    expect(forbidden.otherRpc).not.toHaveBeenCalled();
     expect(forbidden.functionsInvoke).not.toHaveBeenCalled();
+    expect(actionQueueEventInsertCalls.length).toBe(0);
   });
 });
 

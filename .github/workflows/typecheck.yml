@@ -3,7 +3,7 @@ name: TypeScript typecheck
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, verdant-grow-diary]
 
 jobs:
   typecheck:

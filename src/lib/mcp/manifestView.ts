@@ -224,6 +224,8 @@ export const SECRET_LIKE_PATTERNS: ReadonlyArray<RegExp> = [
   /bridge[_-]?token/i,
   /client[_-]?secret/i,
   /access[_-]?token/i,
+  /\bsb_secret_[A-Za-z0-9_-]{8,}/, // Supabase new-format secret API key
+  /\bsk-[A-Za-z0-9_-]{16,}/, // generic sk- API key shapes
 ];
 
 export function containsSecretLikeValue(text: string): boolean {

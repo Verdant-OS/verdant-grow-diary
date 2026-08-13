@@ -68,7 +68,7 @@ describe("buildDashboardSensorHealthSummary", () => {
     expect(vm.suspiciousFields).toEqual([]);
   });
 
-  it("returns stale when the latest reading is older than 30 minutes", () => {
+  it("returns stale when the latest reading is older than the source window", () => {
     const vm = buildDashboardSensorHealthSummary(
       ok({
         ts: new Date(NOW - 60 * 60_000).toISOString(),

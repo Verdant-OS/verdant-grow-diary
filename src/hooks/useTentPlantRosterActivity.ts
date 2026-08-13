@@ -89,6 +89,7 @@ export function useTentPlantRosterActivity(
           .from("diary_entries")
           .select("*")
           .eq("plant_id", plantId)
+          .is("retracted_at", null)
           .order("entry_at", { ascending: false })
           .limit(TENT_PLANT_ROSTER_ACTIVITY_LIMIT);
         if (error) throw error;

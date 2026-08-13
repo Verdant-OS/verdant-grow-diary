@@ -104,13 +104,16 @@ export function buildEnvironmentAlerts(inputs: AlertInputs): EnvironmentAlert[] 
       source: "sensor_snapshot",
       createdAt,
     });
-  } else if (isStale(snapshot.ts, now)) {
+  } else if (isStale(snapshot.ts, now, undefined, snapshot.source)) {
     alerts.push({
       id: "snapshot:stale",
       severity: "watch",
       metric: "snapshot",
       title: "Sensor reading is stale",
-      reason: "The latest reading is older than 30 minutes.",
+      reason:
+        snapshot.source === "manual" || snapshot.source === "diary"
+          ? "The latest reading is older than 24 hours."
+          : "The latest reading is older than 15 minutes.",
       source: "sensor_snapshot",
       createdAt,
     });

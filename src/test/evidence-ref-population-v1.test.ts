@@ -132,7 +132,7 @@ describe("Evidence Ref Population v1 — pure helper", () => {
 });
 
 // ---------------------------------------------------------------------------
-// B. AlertDetail action_queue insert — uses the forward helper, not literal []
+// B. AlertDetail action_queue create — uses the forward helper, not literal []
 // ---------------------------------------------------------------------------
 
 describe("Evidence Ref Population v1 — AlertDetail wiring", () => {
@@ -143,23 +143,23 @@ describe("Evidence Ref Population v1 — AlertDetail wiring", () => {
     expect(src).toMatch(/forwardAlertRefsToActionQueue/);
   });
 
-  it("passes forwarded refs into the action_queue insert payload", () => {
+  it("passes forwarded refs into the action_queue create draft", () => {
     expect(src).toMatch(
       /originating_timeline_events:\s*\n?\s*forwardAlertRefsToActionQueue\(alert\)/,
     );
   });
 
-  it("does not regress to a literal [] originating_timeline_events on the alert→action insert", () => {
-    // Locate the action_queue.insert(...) call site and assert no
+  it("does not regress to a literal [] originating_timeline_events on the alert→action create", () => {
+    // Locate the createActionQueueItem({...}) call site and assert no
     // `originating_timeline_events: []` literal lives inside it.
-    const m = src.match(/\.from\("action_queue"\)\s*\.insert\(\{[\s\S]*?\}\)/);
-    expect(m, "alert→action_queue insert call not found").not.toBeNull();
+    const m = src.match(/createActionQueueItem\(\{[\s\S]*?\}\)/);
+    expect(m, "alert→action_queue create call not found").not.toBeNull();
     expect(m![0]).not.toMatch(/originating_timeline_events:\s*\[\]/);
   });
 
-  it("never infers refs from alert id, prose, metric, or timestamps at the insert site", () => {
-    const m = src.match(/\.from\("action_queue"\)\s*\.insert\(\{[\s\S]*?\}\)/);
-    expect(m, "alert→action_queue insert call not found").not.toBeNull();
+  it("never infers refs from alert id, prose, metric, or timestamps at the create site", () => {
+    const m = src.match(/createActionQueueItem\(\{[\s\S]*?\}\)/);
+    expect(m, "alert→action_queue create call not found").not.toBeNull();
     const block = m![0].toLowerCase();
     const payloadStart = block.indexOf("originating_timeline_events:");
     expect(payloadStart).toBeGreaterThan(-1);

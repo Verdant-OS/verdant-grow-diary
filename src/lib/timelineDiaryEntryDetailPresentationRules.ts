@@ -56,6 +56,10 @@ export const HIDDEN_DIARY_DETAIL_KEYS: ReadonlySet<string> = new Set([
   // a schema version marker and a grow_events join id.
   "quick_log_version",
   "linked_grow_event_id",
+  // Correction/retraction handle (issue #786): display-only spine join id
+  // stamped by growEventToDiaryRawEntry so history-panel controls can
+  // target the right root. Machine bookkeeping; never a chip.
+  "origin_grow_event_id",
   // Guided Symptom Check stage is presented by its dedicated evidence card.
   "observation_stage",
   // Redundant with the dedicated photo render, which reads the row-level

@@ -108,7 +108,7 @@ describe("CheckoutSuccess truth copy", () => {
       isActive: true,
       displayPlanId: "free",
     };
-    markCheckoutStarted(Date.now(), window.sessionStorage);
+    markCheckoutStarted(Date.now(), "plan", window.sessionStorage);
     renderPage();
     expect(screen.getByTestId("checkout-success-page")).toHaveAttribute("data-view", "confirming");
     expect(screen.getByTestId("checkout-success-pending-heading")).toHaveTextContent(
@@ -162,7 +162,7 @@ describe("CheckoutSuccess truth copy", () => {
       isActive: true,
       displayPlanId: "free",
     };
-    markCheckoutStarted(Date.now() - 3 * 60 * 60 * 1000, window.sessionStorage);
+    markCheckoutStarted(Date.now() - 3 * 60 * 60 * 1000, "plan", window.sessionStorage);
     renderPage();
     expect(screen.getByTestId("checkout-success-page")).toHaveAttribute("data-view", "no_context");
   });

@@ -29,8 +29,10 @@ test("report.missingByEnv groups guarded Craft and credit-pack rows by env", () 
   assert.ok(Array.isArray(report.missingByEnv.sandbox), "sandbox array present");
   // Derived, not hardcoded: the preflight guards every PAID_PLAN_ID matching a
   // guarded prefix, so widening GUARDED_EXTERNAL_ID_PREFIXES (Craft + credit
-  // packs today) must not require editing this contract test. Pinning "2" and
-  // "craft_" made this fail with 4 !== 2 the moment packs were guarded.
+  // packs originally; Pro and Founder Lifetime added after an audit found
+  // them uncovered) must not require editing this contract test beyond the
+  // exact-array pin below. Pinning "2" and "craft_" made this fail with
+  // 4 !== 2 the moment packs were guarded; the same pin now moves 4 -> 7.
   assert.ok(
     report.missingByEnv.sandbox.length >= 2,
     "expected at least the two Craft plans to be reported",
@@ -44,9 +46,19 @@ test("report.missingByEnv groups guarded Craft and credit-pack rows by env", () 
       `${row.externalId} reported but not in requiredIds`,
     );
   }
-  // Exact guarded catalog, sorted by externalId for deterministic downstream tooling.
+  // Exact guarded catalog, sorted by externalId for deterministic downstream
+  // tooling. All 7 PAID_PLAN_IDS entries — Pro and Founder Lifetime are now
+  // guarded alongside Craft and the credit packs.
   const ids = report.missingByEnv.sandbox.map((r) => r.externalId);
-  assert.deepEqual(ids, ["craft_annual", "craft_monthly", "credit_pack_150", "credit_pack_50"]);
+  assert.deepEqual(ids, [
+    "craft_annual",
+    "craft_monthly",
+    "credit_pack_150",
+    "credit_pack_50",
+    "founder_lifetime",
+    "pro_annual",
+    "pro_monthly",
+  ]);
   // No live entry when live wasn't requested.
   assert.equal(report.missingByEnv.live, undefined);
 });

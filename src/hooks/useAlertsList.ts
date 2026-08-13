@@ -4,7 +4,7 @@
  * Returns alerts the authenticated user owns. RLS does the enforcement.
  */
 import { useCallback, useEffect, useState } from "react";
-import { listAlerts, type AlertRow, type AlertsQuery } from "@/lib/alerts";
+import { listAlerts, type AlertRow, type AlertsQuery, type AlertStatusRow } from "@/lib/alerts";
 
 export type AlertsListStatus = "idle" | "loading" | "ok" | "unavailable";
 
@@ -41,6 +41,11 @@ export function useAlertsList(
   const queryStatus = query.status ?? "all";
   const querySeverity = query.severity ?? "all";
   const enabled = options.enabled ?? true;
+  // Serialize `statuses` into a primitive so the effect below can depend on its
+  // VALUE rather than its identity. A caller passing an inline array literal
+  // would otherwise hand us a new reference every render and refetch forever.
+  // Status values are plain identifiers, so join/split round-trips losslessly.
+  const statusesKey = query.statuses ? [...query.statuses].join(",") : "";
 
   useEffect(() => {
     if (!enabled) {
@@ -52,7 +57,8 @@ export function useAlertsList(
     let cancelled = false;
     setStatus("loading");
     setError(null);
-    listAlerts({ growId, status: queryStatus, severity: querySeverity })
+    const statuses = statusesKey ? (statusesKey.split(",") as AlertStatusRow[]) : undefined;
+    listAlerts({ growId, status: queryStatus, statuses, severity: querySeverity })
       .then((rows) => {
         if (cancelled) return;
         setAlerts(rows);
@@ -67,7 +73,7 @@ export function useAlertsList(
     return () => {
       cancelled = true;
     };
-  }, [growId, queryStatus, querySeverity, nonce, enabled]);
+  }, [growId, queryStatus, statusesKey, querySeverity, nonce, enabled]);
 
   return { status, alerts, error, reload };
 }

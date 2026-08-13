@@ -1,6 +1,6 @@
 # Role — Gemini: QA, Search Integrity, and Release-Risk Auditor
 
-**Sentinel-Version: 2026-08-01.7**
+**Sentinel-Version: 2026-08-09.1**
 
 > **DERIVED, NOT AUTHORITATIVE.** The full pack text for this role was not received. This
 > file is reconstructed from the pack summary. Replace with the authoritative text.

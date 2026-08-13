@@ -29,7 +29,8 @@ const ROOT = resolve(__dirname, "../..");
 const DASHBOARD = readFileSync(resolve(ROOT, "src/pages/Dashboard.tsx"), "utf8");
 
 const FRESH_TS = new Date().toISOString();
-const STALE_TS = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+// Past the 24h manual current-context window (Sensor Truth Canon).
+const STALE_TS = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
 
 const goodQuality = {
   quality: "good" as const,
@@ -91,7 +92,7 @@ describe("Latest snapshot labels a fresh manual reading correctly", () => {
       { ts: STALE_TS, metric: "temperature_c", value: 25, source: "manual" },
     ]);
     expect(snap!.source).toBe("manual");
-    expect(isStale(snap!.ts)).toBe(true);
+    expect(isStale(snap!.ts, Date.now(), undefined, snap!.source)).toBe(true);
   });
 });
 

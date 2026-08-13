@@ -13,6 +13,7 @@
  *
  * All time is injectable via `now` for tests.
  */
+import { LIVE_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
 import type { NormalizedDiaryEntry } from "@/lib/diaryEntryRules";
 
 export type GuidedActionItemKind =
@@ -78,7 +79,7 @@ export interface BuildGuidedActionChecklistInput {
 }
 
 // Time windows — kept as named constants for auditability.
-export const SENSOR_FRESHNESS_MS = 30 * 60 * 1000;
+export const SENSOR_FRESHNESS_MS = LIVE_CURRENT_STATE_STALE_MS;
 export const WATERING_CADENCE_MS = 3 * 24 * 60 * 60 * 1000;
 export const PHOTO_CADENCE_MS = 5 * 24 * 60 * 60 * 1000;
 export const FLOWER_TRICHOME_CHECK_CADENCE_MS = 14 * 24 * 60 * 60 * 1000;

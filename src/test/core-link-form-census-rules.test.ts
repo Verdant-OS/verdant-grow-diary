@@ -124,6 +124,17 @@ describe("core link and form census rules", () => {
     );
   });
 
+  it("pins the browser clock before auditing dynamic report links", () => {
+    // The timeline's range-report href includes the current calendar date.
+    // The census revisits links after auditing many routes, so its browser
+    // clock must stay fixed or a midnight rollover makes a previously
+    // discovered href disappear without any product regression.
+    expect(CENSUS_SPEC_SOURCE).toContain(
+      'const CORE_CENSUS_FIXED_TIME = "2026-08-11T12:00:00.000Z";',
+    );
+    expect(CENSUS_SPEC_SOURCE).toContain("await page.clock.setFixedTime(CORE_CENSUS_FIXED_TIME);");
+  });
+
   it("mutates and restores controlled selects through the reacquired live locator", () => {
     // EVERY select — named or not — exercises through the pinned node: an
     // accessible name can migrate to a sibling combobox when the value it

@@ -24,7 +24,7 @@ describe("aiCreditLimitNoticeViewModel — branching by credit.plan_id", () => {
     expect(vm.kind).toBe("upsell");
     expect(vm.paywallVm).toBeDefined();
     expect(vm.charged).toBe(false);
-    expect(vm.paywallVm?.primaryCtaHref).toBe("/pricing");
+    expect(vm.paywallVm?.primaryCtaHref).toBe("/pricing?plan=pro_annual");
   });
 
   it.each(["pro_monthly", "pro_annual", "craft_monthly", "craft_annual", "founder_lifetime"])(
@@ -39,6 +39,19 @@ describe("aiCreditLimitNoticeViewModel — branching by credit.plan_id", () => {
       // plan-neutral copy — must never say "Pro"
       expect(vm.title.toLowerCase()).not.toContain("pro");
       expect(vm.body.toLowerCase()).not.toContain("pro");
+    },
+  );
+
+  it.each(["craft_monthly", "craft_annual"])(
+    "%s → wait copy reports the Craft 300-credit monthly allowance",
+    (plan) => {
+      const vm = buildAiCreditLimitNoticeViewModel({
+        credit: { ...baseDenial(plan), scope_limit: 300 },
+      });
+
+      expect(vm.kind).toBe("wait");
+      expect(vm.title).toContain("300");
+      expect(vm.title).not.toContain("100");
     },
   );
 

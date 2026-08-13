@@ -142,7 +142,9 @@ describe("classifySnapshotTruth", () => {
   });
 
   it("keeps a stale-but-realistic reading classified as stale, not invalid", () => {
-    const r = classifySnapshotTruth(snap({ ts: STALE }), NOW);
+    // Default snap source is manual (24h window). Use live so a 60-minute-old
+    // reading is past the 15-minute live current-state boundary.
+    const r = classifySnapshotTruth(snap({ ts: STALE, source: "live" }), NOW);
     expect(r.stale).toBe(true);
     expect(r.hasInvalid).toBe(false);
     expect(r.snapshot.temp).toBe(24); // value preserved

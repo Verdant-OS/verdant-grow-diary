@@ -14,6 +14,8 @@ import { MemoryRouter, Route, Routes, useLocation } from "@/lib/react-router-com
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   clearLocalStorageForTest,
+  ensureLocalStorageForTest,
+  getLocalStorageMethodOwnerForTest,
   getLocalStorageItemForTest,
   setLocalStorageItemForTest,
 } from "./helpers/localStorageTestHelper";
@@ -248,9 +250,12 @@ describe("AiDoctorSessionsIndex — saved views UI", () => {
   });
 
   it("does not claim an unsaved view when browser storage rejects the write", async () => {
-    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
-      throw new DOMException("Storage is unavailable", "QuotaExceededError");
-    });
+    const storage = ensureLocalStorageForTest();
+    vi.spyOn(getLocalStorageMethodOwnerForTest(storage, "setItem"), "setItem").mockImplementation(
+      () => {
+        throw new DOMException("Storage is unavailable", "QuotaExceededError");
+      },
+    );
 
     renderAt("/doctor/sessions?risk=high");
     fireEvent.click(await screen.findByTestId("ai-doctor-sessions-saved-views-open"));
@@ -397,9 +402,12 @@ describe("AiDoctorSessionsIndex — saved views UI", () => {
     fireEvent.change(select, { target: { value: "v-keep" } });
     fireEvent.click(await screen.findByTestId("ai-doctor-sessions-saved-views-delete"));
 
-    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
-      throw new DOMException("Storage is unavailable", "QuotaExceededError");
-    });
+    const storage = ensureLocalStorageForTest();
+    vi.spyOn(getLocalStorageMethodOwnerForTest(storage, "setItem"), "setItem").mockImplementation(
+      () => {
+        throw new DOMException("Storage is unavailable", "QuotaExceededError");
+      },
+    );
     fireEvent.click(
       await screen.findByTestId("ai-doctor-sessions-saved-views-delete-dialog-confirm"),
     );

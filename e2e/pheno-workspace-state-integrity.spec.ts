@@ -54,6 +54,11 @@
  */
 import type { Page } from "@playwright/test";
 import { test, expect } from "./lib/authedTest";
+import {
+  assertGrowAllowedForWriteSmoke,
+  assertPhenoWriteFixtureEnv,
+  buildE2eHuntName,
+} from "./lib/fixtureSafety";
 
 const PHASE = process.env.E2E_PHENO_PHASE ?? "";
 const BASE_URL = process.env.E2E_BASE_URL ?? "";
@@ -67,9 +72,13 @@ test.describe.configure({ mode: "serial" });
 const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 
 async function discoverFixtureGrowId(page: Page): Promise<string> {
+  // Env gate before any navigation that could write later.
+  assertPhenoWriteFixtureEnv();
   await page.goto(`${BASE_URL}/grows`);
   const growLink = page.locator('a[href^="/grows/"]').first();
   await expect(growLink, "fixture account must have a grow").toBeVisible({ timeout: 15_000 });
+  const label = ((await growLink.innerText()) ?? "").trim();
+  assertGrowAllowedForWriteSmoke(label);
   const href = await growLink.getAttribute("href");
   const m = href?.match(new RegExp(`^/grows/(${UUID_RE.source})$`, "i"));
   expect(m, `grow link href must carry a uuid (got ${href})`).toBeTruthy();
@@ -105,7 +114,10 @@ async function createHuntWithCandidates(
   await expect(wizard, "Pro fixture must reach the stepper, not the upgrade gate").toBeVisible({
     timeout: 20_000,
   });
-  await expect(page.getByTestId("ph-name-input")).toHaveValue(/.+/);
+  // Replace prefill entirely (never append — #569 concat residue).
+  const huntName = buildE2eHuntName("workspace-integrity");
+  await page.getByTestId("ph-name-input").fill(huntName);
+  await expect(page.getByTestId("ph-name-input")).toHaveValue(huntName);
 
   await page.getByTestId("pheno-step-next").click();
   await expect(page.getByTestId("pheno-step-candidates")).toBeVisible({ timeout: 15_000 });
@@ -183,9 +195,15 @@ async function deleteHuntViaTimeline(page: Page, growId: string) {
   await page.goto(`${BASE_URL}/timeline?growId=${growId}`);
   const section = page.getByTestId("pheno-hunt-timeline-section");
   if (!(await section.isVisible({ timeout: 20_000 }).catch(() => false))) return;
-  await page.getByTestId("pheno-hunt-delete-btn").click();
-  await expect(page.getByTestId("pheno-hunt-delete-confirm")).toBeVisible();
-  await page.getByTestId("pheno-hunt-delete-confirm-btn").click();
+  await page
+    .getByTestId(/^pheno-hunt-delete-btn-/)
+    .first()
+    .click();
+  await expect(page.getByTestId(/^pheno-hunt-delete-confirm-/).first()).toBeVisible();
+  await page
+    .getByTestId(/^pheno-hunt-delete-confirm-btn-/)
+    .first()
+    .click();
   await expect(section).toHaveCount(0, { timeout: 20_000 });
 }
 

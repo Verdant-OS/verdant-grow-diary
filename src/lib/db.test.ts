@@ -5,6 +5,7 @@ type Result = { data: unknown; error: unknown };
 interface FakeBuilder {
   select: () => FakeBuilder;
   eq: (col: string, val: unknown) => FakeBuilder;
+  is: (col: string, val: unknown) => FakeBuilder;
   order: (col: string, opts?: unknown) => FakeBuilder;
   limit: (n: number) => FakeBuilder;
   maybeSingle: () => Promise<Result>;
@@ -48,6 +49,10 @@ function builder(): FakeBuilder {
   const b: FakeBuilder = {
     select: () => b,
     eq: (col: string, val: unknown) => {
+      calls.filters.push([col, val]);
+      return b;
+    },
+    is: (col: string, val: unknown) => {
       calls.filters.push([col, val]);
       return b;
     },
@@ -234,10 +239,12 @@ describe("fetchDiaryEntryRows", () => {
     expect(calls.table).toBe("diary_entries");
     expect(calls.filters).toContainEqual(["grow_id", "g1"]);
   });
-  it("returns all rows when no growId", async () => {
+  it("returns all rows when no growId (retracted rows always excluded)", async () => {
     nextResult = { data: [diaryRow], error: null };
     await fetchDiaryEntryRows();
-    expect(calls.filters).toEqual([]);
+    // Quick Log retractions (#786): the only baseline filter is the
+    // operational-read exclusion of retracted rows.
+    expect(calls.filters).toEqual([["retracted_at", null]]);
   });
 });
 

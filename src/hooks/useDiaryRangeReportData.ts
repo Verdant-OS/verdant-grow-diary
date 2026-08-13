@@ -100,6 +100,7 @@ export function useDiaryRangeReportData(
           .from("diary_entries")
           .select("id,note,photo_url,entry_at,details")
           .eq("grow_id", growId)
+          .is("retracted_at", null)
           .gte("entry_at", startIso)
           .lte("entry_at", endIso)
           .order("entry_at", { ascending: true })

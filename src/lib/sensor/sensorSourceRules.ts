@@ -5,7 +5,13 @@
  *
  * Allowed sources only. Unknown / missing input must resolve to "invalid",
  * never to "live" or another healthy label.
+ *
+ * Trust aliases for `live` are listed in sensorLiveMembership.TRUST_LIVE_ALIASES
+ * (#592 / #584 residual). Transport-receiving and live-window membership
+ * are separate tables — do not fold them into this normalizer.
  */
+
+import { TRUST_LIVE_ALIASES } from "../sensorLiveMembership";
 
 export const SENSOR_SOURCES = ["live", "manual", "csv", "demo", "stale", "invalid"] as const;
 
@@ -15,20 +21,34 @@ const ALIAS: Record<string, SensorSource> = {
   live: "live",
   sensor: "live",
   realtime: "live",
+  // First-party bridge is trust-live for badge purposes (matches
+  // VERIFIED_SNAPSHOT_LIVE_ROW_SOURCES reservation in sensorSnapshot).
+  pi_bridge: "live",
   manual: "manual",
   user: "manual",
   entry: "manual",
   log: "manual",
+  diary: "manual",
+  manual_snapshot: "manual",
   csv: "csv",
   import: "csv",
+  imported: "csv",
   demo: "demo",
   mock: "demo",
   sample: "demo",
   fixture: "demo",
+  sim: "demo",
   stale: "stale",
   invalid: "invalid",
   unknown: "invalid",
 };
+
+// Keep TRUST_LIVE_ALIASES and ALIAS live entries aligned (dev-time pin).
+for (const alias of TRUST_LIVE_ALIASES) {
+  if (ALIAS[alias] === undefined) {
+    ALIAS[alias] = "live";
+  }
+}
 
 const SOURCE_LABEL: Record<SensorSource, string> = {
   live: "Live sensor",

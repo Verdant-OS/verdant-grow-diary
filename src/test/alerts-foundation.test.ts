@@ -172,7 +172,12 @@ describe("Dashboard save-alert integration", () => {
   });
 
   it("renders a Save alert button bound to onClick (user-initiated only)", () => {
-    expect(DASHBOARD).toMatch(/onClick=\{[^}]*saveAlert/);
+    // `[^}]*` broke the moment the handler grew an early-return persistence
+    // check (its own `{...}` block) before the `saveAlert` call — a fragile
+    // zero-nested-brace assumption, not a meaningful constraint. Anchor on
+    // the handler's own opening instead and allow nested braces, bounded so
+    // it can't spuriously reach into an unrelated onClick further down.
+    expect(DASHBOARD).toMatch(/onClick=\{async \(\) => \{[\s\S]{0,1500}?saveAlert/);
     expect(DASHBOARD).toMatch(/Save alert/);
   });
 

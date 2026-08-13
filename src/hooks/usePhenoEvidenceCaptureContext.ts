@@ -47,8 +47,9 @@ async function loadPhenoEvidenceCaptureContext(
   const diaryQuery = applyPostgrestAbortSignal(
     supabase
       .from("diary_entries")
-      .select("id, plant_id, tent_id, grow_id, entry_at, photo_url, details")
+      .select("id, plant_id, tent_id, grow_id, entry_at, photo_url, details, retracted_at")
       .eq("plant_id", plantId)
+      .is("retracted_at", null)
       .eq("details->>kind" as never, PHENO_EVIDENCE_RECEIPT_KIND as never)
       .order("entry_at", { ascending: false })
       .limit(PHENO_EVIDENCE_CAPTURE_RECEIPT_LIMIT),

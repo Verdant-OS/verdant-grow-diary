@@ -118,7 +118,7 @@ describe("dependency-security CI workflow", () => {
       command.startsWith("bunx playwright test"),
     );
     expect(playwrightCommands).toEqual([
-      "bunx playwright test e2e/auth-loading.spec.ts e2e/auth-route-protection.spec.ts e2e/legal-seo-metadata.spec.ts --project=chromium-mocked",
+      "bunx playwright test e2e/auth-loading.spec.ts e2e/auth-route-protection.spec.ts e2e/entitlement-ladder-route-smoke.spec.ts e2e/legal-seo-metadata.spec.ts --project=chromium-mocked",
     ]);
     expect(playwrightCommands).not.toContain("bunx playwright test --project=chromium-mocked");
     expect(workflow).toContain("Repo-wide browser coverage");

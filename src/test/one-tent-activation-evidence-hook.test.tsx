@@ -35,6 +35,7 @@ vi.mock("@/integrations/supabase/client", () => {
     const builder = {
       select: vi.fn(() => builder),
       eq: vi.fn(() => builder),
+      is: vi.fn(() => builder),
       order: vi.fn(() => builder),
       limit: mocks.limits[table],
     };

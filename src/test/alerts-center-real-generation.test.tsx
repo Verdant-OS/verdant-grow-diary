@@ -47,7 +47,13 @@ const PERSIST_HOOK = readFileSync(
 );
 
 const FRESH = new Date().toISOString();
-const STALE = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+// Staleness is source-aware since the #592 canon: live 15m, manual 24h. The
+// snapshots here are `manual`, so a 1-hour-old timestamp is now current by
+// design — age the stale fixture past the manual window, and keep a live-stale
+// timestamp for the tightened window.
+const STALE = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
+const LIVE_STALE = new Date(Date.now() - 20 * 60 * 1000).toISOString();
+const MANUAL_CURRENT = new Date(Date.now() - 23 * 60 * 60 * 1000).toISOString();
 
 function manualSnap(over: Partial<{ temp: number; rh: number; vpd: number; ts: string }> = {}) {
   return {
@@ -141,6 +147,29 @@ describe("alert engine — real breach detection", () => {
 describe("alert persistence — source-truth guards", () => {
   it("never persists from a stale snapshot", () => {
     const snap = manualSnap({ ts: STALE, rh: 65 });
+    expect(
+      isSnapshotPersistable({
+        snapshot: snap,
+        quality: "good",
+      }),
+    ).toBe(false);
+  });
+
+  it("never persists from a stale live snapshot (15-minute window)", () => {
+    const snap = { ...manualSnap({ ts: LIVE_STALE, rh: 65 }), source: "live" as const };
+    expect(
+      isSnapshotPersistable({
+        snapshot: snap,
+        quality: "good",
+      }),
+    ).toBe(false);
+  });
+
+  // Persistence holds every source to the LIVE window. A manual reading inside
+  // the 24h DISPLAY window still reads as current on read-only surfaces, but it
+  // cannot back an `alerts` row (which is stamped first_seen_at = now()).
+  it("does NOT persist from a manual snapshot that is only inside the 24-hour display window", () => {
+    const snap = manualSnap({ ts: MANUAL_CURRENT, rh: 65 });
     expect(
       isSnapshotPersistable({
         snapshot: snap,

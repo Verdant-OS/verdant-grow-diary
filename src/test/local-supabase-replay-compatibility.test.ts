@@ -259,10 +259,42 @@ describe("local Supabase replay compatibility workspace", () => {
     expect(report).toMatchObject({
       mode: "verify_only",
       compatibility_entry_count: 18,
-      compatibility_patch_count: 3,
+      compatibility_patch_count: 4,
       compatibility_injection_count: 1,
       source_migrations_unchanged: true,
     });
+  });
+
+  it("pins the immutable default-privilege replay repair to global and schema revokes", () => {
+    const manifest = JSON.parse(readFileSync(REAL_MANIFEST, "utf8")) as {
+      compatibility_patches: Array<{
+        source_path: string;
+        source_sha256: string;
+        patched_sha256: string;
+        replacements: Array<{ from: string; to: string }>;
+      }>;
+    };
+    const patch = manifest.compatibility_patches.find((entry) =>
+      entry.source_path.endsWith("20260805090000_security_advisor_hardening_followup.sql"),
+    );
+
+    expect(patch).toBeDefined();
+    expect(patch?.source_sha256).toBe(
+      "13d85bde5a60f2df9d5f62e72a61b91b0073f615d2d9e8b4da8e5ef57dbd40ff",
+    );
+    expect(patch?.patched_sha256).toBe(
+      "ac5f665bd97d318cc25b5ee7fd3a50be5d48aca8e1c28b360733bae7d7da31e4",
+    );
+    expect(patch?.replacements).toHaveLength(1);
+    expect(patch?.replacements[0]?.from).toContain(
+      "ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON FUNCTIONS",
+    );
+    expect(patch?.replacements[0]?.to).toContain(
+      "ALTER DEFAULT PRIVILEGES REVOKE ALL ON FUNCTIONS FROM PUBLIC, anon",
+    );
+    expect(patch?.replacements[0]?.to).toContain(
+      "ALTER DEFAULT PRIVILEGES FOR ROLE postgres REVOKE ALL ON FUNCTIONS",
+    );
   });
 
   it("copies the Supabase project and no-ops only the fingerprinted duplicate", () => {

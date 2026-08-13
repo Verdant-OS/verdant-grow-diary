@@ -18,14 +18,13 @@ visually stable, accessible, inert, and free of verdict/keeper/ranking copy.
 
 ## Specs
 
-| Spec | What it proves |
-| ---- | -------------- |
-| `e2e/pheno-disabled-compare-visual-regression.spec.ts` | One scenario per disabled reason. Asserts disabled button, `aria-describedby` helper, exact reason copy, no `/compare` link, no forbidden verdict/keeper/ranking copy. Captures a region screenshot artifact per reason. |
-| `e2e/pheno-disabled-compare-workspace-navigation.spec.ts` | Compare stays disabled and helper reason unchanged after intra-workspace navigation (desktop + mobile). |
-| `e2e/pheno-disabled-compare-direct-navigation.spec.ts` | Direct `/pheno-hunts/:id/compare` navigation shows the "Not comparison-ready yet" warning, exposes no active comparison / ranking / verdict / keeper UI, links back to the workspace, and fires no comparison-execution / ranking / keeper / AI-comparison / Action Queue write network requests. |
-| `e2e/pheno-workspace-missing-evidence-anchors.spec.ts` | Missing-evidence next-step links point at `/pheno-hunts/:id/workspace#<anchor>` (never `/compare`). Clicking scrolls to the target and Compare stays disabled. |
-| `e2e/pheno-comparison-visual-regression.spec.ts` | Public `/pheno-comparison` demo + optional authenticated `/compare` and workspace snapshots. |
-
+| Spec                                                      | What it proves                                                                                                                                                                                                                                                                                    |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `e2e/pheno-disabled-compare-visual-regression.spec.ts`    | One scenario per disabled reason. Asserts disabled button, `aria-describedby` helper, exact reason copy, no `/compare` link, no forbidden verdict/keeper/ranking copy. Captures a region screenshot artifact per reason.                                                                          |
+| `e2e/pheno-disabled-compare-workspace-navigation.spec.ts` | Compare stays disabled and helper reason unchanged after intra-workspace navigation (desktop + mobile).                                                                                                                                                                                           |
+| `e2e/pheno-disabled-compare-direct-navigation.spec.ts`    | Direct `/pheno-hunts/:id/compare` navigation shows the "Not comparison-ready yet" warning, exposes no active comparison / ranking / verdict / keeper UI, links back to the workspace, and fires no comparison-execution / ranking / keeper / AI-comparison / Action Queue write network requests. |
+| `e2e/pheno-workspace-missing-evidence-anchors.spec.ts`    | Missing-evidence next-step links point at `/pheno-hunts/:id/workspace#<anchor>` (never `/compare`). Clicking scrolls to the target and Compare stays disabled.                                                                                                                                    |
+| `e2e/pheno-comparison-visual-regression.spec.ts`          | Public `/pheno-comparison` demo + optional authenticated `/compare` and workspace snapshots.                                                                                                                                                                                                      |
 
 ## Fixture env vars
 
@@ -73,7 +72,6 @@ disabled: `/compare-candidates`, `/pheno-comparison-result`,
 `pheno_keeper*` / `action_queue`. Ordinary read-only fetches (hunt row,
 candidates, evidence, static assets) are allowed.
 
-
 ## Forbidden copy matrix
 
 The visual spec asserts none of these appear in any disabled Compare
@@ -92,7 +90,6 @@ Read-only. No schema, RLS, entitlement, scoring, AI, Action Queue, or
 device-control changes. Only real evidence changes may flip a hunt to
 comparison-ready — navigation, focus, or clicking inert items cannot.
 
-
 ## Pheno Tracker paid-user smoke
 
 `e2e/pheno-tracker-paid-user-smoke.spec.ts` covers the Free → Pro →
@@ -105,6 +102,9 @@ Provide either session files (preferred) OR email+password pairs:
 
 - `E2E_PHENO_FREE_SESSION_FILE` OR `E2E_PHENO_FREE_EMAIL` + `E2E_PHENO_FREE_PASSWORD`
 - `E2E_PHENO_PRO_SESSION_FILE` OR `E2E_PHENO_PRO_EMAIL` + `E2E_PHENO_PRO_PASSWORD`
+- `E2E_PHENO_PRO_ANNUAL_SESSION_FILE` OR `E2E_PHENO_PRO_ANNUAL_EMAIL` + `E2E_PHENO_PRO_ANNUAL_PASSWORD`
+- `E2E_PHENO_CRAFT_SESSION_FILE` OR `E2E_PHENO_CRAFT_EMAIL` + `E2E_PHENO_CRAFT_PASSWORD`
+- `E2E_PHENO_CRAFT_ANNUAL_SESSION_FILE` OR `E2E_PHENO_CRAFT_ANNUAL_EMAIL` + `E2E_PHENO_CRAFT_ANNUAL_PASSWORD`
 - `E2E_PHENO_FOUNDER_SESSION_FILE` OR `E2E_PHENO_FOUNDER_EMAIL` + `E2E_PHENO_FOUNDER_PASSWORD` (optional)
 - `E2E_PHENO_CANCELED_SESSION_FILE` OR `E2E_PHENO_CANCELED_EMAIL` + `E2E_PHENO_CANCELED_PASSWORD` (optional)
 
@@ -149,16 +149,16 @@ bun run test:pheno-paid-smoke:verify-tests  # unit + CLI tests for the verifier 
 
 ### Automated vs manual steps
 
-| Step | Automation |
-| ---- | ---------- |
-| A. Free gate + returnTo on Upgrade CTA | Automated — gate and CTA asserted affirmatively (visible testids, exact `/pricing?returnTo=%2Fpheno-hunts%2Fnew` href, click-through renders plan content); an `/auth` bounce or absent gate/CTA FAILS |
-| B. CheckoutSuccess sanitization + entitlement wait | Automated (route contract only) |
-| B. Paddle iframe payment | **MANUAL** — iframe is cross-origin; no real charge is ever performed |
-| C. Pro hunt creation flow | Requires Pro session + fixture; automated when inputs present |
+| Step                                               | Automation                                                                                                                                                                                                                                                                                              |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A. Free gate + returnTo on Upgrade CTA             | Automated — gate and CTA asserted affirmatively (visible testids, exact `/pricing?returnTo=%2Fpheno-hunts%2Fnew` href, click-through renders plan content); an `/auth` bounce or absent gate/CTA FAILS                                                                                                  |
+| B. CheckoutSuccess sanitization + entitlement wait | Automated (route contract only)                                                                                                                                                                                                                                                                         |
+| B. Paddle iframe payment                           | **MANUAL** — iframe is cross-origin; no real charge is ever performed                                                                                                                                                                                                                                   |
+| C. Pro hunt creation flow                          | Requires Pro session + fixture; automated when inputs present                                                                                                                                                                                                                                           |
 | D–F. Disabled Compare / direct incomplete /compare | Automated with `E2E_PHENO_HUNT_ID_MISSING_EVIDENCE` — required assertions: disabled state, EXACT not-ready reason copy (pinned per `data-readiness` from the readiness view model), and missing-evidence anchor click-through (same-workspace hash navigation, target attached, Compare stays disabled) |
-| G. Comparison-ready enable + read-only render | Automated with `E2E_PHENO_HUNT_ID_COMPARISON_READY` — enabled Compare link with exact hunt route, then substantive content: live mode, ≥2 candidate surfaces with non-empty labels, ≥1 hydrated expression/evidence field, read-only badge, zero action controls inside the surface |
-| H. Canceled/expired write attempt | Automated when canceled session present — gate asserted affirmatively |
-| I. Core one-tent regression | Automated (smoke asserts dashboard resolves) |
+| G. Comparison-ready enable + read-only render      | Automated with `E2E_PHENO_HUNT_ID_COMPARISON_READY` — enabled Compare link with exact hunt route, then substantive content: live mode, ≥2 candidate surfaces with non-empty labels, ≥1 hydrated expression/evidence field, read-only badge, zero action controls inside the surface                     |
+| H. Canceled/expired write attempt                  | Automated when canceled session present — gate asserted affirmatively                                                                                                                                                                                                                                   |
+| I. Core one-tent regression                        | Automated (smoke asserts dashboard resolves)                                                                                                                                                                                                                                                            |
 
 A static contract suite
 (`src/test/pheno-live-smoke-assertion-contract.test.ts`, run via
@@ -213,10 +213,16 @@ Required env vars (all optional; missing = SKIPPED):
 E2E_BASE_URL
 E2E_PHENO_FREE_EMAIL / E2E_PHENO_FREE_PASSWORD
 E2E_PHENO_PRO_EMAIL / E2E_PHENO_PRO_PASSWORD
+E2E_PHENO_PRO_ANNUAL_EMAIL / E2E_PHENO_PRO_ANNUAL_PASSWORD
+E2E_PHENO_CRAFT_EMAIL / E2E_PHENO_CRAFT_PASSWORD
+E2E_PHENO_CRAFT_ANNUAL_EMAIL / E2E_PHENO_CRAFT_ANNUAL_PASSWORD
 E2E_PHENO_FOUNDER_EMAIL / E2E_PHENO_FOUNDER_PASSWORD
 E2E_PHENO_CANCELED_EMAIL / E2E_PHENO_CANCELED_PASSWORD
 E2E_PHENO_FREE_SESSION_FILE     (=> e2e/.auth/pheno-free.json)
 E2E_PHENO_PRO_SESSION_FILE      (=> e2e/.auth/pheno-pro.json)
+E2E_PHENO_PRO_ANNUAL_SESSION_FILE (=> e2e/.auth/pheno-pro-annual.json)
+E2E_PHENO_CRAFT_SESSION_FILE (=> e2e/.auth/pheno-craft.json)
+E2E_PHENO_CRAFT_ANNUAL_SESSION_FILE (=> e2e/.auth/pheno-craft-annual.json)
 E2E_PHENO_FOUNDER_SESSION_FILE  (=> e2e/.auth/pheno-founder.json)
 E2E_PHENO_CANCELED_SESSION_FILE (=> e2e/.auth/pheno-canceled.json)
 E2E_PHENO_HUNT_ID_MISSING_EVIDENCE

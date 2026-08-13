@@ -11,7 +11,7 @@ on:
       - "bun.lock"
       - ".github/workflows/jsonld-rich-results.yml"
   push:
-    branches: [main]
+    branches: [main, verdant-grow-diary]
 
 jobs:
   validate:

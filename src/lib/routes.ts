@@ -35,6 +35,12 @@ export const diaryRangeReportPath = (): string => "/reports/diary-range";
 export const phenoHuntsPath = (): string => "/pheno-hunts";
 export const phenoHuntWorkspacePath = (huntId: string): string =>
   `/pheno-hunts/${encodeURIComponent(huntId)}/workspace`;
+export const phenoHuntKeepersPath = (huntId: string): string =>
+  `/pheno-hunts/${encodeURIComponent(huntId)}/keepers`;
+export const phenoHuntComparePath = (huntId: string): string =>
+  `/pheno-hunts/${encodeURIComponent(huntId)}/compare`;
+export const phenoHuntShowcasePath = (huntId: string): string =>
+  `/pheno-hunts/${encodeURIComponent(huntId)}/showcase`;
 
 /** Grow-scoped breeding event entry, optionally narrowed to one tent. */
 export const breedingLogNewPath = (growId: string, tentId?: string | null): string => {

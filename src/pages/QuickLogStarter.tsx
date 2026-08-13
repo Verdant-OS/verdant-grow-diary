@@ -20,6 +20,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { usePageSeo } from "@/hooks/usePageSeo";
+import { useHydrated } from "@/hooks/useHydrated";
 import {
   buildFaqPageJsonLd,
   buildSoftwareApplicationJsonLd,
@@ -56,6 +57,11 @@ import { PUBLIC_QUICK_LOG_STARTER_COPY as COPY } from "@/constants/publicQuickLo
 const PAGE_URL = `${VERDANT_SITE_ORIGIN}${PUBLIC_QUICK_LOG_STARTER_PATH}`;
 
 export default function QuickLogStarter() {
+  // The SSR shell makes the public page readable immediately, but controls
+  // must wait for React's first client render. Otherwise an eager visitor can
+  // type or click into static markup before handlers exist and lose the input.
+  const hydrated = useHydrated();
+
   usePageSeo({
     title: COPY.seoTitle,
     description: COPY.seoDescription,
@@ -194,13 +200,23 @@ export default function QuickLogStarter() {
         <CardHeader>
           <h2 className="text-lg font-semibold leading-none tracking-tight">{COPY.formHeading}</h2>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4" aria-busy={hydrated ? undefined : true}>
+          {hydrated ? null : (
+            <p
+              role="status"
+              className="text-sm text-muted-foreground"
+              data-testid="starter-hydration-status"
+            >
+              {COPY.hydrationPendingLine}
+            </p>
+          )}
           <div className="space-y-1.5">
             <Label htmlFor="starter-plant-nickname">Plant nickname</Label>
             <Input
               id="starter-plant-nickname"
               data-testid="starter-plant-nickname"
               value={plantNickname}
+              disabled={!hydrated}
               maxLength={PUBLIC_QUICK_LOG_STARTER_MAX_NICKNAME_LENGTH}
               onChange={(e) => setPlantNickname(e.target.value)}
               placeholder="e.g. Blue Dream #1"
@@ -222,6 +238,7 @@ export default function QuickLogStarter() {
             <legend className="text-sm font-medium leading-none">What are you logging?</legend>
             <RadioGroup
               value={logType}
+              disabled={!hydrated}
               onValueChange={(v) => setLogType(v as PublicQuickLogStarterLogType)}
               className="grid grid-cols-2 gap-2 pt-1.5"
               data-testid="starter-log-type"
@@ -240,6 +257,7 @@ export default function QuickLogStarter() {
                       value={type}
                       id={`starter-log-type-${type}`}
                       data-testid={`starter-log-type-${type}`}
+                      disabled={!hydrated}
                       className="mt-0.5"
                     />
                     <Label htmlFor={`starter-log-type-${type}`} className="leading-snug">
@@ -266,6 +284,7 @@ export default function QuickLogStarter() {
               id="starter-stage"
               data-testid="starter-stage"
               value={stage}
+              disabled={!hydrated}
               onChange={(e) => setStage(e.target.value)}
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
@@ -286,6 +305,7 @@ export default function QuickLogStarter() {
                 data-testid="starter-watering-volume"
                 inputMode="decimal"
                 value={wateringVolumeRaw}
+                disabled={!hydrated}
                 onChange={(e) => setWateringVolumeRaw(e.target.value)}
                 placeholder="e.g. 500"
                 aria-invalid={errors.wateringVolumeMl ? true : undefined}
@@ -313,6 +333,7 @@ export default function QuickLogStarter() {
               id="starter-note"
               data-testid="starter-note"
               value={note}
+              disabled={!hydrated}
               maxLength={PUBLIC_QUICK_LOG_STARTER_MAX_NOTE_LENGTH}
               onChange={(e) => setNote(e.target.value)}
               placeholder="What did you do or notice?"
@@ -328,7 +349,12 @@ export default function QuickLogStarter() {
           </div>
 
           <div className="space-y-2">
-            <Button type="button" onClick={onSave} data-testid="starter-save-draft">
+            <Button
+              type="button"
+              onClick={onSave}
+              data-testid="starter-save-draft"
+              disabled={!hydrated}
+            >
               {COPY.saveDraftLabel}
             </Button>
             {storageError ? (

@@ -20,6 +20,7 @@ export type Database = {
           approved_at: string | null
           completed_at: string | null
           created_at: string
+          dedupe_key: string | null
           grow_id: string
           id: string
           originating_timeline_events: Json
@@ -41,6 +42,7 @@ export type Database = {
           approved_at?: string | null
           completed_at?: string | null
           created_at?: string
+          dedupe_key?: string | null
           grow_id: string
           id?: string
           originating_timeline_events?: Json
@@ -62,6 +64,7 @@ export type Database = {
           approved_at?: string | null
           completed_at?: string | null
           created_at?: string
+          dedupe_key?: string | null
           grow_id?: string
           id?: string
           originating_timeline_events?: Json
@@ -974,6 +977,7 @@ export type Database = {
           note: string
           photo_url: string | null
           plant_id: string | null
+          retracted_at: string | null
           stage: string | null
           tent_id: string | null
           user_id: string
@@ -987,6 +991,7 @@ export type Database = {
           note: string
           photo_url?: string | null
           plant_id?: string | null
+          retracted_at?: string | null
           stage?: string | null
           tent_id?: string | null
           user_id?: string
@@ -1000,6 +1005,7 @@ export type Database = {
           note?: string
           photo_url?: string | null
           plant_id?: string | null
+          retracted_at?: string | null
           stage?: string | null
           tent_id?: string | null
           user_id?: string
@@ -3761,6 +3767,54 @@ export type Database = {
         }
         Relationships: []
       }
+      quicklog_entry_revisions: {
+        Row: {
+          actor_id: string
+          created_at: string
+          diary_entry_id: string | null
+          grow_event_id: string | null
+          id: string
+          kind: string
+          new_state: Json | null
+          previous_state: Json
+          reason_code: string
+          reason_note: string | null
+          revision_no: number
+          root_id: string
+          user_id: string
+        }
+        Insert: {
+          actor_id: string
+          created_at?: string
+          diary_entry_id?: string | null
+          grow_event_id?: string | null
+          id?: string
+          kind: string
+          new_state?: Json | null
+          previous_state?: Json
+          reason_code: string
+          reason_note?: string | null
+          revision_no: number
+          root_id: string
+          user_id: string
+        }
+        Update: {
+          actor_id?: string
+          created_at?: string
+          diary_entry_id?: string | null
+          grow_event_id?: string | null
+          id?: string
+          kind?: string
+          new_state?: Json | null
+          previous_state?: Json
+          reason_code?: string
+          reason_note?: string | null
+          revision_no?: number
+          root_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       quicklog_idempotency: {
         Row: {
           created_at: string
@@ -4469,6 +4523,23 @@ export type Database = {
       }
     }
     Functions: {
+      action_queue_create: {
+        Args: {
+          p_action_type: string
+          p_audit_note?: string
+          p_dedupe_key?: string
+          p_grow_id: string
+          p_originating_timeline_events?: Json
+          p_plant_id?: string
+          p_reason: string
+          p_risk_level?: string
+          p_source?: string
+          p_suggested_change: string
+          p_target_metric?: string
+          p_tent_id?: string
+        }
+        Returns: Json
+      }
       admin_schema_audit:
         | { Args: { _migrations: string[]; _tables: string[] }; Returns: Json }
         | {
@@ -4813,6 +4884,25 @@ export type Database = {
           deleted_count: number
           event_type: string
         }[]
+      }
+      quicklog_correct_entry: {
+        Args: {
+          p_changes: Json
+          p_diary_entry_id?: string
+          p_grow_event_id?: string
+          p_reason_code: string
+          p_reason_note?: string
+        }
+        Returns: Json
+      }
+      quicklog_retract_entry: {
+        Args: {
+          p_diary_entry_id?: string
+          p_grow_event_id?: string
+          p_reason_code: string
+          p_reason_note?: string
+        }
+        Returns: Json
       }
       quicklog_save_event: {
         Args: {

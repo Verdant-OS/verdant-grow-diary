@@ -88,6 +88,7 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Typecheck (stop-ship gate)
+        id: typecheck
         run: bun run typecheck
 
       - name: Production build
@@ -103,8 +104,9 @@ jobs:
           BUILD_SUMMARY_TRIGGER: ${{ github.event_name }}
           BUILD_SUMMARY_VALIDATORS: >-
             [
+              {"name":"job-status","result":"${{ job.status }}","detail":"backstop: covers steps not listed below"},
               {"name":"edge-shared-preflight","result":"pass","detail":"gated by needs: preflight"},
-              {"name":"typecheck","result":"pass"},
+              {"name":"typecheck","result":"${{ steps.typecheck.outcome }}"},
               {"name":"production-build","result":"${{ steps.prod_build.outcome }}"}
             ]
         run: node scripts/generate-build-summary.mjs

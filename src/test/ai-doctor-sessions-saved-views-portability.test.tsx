@@ -16,6 +16,8 @@ import { MemoryRouter, Route, Routes, useLocation } from "@/lib/react-router-com
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   clearLocalStorageForTest,
+  ensureLocalStorageForTest,
+  getLocalStorageMethodOwnerForTest,
   getLocalStorageItemForTest,
   setLocalStorageItemForTest,
 } from "./helpers/localStorageTestHelper";
@@ -378,9 +380,12 @@ describe("AiDoctorSessionsIndex — import action", () => {
       target: { value: json },
     });
 
-    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
-      throw new DOMException("Storage is unavailable", "QuotaExceededError");
-    });
+    const storage = ensureLocalStorageForTest();
+    vi.spyOn(getLocalStorageMethodOwnerForTest(storage, "setItem"), "setItem").mockImplementation(
+      () => {
+        throw new DOMException("Storage is unavailable", "QuotaExceededError");
+      },
+    );
     fireEvent.click(screen.getByTestId("ai-doctor-sessions-saved-views-import-confirm"));
 
     expect(

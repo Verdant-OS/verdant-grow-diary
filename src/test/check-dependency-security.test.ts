@@ -196,7 +196,7 @@ describe("check-dependency-security audit parser", () => {
 });
 
 describe("check-dependency-security core policy", () => {
-  it.each(["@lovable.dev/mcp-js", "esbuild", "ajv"])(
+  it.each(["@lovable.dev/mcp-js", "@hono/node-server", "hono", "esbuild", "ajv"])(
     "blocks %s at every severity",
     (packageName) => {
       expect(
@@ -222,7 +222,13 @@ describe("check-dependency-security core policy", () => {
   });
 
   it("exposes the expected package and severity policy", () => {
-    expect(BLOCKED_PACKAGES).toEqual(["@lovable.dev/mcp-js", "esbuild", "ajv"]);
+    expect(BLOCKED_PACKAGES).toEqual([
+      "@lovable.dev/mcp-js",
+      "@hono/node-server",
+      "hono",
+      "esbuild",
+      "ajv",
+    ]);
     expect(BLOCKED_SEVERITIES).toEqual(["high", "critical"]);
   });
 });

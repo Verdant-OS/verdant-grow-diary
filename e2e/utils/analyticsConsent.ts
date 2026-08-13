@@ -9,7 +9,12 @@ import type { Page } from "@playwright/test";
  */
 export const ANALYTICS_CONSENT_STORAGE_KEY = "verdant.analytics-consent.v1";
 
-export async function grantAnalyticsConsent(page: Page): Promise<void> {
+type PersistedAnalyticsConsentDecision = "granted" | "denied";
+
+async function seedAnalyticsConsent(
+  page: Page,
+  decision: PersistedAnalyticsConsentDecision,
+): Promise<void> {
   await page.addInitScript(
     ([key, value]) => {
       try {
@@ -18,6 +23,19 @@ export async function grantAnalyticsConsent(page: Page): Promise<void> {
         /* storage blocked; the spec will surface the consequence */
       }
     },
-    [ANALYTICS_CONSENT_STORAGE_KEY, "granted"] as const,
+    [ANALYTICS_CONSENT_STORAGE_KEY, decision] as const,
   );
+}
+
+export async function grantAnalyticsConsent(page: Page): Promise<void> {
+  await seedAnalyticsConsent(page, "granted");
+}
+
+/**
+ * Keep unrelated browser contracts clear of the fixed consent banner while
+ * preserving the no-analytics default. Use this only when a spec does not
+ * itself assert the consent experience.
+ */
+export async function denyAnalyticsConsent(page: Page): Promise<void> {
+  await seedAnalyticsConsent(page, "denied");
 }

@@ -3,8 +3,9 @@
  *
  * Confirms (without changing behavior):
  *   - user-initiated only (button click; no auto-create on render)
- *   - insert payload omits user_id, pins status='pending_approval' + source='environment_alert',
- *     keeps action_type='advisory', and includes the [alert:<id>] back-pointer
+ *   - create RPC args omit user_id, pin source='environment_alert',
+ *     keep action_type='advisory', and include the [alert:<id>] back-pointer
+ *   - audit trail is server-side via action_queue_create (no client events insert)
  *   - idempotency UI swaps the button for a "view details" link to /actions/<id>
  *   - RLS / permission failure surfaces an error toast and never shows a fake success state
  *   - closed (non-open) alerts hide the add button entirely
@@ -59,6 +60,21 @@ let actionQueueInsertResult: { data: unknown; error: { code?: string; message: s
   data: { id: "new-action-uuid-1", grow_id: "grow-uuid-1" },
   error: null,
 };
+let actionQueueCreateRpcResult: {
+  data: unknown;
+  error: { code?: string; message: string } | null;
+} = {
+  data: {
+    ok: true,
+    action_queue_id: "new-action-uuid-1",
+    grow_id: "grow-uuid-1",
+    status: "pending_approval",
+    event_id: "event-uuid-1",
+    reused: false,
+  },
+  error: null,
+};
+const rpcCalls: Array<{ name: string; args: unknown }> = [];
 let relatedActionsSelectGate: { promise: Promise<void>; resolve: () => void } | null = null;
 let relatedActionsSelectStarted = false;
 
@@ -179,6 +195,13 @@ vi.mock("@/integrations/supabase/client", () => {
         ...makeSelectChain(table),
         insert: (payload: unknown) => makeInsert(table, payload),
       }),
+      rpc: (name: string, args: unknown) => {
+        rpcCalls.push({ name, args });
+        if (name === "action_queue_create") {
+          return Promise.resolve(actionQueueCreateRpcResult);
+        }
+        return Promise.resolve({ data: null, error: { message: `unknown rpc ${name}` } });
+      },
     },
   };
 });
@@ -191,6 +214,18 @@ beforeEach(() => {
     data: { id: "new-action-uuid-1", grow_id: "grow-uuid-1" },
     error: null,
   };
+  actionQueueCreateRpcResult = {
+    data: {
+      ok: true,
+      action_queue_id: "new-action-uuid-1",
+      grow_id: "grow-uuid-1",
+      status: "pending_approval",
+      event_id: "event-uuid-1",
+      reused: false,
+    },
+    error: null,
+  };
+  rpcCalls.length = 0;
   inserts.length = 0;
   toastSuccess.mockClear();
   toastError.mockClear();
@@ -220,28 +255,33 @@ describe("AlertDetail — Add to Action Queue (render-level)", () => {
     expect(btn).not.toBeDisabled();
     // Give effects a moment to settle.
     await flushAsync();
+    expect(rpcCalls).toHaveLength(0);
     expect(actionQueueInserts()).toHaveLength(0);
   });
 
-  it("clicking creates exactly one action_queue insert with a safe payload", async () => {
+  it("clicking creates exactly one action_queue_create RPC with a safe payload", async () => {
     renderDetail();
     const btn = await screen.findByTestId("alert-handoff-add-button");
     await clickAct(btn);
 
     await waitFor(() => expect(toastSuccess).toHaveBeenCalled());
-    const aqInserts = actionQueueInserts();
-    expect(aqInserts).toHaveLength(1);
+    expect(rpcCalls).toHaveLength(1);
+    expect(rpcCalls[0].name).toBe("action_queue_create");
+    // No client-side action_queue insert path.
+    expect(actionQueueInserts()).toHaveLength(0);
 
-    const payload = aqInserts[0].payload as Record<string, unknown>;
+    const payload = rpcCalls[0].args as Record<string, unknown>;
     // Owner-trust: NEVER send user_id from the client.
     expect(payload).not.toHaveProperty("user_id");
-    // Approval-required handoff defaults.
-    expect(payload.status).toBe("pending_approval");
-    expect(payload.source).toBe("environment_alert");
-    expect(payload.action_type).toBe("advisory");
+    expect(payload).not.toHaveProperty("p_user_id");
+    expect(payload).not.toHaveProperty("p_target_device");
+    // Approval-required handoff defaults (status forced server-side).
+    expect(payload.p_source).toBe("environment_alert");
+    expect(payload.p_action_type).toBe("advisory");
+    expect(payload.p_dedupe_key).toBe("env_alert:alert-uuid-1");
     // Lineage + provenance back-pointer.
-    expect(payload.grow_id).toBe("grow-uuid-1");
-    expect(String(payload.reason ?? "")).toContain("[alert:alert-uuid-1]");
+    expect(payload.p_grow_id).toBe("grow-uuid-1");
+    expect(String(payload.p_reason ?? "")).toContain("[alert:alert-uuid-1]");
     // Read-only / no-control language.
     const blob = JSON.stringify(payload).toLowerCase();
     for (const tok of [
@@ -296,17 +336,19 @@ describe("AlertDetail — Add to Action Queue (render-level)", () => {
     });
   });
 
-  it("also writes an audit event row (action_queue_events) without client user_id", async () => {
+  it("uses action_queue_create so the created audit event is server-side (no client events insert)", async () => {
     renderDetail();
     await clickAct(await screen.findByTestId("alert-handoff-add-button"));
     await waitFor(() => expect(toastSuccess).toHaveBeenCalled());
 
+    expect(rpcCalls).toHaveLength(1);
+    expect(rpcCalls[0].name).toBe("action_queue_create");
+    // Audit is inside the RPC — client must not write action_queue_events.
     const auditInserts = inserts.filter((i) => i.table === "action_queue_events");
-    expect(auditInserts).toHaveLength(1);
-    const auditPayload = auditInserts[0].payload as Record<string, unknown>;
-    expect(auditPayload).not.toHaveProperty("user_id");
-    expect(auditPayload.event_type).toBe("created");
-    expect(auditPayload.new_status).toBe("pending_approval");
+    expect(auditInserts).toHaveLength(0);
+    const args = rpcCalls[0].args as Record<string, unknown>;
+    expect(args).not.toHaveProperty("user_id");
+    expect(args.p_audit_note).toMatch(/Created from persisted alert/);
   });
 
   it("idempotency: existing matching [alert:<id>] row replaces the Add button with a view-details link", async () => {
@@ -328,7 +370,7 @@ describe("AlertDetail — Add to Action Queue (render-level)", () => {
   });
 
   it("RLS / permission failure surfaces an error toast and does not show a fake success state", async () => {
-    actionQueueInsertResult = {
+    actionQueueCreateRpcResult = {
       data: null,
       error: { code: "42501", message: "new row violates row-level security policy" },
     };
@@ -339,7 +381,7 @@ describe("AlertDetail — Add to Action Queue (render-level)", () => {
 
     await waitFor(() => expect(toastError).toHaveBeenCalled());
     expect(toastSuccess).not.toHaveBeenCalled();
-    // No audit row written on failure.
+    // No client audit row written on failure.
     expect(inserts.filter((i) => i.table === "action_queue_events")).toHaveLength(0);
     // Button still present (not swapped to "already queued").
     expect(screen.getByTestId("alert-handoff-add-button")).toBeInTheDocument();

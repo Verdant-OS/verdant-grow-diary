@@ -161,6 +161,13 @@ export interface QuickLogHistoryRow {
   stage: string | null;
   eventType: string;
   noteBody: string;
+  /**
+   * The full persisted note, INCLUDING the manual-handheld readings block
+   * that `noteBody` strips for display. Corrections must edit this value —
+   * prefilling from `noteBody` would silently drop the measurements on save
+   * (issue #786 review).
+   */
+  rawNote: string;
   manualHandheld: ManualHandheldReadings | null;
   photoUrl: string | null;
   warnings: string[];
@@ -177,6 +184,7 @@ function toRow(entry: NormalizedDiaryEntry): QuickLogHistoryRow {
     stage: entry.stage,
     eventType: entry.eventType,
     noteBody: split.body,
+    rawNote: entry.note ?? "",
     manualHandheld: parseManualHandheldReadings(entry.note),
     photoUrl: entry.photoUrl,
     warnings: entry.warnings.slice(),

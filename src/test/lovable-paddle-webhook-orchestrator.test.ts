@@ -278,6 +278,15 @@ describe("redactError", () => {
     expect(out).toContain("[redacted]");
   });
 
+  it("redacts whitespace-delimited bearer credentials", () => {
+    const opaqueToken = "ZXCV987654321QWERTY";
+    for (const input of [`Authorization: Bearer ${opaqueToken}`, `api_key ${opaqueToken}`]) {
+      const out = redactError(input);
+      expect(out).not.toContain(opaqueToken);
+      expect(out).toContain("[redacted]");
+    }
+  });
+
   it("truncates to 500 chars", () => {
     expect(redactError("x".repeat(2000)).length).toBe(500);
   });

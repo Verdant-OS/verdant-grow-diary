@@ -14,6 +14,12 @@ import {
 import { summarizeCsvVendor } from "@/lib/sensorReadingVendorLineage";
 import { isSensorTestbenchRow } from "@/lib/sensorTestbenchIndicatorRules";
 import { resolveSensorObservationTime } from "@/lib/sensorObservationTimeRules";
+import {
+  isCurrentStateStale,
+  LIVE_CURRENT_STATE_STALE_MS,
+  resolveCurrentStateStaleWindowMs,
+} from "@/lib/sensorTruthCanon";
+import { isVerifiedSnapshotLiveRowSource } from "@/lib/sensorLiveMembership";
 
 import { SENSOR_SNAPSHOT_STALE_THRESHOLD_MS } from "../constants/sensorTiming";
 export type SnapshotSource =
@@ -50,6 +56,18 @@ export interface SensorSnapshotMetricRef {
   id: string;
   captured_at: string;
   source: string;
+}
+
+/**
+ * Provenance for a diary-backed Environment Check snapshot. Carries ONLY
+ * the EXACT `diary_entries.id` + `entry_at` already known when the
+ * snapshot was built from that row. Distinct from {@link SensorSnapshotMetricRef}
+ * so diary ids never masquerade as `sensor_readings` rows (see #603).
+ * Never carries details/raw_payload/note body.
+ */
+export interface SensorSnapshotDiaryEvidenceRef {
+  id: string;
+  entry_at: string;
 }
 
 export interface SensorSnapshot {
@@ -89,6 +107,27 @@ export interface SensorSnapshot {
    * row carried an `id`. Diary-derived snapshots never populate this.
    */
   metric_refs?: Partial<Record<SensorSnapshotMetricRefKey, SensorSnapshotMetricRef>>;
+  /**
+   * Diary-row provenance for Environment Check snapshots only. Populated
+   * when {@link snapshotFromEnvironmentCheck} is given the originating
+   * `diary_entries.id`. Never present on sensor_readings-derived
+   * snapshots. Never confusable with {@link metric_refs}.
+   */
+  diary_evidence_ref?: SensorSnapshotDiaryEvidenceRef;
+  /**
+   * Tent the contributing rows came from, when they UNAMBIGUOUSLY share
+   * one. Environment alerts persist this so tent-scoped surfaces (e.g.
+   * Plant Detail's assigned-tent alerts panel) can attribute a breach to
+   * the tent whose readings produced it.
+   *
+   * Deliberately null when the evidence spans several tents — the
+   * Dashboard's "All tents" view genuinely mixes rows, and inventing a
+   * winner there would attach a real breach to an arbitrary tent. Null is
+   * the honest answer and matches this file's never-invent-provenance
+   * posture. Carried ON the snapshot rather than beside it so attribution
+   * can never drift from the evidence it describes.
+   */
+  tent_id?: string | null;
 }
 
 export const EMPTY_SNAPSHOT: SensorSnapshot = {
@@ -104,6 +143,7 @@ export const EMPTY_SNAPSHOT: SensorSnapshot = {
   ppfd: null,
   device_id: null,
   csvVendor: null,
+  tent_id: null,
 };
 
 /** Coerce numeric DB values; returns null for null/undefined/NaN/Infinity. */
@@ -123,18 +163,37 @@ export const SOURCE_LABEL: Record<SnapshotSource, string> = {
   unverified: "Unverified source",
 };
 
-/** Default stale threshold (30 minutes). */
+/** Default stale threshold for live current-state (15 minutes). Prefer isSnapshotStale when source is known. */
 export const STALE_THRESHOLD_MS = SENSOR_SNAPSHOT_STALE_THRESHOLD_MS;
 
+export { isCurrentStateStale, LIVE_CURRENT_STATE_STALE_MS, resolveCurrentStateStaleWindowMs };
+
+/**
+ * Age-only stale check. Default threshold is the live window (15 minutes).
+ * Pass `source` for Sensor Truth Canon source-aware windows (manual = 24h).
+ * An explicit non-default `thresholdMs` always wins over source resolution.
+ */
 export function isStale(
   ts: string | null,
   now: number = Date.now(),
   thresholdMs: number = STALE_THRESHOLD_MS,
+  source?: string | null,
 ): boolean {
-  if (!ts) return false;
-  const t = new Date(ts).getTime();
-  if (!Number.isFinite(t)) return false;
-  return now - t > thresholdMs;
+  if (thresholdMs !== STALE_THRESHOLD_MS) {
+    return isCurrentStateStale(ts, { now, thresholdMs });
+  }
+  if (source !== undefined) {
+    return isCurrentStateStale(ts, { now, source });
+  }
+  return isCurrentStateStale(ts, { now, thresholdMs: STALE_THRESHOLD_MS });
+}
+
+/** Source-aware stale check for a snapshot that already carries provenance. */
+export function isSnapshotStale(
+  snapshot: Pick<SensorSnapshot, "ts" | "source">,
+  now: number = Date.now(),
+): boolean {
+  return isCurrentStateStale(snapshot.ts, { now, source: snapshot.source });
 }
 
 export interface SensorReadingLike {
@@ -150,6 +209,11 @@ export interface SensorReadingLike {
    * for the env-alert ref population path. Never inferred.
    */
   id?: string | null;
+  /**
+   * Originating `sensor_readings.tent_id`. Used only to derive
+   * {@link SensorSnapshot.tent_id} when every contributing row agrees.
+   */
+  tent_id?: string | null;
   /**
    * Upstream provenance envelope. This file NEVER reads, returns, or
    * renders its contents — it is forwarded as-is to
@@ -219,9 +283,7 @@ export function snapshotFromReadings(rows: SensorReadingLike[]): SensorSnapshot 
   // promotion, and this card must not be looser than it.
   const allLive =
     latest.length > 0 &&
-    latest.every(
-      (r) => (r.source === "live" || r.source === "pi_bridge") && !isSensorTestbenchRow(r),
-    );
+    latest.every((r) => isVerifiedSnapshotLiveRowSource(r.source) && !isSensorTestbenchRow(r));
   // CSV history must never be promoted to "live". If every row at the
   // latest timestamp is CSV, classify as "csv". If CSV is mixed with
   // non-live sources but no manual, still prefer csv over live so
@@ -262,6 +324,22 @@ export function snapshotFromReadings(rows: SensorReadingLike[]): SensorSnapshot 
       source: typeof row.source === "string" ? row.source : "",
     };
   }
+  // Attribute a tent ONLY when every contributing row agrees on one.
+  // Derived from `latest` — the exact rows this snapshot is built from —
+  // so the tent can never describe evidence that did not produce it.
+  // Mixed tents (e.g. the Dashboard's "All tents" view) yield null rather
+  // than an arbitrary winner.
+  // EVERY contributing row must carry the SAME non-blank tent. Filtering
+  // blanks out before testing uniqueness would make ["tent-a", null] look
+  // unanimous and pin the alert on tent-a, even though one contributing row
+  // had no known tent — the precise mis-attribution this guard exists to
+  // prevent. An unknown tent is disagreement, not absence.
+  const latestTentIds = latest.map((r) => (typeof r.tent_id === "string" ? r.tent_id.trim() : ""));
+  const tent_id =
+    latestTentIds.length > 0 &&
+    latestTentIds.every((id) => id.length > 0 && id === latestTentIds[0])
+      ? latestTentIds[0]
+      : null;
   return {
     source,
     ts: latestTs,
@@ -275,6 +353,7 @@ export function snapshotFromReadings(rows: SensorReadingLike[]): SensorSnapshot 
     ppfd: get("ppfd"),
     device_id: deviceRow?.device_id ?? null,
     csvVendor,
+    tent_id,
     ...(metric_refs ? { metric_refs } : {}),
   };
 }
@@ -372,15 +451,25 @@ export function snapshotFromDiary(
  *    accepted only as number-typed finite values inside the same canonical
  *    plausibility bands the writer uses; `""`/booleans/numeric strings are
  *    rejected, never coerced, and an out-of-band metric drops to null.
+ *  - When `diaryEntryId` is provided, the snapshot carries
+ *    `diary_evidence_ref` so alert persistence can link the EXACT diary
+ *    row (see #603). Never populates `metric_refs` (those are for
+ *    `sensor_readings` rows only).
  */
 function strictBandValue(value: unknown, isValid: (n: number | null) => boolean): number | null {
   if (typeof value !== "number" || !Number.isFinite(value)) return null;
   return isValid(value) ? value : null;
 }
 
+export interface SnapshotFromEnvironmentCheckOptions {
+  /** Exact `diary_entries.id` for the row this envelope came from. */
+  diaryEntryId?: string | null;
+}
+
 export function snapshotFromEnvironmentCheck(
   entryAt: string | null,
   envCheck: Record<string, unknown> | null | undefined,
+  options?: SnapshotFromEnvironmentCheckOptions | null,
 ): SensorSnapshot | null {
   if (!envCheck || typeof envCheck !== "object") return null;
   if (!entryAt) return null;
@@ -388,6 +477,13 @@ export function snapshotFromEnvironmentCheck(
   const rh = strictBandValue(envCheck.humidity_pct, isHumidityValid);
   const vpd = strictBandValue(envCheck.vpd_kpa, isVpdValid);
   if (temp === null && rh === null && vpd === null) return null;
+
+  const diaryId = typeof options?.diaryEntryId === "string" ? options.diaryEntryId.trim() : "";
+  const diary_evidence_ref =
+    diaryId && entryAt
+      ? ({ id: diaryId, entry_at: entryAt } satisfies SensorSnapshotDiaryEvidenceRef)
+      : undefined;
+
   return {
     source: "manual",
     ts: entryAt,
@@ -400,6 +496,7 @@ export function snapshotFromEnvironmentCheck(
     soil_temp: null,
     ppfd: null,
     device_id: null,
+    ...(diary_evidence_ref ? { diary_evidence_ref } : {}),
   };
 }
 

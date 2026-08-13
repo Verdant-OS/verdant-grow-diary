@@ -26,10 +26,12 @@ import {
   buildPlantTentMovementDetails,
   formatPlantTentMovementNote,
 } from "@/lib/plantTentMovementRules";
+import { getEligibleTentsForPlantMove } from "@/lib/plantTentRelationshipRules";
 
 interface TentRow {
   id: string;
   name: string;
+  grow_id?: string | null;
 }
 
 interface Props {
@@ -56,38 +58,43 @@ export default function AssignTentDialog({ plantId, growId, currentTentId, trigg
   const [selected, setSelected] = useState<string>("");
   const [busy, setBusy] = useState(false);
 
-  const hasGrowContext = Boolean(growId);
   const isMove = Boolean(currentTentId);
 
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ["plant-detail", "eligible-tents", plantId, growId ?? null],
-    enabled: open && hasGrowContext,
+    enabled: open,
     queryFn: async (): Promise<TentRow[]> => {
-      // Same-grow, non-archived tents. Cross-grow tents are excluded
-      // by the explicit grow_id filter.
-      const { data, error } = await supabase
+      // Non-archived tents. When the plant HAS a grow, cross-grow tents are
+      // excluded by the explicit grow_id filter below. When it does NOT
+      // (legacy rows, or a server-side grow delete — plants.grow_id is
+      // `ON DELETE SET NULL`), there is no grow for a tent to be "cross" of,
+      // so the filter is vacuous rather than protective and is skipped:
+      // offering the owner's own tents is strictly better than the dead end
+      // this dialog used to render. Ownership stays fenced by RLS either way,
+      // and EditPlantDialog already takes exactly this fallback.
+      let q = supabase
         .from("tents")
         .select("id, name, grow_id, is_archived")
-        .eq("grow_id", growId as string)
-        .eq("is_archived", false)
-        .order("created_at", { ascending: true });
+        .eq("is_archived", false);
+      if (growId) q = q.eq("grow_id", growId as string);
+      const { data, error } = await q.order("created_at", { ascending: true });
       if (error) throw error;
       return (data ?? []).map((t) => ({
         id: t.id as string,
         name: (t.name as string) ?? "Unnamed tent",
+        grow_id: (t.grow_id as string | null) ?? null,
       }));
     },
   });
 
-  const { others, current } = useMemo(() => {
-    const o: TentRow[] = [];
-    const c: TentRow[] = [];
-    for (const t of rows) {
-      if (currentTentId && t.id === currentTentId) c.push(t);
-      else o.push(t);
-    }
-    return { others: o, current: c };
-  }, [rows, currentTentId]);
+  // Partitioning lives in the pure, unit-tested helper rather than inline:
+  // its cross-grow rule ("skip the grow filter entirely when the plant has
+  // no grow") is the exact semantics this dialog needs for a null-grow
+  // plant, and it stays covered by plant-tent-crud-management.test.ts.
+  const { others, current } = useMemo(
+    () => getEligibleTentsForPlantMove(rows, currentTentId ?? null, growId ?? null),
+    [rows, currentTentId, growId],
+  );
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -119,6 +126,11 @@ export default function AssignTentDialog({ plantId, growId, currentTentId, trigg
     const prevName = current[0]?.name ?? null;
     const nextName = others.find((t) => t.id === selected)?.name ?? null;
     let timelineRecordFailed = false;
+    // diary_entries.grow_id is NOT NULL, so a plant with no grow structurally
+    // cannot carry a timeline row and the insert below is skipped. Skipping is
+    // correct; staying silent about it is not — without this flag the grower
+    // gets an unqualified success toast for a write that never happened.
+    const timelineSkippedWithoutGrow = !growId;
     if (growId) {
       const { error: diaryErr } = await supabase.from("diary_entries").insert({
         user_id: user.id,
@@ -154,6 +166,16 @@ export default function AssignTentDialog({ plantId, growId, currentTentId, trigg
         {
           description:
             "The tent assignment is saved. Use Quick Log to add a manual note if you need this change in the plant timeline.",
+        },
+      );
+    } else if (timelineSkippedWithoutGrow) {
+      toast.warning(
+        isMove
+          ? "Plant moved, but its timeline entry was not recorded"
+          : "Plant assigned, but its timeline entry was not recorded",
+        {
+          description:
+            "The tent assignment is saved. This plant is not linked to a grow yet, so this change could not be added to its timeline. Link the plant to its tent setup on the plant page to record future changes.",
         },
       );
     } else {
@@ -193,15 +215,11 @@ export default function AssignTentDialog({ plantId, growId, currentTentId, trigg
           </DialogTitle>
         </DialogHeader>
 
-        {!hasGrowContext ? (
-          <p className="text-sm text-muted-foreground" data-testid="assign-tent-no-grow">
-            Unable to load tents because this plant is missing grow context.
-          </p>
-        ) : isLoading ? (
+        {isLoading ? (
           <p className="text-sm text-muted-foreground">Loading…</p>
         ) : others.length === 0 && current.length === 0 ? (
           <p className="text-sm text-muted-foreground" data-testid="assign-tent-empty">
-            No tents available in this grow.
+            {growId ? "No tents available in this grow." : "No tents available."}
           </p>
         ) : (
           <form onSubmit={submit} className="grid gap-3">

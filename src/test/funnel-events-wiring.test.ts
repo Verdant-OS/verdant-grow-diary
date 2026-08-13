@@ -16,6 +16,7 @@
  *   csv_import_completed    → EnvironmentCsvImportLauncher.tsx (success block)
  *   csv_history_ai_doctor_clicked
  *                           → ImportedSensorHistoryAiDoctorHandoff.tsx (grower CTA click)
+ *   ai_doctor_cta_clicked   → plantTentAlertsDoctorCtaTracking.ts (alert CTA click)
  *   ai_doctor_review_started / historical_ai_review_started /
  *   ai_doctor_result_received / ai_doctor_session_saved
  *                           → PlantDetailAiDoctorLiveReview.tsx
@@ -90,6 +91,13 @@ const SEAMS: Array<{ event: string; file: string; extra?: RegExp[] }> = [
     ],
   },
   {
+    event: "ai_doctor_cta_clicked",
+    file: "src/lib/plantTentAlertsDoctorCtaTracking.ts",
+    extra: [
+      /trackFunnelEvent\("ai_doctor_cta_clicked",\s*\{\s*surface:\s*"tent_alert_row",\s*metric:\s*safeMetric,\s*severity:\s*safeSeverity,?\s*\}\)/,
+    ],
+  },
+  {
     event: "ai_doctor_review_started",
     file: "src/components/PlantDetailAiDoctorLiveReview.tsx",
     extra: [/surface:\s*acceptedMode/],
@@ -110,6 +118,40 @@ const SEAMS: Array<{ event: string; file: string; extra?: RegExp[] }> = [
     extra: [/trackFunnelEvent\("ai_doctor_session_saved",\s*\{\s*surface\s*\}\)/],
   },
   {
+    event: "blueprint_cta_clicked",
+    file: "src/components/PlantAssignedTentAlertsPanel.tsx",
+    extra: [
+      // Both fixed-vocabulary fields, no ids — and the metric can only be a
+      // mapped token because the link itself is gated on the mapping.
+      /trackFunnelEvent\("blueprint_cta_clicked",\s*\{\s*surface:\s*"tent_alert_row",\s*metric:\s*row\.metric \?\? undefined,\s*severity:\s*row\.severity,?\s*\}\)/,
+    ],
+  },
+  {
+    event: "blueprint_cta_clicked",
+    file: "src/components/TentAlertsBlueprintHint.tsx",
+    extra: [
+      // The Daily Check hint is stage-level: no metric, no severity.
+      /trackFunnelEvent\("blueprint_cta_clicked",\s*\{\s*surface:\s*"daily_check_hint",?\s*\}\)/,
+    ],
+  },
+  {
+    event: "credit_pack_cta_viewed",
+    file: "src/components/PlantDetailAiDoctorLiveReview.tsx",
+    extra: [
+      /trackFunnelEvent\("credit_pack_cta_viewed",\s*\{\s*surface:\s*"ai_doctor_limit"\s*\}\)/,
+      // Must key on the branch that actually renders the link.
+      /creditNoticeKind === "wait"/,
+    ],
+  },
+  {
+    event: "credit_pack_cta_clicked",
+    file: "src/components/PlantDetailAiDoctorLiveReview.tsx",
+    extra: [
+      /trackFunnelEvent\("credit_pack_cta_clicked",\s*\{\s*surface:\s*"ai_doctor_limit"\s*\}\)/,
+      /onBuyCreditsClick=\{handleBuyCreditsClick\}/,
+    ],
+  },
+  {
     event: "checkout_started",
     file: "src/hooks/usePaddleCheckout.ts",
     extra: [/plan:\s*options\.priceId/],
@@ -118,6 +160,22 @@ const SEAMS: Array<{ event: string; file: string; extra?: RegExp[] }> = [
     event: "subscription_activated",
     file: "src/pages/CheckoutSuccess.tsx",
     extra: [/plan:\s*entitlement\.effectivePlanId/, /surface:\s*checkoutReturnSurface/],
+  },
+  {
+    event: "founder_note_viewed",
+    file: "src/components/CheckoutSuccessFounderNote.tsx",
+    extra: [
+      /trackFunnelEvent\("founder_note_viewed",\s*\{\s*surface:\s*"checkout_success"\s*\}\)/,
+      // Impression only when the note is actually shown, deduped per mount.
+      /if \(!visible \|\| viewedRef\.current\) return;/,
+    ],
+  },
+  {
+    event: "founder_note_clicked",
+    file: "src/components/CheckoutSuccessFounderNote.tsx",
+    extra: [
+      /trackFunnelEvent\("founder_note_clicked",\s*\{\s*surface:\s*"checkout_success"\s*\}\)/,
+    ],
   },
   {
     event: "checkout_return_completed",
@@ -178,6 +236,13 @@ describe("each funnel event fires from its canonical seam", () => {
       /trackFunnelEvent\("paywall_viewed",\s*\{\s*surface:\s*"ai_doctor_limit"\s*\}\)/,
     );
     expect(aiDoctor).toContain("surface: AI_DOCTOR_POST_VALUE_UPGRADE_SURFACE");
+    const blueprintSection = read("src/components/PlantBlueprintOverlaySection.tsx");
+    expect(blueprintSection).toMatch(
+      /trackFunnelEvent\("paywall_viewed",\s*\{\s*surface:\s*"blueprint_locked"\s*\}\)/,
+    );
+    // The impression must be stricter than the render: the locked branch also
+    // shows on lookupFailed, but an unverified viewer may be entitled.
+    expect(blueprintSection).toMatch(/!entLoading && !lookupFailed && !canUseCapability/);
   });
 
   it("paywall_cta_clicked is wired only to explicit AI Doctor pricing actions", () => {

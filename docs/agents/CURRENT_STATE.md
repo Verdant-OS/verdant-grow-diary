@@ -1,6 +1,6 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-07
+**Last updated:** 2026-08-13
 **Updated by:** Claude (Knowledge Library & Product Specification Architect)
 
 This is the shift report. It changes often. Permanent rules live in `/AGENTS.md` and must
@@ -133,8 +133,15 @@ tests; active-writer transport tags (`pi_bridge`, `ecowitt`) map to `live` delib
 via an explicit compat set. V5 is split — V5a
 (invalid-provenance read fences) is mandatory and unconditional, V5b (stale fences)
 conditional on D4. All owner decisions are ruled. Spec advances to `APPROVED` when **V1, V3, V4, and V6
-pass** — all four blocked on the single live-access grant (V2, V5a `PASS`; V5b
-`NOT_APPLICABLE`).
+pass** — all four blocked on live access (V2, V5a `PASS`; V5b `NOT_APPLICABLE`).
+**Third attempt 2026-08-13 — root cause isolated:** the blocker is **org membership,
+not connector scope**. The re-granted Supabase MCP connector reaches only the sandbox
+(`bzatgtgjvuojpoxcknaa`), and the Supabase account signed in on the owner's machine
+belongs to exactly two orgs, neither of them production `wpczgwxsriezaubncuom` — Studio
+redirects away from the project. Unblock: the identity owning `wpczgwxsriezaubncuom`
+invites the owner's dashboard account (then re-scope the connector), or hand the run to
+Lovable. Turnkey run sheet: `docs/ecowitt-phase-1-8-studio-verification-prompt.md`
+(spec's 2026-08-13 attempt record has the full evidence).
 
 | Phase 2 gate item                             | Status                                                                                         |
 | --------------------------------------------- | ---------------------------------------------------------------------------------------------- |

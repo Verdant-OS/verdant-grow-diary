@@ -219,20 +219,44 @@ apply resolves it.
 
 Worth recording, because it is the reusable lesson rather than a detail of this incident:
 
-- **The failure signal has no first-party persistence — but a sink already exists, so extend
-  it rather than building a second one.** `src/components/FunnelEventDbSink.tsx` is mounted in
+- **The failure signal has no first-party persistence — and it is blocked THREE ways, not
+  one.** A sink already exists: `src/components/FunnelEventDbSink.tsx` is mounted in
   `src/routes/__root.tsx` and subscribes to the same `verdant:analytics` bridge, writing
-  catalogued events into `public.funnel_events` (migration `20260813020000`). It fails to
-  capture this outage for **two independent reasons**, and both need fixing:
-  1. **Not catalogued.** The relevant event is `signup_failed`, emitted via
-     `trackPricingEvent`. `FUNNEL_EVENTS` in `src/lib/funnelAnalytics.ts` contains `signup`
-     but **not** `signup_failed`, so the sink's write gate rejects it before any insert.
-  2. **The sink's own table is unapplied too.** Verified in the same production session:
-     `to_regclass('public.funnel_events')` is `NULL` and `20260813020000` is **not** in
-     `schema_migrations`. So even a catalogued event currently has nowhere to land.
+  catalogued events into `public.funnel_events` (migration `20260813020000`). Extend it rather
+  than building a second one — but note that fixing only the two obvious blockers still
+  persists nothing:
 
-  The remaining path, GA4 via `gtag`, is recorded as blocked for the authenticated baseline.
-  So the one signal that would have revealed this had no reachable destination at all.
+  1. **Identity gate — the blocker that defeats the obvious fix.**
+     `decideFunnelEventSinkWrite` (`src/lib/funnelEventDbSinkRules.ts:73-74`) rejects a null
+     `userId` *before* it inspects the event at all. And `signup_failed` is emitted at
+     `src/pages/Auth.tsx:355-360`, inside the `if (error)` branch — i.e. precisely when
+     `signUp` failed and there is **no authenticated user**. So the row is refused on
+     identity, ahead of any catalogue question.
+  2. **Not catalogued.** `FUNNEL_EVENTS` in `src/lib/funnelAnalytics.ts` carries `signup` but
+     **not** `signup_failed`, so the write gate would reject it even with a user present.
+  3. **The sink's own table is unapplied.** Verified in the same production session:
+     `to_regclass('public.funnel_events')` is `NULL` and `20260813020000` is **not** in
+     `schema_migrations`. Even a catalogued event from a signed-in user has nowhere to land.
+
+  **Do not treat blocker 1 as a bug to patch out.** The gate is deliberate — its own comment
+  says a declined-consent or signed-out visitor "should never reach the event-shape logic
+  below", and it checks consent on the line above. Persisting a signed-out visitor's failure
+  event is a **separate design decision** that needs explicit privacy justification and its own
+  review, not a one-line relaxation of an intentional fence. Cataloguing `signup_failed` and
+  applying `20260813020000` are necessary but **not sufficient**; without a deliberately
+  designed signed-out ingestion path, this specific signal still cannot be persisted.
+
+- **GA4 delivery for this event: `NOT_MEASURED`.** Do not record that the signal went nowhere
+  — that is a claim nobody has checked. `trackPricingEvent`
+  (`src/lib/pricingAnalytics.ts:129-137`) sends `signup_failed` to `window.gtag` in a
+  **separate** `try` block from the `verdant:analytics` bridge, so it is entirely independent
+  of the first-party sink and its catalogue. For a visitor who granted analytics consent with
+  `gtag` loaded, this event may well have been delivered. What is actually true is narrower:
+  the **authenticated GA4 baseline is `BLOCKED`**, so we cannot read GA4 to find out. Ingestion
+  and visibility are therefore `BLOCKED` / `NOT_MEASURED` per `AGENTS.md` — "when an outcome
+  cannot be measured, report the blocker instead of claiming success". Checking GA4 for
+  `signup_failed` events since 2026-07-21 is a genuine open lead: a nonzero count would be the
+  first direct evidence that a real visitor hit this.
 - **No test could catch it.** Every repo test touching this subsystem is a static scan that
   pins SQL text in migration *files*. The runtime lane (`test:security-db-local`) does a
   `supabase db reset`, which applies **every** migration to a fresh database — where the table

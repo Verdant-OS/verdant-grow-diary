@@ -294,13 +294,14 @@ repair fixes the outage; applying the sink migration is only part of restoring t
 that would have caught it.
 
 > **Method caveat on queries 3 and 4 — do not copy their `WHERE version = …` form.** Those
-> two blocks are preserved exactly as executed, so they are honest receipts, but the
+> two blocks are preserved exactly as executed, so they remain honest receipts, but the
 > technique is **drift-prone**: Lovable records a migration under a version ~2 seconds after
 > its filename timestamp, so an exact `version =` match can report `0` for a migration that
-> did apply. See "Ledger hazard" below for the trap and the correct query. Their recorded
-> `0` results happen to be **right**, independently re-confirmed by matching on `name` and on
-> a +5s version window — but had these been applied, the same queries would have lied. Use
-> the name-or-window form for any new check.
+> did apply. Their recorded `0` results happen to be **right** — independently re-confirmed
+> by the exact name-bound check in "Ledger hazard" below — but had these migrations been
+> applied, the same queries would have lied. **Use the name-bound form for any new check,
+> and do not substitute a version window either**: a window trades this false negative for a
+> false positive, which is worse. Both traps are set out below.
 
 **Frontend evidence** was gathered separately, by fetching the deployed bundle over public
 HTTPS from `https://verdantgrowdiary.com` (no auth, read-only) and reading the chunk graph:
@@ -405,62 +406,87 @@ migrations remain **absent from the ledger**, and every one of them carries a *l
 than the repair. If any future backlog catch-up executes pending migrations in version order,
 they run **after** the repair and clobber it.
 
-### The ledger, measured
+### Two traps in the obvious query — both must be avoided
 
-The version-drift trap first, because it makes the obvious query lie: **Lovable records a
-migration under a version ~2 seconds later than its filename timestamp, with the filename in
-the `name` column.** `20260721194325_f96507e6-…` is in the ledger as version
-`20260721194327`. So `WHERE version = '<filename timestamp>'` produces **false negatives**.
-Match on `name`, or on a small version range.
+**Trap 1, false negatives from version drift.** Lovable records a migration under a version
+~2 seconds later than its filename timestamp, with the filename in the `name` column:
+`20260721194325_f96507e6-…` is in the ledger as version `20260721194327`. So
+`WHERE version = '<filename timestamp>'` misses it. Hand-authored migrations use the exact
+timestamp with a slug name, so **both conventions coexist in one table**.
+
+**Trap 2, false positives from a version window.** The obvious fix — widen to a few
+seconds — is unsound, because migrations can legitimately sit that close together. This repo
+contains `20260806230020_candidate_number_maintenance_paths` and
+`20260806230021_candidate_number_membership_validate`, one second apart: a ledger holding
+only the second would make a window check report the **first** as applied. That is the worse
+failure of the two — it classifies an unapplied migration as applied.
+
+**Use an exact, name-bound check with no window at all.** For a file `<ts>_<slug>.sql`, the
+ledger row is identified by the full stem (Lovable), the bare slug (hand-authored), or the
+exact version — never by proximity:
 
 ```sql
--- Correct method: match name OR a +5s version window, never version alone.
-SELECT pat AS looking_for,
+WITH targets(stem) AS (VALUES
+  ('20260515204616_dba9604f-080f-4b98-a10f-5bd0f73dbae7'),
+  ('20260515204637_3c2dcaf4-a0b6-416a-8280-8e9a0089acac'),
+  ('20260515211702_02a55c35-7e90-4da0-ae94-346d79111d63'),
+  ('20260714231627_signup_acquisition_attribution'),
+  ('20260715002000_signup_to_paid_operator_snapshot'),
+  ('20260716215516_add_csv_history_signup_attribution'),
+  ('20260721107000_referral_code_and_pending_capture'),
+  ('20260721194325_f96507e6-a612-4d26-a99d-2a261f2c0ad5'),
+  ('20260813030000_signup_acquisition_forward_repair')
+), parsed AS (
+  SELECT stem, left(stem, 14) AS ts, substr(stem, 16) AS slug FROM targets
+)
+SELECT p.ts, p.slug,
        (SELECT count(*) FROM supabase_migrations.schema_migrations m
-         WHERE m.name LIKE pat || '%'
-            OR m.version BETWEEN pat AND (pat::bigint + 5)::text) AS in_ledger
-FROM (VALUES
-  ('20260714231627'), ('20260715002000'), ('20260716215516'),
-  ('20260721194325'), ('20260813020000'), ('20260813030000')
-) AS t(pat) ORDER BY pat;
--- => 20260714231627:0  20260715002000:0  20260716215516:0
---    20260721194325:1  20260813020000:0  20260813030000:0
+          WHERE m.name = p.stem OR m.name = p.slug OR m.version = p.ts) AS in_ledger
+FROM parsed p ORDER BY p.ts;
+-- => only 20260721194325 returns 1. All other eight return 0.
 ```
 
-### Why that specific combination is dangerous
+### The full exposure — eight migrations, not three
 
-`20260721194325` **is** recorded, so it will **not** re-run. The three below are **not**
-recorded, so they will. And `20260716215516` redefines **all four** functions — verified by
-reading the file: `referral_code` 0 occurrences, `convert_referral` 0, `blueprint_targets` 0,
-`billing_subscriptions` 1.
+Every migration in the repo that defines any of the four functions, and what each would do
+if it ran **after** the repair. Occurrence counts are from reading the files:
 
-So a catch-up after a repair-only apply would:
+| Migration | Defines | In ledger | Would revert |
+| --- | --- | --- | --- |
+| `20260515204616`, `20260515204637`, `20260515211702` | `handle_new_user` | **no** | referral system **and** attribution entirely — these predate both |
+| `20260714231627_signup_acquisition_attribution` | `handle_new_user`, acq snapshot | **no** | referral system; `blueprint_targets` |
+| `20260715002000_signup_to_paid_operator_snapshot` | paid snapshot | **no** | restores the `billing_subscriptions` branch |
+| `20260716215516_add_csv_history_signup_attribution` | **all four** | **no** | referral system; `blueprint_targets`; restores `billing_subscriptions` |
+| `20260721107000_referral_code_and_pending_capture` | `handle_new_user` | **no** | `blueprint_targets` only — it *has* the referral block (`referral_code` ×23, `convert_referral` ×6) |
+| `20260721194325_f96507e6-…` | `handle_new_user` | **yes** | — will not re-run |
+| `20260813030000_signup_acquisition_forward_repair` | **all four** | **no** | this is the repair. The **only** migration containing `blueprint_targets` |
 
-| Effect | Consequence |
-| --- | --- |
-| `handle_new_user` reverts to the 2026-07-16 body | **the referral system is silently removed** — no `referral_code` on the profiles INSERT, no `convert_referral` block |
-| `blueprint_targets` disappears from every allowlist | `/tools/blueprint-targets` signups stop being attributed |
-| `signup_to_paid_operator_snapshot` regains its `billing_subscriptions` UNION | a legacy surface `AGENTS.md` says must never grant an entitlement is back in the paid cohort |
-| `20260721194325` does **not** re-run | nothing restores the referral behaviour |
+Note `20260721107000`: it is the subtle one. Because it carries the referral block, a reader
+checking "does a revert lose referrals?" would clear it — but it has **zero**
+`blueprint_targets`, so it silently reverts attribution for `/tools/blueprint-targets` while
+leaving referrals intact. Being *nearly* current is what makes it easy to miss.
 
-The outage itself would *not* return — the table still exists once created — but you would
-trade it for a quieter regression across referrals, attribution, and operator reporting.
+The outage itself would not return — the table survives once created — but you would trade it
+for a quieter regression across referrals, attribution, and operator reporting.
 
 ### Safe disposition
 
-Marking the three as applied is **semantically correct**, not a workaround: the repair is a
-strict superset of all three. It creates the table (`20260714231627`), and re-issues all four
-functions at their current-best definitions, including `signup_to_paid_operator_snapshot`
-(`20260715002000`) and the csv-history allowlist work (`20260716215516`). Their intent is
-fully satisfied the moment the repair applies; re-running them could only regress.
+Marking the superseded versions as applied is **semantically correct**, not a workaround: the
+repair is a strict superset. It creates the table, and re-issues all four functions at their
+current-best definitions — the referral block, the full 11-value allowlist including
+`blueprint_targets`, and the paid snapshot without the legacy `billing_subscriptions` branch.
+Their intent is satisfied the moment it applies; re-running any of them could only regress.
+
+**Scope it to the eight unrecorded rows above, not the three originally identified** — the
+first inventory of this hazard missed `20260721107000` and the three May migrations.
 
 **Order matters — record them only AFTER the repair has applied and verified.** Doing it
 first would mark the table's creating migration as applied while the table does not exist.
 
-This is a write to `supabase_migrations.schema_migrations` and therefore a founder decision;
-it is not something to do casually. The alternative dispositions are to guarantee the repair
-always runs last after any catch-up, or to never run a catch-up at all — both rely on
-process holding indefinitely, which is what produced this outage in the first place.
+This is a write to `supabase_migrations.schema_migrations` and therefore a founder decision.
+The alternatives are to guarantee the repair always runs last after any catch-up, or to never
+run a catch-up — both rely on process holding indefinitely, which is what produced this
+outage in the first place.
 
 ## Applying the fix
 
@@ -492,12 +518,14 @@ SELECT to_regclass('public.signup_acquisition_attributions') IS NOT NULL AS tabl
          WHERE proname IN ('record_signup_acquisition_first_touch',
                            'signup_acquisition_operator_snapshot',
                            'signup_to_paid_operator_snapshot')) AS functions_present,
-       -- Match name OR a +5s window, NOT version alone: Lovable records a version ~2s
-       -- after the filename timestamp (see "Ledger hazard"), so `version = '...'` on its
-       -- own returns a false negative and would tell you the apply failed when it did not.
+       -- Exact and name-bound. NOT `version = '...'` alone (false negative: Lovable records
+       -- a version ~2s after the filename timestamp) and NOT a version window (false
+       -- positive: a neighbouring migration one second away would satisfy it). See
+       -- "Ledger hazard" above for both traps.
        (SELECT count(*) FROM supabase_migrations.schema_migrations
-         WHERE name LIKE '20260813030000%'
-            OR version BETWEEN '20260813030000' AND '20260813030005') AS migration_recorded;
+         WHERE name = '20260813030000_signup_acquisition_forward_repair'
+            OR name = 'signup_acquisition_forward_repair'
+            OR version = '20260813030000') AS migration_recorded;
 ```
 
 Expect `true`, `3`, `1`. Then confirm end to end by completing a signup from the homepage CTA.

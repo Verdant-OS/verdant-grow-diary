@@ -1378,8 +1378,16 @@ export default function Dashboard() {
               // the grower clicks (between useNowTick ticks, or while a
               // background tab's timers are throttled). The write itself must
               // therefore re-evaluate — see the handler below.
+              //
+              // Deliberately `currentSensorSnapshot`, NOT `snap`: `snap` is
+              // already health-filtered to null for any non-live/manual source
+              // (dashboardSnapshotForHealthyCues), so the reason gate would see
+              // "no snapshot" for a sim/CSV/diary reading that is actually
+              // present, just ineligible. Passing the unfiltered snapshot lets
+              // "context_only_source" reach the grower instead of misreporting
+              // a real (if untrusted) reading as no reading at all.
               const saveBlockedReason = describeAlertSaveBlock({
-                snapshot: snap,
+                snapshot: currentSensorSnapshot,
                 quality: quality.quality,
               });
               const canPersistAlerts = saveBlockedReason === null;
@@ -1441,8 +1449,10 @@ export default function Dashboard() {
                                     // checking it here would only re-read the
                                     // same answer and could still write an
                                     // expired reading as a brand-new alert.
+                                    // `currentSensorSnapshot`, not `snap` — see
+                                    // the render-time comment above for why.
                                     const blockedNow = describeAlertSaveBlock({
-                                      snapshot: snap,
+                                      snapshot: currentSensorSnapshot,
                                       quality: quality.quality,
                                     });
                                     if (blockedNow !== null) {

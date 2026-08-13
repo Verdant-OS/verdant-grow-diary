@@ -293,6 +293,15 @@ repair) and `20260813020000` (the funnel-events sink). They are independent — 
 repair fixes the outage; applying the sink migration is only part of restoring the telemetry
 that would have caught it.
 
+> **Method caveat on queries 3 and 4 — do not copy their `WHERE version = …` form.** Those
+> two blocks are preserved exactly as executed, so they are honest receipts, but the
+> technique is **drift-prone**: Lovable records a migration under a version ~2 seconds after
+> its filename timestamp, so an exact `version =` match can report `0` for a migration that
+> did apply. See "Ledger hazard" below for the trap and the correct query. Their recorded
+> `0` results happen to be **right**, independently re-confirmed by matching on `name` and on
+> a +5s version window — but had these been applied, the same queries would have lied. Use
+> the name-or-window form for any new check.
+
 **Frontend evidence** was gathered separately, by fetching the deployed bundle over public
 HTTPS from `https://verdantgrowdiary.com` (no auth, read-only) and reading the chunk graph:
 `index-*.js` → `signupAcquisitionRules-*.js` (carries the `verdant_signup_source` literal) →
@@ -389,6 +398,70 @@ Two independent reasons, both worth internalising:
 
 ---
 
+## ⚠️ Ledger hazard — read before applying
+
+Applying `20260813030000` alone fixes the outage, but leaves a loaded gun. Three superseded
+migrations remain **absent from the ledger**, and every one of them carries a *lower* version
+than the repair. If any future backlog catch-up executes pending migrations in version order,
+they run **after** the repair and clobber it.
+
+### The ledger, measured
+
+The version-drift trap first, because it makes the obvious query lie: **Lovable records a
+migration under a version ~2 seconds later than its filename timestamp, with the filename in
+the `name` column.** `20260721194325_f96507e6-…` is in the ledger as version
+`20260721194327`. So `WHERE version = '<filename timestamp>'` produces **false negatives**.
+Match on `name`, or on a small version range.
+
+```sql
+-- Correct method: match name OR a +5s version window, never version alone.
+SELECT pat AS looking_for,
+       (SELECT count(*) FROM supabase_migrations.schema_migrations m
+         WHERE m.name LIKE pat || '%'
+            OR m.version BETWEEN pat AND (pat::bigint + 5)::text) AS in_ledger
+FROM (VALUES
+  ('20260714231627'), ('20260715002000'), ('20260716215516'),
+  ('20260721194325'), ('20260813020000'), ('20260813030000')
+) AS t(pat) ORDER BY pat;
+-- => 20260714231627:0  20260715002000:0  20260716215516:0
+--    20260721194325:1  20260813020000:0  20260813030000:0
+```
+
+### Why that specific combination is dangerous
+
+`20260721194325` **is** recorded, so it will **not** re-run. The three below are **not**
+recorded, so they will. And `20260716215516` redefines **all four** functions — verified by
+reading the file: `referral_code` 0 occurrences, `convert_referral` 0, `blueprint_targets` 0,
+`billing_subscriptions` 1.
+
+So a catch-up after a repair-only apply would:
+
+| Effect | Consequence |
+| --- | --- |
+| `handle_new_user` reverts to the 2026-07-16 body | **the referral system is silently removed** — no `referral_code` on the profiles INSERT, no `convert_referral` block |
+| `blueprint_targets` disappears from every allowlist | `/tools/blueprint-targets` signups stop being attributed |
+| `signup_to_paid_operator_snapshot` regains its `billing_subscriptions` UNION | a legacy surface `AGENTS.md` says must never grant an entitlement is back in the paid cohort |
+| `20260721194325` does **not** re-run | nothing restores the referral behaviour |
+
+The outage itself would *not* return — the table still exists once created — but you would
+trade it for a quieter regression across referrals, attribution, and operator reporting.
+
+### Safe disposition
+
+Marking the three as applied is **semantically correct**, not a workaround: the repair is a
+strict superset of all three. It creates the table (`20260714231627`), and re-issues all four
+functions at their current-best definitions, including `signup_to_paid_operator_snapshot`
+(`20260715002000`) and the csv-history allowlist work (`20260716215516`). Their intent is
+fully satisfied the moment the repair applies; re-running them could only regress.
+
+**Order matters — record them only AFTER the repair has applied and verified.** Doing it
+first would mark the table's creating migration as applied while the table does not exist.
+
+This is a write to `supabase_migrations.schema_migrations` and therefore a founder decision;
+it is not something to do casually. The alternative dispositions are to guarantee the repair
+always runs last after any catch-up, or to never run a catch-up at all — both rely on
+process holding indefinitely, which is what produced this outage in the first place.
+
 ## Applying the fix
 
 Apply `supabase/migrations/20260813030000_signup_acquisition_forward_repair.sql` through
@@ -419,11 +492,20 @@ SELECT to_regclass('public.signup_acquisition_attributions') IS NOT NULL AS tabl
          WHERE proname IN ('record_signup_acquisition_first_touch',
                            'signup_acquisition_operator_snapshot',
                            'signup_to_paid_operator_snapshot')) AS functions_present,
+       -- Match name OR a +5s window, NOT version alone: Lovable records a version ~2s
+       -- after the filename timestamp (see "Ledger hazard"), so `version = '...'` on its
+       -- own returns a false negative and would tell you the apply failed when it did not.
        (SELECT count(*) FROM supabase_migrations.schema_migrations
-         WHERE version = '20260813030000') AS migration_recorded;
+         WHERE name LIKE '20260813030000%'
+            OR version BETWEEN '20260813030000' AND '20260813030005') AS migration_recorded;
 ```
 
 Expect `true`, `3`, `1`. Then confirm end to end by completing a signup from the homepage CTA.
+
+If `migration_recorded` is `0` but `table_exists` is `true` and `functions_present` is `3`,
+the apply **worked** and only the ledger row is missing — treat the object state as
+authoritative, and see the "Ledger hazard" section above, because an unrecorded repair is
+exactly the condition that lets a later catch-up re-run it out of order.
 
 ### Also fixed by the same apply
 

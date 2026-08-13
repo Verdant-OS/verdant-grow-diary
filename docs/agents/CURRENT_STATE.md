@@ -118,6 +118,16 @@ is a same-day-safe merge target except this doc PR itself. `mergeable`/`mergeSta
 are live and recomputed — re-run the `reviewThreads` query above per PR immediately before
 acting on any claim in this file, including this update.
 
+**Correction to the note above (still 2026-08-13):** "merged/closed" was imprecise —
+verified separately, the two are not equivalent here. #764 **merged** at
+`2026-08-13T07:17:09Z`, confirming the original "genuinely clean end to end" read held up.
+#853 was **closed without merging** — deliberately, because its content (a point-in-time
+SEO production/deploy lineage snapshot) had gone factually stale, not because its 1
+unresolved P2 finding got addressed; no code landed. If that P2 still matters, it needs
+fresh work, not assumed coverage from #853's branch. Also: this doc PR (#953) has itself
+since merged, so the "except this doc PR itself" line above is now historical, not a
+live caveat.
+
 ---
 
 ## Next approved slice

@@ -318,9 +318,7 @@ function SubscriptionTile() {
   const isLifetime = planId === "founder_lifetime";
   const isStaff = !!entitlement?.isStaff;
   const staffNote = staffSubscriptionNote(
-    entitlement
-      ? { isStaff: entitlement.isStaff, displayPlanId: entitlement.displayPlanId }
-      : null,
+    entitlement ? { isStaff: entitlement.isStaff, displayPlanId: entitlement.displayPlanId } : null,
   );
 
   return (

@@ -6,17 +6,11 @@
  * Founder product cap (PLAN_CATALOG / constitution: 100 per UTC month).
  */
 import { describe, it, expect } from "vitest";
-import {
-  staffSubscriptionNote,
-  STAFF_OPERATOR_METER_NOTE,
-  PLAN_CATALOG,
-} from "@/lib/entitlements";
+import { staffSubscriptionNote, STAFF_OPERATOR_METER_NOTE, PLAN_CATALOG } from "@/lib/entitlements";
 
 describe("staffSubscriptionNote", () => {
   it("returns null when isStaff is false", () => {
-    expect(
-      staffSubscriptionNote({ isStaff: false, displayPlanId: "founder_lifetime" }),
-    ).toBeNull();
+    expect(staffSubscriptionNote({ isStaff: false, displayPlanId: "founder_lifetime" })).toBeNull();
   });
 
   it("returns null for null or undefined input", () => {

@@ -113,9 +113,11 @@ describe("BlueprintTargetsGuide", () => {
     // Bare /auth resolves to mode "signin" and skips the signup page-view path.
     expect(href).toContain("mode=signup");
     expect(href).not.toBe("/auth");
-    // No utm_* source: an attribution source only records once it is in the
-    // server-side allowlists, so claiming one here would measure nothing.
-    expect(href).not.toContain("utm_source");
+    // Attribution is now recorded server-side (see the forward-repair
+    // migration), so the CTA carries the fixed first-party tuple.
+    expect(href).toContain("utm_source=blueprint_targets");
+    expect(href).toContain("utm_medium=owned");
+    expect(href).toContain("utm_campaign=blueprint_targets");
   });
 
   it("names the medium on feed EC and pH so soil growers are not misled", () => {

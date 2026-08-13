@@ -47,6 +47,26 @@ function snap(over: Partial<SensorSnapshot> = {}): SensorSnapshot {
 // Save path: CSV stays CSV, never live
 // ---------------------------------------------------------------------------
 
+describe("Quick Log save path — capture time beats ingest ts", () => {
+  it("a delayed insert's envelope carries the old captured_at and never fresh_live", () => {
+    const oldCapture = new Date(NOW.getTime() - 3 * 60 * 60 * 1000).toISOString();
+    const p = buildQuickLogSensorAttachPayload({
+      snapshot: snap({
+        source: "live",
+        ts: new Date(NOW.getTime() - 60_000).toISOString(),
+        captured_at: oldCapture,
+      }),
+      stripStatus: "usable",
+      attach: true,
+      tentId: "t1",
+      now: NOW,
+    });
+    expect(p).not.toBeNull();
+    expect(p!.captured_at).toBe(oldCapture);
+    expect(p!.status).not.toBe("fresh_live");
+  });
+});
+
 describe("Quick Log save path — csv sensor snapshot", () => {
   it("csv source attaches an envelope but never resolves as fresh_live", () => {
     const p = buildQuickLogSensorAttachPayload({

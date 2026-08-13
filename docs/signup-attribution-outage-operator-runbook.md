@@ -102,31 +102,108 @@ FROM spans;
 --    begins_between_insert_and_handler=1
 ```
 
-**How to read 1b — this is the load-bearing inference of the whole document.** The live
-body contains exactly **one** `EXCEPTION` handler (`total_exception=1`), and exactly one
-`BEGIN` opens *between* the attribution INSERT and that handler
-(`begins_between_insert_and_handler=1`). A plpgsql handler only catches statements inside
-its own `BEGIN ... EXCEPTION` block, so that sole handler belongs to a block that opened
-**after** the INSERT. The INSERT therefore sits in the outer block — which, with only one
-`EXCEPTION` in the function and it already accounted for, has **no handler at all**. Its
-error is unhandled and propagates out of the trigger.
+**Token counts alone cannot prove this, so the complete definition is preserved below.**
+A count of `total_exception=1` plus one `BEGIN` between the INSERT and the handler is
+*consistent with* the INSERT being unhandled — but it is equally consistent with a **safe**
+shape: outer `BEGIN` → INSERT → a fully closed inner `BEGIN ... END;` → outer `EXCEPTION`,
+in which the handler does catch the INSERT. Counting cannot separate those two, and an md5
+does not either unless the definition it fingerprints is actually recorded. So here it is.
 
-`definition_md5 = d67b343a174e86b5ba9ee065c43545ed` (2177 bytes) fingerprints the exact
-definition this diagnosis was made against. **If that hash no longer matches, re-run 1b
-before trusting anything below** — the body has changed.
-
-The INSERT as it appears in the live definition, extracted via
-`substr(def, ins - 120, 300)`:
+**Live `pg_get_functiondef(handle_new_user)`, production, 2026-08-13 —
+`md5 = d67b343a174e86b5ba9ee065c43545ed`, 2177 bytes.** If that hash no longer matches,
+this whole diagnosis is stale; re-derive it before acting.
 
 ```sql
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  v_signup_source text;
+  v_marketing_opt_in boolean;
+  v_ref_code text;
+  v_referrer uuid;
+BEGIN                                        -- <== OUTER BLOCK OPENS
+  v_signup_source := CASE
+    WHEN NEW.raw_user_meta_data->>'verdant_signup_source' IN (
+      'landing_page','pricing_page','founder_page','founder_share',
+      'pricing_interest_share','operator_outreach','grower_invite',
+      'context_check','vpd_calculator','csv_history'
+    ) THEN NEW.raw_user_meta_data->>'verdant_signup_source'
+    ELSE NULL
+  END;
+
+  v_marketing_opt_in := CASE
+    WHEN NEW.raw_user_meta_data->'marketing_opt_in' = 'true'::jsonb THEN true
+    ELSE false
+  END;
+
+  INSERT INTO public.profiles (
+    user_id, display_name, marketing_opt_in, marketing_opt_in_at, referral_code
+  )
+  VALUES (
+    NEW.id,
+    COALESCE(NEW.raw_user_meta_data->>'display_name', split_part(NEW.email, '@', 1)),
+    v_marketing_opt_in,
+    CASE WHEN v_marketing_opt_in THEN COALESCE(NEW.created_at, now()) ELSE NULL END,
+    public.generate_referral_code()
+  )
   ON CONFLICT (user_id) DO NOTHING;
 
   IF v_signup_source IS NOT NULL THEN
     INSERT INTO public.signup_acquisition_attributions (user_id, source, created_at)
     VALUES (NEW.id, v_signup_source, COALESCE(NEW.created_at, now()))
-    ON CONFLICT (user_id) DO NOTHING;
-  END IF;
+    ON CONFLICT (user_id) DO NOTHING;      -- <== THE FAILING STATEMENT. Still in the
+  END IF;                                  --     OUTER block. No handler covers it.
+
+  BEGIN                                    -- <== INNER BLOCK OPENS, AFTER the INSERT
+    v_ref_code := lower(btrim(NEW.raw_user_meta_data->>'verdant_ref_code'));
+    IF v_ref_code IS NOT NULL AND v_ref_code ~ '^[a-z0-9]{6,16}$' THEN
+      SELECT p.user_id INTO v_referrer
+        FROM public.profiles p
+       WHERE p.referral_code = v_ref_code
+       LIMIT 1;
+      IF v_referrer IS NOT NULL AND v_referrer <> NEW.id THEN
+        PERFORM public.convert_referral(
+          v_referrer, NEW.id, v_ref_code,
+          COALESCE(NULLIF(current_setting('app.payments_environment', true), ''), 'live'),
+          NEW.email_confirmed_at IS NOT NULL
+            AND NULLIF(current_setting('app.payments_environment', true), '') IS NOT NULL
+        );
+      END IF;
+    END IF;
+  EXCEPTION WHEN OTHERS THEN                -- <== THE ONLY HANDLER. Pairs with the INNER
+    NULL;                                   --     BEGIN above, so it covers ONLY the
+  END;                                      --     referral logic.
+
+  RETURN NEW;
+END;                                        -- <== OUTER BLOCK CLOSES. It never had an
+$function$                                  --     EXCEPTION clause at all.
 ```
+
+Read directly: the sole `EXCEPTION` clause pairs with the inner `BEGIN` that opens *after*
+the attribution INSERT and closes immediately before `RETURN NEW`. It wraps only the
+referral logic. The outer block — which contains the INSERT — reaches its `END` with no
+`EXCEPTION` clause, so the 42P01 is unhandled and propagates out of the trigger.
+
+If you would rather re-check this mechanically than re-read it, the discriminator is
+whether the intervening `BEGIN` is still **open** at the handler — i.e. whether any
+block-closing `END` occurs between them. `END IF` is not one:
+
+```sql
+-- => begins_between=1, ends_between=3, end_ifs_between=3
+--    block-closing ENDs = ends_between - end_ifs_between = 0
+--    therefore the intervening BEGIN is still open at EXCEPTION, and pairs with it.
+SELECT (SELECT count(*) FROM regexp_matches(substr(def, ins, exc - ins), '\mBEGIN\M',  'g')) AS begins_between,
+       (SELECT count(*) FROM regexp_matches(substr(def, ins, exc - ins), '\mEND\M',    'g')) AS ends_between,
+       (SELECT count(*) FROM regexp_matches(substr(def, ins, exc - ins), '\mEND IF\M', 'g')) AS end_ifs_between
+FROM spans;
+```
+
+Under the safe shape this rules out, the closed inner block would contribute a
+block-closing `END`, giving `ends_between - end_ifs_between = 1` instead of `0`.
 
 ```sql
 

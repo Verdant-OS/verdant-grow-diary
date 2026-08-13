@@ -1,6 +1,10 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import { useAuth } from "@/store/auth";
-import { resolveRootEntrySurface, ROOT_ENTRY_PRE_HYDRATION_SURFACE } from "@/lib/rootEntryRules";
+import {
+  resolveRootEntrySurface,
+  ROOT_ENTRY_PRE_HYDRATION_SURFACE,
+  shouldTrackRootLandingPageView,
+} from "@/lib/rootEntryRules";
 
 // Keep the signed-out apex light: the protected shell and dashboard chunks are
 // only requested after AuthProvider resolves an authenticated user.
@@ -34,12 +38,15 @@ export default function RootEntry() {
     setHydrated(true);
   }, []);
 
+  const rootEntryState = {
+    authLoading: loading,
+    hasAuthenticatedUser: Boolean(user),
+  };
+
   const surface = hydrated
-    ? resolveRootEntrySurface({
-        authLoading: loading,
-        hasAuthenticatedUser: Boolean(user),
-      })
+    ? resolveRootEntrySurface(rootEntryState)
     : ROOT_ENTRY_PRE_HYDRATION_SURFACE;
+  const trackLandingPageView = shouldTrackRootLandingPageView(rootEntryState);
 
   // Keep this boundary unconditional so SSR and the first client pass retain
   // the same tree shape even when a returning grower's session is cached.
@@ -48,7 +55,7 @@ export default function RootEntry() {
       {surface === "loading" ? (
         <RootEntryLoader />
       ) : surface === "landing" ? (
-        <Landing canonicalPath="/" />
+        <Landing canonicalPath="/" trackPageView={trackLandingPageView} />
       ) : (
         <AppShell>
           <Dashboard />

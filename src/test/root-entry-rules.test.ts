@@ -1,18 +1,37 @@
 import { describe, expect, it } from "vitest";
-import { resolveRootEntrySurface, ROOT_ENTRY_PRE_HYDRATION_SURFACE } from "@/lib/rootEntryRules";
+import {
+  resolveRootEntrySurface,
+  ROOT_ENTRY_PRE_HYDRATION_SURFACE,
+  shouldTrackRootLandingPageView,
+} from "@/lib/rootEntryRules";
 
 describe("root entry rules", () => {
   it("renders the public landing before hydration", () => {
     expect(ROOT_ENTRY_PRE_HYDRATION_SURFACE).toBe("landing");
   });
 
-  it("waits while auth state is unresolved, regardless of cached user state", () => {
+  it("keeps the public landing visible while auth is unresolved", () => {
     expect(resolveRootEntrySurface({ authLoading: true, hasAuthenticatedUser: false })).toBe(
-      "loading",
+      "landing",
     );
     expect(resolveRootEntrySurface({ authLoading: true, hasAuthenticatedUser: true })).toBe(
-      "loading",
+      "landing",
     );
+  });
+
+  it("tracks acquisition only after auth resolves signed out", () => {
+    expect(shouldTrackRootLandingPageView({ authLoading: true, hasAuthenticatedUser: false })).toBe(
+      false,
+    );
+    expect(shouldTrackRootLandingPageView({ authLoading: true, hasAuthenticatedUser: true })).toBe(
+      false,
+    );
+    expect(shouldTrackRootLandingPageView({ authLoading: false, hasAuthenticatedUser: true })).toBe(
+      false,
+    );
+    expect(
+      shouldTrackRootLandingPageView({ authLoading: false, hasAuthenticatedUser: false }),
+    ).toBe(true);
   });
 
   it("selects the public landing for a resolved signed-out session", () => {

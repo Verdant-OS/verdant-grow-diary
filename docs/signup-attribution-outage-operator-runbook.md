@@ -99,6 +99,21 @@ Note what check 3 shows beyond the apply status: `newest_applied_migration` is
 `20260813125355`, which is **later** than the repair migration `20260813030000`. Other
 migrations have been applied since; this one was skipped, not merely pending.
 
+```sql
+-- 4. funnel-events sink status (drives the "the sink has nowhere to write" conclusion
+--    in "Why nothing alerted" below — a separate table and a separate migration from
+--    the repair, so query 3 does not cover it)
+SELECT to_regclass('public.funnel_events') IS NOT NULL AS funnel_events_exists,
+       (SELECT count(*) FROM supabase_migrations.schema_migrations WHERE version = '20260813020000') AS funnel_sink_migration_applied,
+       (SELECT count(*) FROM supabase_migrations.schema_migrations WHERE version = '20260813030000') AS signup_repair_applied;
+-- => funnel_events_exists=false, funnel_sink_migration_applied=0, signup_repair_applied=0
+```
+
+So **two** separate migrations are outstanding, not one: `20260813030000` (the signup
+repair) and `20260813020000` (the funnel-events sink). They are independent — applying the
+repair fixes the outage; applying the sink migration is only part of restoring the telemetry
+that would have caught it.
+
 **Frontend evidence** was gathered separately, by fetching the deployed bundle over public
 HTTPS from `https://verdantgrowdiary.com` (no auth, read-only) and reading the chunk graph:
 `index-*.js` → `signupAcquisitionRules-*.js` (carries the `verdant_signup_source` literal) →

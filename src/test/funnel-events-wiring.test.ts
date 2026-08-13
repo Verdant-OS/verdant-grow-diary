@@ -162,6 +162,22 @@ const SEAMS: Array<{ event: string; file: string; extra?: RegExp[] }> = [
     extra: [/plan:\s*entitlement\.effectivePlanId/, /surface:\s*checkoutReturnSurface/],
   },
   {
+    event: "founder_note_viewed",
+    file: "src/components/CheckoutSuccessFounderNote.tsx",
+    extra: [
+      /trackFunnelEvent\("founder_note_viewed",\s*\{\s*surface:\s*"checkout_success"\s*\}\)/,
+      // Impression only when the note is actually shown, deduped per mount.
+      /if \(!visible \|\| viewedRef\.current\) return;/,
+    ],
+  },
+  {
+    event: "founder_note_clicked",
+    file: "src/components/CheckoutSuccessFounderNote.tsx",
+    extra: [
+      /trackFunnelEvent\("founder_note_clicked",\s*\{\s*surface:\s*"checkout_success"\s*\}\)/,
+    ],
+  },
+  {
     event: "checkout_return_completed",
     file: "src/hooks/useCheckoutReturnCompletionTracking.ts",
     extra: [/surface\s*\}/],

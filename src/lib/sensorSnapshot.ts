@@ -125,18 +125,34 @@ export interface SensorReadingLike {
 }
 
 /**
+ * Source tags persisted by ACTIVE checked ingest writers that have not yet
+ * migrated to the canonical "live" label:
+ *   - "pi_bridge"  — supabase/functions/pi-ingest-readings
+ *   - "ecowitt"    — supabase/functions/_shared/ecowittRoutedRowBuilder
+ * These are live-transport readings; freshness/quality layers decide the
+ * rest. Compatibility mapping only — remove entries once the writers store
+ * canonical "live" (EcoWitt Phase 1.8 workstream). Do NOT add new tags
+ * here; new writers must persist canonical sources.
+ */
+const ACTIVE_LIVE_TRANSPORT_SOURCES: ReadonlySet<string> = new Set([
+  "pi_bridge",
+  "ecowitt",
+]);
+
+/**
  * Classify one sensor_readings row's raw source into the snapshot
  * vocabulary. Routes through the canonical timeline classifier so
- * missing/unknown/legacy alias sources (e.g. "pi_bridge", "ecowitt")
- * resolve to "invalid" — never "live". The legacy "sim" label is kept
- * as "sim" for existing simulated-data disclosure surfaces.
+ * missing/unknown/retired alias sources resolve to "invalid" — never
+ * "live". Exceptions: the legacy "sim" label is kept as "sim" for
+ * existing simulated-data disclosure surfaces, and the active writers'
+ * transport tags above map to "live" until those writers migrate.
  */
 export function classifySensorReadingRowSource(
   raw: string | null | undefined,
 ): Exclude<SnapshotSource, "diary" | "unavailable"> {
-  if (typeof raw === "string" && raw.trim().toLowerCase() === "sim") {
-    return "sim";
-  }
+  const v = typeof raw === "string" ? raw.trim().toLowerCase() : "";
+  if (v === "sim") return "sim";
+  if (ACTIVE_LIVE_TRANSPORT_SOURCES.has(v)) return "live";
   return classifyTimelineSensorSource({ rawSource: raw }).kind;
 }
 

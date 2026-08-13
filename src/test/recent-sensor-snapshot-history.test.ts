@@ -95,10 +95,18 @@ describe("buildRecentSensorSnapshotHistory", () => {
   });
 
   it("classifies unknown/missing sources as invalid, never live", () => {
-    for (const source of ["ecowitt", "junk", null]) {
+    for (const source of ["junk", "mystery_bridge", null]) {
       const rows = [row("2026-05-24T11:00:00Z", "temperature_c", 24, source)];
       const out = buildRecentSensorSnapshotHistory(rows, { now: NOW });
       expect(out[0].source).toBe("invalid");
+    }
+  });
+
+  it("maps the active writers' transport tags (pi_bridge/ecowitt) to live", () => {
+    for (const source of ["pi_bridge", "ecowitt"] as const) {
+      const rows = [row("2026-05-24T11:00:00Z", "temperature_c", 24, source)];
+      const out = buildRecentSensorSnapshotHistory(rows, { now: NOW });
+      expect(out[0].source).toBe("live");
     }
   });
 

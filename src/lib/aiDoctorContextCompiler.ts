@@ -265,11 +265,13 @@ function classifySource(row: SensorReadingRowLike): SensorSourceTag {
   if (source === "csv" || source === "csv_import" || source === "import")
     return "csv";
   if (source === "sim") return "demo";
-  // "ecowitt" is this layer's pinned live vendor transport (quality/state
-  // flags above carry the stale/invalid dimension for those rows).
-  if (source === "live" || source === "ecowitt") return "live";
-  // Unknown/legacy alias sources (e.g. "pi_bridge", empty) must never be
-  // tagged live — the trustworthy-evidence gates key off "live".
+  // "ecowitt" and "pi_bridge" are the active writers' live transport tags
+  // (quality/state flags above carry the stale/invalid dimension for those
+  // rows). Compatibility mapping until the writers persist canonical "live".
+  if (source === "live" || source === "ecowitt" || source === "pi_bridge")
+    return "live";
+  // Unknown/missing sources must never be tagged live — the
+  // trustworthy-evidence gates key off "live".
   return "invalid";
 }
 

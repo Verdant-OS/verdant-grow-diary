@@ -91,14 +91,26 @@ describe("sensorSnapshot pure helpers", () => {
     expect(snap!.source).toBe("manual");
   });
 
-  it("snapshotFromReadings never classifies unknown/legacy alias sources as live", () => {
+  it("snapshotFromReadings never classifies unknown/missing sources as live", () => {
     const ts = "2026-05-20T11:55:00Z";
-    for (const source of ["pi_bridge", "ecowitt", "garbage", "", null, undefined]) {
+    for (const source of ["garbage", "mystery_bridge", "", null, undefined]) {
       const snap = snapshotFromReadings([
         { ts, metric: "temperature_c", value: 24, source },
       ]);
       expect(snap!.source).toBe("invalid");
       expect(snap!.source).not.toBe("live");
+    }
+  });
+
+  it("snapshotFromReadings maps the active writers' transport tags to live", () => {
+    const ts = "2026-05-20T11:55:00Z";
+    // pi-ingest-readings persists "pi_bridge"; the EcoWitt routed writer
+    // persists "ecowitt". Compatibility mapping until they store "live".
+    for (const source of ["pi_bridge", "ecowitt"] as const) {
+      const snap = snapshotFromReadings([
+        { ts, metric: "temperature_c", value: 24, source },
+      ]);
+      expect(snap!.source).toBe("live");
     }
   });
 

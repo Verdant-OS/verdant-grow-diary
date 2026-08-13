@@ -150,20 +150,21 @@ describe("compilePlantContextFromRows — source separation", () => {
     expect(ctx.sensor_groups.find((g) => g.source === "demo")?.sample_count).toBe(1);
   });
 
-  it("never tags unknown/missing/legacy alias sources as live", () => {
+  it("never tags unknown/missing sources as live; active transports stay live", () => {
     const ctx = compilePlantContextFromRows({
       plant: basePlant,
       growEvents: [],
       sensorReadings: [
+        // pi_bridge is an active writer's live transport tag.
         { metric: "temperature_c", value: 24, captured_at: iso(60_000), source: "pi_bridge" },
         { metric: "humidity_pct", value: 55, captured_at: iso(60_000), source: null },
         { metric: "vpd_kpa", value: 1.1, captured_at: iso(60_000) },
       ],
       now: NOW,
     });
-    expect(ctx.sensor_groups.find((g) => g.source === "live")).toBeUndefined();
+    expect(ctx.sensor_groups.find((g) => g.source === "live")?.sample_count).toBe(1);
     const invalid = ctx.sensor_groups.find((g) => g.source === "invalid");
-    expect(invalid?.sample_count).toBe(3);
+    expect(invalid?.sample_count).toBe(2);
   });
 });
 

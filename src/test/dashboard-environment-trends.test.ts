@@ -140,13 +140,23 @@ describe("samplesFromReadings", () => {
     }
   });
 
-  it("classifies unknown/missing/legacy alias sources as invalid, never live", () => {
+  it("classifies unknown/missing sources as invalid, never live", () => {
     const ts = "2026-05-20T11:00:00Z";
-    for (const source of ["ecowitt", "pi_bridge", "junk", null, undefined]) {
+    for (const source of ["junk", "mystery_bridge", null, undefined]) {
       const samples = samplesFromReadings([
         { ts, metric: "temperature_c", value: 24, tent_id: "t1", source },
       ]);
       expect(samples[0].source).toBe("invalid");
+    }
+  });
+
+  it("maps the active writers' transport tags (pi_bridge/ecowitt) to live", () => {
+    const ts = "2026-05-20T11:00:00Z";
+    for (const source of ["pi_bridge", "ecowitt"] as const) {
+      const samples = samplesFromReadings([
+        { ts, metric: "temperature_c", value: 24, tent_id: "t1", source },
+      ]);
+      expect(samples[0].source).toBe("live");
     }
   });
 

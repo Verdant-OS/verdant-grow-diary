@@ -1,11 +1,11 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-12 UTC / 2026-08-12 America/Chicago
-**Updated by:** Claude (public-surface rows re-measured against the live site — sitemap
-count, root route, indexable-route coverage — from the 2026-08-07 Ahrefs audit
-reconciliation plus a 2026-08-12 live re-count; records Cheek's canonical-home
-Option A decision. GA4/analytics and release-identity facts retain their earlier
-verification dates; none were re-measured in this update)
+**Last updated:** 2026-08-13 UTC
+**Updated by:** Claude (records Cheek's 2026-08-13 in-session approval of the
+named isolated Convex component sandbox spike, plus the deploy-branch HEAD
+observed while writing that spec. Public-surface, GA4, and release-identity
+rows retain their earlier verification dates; none were re-measured in this
+update)
 
 This is the changing shift report. Permanent rules live in `/AGENTS.md`; do not edit
 that constitution to record branch, deployment, blocker, or assignment changes.
@@ -20,7 +20,7 @@ inside the active governance handoff.
 
 | Branch               | Role                                             | Verified head                                                                                                                                |
 | -------------------- | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `verdant-grow-diary` | **Deploy branch. Production ships from here.**   | `1a9082bb1` (#885), verified 2026-08-11 after `git fetch origin`; the queue advances it several times daily — re-verify before relying on it |
+| `verdant-grow-diary` | **Deploy branch. Production ships from here.**   | `6434ea2a8` (#942), verified 2026-08-13 with `git rev-parse HEAD` on this checkout (this session did not re-fetch; treat as the local tracking ref). Prior CURRENT_STATE snapshot was `1a9082bb1` (#885) on 2026-08-11 — the queue has advanced; do not carry older validation tables forward |
 | `main`               | Integration branch. It is not production parity. | `b6d747941948ce68157185a2b0847acea6970d44` (#779), verified 2026-08-07                                                                       |
 
 `main` and `verdant-grow-diary` are divergent. Do not infer production behavior from
@@ -121,6 +121,19 @@ deploy branch as fully green; they require their own scoped owner/integration fo
 ---
 
 ## Current approved slices
+
+**Named isolated spike (approved 2026-08-13, not SEO):**
+`CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE`. Cheek approved a spec-first,
+disposable Convex component spike whose only purpose is to demonstrate
+`GAP-CONVEX-001` (physical parent/sibling table sandbox — something
+`service_role` Postgres code in this repo cannot refuse at runtime). Contract:
+`docs/specs/convex-component-physical-sandbox-spike.md`. Claude delivers the
+spec (this update). Codex may implement **Phase 1 only** after that spec
+merges, and only under `spikes/convex-component-sandbox/`. Production Convex,
+root `package.json` `convex` dependency, `src/` / edge-function imports, AI
+credits, sensors, entitlements, Action Queue, and `npx convex deploy` remain
+`REJECT` until a later Cheek decision. This does **not** replace or pause the
+Mode A SEO parent program below.
 
 **Parent program:** MODE A SEO measurement-readiness work.
 
@@ -227,6 +240,7 @@ Out of scope:
 - GA4/GSC activation or property-setting changes
 - a third lighting page or content rewrite
 - changing the two failing schema-guard workflows or their secrets
+- Convex (the isolated spike is a separate named slice above, not SEO work)
 
 ---
 
@@ -320,8 +334,11 @@ git context:
   window or the default remote ref is absent. First live run 2026-08-05
   22:06Z: PASS (exact match via tag annotation).
 
-No new content family, automation, device control, schema change, or direct production
-write is approved by this state file.
+No new content family, automation, device control, production schema change, or
+direct production write is approved by this state file. The 2026-08-13 Convex
+slice is an isolated `spikes/` sandbox specified in
+`docs/specs/convex-component-physical-sandbox-spike.md`; it is not a production
+schema change and does not authorize production writes.
 
 ---
 
@@ -329,9 +346,9 @@ write is approved by this state file.
 
 | Agent             | Assignment                                                            |
 | ----------------- | --------------------------------------------------------------------- |
-| Codex             | Standing SEO measurement readiness and analytics integrity            |
-| Claude            | Unassigned — see completed out-of-slice #586/#809/#812 and #885 above |
-| Grok              | Unassigned                                                            |
-| Security reviewer | Unassigned                                                            |
+| Codex             | Standing SEO measurement readiness and analytics integrity. Queued after the Convex spec merges: Phase 1 of `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` only (see `docs/specs/convex-component-physical-sandbox-spike.md`). Do not start Convex work if it collides with an in-flight SEO slice |
+| Claude            | `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` specification (docs-only). Not implementation. Prior completed out-of-slice work (#586/#809/#812/#885) unchanged |
+| Grok              | Unassigned. Prior same-session HOLD on unapproved Convex expansion is superseded only for this named isolated spike; production Convex remains HOLD |
+| Security reviewer | Unassigned until Phase 1 spike code exists; then review before any Convex cloud credential |
 | Gemini            | Unassigned                                                            |
-| Council Chair     | Unassigned                                                            |
+| Council Chair     | Unassigned until Phase 1 proof tests exist; then compare Convex sandbox vs a possible Postgres-roles alternative (out of this slice) |

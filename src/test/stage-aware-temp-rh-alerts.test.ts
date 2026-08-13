@@ -117,7 +117,12 @@ describe("stage-aware Temp/RH alerts — source filtering", () => {
     const out = buildDefaultThresholdAlerts({ snapshot: s, now: NOW, stage: "flower" });
     expect(out).toEqual([]);
   });
-  it("7a-iii. manual snapshot inside the 24h window → alerts still generated", () => {
+  // buildDefaultThresholdAlerts is a CANDIDATE GENERATOR feeding the read-only
+  // Dashboard summary, so it stays source-aware: a manual reading current for
+  // 24h keeps showing its warning. The tighter live-window bar is enforced at
+  // the write boundary (isSnapshotPersistable), covered in
+  // environment-alert-persistence-live-window.test.ts.
+  it("7a-iii. manual snapshot inside the 24h window → candidates still generated", () => {
     const s = snap({
       ts: new Date(NOW - 23 * 60 * 60 * 1000).toISOString(),
       temp: 40,

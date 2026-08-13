@@ -36,6 +36,8 @@
  *     (SUPABASE_PUBLISHABLE_KEY or VITE_SUPABASE_ANON_KEY are accepted aliases)
  */
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { execFileSync } from "node:child_process";
+import { existsSync } from "node:fs";
 
 const LOCAL_LANE_FLAG = "--confirm-local-security-lane";
 
@@ -289,10 +291,276 @@ async function checkQuicklogSaveManual(): Promise<void> {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Causation proof (Copilot review on PR #808)
+// ---------------------------------------------------------------------------
+//
+// Everything above asserts an END STATE: anon is denied. That end state is
+// ALSO produced by supabase/seed.sql, which independently performs the same
+// REVOKE/GRANT for lead_events and lovable_paddle_events and runs AFTER
+// migrations in the local lane. So those checks pass whether or not the
+// migration under test ever executed -- they were vacuous as a proof that
+// THIS migration does anything.
+//
+// This phase closes that hole by proving causation rather than correlation:
+//
+//   1. deliberately re-open the hole (GRANT anon back in), undoing whatever
+//      seed.sql/migrations left behind;
+//   2. assert the probes now SEE the hole -- a negative control, which is
+//      what proves the probes are capable of failing at all;
+//   3. re-apply only the migration under test;
+//   4. assert the hole is closed again.
+//
+// Steps 2 and 4 together are the deny/allow transition. If the migration
+// were deleted, step 4 would fail -- which is exactly what the previous
+// shape could not detect.
+//
+// Runs against a loopback DB only (guarded above and re-checked here), via
+// psql rather than a new `pg` dependency (adding one would trip the
+// lockfile-policy gate for a test-only need).
+
+const MIGRATION_UNDER_TEST =
+  "supabase/migrations/20260807150000_quicklog_save_manual_all_overloads.sql";
+
+function dbUrlOrSkip(): string | null {
+  const dbUrl = process.env.SUPABASE_DB_URL;
+  if (!dbUrl) return null;
+  let host: string;
+  try {
+    host = new URL(dbUrl).hostname;
+  } catch {
+    return null;
+  }
+  // Never mutate grants anywhere but a disposable local stack.
+  return isLoopbackHost(host) ? dbUrl : null;
+}
+
+function psql(dbUrl: string, sql: string): { ok: boolean; detail?: string } {
+  try {
+    execFileSync("psql", [dbUrl, "-v", "ON_ERROR_STOP=1", "-c", sql], {
+      stdio: ["ignore", "ignore", "pipe"],
+      encoding: "utf8",
+    });
+    return { ok: true };
+  } catch (error) {
+    const stderr = (error as { stderr?: string }).stderr;
+    return { ok: false, detail: (stderr ?? safeError(error) ?? "psql failed").slice(0, 400) };
+  }
+}
+
+function psqlFile(dbUrl: string, file: string): { ok: boolean; detail?: string } {
+  try {
+    execFileSync("psql", [dbUrl, "-v", "ON_ERROR_STOP=1", "-f", file], {
+      stdio: ["ignore", "ignore", "pipe"],
+      encoding: "utf8",
+    });
+    return { ok: true };
+  } catch (error) {
+    const stderr = (error as { stderr?: string }).stderr;
+    return { ok: false, detail: (stderr ?? safeError(error) ?? "psql failed").slice(0, 400) };
+  }
+}
+
+function psqlScalar(dbUrl: string, sql: string): string | null {
+  try {
+    return execFileSync("psql", [dbUrl, "-tAc", sql], {
+      stdio: ["ignore", "pipe", "pipe"],
+      encoding: "utf8",
+    }).trim();
+  } catch {
+    return null;
+  }
+}
+
+// Probe the exact thing 20260807150000 changes: anon EXECUTE on ANY
+// quicklog_save_manual overload. Read via has_function_privilege rather
+// than by calling the RPC -- calling it would execute real business logic
+// for a privilege question, and the point here is the grant, not behavior.
+function anonHasQuicklogExecute(dbUrl: string): boolean | null {
+  const out = psqlScalar(
+    dbUrl,
+    `SELECT EXISTS (
+       SELECT 1 FROM pg_proc p
+       JOIN pg_namespace n ON n.oid = p.pronamespace
+       WHERE n.nspname = 'public'
+         AND p.proname = 'quicklog_save_manual'
+         AND has_function_privilege('anon', p.oid, 'EXECUTE')
+     );`,
+  );
+  if (out === null) return null;
+  return out === "t";
+}
+
+function grantAnonQuicklogExecute(dbUrl: string): { ok: boolean; detail?: string } {
+  // Re-open the hole on every overload, mirroring how it recurs in
+  // production (a new signature is born with the schema default ACL).
+  //
+  // Grants to PUBLIC as well as anon, deliberately. PUBLIC is the privilege
+  // path that actually causes this in production: Postgres grants EXECUTE on
+  // new functions to PUBLIC by default and anon inherits through it. A
+  // negative control that only granted anon directly would be satisfied by a
+  // migration that revokes anon while omitting PUBLIC -- which would leave a
+  // real default-ACL overload anonymously executable. Granting both means
+  // the migration must revoke both to pass.
+  return psql(
+    dbUrl,
+    `DO $$
+     DECLARE fn RECORD;
+     BEGIN
+       FOR fn IN
+         SELECT p.oid::regprocedure AS sig FROM pg_proc p
+         JOIN pg_namespace n ON n.oid = p.pronamespace
+         WHERE n.nspname = 'public' AND p.proname = 'quicklog_save_manual'
+       LOOP
+         EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO PUBLIC', fn.sig);
+         EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO anon', fn.sig);
+       END LOOP;
+     END $$;`,
+  );
+}
+
+// Is EXECUTE reachable specifically THROUGH PUBLIC (rather than via a
+// direct anon grant)? Asserted separately so the negative control proves it
+// re-created the production privilege path, not merely "some" anon access.
+function publicHasQuicklogExecute(dbUrl: string): boolean | null {
+  // PUBLIC is a pseudo-role (ACL grantee OID 0), not a row in pg_roles, so
+  // it cannot be resolved by name the way a real role can. Read the ACL
+  // directly instead.
+  //
+  // COALESCE(proacl, acldefault('f', proowner)) matters: a function that has
+  // never had an explicit GRANT/REVOKE carries proacl = NULL, and NULL means
+  // "the built-in default" -- which for functions INCLUDES EXECUTE to PUBLIC.
+  // Reading bare proacl would return no rows there and wrongly report the
+  // hole closed on exactly the freshly-created-overload case this whole
+  // migration exists to defend against.
+  const out = psqlScalar(
+    dbUrl,
+    `SELECT EXISTS (
+       SELECT 1
+         FROM pg_proc p
+         JOIN pg_namespace n ON n.oid = p.pronamespace
+         CROSS JOIN LATERAL aclexplode(COALESCE(p.proacl, acldefault('f', p.proowner))) a
+        WHERE n.nspname = 'public'
+          AND p.proname = 'quicklog_save_manual'
+          AND a.grantee = 0
+          AND a.privilege_type = 'EXECUTE'
+     );`,
+  );
+  if (out === null) return null;
+  return out === "t";
+}
+
+async function checkMigrationCausesTheTransition(): Promise<void> {
+  console.log("→ causation: this migration (not seed.sql) closes the anon hole");
+
+  const dbUrl = dbUrlOrSkip();
+  if (!dbUrl) {
+    // Explicitly reported, never a silent pass. Without a loopback DB URL
+    // this phase cannot run, and the suite must not imply it proved
+    // causation when it did not.
+    check(
+      "causation proof ran (needs loopback SUPABASE_DB_URL + psql)",
+      false,
+      "SUPABASE_DB_URL absent or non-loopback — causation NOT proven; end-state checks alone are satisfiable by seed.sql",
+    );
+    return;
+  }
+
+  if (!existsSync(MIGRATION_UNDER_TEST)) {
+    check("migration under test exists", false, `${MIGRATION_UNDER_TEST} not found`);
+    return;
+  }
+
+  // 1. Re-open the hole -- on the object THIS migration actually changes.
+  //    (An earlier draft opened lead_events instead and this phase caught
+  //    it: 20260807150000 revokes quicklog_save_manual EXECUTE only; the
+  //    table grants belong to 20260807003500. Probing the wrong object made
+  //    step 4 unsatisfiable, which is exactly the failure a non-vacuous
+  //    harness should produce.)
+  const opened = grantAnonQuicklogExecute(dbUrl);
+  if (!opened.ok) {
+    check("could re-open the anon hole for the negative control", false, opened.detail);
+    return;
+  }
+
+  try {
+    // 2. Negative control: the probe must SEE the hole. If this fails, the
+    //    probe is incapable of detecting a real regression.
+    const holeVisible = anonHasQuicklogExecute(dbUrl);
+    check(
+      "negative control: probe detects the anon hole when it is genuinely open",
+      holeVisible === true,
+      holeVisible === null
+        ? "privilege probe failed to run"
+        : holeVisible
+          ? undefined
+          : "probe reported no anon EXECUTE immediately after granting it",
+    );
+
+    // The hole must be open via PUBLIC specifically -- that is the path the
+    // production regression travels, and the one a PUBLIC-omitting REVOKE
+    // would leave behind.
+    const publicPathOpen = publicHasQuicklogExecute(dbUrl);
+    check(
+      "negative control re-creates the PUBLIC privilege path, not just a direct anon grant",
+      publicPathOpen === true,
+      publicPathOpen === null
+        ? "PUBLIC privilege probe failed to run"
+        : "PUBLIC does not hold EXECUTE after granting it",
+    );
+
+    // 3. Re-apply ONLY the migration under test.
+    const applied = psqlFile(dbUrl, MIGRATION_UNDER_TEST);
+    check("migration under test re-applies cleanly", applied.ok, applied.detail);
+
+    // 4. The transition: the hole must now be closed BY that migration.
+    const stillOpen = anonHasQuicklogExecute(dbUrl);
+    check(
+      "migration closes the anon hole (deny transition caused by THIS file)",
+      stillOpen === false,
+      stillOpen === null
+        ? "privilege probe failed to run"
+        : "anon still has EXECUTE after applying the migration",
+    );
+
+    // Closing anon while leaving PUBLIC would be a false pass: anon
+    // re-inherits EXECUTE through PUBLIC the moment anything re-grants it.
+    const publicStillOpen = publicHasQuicklogExecute(dbUrl);
+    check(
+      "migration revokes PUBLIC too, not just anon",
+      publicStillOpen === false,
+      publicStillOpen === null
+        ? "PUBLIC privilege probe failed to run"
+        : "PUBLIC still has EXECUTE after applying the migration — anon can re-inherit it",
+    );
+  } finally {
+    // Restore the intended posture even if an assertion above threw, so a
+    // failure here can never leave the local stack permissively granted.
+    const restored = psql(
+      dbUrl,
+      `DO $$
+       DECLARE fn RECORD;
+       BEGIN
+         FOR fn IN
+           SELECT p.oid::regprocedure AS sig FROM pg_proc p
+           JOIN pg_namespace n ON n.oid = p.pronamespace
+           WHERE n.nspname = 'public' AND p.proname = 'quicklog_save_manual'
+         LOOP
+           EXECUTE format('REVOKE EXECUTE ON FUNCTION %s FROM PUBLIC, anon', fn.sig);
+         END LOOP;
+       END $$;`,
+    );
+    if (!restored.ok) {
+      console.log(`  ! could not restore quicklog_save_manual grants: ${restored.detail}`);
+    }
+  }
+}
+
 async function main(): Promise<void> {
   await checkLovablePaddleEvents();
   await checkLeadEvents();
   await checkQuicklogSaveManual();
+  await checkMigrationCausesTheTransition();
 }
 
 async function cleanupStep(

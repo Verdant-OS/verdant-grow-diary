@@ -220,7 +220,16 @@ function setupHooks({
   actionsLoading?: boolean;
 } = {}) {
   mockEntries.mockReturnValue({ data: entries, isLoading: entriesLoading });
-  mockAlerts.mockReturnValue({ rows: alertRows, status: alertStatus });
+  // openCount mirrors what the hook derives from the UNCAPPED active set.
+  const openCount = (alertRows as Array<{ status?: string }>).filter(
+    (r) => r?.status === "open",
+  ).length;
+  mockAlerts.mockReturnValue({
+    rows: alertRows,
+    openCount,
+    activeCount: alertRows.length,
+    status: alertStatus,
+  });
   mockActions.mockReturnValue({ rows: actionRows, isLoading: actionsLoading });
 }
 
@@ -273,7 +282,10 @@ describe("PlantQuickStatusStrip — render", () => {
   it("renders alert + action counts when tent context provides them", () => {
     setupHooks({
       entries: [NOTE_ENTRY("e1", "2026-05-31T08:00:00Z")],
-      alertRows: [{ id: "a1" }, { id: "a2" }],
+      alertRows: [
+        { id: "a1", status: "open" },
+        { id: "a2", status: "open" },
+      ],
       alertStatus: "ok",
       actionRows: [{ id: "ac1" }],
       actionsLoading: false,
@@ -348,7 +360,7 @@ describe("PlantQuickStatusStrip — render", () => {
   it("never exposes plant IDs, tent IDs, tokens, or provenance markers in visible text", () => {
     setupHooks({
       entries: [NOTE_ENTRY("entry-uuid-secret", "2026-05-31T08:00:00Z")],
-      alertRows: [{ id: "alert-uuid-secret" }],
+      alertRows: [{ id: "alert-uuid-secret", status: "open" }],
       alertStatus: "ok",
       actionRows: [{ id: "action-uuid-secret" }],
     });

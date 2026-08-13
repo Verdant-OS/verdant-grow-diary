@@ -78,6 +78,7 @@ import {
   EMPTY_ALERTS_MESSAGE,
   type EnvironmentAlert,
 } from "@/lib/environmentAlerts";
+import { describeAlertSaveBlock } from "@/lib/alertFreshnessContext";
 import { saveAlert, logAlertEvent } from "@/lib/alerts";
 import { usePersistEnvironmentAlerts } from "@/hooks/usePersistEnvironmentAlerts";
 import { useAlertsList } from "@/hooks/useAlertsList";
@@ -192,6 +193,14 @@ export default function Dashboard() {
   const targetsState = useGrowTargets(scopedGrowId ?? null);
   const [targetsEditorOpen, setTargetsEditorOpen] = useState(false);
   const currentSensorSnapshot = sensorState.status === "ok" ? sensorState.snapshot : null;
+  // Tent attribution for a manually saved alert, taken from the same snapshot
+  // the alert was derived from. Null when the current view spans several tents
+  // — inventing a winner there would pin a real breach on an arbitrary tent.
+  // Hoisted rather than inlined at the saveAlert call simply to keep that
+  // deeply-indented payload readable; nothing depends on its width any more
+  // (alert-events.test.ts used to scan a fixed 2000-char window here — this
+  // PR re-anchored it to the handler's content, so the constraint is gone).
+  const manualAlertTentId = currentSensorSnapshot?.tent_id ?? null;
   // Unverified/simulated snapshots remain visible with their honest source
   // label, but they cannot drive green quality, target, stage, alert, or
   // persistence semantics.
@@ -239,6 +248,9 @@ export default function Dashboard() {
   // user-scoped via RLS. Not automation; not device control.
   usePersistEnvironmentAlerts({
     growId: scopedGrowId ?? null,
+    // Sourced from the SAME snapshot being alerted on, so attribution can
+    // never describe different evidence. Null while the view spans tents.
+    tentId: dashboardHealthSnapshot?.tent_id ?? null,
     snapshot: dashboardHealthSnapshot,
     quality: dashboardSensorQuality,
     targets: compareSnapshotToTargets(
@@ -1354,6 +1366,31 @@ export default function Dashboard() {
                 targets: targetsCmp,
                 stage: alertContextStage,
               });
+              // Candidates above are DISPLAY-scoped and stay source-aware, so a
+              // manual reading current for 24h still shows its warning. Saving
+              // one writes a `public.alerts` row stamped first_seen_at = now(),
+              // which is the tighter live-window bar — the same gate the
+              // automatic persistence path uses. Without this, the manual Save
+              // button would bypass the invariant the automatic path enforces.
+              // Render-time value, used ONLY for the button's affordance. It
+              // ages: `now` defaults to the current clock, so a snapshot that
+              // was inside the window at render can be outside it by the time
+              // the grower clicks (between useNowTick ticks, or while a
+              // background tab's timers are throttled). The write itself must
+              // therefore re-evaluate — see the handler below.
+              //
+              // Deliberately `currentSensorSnapshot`, NOT `snap`: `snap` is
+              // already health-filtered to null for any non-live/manual source
+              // (dashboardSnapshotForHealthyCues), so the reason gate would see
+              // "no snapshot" for a sim/CSV/diary reading that is actually
+              // present, just ineligible. Passing the unfiltered snapshot lets
+              // "context_only_source" reach the grower instead of misreporting
+              // a real (if untrusted) reading as no reading at all.
+              const saveBlockedReason = describeAlertSaveBlock({
+                snapshot: currentSensorSnapshot,
+                quality: quality.quality,
+              });
+              const canPersistAlerts = saveBlockedReason === null;
               const vpdStageMissing =
                 snap?.vpd != null && normalizeVpdStage(alertContextStage) === "unknown";
               return (
@@ -1403,10 +1440,29 @@ export default function Dashboard() {
                                 <Button
                                   size="sm"
                                   variant="outline"
+                                  disabled={!canPersistAlerts}
+                                  title={saveBlockedReason ?? undefined}
                                   onClick={async () => {
+                                    // Re-evaluate against the CURRENT clock.
+                                    // The render-time value is a cached boolean
+                                    // that goes stale as the snapshot ages, so
+                                    // checking it here would only re-read the
+                                    // same answer and could still write an
+                                    // expired reading as a brand-new alert.
+                                    // `currentSensorSnapshot`, not `snap` — see
+                                    // the render-time comment above for why.
+                                    const blockedNow = describeAlertSaveBlock({
+                                      snapshot: currentSensorSnapshot,
+                                      quality: quality.quality,
+                                    });
+                                    if (blockedNow !== null) {
+                                      toast.error(blockedNow);
+                                      return;
+                                    }
                                     try {
                                       const saved = await saveAlert({
                                         grow_id: scopedGrowId,
+                                        tent_id: manualAlertTentId,
                                         severity: a.severity,
                                         title: a.title,
                                         reason: a.reason,

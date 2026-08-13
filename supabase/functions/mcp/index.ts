@@ -393,6 +393,7 @@ async function listRecentDiaryEntriesForOwnedGrow(client, growId, limit) {
     .from("diary_entries")
     .select(DIARY_COLUMNS)
     .eq("grow_id", growId)
+    .is("retracted_at", null)
     .order("entry_at", { ascending: false })
     .limit(normalizeDiaryLimit(limit));
   if (error) {

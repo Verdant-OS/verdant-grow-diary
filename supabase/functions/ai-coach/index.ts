@@ -423,6 +423,7 @@ Deno.serve(async (req) => {
         .from("diary_entries")
         .select("id,note,stage,entry_at,photo_url,plant_id,tent_id,details")
         .eq("grow_id", body.growId)
+        .is("retracted_at", null)
         .order("entry_at", { ascending: false })
         .limit(12);
       entries = (e ?? []) as DiaryRow[];

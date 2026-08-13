@@ -115,6 +115,17 @@ describe("performSafeSignOut", () => {
       expect(r.message).not.toMatch(/network|token|session/i);
     }
   });
+  it("treats a resolved { error } payload as failure without requiring throw (#588)", async () => {
+    // Mirrors supabase.auth.signOut() when the store forgets to rethrow.
+    const signOut = vi.fn().mockResolvedValue({ error: { message: "Auth session missing" } });
+    const r = await performSafeSignOut({ signOut });
+    expect(r.ok).toBe(false);
+    if (r.ok === false) {
+      expect(r.message).toBe(SIGN_OUT_FAILURE_MESSAGE);
+      expect(r.message).not.toMatch(/session|token|Auth/i);
+      expect(r.redirectTo).toBe(SAFE_SIGN_OUT_REDIRECT);
+    }
+  });
   it("never logs anything", () => {
     expect(SIGN_OUT_LOADING_LABEL).toMatch(/signing out/i);
   });

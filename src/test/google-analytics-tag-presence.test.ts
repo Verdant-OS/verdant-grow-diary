@@ -44,9 +44,12 @@ describe("Google Analytics consent gate", () => {
     );
   });
 
-  it("contains the dataLayer bootstrap and gtag definition", () => {
+  it("contains the dataLayer bootstrap and Arguments-shaped gtag queue push", () => {
     expect(LOADER).toMatch(/dataLayer\s*=\s*w\.dataLayer\s*\|\|\s*\[\]/);
-    expect(LOADER).toMatch(/function gtag\(\.\.\.args: unknown\[\]\)/);
+    // Must push `arguments` (Arguments object). Rest-parameter Array push is
+    // silently ignored by gtag.js and leaves collection dark.
+    expect(LOADER).toMatch(/dataLayer\.push\(arguments/);
+    expect(LOADER).not.toMatch(/dataLayer\.push\(args\)/);
   });
 
   it("blocks page_view events until consent is granted", () => {

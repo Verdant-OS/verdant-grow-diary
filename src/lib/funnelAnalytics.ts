@@ -39,12 +39,30 @@ export const FUNNEL_EVENTS = [
   "csv_import_started",
   "csv_import_completed",
   "csv_history_ai_doctor_clicked",
+  // Click-only entry intent. This does not claim that a review started or
+  // consumed a credit; that remains ai_doctor_review_started below.
+  "ai_doctor_cta_clicked",
   "ai_doctor_review_started",
   "historical_ai_review_started",
   "ai_doctor_result_received",
   "ai_doctor_session_saved",
+  // Blueprint entry intent. Tier-agnostic — Craft clicks land on live
+  // scoring, everyone else on the free preview — so deliberately NOT a
+  // paywall event: counting a Craft grower's navigation as an upgrade
+  // impression would inflate that funnel. It sits before paywall_viewed
+  // because for a non-Craft clicker that is literally the next step.
+  "blueprint_cta_clicked",
   "paywall_viewed",
   "paywall_cta_clicked",
+  // Top-up funnel. Deliberately NOT the paywall events: these fire for a
+  // PAYING grower who exhausted a monthly allowance, and paid denials must
+  // never register as an upgrade opportunity. Folding them into
+  // paywall_viewed / paywall_cta_clicked would inflate the upgrade funnel
+  // with people who already upgraded. They sit here because a top-up is the
+  // other pre-checkout intent surface, and both paths lead to
+  // checkout_started next.
+  "credit_pack_cta_viewed",
+  "credit_pack_cta_clicked",
   "checkout_started",
   "checkout_catalog_unavailable",
   "checkout_recovery_dismissed",
@@ -52,6 +70,12 @@ export const FUNNEL_EVENTS = [
   "checkout_recovery_retry",
   "checkout_recovery_plan_slug_fallback",
   "subscription_activated",
+  // Founder-note cross-sell, shown on the confirmation page a moment after
+  // subscription_activated. Its own pair, NOT paywall events: the viewer just
+  // paid, and counting a paid grower's impression as an upgrade-funnel view
+  // would inflate that funnel — the same separation as credit_pack_cta_*.
+  "founder_note_viewed",
+  "founder_note_clicked",
   "checkout_return_completed",
 ] as const;
 
@@ -87,6 +111,14 @@ export const FUNNEL_PARAM_KEYS = [
    * Never carries or approximates the raw rejected value.
    */
   "length_bucket",
+  /**
+   * Fixed-vocabulary alert metric token ("temp" | "rh" | "vpd" | "ppfd").
+   * Call sites are gated on the alert→Blueprint mapping, so only mapped
+   * tokens can reach here — never an id, a reading value, or grower input.
+   */
+  "metric",
+  /** Alert severity bucket ("critical" | "warning" | "watch" | "info"). Never an id. */
+  "severity",
 ] as const;
 
 type FunnelParamKey = (typeof FUNNEL_PARAM_KEYS)[number];

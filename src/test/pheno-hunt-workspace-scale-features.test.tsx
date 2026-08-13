@@ -307,14 +307,17 @@ describe("owner-only candidate-number assignment", () => {
 });
 
 describe("per-candidate readiness badge", () => {
-  it("labels an insufficient candidate honestly (evidence completeness, not quality)", () => {
+  it("labels an insufficient candidate with stage-appropriate readiness checks, not configured goals", () => {
     renderWorkspace({
       candidates: [candidate("p1", { candidateLabel: null, plantLabel: null })],
       totalCandidateCount: 1,
     });
     const badge = screen.getByTestId("workspace-readiness-p1");
     expect(badge).toHaveAttribute("data-readiness", "insufficient");
-    expect(badge).toHaveTextContent(/evidence goals/i);
+    expect(screen.getByTestId("workspace-readiness-count-p1")).toHaveTextContent(
+      /stage-appropriate readiness checks/i,
+    );
+    expect(badge.textContent ?? "").not.toMatch(/evidence goals/i);
     expect(badge.textContent ?? "").not.toMatch(/winner|best|keeper pick/i);
   });
 });

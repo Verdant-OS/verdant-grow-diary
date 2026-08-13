@@ -23,7 +23,7 @@ function memoryStorage(): Pick<Storage, "getItem" | "setItem" | "removeItem"> {
 describe("checkout-started marker", () => {
   it("round-trips a timestamp", () => {
     const storage = memoryStorage();
-    markCheckoutStarted(1_000_000, storage);
+    markCheckoutStarted(1_000_000, "plan", storage);
     expect(readCheckoutStartedAt(storage)).toBe(1_000_000);
     clearCheckoutStarted(storage);
     expect(readCheckoutStartedAt(storage)).toBeNull();
@@ -40,7 +40,7 @@ describe("checkout-started marker", () => {
   it("is fresh within the window, stale outside it, never fresh from the future", () => {
     const storage = memoryStorage();
     const started = 10_000_000;
-    markCheckoutStarted(started, storage);
+    markCheckoutStarted(started, "plan", storage);
     expect(hasFreshCheckoutContext(started + 5_000, storage)).toBe(true);
     expect(hasFreshCheckoutContext(started + CHECKOUT_CONTEXT_MAX_AGE_MS, storage)).toBe(true);
     expect(hasFreshCheckoutContext(started + CHECKOUT_CONTEXT_MAX_AGE_MS + 1, storage)).toBe(false);
@@ -59,7 +59,7 @@ describe("checkout-started marker", () => {
         throw new Error("blocked");
       },
     };
-    expect(() => markCheckoutStarted(1, throwing)).not.toThrow();
+    expect(() => markCheckoutStarted(1, "plan", throwing)).not.toThrow();
     expect(() => clearCheckoutStarted(throwing)).not.toThrow();
     expect(hasFreshCheckoutContext(1, throwing)).toBe(false);
   });

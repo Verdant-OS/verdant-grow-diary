@@ -140,6 +140,12 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   },
   { path: "/diagnostics", access: "operator" },
   {
+    path: "/diagnostics-lighting-measurement",
+    access: "operator",
+    description:
+      "Operator diagnostics: measurement readiness for the two lighting launch guides (technical readout, GA4/GSC verified stamps, PDF export).",
+  },
+  {
     path: "/diagnostics-seo-artifacts",
     access: "operator",
     description:
@@ -496,6 +502,11 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/terms", access: "public", description: "Terms of service." },
   { path: "/terms-of-service", access: "redirect", description: "→ /terms" },
   { path: "/timeline", access: "auth" },
+  {
+    path: "/tools/blueprint-targets",
+    access: "public",
+    description: "Public per-stage SOP target bands reference (temp, RH, EC, pH, PPFD, DLI).",
+  },
   {
     path: "/tools/vpd-calculator",
     access: "public",

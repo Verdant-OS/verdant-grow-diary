@@ -243,14 +243,14 @@ describe("QuickLog history summary — diary PDF export", () => {
   ];
 
   it("renders an Export diary PDF button on the recent diary summary list", () => {
-    render(<RecentQuickLogActivityPanel rawEntries={rawEntries} />);
+    renderWithClient(<RecentQuickLogActivityPanel rawEntries={rawEntries} />);
     const button = screen.getByTestId("quicklog-history-export-diary-pdf");
     expect(button).toBeInTheDocument();
     expect(button).toHaveTextContent(/Export diary PDF/i);
   });
 
   it("exports counts and recent rows from the diary summary list", () => {
-    render(<RecentQuickLogActivityPanel rawEntries={rawEntries} limit={10} />);
+    renderWithClient(<RecentQuickLogActivityPanel rawEntries={rawEntries} limit={10} />);
     fireEvent.click(screen.getByTestId("quicklog-history-export-diary-pdf"));
 
     expect(exportGrowDiaryReportAsPdf).toHaveBeenCalledTimes(1);

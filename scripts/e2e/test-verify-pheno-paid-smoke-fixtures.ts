@@ -69,6 +69,7 @@ test("HYDRATED when every candidate has score + smoke", () => {
   const out = verifyComparisonReadyRows("hunt", {
     plants,
     scores: plants.map((p) => ({ plant_id: p.id, traits: {}, note: "dense resinous" })),
+    decisions: [{ plant_id: plants[0].id, decision: "hold" }],
     smoke: plants.map((p) => ({
       plant_id: p.id,
       flavor_descriptors: ["citrus"],
@@ -156,6 +157,25 @@ test("BLOCKED when readiness != comparison_ready even with expressions", () => {
   });
   assert.equal(out.status, "BLOCKED");
   assert.notEqual(out.readiness, "comparison_ready");
+});
+
+test("BLOCKED when post-cure evidence exists without a post-harvest decision", () => {
+  const plants = makePlants(2);
+  const out = verifyComparisonReadyRows("hunt", {
+    plants,
+    scores: plants.map((p) => ({ plant_id: p.id, traits: {}, note: "dense" })),
+    smoke: plants.map((p) => ({
+      plant_id: p.id,
+      flavor_descriptors: ["citrus"],
+      effect_descriptors: ["uplifting"],
+      smoothness: 4,
+      potency_impression: 4,
+      verdict: "recorded",
+    })),
+    labs: [],
+  });
+  assert.equal(out.status, "BLOCKED");
+  assert.equal(out.readiness, "pending_until_harvest");
 });
 
 // CLI tests (no secrets in env → SKIPPED, and no secret leakage in output).

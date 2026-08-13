@@ -17,6 +17,7 @@
  * See docs/spec-pro-blueprint-overlay.md.
  */
 
+import { useEffect, useRef } from "react";
 import { ProBlueprintOverlay } from "@/components/ProBlueprintOverlay";
 import { BlueprintTeaser } from "@/components/BlueprintTeaser";
 import PaywallCta from "@/components/PaywallCta";
@@ -29,6 +30,7 @@ import { useRootZoneObservations } from "@/hooks/useRootZoneObservations";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 import { canUseCapability } from "@/lib/entitlements/capabilityAccess";
+import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 import { cn } from "@/lib/utils";
 
 export interface PlantBlueprintOverlaySectionProps {
@@ -76,6 +78,21 @@ export function PlantBlueprintOverlaySection({
   const { observations } = useRootZoneObservations(
     unlocked && plantId ? { kind: "plant", plantId } : null,
   );
+
+  // Paywall impression, once per mount. STRICTER than the render on purpose:
+  // the locked branch also shows on lookupFailed (the section must show
+  // something safe when the plan can't be read), but an unverified viewer may
+  // well be Craft — counting them would inflate the upgrade funnel, the same
+  // corruption the credit-denial notices guard against. So the impression
+  // requires a settled, verified, genuinely-unentitled viewer.
+  const lockedForVerifiedViewer =
+    !entLoading && !lookupFailed && !canUseCapability(entitlement, "blueprint");
+  const impressionTrackedRef = useRef(false);
+  useEffect(() => {
+    if (!lockedForVerifiedViewer || impressionTrackedRef.current) return;
+    impressionTrackedRef.current = true;
+    trackFunnelEvent("paywall_viewed", { surface: "blueprint_locked" });
+  }, [lockedForVerifiedViewer]);
 
   // Presentation-only gate; the client hint is never authoritative for data
   // access (RLS enforces that). Blueprint is premium analysis, so hiding it

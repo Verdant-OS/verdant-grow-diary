@@ -13,7 +13,7 @@ function makeChain() {
       calls.push({ method, args });
       return chain;
     };
-  for (const m of ["select", "in", "eq", "order", "abortSignal"]) chain[m] = record(m);
+  for (const m of ["select", "in", "eq", "is", "order", "abortSignal"]) chain[m] = record(m);
   chain.limit = (...args: unknown[]) => {
     calls.push({ method: "limit", args });
     return chain;

@@ -96,6 +96,7 @@ export function usePostGrowLearningReportData(
           .from("diary_entries")
           .select("id,note,photo_url,entry_at,details")
           .eq("grow_id", growId)
+          .is("retracted_at", null)
           .order("entry_at", { ascending: false })
           .limit(250),
         tentIds.length > 0

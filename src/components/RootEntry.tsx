@@ -1,6 +1,10 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import { useAuth } from "@/store/auth";
-import { resolveRootEntrySurface } from "@/lib/rootEntryRules";
+import {
+  resolveRootEntrySurface,
+  ROOT_ENTRY_PRE_HYDRATION_SURFACE,
+  shouldTrackRootLandingPageView,
+} from "@/lib/rootEntryRules";
 
 // Keep the signed-out apex light: the protected shell and dashboard chunks are
 // only requested after AuthProvider resolves an authenticated user.
@@ -25,33 +29,33 @@ function RootEntryLoader() {
  */
 export default function RootEntry() {
   const { user, loading } = useAuth();
-  // The server always renders the "loading" surface (no session on the SSR
-  // pass). A returning grower's cached session can resolve before React's
-  // first client render, which would otherwise commit `landing`/`dashboard`
-  // against server HTML that says `loading`. Staying on the loading surface
-  // until after hydration keeps the first client pass byte-identical to SSR;
-  // the real surface commits on the next render.
+  // SSR has no trusted session, so both the server and first client pass render
+  // the public landing surface. AuthProvider may restore a cached session
+  // before hydration finishes; waiting for this effect keeps those two passes
+  // byte-identical. The existing auth resolver takes over on the next render.
   const [hydrated, setHydrated] = useState(false);
   useEffect(() => {
     setHydrated(true);
   }, []);
 
-  const surface = hydrated
-    ? resolveRootEntrySurface({
-        authLoading: loading,
-        hasAuthenticatedUser: Boolean(user),
-      })
-    : "loading";
+  const rootEntryState = {
+    authLoading: loading,
+    hasAuthenticatedUser: Boolean(user),
+  };
 
-  // The Suspense boundary is rendered unconditionally so the server ("loading")
-  // and first client pass (session may already be cached) produce the same tree
-  // shape — a conditional boundary here caused a hydration mismatch at `/`.
+  const surface = hydrated
+    ? resolveRootEntrySurface(rootEntryState)
+    : ROOT_ENTRY_PRE_HYDRATION_SURFACE;
+  const trackLandingPageView = shouldTrackRootLandingPageView(rootEntryState);
+
+  // Keep this boundary unconditional so SSR and the first client pass retain
+  // the same tree shape even when a returning grower's session is cached.
   return (
     <Suspense fallback={<RootEntryLoader />}>
       {surface === "loading" ? (
         <RootEntryLoader />
       ) : surface === "landing" ? (
-        <Landing canonicalPath="/" />
+        <Landing canonicalPath="/" trackPageView={trackLandingPageView} />
       ) : (
         <AppShell>
           <Dashboard />

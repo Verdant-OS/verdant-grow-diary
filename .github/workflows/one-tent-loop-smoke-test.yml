@@ -2,13 +2,13 @@ name: One-Tent Loop smoke test
 
 on:
   push:
-    branches: [main]
+    branches: [main, verdant-grow-diary]
   pull_request:
     paths-ignore:
-      - 'src/lib/ggsSentinelSmokeRunner.ts'
-      - 'src/components/GgsSentinelSmokeRunnerPanel.tsx'
-      - 'src/test/ggs-sentinel-*.test.ts'
-      - 'src/test/ggs-sentinel-*.test.tsx'
+      - "src/lib/ggsSentinelSmokeRunner.ts"
+      - "src/components/GgsSentinelSmokeRunnerPanel.tsx"
+      - "src/test/ggs-sentinel-*.test.ts"
+      - "src/test/ggs-sentinel-*.test.tsx"
   workflow_dispatch:
 
 jobs:
@@ -55,4 +55,3 @@ jobs:
 
       - name: VPD stage mapping ownership scanner
         run: bun run test:vpd-stage-normalization-ownership
-

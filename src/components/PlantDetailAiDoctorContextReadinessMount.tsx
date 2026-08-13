@@ -219,7 +219,10 @@ export default function PlantDetailAiDoctorContextReadinessMount({
     <div data-testid="plant-detail-ai-doctor-context-readiness-mount" className="my-3 space-y-2">
       <AiDoctorContextReadinessPanel
         context={built.context}
-        openAlertsCount={alerts.rows.length}
+        // The readiness panel renders this under "Open alerts", so it must be
+        // the strictly-open count over the UNCAPPED set — the hook's rows
+        // include acknowledged alerts and are truncated for display.
+        openAlertsCount={alerts.openCount}
         quickActions={{
           // Every action routes into an existing Quick Log surface; the
           // grower still reviews and saves. Dispatching never writes.

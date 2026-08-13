@@ -26,6 +26,17 @@ Because of this:
 - No automatic data cleanup, deletion, or mutation of existing grow data
   happens outside the intentional Quick Log save flow itself.
 
+## Write-risk playbook
+
+For the full strategy (read vs write split, fixture garden, create/delete,
+denylist, and #570 residue prune), see:
+
+**[`docs/cleanup/e2e-test-data-management.md`](../docs/cleanup/e2e-test-data-management.md)**
+
+Write-producing **pheno** smokes (`e2e:pheno-journey`, workspace integrity)
+call `assertPhenoWriteFixtureEnv` + `assertGrowAllowedForWriteSmoke` and name
+hunts with `buildE2eHuntName` (never append to the wizard prefill).
+
 ## Safety guarantees
 
 - No app-level auth bypass.
@@ -121,6 +132,21 @@ full checklist in [`e2e/FIXTURE_SETUP.md`](./FIXTURE_SETUP.md) and the
 
 > For the end-to-end fixture setup, screenshot guidance, and account
 > rotation steps, see [`e2e/FIXTURE_SETUP.md`](./FIXTURE_SETUP.md).
+
+### Garden rotation CLI
+
+Prune **E2E-prefixed pheno hunts** on a clean fixture account (dry-run by default):
+
+```bash
+export E2E_ROTATION_TARGET_PROJECT_REF=<supabase-project-ref>  # required pin
+bun run e2e:fixture:rotate:dry
+bun run e2e:fixture:rotate              # hunts + auto-seed tent/plant
+bun run e2e:fixture:rotate:with-diary   # also E2E diary notes on fixture plants
+```
+
+Requires fixture user JWT, Supabase URL/anon, and **project pin**. Contaminated
+accounts (real grows) are **blocked**. CI: workflow_dispatch only
+(`e2e-fixture-garden-rotation.yml`). See `docs/cleanup/e2e-test-data-management.md` §8.
 
 ## Rotate or recreate the disposable E2E account
 

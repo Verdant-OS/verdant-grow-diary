@@ -108,6 +108,26 @@ describe("saving", () => {
     await waitFor(() => expect(screen.queryByText("Unsaved changes")).not.toBeInTheDocument());
   });
 
+  it("shows an accessible confirmation after a successful save and clears it on the next edit", async () => {
+    const onSave = vi.fn().mockResolvedValue(true);
+    renderEditor([], onSave);
+    fireEvent.change(screen.getByTestId("pheno-breeding-objective-axis-select"), {
+      target: { value: "stretch" },
+    });
+    fireEvent.change(screen.getByTestId("pheno-breeding-objective-threshold-input"), {
+      target: { value: "2" },
+    });
+    fireEvent.click(screen.getByTestId("pheno-breeding-objective-add-target"));
+    fireEvent.click(screen.getByTestId("pheno-breeding-objective-save"));
+
+    const confirmation = await screen.findByTestId("pheno-breeding-objective-saved");
+    expect(confirmation).toHaveAttribute("role", "status");
+    expect(confirmation).toHaveTextContent("Saved objective");
+
+    fireEvent.click(screen.getByTestId("pheno-breeding-objective-remove-stretch"));
+    expect(screen.queryByTestId("pheno-breeding-objective-saved")).not.toBeInTheDocument();
+  });
+
   it("surfaces an inline error and keeps the draft when save fails", async () => {
     const onSave = vi.fn().mockResolvedValue(false);
     renderEditor([], onSave);
@@ -124,6 +144,7 @@ describe("saving", () => {
       expect(screen.getByTestId("pheno-breeding-objective-error")).toBeInTheDocument(),
     );
     expect(screen.getByTestId("pheno-breeding-objective-target-stretch")).toBeInTheDocument();
+    expect(screen.queryByTestId("pheno-breeding-objective-saved")).not.toBeInTheDocument();
   });
 
   it("disables save while a save is in flight", () => {

@@ -76,6 +76,7 @@ async function loadConnectedActivationEvidence(
       .from("diary_entries")
       .select("id,grow_id,tent_id,plant_id,entry_at,details")
       .eq("grow_id", scope.growId)
+      .is("retracted_at", null)
       .order("entry_at", { ascending: false })
       .limit(ONE_TENT_ACTIVATION_EVIDENCE_LIMIT),
     supabase

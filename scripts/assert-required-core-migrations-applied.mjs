@@ -6,8 +6,8 @@
  * - the selected environment is mapped to a pinned Supabase project ref;
  * - the URL identity is proven before psql is invoked;
  * - ambient PG* and DATABASE_URL fallbacks are ignored;
- * - the connection URL is provided to libpq through child-process
- *   PGDATABASE, never through argv;
+ * - the identity-checked connection is provided through discrete child-process
+ *   libpq variables, never through argv;
  * - raw psql stderr and connection strings are never printed or persisted;
  * - only ordinary and partitioned public relations satisfy a requirement.
  */
@@ -17,6 +17,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   assertSupabaseDatabaseTargetIdentity,
+  buildLibpqConnectionEnvironment,
   databaseTargetForEnvironment,
   sanitizeSupabaseDatabaseUrlForPsql,
   SupabaseDatabaseTargetIdentityError,
@@ -102,15 +103,11 @@ export function buildPsqlEnvironment(sourceEnv, databaseUrl, targetEnv) {
     }
   }
   const connection = sanitizeSupabaseDatabaseUrlForPsql(databaseUrl, targetEnv);
-  childEnv.PGDATABASE = connection.databaseUrl;
-  // Never trust ambient PGSSLMODE. Query-free Dashboard URLs default to
-  // require, while an explicit verify-ca/verify-full request is preserved.
-  childEnv.PGSSLMODE = connection.sslMode;
-  return childEnv;
+  return { ...childEnv, ...buildLibpqConnectionEnvironment(connection) };
 }
 
 function createArtifactWriters({ targetEnv, reportPath, auditPath, expected, logger, now }) {
-  const writeAudit = (outcome, note = "") => {
+  const writeAudit = (outcome, note = "", extras = {}) => {
     if (!auditPath) return;
     const observed = expected.filter((entry) => entry.present !== null);
     const payload = {
@@ -125,6 +122,20 @@ function createArtifactWriters({ targetEnv, reportPath, auditPath, expected, log
       missing_count: observed.filter((entry) => entry.present === false).length,
       expected,
       ...(note ? { note } : {}),
+      // Safe connection identity only — never credentials, never raw URL.
+      ...(extras.identity
+        ? {
+            database_identity: {
+              project_ref: extras.identity.projectRef,
+              connection_mode: extras.identity.connectionMode,
+              hostname: extras.identity.hostname,
+              port: extras.identity.port,
+            },
+          }
+        : {}),
+      ...(typeof extras.psql_status === "number" || typeof extras.psql_status === "string"
+        ? { psql_status: Number(extras.psql_status) }
+        : {}),
     };
     writeTextFile(auditPath, `${JSON.stringify(payload, null, 2)}\n`, logger);
   };
@@ -268,7 +279,7 @@ export function runRequiredCoreMigrationsApplied({
   if (result.error) {
     logger.error("psql is not invocable on this runner. No schema verdict was reached.");
     writeReport("FAILED - psql unavailable", ["Install `postgresql-client` and re-run the gate."]);
-    writeAudit("psql_not_invocable", "psql could not be invoked.");
+    writeAudit("psql_not_invocable", "psql could not be invoked.", { identity });
     return EXIT.PSQL_NOT_INVOCABLE;
   }
   if (result.status !== 0) {
@@ -293,16 +304,20 @@ export function runRequiredCoreMigrationsApplied({
     const psqlStatus = String(result.status);
     const statusHint =
       result.status === 2
-        ? "psql status 2 means the CONNECTION to the server went bad — either it was never established, or an established session was lost. The exit code alone cannot distinguish those, so this gate reached no verdict on the schema either way. Treat reachability and credentials for the target as the first suspects rather than schema drift; note GitHub-hosted runners are IPv4-only, so a direct db.<ref>.supabase.co host may need the pooler host instead."
+        ? "psql status 2 means the CONNECTION to the server went bad — either it was never established, or an established session was lost. The exit code alone cannot distinguish those, so this gate reached no verdict on the schema either way. Treat reachability and credentials for the target as the first suspects rather than schema drift; note GitHub-hosted runners are IPv4-only, so a direct db.<ref>.supabase.co host may need the pooler host instead. Owner fix: refresh environment secret SUPABASE_DB_URL_SANDBOX (or SUPABASE_DB_URL for production) in Settings → Environments with a current Session/Transaction pooler URI for the pinned project, then re-run the workflow."
         : result.status === 3
           ? "psql status 3 means the SQL was rejected under ON_ERROR_STOP — the connection itself succeeded."
           : "psql reported its own fatal error before a verdict was reached.";
     writeReport("FAILED - schema query failed", [
       "The target schema remains unknown. Raw psql stderr was suppressed to protect credentials.",
       `psql exit status: ${psqlStatus}.`,
+      `Pinned project: ${identity.projectRef} (${identity.connectionMode} @ ${identity.hostname}:${identity.port}).`,
       statusHint,
     ]);
-    writeAudit("schema_query_failed", `psql returned a non-zero status (${psqlStatus}).`);
+    writeAudit("schema_query_failed", `psql returned a non-zero status (${psqlStatus}).`, {
+      identity,
+      psql_status: result.status,
+    });
     return EXIT.SCHEMA_QUERY_FAILED;
   }
 

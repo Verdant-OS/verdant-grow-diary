@@ -57,9 +57,11 @@ function buildUpgradeHref(pathname: string, search: string): string {
     typeof pathname === "string" && (typeof search === "string" ? search : "").startsWith("?")
       ? `${pathname}${search}`
       : pathname;
+  // The gate pitches Pro by name ("Pro feature" / "Upgrade to Pro"), so
+  // preselect the Pro card. `?plan=` never auto-opens checkout.
   const safe = sanitizeCheckoutReturnTo(candidate);
-  if (!safe) return "/pricing";
-  const params = new URLSearchParams({ returnTo: safe });
+  const params = new URLSearchParams({ plan: "pro_annual" });
+  if (safe) params.set("returnTo", safe);
   return `/pricing?${params.toString()}`;
 }
 
@@ -77,7 +79,14 @@ export default function PhenoTrackerUpgradeGate({
     [location.pathname, location.search],
   );
 
-  if (loading) {
+  const entitled = canUseFeature(entitlement, "pheno_tracker");
+  const readOnlyOk = allowReadOnly && canReadExistingFeatureData(entitlement, "pheno_tracker");
+
+  // #564: never unmount entitled children during a soft entitlement revalidate.
+  // useMyEntitlements keeps loading=false for same-user refreshes, but if loading
+  // is true while we already know the grower is entitled (or read-only eligible),
+  // keep the workspace/wizard mounted so unsaved input is not discarded.
+  if (loading && !entitled && !readOnlyOk) {
     return (
       <div
         data-testid={`${testId}-loading`}
@@ -88,7 +97,7 @@ export default function PhenoTrackerUpgradeGate({
     );
   }
 
-  if (lookupFailed) {
+  if (lookupFailed && !entitled && !readOnlyOk) {
     return (
       <section
         data-testid={`${testId}-verification-failed`}
@@ -103,7 +112,7 @@ export default function PhenoTrackerUpgradeGate({
           Plan check unavailable
         </h2>
         <p className="mt-3 text-sm text-muted-foreground">
-          We couldn&apos;t verify Pheno Tracker access right now. Your plan has not changed.
+          We couldn't verify Pheno Tracker access right now. Your plan has not changed.
         </p>
         <Button
           type="button"
@@ -118,11 +127,11 @@ export default function PhenoTrackerUpgradeGate({
     );
   }
 
-  if (canUseFeature(entitlement, "pheno_tracker")) {
+  if (entitled) {
     return <>{children}</>;
   }
 
-  if (allowReadOnly && canReadExistingFeatureData(entitlement, "pheno_tracker")) {
+  if (readOnlyOk) {
     return (
       <div data-testid={`${testId}-readonly`}>
         <div

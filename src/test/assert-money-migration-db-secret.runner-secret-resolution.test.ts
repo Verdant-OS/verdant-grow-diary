@@ -124,13 +124,13 @@ describe("SUPABASE_DB_URL_SANDBOX resolution — runner-shaped values", () => {
   it("LIVE follows the same whitespace/trim rules", () => {
     const missing = run({ TARGET_ENV: "live", SUPABASE_DB_URL: "  \n  " });
     expect(missing.status).toBe(1);
-    expect(missing.stderr).toMatch(/::error title=SUPABASE_DB_URL_LIVE missing::/);
+    expect(missing.stderr).toMatch(/::error title=SUPABASE_DB_URL missing::/);
 
     const configured = run({
       TARGET_ENV: "live",
       SUPABASE_DB_URL: "postgres://ok\n",
     });
     expect(configured.status).toBe(0);
-    expect(configured.stdout).toContain("SUPABASE_DB_URL_LIVE is configured");
+    expect(configured.stdout).toContain("SUPABASE_DB_URL is configured");
   });
 });

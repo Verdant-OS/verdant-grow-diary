@@ -39,6 +39,10 @@ import {
   buildConnectedActivationRoutes,
   isOneTentActivationIntent,
 } from "@/lib/connectedOneTentActivationRules";
+import {
+  readFastAddParam,
+  fastAddPickerBannerCopy,
+} from "@/lib/fastAddActionRules";
 
 const EMPTY_QUERY_ROWS: never[] = [];
 
@@ -49,6 +53,7 @@ function formatPlantCount(count: number): string {
 export default function Tents() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const pendingFastAdd = readFastAddParam(searchParams.toString());
   const { user } = useAuth();
   // Shared URL `?growId=` resolution against RLS-loaded grows.
   const { urlGrowId, scopedGrowName, isValidScopedGrow, backHref } = useScopedGrow();
@@ -145,6 +150,15 @@ export default function Tents() {
           ) : null
         }
       />
+      {pendingFastAdd ? (
+        <p
+          role="status"
+          data-testid="fast-add-picker-banner"
+          className="mb-4 rounded-xl border border-border/60 bg-muted/40 px-4 py-3 text-sm text-muted-foreground"
+        >
+          {fastAddPickerBannerCopy("tent", pendingFastAdd)}
+        </p>
+      ) : null}
     </>
   );
 

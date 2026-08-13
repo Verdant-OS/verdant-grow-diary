@@ -14,7 +14,7 @@
  * entry with a short observational reason (kept visible — never silently
  * removed). Callers must pass what they already have.
  */
-import { sensorsPath } from "@/lib/routes";
+import { plantDetailPath, sensorsPath } from "@/lib/routes";
 import { buildSensorsTentRouteHref, SENSORS_TENT_ROUTE } from "@/lib/sensorRouteTentIntentRules";
 import { QUICK_LOG_ACTIVITY_DEFINITIONS } from "@/constants/quickLogActivityTypes";
 import {
@@ -70,6 +70,23 @@ export interface PlantDetailQuickActionsInput {
 export const PLANT_RELATIVE_TIMELINE_ANCHOR_ID = "plant-relative-timeline" as const;
 export const PLANT_PHOTOS_ANCHOR_ID = "plant-photos" as const;
 export const PLANT_AI_DOCTOR_REVIEW_ANCHOR_ID = "plant-ai-doctor-review" as const;
+export const PLANT_BLUEPRINT_ANCHOR_ID = "plant-blueprint" as const;
+
+/**
+ * Deep link to a plant's Blueprint section.
+ *
+ * Shared so no caller hand-rolls the URL and drifts from the anchor
+ * DeepLinkAnchorRestorer listens for — a hand-written string that stops
+ * matching fails silently, landing the grower at the top of a long page with
+ * nothing to indicate anything went wrong.
+ *
+ * Returns null for a missing plant id rather than a half-built path.
+ */
+export function buildPlantBlueprintPath(plantId: string | null | undefined): string | null {
+  const id = typeof plantId === "string" ? plantId.trim() : "";
+  if (!id) return null;
+  return `${plantDetailPath(id)}#${PLANT_BLUEPRINT_ANCHOR_ID}`;
+}
 
 const LABELS: Record<PlantDetailQuickActionKind, { label: string; description: string }> = {
   quicklog: {

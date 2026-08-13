@@ -2,6 +2,15 @@ import { useMemo } from "react";
 import { Leaf, AlertTriangle } from "lucide-react";
 
 import { normalizeDiaryEntries, type NormalizeDiaryInput } from "@/lib/diaryEntryRules";
+import {
+  buildQuickLogEntryHandleIndex,
+  handleRootId,
+  type QuickLogEntryHandleRef,
+} from "@/lib/quick-log/quickLogRevisionRules";
+import { useQuickLogRevisionBadges } from "@/hooks/useQuickLogRevisionBadges";
+import QuickLogEntryIntegrityControls, {
+  QuickLogEditedBadge,
+} from "@/components/QuickLogEntryIntegrityControls";
 import { buildFeedingHistory, type FeedingHistoryRow } from "@/lib/feedingHistoryRules";
 import {
   buildEcCompensationPreview,
@@ -19,6 +28,8 @@ interface FeedingHistoryPanelProps {
   /** Optional cap for the rendered list. Defaults to 20. */
   limit?: number;
   className?: string;
+  /** Notifies the owner (e.g. Timeline local state) after a correction/retraction. */
+  onEntryChanged?: () => void;
 }
 
 function fmtNumber(n: number | null, opts?: { suffix?: string }): string {
@@ -53,7 +64,19 @@ function MetricChip({ label, value }: { label: string; value: string }) {
   );
 }
 
-function Row({ row }: { row: FeedingHistoryRow }) {
+function Row({
+  row,
+  integrityHandle,
+  correctionCount,
+  currentNote,
+  onEntryChanged,
+}: {
+  row: FeedingHistoryRow;
+  integrityHandle?: QuickLogEntryHandleRef | null;
+  correctionCount?: number;
+  currentNote?: string | null;
+  onEntryChanged?: () => void;
+}) {
   return (
     <li
       id={row.timelineAnchorId ?? undefined}
@@ -73,7 +96,19 @@ function Row({ row }: { row: FeedingHistoryRow }) {
           >
             {row.sourceLabel}
           </span>
+          <QuickLogEditedBadge correctionCount={correctionCount ?? 0} />
         </div>
+        {integrityHandle && (
+          <QuickLogEntryIntegrityControls
+            handle={integrityHandle}
+            currentNote={currentNote ?? null}
+            currentOccurredAt={row.occurredAt}
+            currentPlantId={row.plantId}
+            plantId={row.plantId}
+            tentId={row.tentId}
+            onChanged={onEntryChanged}
+          />
+        )}
         {row.warnings.length > 0 && (
           <span
             className="inline-flex items-center gap-1 rounded-full border border-yellow-500/30 bg-yellow-500/10 px-2 py-0.5 text-[11px] text-yellow-300"
@@ -149,6 +184,7 @@ export default function FeedingHistoryPanel({
   rawEntries,
   limit = 20,
   className,
+  onEntryChanged,
 }: FeedingHistoryPanelProps) {
   const rows = useMemo(() => {
     // Mirror Timeline's normalization convention: lift `details.event_type`
@@ -167,6 +203,31 @@ export default function FeedingHistoryPanel({
     const all = buildFeedingHistory(normalized);
     return all.slice(0, Math.max(0, limit));
   }, [rawEntries, limit]);
+
+  // Correction/retraction wiring (issue #786): handles resolved from the raw
+  // entries; rows without a Quick Log handle stay control-free.
+  const handleIndex = useMemo(() => buildQuickLogEntryHandleIndex(rawEntries), [rawEntries]);
+  const rawNoteById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const raw of rawEntries ?? []) {
+      const r = (raw ?? {}) as Record<string, unknown>;
+      if (typeof r.id === "string" && typeof r.note === "string") map.set(r.id, r.note);
+    }
+    return map;
+  }, [rawEntries]);
+  const rootIds = useMemo(
+    () =>
+      [
+        ...new Set(
+          rows
+            .map((r) => handleIndex.get(r.id))
+            .filter((h): h is NonNullable<typeof h> => !!h)
+            .map(handleRootId),
+        ),
+      ].filter((id) => id.length > 0),
+    [rows, handleIndex],
+  );
+  const { badges } = useQuickLogRevisionBadges(rootIds);
 
   return (
     <section className={"glass rounded-2xl p-4 " + (className ?? "")} aria-label="Feeding history">
@@ -189,9 +250,20 @@ export default function FeedingHistoryPanel({
         </div>
       ) : (
         <ul className="space-y-2">
-          {rows.map((r) => (
-            <Row key={r.id} row={r} />
-          ))}
+          {rows.map((r) => {
+            const handle = handleIndex.get(r.id) ?? null;
+            const badge = handle ? badges.get(handleRootId(handle)) : undefined;
+            return (
+              <Row
+                key={r.id}
+                row={r}
+                integrityHandle={handle}
+                correctionCount={badge?.correctionCount ?? 0}
+                currentNote={rawNoteById.get(r.id) ?? null}
+                onEntryChanged={onEntryChanged}
+              />
+            );
+          })}
         </ul>
       )}
     </section>

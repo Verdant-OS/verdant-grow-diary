@@ -90,6 +90,7 @@ vi.mock("@/integrations/supabase/client", () => {
       lastFilter = { column, value };
       return q;
     };
+    q.is = () => q;
     q.order = () => q;
     q.limit = () => Promise.resolve(nextResponse);
     return q;

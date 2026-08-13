@@ -68,6 +68,9 @@ function resolveSession(envName: string): { path?: string; skipReason?: string }
 
 const FREE_SESSION = resolveSession("E2E_PHENO_FREE_SESSION_FILE");
 const PRO_SESSION = resolveSession("E2E_PHENO_PRO_SESSION_FILE");
+const PRO_ANNUAL_SESSION = resolveSession("E2E_PHENO_PRO_ANNUAL_SESSION_FILE");
+const CRAFT_SESSION = resolveSession("E2E_PHENO_CRAFT_SESSION_FILE");
+const CRAFT_ANNUAL_SESSION = resolveSession("E2E_PHENO_CRAFT_ANNUAL_SESSION_FILE");
 const FOUNDER_SESSION = resolveSession("E2E_PHENO_FOUNDER_SESSION_FILE");
 const CANCELED_SESSION = resolveSession("E2E_PHENO_CANCELED_SESSION_FILE");
 
@@ -113,16 +116,22 @@ function bindRoleSession(session: { path?: string }) {
 const MISSING_EVIDENCE_HUNT = process.env.E2E_PHENO_HUNT_ID_MISSING_EVIDENCE;
 const COMPARISON_READY_HUNT = process.env.E2E_PHENO_HUNT_ID_COMPARISON_READY;
 
-// Pick a Pro-capable session for the paid workspace scenarios: prefer Pro,
-// fall back to Founder. Missing → scenarios in that block skip cleanly.
+// Pick a paid session for the workspace scenarios: prefer Pro monthly, then
+// annual, then Craft monthly/annual, then Founder. Missing → scenarios in that
+// block skip cleanly.
 const PAID_SESSION = PRO_SESSION.path
   ? PRO_SESSION
-  : FOUNDER_SESSION.path
-    ? FOUNDER_SESSION
-    : {
-        skipReason:
-          "SKIPPED: neither E2E_PHENO_PRO_SESSION_FILE nor E2E_PHENO_FOUNDER_SESSION_FILE is set.",
-      };
+  : PRO_ANNUAL_SESSION.path
+    ? PRO_ANNUAL_SESSION
+    : CRAFT_SESSION.path
+      ? CRAFT_SESSION
+      : CRAFT_ANNUAL_SESSION.path
+        ? CRAFT_ANNUAL_SESSION
+        : FOUNDER_SESSION.path
+          ? FOUNDER_SESSION
+          : {
+              skipReason: "SKIPPED: no Pro, Craft, or Founder paid session is set.",
+            };
 
 async function assertNoForbiddenCopy(page: Page) {
   const body = (await page.locator("body").innerText()).toLowerCase();
@@ -170,7 +179,7 @@ test.describe("A. Free user gate", () => {
     // returnTo is the ONLY query param production adds (URLSearchParams).
     await expect(cta).toHaveAttribute("href", "/pricing?returnTo=%2Fpheno-hunts%2Fnew");
     const originBefore = new URL(page.url()).origin;
-    await cta.click();
+    await cta.click({ noWaitAfter: true });
     await expect(page).toHaveURL(/\/pricing\?returnTo=%2Fpheno-hunts%2Fnew$/);
     expect(new URL(page.url()).origin, "CTA must never leave the app origin").toBe(originBefore);
     await expect(page).not.toHaveURL(/\/auth/);
@@ -212,27 +221,90 @@ test.describe("C. Pro Monthly access", () => {
   test.skip(!PRO_SESSION.path, PRO_SESSION.skipReason ?? "SKIPPED: no Pro session.");
   bindRoleSession(PRO_SESSION);
 
-  test("Pro user can load /pheno-hunts/new without auth wall", async ({ page }) => {
+  test("Pro Monthly user can load /pheno-hunts/new without auth wall", async ({ page }) => {
     await page.goto("/pheno-hunts/new");
-    expect(page.url()).not.toContain("/auth");
+    await expect(page).not.toHaveURL(/\/auth/);
+    await expect(
+      page.getByRole("heading", { name: "Start Pheno Hunt" }),
+      "Pro Monthly user must reach the mounted paid route",
+    ).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByTestId("pheno-tracker-upgrade-gate")).toHaveCount(0);
     await assertNoForbiddenCopy(page);
   });
 });
 
-// ─── C2. Founder Lifetime can reach paid workspace ────────────────────────
-test.describe("C2. Founder Lifetime access", () => {
+// ─── C2. Pro Annual can reach paid workspace ──────────────────────────────
+test.describe("C2. Pro Annual access", () => {
+  test.skip(
+    !PRO_ANNUAL_SESSION.path,
+    PRO_ANNUAL_SESSION.skipReason ?? "SKIPPED: no Pro Annual session.",
+  );
+  bindRoleSession(PRO_ANNUAL_SESSION);
+
+  test("Pro Annual user can load /pheno-hunts/new without auth wall", async ({ page }) => {
+    await page.goto("/pheno-hunts/new");
+    await expect(page).not.toHaveURL(/\/auth/);
+    await expect(
+      page.getByRole("heading", { name: "Start Pheno Hunt" }),
+      "Pro Annual user must reach the mounted paid route",
+    ).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByTestId("pheno-tracker-upgrade-gate")).toHaveCount(0);
+    await assertNoForbiddenCopy(page);
+  });
+});
+
+// ─── C3. Craft Monthly can reach paid workspace ──────────────────────────
+test.describe("C3. Craft Monthly access", () => {
+  test.skip(!CRAFT_SESSION.path, CRAFT_SESSION.skipReason ?? "SKIPPED: no Craft session.");
+  bindRoleSession(CRAFT_SESSION);
+
+  test("Craft Monthly user can load /pheno-hunts/new without auth wall", async ({ page }) => {
+    await page.goto("/pheno-hunts/new");
+    await expect(page).not.toHaveURL(/\/auth/);
+    await expect(page.getByRole("heading", { name: "Start Pheno Hunt" })).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(page.getByTestId("pheno-tracker-upgrade-gate")).toHaveCount(0);
+    await assertNoForbiddenCopy(page);
+  });
+});
+
+test.describe("C4. Craft Annual access", () => {
+  test.skip(
+    !CRAFT_ANNUAL_SESSION.path,
+    CRAFT_ANNUAL_SESSION.skipReason ?? "SKIPPED: no Craft Annual session.",
+  );
+  bindRoleSession(CRAFT_ANNUAL_SESSION);
+
+  test("Craft Annual user can load /pheno-hunts/new without auth wall", async ({ page }) => {
+    await page.goto("/pheno-hunts/new");
+    await expect(page).not.toHaveURL(/\/auth/);
+    await expect(page.getByRole("heading", { name: "Start Pheno Hunt" })).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(page.getByTestId("pheno-tracker-upgrade-gate")).toHaveCount(0);
+    await assertNoForbiddenCopy(page);
+  });
+});
+
+// ─── C5. Founder Lifetime can reach paid workspace ────────────────────────
+test.describe("C5. Founder Lifetime access", () => {
   test.skip(!FOUNDER_SESSION.path, FOUNDER_SESSION.skipReason ?? "SKIPPED: no Founder session.");
   bindRoleSession(FOUNDER_SESSION);
 
   test("Founder user can load /pheno-hunts/new without auth wall", async ({ page }) => {
     await page.goto("/pheno-hunts/new");
-    expect(page.url()).not.toContain("/auth");
+    await expect(page).not.toHaveURL(/\/auth/);
+    await expect(page.getByRole("heading", { name: "Start Pheno Hunt" })).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(page.getByTestId("pheno-tracker-upgrade-gate")).toHaveCount(0);
     await assertNoForbiddenCopy(page);
   });
 });
 
-// ─── C3. Canceled/expired user is blocked ─────────────────────────────────
-test.describe("C3. Canceled/expired blocked from paid pheno workspace", () => {
+// ─── C6. Canceled/expired user is blocked ─────────────────────────────────
+test.describe("C6. Canceled/expired blocked from paid pheno workspace", () => {
   test.skip(!CANCELED_SESSION.path, CANCELED_SESSION.skipReason ?? "SKIPPED: no Canceled session.");
   bindRoleSession(CANCELED_SESSION);
 
@@ -248,6 +320,41 @@ test.describe("C3. Canceled/expired blocked from paid pheno workspace", () => {
     await assertNoForbiddenCopy(page);
   });
 });
+
+function describeBlueprintCapability(
+  label: string,
+  session: { path?: string; skipReason?: string },
+  expectedUnlocked: boolean,
+) {
+  test.describe(`C7. ${label} Blueprint capability`, () => {
+    test.skip(!session.path, session.skipReason ?? `SKIPPED: no ${label} session.`);
+    bindRoleSession(session);
+
+    test(`renders the server-backed Blueprint state for ${label}`, async ({ page }) => {
+      await page.goto("/cultivars/og-kush");
+      await expect(page).not.toHaveURL(/\/auth/);
+      const section = page.getByTestId("cultivar-blueprint-crosssell");
+      await expect(section).toBeVisible({ timeout: 20_000 });
+      await expect(section).toHaveAttribute("data-unlocked", String(expectedUnlocked));
+
+      if (expectedUnlocked) {
+        await expect(page.getByTestId("cultivar-blueprint-open")).toBeVisible();
+        await expect(page.getByTestId("cultivar-blueprint-upgrade")).toHaveCount(0);
+      } else {
+        await expect(page.getByTestId("cultivar-blueprint-upgrade")).toBeVisible();
+        await expect(page.getByTestId("cultivar-blueprint-open")).toHaveCount(0);
+      }
+    });
+  });
+}
+
+describeBlueprintCapability("Free", FREE_SESSION, false);
+describeBlueprintCapability("Pro Monthly", PRO_SESSION, false);
+describeBlueprintCapability("Pro Annual", PRO_ANNUAL_SESSION, false);
+describeBlueprintCapability("Craft Monthly", CRAFT_SESSION, true);
+describeBlueprintCapability("Craft Annual", CRAFT_ANNUAL_SESSION, true);
+describeBlueprintCapability("Founder Lifetime", FOUNDER_SESSION, true);
+describeBlueprintCapability("Canceled", CANCELED_SESSION, false);
 
 // ─── D–F. Missing-evidence hunt (requires paid session) ───────────────────
 test.describe("D–F. Missing-evidence hunt", () => {
@@ -330,7 +437,7 @@ test.describe("D–F. Missing-evidence hunt", () => {
     );
     const expectedHash = target.hash;
 
-    await nextSteps.first().click();
+    await nextSteps.first().click({ noWaitAfter: true });
     await expect
       .poll(() => new URL(page.url()).hash, {
         message: "anchor click must update the URL to the workspace anchor hash",
@@ -408,7 +515,7 @@ test.describe("G. Comparison-ready hunt", () => {
       "Compare link must target this hunt's compare route",
     ).toBe(true);
 
-    await compareLink.click();
+    await compareLink.click({ noWaitAfter: true });
     await expect(page).toHaveURL(/\/compare$/);
 
     // Substantive read-only comparison content — not an empty shell.

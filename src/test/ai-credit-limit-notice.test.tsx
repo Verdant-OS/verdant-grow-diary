@@ -47,11 +47,12 @@ describe("AiCreditLimitNotice presenter", () => {
     entitlementLookup.failed = false;
   });
 
-  it("upsell branch (free) shows paywall CTA link to /pricing", () => {
+  it("upsell branch (free) shows paywall CTA link with the Pro card preselected", () => {
     renderWithRouter(<AiCreditLimitNotice credit={denial("free")} />);
     expect(screen.getByTestId("ai-credit-limit-notice")).toHaveAttribute("data-kind", "upsell");
     const link = screen.getByTestId("ai-credit-limit-notice-paywall-link");
-    expect(link).toHaveAttribute("href", "/pricing");
+    // The copy pitches Pro by name; ?plan= preselects the card, never opens checkout.
+    expect(link).toHaveAttribute("href", "/pricing?plan=pro_annual");
   });
 
   it("runs an explicit Free-upsell CTA callback exactly once", () => {
@@ -68,7 +69,7 @@ describe("AiCreditLimitNotice presenter", () => {
     renderWithRouter(<AiCreditLimitNotice credit={denial("free")} returnTo="/plants/plant-123" />);
     expect(screen.getByTestId("ai-credit-limit-notice-paywall-link")).toHaveAttribute(
       "href",
-      "/pricing?returnTo=%2Fplants%2Fplant-123",
+      "/pricing?plan=pro_annual&returnTo=%2Fplants%2Fplant-123",
     );
   });
 
@@ -78,7 +79,7 @@ describe("AiCreditLimitNotice presenter", () => {
     );
     expect(screen.getByTestId("ai-credit-limit-notice-paywall-link")).toHaveAttribute(
       "href",
-      "/pricing",
+      "/pricing?plan=pro_annual",
     );
   });
 

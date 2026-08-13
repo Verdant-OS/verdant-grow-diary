@@ -103,6 +103,7 @@ async function fetchRows(plantId: string): Promise<DiaryRow[]> {
   const { data, error } = await supabase
     .from("diary_entries")
     .select("id, entry_at, details")
+    .is("retracted_at", null)
     .eq("plant_id", plantId)
     .order("entry_at", { ascending: false })
     .limit(PLANT_MANUAL_SENSOR_HISTORY_LIMIT);

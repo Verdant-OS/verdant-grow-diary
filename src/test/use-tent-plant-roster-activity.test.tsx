@@ -36,6 +36,7 @@ vi.mock("@/integrations/supabase/client", () => {
         if (col === "plant_id") plantId = v;
         return builder;
       },
+      is: () => builder,
       order: () => builder,
       limit: () => Promise.resolve(build(plantId)),
     };

@@ -43,6 +43,14 @@ export interface PersistEnvironmentAlertsInput {
   snapshot: SensorSnapshot | null;
   quality: SensorQualityResult;
   targets: TargetComparisonResult;
+  /**
+   * Tent the breach was observed in, when the evidence unambiguously points
+   * at one (normally `snapshot.tent_id`). Persisted on the alert so
+   * tent-scoped surfaces can attribute it, and folded into the dedupe key so
+   * two tents breaching the same metric each get their own row. Null is
+   * honest and expected for multi-tent (e.g. "All tents") views.
+   */
+  tentId?: string | null;
   /** True when the upstream data layer flagged this as demo/fallback/mock. */
   isDemoData?: boolean;
   /** Default false. Setting false short-circuits the hook entirely. */
@@ -123,6 +131,8 @@ export function usePersistEnvironmentAlerts(
   const enabled = input.enabled !== false;
   const growId = input.growId ?? null;
   const isDemoData = input.isDemoData === true;
+  // Part of the dedupe key, so a tent change must re-run the effect.
+  const tentKey = input.tentId ?? "";
   const stageProvided = "stage" in input;
   const stageKey = stageProvided ? (input.stage ?? "__unknown__") : "__legacy__";
 
@@ -161,14 +171,21 @@ export function usePersistEnvironmentAlerts(
         setState((s) => ({ ...s, status: "checking", lastError: null }));
       }
 
-      // 3. Load currently-open alerts for this grow and dedupe by rule key.
-      let openRows: { metric: string | null; source: string | null; title: string }[] = [];
+      // 3. Load currently-open alerts for this grow and dedupe by rule key,
+      //    scoped to the tent the breach was observed in.
+      let openRows: {
+        metric: string | null;
+        source: string | null;
+        title: string;
+        tent: string | null;
+      }[] = [];
       try {
         const rows = await listAlerts({ growId, status: "open" });
         openRows = rows.map((r) => ({
           metric: r.metric ?? null,
           source: r.source ?? null,
           title: r.title,
+          tent: r.tent_id ?? null,
         }));
       } catch (err) {
         if (!cancelled) {
@@ -181,26 +198,50 @@ export function usePersistEnvironmentAlerts(
         return;
       }
 
+      // The tent this run's evidence belongs to (null when the snapshot spans
+      // several tents, or none is known).
+      const observedTentId = input.tentId ?? null;
+
+      // Dedupe is per (tent, rule), not per rule. Two tents in one grow can
+      // breach the same metric simultaneously and BOTH deserve their own
+      // alert row — grow-scoped keys would collapse them into one, silently
+      // attributing the breach to whichever tent won the race and leaving the
+      // other tent's Plant Detail panel empty. Composed here rather than
+      // inside derivedAlertKey so its other callers are unaffected. Rows with
+      // no tent (all historical rows, and any snapshot spanning tents) key on
+      // "" and so keep their existing grow-wide dedupe behavior.
+      // Grow is part of the key because `inFlightKeys` is a ref that survives
+      // grow switches and never drops successful keys. Without it, a
+      // tent-null rule persisted for one grow would suppress the same rule
+      // in the next grow the user selects, even with that grow's open-alert
+      // query empty. (The pre-existing key omitted grow too; it is included
+      // here rather than left as a latent collision in code being rewritten.)
+      const scopedKey = (tent: string | null, ruleKey: string) =>
+        `${growId ?? ""}::${tent ?? ""}::${ruleKey}`;
+
       const existing = new Set(
         openRows.map((r) =>
-          derivedAlertKey(
-            // Shape-compatible: derivedAlertKey only reads metric/title.
-            {
-              id: "",
-              severity: "info",
-              metric: (r.metric ?? "snapshot") as EnvironmentAlert["metric"],
-              title: r.title,
-              reason: "",
-              source: "sensor_snapshot",
-              createdAt: "",
-            },
-            r.source ?? SOURCE,
+          scopedKey(
+            r.tent,
+            derivedAlertKey(
+              // Shape-compatible: derivedAlertKey only reads metric/title.
+              {
+                id: "",
+                severity: "info",
+                metric: (r.metric ?? "snapshot") as EnvironmentAlert["metric"],
+                title: r.title,
+                reason: "",
+                source: "sensor_snapshot",
+                createdAt: "",
+              },
+              r.source ?? SOURCE,
+            ),
           ),
         ),
       );
 
       const toInsert = persistable.filter((a) => {
-        const key = derivedAlertKey(a, SOURCE);
+        const key = scopedKey(observedTentId, derivedAlertKey(a, SOURCE));
         if (existing.has(key)) return false;
         if (inFlightKeys.current.has(key)) return false;
         inFlightKeys.current.add(key);
@@ -222,7 +263,7 @@ export function usePersistEnvironmentAlerts(
       let lastError: string | null = null;
 
       for (const a of toInsert) {
-        const key = derivedAlertKey(a, SOURCE);
+        const key = scopedKey(observedTentId, derivedAlertKey(a, SOURCE));
         try {
           // Explicit refs only: metric_refs (sensor_readings) first, then
           // diary_evidence_ref (Environment Check diary row). Never
@@ -230,6 +271,7 @@ export function usePersistEnvironmentAlerts(
           const refs = resolveEnvironmentAlertEvidenceRefs(a, input.snapshot);
           const saved = await saveAlert({
             grow_id: growId,
+            tent_id: observedTentId,
             severity: a.severity,
             title: a.title,
             reason: a.reason,
@@ -279,6 +321,7 @@ export function usePersistEnvironmentAlerts(
     isDemoData,
     stageKey,
     stageProvided,
+    tentKey,
   ]);
 
   return state;

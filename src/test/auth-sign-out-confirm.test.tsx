@@ -1,9 +1,10 @@
 // SignOutConfirmDialog: cancel preserves session, confirm signs out and
-// redirects to /auth.
-import { describe, it, expect, vi } from "vitest";
+// redirects to /welcome; failure still redirects with a non-sensitive toast.
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import SignOutConfirmDialog from "@/components/SignOutConfirmDialog";
+import { SIGN_OUT_FAILURE_MESSAGE } from "@/lib/authSessionExitRules";
 
 const signOutMock = vi.fn().mockResolvedValue(undefined);
 vi.mock("@/store/auth", () => ({
@@ -16,6 +17,10 @@ vi.mock("@/lib/react-router-compat", async () => {
   );
   return { ...actual, useNavigate: () => navMock };
 });
+const toastError = vi.fn();
+vi.mock("sonner", () => ({
+  toast: { error: (...a: unknown[]) => toastError(...a), success: vi.fn() },
+}));
 
 function setup() {
   return render(
@@ -26,6 +31,13 @@ function setup() {
 }
 
 describe("SignOutConfirmDialog", () => {
+  beforeEach(() => {
+    signOutMock.mockReset();
+    signOutMock.mockResolvedValue(undefined);
+    navMock.mockClear();
+    toastError.mockClear();
+  });
+
   it("opens on trigger and shows confirm copy", () => {
     setup();
     fireEvent.click(screen.getByText("Sign out"));
@@ -34,8 +46,6 @@ describe("SignOutConfirmDialog", () => {
   });
 
   it("cancel does not sign out or redirect", () => {
-    signOutMock.mockClear();
-    navMock.mockClear();
     setup();
     fireEvent.click(screen.getByText("Sign out"));
     fireEvent.click(screen.getByRole("button", { name: /cancel/i }));
@@ -43,16 +53,25 @@ describe("SignOutConfirmDialog", () => {
     expect(navMock).not.toHaveBeenCalled();
   });
 
-  it("confirm calls signOut and redirects to /auth", async () => {
-    signOutMock.mockClear();
-    navMock.mockClear();
+  it("confirm calls signOut and redirects to /welcome", async () => {
     setup();
     fireEvent.click(screen.getByText("Sign out"));
-    // Action button (not the trigger): find inside dialog by role
     const buttons = screen.getAllByRole("button", { name: /sign out/i });
-    // last one is the AlertDialogAction
     fireEvent.click(buttons[buttons.length - 1]);
     await waitFor(() => expect(signOutMock).toHaveBeenCalledTimes(1));
     expect(navMock).toHaveBeenCalledWith("/welcome", { replace: true });
+    expect(toastError).not.toHaveBeenCalled();
+  });
+
+  it("on signOut throw: still redirects and toasts non-sensitive failure copy (#588)", async () => {
+    signOutMock.mockRejectedValueOnce(new Error("network token session"));
+    setup();
+    fireEvent.click(screen.getByText("Sign out"));
+    const buttons = screen.getAllByRole("button", { name: /sign out/i });
+    fireEvent.click(buttons[buttons.length - 1]);
+    await waitFor(() => expect(signOutMock).toHaveBeenCalledTimes(1));
+    expect(navMock).toHaveBeenCalledWith("/welcome", { replace: true });
+    expect(toastError).toHaveBeenCalledWith(SIGN_OUT_FAILURE_MESSAGE);
+    expect(toastError.mock.calls[0][0]).not.toMatch(/network|token|session/i);
   });
 });

@@ -78,6 +78,58 @@ WHERE p.proname = 'handle_new_user';
 --    attribution_table_exists=false, body_inserts_attribution=true,
 --    allowlists_landing_page=true, allowlists_blueprint_targets=false
 
+-- 1b. STRUCTURAL PROOF that the INSERT is not covered by an exception handler.
+--     Query 1 alone is insufficient: it only shows two strings are PRESENT. A live
+--     body that wrapped the INSERT in its own EXCEPTION handler would produce the
+--     identical result and would NOT abort signup. This is the check that
+--     distinguishes those two worlds, so the hard-failure diagnosis rests on it.
+WITH d AS (
+  SELECT pg_get_functiondef(oid) AS def FROM pg_proc WHERE proname = 'handle_new_user' LIMIT 1
+), spans AS (
+  SELECT def,
+         position('signup_acquisition_attributions' IN def) AS ins,
+         position('EXCEPTION' IN def) AS exc
+  FROM d
+)
+SELECT md5(def) AS definition_md5, length(def) AS definition_bytes, ins, exc,
+       (SELECT count(*) FROM regexp_matches(def, '\mBEGIN\M', 'g'))     AS total_begin,
+       (SELECT count(*) FROM regexp_matches(def, '\mEXCEPTION\M', 'g')) AS total_exception,
+       (SELECT count(*) FROM regexp_matches(substr(def, ins, exc - ins), '\mBEGIN\M', 'g'))
+         AS begins_between_insert_and_handler
+FROM spans;
+-- => definition_md5=d67b343a174e86b5ba9ee065c43545ed, definition_bytes=2177,
+--    ins=1228, exc=2103, total_begin=2, total_exception=1,
+--    begins_between_insert_and_handler=1
+```
+
+**How to read 1b — this is the load-bearing inference of the whole document.** The live
+body contains exactly **one** `EXCEPTION` handler (`total_exception=1`), and exactly one
+`BEGIN` opens *between* the attribution INSERT and that handler
+(`begins_between_insert_and_handler=1`). A plpgsql handler only catches statements inside
+its own `BEGIN ... EXCEPTION` block, so that sole handler belongs to a block that opened
+**after** the INSERT. The INSERT therefore sits in the outer block — which, with only one
+`EXCEPTION` in the function and it already accounted for, has **no handler at all**. Its
+error is unhandled and propagates out of the trigger.
+
+`definition_md5 = d67b343a174e86b5ba9ee065c43545ed` (2177 bytes) fingerprints the exact
+definition this diagnosis was made against. **If that hash no longer matches, re-run 1b
+before trusting anything below** — the body has changed.
+
+The INSERT as it appears in the live definition, extracted via
+`substr(def, ins - 120, 300)`:
+
+```sql
+  ON CONFLICT (user_id) DO NOTHING;
+
+  IF v_signup_source IS NOT NULL THEN
+    INSERT INTO public.signup_acquisition_attributions (user_id, source, created_at)
+    VALUES (NEW.id, v_signup_source, COALESCE(NEW.created_at, now()))
+    ON CONFLICT (user_id) DO NOTHING;
+  END IF;
+```
+
+```sql
+
 -- 2. account census (the "has anyone been harmed" question)
 SELECT COALESCE(raw_user_meta_data->>'verdant_signup_source', '(none)') AS signup_source,
        count(*) AS users, min(created_at) AS first_seen, max(created_at) AS last_seen
@@ -247,12 +299,24 @@ apply resolves it.
 
 Worth recording, because it is the reusable lesson rather than a detail of this incident:
 
-- **The failure signal has no first-party persistence — and it is blocked THREE ways, not
-  one.** A sink already exists: `src/components/FunnelEventDbSink.tsx` is mounted in
+- **The failure signal has no first-party persistence — and it is blocked FOUR ways, not
+  one.** A sink exists *in the repo*: `src/components/FunnelEventDbSink.tsx` is mounted in
   `src/routes/__root.tsx` and subscribes to the same `verdant:analytics` bridge, writing
   catalogued events into `public.funnel_events` (migration `20260813020000`). Extend it rather
-  than building a second one — but note that fixing only the two obvious blockers still
-  persists nothing:
+  than building a second one — but every one of the following must be cleared, and the
+  obvious two are not enough:
+
+  0. **The listener is not deployed.** Measured 2026-08-13 by crawling the production bundle
+     from `https://verdantgrowdiary.com/auth?mode=signup`: 61 real JS chunks fetched, and
+     `funnel_events`, `consentGranted` and `FunnelEvent` appear in **none** of them. The
+     crawl is trustworthy for this question because it carries a passing positive control —
+     the same sweep does find `verdant_signup_source` (in `signupAcquisitionRules-*.js`) and
+     `gtag` — and because `FunnelEventDbSink` is mounted in the **eagerly loaded** root
+     route, so it would appear in exactly this eager chunk set rather than behind a lazy
+     import. Consistent with `CURRENT_STATE.md` recording production at #942 while
+     `FunnelEventDbSink` entered history in #964. **The component cannot reject an event it
+     never receives, so blockers 1-3 are currently moot in production** — they are what you
+     would hit next, after a publish.
 
   1. **Identity gate — the blocker that defeats the obvious fix.**
      `decideFunnelEventSinkWrite` (`src/lib/funnelEventDbSinkRules.ts:73-74`) rejects a null
@@ -270,9 +334,12 @@ Worth recording, because it is the reusable lesson rather than a detail of this 
   says a declined-consent or signed-out visitor "should never reach the event-shape logic
   below", and it checks consent on the line above. Persisting a signed-out visitor's failure
   event is a **separate design decision** that needs explicit privacy justification and its own
-  review, not a one-line relaxation of an intentional fence. Cataloguing `signup_failed` and
-  applying `20260813020000` are necessary but **not sufficient**; without a deliberately
-  designed signed-out ingestion path, this specific signal still cannot be persisted.
+  review, not a one-line relaxation of an intentional fence.
+
+  **So the full sequence to actually capture this signal is: publish the frontend (0), design
+  and justify a signed-out ingestion path (1), catalogue `signup_failed` (2), and apply
+  `20260813020000` (3).** Cataloguing plus applying the table — the two obvious fixes — clears
+  only 2 and 3 and still persists nothing.
 
 - **GA4 delivery for this event: `NOT_MEASURED`.** Do not record that the signal went nowhere
   — that is a claim nobody has checked. `trackPricingEvent`

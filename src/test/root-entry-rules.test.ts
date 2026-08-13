@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { resolveRootEntrySurface } from "@/lib/rootEntryRules";
+import { resolveRootEntrySurface, ROOT_ENTRY_PRE_HYDRATION_SURFACE } from "@/lib/rootEntryRules";
 
 describe("root entry rules", () => {
+  it("renders the public landing before hydration", () => {
+    expect(ROOT_ENTRY_PRE_HYDRATION_SURFACE).toBe("landing");
+  });
+
   it("waits while auth state is unresolved, regardless of cached user state", () => {
     expect(resolveRootEntrySurface({ authLoading: true, hasAuthenticatedUser: false })).toBe(
       "loading",

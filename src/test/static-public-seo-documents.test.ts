@@ -24,10 +24,14 @@ const VERCEL = JSON.parse(readFileSync(resolve(ROOT, "vercel.json"), "utf8")) as
 };
 
 describe("static public SEO documents", () => {
+  const expectedFileName = (path: string) =>
+    path === "/" ? "index.html" : `${path.slice(1)}/index.html`;
+
   it("pre-renders every public acquisition hub, guide, and cultivar route", () => {
     const paths = new Set(STATIC_PUBLIC_SEO_DOCUMENTS.map((document) => document.path));
 
     for (const required of [
+      "/",
       "/founder",
       "/welcome",
       "/pricing",
@@ -111,7 +115,7 @@ describe("static public SEO documents", () => {
     expect(new Set(fileNames).size).toBe(fileNames.length);
     for (const document of STATIC_PUBLIC_OUTPUT_DOCUMENTS) {
       expect(document.path).not.toMatch(/[?#]/);
-      expect(document.fileName).toBe(`${document.path.slice(1)}/index.html`);
+      expect(document.fileName).toBe(expectedFileName(document.path));
     }
   });
 
@@ -120,7 +124,7 @@ describe("static public SEO documents", () => {
     for (const document of STATIC_PUBLIC_SEO_DOCUMENTS) {
       expect(outputPaths.has(document.fileName)).toBe(false);
       outputPaths.add(document.fileName);
-      expect(document.fileName).toBe(`${document.path.slice(1)}/index.html`);
+      expect(document.fileName).toBe(expectedFileName(document.path));
       expect(document.metadata.url).toBe(`${VERDANT_SITE_ORIGIN}${document.path}`);
       expect(document.metadata.url).not.toMatch(/[?#]/);
       expect(document.metadata.title).toBeTruthy();
@@ -196,7 +200,7 @@ describe("static public SEO documents", () => {
 
   it("uses directory-local documents that filesystem-first hosts serve before the SPA fallback", () => {
     for (const document of STATIC_PUBLIC_SEO_DOCUMENTS) {
-      expect(document.fileName).toBe(`${document.path.slice(1)}/index.html`);
+      expect(document.fileName).toBe(expectedFileName(document.path));
     }
 
     expect(VERCEL.cleanUrls).toBe(true);

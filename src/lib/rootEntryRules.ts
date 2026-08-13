@@ -1,5 +1,11 @@
 export type RootEntrySurface = "loading" | "landing" | "dashboard";
 
+/**
+ * Public, session-free surface shared by the server render and the first
+ * client render. Authenticated routing starts only after hydration.
+ */
+export const ROOT_ENTRY_PRE_HYDRATION_SURFACE: RootEntrySurface = "landing";
+
 export interface RootEntryState {
   authLoading: boolean;
   hasAuthenticatedUser: boolean;

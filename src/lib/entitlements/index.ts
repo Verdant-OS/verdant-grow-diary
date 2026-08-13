@@ -17,6 +17,11 @@ export { PLAN_CATALOG, KNOWN_PLAN_IDS, isKnownPlanId } from "./planCatalog";
 export { resolveEntitlements } from "./resolveEntitlements";
 export { canUseCapability, type BooleanCapabilityKey } from "./capabilityAccess";
 export {
+  staffSubscriptionNote,
+  STAFF_OPERATOR_METER_NOTE,
+  type StaffSubscriptionNoteInput,
+} from "./staffSubscriptionNote";
+export {
   mapLovableSubscriptionRow,
   type LovableSubscriptionRow,
   type LovableBillingEnvironment,

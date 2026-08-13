@@ -1,9 +1,9 @@
 /**
  * Settings · Subscription tile — staff note visibility.
  *
- * Regression fence: the "Internal staff — Pro capabilities, 10,000 AI
- * credits/month." note MUST render only when entitlement.isStaff === true.
- * Non-staff users (free or paid Pro) must not see it.
+ * Regression fence: the staff note MUST render only when
+ * entitlement.isStaff === true. Non-staff users (free or paid Pro) must
+ * not see it. Founder Lifetime + staff must not advertise 10,000 credits.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
@@ -77,6 +77,17 @@ const freeEntitlement: ResolvedEntitlement = {
   isStaff: false,
 };
 
+const founderStaffEntitlement: ResolvedEntitlement = {
+  effectivePlanId: "founder_lifetime",
+  displayPlanId: "founder_lifetime",
+  status: "active",
+  isActive: true,
+  capabilities: PLAN_CATALOG.founder_lifetime,
+  degraded: false,
+  degradedReason: null,
+  isStaff: true,
+};
+
 beforeEach(() => {
   try {
     clearLocalStorageForTest();
@@ -118,5 +129,19 @@ describe("Settings · Subscription staff note", () => {
     const note = screen.getByTestId("settings-subscription-staff-note");
     expect(note).toBeInTheDocument();
     expect(note).toHaveTextContent(/internal staff.*pro capabilities.*10,000 ai credits\/month/i);
+  });
+
+  it("founder + staff cites 100 credits per UTC month and never claims 10,000", () => {
+    entitlementState.value = founderStaffEntitlement;
+    render(
+      <MemoryRouter>
+        <Settings />
+      </MemoryRouter>,
+    );
+    const note = screen.getByTestId("settings-subscription-staff-note");
+    expect(note).toBeInTheDocument();
+    expect(note).toHaveTextContent(/founder lifetime ai credits stay at 100 per utc month/i);
+    expect(note).not.toHaveTextContent(/10,000/);
+    expect(screen.getByTestId("settings-subscription-plan")).toHaveTextContent(/founder lifetime/i);
   });
 });

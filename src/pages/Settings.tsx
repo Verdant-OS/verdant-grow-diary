@@ -22,6 +22,7 @@ import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import AccountPlanBadge from "@/components/AccountPlanBadge";
 import RewardedReferralCard from "@/components/RewardedReferralCard";
 import { PRICING_TIERS } from "@/config/pricing";
+import { staffSubscriptionNote } from "@/lib/entitlements";
 import {
   describeSettingsTile,
   settingsTileAriaLabel,
@@ -316,6 +317,11 @@ function SubscriptionTile() {
   const isPaid = !loading && !lookupFailed && !!tier && planId !== "free";
   const isLifetime = planId === "founder_lifetime";
   const isStaff = !!entitlement?.isStaff;
+  const staffNote = staffSubscriptionNote(
+    entitlement
+      ? { isStaff: entitlement.isStaff, displayPlanId: entitlement.displayPlanId }
+      : null,
+  );
 
   return (
     <Tile name="Subscription" state="available">
@@ -333,12 +339,12 @@ function SubscriptionTile() {
             </span>
             {!lookupFailed && <AccountPlanBadge entitlement={entitlement} loading={loading} />}
           </p>
-          {isStaff && (
+          {staffNote && (
             <p
               className="text-xs text-muted-foreground mt-1"
               data-testid="settings-subscription-staff-note"
             >
-              Internal staff — Pro capabilities, 10,000 AI credits/month.
+              {staffNote}
             </p>
           )}
           {entitlement?.status === "past_due" && (

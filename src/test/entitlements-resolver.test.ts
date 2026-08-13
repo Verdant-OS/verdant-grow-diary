@@ -198,6 +198,21 @@ describe("resolveEntitlements — unknown values degrade safely", () => {
   });
 });
 
+describe("resolveEntitlements — staff lift does not rewrite paid catalog caps", () => {
+  it("staff + active founder_lifetime keeps 100 monthly credits and founder identity", () => {
+    const r = resolveEntitlements(
+      row({ plan_id: "founder_lifetime", current_period_end: null, founder_number: 1 }),
+      NOW,
+      { isStaff: true },
+    );
+    expect(r.isStaff).toBe(true);
+    expect(r.displayPlanId).toBe("founder_lifetime");
+    expect(r.effectivePlanId).toBe("founder_lifetime");
+    expect(r.capabilities.aiMonthlyCredits).toBe(100);
+    expect(r.capabilities).toEqual(PLAN_CATALOG.founder_lifetime);
+  });
+});
+
 describe("resolveEntitlements — purity", () => {
   it("does not read internal now() — same input + same now → same output", () => {
     const a = resolveEntitlements(row(), NOW);

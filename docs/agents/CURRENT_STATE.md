@@ -108,6 +108,16 @@ branch-updated 2026-08-13 to unblock the queue; merge-queue re-attempt pending t
 CI run it triggers. This sweep is a process/hygiene pass, orthogonal to the SEO slice
 below — it does not change or supersede the approved slice.
 
+**Update (2026-08-13, later same day, live re-check before landing this doc):** #764 and
+#853 have since merged/closed. #813 has been rebased and is no longer conflicting — it now
+shows `mergeable: MERGEABLE` but still carries 4 unresolved review threads, so it stays
+blocked, just by a different mechanism than the table above records. #943 (opened after
+the original sweep, not one of the original 8) shows the identical pattern: `BEHIND` + 2
+unresolved review threads despite `reviewDecision: APPROVED`. Net still holds: nothing here
+is a same-day-safe merge target except this doc PR itself. `mergeable`/`mergeStateStatus`
+are live and recomputed — re-run the `reviewThreads` query above per PR immediately before
+acting on any claim in this file, including this update.
+
 ---
 
 ## Next approved slice

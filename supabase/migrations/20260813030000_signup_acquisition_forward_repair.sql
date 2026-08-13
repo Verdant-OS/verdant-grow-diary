@@ -5,16 +5,42 @@
 -- public.signup_acquisition_attributions absent, and of the four functions only
 -- handle_new_user present -- it survives because a later migration
 -- (20260721194325) recreated it. So 20260714231627, 20260715002000 and
--- 20260716215516 never reached prod: every signup has been unattributed, the
--- OAuth first-touch RPC has been missing, and both operator snapshot cards have
--- had no function to call. Repairing forward in one apply is cheaper and safer
--- than replaying three historical migrations in order.
+-- 20260716215516 never reached prod. Repairing forward in one apply is cheaper
+-- and safer than replaying three historical migrations in order.
+--
+-- THIS IS NOT MERELY A REPORTING GAP -- IT BREAKS ACCOUNT CREATION. The live
+-- handle_new_user does, at its line 113 equivalent:
+--     IF v_signup_source IS NOT NULL THEN
+--       INSERT INTO public.signup_acquisition_attributions ...
+-- and that INSERT sits OUTSIDE the BEGIN/EXCEPTION WHEN OTHERS block, which
+-- wraps only the referral logic. The target relation does not exist, so any
+-- signup carrying an allowlisted verdant_signup_source raises 42P01, the
+-- unhandled error aborts the AFTER INSERT trigger on auth.users, the row rolls
+-- back, and GoTrue returns HTTP 500 "Database error saving new user". The
+-- account is never created. This has been true since 20260721194325 applied on
+-- 2026-07-21. Verified against prod: on_auth_user_created is enabled
+-- (tgenabled='O'), the live body allowlists 'landing_page', and the table is
+-- absent. Scope: the front-door CTA and the other attributed entry points --
+-- NOT every signup. Google OAuth sends no metadata, magic link uses
+-- shouldCreateUser:false, and a bare /auth?mode=signup or any non-exact utm
+-- triple resolves to NULL, so all of those still succeed.
+--
+-- Not yet known to have harmed anyone: auth.users holds 7 accounts, all with a
+-- NULL verdant_signup_source, the newest created 2026-07-02 -- BEFORE the
+-- breaking body landed. A failed signup rolls back and leaves no row, so
+-- "nobody tried" and "everyone who tried failed" are indistinguishable from
+-- the table. Treat this as a live defect that has not yet been exercised.
 --
 -- The new 'blueprint_targets' source is folded in here rather than added by a
--- follow-up: /tools/blueprint-targets shipped with a plan-neutral CTA and no
--- utm attribution precisely because an unrecognized source is mapped to NULL
--- for email signups and rejected by the OAuth RPC. The client CTA switches to
--- buildAttributedSignupPath in the same PR as this migration.
+-- follow-up, because the client half is ALREADY DEPLOYED and ahead of the repo:
+-- the live bundle's attribution table carries blueprint_targets while the repo
+-- base branch does not. Widening the allowlist here is catch-up to published
+-- Lovable code, not same-PR coordination. Note the ordering consequence --
+-- /tools/blueprint-targets currently SUCCEEDS precisely because the live
+-- allowlist omits its source, so it resolves to NULL and never reaches the
+-- missing table. CREATE TABLE (below) therefore has to precede the allowlist
+-- widening, and it does, so no partial-apply prefix can widen the allowlist
+-- while the table is still absent.
 --
 -- Analytics only. raw_user_meta_data stays client-editable and must never grant
 -- a role, entitlement, billing state, credit, or Founder allocation. The table

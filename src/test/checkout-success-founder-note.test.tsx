@@ -19,6 +19,14 @@ import { MemoryRouter } from "@/lib/react-router-compat";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { FounderSlotsState } from "@/hooks/useFounderSlotsRemaining";
+
+const spies = vi.hoisted(() => ({ track: vi.fn() }));
+vi.mock("@/lib/funnelAnalytics", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/lib/funnelAnalytics")>();
+  return { ...real, trackFunnelEvent: spies.track };
+});
+import { FUNNEL_EVENTS, sanitizeFunnelParams } from "@/lib/funnelAnalytics";
+import { FUNNEL_EVENT_SCHEMA, enforceFunnelEventSchema } from "@/lib/funnelEventSchema";
 import {
   CHECKOUT_CONTEXT_MAX_AGE_MS,
   CHECKOUT_KIND_STORAGE_KEY,
@@ -59,6 +67,69 @@ function renderNote() {
 
 beforeEach(() => {
   slots.value = { status: "ready", remaining: 40, total: 75, claimed: 35, soldOut: false };
+  spies.track.mockClear();
+});
+
+describe("founder note · analytics", () => {
+  it("is registered as its own pair with surface only — never a paywall event", () => {
+    expect(FUNNEL_EVENTS).toContain("founder_note_viewed");
+    expect(FUNNEL_EVENTS).toContain("founder_note_clicked");
+    expect(FUNNEL_EVENT_SCHEMA.founder_note_viewed).toEqual(["surface"]);
+    expect(FUNNEL_EVENT_SCHEMA.founder_note_clicked).toEqual(["surface"]);
+    // The viewer just paid; counting them as an upgrade-funnel impression
+    // would corrupt it — same separation as credit_pack_cta_*.
+    expect("founder_note_viewed").not.toMatch(/paywall/);
+  });
+
+  it("survives the real sanitizer chain — nothing silently stripped", () => {
+    const sent = { surface: "checkout_success" };
+    expect(enforceFunnelEventSchema("founder_note_viewed", sanitizeFunnelParams(sent))).toEqual(
+      sent,
+    );
+  });
+
+  it("fires the impression once when shown, and not for hidden states", () => {
+    renderNote();
+    expect(spies.track).toHaveBeenCalledTimes(1);
+    expect(spies.track).toHaveBeenCalledWith("founder_note_viewed", {
+      surface: "checkout_success",
+    });
+
+    spies.track.mockClear();
+    slots.value = { status: "ready", remaining: 0, total: 75, claimed: 75, soldOut: true };
+    renderNote();
+    slots.value = { status: "unknown", remaining: null, total: 75, claimed: null, soldOut: false };
+    renderNote();
+    expect(spies.track).not.toHaveBeenCalled();
+  });
+
+  it("dedupes the impression across a slots flicker — one mount, one view", () => {
+    const { rerender } = renderNote();
+    // Fresh JSX per rerender: a reused element reference makes React bail out
+    // of re-rendering the subtree, and the flicker never happens.
+    slots.value = { status: "loading", remaining: null, total: 75, claimed: null, soldOut: false };
+    rerender(
+      <MemoryRouter>
+        <CheckoutSuccessFounderNote />
+      </MemoryRouter>,
+    );
+    slots.value = { status: "ready", remaining: 40, total: 75, claimed: 35, soldOut: false };
+    rerender(
+      <MemoryRouter>
+        <CheckoutSuccessFounderNote />
+      </MemoryRouter>,
+    );
+    expect(spies.track).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports the click under its own event", () => {
+    renderNote();
+    spies.track.mockClear();
+    screen.getByTestId(`${NOTE}-link`).click();
+    expect(spies.track).toHaveBeenCalledWith("founder_note_clicked", {
+      surface: "checkout_success",
+    });
+  });
 });
 
 describe("founder note · content", () => {

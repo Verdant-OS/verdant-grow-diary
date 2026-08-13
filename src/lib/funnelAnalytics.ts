@@ -70,6 +70,12 @@ export const FUNNEL_EVENTS = [
   "checkout_recovery_retry",
   "checkout_recovery_plan_slug_fallback",
   "subscription_activated",
+  // Founder-note cross-sell, shown on the confirmation page a moment after
+  // subscription_activated. Its own pair, NOT paywall events: the viewer just
+  // paid, and counting a paid grower's impression as an upgrade-funnel view
+  // would inflate that funnel — the same separation as credit_pack_cta_*.
+  "founder_note_viewed",
+  "founder_note_clicked",
   "checkout_return_completed",
 ] as const;
 

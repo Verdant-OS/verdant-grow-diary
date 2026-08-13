@@ -64,6 +64,11 @@ describe("event name contract", () => {
       "checkout_recovery_retry",
       "checkout_recovery_plan_slug_fallback",
       "subscription_activated",
+      // Paid→paid cross-sell on the confirmation page — its own pair, never
+      // paywall events (the viewer just paid; same separation as the
+      // credit_pack pair above).
+      "founder_note_viewed",
+      "founder_note_clicked",
       "checkout_return_completed",
     ]);
   });

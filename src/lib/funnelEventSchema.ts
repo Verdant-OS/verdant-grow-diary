@@ -67,6 +67,10 @@ export const FUNNEL_EVENT_SCHEMA: Readonly<Record<FunnelEventName, ReadonlyArray
     checkout_recovery_retry: ["plan"],
     checkout_recovery_plan_slug_fallback: ["reason", "length_bucket"],
     subscription_activated: ["plan", "surface"],
+    // Paid→paid cross-sell pair; surface only — the pitched plan is always
+    // founder_lifetime, and a constant param is noise, not measurement.
+    founder_note_viewed: ["surface"],
+    founder_note_clicked: ["surface"],
     checkout_return_completed: ["surface"],
   };
 

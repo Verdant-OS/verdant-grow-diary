@@ -9,8 +9,16 @@ const auth = vi.hoisted(() => ({
 
 vi.mock("@/store/auth", () => ({ useAuth: () => auth }));
 vi.mock("@/pages/Landing", () => ({
-  default: ({ canonicalPath }: { canonicalPath?: string }) => (
-    <div data-testid="landing">Landing canonical: {canonicalPath}</div>
+  default: ({
+    canonicalPath,
+    trackPageView,
+  }: {
+    canonicalPath?: string;
+    trackPageView?: boolean;
+  }) => (
+    <div data-testid="landing" data-track-page-view={String(trackPageView)}>
+      Landing canonical: {canonicalPath}
+    </div>
   ),
 }));
 vi.mock("@/components/AppShell", () => ({
@@ -30,12 +38,12 @@ beforeEach(() => {
 });
 
 describe("session-aware root entry", () => {
-  it("shows a calm loading state while auth is unresolved", () => {
+  it("preserves the SSR landing without acquisition tracking while auth is unresolved", async () => {
     auth.loading = true;
     render(<RootEntry />);
 
-    expect(screen.getByRole("status")).toBeInTheDocument();
-    expect(screen.queryByTestId("landing")).not.toBeInTheDocument();
+    expect(await screen.findByTestId("landing")).toHaveAttribute("data-track-page-view", "false");
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
     expect(screen.queryByTestId("dashboard")).not.toBeInTheDocument();
   });
 
@@ -43,6 +51,7 @@ describe("session-aware root entry", () => {
     render(<RootEntry />);
 
     expect(await screen.findByTestId("landing")).toHaveTextContent("Landing canonical: /");
+    expect(screen.getByTestId("landing")).toHaveAttribute("data-track-page-view", "true");
     expect(screen.queryByTestId("app-shell")).not.toBeInTheDocument();
     expect(screen.queryByTestId("dashboard")).not.toBeInTheDocument();
   });

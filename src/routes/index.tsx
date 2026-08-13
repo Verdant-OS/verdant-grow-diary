@@ -1,21 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import RootEntry from "@/components/RootEntry";
-
-const SITE_URL = "https://verdantgrowdiary.com";
+import { staticRouteHead } from "@/lib/build/staticRouteHead";
 
 export const Route = createFileRoute("/")({
-  // No head() canonical: usePageSeo owns <link rel="canonical"> app-wide
-  // (Landing calls it with canonicalPath="/"). Declaring one here creates a
-  // React-owned hoistable that the hook then mutates and removes — React
-  // crashes deleting the detached node on the next navigation, silently
-  // freezing every landing-origin route transition
-  // (src/test/page-seo-head-ownership.test.tsx).
-  head: () => ({
-    meta: [
-      { property: "og:image", content: `${SITE_URL}/og/home.png` },
-      { name: "twitter:image", content: `${SITE_URL}/og/home.png` },
-    ],
-  }),
+  // The shared route-head contract supplies the SSR self-canonical and reuses
+  // the existing /og/home.png card. Landing's client manager adopts this
+  // foreign canonical without removing it; this is the same ownership model
+  // already exercised by the other static public routes.
+  head: () => staticRouteHead("/"),
   component: RouteComponent,
 });
 

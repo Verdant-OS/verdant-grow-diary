@@ -325,10 +325,10 @@ function buildStaticGrowStageCareBodyFallback(): string {
 }
 
 function routeFileName(path: string): string {
-  if (!path.startsWith("/") || path === "/" || path.includes("?") || path.includes("#")) {
-    throw new Error(`Static SEO route must be a non-root clean path: ${path}`);
+  if (!path.startsWith("/") || path.includes("?") || path.includes("#")) {
+    throw new Error(`Static SEO route must be a clean absolute path: ${path}`);
   }
-  return `${path.slice(1)}/index.html`;
+  return path === "/" ? "index.html" : `${path.slice(1)}/index.html`;
 }
 
 function buildStaticWebPageJsonLd(metadata: {
@@ -465,6 +465,12 @@ const CULTIVAR_HUB = publicDocument("/cultivars", {
 });
 
 const CORE_ACQUISITION_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> = [
+  publicDocument("/", {
+    title: "Grow Diary & Grow Room Tracking App | Verdant Grow Diary",
+    description:
+      "See what changed in your grow and decide what to do next. Verdant turns logs, photos, and sensor readings from the gear you already own into one plant timeline.",
+    imageAlt: "Verdant Grow Diary",
+  }),
   publicDocument("/welcome", {
     title: "Grow Diary & Grow Room Tracking App | Verdant Grow Diary",
     description:

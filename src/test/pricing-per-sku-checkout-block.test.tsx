@@ -124,7 +124,12 @@ describe("per-SKU checkout blocking", () => {
     const view = renderPricing();
 
     await user.click(screen.getByTestId("pricing-cta-credit_pack_50"));
-    expect(mocks.openCheckout).toHaveBeenCalledWith({ priceId: "credit_pack_50" });
+    expect(mocks.openCheckout).toHaveBeenCalledWith({
+      priceId: "credit_pack_50",
+      // Packs carry an explicit successUrl so /checkout/success never
+      // auto-redirects them before the grant ledger is credited.
+      successUrl: expect.stringContaining("/checkout/success"),
+    });
     mocks.openCheckout.mockReset();
 
     failLastAttempt(() =>
@@ -170,7 +175,12 @@ describe("per-SKU checkout blocking", () => {
     await user.click(screen.getByTestId("pricing-checkout-retry"));
 
     // The whole point: a $9 pack retry must not become a $99/yr subscription.
-    expect(mocks.openCheckout).toHaveBeenCalledWith({ priceId: "credit_pack_50" });
+    expect(mocks.openCheckout).toHaveBeenCalledWith({
+      priceId: "credit_pack_50",
+      // Packs carry an explicit successUrl so /checkout/success never
+      // auto-redirects them before the grant ledger is credited.
+      successUrl: expect.stringContaining("/checkout/success"),
+    });
     expect(mocks.openCheckout).not.toHaveBeenCalledWith({ priceId: "pro_annual" });
   });
 

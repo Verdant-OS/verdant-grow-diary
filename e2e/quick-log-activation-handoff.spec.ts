@@ -274,7 +274,7 @@ async function walkResumeToSave(page: Page, world: MockWorld) {
 
   // Review: the EXISTING Quick Log dialog opens prefilled.
   await page.getByTestId("public-quick-log-handoff-review-save").click();
-  const dialog = page.getByRole("dialog");
+  const dialog = page.getByRole("dialog", { name: /^quick log$/i });
   await expect(dialog).toBeVisible();
   await expect(dialog.getByTestId("quicklog-note")).toHaveValue(NOTE_TEXT);
   await expect(dialog.getByTestId("quick-log-target-plant")).toContainText(NICKNAME);
@@ -370,7 +370,7 @@ test.describe("Public Quick Log → first diary entry activation loop (mocked)",
     expect(overflow, "horizontal overflow px").toBeLessThanOrEqual(0);
 
     await page.getByTestId("public-quick-log-handoff-review-save").click();
-    const dialog = page.getByRole("dialog");
+    const dialog = page.getByRole("dialog", { name: /^quick log$/i });
     await expect(dialog).toBeVisible();
     await expect(dialog.getByTestId("quicklog-note")).toHaveValue(NOTE_TEXT);
     await dialog.getByTestId("quick-log-save").click();

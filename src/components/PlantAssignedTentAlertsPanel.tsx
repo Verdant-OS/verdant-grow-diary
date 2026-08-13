@@ -5,8 +5,18 @@
  * the pure rules layer. No writes. No action_queue handoff from this panel.
  * Recommendations are never invented — only fields already stored render.
  */
+import { useEffect, useRef } from "react";
 import { Link } from "@/lib/react-router-compat";
-import { ArrowRight, Bell, AlertCircle, AlertTriangle, Info, Eye } from "lucide-react";
+import {
+  ArrowRight,
+  Bell,
+  AlertCircle,
+  AlertTriangle,
+  Gauge,
+  Info,
+  Eye,
+  Sparkles,
+} from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,11 +24,36 @@ import { formatDistanceToNow } from "date-fns";
 import { usePlantAssignedTentAlerts } from "@/hooks/usePlantAssignedTentAlerts";
 import type { PlantAssignedTentAlertRow } from "@/lib/plantAssignedTentAlertRules";
 import { alertsPath } from "@/lib/routes";
+import { buildPlantAiDoctorReviewPath } from "@/lib/aiDoctorEntryRules";
+import { buildPlantBlueprintPath } from "@/lib/plantDetailQuickActions";
+import { resolveAlertBlueprintMetric } from "@/lib/alertBlueprintLinkRules";
+import { trackTentAlertsDoctorCta } from "@/lib/plantTentAlertsDoctorCtaTracking";
+import {
+  ALERT_DOCTOR_CREDIT_GATE_SURFACE,
+  type AlertDoctorCreditGateView,
+} from "@/lib/alertDoctorCreditGateRules";
+import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 
 interface Props {
   tentId: string | null | undefined;
   tentName?: string | null;
   growId: string | null | undefined;
+  /**
+   * When provided, each row offers an "Ask AI Doctor" shortcut into THIS
+   * plant's cautious-review section. Optional so a caller that cannot prove
+   * the alerts belong to the plant in view simply omits the shortcut rather
+   * than pointing the grower at an unrelated plant.
+   */
+  plantId?: string | null;
+  /**
+   * Out-of-credits interception for the doctor CTA, computed by the CALLER
+   * from presentation-only entitlement + usage reads (the panel itself
+   * stays hook-free/presenter-only). When absent or intercept=false the
+   * doctor CTA behaves exactly as before — callers that do not resolve
+   * credit state simply omit it. Never gates access: the server-side
+   * ai_credit_spend check remains the only spend authority.
+   */
+  doctorCreditGate?: AlertDoctorCreditGateView | null;
 }
 
 function severityClass(sev: PlantAssignedTentAlertRow["severity"]): string {
@@ -48,7 +83,32 @@ function fmt(ts: string | null): string {
   return formatDistanceToNow(new Date(t), { addSuffix: true });
 }
 
-function AlertRowItem({ row }: { row: PlantAssignedTentAlertRow }) {
+function AlertRowItem({
+  row,
+  plantId,
+  tentId,
+  creditGate,
+}: {
+  row: PlantAssignedTentAlertRow;
+  plantId?: string | null;
+  tentId?: string | null;
+  creditGate?: AlertDoctorCreditGateView | null;
+}) {
+  // Deep-links into the plant's existing cautious-review section via the
+  // shared helper (same href five other surfaces already use). Navigation
+  // only — reaching the anchor never starts a review or spends a credit.
+  const doctorHref = plantId ? buildPlantAiDoctorReviewPath({ plantId, tentId }) : null;
+  // Reference navigation to the Blueprint targets for this alert's metric —
+  // only when Blueprint actually bands that metric (soil-probe and snapshot
+  // alerts have none). Deliberately NOT a causal claim: the persisted row
+  // carries no source provenance, and an alert may have breached a CUSTOM
+  // grow target while the same reading sits inside the SOP band — so the
+  // label names the destination ("Stage Targets"), never "the band this
+  // broke". Tier-agnostic and NOT an upsell: Craft growers land on their
+  // live scoring, everyone else on the free targets preview; all entitlement
+  // branching stays inside the Blueprint section itself.
+  const bandHref =
+    plantId && resolveAlertBlueprintMetric(row.metric) ? buildPlantBlueprintPath(plantId) : null;
   return (
     <li
       className="rounded-lg border bg-card/40 p-3 text-sm"
@@ -82,17 +142,94 @@ function AlertRowItem({ row }: { row: PlantAssignedTentAlertRow }) {
             {row.status}
           </Badge>
         </div>
-        <Button
-          asChild
-          variant="ghost"
-          size="sm"
-          className="h-7 px-2 gap-1"
-          data-testid="plant-assigned-tent-alert-view"
-        >
-          <Link to={`/alerts/${row.id}`}>
-            View Alert <ArrowRight className="h-3.5 w-3.5" />
-          </Link>
-        </Button>
+        <div className="flex items-center gap-1">
+          {doctorHref && creditGate?.intercept ? (
+            // Honest interception: this grow's free AI Doctor allotment is
+            // spent, so the review section could only show the server-side
+            // quota denial. The row action routes to plans instead; the
+            // reason renders once at panel level (credits note) and in this
+            // link's title. Impression (paywall_viewed) also fires at panel
+            // level, deduped — never per row.
+            <Button
+              asChild
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 gap-1"
+              data-testid="plant-assigned-tent-alert-doctor-plans"
+            >
+              <Link
+                to={creditGate.href}
+                title={creditGate.note}
+                onClick={() =>
+                  // Id-free by construction: a fixed surface token only.
+                  trackFunnelEvent("paywall_cta_clicked", {
+                    surface: ALERT_DOCTOR_CREDIT_GATE_SURFACE,
+                  })
+                }
+              >
+                <Sparkles className="h-3.5 w-3.5" /> {creditGate.ctaLabel}
+              </Link>
+            </Button>
+          ) : doctorHref ? (
+            <Button
+              asChild
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 gap-1"
+              data-testid="plant-assigned-tent-alert-ask-doctor"
+            >
+              <Link
+                to={doctorHref}
+                onClick={() =>
+                  trackTentAlertsDoctorCta({
+                    severity: row.severity,
+                    metric: row.metric,
+                  })
+                }
+              >
+                <Sparkles className="h-3.5 w-3.5" /> Ask AI Doctor
+              </Link>
+            </Button>
+          ) : null}
+          {bandHref ? (
+            <Button
+              asChild
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 gap-1"
+              data-testid="plant-assigned-tent-alert-target-band"
+            >
+              <Link
+                to={bandHref}
+                onClick={() =>
+                  // Funnel-sinked (gtag), unlike the doctor CTA's CustomEvent,
+                  // which has no listener. Same privacy contract: severity
+                  // bucket + fixed metric token only, never an id. The link is
+                  // gated on the alert→Blueprint mapping, so row.metric here
+                  // can only be a mapped vocabulary token.
+                  trackFunnelEvent("blueprint_cta_clicked", {
+                    surface: "tent_alert_row",
+                    metric: row.metric ?? undefined,
+                    severity: row.severity,
+                  })
+                }
+              >
+                <Gauge className="h-3.5 w-3.5" /> Stage Targets
+              </Link>
+            </Button>
+          ) : null}
+          <Button
+            asChild
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 gap-1"
+            data-testid="plant-assigned-tent-alert-view"
+          >
+            <Link to={`/alerts/${row.id}`}>
+              View Alert <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </Button>
+        </div>
       </div>
       <p className="mt-2 font-medium leading-snug">{row.title}</p>
       {row.reason ? (
@@ -110,9 +247,37 @@ function AlertRowItem({ row }: { row: PlantAssignedTentAlertRow }) {
   );
 }
 
-export default function PlantAssignedTentAlertsPanel({ tentId, tentName, growId }: Props) {
+export default function PlantAssignedTentAlertsPanel({
+  tentId,
+  tentName,
+  growId,
+  plantId,
+  doctorCreditGate,
+}: Props) {
   const enabled = !!tentId;
   const { status, rows } = usePlantAssignedTentAlerts(tentId ?? null, growId ?? null);
+
+  // The credits note (and the swapped row CTAs it explains) only exist when
+  // the caller resolved an exhausted free allotment AND alert rows actually
+  // render — the same condition gates the paywall impression below, so the
+  // impression can never be broader than what the grower saw.
+  const showCreditsNote =
+    doctorCreditGate?.intercept === true && enabled && status === "ok" && rows.length > 0;
+
+  // One impression per gated EXPOSURE, only when the gated state actually
+  // rendered. The /plants/:id route component is REUSED across plant-to-
+  // plant navigations, so a plain boolean ref would swallow the second
+  // plant's visibly-rendered paywall and undercount the funnel. The guard
+  // keys on the exposure identity instead; those ids stay client-side —
+  // the payload carries only the fixed surface token.
+  const paywallTrackedForRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!showCreditsNote) return;
+    const exposureKey = `${plantId ?? ""}:${growId ?? ""}:${tentId ?? ""}`;
+    if (paywallTrackedForRef.current === exposureKey) return;
+    paywallTrackedForRef.current = exposureKey;
+    trackFunnelEvent("paywall_viewed", { surface: ALERT_DOCTOR_CREDIT_GATE_SURFACE });
+  }, [showCreditsNote, plantId, growId, tentId]);
 
   return (
     <Card data-testid="plant-assigned-tent-alerts-panel" className="mt-4">
@@ -156,11 +321,27 @@ export default function PlantAssignedTentAlertsPanel({ tentId, tentName, growId 
             No open alerts for this assigned tent.
           </p>
         ) : (
-          <ul className="space-y-2" data-testid="plant-assigned-tent-alerts-list">
-            {rows.map((r) => (
-              <AlertRowItem key={r.id} row={r} />
-            ))}
-          </ul>
+          <>
+            {showCreditsNote ? (
+              <p
+                className="mb-2 text-xs text-muted-foreground"
+                data-testid="plant-assigned-tent-alerts-credits-note"
+              >
+                {doctorCreditGate!.note}
+              </p>
+            ) : null}
+            <ul className="space-y-2" data-testid="plant-assigned-tent-alerts-list">
+              {rows.map((r) => (
+                <AlertRowItem
+                  key={r.id}
+                  row={r}
+                  plantId={plantId ?? null}
+                  tentId={tentId ?? null}
+                  creditGate={doctorCreditGate ?? null}
+                />
+              ))}
+            </ul>
+          </>
         )}
       </CardContent>
     </Card>

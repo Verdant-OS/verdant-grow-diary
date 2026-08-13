@@ -36,6 +36,7 @@ vi.mock("@/integrations/supabase/client", () => ({
       const chain = () => builder;
       builder.select = chain;
       builder.eq = chain;
+      builder.is = chain;
       builder.in = chain;
       builder.or = chain;
       builder.order = chain;

@@ -41,12 +41,25 @@ export const FUNNEL_EVENT_SCHEMA: Readonly<Record<FunnelEventName, ReadonlyArray
     csv_import_started: [],
     csv_import_completed: ["rows"],
     csv_history_ai_doctor_clicked: ["surface"],
+    // Navigation intent only. The metric and severity are normalized to
+    // fixed alert vocabularies by the canonical CTA helper.
+    ai_doctor_cta_clicked: ["surface", "metric", "severity"],
     ai_doctor_review_started: ["surface"],
     historical_ai_review_started: [],
     ai_doctor_result_received: ["surface"],
     ai_doctor_session_saved: ["surface"],
+    // "metric"/"severity" are fixed alert vocabularies, never ids or values.
+    // Tier-agnostic navigation intent — kept out of the paywall pair so a
+    // Craft grower's click never counts as an upgrade impression.
+    blueprint_cta_clicked: ["surface", "metric", "severity"],
     paywall_viewed: ["surface"],
     paywall_cta_clicked: ["surface", "plan"],
+    // "surface" only, never "plan". A pack SKU is not a plan, and letting one
+    // into a param that plan-entitlement code reads is exactly how a pack id
+    // ends up mistaken for a tier. Pricing already reports the SKU via its own
+    // pricing_cta_credit_pack_clicked event.
+    credit_pack_cta_viewed: ["surface"],
+    credit_pack_cta_clicked: ["surface"],
     checkout_started: ["plan"],
     checkout_catalog_unavailable: ["plan", "reason"],
     checkout_recovery_dismissed: ["plan"],
@@ -54,6 +67,10 @@ export const FUNNEL_EVENT_SCHEMA: Readonly<Record<FunnelEventName, ReadonlyArray
     checkout_recovery_retry: ["plan"],
     checkout_recovery_plan_slug_fallback: ["reason", "length_bucket"],
     subscription_activated: ["plan", "surface"],
+    // Paid→paid cross-sell pair; surface only — the pitched plan is always
+    // founder_lifetime, and a constant param is noise, not measurement.
+    founder_note_viewed: ["surface"],
+    founder_note_clicked: ["surface"],
     checkout_return_completed: ["surface"],
   };
 

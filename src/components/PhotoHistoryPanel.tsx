@@ -2,6 +2,15 @@ import { useMemo } from "react";
 import { Image as ImageIcon, AlertTriangle } from "lucide-react";
 
 import { normalizeDiaryEntries, type NormalizeDiaryInput } from "@/lib/diaryEntryRules";
+import {
+  buildQuickLogEntryHandleIndex,
+  handleRootId,
+  type QuickLogEntryHandleRef,
+} from "@/lib/quick-log/quickLogRevisionRules";
+import { useQuickLogRevisionBadges } from "@/hooks/useQuickLogRevisionBadges";
+import QuickLogEntryIntegrityControls, {
+  QuickLogEditedBadge,
+} from "@/components/QuickLogEntryIntegrityControls";
 import { buildPhotoHistory, type PhotoHistoryRow } from "@/lib/photoHistoryRules";
 import {
   PHOTO_NON_DIAGNOSTIC_LABEL,
@@ -18,6 +27,8 @@ interface PhotoHistoryPanelProps {
   /** Optional cap for the rendered list. Defaults to 24. */
   limit?: number;
   className?: string;
+  /** Notifies the owner (e.g. Timeline local state) after a correction/retraction. */
+  onEntryChanged?: () => void;
 }
 
 function fmtDate(iso: string | null, fallbackLabel: string): string {
@@ -37,7 +48,19 @@ function fmtDate(iso: string | null, fallbackLabel: string): string {
   }
 }
 
-function Card({ row }: { row: PhotoHistoryRow }) {
+function Card({
+  row,
+  integrityHandle,
+  correctionCount,
+  currentNote,
+  onEntryChanged,
+}: {
+  row: PhotoHistoryRow;
+  integrityHandle?: QuickLogEntryHandleRef | null;
+  correctionCount?: number;
+  currentNote?: string | null;
+  onEntryChanged?: () => void;
+}) {
   return (
     <li className="rounded-xl border border-border/40 bg-card/40 overflow-hidden animate-fade-in">
       <div className="relative aspect-square bg-secondary/30">
@@ -85,6 +108,20 @@ function Card({ row }: { row: PhotoHistoryRow }) {
             {row.caption}
           </p>
         )}
+        <div className="mt-1 flex flex-wrap items-center gap-1.5">
+          <QuickLogEditedBadge correctionCount={correctionCount ?? 0} />
+          {integrityHandle && (
+            <QuickLogEntryIntegrityControls
+              handle={integrityHandle}
+              currentNote={currentNote ?? null}
+              currentOccurredAt={row.occurredAt}
+              currentPlantId={row.plantId}
+              plantId={row.plantId}
+              tentId={row.tentId}
+              onChanged={onEntryChanged}
+            />
+          )}
+        </div>
       </div>
     </li>
   );
@@ -94,6 +131,7 @@ export default function PhotoHistoryPanel({
   rawEntries,
   limit = 24,
   className,
+  onEntryChanged,
 }: PhotoHistoryPanelProps) {
   const rows = useMemo(() => {
     // Mirror Timeline's normalization convention: lift `details.event_type`
@@ -112,6 +150,31 @@ export default function PhotoHistoryPanel({
     const all = buildPhotoHistory(normalized);
     return all.slice(0, Math.max(0, limit));
   }, [rawEntries, limit]);
+
+  // Correction/retraction wiring (issue #786): handles resolved from the raw
+  // entries; photos without a Quick Log handle stay control-free.
+  const handleIndex = useMemo(() => buildQuickLogEntryHandleIndex(rawEntries), [rawEntries]);
+  const rawNoteById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const raw of rawEntries ?? []) {
+      const r = (raw ?? {}) as Record<string, unknown>;
+      if (typeof r.id === "string" && typeof r.note === "string") map.set(r.id, r.note);
+    }
+    return map;
+  }, [rawEntries]);
+  const rootIds = useMemo(
+    () =>
+      [
+        ...new Set(
+          rows
+            .map((r) => handleIndex.get(r.id))
+            .filter((h): h is NonNullable<typeof h> => !!h)
+            .map(handleRootId),
+        ),
+      ].filter((id) => id.length > 0),
+    [rows, handleIndex],
+  );
+  const { badges } = useQuickLogRevisionBadges(rootIds);
 
   return (
     <section className={"glass rounded-2xl p-4 " + (className ?? "")} aria-label="Photo history">
@@ -134,9 +197,20 @@ export default function PhotoHistoryPanel({
         </div>
       ) : (
         <ul className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-          {rows.map((r) => (
-            <Card key={r.id} row={r} />
-          ))}
+          {rows.map((r) => {
+            const handle = handleIndex.get(r.id) ?? null;
+            const badge = handle ? badges.get(handleRootId(handle)) : undefined;
+            return (
+              <Card
+                key={r.id}
+                row={r}
+                integrityHandle={handle}
+                correctionCount={badge?.correctionCount ?? 0}
+                currentNote={rawNoteById.get(r.id) ?? null}
+                onEntryChanged={onEntryChanged}
+              />
+            );
+          })}
         </ul>
       )}
     </section>

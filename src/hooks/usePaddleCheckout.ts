@@ -25,6 +25,7 @@ import { buildCheckoutCancelPath } from "@/lib/checkoutCancelRecoveryRules";
 import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 import { saveCheckoutReturnTo } from "@/lib/checkoutReturnToSession";
 import { clearCheckoutStarted, markCheckoutStarted } from "@/lib/checkoutContextRules";
+import { CREDIT_PACKS } from "@/constants/pricing";
 
 export interface OpenCheckoutOptions {
   priceId: string;
@@ -178,8 +179,13 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
 
         // Same-device checkout-context marker so /checkout/success can show
         // "confirming" vs "no checkout context". Grants nothing — see
-        // checkoutContextRules.
-        markCheckoutStarted(Date.now());
+        // checkoutContextRules. The KIND lets that page distinguish a plan
+        // purchase from a one-time pack, so plan-only surfaces (e.g. the
+        // Founder availability note) never fire off a pack checkout.
+        markCheckoutStarted(
+          Date.now(),
+          CREDIT_PACKS.some((pack) => pack.sku === options.priceId) ? "pack" : "plan",
+        );
 
         // Slice D: register overlay session BEFORE calling
         // Paddle.Checkout.open so the module-level eventCallback (set at

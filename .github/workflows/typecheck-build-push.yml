@@ -7,7 +7,7 @@ name: Typecheck (tsgo) + build
 #     `main` and `verdant-grow-diary` — pushes to feature branches get no
 #     signal until a PR is opened.
 #   * `typecheck.yml` runs `tsc -p tsconfig.json --noEmit` on PRs and
-#     pushes to `main` only.
+#     pushes to both protected release branches.
 #
 # This workflow is the cheap always-on gate: `tsgo --noEmit` (the same
 # command used for local validation, so CI and local agree) followed by a
@@ -24,10 +24,10 @@ on:
 
 concurrency:
   # One run per ref; a newer push supersedes an in-flight run on the same
-  # branch. `main` is excluded from cancellation so release history keeps a
-  # completed run for every commit.
+  # branch. Both protected release branches are excluded from cancellation so
+  # release history keeps a completed run for every commit.
   group: typecheck-build-push-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  cancel-in-progress: ${{ !contains(fromJSON('["refs/heads/main","refs/heads/verdant-grow-diary"]'), github.ref) }}
 
 permissions:
   contents: read

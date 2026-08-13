@@ -78,6 +78,33 @@ describe("PhenoHuntsIndex", () => {
     expect(second.textContent).toContain("setup in progress");
   });
 
+  it("renders a stored concatenated name as a single field with no extra join (#569)", async () => {
+    // Issue observed "Starter Grow Pheno HuntClaude E2E Pheno Hunt" on the
+    // index. Index must show exactly the stored `name` once — not grow name
+    // + hunt name. That proves the bug is bad stored data (e2e leftover),
+    // not a display concatenation.
+    const weird = "Starter Grow Pheno HuntClaude E2E Pheno Hunt";
+    mockList.mockResolvedValue([
+      {
+        id: "9540a3f2-10e9-4815-ac50-e7ae892babbd",
+        name: weird,
+        createdAt: "2026-07-29T00:00:00.000Z",
+        setupCompletedAt: null,
+        candidateCount: 2,
+      },
+    ]);
+    renderIndex();
+    const item = await screen.findByTestId(
+      "pheno-hunts-index-item-9540a3f2-10e9-4815-ac50-e7ae892babbd",
+    );
+    const headings = within(item).getAllByRole("heading");
+    expect(headings).toHaveLength(1);
+    expect(headings[0].textContent).toBe(weird);
+    // Stored string contains "Pheno Hunt" twice; heading must equal storage
+    // exactly (no third "Pheno Hunt" from the template).
+    expect(headings[0].textContent?.match(/Pheno Hunt/g)?.length ?? 0).toBe(2);
+  });
+
   it("shows an empty state routing to My Grows when there are no hunts", async () => {
     mockList.mockResolvedValue([]);
     renderIndex();

@@ -19,6 +19,7 @@
 //     resolver keeps failing.
 
 import { expect, test, type Page } from "@playwright/test";
+import { denyAnalyticsConsent } from "./utils/analyticsConsent";
 
 const PROJECT_REF = "knkwiiywfkbqznbxwqfh";
 const SESSION_KEY = `sb-${PROJECT_REF}-auth-token`;
@@ -88,6 +89,33 @@ async function captureAnalyticsEvents(page: Page) {
 
 type CapturedAnalyticsEvent = { name: string; props: Record<string, unknown> | null };
 
+type PaidCheckoutPlanId =
+  "pro_monthly" | "pro_annual" | "craft_monthly" | "craft_annual" | "founder_lifetime";
+
+const EXPECTED_PAID_CHECKOUT_PLAN_IDS: readonly PaidCheckoutPlanId[] = [
+  "pro_monthly",
+  "pro_annual",
+  "craft_monthly",
+  "craft_annual",
+  "founder_lifetime",
+];
+
+const PAID_RECOVERY_PLAN_IDS: readonly PaidCheckoutPlanId[] = [
+  "pro_monthly",
+  "pro_annual",
+  "craft_monthly",
+  "craft_annual",
+  "founder_lifetime",
+];
+
+const PAID_CTA_TEST_IDS: Readonly<Record<PaidCheckoutPlanId, string>> = {
+  pro_monthly: "pricing-cta-pro-monthly",
+  pro_annual: "pricing-cta-pro-annual",
+  craft_monthly: "pricing-cta-craft-monthly",
+  craft_annual: "pricing-cta-craft-annual",
+  founder_lifetime: "pricing-cta-founder-lifetime",
+};
+
 async function readAnalyticsEvents(page: Page): Promise<CapturedAnalyticsEvent[]> {
   return page.evaluate(
     () =>
@@ -124,6 +152,13 @@ async function mockSupabaseAndPaddle(page: Page) {
     return route.fulfill({ status: 200, contentType: "application/json", body });
   });
 
+  // Any other edge function: silent 404 so nothing else crashes. Register
+  // this broad fallback first: Playwright gives the most recently registered
+  // matching route precedence, so the explicit price mock below must win.
+  await page.route(/\/functions\/v1\//, (route) =>
+    route.fulfill({ status: 404, contentType: "application/json", body: "{}" }),
+  );
+
   // get-paddle-price: force the catalog-unavailable branch so the recovery
   // panel is reached even if the local build ships with a payments token
   // (env=sandbox). If env resolves to "unavailable" instead, the hook
@@ -135,11 +170,6 @@ async function mockSupabaseAndPaddle(page: Page) {
       contentType: "application/json",
       body: JSON.stringify({ error: "price_not_configured" }),
     }),
-  );
-
-  // Any other edge function: silent 404 so nothing else crashes.
-  await page.route(/\/functions\/v1\//, (route) =>
-    route.fulfill({ status: 404, contentType: "application/json", body: "{}" }),
   );
 
   // Paddle CDN: stub `window.Paddle` and swallow the script so we never
@@ -162,33 +192,53 @@ async function mockSupabaseAndPaddle(page: Page) {
   await page.route(/google-analytics\.com|googletagmanager\.com/, (route) => route.abort());
 }
 
-async function triggerBlockedRecovery(page: Page) {
-  const proMonthly = page.getByTestId("pricing-cta-pro-monthly");
-  await expect(proMonthly).toBeVisible();
-  await proMonthly.click();
+async function triggerBlockedRecovery(page: Page, planId: PaidCheckoutPlanId) {
+  const cta = page.getByTestId(PAID_CTA_TEST_IDS[planId]);
+  await expect(cta).toBeVisible();
+  await cta.click();
   const recovery = page.getByTestId("pricing-checkout-recovery");
   await expect(recovery).toBeVisible();
   return recovery;
 }
 
-async function openBlockedRecovery(page: Page) {
-  // Pin the plan exercised by this contract. Pricing intentionally defaults
-  // to annual, while this smoke proves the monthly recovery analytics slug.
-  await page.goto("/pricing?plan=pro_monthly");
-  return triggerBlockedRecovery(page);
+async function openBlockedRecovery(page: Page, planId: PaidCheckoutPlanId) {
+  await page.goto(`/pricing?plan=${planId}`);
+  // TanStack Start pre-renders the CTA before React has attached its event
+  // handler. The page-view event is emitted from Pricing's client effect, so
+  // waiting for it makes this a real browser click rather than a lost SSR-era
+  // click on static markup.
+  await expect
+    .poll(() => countAnalyticsEvents(page, "pricing_page_view"), { timeout: 10_000 })
+    .toBeGreaterThan(0);
+  return triggerBlockedRecovery(page, planId);
 }
 
 test.describe("Pricing checkout recovery (blocked state)", () => {
   test.beforeEach(async ({ page }) => {
+    // This suite does not test analytics consent. A persisted denial prevents
+    // the fixed banner from intercepting the paid CTA while guaranteeing no
+    // analytics request leaves the hermetic browser.
+    await denyAnalyticsConsent(page);
     await seedFakeSession(page);
     await captureAnalyticsEvents(page);
     await mockSupabaseAndPaddle(page);
   });
 
+  test("covers every sellable paid CTA in the blocked-checkout recovery matrix", () => {
+    expect(PAID_RECOVERY_PLAN_IDS).toEqual(EXPECTED_PAID_CHECKOUT_PLAN_IDS);
+  });
+
+  for (const planId of PAID_RECOVERY_PLAN_IDS) {
+    test(`${planId} CTA reaches the calm blocked-checkout recovery state`, async ({ page }) => {
+      const recovery = await openBlockedRecovery(page, planId);
+      await expect(recovery).toContainText(/checkout/i);
+    });
+  }
+
   test("blocked recovery panel renders without leaking internal reason tokens", async ({
     page,
   }) => {
-    const recovery = await openBlockedRecovery(page);
+    const recovery = await openBlockedRecovery(page, "pro_monthly");
 
     // The recovery buttons are the ones the spec exercises next.
     await expect(page.getByTestId("pricing-checkout-retry")).toBeVisible();
@@ -210,7 +260,7 @@ test.describe("Pricing checkout recovery (blocked state)", () => {
   });
 
   test("Dismiss clears the recovery panel", async ({ page }) => {
-    await openBlockedRecovery(page);
+    await openBlockedRecovery(page, "pro_monthly");
     await page.getByTestId("pricing-checkout-dismiss").click();
     await expect(page.getByTestId("pricing-checkout-recovery")).toHaveCount(0);
   });
@@ -218,7 +268,7 @@ test.describe("Pricing checkout recovery (blocked state)", () => {
   test("Choose another plan clears the panel and returns focus to the plans grid", async ({
     page,
   }) => {
-    await openBlockedRecovery(page);
+    await openBlockedRecovery(page, "pro_monthly");
     await page.getByTestId("pricing-checkout-choose-another-plan").click();
     await expect(page.getByTestId("pricing-checkout-recovery")).toHaveCount(0);
     // Plans grid is still there and reachable — the anchor scroll target
@@ -230,7 +280,7 @@ test.describe("Pricing checkout recovery (blocked state)", () => {
   test("Try again re-invokes checkout and keeps the panel while resolution keeps failing", async ({
     page,
   }) => {
-    await openBlockedRecovery(page);
+    await openBlockedRecovery(page, "pro_monthly");
 
     // Count subsequent resolver calls so we can prove Retry actually
     // re-invokes checkout rather than only clearing state.
@@ -306,7 +356,7 @@ test.describe("Pricing checkout recovery (blocked state)", () => {
       "rows",
     ]);
 
-    await openBlockedRecovery(page);
+    await openBlockedRecovery(page, "pro_monthly");
 
     // --- Retry -----------------------------------------------------------
     const blockedEventsBeforeRetry = await countAnalyticsEvents(page, "pricing_checkout_blocked");
@@ -338,7 +388,7 @@ test.describe("Pricing checkout recovery (blocked state)", () => {
     // Re-open in the SAME document so the init-script analytics collector
     // retains Retry and Choose-another events. Calling openBlockedRecovery
     // again would navigate and reset the collector before the final read.
-    await triggerBlockedRecovery(page);
+    await triggerBlockedRecovery(page, "pro_monthly");
 
     // --- Dismiss --------------------------------------------------------
     await page.getByTestId("pricing-checkout-dismiss").click();

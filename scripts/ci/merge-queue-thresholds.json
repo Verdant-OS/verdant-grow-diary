@@ -1,0 +1,67 @@
+{
+  "$comment": "Alert thresholds for scripts/ci/merge-queue-snapshot.mjs — tune without code changes",
+  "scaling": {
+    "enabled": true,
+    "baseline_open_prs": 10,
+    "min_factor": 1.0,
+    "max_factor": 2.5,
+    "count_metrics": [
+      "dirty_open_prs",
+      "behind_open_prs",
+      "blocked_open_prs",
+      "auto_merge_waiting"
+    ],
+    "depth_metrics": ["queue_depth"],
+    "depth_max_cap": 5,
+    "age_metrics": [],
+    "ratio_alerts": {
+      "enabled": true,
+      "min_open_prs": 4,
+      "dirty_ratio": { "warn": 0.45, "critical": 0.7 },
+      "behind_ratio": { "warn": 0.4, "critical": 0.65 }
+    },
+    "why": "Absolute count floors scale with open-PR load (factor=clamp(open/baseline,min,max)). Age thresholds stay fixed (timeout-bound). Optional ratio alerts catch high conflict fractions on small or large backlogs."
+  },
+  "queue_depth": {
+    "warn": 3,
+    "critical": 5,
+    "unit": "entries",
+    "why": "Serial queue (max_entries_to_merge=1); depth>3 is sustained backlog"
+  },
+  "max_age_sec": {
+    "warn": 1800,
+    "critical": 5400,
+    "unit": "seconds",
+    "why": "Warn at 30m; critical near 90m ruleset check timeout — not scaled"
+  },
+  "median_age_sec": {
+    "warn": 900,
+    "critical": 2700,
+    "unit": "seconds",
+    "why": "Typical green docs PR should clear well under 15–45m once required CI is green — not scaled"
+  },
+  "dirty_open_prs": {
+    "warn": 5,
+    "critical": 10,
+    "unit": "prs",
+    "why": "Content conflicts never enter the queue — ownership/serialisation smell"
+  },
+  "behind_open_prs": {
+    "warn": 5,
+    "critical": 12,
+    "unit": "prs",
+    "why": "Stale heads need update-branch; not a queue latency problem"
+  },
+  "blocked_open_prs": {
+    "warn": 8,
+    "critical": 15,
+    "unit": "prs",
+    "why": "Required checks/reviews stuck across many PRs"
+  },
+  "auto_merge_waiting": {
+    "warn": 3,
+    "critical": 6,
+    "unit": "prs",
+    "why": "Many auto-merge/queue requests waiting often means required gates never go green"
+  }
+}

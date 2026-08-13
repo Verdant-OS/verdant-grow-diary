@@ -101,12 +101,14 @@ describe("assert-required-money-migrations-applied process boundary", () => {
     expect(invocation).toBeDefined();
     expect(invocation?.args.join(" ")).not.toContain(dbUrl);
     expect(invocation?.args.join(" ")).not.toContain("argv-canary-secret");
-    const canonical = new URL(dbUrl);
-    canonical.username = `postgres.${SANDBOX_REF}`;
-    canonical.search = "";
     expect(invocation?.env).toEqual({
-      PGDATABASE: canonical.toString(),
+      PGHOST: "aws-0-us-east-1.pooler.supabase.com",
+      PGPORT: "5432",
+      PGUSER: `postgres.${SANDBOX_REF}`,
+      PGPASSWORD: "argv-canary-secret",
+      PGDATABASE: "postgres",
       PGSSLMODE: "require",
+      PGGSSENCMODE: "disable",
     });
   });
 
@@ -137,6 +139,37 @@ describe("assert-required-money-migrations-applied process boundary", () => {
     expect(observableOutput).not.toContain("raw-stderr-secret");
     expect(observableOutput).not.toContain("postgresql://");
   });
+
+  it.each([
+    {
+      targetEnv: "live",
+      dbUrl: directUrl(PRODUCTION_REF, "live-connection-secret"),
+      expectedHint: "refresh `SUPABASE_DB_URL` under Settings → Environments → verdant-production",
+    },
+    {
+      targetEnv: "sandbox",
+      dbUrl: directUrl(SANDBOX_REF, "sandbox-connection-secret"),
+      expectedHint:
+        "refresh `SUPABASE_DB_URL_SANDBOX` under Settings → Environments → verdant-sandbox",
+    },
+  ])(
+    "names the exact $targetEnv environment secret after a connection failure",
+    ({ targetEnv, dbUrl, expectedHint }) => {
+      const reportPath = artifactPath(`connection-failure-${targetEnv}.md`);
+      installPsql({ exit: 2 });
+
+      const result = runScript({
+        REPORT_PATH: reportPath,
+        SUPABASE_DB_URL: dbUrl,
+        TARGET_ENV: targetEnv,
+      });
+
+      expect(result.status).toBe(5);
+      const report = readFileSync(reportPath, "utf8");
+      expect(report).toContain(expectedHint);
+      expect(report).not.toContain("SUPABASE_DB_URL_LIVE");
+    },
+  );
 
   it("rejects a protected target mismatch before psql and emits only a sanitized reason", () => {
     const secret = "wrong-target-secret";

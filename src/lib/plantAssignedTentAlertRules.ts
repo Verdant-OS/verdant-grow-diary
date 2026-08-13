@@ -3,8 +3,9 @@
  *
  * Read-only. No React. No Supabase. No I/O.
  *
- * Filters persisted alert rows (already RLS-scoped) down to open alerts that
- * belong to a given tent, sorts by severity (highest first) with deterministic
+ * Filters persisted alert rows (already RLS-scoped) down to still-active
+ * alerts (see ASSIGNED_TENT_ALERT_STATUSES) that belong to a given tent,
+ * sorts by severity (highest first) with deterministic
  * tie-breaking, and caps to a small display limit. Missing fields stay null —
  * never invented. Recommendations are never fabricated here.
  */
@@ -42,8 +43,41 @@ const SEVERITY_LABEL: Record<AlertSeverityRow, string> = {
   info: "Info",
 };
 
-function isOpen(status: AlertStatusRow): boolean {
-  return status === "open" || status === "acknowledged";
+/**
+ * Alert statuses this panel treats as still needing the grower's attention.
+ *
+ * `acknowledged` is deliberately included: acknowledging an alert records that
+ * the grower has seen it, not that the underlying condition is fixed. It stays
+ * visible until it is genuinely resolved or dismissed.
+ *
+ * Exported so the data layer can keep its query wide enough to match. This
+ * list and the query that feeds it must not drift apart — naming the statuses
+ * in two places independently is what made the `acknowledged` branch below
+ * unreachable in the running app.
+ */
+export const ASSIGNED_TENT_ALERT_STATUSES: readonly AlertStatusRow[] = ["open", "acknowledged"];
+
+function isActive(status: AlertStatusRow): boolean {
+  return ASSIGNED_TENT_ALERT_STATUSES.includes(status);
+}
+
+/**
+ * Count only the strictly-open rows in an already-built active list.
+ *
+ * Surfaces whose copy says "open alerts" must use this rather than
+ * `rows.length`. `rows` is the ACTIVE set (open + acknowledged), so counting it
+ * under an "open" label would report open alerts that do not exist — an
+ * acknowledged-only tent would read as though nothing had been seen yet.
+ *
+ * Kept as a separate count rather than relabelling those surfaces to "active":
+ * whether the quick-status strips should start counting acknowledged alerts is
+ * a product decision, not a side effect of repairing the panel's query.
+ */
+export function countOpenAlerts(
+  rows: readonly PlantAssignedTentAlertRow[] | null | undefined,
+): number {
+  if (!rows || rows.length === 0) return 0;
+  return rows.reduce((n, r) => (r.status === "open" ? n + 1 : n), 0);
 }
 
 function toRow(a: AlertRow): PlantAssignedTentAlertRow {
@@ -80,17 +114,33 @@ export function buildAssignedTentAlerts(
   rows: readonly AlertRow[] | null | undefined,
   opts: BuildAssignedTentAlertsOptions,
 ): PlantAssignedTentAlertRow[] {
+  const limit = Math.max(1, opts.limit ?? ASSIGNED_TENT_ALERTS_DEFAULT_LIMIT);
+  return selectActiveTentAlerts(rows, opts).slice(0, limit);
+}
+
+/**
+ * The same scoping and ordering as `buildAssignedTentAlerts`, but WITHOUT the
+ * display cap.
+ *
+ * Counts must be derived from this, never from the capped list. The cap is a
+ * display concern; a tent whose top slots are filled by higher-severity
+ * acknowledged alerts would otherwise report zero open alerts while an open one
+ * sits just past the cutoff — a false "No open alerts" on a tent that has one.
+ */
+export function selectActiveTentAlerts(
+  rows: readonly AlertRow[] | null | undefined,
+  opts: BuildAssignedTentAlertsOptions,
+): PlantAssignedTentAlertRow[] {
   const tentId = opts.tentId ?? null;
   if (!tentId) return [];
   if (!rows || rows.length === 0) return [];
   const growId = opts.growId ?? null;
-  const limit = Math.max(1, opts.limit ?? ASSIGNED_TENT_ALERTS_DEFAULT_LIMIT);
 
   const scoped = rows.filter((a) => {
     if (!a) return false;
     if (a.tent_id !== tentId) return false;
     if (growId && a.grow_id !== growId) return false;
-    return isOpen(a.status);
+    return isActive(a.status);
   });
 
   const mapped = scoped.map(toRow);
@@ -101,5 +151,5 @@ export function buildAssignedTentAlerts(
     if (bt !== at) return bt - at;
     return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
   });
-  return mapped.slice(0, limit);
+  return mapped;
 }

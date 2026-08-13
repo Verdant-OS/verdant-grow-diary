@@ -200,7 +200,11 @@ export interface HandleResult {
  */
 export function redactError(e: string): string {
   return e
-    .replace(/(?:api[_-]?key|service[_-]?role|secret|token|password|bearer)[^\s]*/gi, "[redacted]")
+    .replace(
+      /\b(?:api[_-]?key|service[_-]?role|secret|token|password)\b(?:\s*(?:=|:)\s*|\s+)(?:"[^"]*"|'[^']*'|[^\s,;]+)/gi,
+      "[redacted]",
+    )
+    .replace(/\bbearer\s+(?:"[^"]*"|'[^']*'|[^\s,;]+)/gi, "[redacted]")
     .slice(0, 500);
 }
 

@@ -67,6 +67,7 @@ export function useRecentFeedingsForDefaults(input: RecentFeedingsForDefaultsInp
       let legacy = supabase
         .from("diary_entries")
         .select("id,grow_id,plant_id,tent_id,entry_at,note,details")
+        .is("retracted_at", null)
         .order("entry_at", { ascending: false })
         .limit(RECENT_FEEDINGS_DEFAULTS_LIMIT);
       if (plantId) {

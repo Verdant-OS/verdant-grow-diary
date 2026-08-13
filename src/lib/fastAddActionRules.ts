@@ -88,6 +88,67 @@ export const FAST_ADD_PICKER_CTAS = [
 ] as const;
 export type FastAddPickerCtaId = (typeof FAST_ADD_PICKER_CTAS)[number]["id"];
 
+/** Query param that carries a pending Quick Log action through the picker. */
+export const FAST_ADD_QUERY_PARAM = "fastAdd";
+
+export type FastAddPickerCta = {
+  id: FastAddPickerCtaId;
+  label: string;
+  to: string;
+};
+
+const FAST_ADD_ACTION_ID_SET = new Set<string>(
+  FAST_ADD_ACTIONS.map((a) => a.id),
+);
+
+/**
+ * Build plant/tent picker CTAs that preserve the pending Quick Log action
+ * as `?fastAdd=<actionId>`. Pure. No I/O.
+ */
+export function buildFastAddPickerCtas(
+  actionId: FastAddActionId,
+): readonly FastAddPickerCta[] {
+  const q = encodeURIComponent(actionId);
+  return [
+    { id: "choose_plant", label: "Choose plant", to: `/plants?${FAST_ADD_QUERY_PARAM}=${q}` },
+    { id: "choose_tent", label: "Choose tent", to: `/tents?${FAST_ADD_QUERY_PARAM}=${q}` },
+  ];
+}
+
+/**
+ * Read a pending Fast Add action from a search string (with or without `?`).
+ * Unknown / empty / malformed → null. Never throws.
+ */
+export function readFastAddParam(
+  search: string | null | undefined,
+): FastAddActionId | null {
+  if (search == null || search === "") return null;
+  try {
+    const raw = search.startsWith("?") ? search.slice(1) : search;
+    // Also accept full path?query
+    const q = raw.includes("?") ? raw.split("?").pop()! : raw;
+    const params = new URLSearchParams(q);
+    const value = params.get(FAST_ADD_QUERY_PARAM);
+    if (!value) return null;
+    if (!FAST_ADD_ACTION_ID_SET.has(value)) return null;
+    return value as FastAddActionId;
+  } catch {
+    return null;
+  }
+}
+
+/** Calm banner copy for picker pages. Presenter-only. */
+export function fastAddPickerBannerCopy(
+  kind: "plant" | "tent",
+  actionId: FastAddActionId,
+): string {
+  const label =
+    FAST_ADD_ACTIONS.find((a) => a.id === actionId)?.label ?? "this action";
+  return kind === "tent"
+    ? `Choose a tent to log ${label}.`
+    : `Choose a plant to log ${label}.`;
+}
+
 export interface FastAddSelectionContext {
   plantId: string | null;
   plantName?: string | null;
@@ -123,7 +184,8 @@ export interface FastAddOpenQuickLogIntent {
 export interface FastAddNeedsContextIntent {
   kind: "needs-context";
   message: typeof FAST_ADD_NO_CONTEXT_COPY;
-  ctas: typeof FAST_ADD_PICKER_CTAS;
+  /** Picker destinations; prefer buildFastAddPickerCtas(actionId) so action survives. */
+  ctas: readonly FastAddPickerCta[];
 }
 export interface FastAddOpenQuickLogV2Intent {
   kind: "open-quicklog-v2";
@@ -165,7 +227,7 @@ export function resolveFastAddIntent(
     return {
       kind: "needs-context",
       message: FAST_ADD_NO_CONTEXT_COPY,
-      ctas: FAST_ADD_PICKER_CTAS,
+      ctas: buildFastAddPickerCtas(actionId),
     };
   }
   const context = ctx as FastAddSelectionContext;
@@ -174,7 +236,7 @@ export function resolveFastAddIntent(
     return {
       kind: "needs-context",
       message: FAST_ADD_NO_CONTEXT_COPY,
-      ctas: FAST_ADD_PICKER_CTAS,
+      ctas: [...FAST_ADD_PICKER_CTAS],
     };
   }
 
@@ -198,7 +260,7 @@ export function resolveFastAddIntent(
       : {
           kind: "needs-context",
           message: FAST_ADD_NO_CONTEXT_COPY,
-          ctas: FAST_ADD_PICKER_CTAS,
+          ctas: buildFastAddPickerCtas("watering"),
         };
   }
 

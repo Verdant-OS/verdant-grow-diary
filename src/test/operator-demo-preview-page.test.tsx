@@ -36,11 +36,14 @@ describe("OperatorDemoPreview", () => {
     expect(screen.getByText(/no database writes are performed/i)).toBeInTheDocument();
   });
 
-  it("renders Demo source badge (never Live)", () => {
+  it("renders a Demo source badge inside the fixture walkthrough", () => {
     renderPage();
-    const badge = screen.getByTestId("operator-demo-preview-source-badge");
+    const preview = screen.getByTestId("operator-demo-preview");
+    const badge = within(preview).getByTestId("operator-demo-preview-source-badge");
     expect(badge.textContent?.trim()).toBe("Demo");
-    expect(document.body.textContent ?? "").not.toMatch(/\bLive\b/);
+    // The page also contains a separately labelled, owner-scoped read-only
+    // account panel. Only the fixture walkthrough is required to stay Demo.
+    expect(preview.textContent ?? "").not.toMatch(/\bLive\b/);
   });
 
   it("renders alert section with evidence badges from safe refs", () => {

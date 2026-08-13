@@ -26,6 +26,7 @@ describe("paid acquisition attribution rules", () => {
     ["context_check", "owned", "context_check", "pricing_interest_context_check"],
     ["vpd_calculator", "owned", "vpd_calculator", "pricing_interest_vpd_calculator"],
     ["csv_history", "owned", "csv_history", "pricing_interest"],
+    ["blueprint_targets", "owned", "blueprint_targets", "pricing_interest"],
   ] as const)(
     "round-trips the fixed %s attribution tuple",
     (source, medium, campaign, leadSource) => {

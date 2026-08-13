@@ -21,6 +21,9 @@ const CRITICAL_PACKAGE = "@lovable.dev/mcp-js";
 const TRANSITION_CONFIG = "config/dependency-lockfile-transition.json";
 const REQUIRED_LOCKFILES = Object.freeze(["bun.lock", "package-lock.json"]);
 export const PACKAGE_LOCK_SECURITY_FLOORS = Object.freeze({
+  "@hono/node-server": "2.0.10",
+  "@modelcontextprotocol/sdk": "1.30.0",
+  hono: "4.12.34",
   vite: "6.4.3",
   postcss: "8.5.18",
   "brace-expansion": "1.1.18",
@@ -31,6 +34,12 @@ export const PACKAGE_LOCK_SECURITY_FLOORS = Object.freeze({
   picomatch: "2.3.2",
   rollup: "4.59.0",
   vitest: "3.2.6",
+});
+export const BUN_LOCK_SECURITY_FLOORS = Object.freeze({
+  "@hono/node-server": "2.0.10",
+  "@modelcontextprotocol/sdk": "1.30.0",
+  hono: "4.12.34",
+  esbuild: "0.28.1",
 });
 export const PACKAGE_LOCK_MAJOR_SECURITY_FLOORS = Object.freeze({
   "brace-expansion": Object.freeze({
@@ -483,6 +492,19 @@ export function evaluatePolicy({
                 `is ${resolvedVersion ?? "missing"}.`,
             );
           }
+        }
+      }
+
+      for (const [packageName, minimum] of Object.entries(BUN_LOCK_SECURITY_FLOORS)) {
+        const versions = resolvedVersionInBunLock(bunLockText, packageName);
+        if (
+          !versions ||
+          versions.some((resolvedVersion) => !versionAtLeast(resolvedVersion, minimum))
+        ) {
+          errors.push(
+            `bun.lock security floor for ${packageName} is ${minimum}; ` +
+              `found ${versions?.join(", ") || "none"}.`,
+          );
         }
       }
 

@@ -19,6 +19,9 @@
     "predeploy:functions:all": "node scripts/sync-edge-shared.mjs --check && node scripts/verify-edge-shared-in-sync.mjs && node scripts/check-no-src-lib-imports.mjs",
     "deploy:functions": "supabase functions deploy",
     "deploy:functions:all": "bun run predeploy:functions:all && supabase functions deploy",
+    "merge-queue:snapshot": "node scripts/ci/merge-queue-snapshot.mjs",
+    "merge-queue:snapshot:json": "node scripts/ci/merge-queue-snapshot.mjs --json",
+    "merge-queue:snapshot:alert": "node scripts/ci/merge-queue-snapshot.mjs --alert",
     "check:no-src-lib-imports": "node scripts/check-no-src-lib-imports.mjs",
     "check:jsonld": "node scripts/validate-jsonld-rich-results.mjs dist",
     "og:baselines": "bun run scripts/update-og-card-baselines.ts",
@@ -61,6 +64,9 @@
     "money-migrations:assert-applied": "node scripts/assert-required-money-migrations-applied.mjs",
     "money-migrations:assert-applied:sandbox": "cross-env TARGET_ENV=sandbox node scripts/assert-required-money-migrations-applied.mjs",
     "money-migrations:assert-applied:live": "cross-env TARGET_ENV=live node scripts/assert-required-money-migrations-applied.mjs",
+    "money-contract:verify-effect": "node scripts/verify-ai-credit-service-contract-effect.mjs",
+    "money-contract:verify-effect:live": "cross-env TARGET_ENV=live node scripts/verify-ai-credit-service-contract-effect.mjs",
+    "test:money-contract-effect": "vitest run src/test/ai-credit-service-contract-effect.test.ts src/test/ai-credit-service-contract-effect-workflow.test.ts",
     "prefix-diff": "node scripts/diff-money-migration-prefixes.mjs",
     "prefix-diff:expected": "node scripts/diff-money-migration-prefixes.mjs --expected --json",
     "prefix-diff:sarif": "node scripts/diff-money-migration-prefixes.mjs --sarif --sarif-out=artifacts/prefix-diff.sarif",
@@ -215,6 +221,8 @@
     "ai-doctor:preview-safety": "node scripts/assert-ai-doctor-preview-safety.mjs",
     "supabase:migrations:sync": "node scripts/sync-supabase-migrations-from-integration.mjs",
     "supabase:migrations:verify-remote": "node scripts/verify-supabase-migrations-complete.mjs",
+    "candidate-number:preflight": "node scripts/preflight-candidate-number-membership.mjs",
+    "candidate-number:verify-history": "node scripts/verify-candidate-number-migration-history.mjs",
     "preflight:privilege-matrix": "bun run scripts/run-privilege-matrix-preflight.ts",
     "preflight:privilege-matrix:report-only": "bun run scripts/run-privilege-matrix-preflight.ts --report-only",
     "precommit:ai-doctor-preview-safety": "node scripts/precommit-ai-doctor-preview-safety.mjs",
@@ -248,6 +256,9 @@
     "e2e:verify-fixture": "playwright test e2e/fixture-safety.spec.ts --project=chromium-authed",
     "e2e:bootstrap-fixture": "playwright test e2e/fixture-bootstrap.spec.ts --project=chromium-authed",
     "e2e:fixture-checklist": "bun run e2e/scripts/print-fixture-config-checklist.ts",
+    "e2e:fixture:rotate:dry": "node scripts/e2e/rotate-e2e-fixture.mjs --dry-run",
+    "e2e:fixture:rotate": "node scripts/e2e/rotate-e2e-fixture.mjs --execute --confirm-fixture-rotation",
+    "e2e:fixture:rotate:with-diary": "node scripts/e2e/rotate-e2e-fixture.mjs --execute --confirm-fixture-rotation --prune-e2e-diary",
     "e2e:quicklog-smoke": "playwright test e2e/quicklog-smoke.spec.ts --project=chromium-authed",
     "e2e:pheno-journey": "playwright test e2e/pheno-paid-journey.spec.ts --project=chromium-authed",
     "e2e:quicklog-smoke:headed": "playwright test e2e/quicklog-smoke.spec.ts --project=chromium-authed --headed",
@@ -298,7 +309,8 @@
     "check:jsonld-id-canonical-parity": "node scripts/validate-jsonld-id-canonical-parity.mjs dist",
     "typecheck:tsgo": "tsgo --noEmit",
     "seo:artifacts": "bun scripts/generate-seo-artifacts.ts dist",
-    "seo:snapshots": "node scripts/capture-ssr-head-snapshots-with-server.mjs dist .output/server/index.mjs"
+    "seo:snapshots": "node scripts/capture-ssr-head-snapshots-with-server.mjs dist .output/server/index.mjs",
+    "probe:migration-drift": "node scripts/probe-migration-drift.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -414,11 +426,16 @@
     ]
   },
   "overrides": {
+    "@hono/node-server": "2.0.10",
+    "@modelcontextprotocol/sdk": "1.30.0",
+    "esbuild": "0.28.1",
     "fast-uri": "3.1.5",
     "form-data": "4.0.6",
     "js-yaml": "4.3.1",
     "lodash": "4.18.1",
     "flatted": "3.4.2",
-    "glob": "10.5.0"
+    "glob": "10.5.0",
+    "hono": "4.12.34",
+    "nanoid": "3.3.18"
   }
 }

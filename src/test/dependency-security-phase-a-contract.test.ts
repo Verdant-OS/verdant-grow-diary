@@ -88,6 +88,7 @@ describe("dependency security Phase A resolution floors", () => {
   it.each([
     ["vite", [6, 4, 3] as const],
     ["postcss", [8, 5, 18] as const],
+    ["esbuild", [0, 28, 1] as const],
     ["fast-uri", [3, 1, 5] as const],
     ["form-data", [4, 0, 6] as const],
     ["js-yaml", [4, 3, 1] as const],
@@ -159,6 +160,7 @@ describe("dependency security Phase A resolution floors", () => {
 
   it("pins only same-major compatible overrides", () => {
     expect(packageJson.overrides).toMatchObject({
+      esbuild: "0.28.1",
       "fast-uri": "3.1.5",
       "form-data": "4.0.6",
       "js-yaml": "4.3.1",
@@ -169,13 +171,13 @@ describe("dependency security Phase A resolution floors", () => {
     expect(packageJson.overrides?.picomatch).toBeUndefined();
   });
 
-  it("keeps the reviewed exception set exact and reviewable", () => {
+  it("keeps the reviewed exception set empty once every tracked advisory is remediated", () => {
     expect(
       exceptionDocument.exceptions.map(
         (exception: { package: string; advisoryId: string; severity: string }) =>
           `${exception.package}#${exception.advisoryId}:${exception.severity}`,
       ),
-    ).toEqual(["esbuild#1120680:low"]);
+    ).toEqual([]);
   });
 
   it("does not import security-sensitive transitive packages from production source", () => {

@@ -2,15 +2,15 @@ name: EcoWitt Windows Testbench safety
 
 on:
   push:
-    branches: [main]
+    branches: [main, verdant-grow-diary]
   pull_request:
     paths:
-      - '.github/workflows/ecowitt-testbench-safety.yml'
-      - 'tools/ecowitt-testbench/**'
-      - 'src/test/ecowitt-windows-testbench-static-safety.test.ts'
-      - 'scripts/**ecowitt**'
-      - 'package.json'
-      - 'bun.lockb'
+      - ".github/workflows/ecowitt-testbench-safety.yml"
+      - "tools/ecowitt-testbench/**"
+      - "src/test/ecowitt-windows-testbench-static-safety.test.ts"
+      - "scripts/**ecowitt**"
+      - "package.json"
+      - "bun.lockb"
   workflow_dispatch:
 
 jobs:

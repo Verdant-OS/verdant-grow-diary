@@ -13,6 +13,11 @@
  * entitling BYO row was backfilled into public.subscriptions there.
  * Environment is derived from the client token prefix (test_ → sandbox,
  * otherwise live) and passed EXPLICITLY into the adapter.
+ *
+ * Soft revalidation (#564): token refresh gives a new `user` object with the
+ * same id. Reloading must NOT flip `loading` back to true for that id, or
+ * PhenoTrackerUpgradeGate (and similar gates) unmount entitled children and
+ * discard unsaved wizard/workspace input. Identity changes still hard-load.
  */
 
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
@@ -46,39 +51,34 @@ export interface UseMyEntitlementsResult {
 
 const FREE_NOW = (): ResolvedEntitlement => resolveEntitlements(null, new Date());
 
-export function useMyEntitlements(): UseMyEntitlementsResult {
-  const { user, loading: authLoading } = useAuth();
-  const [loading, setLoading] = useState<boolean>(true);
-  const [lookupFailed, setLookupFailed] = useState(false);
-  const [entitlement, setEntitlement] = useState<ResolvedEntitlement>(() => FREE_NOW());
+interface EntitlementSnapshot {
+  lookupFailed: boolean;
+  lovableRow: LovableSubscriptionRow | null;
+  resolvedEnvironment: "live" | "sandbox";
+  isStaff: boolean;
+  now: Date;
+}
 
-  const expectedBillingEnvironment = useMemo(() => getPaddleEnvironment(), []);
+/**
+ * One in-flight snapshot fetch per (user, sandbox-expectation). Plant Detail
+ * mounts several consumers of this hook in the same render turn (Blueprint
+ * section, AI Doctor review, the page's credit gate), and without coalescing
+ * each fired its own subscriptions + user_roles reads. Entries are removed
+ * as soon as the fetch settles: this shares CONCURRENT work only, never
+ * serves a completed response as a cache — a later mount or refetch still
+ * observes fresh rows, so the soft-revalidate semantics above are unchanged.
+ */
+const inflightSnapshots = new Map<string, Promise<EntitlementSnapshot>>();
 
-  // The subscription reads race unmount (route change, test teardown):
-  // never setState after unmount.
-  const mountedRef = useRef(true);
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
+function fetchEntitlementSnapshot(
+  userId: string,
+  wantsSandbox: boolean,
+): Promise<EntitlementSnapshot> {
+  const key = `${userId}:${wantsSandbox ? "sandbox" : "live"}`;
+  const existing = inflightSnapshots.get(key);
+  if (existing) return existing;
 
-  // Resolves to whether the lookup FAILED, so a caller that acts on the result
-  // (e.g. a manual "re-check my plan") can tell a real Free answer apart from
-  // an unverifiable one. A failed lookup still resolves the entitlement to
-  // Free for presentation, so a caller that merely awaits completion would
-  // otherwise read "we couldn't check" as "you are not entitled".
-  const doLoad = useCallback(async (): Promise<boolean> => {
-    if (!user) {
-      if (!mountedRef.current) return false;
-      setEntitlement(FREE_NOW());
-      setLookupFailed(false);
-      setLoading(false);
-      return false;
-    }
-    setLoading(true);
-    setLookupFailed(false);
+  const load = (async (): Promise<EntitlementSnapshot> => {
     // All reads are RLS-protected (select-own) and PRESENTATION-ONLY.
     // Subscription reads use bounded newest-first WINDOWS, not limit(1):
     // public.subscriptions is unique per paddle_subscription_id, so a newer
@@ -89,7 +89,7 @@ export function useMyEntitlements(): UseMyEntitlementsResult {
       supabase
         .from("subscriptions")
         .select("*")
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .eq("environment", environment)
         // created_at is not unique; paddle_subscription_id is — without the
         // tiebreak, equal timestamps make the window order (and therefore
@@ -102,7 +102,6 @@ export function useMyEntitlements(): UseMyEntitlementsResult {
     // a sandbox-configured client. Sandbox rows unlock only when this client
     // explicitly expects sandbox. This mirrors the shared Edge helper and
     // the database entitlement gates.
-    const wantsSandbox = expectedBillingEnvironment === "sandbox";
     const [liveRes, sandboxRes, rolesRes] = await Promise.all([
       subscriptionRows("live"),
       wantsSandbox
@@ -111,7 +110,7 @@ export function useMyEntitlements(): UseMyEntitlementsResult {
       supabase
         .from("user_roles")
         .select("role")
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .eq("role", "staff")
         .maybeSingle(),
     ]);
@@ -141,20 +140,82 @@ export function useMyEntitlements(): UseMyEntitlementsResult {
     const lookupFailed =
       !paidRowProven && (liveRes.error != null || (wantsSandbox && sandboxRes.error != null));
 
-    if (!mountedRef.current) return lookupFailed;
-    setLookupFailed(lookupFailed);
+    return { lookupFailed, lovableRow, resolvedEnvironment, isStaff, now };
+  })();
+
+  const tracked = load.finally(() => {
+    if (inflightSnapshots.get(key) === tracked) inflightSnapshots.delete(key);
+  });
+  inflightSnapshots.set(key, tracked);
+  return tracked;
+}
+
+export function useMyEntitlements(): UseMyEntitlementsResult {
+  const { user, loading: authLoading } = useAuth();
+  // Key loads on user id, never the session user object reference. TOKEN_REFRESHED
+  // replaces the user object while keeping the same id (#564).
+  const userId = user?.id ?? null;
+  const [loading, setLoading] = useState<boolean>(true);
+  const [lookupFailed, setLookupFailed] = useState(false);
+  const [entitlement, setEntitlement] = useState<ResolvedEntitlement>(() => FREE_NOW());
+
+  const expectedBillingEnvironment = useMemo(() => getPaddleEnvironment(), []);
+
+  // The subscription reads race unmount (route change, test teardown):
+  // never setState after unmount.
+  const mountedRef = useRef(true);
+  /** Last user id for which we completed a load (soft-refresh marker). */
+  const settledUserIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  // Resolves to whether the lookup FAILED, so a caller that acts on the result
+  // (e.g. a manual "re-check my plan") can tell a real Free answer apart from
+  // an unverifiable one. A failed lookup still resolves the entitlement to
+  // Free for presentation, so a caller that merely awaits completion would
+  // otherwise read "we couldn't check" as "you are not entitled".
+  const doLoad = useCallback(async (): Promise<boolean> => {
+    if (!userId) {
+      if (!mountedRef.current) return false;
+      settledUserIdRef.current = null;
+      setEntitlement(FREE_NOW());
+      setLookupFailed(false);
+      setLoading(false);
+      return false;
+    }
+
+    // Soft revalidate same identity: keep prior entitlement + loading=false so
+    // upgrade gates do not unmount children mid-edit (pheno wizard/workspace).
+    // Hard load on identity change: clear stale plan and show loading.
+    const softRefresh = settledUserIdRef.current === userId;
+    if (!softRefresh) {
+      setEntitlement(FREE_NOW());
+      setLoading(true);
+    }
+    setLookupFailed(false);
+
+    const wantsSandbox = expectedBillingEnvironment === "sandbox";
+    const snapshot = await fetchEntitlementSnapshot(userId, wantsSandbox);
+
+    if (!mountedRef.current) return snapshot.lookupFailed;
+    setLookupFailed(snapshot.lookupFailed);
     setEntitlement(
       resolveUnionEntitlements({
         byoRow: null,
-        lovableRow,
-        expectedBillingEnvironment: resolvedEnvironment,
-        now,
-        opts: { isStaff },
+        lovableRow: snapshot.lovableRow,
+        expectedBillingEnvironment: snapshot.resolvedEnvironment,
+        now: snapshot.now,
+        opts: { isStaff: snapshot.isStaff },
       }),
     );
+    settledUserIdRef.current = userId;
     setLoading(false);
-    return lookupFailed;
-  }, [user, expectedBillingEnvironment]);
+    return snapshot.lookupFailed;
+  }, [userId, expectedBillingEnvironment]);
 
   useEffect(() => {
     if (authLoading) return;

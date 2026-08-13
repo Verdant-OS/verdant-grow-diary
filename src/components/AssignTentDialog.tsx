@@ -126,6 +126,11 @@ export default function AssignTentDialog({ plantId, growId, currentTentId, trigg
     const prevName = current[0]?.name ?? null;
     const nextName = others.find((t) => t.id === selected)?.name ?? null;
     let timelineRecordFailed = false;
+    // diary_entries.grow_id is NOT NULL, so a plant with no grow structurally
+    // cannot carry a timeline row and the insert below is skipped. Skipping is
+    // correct; staying silent about it is not — without this flag the grower
+    // gets an unqualified success toast for a write that never happened.
+    const timelineSkippedWithoutGrow = !growId;
     if (growId) {
       const { error: diaryErr } = await supabase.from("diary_entries").insert({
         user_id: user.id,
@@ -161,6 +166,16 @@ export default function AssignTentDialog({ plantId, growId, currentTentId, trigg
         {
           description:
             "The tent assignment is saved. Use Quick Log to add a manual note if you need this change in the plant timeline.",
+        },
+      );
+    } else if (timelineSkippedWithoutGrow) {
+      toast.warning(
+        isMove
+          ? "Plant moved, but its timeline entry was not recorded"
+          : "Plant assigned, but its timeline entry was not recorded",
+        {
+          description:
+            "The tent assignment is saved. This plant is not linked to a grow yet, so this change could not be added to its timeline. Link the plant to its tent setup on the plant page to record future changes.",
         },
       );
     } else {

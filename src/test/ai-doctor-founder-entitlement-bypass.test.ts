@@ -93,6 +93,28 @@ describe("resolveAiDoctorEntitlementView", () => {
     },
   );
 
+  it.each(["craft_monthly", "craft_annual"] as const)(
+    "%s active subscriber → sees a wait notice, never a Free upsell",
+    (plan) => {
+      const entitlement = entitlementFor(plan);
+      const v = resolveAiDoctorEntitlementView({ entitlement });
+
+      expect(v.isFounder).toBe(false);
+      expect(v.isPaidViewer).toBe(true);
+      expect(v.bypassesUpsell).toBe(true);
+      expect(v.reason).toBe("paid_plan_bypass");
+      expect(reconcileAiCreditDenialPlanId({ denialPlanId: "free", view: v })).toBe(plan);
+
+      const vm = buildAiCreditLimitNoticeViewModel({
+        credit: denial("free"),
+        viewerEntitlement: entitlement,
+      });
+      expect(vm.kind).toBe("wait");
+      expect(vm.paywallVm).toBeUndefined();
+      expect(vm.title).toContain("300");
+    },
+  );
+
   it.each([
     ["paused", { status: "paused" }],
     ["expired", { status: "expired" }],

@@ -55,7 +55,7 @@ export default function PlantQuickStatusStrip({
   });
 
   const hasTent = !!tentId;
-  const { rows: alertRows, status: alertStatus } = usePlantAssignedTentAlerts(
+  const { openCount: openAlertCount, status: alertStatus } = usePlantAssignedTentAlerts(
     hasTent ? (tentId ?? null) : null,
     growId ?? null,
   );
@@ -65,7 +65,9 @@ export default function PlantQuickStatusStrip({
   );
 
   const alertsLoading = hasTent && alertStatus !== "ok";
-  const alertCount = hasTent && alertStatus === "ok" ? alertRows.length : null;
+  // openCount, not rows.length: this strip's copy says "open alert(s)", the
+  // hook's rows now include acknowledged ones, and rows is capped for display.
+  const alertCount = hasTent && alertStatus === "ok" ? openAlertCount : null;
   const actionCount = hasTent && !actionsLoading ? actionRows.length : null;
 
   const view = buildPlantQuickStatusView({

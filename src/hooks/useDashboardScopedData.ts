@@ -79,6 +79,7 @@ export function useDashboardScopedData(growId: string | null | undefined): UseDa
           .from("diary_entries")
           .select("id,plant_id,entry_at,stage,note,details")
           .eq("grow_id", growId)
+          .is("retracted_at", null)
           .order("entry_at", { ascending: false })
           .limit(5),
         supabase

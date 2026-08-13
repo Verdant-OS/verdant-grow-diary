@@ -119,7 +119,7 @@ export async function archiveGrow(id: string): Promise<void> {
 //  Typed CRUD helpers — Diary Entries
 /* ------------------------------------------------------------------ */
 export async function fetchDiaryEntryRows(growId?: string): Promise<DiaryEntryRow[]> {
-  let q = supabase.from("diary_entries").select("*");
+  let q = supabase.from("diary_entries").select("*").is("retracted_at", null);
   if (growId) q = q.eq("grow_id", growId);
   const { data, error } = await q.order("entry_at", { ascending: false });
   if (error) fail("fetchDiaryEntryRows", error);

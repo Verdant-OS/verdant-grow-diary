@@ -1,24 +1,11 @@
 /**
- * Root self-canonical in the SPA shell, and the invariant that makes it safe.
+ * Root SSR self-canonical and public-document coverage contracts.
  *
- * `index.html` deliberately shipped with NO canonical for a long time, because
- * one baked canonical would make every SPA route declare itself a duplicate of
- * the homepage. That reasoning expired when the prerender pass shipped:
- * `buildStaticSocialRouteHtml` REPLACES an existing canonical rather than
- * appending, so each prerendered route overwrites the shell's tag.
- *
- * The shell is therefore served verbatim only for:
- *   - "/", which is not prerendered (`routeFileName` rejects root) and used to
- *     reach non-JS crawlers with no canonical at all; and
- *   - unknown URLs, which static SPA hosting answers with this shell at
- *     HTTP 200 — previously carrying "index, follow" and no canonical, i.e. an
- *     invitation to index unlimited soft-404s.
- *
- * THE LOAD-BEARING INVARIANT: every sitemap URL except "/" must have a
- * prerendered document. If a public route is ever added to the sitemap without
- * one, it would inherit the root canonical and quietly deindex ITSELF by
- * declaring it is the homepage. That is a silent, high-cost SEO regression, so
- * it fails here instead.
+ * TanStack route heads and the postbuild SSR snapshot manifest share
+ * `STATIC_PUBLIC_OUTPUT_DOCUMENTS`. Every sitemap URL, including `/`, must own
+ * one of those documents so its first response can emit a route-specific head.
+ * Unknown URLs remain outside that allowlist and must not gain an indexable
+ * canonical by accident.
  */
 import { describe, expect, it } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
@@ -26,9 +13,11 @@ import { resolve } from "node:path";
 
 import { STATIC_PUBLIC_OUTPUT_DOCUMENTS } from "@/lib/build/staticPublicSeoDocuments";
 import { getRoutesByAccess } from "@/lib/appRouteManifest";
+import { staticRouteHead } from "@/lib/build/staticRouteHead";
 
 const ROOT = resolve(__dirname, "../..");
 const SITE_ORIGIN = "https://verdantgrowdiary.com";
+const ROOT_CANONICAL_URL = `${SITE_ORIGIN}/`;
 const HAS_INDEX_HTML = existsSync(resolve(ROOT, "index.html"));
 // Classic SPA shell is gone under TanStack SSR; root head owns brand SEO.
 const INDEX_HTML = HAS_INDEX_HTML
@@ -44,14 +33,14 @@ function sitemapPaths(): string[] {
 
 const prerendered = new Set(STATIC_PUBLIC_OUTPUT_DOCUMENTS.map((d) => d.path));
 
-describe("the invariant that keeps a baked root canonical safe", () => {
-  it("every sitemap URL except / has a prerendered document", () => {
-    const orphaned = sitemapPaths().filter((p) => p !== "/" && !prerendered.has(p));
+describe("the invariant that keeps every sitemap canonical route-specific", () => {
+  it("every sitemap URL has an SSR metadata document", () => {
+    const orphaned = sitemapPaths().filter((p) => !prerendered.has(p));
     expect(
       orphaned,
-      `These sitemap URLs have no prerendered document, so they would inherit the ` +
-        `root canonical from index.html and declare themselves duplicates of the ` +
-        `homepage — deindexing themselves. Add a static SEO document for each, or ` +
+      `These sitemap URLs have no SSR metadata document, so their first response ` +
+        `cannot emit the route-specific head recorded in the SEO manifest. Add a ` +
+        `static SEO document for each, or ` +
         `remove them from public/sitemap.xml:\n  ${orphaned.join("\n  ")}`,
     ).toEqual([]);
   });
@@ -61,11 +50,24 @@ describe("the invariant that keeps a baked root canonical safe", () => {
     expect(prerendered.size).toBeGreaterThan(20);
   });
 
-  it("root itself is deliberately NOT prerendered", () => {
-    // If root ever gains a prerendered document, it supplies its own canonical
-    // and the shell tag stops being root's only source — worth re-reading this
-    // file's reasoning at that point.
-    expect(prerendered.has("/")).toBe(false);
+  it("root owns index.html and an absolute self-canonical in its SSR head", () => {
+    const rootDocument = STATIC_PUBLIC_OUTPUT_DOCUMENTS.find((document) => document.path === "/");
+    expect(rootDocument).toMatchObject({
+      fileName: "index.html",
+      metadata: { url: ROOT_CANONICAL_URL },
+    });
+
+    const head = staticRouteHead("/");
+    expect(head.links.filter((link) => link.rel === "canonical")).toEqual([
+      { rel: "canonical", href: ROOT_CANONICAL_URL },
+    ]);
+    expect(head.meta).toEqual(
+      expect.arrayContaining([
+        { title: "Grow Diary & Grow Room Tracking App | Verdant Grow Diary" },
+        { property: "og:image", content: `${SITE_ORIGIN}/og/home.png` },
+        { name: "twitter:image", content: `${SITE_ORIGIN}/og/home.png` },
+      ]),
+    );
   });
 });
 
@@ -82,7 +84,6 @@ describe("the invariant that keeps a baked root canonical safe", () => {
  * below with a reason why dedupe-to-homepage is the RIGHT outcome for it.
  */
 const ROOT_CANONICAL_TOLERATED: ReadonlyMap<string, string> = new Map([
-  ["/", "the shell itself — the root canonical IS its self-canonical"],
   ["*", "NotFound catch-all — dedupe-to-homepage is the soft-404 mitigation"],
   ["/.lovable/oauth/consent", "OAuth protocol page; must never rank on its own"],
   ["/auth", "sign-in flow; noindex client-side, never an acquisition page"],

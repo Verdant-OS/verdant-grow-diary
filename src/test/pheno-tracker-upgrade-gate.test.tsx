@@ -121,7 +121,7 @@ describe("PhenoTrackerUpgradeGate", () => {
     // returnTo carried into the upgrade href for the gated Pheno route.
     // Destination is /pricing — the page with LIVE checkout (/upgrade is a
     // dead end: every paddlePriceId there is null).
-    expect(upgradeLinks[0].getAttribute("href")).toBe("/pricing?returnTo=%2Fpheno-hunts%2Fnew");
+    expect(upgradeLinks[0].getAttribute("href")).toBe("/pricing?plan=pro_annual&returnTo=%2Fpheno-hunts%2Fnew");
 
     const demo = screen.getByTestId("pheno-tracker-upgrade-gate-demo-link");
     expect(demo.getAttribute("href")).toBe("/pheno-comparison");
@@ -146,7 +146,7 @@ describe("PhenoTrackerUpgradeGate", () => {
     mode.current = "free";
     renderGate({}, "/pheno-hunts/abc/workspace");
     const upgrade = screen.getByRole("link", { name: /upgrade to pro/i });
-    expect(upgrade.getAttribute("href")).toBe("/pricing?returnTo=%2Fpheno-hunts%2Fabc%2Fworkspace");
+    expect(upgrade.getAttribute("href")).toBe("/pricing?plan=pro_annual&returnTo=%2Fpheno-hunts%2Fabc%2Fworkspace");
   });
 
   it("returnTo preserves the query context of a deep-linked gated route", () => {
@@ -157,7 +157,7 @@ describe("PhenoTrackerUpgradeGate", () => {
     // getByRole (not getAllByRole[0]) so accidental duplicate CTAs fail loudly.
     const upgrade = screen.getByRole("link", { name: /upgrade to pro/i });
     expect(upgrade.getAttribute("href")).toBe(
-      "/pricing?returnTo=%2Fpheno-hunts%2Fnew%3FgrowId%3Dg1%26tentId%3Dt1",
+      "/pricing?plan=pro_annual&returnTo=%2Fpheno-hunts%2Fnew%3FgrowId%3Dg1%26tentId%3Dt1",
     );
   });
 

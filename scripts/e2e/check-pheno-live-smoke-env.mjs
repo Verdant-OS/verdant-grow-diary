@@ -22,6 +22,8 @@ export const PHENO_LIVE_REQUIRED_ENV = [
   "E2E_PHENO_FREE_PASSWORD",
   "E2E_PHENO_PRO_EMAIL",
   "E2E_PHENO_PRO_PASSWORD",
+  "E2E_PHENO_PRO_ANNUAL_EMAIL",
+  "E2E_PHENO_PRO_ANNUAL_PASSWORD",
   "E2E_PHENO_FOUNDER_EMAIL",
   "E2E_PHENO_FOUNDER_PASSWORD",
   "E2E_PHENO_CANCELED_EMAIL",
@@ -116,7 +118,9 @@ export function printPhenoLiveSmokeChecklist(result, log = console.log) {
   log("Local-only setup checklist:");
   log("  1. Use a trusted local checkout of the release branch.");
   log("  2. Set credentials only in the current shell or an ignored local env file.");
-  log("  3. Use dedicated Free / Pro / Founder / Canceled production test accounts.");
+  log(
+    "  3. Use dedicated Free / Pro Monthly / Pro Annual / Founder / Canceled production test accounts.",
+  );
   log("  4. Use existing production-safe test hunts; this flow never seeds production.");
   log(
     "  5. Keep service-role keys, passwords, JWTs, cookies, session files, and fixture ids out of logs and chat.",

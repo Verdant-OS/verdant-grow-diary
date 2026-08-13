@@ -2,7 +2,7 @@ name: EcoWitt Testbench forwarding tests
 
 on:
   push:
-    branches: [main]
+    branches: [main, verdant-grow-diary]
     paths:
       - "tools/ecowitt-testbench/**"
       - "docs/ecowitt-windows-testbench.md"

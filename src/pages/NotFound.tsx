@@ -1,4 +1,4 @@
-import { useLocation } from "@/lib/react-router-compat";
+import { Link, useLocation } from "@/lib/react-router-compat";
 import { usePageSeo } from "@/hooks/usePageSeo";
 
 const NotFound = () => {
@@ -16,9 +16,9 @@ const NotFound = () => {
       <div className="text-center">
         <h1 className="mb-4 text-4xl font-bold">404</h1>
         <p className="mb-4 text-xl text-muted-foreground">Oops! Page not found</p>
-        <a href="/" className="text-primary underline hover:text-primary/90">
+        <Link to="/" className="text-primary underline hover:text-primary/90">
           Return to Home
-        </a>
+        </Link>
       </div>
     </main>
   );

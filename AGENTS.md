@@ -1,6 +1,6 @@
 # Verdant Agent Constitution
 
-**Sentinel-Version: 2026-08-01.8**
+**Sentinel-Version: 2026-08-09.1**
 
 This is Verdant's universal Sentinel Code. Every agent inherits these durable product,
 engineering, data, safety, and release rules. Platform-specific bootstraps live at the

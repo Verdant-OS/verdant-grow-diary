@@ -10,10 +10,11 @@
  */
 import { useCallback, useMemo, useRef, useState } from "react";
 import { Link } from "@/lib/react-router-compat";
-import { ArrowLeft, Copy, ExternalLink, ShieldCheck, FileText } from "lucide-react";
+import { ArrowLeft, Copy, Download, ExternalLink, ShieldCheck, FileText } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import ManifestSummaryModal from "@/components/mcp/ManifestSummaryModal";
 import BrowserConnectPanel from "@/components/mcp/BrowserConnectPanel";
@@ -23,6 +24,14 @@ import {
   getSupabaseOrigin,
 } from "@/lib/mcp/manifestView";
 import { computeManifestHash, shortenManifestHash } from "@/lib/mcp/manifestHash";
+import {
+  buildConnectionStatusExport,
+  serializeConnectionStatusExport,
+} from "@/lib/mcp/connectionStatusExport";
+import { getIssuerSetupGuideLink } from "@/lib/mcp/issuerSetupGuide";
+import { readLocalToolPreferences, setLocalToolPreference } from "@/lib/mcp/localToolPreferences";
+import { readLastOAuthAttempt, type OAuthAttemptRecord } from "@/lib/mcp/oauthAttemptLog";
+import { hasStoredToken } from "@/lib/mcp/browserOAuthClient";
 import {
   verifyMcpToolAccess,
   defaultBrowserHarness,
@@ -86,10 +95,18 @@ export type AgentIntegrationsProps = {
    * Tests inject a fake adapter to exercise the four presenter states.
    */
   verifyHarness?: HarnessAdapter;
+  /**
+   * Test-only override for the derived OAuth issuer status. The real
+   * manifest always derives "configured" in the test environment, so
+   * without this the not_configured/unverified presenter states (badge,
+   * setup-guide link, export issuerContext) would be untestable.
+   */
+  oauthStatusOverride?: OAuthStatus;
 };
 
 export default function AgentIntegrations({
   verifyHarness = defaultBrowserHarness,
+  oauthStatusOverride,
 }: AgentIntegrationsProps = {}) {
   usePageSeo({
     title: "Agent integrations — Verdant Grow Diary",
@@ -110,7 +127,7 @@ export default function AgentIntegrations({
   );
   const appOrigin = typeof window !== "undefined" ? window.location.origin : "";
   const consentUrl = `${appOrigin}${MCP_MANIFEST.consentPath}`;
-  const oauthStatus = deriveOAuthStatus();
+  const oauthStatus = oauthStatusOverride ?? deriveOAuthStatus();
 
   const manifestHash = useMemo(() => computeManifestHash(MCP_MANIFEST), []);
   const manifestFingerprint = useMemo(() => shortenManifestHash(manifestHash), [manifestHash]);
@@ -134,6 +151,70 @@ export default function AgentIntegrations({
       setCopyState("failed");
     }
   }, [supabaseOrigin, appOrigin]);
+
+  // Local (this-browser) per-tool preferences. HONESTY: these do not
+  // change server-side authorization — the OAuth grant is integration-
+  // wide. They gate the in-app test probe and are reflected in exports.
+  const [toolPrefs, setToolPrefs] = useState(() => readLocalToolPreferences());
+  const onToggleTool = useCallback((name: string, enabled: boolean) => {
+    // Functional setter + threading the previous map keeps earlier
+    // toggles intact even when the storage write fails (quota/privacy
+    // mode) and a fresh read would return stale values.
+    setToolPrefs((prev) => setLocalToolPreference(name, enabled, undefined, prev));
+  }, []);
+
+  const setupGuide = getIssuerSetupGuideLink(oauthStatus);
+
+  // Mirror of the connect panel's displayed attempt record, so the
+  // export matches the page even when a localStorage write failed.
+  const [panelAttempt, setPanelAttempt] = useState<OAuthAttemptRecord | null>(null);
+
+  type ExportState = { status: "idle" | "done" | "failed"; message: string };
+  const [exportState, setExportState] = useState<ExportState>({ status: "idle", message: "" });
+  const onExport = useCallback(() => {
+    try {
+      const exportObj = buildConnectionStatusExport({
+        supabaseOrigin,
+        appOrigin,
+        issuerContext: oauthStatus,
+        manifestFingerprint,
+        connectedInThisBrowser: hasStoredToken(),
+        // Export the ACTIVE in-memory state — the same values the
+        // switches and the panel display — not a fresh storage read,
+        // which can diverge after a quota/privacy-mode write failure.
+        localToolPreferences: toolPrefs,
+        lastOAuthAttempt: panelAttempt ?? readLastOAuthAttempt(),
+        exportedAt: new Date().toISOString(),
+      });
+      const serialized = serializeConnectionStatusExport(exportObj);
+      if (!serialized.ok) {
+        setExportState({ status: "failed", message: serialized.error });
+        return;
+      }
+      const blob = new Blob([serialized.json], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = serialized.filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+      setExportState({
+        status: "done",
+        message: `Downloaded ${serialized.filename} — safe to attach to a support request.`,
+      });
+    } catch {
+      setExportState({
+        status: "failed",
+        message: "Export failed in this browser. Use Copy connection details instead.",
+      });
+    }
+  }, [supabaseOrigin, appOrigin, oauthStatus, manifestFingerprint, toolPrefs, panelAttempt]);
+
+  // The panel's probe calls exactly this tool; keep the gate wired to a
+  // named constant so a future rename fails loudly here, not silently open.
+  const PROBE_TOOL_NAME = "list_grows";
 
   const [verifyResult, setVerifyResult] = useState<VerifyMcpToolAccessResult | null>(null);
   const [verifyBusy, setVerifyBusy] = useState(false);
@@ -205,6 +286,19 @@ export default function AgentIntegrations({
             <h2 className="text-lg font-semibold">Connection details</h2>
             <OAuthStatusBadge status={oauthStatus} />
           </div>
+
+          <p className="text-xs text-muted-foreground">
+            <a
+              href={setupGuide.href}
+              className="inline-flex items-center gap-1 underline"
+              data-testid="issuer-setup-guide-link"
+              data-issuer-context={oauthStatus}
+            >
+              {setupGuide.label}
+              <ExternalLink className="h-3 w-3" aria-hidden />
+            </a>{" "}
+            — {setupGuide.description}
+          </p>
 
           <dl className="space-y-3 text-sm">
             <div>
@@ -281,6 +375,15 @@ export default function AgentIntegrations({
               <FileText className="mr-2 h-4 w-4" aria-hidden />
               View MCP manifest
             </Button>
+            <Button
+              variant="outline"
+              onClick={onExport}
+              aria-label="Export MCP connection status as a JSON file for support"
+              data-testid="export-connection-status"
+            >
+              <Download className="mr-2 h-4 w-4" aria-hidden />
+              Export status JSON
+            </Button>
             <span
               role="status"
               aria-live="polite"
@@ -294,9 +397,30 @@ export default function AgentIntegrations({
                   : ""}
             </span>
           </div>
+          <p
+            role="status"
+            aria-live="polite"
+            className={
+              exportState.status === "failed"
+                ? "text-xs text-destructive"
+                : "text-xs text-muted-foreground"
+            }
+            data-testid="export-status"
+          >
+            {exportState.message}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            The export contains public connection metadata only (issuer, project context, endpoints,
+            advertised tools, coarse OAuth attempt history). It records no live endpoint
+            verification, and a secret-pattern scan blocks the download if anything token-like
+            appears in the payload.
+          </p>
         </section>
 
-        <BrowserConnectPanel />
+        <BrowserConnectPanel
+          probeToolEnabled={toolPrefs[PROBE_TOOL_NAME] !== false}
+          onLastAttemptChange={setPanelAttempt}
+        />
 
         {harnessUsable ? (
           <section
@@ -448,6 +572,14 @@ export default function AgentIntegrations({
             Every tool is read-only and runs under the signed-in grower's own row-level security.
             Agents cannot see other growers' data.
           </p>
+          <p className="text-xs text-muted-foreground" data-testid="tool-authorization-note">
+            <strong>What you actually authorize:</strong> one OAuth consent covers the whole
+            read-only tool set — there is no per-tool server-side grant. The switches below are
+            local to this browser: they gate the built-in test clients (the probe above and the
+            docs-page tool explorer) and are recorded in the support export. A connected assistant
+            keeps its full read-only grant until you revoke access from that assistant's own
+            settings — "Disconnect this browser" above only clears this browser's test session.
+          </p>
           <ul className="space-y-4">
             {MCP_MANIFEST.tools.map((tool) => (
               <li
@@ -462,6 +594,31 @@ export default function AgentIntegrations({
                       read-only
                     </Badge>
                   ) : null}
+                  <Badge
+                    variant="secondary"
+                    className="text-xs"
+                    data-testid={`tool-authz-${tool.name}`}
+                  >
+                    authorized via integration-wide OAuth grant
+                  </Badge>
+                </div>
+                <div className="mt-3 flex items-center justify-between gap-3 rounded-md border border-dashed p-3">
+                  <label
+                    htmlFor={`tool-toggle-${tool.name}`}
+                    className="text-xs text-muted-foreground"
+                  >
+                    <span className="block font-medium text-foreground">
+                      Enabled in this browser
+                    </span>
+                    Local preference only — it does not change what the server allows.
+                  </label>
+                  <Switch
+                    id={`tool-toggle-${tool.name}`}
+                    checked={toolPrefs[tool.name] !== false}
+                    onCheckedChange={(checked) => onToggleTool(tool.name, checked)}
+                    aria-label={`Enable ${tool.name} in this browser`}
+                    data-testid={`tool-toggle-${tool.name}`}
+                  />
                 </div>
                 <p className="mt-2 text-sm">{tool.description}</p>
                 {tool.params.length > 0 ? (

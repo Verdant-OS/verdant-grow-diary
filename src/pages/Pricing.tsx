@@ -54,6 +54,7 @@ import { useFounderSlotsRemaining } from "@/hooks/useFounderSlotsRemaining";
 import { useAuth } from "@/store/auth";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { creditPackBlockedCopy, resolveCreditPackPurchaseGate } from "@/lib/creditPackEligibility";
+import { buildCreditPackSuccessUrl } from "@/lib/checkoutReturnTo";
 import { isReducedMotionPreferred } from "@/lib/useTimelineHighlightAutoScroll";
 
 type BillingPeriod = "monthly" | "annual";
@@ -289,6 +290,21 @@ export default function Pricing() {
     void openCheckout({ priceId: planId });
   }
 
+  /**
+   * Success URL for a pack SKU, or undefined for a plan.
+   *
+   * Shared by the buy button and the recovery "Try again" button. Both need
+   * it: a retry that fell back to the shared default would forward `returnTo`
+   * and re-arm the premature auto-redirect for the very buyer whose first
+   * attempt already failed.
+   */
+  function packSuccessUrlFor(sku: string): string | undefined {
+    const isPack = CREDIT_PACKS.some((pack) => pack.sku === sku);
+    return isPack
+      ? buildCreditPackSuccessUrl(window.location.origin, searchParams.get("returnTo"))
+      : undefined;
+  }
+
   // One-time AI credit-pack checkout. Packs are not plans, so this bypasses the
   // plan-intent state and opens checkout for the pack SKU directly. Same
   // canonical checkout hook — this stays inside Pricing.tsx (checkout ownership).
@@ -315,7 +331,12 @@ export default function Pricing() {
       });
       return;
     }
-    void openCheckout({ priceId: sku });
+    // Packs get an explicit success URL rather than the shared default. The
+    // default forwards `returnTo`, which /checkout/success auto-redirects on
+    // once a paid plan is confirmed — already true for every pack buyer, so it
+    // would bounce them back to the credit wall before the grant landed. See
+    // buildCreditPackSuccessUrl.
+    void openCheckout({ priceId: sku, successUrl: packSuccessUrlFor(sku) });
   }
   usePageSeo({
     title: "Pricing — Free, Pro & Craft | Verdant Grow Diary",
@@ -796,7 +817,10 @@ export default function Pricing() {
                     });
                     trackFunnelEvent("checkout_recovery_retry", { plan });
                     dismissBlocked();
-                    void openCheckout({ priceId: rawSku });
+                    void openCheckout({
+                      priceId: rawSku,
+                      successUrl: packSuccessUrlFor(rawSku),
+                    });
                   }}
                 >
                   Try again

@@ -95,12 +95,24 @@ jobs:
             echo "BLOCKED: local Supabase did not expose required keys."
             exit 2
           fi
+          # Local-only Postgres URL. Needed by the hardening harness's
+          # causation phase, which re-opens an ACL hole and re-applies the
+          # migration to prove THAT FILE closes it -- end-state assertions
+          # alone are also satisfied by seed.sql. The harness re-verifies
+          # loopback before mutating any grant.
+          SUPABASE_DB_URL="$(echo "$STATUS_JSON" | jq -r '.DB_URL // .db_url // empty')"
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "BLOCKED: local Supabase did not expose DB_URL; the causation proof cannot run."
+            exit 2
+          fi
           # Local-only keys. Do NOT echo values.
           echo "SUPABASE_URL=$SUPABASE_URL" >> "$GITHUB_ENV"
           echo "::add-mask::$SUPABASE_ANON_KEY"
           echo "::add-mask::$SUPABASE_SERVICE_ROLE_KEY"
+          echo "::add-mask::$SUPABASE_DB_URL"
           echo "SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY" >> "$GITHUB_ENV"
           echo "SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_SERVICE_ROLE_KEY" >> "$GITHUB_ENV"
+          echo "SUPABASE_DB_URL=$SUPABASE_DB_URL" >> "$GITHUB_ENV"
 
       - name: Apply migrations (db reset with grant-parity seed)
         if: env.ENABLED == 'true'

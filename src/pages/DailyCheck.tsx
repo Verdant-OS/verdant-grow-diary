@@ -42,6 +42,7 @@ import QuickLog from "@/components/QuickLog";
 import QuickLogAllActivitiesSection from "@/components/QuickLogAllActivitiesSection";
 import PlantStatusStrip from "@/components/PlantStatusStrip";
 import PlantAssignedTentAlertsPanel from "@/components/PlantAssignedTentAlertsPanel";
+import TentAlertsBlueprintHint from "@/components/TentAlertsBlueprintHint";
 import PlantAssignedTentActionsPanel from "@/components/PlantAssignedTentActionsPanel";
 import { Button } from "@/components/ui/button";
 import {
@@ -1122,6 +1123,30 @@ export default function DailyCheck() {
                 tentId={effectiveTentId || null}
                 tentName={selectedTent?.name ?? null}
                 growId={growId}
+                // Plant-scoped shortcut ONLY when the tent under review is
+                // that plant's own assignment. `effectiveTentId` already
+                // derives from the selected plant, so this is belt-and-braces
+                // — asserted rather than assumed so a future change to that
+                // derivation cannot silently point the CTA at another plant.
+                plantId={
+                  selectedPlant && effectiveTentId && effectiveTentId === selectedPlantTentId
+                    ? selectedPlant.id
+                    : null
+                }
+              />
+              {/* Blueprint context for the alert above. Gated on the SAME
+                  ownership proof as the panel's plant-scoped shortcut: if we
+                  cannot show that these alerts are this plant's, we must not
+                  name this plant's stage targets against them. Rendered here
+                  rather than inside the panel because Plant Detail already
+                  shows the full teaser + paywall a few sections up. */}
+              <TentAlertsBlueprintHint
+                plantId={
+                  selectedPlant && effectiveTentId && effectiveTentId === selectedPlantTentId
+                    ? selectedPlant.id
+                    : null
+                }
+                stage={(selectedPlant as { stage?: string | null } | null)?.stage ?? null}
               />
               <PlantAssignedTentActionsPanel
                 tentId={effectiveTentId || null}

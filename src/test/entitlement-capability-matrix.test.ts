@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   canUseCapability,
+  KNOWN_PLAN_IDS,
   resolveUnionEntitlements,
   type LovableSubscriptionRow,
   type PlanId,
@@ -72,10 +73,16 @@ const MATRIX: ReadonlyArray<{ planId: PlanId; expected: boolean }> = [
   { planId: "free", expected: false },
   { planId: "pro_monthly", expected: true },
   { planId: "pro_annual", expected: true },
+  { planId: "craft_monthly", expected: true },
+  { planId: "craft_annual", expected: true },
   { planId: "founder_lifetime", expected: true },
 ];
 
 describe("entitlement plan x capability parity", () => {
+  it("covers every currently sellable plan in the canonical client/server matrix", () => {
+    expect(MATRIX.map(({ planId }) => planId)).toEqual(KNOWN_PLAN_IDS);
+  });
+
   it("runs the same plan matrix through client and server canonical resolvers", async () => {
     const entitlements = await import("@/lib/entitlements");
     const capabilityHelper = (entitlements as { canUseCapability?: CapabilityFn }).canUseCapability;

@@ -31,6 +31,7 @@ import { Loader2, Play, PlugZap, RotateCcw, ShieldAlert } from "lucide-react";
 import { callMcpTool, hasStoredToken, type ToolCallOutcome } from "@/lib/mcp/browserOAuthClient";
 import { MCP_MANIFEST, getSupabaseOrigin } from "@/lib/mcp/manifestView";
 import { loadLastValidInputs, saveLastValidInputs } from "@/lib/mcp/lastValidInputs";
+import { readLocalToolPreferences } from "@/lib/mcp/localToolPreferences";
 
 type ToolName = "list_grows" | "list_recent_diary_entries" | "get_latest_sensor_snapshot";
 
@@ -271,6 +272,7 @@ function ToolCard({
   toolName,
   endpoint,
   connected,
+  locallyEnabled = true,
   children,
   buildArgs,
   fieldErrors,
@@ -281,6 +283,12 @@ function ToolCard({
   toolName: ToolName;
   endpoint: string;
   connected: boolean;
+  /**
+   * Local (this-browser) preference from Settings → Agent integrations.
+   * When false, this card will not call the tool — the server itself
+   * still allows it for connected assistants.
+   */
+  locallyEnabled?: boolean;
   children: React.ReactNode;
   buildArgs: () => Record<string, unknown>;
   fieldErrors: FieldError[];
@@ -303,7 +311,7 @@ function ToolCard({
   const [copiedArgs, setCopiedArgs] = useState(false);
 
   const run = useCallback(async () => {
-    if (invalid) return;
+    if (invalid || !locallyEnabled) return;
     const args = buildArgs();
     setJustApplied(false);
     setPreApplySnapshot(null);
@@ -328,7 +336,7 @@ function ToolCard({
     }
     const category = classifyOutcome(outcome);
     if (category && onRunOutcome) onRunOutcome(outcome, category);
-  }, [invalid, buildArgs, endpoint, toolName, onAuthLost, onRunOutcome]);
+  }, [invalid, locallyEnabled, buildArgs, endpoint, toolName, onAuthLost, onRunOutcome]);
 
   const requestRetry = useCallback(() => {
     if (confirmBeforeRetry) {
@@ -398,10 +406,21 @@ function ToolCard({
         </div>
       ) : null}
 
+      {!locallyEnabled ? (
+        <p
+          className="text-xs text-muted-foreground"
+          data-testid={`tool-explorer-local-disabled-${toolName}`}
+        >
+          Disabled in this browser — a local preference from Settings → Agent integrations. The
+          server itself still allows this read-only tool for connected assistants; re-enable it on
+          the status page to run it here.
+        </p>
+      ) : null}
+
       <div className="flex flex-wrap items-center gap-3">
         <Button
           onClick={run}
-          disabled={!connected || state.loading || invalid}
+          disabled={!connected || state.loading || invalid || !locallyEnabled}
           aria-describedby={invalid ? summaryId : undefined}
           data-testid={`tool-explorer-run-${toolName}`}
         >
@@ -797,13 +816,23 @@ function FieldError({ id, message }: { id: string; message: string | null }) {
 
 export default function McpToolExplorer() {
   const [connected, setConnected] = useState<boolean>(false);
+  // Local per-tool preferences set on Settings → Agent integrations.
+  // Initialize with manifest defaults on BOTH server and client (this
+  // renders on the public SSR'd /docs/mcp-api route, so reading
+  // localStorage in the initializer would produce a hydration
+  // mismatch); real browser values load in the mount effect below and
+  // refresh alongside auth state so "I've connected — refresh" also
+  // picks up toggles changed in another tab.
+  const [localPrefs, setLocalPrefs] = useState(() => readLocalToolPreferences(null));
 
   useEffect(() => {
     setConnected(hasStoredToken());
+    setLocalPrefs(readLocalToolPreferences());
   }, []);
 
   const refreshAuth = useCallback(() => {
     setConnected(hasStoredToken());
+    setLocalPrefs(readLocalToolPreferences());
   }, []);
 
   const endpoint = `${getSupabaseOrigin()}${MCP_MANIFEST.path}`;
@@ -951,6 +980,7 @@ export default function McpToolExplorer() {
         toolName="list_grows"
         endpoint={endpoint}
         connected={connected}
+        locallyEnabled={localPrefs["list_grows"] !== false}
         onAuthLost={refreshAuth}
         onRunOutcome={(outcome, category) =>
           persistOnOk("list_grows", outcome, category, { includeArchived, growsLimit })
@@ -1019,6 +1049,7 @@ export default function McpToolExplorer() {
         toolName="list_recent_diary_entries"
         endpoint={endpoint}
         connected={connected}
+        locallyEnabled={localPrefs["list_recent_diary_entries"] !== false}
         onAuthLost={refreshAuth}
         onRunOutcome={(outcome, category) =>
           persistOnOk("list_recent_diary_entries", outcome, category, { growId, diaryLimit })
@@ -1106,6 +1137,7 @@ export default function McpToolExplorer() {
         toolName="get_latest_sensor_snapshot"
         endpoint={endpoint}
         connected={connected}
+        locallyEnabled={localPrefs["get_latest_sensor_snapshot"] !== false}
         onAuthLost={refreshAuth}
         onRunOutcome={(outcome, category) =>
           persistOnOk("get_latest_sensor_snapshot", outcome, category, { tentId })

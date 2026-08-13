@@ -22,6 +22,7 @@ import DailyGrowCheckOnboardingCard from "@/components/DailyGrowCheckOnboardingC
 import PlantDailyGrowCheckConsistencyCard from "@/components/PlantDailyGrowCheckConsistencyCard";
 import PlantRecentMoveCard from "@/components/PlantRecentMoveCard";
 import PlantAssignedTentAlertsPanel from "@/components/PlantAssignedTentAlertsPanel";
+import DeepLinkAnchorRestorer from "@/components/DeepLinkAnchorRestorer";
 import PlantAssignedTentActionsPanel from "@/components/PlantAssignedTentActionsPanel";
 import PlantStatusStrip from "@/components/PlantStatusStrip";
 import QuickLogV2Fab from "@/components/QuickLogV2Fab";
@@ -47,6 +48,7 @@ import PlantDetailTimelineEvidenceReadinessLaunch from "@/components/PlantDetail
 import PlantDetailAskDoctorHelper from "@/components/PlantDetailAskDoctorHelper";
 import {
   PLANT_AI_DOCTOR_REVIEW_ANCHOR_ID,
+  PLANT_BLUEPRINT_ANCHOR_ID,
   PLANT_PHOTOS_ANCHOR_ID,
   PLANT_RELATIVE_TIMELINE_ANCHOR_ID,
 } from "@/lib/plantDetailQuickActions";
@@ -71,6 +73,9 @@ import {
 } from "@/lib/archivedPlantVisibilityRules";
 import { Button } from "@/components/ui/button";
 import { useGrowPlant, useGrowTent, getGrowDataMeta } from "@/hooks/useGrowData";
+import { useMyEntitlements } from "@/hooks/useMyEntitlements";
+import { useAlertDoctorCreditGateReads } from "@/hooks/useAlertDoctorCreditGateReads";
+import { buildAlertDoctorCreditGate } from "@/lib/alertDoctorCreditGateRules";
 import { useAuth } from "@/store/auth";
 import { format, formatDistanceToNow } from "date-fns";
 
@@ -258,6 +263,32 @@ export default function PlantDetail() {
   const plantGalleryPhotoCount = usePlantGalleryPhotoCount(plant?.id ?? null);
   const plantMeta = getGrowDataMeta(["grow", "plant", id ?? null], user?.id);
   const tentMeta = getGrowDataMeta(["grow", "tent", plant?.tentId ?? null], user?.id);
+
+  // Presentation-only reads for the tent-alerts doctor-CTA credit gate.
+  // The usage query is enabled ONLY once the entitlement resolved to a
+  // per-grow-allotment (free-taste) plan — monthly-pool viewers never pay
+  // the read. Unresolved/failed lookups fail open inside the rules module.
+  const {
+    loading: entitlementLoading,
+    lookupFailed: entitlementLookupFailed,
+    entitlement,
+  } = useMyEntitlements();
+  const entitlementReady = !entitlementLoading && !entitlementLookupFailed;
+  const perGrowAiCredits = entitlement.capabilities.aiCreditsPerGrow;
+  const { data: doctorCreditReads, isError: doctorCreditReadsFailed } =
+    useAlertDoctorCreditGateReads(
+      entitlementReady && typeof perGrowAiCredits === "number" ? (plant?.growId ?? null) : null,
+    );
+  // A failed REFRESH keeps the prior data alongside isError — cached
+  // evidence must not keep intercepting after the balance may have changed
+  // (e.g. a pack purchase), so an errored read resolves to undefined and
+  // the gate fails open.
+  const doctorCreditGate = buildAlertDoctorCreditGate({
+    aiCreditsPerGrow: perGrowAiCredits,
+    entitlementReady,
+    creditsUsed: doctorCreditReadsFailed ? undefined : doctorCreditReads?.allowanceUsed,
+    hasPackCredits: doctorCreditReadsFailed ? undefined : doctorCreditReads?.hasPackCredits,
+  });
 
   // Bounded-loading guard: if the plant query never settles (slow network,
   // hung Supabase request, etc.) we must not leave the grower on a blank
@@ -699,13 +730,25 @@ export default function PlantDetail() {
             against the per-stage SOP targets, gated behind Pro. `isDay` comes
             from the assigned tent's light state (`tents.light_on`) so the
             temperature row scores against the day or night target. */}
-        <PlantBlueprintOverlaySection
-          growId={plant.growId ?? null}
-          tentId={plant.tentId ?? null}
-          plantId={plant.id}
-          stage={plant.stage ?? null}
-          isDay={tent?.light?.on ?? null}
-        />
+        {/* Anchored so a cross-page link (e.g. the Daily Check tent-alert
+            hint) lands on the Blueprint itself rather than the top of this
+            long page. DeepLinkAnchorRestorer re-applies the hash once this
+            section mounts. */}
+        <section
+          id={PLANT_BLUEPRINT_ANCHOR_ID}
+          tabIndex={-1}
+          aria-label="Plant Blueprint targets"
+          className="min-w-0 scroll-mt-16 rounded-md focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <DeepLinkAnchorRestorer anchorId={PLANT_BLUEPRINT_ANCHOR_ID} />
+          <PlantBlueprintOverlaySection
+            growId={plant.growId ?? null}
+            tentId={plant.tentId ?? null}
+            plantId={plant.id}
+            stage={plant.stage ?? null}
+            isDay={tent?.light?.on ?? null}
+          />
+        </section>
 
         <section
           aria-labelledby="plant-daily-grow-check-section-heading"
@@ -754,6 +797,8 @@ export default function PlantDetail() {
             tentId={plant.tentId ?? null}
             tentName={tent?.name ?? null}
             growId={plant.growId ?? null}
+            plantId={plant.id}
+            doctorCreditGate={doctorCreditGate}
           />
         </div>
         <div

@@ -35,7 +35,7 @@ describe("buildAiDoctorPostValueUpgradeViewModel", () => {
     expect(vm.visible).toBe(true);
     if (!vm.visible) throw new Error("expected visible post-value handoff");
     expect(vm.paywallVm.primaryCtaHref).toBe(
-      "/pricing?returnTo=%2Fplants%2Fplant-1%3FtentId%3Dtent-1%23plant-ai-doctor-review",
+      "/pricing?plan=pro_annual&returnTo=%2Fplants%2Fplant-1%3FtentId%3Dtent-1%23plant-ai-doctor-review",
     );
     expect(vm.paywallVm.description).toContain("3 included AI credits");
     expect(vm.paywallVm.description).toContain("100 AI credits per month");
@@ -194,7 +194,7 @@ describe("buildAiDoctorPostValueUpgradeViewModel", () => {
       });
       expect(vm.visible).toBe(true);
       if (!vm.visible) throw new Error("expected visible post-value handoff");
-      expect(vm.paywallVm.primaryCtaHref).toBe("/pricing");
+      expect(vm.paywallVm.primaryCtaHref).toBe("/pricing?plan=pro_annual");
     },
   );
 

@@ -24,15 +24,20 @@ import fs from "node:fs";
 import path from "node:path";
 
 const FIXTURE_ENV_PATH = path.resolve("e2e/.fixtures/pheno-paid-smoke.env");
+const ROLE_ENV_PATH = path.resolve("e2e/.fixtures/pheno-paid-smoke-roles.env");
 const HOSTED_MARKERS = ["supabase.co", "supabase.in", "lovable.app", "lovable.dev"];
 
 const REQUIRED_LOCAL_ENVS = ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"];
 const REQUIRED_ROLE_CREDS = [
   ["Free", "E2E_PHENO_FREE_EMAIL", "E2E_PHENO_FREE_PASSWORD"],
-  ["Pro", "E2E_PHENO_PRO_EMAIL", "E2E_PHENO_PRO_PASSWORD"],
+  ["Pro Monthly", "E2E_PHENO_PRO_EMAIL", "E2E_PHENO_PRO_PASSWORD"],
+  ["Pro Annual", "E2E_PHENO_PRO_ANNUAL_EMAIL", "E2E_PHENO_PRO_ANNUAL_PASSWORD"],
+  ["Craft Monthly", "E2E_PHENO_CRAFT_EMAIL", "E2E_PHENO_CRAFT_PASSWORD"],
+  ["Craft Annual", "E2E_PHENO_CRAFT_ANNUAL_EMAIL", "E2E_PHENO_CRAFT_ANNUAL_PASSWORD"],
+  ["Founder", "E2E_PHENO_FOUNDER_EMAIL", "E2E_PHENO_FOUNDER_PASSWORD"],
   ["Canceled", "E2E_PHENO_CANCELED_EMAIL", "E2E_PHENO_CANCELED_PASSWORD"],
 ];
-const OPTIONAL_ROLE_CREDS = [["Founder", "E2E_PHENO_FOUNDER_EMAIL", "E2E_PHENO_FOUNDER_PASSWORD"]];
+let ephemeralRolesProvisioned = false;
 
 function present(name) {
   const v = process.env[name];
@@ -65,11 +70,65 @@ function run(cmd, args, extraEnv = {}) {
   return res.status ?? 1;
 }
 
+function loadEnvFile(filePath) {
+  if (!fs.existsSync(filePath)) return [];
+  const names = [];
+  for (const raw of fs.readFileSync(filePath, "utf8").split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line.startsWith("#") || !line.includes("=")) continue;
+    const eq = line.indexOf("=");
+    const name = line.slice(0, eq).trim();
+    process.env[name] = line.slice(eq + 1).trim();
+    names.push(name);
+  }
+  return names.sort();
+}
+
 function finish(code, finalStatus) {
+  if (ephemeralRolesProvisioned) {
+    const cleanupCode = run("node", [
+      "scripts/e2e/provision-pheno-paid-smoke-roles.mjs",
+      "--cleanup",
+    ]);
+    for (const file of [
+      FIXTURE_ENV_PATH,
+      "e2e/.auth/pheno-free.json",
+      "e2e/.auth/pheno-free.session-storage.json",
+      "e2e/.auth/pheno-pro.json",
+      "e2e/.auth/pheno-pro.session-storage.json",
+      "e2e/.auth/pheno-pro-annual.json",
+      "e2e/.auth/pheno-pro-annual.session-storage.json",
+      "e2e/.auth/pheno-craft.json",
+      "e2e/.auth/pheno-craft.session-storage.json",
+      "e2e/.auth/pheno-craft-annual.json",
+      "e2e/.auth/pheno-craft-annual.session-storage.json",
+      "e2e/.auth/pheno-founder.json",
+      "e2e/.auth/pheno-founder.session-storage.json",
+      "e2e/.auth/pheno-canceled.json",
+      "e2e/.auth/pheno-canceled.session-storage.json",
+    ]) {
+      fs.rmSync(file, { force: true });
+    }
+    if (cleanupCode !== 0) {
+      code = 1;
+      finalStatus = "FAIL (cleanup)";
+    }
+  }
   header("Final summary");
   for (const [k, v] of Object.entries(summary)) log(`  ${k.padEnd(11)} ${v}`);
   log(`  final       ${finalStatus}`);
   process.exit(code);
+}
+
+// ── Stage 0: mint disposable role credentials when none were supplied ───
+const missingInitialRoles = REQUIRED_ROLE_CREDS.filter(([, e, p]) => !(present(e) && present(p)));
+if (missingInitialRoles.length > 0 && REQUIRED_LOCAL_ENVS.every(present)) {
+  header("Stage 0 — provision disposable local roles");
+  const provisionCode = run("node", ["scripts/e2e/provision-pheno-paid-smoke-roles.mjs"]);
+  if (provisionCode !== 0) finish(provisionCode === 2 ? 2 : 1, "BLOCKED");
+  const roleNames = loadEnvFile(ROLE_ENV_PATH);
+  log(`  PRESENT  ${roleNames.length} role variable(s) loaded (names only)`);
+  ephemeralRolesProvisioned = true;
 }
 
 // ── Stage 1: initial preflight ────────────────────────────────────────────
@@ -79,10 +138,6 @@ for (const n of REQUIRED_LOCAL_ENVS) log(`  ${present(n) ? "PRESENT " : "SKIPPED
 for (const [label, e, p] of REQUIRED_ROLE_CREDS) {
   const ok = present(e) && present(p);
   log(`  ${ok ? "PRESENT " : "SKIPPED "} ${label} (${e}, ${p})`);
-}
-for (const [label, e, p] of OPTIONAL_ROLE_CREDS) {
-  const ok = present(e) && present(p);
-  log(`  ${ok ? "PRESENT " : "SKIPPED "} ${label} [optional]`);
 }
 
 // Reject hosted host early.
@@ -181,10 +236,28 @@ if (sessCode !== 0) {
   finish(1, "FAIL");
 }
 summary.sessions = "OK";
+Object.assign(process.env, {
+  E2E_PHENO_FREE_SESSION_FILE: "e2e/.auth/pheno-free.json",
+  E2E_PHENO_PRO_SESSION_FILE: "e2e/.auth/pheno-pro.json",
+  E2E_PHENO_PRO_ANNUAL_SESSION_FILE: "e2e/.auth/pheno-pro-annual.json",
+  E2E_PHENO_CRAFT_SESSION_FILE: "e2e/.auth/pheno-craft.json",
+  E2E_PHENO_CRAFT_ANNUAL_SESSION_FILE: "e2e/.auth/pheno-craft-annual.json",
+  E2E_PHENO_FOUNDER_SESSION_FILE: "e2e/.auth/pheno-founder.json",
+  E2E_PHENO_CANCELED_SESSION_FILE: "e2e/.auth/pheno-canceled.json",
+});
 
 // ── Stage 6: Playwright ──────────────────────────────────────────────────
 header("Stage 6 — Playwright paid-user smoke");
-const pwCode = run("bunx", ["playwright", "test", "e2e/pheno-tracker-paid-user-smoke.spec.ts"]);
+const pwCode = run(
+  "bunx",
+  ["playwright", "test", "e2e/pheno-tracker-paid-user-smoke.spec.ts", "--project=chromium-mocked"],
+  {
+    // playwright.config.ts disables trace capture for real-auth runs when
+    // this presence flag is set. The value is a non-credential sentinel;
+    // actual role sessions still come only from the gitignored files above.
+    E2E_TEST_EMAIL: "ephemeral-role-trace-disabled",
+  },
+);
 if (pwCode !== 0) {
   summary.playwright = "FAIL";
   finish(1, "FAIL");

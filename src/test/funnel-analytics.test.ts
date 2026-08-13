@@ -35,12 +35,24 @@ describe("event name contract", () => {
       "csv_import_started",
       "csv_import_completed",
       "csv_history_ai_doctor_clicked",
+      // A click on the existing AI Doctor on-ramp is not a started review.
+      "ai_doctor_cta_clicked",
       "ai_doctor_review_started",
       "historical_ai_review_started",
       "ai_doctor_result_received",
       "ai_doctor_session_saved",
+      // Blueprint entry intent — tier-agnostic navigation, kept out of the
+      // paywall pair so a Craft grower's click never inflates the upgrade
+      // funnel. Sits before paywall_viewed because for a non-Craft clicker
+      // the teaser+paywall is literally the next step on the page.
+      "blueprint_cta_clicked",
       "paywall_viewed",
       "paywall_cta_clicked",
+      // Top-up funnel, deliberately distinct from the paywall pair above: it
+      // fires for a grower who already pays, so folding it into the upgrade
+      // events would inflate that funnel with existing subscribers.
+      "credit_pack_cta_viewed",
+      "credit_pack_cta_clicked",
       "checkout_started",
       // Catalog / recovery funnel. A buyer who reached checkout and could not
       // complete it is a distinct, revenue-relevant drop-off from one who
@@ -52,6 +64,11 @@ describe("event name contract", () => {
       "checkout_recovery_retry",
       "checkout_recovery_plan_slug_fallback",
       "subscription_activated",
+      // Paid→paid cross-sell on the confirmation page — its own pair, never
+      // paywall events (the viewer just paid; same separation as the
+      // credit_pack pair above).
+      "founder_note_viewed",
+      "founder_note_clicked",
       "checkout_return_completed",
     ]);
   });
@@ -71,6 +88,10 @@ describe("event name contract", () => {
       "rows",
       "reason",
       "length_bucket",
+      // Fixed alert vocabularies (metric token / severity bucket), never ids
+      // or reading values; call sites are gated on the alert→Blueprint map.
+      "metric",
+      "severity",
     ]);
   });
 });

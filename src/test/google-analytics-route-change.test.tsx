@@ -2,22 +2,36 @@
  * Unit tests for the Google Analytics route-change helper.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { renderHook } from "@testing-library/react";
+import { renderHook, act } from "@testing-library/react";
 import { useGoogleAnalyticsPageViews, sanitizePagePath } from "@/hooks/useGoogleAnalyticsPageViews";
 import { buildSafeAnalyticsPageLocation } from "@/lib/analyticsPageViewRules";
 import { GOOGLE_ANALYTICS_MEASUREMENT_ID } from "@/constants/analytics";
 
 const locationState = vi.hoisted(() => ({ pathname: "/dashboard" }));
+const consentState = vi.hoisted(() => ({
+  value: "granted" as "granted" | "denied" | "unset",
+  listener: null as null | (() => void),
+}));
+const loadGoogleAnalytics = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/react-router-compat", () => ({
   useLocation: () => ({ pathname: locationState.pathname }),
 }));
 
 vi.mock("@/lib/analyticsConsent", () => ({
-  readAnalyticsConsent: () => "granted",
-  subscribeToAnalyticsConsent: () => () => {},
+  readAnalyticsConsent: () => consentState.value,
+  subscribeToAnalyticsConsent: (listener: () => void) => {
+    consentState.listener = listener;
+    return () => {
+      if (consentState.listener === listener) consentState.listener = null;
+    };
+  },
   writeAnalyticsConsent: () => {},
   parseAnalyticsConsentValue: (v: string) => v,
+}));
+
+vi.mock("@/lib/googleAnalyticsLoader", () => ({
+  loadGoogleAnalytics,
 }));
 
 describe("sanitizePagePath", () => {
@@ -88,8 +102,16 @@ describe("useGoogleAnalyticsPageViews — gtag behavior", () => {
   beforeEach(() => {
     gtagMock = vi.fn();
     window.gtag = gtagMock;
-    vi.spyOn(document, "title", "get").mockReturnValue("Test Title");
+    consentState.value = "granted";
+    consentState.listener = null;
     locationState.pathname = "/dashboard";
+    loadGoogleAnalytics.mockReset();
+    loadGoogleAnalytics.mockImplementation(() => {
+      if (typeof window.gtag !== "function") {
+        window.gtag = gtagMock;
+      }
+    });
+    vi.spyOn(document, "title", "get").mockReturnValue("Test Title");
   });
 
   afterEach(() => {
@@ -117,6 +139,7 @@ describe("useGoogleAnalyticsPageViews — gtag behavior", () => {
       GOOGLE_ANALYTICS_MEASUREMENT_ID,
       expect.anything(),
     );
+    expect(loadGoogleAnalytics).toHaveBeenCalled();
   });
 
   it("sanitizes UUIDs before sending to gtag", () => {
@@ -164,21 +187,57 @@ describe("useGoogleAnalyticsPageViews — gtag behavior", () => {
     );
   });
 
-  it("no-ops safely when window.gtag is missing", () => {
+  it("no-ops safely when window.gtag is missing after loader", () => {
     delete window.gtag;
+    loadGoogleAnalytics.mockImplementation(() => {
+      // Simulate blocked loader / ad blocker: no gtag installed.
+    });
 
-    // Should not throw
     expect(() => {
       renderHook(() => useGoogleAnalyticsPageViews());
     }).not.toThrow();
   });
 
-  it("no-ops safely when gtag is missing on window", () => {
+  it("cold-loads a page_view when gtag is absent until loadGoogleAnalytics runs", () => {
     delete window.gtag;
+    const installed = vi.fn();
+    loadGoogleAnalytics.mockImplementation(() => {
+      window.gtag = installed;
+    });
 
-    expect(() => {
-      renderHook(() => useGoogleAnalyticsPageViews());
-    }).not.toThrow();
+    renderHook(() => useGoogleAnalyticsPageViews());
+
+    expect(loadGoogleAnalytics).toHaveBeenCalled();
+    expect(installed).toHaveBeenCalledWith("event", "page_view", {
+      send_to: GOOGLE_ANALYTICS_MEASUREMENT_ID,
+      page_path: "/dashboard",
+      page_location: `${window.location.origin}/dashboard`,
+      page_title: "Test Title",
+    });
+  });
+
+  it("emits the cold-load page_view after consent flips from unset to granted", () => {
+    consentState.value = "unset";
+    delete window.gtag;
+    const installed = vi.fn();
+    loadGoogleAnalytics.mockImplementation(() => {
+      window.gtag = installed;
+    });
+
+    renderHook(() => useGoogleAnalyticsPageViews());
+    expect(installed).not.toHaveBeenCalled();
+
+    act(() => {
+      consentState.value = "granted";
+      consentState.listener?.();
+    });
+
+    expect(loadGoogleAnalytics).toHaveBeenCalled();
+    expect(installed).toHaveBeenCalledWith(
+      "event",
+      "page_view",
+      expect.objectContaining({ page_path: "/dashboard" }),
+    );
   });
 
   it("emits one explicit event for each settled route change", () => {

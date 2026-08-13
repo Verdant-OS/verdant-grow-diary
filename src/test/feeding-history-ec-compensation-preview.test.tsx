@@ -1,7 +1,16 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { render, screen, within } from "@testing-library/react";
+import { render as rtlRender, screen, within } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactElement } from "react";
+
+// FeedingHistoryPanel now mounts the revision-badge query hook (#786), so
+// renders need a QueryClientProvider.
+function render(ui: ReactElement) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+  return rtlRender(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+}
 
 import FeedingHistoryPanel from "@/components/FeedingHistoryPanel";
 import { normalizeDiaryEntries, type NormalizedDiaryEntry } from "@/lib/diaryEntryRules";

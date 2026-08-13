@@ -123,8 +123,11 @@ D4 needs owner re-confirmation on the corrected facts before implementation. See
 spec's D4 correction block. V1 and V4 were authorized and attempted same day: both `BLOCKED` — no `PG*`
 env/`psql` on this machine and the Supabase MCP connection lacks permission on
 `knkwiiywfkbqznbxwqfh`. Unblock paths and an owner-runnable V4 query are in the spec's
-verification attempt record. V6 is `BLOCKED` on the same access denial as V1/V4;
-V2/V3 and V5a/V5b are pending with no verification result yet. V5 is split — V5a
+verification attempt record. V3 and V6 are `BLOCKED` on the same access denial as
+V1/V4 (re-attempted later 2026-08-12). **V2 passed 2026-08-12**: channel collision
+reproduced against deploy-branch modules — a tent with two channels of one class loses
+half its rows to `ignoreDuplicates`; safe at ≤1 channel per class per tent, which D2
+Option A must enforce. V5a/V5b remain pending with no verification result yet. V5 is split — V5a
 (invalid-provenance read fences) is mandatory and unconditional, V5b (stale fences)
 conditional on D4. Spec advances to `APPROVED` only when **V1–V4, V5a, and V6 pass, V5b passes or
 resolves `NOT_APPLICABLE` (fail-closed re-confirmation), and the owner re-confirms D4**

@@ -119,8 +119,8 @@ Phase 1.8 specification: `docs/ecowitt-real-ingest-phase-1-8-specification.md`, 
 transport → `invalid`), D4 APPROVED (stale persists as evidence only) — fences recorded in
 the spec. **D4 premise corrected later same day:** both deployed handlers already fail
 closed on stale (reject before upsert, deliberately — verified at deploy tip `cb98fe4e4`);
-D4 needs owner re-confirmation on the corrected facts before implementation. See the
-spec's D4 correction block. V1 and V4 were authorized and attempted same day: both `BLOCKED` — no `PG*`
+**D4 re-confirmed FAIL-CLOSED 2026-08-13** — stale stays rejected, never stored; V5b
+`NOT_APPLICABLE`; gate 4 fully `APPROVED`. V1 and V4 were authorized and attempted same day: both `BLOCKED` — no `PG*`
 env/`psql` on this machine and the Supabase MCP connection lacks permission on
 `knkwiiywfkbqznbxwqfh`. Unblock paths and an owner-runnable V4 query are in the spec's
 verification attempt record. V3 and V6 are `BLOCKED` on the same access denial as
@@ -132,16 +132,16 @@ helpers eliminate every else→`live` fallthrough across 11+ read models with pi
 tests; active-writer transport tags (`pi_bridge`, `ecowitt`) map to `live` deliberately
 via an explicit compat set. V5 is split — V5a
 (invalid-provenance read fences) is mandatory and unconditional, V5b (stale fences)
-conditional on D4. Spec advances to `APPROVED` only when **V1–V4, V5a, and V6 pass, V5b passes or
-resolves `NOT_APPLICABLE` (fail-closed re-confirmation), and the owner re-confirms D4**
-on the corrected facts — verification cannot substitute for that decision.
+conditional on D4. All owner decisions are ruled. Spec advances to `APPROVED` when **V1, V3, V4, and V6
+pass** — all four blocked on the single live-access grant (V2, V5a `PASS`; V5b
+`NOT_APPLICABLE`).
 
 | Phase 2 gate item                             | Status                                                                                         |
 | --------------------------------------------- | ---------------------------------------------------------------------------------------------- |
 | 1. Wrapper tests pass                         | `PASS` — 22/22 targeted tests, 2026-08-07                                                      |
 | 2. Token storage/rotation/revocation policy   | `APPROVED` — 2026-08-12, `docs/ecowitt-bridge-token-policy.md` (T1–T5)                         |
 | 3. Schema/RLS/idempotency audit (= Phase 1.8) | `BLOCKED` — spec drafted; approval blocked on verification items + owner decisions (see below) |
-| 4. Live-label fencing policy                  | `BLOCKED` — D3 approved 2026-08-12; D4 re-confirmation outstanding (premise corrected)         |
+| 4. Live-label fencing policy                  | `APPROVED` — D3 2026-08-12; D4 re-confirmed fail-closed 2026-08-13                             |
 
 Persistence remains blocked **on the Phase 1.7 path**: `source='live'` is unreachable via
 the validation-only `ecowitt-real-ingest` wrapper by design — it has no database client. A

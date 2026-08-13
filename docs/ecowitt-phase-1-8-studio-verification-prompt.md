@@ -260,6 +260,12 @@ improvise a workaround.
 > rather than reporting four separate blocked assertions. The alternative and truer
 > harness is to mint a real user JWT and drive the same four assertions through
 > PostgREST as the `authenticated` client role.
+>
+> **Do not run V6 through the repo's `supabase` MCP server.** `.mcp.json` pins it to
+> `read_only=true`, so every INSERT/UPDATE/DELETE probe is refused by the transport with
+> "cannot execute … in a read-only transaction" — which is **indistinguishable** from an
+> RLS denial and must never be read as an assertion passing. That connector is for V1,
+> V3, and V4 only.
 
 **Probe A — assertion 1: authenticated owner cannot INSERT `source='live'`:**
 

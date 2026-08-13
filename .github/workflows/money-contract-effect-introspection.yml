@@ -1,0 +1,174 @@
+name: Money contract effect introspection (production, manual)
+
+# Is the money contract still IN EFFECT, or did something overwrite it after
+# it was applied?
+#
+# migration-drift-probe.yml and money-migration-drift-alert.yml both answer
+# "did this migration RUN?" by reading supabase_migrations.schema_migrations.
+# Neither can answer "is what it did still true?". That gap is not
+# theoretical: supabase/migrations/20260727050000_ai_credit_service_contract_forward_reassert.sql
+# exists precisely BECAUSE a later immutable export reintroduced earlier
+# function bodies over a contract that had already been applied.
+# schema_migrations would have reported that migration applied the whole time.
+#
+# DISPATCH-ONLY, ON PURPOSE. Unlike the other two workflows, this one is NOT
+# scheduled and does NOT open a tracking issue. It is deliberately an
+# introspection, not a gate: asserting an exact expected shape before anyone
+# has seen its actual output would encode a guess as a gate, and a money gate
+# that is confidently wrong is worse than no gate. Run it by hand, read the
+# artifact, and use what it observes to write real assertions later if this
+# graduates into a scheduled check.
+
+on:
+  workflow_dispatch: {}
+
+# Read-only by design: this workflow never writes to the repo (no issues, no
+# comments, no labels). Least privilege, and it also means there is far less
+# surface here than the two scheduled workflows for something to go wrong on.
+permissions:
+  contents: read
+
+concurrency:
+  group: money-contract-effect-introspection
+  cancel-in-progress: false
+
+jobs:
+  introspect:
+    name: Introspect the money contract's live effect
+    runs-on: ubuntu-latest
+    # Trusted-ref gate, matching migration-drift-probe.yml and
+    # money-migration-drift-alert.yml. workflow_dispatch accepts a --ref, and
+    # this job checks out that ref and runs ITS copy of the introspection
+    # script with SUPABASE_DB_URL_LIVE in the environment. Without this,
+    # dispatching from a modified branch runs attacker-editable code holding
+    # the production credential.
+    if: github.ref == 'refs/heads/verdant-grow-diary'
+    # Holds SUPABASE_DB_URL_LIVE.
+    #
+    # OPERATIONAL CAVEAT, same as the other two production workflows: if a
+    # REQUIRED REVIEWER is ever added to verdant-production, a dispatch here
+    # parks awaiting approval. For a manual, on-demand tool that is a much
+    # smaller concern than for the scheduled monitors -- there is no silent
+    # cron to lose -- but it means "I dispatched it and nothing happened"
+    # could mean this, not a bug in the workflow.
+    environment: verdant-production
+    # Bounds the whole job well under the 360-minute default, and
+    # deliberately LARGER than the introspection step's own timeout. A step
+    # timeout fails only that step, so a later reporting step can still run;
+    # a job timeout would cancel everything, including the step summary.
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "24"
+
+      # Hardened for the same reason as the other two production workflows: a
+      # package-mirror hiccup should not turn a manual introspection run into
+      # a confusing red X with no useful diagnostic. Observed on this repo's
+      # runners -- apt-get update returning 403 for a third-party repo this
+      # job does not use, and apt-get failing the whole command when ANY
+      # configured source errors.
+      - name: Install psql client
+        run: |
+          sudo apt-get update -qq || echo "apt-get update reported errors; continuing to install"
+          for attempt in 1 2 3; do
+            if sudo apt-get install -y --no-install-recommends postgresql-client; then
+              echo "postgresql-client installed (attempt $attempt)"
+              exit 0
+            fi
+            echo "install attempt $attempt failed; retrying in 10s"
+            sleep 10
+          done
+          echo "could not install postgresql-client after 3 attempts" >&2
+          exit 1
+
+      - name: Require SUPABASE_DB_URL_LIVE
+        uses: ./.github/actions/require-ci-secret
+        with:
+          secret-name: SUPABASE_DB_URL_LIVE
+          secret-value: ${{ secrets.SUPABASE_DB_URL_LIVE }}
+          guard-heading: "Money contract introspection cannot reach production"
+          reason-lines-json: >
+            ["Without this secret nothing can be observed, and reporting
+            'introspected' without a real query would be worse than reporting
+            nothing. This is a hard failure by design."]
+
+      - name: Introspect the contract's live effect
+        id: introspect
+        # The script's own psql call is bounded at 120s; this step timeout is
+        # slack above that plus install/checkout time, not a second copy of
+        # the same bound.
+        timeout-minutes: 5
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL_LIVE }}
+          INTROSPECTION_PATH: ${{ github.workspace }}/introspection/report.json
+          # Belt and braces for the connect phase specifically: an env var,
+          # not a URL option, because this repo's URL sanitizers strip every
+          # query option before handing the URL to psql.
+          PGCONNECT_TIMEOUT: "15"
+        run: |
+          mkdir -p introspection
+          set +e
+          node scripts/introspect-money-contract-effect.mjs --json
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+          set -e
+
+      # Runs regardless of the introspection step's outcome: "the job failed"
+      # and "here is what could be observed before it failed" are both useful
+      # to see in one place.
+      - name: Publish the introspection report
+        if: always()
+        run: |
+          {
+            echo "## Money contract effect introspection"
+            echo ""
+            echo "This is an OBSERVATION, not a pass/fail gate. See the report's"
+            echo "own \`caveat\` field. Read the comparison entries yourself —"
+            echo "nothing here has been judged for you."
+            echo ""
+            if [ -s introspection/report.json ]; then
+              STATUS=$(node -e 'process.stdout.write(String(JSON.parse(require("fs").readFileSync("introspection/report.json","utf8")).status ?? "unknown"))' 2>/dev/null || echo "unparseable")
+              echo "Status: \`$STATUS\`"
+              echo ""
+              if [ "$STATUS" = "introspected" ]; then
+                echo "Comparison summary (full detail, including function definitions, is in the uploaded artifact):"
+                echo ""
+                echo '```json'
+                node -e 'const r=JSON.parse(require("fs").readFileSync("introspection/report.json","utf8")); console.log(JSON.stringify(r.comparison, null, 2))' 2>/dev/null || echo "(could not render comparison)"
+                echo '```'
+              else
+                echo '```json'
+                cat introspection/report.json
+                echo '```'
+              fi
+            else
+              echo "**No report was produced.** The introspection step likely failed before writing one."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload full introspection report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: money-contract-effect-introspection
+          path: introspection
+          if-no-files-found: warn
+
+      # Condition matches the pattern in migration-drift-probe.yml and
+      # money-migration-drift-alert.yml: gate on step OUTCOME, not the exit
+      # code output alone. Whether an unset output compares equal to '0' is
+      # undocumented Actions behaviour, so `outcome != 'success'` covers the
+      # ambiguous case unambiguously. In THIS workflow the introspect step
+      # uses `set +e` and always reports 'success' to Actions regardless of
+      # the script's own exit code, and any step before it that could skip it
+      # already fails the job on its own -- so the ambiguity is currently
+      # inert here. Kept anyway: cheap, and it is the same pattern a reviewer
+      # will look for after finding it twice already in this repo.
+      - name: Fail the run if introspection could not complete
+        if: always() && (steps.introspect.outcome != 'success' || steps.introspect.outputs.exit_code != '0')
+        run: |
+          echo "Introspection did not complete (step outcome: ${{ steps.introspect.outcome }}, exit code: ${{ steps.introspect.outputs.exit_code }})." >&2
+          echo "Nothing about production was observed. See the report above." >&2
+          exit 1

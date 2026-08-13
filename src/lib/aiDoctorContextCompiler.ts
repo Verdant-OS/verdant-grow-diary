@@ -264,7 +264,15 @@ function classifySource(row: SensorReadingRowLike): SensorSourceTag {
   if (source === "manual" || source === "manual_snapshot") return "manual";
   if (source === "csv" || source === "csv_import" || source === "import")
     return "csv";
-  return "live";
+  if (source === "sim") return "demo";
+  // "ecowitt" and "pi_bridge" are the active writers' live transport tags
+  // (quality/state flags above carry the stale/invalid dimension for those
+  // rows). Compatibility mapping until the writers persist canonical "live".
+  if (source === "live" || source === "ecowitt" || source === "pi_bridge")
+    return "live";
+  // Unknown/missing sources must never be tagged live — the
+  // trustworthy-evidence gates key off "live".
+  return "invalid";
 }
 
 function toFiniteNumber(v: unknown): number | null {

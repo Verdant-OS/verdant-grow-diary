@@ -29,6 +29,27 @@ afterEach(() => {
 });
 
 describe("classifyAuditRow", () => {
+  it("honors a stricter consumer freshness window without changing the shared default", () => {
+    const row = {
+      rowsReceived: 1,
+      rowsAccepted: 1,
+      capturedAt: minutesAgo(16),
+      source: "live",
+    };
+
+    expect(classifyAuditRow(row, { now: NOW }).status).toBe("usable");
+    expect(
+      classifyAuditRow(row, {
+        now: NOW,
+        staleWindowMs: 15 * 60_000,
+      }),
+    ).toMatchObject({
+      status: "stale",
+      reason: "outside_stale_window",
+      isHealthyEvidence: false,
+    });
+  });
+
   it("fresh accepted (5/5, recent ts) → usable + fresh_accepted", () => {
     const row: AuditRowLike = {
       rowsReceived: 5,

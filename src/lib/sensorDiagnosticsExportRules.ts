@@ -1116,7 +1116,6 @@ export function buildCanonicalSensorIngestUrl(
   const trimmed = supabaseUrl.trim().replace(/\/+$/, "");
   if (!/^https?:\/\//i.test(trimmed)) return null;
   try {
-    // eslint-disable-next-line no-new
     new URL(trimmed);
   } catch {
     return null;

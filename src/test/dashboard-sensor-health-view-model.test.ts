@@ -135,6 +135,66 @@ describe("buildDashboardSensorHealthSummary", () => {
     expect(vm.sourceLabel).not.toBe("Live");
   });
 
+  it("source 'invalid' forces invalid status even when metrics look plausible", () => {
+    const vm = buildDashboardSensorHealthSummary(
+      {
+        status: "ok",
+        snapshot: {
+          ...EMPTY_SNAPSHOT,
+          source: "invalid",
+          ts: new Date(NOW - 60_000).toISOString(),
+          temp: 24,
+          rh: 55,
+          vpd: 1.1,
+        },
+      },
+      NOW,
+    );
+    expect(vm.status).toBe("invalid");
+    expect(vm.status).not.toBe("healthy");
+    expect(vm.sourceLabel).toBe("Invalid");
+  });
+
+  it("source 'stale' forces stale status even when ts is fresh", () => {
+    const vm = buildDashboardSensorHealthSummary(
+      {
+        status: "ok",
+        snapshot: {
+          ...EMPTY_SNAPSHOT,
+          source: "stale",
+          ts: new Date(NOW - 60_000).toISOString(),
+          temp: 24,
+          rh: 55,
+          vpd: 1.1,
+        },
+      },
+      NOW,
+    );
+    expect(vm.status).toBe("stale");
+    expect(vm.status).not.toBe("healthy");
+    expect(vm.sourceLabel).toBe("Stale");
+  });
+
+  it("grades freshness from captured_at when present (delayed ingest is stale)", () => {
+    const vm = buildDashboardSensorHealthSummary(
+      {
+        status: "ok",
+        snapshot: {
+          ...EMPTY_SNAPSHOT,
+          source: "live",
+          ts: new Date(NOW - 60_000).toISOString(), // fresh ingest ts
+          captured_at: new Date(NOW - 2 * 60 * 60 * 1000).toISOString(), // old capture
+          temp: 24,
+          rh: 55,
+          vpd: 1.1,
+        },
+      },
+      NOW,
+    );
+    expect(vm.status).toBe("stale");
+    expect(vm.status).not.toBe("healthy");
+  });
+
   it("preserves source truth: sim snapshot reads as Demo, not Live", () => {
     const vm = buildDashboardSensorHealthSummary(
       {

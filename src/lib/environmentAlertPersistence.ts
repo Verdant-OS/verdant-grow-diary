@@ -50,7 +50,10 @@ export function isSnapshotPersistable(ctx: PersistenceContext): boolean {
   if (snapshot.source !== "live" && snapshot.source !== "manual") return false;
   if (quality === "unavailable") return false;
   const now = ctx.now ?? Date.now();
-  if (isStale(snapshot.ts, now)) return false;
+  // Freshness is graded from the explicit capture time when the fold
+  // carried one — `ts` is the ingest timestamp, so a delayed bridge insert
+  // must not make old telemetry look current enough to persist an alert.
+  if (isStale(snapshot.captured_at ?? snapshot.ts, now)) return false;
   return true;
 }
 

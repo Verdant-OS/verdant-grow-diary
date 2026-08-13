@@ -2,15 +2,16 @@
  * AI Doctor credits-exhausted teaser — pure rules + wiring guardrails.
  *
  * Free-plan grows get a fixed, non-renewing AI Doctor credit allotment
- * (unlike Pro's monthly-renewing pool). This marker converts the moment a
- * grower has fully spent that allotment — demonstrated demand for the
- * feature — into a calm, non-gating conversion nudge on Plant Detail.
- * These tests pin:
- *  - the exhaustion math (limit/used → remaining, malformed input hides);
- *  - teaser eligibility (free plan + genuinely exhausted only, never for
- *    paid plans, never while still under the limit);
- *  - teaser copy stays calm (banned-marketing-word free) and never gates
- *    the doctor feature itself (that stays server-side);
+ * (unlike Pro's monthly-renewing pool). This marker converts two moments
+ * into a calm, non-gating conversion nudge on Plant Detail: "low" (exactly
+ * one credit left, at least one already spent — demand shown, not yet
+ * blocked) and "exhausted" (the allotment is fully spent). These tests pin:
+ *  - the exhaustion/low math (limit/used → remaining, malformed input hides);
+ *  - teaser eligibility (free plan only, never for paid plans, never while
+ *    still comfortably under the limit, never falsely "low" on a fresh
+ *    unused grow);
+ *  - teaser copy stays calm (banned-marketing-word free) for both states and
+ *    never gates the doctor feature itself (that stays server-side);
  *  - the marker is wired into PlantDetail and its loader stays read-only,
  *    scoped to the caller's own rows, selecting only `weight`.
  */
@@ -20,6 +21,7 @@ import { resolve } from "node:path";
 import {
   buildAiDoctorCreditsExhaustedTeaserView,
   AI_DOCTOR_CREDITS_TEASER_COPY,
+  AI_DOCTOR_CREDITS_LOW_COPY,
   AI_DOCTOR_CREDITS_TEASER_HREF,
 } from "@/lib/aiDoctorCreditsExhaustedTeaserRules";
 import { paywallCtaHasBannedWords } from "@/lib/paywallCtaViewModel";
@@ -48,18 +50,42 @@ describe("buildAiDoctorCreditsExhaustedTeaserView — exhaustion math", () => {
     expect(v.teaser.show).toBe(false);
   });
 
-  it("under the limit → remaining computed, teaser hidden", () => {
+  it("comfortably under the limit (2+ remaining) → remaining computed, teaser hidden", () => {
+    const v = buildAiDoctorCreditsExhaustedTeaserView({
+      isFreePlan: true,
+      limit: 3,
+      used: 1,
+    });
+    expect(v.resolved).toBe(true);
+    expect(v.remaining).toBe(2);
+    expect(v.teaser.show).toBe(false);
+    expect(v.teaser.state).toBe("none");
+  });
+
+  it("exactly one credit remaining, at least one already spent → LOW state, not exhausted", () => {
     const v = buildAiDoctorCreditsExhaustedTeaserView({
       isFreePlan: true,
       limit: 3,
       used: 2,
     });
-    expect(v.resolved).toBe(true);
     expect(v.remaining).toBe(1);
-    expect(v.teaser.show).toBe(false);
+    expect(v.teaser.show).toBe(true);
+    expect(v.teaser.state).toBe("low");
+    expect(v.teaser.copy).toBe(AI_DOCTOR_CREDITS_LOW_COPY);
   });
 
-  it("exactly at the limit → remaining 0, teaser shows (free plan)", () => {
+  it("a fresh, unused grow with a 1-credit limit is never falsely LOW", () => {
+    const v = buildAiDoctorCreditsExhaustedTeaserView({
+      isFreePlan: true,
+      limit: 1,
+      used: 0,
+    });
+    expect(v.remaining).toBe(1);
+    expect(v.teaser.show).toBe(false);
+    expect(v.teaser.state).toBe("none");
+  });
+
+  it("exactly at the limit → remaining 0, teaser shows EXHAUSTED (free plan)", () => {
     const v = buildAiDoctorCreditsExhaustedTeaserView({
       isFreePlan: true,
       limit: 3,
@@ -67,9 +93,11 @@ describe("buildAiDoctorCreditsExhaustedTeaserView — exhaustion math", () => {
     });
     expect(v.remaining).toBe(0);
     expect(v.teaser.show).toBe(true);
+    expect(v.teaser.state).toBe("exhausted");
+    expect(v.teaser.copy).toBe(AI_DOCTOR_CREDITS_TEASER_COPY);
   });
 
-  it("over the limit (e.g. a since-reduced allotment) clamps remaining to 0, still shows", () => {
+  it("over the limit (e.g. a since-reduced allotment) clamps remaining to 0, still shows EXHAUSTED", () => {
     const v = buildAiDoctorCreditsExhaustedTeaserView({
       isFreePlan: true,
       limit: 3,
@@ -77,6 +105,7 @@ describe("buildAiDoctorCreditsExhaustedTeaserView — exhaustion math", () => {
     });
     expect(v.remaining).toBe(0);
     expect(v.teaser.show).toBe(true);
+    expect(v.teaser.state).toBe("exhausted");
   });
 
   it("never shows for paid plans, even at/over the limit", () => {
@@ -88,8 +117,26 @@ describe("buildAiDoctorCreditsExhaustedTeaserView — exhaustion math", () => {
     expect(v.teaser.show).toBe(false);
   });
 
-  it("teaser copy is calm — no banned marketing words", () => {
+  it("never shows LOW for paid plans either, even at the exact one-remaining threshold", () => {
+    const v = buildAiDoctorCreditsExhaustedTeaserView({
+      isFreePlan: false,
+      limit: 3,
+      used: 2,
+    });
+    expect(v.teaser.show).toBe(false);
+    expect(v.teaser.state).toBe("none");
+  });
+
+  it("exhausted-state copy is calm — no banned marketing words", () => {
     expect(paywallCtaHasBannedWords(AI_DOCTOR_CREDITS_TEASER_COPY)).toBe(false);
+  });
+
+  it("low-state copy is calm — no banned marketing words", () => {
+    expect(paywallCtaHasBannedWords(AI_DOCTOR_CREDITS_LOW_COPY)).toBe(false);
+  });
+
+  it("low-state and exhausted-state copy are distinct", () => {
+    expect(AI_DOCTOR_CREDITS_LOW_COPY).not.toBe(AI_DOCTOR_CREDITS_TEASER_COPY);
   });
 
   it("teaser links to /pricing", () => {
@@ -113,7 +160,9 @@ describe("wiring guardrails", () => {
     expect(HOOK).toMatch(/\.select\(\s*["']weight["']\s*\)/);
     expect(HOOK).toMatch(/\.eq\(\s*["']user_id["']\s*,\s*user!?\.id\s*\)/);
     expect(HOOK).toMatch(/\.eq\(\s*["']grow_id["']\s*,\s*growId/);
-    expect(HOOK).not.toMatch(/\.insert\(|\.update\(|\.delete\(|\.upsert\(|\.rpc\(|functions\.invoke/);
+    expect(HOOK).not.toMatch(
+      /\.insert\(|\.update\(|\.delete\(|\.upsert\(|\.rpc\(|functions\.invoke/,
+    );
     // Never selects `result` — it can carry unrelated AI Doctor payload data.
     expect(HOOK).not.toMatch(/\.select\([^)]*result/);
   });
@@ -130,7 +179,9 @@ describe("wiring guardrails", () => {
 
   it("teaser never hides data or writes — additive copy with a /pricing link only", () => {
     expect(TEASER).toMatch(/ai-doctor-credits-exhausted-teaser/);
-    expect(TEASER).not.toMatch(/\.insert\(|\.update\(|\.delete\(|\.upsert\(|\.rpc\(|functions\.invoke/);
+    expect(TEASER).not.toMatch(
+      /\.insert\(|\.update\(|\.delete\(|\.upsert\(|\.rpc\(|functions\.invoke/,
+    );
   });
 
   it("never introduces a paywall/upsell surface inside the AI Doctor container itself", () => {

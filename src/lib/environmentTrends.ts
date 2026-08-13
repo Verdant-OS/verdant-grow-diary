@@ -6,7 +6,11 @@
  */
 
 import type { SnapshotSource } from "@/lib/sensorSnapshot";
-import { toFiniteNumber } from "@/lib/sensorSnapshot";
+import {
+  classifySensorReadingRowSource,
+  foldSensorSourceKinds,
+  toFiniteNumber,
+} from "@/lib/sensorSnapshot";
 import { calculateAirVpdKpa } from "@/lib/vpdRules";
 
 export interface EnvironmentSample {
@@ -137,6 +141,12 @@ export function samplesFromReadings(
 ): EnvironmentSample[] {
   if (!rows || rows.length === 0) return [];
   const byKey = new Map<string, EnvironmentSample>();
+  // Per-group source kinds, resolved through the canonical classifier so
+  // persisted stale/demo/csv/invalid/unknown rows are never shown as live.
+  const kindsByKey = new Map<
+    string,
+    Array<Exclude<SnapshotSource, "diary" | "unavailable">>
+  >();
   for (const r of rows) {
     const key = `${r.tent_id ?? ""}|${r.ts}`;
     let s = byKey.get(key);
@@ -146,20 +156,20 @@ export function samplesFromReadings(
         temp: null,
         rh: null,
         vpd: null,
-        source:
-          r.source === "manual"
-            ? "manual"
-            : r.source === "sim"
-              ? "sim"
-              : "live",
+        source: "invalid",
       };
       byKey.set(key, s);
+      kindsByKey.set(key, []);
     }
+    kindsByKey.get(key)!.push(classifySensorReadingRowSource(r.source));
     const field = METRIC_MAP[r.metric];
     if (field) {
       const v = toFiniteNumber(r.value);
       if (v !== null) s[field] = v;
     }
+  }
+  for (const [key, s] of byKey) {
+    s.source = foldSensorSourceKinds(kindsByKey.get(key) ?? []);
   }
   // Read-time VPD fallback for historical rows that have valid temp + rh
   // but no persisted vpd_kpa. Derived only — never written back. Does NOT

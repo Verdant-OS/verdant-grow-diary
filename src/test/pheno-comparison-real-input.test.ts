@@ -198,6 +198,24 @@ describe("phenoSnapshotFromSensorSnapshot — canonical snapshot bridge", () => 
     );
   });
 
+  it("passes demo/stale/invalid through — quality is never upgraded", () => {
+    for (const source of ["demo", "stale", "invalid"] as const) {
+      const out = phenoSnapshotFromSensorSnapshot(snap({ source }));
+      expect(out?.source).toBe(source);
+      expect(out?.source).not.toBe("live");
+    }
+  });
+
+  it("grades freshness from captured_at, not the ingest ts, when present", () => {
+    const out = phenoSnapshotFromSensorSnapshot(
+      snap({
+        ts: "2026-07-20T10:00:00Z", // fresh ingest timestamp
+        captured_at: "2026-07-01T00:00:00Z", // much older actual capture
+      }),
+    );
+    expect(out?.capturedAt).toBe("2026-07-01T00:00:00Z");
+  });
+
   it("maps unavailable/missing to null (honest no-snapshot flag)", () => {
     expect(
       phenoSnapshotFromSensorSnapshot(snap({ source: "unavailable" })),

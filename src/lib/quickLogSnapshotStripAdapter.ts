@@ -18,6 +18,7 @@ import {
   type Classification,
   type SnapshotStatus,
 } from "@/lib/sensorSnapshotStatusContract";
+import { SENSOR_FRESH_WINDOW_MINUTES } from "@/lib/latestSensorSnapshotRules";
 import type { SensorSnapshot } from "@/lib/sensorSnapshot";
 import { deriveProviderLabel } from "@/constants/sensorProviderLabels";
 import {
@@ -172,18 +173,29 @@ export function buildQuickLogSnapshotStrip(
   const validity =
     src === "sim" ? { isValid: false as const, reason: "malformed_reading" as const } : undefined;
 
+  // Capture time beats ingest ts for freshness/age when present — a delayed
+  // bridge insert of old telemetry must never present as current context.
+  const capturedAt = snapshot.captured_at ?? snapshot.ts;
+
   const classification = classifyAuditRow(
     {
       rowsReceived: 1,
       rowsAccepted: 1,
-      capturedAt: snapshot.ts,
+      capturedAt,
       source: src,
     },
-    { now, validity },
+    {
+      now,
+      validity,
+      // Keep the pre-save strip on the same strict freshness contract as
+      // buildQuickLogSensorAttachPayload. The strip must never call context
+      // current when the save adapter will refuse to persist it as fresh.
+      staleWindowMs: SENSOR_FRESH_WINDOW_MINUTES * 60_000,
+    },
   );
 
   const status = narrowStatus(classification.status);
-  const capturedMs = new Date(snapshot.ts).getTime();
+  const capturedMs = new Date(capturedAt).getTime();
   const ageLabel = Number.isFinite(capturedMs) ? formatAge(capturedMs, now.getTime()) : null;
 
   // Resolve title/description/action with the attach-toggle override:
@@ -203,7 +215,7 @@ export function buildQuickLogSnapshotStrip(
     status,
     title,
     description,
-    capturedAt: snapshot.ts,
+    capturedAt,
     ageLabel,
     metrics: buildMetrics(snapshot),
     action: finalAction,

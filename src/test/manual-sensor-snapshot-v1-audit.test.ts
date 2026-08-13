@@ -81,12 +81,23 @@ describe("Sensor Context — source labeling", () => {
     expect(SOURCE_LABEL[snap.source]).not.toBe("Live sensor");
   });
 
-  it("Live source label is reserved for pi_bridge/live rows only", () => {
-    const snap = snapshotFromReadings([
-      { ts: "2025-01-01T00:00:00Z", metric: "temperature_c", value: 24, source: "pi_bridge" },
+  it("Live source label is reserved for canonical live + active transport rows", () => {
+    // Canonical "live" and the active writers' transport tags (pi_bridge,
+    // ecowitt) resolve to live; freshness/quality layers decide the rest.
+    for (const source of ["live", "pi_bridge", "ecowitt"] as const) {
+      const snap = snapshotFromReadings([
+        { ts: "2025-01-01T00:00:00Z", metric: "temperature_c", value: 24, source },
+      ])!;
+      expect(snap.source).toBe("live");
+      expect(SOURCE_LABEL[snap.source]).toBe("Live sensor");
+    }
+    // Unknown sources must never be promoted to live (Sensor Truth:
+    // unknown telemetry ≠ healthy).
+    const junk = snapshotFromReadings([
+      { ts: "2025-01-01T00:00:00Z", metric: "temperature_c", value: 24, source: "mystery_bridge" },
     ])!;
-    expect(snap.source).toBe("live");
-    expect(SOURCE_LABEL[snap.source]).toBe("Live sensor");
+    expect(junk.source).toBe("invalid");
+    expect(SOURCE_LABEL[junk.source]).not.toBe("Live sensor");
   });
 
   it("(7) stale readings beyond threshold are flagged stale", () => {

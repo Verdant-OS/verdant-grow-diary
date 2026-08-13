@@ -72,6 +72,9 @@ const SOURCE_TONE: Record<SnapshotSource, SensorSnapshotReadModelTone> = {
   sim: "muted",
   diary: "muted",
   csv: "neutral",
+  demo: "muted",
+  stale: "warning",
+  invalid: "danger",
   unavailable: "muted",
 };
 

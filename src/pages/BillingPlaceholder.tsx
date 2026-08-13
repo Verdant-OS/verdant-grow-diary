@@ -96,7 +96,6 @@ export default function BillingPlaceholder() {
     //   - call Paddle.Checkout.open({ items: [{ priceId: sandboxPriceId }] })
     // and rely on the paddle-webhook edge function for entitlements.
     if (typeof window !== "undefined" && sandboxPriceId) {
-      // eslint-disable-next-line no-console
       console.info(
         "[paddle:sandbox] checkout intent",
         { plan: planSlug, priceId: sandboxPriceId, environment: "sandbox" },

@@ -24,7 +24,45 @@ function snap(partial: Partial<SensorSnapshot>): SensorSnapshot {
   };
 }
 
+describe("buildQuickLogSnapshotStrip — captured_at beats ingest ts", () => {
+  it("a delayed insert (old captured_at, fresh ts) is not presented as current", () => {
+    // Same age the contract's own stale fixture uses — but here the ingest
+    // ts is fresh, so only the explicit capture time can catch it.
+    const v = buildQuickLogSnapshotStrip({
+      snapshot: snap({ ts: minutesAgo(2), captured_at: hoursAgo(48) }),
+      hasTent: true,
+      now: NOW,
+    });
+    expect(v.status).toBe("stale");
+    expect(v.capturedAt).toBe(hoursAgo(48));
+  });
+});
+
 describe("buildQuickLogSnapshotStrip", () => {
+  it("matches the save gate when live capture time is 16 minutes old", () => {
+    const capturedAt = minutesAgo(16);
+    const v = buildQuickLogSnapshotStrip({
+      snapshot: snap({
+        source: "live",
+        ts: minutesAgo(1),
+        captured_at: capturedAt,
+      }),
+      hasTent: true,
+      now: NOW,
+    });
+
+    expect(v).toMatchObject({
+      status: "stale",
+      capturedAt,
+      description: "Refresh before saving for better AI Doctor context.",
+      classification: {
+        status: "stale",
+        reason: "outside_stale_window",
+        isHealthyEvidence: false,
+      },
+    });
+  });
+
   it("no_data — exact copy, labels, and navigation when there is no tent", () => {
     const v = buildQuickLogSnapshotStrip({ snapshot: snap({}), hasTent: false, now: NOW });
     expect(v.status).toBe("no_data");

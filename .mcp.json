@@ -3,6 +3,10 @@
     "lovable": {
       "type": "http",
       "url": "https://mcp.lovable.dev"
+    },
+    "supabase": {
+      "type": "http",
+      "url": "https://mcp.supabase.com/mcp?project_ref=knkwiiywfkbqznbxwqfh&read_only=true&features=database%2Cfunctions%2Cdebugging%2Cdocs"
     }
   }
 }

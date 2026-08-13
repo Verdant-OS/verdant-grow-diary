@@ -42,6 +42,30 @@ describe("alertFreshnessContext — shared constants", () => {
   });
 });
 
+describe("freshness grades from captured_at when present (delayed ingest)", () => {
+  const delayed = snap({
+    source: "live",
+    ts: new Date(NOW - 60_000).toISOString(), // fresh ingest ts
+    captured_at: new Date(NOW - 2 * 60 * 60 * 1000).toISOString(), // old capture
+    temp: 24,
+  });
+  it("classifyLatestSnapshotFreshness treats it as stale", () => {
+    expect(
+      classifyLatestSnapshotFreshness({ status: "ok", snapshot: delayed, now: NOW }),
+    ).toBe("stale");
+  });
+  it("snapshotAlertsCanPersist rejects it", () => {
+    expect(
+      snapshotAlertsCanPersist({ status: "ok", snapshot: delayed, now: NOW }),
+    ).toBe(false);
+  });
+  it("buildLatestSnapshotDetail reports outside-window and not persistable", () => {
+    const d = buildLatestSnapshotDetail({ status: "ok", snapshot: delayed, now: NOW });
+    expect(d?.insideWindow).toBe(false);
+    expect(d?.canPersist).toBe(false);
+  });
+});
+
 describe("classifyLatestSnapshotFreshness", () => {
   it("returns unavailable when not loaded", () => {
     expect(

@@ -87,6 +87,12 @@ export interface AuditRowLike {
 export interface ClassifyOptions {
   now?: Date;
   validity?: { isValid: boolean; reason?: SnapshotReason };
+  /**
+   * Optional consumer-specific freshness window. The shared audit contract
+   * remains 24 hours by default, while stricter save surfaces can pass their
+   * own canonical window without changing unrelated consumers.
+   */
+  staleWindowMs?: number;
 }
 
 function parseDate(v: string | Date | null | undefined): Date | null {
@@ -155,7 +161,13 @@ export function classifyAuditRow(
   }
 
   const now = opts.now ?? new Date(0); // caller must supply `now`; deterministic fallback
-  const windowMs = resolveStaleWindowMs(row.source ?? null);
+  const requestedWindowMs = opts.staleWindowMs;
+  const windowMs =
+    typeof requestedWindowMs === "number" &&
+    Number.isFinite(requestedWindowMs) &&
+    requestedWindowMs > 0
+      ? requestedWindowMs
+      : resolveStaleWindowMs(row.source ?? null);
   if (now.getTime() - captured.getTime() > windowMs) {
     return buildClassification("stale", "outside_stale_window");
   }

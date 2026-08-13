@@ -70,6 +70,49 @@ describe("buildEcowittTimelineContext", () => {
     expect(out[0].matchAgeMinutes).toBeLessThanOrEqual(5);
   });
 
+  it("passes persisted csv/stale/invalid sources through — never relabels them live", () => {
+    for (const source of ["csv", "stale", "invalid"] as const) {
+      const out = buildEcowittTimelineContext({
+        diaryEntries: [baseEntry],
+        sensorReadings: [
+          {
+            id: "r1",
+            tent_id: TENT,
+            plant_id: PLANT,
+            source,
+            captured_at: FRESH_AT,
+            raw_payload: freshPayload(FRESH_AT),
+          },
+        ],
+        growId: GROW,
+        tentId: TENT,
+        now: NOW,
+      });
+      expect(out[0].snapshot?.hasReading).toBe(true);
+      expect(out[0].snapshot?.source).not.toBe("live");
+    }
+  });
+
+  it("classifies unknown row sources as invalid, never live", () => {
+    const out = buildEcowittTimelineContext({
+      diaryEntries: [baseEntry],
+      sensorReadings: [
+        {
+          id: "r1",
+          tent_id: TENT,
+          plant_id: PLANT,
+          source: "some_unknown_bridge",
+          captured_at: FRESH_AT,
+          raw_payload: freshPayload(FRESH_AT),
+        },
+      ],
+      growId: GROW,
+      tentId: TENT,
+      now: NOW,
+    });
+    expect(out[0].snapshot?.source).toBe("invalid");
+  });
+
   it("does not link a reading outside the time window", () => {
     const out = buildEcowittTimelineContext({
       diaryEntries: [baseEntry],

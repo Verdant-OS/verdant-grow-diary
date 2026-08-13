@@ -22,6 +22,7 @@ import type {
   PhenoTimelineEventInput,
 } from "@/lib/phenoComparisonViewModel";
 import type { PhenoSensorSnapshotInput } from "@/lib/phenoComparisonRules";
+import type { PhenoLabEvidenceInput } from "@/lib/phenoLabEvidenceRules";
 import type { SensorSnapshot } from "@/lib/sensorSnapshot";
 import { phenotypeInputFromScoreTraits } from "@/lib/phenoScorecardRules";
 
@@ -67,6 +68,11 @@ export interface BuildRealPhenoComparisonInputArgs {
    * stop showing "Not recorded". Missing → the engine keeps its honest gaps.
    */
   scoreTraitsByPlant?: Readonly<Record<string, unknown>>;
+  /**
+   * plant_id → latest measured lab result (lab_tests). Missing → the engine
+   * shows the honest "No lab result recorded" gap for that candidate.
+   */
+  labEvidenceByPlant?: Readonly<Record<string, PhenoLabEvidenceInput | null>>;
   /** Max quick-log / timeline rows carried per candidate. Default 5. */
   maxActivityPerCandidate?: number;
 }
@@ -95,10 +101,7 @@ function candidateSortKey(c: RealPhenoCandidatePlant): [number, string, string] 
   return [Number.isFinite(num) ? num : Number.MAX_SAFE_INTEGER, label, c.id];
 }
 
-function compareCandidates(
-  a: RealPhenoCandidatePlant,
-  b: RealPhenoCandidatePlant,
-): number {
+function compareCandidates(a: RealPhenoCandidatePlant, b: RealPhenoCandidatePlant): number {
   const [an, al, ai] = candidateSortKey(a);
   const [bn, bl, bi] = candidateSortKey(b);
   if (an !== bn) return an - bn;
@@ -106,10 +109,7 @@ function compareCandidates(
   return ai < bi ? -1 : ai > bi ? 1 : 0;
 }
 
-function toQuickLogs(
-  rows: readonly RealPhenoActivityRow[],
-  max: number,
-): PhenoQuickLogInput[] {
+function toQuickLogs(rows: readonly RealPhenoActivityRow[], max: number): PhenoQuickLogInput[] {
   return rows.slice(0, max).map((r) => ({
     id: r.id,
     at: nullableText(r.at),
@@ -150,8 +150,7 @@ export function phenoSnapshotFromSensorSnapshot(
 ): PhenoSensorSnapshotInput | null {
   if (!snap) return null;
   if (snap.source === "unavailable") return null;
-  const source =
-    snap.source === "sim" ? "demo" : snap.source === "diary" ? "manual" : snap.source;
+  const source = snap.source === "sim" ? "demo" : snap.source === "diary" ? "manual" : snap.source;
   return {
     source,
     capturedAt: snap.captured_at ?? snap.ts ?? null,
@@ -177,12 +176,13 @@ export function buildRealPhenoComparisonInput(
 
   const snapshotByTent = args.snapshotByTent ?? {};
   const scoreTraitsByPlant = args.scoreTraitsByPlant ?? {};
+  const labEvidenceByPlant = args.labEvidenceByPlant ?? {};
 
   const candidates: PhenoCandidateInput[] = ordered.map((c, index) => {
     const activity = args.activityByPlant[c.id] ?? [];
     const tentName = c.tent_id ? nullableText(args.tentNameById[c.tent_id]) : null;
     const photoUrl = nullableText(photoByPlant[c.id] ?? null);
-    const snapshot = c.tent_id ? snapshotByTent[c.tent_id] ?? null : null;
+    const snapshot = c.tent_id ? (snapshotByTent[c.tent_id] ?? null) : null;
     // Grower-entered trait scores become the phenotype record. Absent scores
     // yield an empty phenotype → the engine still shows honest "Not recorded".
     const rawScores = scoreTraitsByPlant[c.id];
@@ -202,6 +202,7 @@ export function buildRealPhenoComparisonInput(
       timelineEvents: toTimelineEvents(activity, max),
       snapshot,
       phenotype,
+      labEvidence: labEvidenceByPlant[c.id] ?? null,
       // postCure / dayOfFlower / replicateCount are intentionally unset — no
       // structured store exists yet, and the engine renders honest
       // evidence-gap caveats for each.

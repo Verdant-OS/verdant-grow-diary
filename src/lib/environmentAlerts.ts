@@ -103,6 +103,19 @@ function nowIso(now: number): string {
   return new Date(now).toISOString();
 }
 
+/**
+ * True when the snapshot actually carries a value for `field`. A field that is
+ * simply absent is unknown, not suspect, and must not raise a quality alert.
+ */
+function fieldHasValue(
+  field: string,
+  snapshot: AlertInputs["snapshot"],
+): boolean {
+  if (!snapshot) return false;
+  const v = (snapshot as unknown as Record<string, unknown>)[field];
+  return v !== null && v !== undefined;
+}
+
 export function buildEnvironmentAlerts(
   inputs: AlertInputs,
 ): EnvironmentAlert[] {
@@ -138,6 +151,14 @@ export function buildEnvironmentAlerts(
   // --- 2. Sensor quality (suspicious fields) ------------------------------
   if (quality && quality.suspiciousFields.length > 0) {
     for (const field of quality.suspiciousFields) {
+      // `evaluateSensorQuality` deliberately lists a *missing* field (today
+      // that is VPD) in suspiciousFields so the snapshot grades as "watch".
+      // Raising an alert from that told the grower their telemetry "looks
+      // suspicious" when the reading they entered was fine and we simply
+      // never stored a VPD for it. Absence is already reported by the
+      // snapshot-availability and target surfaces; only a field that actually
+      // carries a value can be suspect.
+      if (!fieldHasValue(field, snapshot)) continue;
       const critical = isCriticalImplausible(field, snapshot);
       alerts.push({
         id: `quality:${field}`,

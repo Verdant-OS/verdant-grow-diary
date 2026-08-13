@@ -98,6 +98,38 @@ describe("buildEnvironmentAlerts — rules", () => {
     expect(anyWarning).toBeUndefined();
   });
 
+  it("does not raise a quality alert for a merely missing field", () => {
+    // Regression: `evaluateSensorQuality` lists a *missing* VPD in
+    // suspiciousFields so the snapshot grades as "watch". That produced a
+    // live "VPD reading needs review / VPD looks suspicious in the latest
+    // snapshot" alert for growers whose manual readings were fine and simply
+    // had no stored VPD.
+    const noVpd = snap({ temp: 24, rh: 55, vpd: null });
+    const alerts = buildEnvironmentAlerts({
+      snapshot: noVpd,
+      quality: evaluateSensorQuality(noVpd, NOW),
+      targets: compareSnapshotToTargets(noVpd, null),
+      now: NOW,
+    });
+    expect(alerts.find((x) => x.id === "quality:vpd")).toBeUndefined();
+    const blob = alerts.map((a) => `${a.title} ${a.reason}`).join(" ");
+    expect(blob).not.toMatch(/looks suspicious/i);
+  });
+
+  it("still raises a quality alert for a present, implausible VPD", () => {
+    // Counter-test: absence is forgiven, corruption is not.
+    const badVpd = snap({ temp: 24, rh: 55, vpd: 9 });
+    const alerts = buildEnvironmentAlerts({
+      snapshot: badVpd,
+      quality: evaluateSensorQuality(badVpd, NOW),
+      targets: compareSnapshotToTargets(badVpd, null),
+      now: NOW,
+    });
+    const a = alerts.find((x) => x.id === "quality:vpd");
+    expect(a).toBeDefined();
+    expect(a?.severity).toBe("critical");
+  });
+
   it("returns critical for implausible metric values", () => {
     const bad = snap({ temp: 120, rh: 55, vpd: 1.0 });
     const alerts = buildEnvironmentAlerts({

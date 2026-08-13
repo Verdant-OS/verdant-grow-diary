@@ -135,8 +135,13 @@ function toTimelineEvents(
  * snapshot input. Pure. Source honesty is preserved:
  *   - "sim" maps to "demo" (the pheno canonical for simulated data);
  *   - "diary" maps to "manual" (a diary-sourced reading was hand-entered);
+ *   - "demo" / "stale" / "invalid" pass through so the engine's classifier
+ *     keeps flagging them — they are never upgraded here;
  *   - "unavailable" (or a missing snapshot) maps to null so the engine shows
  *     the honest no-snapshot flag instead of a fabricated reading.
+ * Freshness is graded from the reading's explicit `captured_at` when the
+ * fold carried one — `ts` is the ingest timestamp and can be fresher than
+ * the actual capture.
  * EC/pH/PPFD relevance flags are left unset (false): tent readings are
  * context only here, so absent metrics are not alarmed as "missing".
  */
@@ -148,7 +153,7 @@ export function phenoSnapshotFromSensorSnapshot(
   const source = snap.source === "sim" ? "demo" : snap.source === "diary" ? "manual" : snap.source;
   return {
     source,
-    capturedAt: snap.ts ?? null,
+    capturedAt: snap.captured_at ?? snap.ts ?? null,
     temp: snap.temp,
     rh: snap.rh,
     vpd: snap.vpd,

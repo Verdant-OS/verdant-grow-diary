@@ -14,6 +14,8 @@
  * control. Never invents placeholder values.
  */
 import {
+  classifySensorReadingRowSource,
+  foldSensorSourceKinds,
   isStale,
   toFiniteNumber,
   type SensorReadingLike,
@@ -50,10 +52,11 @@ function clampLimit(n: number | undefined): number {
 }
 
 function classifySource(rows: SensorReadingLike[]): SnapshotSource {
-  if (rows.length === 0) return "unavailable";
-  if (rows.some((r) => r.source === "manual")) return "manual";
-  if (rows.every((r) => r.source === "sim")) return "sim";
-  return "live";
+  // Shared canonical fold: csv/demo/stale/invalid/unknown rows are never
+  // classified as "live"; empty groups stay "unavailable".
+  return foldSensorSourceKinds(
+    rows.map((r) => classifySensorReadingRowSource(r.source)),
+  );
 }
 
 function pickMetric(rows: SensorReadingLike[], metric: string): number | null {

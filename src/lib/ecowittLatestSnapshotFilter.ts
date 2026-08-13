@@ -102,7 +102,12 @@ function resolveCandidateSource(
   const src = (row.source ?? "").trim().toLowerCase();
   if (src === "manual") return "manual";
   if (src === "demo") return "demo";
-  // Treat all listener-tagged EcoWitt rows as "live" candidates; the
+  // Persisted quality/history labels survive — imported history or rows
+  // already downgraded at ingest must never re-present as live candidates.
+  if (src === "csv") return "csv";
+  if (src === "stale") return "stale";
+  if (src === "invalid") return "invalid";
+  // Remaining listener-tagged EcoWitt rows are "live" candidates; the
   // view-model will demote stale ones to "stale" via freshness.
   return "live";
 }

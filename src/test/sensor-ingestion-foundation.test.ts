@@ -125,11 +125,17 @@ describe("snapshot pipeline ignores raw_payload", () => {
   });
 });
 
-describe("alert persistence behavior unchanged", () => {
-  it("environmentAlertPersistence.ts does not reference new ingestion fields", () => {
+describe("alert persistence stays payload-agnostic", () => {
+  it("environmentAlertPersistence.ts never touches raw payload / device fields", () => {
     expect(persistenceSrc).not.toMatch(/raw_payload/);
     expect(persistenceSrc).not.toMatch(/device_id/);
-    expect(persistenceSrc).not.toMatch(/captured_at/);
+  });
+  it("freshness grades from the snapshot's capture time with ts fallback", () => {
+    // PR #917: `captured_at` is the explicit capture time carried by the
+    // canonical fold; `ts` is the ingest timestamp. The persistence gate
+    // must prefer capture time so delayed inserts of old telemetry never
+    // back a persisted alert.
+    expect(persistenceSrc).toMatch(/captured_at\s*\?\?\s*snapshot\.ts/);
   });
 });
 

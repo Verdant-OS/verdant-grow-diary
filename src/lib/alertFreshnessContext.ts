@@ -274,6 +274,9 @@ const SOURCE_LABELS: Record<SnapshotSource, string> = {
   csv: "CSV",
   diary: "Diary",
   sim: "Simulated",
+  demo: "Demo",
+  stale: "Stale",
+  invalid: "Invalid",
   unavailable: "Unknown",
 };
 

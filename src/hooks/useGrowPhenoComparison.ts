@@ -209,7 +209,7 @@ export function useGrowPhenoComparison(growId: string | null | undefined) {
         tentIds.map(async (tentId) => {
           const { data: readings, error: readErr } = await supabase
             .from("sensor_readings")
-            .select("ts,metric,value,source,created_at,device_id")
+            .select("ts,metric,value,source,captured_at,created_at,device_id")
             .eq("tent_id", tentId)
             .order("ts", { ascending: false })
             .order("created_at", { ascending: false })
@@ -224,6 +224,8 @@ export function useGrowPhenoComparison(growId: string | null | undefined) {
               metric: r.metric as string,
               value: r.value as number | string | null,
               source: (r as { source?: string | null }).source ?? null,
+              captured_at:
+                (r as { captured_at?: string | null }).captured_at ?? null,
               device_id: (r as { device_id?: string | null }).device_id ?? null,
             })),
           );

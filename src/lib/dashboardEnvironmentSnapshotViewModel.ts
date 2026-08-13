@@ -129,17 +129,23 @@ export function buildTentSnapshotView(
   // unknown/garbage source can never be silently promoted to "live" by
   // `snapshotFromReadings`'s heuristic default.
   // Must stay in step with the ingest sources `snapshotFromReadings` accepts.
-  // `pi_bridge` is the Raspberry Pi ingest source and resolves to "live" there;
-  // omitting it here meant a genuine bridge reading failed the recognised check
-  // and rendered as Unknown — the opposite mistake to promoting garbage.
+  // `pi_bridge` is the Raspberry Pi ingest source and resolves to "live" there
+  // (active-transport compatibility mapping); omitting it here meant a genuine
+  // bridge reading failed the recognised check and rendered as Unknown — the
+  // opposite mistake to promoting garbage. `ecowitt` is the EcoWitt routed
+  // writer's tag and maps the same way.
   const RECOGNISED = new Set([
     "manual",
     "live",
     "pi_bridge",
+    "ecowitt",
     "csv",
     "import",
     "sim",
     "diary",
+    "demo",
+    "stale",
+    "invalid",
   ]);
   const hasRecognised = latestRows.some(
     (r) => typeof r.source === "string" && RECOGNISED.has(r.source),
@@ -151,8 +157,12 @@ export function buildTentSnapshotView(
     canonicalSource = "csv";
   } else if (snap.source === "manual" || snap.source === "diary") {
     canonicalSource = "manual";
-  } else if (snap.source === "sim") {
+  } else if (snap.source === "sim" || snap.source === "demo") {
     canonicalSource = "demo";
+  } else if (snap.source === "stale") {
+    canonicalSource = "stale";
+  } else if (snap.source === "invalid") {
+    canonicalSource = "invalid";
   } else if (snap.source === "live") {
     canonicalSource = "live";
   }

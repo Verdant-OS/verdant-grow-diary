@@ -115,8 +115,13 @@ body. `scripts/audit-subscriber-growth-live-parity.mjs` implements this techniqu
 **Affected** (source is in the live 10-value allowlist, so the `INSERT` is attempted):
 
 - `landing_page` — the front-door CTA on `/` and `/welcome`. Emits
-  `utm_source=landing_page&utm_medium=owned&utm_campaign=paid_launch` with no utm params
-  needed from the visitor.
+  `utm_source=landing_page&utm_medium=owned&utm_campaign=paid_launch`.
+  **This fires regardless of what utm params the visitor arrived with, including none.**
+  `Landing.tsx:60` is `resolvePaidAcquisitionSource(searchParams) ?? "landing_page"`, so an
+  absent, partial, or unrecognized inbound tuple falls back to `landing_page`, and line 74
+  then builds a signup URL carrying the exact allowlisted triple. Inbound attribution is
+  **re-written, not preserved** — so arriving with a non-matching utm tuple does not protect
+  a visitor who lands here first.
 - `pricing_page`, `founder_page`, `founder_share`, `vpd_calculator`, `context_check`,
   `csv_history`, `operator_outreach`, `grower_invite`, `pricing_interest_share`.
 
@@ -125,9 +130,17 @@ body. `scripts/audit-subscriber-growth-live-parity.mjs` implements this techniqu
 - Google OAuth — passes no user metadata at signup, so `v_signup_source` is `NULL`.
 - Magic link — uses `shouldCreateUser: false`, so it never creates a user or fires the trigger.
 - A bare `/auth?mode=signup` with no utm params.
-- Any partial utm match. `resolvePaidAcquisitionSource` requires an **exact**
-  source + medium + campaign triple and fails closed to `NULL`, so ordinary paid-ad and
-  organic utm traffic is not affected.
+- A partial or unrecognized utm tuple **supplied directly to `/auth`** — and only that.
+  `resolvePaidAcquisitionSource` requires an exact source + medium + campaign match and fails
+  closed to `NULL`, so a visitor who navigates straight to `/auth?mode=signup` carrying
+  mismatched params still succeeds.
+
+  > **Do not generalise this to "paid-ad and organic traffic is fine".** It is not. That
+  > reasoning holds only for a direct hit on `/auth`. Any visitor who lands on `/` or
+  > `/welcome` first — which is the overwhelmingly normal path for an ad click or a search
+  > result — has their attribution **replaced** with `landing_page` by the fallback at
+  > `Landing.tsx:60` before the CTA is even rendered, and then fails. Inbound utm params
+  > offer no protection once a visitor touches the landing page.
 - `/tools/blueprint-targets` — see the ordering note below.
 
 ---

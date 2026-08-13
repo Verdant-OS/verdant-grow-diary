@@ -8,10 +8,14 @@ rows retain their earlier verification dates; none were re-measured in this
 update. Same-day follow-up: records the previously-untracked Lovable
 knowledge-pack mechanism and this session's audit of its pre-2026-08-13
 backup content against deploy-branch HEAD `e7690396e` — see the new
-"Completed, out of slice (recorded 2026-08-13)" entry below. That entry does
-not re-verify or supersede the Branch topology row's `6434ea2a8` (#942)
-snapshot; the `e7690396e` reference is scoped to that audit's own evidence
-only)
+"Completed, out of slice (recorded 2026-08-13)" entry below; that audit's
+evidence is pinned to `e7690396e` and was not re-verified against a later
+tip. Second same-day follow-up, per Codex review on PR #975: the Branch
+topology row below was stale at `6434ea2a8` (#942) even before this file's
+own `e7690396e` (#943) reference was added, and the branch has since moved
+again — refreshed the row to the actual current tip, `fb42ce00e` (#968),
+verified with a fresh `git fetch` rather than by re-asserting either older
+number)
 
 This is the changing shift report. Permanent rules live in `/AGENTS.md`; do not edit
 that constitution to record branch, deployment, blocker, or assignment changes.
@@ -24,10 +28,10 @@ inside the active governance handoff.
 
 ## Branch topology
 
-| Branch               | Role                                             | Verified head                                                                                                                                                                                                                                                                                 |
-| -------------------- | ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `verdant-grow-diary` | **Deploy branch. Production ships from here.**   | `6434ea2a8` (#942), verified 2026-08-13 with `git rev-parse HEAD` on this checkout (this session did not re-fetch; treat as the local tracking ref). Prior CURRENT_STATE snapshot was `1a9082bb1` (#885) on 2026-08-11 — the queue has advanced; do not carry older validation tables forward |
-| `main`               | Integration branch. It is not production parity. | `b6d747941948ce68157185a2b0847acea6970d44` (#779), verified 2026-08-07                                                                                                                                                                                                                        |
+| Branch               | Role                                             | Verified head                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| -------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `verdant-grow-diary` | **Deploy branch. Production ships from here.**   | `fb42ce00e` (#968), verified 2026-08-13 with `git fetch origin verdant-grow-diary && git rev-parse origin/verdant-grow-diary`. This supersedes both the prior `6434ea2a8` (#942) snapshot in this file and the intermediate `e7690396e` (#943) figure this same edit briefly referenced — the queue moved five more commits past #943 in the time it took to land this correction: `13c935a47` (#964), `43993684e` (#965), `2624a9157` (#971), `2197288bf` (#969), `fb42ce00e` (#968). PR numbers on this branch do not order by merge time (see the note below) — order commits with `git log`, never by PR number. Do not carry older validation tables forward |
+| `main`               | Integration branch. It is not production parity. | `b6d747941948ce68157185a2b0847acea6970d44` (#779), verified 2026-08-07                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 
 `main` and `verdant-grow-diary` are divergent. Do not infer production behavior from
 `main`, and do not backport deploy-only governance or data rules without a scoped branch
@@ -232,9 +236,10 @@ tracked. Cheek supplied a backup of the pre-2026-08-13 Lovable "Workspace/Projec
 Knowledge" pack content (`verdant_project_knowledge_BACKUP_pre-2026-08-13.md`, saved
 outside this repo before Lovable's connector overwrote it) with no other instruction.
 Claude audited its 8 factual claims against deploy-branch HEAD `e7690396e` (#943, this
-branch's tip observed at audit time — a later, unrelated advance from the `6434ea2a8`
-(#942) snapshot recorded in the Branch topology row above, not re-verified as part of
-this entry) and, on request, records the mechanism here. This is the first appearance of
+branch's tip observed at audit time). The Branch topology row above has since been
+refreshed to the branch's actual current tip, `fb42ce00e` (#968) — this audit's evidence
+remains pinned to `e7690396e` specifically and was not re-verified against the newer
+commits. On request, this entry records the mechanism here. This is the first appearance of
 this mechanism anywhere in governance docs: it is a separate, ungoverned knowledge
 surface (Lovable's project-level "Knowledge" field, populated via its own connector) that
 `AGENTS.md`, this file, and every role file were previously silent on.

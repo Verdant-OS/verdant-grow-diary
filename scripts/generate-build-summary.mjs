@@ -6,7 +6,7 @@
  * production build produces one downloadable audit artifact covering:
  *
  *   - commit lineage (SHA, short SHA, branch/ref, actor, run URL)
- *   - validator results (env-provided; each stage: pass/fail/skipped)
+ *   - validator results (env-provided; each stage: pass/fail/skipped/unknown)
  *   - edge-shared drift status (re-checked at summary time so the
  *     artifact is trustworthy even if an earlier step was `continue-on-error`)
  *   - build inputs (Node/Bun version, dist size when present)
@@ -19,6 +19,9 @@
  *   OUT_DIR                    — output directory (default: artifacts/build-summary)
  *   GITHUB_SHA / GITHUB_REF_NAME / GITHUB_ACTOR / GITHUB_RUN_ID / GITHUB_SERVER_URL / GITHUB_REPOSITORY
  *   BUILD_SUMMARY_VALIDATORS   — JSON array: [{ name, result: "pass"|"fail"|"skipped", detail? }]
+ *                                Callers should wire `result` to a real
+ *                                `steps.<id>.outcome`, never a literal — see
+ *                                the verdict note near `summary.overall`.
  *   BUILD_SUMMARY_TRIGGER      — freeform label (e.g. "pull_request", "push", "local")
  */
 import { execSync } from "node:child_process";
@@ -135,8 +138,17 @@ const summary = {
   },
 };
 
+// Verdict precedence: fail > incomplete > pass.
+//
+// `unknown` means a validator row carried no usable outcome — most often a
+// step that never ran because an earlier one failed, so `steps.<id>.outcome`
+// expanded to an empty string. That is NOT evidence of success, and letting it
+// fall through to `pass` is how this artifact reported green for a red run.
+// Per the repo status vocabulary, an unmeasured check is never a perfect
+// score, so it downgrades the verdict to `incomplete` instead.
 const overallFail = edgeShared.status === "drift" || validators.some((v) => v.result === "fail");
-summary.overall = overallFail ? "fail" : "pass";
+const overallIncomplete = validators.some((v) => v.result === "unknown");
+summary.overall = overallFail ? "fail" : overallIncomplete ? "incomplete" : "pass";
 
 writeFileSync(join(OUT_DIR, "build-summary.json"), JSON.stringify(summary, null, 2));
 

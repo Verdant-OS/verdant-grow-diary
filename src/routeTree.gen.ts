@@ -84,9 +84,11 @@ import { Route as PartnersCsvPreviewRouteImport } from './routes/partners.csv-pr
 import { Route as SensorsCsvPreviewRouteImport } from './routes/sensors.csv-preview'
 import { Route as StrainsIndexRouteImport } from './routes/strains.index'
 import { Route as StrainsSlugRouteImport } from './routes/strains.$slug'
+import { Route as ToolsBlueprintTargetsRouteImport } from './routes/tools.blueprint-targets'
 import { Route as ToolsVpdCalculatorRouteImport } from './routes/tools.vpd-calculator'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 import { Route as AppOperatorDiagnosticsRouteImport } from './routes/_app/_operator/diagnostics'
+import { Route as AppOperatorDiagnosticsLightingMeasurementRouteImport } from './routes/_app/_operator/diagnostics-lighting-measurement'
 import { Route as AppOperatorDiagnosticsSeoArtifactsRouteImport } from './routes/_app/_operator/diagnostics-seo-artifacts'
 import { Route as AppOperatorIngestInspectorRouteImport } from './routes/_app/_operator/ingest-inspector'
 import { Route as AppOperatorLeadsRouteImport } from './routes/_app/_operator/leads'
@@ -529,6 +531,11 @@ const StrainsSlugRoute = StrainsSlugRouteImport.update({
   path: '/strains/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ToolsBlueprintTargetsRoute = ToolsBlueprintTargetsRouteImport.update({
+  id: '/tools/blueprint-targets',
+  path: '/tools/blueprint-targets',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ToolsVpdCalculatorRoute = ToolsVpdCalculatorRouteImport.update({
   id: '/tools/vpd-calculator',
   path: '/tools/vpd-calculator',
@@ -544,6 +551,12 @@ const AppOperatorDiagnosticsRoute = AppOperatorDiagnosticsRouteImport.update({
   path: '/diagnostics',
   getParentRoute: () => AppOperatorRoute,
 } as any)
+const AppOperatorDiagnosticsLightingMeasurementRoute =
+  AppOperatorDiagnosticsLightingMeasurementRouteImport.update({
+    id: '/diagnostics-lighting-measurement',
+    path: '/diagnostics-lighting-measurement',
+    getParentRoute: () => AppOperatorRoute,
+  } as any)
 const AppOperatorDiagnosticsSeoArtifactsRoute =
   AppOperatorDiagnosticsSeoArtifactsRouteImport.update({
     id: '/diagnostics-seo-artifacts',
@@ -980,12 +993,14 @@ export interface FileRoutesByFullPath {
   '/partners/csv-preview': typeof PartnersCsvPreviewRoute
   '/sensors/csv-preview': typeof SensorsCsvPreviewRoute
   '/strains/$slug': typeof StrainsSlugRoute
+  '/tools/blueprint-targets': typeof ToolsBlueprintTargetsRoute
   '/tools/vpd-calculator': typeof ToolsVpdCalculatorRoute
   '/cultivars/': typeof CultivarsIndexRoute
   '/guides/': typeof GuidesIndexRoute
   '/strains/': typeof StrainsIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/diagnostics': typeof AppOperatorDiagnosticsRoute
+  '/diagnostics-lighting-measurement': typeof AppOperatorDiagnosticsLightingMeasurementRoute
   '/diagnostics-seo-artifacts': typeof AppOperatorDiagnosticsSeoArtifactsRoute
   '/ingest-inspector': typeof AppOperatorIngestInspectorRoute
   '/leads': typeof AppOperatorLeadsRoute
@@ -1122,12 +1137,14 @@ export interface FileRoutesByTo {
   '/partners/csv-preview': typeof PartnersCsvPreviewRoute
   '/sensors/csv-preview': typeof SensorsCsvPreviewRoute
   '/strains/$slug': typeof StrainsSlugRoute
+  '/tools/blueprint-targets': typeof ToolsBlueprintTargetsRoute
   '/tools/vpd-calculator': typeof ToolsVpdCalculatorRoute
   '/cultivars': typeof CultivarsIndexRoute
   '/guides': typeof GuidesIndexRoute
   '/strains': typeof StrainsIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/diagnostics': typeof AppOperatorDiagnosticsRoute
+  '/diagnostics-lighting-measurement': typeof AppOperatorDiagnosticsLightingMeasurementRoute
   '/diagnostics-seo-artifacts': typeof AppOperatorDiagnosticsSeoArtifactsRoute
   '/ingest-inspector': typeof AppOperatorIngestInspectorRoute
   '/leads': typeof AppOperatorLeadsRoute
@@ -1268,12 +1285,14 @@ export interface FileRoutesById {
   '/partners/csv-preview': typeof PartnersCsvPreviewRoute
   '/sensors/csv-preview': typeof SensorsCsvPreviewRoute
   '/strains/$slug': typeof StrainsSlugRoute
+  '/tools/blueprint-targets': typeof ToolsBlueprintTargetsRoute
   '/tools/vpd-calculator': typeof ToolsVpdCalculatorRoute
   '/cultivars/': typeof CultivarsIndexRoute
   '/guides/': typeof GuidesIndexRoute
   '/strains/': typeof StrainsIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/_app/_operator/diagnostics': typeof AppOperatorDiagnosticsRoute
+  '/_app/_operator/diagnostics-lighting-measurement': typeof AppOperatorDiagnosticsLightingMeasurementRoute
   '/_app/_operator/diagnostics-seo-artifacts': typeof AppOperatorDiagnosticsSeoArtifactsRoute
   '/_app/_operator/ingest-inspector': typeof AppOperatorIngestInspectorRoute
   '/_app/_operator/leads': typeof AppOperatorLeadsRoute
@@ -1413,12 +1432,14 @@ export interface FileRouteTypes {
     | '/partners/csv-preview'
     | '/sensors/csv-preview'
     | '/strains/$slug'
+    | '/tools/blueprint-targets'
     | '/tools/vpd-calculator'
     | '/cultivars/'
     | '/guides/'
     | '/strains/'
     | '/.lovable/oauth/consent'
     | '/diagnostics'
+    | '/diagnostics-lighting-measurement'
     | '/diagnostics-seo-artifacts'
     | '/ingest-inspector'
     | '/leads'
@@ -1555,12 +1576,14 @@ export interface FileRouteTypes {
     | '/partners/csv-preview'
     | '/sensors/csv-preview'
     | '/strains/$slug'
+    | '/tools/blueprint-targets'
     | '/tools/vpd-calculator'
     | '/cultivars'
     | '/guides'
     | '/strains'
     | '/.lovable/oauth/consent'
     | '/diagnostics'
+    | '/diagnostics-lighting-measurement'
     | '/diagnostics-seo-artifacts'
     | '/ingest-inspector'
     | '/leads'
@@ -1700,12 +1723,14 @@ export interface FileRouteTypes {
     | '/partners/csv-preview'
     | '/sensors/csv-preview'
     | '/strains/$slug'
+    | '/tools/blueprint-targets'
     | '/tools/vpd-calculator'
     | '/cultivars/'
     | '/guides/'
     | '/strains/'
     | '/.lovable/oauth/consent'
     | '/_app/_operator/diagnostics'
+    | '/_app/_operator/diagnostics-lighting-measurement'
     | '/_app/_operator/diagnostics-seo-artifacts'
     | '/_app/_operator/ingest-inspector'
     | '/_app/_operator/leads'
@@ -1820,6 +1845,7 @@ export interface RootRouteChildren {
   PartnersCsvPreviewRoute: typeof PartnersCsvPreviewRoute
   SensorsCsvPreviewRoute: typeof SensorsCsvPreviewRoute
   StrainsSlugRoute: typeof StrainsSlugRoute
+  ToolsBlueprintTargetsRoute: typeof ToolsBlueprintTargetsRoute
   ToolsVpdCalculatorRoute: typeof ToolsVpdCalculatorRoute
   CultivarsIndexRoute: typeof CultivarsIndexRoute
   GuidesIndexRoute: typeof GuidesIndexRoute
@@ -2357,6 +2383,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StrainsSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/tools/blueprint-targets': {
+      id: '/tools/blueprint-targets'
+      path: '/tools/blueprint-targets'
+      fullPath: '/tools/blueprint-targets'
+      preLoaderRoute: typeof ToolsBlueprintTargetsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/tools/vpd-calculator': {
       id: '/tools/vpd-calculator'
       path: '/tools/vpd-calculator'
@@ -2376,6 +2409,13 @@ declare module '@tanstack/react-router' {
       path: '/diagnostics'
       fullPath: '/diagnostics'
       preLoaderRoute: typeof AppOperatorDiagnosticsRouteImport
+      parentRoute: typeof AppOperatorRoute
+    }
+    '/_app/_operator/diagnostics-lighting-measurement': {
+      id: '/_app/_operator/diagnostics-lighting-measurement'
+      path: '/diagnostics-lighting-measurement'
+      fullPath: '/diagnostics-lighting-measurement'
+      preLoaderRoute: typeof AppOperatorDiagnosticsLightingMeasurementRouteImport
       parentRoute: typeof AppOperatorRoute
     }
     '/_app/_operator/diagnostics-seo-artifacts': {
@@ -2838,6 +2878,7 @@ declare module '@tanstack/react-router' {
 
 interface AppOperatorRouteChildren {
   AppOperatorDiagnosticsRoute: typeof AppOperatorDiagnosticsRoute
+  AppOperatorDiagnosticsLightingMeasurementRoute: typeof AppOperatorDiagnosticsLightingMeasurementRoute
   AppOperatorDiagnosticsSeoArtifactsRoute: typeof AppOperatorDiagnosticsSeoArtifactsRoute
   AppOperatorIngestInspectorRoute: typeof AppOperatorIngestInspectorRoute
   AppOperatorLeadsRoute: typeof AppOperatorLeadsRoute
@@ -2877,6 +2918,8 @@ interface AppOperatorRouteChildren {
 
 const AppOperatorRouteChildren: AppOperatorRouteChildren = {
   AppOperatorDiagnosticsRoute: AppOperatorDiagnosticsRoute,
+  AppOperatorDiagnosticsLightingMeasurementRoute:
+    AppOperatorDiagnosticsLightingMeasurementRoute,
   AppOperatorDiagnosticsSeoArtifactsRoute:
     AppOperatorDiagnosticsSeoArtifactsRoute,
   AppOperatorIngestInspectorRoute: AppOperatorIngestInspectorRoute,
@@ -3111,6 +3154,7 @@ const rootRouteChildren: RootRouteChildren = {
   PartnersCsvPreviewRoute: PartnersCsvPreviewRoute,
   SensorsCsvPreviewRoute: SensorsCsvPreviewRoute,
   StrainsSlugRoute: StrainsSlugRoute,
+  ToolsBlueprintTargetsRoute: ToolsBlueprintTargetsRoute,
   ToolsVpdCalculatorRoute: ToolsVpdCalculatorRoute,
   CultivarsIndexRoute: CultivarsIndexRoute,
   GuidesIndexRoute: GuidesIndexRoute,

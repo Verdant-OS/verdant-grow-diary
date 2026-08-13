@@ -82,6 +82,7 @@ async function fetchPlantDiaryRows(plantId: string): Promise<DiaryRow[]> {
     .from("diary_entries")
     .select("entry_at, details")
     .eq("plant_id", plantId)
+    .is("retracted_at", null)
     .order("entry_at", { ascending: false })
     .limit(PLANT_SENSOR_SOURCE_HISTORY_LIMIT);
   if (error) throw error;

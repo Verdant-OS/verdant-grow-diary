@@ -20,7 +20,13 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-export const BLOCKED_PACKAGES = Object.freeze(["@lovable.dev/mcp-js", "esbuild", "ajv"]);
+export const BLOCKED_PACKAGES = Object.freeze([
+  "@lovable.dev/mcp-js",
+  "@hono/node-server",
+  "hono",
+  "esbuild",
+  "ajv",
+]);
 export const BLOCKED_SEVERITIES = Object.freeze(["high", "critical"]);
 export const KNOWN_SEVERITIES = Object.freeze(["info", "low", "moderate", "high", "critical"]);
 

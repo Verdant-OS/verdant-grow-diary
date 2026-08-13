@@ -43,10 +43,11 @@ function writeFile(filePath: string, contents: Buffer | string): void {
 }
 
 const emittedOg = new Set<string>();
+const HOME_OG_FILE_NAME = "og/home.png";
 const documents = STATIC_PUBLIC_OUTPUT_DOCUMENTS.map((document) => {
   const canonicalPath = new URL(document.metadata.url).pathname;
   const ogFileName = `og/${ogImageSlugForPath(canonicalPath)}.png`;
-  if (!emittedOg.has(ogFileName)) {
+  if (ogFileName !== HOME_OG_FILE_NAME && !emittedOg.has(ogFileName)) {
     emittedOg.add(ogFileName);
     writeFile(
       join(clientDir, ogFileName),
@@ -60,15 +61,18 @@ const documents = STATIC_PUBLIC_OUTPUT_DOCUMENTS.map((document) => {
   };
 });
 
-// Homepage card — "/" is served by the root route, not by a document entry.
+// Preserve the established homepage card while the root document joins the
+// shared SEO manifest. It intentionally has product-level social copy rather
+// than duplicating the route title and description.
 writeFile(
-  join(clientDir, "og/home.png"),
+  join(clientDir, HOME_OG_FILE_NAME),
   renderPng(
     "Verdant Grow Diary — Plant memory. Sensor truth.",
     "Grow logs, sensor-aware insights, environment alerts, and cautious AI coaching for serious cultivators.",
     "/",
   ),
 );
+emittedOg.add(HOME_OG_FILE_NAME);
 
 writeFile(
   join(distDir, "seo-manifest.json"),
@@ -76,5 +80,5 @@ writeFile(
 );
 
 console.log(
-  `generate-seo-artifacts: ${documents.length} documents, ${emittedOg.size + 1} OG cards -> ${distDir}`,
+  `generate-seo-artifacts: ${documents.length} documents, ${emittedOg.size} OG cards -> ${distDir}`,
 );

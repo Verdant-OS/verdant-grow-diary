@@ -128,6 +128,10 @@ function renderDialog() {
   );
 }
 
+function renderDialogWithoutGrow() {
+  return render(<AssignTentDialog plantId="plant-1" growId={null} currentTentId="tent-current" />);
+}
+
 function chooseAndSubmit() {
   fireEvent.click(screen.getByTestId("assign-tent-test-select-next"));
   fireEvent.click(screen.getByTestId("assign-tent-submit"));
@@ -209,6 +213,40 @@ describe("AssignTentDialog write outcomes", () => {
     });
     expect(mocks.invalidateQueries).toHaveBeenCalledWith({
       queryKey: ["plant_recent_activity", "plant-1"],
+    });
+  });
+
+  it("warns instead of claiming success when no grow means no timeline row is possible", async () => {
+    renderDialogWithoutGrow();
+    chooseAndSubmit();
+
+    await waitFor(() => expect(mocks.toastWarning).toHaveBeenCalledTimes(1));
+
+    // The assignment itself is authoritative and must still land.
+    expect(mocks.plantUpdates).toEqual([{ tent_id: "tent-next" }]);
+    expect(mocks.plantIds).toEqual(["plant-1"]);
+
+    // diary_entries.grow_id is NOT NULL, so no timeline row is even attempted.
+    // This is what separates this state from the insert-failure state above.
+    expect(mocks.diaryInserts).toHaveLength(0);
+
+    // The regression: this path used to fall through to the unqualified
+    // success toast, telling the grower a timeline entry existed when none did.
+    expect(mocks.toastSuccess).not.toHaveBeenCalled();
+    expect(mocks.toastError).not.toHaveBeenCalled();
+
+    const [title, options] = mocks.toastWarning.mock.calls[0];
+    expect(title).toBe("Plant moved, but its timeline entry was not recorded");
+    expect(options).toEqual({
+      description:
+        "The tent assignment is saved. This plant is not linked to a grow yet, so this change could not be added to its timeline. Link the plant to its tent setup on the plant page to record future changes.",
+    });
+    // Same no-unsafe-retry rule as the insert-failure state.
+    expect(options).not.toHaveProperty("action");
+
+    // The assignment still happened, so caches must still refresh.
+    expect(mocks.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ["grow", "plant", "plant-1"],
     });
   });
 });

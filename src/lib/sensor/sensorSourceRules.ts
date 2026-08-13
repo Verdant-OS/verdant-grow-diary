@@ -11,7 +11,7 @@
  * are separate tables — do not fold them into this normalizer.
  */
 
-import { TRUST_LIVE_ALIASES } from "@/lib/sensorLiveMembership";
+import { TRUST_LIVE_ALIASES } from "../sensorLiveMembership";
 
 export const SENSOR_SOURCES = ["live", "manual", "csv", "demo", "stale", "invalid"] as const;
 

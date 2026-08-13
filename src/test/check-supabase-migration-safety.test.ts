@@ -400,6 +400,50 @@ describe("check-supabase-migration-safety", () => {
     expect(r.err).toContain("public.leaky");
   });
 
+  it("does not flag a transaction-local self-test table that is dropped", () => {
+    const { scriptPath } = makeSandbox({
+      "20260101_selftest.sql": `
+        DO $$ BEGIN
+          EXECUTE 'CREATE TABLE public.__selftest (id int)';
+          EXECUTE 'DROP TABLE public.__selftest';
+        END $$;
+      `,
+    });
+
+    const r = run(scriptPath);
+    expect(r.code).toBe(0);
+    expect(r.err).not.toContain("TABLE_WITHOUT_RLS");
+  });
+
+  it("still flags a table recreated without RLS after a transient drop", () => {
+    const { scriptPath } = makeSandbox({
+      "20260101_recreated.sql": `
+        CREATE TABLE public.leaky (id int);
+        DROP TABLE public.leaky;
+        CREATE TABLE public.leaky (id int);
+      `,
+    });
+
+    const r = run(scriptPath);
+    expect(r.code).toBe(1);
+    expect(r.err).toContain("TABLE_WITHOUT_RLS");
+    expect(r.err).toContain("public.leaky");
+  });
+
+  it("does not let a DROP for another table hide a persistent table without RLS", () => {
+    const { scriptPath } = makeSandbox({
+      "20260101_wrong_drop.sql": `
+        CREATE TABLE public.leaky (id int);
+        DROP TABLE public.unrelated;
+      `,
+    });
+
+    const r = run(scriptPath);
+    expect(r.code).toBe(1);
+    expect(r.err).toContain("TABLE_WITHOUT_RLS");
+    expect(r.err).toContain("public.leaky");
+  });
+
   it("ignores SELECT policies that use USING (true) as public-read pattern", () => {
     const { scriptPath } = makeSandbox({
       "20260101_ok.sql": `CREATE POLICY "read_all" ON public.notes

@@ -1,4 +1,5 @@
 import { LIVE_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
+import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import TimelineEmptyState from "@/components/TimelineEmptyState";
 import TimelineLightingGuideCard from "@/components/TimelineLightingGuideCard";
@@ -607,19 +608,24 @@ export default function Timeline() {
       // `diary_entries` and `grow_events` are the two authoritative core
       // Timeline sources. Stage both locally and commit them atomically only
       // after both reads succeed for the same owner/grow/range key.
-      let entriesQuery = supabase
-        .from("diary_entries")
-        .select("id,note,photo_url,stage,details,entry_at,plant_id,tent_id", {
-          count: "exact",
-        })
-        .eq("grow_id", activeGrowId)
-        .order("entry_at", { ascending: false })
-        .limit(100);
-      if (timelineDateRangeBounds.startIso)
-        entriesQuery = entriesQuery.gte("entry_at", timelineDateRangeBounds.startIso);
-      if (timelineDateRangeBounds.endIso)
-        entriesQuery = entriesQuery.lte("entry_at", timelineDateRangeBounds.endIso);
-      const entriesResult = await entriesQuery;
+      // Page-critical read: falls back to unfiltered pre-migration (the
+      // retracted_at column ships in 20260811090000) instead of failing.
+      const entriesResult = await selectWithRetractionCompat((withRetractionFilter) => {
+        let entriesQuery = supabase
+          .from("diary_entries")
+          .select("id,note,photo_url,stage,details,entry_at,plant_id,tent_id", {
+            count: "exact",
+          })
+          .eq("grow_id", activeGrowId)
+          .order("entry_at", { ascending: false })
+          .limit(100);
+        if (withRetractionFilter) entriesQuery = entriesQuery.is("retracted_at", null);
+        if (timelineDateRangeBounds.startIso)
+          entriesQuery = entriesQuery.gte("entry_at", timelineDateRangeBounds.startIso);
+        if (timelineDateRangeBounds.endIso)
+          entriesQuery = entriesQuery.lte("entry_at", timelineDateRangeBounds.endIso);
+        return entriesQuery;
+      });
       if (!isCurrentRequest()) return;
       if (hasTimelineRequiredReadError(entriesResult)) throw entriesResult.error;
 
@@ -821,18 +827,21 @@ export default function Timeline() {
     try {
       // Keyset page stays inside the applied date bounds so pagination
       // never walks out of the filtered range.
-      let olderQuery = supabase
-        .from("diary_entries")
-        .select("id,note,photo_url,stage,details,entry_at,plant_id,tent_id")
-        .eq("grow_id", requestedGrowId)
-        .lt("entry_at", cursor)
-        .order("entry_at", { ascending: false })
-        .limit(100);
-      if (timelineDateRangeBounds.startIso)
-        olderQuery = olderQuery.gte("entry_at", timelineDateRangeBounds.startIso);
-      if (timelineDateRangeBounds.endIso)
-        olderQuery = olderQuery.lte("entry_at", timelineDateRangeBounds.endIso);
-      const olderResult = await olderQuery;
+      const olderResult = await selectWithRetractionCompat((withRetractionFilter) => {
+        let olderQuery = supabase
+          .from("diary_entries")
+          .select("id,note,photo_url,stage,details,entry_at,plant_id,tent_id")
+          .eq("grow_id", requestedGrowId)
+          .lt("entry_at", cursor)
+          .order("entry_at", { ascending: false })
+          .limit(100);
+        if (withRetractionFilter) olderQuery = olderQuery.is("retracted_at", null);
+        if (timelineDateRangeBounds.startIso)
+          olderQuery = olderQuery.gte("entry_at", timelineDateRangeBounds.startIso);
+        if (timelineDateRangeBounds.endIso)
+          olderQuery = olderQuery.lte("entry_at", timelineDateRangeBounds.endIso);
+        return olderQuery;
+      });
       if (!isCurrentPage()) return;
       if (hasTimelineRequiredReadError(olderResult)) throw olderResult.error;
       const older = ((olderResult.data as Entry[] | null) ?? []).map((row) => ({ ...row }));
@@ -2007,7 +2016,14 @@ export default function Timeline() {
           lanes. Action Queue / Alert event logs are surfaced at the
           bottom so Quick Log entries are not buried. */}
       <div className="mt-4">
-        <RecentQuickLogActivityPanel rawEntries={recentLaneRawEntries} limit={10} />
+        <RecentQuickLogActivityPanel
+          rawEntries={recentLaneRawEntries}
+          limit={10}
+          growId={activeGrowId ?? null}
+          onEntryChanged={() => {
+            void load();
+          }}
+        />
       </div>
 
       <div className="mt-4">
@@ -2018,27 +2034,63 @@ export default function Timeline() {
       </div>
 
       <div className="mt-4">
-        <WateringHistoryPanel rawEntries={recentLaneRawEntries} limit={20} />
+        <WateringHistoryPanel
+          rawEntries={recentLaneRawEntries}
+          limit={20}
+          onEntryChanged={() => {
+            void load();
+          }}
+        />
       </div>
 
       <div className="mt-4">
-        <FeedingHistoryPanel rawEntries={recentLaneRawEntries} limit={20} />
+        <FeedingHistoryPanel
+          rawEntries={recentLaneRawEntries}
+          limit={20}
+          onEntryChanged={() => {
+            void load();
+          }}
+        />
       </div>
 
       <div className="mt-4">
-        <PestDiseaseHistoryPanel rawEntries={entries} limit={20} />
+        <PestDiseaseHistoryPanel
+          rawEntries={entries}
+          limit={20}
+          onEntryChanged={() => {
+            void load();
+          }}
+        />
       </div>
 
       <div className="mt-4">
-        <TrainingHistoryPanel rawEntries={entries} limit={20} />
+        <TrainingHistoryPanel
+          rawEntries={entries}
+          limit={20}
+          onEntryChanged={() => {
+            void load();
+          }}
+        />
       </div>
 
       <div className="mt-4">
-        <MeasurementHistoryPanel rawEntries={entries} limit={20} />
+        <MeasurementHistoryPanel
+          rawEntries={entries}
+          limit={20}
+          onEntryChanged={() => {
+            void load();
+          }}
+        />
       </div>
 
       <div className="mt-4">
-        <PhotoHistoryPanel rawEntries={entries} limit={24} />
+        <PhotoHistoryPanel
+          rawEntries={entries}
+          limit={24}
+          onEntryChanged={() => {
+            void load();
+          }}
+        />
       </div>
 
       <div className="mt-4">

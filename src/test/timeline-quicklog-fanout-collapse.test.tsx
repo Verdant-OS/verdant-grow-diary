@@ -31,6 +31,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -460,7 +461,12 @@ describe("recent lane end-to-end (audit #9/#10 regression)", () => {
 
   it("the Watering History panel lists the spine watering exactly once, with its measurements (audit #11 alignment)", () => {
     const lane = buildRecentLane([manualCompanion()], [wateringSpine(), environmentSibling()]);
-    render(<WateringHistoryPanel rawEntries={lane} />);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+    render(
+      <QueryClientProvider client={client}>
+        <WateringHistoryPanel rawEntries={lane} />
+      </QueryClientProvider>,
+    );
     expect(screen.getByText("1 entry")).toBeInTheDocument();
     expect(screen.getByText("500 ml")).toBeInTheDocument();
   });

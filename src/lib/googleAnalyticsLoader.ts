@@ -9,6 +9,9 @@ import { GOOGLE_ANALYTICS_MEASUREMENT_ID } from "@/constants/analytics";
  *
  * `send_page_view: false` is preserved: the router emits explicit,
  * path-sanitized `page_view` events instead of GA's automatic hit.
+ *
+ * `gtag` must push the JavaScript `Arguments` object into `dataLayer`.
+ * Rest-parameter Array push is ignored by gtag.js and leaves collection dark.
  */
 
 type GtagWindow = Window & {
@@ -35,9 +38,11 @@ export function loadGoogleAnalytics(measurementId: string = GOOGLE_ANALYTICS_MEA
   const w = window as GtagWindow;
   w.dataLayer = w.dataLayer || [];
   const dataLayer = w.dataLayer;
-  function gtag(...args: unknown[]) {
-    dataLayer.push(args);
-  }
+  // Official GA bootstrap: push Arguments (not a rest Array).
+  const gtag = function gtag(..._args: unknown[]) {
+    // eslint-disable-next-line prefer-rest-params -- Arguments object required by gtag.js
+    dataLayer.push(arguments);
+  };
   w.gtag = gtag;
   gtag("js", new Date());
   gtag("config", measurementId, { send_page_view: false });
@@ -63,4 +68,9 @@ export function setGoogleAnalyticsOptOut(
 ): void {
   if (typeof window === "undefined") return;
   (window as unknown as Record<string, unknown>)[`ga-disable-${measurementId}`] = optedOut;
+}
+
+/** Test-only reset so suites can re-run the loader. */
+export function __resetGoogleAnalyticsLoaderForTests(): void {
+  loaded = false;
 }

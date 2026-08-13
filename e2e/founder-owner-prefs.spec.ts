@@ -20,10 +20,15 @@
  *     Save are disabled.
  */
 import { test, expect, type Page, type Route } from "@playwright/test";
+import { denyAnalyticsConsent } from "./utils/analyticsConsent";
 
 const SB_PROJECT_REF = "knkwiiywfkbqznbxwqfh";
 const SB_SESSION_KEY = `sb-${SB_PROJECT_REF}-auth-token`;
 const FIXTURE_USER_ID = "00000000-0000-4000-8000-00000000f001";
+const CURRENT_AGREEMENT_ROWS = [
+  { agreement_type: "terms", version: "2026-07-13" },
+  { agreement_type: "privacy", version: "2026-07-13" },
+];
 
 function syntheticSession() {
   const nowSec = Math.floor(Date.now() / 1000);
@@ -71,15 +76,22 @@ function mockFoundersReadOnce(page: Page, row: Record<string, unknown> | null) {
 
 test.describe("Founder owner preferences (mocked)", () => {
   test.beforeEach(async ({ page }) => {
+    // This suite audits Founder preferences, not analytics consent. Keep the
+    // banner out of the interaction plane without enabling analytics.
+    await denyAnalyticsConsent(page);
     // Default safety net — no /rest/v1/** or /functions/v1/** call can
     // escape the mocks and hit real Supabase.
-    await page.route(/\/rest\/v1\//, (route) =>
-      route.fulfill({
+    await page.route(/\/rest\/v1\//, (route, request) => {
+      const pathname = new URL(request.url()).pathname;
+      const body = pathname.endsWith("/user_agreement_acceptances")
+        ? JSON.stringify(CURRENT_AGREEMENT_ROWS)
+        : "[]";
+      return route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: "[]",
-      }),
-    );
+        body,
+      });
+    });
     await page.route(/\/functions\/v1\//, (route) =>
       route.fulfill({
         status: 200,
@@ -220,8 +232,8 @@ test.describe("Founder owner preferences (mocked)", () => {
         status: 200,
         contentType: "application/json",
         body: JSON.stringify([
-          { document_key: "terms", accepted_at: new Date().toISOString() },
-          { document_key: "privacy", accepted_at: new Date().toISOString() },
+          { agreement_type: "terms", version: "2026-07-13" },
+          { agreement_type: "privacy", version: "2026-07-13" },
         ]),
       }),
     );

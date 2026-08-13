@@ -156,12 +156,31 @@ describe("useLatestSensorSnapshot hook — source priority and safety", () => {
     // The diary query selects tent_id, and a tent-scoped view only accepts
     // env checks attributed to one of those tents — null/foreign tent_id
     // rows must not surface as the selected tent's evidence.
-    expect(HOOK).toMatch(/\.select\(\s*['"]entry_at,details,tent_id['"]\s*\)/);
-    expect(HOOK).toMatch(
-      /tentIds\.length === 0 \|\| \(row\.tent_id != null && tentIds\.includes\(row\.tent_id\)\)/,
-    );
+    // Pin the columns the scope gate actually depends on, not the exact column
+    // list: the diary select has since gained `id` (diary evidence ref), which
+    // does not weaken tent scoping. Dropping `tent_id` still fails this.
+    const diarySelect =
+      HOOK.match(/\.select\(\s*["']([^"']*\bentry_at\b[^"']*)["']\s*\)/)?.[1] ?? null;
+    expect(diarySelect, "the diary query must still exist and select entry_at").not.toBeNull();
+    const diaryColumns = (diarySelect ?? "").split(",").map((c) => c.trim());
+    for (const column of ["entry_at", "details", "tent_id"]) {
+      expect(diaryColumns, `diary select must include ${column}`).toContain(column);
+    }
+    // #602: shared pure helper (same fail-closed gate as sensor_snapshot).
+    expect(HOOK).toMatch(/isDiaryRowInTentScope\(row\.tent_id,\s*tentIds\)/);
     // The scope gate must sit before the env-check fallback returns.
-    expect(HOOK).toMatch(/envScopeOk[\s\S]*?snapshotFromEnvironmentCheck\(/);
+    expect(HOOK).toMatch(/isDiaryRowInTentScope[\s\S]*?snapshotFromEnvironmentCheck\(/);
+  });
+
+  it("scopes diary sensor_snapshot evidence to the requested tents (#602)", () => {
+    // Same fail-closed tent gate as environment_check: foreign/null tent_id
+    // must not win the snapshotFromDiary branch before scope is checked.
+    expect(HOOK).toMatch(/isDiaryRowInTentScope\(row\.tent_id,\s*tentIds\)/);
+    expect(HOOK).toMatch(/isDiaryRowInTentScope[\s\S]*?snapshotFromDiary\(/);
+    // Import the pure helper rather than inlining a one-off predicate.
+    expect(HOOK).toMatch(
+      /import\s*\{\s*isDiaryRowInTentScope\s*\}\s*from\s*["']@\/lib\/diaryEvidenceTentScopeRules["']/,
+    );
   });
 
   it("idles when growId is missing (does not query)", () => {

@@ -44,8 +44,13 @@ describe("GrowDetail — related counts", () => {
   it("issues a count query against tents by grow_id", () => {
     expect(PAGE).toMatch(/countFrom\(\s*["']tents["']\s*\)/);
   });
-  it("issues a count query against diary_entries by grow_id", () => {
-    expect(PAGE).toMatch(/countFrom\(\s*["']diary_entries["']\s*\)/);
+  it("issues a count query against diary_entries by grow_id, excluding retracted rows", () => {
+    // Quick Log retractions (#786): the exact diary count must carry the
+    // retraction filter, or retracted entries keep inflating Grow Detail
+    // once the bounded merge window saturates.
+    expect(PAGE).toMatch(
+      /countFrom\(\s*["']diary_entries["']\s*,\s*\(q\)\s*=>\s*q\.is\(\s*["']retracted_at["']\s*,\s*null\s*\)\s*\)/,
+    );
   });
   it("issues a count query against action_queue (total) by grow_id", () => {
     expect(PAGE).toMatch(/countFrom\(\s*["']action_queue["']\s*\)/);

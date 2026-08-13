@@ -52,6 +52,13 @@ const REQUIRED_PUBLIC = [
   "/pricing",
   "/hardware-integrations",
   "/quick-log",
+  "/partners/csv-preview",
+  "/sensors/csv-preview",
+  "/internal/contextual-pheno-comparison-demo",
+  "/internal/demo-proof-walkthrough",
+  "/internal/pheno-hunt-demo",
+  "/pheno-comparison",
+  "/pheno-expression-showcase",
 ];
 
 describe("Operator routes require authenticated AppShell", () => {

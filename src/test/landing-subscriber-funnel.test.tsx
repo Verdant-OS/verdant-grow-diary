@@ -36,6 +36,27 @@ beforeEach(() => {
 });
 
 describe("landing subscriber funnel", () => {
+  it("defers the automatic page view until an auth-gated caller resolves signed out", () => {
+    const { rerender } = render(
+      <MemoryRouter>
+        <Landing canonicalPath="/" trackPageView={false} />
+      </MemoryRouter>,
+    );
+
+    expect(mocks.track).not.toHaveBeenCalledWith("landing_page_view", expect.anything());
+
+    rerender(
+      <MemoryRouter>
+        <Landing canonicalPath="/" trackPageView />
+      </MemoryRouter>,
+    );
+
+    expect(mocks.track).toHaveBeenCalledTimes(1);
+    expect(mocks.track).toHaveBeenCalledWith("landing_page_view", {
+      source: "landing_page",
+    });
+  });
+
   it("uses a truthful canonical for both public entry paths", () => {
     const { unmount } = render(
       <MemoryRouter>

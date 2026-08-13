@@ -17,7 +17,7 @@ import { MemoryRouter, useLocation } from "@/lib/react-router-compat";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 interface QueryFilter {
-  op: "eq" | "gte" | "lte" | "lt";
+  op: "eq" | "is" | "gte" | "lte" | "lt";
   column: string;
   value: unknown;
 }
@@ -76,6 +76,10 @@ vi.mock("@/integrations/supabase/client", () => {
       },
       eq(column: string, value: unknown) {
         spec.filters.push({ op: "eq", column, value });
+        return query;
+      },
+      is(column: string, value: unknown) {
+        spec.filters.push({ op: "is", column, value });
         return query;
       },
       gte(column: string, value: unknown) {

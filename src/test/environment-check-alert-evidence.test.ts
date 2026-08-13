@@ -138,8 +138,26 @@ describe("alert-persistence eligibility (#596)", () => {
     ).toBe(true);
   });
 
-  it("a stale env-check snapshot is not persistable", () => {
-    const snap = snapshotFromEnvironmentCheck(minutesAgoIso(31), envelope());
+  // Env-check snapshots are labelled `manual`. The #592 canon widened the
+  // manual window to 24h for DISPLAY, but alert PERSISTENCE holds every source
+  // to the live window — an `alerts` row asserts the problem is happening now
+  // and is stamped first_seen_at = now(). Both sides of the boundary are
+  // pinned so the bar cannot drift back to the display window.
+  it("a stale env-check snapshot (past the live window) is not persistable", () => {
+    const snap = snapshotFromEnvironmentCheck(minutesAgoIso(25 * 60), envelope());
+    expect(snap).not.toBeNull();
+    expect(
+      isSnapshotPersistable({
+        snapshot: snap,
+        quality: "watch",
+        isDemoData: false,
+        now: NOW,
+      }),
+    ).toBe(false);
+  });
+
+  it("an env-check snapshot inside the 24h DISPLAY window is still NOT persistable", () => {
+    const snap = snapshotFromEnvironmentCheck(minutesAgoIso(23 * 60), envelope());
     expect(snap).not.toBeNull();
     expect(
       isSnapshotPersistable({

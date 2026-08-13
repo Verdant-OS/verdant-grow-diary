@@ -14,6 +14,16 @@
  */
 
 export const CHECKOUT_STARTED_STORAGE_KEY = "verdant:checkout-started-at";
+/**
+ * What KIND of checkout the marker describes, in a separate key so the
+ * timestamp key's format (a bare number) never changes shape for existing
+ * readers. "plan" = subscription/lifetime SKU, "pack" = one-time credit pack.
+ * Consumers that care about kind must treat an absent/legacy marker as
+ * unknown and fail toward NOT claiming plan provenance.
+ */
+export const CHECKOUT_KIND_STORAGE_KEY = "verdant:checkout-started-kind";
+
+export type CheckoutStartKind = "plan" | "pack";
 
 /** How long a started-checkout marker still counts as checkout context. */
 export const CHECKOUT_CONTEXT_MAX_AGE_MS = 2 * 60 * 60 * 1000;
@@ -32,13 +42,33 @@ function defaultStorage(): StorageLike | null {
 /** Record that a checkout overlay is about to open on this device. */
 export function markCheckoutStarted(
   nowMs: number,
+  kind: CheckoutStartKind = "plan",
   storage: StorageLike | null = defaultStorage(),
 ): void {
   try {
     storage?.setItem(CHECKOUT_STARTED_STORAGE_KEY, String(nowMs));
+    storage?.setItem(CHECKOUT_KIND_STORAGE_KEY, kind);
   } catch {
     // Storage unavailable (private mode / quota). The success page then
     // shows its no-context copy — nothing is granted or lost.
+  }
+}
+
+/**
+ * The kind of the fresh checkout marker, or null when there is no fresh
+ * marker or its kind is absent/unrecognized (legacy sessions wrote no kind).
+ * Null deliberately reads as "cannot prove plan provenance".
+ */
+export function readFreshCheckoutKind(
+  nowMs: number,
+  storage: StorageLike | null = defaultStorage(),
+): CheckoutStartKind | null {
+  if (!hasFreshCheckoutContext(nowMs, storage)) return null;
+  try {
+    const raw = storage?.getItem(CHECKOUT_KIND_STORAGE_KEY);
+    return raw === "plan" || raw === "pack" ? raw : null;
+  } catch {
+    return null;
   }
 }
 
@@ -60,6 +90,7 @@ export function readCheckoutStartedAt(
 export function clearCheckoutStarted(storage: StorageLike | null = defaultStorage()): void {
   try {
     storage?.removeItem(CHECKOUT_STARTED_STORAGE_KEY);
+    storage?.removeItem(CHECKOUT_KIND_STORAGE_KEY);
   } catch {
     // Best effort — a stale marker only ever softens copy, never grants.
   }

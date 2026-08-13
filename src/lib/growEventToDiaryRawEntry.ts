@@ -64,6 +64,10 @@ export function mapGrowEventToRecentRawEntry(row: GrowEventRowForRecent): Recent
     details: {
       event_type: row.event_type,
       source: row.source ?? null,
+      // Correction/retraction handle (issue #786): records which grow_events
+      // spine row this adapted entry came from, so history-panel controls can
+      // target the right root. Display-only metadata; never persisted.
+      origin_grow_event_id: row.id,
       ...(expectsRootZone
         ? {
             root_zone_status: !rootZone

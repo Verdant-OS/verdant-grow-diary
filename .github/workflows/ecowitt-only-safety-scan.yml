@@ -2,15 +2,15 @@ name: EcoWitt-only safety scan
 
 on:
   push:
-    branches: [main]
+    branches: [main, verdant-grow-diary]
   pull_request:
     paths:
-      - '.github/workflows/ecowitt-only-safety-scan.yml'
-      - 'scripts/assert-ecowitt-only-sensor-direction.mjs'
-      - 'docs/ecowitt-only-sensor-direction.md'
-      - 'src/test/ecowitt-only-sensor-direction.test.ts'
-      - 'package.json'
-      - 'bun.lockb'
+      - ".github/workflows/ecowitt-only-safety-scan.yml"
+      - "scripts/assert-ecowitt-only-sensor-direction.mjs"
+      - "docs/ecowitt-only-sensor-direction.md"
+      - "src/test/ecowitt-only-sensor-direction.test.ts"
+      - "package.json"
+      - "bun.lockb"
   workflow_dispatch:
 
 jobs:

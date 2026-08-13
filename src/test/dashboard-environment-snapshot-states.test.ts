@@ -48,11 +48,20 @@ describe("Dashboard Environment Snapshot · empty / stale / invalid states", () 
     expect(DASH).toMatch(/Latest reading looks invalid/);
   });
 
-  it("uses source-aware Dashboard quality + isStale to drive the banner (no JSX-local thresholds)", () => {
+  // The #592 canon made staleness source-aware (live 15m, manual 24h) and
+  // introduced `isSnapshotStale`, which always forwards the snapshot's own
+  // `source`. The bare `isStale(ts, now)` form silently falls back to the LIVE
+  // window, which would flag an ordinary 1-hour-old manual reading as stale.
+  // Dashboard moved to the source-aware helper, so this pin now requires it and
+  // forbids the source-dropping form rather than accepting either.
+  it("uses source-aware Dashboard quality + isSnapshotStale to drive the banner (no JSX-local thresholds)", () => {
     expect(DASH).toMatch(/evaluateDashboardSensorQuality\s*\(/);
-    expect(DASH).toMatch(/isStale\s*\(/);
-    // No inline 15-minute or millisecond freshness thresholds in JSX.
+    expect(DASH).toMatch(/isSnapshotStale\s*\(/);
+    // A bare isStale(...) call drops provenance and reverts to one window.
+    expect(DASH).not.toMatch(/(?<!Snapshot)\bisStale\s*\(/);
+    // No inline 15-minute or 30-minute millisecond freshness thresholds in JSX.
     expect(DASH).not.toMatch(/30\s*\*\s*60\s*\*\s*1000/);
+    expect(DASH).not.toMatch(/15\s*\*\s*60\s*\*\s*1000/);
   });
 
   it("does not invent a snapshot or promote stale/invalid to current", () => {

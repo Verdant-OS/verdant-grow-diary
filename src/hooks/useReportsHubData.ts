@@ -329,11 +329,13 @@ export function useReportsHubData(growId: string | null | undefined): ReportsHub
         supabase
           .from("diary_entries")
           .select("id", { count: "exact", head: true })
-          .eq("grow_id", growId),
+          .eq("grow_id", growId)
+          .is("retracted_at", null),
         supabase
           .from("diary_entries")
           .select("id", { count: "exact", head: true })
           .eq("grow_id", growId)
+          .is("retracted_at", null)
           .gte("entry_at", sevenDaysAgo),
         // Bounded row windows for the diary + grow_events spine merge. The
         // spine is the canonical Quick Log record; companion diary rows are
@@ -342,6 +344,7 @@ export function useReportsHubData(growId: string | null | undefined): ReportsHub
           .from("diary_entries")
           .select("id,plant_id,entry_at,created_at,details")
           .eq("grow_id", growId)
+          .is("retracted_at", null)
           .order("entry_at", { ascending: false })
           .limit(REPORTS_HUB_ACTIVITY_MERGE_WINDOW),
         supabase

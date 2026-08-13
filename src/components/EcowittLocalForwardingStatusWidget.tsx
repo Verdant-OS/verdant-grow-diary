@@ -217,7 +217,7 @@ export default function EcowittLocalForwardingStatusWidget({
               className="inline-block pt-1 underline text-[11px]"
               href={LOCAL_FORWARDING_ERROR_REPORT_URL}
               target="_blank"
-              rel="noreferrer"
+              rel="noopener noreferrer"
               data-testid="ecowitt-local-forwarding-banner-report-link"
             >
               View sanitized forwarding error report
@@ -258,7 +258,7 @@ export default function EcowittLocalForwardingStatusWidget({
             className="text-[11px] text-muted-foreground underline"
             href={LOCAL_FORWARDING_ERROR_REPORT_URL}
             target="_blank"
-            rel="noreferrer"
+            rel="noopener noreferrer"
             data-testid="ecowitt-local-forwarding-report-link"
           >
             {LOCAL_FORWARDING_ERROR_REPORT_URL}

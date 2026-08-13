@@ -230,22 +230,28 @@ describe("PlantDetailAiDoctorLiveReview", () => {
       "/doctor/sessions/session-42",
     );
     expect(persist).toHaveBeenCalledTimes(1);
-    expect(trackFunnelEvent).toHaveBeenCalledWith("ai_doctor_session_saved", {
-      surface: "standard",
+    // The durable receipt appears as soon as persistence state commits, while
+    // the saved analytics milestone is intentionally emitted from the next
+    // post-render effect to preserve result -> saved ordering. Wait for that
+    // effect instead of sampling its timing immediately after the receipt.
+    await waitFor(() => {
+      expect(trackFunnelEvent).toHaveBeenCalledWith("ai_doctor_session_saved", {
+        surface: "standard",
+      });
+      expect(
+        trackFunnelEvent.mock.calls.filter(([name]) =>
+          [
+            "ai_doctor_review_started",
+            "ai_doctor_result_received",
+            "ai_doctor_session_saved",
+          ].includes(name),
+        ),
+      ).toEqual([
+        ["ai_doctor_review_started", { surface: "standard" }],
+        ["ai_doctor_result_received", { surface: "standard" }],
+        ["ai_doctor_session_saved", { surface: "standard" }],
+      ]);
     });
-    expect(
-      trackFunnelEvent.mock.calls.filter(([name]) =>
-        [
-          "ai_doctor_review_started",
-          "ai_doctor_result_received",
-          "ai_doctor_session_saved",
-        ].includes(name),
-      ),
-    ).toEqual([
-      ["ai_doctor_review_started", { surface: "standard" }],
-      ["ai_doctor_result_received", { surface: "standard" }],
-      ["ai_doctor_session_saved", { surface: "standard" }],
-    ]);
     expect(screen.getByTestId("plant-detail-live-ai-doctor-review-result-preview")).toBeTruthy();
     await waitFor(() => {
       expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ["ai_doctor_sessions"] });
@@ -289,7 +295,7 @@ describe("PlantDetailAiDoctorLiveReview", () => {
     const link = screen.getByTestId("plant-ai-doctor-post-value-upgrade-link");
     expect(link).toHaveAttribute(
       "href",
-      "/pricing?returnTo=%2Fdoctor%2Fsessions%2Fsession-final-free",
+      "/pricing?plan=pro_annual&returnTo=%2Fdoctor%2Fsessions%2Fsession-final-free",
     );
 
     const beforeClick = trackFunnelEvent.mock.calls.filter(([name]) =>
@@ -455,7 +461,7 @@ describe("PlantDetailAiDoctorLiveReview", () => {
     expect(await screen.findByTestId("plant-ai-doctor-post-value-upgrade")).toBeTruthy();
     expect(screen.getByTestId("plant-ai-doctor-post-value-upgrade-link")).toHaveAttribute(
       "href",
-      "/pricing?returnTo=%2Fdoctor%2Fsessions%2Fsession-after-retry",
+      "/pricing?plan=pro_annual&returnTo=%2Fdoctor%2Fsessions%2Fsession-after-retry",
     );
     expect(
       trackFunnelEvent.mock.calls.filter(([name]) => name === "ai_doctor_session_saved"),

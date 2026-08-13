@@ -8,7 +8,7 @@ on:
       - "scripts/check-sitemap-robots-parity.mjs"
       - ".github/workflows/sitemap-robots-parity.yml"
   push:
-    branches: [main]
+    branches: [main, verdant-grow-diary]
     paths:
       - "public/sitemap.xml"
       - "public/robots.txt"

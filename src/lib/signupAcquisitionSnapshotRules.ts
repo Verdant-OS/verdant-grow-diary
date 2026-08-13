@@ -16,6 +16,7 @@ export interface SignupAcquisitionCounts {
   contextCheck: number;
   vpdCalculator: number;
   csvHistory: number;
+  blueprintTargets: number;
 }
 
 export interface SignupAcquisitionSnapshot {
@@ -42,6 +43,7 @@ const EMPTY_COUNTS: SignupAcquisitionCounts = Object.freeze({
   contextCheck: 0,
   vpdCalculator: 0,
   csvHistory: 0,
+  blueprintTargets: 0,
 });
 
 const REASON_LABELS: Readonly<Record<string, string>> = Object.freeze({
@@ -101,6 +103,7 @@ export function parseSignupAcquisitionSnapshot(input: unknown): SignupAcquisitio
       contextCheck: asCount(raw.context_check),
       vpdCalculator: asCount(raw.vpd_calculator),
       csvHistory: asCount(raw.csv_history),
+      blueprintTargets: asCount(raw.blueprint_targets),
     },
   };
 }

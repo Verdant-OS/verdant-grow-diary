@@ -5,6 +5,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { type QuickLogWateringFormState } from "@/lib/quickLogWateringFormViewModel";
 import {
+  applyWateringVolumePreset,
+  isWateringVolumePresetSelected,
+  QUICK_LOG_WATERING_VOLUME_PRESET_HELP,
+  QUICK_LOG_WATERING_VOLUME_PRESET_OPTIONS,
+} from "@/lib/quickLogWateringVolumePresetRules";
+import {
   buildWateringReview,
   WATERING_REVIEW_NEEDS_INPUT,
   WATERING_REVIEW_TITLE,
@@ -111,10 +117,37 @@ export default function QuickLogWateringForm({
           inputMode="decimal"
           value={value.volumeMl}
           disabled={disabled}
-          aria-describedby="qlv2-volume-help"
+          aria-describedby="qlv2-volume-help qlv2-volume-presets-help"
           onChange={(event) => setField("volumeMl", event.target.value)}
           placeholder="e.g. 500"
         />
+        <div
+          className="mt-2 flex flex-wrap gap-2"
+          role="group"
+          aria-label="Volume presets"
+          data-testid="qlv2-volume-presets"
+        >
+          {QUICK_LOG_WATERING_VOLUME_PRESET_OPTIONS.map((preset) => {
+            const selected = isWateringVolumePresetSelected(value.volumeMl, preset);
+            return (
+              <Button
+                key={preset.ml}
+                type="button"
+                size="sm"
+                variant={selected ? "default" : "outline"}
+                aria-pressed={selected}
+                disabled={disabled}
+                data-testid={`qlv2-volume-preset-${preset.ml}`}
+                onClick={() => setField("volumeMl", applyWateringVolumePreset(value.volumeMl, preset))}
+              >
+                {preset.label}
+              </Button>
+            );
+          })}
+        </div>
+        <p id="qlv2-volume-presets-help" className="mt-1 text-xs text-muted-foreground">
+          {QUICK_LOG_WATERING_VOLUME_PRESET_HELP}
+        </p>
         <p id="qlv2-volume-help" className="mt-1 text-sm text-muted-foreground">
           Required. Record the total water delivered to this target.
         </p>

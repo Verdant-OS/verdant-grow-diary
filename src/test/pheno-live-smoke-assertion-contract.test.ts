@@ -2,7 +2,7 @@
  * Static contract for the Pheno live paid-user smoke
  * (e2e/pheno-tracker-paid-user-smoke.spec.ts).
  *
- * The release-required assertions in Specs A, C3, D+E, and G must stay
+ * The release-required assertions in Specs A, C6, D+E, and G must stay
  * AFFIRMATIVE: this suite fails if any of them regresses to an optional
  * pattern — an `if (await locator.count())` guard or a silent early
  * `return;` — or if a required selector/exact-copy assertion disappears.
@@ -41,8 +41,11 @@ const SLICES: Array<{ name: string; slice: string; requiredSelectors: string[] }
     ],
   },
   {
-    name: "C3. Canceled/expired",
-    slice: sliceBetween("C3. Canceled/expired blocked", "D–F. Missing-evidence hunt"),
+    name: "C6. Canceled/expired",
+    slice: sliceBetween(
+      "C6. Canceled/expired blocked from paid pheno workspace",
+      "D–F. Missing-evidence hunt",
+    ),
     requiredSelectors: [
       'getByTestId("pheno-tracker-upgrade-gate")',
       'getByTestId("pheno-hunt-onboarding")',
@@ -97,6 +100,49 @@ describe("live smoke assertion contract — required assertions stay affirmative
   it("Spec A skips (never runs anonymously) when the Free session is absent", () => {
     const sliceA = SLICES[0].slice;
     expect(sliceA).toContain("test.skip(!FREE_SESSION.path");
+  });
+
+  it("keeps every paid-plan session distinct with affirmative paid-workspace assertions", () => {
+    const paidRoles = [
+      {
+        start: "C. Pro Monthly access",
+        end: "C2. Pro Annual access",
+        session: "PRO_SESSION",
+        env: "E2E_PHENO_PRO_SESSION_FILE",
+      },
+      {
+        start: "C2. Pro Annual access",
+        end: "C3. Craft Monthly access",
+        session: "PRO_ANNUAL_SESSION",
+        env: "E2E_PHENO_PRO_ANNUAL_SESSION_FILE",
+      },
+      {
+        start: "C3. Craft Monthly access",
+        end: "C4. Craft Annual access",
+        session: "CRAFT_SESSION",
+        env: "E2E_PHENO_CRAFT_SESSION_FILE",
+      },
+      {
+        start: "C4. Craft Annual access",
+        end: "C5. Founder Lifetime access",
+        session: "CRAFT_ANNUAL_SESSION",
+        env: "E2E_PHENO_CRAFT_ANNUAL_SESSION_FILE",
+      },
+      {
+        start: "C5. Founder Lifetime access",
+        end: "C6. Canceled/expired blocked from paid pheno workspace",
+        session: "FOUNDER_SESSION",
+        env: "E2E_PHENO_FOUNDER_SESSION_FILE",
+      },
+    ];
+
+    for (const role of paidRoles) {
+      expect(source).toContain(`resolveSession("${role.env}")`);
+      const slice = sliceBetween(role.start, role.end);
+      expect(slice).toMatch(new RegExp(`test\\.skip\\(\\s*!${role.session}\\.path`));
+      expect(slice).toContain('getByRole("heading", { name: "Start Pheno Hunt" })');
+      expect(slice).toContain('getByTestId("pheno-tracker-upgrade-gate")');
+    }
   });
 
   it("pins the exact disabled-reason copy from the readiness view model", () => {

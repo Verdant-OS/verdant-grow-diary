@@ -26,6 +26,7 @@ function setRows(rowsByTable: Record<string, { data: unknown[] | null; error: Er
     const builder = {
       select: () => builder,
       eq: () => builder,
+      is: () => builder,
       or: () => builder,
       in: () => builder,
       not: () => builder,
@@ -87,13 +88,19 @@ describe("TimelineMemorySection — error state has retry", () => {
 describe("TimelineMemorySection — loading does not show fake entries", () => {
   it("renders only the skeleton during initial load", async () => {
     // Never-resolving fetch keeps query in loading state.
-    fromMock.mockImplementation(() => ({
-      select: () => ({
-        eq: () => ({
-          order: () => ({ limit: () => new Promise(() => {}) }),
-        }),
-      }),
-    }));
+    fromMock.mockImplementation(() => {
+      const builder = {
+        select: () => builder,
+        eq: () => builder,
+        is: () => builder,
+        or: () => builder,
+        in: () => builder,
+        not: () => builder,
+        order: () => builder,
+        limit: () => new Promise(() => {}),
+      };
+      return builder;
+    });
     renderSection({ scope: "plant", plantId: "plant-1" });
     await waitFor(() => expect(screen.getByTestId("timeline-memory-loading")).toBeInTheDocument());
     expect(screen.queryByTestId("timeline-memory-list")).toBeNull();

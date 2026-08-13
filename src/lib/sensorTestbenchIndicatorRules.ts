@@ -21,7 +21,7 @@
  */
 
 import { SENSOR_TESTBENCH_LIVE_WINDOW_MS } from "../constants/sensorTiming";
-import { RECEIVING_TRANSPORT_SOURCES } from "@/lib/sensorLiveMembership";
+import { RECEIVING_TRANSPORT_SOURCES } from "./sensorLiveMembership";
 export { SENSOR_TESTBENCH_LIVE_WINDOW_MS };
 
 // "receiving" was previously named "live" (#584): a fresh ingest from a

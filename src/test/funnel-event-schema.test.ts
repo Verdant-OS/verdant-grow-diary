@@ -117,6 +117,23 @@ describe("trackFunnelEvent enforces the per-event schema", () => {
     });
   });
 
+  it("keeps only the bounded alert CTA vocabulary", () => {
+    trackFunnelEvent("ai_doctor_cta_clicked", {
+      surface: "tent_alert_row",
+      metric: "temp",
+      severity: "warning",
+      plan: "private-identifier",
+    } as never);
+
+    const dispatched = capture.events.find((e) => e.name === "ai_doctor_cta_clicked");
+    expect(dispatched?.props).toEqual({
+      surface: "tent_alert_row",
+      metric: "temp",
+      severity: "warning",
+    });
+    expect(getFunnelSchemaViolationCount()).toBe(1);
+  });
+
   it("gtag receives the same schema-restricted payload as the CustomEvent", () => {
     const gtag = vi.fn();
     (window as unknown as { gtag?: unknown }).gtag = gtag;
@@ -140,6 +157,8 @@ describe("trackFunnelEvent enforces the per-event schema", () => {
       rows: 3,
       reason: "price_not_configured",
       length_bucket: "1-8",
+      metric: "temp",
+      severity: "warning",
     };
     for (const name of FUNNEL_EVENTS as ReadonlyArray<FunnelEventName>) {
       const allowed = FUNNEL_EVENT_SCHEMA[name];

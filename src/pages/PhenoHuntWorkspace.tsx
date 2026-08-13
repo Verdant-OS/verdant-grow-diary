@@ -67,6 +67,7 @@ import { phenoCandidateDisplayLabel } from "@/lib/phenoCandidateIdentity";
 import PhenoCandidateEvidenceCoverage from "@/components/PhenoCandidateEvidenceCoverage";
 import { usePhenoEvidencePackets } from "@/hooks/usePhenoEvidencePackets";
 import type { PhenoCandidateEvidencePacket } from "@/lib/phenoEvidencePacket";
+import { phenoHuntKeepersPath } from "@/lib/routes";
 import {
   evaluatePhenoCandidateReadiness,
   readinessEvidenceFromCandidateInput,
@@ -177,8 +178,12 @@ function CandidateReadinessBadge({ readiness }: { readiness: PhenoCandidateReadi
         <span aria-hidden="true">{READINESS_SYMBOL[readiness.readiness]} </span>
         {PHENO_READINESS_LABELS[readiness.readiness]}
       </span>
-      <span className="block text-muted-foreground">
-        {readiness.completedGoalCount}/{readiness.selectedGoalCount} evidence goals
+      <span
+        data-testid={`workspace-readiness-count-${readiness.candidateId}`}
+        className="block text-muted-foreground"
+      >
+        {readiness.completedGoalCount}/{readiness.selectedGoalCount} stage-appropriate readiness
+        checks
       </span>
       {next ? (
         next.anchor ? (
@@ -1443,6 +1448,24 @@ export default function PhenoHuntWorkspace() {
         <header className="space-y-1">
           <h1 className="text-2xl font-semibold">Hunt workspace: {ws.hunt?.name ?? "this hunt"}</h1>
           <p className="text-xs text-muted-foreground">{PHENO_KEEPER_DECISION_CAVEAT}</p>
+          {id ? (
+            <nav
+              aria-label="Hunt surfaces"
+              className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-1 text-sm"
+              data-testid="pheno-workspace-surface-nav"
+            >
+              <Link
+                to={phenoHuntKeepersPath(id)}
+                data-testid="pheno-workspace-keepers-link"
+                className="font-medium text-emerald-700 underline-offset-4 hover:underline dark:text-emerald-400"
+              >
+                Keepers & crosses
+              </Link>
+              <span className="text-xs text-muted-foreground">
+                Name keepers, record clones, and log breeding crosses for this hunt.
+              </span>
+            </nav>
+          ) : null}
           <label className="flex items-center gap-2 pt-1 text-sm">
             <span className="font-medium">Scoring round</span>
             <select

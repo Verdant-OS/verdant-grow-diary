@@ -46,6 +46,68 @@ So the sequence is: allowlisted source present → `INSERT` raises `42P01` → u
 | `to_regclass('public.signup_acquisition_attributions')` | `NULL` (absent) |
 | Deployed front-door CTA emits the matching utm triple | yes, present in the live bundle |
 
+### Provenance
+
+Recorded per `AGENTS.md` → "Record the authorized source and provenance for every material
+measurement." This matters more than usual here, because **ordinary agent database access is
+sandbox-scoped**: the Supabase MCP resolves to `bzatgtgjvuojpoxcknaa`, which is the
+**sandbox**, not production. A future reader must be able to tell verified production
+evidence from a sandbox read presented as one.
+
+- **Authorized source:** Lovable MCP `query_database`.
+- **Production project identity:** Lovable project id `66255e7b-892c-4be5-8686-ab1cfc3666db`
+  (workspace "Verdant"). The underlying Supabase host is `knkwiiywfkbqznbxwqfh.supabase.co`,
+  but `query_database` takes the **Lovable UUID**, not the host ref.
+- **Date:** 2026-08-13 UTC. **Run by:** Claude, during the pre-merge audit of #969.
+- **Access class:** read-only `SELECT`. No writes, no DDL.
+
+Sanitized queries and their verbatim results, so each check is reproducible:
+
+```sql
+-- 1. trigger state, live function body, table presence
+SELECT t.tgname, t.tgenabled, c.relname AS on_table,
+       to_regclass('public.signup_acquisition_attributions') IS NOT NULL AS attribution_table_exists,
+       position('signup_acquisition_attributions' IN pg_get_functiondef(p.oid)) > 0 AS body_inserts_attribution,
+       position('''landing_page''' IN pg_get_functiondef(p.oid)) > 0 AS allowlists_landing_page,
+       position('''blueprint_targets''' IN pg_get_functiondef(p.oid)) > 0 AS allowlists_blueprint_targets
+FROM pg_trigger t
+JOIN pg_class c ON c.oid = t.tgrelid
+JOIN pg_proc  p ON p.oid = t.tgfoid
+WHERE p.proname = 'handle_new_user';
+-- => tgname=on_auth_user_created, tgenabled=O, on_table=users,
+--    attribution_table_exists=false, body_inserts_attribution=true,
+--    allowlists_landing_page=true, allowlists_blueprint_targets=false
+
+-- 2. account census (the "has anyone been harmed" question)
+SELECT COALESCE(raw_user_meta_data->>'verdant_signup_source', '(none)') AS signup_source,
+       count(*) AS users, min(created_at) AS first_seen, max(created_at) AS last_seen
+FROM auth.users GROUP BY 1 ORDER BY users DESC;
+-- => single row: signup_source='(none)', users=7,
+--    first_seen=2026-05-15 18:05:05+00, last_seen=2026-07-02 00:23:09+00
+
+-- 3. apply status, re-run AFTER #969 merged
+SELECT to_regclass('public.signup_acquisition_attributions') IS NOT NULL AS table_now_exists,
+       (SELECT count(*) FROM pg_proc WHERE proname = 'record_signup_acquisition_first_touch') AS first_touch_fn,
+       (SELECT count(*) FROM pg_proc WHERE proname = 'signup_acquisition_operator_snapshot') AS acq_snapshot_fn,
+       (SELECT max(version) FROM supabase_migrations.schema_migrations) AS newest_applied_migration,
+       (SELECT count(*) FROM supabase_migrations.schema_migrations WHERE version = '20260813030000') AS repair_migration_applied;
+-- => table_now_exists=false, first_touch_fn=0, acq_snapshot_fn=0,
+--    newest_applied_migration=20260813125355, repair_migration_applied=0
+```
+
+Note what check 3 shows beyond the apply status: `newest_applied_migration` is
+`20260813125355`, which is **later** than the repair migration `20260813030000`. Other
+migrations have been applied since; this one was skipped, not merely pending.
+
+**Frontend evidence** was gathered separately, by fetching the deployed bundle over public
+HTTPS from `https://verdantgrowdiary.com` (no auth, read-only) and reading the chunk graph:
+`index-*.js` → `signupAcquisitionRules-*.js` (carries the `verdant_signup_source` literal) →
+`auth-*.js` (spreads it into `signUp` `options.data`) → `Landing-*.js` (defaults to
+`landing_page`). Two traps when reproducing this: `/` is a suspended skeleton, so seed the
+crawl from `/auth?mode=signup` or `/welcome`; and a bogus asset path returns HTTP 200 with
+`index.html`, so a 200 alone does not prove a chunk exists — check `Content-Type` and the
+body. `scripts/audit-subscriber-growth-live-parity.mjs` implements this technique.
+
 ---
 
 ## Scope — this is not every signup
@@ -157,10 +219,20 @@ apply resolves it.
 
 Worth recording, because it is the reusable lesson rather than a detail of this incident:
 
-- **No telemetry sink.** `trackFunnelEvent` / `trackPricingEvent` dispatch a `window`
-  CustomEvent and call `gtag`. There is no database sink, and the GA4 authenticated baseline
-  is recorded as blocked — so the one signal that would have revealed this lands somewhere
-  nobody can currently read.
+- **The failure signal has no first-party persistence — but a sink already exists, so extend
+  it rather than building a second one.** `src/components/FunnelEventDbSink.tsx` is mounted in
+  `src/routes/__root.tsx` and subscribes to the same `verdant:analytics` bridge, writing
+  catalogued events into `public.funnel_events` (migration `20260813020000`). It fails to
+  capture this outage for **two independent reasons**, and both need fixing:
+  1. **Not catalogued.** The relevant event is `signup_failed`, emitted via
+     `trackPricingEvent`. `FUNNEL_EVENTS` in `src/lib/funnelAnalytics.ts` contains `signup`
+     but **not** `signup_failed`, so the sink's write gate rejects it before any insert.
+  2. **The sink's own table is unapplied too.** Verified in the same production session:
+     `to_regclass('public.funnel_events')` is `NULL` and `20260813020000` is **not** in
+     `schema_migrations`. So even a catalogued event currently has nowhere to land.
+
+  The remaining path, GA4 via `gtag`, is recorded as blocked for the authenticated baseline.
+  So the one signal that would have revealed this had no reachable destination at all.
 - **No test could catch it.** Every repo test touching this subsystem is a static scan that
   pins SQL text in migration *files*. The runtime lane (`test:security-db-local`) does a
   `supabase db reset`, which applies **every** migration to a fresh database — where the table

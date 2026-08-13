@@ -54,6 +54,18 @@ export interface ClassifyLatestSnapshotArgs {
  *   - everything else (stale, sim/diary/csv, future-dated, etc.) → "stale".
  *     Stale never gets relabeled as healthy.
  */
+/**
+ * Freshness timestamp for a snapshot: the explicit capture time when the
+ * fold carried one, else the ingest `ts`. A delayed bridge insert of old
+ * telemetry must never grade as current.
+ */
+function freshnessTs(snap: {
+  captured_at?: string | null;
+  ts: string | null;
+}): string | null {
+  return snap.captured_at ?? snap.ts;
+}
+
 export function classifyLatestSnapshotFreshness(
   args: ClassifyLatestSnapshotArgs,
 ): LatestSnapshotFreshness {
@@ -61,7 +73,7 @@ export function classifyLatestSnapshotFreshness(
   const snap = args.snapshot;
   if (!snap || snap.source === "unavailable" || !snap.ts) return "missing";
   const now = args.now ?? Date.now();
-  const stale = isStale(snap.ts, now);
+  const stale = isStale(freshnessTs(snap), now);
   if (stale) return "stale";
   if (snap.source === "live" || snap.source === "manual") return "fresh";
   // sim / diary / csv: not eligible for persistence even when "fresh".
@@ -80,7 +92,7 @@ export function hasRecentManualSnapshot(
   const snap = args.snapshot;
   if (!snap || snap.source !== "manual" || !snap.ts) return false;
   const now = args.now ?? Date.now();
-  return !isStale(snap.ts, now);
+  return !isStale(freshnessTs(snap), now);
 }
 
 /**
@@ -96,7 +108,7 @@ export function snapshotAlertsCanPersist(
   if (!snap || !snap.ts) return false;
   if (snap.source !== "live" && snap.source !== "manual") return false;
   const now = args.now ?? Date.now();
-  return !isStale(snap.ts, now);
+  return !isStale(freshnessTs(snap), now);
 }
 
 /**
@@ -117,7 +129,7 @@ export function describeLatestSnapshotForAlerts(
   if (!persistableSource) {
     return "Latest snapshot is for context only. Alerts persist only from fresh manual or live readings.";
   }
-  const stale = isStale(snap.ts, args.now ?? Date.now());
+  const stale = isStale(freshnessTs(snap), args.now ?? Date.now());
   const sourceWord = snap.source === "live" ? "live" : "manual";
   if (stale) {
     return `Latest ${sourceWord} snapshot is stale. Enter a new manual snapshot inside the ${FRESHNESS_WINDOW_LABEL}.`;
@@ -274,6 +286,9 @@ const SOURCE_LABELS: Record<SnapshotSource, string> = {
   csv: "CSV",
   diary: "Diary",
   sim: "Simulated",
+  demo: "Demo",
+  stale: "Stale",
+  invalid: "Invalid",
   unavailable: "Unknown",
 };
 
@@ -312,9 +327,9 @@ export function buildLatestSnapshotDetail(
   const snap = args.snapshot;
   if (!snap || snap.source === "unavailable" || !snap.ts) return null;
   const now = args.now ?? Date.now();
-  const ms = Date.parse(snap.ts);
+  const ms = Date.parse(freshnessTs(snap) ?? "");
   const capturedAgoText = formatCapturedAgo(Number.isFinite(ms) ? ms : null, now);
-  const stale = isStale(snap.ts, now);
+  const stale = isStale(freshnessTs(snap), now);
   const insideWindow = !stale;
   const persistableSource = snap.source === "live" || snap.source === "manual";
   const canPersist = persistableSource && insideWindow;
@@ -468,7 +483,7 @@ export function buildSourceChip(
       canPersist: false,
     };
   }
-  const stale = isStale(snap.ts, args.now ?? Date.now());
+  const stale = isStale(freshnessTs(snap), args.now ?? Date.now());
   const label = SOURCE_LABELS[snap.source] ?? "Unknown";
   if (snap.source === "manual" || snap.source === "live") {
     if (stale) {
@@ -532,7 +547,7 @@ export function emptyStateSnapshotCta(
       kind: "context-only",
     };
   }
-  const stale = isStale(snap.ts, args.now ?? Date.now());
+  const stale = isStale(freshnessTs(snap), args.now ?? Date.now());
   if (stale) {
     return {
       message: `Latest snapshot is outside the ${FRESHNESS_WINDOW_LABEL}. Enter a fresh manual snapshot to check alerts.`,

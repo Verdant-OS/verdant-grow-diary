@@ -292,7 +292,14 @@ function classifySource(
   const s = (source ?? "").toLowerCase();
   if (s === "csv") return "csv";
   if (s === "manual") return "manual";
-  return "live";
+  if (s === "stale") return "stale";
+  // "ecowitt" and "pi_bridge" are the active writers' live transport tags
+  // (the quality flag above carries the stale/invalid dimension for those
+  // rows). Compatibility mapping until the writers persist canonical "live".
+  if (s === "live" || s === "ecowitt" || s === "pi_bridge") return "live";
+  // Unknown/missing/demo sources must never be tagged live — this legacy
+  // union has no demo tag, so anything non-canonical is invalid.
+  return "invalid";
 }
 
 function avg(nums: number[]): number | null {

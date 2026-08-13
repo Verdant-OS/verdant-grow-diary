@@ -206,4 +206,13 @@ describe("Reports page · static safety", () => {
     expect(HOOK_SRC).not.toMatch(/service_role/);
     expect(HOOK_SRC).not.toMatch(/ai-coach|ai_coach|functions\.invoke/);
   });
+
+  it("hook excludes synthetic demo/sim rows from sensor recency + count queries", () => {
+    const matches = HOOK_SRC.match(
+      /\.or\("source\.is\.null,source\.not\.in\.\(demo,sim\)"\)/g,
+    );
+    expect(matches).not.toBeNull();
+    // Applied to BOTH the latest-reading query and the 7-day count query.
+    expect(matches!.length).toBeGreaterThanOrEqual(2);
+  });
 });

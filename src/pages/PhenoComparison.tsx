@@ -20,12 +20,7 @@
  */
 import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { canonicalBadgeToneClass } from "@/lib/canonicalSourceBadgeViewModel";
 import { CANONICAL_SOURCE_LEGEND_ENTRIES } from "@/components/CanonicalSourceLegend";
 import {
@@ -43,6 +38,10 @@ import {
   type PhenoComparisonViewModel,
   type PhenoMissingFlagView,
 } from "@/lib/phenoComparisonViewModel";
+import {
+  PHENO_LAB_EVIDENCE_HEADING,
+  PHENO_LAB_EVIDENCE_MISSING_COPY,
+} from "@/lib/phenoLabEvidenceRules";
 
 export interface PhenoComparisonProps {
   /**
@@ -82,10 +81,7 @@ export default function PhenoComparison({
   );
 
   return (
-    <div
-      data-testid="pheno-comparison-page"
-      className="mx-auto max-w-6xl space-y-5 p-4"
-    >
+    <div data-testid="pheno-comparison-page" className="mx-auto max-w-6xl space-y-5 p-4">
       <header className="space-y-3">
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="text-xl font-display font-bold">Pheno Comparison</h1>
@@ -104,9 +100,8 @@ export default function PhenoComparison({
         </div>
 
         <p className="text-sm text-muted-foreground">
-          Compare candidate phenos on selection evidence — phenotype, timepoint,
-          replication, and post-cure. Sensors are context, not a selection
-          signal.
+          Compare candidate phenos on selection evidence — phenotype, timepoint, replication, and
+          post-cure. Sensors are context, not a selection signal.
         </p>
 
         {vm.isDemo ? (
@@ -114,28 +109,22 @@ export default function PhenoComparison({
             data-testid="pheno-comparison-demo-banner"
             className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-800 dark:text-amber-300"
           >
-            Sample / demo data — not real telemetry. This is a read-only
-            preview. No readings, entries, or actions can be created, imported,
-            or saved here.
+            Sample / demo data — not real telemetry. This is a read-only preview. No readings,
+            entries, or actions can be created, imported, or saved here.
           </div>
         ) : null}
 
-        <p
-          data-testid="pheno-comparison-safety-note"
-          className="text-xs text-muted-foreground"
-        >
-          Read-only preview · No writes · No equipment commands · No AI calls.
-          This surface only displays saved data and runs nothing on its own.
-          Verdant surfaces evidence; the grower decides.
+        <p data-testid="pheno-comparison-safety-note" className="text-xs text-muted-foreground">
+          Read-only preview · No writes · No equipment commands · No AI calls. This surface only
+          displays saved data and runs nothing on its own. Verdant surfaces evidence; the grower
+          decides.
         </p>
 
         <p
           data-testid="pheno-comparison-confidence-caveat"
           className="rounded-md border border-border/60 bg-muted/30 p-2 text-xs text-muted-foreground"
         >
-          {vm.isDemo
-            ? PHENO_COMPARISON_CONFIDENCE_CAVEAT
-            : PHENO_COMPARISON_REAL_CONFIDENCE_CAVEAT}
+          {vm.isDemo ? PHENO_COMPARISON_CONFIDENCE_CAVEAT : PHENO_COMPARISON_REAL_CONFIDENCE_CAVEAT}
         </p>
 
         <SourceLegend />
@@ -148,7 +137,11 @@ export default function PhenoComparison({
         className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3"
       >
         {vm.candidates.map((candidate) => (
-          <CandidateCard key={candidate.id} candidate={candidate} />
+          <CandidateCard
+            key={candidate.id}
+            candidate={candidate}
+            showLabEvidence={vm.hasAnyLabEvidence}
+          />
         ))}
       </div>
     </div>
@@ -231,20 +224,16 @@ function SourceLegend(): JSX.Element {
 
 function CandidateCard({
   candidate,
+  showLabEvidence,
 }: {
   candidate: PhenoCandidateView;
+  showLabEvidence: boolean;
 }): JSX.Element {
   return (
-    <Card
-      data-testid={`pheno-comparison-candidate-${candidate.id}`}
-      className="flex flex-col"
-    >
+    <Card data-testid={`pheno-comparison-candidate-${candidate.id}`} className="flex flex-col">
       <CardHeader className="pb-2">
         <div className="flex flex-wrap items-center gap-2">
-          <Badge
-            variant="secondary"
-            data-testid={`pheno-candidate-label-${candidate.id}`}
-          >
+          <Badge variant="secondary" data-testid={`pheno-candidate-label-${candidate.id}`}>
             {candidate.candidateLabel}
           </Badge>
           <CardTitle className="text-base">{candidate.plantName}</CardTitle>
@@ -269,6 +258,7 @@ function CandidateCard({
 
       <CardContent className="space-y-3 text-sm">
         <PhenotypeSection candidate={candidate} />
+        {showLabEvidence ? <LabEvidenceSection candidate={candidate} /> : null}
         <TimepointReplicationRow candidate={candidate} />
         <PostCureSection candidate={candidate} />
         <PhotoSection candidate={candidate} />
@@ -297,10 +287,7 @@ function PhenotypeSection({ candidate }: { candidate: PhenoCandidateView }) {
   return (
     <section className="space-y-1">
       <SectionHeading>Selection evidence (phenotype)</SectionHeading>
-      <dl
-        data-testid={`pheno-phenotype-${candidate.id}`}
-        className="space-y-1"
-      >
+      <dl data-testid={`pheno-phenotype-${candidate.id}`} className="space-y-1">
         {candidate.phenotypeTraits.map((trait) => (
           <div
             key={trait.key}
@@ -339,11 +326,63 @@ function PhenotypeSection({ candidate }: { candidate: PhenoCandidateView }) {
   );
 }
 
-function TimepointReplicationRow({
-  candidate,
-}: {
-  candidate: PhenoCandidateView;
-}) {
+/**
+ * Measured lab evidence — shown only when at least one candidate in the
+ * comparison has a lab result (vm.hasAnyLabEvidence). Values are the grower's
+ * own transcription; candidates without one get the honest missing-data copy.
+ * Never a ranking: no highlighting, no winner, no cross-candidate judgment.
+ */
+function LabEvidenceSection({ candidate }: { candidate: PhenoCandidateView }) {
+  const lab = candidate.labEvidence;
+  return (
+    <section className="space-y-1">
+      <SectionHeading>{PHENO_LAB_EVIDENCE_HEADING}</SectionHeading>
+      {lab ? (
+        <div data-testid={`pheno-lab-evidence-${candidate.id}`} className="space-y-1">
+          <p className="text-[11px] text-muted-foreground">
+            {lab.dateLabel}
+            {lab.labName ? ` · ${lab.labName}` : ""}
+          </p>
+          <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+            {lab.totalThcLabel ? (
+              <span className="text-muted-foreground">
+                Total THC (calculated){" "}
+                <span className="font-medium text-foreground">{lab.totalThcLabel}</span>
+              </span>
+            ) : null}
+            {lab.totalCbdLabel ? (
+              <span className="text-muted-foreground">
+                Total CBD (calculated){" "}
+                <span className="font-medium text-foreground">{lab.totalCbdLabel}</span>
+              </span>
+            ) : null}
+          </div>
+          {lab.topTerpenes.length > 0 ? (
+            <div className="flex flex-wrap gap-1.5">
+              {lab.topTerpenes.map((t) => (
+                <span
+                  key={t.name}
+                  className="rounded-md border border-border/50 bg-muted/40 px-1.5 py-0.5 text-[11px] text-muted-foreground"
+                >
+                  {t.name} {t.valueLabel}
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : (
+        <p
+          data-testid={`pheno-lab-evidence-missing-${candidate.id}`}
+          className="text-xs font-medium text-amber-700 dark:text-amber-300"
+        >
+          {PHENO_LAB_EVIDENCE_MISSING_COPY}
+        </p>
+      )}
+    </section>
+  );
+}
+
+function TimepointReplicationRow({ candidate }: { candidate: PhenoCandidateView }) {
   return (
     <section className="grid grid-cols-2 gap-2">
       <div>
@@ -387,9 +426,7 @@ function PostCureSection({ candidate }: { candidate: PhenoCandidateView }) {
         data-testid={`pheno-postcure-${candidate.id}`}
         data-cured={pc.cured ? "true" : "false"}
         className={
-          pc.cured
-            ? "text-xs text-foreground"
-            : "text-xs text-amber-700 dark:text-amber-300"
+          pc.cured ? "text-xs text-foreground" : "text-xs text-amber-700 dark:text-amber-300"
         }
       >
         {pc.label}
@@ -443,9 +480,7 @@ function QuickLogSection({ candidate }: { candidate: PhenoCandidateView }) {
             <li key={log.id} className="text-xs">
               <span className="font-medium">{log.kindLabel}</span>
               <span className="text-muted-foreground"> · {log.atLabel}</span>
-              {log.note ? (
-                <span className="block text-muted-foreground">{log.note}</span>
-              ) : null}
+              {log.note ? <span className="block text-muted-foreground">{log.note}</span> : null}
             </li>
           ))}
         </ul>
@@ -503,10 +538,7 @@ function CaveatsSection({ candidate }: { candidate: PhenoCandidateView }) {
   return (
     <section className="space-y-1">
       <SectionHeading>Evidence gaps</SectionHeading>
-      <div
-        data-testid={`pheno-caveats-${candidate.id}`}
-        className="flex flex-wrap gap-1.5"
-      >
+      <div data-testid={`pheno-caveats-${candidate.id}`} className="flex flex-wrap gap-1.5">
         {candidate.selectionCaveats.map((caveat) => (
           <Badge
             key={caveat.code}
@@ -537,20 +569,14 @@ function CaveatsSection({ candidate }: { candidate: PhenoCandidateView }) {
   );
 }
 
-function EnvironmentContextSection({
-  candidate,
-}: {
-  candidate: PhenoCandidateView;
-}) {
+function EnvironmentContextSection({ candidate }: { candidate: PhenoCandidateView }) {
   const env = candidate.environmentContext;
   const snapshot = env.snapshot;
   const coreKeys = CORE_SENSOR_METRIC_KEYS as readonly string[];
   // Show present core metrics plus any present metric that is relevant for
   // this context (e.g. EC/pH on a hydro run, PPFD under lights).
   const shownMetrics = snapshot
-    ? snapshot.metrics.filter(
-        (m) => m.present && (coreKeys.includes(m.key) || m.relevant),
-      )
+    ? snapshot.metrics.filter((m) => m.present && (coreKeys.includes(m.key) || m.relevant))
     : [];
   return (
     <section className="space-y-1 border-t border-border/50 pt-2">
@@ -577,10 +603,7 @@ function EnvironmentContextSection({
               </Badge>
             ) : null}
             {snapshot.isInvalid ? (
-              <Badge
-                variant="destructive"
-                data-testid={`pheno-envcontext-invalid-${candidate.id}`}
-              >
+              <Badge variant="destructive" data-testid={`pheno-envcontext-invalid-${candidate.id}`}>
                 Invalid
               </Badge>
             ) : null}
@@ -590,9 +613,7 @@ function EnvironmentContextSection({
             className="text-[11px] text-muted-foreground"
           >
             {shownMetrics.length > 0
-              ? shownMetrics
-                  .map((m) => `${m.label} ${m.value}${m.unit ? m.unit : ""}`)
-                  .join(" · ")
+              ? shownMetrics.map((m) => `${m.label} ${m.value}${m.unit ? m.unit : ""}`).join(" · ")
               : "No usable environment metrics"}
           </p>
           <EnvironmentFlags candidateId={candidate.id} flags={env.flags} />
@@ -621,15 +642,10 @@ function EnvironmentFlags({
   candidateId: string;
   flags: PhenoMissingFlagView[];
 }) {
-  const missing = flags.filter(
-    (f) => f.code !== "stale_reading" && f.code !== "invalid_reading",
-  );
+  const missing = flags.filter((f) => f.code !== "stale_reading" && f.code !== "invalid_reading");
   if (missing.length === 0) return null;
   return (
-    <div
-      data-testid={`pheno-envcontext-flags-${candidateId}`}
-      className="flex flex-wrap gap-1"
-    >
+    <div data-testid={`pheno-envcontext-flags-${candidateId}`} className="flex flex-wrap gap-1">
       {missing.map((f) => (
         <Badge
           key={f.code}

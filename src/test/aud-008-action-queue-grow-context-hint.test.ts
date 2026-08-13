@@ -3,12 +3,50 @@
  * tests lock in the pure helper that produces the header hint state.
  */
 import { describe, it, expect } from "vitest";
-import { buildActionQueueGrowContextHint } from "@/lib/actionQueueGrowContextHintRules";
+import {
+  buildActionQueueGrowContextHint,
+  buildOtherGrowPendingDisclosure,
+} from "@/lib/actionQueueGrowContextHintRules";
 
 const grows = [
   { id: "g1", name: "Sour Diesel Auto" },
   { id: "g2", name: "Northern Lights" },
 ];
+
+describe("buildOtherGrowPendingDisclosure", () => {
+  // The queue only loads the scoped grow's actions, so its empty state cannot
+  // claim none exist. A grow can hold an unapproved high-risk action while
+  // being absent from every selector, because fetchGrowRows filters
+  // `is_archived = false` — archiving hides the container, not the live
+  // records inside it. This line is the only signal such an action exists.
+  it("discloses a single pending action in another grow", () => {
+    const s = buildOtherGrowPendingDisclosure({ count: 1, isScoped: true });
+    expect(s).toContain("1 approval-required action is pending");
+    expect(s).toMatch(/another grow/i);
+    expect(s).toMatch(/archived/i);
+  });
+
+  it("pluralises correctly for several", () => {
+    const s = buildOtherGrowPendingDisclosure({ count: 3, isScoped: true });
+    expect(s).toContain("3 approval-required actions are pending");
+  });
+
+  it("says nothing when the queue is already showing all grows", () => {
+    // Unscoped, the rows are all there — there is no elsewhere to disclose.
+    expect(buildOtherGrowPendingDisclosure({ count: 5, isScoped: false })).toBeNull();
+  });
+
+  it("says nothing when no other grow has pending work", () => {
+    expect(buildOtherGrowPendingDisclosure({ count: 0, isScoped: true })).toBeNull();
+  });
+
+  it("never invents a count from a bad input", () => {
+    expect(buildOtherGrowPendingDisclosure({ count: -2, isScoped: true })).toBeNull();
+    expect(
+      buildOtherGrowPendingDisclosure({ count: Number.NaN, isScoped: true }),
+    ).toBeNull();
+  });
+});
 
 describe("AUD-008 buildActionQueueGrowContextHint", () => {
   it("scopes via URL when urlGrowId is set and recommends clearing when multiple grows exist", () => {

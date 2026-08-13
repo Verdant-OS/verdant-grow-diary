@@ -128,7 +128,25 @@ export function buildTentSnapshotView(
   // Source resolution: derive from the actual contributing rows so an
   // unknown/garbage source can never be silently promoted to "live" by
   // `snapshotFromReadings`'s heuristic default.
-  const RECOGNISED = new Set(["manual", "live", "csv", "import", "sim", "diary"]);
+  // Must stay in step with the ingest sources `snapshotFromReadings` accepts.
+  // `pi_bridge` is the Raspberry Pi ingest source and resolves to "live" there
+  // (active-transport compatibility mapping); omitting it here meant a genuine
+  // bridge reading failed the recognised check and rendered as Unknown — the
+  // opposite mistake to promoting garbage. `ecowitt` is the EcoWitt routed
+  // writer's tag and maps the same way.
+  const RECOGNISED = new Set([
+    "manual",
+    "live",
+    "pi_bridge",
+    "ecowitt",
+    "csv",
+    "import",
+    "sim",
+    "diary",
+    "demo",
+    "stale",
+    "invalid",
+  ]);
   const hasRecognised = latestRows.some(
     (r) => typeof r.source === "string" && RECOGNISED.has(r.source),
   );
@@ -139,8 +157,12 @@ export function buildTentSnapshotView(
     canonicalSource = "csv";
   } else if (snap.source === "manual" || snap.source === "diary") {
     canonicalSource = "manual";
-  } else if (snap.source === "sim") {
+  } else if (snap.source === "sim" || snap.source === "demo") {
     canonicalSource = "demo";
+  } else if (snap.source === "stale") {
+    canonicalSource = "stale";
+  } else if (snap.source === "invalid") {
+    canonicalSource = "invalid";
   } else if (snap.source === "live") {
     canonicalSource = "live";
   }
@@ -154,7 +176,19 @@ export function buildTentSnapshotView(
   const capturedAt = resolveCapturedAt(latestRows, snap.ts);
   const stale = !!capturedAt && isStale(capturedAt, now);
   const quality = evaluateSensorQuality(snap, now);
-  const invalid = quality.suspiciousFields.length > 0;
+  // `evaluateSensorQuality` deliberately lists a *missing* VPD in
+  // `suspiciousFields` so the snapshot grades as "watch". That must not
+  // escalate the tent's source label to "Invalid": absence is "Unknown" —
+  // which the per-metric renderer below already reports correctly — whereas
+  // "Invalid" asserts present-but-implausible telemetry ("do not treat as
+  // healthy"). Only a field that actually carries a value can make the
+  // snapshot invalid, otherwise a tent of sound manual readings with no
+  // stored VPD is branded untrustworthy.
+  const hasValue = (field: string): boolean => {
+    const v = (snap as unknown as Record<string, unknown>)[field];
+    return v !== null && v !== undefined;
+  };
+  const invalid = quality.suspiciousFields.some(hasValue);
 
   // Stale/invalid override the source label per requirement #2/#6.
   let sourceLabel = resolved.label;

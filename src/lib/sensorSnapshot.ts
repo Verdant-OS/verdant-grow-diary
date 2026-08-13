@@ -7,13 +7,30 @@
 
 import { normalizeQuickLogSnapshotMetrics } from "@/lib/quick-log/quickLogSnapshotMetricNormalizer";
 import { summarizeCsvVendor } from "@/lib/sensorReadingVendorLineage";
+import { classifyTimelineSensorSource } from "@/lib/timelineSensorSourceBadgeRules";
 
 
-export type SnapshotSource = "live" | "manual" | "sim" | "diary" | "csv" | "unavailable";
+export type SnapshotSource =
+  | "live"
+  | "manual"
+  | "sim"
+  | "diary"
+  | "csv"
+  | "demo"
+  | "stale"
+  | "invalid"
+  | "unavailable";
 
 export interface SensorSnapshot {
   source: SnapshotSource;
   ts: string | null;
+  /**
+   * Explicit capture time from the contributing sensor rows, when one is
+   * present. `ts` is the ingest/bucket timestamp and can be fresher than
+   * the moment the reading was actually captured, so freshness decisions
+   * must prefer `captured_at` over `ts` whenever it is available.
+   */
+  captured_at?: string | null;
   temp: number | null;
   rh: number | null;
   vpd: number | null;
@@ -45,6 +62,7 @@ export interface SensorSnapshot {
 export const EMPTY_SNAPSHOT: SensorSnapshot = {
   source: "unavailable",
   ts: null,
+  captured_at: null,
   temp: null,
   rh: null,
   vpd: null,
@@ -70,6 +88,9 @@ export const SOURCE_LABEL: Record<SnapshotSource, string> = {
   sim: "Simulated",
   diary: "Diary snapshot",
   csv: "CSV history",
+  demo: "Demo data",
+  stale: "Stale",
+  invalid: "Invalid",
   unavailable: "Unavailable",
 };
 
@@ -92,6 +113,8 @@ export interface SensorReadingLike {
   metric: string;
   value: number | string | null;
   source?: string | null;
+  /** Explicit capture time from the row, when the caller selected it. */
+  captured_at?: string | null;
   device_id?: string | null;
   /**
    * Upstream provenance envelope. This file NEVER reads, returns, or
@@ -99,6 +122,58 @@ export interface SensorReadingLike {
    * `summarizeCsvVendor`, which is the only sanctioned reader.
    */
   raw_payload?: unknown;
+}
+
+/**
+ * Source tags persisted by ACTIVE checked ingest writers that have not yet
+ * migrated to the canonical "live" label:
+ *   - "pi_bridge"  — supabase/functions/pi-ingest-readings
+ *   - "ecowitt"    — supabase/functions/_shared/ecowittRoutedRowBuilder
+ * These are live-transport readings; freshness/quality layers decide the
+ * rest. Compatibility mapping only — remove entries once the writers store
+ * canonical "live" (EcoWitt Phase 1.8 workstream). Do NOT add new tags
+ * here; new writers must persist canonical sources.
+ */
+const ACTIVE_LIVE_TRANSPORT_SOURCES: ReadonlySet<string> = new Set([
+  "pi_bridge",
+  "ecowitt",
+]);
+
+/**
+ * Classify one sensor_readings row's raw source into the snapshot
+ * vocabulary. Routes through the canonical timeline classifier so
+ * missing/unknown/retired alias sources resolve to "invalid" — never
+ * "live". Exceptions: the legacy "sim" label is kept as "sim" for
+ * existing simulated-data disclosure surfaces, and the active writers'
+ * transport tags above map to "live" until those writers migrate.
+ */
+export function classifySensorReadingRowSource(
+  raw: string | null | undefined,
+): Exclude<SnapshotSource, "diary" | "unavailable"> {
+  const v = typeof raw === "string" ? raw.trim().toLowerCase() : "";
+  if (v === "sim") return "sim";
+  if (ACTIVE_LIVE_TRANSPORT_SOURCES.has(v)) return "live";
+  return classifyTimelineSensorSource({ rawSource: raw }).kind;
+}
+
+/**
+ * Fold the per-row source kinds of one capture batch into a single
+ * snapshot source. Precedence: manual wins (a grower's entry is never
+ * relabeled), all-sim stays sim, CSV history never masquerades as live,
+ * then invalid / demo / stale each block "live". "live" is returned only
+ * when every contributing row is canonically live — never by fallthrough.
+ */
+export function foldSensorSourceKinds(
+  kinds: ReadonlyArray<Exclude<SnapshotSource, "diary" | "unavailable">>,
+): SnapshotSource {
+  if (kinds.length === 0) return "unavailable";
+  if (kinds.includes("manual")) return "manual";
+  if (kinds.every((k) => k === "sim")) return "sim";
+  if (kinds.includes("csv")) return "csv";
+  if (kinds.includes("invalid")) return "invalid";
+  if (kinds.includes("demo") || kinds.includes("sim")) return "demo";
+  if (kinds.includes("stale")) return "stale";
+  return kinds.every((k) => k === "live") ? "live" : "invalid";
 }
 
 /**
@@ -118,37 +193,31 @@ export function snapshotFromReadings(
     const r = latest.find((x) => x.metric === metric);
     return r ? toFiniteNumber(r.value) : null;
   };
-  const anyManual = latest.some((r) => r.source === "manual");
-  const allSim =
-    latest.length > 0 && latest.every((r) => r.source === "sim");
-  const allCsv =
-    latest.length > 0 && latest.every((r) => r.source === "csv");
-  const anyCsv = latest.some((r) => r.source === "csv");
-  // CSV history must never be promoted to "live". If every row at the
-  // latest timestamp is CSV, classify as "csv". If CSV is mixed with
-  // non-live sources but no manual, still prefer csv over live so
-  // imported history never masquerades as a live reading.
-  const source: SnapshotSource = anyManual
-    ? "manual"
-    : allSim
-      ? "sim"
-      : allCsv
-        ? "csv"
-        : anyCsv
-          ? "csv"
-          : "live";
+  const kinds = latest.map((r) => classifySensorReadingRowSource(r.source));
+  const source = foldSensorSourceKinds(kinds);
   // Prefer a device_id from a row matching the resolved source so manual
   // device notes (device_id = "manual:...") are surfaced for manual
   // snapshots; otherwise fall back to any device_id at the latest ts.
   const deviceRow =
-    latest.find((r) => r.source === source && !!r.device_id) ??
+    latest.find((r, i) => kinds[i] === source && !!r.device_id) ??
     latest.find((r) => !!r.device_id);
   // Summarise CSV vendor lineage (presentation hint only — never
   // upgrades the source classification).
   const csvVendor = source === "csv" ? summarizeCsvVendor(latest) : null;
+  // Explicit capture time from the contributing rows, when selected by
+  // the caller. Freshness decisions must prefer this over `ts`.
+  let capturedAt: string | null = null;
+  for (const r of latest) {
+    const c = r.captured_at;
+    if (typeof c === "string" && Number.isFinite(Date.parse(c))) {
+      capturedAt = c;
+      break;
+    }
+  }
   return {
     source,
     ts: latestTs,
+    captured_at: capturedAt,
     temp: get("temperature_c"),
     rh: get("humidity_pct"),
     vpd: get("vpd_kpa"),
@@ -204,6 +273,7 @@ export function snapshotFromDiary(
     return {
       source: "diary",
       ts: capturedAt,
+      captured_at: capturedAt,
       temp: toFiniteNumber(m.temperature),
       rh: toFiniteNumber(m.humidity),
       vpd: toFiniteNumber(m.vpd),
@@ -221,6 +291,7 @@ export function snapshotFromDiary(
   return {
     source: "diary",
     ts,
+    captured_at: ts,
     temp: toFiniteNumber(snap.temp),
     rh: toFiniteNumber(snap.rh),
     vpd: toFiniteNumber(snap.vpd),

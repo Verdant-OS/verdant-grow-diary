@@ -149,6 +149,23 @@ describe("compilePlantContextFromRows — source separation", () => {
     expect(ctx.averages_7d.temperature_c).toBeNull();
     expect(ctx.sensor_groups.find((g) => g.source === "demo")?.sample_count).toBe(1);
   });
+
+  it("never tags unknown/missing sources as live; active transports stay live", () => {
+    const ctx = compilePlantContextFromRows({
+      plant: basePlant,
+      growEvents: [],
+      sensorReadings: [
+        // pi_bridge is an active writer's live transport tag.
+        { metric: "temperature_c", value: 24, captured_at: iso(60_000), source: "pi_bridge" },
+        { metric: "humidity_pct", value: 55, captured_at: iso(60_000), source: null },
+        { metric: "vpd_kpa", value: 1.1, captured_at: iso(60_000) },
+      ],
+      now: NOW,
+    });
+    expect(ctx.sensor_groups.find((g) => g.source === "live")?.sample_count).toBe(1);
+    const invalid = ctx.sensor_groups.find((g) => g.source === "invalid");
+    expect(invalid?.sample_count).toBe(2);
+  });
 });
 
 describe("compilePlantContextFromRows — windows + determinism", () => {
@@ -231,14 +248,22 @@ describe("compilePlantContextFromRows — windows + determinism", () => {
       plant: basePlant,
       growEvents: [],
       sensorReadings: [
-        { metric: "vpd_kpa", value: "not-a-number", captured_at: iso(60_000) },
-        { metric: "vpd_kpa", value: 1.2, captured_at: "not-a-date" },
+        // source carried explicitly — a missing source now classifies as
+        // "invalid" (never live), which is not what this test exercises.
+        {
+          metric: "vpd_kpa",
+          value: "not-a-number",
+          captured_at: iso(60_000),
+          source: "ecowitt",
+        },
+        { metric: "vpd_kpa", value: 1.2, captured_at: "not-a-date", source: "ecowitt" },
         {
           metric: "vpd_kpa",
           value: 1.2,
           captured_at: new Date(NOW.getTime() + 60_000).toISOString(),
+          source: "ecowitt",
         },
-        { metric: "vpd_kpa", value: 1.2, captured_at: iso(60_000) },
+        { metric: "vpd_kpa", value: 1.2, captured_at: iso(60_000), source: "ecowitt" },
       ],
       now: NOW,
     });

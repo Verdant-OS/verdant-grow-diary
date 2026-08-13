@@ -1,14 +1,16 @@
 /**
- * AiDoctorCreditsExhaustedTeaser — calm Plant Detail marker shown once a
- * free-plan grow has spent its entire (fixed, non-renewing) AI Doctor
- * credit allotment.
+ * AiDoctorCreditsExhaustedTeaser — calm Plant Detail marker for a free-plan
+ * grow's (fixed, non-renewing) AI Doctor credit allotment. Shows at two
+ * moments: "low" (exactly one credit left, at least one already spent) and
+ * "exhausted" (allotment fully spent) — see aiDoctorCreditsExhaustedTeaserRules
+ * for why "low" exists as an earlier, calmer checkpoint.
  *
  * Presentation-only: reads this grow's spend total (useAiDoctorGrowCreditsUsed)
  * and the client entitlement hint (useMyEntitlements), renders the pure
  * aiDoctorCreditsExhaustedTeaserRules view. Renders null for paid plans, for
- * grows still under their limit, and while any input is unresolved — it is
- * a garnish row, never a blocking surface, and it never gates the doctor
- * feature itself (that stays server-side).
+ * grows still comfortably under their limit, and while any input is
+ * unresolved — it is a garnish row, never a blocking surface, and it never
+ * gates the doctor feature itself (that stays server-side).
  *
  * No writes, no AI calls, no device control, no checkout logic.
  */
@@ -42,13 +44,11 @@ export default function AiDoctorCreditsExhaustedTeaser({ growId }: Props) {
   return (
     <div
       data-testid="ai-doctor-credits-exhausted-teaser"
+      data-state={view.teaser.state}
       className="mb-3 rounded-lg border border-border/40 bg-card/30 px-3 py-1.5 text-xs text-muted-foreground"
     >
       {view.teaser.copy}{" "}
-      <Link
-        to={view.teaser.href}
-        className="text-primary underline-offset-4 hover:underline"
-      >
+      <Link to={view.teaser.href} className="text-primary underline-offset-4 hover:underline">
         {view.teaser.ctaLabel}
       </Link>
     </div>

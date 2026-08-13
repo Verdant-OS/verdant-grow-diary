@@ -70,6 +70,11 @@ describe("loader — read-only, RLS-scoped, real (non-demo) input", () => {
   it("builds a real (isDemo:false) input via the pure mapper", () => {
     expect(HOOK).toMatch(/buildRealPhenoComparisonInput/);
   });
+
+  it("selects captured_at so snapshot freshness is graded from capture time, not ingest ts", () => {
+    expect(HOOK).toMatch(/select\(\s*["']ts,metric,value,source,captured_at/);
+    expect(HOOK).toMatch(/captured_at/);
+  });
 });
 
 describe("route + entry wiring (no drift)", () => {

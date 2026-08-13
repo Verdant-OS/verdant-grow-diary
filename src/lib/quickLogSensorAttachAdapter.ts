@@ -70,8 +70,11 @@ export function buildQuickLogSensorAttachPayload(
 
   // Translate dashboard fields → long-format rows the resolver accepts.
   // We pass the raw source through verbatim so only `"live"` can promote
-  // to fresh_live downstream. Manual/sim/diary stay non-Live.
-  const captured = snap.ts;
+  // to fresh_live downstream. Manual/sim/diary stay non-Live. The capture
+  // time is the snapshot's explicit captured_at when the fold carried one
+  // — `ts` is the ingest timestamp and must not relabel old telemetry as
+  // a current capture.
+  const captured = snap.captured_at ?? snap.ts;
   const rows: RawSensorRow[] = [];
   const push = (metric: string, value: number | null) => {
     if (value === null) return;

@@ -1,11 +1,11 @@
 # Verdant — Current Operating State
 
 **Last updated:** 2026-08-13 UTC
-**Updated by:** Claude (records Cheek's 2026-08-13 in-session approval of the
-named isolated Convex component sandbox spike, plus the deploy-branch HEAD
-observed while writing that spec. Public-surface, GA4, and release-identity
-rows retain their earlier verification dates; none were re-measured in this
-update)
+**Updated by:** Grok (records the 2026-08-13 CONFLICT_RECONCILIATION comment
+pass on four still-open DIRTY PRs, the #933 close, and the still-open #936
+follow-up. Deploy-branch HEAD re-fetched this session. The Convex-spike
+assignment block and the public-surface / GA4 / release-identity rows retain
+their earlier verification dates; none were re-measured in this update)
 
 This is the changing shift report. Permanent rules live in `/AGENTS.md`; do not edit
 that constitution to record branch, deployment, blocker, or assignment changes.
@@ -20,7 +20,7 @@ inside the active governance handoff.
 
 | Branch               | Role                                             | Verified head                                                                                                                                |
 | -------------------- | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `verdant-grow-diary` | **Deploy branch. Production ships from here.**   | `6434ea2a8` (#942), verified 2026-08-13 with `git rev-parse HEAD` on this checkout (this session did not re-fetch; treat as the local tracking ref). Prior CURRENT_STATE snapshot was `1a9082bb1` (#885) on 2026-08-11 — the queue has advanced; do not carry older validation tables forward |
+| `verdant-grow-diary` | **Deploy branch. Production ships from here.**   | `43993684e` (#965), verified 2026-08-13 with `git fetch origin verdant-grow-diary` + `git rev-parse origin/verdant-grow-diary`. Prior CURRENT_STATE snapshot was `6434ea2a8` (#942) — the queue has advanced; do not carry older validation tables forward |
 | `main`               | Integration branch. It is not production parity. | `b6d747941948ce68157185a2b0847acea6970d44` (#779), verified 2026-08-07                                                                       |
 
 `main` and `verdant-grow-diary` are divergent. Do not infer production behavior from
@@ -32,6 +32,44 @@ The deploy-branch governance integration is complete in PR #626, and reconciliat
 [PR #679](https://github.com/Verdant-OS/verdant-grow-diary/pull/679)
 (`codex/seo-readiness-evidence-20260802`) merged 2026-08-02 as `bff64896679d`. It
 changed readiness evidence, artifacts, and tests only; it is **not** deployment evidence.
+
+---
+
+## DIRTY PR conflict reconciliation (recorded 2026-08-13)
+
+Owner-posted `CONFLICT_RECONCILIATION` comments on four still-open DIRTY PRs.
+No rebases, merges, or closes on those four. [#933](https://github.com/Verdant-OS/verdant-grow-diary/pull/933)
+was closed as superseded in the same pass. This is an ownership/serialisation
+signal (`docs/agents/merge-queue.md`: empty queue + high `DIRTY` count), not
+queue latency. Branch-name authorship is not a role assignment: Grok remains
+Unassigned in the agents table below. The comments hand a recommended rebase
+path to whoever next owns each branch.
+
+Locked rule still in force:
+
+```text
+Same complete intent already on base → CLOSE SUPERSEDED
+Never hybrid-patch only to become mergeable
+Never reuse green checks from pre-resolution SHA
+```
+
+| PR | State | Disposition | Head | Unique surviving work (from the comment) | Comment |
+| -- | ----- | ----------- | ---- | ---------------------------------------- | ------- |
+| [#913](https://github.com/Verdant-OS/verdant-grow-diary/pull/913) | OPEN | REBASE | `grok/seo-public-surface-docs-20260812` | Live-host evidence that `vercel.json` public-alias redirects are not firing in production (HTTP 200 soft shells) plus `docs/seo/vercel-host-redirect-fix-steps.md`. Drop the duplicate Ahrefs / `/` vs `/welcome` material already shipped via #914 / #949 | [comment](https://github.com/Verdant-OS/verdant-grow-diary/pull/913#issuecomment-5285119408) |
+| [#817](https://github.com/Verdant-OS/verdant-grow-diary/pull/817) | OPEN | REBASE | `grok/tent-alert-history-pro` | `TentAlertHistoryPanel` and history helpers. Keep base's `isActive` / `openCount` / `activeCount` and the Doctor / Blueprint CTAs from #816 / #888 / #928 | [comment](https://github.com/Verdant-OS/verdant-grow-diary/pull/817#issuecomment-5285121690) |
+| [#710](https://github.com/Verdant-OS/verdant-grow-diary/pull/710) | OPEN | REBASE | `claude/docs-cheek-approval-workflow` | Add `docs/agents/cheek-approval-workflow.md` and its OPERATING STATE list line; keep base's `merge-queue.md` line; refresh Sentinel-Version across all twelve governance files if the BUMP check requires it | [comment](https://github.com/Verdant-OS/verdant-grow-diary/pull/710#issuecomment-5285129001) |
+| [#699](https://github.com/Verdant-OS/verdant-grow-diary/pull/699) | OPEN | REBASE | `chore/adopt-biome-lint` | Tooling swap only (`package.json` / `biome.json` / lint-staged). Drop the 327-commit-stale format commit; regenerate after rebase; hand-reconcile `src/test/helpers/reactRouterCompat.vitest.tsx`; add a Biome ignore for `supabase/functions/mcp/index.ts` | [comment](https://github.com/Verdant-OS/verdant-grow-diary/pull/699#issuecomment-5285131401) |
+| [#933](https://github.com/Verdant-OS/verdant-grow-diary/pull/933) | CLOSED | CLOSE_SUPERSEDED | `claude/strange-keller-036221` | Complete intent already shipped as #930 (`ai_doctor_cta_clicked`). Closing avoids two competing funnel events on the same click | [comment](https://github.com/Verdant-OS/verdant-grow-diary/pull/933#issuecomment-5285025091) |
+
+Follow-up, not closed: [#936](https://github.com/Verdant-OS/verdant-grow-diary/pull/936)
+(`claude/alert-doctor-credit-gate`) is still OPEN and still based on #933's
+head `claude/strange-keller-036221` (branch still on origin as of this
+recording). It must rebase onto current `verdant-grow-diary` and drop #933's
+superseded commits before it can land. Flagged on the #933 close comment; not
+part of the four-PR comment pass.
+
+Do not unilaterally close the four REBASE PRs, and do not land a hybrid patch
+on any of them solely to clear `DIRTY`.
 
 ---
 

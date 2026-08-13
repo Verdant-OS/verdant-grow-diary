@@ -373,9 +373,11 @@ Sound evidence has to be **immutable and server-side**. The candidates:
 
 | Source | What it would show | Caveat |
 | --- | --- | --- |
-| Postgres error logs | `42P01` on `public.signup_acquisition_attributions` at signup time — direct proof the path was exercised | Subject to the retention window; absence past retention proves nothing |
-| GA4 `signup_failed` | Client-side count of failed signups since 2026-07-21 | Consent-gated and currently unreadable (baseline `BLOCKED`); see "Why nothing alerted" |
-| `public.signup_acquisition_attributions` rows | Trigger-written and not client-editable — the ideal evidence | **The table does not exist**, which is the outage itself. Available only *after* the apply |
+| **Postgres error logs** | `42P01` on `public.signup_acquisition_attributions` raised from `handle_new_user` at signup time. **This is the only incident-specific evidence that exists** | Subject to the retention window; absence past retention proves nothing |
+| GA4 `signup_failed` | That *some* signup failed — a **lead**, not proof | **Not incident-specific.** `Auth.tsx` emits `signup_failed` with `reason: "auth_rejected"` for **every** `supabase.auth.signUp` error: rate limiting, duplicate account, provider outage, weak password. A nonzero count is only meaningful if correlated with a server-side `42P01`. Also consent-gated and currently unreadable (baseline `BLOCKED`) |
+| `signup_acquisition_attributions` rows *(post-apply)* | Very little — see below | **Rows are NOT proof the trigger fired.** The table has no provenance column, and rows reach it three ways: the repair's own backfill from current `raw_user_meta_data`, `record_signup_acquisition_first_touch` (which an authenticated OAuth user can call with a source from client-controlled session storage), and the trigger. A row cannot be attributed to the failing email-signup path |
+
+An earlier revision of this runbook called that last row "trigger-written and not client-editable — the ideal evidence". That was wrong on both counts, and wrong in the same way as the retracted metadata falsifier: it assumed a value's *presence* implies the path that would have written it. **Database logs are the incident-specific evidence. Everything else is circumstantial.**
 
 Note the structural bind: the one trustworthy database record is the very table whose
 absence causes the failure. **Until the migration is applied, no immutable database evidence
@@ -469,16 +471,56 @@ leaving referrals intact. Being *nearly* current is what makes it easy to miss.
 The outage itself would not return — the table survives once created — but you would trade it
 for a quieter regression across referrals, attribution, and operator reporting.
 
+### ⚠️ The repair is NOT a strict superset — an earlier revision said so, wrongly
+
+For the six **attribution** migrations the superset claim holds: the repair creates the table
+and re-issues all four functions at their current-best definitions — the referral block, the
+full 11-value allowlist including `blueprint_targets`, and the paid snapshot without the
+legacy `billing_subscriptions` branch.
+
+**It does not hold for the three May-2026 migrations,** and marking those applied on a false
+superset claim would permanently suppress a catch-up that installs things the repair never
+mentions. `20260515204616` alone creates four tables (`profiles`, `nug_events`, `unlocks`,
+`user_quests`), the `on_auth_user_created` and `profiles_updated_at` triggers, `compute_level`,
+`award_nugs`, RLS policies and an index; the following two alter function security and grants.
+The repair reasserts **none** of that.
+
+So every non-attribution effect must be **fingerprinted present before** any ledger write.
+Measured 2026-08-13:
+
+```sql
+SELECT (SELECT count(*) FROM information_schema.tables WHERE table_schema='public'
+          AND table_name IN ('profiles','nug_events','unlocks','user_quests')) AS tables_4,
+       (SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+          WHERE n.nspname='public' AND p.proname IN ('compute_level','award_nugs')) AS fns_2,
+       (SELECT count(*) FROM pg_trigger WHERE tgname IN ('on_auth_user_created','profiles_updated_at')) AS triggers_2,
+       (SELECT count(*) FROM pg_indexes WHERE schemaname='public' AND indexname='nug_events_user_idx') AS idx_1,
+       (SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+          WHERE n.nspname='public' AND c.relname IN ('profiles','nug_events','unlocks','user_quests')
+            AND c.relrowsecurity) AS rls_on_4,
+       (SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+          WHERE n.nspname='public' AND p.proname IN ('max_level_for','recompute_level')) AS grant_fns,
+       (SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+          WHERE n.nspname='public' AND p.proname='handle_new_user'
+            AND (has_function_privilege('anon', p.oid, 'EXECUTE')
+              OR has_function_privilege('authenticated', p.oid, 'EXECUTE'))) AS hnu_leaks_execute;
+-- => tables_4=4, fns_2=2, triggers_2=2, idx_1=1, rls_on_4=4,
+--    grant_fns=0, hnu_leaks_execute=0
+```
+
+Every installable effect is **present**, and `hnu_leaks_execute=0` confirms the later
+`REVOKE EXECUTE` migrations took hold. One anomaly worth recording rather than glossing:
+`grant_fns=0` — `max_level_for` and `recompute_level` **do not exist in production**, so
+`20260515211702`'s `GRANT`/`REVOKE` statements reference absent objects. Re-running it would
+**error**, not silently install anything. That is a different failure mode from the revert
+hazard, and it is another reason not to leave these rows to chance.
+
 ### Safe disposition
 
-Marking the superseded versions as applied is **semantically correct**, not a workaround: the
-repair is a strict superset. It creates the table, and re-issues all four functions at their
-current-best definitions — the referral block, the full 11-value allowlist including
-`blueprint_targets`, and the paid snapshot without the legacy `billing_subscriptions` branch.
-Their intent is satisfied the moment it applies; re-running any of them could only regress.
-
-**Scope it to the eight unrecorded rows above, not the three originally identified** — the
-first inventory of this hazard missed `20260721107000` and the three May migrations.
+**Scope: seven rows, not eight.** The eight-unrecorded figure above includes
+`20260813030000` itself, which the apply records on its own. Attempting to insert it again
+would collide with the apply-generated entry. **Re-run the name-bound inventory after the
+apply** and disposition only the legacy versions that remain.
 
 **Order matters — record them only AFTER the repair has applied and verified.** Doing it
 first would mark the table's creating migration as applied while the table does not exist.
@@ -487,6 +529,27 @@ This is a write to `supabase_migrations.schema_migrations` and therefore a found
 The alternatives are to guarantee the repair always runs last after any catch-up, or to never
 run a catch-up — both rely on process holding indefinitely, which is what produced this
 outage in the first place.
+
+### The repo's replay config contradicts this measurement — the config is wrong
+
+`config/local-supabase-replay-compatibility.json` states, for its `20260721107000` /
+`20260721194325` no-op pair: *"Production records 20260721107000; the later Lovable export
+repeats referral code generation and pending-referral capture functions and triggers."*
+
+**That is the exact reverse of production.** Measured: no ledger row mentions `referral`,
+`pending_capture`, or `20260721107000` under any column or version range, while
+`20260721194325_f96507e6-…` is present as version `20260721194327`. Production records the
+**later** file, not the earlier one.
+
+The referral objects themselves do exist (`generate_referral_code`, `convert_referral`,
+`profiles.referral_code` all present) — installed by `20260721194325`, which carries them
+(`referral_code` ×19, `convert_referral` ×3). So object presence does not disambiguate the
+two; only the ledger does, and the ledger says the config's rationale is stale.
+
+**Trust the live ledger over the config.** The config's *behaviour* — no-op the duplicate
+during local replay — is unaffected either way, since both files install the referral
+objects; only its stated reason is wrong. Correcting that file is out of scope for this
+docs-only PR and needs its own change, because the entry carries pinned SHA-256 hashes.
 
 ## Applying the fix
 
@@ -598,9 +661,15 @@ Worth recording, because it is the reusable lesson rather than a detail of this 
   `gtag` loaded, this event may well have been delivered. What is actually true is narrower:
   the **authenticated GA4 baseline is `BLOCKED`**, so we cannot read GA4 to find out. Ingestion
   and visibility are therefore `BLOCKED` / `NOT_MEASURED` per `AGENTS.md` — "when an outcome
-  cannot be measured, report the blocker instead of claiming success". Checking GA4 for
-  `signup_failed` events since 2026-07-21 is a genuine open lead: a nonzero count would be the
-  first direct evidence that a real visitor hit this.
+  cannot be measured, report the blocker instead of claiming success".
+
+  Checking GA4 for `signup_failed` since 2026-07-21 is a genuine open lead, but **treat it as
+  a lead and nothing more.** `Auth.tsx` emits that event with `reason: "auth_rejected"` for
+  **every** `supabase.auth.signUp` error — rate limiting, duplicate account, provider outage,
+  a rejected password. A nonzero count would therefore be consistent with this outage but
+  would not demonstrate it; it only becomes evidence when correlated with a server-side
+  `42P01` in the database logs for the same window. A **zero** count would be the more
+  informative result, since it would be hard to reconcile with anyone having hit this at all.
 - **No test could catch it.** Every repo test touching this subsystem is a static scan that
   pins SQL text in migration *files*. The runtime lane (`test:security-db-local`) does a
   `supabase db reset`, which applies **every** migration to a fresh database — where the table

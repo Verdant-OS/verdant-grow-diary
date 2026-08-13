@@ -4,6 +4,21 @@
 V4, V6 of `docs/ecowitt-real-ingest-phase-1-8-specification.md`. Generated 2026-08-13;
 code fingerprints extracted from `origin/verdant-grow-diary` at tip `6434ea2a8`.
 
+> **STATUS UPDATE — 2026-08-13, after the first execution of this sheet.**
+> **V1 and V4 now `PASS`; do not re-run them** (their sections are retained for
+> reproducibility and audit). **Only V3 and V6 remain.** Two lessons from that run,
+> folded into the sections below:
+>
+> - **V6 needs the right role.** A `psql` session failed at
+>   `set local role authenticated` with `ERROR: permission denied to set role`,
+>   blocking all four assertions. **Studio's SQL editor connects as `postgres`, which
+>   can `SET ROLE`** — run the probes there, or drive the assertions through PostgREST
+>   with a real user JWT (the truer client-role harness).
+> - **V3 has no runtime shortcut.** Do not infer the deployed build from stored-row
+>   metadata: no row in the live table carries `raw_payload.passkey_fingerprint`, which
+>   the current row builder sets unconditionally, so no stored row is attributable to
+>   the current `ecowitt-ingest`. The deployed body itself is the only evidence.
+
 Copy everything below the line into a Claude session that has Browser access and where
 the operator is **already signed in** to https://supabase.com/dashboard with an account
 that is a member of production org `wpczgwxsriezaubncuom` — or hand it to Lovable
@@ -50,9 +65,9 @@ criterion you need is embedded below. Do not guess anything that is not here.
 
 ## Context (already settled — do not re-verify)
 
-- Spec verdict is `HOLD — approvable`. V2 = `PASS`, V5a = `PASS`, V5b =
-  `NOT_APPLICABLE`, all owner decisions (D1–D6) ruled. Approval waits **only** on
-  V1, V3, V4, V6.
+- Spec verdict is `HOLD — approvable`. V1 = `PASS`, V2 = `PASS`, V4 = `PASS`,
+  V5a = `PASS`, V5b = `NOT_APPLICABLE`, all owner decisions (D1–D6) ruled. Approval
+  waits **only** on **V3 and V6**.
 - Deploy branch is `verdant-grow-diary`; its tip when this prompt was generated:
   `6434ea2a8`. The fingerprints below were extracted from that ref.
 - `sensor_readings` is long format: one row per (tent, metric, sample). The
@@ -233,8 +248,24 @@ findings`, listed). Enumeration incomplete ⇒ do not claim PASS.
 ## V6 — Runtime RLS probes (all deny-expected; every block ends in rollback)
 
 Run each block as ONE SQL Editor submission. If `set local role authenticated` itself
-errors (the Studio connection may refuse SET ROLE), record V6 as `BLOCKED` with the
-exact error text and stop probing — do not improvise a workaround.
+errors, record V6 as `BLOCKED` with the exact error text and stop probing — do not
+improvise a workaround.
+
+> **Known failure, observed 2026-08-13:** a `psql` session connected as a non-superuser
+> returned `ERROR: permission denied to set role "authenticated"` on Probe A, aborting
+> the transaction and blocking all four assertions. **Run these in Studio's SQL editor**,
+> whose connection is `postgres` and may `SET ROLE`. If your transport is not Studio,
+> confirm the connecting role can `SET ROLE authenticated` **before** starting — e.g.
+> `begin; set local role authenticated; rollback;` — and if it cannot, switch transport
+> rather than reporting four separate blocked assertions. The alternative and truer
+> harness is to mint a real user JWT and drive the same four assertions through
+> PostgREST as the `authenticated` client role.
+>
+> **Do not run V6 through the repo's `supabase` MCP server.** `.mcp.json` pins it to
+> `read_only=true`, so every INSERT/UPDATE/DELETE probe is refused by the transport with
+> "cannot execute … in a read-only transaction" — which is **indistinguishable** from an
+> RLS denial and must never be read as an assertion passing. That connector is for V1,
+> V3, and V4 only.
 
 **Probe A — assertion 1: authenticated owner cannot INSERT `source='live'`:**
 

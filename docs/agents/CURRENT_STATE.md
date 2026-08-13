@@ -175,16 +175,37 @@ helpers eliminate every else→`live` fallthrough across 11+ read models with pi
 tests; active-writer transport tags (`pi_bridge`, `ecowitt`) map to `live` deliberately
 via an explicit compat set. V5 is split — V5a
 (invalid-provenance read fences) is mandatory and unconditional, V5b (stale fences)
-conditional on D4. All owner decisions are ruled. Spec advances to `APPROVED` when **V1, V3, V4, and V6
-pass** — all four blocked on live access (V2, V5a `PASS`; V5b `NOT_APPLICABLE`).
-**Third attempt 2026-08-13 — root cause isolated:** the blocker is **org membership,
-not connector scope**. The re-granted Supabase MCP connector reaches only the sandbox
-(`bzatgtgjvuojpoxcknaa`), and the Supabase account signed in on the owner's machine
-belongs to exactly two orgs, neither of them production `wpczgwxsriezaubncuom` — Studio
-redirects away from the project. Unblock: the identity owning `wpczgwxsriezaubncuom`
-invites the owner's dashboard account (then re-scope the connector), or hand the run to
-Lovable. Turnkey run sheet: `docs/ecowitt-phase-1-8-studio-verification-prompt.md`
-(spec's 2026-08-13 attempt record has the full evidence).
+conditional on D4. All owner decisions are ruled.
+
+**V1 and V4 PASSED 2026-08-13** — owner-run `psql` against production, outside the agent
+environment. V1: the live `validate_sensor_reading` matches migration `20260617164759`
+with no diff (9 metrics, 4 qualities, 19 sources, NaN guard, +5-min bound, soil_temp_c
+−20..80); both duplicate triggers exist and are enabled; `sensor_readings_dedupe_uidx` is
+non-partial in the pinned column order. V4: **29,743** `source='live'` EcoWitt rows
+enumerated exhaustively, **0 defects**, legacy `source='ecowitt'` count **0**.
+
+**Spec now advances to `APPROVED` on just V3 + V6.** V3 needs one read of the deployed
+Edge function bodies/versions (dashboard, Management API, or a production-scoped MCP
+connector). V6 needs a role permitted to `SET ROLE authenticated` — the owner's `psql`
+role was refused; Studio's `postgres` connection qualifies, or drive the four assertions
+through PostgREST with a real user JWT. Turnkey run sheet:
+`docs/ecowitt-phase-1-8-studio-verification-prompt.md`.
+
+**Three findings carried out of the 2026-08-13 run** (full evidence in the spec's second
+attempt record): **F1** — no row in `sensor_readings` is attributable to the current
+`ecowitt-ingest` build (`passkey_fingerprint` absent on all 29,743 rows; vendor is not the
+type-pinned literal), so V3 has **no** runtime corroboration and the deployed body is the
+only remaining evidence of that endpoint's behavior. **F2 (owner)** — 29,738 of those
+`live` rows are testbench traffic (`vendor='ecowitt_windows_testbench'`) and none is newer
+than 2026-07-14, so production carries **no verified real live EcoWitt telemetry**;
+relabeling is not authorized (source is a dedupe-key column). **F3** — **zero** tents
+carry `hardware_config ? 'ecowitt'`, so the deployed passkey→tent routing can resolve no
+gateway POST today, and D2 Option A's designation surface is unpopulated.
+
+Access note (2026-08-13): the Supabase MCP connector still reaches only the sandbox
+(`bzatgtgjvuojpoxcknaa`), and the dashboard account on the owner's machine is not a member
+of production org `wpczgwxsriezaubncuom` — Studio redirects away from the project. That is
+an org-membership gap, not a connector-scope one.
 
 | Phase 2 gate item                             | Status                                                                                         |
 | --------------------------------------------- | ---------------------------------------------------------------------------------------------- |
@@ -221,3 +242,23 @@ measurement. Whether EcoWitt supersedes it is Cheek's call, not an agent's.
 `build/07-skill-evaluation-harness`. CI green at `22d9054d3`. Five findings open. This is
 internal AI-skill infrastructure and does not touch public content, SEO, or the routes
 above. Do not conflate the two workstreams.
+
+---
+
+## Unrelated work resolved
+
+`PR #779` — Quick Log v2: asserts the retry success path (`applyQuickLogV2Refresh` +
+`verdant:entry-created` dispatch) fires exactly once, and stays silent on a half-committed
+retry. Test-only, **merged to `main`** at `b6d74794` (2026-08-07).
+
+A companion fix, `PR #777`, was opened for what looked like a live duplicate-save-on-retry
+bug, then found redundant: `main` already carried a more complete fix in `PR #317`
+(`11adbd4e1`, merged 2026-07-18 — `committedMainLogRef` + `saveInFlightRef`, which also
+closes a concurrent-double-tap race #777 only flagged as deferred). `#777` was closed
+without merging. `#779` salvaged the one real coverage gap #317's own tests missed.
+
+Neither PR touches public content, SEO, or the routes above — do not conflate with the
+slice tracked in this file. Local full-parallel `vitest` closure runs on the implementing
+agent's machine were noisy (nondeterministic 5000ms timeouts, zero assertion failures) —
+a known local-only artifact, not a regression. The isolated single-file run and GitHub
+Actions CI (8 shards, green) are the trustworthy signals, not the noisy parallel run.

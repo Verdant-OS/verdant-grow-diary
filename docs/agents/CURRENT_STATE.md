@@ -86,7 +86,7 @@ findings that generalize beyond this one sweep — read before trusting a green 
 reflects that an Approve event was submitted, not that every inline finding was
 addressed. Check `reviewThreads` for `isResolved: false` separately — e.g.
 `gh api graphql -f query='query{repository(owner:"Verdant-OS",name:"verdant-grow-diary"){pullRequest(number:N){reviewThreads(first:50){nodes{isResolved comments(first:1){nodes{body}}}}}}}'`.
-Of 8 open PRs whose CI rollup showed `SUCCESS`, 6 had a real blocker underneath:
+Of 8 open PRs whose CI rollup showed `SUCCESS`, 7 had a real blocker underneath:
 
 | PR               | Looked green because | Actually blocked by                                                                                                                                                                                                                                                            |
 | ---------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |

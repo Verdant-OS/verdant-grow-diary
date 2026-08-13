@@ -248,16 +248,27 @@ in the originating Claude Code session; not reproduced here):
   now only a client-side redirect to `/welcome`. No app-wide demo-mode write-exclusion
   mechanism exists for any public surface.
 - `PARTIALLY_ACCURATE` — CSV/TSV handling is a read-only review surface with disabled
-  persistence: true for the specific `CsvPreviewReviewGate.tsx` / `/sensors/csv-preview`
-  surface (still unreachable from any live route). False as a description of Verdant's
-  overall CSV capability — a separate, live, authenticated flow
-  (`EnvironmentCsvImportLauncher` → `environmentCsvImportPersistence.ts`, mounted in
-  `src/pages/Sensors.tsx`) really does insert into `sensor_readings` on confirm, shipped
-  2026-06-28, before the pack's own capture date.
+  persistence: true for `CsvPreviewReviewGate.tsx` itself, which remains genuinely
+  unreachable (imported only by its own test files, no page or route mounts it) — but
+  that component is distinct from the public `/sensors/csv-preview` route, which is a
+  live, reachable page (`src/pages/SensorCsvPreview.tsx` mounting
+  `CsvSensorPreviewPanel.tsx`, linked from `/hardware-integrations` and
+  `/partners/csv-preview`). `/sensors/csv-preview` is read-only in the same sense —
+  no Supabase/network call in that component either — so the no-persistence verdict
+  holds, but "unreachable" does not; do not conflate the two components. Separately,
+  a live, authenticated write flow (`EnvironmentCsvImportLauncher` →
+  `environmentCsvImportPersistence.ts`, mounted in `src/pages/Sensors.tsx`) really
+  does insert into `sensor_readings` on confirm, shipped 2026-06-28, before the
+  pack's own capture date — so "CSV/TSV handling" as a whole is not read-only either.
 - `PARTIALLY_ACCURATE` — grower action follow-up evidence supported, outcomes never
   inferred, automatic diary creation unsupported: the outcome-never-inferred half holds.
-  But `ActionDetail.tsx` does auto-insert a templated, outcome-less `diary_entries` marker
-  row on every Action Queue completion — a mechanism from 2026-05-26, predating the pack.
+  But `ActionDetail.tsx` does auto-insert (best-effort, not transactional — an insert
+  failure does not roll back the completed status) a templated, outcome-less
+  `diary_entries` marker row when an action is completed **from the Action Detail
+  page** — a mechanism from 2026-05-26, predating the pack. This is narrower than "every
+  Action Queue completion": completing via the Action Queue **list's** own "Mark
+  Complete" control (`ActionQueue.tsx`, calling the `action_queue_transition` RPC
+  directly) does not create a diary row at all.
 - `PARTIALLY_ACCURATE` — real-data One-Tent smoke test blocked pending an actual tent
   reading, ghost seeding prohibited: the ghost-seeding prohibition is real and current.
   The actual block condition is a missing authenticated managed Supabase session, not

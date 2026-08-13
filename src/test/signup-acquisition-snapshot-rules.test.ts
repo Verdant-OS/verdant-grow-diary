@@ -23,6 +23,7 @@ describe("signup acquisition snapshot rules", () => {
         context_check: 1,
         vpd_calculator: 4,
         csv_history: 5,
+        blueprint_targets: 3,
         email: "must-not-survive@example.com",
       },
       user_id: "must-not-survive",
@@ -49,6 +50,7 @@ describe("signup acquisition snapshot rules", () => {
         contextCheck: 1,
         vpdCalculator: 4,
         csvHistory: 5,
+        blueprintTargets: 3,
       },
     });
     expect(JSON.stringify(parsed)).not.toContain("must-not-survive");

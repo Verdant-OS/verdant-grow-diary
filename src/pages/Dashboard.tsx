@@ -78,8 +78,7 @@ import {
   EMPTY_ALERTS_MESSAGE,
   type EnvironmentAlert,
 } from "@/lib/environmentAlerts";
-import { isSnapshotPersistable } from "@/lib/environmentAlertPersistence";
-import { FRESHNESS_WINDOW_LABEL } from "@/lib/alertFreshnessContext";
+import { describeAlertSaveBlock } from "@/lib/alertFreshnessContext";
 import { saveAlert, logAlertEvent } from "@/lib/alerts";
 import { usePersistEnvironmentAlerts } from "@/hooks/usePersistEnvironmentAlerts";
 import { useAlertsList } from "@/hooks/useAlertsList";
@@ -1373,10 +1372,17 @@ export default function Dashboard() {
               // which is the tighter live-window bar — the same gate the
               // automatic persistence path uses. Without this, the manual Save
               // button would bypass the invariant the automatic path enforces.
-              const canPersistAlerts = isSnapshotPersistable({
+              // Render-time value, used ONLY for the button's affordance. It
+              // ages: `now` defaults to the current clock, so a snapshot that
+              // was inside the window at render can be outside it by the time
+              // the grower clicks (between useNowTick ticks, or while a
+              // background tab's timers are throttled). The write itself must
+              // therefore re-evaluate — see the handler below.
+              const saveBlockedReason = describeAlertSaveBlock({
                 snapshot: snap,
                 quality: quality.quality,
               });
+              const canPersistAlerts = saveBlockedReason === null;
               const vpdStageMissing =
                 snap?.vpd != null && normalizeVpdStage(alertContextStage) === "unknown";
               return (
@@ -1427,15 +1433,22 @@ export default function Dashboard() {
                                   size="sm"
                                   variant="outline"
                                   disabled={!canPersistAlerts}
-                                  title={
-                                    canPersistAlerts
-                                      ? undefined
-                                      : `This reading is outside the ${FRESHNESS_WINDOW_LABEL}, so it cannot raise a new alert. Enter a fresh manual snapshot.`
-                                  }
+                                  title={saveBlockedReason ?? undefined}
                                   onClick={async () => {
-                                    // Belt and braces: the disabled state above
-                                    // is UX, this is the invariant.
-                                    if (!canPersistAlerts) return;
+                                    // Re-evaluate against the CURRENT clock.
+                                    // The render-time value is a cached boolean
+                                    // that goes stale as the snapshot ages, so
+                                    // checking it here would only re-read the
+                                    // same answer and could still write an
+                                    // expired reading as a brand-new alert.
+                                    const blockedNow = describeAlertSaveBlock({
+                                      snapshot: snap,
+                                      quality: quality.quality,
+                                    });
+                                    if (blockedNow !== null) {
+                                      toast.error(blockedNow);
+                                      return;
+                                    }
                                     try {
                                       const saved = await saveAlert({
                                         grow_id: scopedGrowId,

@@ -374,7 +374,8 @@ export default function Dashboard() {
             const isStaleSnap =
               sensorState.status === "ok" &&
               !!sensorState.snapshot.ts &&
-              isStale(sensorState.snapshot.ts);
+              // Capture time beats ingest ts for freshness when present.
+              isStale(sensorState.snapshot.captured_at ?? sensorState.snapshot.ts);
             const isInvalidSnap = !!snapshotQuality && snapshotQuality.suspiciousFields.length > 0;
             if (!anyReading) {
               return (
@@ -773,12 +774,19 @@ export default function Dashboard() {
                   </Badge>
                   {sensorState.snapshot.ts && (
                     <span className="text-xs text-muted-foreground">
-                      {formatDistanceToNow(new Date(sensorState.snapshot.ts), {
-                        addSuffix: true,
-                      })}
+                      {formatDistanceToNow(
+                        new Date(
+                          sensorState.snapshot.captured_at ?? sensorState.snapshot.ts,
+                        ),
+                        {
+                          addSuffix: true,
+                        },
+                      )}
                     </span>
                   )}
-                  {isStale(sensorState.snapshot.ts) && (
+                  {isStale(
+                    sensorState.snapshot.captured_at ?? sensorState.snapshot.ts,
+                  ) && (
                     <Badge
                       variant="outline"
                       className="text-[10px] uppercase border-amber-500 text-amber-600"
@@ -1063,7 +1071,7 @@ export default function Dashboard() {
                   )}
                   {(() => {
                     const vpdValue = snap?.vpd ?? null;
-                    const stale = snap ? isStale(snap.ts) : false;
+                    const stale = snap ? isStale(snap.captured_at ?? snap.ts) : false;
                     const vpd = classifyVpdAgainstStage({
                       value: vpdValue,
                       stage: scopedGrow?.stage ?? null,

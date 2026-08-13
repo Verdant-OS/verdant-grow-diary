@@ -127,6 +127,22 @@ describe("isSnapshotPersistable — source allowlist", () => {
       }),
     ).toBe(false);
   });
+  it("old captured_at with fresh ingest ts → NOT persistable", () => {
+    // A delayed bridge insert has a recent ts but an old capture time; the
+    // capture time governs freshness so old telemetry never backs an alert.
+    expect(
+      isSnapshotPersistable({
+        snapshot: {
+          ...base,
+          source: "live",
+          ts: new Date(NOW - 60_000).toISOString(),
+          captured_at: new Date(NOW - 60 * 60 * 1000).toISOString(),
+        },
+        quality: "good",
+        now: NOW,
+      }),
+    ).toBe(false);
+  });
 });
 
 describe("end-to-end: sim sensor readings never persist alerts", () => {

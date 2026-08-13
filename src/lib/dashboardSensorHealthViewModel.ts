@@ -153,8 +153,16 @@ export function buildDashboardSensorHealthSummary(
   const resolved = resolveSensorSourceLabel({ source: canonical, vendor: null });
   let sourceLabel = resolved.label;
 
-  const stale = isStale(snapshot.ts, now);
-  const invalid = quality.suspiciousFields.length > 0;
+  // A persisted quality label on the SOURCE forces the matching status —
+  // a fresh, plausible-looking snapshot whose source is stale/invalid must
+  // never render a green Healthy pill. Freshness itself is graded from the
+  // explicit capture time when present; `ts` is the ingest timestamp and
+  // can be fresher than the actual capture.
+  const stale =
+    snapshot.source === "stale" ||
+    isStale(snapshot.captured_at ?? snapshot.ts, now);
+  const invalid =
+    snapshot.source === "invalid" || quality.suspiciousFields.length > 0;
 
   // Source-label truth: stale/invalid override label even if source === live.
   // Manual/csv/demo/stale/invalid never get promoted to "Live" upstream.

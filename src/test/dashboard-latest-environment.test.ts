@@ -134,6 +134,11 @@ describe("sensorSnapshot pure helpers", () => {
     expect(snap!.source).toBe("demo");
   });
 
+  it("useLatestSensorSnapshot selects and maps captured_at for the fold", () => {
+    expect(HOOK).toMatch(/select\(\s*["']ts,metric,value,source,captured_at/);
+    expect(HOOK).toMatch(/captured_at:/);
+  });
+
   it("snapshotFromReadings carries captured_at (capture time beats ingest ts)", () => {
     const ts = "2026-05-20T11:55:00Z"; // fresh ingest timestamp
     const capturedAt = "2026-05-19T08:00:00Z"; // much older actual capture

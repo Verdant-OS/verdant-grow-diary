@@ -26,6 +26,33 @@ inside the active governance handoff.
 
 ---
 
+## ⚠️ Open production incident — attributed signups hard-fail
+
+**Status 2026-08-13: OPEN. Fix merged, NOT applied. Production is still broken.**
+
+Account creation aborts for any signup carrying an allowlisted acquisition source —
+including the front-door CTA on `/` and `/welcome`. The live `handle_new_user`
+INSERTs into `public.signup_acquisition_attributions`, which does not exist, and that
+INSERT sits outside the function's EXCEPTION block. Result: `42P01` → the AFTER INSERT
+trigger on `auth.users` aborts → the row rolls back → GoTrue returns HTTP 500
+"Database error saving new user". **The account is never created.**
+
+Not every signup: Google OAuth, magic link, and a bare `/auth?mode=signup` resolve to NULL
+and still succeed. **Do NOT extend that to "traffic carrying its own utm params is fine".**
+`Landing.tsx:60` falls back to `landing_page` for an absent, partial, or unrecognized inbound
+tuple and then rebuilds the signup URL with the exact allowlisted triple, so any visitor who
+lands on `/` or `/welcome` first — the normal path for an ad click or a search result — is
+re-attributed and fails. Only a non-exact tuple supplied **directly to `/auth`** is unaffected.
+
+Fix is `supabase/migrations/20260813030000_signup_acquisition_forward_repair.sql`, merged
+in #969. **Merging did not fix it** — only a Lovable apply does, and the frontend half was
+already deployed ahead of the repo.
+
+**Full detail, evidence, apply steps and post-apply verification:**
+`docs/signup-attribution-outage-operator-runbook.md`
+
+---
+
 ## Branch topology
 
 | Branch               | Role                                             | Verified head                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |

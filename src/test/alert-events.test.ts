@@ -162,15 +162,69 @@ describe("Dashboard save-alert audit wiring", () => {
     // calls saveAlert directly. Left ungated it would write a `public.alerts`
     // row — stamped first_seen_at = now() — from a reading the automatic path
     // refuses, silently reopening the exact hole the gate exists to close.
-    expect(DASHBOARD).toMatch(/import\s*\{[^}]*isSnapshotPersistable[^}]*\}\s*from/);
-    // The gate result must be computed and bound to the button's disabled state.
-    expect(DASHBOARD).toMatch(/canPersistAlerts\s*=\s*isSnapshotPersistable\(/);
+    expect(DASHBOARD).toMatch(/import\s*\{[^}]*describeAlertSaveBlock[^}]*\}\s*from/);
+    // The gate result must be bound to the button's disabled state.
     expect(DASHBOARD).toMatch(/disabled=\{!canPersistAlerts\}/);
-    // ...and re-checked inside the handler, so a re-enabled button cannot write.
+
+    // ...and the handler must RE-EVALUATE the gate, not re-read the boolean
+    // captured at render. `now` defaults to the current clock, so a cached
+    // value goes stale as the snapshot ages past the window; a guard that only
+    // re-reads it would pass and still write an expired reading.
+    //
+    // An earlier version of this test asserted the literal
+    // `if (!canPersistAlerts) return;`, which is exactly the vacuous check —
+    // it pinned the shape of the guard rather than its effect. Assert a fresh
+    // call inside the handler instead.
     const around = saveAlertHandler();
-    const guardIdx = DASHBOARD.lastIndexOf("if (!canPersistAlerts) return;", DASHBOARD.indexOf(around));
-    expect(guardIdx, "the Save alert handler must re-check the gate before writing").toBeGreaterThan(
+    const handlerStart = DASHBOARD.indexOf(around);
+    const clickStart = DASHBOARD.lastIndexOf("onClick={async () => {", handlerStart);
+    expect(clickStart, "could not locate the Save alert click handler").toBeGreaterThan(-1);
+    const handlerBody = DASHBOARD.slice(clickStart, handlerStart);
+    expect(
+      handlerBody,
+      "the Save alert handler must call describeAlertSaveBlock again at click time",
+    ).toMatch(/describeAlertSaveBlock\(/);
+    expect(
+      handlerBody,
+      "the handler must bail out when the fresh gate result is blocking",
+    ).toMatch(/!==\s*null[\s\S]{0,120}return;/);
+    // The stale cached boolean must NOT be what guards the write.
+    expect(
+      handlerBody,
+      "the handler must not gate the write on the render-time boolean",
+    ).not.toMatch(/if\s*\(\s*!canPersistAlerts\s*\)\s*return;/);
+  });
+
+  it("the save-block gate reads the UNFILTERED snapshot, so context-only sources get an honest reason", () => {
+    // `snap` (dashboardHealthSnapshot) is dashboardSnapshotForHealthyCues(...)
+    // — it collapses any non-live/manual source (sim, csv, diary, unverified)
+    // to null. Gating on `snap` therefore makes `no_snapshot` fire before
+    // `context_only_source` ever can: a grower with a visibly present but
+    // ineligible reading would be told "there is no sensor reading yet",
+    // which is false. Both call sites (render-time affordance and the
+    // click-time re-check) must read `currentSensorSnapshot` instead.
+    const renderCallIdx = DASHBOARD.indexOf("describeAlertSaveBlock(");
+    expect(renderCallIdx, "could not locate the render-time describeAlertSaveBlock call").toBeGreaterThan(
       -1,
+    );
+    const renderCallBlock = DASHBOARD.slice(renderCallIdx, renderCallIdx + 200);
+    expect(renderCallBlock).toMatch(/snapshot\s*:\s*currentSensorSnapshot/);
+    expect(renderCallBlock, "must not gate on the health-filtered snapshot").not.toMatch(
+      /snapshot\s*:\s*snap\s*[,}]/,
+    );
+
+    const around = saveAlertHandler();
+    const handlerStart = DASHBOARD.indexOf(around);
+    const clickStart = DASHBOARD.lastIndexOf("onClick={async () => {", handlerStart);
+    const handlerBody = DASHBOARD.slice(clickStart, handlerStart);
+    const clickCallIdx = handlerBody.indexOf("describeAlertSaveBlock(");
+    expect(clickCallIdx, "could not locate the click-time describeAlertSaveBlock call").toBeGreaterThan(
+      -1,
+    );
+    const clickCallBlock = handlerBody.slice(clickCallIdx, clickCallIdx + 200);
+    expect(clickCallBlock).toMatch(/snapshot\s*:\s*currentSensorSnapshot/);
+    expect(clickCallBlock, "must not gate on the health-filtered snapshot").not.toMatch(
+      /snapshot\s*:\s*snap\s*[,}]/,
     );
   });
 

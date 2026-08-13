@@ -28,6 +28,7 @@ const EXIT = Object.freeze({
   QUERY_FAILED: 5,
   TARGET_IDENTITY_REJECTED: 6,
   OBSERVATION_UNREADABLE: 7,
+  SIBLING_OVERLOAD_DETECTED: 8,
 });
 
 const TARGET_ENV = process.env.TARGET_ENV ?? "unspecified";
@@ -62,6 +63,7 @@ function reportMarkdown(report) {
   failed.push(
     ...report.result_sidecar.failed_checks.map((check) => `- result sidecar: \`${check.id}\``),
   );
+  const siblingOverloads = report.sibling_overloads ?? [];
   return [
     `### AI-credit service contract effect — ${String(report.target_env).toUpperCase()}`,
     "",
@@ -74,10 +76,30 @@ function reportMarkdown(report) {
           ? "FAIL — drift detected"
           : "PASS — no drift detected"
     }**`,
+    `- sibling_overloads_detected: **${
+      statuses.sibling_overloads_detected === null
+        ? "BLOCKED"
+        : statuses.sibling_overloads_detected
+          ? "FAIL — sibling overload(s) found"
+          : "PASS — pinned signature is the only entry point"
+    }**`,
     `- verification_blocked: **${statuses.verification_blocked ? "BLOCKED" : "PASS"}**`,
     "",
     ...(report.blocked_reason ? [`Blocked reason: \`${report.blocked_reason}\``, ""] : []),
     ...(failed.length ? ["Failed contract checks:", "", ...failed, ""] : []),
+    ...(siblingOverloads.length
+      ? [
+          "Sibling overloads (same function name, different argument signature):",
+          "",
+          ...siblingOverloads.map((row) => {
+            const grantees = row.execute_grantees.length
+              ? row.execute_grantees.map((grantee) => `\`${grantee}\``).join(", ")
+              : "no roles";
+            return `- \`public.${row.name}(${row.identity_arguments ?? "unknown arguments"})\`: EXECUTE granted to ${grantees}`;
+          }),
+          "",
+        ]
+      : []),
     "This is a read-only catalog/body inspection. It does not invoke either money function.",
     "Raw function definitions and database connection material are not persisted.",
     "",
@@ -93,6 +115,7 @@ function finish(report, exitCode, message) {
       migration_applied: report.statuses.migration_applied,
       contract_effective: report.statuses.contract_effective,
       definition_drift_detected: report.statuses.definition_drift_detected,
+      sibling_overloads_detected: report.statuses.sibling_overloads_detected,
       verification_blocked: report.statuses.verification_blocked,
     }),
   );
@@ -129,8 +152,18 @@ if (!DB_URL && !HAS_PG_ENV) {
   );
 }
 
+function functionNameFromSignature(signature) {
+  const match = /^public\.([a-zA-Z_][a-zA-Z0-9_]*)\(/.exec(signature);
+  if (!match) {
+    throw new Error(`Could not parse a bare function name from signature: ${signature}`);
+  }
+  return match[1];
+}
+
 const spend = AI_CREDIT_SERVICE_SIGNATURES.spend;
 const refund = AI_CREDIT_SERVICE_SIGNATURES.refund;
+const spendName = functionNameFromSignature(spend);
+const refundName = functionNameFromSignature(refund);
 const sql = `
 WITH target(signature) AS (
   VALUES ('${spend}'::text), ('${refund}'::text)
@@ -154,6 +187,30 @@ WITH target(signature) AS (
   FROM resolved r
   LEFT JOIN pg_proc proc ON proc.oid = r.oid
   LEFT JOIN pg_language lang ON lang.oid = proc.prolang
+), sibling_rows AS (
+  -- to_regprocedure() above only ever resolves the exact pinned signature; it
+  -- cannot see other overloads sharing the same function name. Enumerate every
+  -- pg_proc row for these names directly so a reintroduced legacy overload
+  -- (e.g. with grants left over from before the forward-reassert migration)
+  -- cannot hide from this verifier the way it hides from to_regprocedure().
+  SELECT
+    p.oid,
+    p.proname,
+    oidvectortypes(p.proargtypes) AS identity_arguments,
+    COALESCE((
+      -- LEFT JOIN, not JOIN: aclexplode() emits grantee OID 0 for a PUBLIC
+      -- grant, and pg_roles has no row for OID 0. An inner join here would
+      -- silently drop PUBLIC from the reported grantees — the worst-case
+      -- exposure this check exists to surface, understated as "no roles".
+      SELECT jsonb_agg(DISTINCT COALESCE(grantee.rolname, 'PUBLIC') ORDER BY COALESCE(grantee.rolname, 'PUBLIC'))
+      FROM aclexplode(COALESCE(p.proacl, acldefault('f', p.proowner))) AS acl
+      LEFT JOIN pg_roles grantee ON grantee.oid = acl.grantee
+      WHERE acl.privilege_type = 'EXECUTE'
+    ), '[]'::jsonb) AS execute_grantees
+  FROM pg_proc p
+  WHERE p.pronamespace = 'public'::regnamespace
+    AND p.proname IN ('${spendName}', '${refundName}')
+    AND p.oid NOT IN (SELECT oid FROM resolved WHERE oid IS NOT NULL)
 ), sidecar AS (
   SELECT jsonb_build_object(
     'exists', to_regclass('public.ai_credit_spend_results') IS NOT NULL,
@@ -181,7 +238,15 @@ SELECT jsonb_build_object(
     SELECT jsonb_agg(to_jsonb(function_rows) - 'oid' ORDER BY signature)
     FROM function_rows
   ), '[]'::jsonb),
-  'result_sidecar', (SELECT value FROM sidecar)
+  'result_sidecar', (SELECT value FROM sidecar),
+  'sibling_overloads', COALESCE((
+    SELECT jsonb_agg(jsonb_build_object(
+      'name', proname,
+      'identity_arguments', identity_arguments,
+      'execute_grantees', execute_grantees
+    ) ORDER BY proname, identity_arguments)
+    FROM sibling_rows
+  ), '[]'::jsonb)
 );`;
 
 const psqlEnv = { ...process.env };
@@ -289,6 +354,13 @@ if (report.statuses.migration_applied === false) {
     report,
     EXIT.MIGRATION_MISSING,
     "✗ Forward-reassert migration is not recorded as applied.",
+  );
+}
+if (report.statuses.sibling_overloads_detected === true) {
+  finish(
+    report,
+    EXIT.SIBLING_OVERLOAD_DETECTED,
+    "✗ A sibling overload of a pinned money function name exists; the exact-signature contract is not the only entry point.",
   );
 }
 

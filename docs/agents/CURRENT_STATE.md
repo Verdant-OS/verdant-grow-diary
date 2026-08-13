@@ -5,7 +5,17 @@
 named isolated Convex component sandbox spike, plus the deploy-branch HEAD
 observed while writing that spec. Public-surface, GA4, and release-identity
 rows retain their earlier verification dates; none were re-measured in this
-update)
+update. Same-day follow-up: records the previously-untracked Lovable
+knowledge-pack mechanism and this session's audit of its pre-2026-08-13
+backup content against deploy-branch HEAD `e7690396e` — see the new
+"Completed, out of slice (recorded 2026-08-13)" entry below; that audit's
+evidence is pinned to `e7690396e` and was not re-verified against a later
+tip. Second same-day follow-up, per Codex review on PR #975: the Branch
+topology row below was stale at `6434ea2a8` (#942) even before this file's
+own `e7690396e` (#943) reference was added, and the branch has since moved
+again — refreshed the row to the actual current tip, `fb42ce00e` (#968),
+verified with a fresh `git fetch` rather than by re-asserting either older
+number)
 
 This is the changing shift report. Permanent rules live in `/AGENTS.md`; do not edit
 that constitution to record branch, deployment, blocker, or assignment changes.
@@ -18,10 +28,10 @@ inside the active governance handoff.
 
 ## Branch topology
 
-| Branch               | Role                                             | Verified head                                                                                                                                |
-| -------------------- | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `verdant-grow-diary` | **Deploy branch. Production ships from here.**   | `6434ea2a8` (#942), verified 2026-08-13 with `git rev-parse HEAD` on this checkout (this session did not re-fetch; treat as the local tracking ref). Prior CURRENT_STATE snapshot was `1a9082bb1` (#885) on 2026-08-11 — the queue has advanced; do not carry older validation tables forward |
-| `main`               | Integration branch. It is not production parity. | `b6d747941948ce68157185a2b0847acea6970d44` (#779), verified 2026-08-07                                                                       |
+| Branch               | Role                                             | Verified head                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| -------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `verdant-grow-diary` | **Deploy branch. Production ships from here.**   | `fb42ce00e` (#968), verified 2026-08-13 with `git fetch origin verdant-grow-diary && git rev-parse origin/verdant-grow-diary`. This supersedes both the prior `6434ea2a8` (#942) snapshot in this file and the intermediate `e7690396e` (#943) figure this same edit briefly referenced — the queue moved five more commits past #943 in the time it took to land this correction: `13c935a47` (#964), `43993684e` (#965), `2624a9157` (#971), `2197288bf` (#969), `fb42ce00e` (#968). PR numbers on this branch do not order by merge time (see the note below) — order commits with `git log`, never by PR number. Do not carry older validation tables forward |
+| `main`               | Integration branch. It is not production parity. | `b6d747941948ce68157185a2b0847acea6970d44` (#779), verified 2026-08-07                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 
 `main` and `verdant-grow-diary` are divergent. Do not infer production behavior from
 `main`, and do not backport deploy-only governance or data rules without a scoped branch
@@ -221,6 +231,84 @@ Active status, OAuth 2.1 dashboard setting, endpoint reachability) remains
 of automated (Codex-connector) inline review were verified against source and
 addressed pre-merge. This entry records the work; it does not open a new slice.
 
+**Completed, out of slice (recorded 2026-08-13):** Lovable knowledge-pack mechanism now
+tracked. Cheek supplied a backup of the pre-2026-08-13 Lovable "Workspace/Project
+Knowledge" pack content (`verdant_project_knowledge_BACKUP_pre-2026-08-13.md`, saved
+outside this repo before Lovable's connector overwrote it) with no other instruction.
+Claude audited its 8 factual claims against deploy-branch HEAD `e7690396e` (#943, this
+branch's tip observed at audit time). The Branch topology row above has since been
+refreshed to the branch's actual current tip, `fb42ce00e` (#968) — this audit's evidence
+remains pinned to `e7690396e` specifically and was not re-verified against the newer
+commits. On request, this entry records the mechanism here. This is the first appearance of
+this mechanism anywhere in governance docs: it is a separate, ungoverned knowledge
+surface (Lovable's project-level "Knowledge" field, populated via its own connector) that
+`AGENTS.md`, this file, and every role file were previously silent on.
+
+Audit verdicts (full evidence trail — file/line citations, git commits, PR numbers — lives
+in the originating Claude Code session; not reproduced here):
+
+- `PARTIALLY_ACCURATE` — public `/welcome` + `/demo` shipped with writes excluded from a
+  "demo mode": `/welcome` holds; `/demo` does not — the standalone Demo page was deleted
+  2026-06-03, six weeks before the pack's own ~2026-07-14 capture window, and `/demo` is
+  now only a client-side redirect to `/welcome`. No app-wide demo-mode write-exclusion
+  mechanism exists for any public surface.
+- `PARTIALLY_ACCURATE` — CSV/TSV handling is a read-only review surface with disabled
+  persistence: true for `CsvPreviewReviewGate.tsx` itself, which remains genuinely
+  unreachable (imported only by its own test files, no page or route mounts it) — but
+  that component is distinct from the public `/sensors/csv-preview` route, which is a
+  live, reachable page (`src/pages/SensorCsvPreview.tsx` mounting
+  `CsvSensorPreviewPanel.tsx`, linked from `/hardware-integrations` and
+  `/partners/csv-preview`). `/sensors/csv-preview` is read-only in the same sense —
+  no Supabase/network call in that component either — so the no-persistence verdict
+  holds, but "unreachable" does not; do not conflate the two components. Separately,
+  a live, authenticated write flow (`EnvironmentCsvImportLauncher` →
+  `environmentCsvImportPersistence.ts`, mounted in `src/pages/Sensors.tsx`) really
+  does insert into `sensor_readings` on confirm, shipped 2026-06-28, before the
+  pack's own capture date — so "CSV/TSV handling" as a whole is not read-only either.
+- `PARTIALLY_ACCURATE` — grower action follow-up evidence supported, outcomes never
+  inferred, automatic diary creation unsupported: the outcome-never-inferred half holds.
+  But `ActionDetail.tsx` does auto-insert (best-effort, not transactional — an insert
+  failure does not roll back the completed status) a templated, outcome-less
+  `diary_entries` marker row when an action is completed **from the Action Detail
+  page** — a mechanism from 2026-05-26, predating the pack. This is narrower than "every
+  Action Queue completion": completing via the Action Queue **list's** own "Mark
+  Complete" control (`ActionQueue.tsx`, calling the `action_queue_transition` RPC
+  directly) does not create a diary row at all.
+- `PARTIALLY_ACCURATE` — real-data One-Tent smoke test blocked pending an actual tent
+  reading, ghost seeding prohibited: the ghost-seeding prohibition is real and current.
+  The actual block condition is a missing authenticated managed Supabase session, not
+  literally an absent physical tent reading — once authenticated, the e2e spec enters a
+  scripted, labeled "manual" reading.
+- `STALE_NOW_DIFFERENT` — AI Doctor semantic output evaluator labeled an unmerged draft
+  PR: [PR #230](https://github.com/Verdant-OS/verdant-grow-diary/pull/230) is confirmed
+  **MERGED** (2026-07-14) and wired into required CI (`ci.yml` step
+  `ai_doctor_output_eval`). Its content landed on the deploy branch via squash commit
+  `0c4b3c1a4`, titled after unrelated PR #229 ("harden re-consent gate") — another
+  instance of this repo's known squash-merge title/content mismatch pattern (see the
+  #586/#809/#812 entry above for a prior example).
+- `PARTIALLY_ACCURATE` — expanded pheno taxonomy migration merged but unverified on the
+  live schema, cross-form UI gated pending confirmation: the migration-merged half holds,
+  and production-schema verification remains genuinely `BLOCKED` from any agent session
+  (same sandbox-vs-production Supabase MCP mismatch already documented in the #586 entry
+  above). But no schema-confirmation gate exists in the live `PhenoKeepersPage` code — it
+  silently degrades to an empty list / generic error on any Supabase error instead of
+  holding for confirmation.
+- `STILL_ACCURATE` — EcoWitt continuous live sync unverified until one real payload
+  completes the full payload → dry-run → webhook → in-app provenance path: the repo's own
+  acceptance ledger (`docs/ecowitt-hardware-validation-runbook.md`, "Final live proof
+  ledger") remains a blank template as of its last edit (2026-07-18); every EcoWitt CI
+  lane runs on fixtures/mocks only. This file carried zero EcoWitt mentions before this
+  edit.
+- `STILL_ACCURATE` — Quick Log legacy and V2 contracts remain separate with typecheck as
+  a stop-ship gate: unchanged since PR #156 (2026-07-06); `quicklog-gate.yml` still runs
+  `bun run typecheck` as a hard first gate before either note-sync test suite.
+
+This entry does not authorize any new automation to keep the Lovable pack synchronized
+with this repo, does not assign an owner for that mechanism going forward, and does not
+claim the pack that replaced it on 2026-08-13 (which no agent session has read) is
+accurate — only that the mechanism now exists in governance memory and that its prior
+content's accuracy has been checked once.
+
 In scope — these bullets scope the **Mode A SEO parent program above**, not the completed
 #809 entry:
 
@@ -344,11 +432,11 @@ schema change and does not authorize production writes.
 
 ## Agents currently assigned
 
-| Agent             | Assignment                                                            |
-| ----------------- | --------------------------------------------------------------------- |
+| Agent             | Assignment                                                                                                                                                                                                                                                                                    |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Codex             | Standing SEO measurement readiness and analytics integrity. Queued after the Convex spec merges: Phase 1 of `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` only (see `docs/specs/convex-component-physical-sandbox-spike.md`). Do not start Convex work if it collides with an in-flight SEO slice |
-| Claude            | `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` specification (docs-only). Not implementation. Prior completed out-of-slice work (#586/#809/#812/#885) unchanged |
-| Grok              | Unassigned. Prior same-session HOLD on unapproved Convex expansion is superseded only for this named isolated spike; production Convex remains HOLD |
-| Security reviewer | Unassigned until Phase 1 spike code exists; then review before any Convex cloud credential |
-| Gemini            | Unassigned                                                            |
-| Council Chair     | Unassigned until Phase 1 proof tests exist; then compare Convex sandbox vs a possible Postgres-roles alternative (out of this slice) |
+| Claude            | `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` specification (docs-only). Not implementation. Prior completed out-of-slice work (#586/#809/#812/#885) unchanged                                                                                                                                    |
+| Grok              | Unassigned. Prior same-session HOLD on unapproved Convex expansion is superseded only for this named isolated spike; production Convex remains HOLD                                                                                                                                           |
+| Security reviewer | Unassigned until Phase 1 spike code exists; then review before any Convex cloud credential                                                                                                                                                                                                    |
+| Gemini            | Unassigned                                                                                                                                                                                                                                                                                    |
+| Council Chair     | Unassigned until Phase 1 proof tests exist; then compare Convex sandbox vs a possible Postgres-roles alternative (out of this slice)                                                                                                                                                          |

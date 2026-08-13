@@ -1,11 +1,10 @@
 # Verdant — Current Operating State
 
 **Last updated:** 2026-08-13 UTC
-**Updated by:** Claude (records Cheek's 2026-08-13 in-session approval of the
-named isolated Convex component sandbox spike, plus the deploy-branch HEAD
-observed while writing that spec. Public-surface, GA4, and release-identity
-rows retain their earlier verification dates; none were re-measured in this
-update)
+**Updated by:** Grok (records Cheek's cloud-agent assignment to scaffold a
+local Cursor plugin at `~/.cursor/plugins/local/verdant-grow-os/`, mirrored in
+`plugins/verdant-grow-os/`. Public-surface, GA4, release-identity, and Convex
+spec rows are unchanged; none were re-measured in this update)
 
 This is the changing shift report. Permanent rules live in `/AGENTS.md`; do not edit
 that constitution to record branch, deployment, blocker, or assignment changes.
@@ -348,7 +347,7 @@ schema change and does not authorize production writes.
 | ----------------- | --------------------------------------------------------------------- |
 | Codex             | Standing SEO measurement readiness and analytics integrity. Queued after the Convex spec merges: Phase 1 of `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` only (see `docs/specs/convex-component-physical-sandbox-spike.md`). Do not start Convex work if it collides with an in-flight SEO slice |
 | Claude            | `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` specification (docs-only). Not implementation. Prior completed out-of-slice work (#586/#809/#812/#885) unchanged |
-| Grok              | Unassigned. Prior same-session HOLD on unapproved Convex expansion is superseded only for this named isolated spike; production Convex remains HOLD |
+| Grok              | Cursor plugin scaffold `verdant-grow-os` (local plugin + repo mirror). Not SEO implementation and not Convex. Prior HOLD on unapproved Convex expansion still stands for production Convex |
 | Security reviewer | Unassigned until Phase 1 spike code exists; then review before any Convex cloud credential |
 | Gemini            | Unassigned                                                            |
 | Council Chair     | Unassigned until Phase 1 proof tests exist; then compare Convex sandbox vs a possible Postgres-roles alternative (out of this slice) |

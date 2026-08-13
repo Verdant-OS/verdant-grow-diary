@@ -21,6 +21,11 @@ import {
   type SensorSnapshot,
   type SnapshotSource,
 } from "@/lib/sensorSnapshot";
+import {
+  snapshotPersistenceBlockReason,
+  type PersistenceBlockReason,
+  type PersistenceContext,
+} from "@/lib/environmentAlertPersistence";
 import { METRIC_LABELS, type GrowTargets } from "@/lib/environmentTargetComparison";
 import {
   convertCelsiusForDisplay,
@@ -35,6 +40,32 @@ export const STALE_THRESHOLD_MINUTES = Math.round(STALE_THRESHOLD_MS / 60_000);
 export const FRESHNESS_WINDOW_LABEL = "15-minute alert window";
 
 export type LatestSnapshotFreshness = "fresh" | "stale" | "missing" | "unavailable";
+
+/**
+ * Operator-facing explanation for why the manual "Save alert" action is
+ * unavailable, keyed by the gate's own reason.
+ *
+ * Each string must describe the reason it is keyed to and nothing else. A
+ * single catch-all ("this reading is outside the window") is what this map
+ * exists to prevent: it misreports provenance for a missing, simulated, or
+ * demo snapshot, telling the grower their reading is merely expired when it
+ * was never eligible in the first place.
+ */
+export const ALERT_SAVE_BLOCK_MESSAGE: Record<PersistenceBlockReason, string> = {
+  demo_data: "This is demo data, so it cannot create a saved alert.",
+  no_snapshot: "There is no sensor reading yet. Enter a manual snapshot to save alerts.",
+  context_only_source:
+    "This reading is context only. Saved alerts come from manual or live readings.",
+  quality_unavailable:
+    "This reading has no usable values, so it cannot create a saved alert.",
+  outside_live_window: `This reading is outside the ${FRESHNESS_WINDOW_LABEL}, so it cannot raise a new alert. Enter a fresh manual snapshot.`,
+};
+
+/** Explanation for the current gate result, or null when saving is allowed. */
+export function describeAlertSaveBlock(ctx: PersistenceContext): string | null {
+  const reason = snapshotPersistenceBlockReason(ctx);
+  return reason === null ? null : ALERT_SAVE_BLOCK_MESSAGE[reason];
+}
 
 export interface ClassifyLatestSnapshotArgs {
   /** From useLatestSensorSnapshot — `"ok"` means data loaded successfully. */

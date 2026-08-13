@@ -402,12 +402,18 @@ if (result.status !== 0) {
     "  Raw psql diagnostics were withheld because they may contain connection details.",
   );
   console.error("  Do NOT deploy — target migration state is unknown.");
+  const ownerCredentialHint =
+    TARGET_ENV === "live"
+      ? "Owner fix: refresh `SUPABASE_DB_URL` under Settings → Environments → verdant-production"
+      : TARGET_ENV === "sandbox"
+        ? "Owner fix: refresh `SUPABASE_DB_URL_SANDBOX` under Settings → Environments → verdant-sandbox"
+        : "Owner fix: refresh the configured Postgres connection string";
   const statusHint =
     result.status === 2
       ? [
           "psql exit status 2: connection to the server went bad (never established or dropped).",
           "This is a reachability/credentials problem, not proof that migrations are missing.",
-          "Owner fix: refresh `SUPABASE_DB_URL_SANDBOX` (or LIVE) under Settings → Environments",
+          ownerCredentialHint,
           "with a current Supabase **pooler** URI for the pinned project (GitHub runners are IPv4-only;",
           "prefer Session mode `postgres.<project-ref>` user on `*.pooler.supabase.com`).",
         ]

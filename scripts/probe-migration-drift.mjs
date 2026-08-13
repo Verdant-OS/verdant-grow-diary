@@ -56,7 +56,6 @@ const urlFlagIndex = args.indexOf("--url");
 const dbUrl =
   (urlFlagIndex !== -1 ? args[urlFlagIndex + 1] : undefined) ??
   process.env.SUPABASE_DB_URL ??
-  process.env.SUPABASE_DB_URL_LIVE ??
   process.env.DATABASE_URL;
 
 // Every byte this script emits goes through one of these two. The connection

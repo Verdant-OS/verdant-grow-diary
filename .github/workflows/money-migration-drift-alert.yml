@@ -76,11 +76,11 @@ jobs:
     name: Verify money migrations applied in production
     runs-on: ubuntu-latest
     # Trusted-ref gate. workflow_dispatch accepts a --ref, and this job checks
-    # out that ref and runs ITS copy of the checker with SUPABASE_DB_URL_LIVE
+    # out that ref and runs ITS copy of the checker with SUPABASE_DB_URL
     # in the environment. Without this, dispatching from a modified branch runs
     # attacker-editable code holding the production credential.
     if: github.ref == 'refs/heads/verdant-grow-diary'
-    # Holds SUPABASE_DB_URL_LIVE.
+    # Holds the verdant-production environment's SUPABASE_DB_URL.
     #
     # OPERATIONAL CAVEAT, same as migration-drift-probe.yml: if a REQUIRED
     # REVIEWER is ever added to verdant-production, every scheduled run parks
@@ -124,11 +124,11 @@ jobs:
 
       # Hard-fail on a missing secret rather than letting the checker report
       # "no database connection" into a void.
-      - name: Require SUPABASE_DB_URL_LIVE
+      - name: Require SUPABASE_DB_URL
         uses: ./.github/actions/require-ci-secret
         with:
-          secret-name: SUPABASE_DB_URL_LIVE
-          secret-value: ${{ secrets.SUPABASE_DB_URL_LIVE }}
+          secret-name: SUPABASE_DB_URL
+          secret-value: ${{ secrets.SUPABASE_DB_URL }}
           guard-heading: "Money migration drift alert cannot reach production"
           reason-lines-json: >
             ["Without this secret the billing-critical migrations cannot be
@@ -147,7 +147,7 @@ jobs:
         # swallowed by a cancelled job.
         timeout-minutes: 5
         env:
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL_LIVE }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
           TARGET_ENV: live
           # Belt and braces for the connect phase specifically. It has to be an
           # env var: the target sanitizer sets `url.search = ""`, stripping ALL

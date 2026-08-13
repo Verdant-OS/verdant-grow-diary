@@ -56,7 +56,7 @@ jobs:
     # workflow_dispatch accepts a --ref, and this job checks out that ref and
     # then executes ITS copy of scripts/probe-migration-drift.mjs and its
     # copy of the local ./.github/actions/require-ci-secret -- with
-    # SUPABASE_DB_URL_LIVE in the environment. Without this guard, dispatching
+    # SUPABASE_DB_URL in the environment. Without this guard, dispatching
     # from a modified branch would run attacker-editable code holding the
     # production database credential, which is a credential-exfiltration path
     # regardless of what the probe itself does.
@@ -65,8 +65,9 @@ jobs:
     # repository default branch, which IS verdant-grow-diary here, so this
     # gate never blocks the cron it exists to protect.
     if: github.ref == 'refs/heads/verdant-grow-diary'
-    # Holds SUPABASE_DB_URL_LIVE. If this environment stops resolving, the
-    # secret guard below fails the job loudly rather than skipping green.
+    # Holds the verdant-production environment's SUPABASE_DB_URL. If this
+    # environment stops resolving, the secret guard below fails the job loudly
+    # rather than skipping green.
     #
     # OPERATIONAL CAVEAT: if a REQUIRED REVIEWER is ever added to
     # verdant-production, every scheduled run will park awaiting deployment
@@ -111,11 +112,11 @@ jobs:
 
       # Hard-fail on a missing secret instead of letting the probe report
       # "could not check" into a void.
-      - name: Require SUPABASE_DB_URL_LIVE
+      - name: Require SUPABASE_DB_URL
         uses: ./.github/actions/require-ci-secret
         with:
-          secret-name: SUPABASE_DB_URL_LIVE
-          secret-value: ${{ secrets.SUPABASE_DB_URL_LIVE }}
+          secret-name: SUPABASE_DB_URL
+          secret-value: ${{ secrets.SUPABASE_DB_URL }}
           guard-heading: "Migration drift probe cannot reach production"
           reason-lines-json: >
             ["Without this secret the probe cannot compare applied migrations
@@ -125,7 +126,7 @@ jobs:
       - name: Probe drift
         id: probe
         env:
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL_LIVE }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
           set +e
           node scripts/probe-migration-drift.mjs --json > drift.json 2> drift.err

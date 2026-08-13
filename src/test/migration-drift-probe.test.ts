@@ -65,6 +65,15 @@ describe("migration drift probe — cannot silently pass", () => {
     expect(parsed.status).not.toBe("current");
   });
 
+  it("does not accept the retired production secret alias", () => {
+    const { code, stderr } = runProbe([], {
+      SUPABASE_DB_URL_LIVE: "postgresql://retired-alias.invalid/decoy",
+    });
+    expect(code).toBe(2);
+    expect(stderr).toContain("COULD NOT PROBE");
+    expect(SRC).not.toContain("process.env.SUPABASE_DB_URL_LIVE");
+  });
+
   it("exits 2 when psql is unavailable or the database is unreachable", () => {
     const { code } = runProbe(["--url", "postgresql://nobody@127.0.0.1:1/nope"]);
     expect(code).toBe(2);
@@ -181,6 +190,17 @@ describe("migration drift probe — never publishes credentials", () => {
     );
     expect(workflow).toContain("apt-get update -qq || echo");
     expect(workflow).toContain("could not install postgresql-client after 3 attempts");
+  });
+
+  it("uses the protected production DB secret without a retired alias or fallback", () => {
+    const workflow = readFileSync(
+      resolve(ROOT, ".github/workflows/migration-drift-probe.yml"),
+      "utf8",
+    );
+    expect(workflow).toContain("environment: verdant-production");
+    expect(workflow.match(/secrets\.SUPABASE_DB_URL\b/g)).toHaveLength(2);
+    expect(workflow).not.toContain("SUPABASE_DB_URL_LIVE");
+    expect(workflow).not.toContain("SUPABASE_DB_URL_SANDBOX");
   });
 
   it("closes the tracking issue after a clean run, from a single shared title", () => {

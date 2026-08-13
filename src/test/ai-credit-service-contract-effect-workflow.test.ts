@@ -43,11 +43,12 @@ describe("AI-credit service contract effect workflow trust boundary", () => {
     expect(WORKFLOW).toContain('PGCONNECT_TIMEOUT: "15"');
   });
 
-  it("preserves all four statuses through audit, summary, and issue reconciliation", () => {
+  it("preserves all five statuses through audit, summary, and issue reconciliation", () => {
     for (const status of [
       "migration_applied",
       "contract_effective",
       "definition_drift_detected",
+      "sibling_overloads_detected",
       "verification_blocked",
     ]) {
       expect(WORKFLOW.match(new RegExp(status, "g"))?.length ?? 0).toBeGreaterThanOrEqual(4);
@@ -60,6 +61,7 @@ describe("AI-credit service contract effect workflow trust boundary", () => {
     expect(WORKFLOW).toContain("statuses.migration_applied === true");
     expect(WORKFLOW).toContain("statuses.contract_effective === true");
     expect(WORKFLOW).toContain("statuses.definition_drift_detected === false");
+    expect(WORKFLOW).toContain("statuses.sibling_overloads_detected === false");
     expect(WORKFLOW).toContain("statuses.verification_blocked === false");
     expect(WORKFLOW).toContain('state: "closed"');
   });

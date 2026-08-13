@@ -77,6 +77,39 @@ invented finding.
 
 ---
 
+## PR merge-readiness sweep (2026-08-13)
+
+Cheek asked for a repo-wide "merge on green only" pass across all 32 open PRs. Two
+findings that generalize beyond this one sweep — read before trusting a green rollup:
+
+**1. CI-green + `reviewDecision: APPROVED` does not mean mergeable.** `reviewDecision`
+reflects that an Approve event was submitted, not that every inline finding was
+addressed. Check `reviewThreads` for `isResolved: false` separately — e.g.
+`gh api graphql -f query='query{repository(owner:"Verdant-OS",name:"verdant-grow-diary"){pullRequest(number:N){reviewThreads(first:50){nodes{isResolved comments(first:1){nodes{body}}}}}}}'`.
+Of 8 open PRs whose CI rollup showed `SUCCESS`, 6 had a real blocker underneath:
+
+| PR               | Looked green because | Actually blocked by                                                                                                                                                                                                                                                            |
+| ---------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| #803             | CI pass, approved    | 5 unresolved review threads incl. 1 **P1** — broken `test:sentinel-governance` script reference, a version-parity check that accepts stale versions, a doc pointing at nonexistent config, `CURRENT_STATE.md` misclassified under the constitution's own `docs/agents/**` rule |
+| #910             | CI pass, approved    | 2 unresolved threads (1 P1, 1 P2)                                                                                                                                                                                                                                              |
+| #853             | CI pass, approved    | 1 unresolved P2                                                                                                                                                                                                                                                                |
+| #813, #913, #933 | CI pass, approved    | real merge conflicts (`mergeable: CONFLICTING`) — GitHub rejects these outright regardless of instruction                                                                                                                                                                      |
+| #936             | CI pass, approved    | base is `#933`'s branch, not `main`/deploy — stacked, can't land until #933's conflicts resolve                                                                                                                                                                                |
+
+**2. `verdant-grow-diary`'s merge queue rejects `BEHIND` PRs even when their own CI is
+green.** The queue ruleset sets `strict_required_status_checks_policy: true`, so it will
+not trust check results captured against a stale base. `enqueuePullRequest` then fails
+with a misleading `"35 of 35 required status checks are expected"` — reads like pending,
+is actually a rejection. Fix: `PUT /repos/{owner}/{repo}/pulls/{n}/update-branch` to merge
+current base into the PR branch, wait for the fresh full-check run, then retry enqueue.
+
+Only **#764** (Playwright/census-harness fix) was genuinely clean end to end —
+branch-updated 2026-08-13 to unblock the queue; merge-queue re-attempt pending the fresh
+CI run it triggers. This sweep is a process/hygiene pass, orthogonal to the SEO slice
+below — it does not change or supersede the approved slice.
+
+---
+
 ## Next approved slice
 
 **Repair and measurement. No new page families.**

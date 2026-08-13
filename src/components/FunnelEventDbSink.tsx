@@ -20,8 +20,8 @@
  *  - Fire-and-forget, like the gtag call it mirrors: never blocks, never
  *    throws, never retried. A dropped analytics row is an acceptable loss;
  *    a broken save/checkout path is not.
- *  - Buffers events until BOTH consent and auth have hydrated. Mounting
- *    this before <Outlet/> guarantees the window LISTENER exists before a
+ *  - Buffers events until the write outcome is DECIDABLE. Mounting this
+ *    before <Outlet/> guarantees the window LISTENER exists before a
  *    route's own mount-effect trackFunnelEvent call (e.g. Pricing's
  *    paywall_viewed) — but not that consentGrantedRef/userIdRef already
  *    reflect real values: useAnalyticsConsent's hydration read is
@@ -32,9 +32,16 @@
  *    after the CURRENT effect flush finishes across the whole tree, so a
  *    route mount effect firing in that same first flush would otherwise see
  *    the refs' pre-hydration values (false/null) and drop the event
- *    permanently. Buffering and replaying once both signals settle closes
- *    that gap without reaching into Supabase internals for a synchronous
- *    session read.
+ *    permanently.
+ *  - Buffering is NOT simply "wait for both signals" — an event observed
+ *    while consent is genuinely "unset" (a first-time visitor who hasn't
+ *    decided) must never become eligible later just because the visitor
+ *    happens to accept before auth resolves; that would retroactively
+ *    capture pre-consent activity, contradicting "nothing analytics-related
+ *    loads until acceptance." "unset" and "denied" are decidable the MOMENT
+ *    consent hydrates, regardless of auth state, since the outcome (don't
+ *    write) is already fixed — only "granted" needs to wait on auth for a
+ *    real user_id. See isDecidable below.
  */
 import { useEffect, useRef } from "react";
 import { useAuth } from "@/store/auth";
@@ -66,8 +73,13 @@ export default function FunnelEventDbSink() {
   consentGrantedRef.current = decision === "granted";
   const userIdRef = useRef<string | null>(null);
   userIdRef.current = user?.id ?? null;
+
+  // "unset" or "denied": the outcome is already fixed (don't write) the
+  // moment consent hydrates, regardless of auth — no need to wait, and
+  // waiting would risk a later "granted" retroactively reviving a
+  // pre-consent event. "granted": still need a real user_id from auth.
   const readyRef = useRef(false);
-  readyRef.current = consentHydrated && !authLoading;
+  readyRef.current = consentHydrated && (decision !== "granted" || !authLoading);
 
   // Events that arrive before both signals above have settled — see the
   // buffering note in the file header. Drained once readyRef flips true.
@@ -109,18 +121,24 @@ export default function FunnelEventDbSink() {
     return () => window.removeEventListener(PRICING_ANALYTICS_EVENT, handler);
   }, []);
 
-  // Fires whenever either hydration signal changes. By the time this runs,
-  // the render that changed consentHydrated/authLoading has already
-  // updated consentGrantedRef/userIdRef above (ref writes happen during
-  // render, before effects), so replaying against them here uses the real,
-  // settled values — never whatever they were at the original dispatch.
+  // Fires whenever consent/auth state changes. By the time this runs, the
+  // render that changed them has already updated consentGrantedRef/
+  // userIdRef above (ref writes happen during render, before effects), so
+  // replaying against them here uses the real, settled values — never
+  // whatever they were at the original dispatch. Same isDecidable logic as
+  // readyRef above: draining still respects "unset"/"denied" not needing
+  // auth, and never resurrects a pre-consent event just because a LATER
+  // "granted" and a LATER auth resolution happen to coincide — by the time
+  // decision first becomes "granted", any pre-consent buffer has already
+  // been drained-and-dropped by the "unset" transition that preceded it.
   useEffect(() => {
-    if (!(consentHydrated && !authLoading)) return;
+    const isDecidable = consentHydrated && (decision !== "granted" || !authLoading);
+    if (!isDecidable) return;
     if (pendingRef.current.length === 0) return;
     const queued = pendingRef.current;
     pendingRef.current = [];
     queued.forEach((detail) => writeRowRef.current(detail));
-  }, [consentHydrated, authLoading]);
+  }, [consentHydrated, authLoading, decision]);
 
   return null;
 }

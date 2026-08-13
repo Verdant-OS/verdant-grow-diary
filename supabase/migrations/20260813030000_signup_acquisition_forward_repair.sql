@@ -366,24 +366,18 @@ BEGIN
       ON a.user_id = p.user_id
     GROUP BY COALESCE(a.source, 'unattributed')
   ),
+  -- Paid cohorts come solely from public.subscriptions. The retired
+  -- public.billing_subscriptions branch is deliberately NOT revived here:
+  -- AGENTS.md is explicit that it is a legacy sandbox/operator-audit surface
+  -- that must never grant an entitlement, and because this forward repair is
+  -- the FIRST install of this function in production, carrying it over would
+  -- have counted legacy rows as authoritative active-paid subscribers and
+  -- inflated every operator conversion total.
   active_paid_candidates AS (
-    SELECT
-      bs.user_id,
-      bs.plan_id,
-      bs.created_at,
-      0 AS source_priority
-    FROM public.billing_subscriptions AS bs
-    WHERE bs.plan_id IN ('pro_monthly', 'pro_annual', 'founder_lifetime')
-      AND bs.status = 'active'
-      AND (bs.current_period_end IS NULL OR bs.current_period_end > now())
-
-    UNION ALL
-
     SELECT
       s.user_id,
       s.price_id AS plan_id,
-      s.created_at,
-      1 AS source_priority
+      s.created_at
     FROM public.subscriptions AS s
     WHERE s.environment = 'live'
       AND s.price_id IN ('pro_monthly', 'pro_annual', 'founder_lifetime')
@@ -406,7 +400,6 @@ BEGIN
     ORDER BY
       candidate.user_id,
       CASE WHEN candidate.plan_id = 'founder_lifetime' THEN 0 ELSE 1 END,
-      candidate.source_priority,
       candidate.created_at DESC
   ),
   paid_counts AS (

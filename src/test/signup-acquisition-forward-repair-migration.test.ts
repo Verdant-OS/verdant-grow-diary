@@ -12,7 +12,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const SQL = readFileSync(
-  "supabase/migrations/20260812130000_signup_acquisition_forward_repair.sql",
+  "supabase/migrations/20260813030000_signup_acquisition_forward_repair.sql",
   "utf8",
 );
 
@@ -106,6 +106,18 @@ describe("signup acquisition forward repair — privacy and access fences", () =
     expect(definers.length).toBeGreaterThanOrEqual(4);
     const pinned = SQL.match(/SET search_path = public, pg_temp/g) ?? [];
     expect(pinned.length).toBeGreaterThanOrEqual(4);
+  });
+
+  // AGENTS.md: public.billing_subscriptions is a legacy sandbox/operator-audit
+  // surface that must never grant an entitlement. This migration is the FIRST
+  // install of the snapshots in production, so the legacy branch is dropped
+  // here rather than carried forward.
+  it("never sources paid cohorts from the legacy billing_subscriptions table", () => {
+    const executable = SQL.split("\n")
+      .filter((line) => !line.trim().startsWith("--"))
+      .join("\n");
+    expect(executable).not.toContain("billing_subscriptions");
+    expect(executable).toContain("FROM public.subscriptions AS s");
   });
 
   it("never selects email, provider id, or raw metadata into a snapshot", () => {

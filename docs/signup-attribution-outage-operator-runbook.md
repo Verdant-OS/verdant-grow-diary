@@ -61,7 +61,17 @@ evidence from a sandbox read presented as one.
 - **Date:** 2026-08-13 UTC. **Run by:** Claude, during the pre-merge audit of #969.
 - **Access class:** read-only `SELECT`. No writes, no DDL.
 
-Sanitized queries and their verbatim results, so each check is reproducible:
+Sanitized queries and their verbatim results, so each check is reproducible.
+
+> **Every SQL block below was executed against production exactly as written here**, by
+> extracting it from this file rather than retyping it, and each recorded `-- =>` line is
+> that execution's actual output. This is not a formality: two earlier revisions shipped
+> snippets that could not run — one referenced an out-of-scope CTE, and one carried doubled
+> backslashes (`'\\mBEGIN\\M'`) that match a literal backslash instead of a `\m` word
+> boundary and so returned the wrong counts. **If you change a query here, run it before
+> committing.** A verification step that fails when an operator runs it during an incident
+> is worse than no verification at all, because the error reads as a contradiction of the
+> finding it was meant to support.
 
 ```sql
 -- 1. trigger state, live function body, table presence
@@ -233,9 +243,9 @@ WITH d AS (
          position('EXCEPTION' IN def) AS exc
   FROM d
 )
-SELECT (SELECT count(*) FROM regexp_matches(substr(def, ins, exc - ins), '\\mBEGIN\\M',  'g')) AS begins_between,
-       (SELECT count(*) FROM regexp_matches(substr(def, ins, exc - ins), '\\mEND\\M',    'g')) AS ends_between,
-       (SELECT count(*) FROM regexp_matches(substr(def, ins, exc - ins), '\\mEND IF\\M', 'g')) AS end_ifs_between
+SELECT (SELECT count(*) FROM regexp_matches(substr(def, ins, exc - ins), '\mBEGIN\M',  'g')) AS begins_between,
+       (SELECT count(*) FROM regexp_matches(substr(def, ins, exc - ins), '\mEND\M',    'g')) AS ends_between,
+       (SELECT count(*) FROM regexp_matches(substr(def, ins, exc - ins), '\mEND IF\M', 'g')) AS end_ifs_between
 FROM spans;
 -- => begins_between=1, ends_between=3, end_ifs_between=3
 --    block-closing ENDs = ends_between - end_ifs_between = 0

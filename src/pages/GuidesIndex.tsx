@@ -5,7 +5,6 @@
  * no device control. Content comes from shared SEO content constants
  * so visible copy and FAQPage JSON-LD cannot drift.
  */
-import { useEffect } from "react";
 import { Link } from "@/lib/react-router-compat";
 import BrandLogo from "@/components/BrandLogo";
 import DiaryFaqLinkStatsPanel from "@/components/DiaryFaqLinkStatsPanel";
@@ -16,20 +15,8 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import {
-  VERDANT_GROWER_GUIDE_FAQ,
-  VERDANT_GUIDES_BREADCRUMB_ITEMS,
-  VERDANT_SEO_GUIDES,
-  VERDANT_SITE_ORIGIN,
-} from "@/constants/verdantSeoContent";
-import {
-  buildBreadcrumbListJsonLd,
-  buildFaqPageJsonLd,
-  buildWebPageJsonLd,
-  safeJsonLdStringify,
-} from "@/lib/seoStructuredData";
+import { VERDANT_GROWER_GUIDE_FAQ, VERDANT_SEO_GUIDES } from "@/constants/verdantSeoContent";
 
-const PAGE_URL = "https://verdantgrowdiary.com/guides";
 const PAGE_TITLE = "Grower Guides: Diary, Lighting & Sensor Truth | Verdant";
 const PAGE_DESCRIPTION =
   "Practical grower guides for plant timelines, grow-light distance, PPFD, DLI, source-labeled sensor data, VPD context, and cautious troubleshooting.";
@@ -45,51 +32,6 @@ export default function GuidesIndex() {
     description: PAGE_DESCRIPTION,
     path: "/guides",
   });
-
-  useEffect(() => {
-    const webpage = buildWebPageJsonLd({
-      title: PAGE_TITLE,
-      description: PAGE_DESCRIPTION,
-      url: PAGE_URL,
-      siteUrl: VERDANT_SITE_ORIGIN,
-    });
-    const faq = buildFaqPageJsonLd({
-      pageUrl: PAGE_URL,
-      questions: VERDANT_GROWER_GUIDE_FAQ,
-    });
-    const crumbs = buildBreadcrumbListJsonLd({
-      items: VERDANT_GUIDES_BREADCRUMB_ITEMS,
-    });
-
-    // The SSR response already carries route-local WebPage, FAQPage, and
-    // BreadcrumbList scripts for non-JS crawlers. Once hydrated, replace that
-    // static set with one component-owned set so the same schemas are not
-    // serialized twice and later client navigation can clean them up safely.
-    document
-      .querySelectorAll('script[type="application/ld+json"][data-static-route-ldjson]')
-      .forEach((script) => script.remove());
-
-    const webpageScript = document.createElement("script");
-    webpageScript.type = "application/ld+json";
-    webpageScript.setAttribute("data-page-ldjson", "guides-index-webpage");
-    webpageScript.text = safeJsonLdStringify(webpage);
-    document.head.appendChild(webpageScript);
-    const faqScript = document.createElement("script");
-    faqScript.type = "application/ld+json";
-    faqScript.setAttribute("data-page-ldjson", "guides-index-faq");
-    faqScript.text = safeJsonLdStringify(faq);
-    document.head.appendChild(faqScript);
-    const crumbScript = document.createElement("script");
-    crumbScript.type = "application/ld+json";
-    crumbScript.setAttribute("data-page-ldjson", "guides-index-breadcrumb");
-    crumbScript.text = safeJsonLdStringify(crumbs);
-    document.head.appendChild(crumbScript);
-    return () => {
-      webpageScript.remove();
-      faqScript.remove();
-      crumbScript.remove();
-    };
-  }, []);
 
   return (
     <main data-testid="guides-index-page" className="min-h-screen bg-background text-foreground">

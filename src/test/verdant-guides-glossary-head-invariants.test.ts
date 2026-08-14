@@ -154,14 +154,35 @@ describe("Guides + glossary SSR head matches global invariants", () => {
     expect(ROOT_ROUTE).not.toContain('name: "twitter:creator"');
   });
 
-  it.each(TARGET_PATHS)("%s marks every route-local JSON-LD script for hydration", (path) => {
+  it.each(TARGET_PATHS)("%s exposes valid JSON-LD through the TanStack route head", (path) => {
     const scripts = staticRouteHead(path).scripts;
     expect(scripts.length).toBeGreaterThan(0);
     for (const script of scripts) {
       expect(script.type).toBe("application/ld+json");
-      expect(script["data-static-route-ldjson"]).toBe("true");
+      expect(() => JSON.parse(script.children)).not.toThrow();
+      expect(script).not.toHaveProperty("data-static-route-ldjson");
+      expect(script).not.toHaveProperty("data-page-ldjson");
     }
   });
+
+  it("keeps the guide hub schema set complete and singly owned by its route head", () => {
+    const types = staticRouteHead(GUIDE_HUB_PATH)
+      .scripts.map((script) => JSON.parse(script.children)["@type"])
+      .sort();
+    expect(types).toEqual(["BreadcrumbList", "FAQPage", "WebPage"]);
+  });
+
+  it.each(VERDANT_SEO_GUIDES)(
+    "$slug keeps its expected guide schema set in the route head",
+    (guide) => {
+      const types = staticRouteHead(guidePath(guide.slug))
+        .scripts.map((script) => JSON.parse(script.children)["@type"])
+        .sort();
+      const expected = ["BreadcrumbList", "FAQPage", "WebPage"];
+      if (guide.publishedOn) expected.push("Article");
+      expect(types).toEqual(expected.sort());
+    },
+  );
 
   it.each(TARGET_PATHS)("%s ships the expected robots directive", (path) => {
     const head = headFor(path);

@@ -47,7 +47,6 @@ export interface StaticRouteHead {
   links: Array<Record<string, string>>;
   scripts: Array<{
     type: "application/ld+json";
-    "data-static-route-ldjson": "true";
     children: string;
   }>;
 }
@@ -77,7 +76,6 @@ export function staticRouteHead(path: string): StaticRouteHead {
 
   const scripts = (metadata.jsonLd ?? []).map((node) => ({
     type: "application/ld+json" as const,
-    "data-static-route-ldjson": "true" as const,
     children: JSON.stringify(node),
   }));
 

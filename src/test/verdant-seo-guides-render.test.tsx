@@ -50,20 +50,22 @@ function readMeta(selector: string): string | null {
   return document.head.querySelector<HTMLMetaElement>(selector)?.getAttribute("content") ?? null;
 }
 
-function readJsonLd(marker: string): unknown {
-  const el = document.head.querySelector<HTMLScriptElement>(`script[data-page-ldjson="${marker}"]`);
-  if (!el || !el.textContent) return null;
-  return JSON.parse(el.textContent);
+function readStaticRouteJsonLd(path: string, type: string): Record<string, unknown> | null {
+  return (
+    staticRouteHead(path)
+      .scripts.map((script) => JSON.parse(script.children) as Record<string, unknown>)
+      .find((node) => node["@type"] === type) ?? null
+  );
 }
 
 function appendStaticRouteJsonLd(
   definition: ReturnType<typeof staticRouteHead>["scripts"][number],
-) {
+): HTMLScriptElement {
   const script = document.createElement("script");
   script.type = definition.type;
-  script.setAttribute("data-static-route-ldjson", definition["data-static-route-ldjson"]);
   script.text = definition.children;
   document.head.appendChild(script);
+  return script;
 }
 
 describe("/guides hub — public render", () => {
@@ -91,23 +93,22 @@ describe("/guides hub — public render", () => {
     expect(readMeta('meta[name="twitter:title"]')).toContain("Grower Guides");
   });
 
-  it("injects FAQPage + BreadcrumbList JSON-LD", () => {
-    renderAt("/guides");
-    const webpage = readJsonLd("guides-index-webpage") as {
+  it("registers WebPage + FAQPage + BreadcrumbList JSON-LD in the route head", () => {
+    const webpage = readStaticRouteJsonLd("/guides", "WebPage") as {
       "@type": string;
       url: string;
     } | null;
     expect(webpage?.["@type"]).toBe("WebPage");
     expect(webpage?.url).toBe("https://verdantgrowdiary.com/guides");
 
-    const faq = readJsonLd("guides-index-faq") as {
+    const faq = readStaticRouteJsonLd("/guides", "FAQPage") as {
       "@type": string;
       mainEntity: unknown[];
     } | null;
     expect(faq?.["@type"]).toBe("FAQPage");
     expect((faq?.mainEntity ?? []).length).toBeGreaterThan(0);
 
-    const crumbs = readJsonLd("guides-index-breadcrumb") as {
+    const crumbs = readStaticRouteJsonLd("/guides", "BreadcrumbList") as {
       "@type": string;
       itemListElement: Array<{ position: number; item: string; name: string }>;
     } | null;
@@ -117,29 +118,19 @@ describe("/guides hub — public render", () => {
     expect(crumbs?.itemListElement[1].item).toBe("https://verdantgrowdiary.com/guides");
   });
 
-  it("replaces the SSR route JSON-LD with one hydrated hub-owned set", async () => {
+  it("leaves TanStack-owned route JSON-LD untouched during hub hydration", async () => {
     const staticScripts = staticRouteHead("/guides").scripts;
     expect(staticScripts).toHaveLength(3);
-    staticScripts.forEach(appendStaticRouteJsonLd);
-    expect(document.head.querySelectorAll("script[data-static-route-ldjson]")).toHaveLength(3);
+    const routeOwnedNodes = staticScripts.map(appendStaticRouteJsonLd);
 
     renderAt("/guides");
 
     await waitFor(() => {
-      expect(document.head.querySelectorAll("script[data-static-route-ldjson]")).toHaveLength(0);
-      expect(
-        document.head.querySelectorAll('script[data-page-ldjson^="guides-index-"]'),
-      ).toHaveLength(3);
+      expect(screen.getByTestId("guides-index-page")).toBeTruthy();
     });
-
-    const currentScripts = Array.from(
-      document.head.querySelectorAll<HTMLScriptElement>(
-        'script[data-page-ldjson^="guides-index-"]',
-      ),
-    );
-    const serialized = currentScripts.map((script) => script.text);
-    expect(serialized).toHaveLength(new Set(serialized).size);
-    expect(currentScripts.map((script) => JSON.parse(script.text)["@type"]).sort()).toEqual([
+    expect(routeOwnedNodes.every((node) => node.isConnected)).toBe(true);
+    expect(document.head.querySelectorAll("script[data-page-ldjson]")).toHaveLength(0);
+    expect(routeOwnedNodes.map((node) => JSON.parse(node.text)["@type"]).sort()).toEqual([
       "BreadcrumbList",
       "FAQPage",
       "WebPage",
@@ -208,7 +199,7 @@ describe("/guides/:slug detail — public render", () => {
       expect(readMeta('meta[name="twitter:title"]')).toBe(g.title);
       expect(readMeta('meta[name="twitter:card"]')).toBe("summary_large_image");
 
-      const crumbs = readJsonLd(`guide-${g.slug}-breadcrumb`) as {
+      const crumbs = readStaticRouteJsonLd(`/guides/${g.slug}`, "BreadcrumbList") as {
         itemListElement: Array<{ position: number; item: string; name: string }>;
       } | null;
       expect(crumbs?.itemListElement.length).toBe(3);
@@ -232,7 +223,10 @@ describe("/guides/:slug detail — public render", () => {
     expect(screen.getByTestId("guide-sources")).toHaveTextContent(/Evidence and scope/i);
     expect(screen.getAllByRole("link", { name: /et al\./i }).length).toBeGreaterThanOrEqual(3);
 
-    const article = readJsonLd("guide-cannabis-grow-light-distance-and-schedule-article") as {
+    const article = readStaticRouteJsonLd(
+      "/guides/cannabis-grow-light-distance-and-schedule",
+      "Article",
+    ) as {
       datePublished?: string;
       dateModified?: string;
     } | null;
@@ -240,7 +234,7 @@ describe("/guides/:slug detail — public render", () => {
     expect(article?.dateModified).toBe("2026-07-30");
   });
 
-  it("replaces static route JSON-LD with one current guide-owned set across hydration and navigation", async () => {
+  it("never mutates TanStack-owned JSON-LD during guide hydration or component rerenders", async () => {
     const distance = VERDANT_SEO_GUIDES.find(
       (guide) => guide.slug === "cannabis-grow-light-distance-and-schedule",
     )!;
@@ -249,20 +243,15 @@ describe("/guides/:slug detail — public render", () => {
     )!;
     const staticScripts = staticRouteHead(`/guides/${distance.slug}`).scripts;
     expect(staticScripts).toHaveLength(4);
-    staticScripts.forEach(appendStaticRouteJsonLd);
-    expect(document.head.querySelectorAll("script[data-static-route-ldjson]")).toHaveLength(4);
+    const routeOwnedNodes = staticScripts.map(appendStaticRouteJsonLd);
 
     const rendered = renderAt(`/guides/${distance.slug}`);
 
     await waitFor(() => {
-      expect(document.head.querySelectorAll("script[data-static-route-ldjson]")).toHaveLength(0);
-      expect(
-        document.head.querySelectorAll(`script[data-page-ldjson^="guide-${distance.slug}-"]`),
-      ).toHaveLength(4);
+      expect(screen.getByTestId("guide-page")).toHaveAttribute("data-guide-slug", distance.slug);
     });
-    expect((readJsonLd(`guide-${distance.slug}-webpage`) as { url: string }).url).toBe(
-      `https://verdantgrowdiary.com/guides/${distance.slug}`,
-    );
+    expect(routeOwnedNodes.every((node) => node.isConnected)).toBe(true);
+    expect(document.head.querySelectorAll("script[data-page-ldjson]")).toHaveLength(0);
 
     const crossGuideLink = document.querySelector<HTMLAnchorElement>(
       `a[href="/guides/${stress.slug}"]`,
@@ -274,31 +263,13 @@ describe("/guides/:slug detail — public render", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("guide-page")).toHaveAttribute("data-guide-slug", stress.slug);
-      expect(
-        document.head.querySelectorAll(`script[data-page-ldjson^="guide-${stress.slug}-"]`),
-      ).toHaveLength(4);
     });
-    expect(
-      document.head.querySelectorAll(`script[data-page-ldjson^="guide-${distance.slug}-"]`),
-    ).toHaveLength(0);
-    const currentUrl = `https://verdantgrowdiary.com/guides/${stress.slug}`;
-    const currentScripts = Array.from(
-      document.head.querySelectorAll<HTMLScriptElement>(
-        `script[data-page-ldjson^="guide-${stress.slug}-"]`,
-      ),
-    );
-    expect(currentScripts.map((script) => script.text).join("\n")).toContain(currentUrl);
-    expect(currentScripts.map((script) => script.text)).toHaveLength(
-      new Set(currentScripts.map((script) => script.text)).size,
-    );
-    expect(document.head.textContent).not.toContain(
-      `https://verdantgrowdiary.com/guides/${distance.slug}`,
-    );
+    expect(routeOwnedNodes.every((node) => node.isConnected)).toBe(true);
+    expect(document.head.querySelectorAll("script[data-page-ldjson]")).toHaveLength(0);
   });
 
   it("omits Article schema when a legacy guide has no verified publication date", () => {
-    renderAt("/guides/grow-diary-app");
-    expect(readJsonLd("guide-grow-diary-app-article")).toBeNull();
+    expect(readStaticRouteJsonLd("/guides/grow-diary-app", "Article")).toBeNull();
   });
 
   it("moves keyboard focus to the deep-linked FAQ accordion item", async () => {

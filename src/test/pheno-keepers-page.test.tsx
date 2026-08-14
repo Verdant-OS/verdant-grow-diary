@@ -36,6 +36,7 @@ function renderAt(state: Partial<UsePhenoKeepersState>) {
   const markReversed = state.markReversed ?? vi.fn().mockResolvedValue(true);
   const saveCross = state.saveCross ?? vi.fn().mockResolvedValue(true);
   const saveStabilityRuns = state.saveStabilityRuns ?? vi.fn().mockResolvedValue(true);
+  const linkGrowOutPlant = state.linkGrowOutPlant ?? vi.fn().mockResolvedValue(true);
   hookMock.mockReturnValue({
     status: "ok",
     hunt: { id: "h1", name: "Loud Hunt", growId: "g1", tentId: "t1" },
@@ -55,6 +56,8 @@ function renderAt(state: Partial<UsePhenoKeepersState>) {
     markReversed,
     saveCross,
     saveStabilityRuns,
+    growOutPlantsById: {},
+    linkGrowOutPlant,
     ...state,
   });
   const utils = render(
@@ -64,7 +67,15 @@ function renderAt(state: Partial<UsePhenoKeepersState>) {
       </Routes>
     </MemoryRouter>,
   );
-  return { ...utils, promoteToKeeper, addKeeperClone, markReversed, saveCross, saveStabilityRuns };
+  return {
+    ...utils,
+    promoteToKeeper,
+    addKeeperClone,
+    markReversed,
+    saveCross,
+    saveStabilityRuns,
+    linkGrowOutPlant,
+  };
 }
 
 beforeEach(() => hookMock.mockReset());
@@ -468,6 +479,121 @@ describe("PhenoKeepersPage — stability ledger wiring", () => {
     expect(saveStabilityRuns).toHaveBeenCalledWith("k1", [
       { runLabel: "Run 2", observedAt: null, traits: { vigor: 4 }, note: null },
     ]);
+  });
+});
+
+describe("PhenoKeepersPage — grow-out handoff wiring", () => {
+  const linkedClone = {
+    id: "c1",
+    keeperId: "k1",
+    parentCloneId: null,
+    clonePlantId: "p9",
+    cloneLabel: "cut #2",
+    note: null,
+    takenAt: "2026-07-01",
+  };
+
+  it("hides the handoff when no clone is linked to a plant", () => {
+    renderAt({
+      keepers: [keeper("k1", "Gas")],
+      clonesByKeeper: { k1: [{ ...linkedClone, clonePlantId: null }] },
+    });
+    expect(screen.queryByTestId("pheno-grow-out-handoff-k1")).not.toBeInTheDocument();
+  });
+
+  it("proposes a linked plant's recorded traits as a grow-out", () => {
+    renderAt({
+      keepers: [keeper("k1", "Gas")],
+      clonesByKeeper: { k1: [linkedClone] },
+      growOutPlantsById: {
+        p9: {
+          plantId: "p9",
+          plantName: "Gas cut #2",
+          growName: "Winter",
+          traits: { nose_loudness: 8 },
+        },
+      },
+    });
+    const handoff = screen.getByTestId("pheno-grow-out-handoff-k1");
+    expect(within(handoff).getByTestId("pheno-grow-out-suggestion-c1")).toHaveTextContent(
+      /Gas cut #2 · Winter/,
+    );
+    expect(handoff).toHaveTextContent(/Pre-filled from the 1 trait score/);
+  });
+
+  it("accepting APPENDS the proposed run to the existing ledger (never replaces it)", () => {
+    const saveStabilityRuns = vi.fn().mockResolvedValue(true);
+    const existing = {
+      runLabel: "Baseline",
+      observedAt: null,
+      traits: { nose_loudness: 8 },
+      note: null,
+    };
+    renderAt({
+      keepers: [{ ...keeper("k1", "Gas"), stabilityRuns: [existing] }],
+      clonesByKeeper: { k1: [linkedClone] },
+      growOutPlantsById: {
+        p9: {
+          plantId: "p9",
+          plantName: "Gas cut #2",
+          growName: null,
+          traits: { nose_loudness: 9 },
+        },
+      },
+      saveStabilityRuns,
+    });
+    fireEvent.click(screen.getByTestId("pheno-grow-out-accept-c1"));
+    expect(saveStabilityRuns).toHaveBeenCalledTimes(1);
+    const [id, runs] = saveStabilityRuns.mock.calls[0];
+    expect(id).toBe("k1");
+    // Baseline preserved, proposal appended with its plant provenance.
+    expect(runs).toHaveLength(2);
+    expect(runs[0]).toEqual(existing);
+    expect(runs[1].sourcePlantId).toBe("p9");
+    expect(runs[1].traits).toEqual({ nose_loudness: 9 });
+  });
+
+  it("a plant already in the ledger is never proposed again (no double-count)", () => {
+    renderAt({
+      keepers: [
+        {
+          ...keeper("k1", "Gas"),
+          stabilityRuns: [
+            {
+              runLabel: "Winter",
+              observedAt: null,
+              traits: { nose_loudness: 8 },
+              note: null,
+              sourcePlantId: "p9",
+            },
+          ],
+        },
+      ],
+      clonesByKeeper: { k1: [linkedClone] },
+      growOutPlantsById: {
+        p9: {
+          plantId: "p9",
+          plantName: "Gas cut #2",
+          growName: null,
+          traits: { nose_loudness: 8 },
+        },
+      },
+    });
+    expect(screen.queryByTestId("pheno-grow-out-handoff-k1")).not.toBeInTheDocument();
+  });
+
+  it("flags a linked plant with no recorded traits instead of implying evidence", () => {
+    renderAt({
+      keepers: [keeper("k1", "Gas")],
+      clonesByKeeper: { k1: [linkedClone] },
+      growOutPlantsById: {
+        p9: { plantId: "p9", plantName: "Gas cut #2", growName: null, traits: null },
+      },
+    });
+    expect(screen.getByTestId("pheno-grow-out-no-traits-c1")).toBeInTheDocument();
+    expect(screen.getByTestId("pheno-grow-out-suggestion-c1")).toHaveTextContent(
+      /will not count toward the stability comparison/i,
+    );
   });
 });
 

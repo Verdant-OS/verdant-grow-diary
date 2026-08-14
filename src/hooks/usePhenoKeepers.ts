@@ -12,6 +12,7 @@ import {
   listKeepersForHunt,
   addClone,
   listClonesForKeepers,
+  linkClonePlant,
   recordCross,
   listCrossesForHunt,
   updateKeeperStabilityRuns,
@@ -20,6 +21,8 @@ import {
   type CrossRow,
 } from "@/lib/phenoKeepersService";
 import type { StabilityRun } from "@/lib/phenoStabilityRunRules";
+import type { GrowOutPlantInput } from "@/lib/phenoGrowOutHandoffRules";
+import { loadGrowOutPlantDetails } from "@/lib/phenoGrowOutPlantsService";
 import {
   recordReversal,
   listReversalsForKeepers,
@@ -66,6 +69,13 @@ export interface UsePhenoKeepersState {
    */
   saveStabilityRuns: (keeperId: string, runs: readonly StabilityRun[]) => Promise<boolean>;
   /**
+   * Details for plants the grower linked their clones to, keyed by plant id —
+   * the evidence the grow-out handoff pre-fills a proposed run from.
+   */
+  growOutPlantsById: Record<string, GrowOutPlantInput>;
+  /** Link (or unlink, with null) the real plant a clone was grown as. */
+  linkGrowOutPlant: (cloneId: string, plantId: string | null) => Promise<boolean>;
+  /**
    * Record a cross. Pass a distinct maleKeeperId for a two-parent cross, or
    * null to self (S1) the female keeper. With no `options` the service
    * auto-classifies (standard_f1 / feminized_cross / selfing_s1); pass `options`
@@ -102,6 +112,7 @@ export function usePhenoKeepers(huntId: string | null | undefined): UsePhenoKeep
   const [decisionsByPlant, setDecisionsByPlant] = useState<
     Record<string, KeeperDecisionLogEntry[]>
   >({});
+  const [growOutPlantsById, setGrowOutPlantsById] = useState<Record<string, GrowOutPlantInput>>({});
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [reloadTick, setReloadTick] = useState(0);
@@ -138,6 +149,19 @@ export function usePhenoKeepers(huntId: string | null | undefined): UsePhenoKeep
       const reversedIds = [...new Set(reversalRows.map((r) => r.keeperId))];
       const byKeeper: Record<string, CloneRow[]> = {};
       for (const c of clones) (byKeeper[c.keeperId] ??= []).push(c);
+      // Grow-out handoff: details for the plants clones were linked to, so a
+      // plant's own recorded traits can be PROPOSED instead of retyped.
+      // Best-effort — a failure here just means no suggestions, never a
+      // broken keepers page.
+      const linkedPlantIds = clones
+        .map((c) => (typeof c.clonePlantId === "string" ? c.clonePlantId : ""))
+        .filter((v) => v !== "");
+      const growOutPlants =
+        linkedPlantIds.length > 0
+          ? await loadGrowOutPlantDetails(linkedPlantIds).catch(() => ({}))
+          : {};
+      if (cancelled) return;
+      setGrowOutPlantsById(growOutPlants);
       setHunt(result.hunt);
       setCandidates([...result.candidates]);
       setKeepers(keeperRows);
@@ -195,6 +219,21 @@ export function usePhenoKeepers(huntId: string | null | undefined): UsePhenoKeep
     async (keeperId: string, method: string) => {
       setSaving(true);
       const res = await recordReversal({ keeperId, method });
+      setSaving(false);
+      if (res.ok === true) {
+        reload();
+        return true;
+      }
+      setError(res.error);
+      return false;
+    },
+    [reload],
+  );
+
+  const linkGrowOutPlant = useCallback(
+    async (cloneId: string, plantId: string | null) => {
+      setSaving(true);
+      const res = await linkClonePlant({ cloneId, plantId });
       setSaving(false);
       if (res.ok === true) {
         reload();
@@ -269,6 +308,8 @@ export function usePhenoKeepers(huntId: string | null | undefined): UsePhenoKeep
     addKeeperClone,
     markReversed,
     saveStabilityRuns,
+    growOutPlantsById,
+    linkGrowOutPlant,
     saveCross,
   };
 }

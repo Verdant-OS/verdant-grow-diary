@@ -442,6 +442,44 @@ Carry this into any Phase 2 design: a production role cannot be *hardened* by
 `ALTER` from the privilege level Verdant actually has. It can only be created
 correctly and then verified.
 
+### 5.2.2 Phase 1 first live result — the fence holds; the harness was wrong
+
+First execution of P1–P10 in the replay lane, 2026-08-14: **4 passed, 6 failed,
+0 blocked.** The headline is buried in P2's own detail line:
+
+```text
+✗ P2 — SELECT diary_entries -> SQLSTATE none
+       (ERROR: 42501: permission denied for table diary_entries
+        LOCATION: aclcheck_error, aclchk.c:2843)
+```
+
+**Postgres refused the cross-domain read with `42501`.** `established fact` —
+measured. The fence works. Five of the six "failures" were defects in the
+harness, not in the design:
+
+| Defect | Effect | Status |
+| --- | --- | --- |
+| SQLSTATE regex expected a literal `SQLSTATE` prefix psql never writes (it emits `ERROR:  42501:`) | Every real refusal read as "SQLSTATE none" — P2, P4, P7, P9 | Fixed |
+| P1 compared `pg_roles` booleans against `"f,f,f,f,f,f"`; psql renders `true`/`false` | P1 failed on a role whose attributes were all correctly off | Fixed — now asks Postgres for one boolean |
+| **P8 compared two unparsed nulls for equality and reported PASS** | A **vacuous pass** — green while proving nothing | Fixed — both sides must equal `42501` |
+| P3 accepted any 401/403 as proof of a role switch | PostgREST also 401/403s a token it rejects outright, which looks identical | Fixed — requires a grant-layer refusal in the body |
+| Fixture pre-checked `pg_get_function_identity_arguments = 'uuid, integer'` and skipped the GRANT when it did not match | Failed **closed and silently**; the role never got EXECUTE, and P5's denial was unexplained | Fixed — attempts the GRANT and lets Postgres arbitrate |
+
+The P8 defect deserves naming plainly: it is exactly the "green but verifying
+nothing" failure `AGENTS.md` warns about for source-text guards, reproduced here
+in a runtime harness by the same author who wrote that warning into this spec.
+Four regression tests now pin each of these.
+
+**P3 passed on the first run** — `HTTP 403`, the role claim honoured — but on
+the weak inference above. Treat §5.3 as *encouraging, not proven*, until P3
+passes under the stricter body check.
+
+`P5` (the allowlisted function call) remains the one substantive unknown: the
+role was denied EXECUTE because the fixture's guard silently skipped the GRANT.
+The next run carries a diagnostic reporting `has_function_privilege` and the
+matching signature count, so a repeat failure produces evidence rather than a
+guess.
+
 The role itself is exactly the §5.2 shape: `NOLOGIN NOINHERIT NOSUPERUSER
 NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS`, `USAGE` on `public`,
 `EXECUTE` on exactly one function

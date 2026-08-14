@@ -100,7 +100,12 @@ test("the harness verifies the dangerous attributes from pg_roles, not from text
   ]) {
     assert.ok(harness.includes(col), `P1 must read ${col} from pg_roles`);
   }
-  assert.match(harness, /attrs\.out === "f,f,f,f,f,f"/);
+  // P1 asks Postgres for ONE boolean rather than string-matching a
+  // concatenation: psql renders booleans as "true"/"false", and the original
+  // "f,f,f,f,f,f" comparison failed on a role whose attributes were all
+  // correctly off.
+  assert.match(harness, /NOT \(rolcanlogin OR rolinherit OR rolsuper OR rolbypassrls OR rolcreatedb OR rolcreaterole\)/);
+  assert.match(harness, /attrs\.out === "true"/);
 });
 
 test("fixture grants no dangerous attribute in the positive form", () => {
@@ -166,4 +171,35 @@ test("harness asserts SQLSTATE 42501 rather than message text", () => {
 
 test("harness does not re-point any edge function", () => {
   assert.doesNotMatch(harness, /supabase\/functions\//);
+});
+
+// ── Regressions for the defects the first live run exposed ────────────────
+test("SQLSTATE extraction matches psql's actual ERROR: <code>: format", () => {
+  // The first run reported "SQLSTATE none" for every refusal because the regex
+  // expected a literal "SQLSTATE" prefix psql never writes. The refusals were
+  // real 42501s. Pin the corrected pattern against a real psql error string.
+  const m = harness.match(/text\.match\(([^)]*ERROR[^)]*)\)/);
+  assert.ok(m, "harness must parse the ERROR: <sqlstate>: form");
+  const sample =
+    "psql:ERROR:  42501: permission denied for table diary_entries\nLOCATION: aclcheck_error";
+  assert.equal(sample.match(/ERROR:\s*([0-9A-Z]{5}):/)?.[1], "42501");
+});
+
+test("P8 cannot pass vacuously when neither side parsed", () => {
+  // It originally compared two nulls for equality and reported green.
+  assert.match(harness, /p2b\.sqlstate === PERMISSION_DENIED && p2\.sqlstate === PERMISSION_DENIED/);
+});
+
+test("P3 requires a grant-layer refusal, not any 403", () => {
+  // PostgREST also 401/403s a token it rejects outright, which would look
+  // identical while never switching role.
+  assert.match(harness, /res\.status === 403 &&/);
+  assert.match(harness, /permission denied/i);
+});
+
+test("the fixture never silently skips the allowlisted GRANT", () => {
+  // The pre-check on pg_get_function_identity_arguments failed closed and
+  // silently, leaving the role with no EXECUTE and P5 unexplained.
+  assert.doesNotMatch(fixtureCode, /IF EXISTS[\s\S]*pg_get_function_identity_arguments/);
+  assert.match(fixtureCode, /WHEN undefined_function THEN/);
 });

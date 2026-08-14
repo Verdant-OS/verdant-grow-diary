@@ -106,7 +106,12 @@ function psqlExpectError(sql: string): { sqlstate: string | null; detail: string
       (typeof err.stderr === "string" ? err.stderr : err.stderr?.toString("utf-8")) ??
       err.message ??
       "";
-    const m = text.match(/SQLSTATE:?\s*([0-9A-Z]{5})/) ?? text.match(/\b([0-9A-Z]{5})\b(?=.*ERROR)/);
+    // psql --VERBOSITY verbose emits "ERROR:  42501: permission denied ...".
+    // MEASURED 2026-08-14: the first Phase 1 run reported "SQLSTATE none" for
+    // every refusal because this regex expected a literal "SQLSTATE" prefix
+    // that psql never writes. The refusals were real 42501s all along.
+    const m =
+      text.match(/ERROR:\s*([0-9A-Z]{5}):/) ?? text.match(/SQLSTATE:?\s*([0-9A-Z]{5})/);
     return { sqlstate: m ? m[1] : null, detail: text.replace(/\s+/g, " ").slice(0, 300) };
   }
 }
@@ -164,14 +169,21 @@ if (!applyFixture()) {
 
 try {
   // ── P1: role exists with no dangerous attribute ────────────────────────
+  // One boolean rather than a concatenated string: psql renders booleans as
+  // "true"/"false", and comparing against "f,f,f,f,f,f" failed on the first
+  // run even though every attribute was correctly false.
   const attrs = psql(
+    `SELECT NOT (rolcanlogin OR rolinherit OR rolsuper OR rolbypassrls OR rolcreatedb OR rolcreaterole)
+       FROM pg_roles WHERE rolname='${ROLE}'`,
+  );
+  const detail = psql(
     `SELECT rolcanlogin||','||rolinherit||','||rolsuper||','||rolbypassrls||','||rolcreatedb||','||rolcreaterole
        FROM pg_roles WHERE rolname='${ROLE}'`,
   );
   record(
     "P1",
-    attrs.ok && attrs.out === "f,f,f,f,f,f",
-    `role attributes from pg_roles (login,inherit,super,bypassrls,createdb,createrole) = ${attrs.out ?? attrs.detail}`,
+    attrs.ok && attrs.out === "true",
+    `every dangerous attribute is off (login,inherit,super,bypassrls,createdb,createrole) = ${detail.out ?? attrs.detail}`,
   );
 
   // ── P6: zero table grants ──────────────────────────────────────────────
@@ -193,6 +205,23 @@ try {
   // NULL args make the function a no-op by its own guard clause, so this
   // proves the privilege check passes without mutating any row.
   const p5 = psql(`SET ROLE ${ROLE}; SELECT public.bump_bridge_token_usage(NULL::uuid, NULL::integer) IS NULL;`);
+  if (!p5.ok) {
+    // Turn a denial into evidence instead of a guess: report whether the GRANT
+    // actually landed and whether the function exists under the expected
+    // identity signature.
+    const priv = psql(
+      `SELECT has_function_privilege('${ROLE}', 'public.bump_bridge_token_usage(uuid,integer)', 'EXECUTE')`,
+    );
+    const sig = psql(
+      `SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='bump_bridge_token_usage'
+          AND pg_get_function_identity_arguments(p.oid)='uuid, integer'`,
+    );
+    console.error(
+      `    diagnostic: has_function_privilege=${priv.out ?? priv.detail}; ` +
+        `matching identity signature count=${sig.out ?? sig.detail}`,
+    );
+  }
   record("P5", p5.ok, `allowlisted function call ${p5.ok ? "succeeded" : `failed: ${p5.detail}`}`);
 
   // ── P9: revoking EXECUTE immediately restores the refusal ──────────────
@@ -220,7 +249,14 @@ try {
 
   // ── P8: determinism ────────────────────────────────────────────────────
   const p2b = psqlExpectError(`SET ROLE ${ROLE}; SELECT count(*) FROM public.diary_entries;`);
-  record("P8", p2b.sqlstate === p2.sqlstate, `repeat of P2 yields the same SQLSTATE (${p2b.sqlstate ?? "none"})`);
+  // Both sides must be the real refusal code. Comparing only for equality made
+  // this a VACUOUS PASS on the first run: two unparsed nulls compared equal and
+  // reported green while proving nothing.
+  record(
+    "P8",
+    p2b.sqlstate === PERMISSION_DENIED && p2.sqlstate === PERMISSION_DENIED,
+    `repeat of P2 yields the same refusal (first=${p2.sqlstate ?? "none"}, second=${p2b.sqlstate ?? "none"})`,
+  );
 
   // ── P10: no dangerous attribute anywhere in the fixture text ───────────
   // Re-asserted from pg_roles in P1; this is the source-side companion.
@@ -253,11 +289,19 @@ try {
       // The role claim was honoured if PostgREST switched to a role that is
       // refused at the grant layer. A 200 would mean it did NOT switch.
       const body = await res.text();
-      const switched = res.status === 401 || res.status === 403 || body.includes(PERMISSION_DENIED);
+      // A bare 403 is NOT proof: PostgREST also 401/403s a token it rejects
+      // outright, which would look identical while never switching role. Require
+      // the body to carry the grant-layer refusal itself.
+      const switched =
+        res.status === 403 &&
+        (body.includes(PERMISSION_DENIED) || /permission denied/i.test(body));
       record(
         "P3",
         switched,
-        `PostgREST role-claim switch: HTTP ${res.status}${switched ? " (role honoured, access refused as designed)" : " — role claim appears NOT honoured"}`,
+        `PostgREST role-claim switch: HTTP ${res.status}; body=${body.replace(/\s+/g, " ").slice(0, 160)}` +
+          (switched
+            ? " (role honoured — refused at the grant layer, not at the JWT layer)"
+            : " — NOT proof of a role switch"),
       );
     } catch (error) {
       recordBlocked("P3", `PostgREST unreachable at ${base}: ${(error as Error).message}`);

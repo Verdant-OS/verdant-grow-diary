@@ -69,18 +69,22 @@ GRANT USAGE ON SCHEMA public TO verdant_ingest_writer;
 -- Exactly one function, guarded on its existence so a schema drift cannot
 -- abort the fixture. bump_bridge_token_usage(uuid, integer) is ingest-domain,
 -- SECURITY DEFINER, has a single overload, and writes only bridge_tokens.
+-- MEASURED 2026-08-14: the first run that reached this point left the role
+-- WITHOUT execute permission ("permission denied for function
+-- bump_bridge_token_usage" at P5). The previous version pre-checked
+-- pg_get_function_identity_arguments(p.oid) = 'uuid, integer' and silently
+-- skipped the GRANT when that string did not match exactly -- a guard that
+-- fails CLOSED and silently, which is the worst combination.
+--
+-- Attempt the GRANT directly instead and let Postgres arbitrate the signature.
+-- If the function is genuinely absent, that is a P5 failure the harness reports
+-- with a diagnostic, not a silent no-op here.
 DO $grant_fn$
 BEGIN
-  IF EXISTS (
-    SELECT 1
-      FROM pg_proc p
-      JOIN pg_namespace n ON n.oid = p.pronamespace
-     WHERE n.nspname = 'public'
-       AND p.proname = 'bump_bridge_token_usage'
-       AND pg_get_function_identity_arguments(p.oid) = 'uuid, integer'
-  ) THEN
-    EXECUTE 'GRANT EXECUTE ON FUNCTION public.bump_bridge_token_usage(uuid, integer) TO verdant_ingest_writer';
-  END IF;
+  EXECUTE 'GRANT EXECUTE ON FUNCTION public.bump_bridge_token_usage(uuid, integer) TO verdant_ingest_writer';
+EXCEPTION
+  WHEN undefined_function THEN
+    RAISE NOTICE 'allowlisted function absent; harness P5 will fail and report the diagnostic';
 END
 $grant_fn$;
 

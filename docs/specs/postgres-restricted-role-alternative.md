@@ -416,6 +416,32 @@ So Phase 1 ships as:
 `AGENTS.md`'s Migration Immutability section is also satisfied trivially: no
 migration file is added, edited, or renamed.
 
+**Measured constraint, 2026-08-14 — Supabase's `postgres` cannot set the
+dangerous role attributes at all.** The first Phase 1 run failed with:
+
+```text
+psql:scripts/sql/restricted-role-phase1-ingest.sql:46:
+ERROR:  permission denied to alter role
+```
+
+PostgreSQL requires **superuser** to change `SUPERUSER`, `REPLICATION`, and
+`BYPASSRLS` — *even to turn them off* — and Supabase's `postgres` role is not a
+true superuser. `established fact`, measured in the replay lane.
+
+This is a real constraint on any Verdant role design, and the fix is the better
+design anyway: those attributes are already off by `CREATE ROLE` default, so the
+fixture **verifies** them instead of commanding them. Harness P1 reads
+`rolsuper`, `rolbypassrls`, `rolcreatedb`, `rolcreaterole`, `rolcanlogin` and
+`rolinherit` straight out of `pg_roles` and fails if any is true. That is
+strictly stronger than an `ALTER` asserting a value it already holds, because it
+would also catch a changed server default. Only `NOLOGIN NOINHERIT` are set
+explicitly, at `CREATE` time — `INHERIT` being the one default that does not go
+the safe way.
+
+Carry this into any Phase 2 design: a production role cannot be *hardened* by
+`ALTER` from the privilege level Verdant actually has. It can only be created
+correctly and then verified.
+
 The role itself is exactly the §5.2 shape: `NOLOGIN NOINHERIT NOSUPERUSER
 NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS`, `USAGE` on `public`,
 `EXECUTE` on exactly one function

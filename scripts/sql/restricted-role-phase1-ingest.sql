@@ -24,26 +24,44 @@
 
 BEGIN;
 
+-- Only NOLOGIN and NOINHERIT are set explicitly, and only at CREATE time.
+--
+-- MEASURED 2026-08-14: an ALTER ROLE naming NOSUPERUSER / NOREPLICATION /
+-- NOBYPASSRLS fails on the Supabase local stack with
+--   ERROR: permission denied to alter role
+-- because PostgreSQL requires **superuser** to change those three attributes --
+-- even to turn them OFF -- and Supabase's `postgres` role is not a true
+-- superuser. This is a real constraint on any Verdant role design, not a
+-- fixture bug, and it is recorded in the spec's §5.2.1.
+--
+-- It is also harmless, because CREATE ROLE already defaults every one of them
+-- to off. NOINHERIT is the one default that does NOT go the safe way (roles
+-- INHERIT by default), so it is named explicitly here.
+--
+-- The safety property is therefore VERIFIED rather than COMMANDED: harness P1
+-- reads rolsuper / rolbypassrls / rolcreatedb / rolcreaterole / rolcanlogin /
+-- rolinherit straight out of pg_roles and fails if any of them is true. That is
+-- the stronger check anyway — it would catch a changed server default, which an
+-- ALTER asserting the value it already has never would.
 DO $phase1$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'verdant_ingest_writer') THEN
-    CREATE ROLE verdant_ingest_writer;
+    CREATE ROLE verdant_ingest_writer NOLOGIN NOINHERIT;
   END IF;
 END
 $phase1$;
 
--- Attributes asserted explicitly so a pre-existing role cannot carry anything
--- stronger. NOINHERIT matters: the role must not passively acquire privileges
--- through membership. Every dangerous attribute is negated here and P10 in the
--- harness re-asserts it from pg_roles rather than trusting this text.
-ALTER ROLE verdant_ingest_writer
-  NOLOGIN
-  NOINHERIT
-  NOSUPERUSER
-  NOCREATEDB
-  NOCREATEROLE
-  NOREPLICATION
-  NOBYPASSRLS;
+-- Re-assert only the two attributes a non-superuser role holder may change, and
+-- never let it abort the fixture: a pre-existing role owned by someone else is
+-- a P1 failure to report, not a crash to hide behind.
+DO $reassert$
+BEGIN
+  EXECUTE 'ALTER ROLE verdant_ingest_writer NOLOGIN NOINHERIT';
+EXCEPTION
+  WHEN insufficient_privilege THEN
+    RAISE NOTICE 'could not re-assert NOLOGIN NOINHERIT; P1 will verify from pg_roles';
+END
+$reassert$;
 
 -- USAGE on the schema only. This does NOT grant access to any object in it.
 GRANT USAGE ON SCHEMA public TO verdant_ingest_writer;

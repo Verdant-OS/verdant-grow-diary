@@ -104,7 +104,10 @@ test("the harness verifies the dangerous attributes from pg_roles, not from text
   // concatenation: psql renders booleans as "true"/"false", and the original
   // "f,f,f,f,f,f" comparison failed on a role whose attributes were all
   // correctly off.
-  assert.match(harness, /NOT \(rolcanlogin OR rolinherit OR rolsuper OR rolbypassrls OR rolcreatedb OR rolcreaterole\)/);
+  assert.match(harness, /NOT \(rolcanlogin OR rolinherit OR rolsuper OR rolbypassrls OR rolcreatedb OR rolcreaterole\)\)::text/);
+  // psql renders a bare boolean as "t"/"f" but a text-concatenated one as
+  // "true"/"false". The cast removes that ambiguity; without it P1 failed on a
+  // correctly-configured role for the third time in this family of defects.
   assert.match(harness, /attrs\.out === "true"/);
 });
 

@@ -480,6 +480,58 @@ The next run carries a diagnostic reporting `has_function_privilege` and the
 matching signature count, so a repeat failure produces evidence rather than a
 guess.
 
+### 5.2.3 Second live result — GAP-PGROLE-001 is DEMONSTRATED
+
+Second execution, 2026-08-14, after the harness fixes: **9 passed, 1 failed,
+0 blocked.** Every substantive proof passed. `established fact` — measured in
+the `security-db-local` replay lane.
+
+```text
+✓ P2 — SELECT diary_entries        -> SQLSTATE 42501
+✓ P4 — UPDATE subscriptions        -> SQLSTATE 42501
+✓ P5 — allowlisted function call succeeded
+✓ P6 — table grants held by the role = 0
+✓ P7 — newly created table is NOT reachable -> SQLSTATE 42501
+✓ P8 — repeat of P2 (first=42501, second=42501)
+✓ P9 — after REVOKE, function call -> SQLSTATE 42501
+✓ P10 — fixture grants no dangerous attribute
+✓ P3 — HTTP 403; body={"code":"42501","message":"permission denied for table diary_entries"}
+```
+
+Against the §4.3 success definition, which required (1)–(6): **all six are met.**
+A role holding `EXECUTE` on one function and **zero** table grants is refused by
+the database — not by application code, not by a test — on both a cross-domain
+read and a cross-domain write, with the SQLSTATE asserted rather than a message
+string.
+
+**P7 is the result that matters most for Verdant specifically.** A table created
+*after* the role existed was still unreachable. That is the 2026-08-06 founder
+decision's constraint under test: Lovable ships tables without ACL awareness, and
+a function-grant partition does not drift open when it does. A table-grant
+partition would have.
+
+**P3 is now proven rather than inferred.** The first run accepted any 403; this
+one required the grant-layer refusal in the body and got
+`{"code":"42501", "message":"permission denied for table diary_entries"}`.
+PostgREST honoured the custom `role` claim and the refusal came from the grant
+layer, not the JWT layer. §5.3's mechanism — mint a role-claim JWT, no transport
+change — is **demonstrated on this stack**. That was the single blocking
+feasibility question for this arm.
+
+The one remaining failure was P1, and it was a third instance of the same defect
+family: `SELECT NOT (…)` returns a bare boolean, which psql renders `t`, while
+the same value concatenated into text renders `false`. The comparison expected
+`"true"`. Fixed with an explicit `::text` cast. The role's attributes were
+correct throughout — `false,false,false,false,false,false` — as the failure
+message itself showed.
+
+**What this does NOT establish.** Still not a production role: everything above
+ran against a disposable local replay and the role was dropped in teardown.
+Phase 2 remains `REJECT`, and §5.2.1's measured constraint still applies — a
+production role could not be *hardened* by `ALTER` from Verdant's privilege
+level, only created correctly and verified. And it remains true that neither
+architecture removes `ai-coach`'s five cross-domain reaches cheaply.
+
 The role itself is exactly the §5.2 shape: `NOLOGIN NOINHERIT NOSUPERUSER
 NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS`, `USAGE` on `public`,
 `EXECUTE` on exactly one function
@@ -786,8 +838,14 @@ files_touched:
 ## 14. Verdict
 
 ```text
-APPROVED — PHASE 0 MEASURED; PHASE 1 DELIVERED, LOCAL-ONLY
+APPROVED — PHASE 0 MEASURED; PHASE 1 DEMONSTRATED (9/10, LOCAL-ONLY)
 ```
+
+`GAP-PGROLE-001` is **demonstrated** against its own §4.3 success definition.
+Postgres refuses a restricted role's cross-domain reads and writes with `42501`,
+including tables created after the role existed, and PostgREST honours a custom
+role claim so the mechanism is reachable without a transport change. Production
+adoption remains `REJECT` pending a Cheek decision and Security review.
 
 The gap is real and measured: 22 functions, one `service_role`, 115 tables, one
 schema, zero custom roles. The mechanism that would close it is plausible and

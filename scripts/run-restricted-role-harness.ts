@@ -172,8 +172,13 @@ try {
   // One boolean rather than a concatenated string: psql renders booleans as
   // "true"/"false", and comparing against "f,f,f,f,f,f" failed on the first
   // run even though every attribute was correctly false.
+  // ::text is load-bearing. psql renders a BARE boolean column as "t"/"f",
+  // but a boolean concatenated into text renders as "true"/"false" — which is
+  // why the detail string below reads "false,false,..." while the bare
+  // expression reads "t". Casting makes the value unambiguous instead of
+  // depending on which of psql's two renderings applies.
   const attrs = psql(
-    `SELECT NOT (rolcanlogin OR rolinherit OR rolsuper OR rolbypassrls OR rolcreatedb OR rolcreaterole)
+    `SELECT (NOT (rolcanlogin OR rolinherit OR rolsuper OR rolbypassrls OR rolcreatedb OR rolcreaterole))::text
        FROM pg_roles WHERE rolname='${ROLE}'`,
   );
   const detail = psql(

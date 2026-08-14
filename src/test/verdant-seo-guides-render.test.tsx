@@ -90,6 +90,13 @@ describe("/guides hub — public render", () => {
 
   it("injects FAQPage + BreadcrumbList JSON-LD", () => {
     renderAt("/guides");
+    const webpage = readJsonLd("guides-index-webpage") as {
+      "@type": string;
+      url: string;
+    } | null;
+    expect(webpage?.["@type"]).toBe("WebPage");
+    expect(webpage?.url).toBe("https://verdantgrowdiary.com/guides");
+
     const faq = readJsonLd("guides-index-faq") as {
       "@type": string;
       mainEntity: unknown[];
@@ -105,6 +112,36 @@ describe("/guides hub — public render", () => {
     expect(crumbs?.itemListElement.length).toBe(2);
     expect(crumbs?.itemListElement[0].position).toBe(1);
     expect(crumbs?.itemListElement[1].item).toBe("https://verdantgrowdiary.com/guides");
+  });
+
+  it("replaces the SSR route JSON-LD with one hydrated hub-owned set", async () => {
+    const staleUrl = "https://verdantgrowdiary.com/guides/stale-static-route";
+    for (const type of ["WebPage", "FAQPage", "BreadcrumbList"]) {
+      appendStaticRouteJsonLd({ "@context": "https://schema.org", "@type": type, url: staleUrl });
+    }
+
+    renderAt("/guides");
+
+    await waitFor(() => {
+      expect(document.head.querySelectorAll("script[data-static-route-ldjson]")).toHaveLength(0);
+      expect(
+        document.head.querySelectorAll('script[data-page-ldjson^="guides-index-"]'),
+      ).toHaveLength(3);
+    });
+
+    const currentScripts = Array.from(
+      document.head.querySelectorAll<HTMLScriptElement>(
+        'script[data-page-ldjson^="guides-index-"]',
+      ),
+    );
+    const serialized = currentScripts.map((script) => script.text);
+    expect(serialized.join("\n")).not.toContain(staleUrl);
+    expect(serialized).toHaveLength(new Set(serialized).size);
+    expect(currentScripts.map((script) => JSON.parse(script.text)["@type"]).sort()).toEqual([
+      "BreadcrumbList",
+      "FAQPage",
+      "WebPage",
+    ]);
   });
 
   it("does not link to protected/auth-only app routes", () => {

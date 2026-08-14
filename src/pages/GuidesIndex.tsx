@@ -20,14 +20,19 @@ import {
   VERDANT_GROWER_GUIDE_FAQ,
   VERDANT_GUIDES_BREADCRUMB_ITEMS,
   VERDANT_SEO_GUIDES,
+  VERDANT_SITE_ORIGIN,
 } from "@/constants/verdantSeoContent";
 import {
   buildBreadcrumbListJsonLd,
   buildFaqPageJsonLd,
+  buildWebPageJsonLd,
   safeJsonLdStringify,
 } from "@/lib/seoStructuredData";
 
 const PAGE_URL = "https://verdantgrowdiary.com/guides";
+const PAGE_TITLE = "Grower Guides: Diary, Lighting & Sensor Truth | Verdant";
+const PAGE_DESCRIPTION =
+  "Practical grower guides for plant timelines, grow-light distance, PPFD, DLI, source-labeled sensor data, VPD context, and cautious troubleshooting.";
 const FEATURED_GUIDE_SLUGS = new Set([
   "cannabis-leaf-symptoms",
   "cannabis-grow-light-distance-and-schedule",
@@ -36,13 +41,18 @@ const FEATURED_GUIDE_SLUGS = new Set([
 
 export default function GuidesIndex() {
   usePageSeo({
-    title: "Grower Guides: Diary, Lighting & Sensor Truth | Verdant",
-    description:
-      "Practical grower guides for plant timelines, grow-light distance, PPFD, DLI, source-labeled sensor data, VPD context, and cautious troubleshooting.",
+    title: PAGE_TITLE,
+    description: PAGE_DESCRIPTION,
     path: "/guides",
   });
 
   useEffect(() => {
+    const webpage = buildWebPageJsonLd({
+      title: PAGE_TITLE,
+      description: PAGE_DESCRIPTION,
+      url: PAGE_URL,
+      siteUrl: VERDANT_SITE_ORIGIN,
+    });
     const faq = buildFaqPageJsonLd({
       pageUrl: PAGE_URL,
       questions: VERDANT_GROWER_GUIDE_FAQ,
@@ -50,6 +60,20 @@ export default function GuidesIndex() {
     const crumbs = buildBreadcrumbListJsonLd({
       items: VERDANT_GUIDES_BREADCRUMB_ITEMS,
     });
+
+    // The SSR response already carries route-local WebPage, FAQPage, and
+    // BreadcrumbList scripts for non-JS crawlers. Once hydrated, replace that
+    // static set with one component-owned set so the same schemas are not
+    // serialized twice and later client navigation can clean them up safely.
+    document
+      .querySelectorAll('script[type="application/ld+json"][data-static-route-ldjson]')
+      .forEach((script) => script.remove());
+
+    const webpageScript = document.createElement("script");
+    webpageScript.type = "application/ld+json";
+    webpageScript.setAttribute("data-page-ldjson", "guides-index-webpage");
+    webpageScript.text = safeJsonLdStringify(webpage);
+    document.head.appendChild(webpageScript);
     const faqScript = document.createElement("script");
     faqScript.type = "application/ld+json";
     faqScript.setAttribute("data-page-ldjson", "guides-index-faq");
@@ -61,6 +85,7 @@ export default function GuidesIndex() {
     crumbScript.text = safeJsonLdStringify(crumbs);
     document.head.appendChild(crumbScript);
     return () => {
+      webpageScript.remove();
       faqScript.remove();
       crumbScript.remove();
     };

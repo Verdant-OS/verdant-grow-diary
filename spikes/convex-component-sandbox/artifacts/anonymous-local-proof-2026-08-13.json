@@ -1,0 +1,113 @@
+{
+  "schema_version": 1,
+  "receipt_type": "sanitized_point_in_time_cli_observation",
+  "recorded_at": "2026-08-13T20:39:11.4653539-05:00",
+  "source_binding": {
+    "repository_base_commit": "68c0098176f1755d129fe4d1d5e382c494ae1aac",
+    "hash_algorithm": "sha256",
+    "files": {
+      "convex.json": "4c13d4b2bafae1a3a5f5c019493442bf2b0f25fb14b5485acc46c4a64c9153a6",
+      "package.json": "7bc23bce66b692708a8750c8f0009e272c3b78857131dff9e66cc416a054667d",
+      "convex/convex.config.ts": "12cef71e6f9523293370eb338236881c8978ce95daec0e1e7e2e9283f8086ae3",
+      "convex/schema.ts": "6de00a243d8ab89a54d7f3097cd8ca312def7a5e59427e2b4ed39889cded94c5",
+      "convex/notes.ts": "880464635d522f3dc895e67762cb3e8e0c80447b0d03df96e861027812c2ec0a",
+      "convex/guardBridge.ts": "a7da073f54928fab6d758d6f0cc98507cb9ee10e780c788962e5027025c3b19d",
+      "convex/componentMutationProbe.ts": "e8ce456a8b0e3483ba7be61155fd0fb1c7362bc1ff18fd9319064c214d5cce5a",
+      "convex/_generated/api.d.ts": "716c903a852a41452509628870d8302dab23d06246a4c4068435423cb330affa",
+      "convex/_generated/dataModel.d.ts": "e7f63448f002e93eb31bb4a7c84cd27f0cda0d86bf3cf127ac89bfc122f5a895",
+      "convex/components/abuse_guard/convex.config.ts": "e3a7fa7586e084a546dafef5d9220d28df48630b81b720c0fb1cdb487b3ec6d3",
+      "convex/components/abuse_guard/schema.ts": "d1e74c573fc0468190a6339c8d06be8c03fc98090ac50bb49c57d097eaf5e130",
+      "convex/components/abuse_guard/check.ts": "44d52dcc6b7eded45a01637b710d66a259f74df17f5c3c13c2da06551c4c4791",
+      "convex/components/abuse_guard/isolationProbe.ts": "0c5a1e9bc19ec781ea2792290c1e39745b6e65dd33e93581258cd78468d30d37",
+      "convex/components/abuse_guard/_generated/api.ts": "9b3ff87c7497e3b99e90b11f1a33a5157c8d6b7ca333c964bc36bd7f27a2879a",
+      "convex/components/abuse_guard/_generated/component.ts": "880e0ecc13de920b7788209b43a6971def5041d013f385dd56e32a74dda310e9",
+      "convex/components/abuse_guard/_generated/dataModel.ts": "e7f63448f002e93eb31bb4a7c84cd27f0cda0d86bf3cf127ac89bfc122f5a895",
+      "convex/components/abuse_guard/_generated/server.ts": "bfce864bc0172f89495b90cf85209df52ed3c10d154b6c7afc044522397fcccf"
+    }
+  },
+  "observed_window": {
+    "started_at_local": "2026-08-13T20:35:28-05:00",
+    "completed_before_local": "2026-08-13T20:39:11-05:00"
+  },
+  "environment": {
+    "backend": "anonymous_local",
+    "convex_account_used": false,
+    "cloud_deployment_used": false,
+    "convex_version": "1.43.0",
+    "convex_test_version": "0.0.55",
+    "local_backend_stopped_after_proof": true
+  },
+  "mount": {
+    "command": "CONVEX_AGENT_MODE=anonymous bunx convex dev --once --codegen disable --typecheck enable --typecheck-components --tail-logs disable",
+    "exit_code": 0,
+    "component": "abuse_guard",
+    "parent_typecheck": "pass",
+    "component_typecheck": "pass"
+  },
+  "proofs": {
+    "P1": {
+      "command_shape": "run check:consume <synthetic args> --component abuse_guard, six times; then check:snapshot",
+      "results": [
+        { "status": "allow", "remaining": 4 },
+        { "status": "allow", "remaining": 3 },
+        { "status": "allow", "remaining": 2 },
+        { "status": "allow", "remaining": 1 },
+        { "status": "allow", "remaining": 0 },
+        { "status": "deny", "remaining": 0, "retryAfterMs": 60000 }
+      ],
+      "snapshot_count": 5,
+      "exit_code": 0
+    },
+    "P2": {
+      "command_shape": "run check:consume at nowMs 59999 and 60000 with windowMs 60000",
+      "remaining": [4, 4],
+      "exit_code": 0
+    },
+    "P3": {
+      "command_shape": "run check:consume with max 0; then snapshot the same fresh key",
+      "invalid_call_exit_code": 1,
+      "error_category": "input_validation",
+      "snapshot_count": 0
+    },
+    "P4": {
+      "command_shape": "run check:check twice with identical synthetic arguments",
+      "results_equal": true,
+      "result": { "status": "allow", "remaining": 5 }
+    },
+    "P5": {
+      "command_shape": "seed one synthetic parent row; run isolationProbe:attemptParentTableRead in abuse_guard; reread parent",
+      "component_result": null,
+      "component_exit_code": 0,
+      "parent_rows_before": 2,
+      "parent_rows_after": 2
+    },
+    "P6": {
+      "command_shape": "create component bucket; require a non-null component ID; run parent componentMutationProbe; reread both stores",
+      "component_id_non_null": true,
+      "patch_exit_code": 1,
+      "patch_error_category": "nonexistent_document",
+      "component_count_before": 1,
+      "component_count_after": 1,
+      "parent_rows_before": 2,
+      "parent_rows_after": 2
+    },
+    "P7": {
+      "command_shape": "set a synthetic local-only pepper; call parent guardBridge; list component buckets; remove pepper",
+      "bridge_result": { "status": "allow", "remaining": 4 },
+      "expected_hash_present": true,
+      "raw_subject_present": false,
+      "local_pepper_removed": true
+    }
+  },
+  "redactions": [
+    "request_ids",
+    "generated_document_ids",
+    "local_backend_paths",
+    "local_connection_values"
+  ],
+  "limitations": [
+    "This receipt records a local CLI observation; CI runs compile-negative and convex-test proofs instead.",
+    "No cloud backend or production Verdant runtime was tested.",
+    "convex-test is a backend mock and is not presented as a security boundary."
+  ]
+}

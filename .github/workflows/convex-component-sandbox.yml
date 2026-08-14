@@ -1,0 +1,59 @@
+name: Convex component sandbox
+
+on:
+  push:
+    branches: [main, verdant-grow-diary]
+    paths:
+      - "spikes/convex-component-sandbox/**"
+      - "src/test/convex-production-isolation-fence.test.ts"
+      - "package.json"
+      - ".github/workflows/convex-component-sandbox.yml"
+  pull_request:
+    paths:
+      - "spikes/convex-component-sandbox/**"
+      - "src/test/convex-production-isolation-fence.test.ts"
+      - "package.json"
+      - ".github/workflows/convex-component-sandbox.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-proof:
+    name: Nested proofs and production fence
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Cache Bun
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-convex-sandbox-${{ hashFiles('bun.lock', 'spikes/convex-component-sandbox/bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-convex-sandbox-
+
+      - name: Install root dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install isolated spike dependencies
+        working-directory: spikes/convex-component-sandbox
+        run: bun install --frozen-lockfile
+
+      - name: Production isolation fence
+        run: bunx vitest run src/test/convex-production-isolation-fence.test.ts --reporter=dot
+
+      - name: Nested component proofs
+        run: bun run test:convex-component-sandbox
+
+      - name: Audit isolated dependency tree
+        working-directory: spikes/convex-component-sandbox
+        run: bun audit

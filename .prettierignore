@@ -5,6 +5,7 @@ pnpm-lock.yaml
 dist
 build
 node_modules
+spikes/convex-component-sandbox/.convex/
 .husky
 src/integrations/supabase/types.ts
 supabase/functions/_shared/lib/integrations/supabase/types.ts

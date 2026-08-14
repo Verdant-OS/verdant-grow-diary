@@ -1,0 +1,5 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [],
+  "files": ["convex/components/abuse_guard/isolationProbe.ts", "convex/componentMutationProbe.ts"]
+}

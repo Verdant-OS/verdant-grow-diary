@@ -1,0 +1,6 @@
+.env.local
+.convex/
+convex/.env.local
+*admin-key*
+*deploy-key*
+node_modules/

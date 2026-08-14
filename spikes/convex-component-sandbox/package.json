@@ -1,0 +1,21 @@
+{
+  "name": "@verdant/spike-convex-component-sandbox",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run --reporter=dot",
+    "test:repeatability-worker": "vitest run --config vitest.worker.config.ts --reporter=verbose",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "validate": "bun run typecheck && bun run test"
+  },
+  "dependencies": {
+    "convex": "1.43.0"
+  },
+  "devDependencies": {
+    "@edge-runtime/vm": "5.0.0",
+    "convex-test": "0.0.55",
+    "typescript": "5.9.3",
+    "vitest": "3.2.7"
+  }
+}

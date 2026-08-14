@@ -14,6 +14,7 @@ import { render, screen, cleanup, waitFor, fireEvent } from "@testing-library/re
 import GuidesIndex from "@/pages/GuidesIndex";
 import GuidePage from "@/pages/GuidePage";
 import { VERDANT_SEO_GUIDES } from "@/constants/verdantSeoContent";
+import { staticRouteHead } from "@/lib/build/staticRouteHead";
 
 const routeState = vi.hoisted(() => ({ slug: "", hash: "" }));
 
@@ -55,11 +56,13 @@ function readJsonLd(marker: string): unknown {
   return JSON.parse(el.textContent);
 }
 
-function appendStaticRouteJsonLd(data: unknown) {
+function appendStaticRouteJsonLd(
+  definition: ReturnType<typeof staticRouteHead>["scripts"][number],
+) {
   const script = document.createElement("script");
-  script.type = "application/ld+json";
-  script.setAttribute("data-static-route-ldjson", "true");
-  script.text = JSON.stringify(data);
+  script.type = definition.type;
+  script.setAttribute("data-static-route-ldjson", definition["data-static-route-ldjson"]);
+  script.text = definition.children;
   document.head.appendChild(script);
 }
 
@@ -115,10 +118,10 @@ describe("/guides hub — public render", () => {
   });
 
   it("replaces the SSR route JSON-LD with one hydrated hub-owned set", async () => {
-    const staleUrl = "https://verdantgrowdiary.com/guides/stale-static-route";
-    for (const type of ["WebPage", "FAQPage", "BreadcrumbList"]) {
-      appendStaticRouteJsonLd({ "@context": "https://schema.org", "@type": type, url: staleUrl });
-    }
+    const staticScripts = staticRouteHead("/guides").scripts;
+    expect(staticScripts).toHaveLength(3);
+    staticScripts.forEach(appendStaticRouteJsonLd);
+    expect(document.head.querySelectorAll("script[data-static-route-ldjson]")).toHaveLength(3);
 
     renderAt("/guides");
 
@@ -135,7 +138,6 @@ describe("/guides hub — public render", () => {
       ),
     );
     const serialized = currentScripts.map((script) => script.text);
-    expect(serialized.join("\n")).not.toContain(staleUrl);
     expect(serialized).toHaveLength(new Set(serialized).size);
     expect(currentScripts.map((script) => JSON.parse(script.text)["@type"]).sort()).toEqual([
       "BreadcrumbList",
@@ -245,10 +247,10 @@ describe("/guides/:slug detail — public render", () => {
     const stress = VERDANT_SEO_GUIDES.find(
       (guide) => guide.slug === "cannabis-light-stress-light-burn-bleaching-or-heat",
     )!;
-    const staleUrl = "https://verdantgrowdiary.com/guides/stale-static-route";
-    for (const type of ["WebPage", "FAQPage", "BreadcrumbList", "Article"]) {
-      appendStaticRouteJsonLd({ "@context": "https://schema.org", "@type": type, url: staleUrl });
-    }
+    const staticScripts = staticRouteHead(`/guides/${distance.slug}`).scripts;
+    expect(staticScripts).toHaveLength(4);
+    staticScripts.forEach(appendStaticRouteJsonLd);
+    expect(document.head.querySelectorAll("script[data-static-route-ldjson]")).toHaveLength(4);
 
     const rendered = renderAt(`/guides/${distance.slug}`);
 
@@ -261,7 +263,6 @@ describe("/guides/:slug detail — public render", () => {
     expect((readJsonLd(`guide-${distance.slug}-webpage`) as { url: string }).url).toBe(
       `https://verdantgrowdiary.com/guides/${distance.slug}`,
     );
-    expect(document.head.textContent).not.toContain(staleUrl);
 
     const crossGuideLink = document.querySelector<HTMLAnchorElement>(
       `a[href="/guides/${stress.slug}"]`,
@@ -290,7 +291,6 @@ describe("/guides/:slug detail — public render", () => {
     expect(currentScripts.map((script) => script.text)).toHaveLength(
       new Set(currentScripts.map((script) => script.text)).size,
     );
-    expect(document.head.textContent).not.toContain(staleUrl);
     expect(document.head.textContent).not.toContain(
       `https://verdantgrowdiary.com/guides/${distance.slug}`,
     );

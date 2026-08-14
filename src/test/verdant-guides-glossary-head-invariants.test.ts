@@ -154,6 +154,15 @@ describe("Guides + glossary SSR head matches global invariants", () => {
     expect(ROOT_ROUTE).not.toContain('name: "twitter:creator"');
   });
 
+  it.each(TARGET_PATHS)("%s marks every route-local JSON-LD script for hydration", (path) => {
+    const scripts = staticRouteHead(path).scripts;
+    expect(scripts.length).toBeGreaterThan(0);
+    for (const script of scripts) {
+      expect(script.type).toBe("application/ld+json");
+      expect(script["data-static-route-ldjson"]).toBe("true");
+    }
+  });
+
   it.each(TARGET_PATHS)("%s ships the expected robots directive", (path) => {
     const head = headFor(path);
     expect(head.metas.get("name:robots") ?? null).toBe(

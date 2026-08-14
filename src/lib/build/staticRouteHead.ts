@@ -45,7 +45,11 @@ const METADATA_BY_PATH = new Map<string, ResolvedStaticRouteMetadata>(
 export interface StaticRouteHead {
   meta: Array<Record<string, string>>;
   links: Array<Record<string, string>>;
-  scripts: Array<{ type: string; children: string }>;
+  scripts: Array<{
+    type: "application/ld+json";
+    "data-static-route-ldjson": "true";
+    children: string;
+  }>;
 }
 
 /**
@@ -72,7 +76,8 @@ export function staticRouteHead(path: string): StaticRouteHead {
   ];
 
   const scripts = (metadata.jsonLd ?? []).map((node) => ({
-    type: "application/ld+json",
+    type: "application/ld+json" as const,
+    "data-static-route-ldjson": "true" as const,
     children: JSON.stringify(node),
   }));
 

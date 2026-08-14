@@ -29,6 +29,8 @@ import {
   safeJsonLdStringify,
 } from "@/lib/seoStructuredData";
 import { staticRouteHead } from "@/lib/build/staticRouteHead";
+import { Route as GuidesIndexRoute } from "@/routes/guides.index";
+import { Route as GuideRoute } from "@/routes/guides.$slug";
 
 const REPO = resolve(__dirname, "../..");
 const read = (rel: string) => readFileSync(resolve(REPO, rel), "utf8");
@@ -36,8 +38,6 @@ const read = (rel: string) => readFileSync(resolve(REPO, rel), "utf8");
 const APP_TSX = readAllRouteModuleSources();
 const GUIDES_INDEX = read("src/pages/GuidesIndex.tsx");
 const GUIDE_PAGE = read("src/pages/GuidePage.tsx");
-const GUIDES_INDEX_ROUTE = read("src/routes/guides.index.tsx");
-const GUIDE_ROUTE = read("src/routes/guides.$slug.tsx");
 const CONTENT_TS = read("src/constants/verdantSeoContent.ts");
 const SITEMAP = read("public/sitemap.xml");
 const ROBOTS = read("public/robots.txt");
@@ -115,9 +115,10 @@ describe("Verdant grower guide FAQ (/guides)", () => {
     }
   });
 
-  it("the guides route head builds FAQPage JSON-LD from the shared constant", () => {
+  it("the guides route head builds FAQPage JSON-LD from the shared constant", async () => {
     expect(GUIDES_INDEX).toContain("VERDANT_GROWER_GUIDE_FAQ");
-    expect(GUIDES_INDEX_ROUTE).toContain('staticRouteHead("/guides")');
+    const routeHead = await GuidesIndexRoute.options.head?.({} as never);
+    expect(routeHead).toEqual(staticRouteHead("/guides"));
     const faq = staticRouteHead("/guides")
       .scripts.map((script) => JSON.parse(script.children))
       .find((node) => node["@type"] === "FAQPage");
@@ -173,11 +174,14 @@ describe("Verdant SEO guide pages (28)", () => {
     }
   });
 
-  it("GuidePage renders H1, sections, FAQ accordion, and internal links", () => {
+  it("GuidePage renders H1, sections, FAQ accordion, and internal links", async () => {
     expect(GUIDE_PAGE).toMatch(/<h1[^>]*>[\s\S]*guide\.h1[\s\S]*<\/h1>/);
     expect(GUIDE_PAGE).toContain("guide.sections.map");
     expect(GUIDE_PAGE).toContain("guide.faq.map");
-    expect(GUIDE_ROUTE).toContain("staticRouteHead(`/guides/${params.slug}`)");
+    const routeHead = await GuideRoute.options.head?.({
+      params: { slug: "grow-diary-app" },
+    } as never);
+    expect(routeHead).toEqual(staticRouteHead("/guides/grow-diary-app"));
     // Verdant positioning + required internal links.
     expect(GUIDE_PAGE).toMatch(/to="\/welcome"/);
     expect(GUIDE_PAGE).toMatch(/to="\/pricing"/);

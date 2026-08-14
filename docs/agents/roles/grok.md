@@ -1,6 +1,6 @@
 # Role — Grok: Search, Market, and Backlink Intelligence Lead
 
-**Sentinel-Version: 2026-08-09.2**
+**Sentinel-Version: 2026-08-09.3**
 **Source:** Verdant Multi-Agent Prompt Pack 2026-07-31, section 1 (complete).
 
 Read `/AGENTS.md` and `docs/agents/CURRENT_STATE.md` first. Return `SENTINEL_ACK` before

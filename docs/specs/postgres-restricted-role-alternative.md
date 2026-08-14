@@ -4,9 +4,10 @@
 **Date:** 2026-08-14
 **Audited ref:** deploy branch `verdant-grow-diary` tip
 `cbbd7122597358e4c6e55e14b7f6a769a3a69132` (fetched and verified this session)
-**Slice name:** `POSTGRES_RESTRICTED_ROLE_SPIKE` (proposed — not yet approved)
+**Slice name:** `POSTGRES_RESTRICTED_ROLE_SPIKE` (approved 2026-08-14)
 **Capability gap:** `GAP-PGROLE-001`
-**Status:** SPECIFICATION ONLY — **no owner approval recorded.** See §2.
+**Status:** APPROVED 2026-08-14 by Cheek. Phase 0 is **delivered and measured**
+— see §2 and §5.1. Phase 1 remains `HOLD`; production roles remain `REJECT`.
 
 This document is the comparison arm that
 `docs/specs/convex-component-physical-sandbox-spike.md` §4.2 and §11 defer:
@@ -37,9 +38,9 @@ already ships, and hold **no table grants at all**.
 
 Concretely:
 
-- **Phase 0 (recommended now, low risk):** static domain-reach detector. No
-  schema change, no migration, no role. Buys most of the safety and all of the
-  evidence.
+- **Phase 0 (DELIVERED 2026-08-14):** static domain-reach detector. No schema
+  change, no migration, no role. Bought most of the safety and all of the
+  evidence — result in §5.1.1: **8 cross-domain reaches across 22 functions**.
 - **Phase 1 (only after Phase 0 evidence):** one restricted role, one domain,
   proven in the local replay lane, never in production.
 - **Phase 2 (`REJECT` until Cheek + Security):** production role adoption.
@@ -49,30 +50,37 @@ recorded in a merged migration, already declined exactly that — see §3.4. Tha
 decision is the single hardest constraint on this whole design and it is not
 mine to overturn.
 
-**Verdict for Phase 0:** `PROCEED` if Cheek names the slice.
-**Verdict for Phase 1:** `HOLD` pending Phase 0 evidence.
+**Verdict for Phase 0:** `DONE` — approved and delivered 2026-08-14 (§5.1.1).
+**Verdict for Phase 1:** `HOLD`. Its gating evidence now exists; it still needs
+its own Cheek decision.
 **Verdict for production roles:** `REJECT` at this time.
 
 ---
 
-## 2. Approval status — read this before implementing
+## 2. Approval status
 
 | Item | Value |
 | --- | --- |
-| Owner approval for this slice | **None recorded.** `established fact` — `docs/agents/CURRENT_STATE.md` at the audited ref lists Claude's assignment as the *Convex* spec, and lists the Postgres-roles alternative under "out of this slice" / "Unassigned" |
-| Why this document exists anyway | The session's designated branch is `claude/postgres-restricted-role-spec-bqw6i6`, which names this work explicitly. `inference`: naming the branch is an instruction to specify it |
-| What this document is | A specification and audit, docs-only, so Council Chair has a real alternative arm to compare against `GAP-CONVEX-001` |
-| What this document is **not** | Authorization to create roles, edit migrations, or touch production |
+| Owner approval | **Granted by Cheek, 2026-08-14, in session.** `established fact` of that turn. The slice `POSTGRES_RESTRICTED_ROLE_SPIKE` is open |
+| What was approved | Phase 0 — the domain-reach detector in §5.1 — and the slice as a named workstream |
+| What was **not** approved | Phase 1 role creation, any production role, dropping `service_role` from any function, or default-deny table grants (§3.4 founder decision stands) |
+| Phase 0 status | **Delivered 2026-08-14.** Implemented by Claude rather than Codex — see the note below |
+| Phase 1 status | `HOLD`. It now has the evidence it was gated on (§5.1 results); it still needs a fresh Cheek decision per §9 |
 
-**If Cheek did not intend this branch to open the Postgres-roles arm, this spec
-is void and should be closed unmerged.** I have not assumed approval, and unlike
-the Convex spec I cannot cite an in-session owner statement. This is the honest
-difference between the two arms and it is recorded rather than papered over.
+**Who implemented Phase 0.** §6 originally assigned it to Codex. Cheek granted
+full authority in the approving turn, and Codex is occupied with Convex Phase 1
+in PR #977, so Claude built it. This is recorded here and in `CURRENT_STATE.md`
+specifically to prevent the parallel-implementation failure `AGENTS.md` warns
+about: **Phase 0 is done — Codex must not build a second detector.**
 
-`docs/agents/CURRENT_STATE.md` is updated in this PR to record the divergence.
-It carries no `Sentinel-Version` and is exempt from the twelve-file parity bump
-(`AGENTS.md`, Cursor Cloud notes; merged precedent #729, #746). No governance
-file is edited.
+Original authorization history, kept because it explains the document's shape:
+this spec was written before approval existed, on the strength of a designated
+branch name (`claude/postgres-restricted-role-spec-bqw6i6`), and said so
+plainly rather than assuming consent. That caveat is now resolved.
+
+`docs/agents/CURRENT_STATE.md` records this slice's status. It carries no
+`Sentinel-Version` and is exempt from the twelve-file parity bump (`AGENTS.md`,
+Cursor Cloud notes; merged precedent #729, #746). No governance file is edited.
 
 ---
 
@@ -308,6 +316,53 @@ Properties that make this worth doing regardless of what happens to roles:
   test over resolved config, so the `check-contract-test-resolution.mjs` rule
   does not apply. State that in the header.
 
+### 5.1.1 Phase 0 RESULT — measured 2026-08-14 against deploy tip `e1214d3df`
+
+Shipped as `scripts/check-edge-function-domain-reach.mjs` +
+`config/edge-function-domain-reach.json` +
+`scripts/check-edge-function-domain-reach.test.mjs` (16 tests, 16 pass).
+Reproduce with `node scripts/check-edge-function-domain-reach.mjs --report`.
+
+**The headline number: 22 service-role functions, 8 cross-domain table
+reaches.** `established fact` — measured, not inferred.
+
+| Function | Declared domain | Cross-domain reach |
+| --- | --- | --- |
+| `ai-coach` | `ai` | `diary_entries`, `grows`, `plants`, `tents` (grower), `sensor_readings` (ingest) — **5** |
+| `ecowitt-ingest` | `ingest` | `tents` (grower) |
+| `operator-ggs-real-payload-commit` | `ingest` | `tents` (grower) |
+| `redeem-referral` | `money` | `profiles` (grower) |
+
+Plus two functions declared `cross` and exempt from that count because they
+legitimately span domains: `delete-account` (3 tables, erasure — §5.5) and
+`rls-selftest` (**9 tables across four domains**, the widest reach of any
+service-role function; it exists to probe the fences).
+
+**What this changes.** §4.2 said the gap was "justified by capability argument
+and neither by measurement". That is no longer true for this arm: cross-domain
+reach is **real and non-zero**, concentrated in `ai-coach` and `rls-selftest`.
+`inference` for the reading; `established fact` for the counts.
+
+**What this does not change.** Three honest limits:
+
+1. The scan is **literal-only**. `.from(variable)` is invisible to it, and the
+   test suite pins that blind spot rather than hiding it. A green run means "no
+   undeclared *literal* reach", never "cannot reach anything else".
+2. `pi-ingest-readings` holds a service-role client but has **zero** measured
+   literal reach. Zero measured reach is not zero capability — it is the blind
+   spot in one function.
+3. Most of the 8 reaches are **defensible**. `ai-coach` reading grower context
+   is required by `AGENTS.md`'s AI Doctor rules; the `tents` reads are routing.
+   The finding is not "someone did something wrong" — it is that **nothing in
+   the database distinguishes these intended reads from unintended ones**,
+   which is the gap exactly as stated in §4.1.
+
+**Bearing on the Convex comparison (§10).** This measurement moves the Postgres
+arm from `NOT_MEASURED` to measured. The Convex arm remains `NOT_MEASURED`.
+Council Chair should note that the asymmetry is now in evidence, not just in
+architecture — but a measured gap on one arm is not a verdict for that arm, and
+`ai-coach`'s five reaches are the case **neither** architecture removes cheaply.
+
 ### 5.2 Phase 1 — one restricted role, one domain, local only
 
 **Design principle, from §3.4: partition by function `EXECUTE`, never by table
@@ -482,8 +537,8 @@ tree. Run `git status` before any commit that follows a review pass.
 
 | Gate | Default | What would change it |
 | --- | --- | --- |
-| Phase 0 detector | `HOLD` — needs Cheek to name the slice | Owner approval |
-| Phase 1 local role spike | `HOLD` | Phase 0 evidence showing real cross-domain reach |
+| Phase 0 detector | **DONE** — approved and delivered 2026-08-14 | Complete; do not rebuild |
+| Phase 1 local role spike | `HOLD` | Phase 0 evidence now exists (§5.1.1: 8 cross-domain reaches). The gating condition is met; it still needs a fresh Cheek decision |
 | Role reachable via minted JWT in production | `REJECT` | P3 `PASS` locally + Security review of JWT minting and key custody |
 | Re-point any money function to a restricted role | `REJECT` | Separate slice; money is the last domain to migrate, not the first |
 | Default-deny table grants | `REJECT` | Reverses a recorded founder decision (§3.4). Cheek only |
@@ -565,9 +620,9 @@ ls scripts/ | grep -cE "run-.*-rls-harness"
 | Whether hosted Supabase permits `CREATE ROLE` from a migration | `unknown` | Codex, Phase 1 local replay first |
 | Whether PostgREST here honors a custom `role` JWT claim (§5.3) | `unknown` — the single blocking feasibility question | Codex, P3 |
 | Whether this project will migrate to new-style `sb_secret_…` API keys | `unknown` | Owner. A migration would invalidate §5.3 |
-| Actual cross-domain reach among the 22 functions | `NOT_MEASURED` | Phase 0 answers it |
+| Actual cross-domain reach among the 22 functions | **MEASURED 2026-08-14: 8** (§5.1.1) | Answered by Phase 0 |
 | Production role inventory | `BLOCKED` | No authorized production path from an agent session |
-| Whether Cheek intends this arm to open at all | `unknown` | **Cheek** — §2. This is the gating question for the whole document |
+| Whether Cheek intends this arm to open at all | **RESOLVED — approved 2026-08-14** | Cheek; see §2 |
 | Operational cost of role lifecycle vs a second runtime | `NOT_MEASURED` | Do not assert a cost verdict |
 
 ---
@@ -600,7 +655,7 @@ verified_by:
 
 not_done:
   - No migration, no role, no harness, no config, no test in this PR
-  - Phase 0 detector not implemented
+  - Phase 1 role, migration, and harness: not implemented (Phase 0 IS implemented)
   - No production or sandbox database was read or mutated
   - No Security review (nothing to review yet)
   - No recommendation between the Convex and Postgres arms
@@ -635,7 +690,7 @@ files_touched:
 ## 14. Verdict
 
 ```text
-SPECIFIED — NOT APPROVED, NOT DECIDABLE YET
+APPROVED — PHASE 0 DELIVERED AND MEASURED; PHASE 1 STILL HOLD
 ```
 
 The gap is real and measured: 22 functions, one `service_role`, 115 tables, one

@@ -1,14 +1,15 @@
 # Verdant — Current Operating State
 
 **Last updated:** 2026-08-14 UTC
-**Updated by:** Claude (2026-08-14 edit: records the **unapproved**
-`POSTGRES_RESTRICTED_ROLE_SPIKE` specification — the Convex spec's deferred
-comparison arm — and refreshes the Branch topology row to the tip verified this
-session, `cbbd7122` (#978), which supersedes the `fb42ce00e` (#968) figure the
-2026-08-13 edit recorded. Also updates the Codex and Council Chair rows: Convex
-Phase 1 is no longer "queued", it is open-unmerged in PR #977. No production,
-GA4, GSC, sitemap, or release-identity row was re-measured in this edit; those
-retain their earlier verification dates. Prior 2026-08-13 entry follows.)
+**Updated by:** Claude (2026-08-14, later edit: records Cheek's in-session
+approval of `POSTGRES_RESTRICTED_ROLE_SPIKE` and the **delivered, measured**
+Phase 0 detector — 22 service-role edge functions, 8 cross-domain table reaches
+against deploy tip `e1214d3df`. Records Cheek's decision to abandon
+`claude/breeder-mode-genetics` and `claude/cultivar-library-p1`. Refreshes the
+Branch topology row from `cbbd7122` to `e1214d3df` after five merges this
+session (#979, #815, #710, #795, #980). Sentinel-Version moved to 2026-08-09.3
+via #710. No production, GA4, GSC, sitemap, or release-identity row was
+re-measured in this edit; those retain their earlier verification dates.)
 
 **Prior update:** 2026-08-13 UTC
 **Updated by:** Claude (records Cheek's 2026-08-13 in-session approval of the
@@ -67,7 +68,7 @@ already deployed ahead of the repo.
 
 | Branch               | Role                                             | Verified head                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | -------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `verdant-grow-diary` | **Deploy branch. Production ships from here.**   | `cbbd7122597358e4c6e55e14b7f6a769a3a69132` (#978), verified 2026-08-14 with `git fetch origin verdant-grow-diary && git rev-parse origin/verdant-grow-diary`. This supersedes the `fb42ce00e` (#968) snapshot recorded 2026-08-13, which superseded `6434ea2a8` (#942) and the intermediate `e7690396e` (#943). The branch moved five further commits past #968, in `git log` merge order oldest-first: `fde2a8d` (#813), `43ea0f8` (#975), `5a3dedf` (#972), `68c0098` (#976), `cbbd712` (#978). PR numbers on this branch do not order by merge time (see the note below) — order commits with `git log`, never by PR number. Do not carry older validation tables forward |
+| `verdant-grow-diary` | **Deploy branch. Production ships from here.**   | `e1214d3df390eeba3b277f8a40d7e1fae9030bb9` (#980), verified 2026-08-14 with `git fetch origin verdant-grow-diary && git rev-parse origin/verdant-grow-diary`. This supersedes `cbbd7122` (#978), which superseded `fb42ce00e` (#968), `6434ea2a8` (#942) and `e7690396e` (#943). Five commits landed this session, in `git log` merge order oldest-first: `623edf17b` (#979), `e200d7561` (#815), `1a3a70d1b` (#710), `cba42c6d4` (#795), `e1214d3df` (#980). PR numbers on this branch do not order by merge time — order commits with `git log`, never by PR number. Do not carry older validation tables forward |
 | `main`               | Integration branch. It is not production parity. | `b6d747941948ce68157185a2b0847acea6970d44` (#779), verified 2026-08-07                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 
 `main` and `verdant-grow-diary` are divergent. Do not infer production behavior from
@@ -182,27 +183,66 @@ credits, sensors, entitlements, Action Queue, and `npx convex deploy` remain
 `REJECT` until a later Cheek decision. This does **not** replace or pause the
 Mode A SEO parent program below.
 
-**Specified but NOT approved (recorded 2026-08-14):**
-`POSTGRES_RESTRICTED_ROLE_SPIKE`. Claude authored
-`docs/specs/postgres-restricted-role-alternative.md`, the comparison arm the
-Convex spec defers in its §4.2 and §11 ("Postgres restricted-role alternative —
-Specified as out of slice; not measured — Unassigned"). **No owner approval is
-recorded for this arm.** It was written because this session's designated branch
-was named `claude/postgres-restricted-role-spec-bqw6i6`; that branch name is the
-only authorization signal, and the spec says so in its §2 rather than assuming
-approval. Docs-only: no migration, no role, no harness, no database access.
-Cheek must decide whether the slice opens at all. Its own strongest
-recommendation is a **Phase 0 static detector** (measure actual cross-domain
-reach among the 22 service-role edge functions) *before* buying either isolation
-architecture — because both this arm and the Convex arm are currently justified
-by capability argument and neither by measurement.
+**Approved slice (Cheek, 2026-08-14):** `POSTGRES_RESTRICTED_ROLE_SPIKE`.
+Contract: `docs/specs/postgres-restricted-role-alternative.md`. This is the
+comparison arm the Convex spec defers in its §4.2 and §11. It was specified
+before approval existed (the only signal was a designated branch name, and the
+spec said so rather than assuming consent); Cheek approved it in session on
+2026-08-14.
 
-Two audit results in that spec update facts recorded elsewhere in this file's
+**Phase 0 is DELIVERED and MEASURED — do not rebuild it.** Claude implemented
+it, not Codex, because Codex is occupied with Convex Phase 1 in PR #977 and
+Cheek granted full authority in the approving turn. Shipped:
+`scripts/check-edge-function-domain-reach.mjs`,
+`config/edge-function-domain-reach.json`, and
+`scripts/check-edge-function-domain-reach.test.mjs` (16 tests, 16 pass locally),
+plus `check:/report:/test:edge-domain-reach` npm scripts.
+
+**The measurement, against deploy tip `e1214d3df`: 22 service-role edge
+functions, 8 cross-domain table reaches.** Concentrated in `ai-coach` (5 —
+grower diary/grows/plants/tents plus ingest sensor_readings) with one each from
+`ecowitt-ingest`, `operator-ggs-real-payload-commit`, and `redeem-referral`.
+Two further functions are declared `cross` and exempt by design: `delete-account`
+(erasure, 3 tables) and `rls-selftest` (**9 tables across four domains**, the
+widest reach of any service-role function). Reproduce with
+`node scripts/check-edge-function-domain-reach.mjs --report`.
+
+Read it carefully: most of those 8 reaches are **defensible** — `ai-coach` needs
+grower context per the AI Doctor rules, the `tents` reads are routing. The
+finding is not misconduct. It is that **nothing in the database distinguishes an
+intended cross-domain read from an unintended one**. Three limits are pinned in
+the spec's §5.1.1 and in the test suite: the scan is literal-only
+(`.from(variable)` is invisible), `pi-ingest-readings` holds a service-role
+client with zero measured literal reach (zero measured ≠ zero capability), and a
+green run means "no undeclared literal reach", never a runtime fence.
+
+**Phase 1 (one restricted role, local replay only) remains `HOLD`** — its gating
+evidence now exists, but it needs its own Cheek decision. Production roles,
+dropping `service_role` from any function, and default-deny table grants all
+remain `REJECT`; the last of those would reverse the 2026-08-06 founder decision
+recorded in migration `20260807003500`.
+
+Two audit results from that spec update facts recorded elsewhere in this file's
 orbit: the Convex spec's open `uncertainty` about `supabase/functions/_shared/`
 constructing service-role clients resolves to **zero** such helpers, and the
-2026-08-06 founder decision quoted in migration `20260807003500` (declining
-default-deny table ACLs because Lovable ships tables without ACL awareness) is
-the binding constraint on any role design.
+2026-08-06 founder decision (declining default-deny table ACLs because Lovable
+ships tables without ACL awareness) is the binding constraint on any role design.
+
+**Abandoned by Cheek, 2026-08-14 — do not revive, do not merge:**
+
+- `claude/breeder-mode-genetics` — superseded. Deploy already carries every
+  `src/lib/genetics/*` module it adds, plus many it does not. Conflicts in ~30
+  files against a 2026-06-06 base.
+- `claude/cultivar-library-p1` — superseded **and unsafe**. Its migration
+  `20260724000000_cultivar_library_foundation.sql` uses bare `CREATE TABLE`
+  (9 unguarded, zero `IF NOT EXISTS`) for tables that already exist, shipped two
+  days earlier by `20260722203000_strain_reference_library_v1.sql`. Merging it
+  raises `42P07` and aborts the replay, taking `security-db-local` and the pgTAP
+  lanes with it. It is an earlier draft of a feature that already shipped.
+
+Neither branch could be deleted from this environment (the agent proxy refuses
+GitHub API writes and `git push --delete` alike), so both still exist on origin.
+They are dead by decision, not by absence — treat this entry as the disposition.
 
 **Parent program:** MODE A SEO measurement-readiness work.
 
@@ -493,9 +533,9 @@ schema change and does not authorize production writes.
 
 | Agent             | Assignment                                                                                                                                                                                                                                                                                    |
 | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Codex             | Standing SEO measurement readiness and analytics integrity. Convex Phase 1 of `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` is **no longer queued — it is in review**: PR #977 (`codex/convex-component-physical-sandbox-spike`), opened 2026-08-14, not a draft. Scope stays Phase 1 only, under `spikes/convex-component-sandbox/` (see `docs/specs/convex-component-physical-sandbox-spike.md` §5–§8). Do **not** also start Postgres-role work — that arm is unapproved (see slices above) |
-| Claude            | `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` specification (docs-only) — delivered. Also delivered 2026-08-14, **unapproved**: `POSTGRES_RESTRICTED_ROLE_SPIKE` specification (docs-only), pending a Cheek decision on whether that arm opens. Not implementation for either. Prior completed out-of-slice work (#586/#809/#812/#885) unchanged                                                                |
+| Codex             | Standing SEO measurement readiness and analytics integrity. Convex Phase 1 of `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` is in review: PR #977, opened 2026-08-14, not a draft. Scope stays Phase 1 only, under `spikes/convex-component-sandbox/`. **Do NOT build a Postgres domain-reach detector — Phase 0 of `POSTGRES_RESTRICTED_ROLE_SPIKE` is already delivered by Claude (see slices above). Phase 1 of that arm is `HOLD` pending its own Cheek decision** |
+| Claude            | `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` specification — delivered. `POSTGRES_RESTRICTED_ROLE_SPIKE`: spec delivered **and Phase 0 detector implemented and measured** 2026-08-14 under Cheek's approval and full-authority grant (see slices above). Prior completed out-of-slice work (#586/#809/#812/#885) unchanged |
 | Grok              | Unassigned. Prior same-session HOLD on unapproved Convex expansion is superseded only for this named isolated spike; production Convex remains HOLD                                                                                                                                           |
 | Security reviewer | Unassigned until Phase 1 spike code exists; then review before any Convex cloud credential                                                                                                                                                                                                    |
 | Gemini            | Unassigned                                                                                                                                                                                                                                                                                    |
-| Council Chair     | Unassigned until Phase 1 proof tests exist; then compare Convex sandbox vs the Postgres-roles alternative. The comparison table now exists (`docs/specs/postgres-restricted-role-alternative.md` §10) but is **not decidable yet** — both arms are `NOT_MEASURED` (Convex Phase 1 open-unmerged in #977; Postgres arm unapproved). Do not recommend before evidence exists on both |
+| Council Chair     | Convex-vs-Postgres comparison: **now partly decidable.** The Postgres arm has a measured number (8 cross-domain reaches across 22 service-role functions, `docs/specs/postgres-restricted-role-alternative.md` §5.1.1); the Convex arm remains `NOT_MEASURED` pending #977. Do not issue a recommendation until both arms carry evidence — and note that `ai-coach`'s five reaches are the case neither architecture removes cheaply |

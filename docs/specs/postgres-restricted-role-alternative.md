@@ -6,8 +6,9 @@
 `cbbd7122597358e4c6e55e14b7f6a769a3a69132` (fetched and verified this session)
 **Slice name:** `POSTGRES_RESTRICTED_ROLE_SPIKE` (approved 2026-08-14)
 **Capability gap:** `GAP-PGROLE-001`
-**Status:** APPROVED 2026-08-14 by Cheek. Phase 0 is **delivered and measured**
-— see §2 and §5.1. Phase 1 remains `HOLD`; production roles remain `REJECT`.
+**Status:** APPROVED 2026-08-14 by Cheek. Phase 0 **delivered and measured**
+(§5.1.1) and Phase 1 **delivered, local-replay only** (§5.2.1). Production roles
+remain `REJECT`.
 
 This document is the comparison arm that
 `docs/specs/convex-component-physical-sandbox-spike.md` §4.2 and §11 defer:
@@ -41,8 +42,10 @@ Concretely:
 - **Phase 0 (DELIVERED 2026-08-14):** static domain-reach detector. No schema
   change, no migration, no role. Bought most of the safety and all of the
   evidence — result in §5.1.1: **8 cross-domain reaches across 22 functions**.
-- **Phase 1 (only after Phase 0 evidence):** one restricted role, one domain,
-  proven in the local replay lane, never in production.
+- **Phase 1 (DELIVERED 2026-08-14):** one restricted role, one domain, proven
+  in the local replay lane, never in production. Shipped as a local-only fixture
+  plus harness rather than a migration — see §5.2.1 for why that distinction is
+  load-bearing.
 - **Phase 2 (`REJECT` until Cheek + Security):** production role adoption.
 
 **Do not** ship a default-deny grant posture. A founder decision on 2026-08-06,
@@ -51,8 +54,8 @@ decision is the single hardest constraint on this whole design and it is not
 mine to overturn.
 
 **Verdict for Phase 0:** `DONE` — approved and delivered 2026-08-14 (§5.1.1).
-**Verdict for Phase 1:** `HOLD`. Its gating evidence now exists; it still needs
-its own Cheek decision.
+**Verdict for Phase 1:** `DONE` — approved and delivered 2026-08-14 (§5.2.1).
+Runtime proofs execute in the `security-db-local` replay lane.
 **Verdict for production roles:** `REJECT` at this time.
 
 ---
@@ -63,9 +66,9 @@ its own Cheek decision.
 | --- | --- |
 | Owner approval | **Granted by Cheek, 2026-08-14, in session.** `established fact` of that turn. The slice `POSTGRES_RESTRICTED_ROLE_SPIKE` is open |
 | What was approved | Phase 0 — the domain-reach detector in §5.1 — and the slice as a named workstream |
-| What was **not** approved | Phase 1 role creation, any production role, dropping `service_role` from any function, or default-deny table grants (§3.4 founder decision stands) |
+| What was **not** approved | Any **production** role, dropping `service_role` from any function, or default-deny table grants (§3.4 founder decision stands). Phase 1 was approved separately, later the same day |
 | Phase 0 status | **Delivered 2026-08-14.** Implemented by Claude rather than Codex — see the note below |
-| Phase 1 status | `HOLD`. It now has the evidence it was gated on (§5.1 results); it still needs a fresh Cheek decision per §9 |
+| Phase 1 status | **APPROVED and DELIVERED 2026-08-14.** Cheek said "execute phase 1" after reading the Phase 0 measurement. Implemented as a local-only fixture plus a replay harness — see §5.2.1 for the design correction that kept it out of production |
 
 **Who implemented Phase 0.** §6 originally assigned it to Codex. Cheek granted
 full authority in the approving turn, and Codex is occupied with Convex Phase 1
@@ -391,6 +394,35 @@ which existing ones a caller may execute. `inference`
 memberships. `source claim` — standard Postgres role semantics; verify in the
 replay lane rather than trusting this line.
 
+### 5.2.1 Phase 1 implementation note — why this is NOT a migration
+
+**The obvious implementation would have violated this spec's own §8 fence.**
+
+A file under `supabase/migrations/` eventually reaches production on a Lovable
+apply. §8 says the spike must never create a role in production or the sandbox
+project, and §9 marks production role adoption `REJECT`. Shipping the role as a
+migration would have quietly done both — the role would have appeared in
+production the next time migrations were applied, with no further decision from
+anyone.
+
+So Phase 1 ships as:
+
+| File | Role |
+| --- | --- |
+| `scripts/sql/restricted-role-phase1-ingest.sql` | Creates the role. **Not** a migration. Applied only by the harness, against a loopback database, and dropped in teardown |
+| `scripts/run-restricted-role-harness.ts` | Applies the fixture, runs the §7 proofs, tears down. Refuses any non-loopback `SUPABASE_DB_URL` with **no remote opt-in flag** — deliberately, unlike the other harnesses in this repo, because §9 marks production roles `REJECT` |
+| `scripts/check-restricted-role-fixture.test.mjs` | 16 static tests. Three of them exist purely to keep the fence: the fixture must not be under `supabase/migrations/`, no migration may mention the role, and the repository must still contain **zero** `CREATE ROLE` statements in migrations — the §3.1 audit fact this whole spec was built on |
+
+`AGENTS.md`'s Migration Immutability section is also satisfied trivially: no
+migration file is added, edited, or renamed.
+
+The role itself is exactly the §5.2 shape: `NOLOGIN NOINHERIT NOSUPERUSER
+NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS`, `USAGE` on `public`,
+`EXECUTE` on exactly one function
+(`public.bump_bridge_token_usage(uuid, integer)` — ingest-domain, single
+overload, `SECURITY DEFINER`, writes only `bridge_tokens`), and **zero table
+grants**. It contains no raising self-test, per the R1 rule in §3.5.
+
 ### 5.3 How a restricted role is actually reached
 
 This is the feasibility crux, and it is where a naive role proposal dies.
@@ -538,7 +570,7 @@ tree. Run `git status` before any commit that follows a review pass.
 | Gate | Default | What would change it |
 | --- | --- | --- |
 | Phase 0 detector | **DONE** — approved and delivered 2026-08-14 | Complete; do not rebuild |
-| Phase 1 local role spike | `HOLD` | Phase 0 evidence now exists (§5.1.1: 8 cross-domain reaches). The gating condition is met; it still needs a fresh Cheek decision |
+| Phase 1 local role spike | **DONE** — approved and delivered 2026-08-14 | Complete. Proofs run in the `security-db-local` replay lane |
 | Role reachable via minted JWT in production | `REJECT` | P3 `PASS` locally + Security review of JWT minting and key custody |
 | Re-point any money function to a restricted role | `REJECT` | Separate slice; money is the last domain to migrate, not the first |
 | Default-deny table grants | `REJECT` | Reverses a recorded founder decision (§3.4). Cheek only |
@@ -618,7 +650,7 @@ ls scripts/ | grep -cE "run-.*-rls-harness"
 | Item | Status | Owner |
 | --- | --- | --- |
 | Whether hosted Supabase permits `CREATE ROLE` from a migration | `unknown` | Codex, Phase 1 local replay first |
-| Whether PostgREST here honors a custom `role` JWT claim (§5.3) | `unknown` — the single blocking feasibility question | Codex, P3 |
+| Whether PostgREST here honors a custom `role` JWT claim (§5.3) | Phase 1 P3 tests it. It reports **`BLOCKED`, never `PASS`**, when `SUPABASE_JWT_SECRET` is absent; the workflow step derives it from `supabase status` where available | Harness, per run |
 | Whether this project will migrate to new-style `sb_secret_…` API keys | `unknown` | Owner. A migration would invalidate §5.3 |
 | Actual cross-domain reach among the 22 functions | **MEASURED 2026-08-14: 8** (§5.1.1) | Answered by Phase 0 |
 | Production role inventory | `BLOCKED` | No authorized production path from an agent session |
@@ -690,7 +722,7 @@ files_touched:
 ## 14. Verdict
 
 ```text
-APPROVED — PHASE 0 DELIVERED AND MEASURED; PHASE 1 STILL HOLD
+APPROVED — PHASE 0 MEASURED; PHASE 1 DELIVERED, LOCAL-ONLY
 ```
 
 The gap is real and measured: 22 functions, one `service_role`, 115 tables, one

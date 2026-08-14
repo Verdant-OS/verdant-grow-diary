@@ -8,8 +8,11 @@ against deploy tip `e1214d3df`. Records Cheek's decision to abandon
 `claude/breeder-mode-genetics` and `claude/cultivar-library-p1`. Refreshes the
 Branch topology row from `cbbd7122` to `e1214d3df` after five merges this
 session (#979, #815, #710, #795, #980). Sentinel-Version moved to 2026-08-09.3
-via #710. No production, GA4, GSC, sitemap, or release-identity row was
-re-measured in this edit; those retain their earlier verification dates.)
+via #710, and the tip has since moved again to `7843a3fcb` (#981, Phase 0) —
+Phase 1 lands on top of that. Records Cheek's "execute phase 1" decision and
+the delivered local-only role harness. No production, GA4, GSC, sitemap, or
+release-identity row was re-measured in this edit; those retain their earlier
+verification dates.)
 
 **Prior update:** 2026-08-13 UTC
 **Updated by:** Claude (records Cheek's 2026-08-13 in-session approval of the
@@ -216,11 +219,40 @@ the spec's §5.1.1 and in the test suite: the scan is literal-only
 client with zero measured literal reach (zero measured ≠ zero capability), and a
 green run means "no undeclared literal reach", never a runtime fence.
 
-**Phase 1 (one restricted role, local replay only) remains `HOLD`** — its gating
-evidence now exists, but it needs its own Cheek decision. Production roles,
-dropping `service_role` from any function, and default-deny table grants all
-remain `REJECT`; the last of those would reverse the 2026-08-06 founder decision
-recorded in migration `20260807003500`.
+**Phase 1 is APPROVED and DELIVERED (Cheek, 2026-08-14, "execute phase 1").**
+One restricted role, one domain, local replay only. Shipped as
+`scripts/sql/restricted-role-phase1-ingest.sql` (the role),
+`scripts/run-restricted-role-harness.ts` (the §7 proofs), and
+`scripts/check-restricted-role-fixture.test.mjs` (16 static safety tests, 16
+pass locally), wired into `security-db-local` as a non-required step.
+
+**Read this before touching it: the role is deliberately NOT a migration.**
+Anything under `supabase/migrations/` reaches production on the next Lovable
+apply, which would have violated the spec's own §8 fence (never create a role in
+production) and §9 (`REJECT` for production roles) — silently, with no further
+decision from anyone. So the role is created by a fixture applied only against a
+loopback database by the harness, and dropped in teardown. The harness refuses a
+non-loopback `SUPABASE_DB_URL` and has **no remote opt-in flag**, unlike the
+other harnesses in this repo. Three of the static tests exist purely to hold that
+line, including one asserting the repository still contains **zero** `CREATE ROLE`
+statements in migrations — the §3.1 audit fact the whole spec was built on.
+
+The role's shape: `NOLOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE
+NOREPLICATION NOBYPASSRLS`, `USAGE` on `public`, `EXECUTE` on exactly one
+function (`public.bump_bridge_token_usage(uuid, integer)`), and **zero table
+grants**. Partitioning by function grant rather than table grant is what survives
+the 2026-08-06 founder decision.
+
+**P3 — whether PostgREST honours a custom `role` JWT claim here — is the one
+proof that may not run.** It needs `SUPABASE_JWT_SECRET`; the workflow step
+derives it from `supabase status` where available, and the harness reports
+`BLOCKED` (never `PASS`) when it is absent. Do not record the PostgREST
+role-switching mechanism as available until P3 actually passes.
+
+**Production roles, dropping `service_role` from any function, and default-deny
+table grants all remain `REJECT`** — the last would reverse the 2026-08-06
+founder decision recorded in migration `20260807003500`. Phase 2 needs its own
+Cheek decision plus Security review.
 
 Two audit results from that spec update facts recorded elsewhere in this file's
 orbit: the Convex spec's open `uncertainty` about `supabase/functions/_shared/`
@@ -534,7 +566,7 @@ schema change and does not authorize production writes.
 | Agent             | Assignment                                                                                                                                                                                                                                                                                    |
 | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Codex             | Standing SEO measurement readiness and analytics integrity. Convex Phase 1 of `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` is in review: PR #977, opened 2026-08-14, not a draft. Scope stays Phase 1 only, under `spikes/convex-component-sandbox/`. **Do NOT build a Postgres domain-reach detector — Phase 0 of `POSTGRES_RESTRICTED_ROLE_SPIKE` is already delivered by Claude (see slices above). Phase 1 of that arm is `HOLD` pending its own Cheek decision** |
-| Claude            | `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` specification — delivered. `POSTGRES_RESTRICTED_ROLE_SPIKE`: spec delivered **and Phase 0 detector implemented and measured** 2026-08-14 under Cheek's approval and full-authority grant (see slices above). Prior completed out-of-slice work (#586/#809/#812/#885) unchanged |
+| Claude            | `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` specification — delivered. `POSTGRES_RESTRICTED_ROLE_SPIKE`: spec delivered, **Phase 0 detector measured and Phase 1 role harness delivered (local-only)**, 2026-08-14 under Cheek's approval and full-authority grant (see slices above). Prior completed out-of-slice work (#586/#809/#812/#885) unchanged |
 | Grok              | Unassigned. Prior same-session HOLD on unapproved Convex expansion is superseded only for this named isolated spike; production Convex remains HOLD                                                                                                                                           |
 | Security reviewer | Unassigned until Phase 1 spike code exists; then review before any Convex cloud credential                                                                                                                                                                                                    |
 | Gemini            | Unassigned                                                                                                                                                                                                                                                                                    |

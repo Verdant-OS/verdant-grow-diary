@@ -28,6 +28,7 @@ import {
   buildFaqPageJsonLd,
   safeJsonLdStringify,
 } from "@/lib/seoStructuredData";
+import { staticRouteHead } from "@/lib/build/staticRouteHead";
 
 const REPO = resolve(__dirname, "../..");
 const read = (rel: string) => readFileSync(resolve(REPO, rel), "utf8");
@@ -35,6 +36,8 @@ const read = (rel: string) => readFileSync(resolve(REPO, rel), "utf8");
 const APP_TSX = readAllRouteModuleSources();
 const GUIDES_INDEX = read("src/pages/GuidesIndex.tsx");
 const GUIDE_PAGE = read("src/pages/GuidePage.tsx");
+const GUIDES_INDEX_ROUTE = read("src/routes/guides.index.tsx");
+const GUIDE_ROUTE = read("src/routes/guides.$slug.tsx");
 const CONTENT_TS = read("src/constants/verdantSeoContent.ts");
 const SITEMAP = read("public/sitemap.xml");
 const ROBOTS = read("public/robots.txt");
@@ -112,9 +115,13 @@ describe("Verdant grower guide FAQ (/guides)", () => {
     }
   });
 
-  it("GuidesIndex builds FAQPage JSON-LD from the shared constant", () => {
+  it("the guides route head builds FAQPage JSON-LD from the shared constant", () => {
     expect(GUIDES_INDEX).toContain("VERDANT_GROWER_GUIDE_FAQ");
-    expect(GUIDES_INDEX).toContain("buildFaqPageJsonLd");
+    expect(GUIDES_INDEX_ROUTE).toContain('staticRouteHead("/guides")');
+    const faq = staticRouteHead("/guides")
+      .scripts.map((script) => JSON.parse(script.children))
+      .find((node) => node["@type"] === "FAQPage");
+    expect(faq?.mainEntity).toHaveLength(VERDANT_GROWER_GUIDE_FAQ.length);
   });
 
   it("produces valid FAQPage JSON-LD for the grower guide", () => {
@@ -170,7 +177,7 @@ describe("Verdant SEO guide pages (28)", () => {
     expect(GUIDE_PAGE).toMatch(/<h1[^>]*>[\s\S]*guide\.h1[\s\S]*<\/h1>/);
     expect(GUIDE_PAGE).toContain("guide.sections.map");
     expect(GUIDE_PAGE).toContain("guide.faq.map");
-    expect(GUIDE_PAGE).toContain("buildFaqPageJsonLd");
+    expect(GUIDE_ROUTE).toContain("staticRouteHead(`/guides/${params.slug}`)");
     // Verdant positioning + required internal links.
     expect(GUIDE_PAGE).toMatch(/to="\/welcome"/);
     expect(GUIDE_PAGE).toMatch(/to="\/pricing"/);
@@ -399,11 +406,19 @@ describe("BreadcrumbList JSON-LD for guides", () => {
     ).toThrow();
   });
 
-  it("GuidesIndex and GuidePage inject breadcrumb JSON-LD", () => {
-    expect(GUIDES_INDEX).toContain("buildBreadcrumbListJsonLd");
-    expect(GUIDES_INDEX).toContain("guides-index-breadcrumb");
-    expect(GUIDE_PAGE).toContain("buildBreadcrumbListJsonLd");
-    expect(GUIDE_PAGE).toContain("breadcrumb");
+  it("guide route heads own breadcrumb JSON-LD", () => {
+    const hubCrumbs = staticRouteHead("/guides")
+      .scripts.map((script) => JSON.parse(script.children))
+      .find((node) => node["@type"] === "BreadcrumbList");
+    expect(hubCrumbs?.itemListElement).toHaveLength(2);
+
+    for (const guide of VERDANT_SEO_GUIDES) {
+      const crumbs = staticRouteHead(`/guides/${guide.slug}`)
+        .scripts.map((script) => JSON.parse(script.children))
+        .find((node) => node["@type"] === "BreadcrumbList");
+      expect(crumbs?.itemListElement).toHaveLength(3);
+      expect(crumbs?.itemListElement[2].item).toBe(`${VERDANT_SITE_ORIGIN}/guides/${guide.slug}`);
+    }
   });
 });
 

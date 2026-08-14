@@ -105,6 +105,17 @@ jobs:
             echo "BLOCKED: local Supabase did not expose DB_URL; the causation proof cannot run."
             exit 2
           fi
+          # Optional. Enables only the restricted-role harness's P3 PostgREST
+          # role-claim proof. Read from the STATUS_JSON already fetched above --
+          # deliberately NOT a second `supabase status` call, which would break
+          # the 4-command lifecycle pin in
+          # src/test/local-supabase-replay-compatibility.test.ts. Absent is not
+          # fatal: that harness reports P3 BLOCKED, never PASS.
+          SUPABASE_JWT_SECRET="$(echo "$STATUS_JSON" | jq -r '.JWT_SECRET // .jwt_secret // empty')"
+          if [ -n "$SUPABASE_JWT_SECRET" ]; then
+            echo "::add-mask::$SUPABASE_JWT_SECRET"
+            echo "SUPABASE_JWT_SECRET=$SUPABASE_JWT_SECRET" >> "$GITHUB_ENV"
+          fi
           # Local-only keys. Do NOT echo values.
           echo "SUPABASE_URL=$SUPABASE_URL" >> "$GITHUB_ENV"
           echo "::add-mask::$SUPABASE_ANON_KEY"
@@ -179,15 +190,6 @@ jobs:
         id: restricted-role
         run: |
           set -o pipefail
-          # Derived here rather than in the shared export step so this lane's
-          # other harnesses are untouched. Absent -> the harness reports P3
-          # BLOCKED, which is never counted as a pass.
-          JWT="$(supabase status --workdir "$SUPABASE_REPLAY_WORKDIR" -o json \
-            | jq -r '.JWT_SECRET // .jwt_secret // empty')"
-          if [ -n "$JWT" ]; then
-            echo "::add-mask::$JWT"
-            export SUPABASE_JWT_SECRET="$JWT"
-          fi
           bun run test:restricted-role 2>&1 | tee restricted-role.log
 
       - name: Aggregate DB security lane

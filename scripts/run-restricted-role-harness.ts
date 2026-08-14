@@ -30,7 +30,7 @@
  */
 import { execFileSync } from "node:child_process";
 import { createHmac } from "node:crypto";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const LOCAL_LANE_FLAG = "--confirm-local-security-lane";
@@ -224,7 +224,7 @@ try {
 
   // ── P10: no dangerous attribute anywhere in the fixture text ───────────
   // Re-asserted from pg_roles in P1; this is the source-side companion.
-  const fixtureText = execFileSync("cat", [FIXTURE], { encoding: "utf-8" });
+  const fixtureText = readFileSync(FIXTURE, "utf-8");
   const forbidden = /\b(?<!NO)(SUPERUSER|BYPASSRLS|CREATEROLE|CREATEDB|REPLICATION)\b/g;
   const hits = [...fixtureText.matchAll(forbidden)].map((m) => m[1]);
   record("P10", hits.length === 0, `fixture grants no dangerous attribute${hits.length ? `: ${hits.join(", ")}` : ""}`);

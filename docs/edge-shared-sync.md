@@ -33,6 +33,26 @@ Forbidden imports (frontend-only code such as `@/components`, `@/hooks`,
 generator to fail loudly instead of silently pulling browser code into
 Deno.
 
+## CI guard (forbidden imports)
+
+`scripts/check-no-src-lib-imports.mjs` fails closed when any file under
+`supabase/functions/**` contains:
+
+- Vite aliases (`@/…`, `npm:@/…`)
+- Relative escapes into `src/**`
+- Windows absolute / `npm:C:…` paths
+- Browser-only bare modules (`react`, `react-dom`, …)
+- The same patterns inside `import("…")`
+
+Wired into:
+
+- `package.json` → `prebuild`, `predeploy:functions*`, `check:no-src-lib-imports`
+- `.github/workflows/ci.yml` → `edge-shared-sync-preflight` (required before `test`)
+- `deployment-preview.yml`, `edge-shared-sync.yml`
+
+Regression tests: `src/test/check-no-src-lib-imports.test.ts` and the full-tree
+scan in `src/test/edge-shared-mirror-static-safety.test.ts`.
+
 ## Commands
 
 ```bash

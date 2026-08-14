@@ -19,7 +19,7 @@ on:
       - "docs/schemas/ecowitt-soil-channel-map.schema.json"
       - ".github/workflows/ecowitt-config-validate-contract.yml"
   push:
-    branches: [main]
+    branches: [main, verdant-grow-diary]
     paths:
       - "scripts/ecowitt-live-soil-bridge.ts"
       - "scripts/ci-ecowitt-config-validate-contract.mjs"

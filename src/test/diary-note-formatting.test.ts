@@ -8,7 +8,34 @@ import {
   normalizeDiaryNoteText,
   formatDiaryNoteForLabeledContainer,
   parseDiaryNoteSections,
+  repairDiaryNoteSentenceSpacing,
 } from "@/lib/diaryNoteFormatting";
+
+describe("repairDiaryNoteSentenceSpacing — shared glued-sentence repair", () => {
+  it("repairs the audited calendar pattern ('Watered today.Full watering to runoff')", () => {
+    expect(repairDiaryNoteSentenceSpacing("Watered today.Full watering to runoff")).toBe(
+      "Watered today. Full watering to runoff",
+    );
+  });
+
+  it("leaves decimals, ellipses, and already-spaced prose untouched", () => {
+    expect(repairDiaryNoteSentenceSpacing("pH 6.2 at runoff. EC 1.4.")).toBe(
+      "pH 6.2 at runoff. EC 1.4.",
+    );
+    expect(repairDiaryNoteSentenceSpacing("Waiting... still dry")).toBe("Waiting... still dry");
+  });
+
+  it("preserves newlines (unlike the full display normalizer)", () => {
+    expect(repairDiaryNoteSentenceSpacing("Watered today.\n\npH: 6.2")).toBe(
+      "Watered today.\n\npH: 6.2",
+    );
+  });
+
+  it("returns empty string for non-string input", () => {
+    expect(repairDiaryNoteSentenceSpacing(null)).toBe("");
+    expect(repairDiaryNoteSentenceSpacing(undefined)).toBe("");
+  });
+});
 
 describe("normalizeDiaryNoteText — repeated labels + missing spaces", () => {
   it("collapses a doubled 'Response check:' prefix", () => {

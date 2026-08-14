@@ -1,18 +1,22 @@
 /**
- * Static safety scan for the Operator Demo Preview slice files.
- * Ensures no unsafe phrases, no Supabase mutations, no automation/device
- * control copy, and no token/payload exposure in source.
+ * Direct-file static safety scan for the Operator Demo fixture slice.
+ *
+ * The route deliberately co-renders a signed-in grower's read-only account
+ * context. That context has its own focused safety contract in
+ * operator-account-read-models-static-safety.test.ts. This suite only claims
+ * that the fixture presenter and fixture view model remain dependency-light,
+ * and that the route composition itself has no direct mutation/control code.
  */
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const ROOT = join(__dirname, "..", "..");
-const FILES = [
-  "src/pages/OperatorDemoPreview.tsx",
+const FIXTURE_FILES = [
   "src/components/OperatorDemoEvidenceChainPreview.tsx",
   "src/lib/operatorDemoPreviewViewModel.ts",
 ];
+const COMPOSITION_PAGE = "src/pages/OperatorDemoPreview.tsx";
 
 const BANNED_SUBSTRINGS = [
   "fake live",
@@ -53,10 +57,18 @@ const BANNED_REGEX: Array<{ name: string; re: RegExp }> = [
   { name: "model_output identifier", re: /\bmodel_output\b/ },
 ];
 
-describe("operator-demo-preview static safety", () => {
-  for (const rel of FILES) {
+function source(rel: string): string {
+  return readFileSync(join(ROOT, rel), "utf8");
+}
+
+function codeOnly(value: string): string {
+  return value.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|\s)\/\/.*$/gm, "");
+}
+
+describe("operator demo fixture direct-file safety", () => {
+  for (const rel of FIXTURE_FILES) {
     describe(rel, () => {
-      const src = readFileSync(join(ROOT, rel), "utf8");
+      const src = source(rel);
       const lower = src.toLowerCase();
 
       for (const phrase of BANNED_SUBSTRINGS) {
@@ -72,4 +84,23 @@ describe("operator-demo-preview static safety", () => {
       }
     });
   }
+
+  it("keeps the owner read-model panel explicitly separate from the demo fixture", () => {
+    const page = source(COMPOSITION_PAGE);
+    expect(page).toMatch(/<OperatorAccountReadModelsPanel\b/);
+    expect(page).toMatch(/<OperatorDemoEvidenceChainPreview\b/);
+  });
+
+  it("has no direct mutation, edge invocation, or device-control code in route composition", () => {
+    const page = codeOnly(source(COMPOSITION_PAGE));
+    expect(page).not.toMatch(/\.insert\s*\(/);
+    expect(page).not.toMatch(/\.update\s*\(/);
+    expect(page).not.toMatch(/\.upsert\s*\(/);
+    expect(page).not.toMatch(/\.delete\s*\(/);
+    expect(page).not.toMatch(/\.rpc\s*\(/);
+    expect(page).not.toMatch(/functions\.invoke/);
+    expect(page).not.toMatch(
+      /\b(?:sendDeviceCommand|setRelay|relayOn|relayOff|setAutomation|runAutomation)\b/,
+    );
+  });
 });

@@ -98,18 +98,49 @@ describe("isSnapshotPersistable — source allowlist", () => {
       }),
     ).toBe(false);
   });
-  it("stale manual → NOT persistable", () => {
+  // Persistence holds EVERY source to the live window (15m). The #592 canon's
+  // source-aware widening (manual 6h → 24h) governs DISPLAY freshness only:
+  // rendering a day-old manual value is honest, but writing an `alerts` row
+  // from it is not, because the row is stamped first_seen_at = now().
+  // Both sides of the boundary are pinned so neither can drift silently.
+  it("stale manual (past the live window) → NOT persistable", () => {
     expect(
       isSnapshotPersistable({
         snapshot: {
           ...base,
           source: "manual",
-          ts: new Date(NOW - 60 * 60 * 1000).toISOString(),
+          ts: new Date(NOW - 25 * 60 * 60 * 1000).toISOString(),
         },
         quality: "good",
         now: NOW,
       }),
     ).toBe(false);
+  });
+  it("manual inside the 24h DISPLAY window but past the live window → NOT persistable", () => {
+    expect(
+      isSnapshotPersistable({
+        snapshot: {
+          ...base,
+          source: "manual",
+          ts: new Date(NOW - 23 * 60 * 60 * 1000).toISOString(),
+        },
+        quality: "good",
+        now: NOW,
+      }),
+    ).toBe(false);
+  });
+  it("manual inside the live window → persistable", () => {
+    expect(
+      isSnapshotPersistable({
+        snapshot: {
+          ...base,
+          source: "manual",
+          ts: new Date(NOW - 60 * 1000).toISOString(),
+        },
+        quality: "good",
+        now: NOW,
+      }),
+    ).toBe(true);
   });
   it("stale live → NOT persistable", () => {
     expect(

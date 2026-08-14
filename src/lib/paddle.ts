@@ -22,6 +22,7 @@ import {
   type PaddleCheckoutEnvironment,
 } from "@/lib/paddleEnvironment";
 import { handlePaddleCheckoutEvent } from "@/lib/checkoutOverlaySession";
+import { readEdgeFunctionErrorCode } from "@/lib/edgeFunctionError";
 
 const clientToken = import.meta.env.VITE_PAYMENTS_CLIENT_TOKEN as string | undefined;
 
@@ -163,17 +164,9 @@ async function extractCatalogReason(
   if (fromData && CATALOG_REASONS.has(fromData as PaddleCheckoutCatalogReason)) {
     return fromData as PaddleCheckoutCatalogReason;
   }
-  const ctx = (error as { context?: unknown } | null)?.context;
-  if (ctx && typeof (ctx as Response).json === "function") {
-    try {
-      const body = await (ctx as Response).clone().json();
-      const code = body && typeof body.error === "string" ? body.error : null;
-      if (code && CATALOG_REASONS.has(code as PaddleCheckoutCatalogReason)) {
-        return code as PaddleCheckoutCatalogReason;
-      }
-    } catch {
-      // fall through — not a JSON body
-    }
+  const code = await readEdgeFunctionErrorCode(error);
+  if (code && CATALOG_REASONS.has(code as PaddleCheckoutCatalogReason)) {
+    return code as PaddleCheckoutCatalogReason;
   }
   return null;
 }

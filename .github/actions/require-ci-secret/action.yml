@@ -12,7 +12,7 @@ description: >
 
 inputs:
   secret-name:
-    description: "Exact repository secret name, e.g. SUPABASE_DB_URL_LIVE."
+    description: "Exact protected secret name, e.g. SUPABASE_DB_URL."
     required: true
   secret-value:
     description: >

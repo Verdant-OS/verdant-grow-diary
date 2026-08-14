@@ -1,0 +1,399 @@
+name: Money migration drift alert (production)
+
+# Are the billing-critical migrations actually applied in production?
+#
+# WHY A SECOND, MONEY-SPECIFIC JOB
+#
+# migration-drift-probe.yml already diffs EVERY repo migration against
+# supabase_migrations.schema_migrations, and all 14 entries of
+# REQUIRED_MONEY_MIGRATIONS are present in supabase/migrations/, so that probe
+# does detect an unapplied money migration. This job is therefore NOT new
+# detection, and should not be described as such. It adds three things the
+# general probe cannot:
+#
+#   1. TRIAGE. "A migration is unapplied" and "the migration that makes a paid
+#      Craft subscriber's Pheno Tracker work is unapplied" need different
+#      response times. This job says which one you are looking at.
+#   2. TARGET-IDENTITY SAFETY. scripts/lib/moneyDatabaseTargetIdentity.mjs
+#      refuses to run against an unexpected database. Reading the sandbox and
+#      reporting it as production is worse than not checking at all, and this
+#      repo has a live sandbox/prod confusion hazard.
+#   3. IT ACTUALLY RUNS. The live money check in required-money-migrations.yml
+#      fires only on workflow_dispatch with target_env=live. Across the last 40
+#      runs of that workflow it was dispatched once, with the default
+#      target_env=sandbox, so the LIVE job was skipped -- it has never
+#      executed. A gate nobody remembers to trigger is not a gate.
+#
+# SEPARATE FILE ON PURPOSE
+#
+# required-money-migrations.yml is a PR gate whose trust boundary is pinned by
+# src/test/required-money-migrations-workflow-trust-boundary.test.ts. Adding a
+# schedule trigger there would make every job in it evaluate on a cron and
+# would mean editing a money gate's `if:` conditions. This file leaves that
+# boundary untouched and reuses the same checker script.
+#
+# NOTE FOR WHOEVER READS A GREEN RESULT HERE: the SANDBOX money gate in
+# required-money-migrations.yml is separately broken and has never passed
+# (misconfigured SUPABASE_DB_URL_SANDBOX). A green run of THIS workflow says
+# production is current; it says nothing about sandbox.
+
+on:
+  schedule:
+    # 07:30 UTC, half an hour after migration-drift-probe.yml. Staggered so the
+    # two jobs do not open the same database at once, and so the general
+    # "something is unapplied" signal lands before the money-specific triage.
+    - cron: "30 7 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: money-migration-drift-alert
+  cancel-in-progress: false
+
+env:
+  # One definition, read by the single reconcile step below. Deliberately
+  # distinct from migration-drift-probe.yml's title so the two alert channels
+  # can never match each other's issues.
+  #
+  # NEUTRAL ON PURPOSE. This one title covers every non-healthy outcome, and
+  # most of them -- target_identity_rejected, tracker_query_failed,
+  # psql_not_invocable, no_db_connection -- mean production was never queried.
+  # A title asserting "production is missing billing-critical migrations" would
+  # state as fact something no query established, turning a blocked
+  # verification into an apparent production defect in the issue list. The body
+  # carries the specific finding; the title must not outrun the evidence.
+  #
+  # A single stable title is also what keeps deduplication working: an
+  # outcome-dependent title would open a second issue whenever the outcome
+  # changed, and the close step matches on exactly one title.
+  MONEY_DRIFT_ISSUE_TITLE: "Money migration check (production) requires attention"
+
+jobs:
+  verify:
+    name: Verify money migrations applied in production
+    runs-on: ubuntu-latest
+    # Trusted-ref gate. workflow_dispatch accepts a --ref, and this job checks
+    # out that ref and runs ITS copy of the checker with SUPABASE_DB_URL
+    # in the environment. Without this, dispatching from a modified branch runs
+    # attacker-editable code holding the production credential.
+    if: github.ref == 'refs/heads/verdant-grow-diary'
+    # Holds the verdant-production environment's SUPABASE_DB_URL.
+    #
+    # OPERATIONAL CAVEAT, same as migration-drift-probe.yml: if a REQUIRED
+    # REVIEWER is ever added to verdant-production, every scheduled run parks
+    # awaiting approval and this monitor silently stops monitoring. Verified at
+    # authoring time that the environment has only a branch policy and zero
+    # reviewers.
+    environment: verdant-production
+    # Bounds the whole job well under the 360-minute default, but deliberately
+    # LARGER than the checker step's own timeout below. That ordering is the
+    # point: a step timeout fails just that step and later `if: always()` steps
+    # still run, so the issue still gets filed. A JOB timeout cancels
+    # everything, including the reconciler -- a stalled query would then leave
+    # no runner, no result, and no issue, which is exactly the silent
+    # scheduled-monitor failure this workflow exists to prevent.
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "24"
+
+      # Hardened for the same reason as migration-drift-probe.yml: a failure
+      # here now raises an alert, so a package-mirror hiccup would file a false
+      # "billing migrations unverified" issue. Observed on this repo's runners
+      # -- apt-get update returned 403 for a third-party repo this job does not
+      # use, and apt-get fails the whole command when ANY source errors.
+      - name: Install psql client
+        run: |
+          sudo apt-get update -qq || echo "apt-get update reported errors; continuing to install"
+          for attempt in 1 2 3; do
+            if sudo apt-get install -y --no-install-recommends postgresql-client; then
+              echo "postgresql-client installed (attempt $attempt)"
+              exit 0
+            fi
+            echo "install attempt $attempt failed; retrying in 10s"
+            sleep 10
+          done
+          echo "could not install postgresql-client after 3 attempts" >&2
+          exit 1
+
+      # Hard-fail on a missing secret rather than letting the checker report
+      # "no database connection" into a void.
+      - name: Require SUPABASE_DB_URL
+        uses: ./.github/actions/require-ci-secret
+        with:
+          secret-name: SUPABASE_DB_URL
+          secret-value: ${{ secrets.SUPABASE_DB_URL }}
+          guard-heading: "Money migration drift alert cannot reach production"
+          reason-lines-json: >
+            ["Without this secret the billing-critical migrations cannot be
+            checked against production, and a green run would falsely imply
+            they are applied. This is a hard failure by design."]
+
+      # Reuses the existing 485-line checker verbatim. No second detector and
+      # no second source of truth: REQUIRED_MONEY_MIGRATIONS stays the only
+      # place the money-critical set is defined.
+      - name: Verify money migrations applied in production
+        id: verify
+        # The checker calls psql through a synchronous spawnSync with no
+        # timeout of its own, so a connection that is accepted and then stalls
+        # would block here indefinitely. Bounded at the step so control returns
+        # to the reconciler below and the stall is REPORTED rather than
+        # swallowed by a cancelled job.
+        timeout-minutes: 5
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          TARGET_ENV: live
+          # Belt and braces for the connect phase specifically. It has to be an
+          # env var: the target sanitizer sets `url.search = ""`, stripping ALL
+          # URL query options, so a connect_timeout in the URL would never
+          # reach libpq. psqlEnv spreads process.env, so this does.
+          PGCONNECT_TIMEOUT: "15"
+          AUDIT_PATH: ${{ github.workspace }}/audit/live/applied-audit.json
+          REPORT_PATH: ${{ github.workspace }}/audit/live/report.md
+        run: |
+          mkdir -p audit/live
+          set +e
+          node scripts/assert-required-money-migrations-applied.mjs
+          code=$?
+          set -e
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit "$code"
+
+      # The checker's writeAudit() returns early when AUDIT_PATH is unset, so a
+      # typo in the env var above would leave no JSON, and a reconcile step
+      # reading an empty file would post a contentless alert while appearing to
+      # work. Resolve the outcome here, and say so explicitly when it cannot be
+      # read rather than defaulting to something reassuring.
+      - name: Resolve audit outcome
+        id: audit
+        if: always()
+        run: |
+          AUDIT="audit/live/applied-audit.json"
+          if [ ! -s "$AUDIT" ]; then
+            echo "outcome=audit_unreadable" >> "$GITHUB_OUTPUT"
+            echo "no audit JSON at $AUDIT — the checker did not report an outcome" >&2
+            exit 1
+          fi
+          if ! node -e 'JSON.parse(require("fs").readFileSync("audit/live/applied-audit.json","utf8"))' 2>/dev/null; then
+            echo "outcome=audit_unreadable" >> "$GITHUB_OUTPUT"
+            echo "audit JSON at $AUDIT is not parseable" >&2
+            exit 1
+          fi
+          OUTCOME=$(node -e 'process.stdout.write(String(JSON.parse(require("fs").readFileSync("audit/live/applied-audit.json","utf8")).outcome ?? "audit_unreadable"))')
+          echo "outcome=$OUTCOME" >> "$GITHUB_OUTPUT"
+          echo "outcome: $OUTCOME"
+
+      - name: Append report to workflow summary
+        if: always()
+        run: |
+          {
+            echo "## Money migration drift (production)"
+            echo ""
+            echo "Outcome: \`${{ steps.audit.outputs.outcome }}\`"
+            echo ""
+            if [ -s audit/live/report.md ]; then cat audit/live/report.md; fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # ONE step reconciles the issue in both directions, so the lookup logic
+      # exists once. Branching on the audit OUTCOME rather than the exit code:
+      # "production is missing billing logic" and "the guard refused the
+      # database target and verified nothing" are different emergencies, and
+      # collapsing every non-zero into "could not check" would hide which one
+      # you have.
+      - name: Reconcile the money drift tracking issue
+        if: always()
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea
+        env:
+          PROBE_OUTCOME: ${{ steps.verify.outcome }}
+          AUDIT_OUTCOME: ${{ steps.audit.outputs.outcome }}
+        with:
+          script: |
+            const fs = require("fs");
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const title = process.env.MONEY_DRIFT_ISSUE_TITLE;
+            // Two labels, for the same reason the title is neutral: filtering
+            // or triaging by label must not present a blocked verification as
+            // a confirmed defect. The base label always applies; the drift
+            // label is attached ONLY when a real query established drift.
+            const BASE_LABEL = "money-migration-check";
+            const DRIFT_LABEL = "money-migration-drift";
+            const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+
+            // Pinned to scripts/lib/redactDbUrl.mjs by a test. The audit JSON
+            // is documented to carry no secrets, but this body is PUBLISHED to
+            // an issue, which Actions secret masking does not cover, so the
+            // boundary redacts regardless of what upstream promises.
+            const redact = (s) =>
+              String(s).replace(/postgres(?:ql)?:\/\/[^\s"'`<>]+/gi, "[redacted-db-url]");
+
+            const outcome = process.env.AUDIT_OUTCOME || "audit_unreadable";
+            const stepOutcome = process.env.PROBE_OUTCOME || "unknown";
+            // Anything other than success/failure means a step BEFORE the
+            // checker failed -- the psql install or the secret guard -- so it
+            // never started. That needs a different first action from "it ran
+            // and produced nothing"; the audit_unreadable copy would send the
+            // reader hunting a broken checker instead of a broken prerequisite.
+            const checkerNeverRan = stepOutcome !== "success" && stepOutcome !== "failure";
+            // Only a checker that ran to completion AND reported verified may
+            // close. Closing is the direction where being wrong hides missing
+            // billing logic, so it takes the conservative gate.
+            const healthy = stepOutcome === "success" && outcome === "verified";
+
+            let audit = null;
+            try {
+              audit = JSON.parse(fs.readFileSync("audit/live/applied-audit.json", "utf8"));
+            } catch { /* handled by the audit_unreadable outcome */ }
+
+            // Distinct copy per outcome: each of these needs a different first
+            // action from whoever opens the issue.
+            const HEADLINES = {
+              missing_migrations:
+                "**Production is missing billing-critical migrations.** Paid behaviour may be silently regressed right now — credit spend, credit grants, referrals, or plan entitlements. Treat as revenue-affecting.",
+              target_identity_rejected:
+                "**The guard refused the database target and verified NOTHING.** It may have been pointed at a database that is not production. Do not interpret this as production being healthy.",
+              tracker_query_failed:
+                "**The migration tracker query failed, so production state is unknown.** This is not a pass.",
+              psql_not_invocable:
+                "**psql was not invocable on the runner, so nothing was checked.** This is not a pass.",
+              no_db_connection:
+                "**No database connection was configured, so nothing was checked.** This is not a pass.",
+              malformed_filename:
+                "**The REQUIRED_MONEY_MIGRATIONS manifest is malformed**, so the guard refused to query. Fix the manifest in scripts/required-money-migrations.mjs; production was not touched.",
+              audit_unreadable:
+                "**The checker produced no readable audit**, so its outcome is unknown. Nothing may be concluded about production.",
+            };
+
+            // Only these two outcomes involved an actual tracker query, so only
+            // they may present counts or name specific migrations.
+            //
+            // malformed_filename carries an `expected` array whose applied
+            // flags were never determined (production was deliberately not
+            // touched), and the four unqueried outcomes carry no `expected` at
+            // all -- whose counts serialise to 0, so an unguarded body would
+            // publish "Required: 0 · applied: 0 · missing: 0" and read as a
+            // zero-drift result on a run that measured nothing.
+            const measured = outcome === "verified" || outcome === "missing_migrations";
+
+            const countsLine =
+              measured && audit
+                ? `Required: ${audit.expected_count}  ·  applied: ${audit.applied_count}  ·  missing: ${audit.missing_count}`
+                : "Counts unavailable — production was not queried on this run.";
+
+            // Naming files under "Not applied in production" is only truthful
+            // when a query established that. For every other outcome this stays
+            // empty rather than restating unverified rows as findings.
+            const missingList =
+              outcome === "missing_migrations"
+                ? (audit?.expected ?? [])
+                    .filter((e) => !e.applied)
+                    .map((e) => `- \`${e.file}\` (version ${e.version ?? "unknown"})`)
+                    .join("\n")
+                : "";
+
+            const headline = checkerNeverRan
+              ? `**The money-migration checker never ran** (step outcome: \`${stepOutcome}\`). A step before it failed — checkout, Node setup, the psql install, or the required-secret guard. Nothing about production was verified, and nothing will be until that is fixed.`
+              : HEADLINES[outcome] ??
+                `**Unrecognised outcome \`${outcome}\`.** Nothing may be concluded.`;
+
+            const body = [
+              headline,
+              "",
+              `Outcome: \`${outcome}\`  ·  checker step: \`${stepOutcome}\``,
+              audit ? countsLine : "No audit payload was produced.",
+              // The checker's own note names the concrete cause for the
+              // outcomes that cannot show counts, e.g. which identity check
+              // rejected the target. Without it those bodies say only "nothing
+              // was verified" and give the reader nowhere to start.
+              ...(audit?.note ? ["", `Checker note: ${audit.note}`] : []),
+              ...(missingList ? ["", "Not applied in production:", "", missingList] : []),
+              "",
+              `Run: ${runUrl}`,
+              "",
+              "Scope: this checks the curated REQUIRED_MONEY_MIGRATIONS set against",
+              "supabase_migrations.schema_migrations. That records a migration RAN; it cannot",
+              "prove a later export did not overwrite its body, which is a known separate gap.",
+            ].join("\n");
+
+            // Paginate: one listForRepo page caps at 100, and this endpoint
+            // returns pull requests alongside issues.
+            const existing = await github.paginate(github.rest.issues.listForRepo, {
+              owner, repo, state: "open", per_page: 100,
+            });
+            const hit = existing.find((i) => !i.pull_request && i.title === title);
+
+            if (healthy) {
+              if (!hit) return;
+              await github.rest.issues.createComment({
+                owner, repo, issue_number: hit.number,
+                body: [
+                  "Resolved — a later run verified every billing-critical migration is applied in production.",
+                  "",
+                  `Verified by: ${runUrl}`,
+                  "",
+                  "Closing so this channel stays meaningful. If it regresses, the next failing",
+                  "run opens a fresh issue rather than appending to a stale one.",
+                ].join("\n"),
+              });
+              await github.rest.issues.update({
+                owner, repo, issue_number: hit.number, state: "closed", state_reason: "completed",
+              });
+              return;
+            }
+
+            // Only a real query may claim drift.
+            const confirmedDrift = outcome === "missing_migrations";
+
+            // Provision before use: creating or labelling with a label that
+            // does not exist fails validation, which would swallow the alert
+            // entirely -- the silent-failure mode this workflow exists to end.
+            const ensureLabel = async (name, color, description) => {
+              try {
+                await github.rest.issues.createLabel({ owner, repo, name, color, description });
+              } catch (e) {
+                // 422 = already exists, the expected steady state.
+                if (e.status !== 422) core.warning(`could not ensure ${name} label: ${e.message}`);
+              }
+            };
+
+            if (hit) {
+              await github.rest.issues.createComment({
+                owner, repo, issue_number: hit.number, body: redact(body),
+              });
+              // An issue first opened for a BLOCKED verification must gain the
+              // drift label if a later run actually confirms drift. Without
+              // this the escalation is invisible to anyone filtering by label,
+              // since the issue itself is only ever commented on after
+              // creation.
+              if (confirmedDrift && !hit.labels?.some((l) => (l.name ?? l) === DRIFT_LABEL)) {
+                await ensureLabel(DRIFT_LABEL, "b60205", "Production is confirmed missing billing-critical migrations");
+                try {
+                  await github.rest.issues.addLabels({
+                    owner, repo, issue_number: hit.number, labels: [DRIFT_LABEL],
+                  });
+                } catch (e) {
+                  core.warning(`could not escalate ${DRIFT_LABEL}: ${e.message}`);
+                }
+              }
+              return;
+            }
+
+            await ensureLabel(BASE_LABEL, "d93f0b", "Money migration check requires attention (drift or blocked verification)");
+            const labels = [BASE_LABEL];
+            if (confirmedDrift) {
+              await ensureLabel(DRIFT_LABEL, "b60205", "Production is confirmed missing billing-critical migrations");
+              labels.push(DRIFT_LABEL);
+            }
+            try {
+              await github.rest.issues.create({ owner, repo, title, body: redact(body), labels });
+            } catch (e) {
+              // Last resort: the alert matters more than its labels.
+              core.warning(`labelled issue creation failed (${e.message}); retrying unlabelled`);
+              await github.rest.issues.create({ owner, repo, title, body: redact(body) });
+            }

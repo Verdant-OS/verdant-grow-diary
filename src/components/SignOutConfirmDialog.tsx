@@ -28,6 +28,7 @@ import {
   SAFE_SIGN_OUT_REDIRECT,
   SIGN_OUT_LOADING_LABEL,
 } from "@/lib/authSessionExitRules";
+import { toast } from "sonner";
 
 export default function SignOutConfirmDialog({
   trigger,
@@ -55,7 +56,11 @@ export default function SignOutConfirmDialog({
     );
     setBusy(false);
     if (result.ok === false) {
-      setError((result as { ok: false; message: string }).message);
+      // Dialog closes + navigates immediately; toast keeps the non-sensitive
+      // failure copy visible after redirect (ok:false was previously unreachable
+      // because store.signOut swallowed supabase { error }).
+      setError(result.message);
+      toast.error(result.message);
     }
     setOpen(false);
     nav(result.redirectTo, { replace: true });

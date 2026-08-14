@@ -21,6 +21,7 @@
  * Pure. No I/O, no clock reads, no React.
  */
 
+import { EC_MSCM_SUSPICIOUS_MAX, PH_PRESENTATION_REALISTIC } from "@/constants/sensorTruthRanges";
 import { normalizeSensorSource, type SensorSource } from "@/lib/sensor/sensorSourceRules";
 import { isDiagnosticSensorProvenanceRow } from "@/lib/sensorProvenanceFenceRules";
 import { celsiusToFahrenheit } from "@/lib/temperatureUnits";
@@ -87,8 +88,8 @@ export type NormalizeSensorEvidenceResult = {
   flags: string[];
 };
 
-/** EC values > 50 read as µS/cm per the repo's metric-safety heuristic. */
-const EC_LOOKS_LIKE_MICRO_SIEMENS = 50;
+/** EC values > soft tier read as µS/cm per Sensor Truth two-tier model. */
+const EC_LOOKS_LIKE_MICRO_SIEMENS = EC_MSCM_SUSPICIOUS_MAX;
 
 function plausibilityCheck(
   metric: OutcomeMetricName,
@@ -114,9 +115,13 @@ function plausibilityCheck(
       return { ok: true, normalizedValue: value, flag: null };
     }
     case "reservoir_ph": {
-      // Matches sensorMetricSafetyRules realistic pH band.
-      if (value < 3 || value > 9) {
-        return { ok: false, normalizedValue: value, flag: "implausible pH (outside 3.0–9.0)" };
+      // Matches presentation pH band (sensorTruthRanges PH_PRESENTATION_REALISTIC).
+      if (value < PH_PRESENTATION_REALISTIC.min || value > PH_PRESENTATION_REALISTIC.max) {
+        return {
+          ok: false,
+          normalizedValue: value,
+          flag: `implausible pH (outside ${PH_PRESENTATION_REALISTIC.min}–${PH_PRESENTATION_REALISTIC.max})`,
+        };
       }
       return { ok: true, normalizedValue: value, flag: null };
     }

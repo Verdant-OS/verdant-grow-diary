@@ -10,6 +10,7 @@
  *    informs the age label but they are not promoted to "live".
  */
 import { normalizeSensorSource, type SensorSource } from "./sensorSourceRules";
+import { LIVE_CURRENT_STATE_STALE_MS } from "../sensorTruthCanon";
 
 export type SensorMetrics = Partial<{
   temp_f: number | null;
@@ -44,7 +45,7 @@ export interface FreshnessResult {
 }
 
 export interface ClassifyOptions {
-  /** Freshness window in ms. Default: 30 minutes. */
+  /** Freshness window in ms. Default: live 15-minute canon window. */
   freshnessMs?: number;
   /** Tolerated future drift (clock skew). Default: 2 minutes. */
   futureToleranceMs?: number;
@@ -52,7 +53,7 @@ export interface ClassifyOptions {
   now?: number;
 }
 
-const DEFAULT_FRESH_MS = 30 * 60 * 1000;
+const DEFAULT_FRESH_MS = LIVE_CURRENT_STATE_STALE_MS;
 const DEFAULT_FUTURE_TOL = 2 * 60 * 1000;
 
 function formatAge(ms: number): string {

@@ -1,0 +1,140 @@
+name: Dispatch history e2e (mocked)
+
+# Runs the operator edge-alerts dispatch history Playwright spec and fails
+# the build on any regression in the panel, drilldown, unmapped-code
+# fallthrough, loading/empty states, or mobile layout it covers.
+#
+# SAFETY:
+#  - Mocked/non-destructive only. The spec seeds a clearly fake session and
+#    intercepts every Supabase auth, REST, storage, and Edge request via
+#    page.route(); no real project is contacted.
+#  - No real accounts, grow data, alerts, or webhook dispatches are touched.
+#  - No E2E credentials, elevated DB role, or secrets are read.
+#  - Uses the SAFE pull_request event only — never the elevated PR target
+#    event. No schedule/cron trigger.
+
+on:
+  pull_request:
+    branches: [verdant-grow-diary]
+    paths:
+      - "e2e/operator-edge-alerts-dispatch-history.spec.ts"
+      - "e2e/utils/analyticsConsent.ts"
+      - "src/pages/OperatorEdgeAlerts.tsx"
+      - "src/components/EdgeAlertsBreachDrilldownDialog.tsx"
+      - "src/components/EdgeAlertsDryRunDialog.tsx"
+      - "src/components/RequireOperatorRole.tsx"
+      - "src/hooks/useHasRole.ts"
+      - "src/routes/_app/_operator.tsx"
+      - "src/routes/_app/_operator/operator.edge-alerts.tsx"
+      - "src/components/ui/dialog.tsx"
+      - "src/components/ui/table.tsx"
+      - "src/components/ui/button.tsx"
+      - "src/components/ui/card.tsx"
+      - "src/components/ui/input.tsx"
+      - "src/components/ui/label.tsx"
+      - "src/components/ui/select.tsx"
+      - "src/components/ui/badge.tsx"
+      - "src/components/ui/scroll-area.tsx"
+      - "playwright.config.ts"
+      - ".github/workflows/dispatch-history-e2e.yml"
+      - "package.json"
+      - "bun.lock"
+      - "bun.lockb"
+  # Push paths mirror the pull_request allowlist exactly, so a direct push
+  # or admin-bypassed merge touching any covered dependency still runs the
+  # post-merge gate.
+  push:
+    branches: [verdant-grow-diary]
+    paths:
+      - "e2e/operator-edge-alerts-dispatch-history.spec.ts"
+      - "e2e/utils/analyticsConsent.ts"
+      - "src/pages/OperatorEdgeAlerts.tsx"
+      - "src/components/EdgeAlertsBreachDrilldownDialog.tsx"
+      - "src/components/EdgeAlertsDryRunDialog.tsx"
+      - "src/components/RequireOperatorRole.tsx"
+      - "src/hooks/useHasRole.ts"
+      - "src/routes/_app/_operator.tsx"
+      - "src/routes/_app/_operator/operator.edge-alerts.tsx"
+      - "src/components/ui/dialog.tsx"
+      - "src/components/ui/table.tsx"
+      - "src/components/ui/button.tsx"
+      - "src/components/ui/card.tsx"
+      - "src/components/ui/input.tsx"
+      - "src/components/ui/label.tsx"
+      - "src/components/ui/select.tsx"
+      - "src/components/ui/badge.tsx"
+      - "src/components/ui/scroll-area.tsx"
+      - "playwright.config.ts"
+      - ".github/workflows/dispatch-history-e2e.yml"
+      - "package.json"
+      - "bun.lock"
+      - "bun.lockb"
+  workflow_dispatch:
+
+# Read-only token: the job only checks out code and uploads artifacts.
+permissions:
+  contents: read
+
+jobs:
+  dispatch-history-e2e:
+    name: Dispatch history Playwright (mocked / non-destructive)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('bun.lock', 'bun.lockb', 'package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-chromium-
+
+      - name: Install dependencies (frozen lockfile)
+        run: bun install --frozen-lockfile
+
+      - name: Install Chromium only (with deps)
+        run: bunx playwright install chromium --with-deps
+
+      - name: Run dispatch history Playwright spec
+        run: bunx playwright test e2e/operator-edge-alerts-dispatch-history.spec.ts --project=chromium-mocked
+
+      - name: Upload Playwright report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: dispatch-history-playwright-report
+          path: playwright-report
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Upload Playwright test-results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: dispatch-history-test-results
+          path: test-results
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Job summary — mocked/non-destructive
+        if: ${{ always() }}
+        run: |
+          {
+            echo "### Dispatch history e2e (mocked / non-destructive)";
+            echo "";
+            echo "- Mocked / non-destructive: **yes**";
+            echo "- Spec: e2e/operator-edge-alerts-dispatch-history.spec.ts";
+            echo "- Covers: drilldown open/order/close, unmapped refusal codes,";
+            echo "  loading + truly-empty + filtered-empty states, mobile layout";
+            echo "- All Supabase auth/REST/storage/Edge traffic intercepted via page.route()";
+            echo "- No real accounts, rows, or webhook dispatches touched";
+          } >> "$GITHUB_STEP_SUMMARY"

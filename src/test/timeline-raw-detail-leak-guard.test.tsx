@@ -42,6 +42,12 @@ vi.mock("@/integrations/supabase/client", () => {
       eq() {
         return query;
       },
+      is() {
+        return query;
+      },
+      not() {
+        return query;
+      },
       gte() {
         return query;
       },

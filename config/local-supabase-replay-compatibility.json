@@ -165,6 +165,38 @@
         }
       ],
       "reason": "The immutable Quick Log mirror migration reuses the 12-argument signature; OR REPLACE preserves its body while avoiding replay-state function collisions."
+    },
+    {
+      "source_path": "supabase/migrations/20260804091142_da8cef1f-8279-4137-8d63-e9bbc739004a.sql",
+      "source_sha256": "05a4f8fc94d99e237239b3f52d2adddf9c73ccb82888536784625b05036a3e17",
+      "patched_sha256": "6826ab6081bd6d907167b4f40f866b7308b9233a970eb30b7dfbbec604a18f16",
+      "replacements": [
+        {
+          "from": "REVOKE EXECUTE ON FUNCTION public.email_queue_dispatch() FROM anon, authenticated;",
+          "to": "DO 'BEGIN\n  IF to_regprocedure(''public.email_queue_dispatch()'') IS NOT NULL THEN\n    REVOKE EXECUTE ON FUNCTION public.email_queue_dispatch() FROM anon, authenticated;\n  END IF;\nEND';"
+        },
+        {
+          "from": "REVOKE EXECUTE ON FUNCTION public.email_queue_wake() FROM anon, authenticated;",
+          "to": "DO 'BEGIN\n  IF to_regprocedure(''public.email_queue_wake()'') IS NOT NULL THEN\n    REVOKE EXECUTE ON FUNCTION public.email_queue_wake() FROM anon, authenticated;\n  END IF;\nEND';"
+        },
+        {
+          "from": "REVOKE EXECUTE ON FUNCTION public.admin_schema_audit(text[], text[]) FROM anon;",
+          "to": "DO 'BEGIN\n  IF to_regprocedure(''public.admin_schema_audit(text[], text[])'') IS NOT NULL THEN\n    REVOKE EXECUTE ON FUNCTION public.admin_schema_audit(text[], text[]) FROM anon;\n  END IF;\nEND';"
+        }
+      ],
+      "reason": "A fresh local reset fails three of this migration's REVOKEs with SQLSTATE 42883: email_queue_dispatch and email_queue_wake were created in production outside committed migrations, while the legacy two-argument admin_schema_audit was created by committed 20260728084921 but is dropped during replay by 20260728103000 even though production still holds it; existence-guarded DO blocks skip exactly the three signatures a clean replay verified missing while leaving every hosted revoke intact."
+    },
+    {
+      "source_path": "supabase/migrations/20260805090000_security_advisor_hardening_followup.sql",
+      "source_sha256": "13d85bde5a60f2df9d5f62e72a61b91b0073f615d2d9e8b4da8e5ef57dbd40ff",
+      "patched_sha256": "ac5f665bd97d318cc25b5ee7fd3a50be5d48aca8e1c28b360733bae7d7da31e4",
+      "replacements": [
+        {
+          "from": "ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON FUNCTIONS FROM PUBLIC, anon;\nALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON FUNCTIONS FROM PUBLIC, anon;",
+          "to": "ALTER DEFAULT PRIVILEGES REVOKE ALL ON FUNCTIONS FROM PUBLIC, anon;\nALTER DEFAULT PRIVILEGES FOR ROLE postgres REVOKE ALL ON FUNCTIONS FROM PUBLIC, anon;\nALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON FUNCTIONS FROM PUBLIC, anon;\nALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON FUNCTIONS FROM PUBLIC, anon;"
+        }
+      ],
+      "reason": "PostgreSQL schema-specific default privileges add to global defaults and cannot revoke the global PUBLIC function EXECUTE grant. The disposable replay copy adds the missing global revokes before the immutable migration's effective-privilege self-test; the published migration remains byte-for-byte unchanged."
     }
   ],
   "compatibility_injections": [

@@ -1,3 +1,5 @@
+import { LIVE_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
+import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import TimelineEmptyState from "@/components/TimelineEmptyState";
 import TimelineLightingGuideCard from "@/components/TimelineLightingGuideCard";
@@ -115,7 +117,11 @@ import {
   type GrowEventRowForRecent,
 } from "@/lib/growEventToDiaryRawEntry";
 import { ROOT_ZONE_GROW_EVENT_SELECT } from "@/lib/rootZoneObservationRules";
-import { mergeTimelineSources } from "@/lib/timelineMergeRules";
+import {
+  collapseQuickLogSaveFanOut,
+  findMissingLinkedGrowEventIds,
+  mergeTimelineSources,
+} from "@/lib/timelineMergeRules";
 import { buildTimelineLocalDateRangeBounds } from "@/lib/timelineDateRangeRules";
 import {
   deriveTimelineEventTypeOptions,
@@ -203,7 +209,7 @@ import {
   type TimelineSupplementalReadSource,
 } from "@/lib/timelinePageReadStateRules";
 
-const TIMELINE_SNAPSHOT_STALE_MS = 30 * 60 * 1000;
+const TIMELINE_SNAPSHOT_STALE_MS = LIVE_CURRENT_STATE_STALE_MS;
 
 // URL query params mirroring the Pro date-range filter, matching the
 // ?start/?end convention of the environment summary report.
@@ -291,6 +297,49 @@ function entryKinds(e: Entry): EventFilter[] {
   return kinds;
 }
 
+/**
+ * Resolve grow_event parents that loaded diary companions reference but no
+ * prior fetch returned — deleted (filtered by the primary page's is_deleted
+ * clause) or simply outside that page's own date/limit bound. The exact-id
+ * lookup carries no is_deleted or date filter: an id fetch has no window to
+ * fall outside of. Shared by the initial load and every loadOlder page so
+ * collapseQuickLogSaveFanOut can always tell "known gone" apart from "never
+ * fetched". `onResolved`/`onPartial` own their scope-currency guards and the
+ * merge into the supplemental collapse-only state.
+ */
+async function resolveMissingLinkedGrowEventParents(input: {
+  growId: string;
+  diaryRows: ReadonlyArray<{ id: string; details?: unknown }>;
+  knownGrowEvents: ReadonlyArray<GrowEventRowForRecent>;
+  isCurrent: () => boolean;
+  onResolved: (rows: GrowEventRowForRecent[]) => void;
+  onPartial: () => void;
+}): Promise<void> {
+  const missingLinkedGrowEventIds = findMissingLinkedGrowEventIds({
+    diaryEntries: input.diaryRows.map((row) => ({
+      id: row.id,
+      details: (row.details ?? null) as Record<string, unknown> | null,
+    })),
+    growEvents: input.knownGrowEvents,
+  });
+  if (missingLinkedGrowEventIds.length === 0) return;
+  try {
+    const linkedResult = await supabase
+      .from("grow_events")
+      .select(ROOT_ZONE_GROW_EVENT_SELECT)
+      .eq("grow_id", input.growId)
+      .in("id", missingLinkedGrowEventIds);
+    if (!input.isCurrent()) return;
+    if (linkedResult.error || !Array.isArray(linkedResult.data)) {
+      input.onPartial();
+      return;
+    }
+    input.onResolved(linkedResult.data as unknown as GrowEventRowForRecent[]);
+  } catch {
+    input.onPartial();
+  }
+}
+
 export default function Timeline() {
   const temperatureUnit = useTemperatureUnitPreference();
   const authUser = useAuth().user;
@@ -347,6 +396,15 @@ export default function Timeline() {
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [growEvents, setGrowEvents] = useState<GrowEventRowForRecent[]>([]);
   const [growEventsTotal, setGrowEventsTotal] = useState<number | null>(null);
+  // Deleted or out-of-page grow_event parents that a loaded diary companion
+  // references (details.linked_grow_event_id). Resolved separately from the
+  // primary `growEvents` page so collapseQuickLogSaveFanOut can tell "known
+  // deleted" apart from "never fetched" without deleted rows ever competing
+  // for the primary page's 100-row budget or the growEvents.length UI-copy
+  // gates below. Never rendered directly — feeds only the recent-lane merge.
+  const [supplementalLinkedGrowEvents, setSupplementalLinkedGrowEvents] = useState<
+    GrowEventRowForRecent[]
+  >([]);
   const [actionEvents, setActionEvents] = useState<ActionQueueEvent[]>([]);
   const [alertEvents, setAlertEvents] = useState<AlertEventRow[]>([]);
 
@@ -505,6 +563,7 @@ export default function Timeline() {
       setEntriesTotal(null);
       setGrowEvents([]);
       setGrowEventsTotal(null);
+      setSupplementalLinkedGrowEvents([]);
       setActionEvents([]);
       setAlertEvents([]);
       setPartialReadSources([]);
@@ -523,6 +582,7 @@ export default function Timeline() {
       setEntriesTotal(null);
       setGrowEvents([]);
       setGrowEventsTotal(null);
+      setSupplementalLinkedGrowEvents([]);
       setActionEvents([]);
       setAlertEvents([]);
       setPartialReadSources([]);
@@ -548,19 +608,24 @@ export default function Timeline() {
       // `diary_entries` and `grow_events` are the two authoritative core
       // Timeline sources. Stage both locally and commit them atomically only
       // after both reads succeed for the same owner/grow/range key.
-      let entriesQuery = supabase
-        .from("diary_entries")
-        .select("id,note,photo_url,stage,details,entry_at,plant_id,tent_id", {
-          count: "exact",
-        })
-        .eq("grow_id", activeGrowId)
-        .order("entry_at", { ascending: false })
-        .limit(100);
-      if (timelineDateRangeBounds.startIso)
-        entriesQuery = entriesQuery.gte("entry_at", timelineDateRangeBounds.startIso);
-      if (timelineDateRangeBounds.endIso)
-        entriesQuery = entriesQuery.lte("entry_at", timelineDateRangeBounds.endIso);
-      const entriesResult = await entriesQuery;
+      // Page-critical read: falls back to unfiltered pre-migration (the
+      // retracted_at column ships in 20260811090000) instead of failing.
+      const entriesResult = await selectWithRetractionCompat((withRetractionFilter) => {
+        let entriesQuery = supabase
+          .from("diary_entries")
+          .select("id,note,photo_url,stage,details,entry_at,plant_id,tent_id", {
+            count: "exact",
+          })
+          .eq("grow_id", activeGrowId)
+          .order("entry_at", { ascending: false })
+          .limit(100);
+        if (withRetractionFilter) entriesQuery = entriesQuery.is("retracted_at", null);
+        if (timelineDateRangeBounds.startIso)
+          entriesQuery = entriesQuery.gte("entry_at", timelineDateRangeBounds.startIso);
+        if (timelineDateRangeBounds.endIso)
+          entriesQuery = entriesQuery.lte("entry_at", timelineDateRangeBounds.endIso);
+        return entriesQuery;
+      });
       if (!isCurrentRequest()) return;
       if (hasTimelineRequiredReadError(entriesResult)) throw entriesResult.error;
 
@@ -573,6 +638,12 @@ export default function Timeline() {
       });
       const paths = [...new Set(privatePhotoPathById.values())];
 
+      // Filtered by is_deleted here so the visible-event page (its 100-row
+      // budget, and growEvents.length UI-copy gates below) never shows or
+      // gets displaced by tombstones. A diary companion can still reference
+      // a deleted (or merely out-of-window) parent that this bounded page
+      // doesn't include; that gap is closed by the small supplemental
+      // by-id lookup below, not by widening this query.
       let growEventsQuery = supabase
         .from("grow_events")
         .select(ROOT_ZONE_GROW_EVENT_SELECT, { count: "exact" })
@@ -598,6 +669,12 @@ export default function Timeline() {
       setGrowEventsTotal(
         typeof growEventsResult.count === "number" ? growEventsResult.count : null,
       );
+      // Cleared unconditionally with every fresh core commit: rows resolved
+      // for a previous grow/date scope must never survive into this one —
+      // not while the new lookup below is in flight, and not indefinitely
+      // when that lookup fails (the partial-source disclosure covers the
+      // gap; stale cross-scope evidence must not).
+      setSupplementalLinkedGrowEvents([]);
       setActionEvents([]);
       setAlertEvents([]);
       setPartialReadSources([]);
@@ -610,6 +687,31 @@ export default function Timeline() {
       };
 
       const supplementalTasks: Promise<void>[] = [];
+
+      // A loaded diary companion can reference a grow_event parent this
+      // exact page's `growEvents` fetch doesn't include — deleted (filtered
+      // by is_deleted above) or simply outside this page's own date/limit
+      // bound while the independently-bounded diary fetch still includes
+      // the companion. Resolve exactly those referenced-but-missing ids so
+      // collapseQuickLogSaveFanOut can tell "known gone" apart from "never
+      // fetched" instead of guessing from a primary page that was never
+      // meant to be exhaustive.
+      supplementalTasks.push(
+        resolveMissingLinkedGrowEventParents({
+          growId: activeGrowId,
+          diaryRows: coreRows,
+          knownGrowEvents: nextGrowEvents,
+          isCurrent: isCurrentRequest,
+          onResolved: (rows) =>
+            setSupplementalLinkedGrowEvents((current) => {
+              const seen = new Set(current.map((row) => row.id));
+              const extra = rows.filter((row) => !seen.has(row.id));
+              return extra.length === 0 ? current : [...current, ...extra];
+            }),
+          onPartial: () => markPartial("linked_grow_events"),
+        }),
+      );
+
       if (paths.length > 0) {
         supplementalTasks.push(
           (async () => {
@@ -725,18 +827,21 @@ export default function Timeline() {
     try {
       // Keyset page stays inside the applied date bounds so pagination
       // never walks out of the filtered range.
-      let olderQuery = supabase
-        .from("diary_entries")
-        .select("id,note,photo_url,stage,details,entry_at,plant_id,tent_id")
-        .eq("grow_id", requestedGrowId)
-        .lt("entry_at", cursor)
-        .order("entry_at", { ascending: false })
-        .limit(100);
-      if (timelineDateRangeBounds.startIso)
-        olderQuery = olderQuery.gte("entry_at", timelineDateRangeBounds.startIso);
-      if (timelineDateRangeBounds.endIso)
-        olderQuery = olderQuery.lte("entry_at", timelineDateRangeBounds.endIso);
-      const olderResult = await olderQuery;
+      const olderResult = await selectWithRetractionCompat((withRetractionFilter) => {
+        let olderQuery = supabase
+          .from("diary_entries")
+          .select("id,note,photo_url,stage,details,entry_at,plant_id,tent_id")
+          .eq("grow_id", requestedGrowId)
+          .lt("entry_at", cursor)
+          .order("entry_at", { ascending: false })
+          .limit(100);
+        if (withRetractionFilter) olderQuery = olderQuery.is("retracted_at", null);
+        if (timelineDateRangeBounds.startIso)
+          olderQuery = olderQuery.gte("entry_at", timelineDateRangeBounds.startIso);
+        if (timelineDateRangeBounds.endIso)
+          olderQuery = olderQuery.lte("entry_at", timelineDateRangeBounds.endIso);
+        return olderQuery;
+      });
       if (!isCurrentPage()) return;
       if (hasTimelineRequiredReadError(olderResult)) throw olderResult.error;
       const older = ((olderResult.data as Entry[] | null) ?? []).map((row) => ({ ...row }));
@@ -777,6 +882,28 @@ export default function Timeline() {
         setEntries((prev) => {
           const seen = new Set(prev.map((e) => e.id));
           return [...prev, ...older.filter((e) => !seen.has(e.id))];
+        });
+        // Older diary pages can reference parents no prior fetch returned
+        // (deleted, or outside the newest-100 grow_events page). Resolve
+        // them exactly like the initial load so the collapse never mistakes
+        // a known-gone parent for never-fetched on paginated companions.
+        await resolveMissingLinkedGrowEventParents({
+          growId: requestedGrowId,
+          diaryRows: older,
+          knownGrowEvents: [...growEvents, ...supplementalLinkedGrowEvents],
+          isCurrent: isCurrentPage,
+          onResolved: (rows) =>
+            setSupplementalLinkedGrowEvents((current) => {
+              const seen = new Set(current.map((row) => row.id));
+              const extra = rows.filter((row) => !seen.has(row.id));
+              return extra.length === 0 ? current : [...current, ...extra];
+            }),
+          onPartial: () => {
+            if (!isCurrentPage()) return;
+            setPartialReadSources((current) =>
+              mergeTimelinePartialSources(current, ["linked_grow_events"]),
+            );
+          },
         });
       }
     } catch {
@@ -984,14 +1111,14 @@ export default function Timeline() {
   useTimelineHashAnchorHandoff(hash, !loading);
 
   // Merge `grow_events` (Quick Log v2 manual saves) and `diary_entries`
-  // through the tested `mergeTimelineSources` helper so the Recent Quick
-  // Logs panel receives a deterministic, deduplicated, newest-first
-  // stream. The helper enforces:
-  //   - exact-duplicate dedup by (source_table, source_id)
-  //   - logical dedup when a diary row mirrors a grow_event via
-  //     `details.grow_event_id`
-  //   - stable tie-breakers (grow_events first on equal timestamps,
-  //     then source_id lexical)
+  // through the tested helpers so the Recent Quick Logs panel receives a
+  // deterministic, deduplicated, newest-first stream:
+  //   - `collapseQuickLogSaveFanOut` collapses one save's write fan-out
+  //     (manual spine + same-instant environment sibling + diary
+  //     companion, linked or (plant, instant)-paired) to the spine row
+  //   - `mergeTimelineSources` enforces exact-duplicate dedup by
+  //     (source_table, source_id) and stable tie-breakers (grow_events
+  //     first on equal timestamps, then source_id lexical)
   // We then re-hydrate each merged entry back into its original loose
   // shape so the existing RecentQuickLogActivityPanel normalizer
   // continues to see the same fields it always has.
@@ -1019,14 +1146,58 @@ export default function Timeline() {
         linked_grow_event_id,
       };
     });
-    const merged = mergeTimelineSources({
+    // One confirmed Quick Log save fans out into up to three persisted rows
+    // (watering/observation spine + same-instant environment sibling + diary
+    // companion). Collapse that write topology before the merge so the
+    // calendar, recent lane, and history panels count each save exactly once
+    // (live audit #9/#10). Companion-only details are re-attached below.
+    //
+    // Fold in supplementalLinkedGrowEvents (deleted/out-of-page parents a
+    // loaded companion references) so the collapse can tell "known gone"
+    // apart from "never fetched" — see the CALLER CONTRACT on
+    // collapseQuickLogSaveFanOut. `growEvents` itself stays untouched for
+    // every other reader (the UI-copy gates and evidence-window checks
+    // below must reflect only the real, visible page).
+    const growEventsForCollapse =
+      supplementalLinkedGrowEvents.length === 0
+        ? growEvents
+        : (() => {
+            const seen = new Set(growEvents.map((row) => row.id));
+            const extra = supplementalLinkedGrowEvents.filter((row) => !seen.has(row.id));
+            return extra.length > 0 ? [...growEvents, ...extra] : growEvents;
+          })();
+    const collapsed = collapseQuickLogSaveFanOut({
       diaryEntries: diaryInputs,
-      growEvents,
+      growEvents: growEventsForCollapse,
+    });
+    const merged = mergeTimelineSources({
+      diaryEntries: collapsed.diaryEntries,
+      growEvents: collapsed.growEvents,
     });
     const diaryById = new Map(entries.map((e) => [e.id, e] as const));
     const growMappedById = new Map(
-      mapGrowEventsToRecentRawEntries(growEvents).map((r) => [r.id, r] as const),
+      mapGrowEventsToRecentRawEntries(collapsed.growEvents).map((r) => [r.id, r] as const),
     );
+    // A dropped companion can carry structure the bare spine row lacks
+    // (sensor snapshots, environment_check envelopes, plant_name). Merge it
+    // into the surviving spine's details so it keeps rendering exactly once.
+    // The spine's own keys (event_type, source, root-zone fields) win.
+    for (const [spineId, companions] of collapsed.droppedCompanionsBySpineId) {
+      const mapped = growMappedById.get(spineId);
+      if (!mapped) continue;
+      const companionDetails: Record<string, unknown> = {};
+      for (const companion of companions) {
+        const det = (companion.details ?? null) as Record<string, unknown> | null;
+        if (det && typeof det === "object") Object.assign(companionDetails, det);
+      }
+      delete companionDetails.linked_grow_event_id;
+      delete companionDetails.grow_event_id;
+      if (Object.keys(companionDetails).length === 0) continue;
+      growMappedById.set(spineId, {
+        ...mapped,
+        details: { ...companionDetails, ...mapped.details },
+      });
+    }
     const out: Array<Entry | ReturnType<typeof mapGrowEventsToRecentRawEntries>[number]> = [];
     for (const m of merged) {
       if (m.source_table === "diary_entries") {
@@ -1038,7 +1209,7 @@ export default function Timeline() {
       }
     }
     return out;
-  }, [entries, growEvents]);
+  }, [entries, growEvents, supplementalLinkedGrowEvents]);
 
   const symptomEvidenceByEntryId = useMemo(() => {
     const result = new Map<string, NonNullable<ReturnType<typeof buildSymptomEvidenceChecklist>>>();
@@ -1845,7 +2016,14 @@ export default function Timeline() {
           lanes. Action Queue / Alert event logs are surfaced at the
           bottom so Quick Log entries are not buried. */}
       <div className="mt-4">
-        <RecentQuickLogActivityPanel rawEntries={recentLaneRawEntries} limit={10} />
+        <RecentQuickLogActivityPanel
+          rawEntries={recentLaneRawEntries}
+          limit={10}
+          growId={activeGrowId ?? null}
+          onEntryChanged={() => {
+            void load();
+          }}
+        />
       </div>
 
       <div className="mt-4">
@@ -1856,27 +2034,63 @@ export default function Timeline() {
       </div>
 
       <div className="mt-4">
-        <WateringHistoryPanel rawEntries={recentLaneRawEntries} limit={20} />
+        <WateringHistoryPanel
+          rawEntries={recentLaneRawEntries}
+          limit={20}
+          onEntryChanged={() => {
+            void load();
+          }}
+        />
       </div>
 
       <div className="mt-4">
-        <FeedingHistoryPanel rawEntries={recentLaneRawEntries} limit={20} />
+        <FeedingHistoryPanel
+          rawEntries={recentLaneRawEntries}
+          limit={20}
+          onEntryChanged={() => {
+            void load();
+          }}
+        />
       </div>
 
       <div className="mt-4">
-        <PestDiseaseHistoryPanel rawEntries={entries} limit={20} />
+        <PestDiseaseHistoryPanel
+          rawEntries={entries}
+          limit={20}
+          onEntryChanged={() => {
+            void load();
+          }}
+        />
       </div>
 
       <div className="mt-4">
-        <TrainingHistoryPanel rawEntries={entries} limit={20} />
+        <TrainingHistoryPanel
+          rawEntries={entries}
+          limit={20}
+          onEntryChanged={() => {
+            void load();
+          }}
+        />
       </div>
 
       <div className="mt-4">
-        <MeasurementHistoryPanel rawEntries={entries} limit={20} />
+        <MeasurementHistoryPanel
+          rawEntries={entries}
+          limit={20}
+          onEntryChanged={() => {
+            void load();
+          }}
+        />
       </div>
 
       <div className="mt-4">
-        <PhotoHistoryPanel rawEntries={entries} limit={24} />
+        <PhotoHistoryPanel
+          rawEntries={entries}
+          limit={24}
+          onEntryChanged={() => {
+            void load();
+          }}
+        />
       </div>
 
       <div className="mt-4">

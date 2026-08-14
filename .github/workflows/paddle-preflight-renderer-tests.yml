@@ -3,7 +3,7 @@ name: Paddle preflight renderer tests
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, verdant-grow-diary]
 
 jobs:
   renderer-tests:

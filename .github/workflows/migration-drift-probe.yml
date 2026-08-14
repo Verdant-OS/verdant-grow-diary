@@ -1,0 +1,339 @@
+name: Migration drift probe (production)
+
+# Is production actually running the migrations we think it is?
+#
+# On 2026-08-05 migration 20260805090000 began failing on every apply, the
+# runner stopped, and SEVEN migrations never reached production for six days
+# -- including an action_queue_create RPC that shipped client code already
+# calling it. CI was green throughout: it verifies migrations are well-formed,
+# not that production ever ran them. The gap surfaced only because someone
+# queried schema_migrations by hand on a hunch.
+#
+# This job closes that blind spot on a schedule.
+#
+# TWO ANTI-VACUITY RULES, both learned the hard way in this repo:
+#
+#   1. It must NEVER skip silently. A DB gate pinned to an environment that
+#      does not resolve produces a green tick having checked nothing -- the
+#      exact failure this probe exists to prevent, reproduced in the probe
+#      itself. The secret is therefore hard-guarded by require-ci-secret, and
+#      the probe exits 2 (not 0) on any "could not check" path.
+#
+#   2. A red scheduled run is close to invisible -- GitHub notifies only the
+#      last cron editor. Drift therefore opens/updates a tracking ISSUE, so
+#      the signal lands somewhere a human actually looks.
+
+on:
+  schedule:
+    # 07:00 UTC daily. Drift is measured in days, so daily is ample; the
+    # point is that six days can never pass unnoticed again.
+    - cron: "0 7 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: migration-drift-probe
+  cancel-in-progress: false
+
+env:
+  # Defined once because two steps match on it -- the one that opens/updates
+  # the tracking issue and the one that closes it after a clean run. Two
+  # hand-copied title literals would drift, and the failure would be silent:
+  # the close step simply would not find the issue, leaving a stale alert open
+  # forever while appearing to work.
+  DRIFT_ISSUE_TITLE: "Migration drift: production is not running every committed migration"
+
+jobs:
+  probe:
+    name: Probe production migration drift
+    runs-on: ubuntu-latest
+    # Trusted-ref gate, matching prefix-diff-sarif.yml and
+    # required-money-migrations.yml.
+    #
+    # workflow_dispatch accepts a --ref, and this job checks out that ref and
+    # then executes ITS copy of scripts/probe-migration-drift.mjs and its
+    # copy of the local ./.github/actions/require-ci-secret -- with
+    # SUPABASE_DB_URL in the environment. Without this guard, dispatching
+    # from a modified branch would run attacker-editable code holding the
+    # production database credential, which is a credential-exfiltration path
+    # regardless of what the probe itself does.
+    #
+    # Safe for the schedule too: scheduled runs only ever fire from the
+    # repository default branch, which IS verdant-grow-diary here, so this
+    # gate never blocks the cron it exists to protect.
+    if: github.ref == 'refs/heads/verdant-grow-diary'
+    # Holds the verdant-production environment's SUPABASE_DB_URL. If this
+    # environment stops resolving, the secret guard below fails the job loudly
+    # rather than skipping green.
+    #
+    # OPERATIONAL CAVEAT: if a REQUIRED REVIEWER is ever added to
+    # verdant-production, every scheduled run will park awaiting deployment
+    # approval and this monitor silently stops monitoring -- no runner, no
+    # probe, no issue. Verified at authoring time that this environment has
+    # only a branch_policy rule and zero reviewers, so the cron does run
+    # today. If approval rules are added later, move this job to a separate
+    # read-only monitoring environment whose protection rules permit
+    # unattended scheduled runs.
+    environment: verdant-production
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "24"
+
+      # Hardened because a failure here is no longer merely a red run: the
+      # tracking-issue step now fires whenever the probe does not complete, so
+      # a transient package-mirror hiccup would file a false "production
+      # unmeasured" alert. Observed on this repo's runners on 2026-08-11 --
+      # apt-get update returned 403 Forbidden for the third-party
+      # packages.microsoft.com azure-cli repo, which this job does not use, and
+      # apt-get fails the whole command when ANY configured source errors.
+      #
+      # So: tolerate update errors, and retry the install, which is the only
+      # load-bearing part. A genuinely unavailable postgresql-client still
+      # fails the step after three attempts, and still raises the alert.
+      - name: Install psql client
+        run: |
+          sudo apt-get update -qq || echo "apt-get update reported errors; continuing to install"
+          for attempt in 1 2 3; do
+            if sudo apt-get install -y --no-install-recommends postgresql-client; then
+              echo "postgresql-client installed (attempt $attempt)"
+              exit 0
+            fi
+            echo "install attempt $attempt failed; retrying in 10s"
+            sleep 10
+          done
+          echo "could not install postgresql-client after 3 attempts" >&2
+          exit 1
+
+      # Hard-fail on a missing secret instead of letting the probe report
+      # "could not check" into a void.
+      - name: Require SUPABASE_DB_URL
+        uses: ./.github/actions/require-ci-secret
+        with:
+          secret-name: SUPABASE_DB_URL
+          secret-value: ${{ secrets.SUPABASE_DB_URL }}
+          guard-heading: "Migration drift probe cannot reach production"
+          reason-lines-json: >
+            ["Without this secret the probe cannot compare applied migrations
+            against the repository, and a green run would falsely imply
+            production is current. This is a hard failure by design."]
+
+      - name: Probe drift
+        id: probe
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set +e
+          node scripts/probe-migration-drift.mjs --json > drift.json 2> drift.err
+          code=$?
+          set -e
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          # The probe redacts connection strings from everything it emits
+          # (scripts/lib/redactDbUrl.mjs). It did NOT always: a psql failure
+          # that wrote no stderr fell back to String(error), whose command text
+          # carries the URL passed as argv. Actions masks registered secrets in
+          # log output, but that masking does not reach the issue body this
+          # same file is copied into -- so redaction happens at the source.
+          cat drift.json 2>/dev/null || true
+          cat drift.err  2>/dev/null || true
+          {
+            echo "## Migration drift probe"
+            echo ""
+            if [ "$code" = "0" ]; then
+              echo "Production is current — every repository migration is recorded applied."
+            elif [ "$code" = "1" ]; then
+              echo "**DRIFT DETECTED** — see the tracking issue."
+              echo ""
+              echo '```json'
+              cat drift.json
+              echo '```'
+            else
+              echo "**COULD NOT PROBE** — nothing was verified. This is not a pass."
+              echo ""
+              echo '```'
+              # --json sends the could-not-probe diagnostic to stdout, so read
+              # drift.json first; drift.err only carries a pre-JSON crash.
+              if [ -s drift.json ]; then cat drift.json; else cat drift.err; fi
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$code"
+
+      # Runs whether the probe found drift (1) or could not check (2). Both
+      # need a human; only a clean 0 is silent.
+      #
+      # Gate on the step OUTCOME, not on the output alone. If anything before
+      # the probe fails -- checkout, setup-node, the apt-get install, or the
+      # required-secret guard -- the probe never runs and never sets
+      # exit_code. Whether an unset output then compares equal to '0' depends
+      # on whether Actions treats it as an empty string (string compare, not
+      # equal) or as null (coerced to the number 0, equal). The documented
+      # casting table does not say which, and betting on the wrong one means
+      # the job goes merely red and opens NO issue -- a rotated secret could
+      # leave production unmeasured indefinitely, which is the exact
+      # low-visibility failure this whole workflow exists to prevent.
+      #
+      # outcome != 'success' is unambiguous under either reading: the probe
+      # step exits with the probe's own code, so it is 'success' only on a
+      # clean 0. Kept alongside the output check so the two must BOTH say
+      # "clean" for the alert to stay silent -- a monitor should fail toward
+      # alerting.
+      - name: Open or update the drift tracking issue
+        if: always() && (steps.probe.outcome != 'success' || steps.probe.outputs.exit_code != '0')
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea
+        env:
+          PROBE_EXIT: ${{ steps.probe.outputs.exit_code }}
+          PROBE_OUTCOME: ${{ steps.probe.outcome }}
+        with:
+          script: |
+            const fs = require("fs");
+            const exitCode = process.env.PROBE_EXIT;
+            // 'skipped' (or anything but success/failure) means a step BEFORE
+            // the probe failed, so no measurement was even attempted. Say so
+            // plainly: "could not reach the database" and "never got as far as
+            // trying" need different fixes, and a rotated secret looks like
+            // the former if the issue does not distinguish them.
+            const probeOutcome = process.env.PROBE_OUTCOME || "unknown";
+            const probeNeverRan = probeOutcome !== "success" && probeOutcome !== "failure";
+            const read = (p) => { try { return fs.readFileSync(p, "utf8").trim(); } catch { return ""; } };
+            // In --json mode the probe writes BOTH its drift report and its
+            // could-not-probe diagnostic to stdout (drift.json); drift.err is
+            // empty on exit 2. Reading only stderr there produced "(no detail
+            // captured)" for precisely the case that most needs detail.
+            // Prefer stdout, fall back to stderr for a hard crash before any
+            // JSON was emitted.
+            // Second, independent redaction layer. The probe already strips
+            // connection strings from its own output; this repeats it at the
+            // trust boundary that actually matters, because an issue body is
+            // published and is NOT covered by Actions secret masking. If a
+            // future probe bug re-opens the hole, this still holds.
+            //
+            // Deliberately URL-pattern-only, unlike the module: the exact-URL
+            // and password passes need the secret in hand, and feeding the
+            // credential into this step purely to redact it would widen the
+            // exposure this layer exists to narrow. The pattern below is
+            // pinned to scripts/lib/redactDbUrl.mjs by a test, so the two
+            // copies cannot drift apart.
+            const redact = (s) =>
+              String(s).replace(/postgres(?:ql)?:\/\/[^\s"'`<>]+/gi, "[redacted-db-url]");
+            const detail = redact(read("drift.json") || read("drift.err"));
+            const title = process.env.DRIFT_ISSUE_TITLE;
+            const body = [
+              probeNeverRan
+                ? `The drift probe **never ran** (step outcome: \`${probeOutcome}\`). A step before it failed — checkout, Node setup, the psql install, or the required-secret guard. Nothing was verified, and nothing will be until that is fixed.`
+                : exitCode === "1"
+                  ? "The drift probe found migrations committed to the repository that production has **not** applied."
+                  : "The drift probe **could not check** production. Nothing was verified — this is not a pass.",
+              "",
+              "```",
+              detail.trim().slice(0, 4000) || "(no detail captured)",
+              "```",
+              "",
+              `Run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              "",
+              "Context: a wedged migration froze this pipeline for six days in Aug 2026 without",
+              "any alert, because CI verifies migrations are well-formed, not that they ran.",
+              "If the unapplied set is a contiguous tail, the runner has stopped at the oldest",
+              "pending migration. If any entry is marked GAP, the runner moved past something",
+              "that never ran and the live schema is in a state nobody authored.",
+            ].join("\n");
+
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const LABEL = "migration-drift";
+
+            // Provision the label first. Creating an issue with a label that
+            // does not exist fails validation, which would swallow the alert
+            // entirely -- the precise silent-failure mode this probe exists
+            // to eliminate. Matches scripts/notify-edge-shared-drift.mjs.
+            try {
+              await github.rest.issues.createLabel({
+                owner, repo, name: LABEL, color: "b60205",
+                description: "Production has not applied every committed migration",
+              });
+            } catch (e) {
+              // 422 = already exists, which is the expected steady state.
+              if (e.status !== 422) {
+                core.warning(`could not ensure ${LABEL} label: ${e.message}`);
+              }
+            }
+
+            // Match on title rather than label, so a lost/renamed label can
+            // never cause duplicate issues to pile up daily.
+            //
+            // Paginate: a single listForRepo page caps at 100, and once this
+            // repo carries more open issues than that, the drift issue would
+            // eventually fall off page one. The dedupe would then silently
+            // stop finding it and open a NEW issue every single day -- turning
+            // the alert channel into noise, which is how a real drift alert
+            // gets ignored. Latent today (well under 100 open), so fix it
+            // while it is cheap.
+            //
+            // Also drop pull requests: this endpoint returns them alongside
+            // issues, so without the filter a PR sharing the title would be
+            // commented on instead of the tracking issue.
+            const existing = await github.paginate(github.rest.issues.listForRepo, {
+              owner, repo, state: "open", per_page: 100,
+            });
+            const hit = existing.find((i) => !i.pull_request && i.title === title);
+            if (hit) {
+              await github.rest.issues.createComment({
+                owner, repo, issue_number: hit.number, body,
+              });
+              return;
+            }
+            try {
+              await github.rest.issues.create({ owner, repo, title, body, labels: [LABEL] });
+            } catch (e) {
+              // Last resort: the alert matters more than its label.
+              core.warning(`labelled issue creation failed (${e.message}); retrying unlabelled`);
+              await github.rest.issues.create({ owner, repo, title, body });
+            }
+
+      # An alert channel that cannot go quiet again stops carrying information.
+      # The issue title is present tense -- "production is not running every
+      # committed migration" -- so leaving it open after recovery asserts
+      # something false, and an operator cannot tell active drift from a stale
+      # alert without re-deriving the answer by hand. That is the same habit of
+      # ignoring the channel that let six days pass unnoticed.
+      #
+      # Requires BOTH signals to agree the run was clean: closing is the
+      # direction where being wrong hides a real problem, so it should be the
+      # conservative one.
+      - name: Close the drift tracking issue after a clean run
+        if: always() && steps.probe.outcome == 'success' && steps.probe.outputs.exit_code == '0'
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea
+        with:
+          script: |
+            const title = process.env.DRIFT_ISSUE_TITLE;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            // Same pagination reasoning as the opening step: page one is not
+            // the whole list, and this endpoint returns pull requests too.
+            const existing = await github.paginate(github.rest.issues.listForRepo, {
+              owner, repo, state: "open", per_page: 100,
+            });
+            const hit = existing.find((i) => !i.pull_request && i.title === title);
+            if (!hit) return;
+
+            await github.rest.issues.createComment({
+              owner, repo, issue_number: hit.number,
+              body: [
+                "Resolved — a later probe run found every committed migration recorded applied.",
+                "",
+                `Verified by: ${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`,
+                "",
+                "Closing so this channel stays meaningful. If drift returns, the next",
+                "failing run reopens a fresh issue rather than appending to a stale one.",
+              ].join("\n"),
+            });
+            await github.rest.issues.update({
+              owner, repo, issue_number: hit.number,
+              state: "closed", state_reason: "completed",
+            });

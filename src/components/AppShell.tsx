@@ -5,6 +5,7 @@ import { Bell, LogOut, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { useAuth } from "@/store/auth";
+import { useHydrated } from "@/hooks/useHydrated";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { buildSignedOutRedirect } from "@/lib/authRedirectRules";
 import { useAlertsList } from "@/hooks/useAlertsList";
@@ -35,6 +36,7 @@ import {
 
 export default function AppShell({ children }: { children?: ReactNode }) {
   const { user, loading } = useAuth();
+  const hydrated = useHydrated();
   const location = useLocation();
   const previousNavigationKeyRef = useRef(location.key);
   // Protected-route boundary: re-validate session against the auth server.
@@ -53,10 +55,11 @@ export default function AppShell({ children }: { children?: ReactNode }) {
   const { loading: entitlementLoading, entitlement } = useMyEntitlements();
   // Real persisted alerts (open only). RLS-scoped to the signed-in user.
   // Replaces the prior mock badge to remove the demo-vs-live mismatch.
-  // Gated on a resolved session: an unauthenticated load (about to redirect
-  // to /welcome) must not fire GET /rest/v1/alerts at all — the
-  // never-healthy E2E spec forbids that request along the redirect path.
-  const { alerts: openAlerts } = useAlertsList({ status: "open" }, { enabled: !loading && !!user });
+  // Gated on a server-validated session: a cached user while getUser() is
+  // still settling (or about to redirect) must not fire GET /rest/v1/alerts —
+  // the never-healthy E2E spec forbids that request along the redirect path.
+  const sessionReady = !loading && !!user && authStatus === "authenticated";
+  const { alerts: openAlerts } = useAlertsList({ status: "open" }, { enabled: sessionReady });
   const nav = useNavigate();
   const [openLog, setOpenLog] = useState(false);
   const [openScopedLog, setOpenScopedLog] = useState(false);
@@ -173,13 +176,22 @@ export default function AppShell({ children }: { children?: ReactNode }) {
     setStructuredOpenIntent(null);
   }, [location.key]);
 
-  if (loading)
+  // SSR/hydration contract (same rule as /auth): the server always renders
+  // this loading state (no session exists server-side), so the client's
+  // hydration render must too — even when the sessionStorage restore resolves
+  // before this lazy route subtree hydrates. Without the `hydrated` gate that
+  // race makes React discard the SSR tree and regenerate client-side.
+  //
+  // Also wait for useRequireAuth (getUser) before mounting protected children
+  // (#588): a stale cached session must not let pageContent fire authenticated
+  // REST calls until the auth server revalidation settles.
+  if (!hydrated || loading || authStatus === "loading")
     return (
       <div className="min-h-screen flex items-center justify-center text-muted-foreground">
         Loading…
       </div>
     );
-  if (!user) return null;
+  if (!user || authStatus === "unauthenticated") return null;
 
   const unread = openAlerts.filter((a) => a.status === "open").length;
   const pageContent = children ?? <Outlet />;

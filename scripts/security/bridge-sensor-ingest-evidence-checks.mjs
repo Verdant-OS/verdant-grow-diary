@@ -36,6 +36,7 @@ export const FILES = {
   piIngest: "supabase/functions/pi-ingest-readings/index.ts",
   staticSecretScan: "scripts/security/static-client-secret-scan.mjs",
   securityRegressionWorkflow: ".github/workflows/security-regression.yml",
+  edgeTestsWorkflow: ".github/workflows/sensor-ingest-webhook-edge-tests.yml",
   packageJson: "package.json",
 };
 
@@ -301,8 +302,10 @@ export const CHECKS = [
   {
     id: "E27",
     file: "securityRegressionWorkflow",
-    description: "this evidence lane is wired into the Security regression workflow",
-    expect: [{ re: /test:bridge-sensor-ingest-evidence/, must: true }],
+    description: "this evidence lane is an active run step in the Security regression workflow",
+    // Anchored as a live YAML `run:` line: a commented-out `# run: ...`
+    // would not satisfy this, so the lane cannot be soft-disabled in place.
+    expect: [{ re: /^\s*run:\s*bun run test:bridge-sensor-ingest-evidence\s*$/m, must: true }],
   },
   {
     id: "E28",
@@ -315,34 +318,144 @@ export const CHECKS = [
       },
     ],
   },
+  {
+    id: "E36",
+    file: "edgeTestsWorkflow",
+    description:
+      "mint and revoke handler e2e tests are ACTIVE in the Deno edge-test lane: live run-list arguments plus live path filters in both push and pull_request",
+    expect: [],
+    // Anchored as active lines (a commented-out `# supabase/...` or
+    // `# - "supabase/..."` never satisfies these), and each trigger section
+    // is validated independently — a filter duplicated twice under one
+    // event must NOT satisfy the other event's wiring.
+    custom: (content) => {
+      const failures = [];
+      // Normalize CRLF so the $-anchored active-line patterns behave
+      // identically on Windows working trees and Linux CI checkouts.
+      const text = content.replace(/\r\n/g, "\n");
+      const sections = { push: [], pull_request: [] };
+      let current = null;
+      for (const line of text.split("\n")) {
+        const head = line.match(/^ {2}(push|pull_request):\s*$/);
+        if (head) {
+          current = head[1];
+          continue;
+        }
+        if (/^\S/.test(line) || /^ {2}\S/.test(line)) {
+          current = null;
+          continue;
+        }
+        if (current) sections[current].push(line);
+      }
+      for (const fn of ["mint-bridge-token", "revoke-bridge-token"]) {
+        const runLine = new RegExp(
+          String.raw`^\s*supabase/functions/${fn}/handler_e2e_test\.ts \\$`,
+          "m",
+        );
+        if (!runLine.test(text)) {
+          failures.push(`${fn} e2e is not an active argument in the deno run list`);
+        }
+        const filterLine = new RegExp(String.raw`^\s*- "supabase/functions/${fn}/\*\*"$`, "m");
+        for (const event of ["push", "pull_request"]) {
+          if (!filterLine.test(sections[event].join("\n"))) {
+            failures.push(`${fn} path filter is not active under ${event}.paths`);
+          }
+        }
+      }
+      return failures;
+    },
+  },
+  {
+    id: "E37",
+    file: "packageJson",
+    description:
+      "the bridge_tokens runtime RLS harness is defined and chained into test:security-db-local",
+    expect: [
+      {
+        re: /"test:bridge-tokens-db-security":\s*"node scripts\/security\/run-bridge-tokens-db-security\.mjs"/,
+        must: true,
+      },
+      { re: /"test:security-db-local":\s*"[^"]*test:bridge-tokens-db-security[^"]*"/, must: true },
+    ],
+  },
 ];
 
 /**
  * Migration checks scan every file under supabase/migrations that mentions
- * bridge_tokens, in aggregate: later migrations may legitimately supersede
- * earlier ones, so expectations run against the concatenated history.
+ * bridge_tokens, in aggregate. Concatenated text alone cannot prove the
+ * *effective* final state (a later migration could undo an earlier one), so
+ * every "protection present" check is paired with a forbidden-regression
+ * tripwire for the statement that would undo it (DISABLE ROW LEVEL SECURITY,
+ * a re-GRANT, a PUBLIC/anon policy). Full effective-state proof belongs to
+ * the runtime bridge_tokens RLS harness tracked as checklist gap G3.
  */
 export const MIGRATION_CHECKS = [
   {
     id: "E29",
-    description: "bridge_tokens has Row Level Security enabled in migration history",
+    description: "bridge_tokens has RLS enabled and no migration ever disables it",
     expect: [
       {
         re: /ALTER TABLE (?:public\.)?bridge_tokens ENABLE ROW LEVEL SECURITY/i,
         must: true,
       },
+      { re: /(?:public\.)?bridge_tokens\s+DISABLE ROW LEVEL SECURITY/i, must: false },
     ],
   },
   {
     id: "E30",
-    description: "no bridge_tokens policy or grant is addressed to anon",
+    description:
+      "every bridge_tokens policy (created or altered) grants only authenticated; no grant reaches anon or PUBLIC",
     expect: [
-      { re: /bridge_tokens[^;]{0,400}\bTO anon\b/is, must: false },
       {
-        re: /GRANT[^;]{0,200}ON (?:TABLE )?(?:public\.)?bridge_tokens[^;]{0,200}\bTO anon\b/is,
+        re: /GRANT[^;]{0,200}ON (?:TABLE )?(?:public\.)?bridge_tokens[^;]{0,200}\bTO[^;]{0,200}\b(anon|PUBLIC)\b/is,
         must: false,
       },
     ],
+    // Role lists are parsed in full for both CREATE POLICY and role-changing
+    // ALTER POLICY statements, after SQL comments are stripped so commented
+    // history never classifies as active SQL. The declared role list must be
+    // exactly `authenticated` — one role, no additions in any order (`TO
+    // authenticated, anon`, `TO anon, authenticated`, `TO authenticated,
+    // service_role` all fail), and a CREATE POLICY with no TO clause fails
+    // because it defaults to PUBLIC (which includes anon). An ALTER POLICY
+    // without a TO clause leaves roles unchanged, and `RENAME TO` is not a
+    // role list.
+    custom: (corpus) => {
+      const failures = [];
+      const policyStatements = stripSqlComments(corpus)
+        .split(";")
+        .map((s) => s.trim())
+        .filter(
+          (s) =>
+            /\b(?:CREATE|ALTER)\s+POLICY\b/i.test(s) &&
+            /\bON\s+(?:public\.)?bridge_tokens\b/i.test(s),
+        );
+      if (!policyStatements.some((s) => /\bCREATE\s+POLICY\b/i.test(s))) {
+        failures.push("no bridge_tokens CREATE POLICY statements found");
+      }
+      for (const raw of policyStatements) {
+        const label = raw.replace(/\s+/g, " ").slice(0, 70);
+        const stmt = raw.replace(/\bRENAME\s+TO\s+(?:"[^"]+"|\w+)/gi, "");
+        const toClause = stmt.match(/\bTO\s+([\w",\s]+?)(?=\s+(?:FOR|USING|WITH)\b|$)/i);
+        const isCreate = /\bCREATE\s+POLICY\b/i.test(stmt);
+        if (!toClause) {
+          if (isCreate) {
+            failures.push(`policy lacks explicit TO clause (defaults to PUBLIC): ${label}`);
+          }
+          continue;
+        }
+        const roles = toClause[1]
+          .split(",")
+          .map((r) => r.trim().replace(/^"|"$/g, "").toLowerCase())
+          .filter((r) => r.length > 0);
+        if (roles.length !== 1 || roles[0] !== "authenticated") {
+          failures.push(
+            `policy role list must be exactly [authenticated], found [${roles.join(", ")}]: ${label}`,
+          );
+        }
+      }
+      return failures;
+    },
   },
   {
     id: "E31",
@@ -355,15 +468,50 @@ export const MIGRATION_CHECKS = [
   {
     id: "E34",
     description:
-      "bump_bridge_token_usage (SECURITY DEFINER) is not executable by anon or authenticated",
+      "bump_bridge_token_usage (SECURITY DEFINER) is locked to service_role and never re-granted",
     expect: [
       {
         re: /REVOKE EXECUTE ON FUNCTION public\.bump_bridge_token_usage\(UUID, INTEGER\) FROM PUBLIC, anon, authenticated;/,
         must: true,
       },
+      {
+        re: /GRANT EXECUTE ON FUNCTION public\.bump_bridge_token_usage[^;]*\bTO[^;]*\b(PUBLIC|anon|authenticated)\b/i,
+        must: false,
+      },
     ],
   },
+  {
+    id: "E35",
+    description:
+      "revocation is one-way, telemetry is server-maintained on BOTH insert and update paths, and client rows are born unrevoked (guard triggers)",
+    expect: [
+      { re: /RAISE EXCEPTION 'bridge_token revocation is one-way'/, must: true },
+      { re: /RAISE EXCEPTION 'bridge_token rows must be created unrevoked'/, must: true },
+    ],
+    // The telemetry guard must exist on the UPDATE path AND the INSERT
+    // path — one occurrence means a whole write path is unprotected.
+    custom: (corpus) => {
+      const n = (
+        stripSqlComments(corpus).match(
+          /RAISE EXCEPTION 'bridge_token usage telemetry is server-maintained'/g,
+        ) ?? []
+      ).length;
+      return n >= 2
+        ? []
+        : [`telemetry guard must exist on both UPDATE and INSERT paths (found ${n})`];
+    },
+  },
 ];
+
+/**
+ * Deterministic comment strip for migration classification: removes block
+ * comments, then `--` line comments. Deliberately NOT a SQL parser — string
+ * literals containing comment markers do not occur in this corpus, and the
+ * G3 runtime harness remains the effective-state authority.
+ */
+export function stripSqlComments(sql) {
+  return sql.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/--[^\n]*/g, " ");
+}
 
 export function readRepoFile(rel) {
   const p = resolve(REPO_ROOT, rel);
@@ -424,7 +572,11 @@ export function runAllChecks({ readFile = readRepoFile, migrations = bridgeMigra
       results.push({ id: check.id, ok: false, detail: "no migration mentions bridge_tokens" });
       continue;
     }
-    const failures = runExpectations(corpus, check.expect);
+    // Comments are stripped for every migration expectation: a commented-out
+    // protection must not satisfy a must-pattern, and a commented-out
+    // regression must not false-trip a forbidden one.
+    const failures = runExpectations(stripSqlComments(corpus), check.expect);
+    if (check.custom) failures.push(...check.custom(corpus));
     results.push({
       id: check.id,
       ok: failures.length === 0,

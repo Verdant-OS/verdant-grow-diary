@@ -1,13 +1,13 @@
 /**
  * sensorTiming — the single home for every sensor stale/freshness window.
  *
- * Consolidated by the 2026-07-30 sensor-truth slice (#592). The 2026-07-30
- * audit found these windows duplicated across 19 modules with SEVEN distinct
- * values while docs/data-labeling-spec.md §freshness specifies 15 minutes
- * for live readings. Per the slice's product decision, consolidation
- * PRESERVES each surface's current value — the divergence is now explicit
- * and named instead of scattered, and unifying any value is a deliberate
- * one-line follow-up here rather than a scavenger hunt.
+ * Consolidated by the 2026-07-30 sensor-truth slice (#592). The Sensor Truth
+ * Canon follow-up unifies grower-facing values to docs/data-labeling-spec.md
+ * and docs/sensor-truth-rules.md:
+ *   - Live current-state → 15 minutes
+ *   - Manual current-context → 24 hours
+ * Source-aware resolution lives in `src/lib/sensorTruthCanon.ts`. Metric-kind
+ * windows (environment 15m / soil 60m) stay in the badge freshness resolver.
  *
  * Rules:
  *  - One constant per consuming surface, named for that surface, unit suffix
@@ -19,7 +19,7 @@
  */
 
 // ---------------------------------------------------------------------------
-// 15 minutes — matches docs/data-labeling-spec.md for live-reading freshness.
+// 15 minutes — live-reading freshness (docs/data-labeling-spec.md).
 // ---------------------------------------------------------------------------
 
 /** Dashboard latest-snapshot freshness (latestSensorSnapshotRules). */
@@ -45,45 +45,47 @@ export const ECOWITT_BRIDGE_TROUBLESHOOTING_STALE_MS = 15 * 60 * 1000;
 /** Testbench transport-receiving window (sensorTestbenchIndicatorRules, #584). */
 export const SENSOR_TESTBENCH_LIVE_WINDOW_MS = 15 * 60 * 1000;
 
-// ---------------------------------------------------------------------------
-// 30 minutes — DIVERGES from the spec's 15; grower-visible on the dashboard
-// card, alert persistence, and AI context. Unify deliberately, not here.
-// ---------------------------------------------------------------------------
+/**
+ * Live current-state staleness for dashboard snapshot + alert persistence
+ * (`sensorSnapshot.isStale` default / Sensor Truth Canon live window).
+ */
+export const SENSOR_SNAPSHOT_STALE_THRESHOLD_MS = 15 * 60 * 1000;
 
-/** Dashboard snapshot + alert-persistence staleness (sensorSnapshot.isStale). */
-export const SENSOR_SNAPSHOT_STALE_THRESHOLD_MS = 30 * 60 * 1000;
+/** Reading normalization staleness for live demotion (sensorReadingNormalizationRules). */
+export const SENSOR_READING_NORMALIZATION_STALE_MS = 15 * 60 * 1000;
 
-/** Reading normalization staleness (sensorReadingNormalizationRules). */
-export const SENSOR_READING_NORMALIZATION_STALE_MS = 30 * 60 * 1000;
+/** Source-health rollup "active" window (sensorSourceHealthRules). */
+export const SENSOR_SOURCE_STALE_MINUTES = 15;
 
-/** Source-health rollup staleness (sensorSourceHealthRules). */
-export const SENSOR_SOURCE_STALE_MINUTES = 30;
+/** AI Coach snapshot context default (overridden per-source via sensorTruthCanon). */
+export const DEFAULT_AI_COACH_STALE_THRESHOLD_MS = 15 * 60 * 1000;
 
-/** AI Coach snapshot context staleness (aiCoachSensorSnapshotContext). */
-export const DEFAULT_AI_COACH_STALE_THRESHOLD_MS = 30 * 60 * 1000;
+/** AI Doctor sensor context default (overridden per-source via sensorTruthCanon). */
+export const DEFAULT_AI_SENSOR_STALE_THRESHOLD_MS = 15 * 60 * 1000;
 
-/** AI Doctor sensor context staleness (aiSensorSnapshotContextRules). */
-export const DEFAULT_AI_SENSOR_STALE_THRESHOLD_MS = 30 * 60 * 1000;
-
-/** Grow Room Mode display staleness (growRoomModeRules). */
-export const GROW_ROOM_MODE_STALE_MINUTES = 30;
+/** Grow Room Mode display default (source-aware via sensorTruthCanon when source known). */
+export const GROW_ROOM_MODE_STALE_MINUTES = 15;
 
 // ---------------------------------------------------------------------------
-// Longer windows — channel labeling, manual snapshots, status contract.
+// Longer windows — soil/channel labeling, manual snapshots, status contract.
 // ---------------------------------------------------------------------------
 
 /** EcoWitt channel labeling recency (ecowittChannelLabelingRules). */
 export const ECOWITT_CHANNEL_LABELING_STALE_AFTER_MS = 60 * 60 * 1000;
 
-/** Manual snapshot "current" window — 6h (manualSensorSnapshotQualityRules).
- *  NOTE: docs/data-labeling-spec.md says 24h for manual; divergence tracked
- *  in #592. */
-export const MANUAL_SNAPSHOT_CURRENT_STALE_HOURS = 6;
+/**
+ * Manual snapshot "current" window — 24h
+ * (manualSensorSnapshotQualityRules, docs/data-labeling-spec.md).
+ */
+export const MANUAL_SNAPSHOT_CURRENT_STALE_HOURS = 24;
 
-/** AI context sufficiency sensor staleness — 6h (aiContextSufficiencyRules). */
-export const DEFAULT_SENSOR_STALE_MS = 6 * 60 * 60 * 1000;
+/**
+ * AI context sufficiency coarse sensor window — 24h
+ * (aiContextSufficiencyRules; aligned with manual current-context).
+ */
+export const DEFAULT_SENSOR_STALE_MS = 24 * 60 * 60 * 1000;
 
-/** Snapshot status contract default window — 24h (sensorSnapshotStatusContract). */
+/** Snapshot status contract default window when source is unknown (sensorSnapshotStatusContract). */
 export const DEFAULT_STALE_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 /** EcoWitt ingest validation view recency — 24h (ecowittIngestValidationViewModel). */

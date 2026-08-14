@@ -7,6 +7,8 @@ on:
       - "supabase/functions/_shared/**"
       - "supabase/functions/sensor-ingest-webhook/**"
       - "supabase/functions/ecowitt-ingest/**"
+      - "supabase/functions/mint-bridge-token/**"
+      - "supabase/functions/revoke-bridge-token/**"
       - "supabase/config.toml"
       - "src/lib/sensorIngestTestResultRules.ts"
       - "src/test/sensor-ingest-webhook*.test.ts"
@@ -18,6 +20,8 @@ on:
       - "supabase/functions/_shared/**"
       - "supabase/functions/sensor-ingest-webhook/**"
       - "supabase/functions/ecowitt-ingest/**"
+      - "supabase/functions/mint-bridge-token/**"
+      - "supabase/functions/revoke-bridge-token/**"
       - "supabase/config.toml"
       - "src/lib/sensorIngestTestResultRules.ts"
       - "src/test/sensor-ingest-webhook*.test.ts"
@@ -53,6 +57,8 @@ jobs:
             supabase/functions/sensor-ingest-webhook/cors_e2e_test.ts \
             supabase/functions/sensor-ingest-webhook/handler_e2e_test.ts \
             supabase/functions/ecowitt-ingest/handler_e2e_test.ts \
+            supabase/functions/mint-bridge-token/handler_e2e_test.ts \
+            supabase/functions/revoke-bridge-token/handler_e2e_test.ts \
             2>&1 | tee deno-edge-tests.log
 
       - name: Upload Deno test log on failure

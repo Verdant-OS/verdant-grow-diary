@@ -19,6 +19,7 @@ import {
   type Page,
 } from "@playwright/test";
 import { APP_ROUTES } from "../src/lib/appRouteManifest";
+import { ANALYTICS_CONSENT_STORAGE_KEY } from "../src/lib/analyticsConsent";
 import {
   AUTHENTICATED_CORE_CENSUS_ROUTES,
   PUBLIC_CORE_CENSUS_ROUTES,
@@ -36,7 +37,15 @@ import {
 } from "./lib/coreLinkFormCensus";
 
 const MOCKED_PROJECT = "chromium-mocked";
+// The census preserves exact hrefs before revisiting them. Keep the browser
+// clock stable so date-derived report links cannot change at midnight midway
+// through the exhaustive authenticated lane.
+const CORE_CENSUS_FIXED_TIME = "2026-08-11T12:00:00.000Z";
 const APP_ORIGIN = new URL(process.env.E2E_BASE_URL?.trim() || "http://localhost:5173").origin;
+// The exhaustive authenticated lane cold-boots the Vite-served app hundreds of
+// times. Late-lane boots can exceed 15 seconds on hosted runners even when the
+// route renders correctly; keep readiness bounded without dropping assertions.
+const APP_SHELL_READY_TIMEOUT_MS = 30_000;
 const PROJECT_REF = "knkwiiywfkbqznbxwqfh";
 const SESSION_KEY = `sb-${PROJECT_REF}-auth-token`;
 const USER_ID = "99999999-9999-4999-8999-999999999999";
@@ -513,6 +522,33 @@ async function seedFakeSession(context: BrowserContext) {
       }
     },
     { appOrigin: APP_ORIGIN, key: SESSION_KEY, user: FAKE_USER },
+  );
+}
+
+/**
+ * Pre-store a "denied" analytics consent decision for the census contexts.
+ *
+ * With no stored decision the consent banner legitimately renders on every
+ * page (fixed to the bottom viewport edge, z-[100]) and intercepts pointer
+ * events over anything beneath it — on the authenticated lane it blocked the
+ * sidebar's lowest links for the entire test budget (926 click retries on
+ * /account/preferences). The census audits app surfaces, not the consent
+ * flow; "denied" keeps the banner away AND guarantees no analytics code can
+ * load (every loader gates on readAnalyticsConsent() === "granted"), which
+ * preserves the lane's hermetic zero-external-fetch contract.
+ */
+async function seedDeniedAnalyticsConsent(context: BrowserContext) {
+  await context.addInitScript(
+    ({ appOrigin, key }) => {
+      if (location.origin !== appOrigin) return;
+      try {
+        localStorage.setItem(key, "denied");
+      } catch {
+        // Sandboxed frames can intentionally deny storage access; they do not
+        // render the app shell and need no consent decision.
+      }
+    },
+    { appOrigin: APP_ORIGIN, key: ANALYTICS_CONSENT_STORAGE_KEY },
   );
 }
 
@@ -1475,11 +1511,11 @@ async function assertMeaningfulPage(page: Page, expectedPath: string) {
   await expect(
     page.locator("main").first(),
     `${expectedPath} must finish the app-shell loading state`,
-  ).toBeVisible({ timeout: 15_000 });
+  ).toBeVisible({ timeout: APP_SHELL_READY_TIMEOUT_MS });
   await expect(
     page.getByText("Loading…", { exact: true }),
     `${expectedPath} must not remain on the global loading screen`,
-  ).toHaveCount(0, { timeout: 15_000 });
+  ).toHaveCount(0, { timeout: APP_SHELL_READY_TIMEOUT_MS });
   await expect(page.locator("body")).not.toContainText("Oops! Page not found");
   await expect(page.locator("body")).not.toContainText("Application error");
   await expect(page.locator("body")).not.toContainText("ChunkLoadError");
@@ -1593,6 +1629,12 @@ async function clickEverySafeInternalHref(
         await assertMeaningfulPage(popup, expectedPathname);
         await popup.close();
       } else {
+        // Captured from the BROWSER, not from the census route spec: a route's
+        // declared `path` may carry a query (e.g. "/daily-check?plantId=…"),
+        // which never equals the bare `expectedPathname` — comparing against
+        // it would leave the fragment assertion below permanently off on
+        // those pages.
+        const pathBeforeClick = new URL(page.url()).pathname;
         await anchor.click();
         await page.waitForLoadState("domcontentloaded");
         await expect
@@ -1600,6 +1642,32 @@ async function clickEverySafeInternalHref(
             message: `${link.href} must finish at its manifest-defined destination`,
           })
           .toBe(expectedPathname);
+        // Same-document fragment link: the pathname assertion above is
+        // trivially true BEFORE the click (the grower never leaves the page),
+        // so without this the census would "pass" the link having proved
+        // nothing. Assert the fragment actually landed — that is the whole
+        // behaviour such a link exists for.
+        //
+        // Both conjuncts matter. `expectedPathname === pathBeforeClick` uses
+        // the browser's real pre-click pathname (route specs may carry a
+        // query). `expectedPathname === classification.pathname` confirms the
+        // destination was NOT rewritten: on the signed-out lane
+        // expectedCensusNavigationPath redirects protected targets to
+        // /welcome, and a fragment link clicked from /welcome would otherwise
+        // look same-page and be asserted for an anchor the redirect never
+        // carries.
+        const expectedHash = link.classification.hash;
+        if (
+          expectedHash &&
+          expectedPathname === pathBeforeClick &&
+          expectedPathname === link.classification.pathname
+        ) {
+          await expect
+            .poll(() => new URL(page.url()).hash, {
+              message: `${link.href} must move the grower to its in-page anchor`,
+            })
+            .toBe(`#${expectedHash}`);
+        }
         await assertMeaningfulPage(page, expectedPathname);
       }
       clicked.push(link.href);
@@ -1633,6 +1701,7 @@ async function runLaneCensus(
 
   installContextErrorAudit(context, report);
   if (signedIn) await seedFakeSession(context);
+  await seedDeniedAnalyticsConsent(context);
   await installNetworkFence(context, signedIn, network);
 
   for (const route of routes) {
@@ -1678,11 +1747,12 @@ async function runLaneCensus(
 }
 
 test.describe("core link and form census", () => {
-  test.beforeEach(() => {
+  test.beforeEach(async ({ page }) => {
     test.skip(
       test.info().project.name !== MOCKED_PROJECT,
       `core census runs once, under the ${MOCKED_PROJECT} project`,
     );
+    await page.clock.setFixedTime(CORE_CENSUS_FIXED_TIME);
   });
 
   test("audits every scheduled public page, visible field, and safe internal link", async ({
@@ -1698,7 +1768,7 @@ test.describe("core link and form census", () => {
   test("audits every scheduled authenticated page, visible field, and safe internal link", async ({
     page,
   }) => {
-    test.setTimeout(900_000);
+    test.setTimeout(1_800_000);
     const report = await runLaneCensus(page, "authenticated", AUTHENTICATED_CORE_CENSUS_ROUTES);
     expect(report.routeAudits).toHaveLength(AUTHENTICATED_CORE_CENSUS_ROUTES.length);
     expect(report.fieldAudits.length).toBeGreaterThan(0);

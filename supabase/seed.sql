@@ -85,7 +85,8 @@ BEGIN
     'billing_subscription_update_audit',
     'pi_ingest_bridge_credentials_safe',
     'billing_customer_links',
-    'paddle_event_processing'
+    'paddle_event_processing',
+    'lovable_paddle_events'
   ] LOOP
     IF to_regclass('public.' || obj) IS NOT NULL THEN
       EXECUTE format(
@@ -93,6 +94,19 @@ BEGIN
       );
     END IF;
   END LOOP;
+END $$;
+
+-- lead_events grants SELECT/INSERT to authenticated only via policy; the
+-- table-level default grant to anon/PUBLIC was never explicitly revoked
+-- until 20260805090000. Reapply that narrower ACL after the blanket local
+-- parity grant.
+DO $$
+BEGIN
+  IF to_regclass('public.lead_events') IS NOT NULL THEN
+    REVOKE ALL ON TABLE public.lead_events FROM PUBLIC, anon, authenticated;
+    GRANT SELECT, INSERT ON TABLE public.lead_events TO authenticated;
+    GRANT ALL ON TABLE public.lead_events TO service_role;
+  END IF;
 END $$;
 
 -- AI Doctor session history is browser-append-only. The production project

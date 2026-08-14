@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import SymptomReferenceTable from "@/components/SymptomReferenceTable";
 import {
@@ -7,6 +7,7 @@ import {
   SYMPTOM_NO_STACK_RULE,
 } from "@/constants/cannabisSymptomReference";
 import { findGuideBySlug } from "@/constants/verdantSeoContent";
+import { staticRouteHead } from "@/lib/build/staticRouteHead";
 import GuidePage from "@/pages/GuidePage";
 
 const SLUGS = [
@@ -102,7 +103,7 @@ describe("public symptom hub and guides", () => {
     }
   });
 
-  it("emits one FAQPage document whose questions and answers mirror the visible hub FAQ", async () => {
+  it("emits one route-head FAQPage whose questions and answers mirror the visible hub FAQ", () => {
     const hub = findGuideBySlug("cannabis-leaf-symptoms")!;
     render(
       <MemoryRouter initialEntries={["/guides/cannabis-leaf-symptoms"]}>
@@ -112,10 +113,9 @@ describe("public symptom hub and guides", () => {
       </MemoryRouter>,
     );
 
-    const marker = 'script[data-page-ldjson="guide-cannabis-leaf-symptoms-faq"]';
-    await waitFor(() => expect(document.head.querySelectorAll(marker)).toHaveLength(1));
-    const script = document.head.querySelector<HTMLScriptElement>(marker)!;
-    const faq = JSON.parse(script.textContent ?? "null") as {
+    const faq = staticRouteHead("/guides/cannabis-leaf-symptoms")
+      .scripts.map((script) => JSON.parse(script.children))
+      .find((node) => node["@type"] === "FAQPage") as {
       "@type": string;
       mainEntity: Array<{ name: string; acceptedAnswer: { text: string } }>;
     };

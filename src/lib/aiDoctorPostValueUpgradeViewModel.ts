@@ -34,10 +34,13 @@ export type AiDoctorPostValueUpgradeViewModel =
 const HIDDEN: AiDoctorPostValueUpgradeViewModel = Object.freeze({ visible: false });
 
 function buildPricingHref(returnTo: string | null | undefined): string {
+  // Post-value copy pitches Pro by name, so preselect the Pro card (annual =
+  // Pricing default + highest LTV — the Blueprint paywall's precedent).
+  // `?plan=` is the canonical preselect and NEVER auto-opens checkout.
+  const params = new URLSearchParams({ plan: "pro_annual" });
   const safeReturnTo = sanitizeCheckoutReturnTo(returnTo);
-  return safeReturnTo
-    ? `/pricing?${new URLSearchParams({ returnTo: safeReturnTo }).toString()}`
-    : "/pricing";
+  if (safeReturnTo) params.set("returnTo", safeReturnTo);
+  return `/pricing?${params.toString()}`;
 }
 
 function isExactFreePostValueCredit(

@@ -23,6 +23,12 @@ function makeClient(opts: {
     from(table: string) {
       if (table === "pheno_hunts") {
         return {
+          // #567 existence check: select → eq → limit
+          select: () => ({
+            eq: () => ({
+              limit: async () => ({ data: [], error: null }),
+            }),
+          }),
           insert: (row: unknown) => {
             huntInsert(row);
             return {

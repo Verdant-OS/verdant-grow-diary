@@ -47,8 +47,16 @@ export default function SeoBuildArtifactsDiagnostics() {
         <p className="text-sm text-muted-foreground">
           Read-only check of the current build output: does{" "}
           <code className="font-mono">seo-manifest.json</code> exist, and is every
-          staticSocialRouteDocuments output document present? Nothing here regenerates or
-          repairs artifacts.
+          staticSocialRouteDocuments output document present? Nothing here regenerates or repairs
+          artifacts. For lighting GA4/GSC measurement readiness, open{" "}
+          <a
+            href="/diagnostics-lighting-measurement"
+            className="font-medium text-primary underline-offset-4 hover:underline"
+            data-testid="link-lighting-measurement-readiness"
+          >
+            Lighting measurement readiness
+          </a>
+          .
         </p>
       </header>
 
@@ -56,9 +64,7 @@ export default function SeoBuildArtifactsDiagnostics() {
         <Button onClick={() => void load()} disabled={loading} size="sm">
           {loading ? "Checking…" : "Re-check"}
         </Button>
-        {report ? (
-          <Badge variant={statusVariant(report.status)}>{report.status}</Badge>
-        ) : null}
+        {report ? <Badge variant={statusVariant(report.status)}>{report.status}</Badge> : null}
       </div>
 
       {error ? (
@@ -100,9 +106,7 @@ export default function SeoBuildArtifactsDiagnostics() {
                     : "MISSING"
                   : "not inspected"}
               </p>
-              <p className="text-muted-foreground">
-                Expected documents: {report.documents.length}
-              </p>
+              <p className="text-muted-foreground">Expected documents: {report.documents.length}</p>
             </CardContent>
           </Card>
 

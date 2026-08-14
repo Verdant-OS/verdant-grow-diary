@@ -115,7 +115,7 @@ describe("buildPlantLogStreakView — teaser eligibility", () => {
     });
     expect(v.daysLoggedInWindow).toBeGreaterThanOrEqual(PLANT_LOG_TEASER_MIN_DAYS);
     expect(v.teaser.show).toBe(true);
-    expect(v.teaser.href).toBe("/pricing");
+    expect(v.teaser.href).toBe("/pricing?plan=pro_annual");
   });
 
   it("never shows for paid plans", () => {

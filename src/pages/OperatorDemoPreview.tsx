@@ -1,8 +1,11 @@
 /**
- * OperatorDemoPreview — protected operator-only page that renders the
- * One-Tent Evidence Chain demo fixture as a read-only walkthrough.
+ * OperatorDemoPreview — protected operator-only page that keeps two
+ * source-separated, read-only surfaces together:
  *
- * Auth: mounted under <RequireOperatorRole /> in src/App.tsx.
+ * - owner-scoped account context from the read-model hook; and
+ * - the One-Tent Evidence Chain demo fixture walkthrough.
+ *
+ * Auth: mounted under the operator route guard.
  * No DB writes. No mutation controls. No automation. No device control.
  */
 import { useState } from "react";

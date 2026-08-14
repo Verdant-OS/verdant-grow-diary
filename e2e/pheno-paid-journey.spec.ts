@@ -25,6 +25,11 @@
  */
 import type { Page } from "@playwright/test";
 import { test, expect } from "./lib/authedTest";
+import {
+  assertGrowAllowedForWriteSmoke,
+  assertPhenoWriteFixtureEnv,
+  buildE2eHuntName,
+} from "./lib/fixtureSafety";
 
 const PHASE = process.env.E2E_PHENO_PHASE ?? "";
 const BASE_URL = process.env.E2E_BASE_URL ?? "";
@@ -37,11 +42,14 @@ test.skip(
 test.describe.configure({ mode: "serial" });
 
 async function discoverFixtureGrowId(page: Page): Promise<string> {
+  assertPhenoWriteFixtureEnv();
   await page.goto(`${BASE_URL}/grows`);
   const growLink = page.locator('a[href^="/grows/"]').first();
   await expect(growLink, "fixture account must have a grow").toBeVisible({
     timeout: 15_000,
   });
+  const label = ((await growLink.innerText()) ?? "").trim();
+  assertGrowAllowedForWriteSmoke(label);
   const href = await growLink.getAttribute("href");
   const m = href?.match(/^\/grows\/([0-9a-f-]{36})$/i);
   expect(m, `grow link href must carry a uuid (got ${href})`).toBeTruthy();
@@ -101,8 +109,10 @@ test.describe("Phase PAID — entitled fixture runs create → evidence → comp
     await page.goto(`${BASE_URL}/pheno-hunts/new?growId=${growId}`);
     await expect(page.getByTestId("pheno-step-basics")).toBeVisible({ timeout: 15_000 });
 
-    // Basics: name is prefilled from the grow; add a note.
-    await expect(page.getByTestId("ph-name-input")).not.toHaveValue("");
+    // Basics: force an E2E-prefixed name (never append to prefill — #569).
+    const huntName = buildE2eHuntName("paid-journey");
+    await page.getByTestId("ph-name-input").fill(huntName);
+    await expect(page.getByTestId("ph-name-input")).toHaveValue(huntName);
     await page.getByTestId("ph-notes-input").fill("E2E paid-journey smoke — safe to delete");
     await page.getByTestId("pheno-step-next").click();
 

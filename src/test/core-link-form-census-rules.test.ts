@@ -69,6 +69,45 @@ describe("core link and form census rules", () => {
     expect(classifyLink({ href }, MANIFEST).disposition).toBe(expected);
   });
 
+  it("retains the fragment on a same-document navigate link", () => {
+    // The authenticated census once clicked
+    // /pheno-hunts/<id>/workspace#phenotype-notes FROM that same workspace
+    // page under a full-navigation contract. Dropping the fragment made the
+    // only post-click assertion (hash-stripped pathname) trivially true
+    // before the click, so a wedged click proved nothing and the lane burned
+    // its whole 900s budget instead of failing on the anchor.
+    const classification = classifyLink(
+      { href: "/pheno-hunts/hunt-1/workspace#phenotype-notes" },
+      MANIFEST,
+    );
+    expect(classification.disposition).toBe("navigate");
+    expect(classification.pathname).toBe("/pheno-hunts/hunt-1/workspace");
+    // Stored WITHOUT the leading "#" so callers compose it explicitly.
+    expect(classification.hash).toBe("phenotype-notes");
+  });
+
+  it("omits hash on links that carry no fragment", () => {
+    const classification = classifyLink({ href: "/grows/grow-1?tab=plants" }, MANIFEST);
+    expect(classification.disposition).toBe("navigate");
+    expect(classification.hash).toBeUndefined();
+  });
+
+  it("keeps bare '#' links classified as fragments, not navigations", () => {
+    expect(classifyLink({ href: "#main-content" }, MANIFEST).disposition).toBe("fragment");
+  });
+
+  it("census click sweep asserts the landed fragment for same-page anchor links", () => {
+    // Contract fence: the spec must compare location.hash for a
+    // same-document fragment link, not only the pathname.
+    expect(CENSUS_SPEC_SOURCE).toMatch(/new URL\(page\.url\(\)\)\.hash/);
+    expect(CENSUS_SPEC_SOURCE).toMatch(/link\.classification\.hash/);
+    // The same-page test must use the browser's pre-click pathname (route
+    // specs may carry a query) AND require an unrewritten destination (the
+    // signed-out lane redirects protected targets to /welcome).
+    expect(CENSUS_SPEC_SOURCE).toMatch(/pathBeforeClick/);
+    expect(CENSUS_SPEC_SOURCE).toMatch(/expectedPathname === link\.classification\.pathname/);
+  });
+
   it("allows explicit downloads without treating their asset path as an app route", () => {
     expect(
       classifyLink({ href: "/exports/example.csv", download: true }, MANIFEST).disposition,
@@ -83,6 +122,17 @@ describe("core link and form census rules", () => {
     ).toBe(
       'a[href="/pheno-hunts/hunt-1/workspace?note=\\"quoted\\"\\\\value#phenotype-notes"]:visible',
     );
+  });
+
+  it("pins the browser clock before auditing dynamic report links", () => {
+    // The timeline's range-report href includes the current calendar date.
+    // The census revisits links after auditing many routes, so its browser
+    // clock must stay fixed or a midnight rollover makes a previously
+    // discovered href disappear without any product regression.
+    expect(CENSUS_SPEC_SOURCE).toContain(
+      'const CORE_CENSUS_FIXED_TIME = "2026-08-11T12:00:00.000Z";',
+    );
+    expect(CENSUS_SPEC_SOURCE).toContain("await page.clock.setFixedTime(CORE_CENSUS_FIXED_TIME);");
   });
 
   it("mutates and restores controlled selects through the reacquired live locator", () => {

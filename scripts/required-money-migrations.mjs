@@ -14,6 +14,16 @@ export const REQUIRED_MONEY_MIGRATIONS = [
   // credit ledger + spend foundation
   "20260620231000_harden_ai_credit_effective_entitlement.sql",
   "20260710010000_ai_credit_spend_union_hardening.sql",
+  // Paid-return measurement + the AI Doctor completions ledger the paid edge
+  // function writes (record_ai_doctor_review_completion). Its filename matches
+  // NO money pattern, which is exactly how it sat unapplied in prod from
+  // Jul 17 to Aug 12 while later migrations landed around it — a hole the
+  // pattern guard could not see. Absence silently regresses paid-return
+  // cohort capture and review-completion evidence (the fn treats the write
+  // as best-effort, so nothing errors when it is gone). Applied to prod via
+  // founder-approved runbook 2026-08-12 (docs/runbook-ai-doctor-credits-live.md);
+  // listing it here makes the daily probe defend that apply.
+  "20260717010000_paid_return_cohort_measurement.sql",
   "20260718160000_ai_credit_server_billing_environment_expand.sql",
   "20260719043000_ai_credit_result_cache.sql",
   "20260720093000_ai_credit_grow_scope_integrity.sql",

@@ -14,7 +14,10 @@ import {
   type BridgeTokenRow,
   bridgeTokenStatus,
   clampTtlDays,
+  extractBridgeFailureCode,
   formatIngestCount,
+  mintFailureDescription,
+  revokeFailureDescription,
   sanitizeTokenName,
 } from "@/lib/bridgeTokenRules";
 
@@ -83,9 +86,12 @@ export default function TentBridgeTokensCard({ tentId }: { tentId: string }) {
     });
     setBusy(false);
     if (error || !data?.ok) {
+      // Fixed calm copy only — server/transport error text is never
+      // rendered verbatim (bridge audit gap G6). Non-2xx responses carry
+      // the reason code on error.context, not data.
       toast({
         title: "Mint failed",
-        description: error?.message ?? data?.error ?? "Unknown error",
+        description: mintFailureDescription(extractBridgeFailureCode(error, data)),
         variant: "destructive",
       });
       return;
@@ -102,7 +108,7 @@ export default function TentBridgeTokensCard({ tentId }: { tentId: string }) {
     if (error || !data?.ok) {
       toast({
         title: "Revoke failed",
-        description: error?.message ?? "Unknown error",
+        description: revokeFailureDescription(extractBridgeFailureCode(error, data)),
         variant: "destructive",
       });
       return;

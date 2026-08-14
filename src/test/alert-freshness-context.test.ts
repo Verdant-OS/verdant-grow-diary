@@ -34,9 +34,13 @@ function snap(
 }
 
 describe("alertFreshnessContext — shared constants", () => {
-  it("derives the minute label from STALE_THRESHOLD_MS", () => {
+  it("derives the minute label from STALE_THRESHOLD_MS and exposes the canon window label", () => {
     expect(STALE_THRESHOLD_MINUTES).toBe(Math.round(STALE_THRESHOLD_MS / 60_000));
-    expect(FRESHNESS_WINDOW_LABEL).toBe(`${STALE_THRESHOLD_MINUTES}-minute alert window`);
+    expect(STALE_THRESHOLD_MINUTES).toBe(15);
+    // Persistence holds every source to the live window, so the operator-facing
+    // label carries no manual carve-out. A "24-hour manual" label here would
+    // promise persistence for snapshots isSnapshotPersistable rejects.
+    expect(FRESHNESS_WINDOW_LABEL).toBe("15-minute alert window");
   });
 });
 
@@ -76,7 +80,7 @@ describe("classifyLatestSnapshotFreshness", () => {
     ).toBe("fresh");
   });
   it("returns stale for old readings", () => {
-    const old = new Date(NOW - 90 * 60_000).toISOString();
+    const old = new Date(NOW - 25 * 60 * 60_000).toISOString();
     expect(
       classifyLatestSnapshotFreshness({
         status: "ok",
@@ -102,7 +106,7 @@ describe("classifyLatestSnapshotFreshness", () => {
 describe("hasRecentManualSnapshot", () => {
   it("only true for fresh manual snapshots", () => {
     const recent = new Date(NOW - 5 * 60_000).toISOString();
-    const old = new Date(NOW - 90 * 60_000).toISOString();
+    const old = new Date(NOW - 25 * 60 * 60_000).toISOString();
     expect(
       hasRecentManualSnapshot({
         status: "ok",
@@ -130,7 +134,7 @@ describe("hasRecentManualSnapshot", () => {
 describe("snapshotAlertsCanPersist", () => {
   it("mirrors the alert pipeline gate (fresh manual/live only)", () => {
     const recent = new Date(NOW - 60_000).toISOString();
-    const old = new Date(NOW - 120 * 60_000).toISOString();
+    const old = new Date(NOW - 25 * 60 * 60_000).toISOString();
     expect(
       snapshotAlertsCanPersist({
         status: "ok",
@@ -167,7 +171,7 @@ describe("snapshotAlertsCanPersist", () => {
 
 describe("describeLatestSnapshotForAlerts — driven by alertsCanPersist", () => {
   const recent = new Date(NOW - 60_000).toISOString();
-  const old = new Date(NOW - 120 * 60_000).toISOString();
+  const old = new Date(NOW - 25 * 60 * 60_000).toISOString();
 
   it("fresh manual reading reports it can be checked", () => {
     const msg = describeLatestSnapshotForAlerts({
@@ -289,7 +293,7 @@ describe("buildAlertsHeaderContext", () => {
   });
 
   it("never claims persistence for stale or csv snapshots", () => {
-    const old = new Date(NOW - 120 * 60_000).toISOString();
+    const old = new Date(NOW - 25 * 60 * 60_000).toISOString();
     const stale = buildAlertsHeaderContext({
       growName: null,
       stage: null,

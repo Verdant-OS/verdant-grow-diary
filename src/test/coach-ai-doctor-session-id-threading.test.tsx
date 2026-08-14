@@ -64,10 +64,17 @@ describe("Coach — persisted AI Doctor session id threading", () => {
   });
 
   it("does not introduce new action_queue write paths for the threading", () => {
-    // Existing inserts: action_queue (Add to Action Queue) + action_queue_events.
-    // No new write surface should appear around persistedSessionId.
-    const aqInserts = COACH.match(/\.from\(\s*["']action_queue["']\s*\)\s*\.insert\(/g) ?? [];
-    expect(aqInserts.length).toBe(2);
+    // This pin was written when Coach dual-inserted into `action_queue` and
+    // `action_queue_events`, and it counted those two inserts. #809 replaced
+    // both with the atomic `action_queue_create` RPC, so the count no longer
+    // describes anything. It is replaced by the stronger claim it was always
+    // standing in for: the client writes neither table directly.
+    expect(COACH).not.toMatch(/\.from\(\s*["']action_queue["']\s*\)\s*\.insert\(/);
+    expect(COACH).not.toMatch(/\.from\(\s*["']action_queue_events["']\s*\)\s*\.insert\(/);
+    // Creation still happens, and only via the RPC helper — exactly twice:
+    // addToQueue (Coach recommendations) and addDoctorSuggestionToQueue.
+    const creates = COACH.match(/createActionQueueItem\s*\(/g) ?? [];
+    expect(creates.length).toBe(2);
   });
 
   it("does not introduce new functions.invoke or service_role usage", () => {
@@ -101,7 +108,14 @@ describe("Coach — persisted AI Doctor session id threading", () => {
 
   it("eligibility/queue mutation logic for AI Doctor suggestions is unchanged in shape", () => {
     expect(COACH).toMatch(/async\s+function\s+addDoctorSuggestionToQueue/);
-    expect(COACH).toMatch(/status\s*:\s*["']pending_approval["']/);
+    // #809 moved creation onto the atomic `action_queue_create` RPC, which
+    // forces status server-side, so the old `status: "pending_approval"`
+    // literal is gone from this file. Asserting the client sends NO status at
+    // all is the tighter fence: the previous pin would have been satisfied by
+    // a client that sets status itself, which is exactly the thing the RPC
+    // exists to prevent.
+    expect(COACH).not.toMatch(/\bstatus\s*:\s*["']/);
+    expect(COACH).toMatch(/createActionQueueItem\s*\(/);
     expect(COACH).toMatch(/ACTION_QUEUE_SOURCE_VALUES\.AI_DOCTOR/);
   });
 });

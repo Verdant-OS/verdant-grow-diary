@@ -27,13 +27,13 @@ import {
 } from "react";
 import {
   Link as TanStackLink,
-  Navigate as TanStackNavigate,
   Outlet as TanStackOutlet,
   useNavigate as useTanStackNavigate,
   useParams as useTanStackParams,
   useRouter,
   useRouterState,
 } from "@tanstack/react-router";
+import { selectCommittedLocation } from "@/lib/routerCommittedLocation";
 
 export { TanStackOutlet as Outlet };
 
@@ -70,7 +70,10 @@ export function useLocation(): CompatLocation {
   if (legacy) return legacy.location;
   return useRouterState({
     select: (state) => {
-      const location = state.location;
+      // Same pending-navigation rule as useSearchParams below: while a
+      // navigation is in flight, `state.location` is the TARGET; the pages
+      // still on screen must keep seeing the committed (resolved) location.
+      const location = selectCommittedLocation(state);
       return {
         pathname: location.pathname,
         search: location.searchStr ?? "",
@@ -128,6 +131,33 @@ function flattenTo(to: CompatTo): string {
 }
 
 /**
+ * Split the FRAGMENT (only) out of a react-router-style path string.
+ *
+ * TanStack reads the fragment from its dedicated `hash` option and never
+ * re-splits one out of `to`, so a '#' left inside `to` rides into the
+ * COMMITTED pathname (`/hunts/55/workspace#notes`). Splitting it is safe:
+ * hashes are forwarded verbatim.
+ *
+ * The QUERY is deliberately left inside `to`, even though it pollutes the
+ * committed pathname the same way. TanStack's default `stringifySearch` is
+ * JSON-based: passing `{ page: "2" }` through the `search` option emits
+ * `?page=%222%22` (quoted so it round-trips as a string, not the number 2).
+ * This app builds and reads raw string params, so routing the query through
+ * `search` silently rewrites every numeric-looking URL — it broke Action
+ * Queue pagination in CI (`expected '"2"' to be '2'`). Splitting the query
+ * correctly requires changing the router's search (de)serializer app-wide,
+ * which is its own slice with its own evidence. See PR #755 discussion.
+ */
+function toTanStackTarget(path: string): { to: string; hash?: string } {
+  const hashIndex = path.indexOf("#");
+  if (hashIndex === -1) return { to: path };
+  return {
+    to: hashIndex === 0 ? "." : path.slice(0, hashIndex),
+    hash: path.slice(hashIndex + 1),
+  };
+}
+
+/**
  * react-router `useNavigate()`. Supports `navigate("/path", { replace })`,
  * the `{ pathname, search, hash }` object form, and history-delta calls such
  * as `navigate(-1)`.
@@ -147,8 +177,10 @@ export function useNavigate(): CompatNavigateFunction {
         else router.history.forward();
         return;
       }
+      const target = toTanStackTarget(flattenTo(to));
       void navigate({
-        to: flattenTo(to),
+        to: target.to,
+        ...(target.hash !== undefined ? { hash: target.hash } : {}),
         replace: options?.replace ?? false,
         ...(options?.state !== undefined ? { state: options.state as never } : {}),
         resetScroll: options?.preventScrollReset !== true,
@@ -196,10 +228,12 @@ export const Link = forwardRef<HTMLAnchorElement, CompatLinkProps>(function Link
       </a>
     );
   }
+  const target = toTanStackTarget(to);
   return (
     <TanStackLink
       ref={ref}
-      to={to as never}
+      to={target.to as never}
+      {...(target.hash !== undefined ? { hash: target.hash } : {})}
       replace={replace ?? false}
       {...(state !== undefined ? { state: state as never } : {})}
       resetScroll={preventScrollReset !== true}
@@ -247,20 +281,34 @@ export interface CompatNavigateProps {
   state?: unknown;
 }
 
-/** react-router `<Navigate to="/path" replace />`. */
+/**
+ * react-router `<Navigate to="/path" replace />`.
+ *
+ * Implemented as an input-keyed effect rather than TanStack's `<Navigate>`:
+ * that component re-navigates whenever its props OBJECT identity changes, and
+ * a wrapper necessarily builds fresh props every render. While the issued
+ * navigation is pending, the still-mounted source route re-renders per
+ * router-state change (e.g. RouteAliasRedirect subscribes via useLocation),
+ * so each re-render re-issued the navigation and restarted the transition —
+ * looping until React threw "Maximum update depth exceeded" (observed on the
+ * /features → /welcome alias; regression-tested in
+ * src/test/react-router-compat-navigate-real.test.tsx). react-router
+ * semantics: navigate on mount, and again only when a navigation input
+ * (`to`/`replace`/`state`) changes — router-state re-renders change none.
+ *
+ * Uses this module's own `useNavigate()` so the legacy
+ * MemoryRouter/BrowserRouter context keeps working without a TanStack
+ * provider (the compat hook early-returns `legacy.navigate` there).
+ */
 export function Navigate({ to, replace, state }: CompatNavigateProps) {
-  const legacy = useContext(LegacyRouterContext);
+  const nav = useNavigate();
   useEffect(() => {
-    if (legacy) legacy.navigate(to, { replace, state });
-  }, [legacy, replace, state, to]);
-  if (legacy) return null;
-  return (
-    <TanStackNavigate
-      to={to as never}
-      replace={replace ?? false}
-      {...(state !== undefined ? { state: state as never } : {})}
-    />
-  );
+    nav(to, {
+      replace: replace ?? false,
+      ...(state !== undefined ? { state } : {}),
+    });
+  }, [nav, to, replace, state]);
+  return null;
 }
 
 export type CompatSetSearchParams = (
@@ -281,7 +329,15 @@ export type CompatSetSearchParams = (
 export function useSearchParams(): [URLSearchParams, CompatSetSearchParams] {
   const legacy = useContext(LegacyRouterContext);
   // Always subscribe so hooks order is stable; prefer legacy MemoryRouter search when present.
-  const tanstackSearch = useRouterState({ select: (state) => state.location.searchStr ?? "" });
+  // During a pending navigation, TanStack's `state.location` is already the
+  // in-flight TARGET location while the previous page is still mounted. A
+  // still-rendered page reading the target's search here would see its own
+  // params vanish mid-transition (react-router semantics: a rendered page
+  // sees the location it was rendered for). Prefer `resolvedLocation` (the
+  // committed location) while a navigation is pending.
+  const tanstackSearch = useRouterState({
+    select: (state) => selectCommittedLocation(state).searchStr ?? "",
+  });
   const router = useRouter();
   const searchRaw = legacy ? (legacy.location.search ?? "") : tanstackSearch;
   const searchKey = searchRaw.startsWith("?") ? searchRaw.slice(1) : searchRaw;
@@ -304,10 +360,19 @@ export function useSearchParams(): [URLSearchParams, CompatSetSearchParams] {
       );
       return;
     }
-    const { pathname, hash } = router.state.location;
-    const suffix = `${serialized ? `?${serialized}` : ""}${hash ? (hash.startsWith("#") ? hash : `#${hash}`) : ""}`;
+    // Setter operates from the COMMITTED page location too: while a
+    // navigation is pending, building the next URL from the in-flight
+    // target would move the wrong page's search params.
+    const { pathname, hash } = selectCommittedLocation(router.state);
+    const normalizedHash = hash ? hash.replace(/^#/, "") : undefined;
+    // Query AND fragment go in TanStack's dedicated options; inside `to` they
+    // would ride into the committed pathname (see toTanStackTarget). The
+    // fragment is carried over so changing a filter does not silently drop
+    // the grower's current anchor.
     void router.navigate({
-      to: `${pathname}${suffix}` as never,
+      to: pathname as never,
+      search: (serialized ? Object.fromEntries(new URLSearchParams(serialized)) : {}) as never,
+      ...(normalizedHash ? { hash: normalizedHash } : {}),
       replace: options?.replace ?? false,
       resetScroll: options?.preventScrollReset !== true,
     } as never);

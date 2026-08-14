@@ -46,6 +46,7 @@ export async function loadActionFollowUpExistingPhotoCandidates(
       .from("diary_entries")
       .select("id,grow_id,tent_id,plant_id,entry_at,photo_url")
       .eq("grow_id", context.growId)
+      .is("retracted_at", null)
       .not("photo_url", "is", null);
     if (context.tentId) q = q.eq("tent_id", context.tentId);
     // Plant scope is applied client-side per documented rule so we

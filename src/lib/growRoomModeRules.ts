@@ -16,6 +16,7 @@
 import type { SensorSnapshot, SnapshotSource } from "@/lib/sensorSnapshot";
 
 import { GROW_ROOM_MODE_STALE_MINUTES } from "../constants/sensorTiming";
+import { resolveCurrentStateStaleWindowMs } from "@/lib/sensorTruthCanon";
 // ---------- Inputs --------------------------------------------------------
 
 export type GrowRoomAlertSeverity = "info" | "watch" | "warning" | "critical";
@@ -59,7 +60,7 @@ export interface GrowRoomAggregationInput {
    * here so it is labeled honestly instead of as live/manual data.
    */
   demoTentIds?: string[];
-  /** Override stale threshold (default 30 minutes). */
+  /** Override stale threshold (default 15 minutes live; source-aware when default). */
   staleMinutes?: number;
   /** Override recent-alert window (default 24h). */
   recentAlertWindowHours?: number;
@@ -146,7 +147,13 @@ function classifySnapshot(
     };
   }
   const age = snapshotAgeMinutes(snapshot, now);
-  if (age === null || age > staleMinutes) {
+  // When caller uses the default live window, apply source-aware canon
+  // (manual/diary → 24h). Explicit staleMinutes overrides stay flat.
+  const effectiveStaleMinutes =
+    staleMinutes === DEFAULT_STALE_MINUTES
+      ? Math.round(resolveCurrentStateStaleWindowMs(snapshot.source) / 60_000)
+      : staleMinutes;
+  if (age === null || age > effectiveStaleMinutes) {
     return { state: "stale", ageMinutes: age };
   }
   const src: SnapshotSource = snapshot.source;

@@ -37,6 +37,10 @@ function configCalls(entries: DataLayerEntry[]): DataLayerEntry[] {
   return entries.filter((entry) => entry[0] === "config");
 }
 
+function countPageViews(entries: DataLayerEntry[]): number {
+  return entries.filter((entry) => entry[0] === "event" && entry[1] === "page_view").length;
+}
+
 /** Marks the live document so a full reload (which clears it) is detectable. */
 async function markDocument(page: Page): Promise<void> {
   await page.evaluate(() => {
@@ -70,6 +74,11 @@ test.describe("GA4 config uniqueness across client-side navigation", () => {
     expect(baseline[0]?.[2]).toMatchObject({ send_page_view: false });
 
     await markDocument(page);
+
+    // Baseline BEFORE the loop: the initial `/` render may already have
+    // recorded its own page_view, which must not satisfy the first route's
+    // "new event" requirement.
+    let pageViewsSeen = countPageViews(await readDataLayer(page));
 
     for (const route of NAV_SEQUENCE) {
       const link = page.locator(`a[href="${route}"]`).first();
@@ -106,11 +115,20 @@ test.describe("GA4 config uniqueness across client-side navigation", () => {
       expect(calls[0]?.[2]).toMatchObject({ send_page_view: false });
 
       // The route change must still be reported — as an explicit page_view
-      // event, never as a repeat config call.
-      expect(
-        entries.some((entry) => entry[0] === "event" && entry[1] === "page_view"),
-        `no explicit page_view event was recorded after navigating to ${route}`,
-      ).toBe(true);
+      // event, never as a repeat config call. The event fires when the router
+      // COMMITS the navigation (after loaders/chunks), which is later than the
+      // URL change `waitForURL` observes — an immediate read here races the
+      // commit and only ever passed while `useLocation` leaked the in-flight
+      // target location. Poll for a page_view count that grows on every
+      // transition, so each route must add its own event (a lone survivor
+      // from an earlier route can no longer satisfy the check).
+      await expect
+        .poll(async () => countPageViews(await readDataLayer(page)), {
+          message: `no new explicit page_view event was recorded after navigating to ${route}`,
+          timeout: 15_000,
+        })
+        .toBeGreaterThan(pageViewsSeen);
+      pageViewsSeen = countPageViews(await readDataLayer(page));
     }
   });
 });

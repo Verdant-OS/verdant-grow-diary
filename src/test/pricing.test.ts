@@ -145,7 +145,10 @@ describe("AI credit packs (top-up surface)", () => {
   });
 
   it("opens the canonical checkout for the pack sku and fires the pack analytics event", () => {
-    expect(PAGE).toMatch(/openCheckout\(\{ priceId: sku \}\)/);
+    // Still the canonical checkout hook with the pack SKU, now carrying an
+    // explicit successUrl — the shared default forwards `returnTo`, which
+    // /checkout/success auto-redirects on before a pack grant has landed.
+    expect(PAGE).toMatch(/openCheckout\(\{ priceId: sku, successUrl: packSuccessUrlFor\(sku\) \}\)/);
     expect(PAGE).toMatch(/pricing_cta_credit_pack_clicked/);
     expect(ANALYTICS).toMatch(/pricing_cta_credit_pack_clicked/);
   });

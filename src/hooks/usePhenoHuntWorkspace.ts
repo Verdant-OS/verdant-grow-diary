@@ -67,7 +67,7 @@ import {
 } from "@/lib/phenoLabResultsService";
 import { PhenoEvidenceReadError } from "@/lib/phenoEvidenceReadError";
 import type { PhenoKeeperDecision } from "@/lib/phenoKeeperDecisionModel";
-import type { PhenoSexObservation } from "@/lib/phenoSexObservationModel";
+import { DEFAULT_SEX_OBSERVATION, type PhenoSexObservation } from "@/lib/phenoSexObservationModel";
 
 export type WorkspaceStatus = "idle" | "loading" | "ok" | "error";
 export type PhenoRoundLoadStatus = "idle" | "loading" | "ready" | "error";
@@ -404,7 +404,31 @@ export function usePhenoHuntWorkspace(
   }, [id, status, totalCandidateCount, candidates.length, filters]);
 
   const setFilter = useCallback((patch: Partial<PhenoWorkspaceFilters>) => {
-    setFiltersState((prev) => ({ ...prev, ...patch }));
+    setFiltersState((prev) => {
+      const next = { ...prev, ...patch };
+      // Identity matters here: `filters` is a dependency of the evidence
+      // reset effect, so returning a fresh object for a no-op patch collapses
+      // the page back to "Loading hunt…" and re-runs every read. The mount
+      // debounce in PhenoHuntWorkspace fires setFilter({ text: undefined }) on
+      // EVERY mount, so without this guard each mount forced a full reload —
+      // which also detaches in-page anchors mid-click.
+      // Compare VALUES across the union of keys, not key counts: the mount
+      // debounce sends `{ text: undefined }`, which adds a `text` key to an
+      // empty object. A key present-but-undefined is semantically identical
+      // to an absent key here, and a count check would call that a change —
+      // exactly the no-op this guard exists to absorb.
+      const keys = new Set([...Object.keys(prev), ...Object.keys(next)]) as Set<
+        keyof PhenoWorkspaceFilters
+      >;
+      let changed = false;
+      for (const key of keys) {
+        if (prev[key] !== next[key]) {
+          changed = true;
+          break;
+        }
+      }
+      return changed ? next : prev;
+    });
   }, []);
   const resetFilters = useCallback(() => setFiltersState({}), []);
 
@@ -608,6 +632,18 @@ export function usePhenoHuntWorkspace(
         existingSex.sex === sex &&
         (existingSex.note?.trim() || null) === normalizedNote
       ) {
+        return true;
+      }
+      // Honest-data rule (F14): the card's Save button fires score, decision,
+      // and sex together, so the FIRST save of a card whose sex select was
+      // never touched arrives here as the "unknown" default. Appending that
+      // row would fabricate a "Sex recorded: Unknown" timeline event the
+      // grower never created. Skip the append when no prior observation
+      // exists, the incoming value is the untouched default, and no note was
+      // written (a note is grower-authored evidence and is always kept).
+      // Deliberately changing a REAL prior value back to "unknown" still
+      // appends via the normal path below.
+      if (!existingSex && sex === DEFAULT_SEX_OBSERVATION && normalizedNote === null) {
         return true;
       }
       setSaving(plantId);

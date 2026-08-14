@@ -84,30 +84,32 @@ import { Route as PartnersCsvPreviewRouteImport } from './routes/partners.csv-pr
 import { Route as SensorsCsvPreviewRouteImport } from './routes/sensors.csv-preview'
 import { Route as StrainsIndexRouteImport } from './routes/strains.index'
 import { Route as StrainsSlugRouteImport } from './routes/strains.$slug'
+import { Route as ToolsBlueprintTargetsRouteImport } from './routes/tools.blueprint-targets'
 import { Route as ToolsVpdCalculatorRouteImport } from './routes/tools.vpd-calculator'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 import { Route as AppOperatorDiagnosticsRouteImport } from './routes/_app/_operator/diagnostics'
+import { Route as AppOperatorDiagnosticsLightingMeasurementRouteImport } from './routes/_app/_operator/diagnostics-lighting-measurement'
 import { Route as AppOperatorDiagnosticsSeoArtifactsRouteImport } from './routes/_app/_operator/diagnostics-seo-artifacts'
 import { Route as AppOperatorIngestInspectorRouteImport } from './routes/_app/_operator/ingest-inspector'
 import { Route as AppOperatorLeadsRouteImport } from './routes/_app/_operator/leads'
 import { Route as AppOperatorOneTentLoopProofRouteImport } from './routes/_app/_operator/one-tent-loop-proof'
 import { Route as AppOperatorPiIngestStatusRouteImport } from './routes/_app/_operator/pi-ingest-status'
 import { Route as AppAccountPreferencesRouteImport } from './routes/_app/account.preferences'
-import { Route as AppActionsActionIdRouteImport } from './routes/_app/actions.$actionId'
-import { Route as AppAlertsAlertIdRouteImport } from './routes/_app/alerts.$alertId'
-import { Route as AppBreedingProgramIdRouteImport } from './routes/_app/breeding.$programId'
-import { Route as AppBreedingNewRouteImport } from './routes/_app/breeding.new'
+import { Route as AppActionsActionIdRouteImport } from './routes/_app/actions_.$actionId'
+import { Route as AppAlertsAlertIdRouteImport } from './routes/_app/alerts_.$alertId'
+import { Route as AppBreedingProgramIdRouteImport } from './routes/_app/breeding_.$programId'
+import { Route as AppBreedingNewRouteImport } from './routes/_app/breeding_.new'
 import { Route as AppDiaryEnvironmentSummaryRouteImport } from './routes/_app/diary.environment-summary'
 import { Route as AppDiaryPhenoExpressionComparisonRouteImport } from './routes/_app/diary.pheno-expression-comparison'
-import { Route as AppDoctorSessionsRouteImport } from './routes/_app/doctor.sessions'
+import { Route as AppDoctorSessionsRouteImport } from './routes/_app/doctor_.sessions'
 import { Route as AppGeneticsIndexRouteImport } from './routes/_app/genetics.index'
-import { Route as AppGrowsGrowIdRouteImport } from './routes/_app/grows.$growId'
-import { Route as AppPhenoHuntsNewRouteImport } from './routes/_app/pheno-hunts.new'
-import { Route as AppPlantsIdRouteImport } from './routes/_app/plants.$id'
-import { Route as AppReportsDiaryRangeRouteImport } from './routes/_app/reports.diary-range'
-import { Route as AppSettingsAgentIntegrationsRouteImport } from './routes/_app/settings.agent-integrations'
-import { Route as AppSettingsAnalyticsRouteImport } from './routes/_app/settings.analytics'
-import { Route as AppTentsIdRouteImport } from './routes/_app/tents.$id'
+import { Route as AppGrowsGrowIdRouteImport } from './routes/_app/grows_.$growId'
+import { Route as AppPhenoHuntsNewRouteImport } from './routes/_app/pheno-hunts_.new'
+import { Route as AppPlantsIdRouteImport } from './routes/_app/plants_.$id'
+import { Route as AppReportsDiaryRangeRouteImport } from './routes/_app/reports_.diary-range'
+import { Route as AppSettingsAgentIntegrationsRouteImport } from './routes/_app/settings_.agent-integrations'
+import { Route as AppSettingsAnalyticsRouteImport } from './routes/_app/settings_.analytics'
+import { Route as AppTentsIdRouteImport } from './routes/_app/tents_.$id'
 import { Route as CustomerGuideOreozVsGelonadeComparisonRouteImport } from './routes/customer.guide.oreoz-vs-gelonade-comparison'
 import { Route as PhenoHuntsIdCompareRouteImport } from './routes/pheno-hunts.$id.compare'
 import { Route as PhenoHuntsIdShowcaseRouteImport } from './routes/pheno-hunts.$id.showcase'
@@ -141,15 +143,15 @@ import { Route as AppOperatorOperatorSubscriberGrowthRouteImport } from './route
 import { Route as AppOperatorOperatorSupportInboxRouteImport } from './routes/_app/_operator/operator.support-inbox'
 import { Route as AppOperatorSensorsEcowittAuditRouteImport } from './routes/_app/_operator/sensors.ecowitt-audit'
 import { Route as AppOperatorSensorsIngestNormalizerRouteImport } from './routes/_app/_operator/sensors.ingest-normalizer'
-import { Route as AppBreedingLogNewRouteImport } from './routes/_app/breeding.log.new'
+import { Route as AppBreedingLogNewRouteImport } from './routes/_app/breeding_.log.new'
 import { Route as AppDiaryStrainsSlugRouteImport } from './routes/_app/diary.strains.$slug'
-import { Route as AppDoctorSessionsSessionIdRouteImport } from './routes/_app/doctor.sessions.$sessionId'
+import { Route as AppDoctorSessionsSessionIdRouteImport } from './routes/_app/doctor_.sessions_.$sessionId'
 import { Route as AppGeneticsAccessionsIdRouteImport } from './routes/_app/genetics.accessions.$id'
 import { Route as AppGeneticsBatchesIdRouteImport } from './routes/_app/genetics.batches.$id'
-import { Route as AppGrowsGrowIdLearningRouteImport } from './routes/_app/grows.$growId.learning'
-import { Route as AppPhenoHuntsIdKeepersRouteImport } from './routes/_app/pheno-hunts.$id.keepers'
-import { Route as AppPhenoHuntsIdWorkspaceRouteImport } from './routes/_app/pheno-hunts.$id.workspace'
-import { Route as AppReportsPostGrowGrowIdRouteImport } from './routes/_app/reports.post-grow.$growId'
+import { Route as AppGrowsGrowIdLearningRouteImport } from './routes/_app/grows_.$growId_.learning'
+import { Route as AppPhenoHuntsIdKeepersRouteImport } from './routes/_app/pheno-hunts_.$id.keepers'
+import { Route as AppPhenoHuntsIdWorkspaceRouteImport } from './routes/_app/pheno-hunts_.$id.workspace'
+import { Route as AppReportsPostGrowGrowIdRouteImport } from './routes/_app/reports_.post-grow.$growId'
 import { Route as AppGeneticsHealthKindIdRouteImport } from './routes/_app/genetics.health.$kind.$id'
 import { Route as AppGeneticsTraceKindIdRouteImport } from './routes/_app/genetics.trace.$kind.$id'
 
@@ -529,6 +531,11 @@ const StrainsSlugRoute = StrainsSlugRouteImport.update({
   path: '/strains/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ToolsBlueprintTargetsRoute = ToolsBlueprintTargetsRouteImport.update({
+  id: '/tools/blueprint-targets',
+  path: '/tools/blueprint-targets',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ToolsVpdCalculatorRoute = ToolsVpdCalculatorRouteImport.update({
   id: '/tools/vpd-calculator',
   path: '/tools/vpd-calculator',
@@ -544,6 +551,12 @@ const AppOperatorDiagnosticsRoute = AppOperatorDiagnosticsRouteImport.update({
   path: '/diagnostics',
   getParentRoute: () => AppOperatorRoute,
 } as any)
+const AppOperatorDiagnosticsLightingMeasurementRoute =
+  AppOperatorDiagnosticsLightingMeasurementRouteImport.update({
+    id: '/diagnostics-lighting-measurement',
+    path: '/diagnostics-lighting-measurement',
+    getParentRoute: () => AppOperatorRoute,
+  } as any)
 const AppOperatorDiagnosticsSeoArtifactsRoute =
   AppOperatorDiagnosticsSeoArtifactsRouteImport.update({
     id: '/diagnostics-seo-artifacts',
@@ -579,24 +592,24 @@ const AppAccountPreferencesRoute = AppAccountPreferencesRouteImport.update({
   getParentRoute: () => AppRoute,
 } as any)
 const AppActionsActionIdRoute = AppActionsActionIdRouteImport.update({
-  id: '/$actionId',
-  path: '/$actionId',
-  getParentRoute: () => AppActionsRoute,
+  id: '/actions_/$actionId',
+  path: '/actions/$actionId',
+  getParentRoute: () => AppRoute,
 } as any)
 const AppAlertsAlertIdRoute = AppAlertsAlertIdRouteImport.update({
-  id: '/$alertId',
-  path: '/$alertId',
-  getParentRoute: () => AppAlertsRoute,
+  id: '/alerts_/$alertId',
+  path: '/alerts/$alertId',
+  getParentRoute: () => AppRoute,
 } as any)
 const AppBreedingProgramIdRoute = AppBreedingProgramIdRouteImport.update({
-  id: '/$programId',
-  path: '/$programId',
-  getParentRoute: () => AppBreedingRoute,
+  id: '/breeding_/$programId',
+  path: '/breeding/$programId',
+  getParentRoute: () => AppRoute,
 } as any)
 const AppBreedingNewRoute = AppBreedingNewRouteImport.update({
-  id: '/new',
-  path: '/new',
-  getParentRoute: () => AppBreedingRoute,
+  id: '/breeding_/new',
+  path: '/breeding/new',
+  getParentRoute: () => AppRoute,
 } as any)
 const AppDiaryEnvironmentSummaryRoute =
   AppDiaryEnvironmentSummaryRouteImport.update({
@@ -611,9 +624,9 @@ const AppDiaryPhenoExpressionComparisonRoute =
     getParentRoute: () => AppRoute,
   } as any)
 const AppDoctorSessionsRoute = AppDoctorSessionsRouteImport.update({
-  id: '/sessions',
-  path: '/sessions',
-  getParentRoute: () => AppDoctorRoute,
+  id: '/doctor_/sessions',
+  path: '/doctor/sessions',
+  getParentRoute: () => AppRoute,
 } as any)
 const AppGeneticsIndexRoute = AppGeneticsIndexRouteImport.update({
   id: '/',
@@ -621,40 +634,40 @@ const AppGeneticsIndexRoute = AppGeneticsIndexRouteImport.update({
   getParentRoute: () => AppGeneticsRoute,
 } as any)
 const AppGrowsGrowIdRoute = AppGrowsGrowIdRouteImport.update({
-  id: '/$growId',
-  path: '/$growId',
-  getParentRoute: () => AppGrowsRoute,
+  id: '/grows_/$growId',
+  path: '/grows/$growId',
+  getParentRoute: () => AppRoute,
 } as any)
 const AppPhenoHuntsNewRoute = AppPhenoHuntsNewRouteImport.update({
-  id: '/new',
-  path: '/new',
-  getParentRoute: () => AppPhenoHuntsRoute,
+  id: '/pheno-hunts_/new',
+  path: '/pheno-hunts/new',
+  getParentRoute: () => AppRoute,
 } as any)
 const AppPlantsIdRoute = AppPlantsIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => AppPlantsRoute,
+  id: '/plants_/$id',
+  path: '/plants/$id',
+  getParentRoute: () => AppRoute,
 } as any)
 const AppReportsDiaryRangeRoute = AppReportsDiaryRangeRouteImport.update({
-  id: '/diary-range',
-  path: '/diary-range',
-  getParentRoute: () => AppReportsRoute,
+  id: '/reports_/diary-range',
+  path: '/reports/diary-range',
+  getParentRoute: () => AppRoute,
 } as any)
 const AppSettingsAgentIntegrationsRoute =
   AppSettingsAgentIntegrationsRouteImport.update({
-    id: '/agent-integrations',
-    path: '/agent-integrations',
-    getParentRoute: () => AppSettingsRoute,
+    id: '/settings_/agent-integrations',
+    path: '/settings/agent-integrations',
+    getParentRoute: () => AppRoute,
   } as any)
 const AppSettingsAnalyticsRoute = AppSettingsAnalyticsRouteImport.update({
-  id: '/analytics',
-  path: '/analytics',
-  getParentRoute: () => AppSettingsRoute,
+  id: '/settings_/analytics',
+  path: '/settings/analytics',
+  getParentRoute: () => AppRoute,
 } as any)
 const AppTentsIdRoute = AppTentsIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => AppTentsRoute,
+  id: '/tents_/$id',
+  path: '/tents/$id',
+  getParentRoute: () => AppRoute,
 } as any)
 const CustomerGuideOreozVsGelonadeComparisonRoute =
   CustomerGuideOreozVsGelonadeComparisonRouteImport.update({
@@ -851,9 +864,9 @@ const AppOperatorSensorsIngestNormalizerRoute =
     getParentRoute: () => AppOperatorRoute,
   } as any)
 const AppBreedingLogNewRoute = AppBreedingLogNewRouteImport.update({
-  id: '/log/new',
-  path: '/log/new',
-  getParentRoute: () => AppBreedingRoute,
+  id: '/breeding_/log/new',
+  path: '/breeding/log/new',
+  getParentRoute: () => AppRoute,
 } as any)
 const AppDiaryStrainsSlugRoute = AppDiaryStrainsSlugRouteImport.update({
   id: '/diary/strains/$slug',
@@ -862,9 +875,9 @@ const AppDiaryStrainsSlugRoute = AppDiaryStrainsSlugRouteImport.update({
 } as any)
 const AppDoctorSessionsSessionIdRoute =
   AppDoctorSessionsSessionIdRouteImport.update({
-    id: '/$sessionId',
-    path: '/$sessionId',
-    getParentRoute: () => AppDoctorSessionsRoute,
+    id: '/doctor_/sessions_/$sessionId',
+    path: '/doctor/sessions/$sessionId',
+    getParentRoute: () => AppRoute,
   } as any)
 const AppGeneticsAccessionsIdRoute = AppGeneticsAccessionsIdRouteImport.update({
   id: '/accessions/$id',
@@ -877,26 +890,26 @@ const AppGeneticsBatchesIdRoute = AppGeneticsBatchesIdRouteImport.update({
   getParentRoute: () => AppGeneticsRoute,
 } as any)
 const AppGrowsGrowIdLearningRoute = AppGrowsGrowIdLearningRouteImport.update({
-  id: '/learning',
-  path: '/learning',
-  getParentRoute: () => AppGrowsGrowIdRoute,
+  id: '/grows_/$growId_/learning',
+  path: '/grows/$growId/learning',
+  getParentRoute: () => AppRoute,
 } as any)
 const AppPhenoHuntsIdKeepersRoute = AppPhenoHuntsIdKeepersRouteImport.update({
-  id: '/$id/keepers',
-  path: '/$id/keepers',
-  getParentRoute: () => AppPhenoHuntsRoute,
+  id: '/pheno-hunts_/$id/keepers',
+  path: '/pheno-hunts/$id/keepers',
+  getParentRoute: () => AppRoute,
 } as any)
 const AppPhenoHuntsIdWorkspaceRoute =
   AppPhenoHuntsIdWorkspaceRouteImport.update({
-    id: '/$id/workspace',
-    path: '/$id/workspace',
-    getParentRoute: () => AppPhenoHuntsRoute,
+    id: '/pheno-hunts_/$id/workspace',
+    path: '/pheno-hunts/$id/workspace',
+    getParentRoute: () => AppRoute,
   } as any)
 const AppReportsPostGrowGrowIdRoute =
   AppReportsPostGrowGrowIdRouteImport.update({
-    id: '/post-grow/$growId',
-    path: '/post-grow/$growId',
-    getParentRoute: () => AppReportsRoute,
+    id: '/reports_/post-grow/$growId',
+    path: '/reports/post-grow/$growId',
+    getParentRoute: () => AppRoute,
   } as any)
 const AppGeneticsHealthKindIdRoute = AppGeneticsHealthKindIdRouteImport.update({
   id: '/health/$kind/$id',
@@ -943,29 +956,29 @@ export interface FileRoutesByFullPath {
   '/upgrade': typeof UpgradeRoute
   '/welcome': typeof WelcomeRoute
   '/action-queue': typeof AppActionQueueRoute
-  '/actions': typeof AppActionsRouteWithChildren
+  '/actions': typeof AppActionsRoute
   '/ai-doctor': typeof AppAiDoctorRoute
-  '/alerts': typeof AppAlertsRouteWithChildren
-  '/breeding': typeof AppBreedingRouteWithChildren
+  '/alerts': typeof AppAlertsRoute
+  '/breeding': typeof AppBreedingRoute
   '/daily-check': typeof AppDailyCheckRoute
   '/dashboard': typeof AppDashboardRoute
-  '/doctor': typeof AppDoctorRouteWithChildren
+  '/doctor': typeof AppDoctorRoute
   '/genetics': typeof AppGeneticsRouteWithChildren
   '/grow-lineage': typeof AppGrowLineageRoute
   '/grow-room': typeof AppGrowRoomRoute
-  '/grows': typeof AppGrowsRouteWithChildren
+  '/grows': typeof AppGrowsRoute
   '/health': typeof AppHealthRoute
   '/invite': typeof AppInviteRoute
   '/logs': typeof AppLogsRoute
   '/onboarding': typeof AppOnboardingRoute
-  '/pheno-hunts': typeof AppPhenoHuntsRouteWithChildren
-  '/plants': typeof AppPlantsRouteWithChildren
-  '/reports': typeof AppReportsRouteWithChildren
+  '/pheno-hunts': typeof AppPhenoHuntsRoute
+  '/plants': typeof AppPlantsRoute
+  '/reports': typeof AppReportsRoute
   '/sensors': typeof AppSensorsRoute
-  '/settings': typeof AppSettingsRouteWithChildren
+  '/settings': typeof AppSettingsRoute
   '/start-room': typeof AppStartRoomRoute
   '/tasks': typeof AppTasksRoute
-  '/tents': typeof AppTentsRouteWithChildren
+  '/tents': typeof AppTentsRoute
   '/timeline': typeof AppTimelineRoute
   '/billing/$plan': typeof BillingPlanRoute
   '/checkout/cancel': typeof CheckoutCancelRoute
@@ -980,12 +993,14 @@ export interface FileRoutesByFullPath {
   '/partners/csv-preview': typeof PartnersCsvPreviewRoute
   '/sensors/csv-preview': typeof SensorsCsvPreviewRoute
   '/strains/$slug': typeof StrainsSlugRoute
+  '/tools/blueprint-targets': typeof ToolsBlueprintTargetsRoute
   '/tools/vpd-calculator': typeof ToolsVpdCalculatorRoute
   '/cultivars/': typeof CultivarsIndexRoute
   '/guides/': typeof GuidesIndexRoute
   '/strains/': typeof StrainsIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/diagnostics': typeof AppOperatorDiagnosticsRoute
+  '/diagnostics-lighting-measurement': typeof AppOperatorDiagnosticsLightingMeasurementRoute
   '/diagnostics-seo-artifacts': typeof AppOperatorDiagnosticsSeoArtifactsRoute
   '/ingest-inspector': typeof AppOperatorIngestInspectorRoute
   '/leads': typeof AppOperatorLeadsRoute
@@ -998,8 +1013,8 @@ export interface FileRoutesByFullPath {
   '/breeding/new': typeof AppBreedingNewRoute
   '/diary/environment-summary': typeof AppDiaryEnvironmentSummaryRoute
   '/diary/pheno-expression-comparison': typeof AppDiaryPhenoExpressionComparisonRoute
-  '/doctor/sessions': typeof AppDoctorSessionsRouteWithChildren
-  '/grows/$growId': typeof AppGrowsGrowIdRouteWithChildren
+  '/doctor/sessions': typeof AppDoctorSessionsRoute
+  '/grows/$growId': typeof AppGrowsGrowIdRoute
   '/pheno-hunts/new': typeof AppPhenoHuntsNewRoute
   '/plants/$id': typeof AppPlantsIdRoute
   '/reports/diary-range': typeof AppReportsDiaryRangeRoute
@@ -1086,28 +1101,28 @@ export interface FileRoutesByTo {
   '/upgrade': typeof UpgradeRoute
   '/welcome': typeof WelcomeRoute
   '/action-queue': typeof AppActionQueueRoute
-  '/actions': typeof AppActionsRouteWithChildren
+  '/actions': typeof AppActionsRoute
   '/ai-doctor': typeof AppAiDoctorRoute
-  '/alerts': typeof AppAlertsRouteWithChildren
-  '/breeding': typeof AppBreedingRouteWithChildren
+  '/alerts': typeof AppAlertsRoute
+  '/breeding': typeof AppBreedingRoute
   '/daily-check': typeof AppDailyCheckRoute
   '/dashboard': typeof AppDashboardRoute
-  '/doctor': typeof AppDoctorRouteWithChildren
+  '/doctor': typeof AppDoctorRoute
   '/grow-lineage': typeof AppGrowLineageRoute
   '/grow-room': typeof AppGrowRoomRoute
-  '/grows': typeof AppGrowsRouteWithChildren
+  '/grows': typeof AppGrowsRoute
   '/health': typeof AppHealthRoute
   '/invite': typeof AppInviteRoute
   '/logs': typeof AppLogsRoute
   '/onboarding': typeof AppOnboardingRoute
-  '/pheno-hunts': typeof AppPhenoHuntsRouteWithChildren
-  '/plants': typeof AppPlantsRouteWithChildren
-  '/reports': typeof AppReportsRouteWithChildren
+  '/pheno-hunts': typeof AppPhenoHuntsRoute
+  '/plants': typeof AppPlantsRoute
+  '/reports': typeof AppReportsRoute
   '/sensors': typeof AppSensorsRoute
-  '/settings': typeof AppSettingsRouteWithChildren
+  '/settings': typeof AppSettingsRoute
   '/start-room': typeof AppStartRoomRoute
   '/tasks': typeof AppTasksRoute
-  '/tents': typeof AppTentsRouteWithChildren
+  '/tents': typeof AppTentsRoute
   '/timeline': typeof AppTimelineRoute
   '/billing/$plan': typeof BillingPlanRoute
   '/checkout/cancel': typeof CheckoutCancelRoute
@@ -1122,12 +1137,14 @@ export interface FileRoutesByTo {
   '/partners/csv-preview': typeof PartnersCsvPreviewRoute
   '/sensors/csv-preview': typeof SensorsCsvPreviewRoute
   '/strains/$slug': typeof StrainsSlugRoute
+  '/tools/blueprint-targets': typeof ToolsBlueprintTargetsRoute
   '/tools/vpd-calculator': typeof ToolsVpdCalculatorRoute
   '/cultivars': typeof CultivarsIndexRoute
   '/guides': typeof GuidesIndexRoute
   '/strains': typeof StrainsIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/diagnostics': typeof AppOperatorDiagnosticsRoute
+  '/diagnostics-lighting-measurement': typeof AppOperatorDiagnosticsLightingMeasurementRoute
   '/diagnostics-seo-artifacts': typeof AppOperatorDiagnosticsSeoArtifactsRoute
   '/ingest-inspector': typeof AppOperatorIngestInspectorRoute
   '/leads': typeof AppOperatorLeadsRoute
@@ -1140,8 +1157,8 @@ export interface FileRoutesByTo {
   '/breeding/new': typeof AppBreedingNewRoute
   '/diary/environment-summary': typeof AppDiaryEnvironmentSummaryRoute
   '/diary/pheno-expression-comparison': typeof AppDiaryPhenoExpressionComparisonRoute
-  '/doctor/sessions': typeof AppDoctorSessionsRouteWithChildren
-  '/grows/$growId': typeof AppGrowsGrowIdRouteWithChildren
+  '/doctor/sessions': typeof AppDoctorSessionsRoute
+  '/grows/$growId': typeof AppGrowsGrowIdRoute
   '/pheno-hunts/new': typeof AppPhenoHuntsNewRoute
   '/plants/$id': typeof AppPlantsIdRoute
   '/reports/diary-range': typeof AppReportsDiaryRangeRoute
@@ -1231,29 +1248,29 @@ export interface FileRoutesById {
   '/welcome': typeof WelcomeRoute
   '/_app/_operator': typeof AppOperatorRouteWithChildren
   '/_app/action-queue': typeof AppActionQueueRoute
-  '/_app/actions': typeof AppActionsRouteWithChildren
+  '/_app/actions': typeof AppActionsRoute
   '/_app/ai-doctor': typeof AppAiDoctorRoute
-  '/_app/alerts': typeof AppAlertsRouteWithChildren
-  '/_app/breeding': typeof AppBreedingRouteWithChildren
+  '/_app/alerts': typeof AppAlertsRoute
+  '/_app/breeding': typeof AppBreedingRoute
   '/_app/daily-check': typeof AppDailyCheckRoute
   '/_app/dashboard': typeof AppDashboardRoute
-  '/_app/doctor': typeof AppDoctorRouteWithChildren
+  '/_app/doctor': typeof AppDoctorRoute
   '/_app/genetics': typeof AppGeneticsRouteWithChildren
   '/_app/grow-lineage': typeof AppGrowLineageRoute
   '/_app/grow-room': typeof AppGrowRoomRoute
-  '/_app/grows': typeof AppGrowsRouteWithChildren
+  '/_app/grows': typeof AppGrowsRoute
   '/_app/health': typeof AppHealthRoute
   '/_app/invite': typeof AppInviteRoute
   '/_app/logs': typeof AppLogsRoute
   '/_app/onboarding': typeof AppOnboardingRoute
-  '/_app/pheno-hunts': typeof AppPhenoHuntsRouteWithChildren
-  '/_app/plants': typeof AppPlantsRouteWithChildren
-  '/_app/reports': typeof AppReportsRouteWithChildren
+  '/_app/pheno-hunts': typeof AppPhenoHuntsRoute
+  '/_app/plants': typeof AppPlantsRoute
+  '/_app/reports': typeof AppReportsRoute
   '/_app/sensors': typeof AppSensorsRoute
-  '/_app/settings': typeof AppSettingsRouteWithChildren
+  '/_app/settings': typeof AppSettingsRoute
   '/_app/start-room': typeof AppStartRoomRoute
   '/_app/tasks': typeof AppTasksRoute
-  '/_app/tents': typeof AppTentsRouteWithChildren
+  '/_app/tents': typeof AppTentsRoute
   '/_app/timeline': typeof AppTimelineRoute
   '/billing/$plan': typeof BillingPlanRoute
   '/checkout/cancel': typeof CheckoutCancelRoute
@@ -1268,32 +1285,34 @@ export interface FileRoutesById {
   '/partners/csv-preview': typeof PartnersCsvPreviewRoute
   '/sensors/csv-preview': typeof SensorsCsvPreviewRoute
   '/strains/$slug': typeof StrainsSlugRoute
+  '/tools/blueprint-targets': typeof ToolsBlueprintTargetsRoute
   '/tools/vpd-calculator': typeof ToolsVpdCalculatorRoute
   '/cultivars/': typeof CultivarsIndexRoute
   '/guides/': typeof GuidesIndexRoute
   '/strains/': typeof StrainsIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/_app/_operator/diagnostics': typeof AppOperatorDiagnosticsRoute
+  '/_app/_operator/diagnostics-lighting-measurement': typeof AppOperatorDiagnosticsLightingMeasurementRoute
   '/_app/_operator/diagnostics-seo-artifacts': typeof AppOperatorDiagnosticsSeoArtifactsRoute
   '/_app/_operator/ingest-inspector': typeof AppOperatorIngestInspectorRoute
   '/_app/_operator/leads': typeof AppOperatorLeadsRoute
   '/_app/_operator/one-tent-loop-proof': typeof AppOperatorOneTentLoopProofRoute
   '/_app/_operator/pi-ingest-status': typeof AppOperatorPiIngestStatusRoute
   '/_app/account/preferences': typeof AppAccountPreferencesRoute
-  '/_app/actions/$actionId': typeof AppActionsActionIdRoute
-  '/_app/alerts/$alertId': typeof AppAlertsAlertIdRoute
-  '/_app/breeding/$programId': typeof AppBreedingProgramIdRoute
-  '/_app/breeding/new': typeof AppBreedingNewRoute
+  '/_app/actions_/$actionId': typeof AppActionsActionIdRoute
+  '/_app/alerts_/$alertId': typeof AppAlertsAlertIdRoute
+  '/_app/breeding_/$programId': typeof AppBreedingProgramIdRoute
+  '/_app/breeding_/new': typeof AppBreedingNewRoute
   '/_app/diary/environment-summary': typeof AppDiaryEnvironmentSummaryRoute
   '/_app/diary/pheno-expression-comparison': typeof AppDiaryPhenoExpressionComparisonRoute
-  '/_app/doctor/sessions': typeof AppDoctorSessionsRouteWithChildren
-  '/_app/grows/$growId': typeof AppGrowsGrowIdRouteWithChildren
-  '/_app/pheno-hunts/new': typeof AppPhenoHuntsNewRoute
-  '/_app/plants/$id': typeof AppPlantsIdRoute
-  '/_app/reports/diary-range': typeof AppReportsDiaryRangeRoute
-  '/_app/settings/agent-integrations': typeof AppSettingsAgentIntegrationsRoute
-  '/_app/settings/analytics': typeof AppSettingsAnalyticsRoute
-  '/_app/tents/$id': typeof AppTentsIdRoute
+  '/_app/doctor_/sessions': typeof AppDoctorSessionsRoute
+  '/_app/grows_/$growId': typeof AppGrowsGrowIdRoute
+  '/_app/pheno-hunts_/new': typeof AppPhenoHuntsNewRoute
+  '/_app/plants_/$id': typeof AppPlantsIdRoute
+  '/_app/reports_/diary-range': typeof AppReportsDiaryRangeRoute
+  '/_app/settings_/agent-integrations': typeof AppSettingsAgentIntegrationsRoute
+  '/_app/settings_/analytics': typeof AppSettingsAnalyticsRoute
+  '/_app/tents_/$id': typeof AppTentsIdRoute
   '/customer/guide/oreoz-vs-gelonade-comparison': typeof CustomerGuideOreozVsGelonadeComparisonRoute
   '/pheno-hunts/$id/compare': typeof PhenoHuntsIdCompareRoute
   '/pheno-hunts/$id/showcase': typeof PhenoHuntsIdShowcaseRoute
@@ -1328,15 +1347,15 @@ export interface FileRoutesById {
   '/_app/_operator/operator/support-inbox': typeof AppOperatorOperatorSupportInboxRoute
   '/_app/_operator/sensors/ecowitt-audit': typeof AppOperatorSensorsEcowittAuditRoute
   '/_app/_operator/sensors/ingest-normalizer': typeof AppOperatorSensorsIngestNormalizerRoute
-  '/_app/breeding/log/new': typeof AppBreedingLogNewRoute
+  '/_app/breeding_/log/new': typeof AppBreedingLogNewRoute
   '/_app/diary/strains/$slug': typeof AppDiaryStrainsSlugRoute
-  '/_app/doctor/sessions/$sessionId': typeof AppDoctorSessionsSessionIdRoute
+  '/_app/doctor_/sessions_/$sessionId': typeof AppDoctorSessionsSessionIdRoute
   '/_app/genetics/accessions/$id': typeof AppGeneticsAccessionsIdRoute
   '/_app/genetics/batches/$id': typeof AppGeneticsBatchesIdRoute
-  '/_app/grows/$growId/learning': typeof AppGrowsGrowIdLearningRoute
-  '/_app/pheno-hunts/$id/keepers': typeof AppPhenoHuntsIdKeepersRoute
-  '/_app/pheno-hunts/$id/workspace': typeof AppPhenoHuntsIdWorkspaceRoute
-  '/_app/reports/post-grow/$growId': typeof AppReportsPostGrowGrowIdRoute
+  '/_app/grows_/$growId_/learning': typeof AppGrowsGrowIdLearningRoute
+  '/_app/pheno-hunts_/$id/keepers': typeof AppPhenoHuntsIdKeepersRoute
+  '/_app/pheno-hunts_/$id/workspace': typeof AppPhenoHuntsIdWorkspaceRoute
+  '/_app/reports_/post-grow/$growId': typeof AppReportsPostGrowGrowIdRoute
   '/_app/genetics/health/$kind/$id': typeof AppGeneticsHealthKindIdRoute
   '/_app/genetics/trace/$kind/$id': typeof AppGeneticsTraceKindIdRoute
 }
@@ -1413,12 +1432,14 @@ export interface FileRouteTypes {
     | '/partners/csv-preview'
     | '/sensors/csv-preview'
     | '/strains/$slug'
+    | '/tools/blueprint-targets'
     | '/tools/vpd-calculator'
     | '/cultivars/'
     | '/guides/'
     | '/strains/'
     | '/.lovable/oauth/consent'
     | '/diagnostics'
+    | '/diagnostics-lighting-measurement'
     | '/diagnostics-seo-artifacts'
     | '/ingest-inspector'
     | '/leads'
@@ -1555,12 +1576,14 @@ export interface FileRouteTypes {
     | '/partners/csv-preview'
     | '/sensors/csv-preview'
     | '/strains/$slug'
+    | '/tools/blueprint-targets'
     | '/tools/vpd-calculator'
     | '/cultivars'
     | '/guides'
     | '/strains'
     | '/.lovable/oauth/consent'
     | '/diagnostics'
+    | '/diagnostics-lighting-measurement'
     | '/diagnostics-seo-artifacts'
     | '/ingest-inspector'
     | '/leads'
@@ -1700,32 +1723,34 @@ export interface FileRouteTypes {
     | '/partners/csv-preview'
     | '/sensors/csv-preview'
     | '/strains/$slug'
+    | '/tools/blueprint-targets'
     | '/tools/vpd-calculator'
     | '/cultivars/'
     | '/guides/'
     | '/strains/'
     | '/.lovable/oauth/consent'
     | '/_app/_operator/diagnostics'
+    | '/_app/_operator/diagnostics-lighting-measurement'
     | '/_app/_operator/diagnostics-seo-artifacts'
     | '/_app/_operator/ingest-inspector'
     | '/_app/_operator/leads'
     | '/_app/_operator/one-tent-loop-proof'
     | '/_app/_operator/pi-ingest-status'
     | '/_app/account/preferences'
-    | '/_app/actions/$actionId'
-    | '/_app/alerts/$alertId'
-    | '/_app/breeding/$programId'
-    | '/_app/breeding/new'
+    | '/_app/actions_/$actionId'
+    | '/_app/alerts_/$alertId'
+    | '/_app/breeding_/$programId'
+    | '/_app/breeding_/new'
     | '/_app/diary/environment-summary'
     | '/_app/diary/pheno-expression-comparison'
-    | '/_app/doctor/sessions'
-    | '/_app/grows/$growId'
-    | '/_app/pheno-hunts/new'
-    | '/_app/plants/$id'
-    | '/_app/reports/diary-range'
-    | '/_app/settings/agent-integrations'
-    | '/_app/settings/analytics'
-    | '/_app/tents/$id'
+    | '/_app/doctor_/sessions'
+    | '/_app/grows_/$growId'
+    | '/_app/pheno-hunts_/new'
+    | '/_app/plants_/$id'
+    | '/_app/reports_/diary-range'
+    | '/_app/settings_/agent-integrations'
+    | '/_app/settings_/analytics'
+    | '/_app/tents_/$id'
     | '/customer/guide/oreoz-vs-gelonade-comparison'
     | '/pheno-hunts/$id/compare'
     | '/pheno-hunts/$id/showcase'
@@ -1760,15 +1785,15 @@ export interface FileRouteTypes {
     | '/_app/_operator/operator/support-inbox'
     | '/_app/_operator/sensors/ecowitt-audit'
     | '/_app/_operator/sensors/ingest-normalizer'
-    | '/_app/breeding/log/new'
+    | '/_app/breeding_/log/new'
     | '/_app/diary/strains/$slug'
-    | '/_app/doctor/sessions/$sessionId'
+    | '/_app/doctor_/sessions_/$sessionId'
     | '/_app/genetics/accessions/$id'
     | '/_app/genetics/batches/$id'
-    | '/_app/grows/$growId/learning'
-    | '/_app/pheno-hunts/$id/keepers'
-    | '/_app/pheno-hunts/$id/workspace'
-    | '/_app/reports/post-grow/$growId'
+    | '/_app/grows_/$growId_/learning'
+    | '/_app/pheno-hunts_/$id/keepers'
+    | '/_app/pheno-hunts_/$id/workspace'
+    | '/_app/reports_/post-grow/$growId'
     | '/_app/genetics/health/$kind/$id'
     | '/_app/genetics/trace/$kind/$id'
   fileRoutesById: FileRoutesById
@@ -1820,6 +1845,7 @@ export interface RootRouteChildren {
   PartnersCsvPreviewRoute: typeof PartnersCsvPreviewRoute
   SensorsCsvPreviewRoute: typeof SensorsCsvPreviewRoute
   StrainsSlugRoute: typeof StrainsSlugRoute
+  ToolsBlueprintTargetsRoute: typeof ToolsBlueprintTargetsRoute
   ToolsVpdCalculatorRoute: typeof ToolsVpdCalculatorRoute
   CultivarsIndexRoute: typeof CultivarsIndexRoute
   GuidesIndexRoute: typeof GuidesIndexRoute
@@ -2357,6 +2383,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StrainsSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/tools/blueprint-targets': {
+      id: '/tools/blueprint-targets'
+      path: '/tools/blueprint-targets'
+      fullPath: '/tools/blueprint-targets'
+      preLoaderRoute: typeof ToolsBlueprintTargetsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/tools/vpd-calculator': {
       id: '/tools/vpd-calculator'
       path: '/tools/vpd-calculator'
@@ -2376,6 +2409,13 @@ declare module '@tanstack/react-router' {
       path: '/diagnostics'
       fullPath: '/diagnostics'
       preLoaderRoute: typeof AppOperatorDiagnosticsRouteImport
+      parentRoute: typeof AppOperatorRoute
+    }
+    '/_app/_operator/diagnostics-lighting-measurement': {
+      id: '/_app/_operator/diagnostics-lighting-measurement'
+      path: '/diagnostics-lighting-measurement'
+      fullPath: '/diagnostics-lighting-measurement'
+      preLoaderRoute: typeof AppOperatorDiagnosticsLightingMeasurementRouteImport
       parentRoute: typeof AppOperatorRoute
     }
     '/_app/_operator/diagnostics-seo-artifacts': {
@@ -2420,33 +2460,33 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAccountPreferencesRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/actions/$actionId': {
-      id: '/_app/actions/$actionId'
-      path: '/$actionId'
+    '/_app/actions_/$actionId': {
+      id: '/_app/actions_/$actionId'
+      path: '/actions/$actionId'
       fullPath: '/actions/$actionId'
       preLoaderRoute: typeof AppActionsActionIdRouteImport
-      parentRoute: typeof AppActionsRoute
+      parentRoute: typeof AppRoute
     }
-    '/_app/alerts/$alertId': {
-      id: '/_app/alerts/$alertId'
-      path: '/$alertId'
+    '/_app/alerts_/$alertId': {
+      id: '/_app/alerts_/$alertId'
+      path: '/alerts/$alertId'
       fullPath: '/alerts/$alertId'
       preLoaderRoute: typeof AppAlertsAlertIdRouteImport
-      parentRoute: typeof AppAlertsRoute
+      parentRoute: typeof AppRoute
     }
-    '/_app/breeding/$programId': {
-      id: '/_app/breeding/$programId'
-      path: '/$programId'
+    '/_app/breeding_/$programId': {
+      id: '/_app/breeding_/$programId'
+      path: '/breeding/$programId'
       fullPath: '/breeding/$programId'
       preLoaderRoute: typeof AppBreedingProgramIdRouteImport
-      parentRoute: typeof AppBreedingRoute
+      parentRoute: typeof AppRoute
     }
-    '/_app/breeding/new': {
-      id: '/_app/breeding/new'
-      path: '/new'
+    '/_app/breeding_/new': {
+      id: '/_app/breeding_/new'
+      path: '/breeding/new'
       fullPath: '/breeding/new'
       preLoaderRoute: typeof AppBreedingNewRouteImport
-      parentRoute: typeof AppBreedingRoute
+      parentRoute: typeof AppRoute
     }
     '/_app/diary/environment-summary': {
       id: '/_app/diary/environment-summary'
@@ -2462,12 +2502,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppDiaryPhenoExpressionComparisonRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/doctor/sessions': {
-      id: '/_app/doctor/sessions'
-      path: '/sessions'
+    '/_app/doctor_/sessions': {
+      id: '/_app/doctor_/sessions'
+      path: '/doctor/sessions'
       fullPath: '/doctor/sessions'
       preLoaderRoute: typeof AppDoctorSessionsRouteImport
-      parentRoute: typeof AppDoctorRoute
+      parentRoute: typeof AppRoute
     }
     '/_app/genetics/': {
       id: '/_app/genetics/'
@@ -2476,54 +2516,54 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppGeneticsIndexRouteImport
       parentRoute: typeof AppGeneticsRoute
     }
-    '/_app/grows/$growId': {
-      id: '/_app/grows/$growId'
-      path: '/$growId'
+    '/_app/grows_/$growId': {
+      id: '/_app/grows_/$growId'
+      path: '/grows/$growId'
       fullPath: '/grows/$growId'
       preLoaderRoute: typeof AppGrowsGrowIdRouteImport
-      parentRoute: typeof AppGrowsRoute
+      parentRoute: typeof AppRoute
     }
-    '/_app/pheno-hunts/new': {
-      id: '/_app/pheno-hunts/new'
-      path: '/new'
+    '/_app/pheno-hunts_/new': {
+      id: '/_app/pheno-hunts_/new'
+      path: '/pheno-hunts/new'
       fullPath: '/pheno-hunts/new'
       preLoaderRoute: typeof AppPhenoHuntsNewRouteImport
-      parentRoute: typeof AppPhenoHuntsRoute
+      parentRoute: typeof AppRoute
     }
-    '/_app/plants/$id': {
-      id: '/_app/plants/$id'
-      path: '/$id'
+    '/_app/plants_/$id': {
+      id: '/_app/plants_/$id'
+      path: '/plants/$id'
       fullPath: '/plants/$id'
       preLoaderRoute: typeof AppPlantsIdRouteImport
-      parentRoute: typeof AppPlantsRoute
+      parentRoute: typeof AppRoute
     }
-    '/_app/reports/diary-range': {
-      id: '/_app/reports/diary-range'
-      path: '/diary-range'
+    '/_app/reports_/diary-range': {
+      id: '/_app/reports_/diary-range'
+      path: '/reports/diary-range'
       fullPath: '/reports/diary-range'
       preLoaderRoute: typeof AppReportsDiaryRangeRouteImport
-      parentRoute: typeof AppReportsRoute
+      parentRoute: typeof AppRoute
     }
-    '/_app/settings/agent-integrations': {
-      id: '/_app/settings/agent-integrations'
-      path: '/agent-integrations'
+    '/_app/settings_/agent-integrations': {
+      id: '/_app/settings_/agent-integrations'
+      path: '/settings/agent-integrations'
       fullPath: '/settings/agent-integrations'
       preLoaderRoute: typeof AppSettingsAgentIntegrationsRouteImport
-      parentRoute: typeof AppSettingsRoute
+      parentRoute: typeof AppRoute
     }
-    '/_app/settings/analytics': {
-      id: '/_app/settings/analytics'
-      path: '/analytics'
+    '/_app/settings_/analytics': {
+      id: '/_app/settings_/analytics'
+      path: '/settings/analytics'
       fullPath: '/settings/analytics'
       preLoaderRoute: typeof AppSettingsAnalyticsRouteImport
-      parentRoute: typeof AppSettingsRoute
+      parentRoute: typeof AppRoute
     }
-    '/_app/tents/$id': {
-      id: '/_app/tents/$id'
-      path: '/$id'
+    '/_app/tents_/$id': {
+      id: '/_app/tents_/$id'
+      path: '/tents/$id'
       fullPath: '/tents/$id'
       preLoaderRoute: typeof AppTentsIdRouteImport
-      parentRoute: typeof AppTentsRoute
+      parentRoute: typeof AppRoute
     }
     '/customer/guide/oreoz-vs-gelonade-comparison': {
       id: '/customer/guide/oreoz-vs-gelonade-comparison'
@@ -2756,12 +2796,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppOperatorSensorsIngestNormalizerRouteImport
       parentRoute: typeof AppOperatorRoute
     }
-    '/_app/breeding/log/new': {
-      id: '/_app/breeding/log/new'
-      path: '/log/new'
+    '/_app/breeding_/log/new': {
+      id: '/_app/breeding_/log/new'
+      path: '/breeding/log/new'
       fullPath: '/breeding/log/new'
       preLoaderRoute: typeof AppBreedingLogNewRouteImport
-      parentRoute: typeof AppBreedingRoute
+      parentRoute: typeof AppRoute
     }
     '/_app/diary/strains/$slug': {
       id: '/_app/diary/strains/$slug'
@@ -2770,12 +2810,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppDiaryStrainsSlugRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/doctor/sessions/$sessionId': {
-      id: '/_app/doctor/sessions/$sessionId'
-      path: '/$sessionId'
+    '/_app/doctor_/sessions_/$sessionId': {
+      id: '/_app/doctor_/sessions_/$sessionId'
+      path: '/doctor/sessions/$sessionId'
       fullPath: '/doctor/sessions/$sessionId'
       preLoaderRoute: typeof AppDoctorSessionsSessionIdRouteImport
-      parentRoute: typeof AppDoctorSessionsRoute
+      parentRoute: typeof AppRoute
     }
     '/_app/genetics/accessions/$id': {
       id: '/_app/genetics/accessions/$id'
@@ -2791,33 +2831,33 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppGeneticsBatchesIdRouteImport
       parentRoute: typeof AppGeneticsRoute
     }
-    '/_app/grows/$growId/learning': {
-      id: '/_app/grows/$growId/learning'
-      path: '/learning'
+    '/_app/grows_/$growId_/learning': {
+      id: '/_app/grows_/$growId_/learning'
+      path: '/grows/$growId/learning'
       fullPath: '/grows/$growId/learning'
       preLoaderRoute: typeof AppGrowsGrowIdLearningRouteImport
-      parentRoute: typeof AppGrowsGrowIdRoute
+      parentRoute: typeof AppRoute
     }
-    '/_app/pheno-hunts/$id/keepers': {
-      id: '/_app/pheno-hunts/$id/keepers'
-      path: '/$id/keepers'
+    '/_app/pheno-hunts_/$id/keepers': {
+      id: '/_app/pheno-hunts_/$id/keepers'
+      path: '/pheno-hunts/$id/keepers'
       fullPath: '/pheno-hunts/$id/keepers'
       preLoaderRoute: typeof AppPhenoHuntsIdKeepersRouteImport
-      parentRoute: typeof AppPhenoHuntsRoute
+      parentRoute: typeof AppRoute
     }
-    '/_app/pheno-hunts/$id/workspace': {
-      id: '/_app/pheno-hunts/$id/workspace'
-      path: '/$id/workspace'
+    '/_app/pheno-hunts_/$id/workspace': {
+      id: '/_app/pheno-hunts_/$id/workspace'
+      path: '/pheno-hunts/$id/workspace'
       fullPath: '/pheno-hunts/$id/workspace'
       preLoaderRoute: typeof AppPhenoHuntsIdWorkspaceRouteImport
-      parentRoute: typeof AppPhenoHuntsRoute
+      parentRoute: typeof AppRoute
     }
-    '/_app/reports/post-grow/$growId': {
-      id: '/_app/reports/post-grow/$growId'
-      path: '/post-grow/$growId'
+    '/_app/reports_/post-grow/$growId': {
+      id: '/_app/reports_/post-grow/$growId'
+      path: '/reports/post-grow/$growId'
       fullPath: '/reports/post-grow/$growId'
       preLoaderRoute: typeof AppReportsPostGrowGrowIdRouteImport
-      parentRoute: typeof AppReportsRoute
+      parentRoute: typeof AppRoute
     }
     '/_app/genetics/health/$kind/$id': {
       id: '/_app/genetics/health/$kind/$id'
@@ -2838,6 +2878,7 @@ declare module '@tanstack/react-router' {
 
 interface AppOperatorRouteChildren {
   AppOperatorDiagnosticsRoute: typeof AppOperatorDiagnosticsRoute
+  AppOperatorDiagnosticsLightingMeasurementRoute: typeof AppOperatorDiagnosticsLightingMeasurementRoute
   AppOperatorDiagnosticsSeoArtifactsRoute: typeof AppOperatorDiagnosticsSeoArtifactsRoute
   AppOperatorIngestInspectorRoute: typeof AppOperatorIngestInspectorRoute
   AppOperatorLeadsRoute: typeof AppOperatorLeadsRoute
@@ -2877,6 +2918,8 @@ interface AppOperatorRouteChildren {
 
 const AppOperatorRouteChildren: AppOperatorRouteChildren = {
   AppOperatorDiagnosticsRoute: AppOperatorDiagnosticsRoute,
+  AppOperatorDiagnosticsLightingMeasurementRoute:
+    AppOperatorDiagnosticsLightingMeasurementRoute,
   AppOperatorDiagnosticsSeoArtifactsRoute:
     AppOperatorDiagnosticsSeoArtifactsRoute,
   AppOperatorIngestInspectorRoute: AppOperatorIngestInspectorRoute,
@@ -2938,69 +2981,6 @@ const AppOperatorRouteWithChildren = AppOperatorRoute._addFileChildren(
   AppOperatorRouteChildren,
 )
 
-interface AppActionsRouteChildren {
-  AppActionsActionIdRoute: typeof AppActionsActionIdRoute
-}
-
-const AppActionsRouteChildren: AppActionsRouteChildren = {
-  AppActionsActionIdRoute: AppActionsActionIdRoute,
-}
-
-const AppActionsRouteWithChildren = AppActionsRoute._addFileChildren(
-  AppActionsRouteChildren,
-)
-
-interface AppAlertsRouteChildren {
-  AppAlertsAlertIdRoute: typeof AppAlertsAlertIdRoute
-}
-
-const AppAlertsRouteChildren: AppAlertsRouteChildren = {
-  AppAlertsAlertIdRoute: AppAlertsAlertIdRoute,
-}
-
-const AppAlertsRouteWithChildren = AppAlertsRoute._addFileChildren(
-  AppAlertsRouteChildren,
-)
-
-interface AppBreedingRouteChildren {
-  AppBreedingProgramIdRoute: typeof AppBreedingProgramIdRoute
-  AppBreedingNewRoute: typeof AppBreedingNewRoute
-  AppBreedingLogNewRoute: typeof AppBreedingLogNewRoute
-}
-
-const AppBreedingRouteChildren: AppBreedingRouteChildren = {
-  AppBreedingProgramIdRoute: AppBreedingProgramIdRoute,
-  AppBreedingNewRoute: AppBreedingNewRoute,
-  AppBreedingLogNewRoute: AppBreedingLogNewRoute,
-}
-
-const AppBreedingRouteWithChildren = AppBreedingRoute._addFileChildren(
-  AppBreedingRouteChildren,
-)
-
-interface AppDoctorSessionsRouteChildren {
-  AppDoctorSessionsSessionIdRoute: typeof AppDoctorSessionsSessionIdRoute
-}
-
-const AppDoctorSessionsRouteChildren: AppDoctorSessionsRouteChildren = {
-  AppDoctorSessionsSessionIdRoute: AppDoctorSessionsSessionIdRoute,
-}
-
-const AppDoctorSessionsRouteWithChildren =
-  AppDoctorSessionsRoute._addFileChildren(AppDoctorSessionsRouteChildren)
-
-interface AppDoctorRouteChildren {
-  AppDoctorSessionsRoute: typeof AppDoctorSessionsRouteWithChildren
-}
-
-const AppDoctorRouteChildren: AppDoctorRouteChildren = {
-  AppDoctorSessionsRoute: AppDoctorSessionsRouteWithChildren,
-}
-
-const AppDoctorRouteWithChildren = AppDoctorRoute._addFileChildren(
-  AppDoctorRouteChildren,
-)
-
 interface AppGeneticsRouteChildren {
   AppGeneticsIndexRoute: typeof AppGeneticsIndexRoute
   AppGeneticsAccessionsIdRoute: typeof AppGeneticsAccessionsIdRoute
@@ -3021,163 +3001,107 @@ const AppGeneticsRouteWithChildren = AppGeneticsRoute._addFileChildren(
   AppGeneticsRouteChildren,
 )
 
-interface AppGrowsGrowIdRouteChildren {
-  AppGrowsGrowIdLearningRoute: typeof AppGrowsGrowIdLearningRoute
-}
-
-const AppGrowsGrowIdRouteChildren: AppGrowsGrowIdRouteChildren = {
-  AppGrowsGrowIdLearningRoute: AppGrowsGrowIdLearningRoute,
-}
-
-const AppGrowsGrowIdRouteWithChildren = AppGrowsGrowIdRoute._addFileChildren(
-  AppGrowsGrowIdRouteChildren,
-)
-
-interface AppGrowsRouteChildren {
-  AppGrowsGrowIdRoute: typeof AppGrowsGrowIdRouteWithChildren
-}
-
-const AppGrowsRouteChildren: AppGrowsRouteChildren = {
-  AppGrowsGrowIdRoute: AppGrowsGrowIdRouteWithChildren,
-}
-
-const AppGrowsRouteWithChildren = AppGrowsRoute._addFileChildren(
-  AppGrowsRouteChildren,
-)
-
-interface AppPhenoHuntsRouteChildren {
-  AppPhenoHuntsNewRoute: typeof AppPhenoHuntsNewRoute
-  AppPhenoHuntsIdKeepersRoute: typeof AppPhenoHuntsIdKeepersRoute
-  AppPhenoHuntsIdWorkspaceRoute: typeof AppPhenoHuntsIdWorkspaceRoute
-}
-
-const AppPhenoHuntsRouteChildren: AppPhenoHuntsRouteChildren = {
-  AppPhenoHuntsNewRoute: AppPhenoHuntsNewRoute,
-  AppPhenoHuntsIdKeepersRoute: AppPhenoHuntsIdKeepersRoute,
-  AppPhenoHuntsIdWorkspaceRoute: AppPhenoHuntsIdWorkspaceRoute,
-}
-
-const AppPhenoHuntsRouteWithChildren = AppPhenoHuntsRoute._addFileChildren(
-  AppPhenoHuntsRouteChildren,
-)
-
-interface AppPlantsRouteChildren {
-  AppPlantsIdRoute: typeof AppPlantsIdRoute
-}
-
-const AppPlantsRouteChildren: AppPlantsRouteChildren = {
-  AppPlantsIdRoute: AppPlantsIdRoute,
-}
-
-const AppPlantsRouteWithChildren = AppPlantsRoute._addFileChildren(
-  AppPlantsRouteChildren,
-)
-
-interface AppReportsRouteChildren {
-  AppReportsDiaryRangeRoute: typeof AppReportsDiaryRangeRoute
-  AppReportsPostGrowGrowIdRoute: typeof AppReportsPostGrowGrowIdRoute
-}
-
-const AppReportsRouteChildren: AppReportsRouteChildren = {
-  AppReportsDiaryRangeRoute: AppReportsDiaryRangeRoute,
-  AppReportsPostGrowGrowIdRoute: AppReportsPostGrowGrowIdRoute,
-}
-
-const AppReportsRouteWithChildren = AppReportsRoute._addFileChildren(
-  AppReportsRouteChildren,
-)
-
-interface AppSettingsRouteChildren {
-  AppSettingsAgentIntegrationsRoute: typeof AppSettingsAgentIntegrationsRoute
-  AppSettingsAnalyticsRoute: typeof AppSettingsAnalyticsRoute
-}
-
-const AppSettingsRouteChildren: AppSettingsRouteChildren = {
-  AppSettingsAgentIntegrationsRoute: AppSettingsAgentIntegrationsRoute,
-  AppSettingsAnalyticsRoute: AppSettingsAnalyticsRoute,
-}
-
-const AppSettingsRouteWithChildren = AppSettingsRoute._addFileChildren(
-  AppSettingsRouteChildren,
-)
-
-interface AppTentsRouteChildren {
-  AppTentsIdRoute: typeof AppTentsIdRoute
-}
-
-const AppTentsRouteChildren: AppTentsRouteChildren = {
-  AppTentsIdRoute: AppTentsIdRoute,
-}
-
-const AppTentsRouteWithChildren = AppTentsRoute._addFileChildren(
-  AppTentsRouteChildren,
-)
-
 interface AppRouteChildren {
   AppOperatorRoute: typeof AppOperatorRouteWithChildren
   AppActionQueueRoute: typeof AppActionQueueRoute
-  AppActionsRoute: typeof AppActionsRouteWithChildren
+  AppActionsRoute: typeof AppActionsRoute
   AppAiDoctorRoute: typeof AppAiDoctorRoute
-  AppAlertsRoute: typeof AppAlertsRouteWithChildren
-  AppBreedingRoute: typeof AppBreedingRouteWithChildren
+  AppAlertsRoute: typeof AppAlertsRoute
+  AppBreedingRoute: typeof AppBreedingRoute
   AppDailyCheckRoute: typeof AppDailyCheckRoute
   AppDashboardRoute: typeof AppDashboardRoute
-  AppDoctorRoute: typeof AppDoctorRouteWithChildren
+  AppDoctorRoute: typeof AppDoctorRoute
   AppGeneticsRoute: typeof AppGeneticsRouteWithChildren
   AppGrowLineageRoute: typeof AppGrowLineageRoute
   AppGrowRoomRoute: typeof AppGrowRoomRoute
-  AppGrowsRoute: typeof AppGrowsRouteWithChildren
+  AppGrowsRoute: typeof AppGrowsRoute
   AppHealthRoute: typeof AppHealthRoute
   AppInviteRoute: typeof AppInviteRoute
   AppLogsRoute: typeof AppLogsRoute
   AppOnboardingRoute: typeof AppOnboardingRoute
-  AppPhenoHuntsRoute: typeof AppPhenoHuntsRouteWithChildren
-  AppPlantsRoute: typeof AppPlantsRouteWithChildren
-  AppReportsRoute: typeof AppReportsRouteWithChildren
+  AppPhenoHuntsRoute: typeof AppPhenoHuntsRoute
+  AppPlantsRoute: typeof AppPlantsRoute
+  AppReportsRoute: typeof AppReportsRoute
   AppSensorsRoute: typeof AppSensorsRoute
-  AppSettingsRoute: typeof AppSettingsRouteWithChildren
+  AppSettingsRoute: typeof AppSettingsRoute
   AppStartRoomRoute: typeof AppStartRoomRoute
   AppTasksRoute: typeof AppTasksRoute
-  AppTentsRoute: typeof AppTentsRouteWithChildren
+  AppTentsRoute: typeof AppTentsRoute
   AppTimelineRoute: typeof AppTimelineRoute
   AppAccountPreferencesRoute: typeof AppAccountPreferencesRoute
+  AppActionsActionIdRoute: typeof AppActionsActionIdRoute
+  AppAlertsAlertIdRoute: typeof AppAlertsAlertIdRoute
+  AppBreedingProgramIdRoute: typeof AppBreedingProgramIdRoute
+  AppBreedingNewRoute: typeof AppBreedingNewRoute
   AppDiaryEnvironmentSummaryRoute: typeof AppDiaryEnvironmentSummaryRoute
   AppDiaryPhenoExpressionComparisonRoute: typeof AppDiaryPhenoExpressionComparisonRoute
+  AppDoctorSessionsRoute: typeof AppDoctorSessionsRoute
+  AppGrowsGrowIdRoute: typeof AppGrowsGrowIdRoute
+  AppPhenoHuntsNewRoute: typeof AppPhenoHuntsNewRoute
+  AppPlantsIdRoute: typeof AppPlantsIdRoute
+  AppReportsDiaryRangeRoute: typeof AppReportsDiaryRangeRoute
+  AppSettingsAgentIntegrationsRoute: typeof AppSettingsAgentIntegrationsRoute
+  AppSettingsAnalyticsRoute: typeof AppSettingsAnalyticsRoute
+  AppTentsIdRoute: typeof AppTentsIdRoute
+  AppBreedingLogNewRoute: typeof AppBreedingLogNewRoute
   AppDiaryStrainsSlugRoute: typeof AppDiaryStrainsSlugRoute
+  AppDoctorSessionsSessionIdRoute: typeof AppDoctorSessionsSessionIdRoute
+  AppGrowsGrowIdLearningRoute: typeof AppGrowsGrowIdLearningRoute
+  AppPhenoHuntsIdKeepersRoute: typeof AppPhenoHuntsIdKeepersRoute
+  AppPhenoHuntsIdWorkspaceRoute: typeof AppPhenoHuntsIdWorkspaceRoute
+  AppReportsPostGrowGrowIdRoute: typeof AppReportsPostGrowGrowIdRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppOperatorRoute: AppOperatorRouteWithChildren,
   AppActionQueueRoute: AppActionQueueRoute,
-  AppActionsRoute: AppActionsRouteWithChildren,
+  AppActionsRoute: AppActionsRoute,
   AppAiDoctorRoute: AppAiDoctorRoute,
-  AppAlertsRoute: AppAlertsRouteWithChildren,
-  AppBreedingRoute: AppBreedingRouteWithChildren,
+  AppAlertsRoute: AppAlertsRoute,
+  AppBreedingRoute: AppBreedingRoute,
   AppDailyCheckRoute: AppDailyCheckRoute,
   AppDashboardRoute: AppDashboardRoute,
-  AppDoctorRoute: AppDoctorRouteWithChildren,
+  AppDoctorRoute: AppDoctorRoute,
   AppGeneticsRoute: AppGeneticsRouteWithChildren,
   AppGrowLineageRoute: AppGrowLineageRoute,
   AppGrowRoomRoute: AppGrowRoomRoute,
-  AppGrowsRoute: AppGrowsRouteWithChildren,
+  AppGrowsRoute: AppGrowsRoute,
   AppHealthRoute: AppHealthRoute,
   AppInviteRoute: AppInviteRoute,
   AppLogsRoute: AppLogsRoute,
   AppOnboardingRoute: AppOnboardingRoute,
-  AppPhenoHuntsRoute: AppPhenoHuntsRouteWithChildren,
-  AppPlantsRoute: AppPlantsRouteWithChildren,
-  AppReportsRoute: AppReportsRouteWithChildren,
+  AppPhenoHuntsRoute: AppPhenoHuntsRoute,
+  AppPlantsRoute: AppPlantsRoute,
+  AppReportsRoute: AppReportsRoute,
   AppSensorsRoute: AppSensorsRoute,
-  AppSettingsRoute: AppSettingsRouteWithChildren,
+  AppSettingsRoute: AppSettingsRoute,
   AppStartRoomRoute: AppStartRoomRoute,
   AppTasksRoute: AppTasksRoute,
-  AppTentsRoute: AppTentsRouteWithChildren,
+  AppTentsRoute: AppTentsRoute,
   AppTimelineRoute: AppTimelineRoute,
   AppAccountPreferencesRoute: AppAccountPreferencesRoute,
+  AppActionsActionIdRoute: AppActionsActionIdRoute,
+  AppAlertsAlertIdRoute: AppAlertsAlertIdRoute,
+  AppBreedingProgramIdRoute: AppBreedingProgramIdRoute,
+  AppBreedingNewRoute: AppBreedingNewRoute,
   AppDiaryEnvironmentSummaryRoute: AppDiaryEnvironmentSummaryRoute,
   AppDiaryPhenoExpressionComparisonRoute:
     AppDiaryPhenoExpressionComparisonRoute,
+  AppDoctorSessionsRoute: AppDoctorSessionsRoute,
+  AppGrowsGrowIdRoute: AppGrowsGrowIdRoute,
+  AppPhenoHuntsNewRoute: AppPhenoHuntsNewRoute,
+  AppPlantsIdRoute: AppPlantsIdRoute,
+  AppReportsDiaryRangeRoute: AppReportsDiaryRangeRoute,
+  AppSettingsAgentIntegrationsRoute: AppSettingsAgentIntegrationsRoute,
+  AppSettingsAnalyticsRoute: AppSettingsAnalyticsRoute,
+  AppTentsIdRoute: AppTentsIdRoute,
+  AppBreedingLogNewRoute: AppBreedingLogNewRoute,
   AppDiaryStrainsSlugRoute: AppDiaryStrainsSlugRoute,
+  AppDoctorSessionsSessionIdRoute: AppDoctorSessionsSessionIdRoute,
+  AppGrowsGrowIdLearningRoute: AppGrowsGrowIdLearningRoute,
+  AppPhenoHuntsIdKeepersRoute: AppPhenoHuntsIdKeepersRoute,
+  AppPhenoHuntsIdWorkspaceRoute: AppPhenoHuntsIdWorkspaceRoute,
+  AppReportsPostGrowGrowIdRoute: AppReportsPostGrowGrowIdRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
@@ -3230,6 +3154,7 @@ const rootRouteChildren: RootRouteChildren = {
   PartnersCsvPreviewRoute: PartnersCsvPreviewRoute,
   SensorsCsvPreviewRoute: SensorsCsvPreviewRoute,
   StrainsSlugRoute: StrainsSlugRoute,
+  ToolsBlueprintTargetsRoute: ToolsBlueprintTargetsRoute,
   ToolsVpdCalculatorRoute: ToolsVpdCalculatorRoute,
   CultivarsIndexRoute: CultivarsIndexRoute,
   GuidesIndexRoute: GuidesIndexRoute,

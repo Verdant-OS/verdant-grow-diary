@@ -42,7 +42,7 @@ function makeFakeClient(
     chain.update = setOp("update");
     chain.delete = setOp("delete");
     chain.select = () => chain;
-    for (const kind of ["eq", "is", "in"]) {
+    for (const kind of ["eq", "is", "in", "limit", "order"]) {
       chain[kind] = () => chain;
     }
     chain.single = () => Promise.resolve(respond(call));

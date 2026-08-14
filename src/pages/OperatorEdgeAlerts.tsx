@@ -805,7 +805,7 @@ export default function OperatorEdgeAlerts() {
                   <Button
                     variant="outline"
                     size="icon"
-                    className="h-11 w-11 sm:h-9 sm:w-9"
+                    className="h-11 w-11 shrink-0 sm:h-9 sm:w-9"
                     onClick={() => setDispatchPage(0)}
                     disabled={dispatchPage === 0}
                     aria-label="First page"
@@ -838,7 +838,7 @@ export default function OperatorEdgeAlerts() {
                   <Button
                     variant="outline"
                     size="icon"
-                    className="h-11 w-11 sm:h-9 sm:w-9"
+                    className="h-11 w-11 shrink-0 sm:h-9 sm:w-9"
                     onClick={() => setDispatchPage(pageCount - 1)}
                     disabled={dispatchPage >= pageCount - 1}
                     aria-label="Last page"
@@ -956,7 +956,7 @@ export default function OperatorEdgeAlerts() {
                   <Button
                     variant="outline"
                     size="icon"
-                    className="h-11 w-11 sm:h-9 sm:w-9"
+                    className="h-11 w-11 shrink-0 sm:h-9 sm:w-9"
                     onClick={() => setAttemptsPage(0)}
                     disabled={attemptsPage === 0}
                     aria-label="First page"
@@ -989,7 +989,7 @@ export default function OperatorEdgeAlerts() {
                   <Button
                     variant="outline"
                     size="icon"
-                    className="h-11 w-11 sm:h-9 sm:w-9"
+                    className="h-11 w-11 shrink-0 sm:h-9 sm:w-9"
                     onClick={() => setAttemptsPage(attemptsPageCount - 1)}
                     disabled={attemptsPage >= attemptsPageCount - 1}
                     aria-label="Last page"

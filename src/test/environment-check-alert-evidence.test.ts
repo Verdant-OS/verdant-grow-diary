@@ -8,6 +8,8 @@
  *     gates; a stale one does not.
  *  3. The diary fence is untouched: sensor_snapshot blobs remain `diary`
  *     and remain non-persistable — this slice widens nothing.
+ *
+ * #603 (diary evidence trail) lives in environment-check-diary-evidence-ref.test.ts.
  */
 import { describe, expect, it } from "vitest";
 import { snapshotFromDiary, snapshotFromEnvironmentCheck } from "@/lib/sensorSnapshot";
@@ -113,6 +115,13 @@ describe("snapshotFromEnvironmentCheck (#596)", () => {
       }),
     ).toBeNull();
   });
+
+  it("never populates metric_refs (sensor_readings contract)", () => {
+    const snap = snapshotFromEnvironmentCheck(minutesAgoIso(1), envelope(), {
+      diaryEntryId: "diary-x",
+    });
+    expect(snap?.metric_refs).toBeUndefined();
+  });
 });
 
 describe("alert-persistence eligibility (#596)", () => {
@@ -129,8 +138,26 @@ describe("alert-persistence eligibility (#596)", () => {
     ).toBe(true);
   });
 
-  it("a stale env-check snapshot is not persistable", () => {
-    const snap = snapshotFromEnvironmentCheck(minutesAgoIso(31), envelope());
+  // Env-check snapshots are labelled `manual`. The #592 canon widened the
+  // manual window to 24h for DISPLAY, but alert PERSISTENCE holds every source
+  // to the live window — an `alerts` row asserts the problem is happening now
+  // and is stamped first_seen_at = now(). Both sides of the boundary are
+  // pinned so the bar cannot drift back to the display window.
+  it("a stale env-check snapshot (past the live window) is not persistable", () => {
+    const snap = snapshotFromEnvironmentCheck(minutesAgoIso(25 * 60), envelope());
+    expect(snap).not.toBeNull();
+    expect(
+      isSnapshotPersistable({
+        snapshot: snap,
+        quality: "watch",
+        isDemoData: false,
+        now: NOW,
+      }),
+    ).toBe(false);
+  });
+
+  it("an env-check snapshot inside the 24h DISPLAY window is still NOT persistable", () => {
+    const snap = snapshotFromEnvironmentCheck(minutesAgoIso(23 * 60), envelope());
     expect(snap).not.toBeNull();
     expect(
       isSnapshotPersistable({

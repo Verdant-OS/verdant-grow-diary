@@ -35,6 +35,19 @@ export const DIARY_NOTE_SECTION_LABELS = [
 export type DiaryNoteSectionLabel = (typeof DIARY_NOTE_SECTION_LABELS)[number];
 
 /**
+ * Repair missing spaces after sentence-ending punctuation
+ * ("Watered today.Full watering to runoff" → "Watered today. Full watering
+ * to runoff"). Letter-to-letter only, so decimals ("6.2") and file-ish
+ * tokens with digits stay intact. Shared by presenters that render stored
+ * note text verbatim (calendar snippets, watering history previews) — the
+ * stored row is never mutated.
+ */
+export function repairDiaryNoteSentenceSpacing(raw: string | null | undefined): string {
+  if (typeof raw !== "string") return "";
+  return raw.replace(/([A-Za-z])([.!?])([A-Za-z])/g, "$1$2 $3");
+}
+
+/**
  * Normalize a diary note for display:
  *   - Repair missing spaces after sentence-ending punctuation ("a.B" → "a. B").
  *   - Collapse runs of whitespace into single spaces.
@@ -54,7 +67,7 @@ export function normalizeDiaryNoteText(raw: string | null | undefined): string {
   // 1. Repair "a.B" / "a!B" / "a?B" → "a. B" (no space after sentence end).
   //    Skip common decimal / abbreviation cases by requiring the preceding
   //    char to be a letter, not a digit.
-  text = text.replace(/([A-Za-z])([.!?])([A-Za-z])/g, "$1$2 $3");
+  text = repairDiaryNoteSentenceSpacing(text);
 
   // 2. Collapse doubled section labels (case-insensitive), e.g.
   //    "Response check: Response check: Better." → "Response check: Better."

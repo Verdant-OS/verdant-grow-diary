@@ -28,7 +28,7 @@ const TARGET_ENV = (process.env.TARGET_ENV ?? "").trim().toLowerCase();
 
 const SECRET_NAMES = {
   sandbox: "SUPABASE_DB_URL_SANDBOX",
-  live: "SUPABASE_DB_URL_LIVE",
+  live: "SUPABASE_DB_URL",
 };
 
 if (!TARGET_ENV || !(TARGET_ENV in SECRET_NAMES)) {
@@ -40,14 +40,15 @@ if (!TARGET_ENV || !(TARGET_ENV in SECRET_NAMES)) {
 
 const secretName = SECRET_NAMES[TARGET_ENV];
 const envLabel = TARGET_ENV.toUpperCase();
+const githubEnvironment = TARGET_ENV === "live" ? "verdant-production" : "verdant-sandbox";
 
 const code = assertRequiredCiSecret({
   secretName,
   secretValue: process.env.SUPABASE_DB_URL,
   guardHeading: `Money-critical migration deploy guard — ${envLabel}`,
   fixSteps: [
-    "1. Open **Settings → Secrets and variables → Actions** in this repository.",
-    `2. Add a repository secret named \`${secretName}\` whose value is the pooled Postgres connection string for the ${envLabel} database (the same URL used by \`supabase db push\`).`,
+    `1. Open **Settings → Environments → ${githubEnvironment}** in this repository.`,
+    `2. Add an environment secret named \`${secretName}\` whose value is the pooled Postgres connection string for the ${envLabel} database (the same URL used by \`supabase db push\`).`,
     `3. Re-run this workflow. The gate will run \`node scripts/assert-required-money-migrations-applied.mjs\` against ${envLabel} and confirm every money-critical migration is applied.`,
   ],
   reasonLines: [

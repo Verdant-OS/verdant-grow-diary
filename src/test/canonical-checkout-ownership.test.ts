@@ -99,7 +99,10 @@ describe("Canonical checkout ownership — static guard", () => {
   it("PhenoTrackerUpgradeGate targets /pricing (never /upgrade or /billing)", () => {
     const f = ALL.find((x) => x.file.endsWith("components/PhenoTrackerUpgradeGate.tsx"));
     expect(f).toBeDefined();
-    expect(f!.text).toMatch(/["']\/pricing/);
+    // Backtick included: the gate now builds `/pricing?…` via a template
+    // literal (plan preselect + returnTo). The guard's intent is unchanged —
+    // pricing, never /upgrade or /billing.
+    expect(f!.text).toMatch(/["'`]\/pricing/);
     expect(f!.text).not.toMatch(/["']\/upgrade["'`?]/);
     expect(f!.text).not.toMatch(/["']\/billing\//);
   });

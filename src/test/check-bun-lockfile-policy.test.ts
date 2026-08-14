@@ -8,6 +8,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import {
+  BUN_LOCK_SECURITY_FLOORS,
   FORBIDDEN_LOCKFILES,
   PACKAGE_LOCK_SECURITY_FLOORS,
   evaluatePolicy,
@@ -47,6 +48,12 @@ function bunLock(manifest = packageJson()) {
     overrides: manifest.overrides,
     packages: {
       [MCP]: [`${MCP}@0.24.0`, "", {}],
+      ...Object.fromEntries(
+        Object.entries(BUN_LOCK_SECURITY_FLOORS).map(([name, version]) => [
+          name,
+          [`${name}@${version}`, "", {}],
+        ]),
+      ),
     },
   });
 }
@@ -240,15 +247,18 @@ describe("evaluatePolicy", () => {
   });
 
   it("fails when an exact npm override is not resolved consistently", () => {
-    const manifest = packageJson("0.24.0", { "fast-uri": "3.1.4" });
+    const manifest = packageJson("0.24.0", { "fast-uri": "3.1.5" });
     const stale = packageLock(manifest);
     stale.packages["node_modules/fast-uri"]!.version = "3.0.0";
     expect(evaluate(policyFiles({ manifest, npmLock: stale })).errors.join(" ")).toContain(
-      "package-lock.json override for fast-uri@3.1.4 is not synchronized",
+      "package-lock.json override for fast-uri@3.1.5 is not synchronized",
     );
   });
 
   it.each([
+    ["@hono/node-server", "2.0.9"],
+    ["@modelcontextprotocol/sdk", "1.29.0"],
+    ["hono", "4.12.33"],
     ["postcss", "8.5.6"],
     ["postcss", "8.5.18-rc.0"],
     ["brace-expansion", "1.1.17"],
@@ -261,6 +271,24 @@ describe("evaluatePolicy", () => {
       `package-lock.json security floor for ${packageName}`,
     );
   });
+
+  it.each([
+    ["@hono/node-server", "2.0.9"],
+    ["@modelcontextprotocol/sdk", "1.29.0"],
+    ["hono", "4.12.33"],
+    ["esbuild", "0.28.0"],
+  ])(
+    "fails when the canonical Bun graph regresses the %s security floor",
+    (packageName, version) => {
+      const files = policyFiles();
+      const stale = JSON.parse(files[at("bun.lock")]);
+      stale.packages[packageName][0] = `${packageName}@${version}`;
+      files[at("bun.lock")] = JSON.stringify(stale);
+      expect(evaluate(files).errors.join(" ")).toContain(
+        `bun.lock security floor for ${packageName}`,
+      );
+    },
+  );
 
   it.each(["2.1.3", "3.0.5", "4.0.1", "5.0.8"])(
     "fails when brace-expansion regresses to vulnerable release %s",

@@ -332,7 +332,7 @@ export default function CultivarPage() {
                     <a
                       href={source.url}
                       target="_blank"
-                      rel="noreferrer"
+                      rel="noopener noreferrer"
                       className="font-medium underline-offset-4 hover:underline"
                     >
                       {source.title}

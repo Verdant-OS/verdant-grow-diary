@@ -588,38 +588,124 @@ function scanActivePermissivePolicies(migrations) {
 }
 
 function scanTablesWithoutRls(migrations) {
-  // Collect all public tables created and all ENABLE ROW LEVEL SECURITY
-  // targets across the whole migrations tree. A CREATE TABLE without a
-  // matching enable anywhere is flagged against the migration that
-  // creates it.
-  const created = new Map(); // table -> {migration, snippet}
-  const enabled = new Set();
+  // Replay CREATE / ENABLE / DROP events in source order. A table that
+  // survives the migration tree without RLS is reportable; a transaction-local
+  // self-test table that is dropped before commit is not a persistent surface.
+  // A later CREATE after DROP starts a fresh state and must enable RLS again.
+  const tables = new Map(); // table -> {migration, snippet, enabled}
   const createRe = /CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?public\.([a-zA-Z0-9_]+)/gi;
   const enableRe =
     /ALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?(?:ONLY\s+)?public\.([a-zA-Z0-9_]+)\s+ENABLE\s+ROW\s+LEVEL\s+SECURITY/gi;
+  const dropRe = /DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?public\.([a-zA-Z0-9_]+)/gi;
   for (const m of migrations) {
+    const events = [];
     let match;
     while ((match = createRe.exec(m.sql))) {
       const t = match[1].toLowerCase();
-      if (!created.has(t)) {
-        const idx = match.index;
-        const snippet = m.sql.slice(idx, idx + 200).replace(/\s+/g, " ");
-        created.set(t, { migration: m.name, snippet });
-      }
+      const snippet = m.sql.slice(match.index, match.index + 200).replace(/\s+/g, " ");
+      events.push({ kind: "create", table: t, index: match.index, snippet });
     }
     while ((match = enableRe.exec(m.sql))) {
-      enabled.add(match[1].toLowerCase());
+      events.push({ kind: "enable", table: match[1].toLowerCase(), index: match.index });
+    }
+    while ((match = dropRe.exec(m.sql))) {
+      events.push({ kind: "drop", table: match[1].toLowerCase(), index: match.index });
+    }
+    events.sort((a, b) => a.index - b.index);
+    for (const event of events) {
+      if (event.kind === "create") {
+        tables.set(event.table, {
+          migration: m.name,
+          snippet: event.snippet,
+          enabled: false,
+        });
+      } else if (event.kind === "enable") {
+        const state = tables.get(event.table);
+        if (state) state.enabled = true;
+      } else {
+        tables.delete(event.table);
+      }
     }
   }
   const findings = [];
-  for (const [table, info] of created) {
-    if (enabled.has(table)) continue;
+  for (const [table, info] of tables) {
+    if (info.enabled) continue;
     findings.push({
       scanner: "TABLE_WITHOUT_RLS",
       migration: info.migration,
       subject: `public.${table}`,
       snippet: info.snippet.slice(0, 240),
     });
+  }
+  return findings;
+}
+
+/**
+ * APPLY_TIME_SELFTEST
+ *
+ * Rejects migration-time "prove it worked" self-tests: a top-level DO block
+ * that creates a disposable object, asserts something about it, and raises
+ * on failure.
+ *
+ * This is not hypothetical. 20260805090000 shipped exactly that shape --
+ * create a throwaway function, assert it is not anon-executable, RAISE
+ * EXCEPTION otherwise. The assertion was wrong on a fresh local stack, and
+ * because the DO block ran in the same transaction as every real statement,
+ * the RAISE rolled back the ENTIRE migration. It then failed on every
+ * subsequent apply, so the migration runner stopped there and SEVEN later
+ * migrations never reached production for six days -- including an
+ * action_queue_create RPC that shipped client code already calling it.
+ *
+ * The failure mode is structural, not incidental: an apply-time assertion
+ * about database behaviour converts "my belief about Postgres is wrong"
+ * into "the deployment pipeline is frozen". Assert in a test harness, where
+ * being wrong costs a red check instead of a stalled queue.
+ *
+ * Deliberately NOT flagged: RAISE EXCEPTION inside a CREATE FUNCTION body
+ * (trigger/RPC validation). Those fire at runtime on bad input, which is
+ * correct and common -- see 20260806230020.
+ *
+ * Detection is by disposability, not by name, so renaming the throwaway
+ * object does not evade it: an object CREATEd and DROPped within the same
+ * DO block exists only to be measured.
+ */
+function scanApplyTimeSelftest(migration, sql) {
+  const findings = [];
+  // Top-level DO blocks only. $tag$-quoted bodies are matched non-greedily
+  // on their own tag so adjacent blocks are not merged.
+  const doBlockRe = /\bDO\s+(\$[A-Za-z_]*\$)([\s\S]*?)\1/gi;
+  let block;
+  while ((block = doBlockRe.exec(sql))) {
+    const body = block[2];
+    if (!/\bRAISE\s+EXCEPTION\b/i.test(body)) continue;
+
+    // Objects created inside this block (directly or via EXECUTE '...').
+    const created = new Set();
+    const createRe = /\bCREATE\s+(?:OR\s+REPLACE\s+)?(FUNCTION|TABLE)\s+([A-Za-z0-9_."]+)/gi;
+    let c;
+    while ((c = createRe.exec(body))) {
+      created.add(`${c[1].toUpperCase()}:${c[2].replace(/"/g, "").toLowerCase()}`);
+    }
+    if (created.size === 0) continue;
+
+    // Dropped in the same block == disposable by construction.
+    const dropped = new Set();
+    const dropRe = /\bDROP\s+(FUNCTION|TABLE)\s+(?:IF\s+EXISTS\s+)?([A-Za-z0-9_."]+)/gi;
+    let d;
+    while ((d = dropRe.exec(body))) {
+      dropped.add(`${d[1].toUpperCase()}:${d[2].replace(/"/g, "").toLowerCase()}`);
+    }
+
+    for (const obj of created) {
+      const isDisposable = dropped.has(obj) || /selftest|self_test|__probe|__tmp|__test/i.test(obj);
+      if (!isDisposable) continue;
+      findings.push({
+        scanner: "APPLY_TIME_SELFTEST",
+        migration,
+        subject: obj.split(":")[1],
+        snippet: body.trim().slice(0, 240).replace(/\s+/g, " "),
+      });
+    }
   }
   return findings;
 }
@@ -632,6 +718,7 @@ function scanAll(migrations) {
       const a = scanSearchPathMutable(m.name, stmt);
       if (a) findings.push(a);
     }
+    findings.push(...scanApplyTimeSelftest(m.name, m.sql));
   }
   findings.push(...scanActivePermissivePolicies(migrations));
   findings.push(...scanTablesWithoutRls(migrations));

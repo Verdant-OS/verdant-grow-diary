@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -18,6 +18,101 @@ const ACTIVE_PAGE = PAGE.slice(
   PAGE.indexOf("const ageDays"),
   PAGE.indexOf("function ArchivedPlantBanner"),
 );
+
+const FRESHNESS_E2E_PATH = "e2e/ai-doctor-freshness-gate.spec.ts";
+const FRESHNESS_E2E = readFileSync(resolve(ROOT, FRESHNESS_E2E_PATH), "utf8");
+
+/**
+ * Test ids the mocked AI Doctor freshness lane needs Plant Detail to be able
+ * to render. A Playwright lane cannot defend itself: when a6972773d unmounted
+ * PlantDetailDoctorContextPreview, it silently orphaned every id that spec
+ * drove, and the lane just failed on a helper line until someone re-pointed it
+ * by hand. Nothing said "the page no longer mounts your subject".
+ *
+ * The two assertions below say exactly that, in ~100ms of vitest: these ids
+ * must be reachable from Plant Detail's real import graph, and the spec must
+ * still reference them, so neither side drifts away from the other unnoticed.
+ *
+ * Scoped to ids the spec asserts POSITIVELY somewhere. `plant-ai-doctor-live-review`
+ * is absent in the blocked scenario but visible in the other two, so it must
+ * still be renderable. Ids only ever asserted absent are excluded — requiring
+ * those to be mountable would invert their meaning.
+ */
+const FRESHNESS_E2E_REQUIRED_TEST_IDS = [
+  "plant-detail-disclosure-ai-trigger",
+  "plant-detail-disclosure-ai-content",
+  "plant-ai-doctor-context-panel",
+  "plant-ai-doctor-live-review",
+  "plant-ai-doctor-live-review-start",
+] as const;
+
+/** Resolve a `@/…` specifier to a real file under src/. */
+function resolveAliasImport(specifier: string): string | null {
+  if (!specifier.startsWith("@/")) return null;
+  const base = resolve(ROOT, "src", specifier.slice(2));
+  for (const candidate of [`${base}.tsx`, `${base}.ts`, resolve(base, "index.tsx")]) {
+    if (existsSync(candidate)) return candidate;
+  }
+  return null;
+}
+
+/**
+ * Every file transitively reachable from Plant Detail through `@/components`
+ * imports — i.e. everything the page can actually put on screen.
+ */
+function collectMountedSources(entry: string): string[] {
+  const seen = new Set<string>();
+  const queue = [entry];
+  const sources: string[] = [];
+
+  while (queue.length > 0) {
+    const file = queue.shift() as string;
+    if (seen.has(file)) continue;
+    seen.add(file);
+
+    const source = readFileSync(file, "utf8");
+    sources.push(source);
+
+    for (const match of source.matchAll(/from\s+"(@\/components\/[^"]+)"/g)) {
+      const next = resolveAliasImport(match[1]);
+      if (next) queue.push(next);
+    }
+  }
+  return sources;
+}
+
+function escapeRegExp(literal: string): string {
+  return literal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Can this mount graph render `testId`? Covers the four shapes the repo uses:
+ * a literal attribute, a `const SOMETHING_TEST_ID = "…"` indirection, a
+ * template attribute (`data-testid={`plant-detail-disclosure-${group}-trigger`}`),
+ * and a computed expression — PlantDetailAiDoctorLiveReview picks between
+ * `-start` and `-retry` with a ternary inside `data-testid={…}`.
+ */
+function canRenderTestId(sources: string[], testId: string): boolean {
+  const escaped = escapeRegExp(testId);
+  const literalAttr = `data-testid="${testId}"`;
+  const constAssignment = new RegExp(`_TEST_ID\\s*=\\s*"${escaped}"`);
+  // `[^}]*` spans newlines (negated class), so a multi-line ternary matches.
+  const computedAttr = new RegExp(`data-testid=\\{[^}]*"${escaped}"`);
+
+  for (const source of sources) {
+    if (source.includes(literalAttr)) return true;
+    if (constAssignment.test(source)) return true;
+    if (computedAttr.test(source)) return true;
+
+    for (const match of source.matchAll(/data-testid=\{`([^`]+)`\}/g)) {
+      // Split on the interpolations, escape the literal chunks, and let each
+      // `${…}` stand for one test-id segment.
+      const pattern = match[1].split(/\$\{[^}]*\}/).map(escapeRegExp).join("[a-z0-9-]+");
+      if (new RegExp(`^${pattern}$`).test(testId)) return true;
+    }
+  }
+  return false;
+}
 
 function count(source: string, token: string) {
   return source.split(token).length - 1;
@@ -73,6 +168,34 @@ describe("Plant Detail information architecture", () => {
       expect(countComponent(ACTIVE_PAGE, component), component).toBe(0);
       expect(PAGE).not.toMatch(new RegExp(`import\\s+${component}\\s+from`));
     }
+  });
+
+  it("keeps every test id the freshness e2e drives reachable from the real mount graph", () => {
+    const mounted = collectMountedSources(resolve(ROOT, "src/pages/PlantDetail.tsx"));
+
+    // Sanity-check the walker, so a resolver regression that silently returned
+    // an empty graph cannot make the real assertion vacuously pass.
+    expect(mounted.length).toBeGreaterThan(1);
+
+    const unreachable = FRESHNESS_E2E_REQUIRED_TEST_IDS.filter(
+      (testId) => !canRenderTestId(mounted, testId),
+    );
+    expect(
+      unreachable,
+      `${FRESHNESS_E2E_PATH} drives test ids that nothing mounted on Plant Detail can render. ` +
+        `Either the surface was unmounted (fix the page) or the lane outlived its subject (re-point the spec).`,
+    ).toEqual([]);
+  });
+
+  it("keeps the freshness e2e actually driving the test ids pinned above", () => {
+    const unused = FRESHNESS_E2E_REQUIRED_TEST_IDS.filter(
+      (testId) => !FRESHNESS_E2E.includes(`"${testId}"`),
+    );
+    expect(
+      unused,
+      `These ids are pinned as load-bearing but ${FRESHNESS_E2E_PATH} no longer references them. ` +
+        `Update the list deliberately so the mount-graph guard keeps matching the spec.`,
+    ).toEqual([]);
   });
 
   it("keeps visible readiness content inside the Ask Doctor anchor when live review is blocked", () => {

@@ -7,12 +7,22 @@
  * writes, and no model invocations are triggered by rendering.
  */
 import { describe, it, expect, vi } from "vitest";
-import { render } from "@testing-library/react";
+import { render as rtlRender } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactElement } from "react";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import {
   PHOTO_NON_DIAGNOSTIC_LABEL,
   PHOTO_NON_DIAGNOSTIC_TESTID,
 } from "@/lib/photoEventNonDiagnosticLabelRules";
+
+// PhotoHistoryPanel mounts the revision-badge query hook (#786), so its
+// renders need a QueryClientProvider even though the hook is disabled here
+// (no Quick Log handle resolves from these plain diary rows).
+function render(ui: ReactElement) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+  return rtlRender(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+}
 
 import PhotoHistoryPanel from "@/components/PhotoHistoryPanel";
 import PlantRecentActivityPanel from "@/components/PlantRecentActivityPanel";

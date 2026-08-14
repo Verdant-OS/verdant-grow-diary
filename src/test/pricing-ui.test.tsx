@@ -160,6 +160,24 @@ describe("Pricing constants completeness", () => {
     const allText = AI_CREDIT_EXPLAINER.points.join(" ").toLowerCase();
     expect(allText).not.toContain("unlimited ai");
   });
+
+  it("credit-pack note scopes the $9/$19 offer to the plans that can actually buy it", () => {
+    // Regression: the note previously advertised "(50 for $9, 150 for $19)"
+    // with no eligibility scoping, directly above a pack section whose
+    // buttons are disabled for anonymous and free viewers (see
+    // creditPackEligibility.ts / resolveCreditPackPurchaseGate). Free and
+    // signed-out visitors read a price they could not act on.
+    expect(AI_CREDIT_EXPLAINER.note).toContain("Pro, Craft and Founder");
+    // The price-bearing sentence and the eligibility clause must be the
+    // same sentence, not merely present somewhere in the note — otherwise
+    // this assertion would pass for a note that re-introduces an
+    // unscoped price mention elsewhere in the string.
+    const priceSentence = AI_CREDIT_EXPLAINER.note
+      .split(/(?<=[.!?])\s+/)
+      .find((s) => s.includes("$9"));
+    expect(priceSentence).toBeDefined();
+    expect(priceSentence).toMatch(/Pro, Craft and Founder/);
+  });
 });
 
 describe("Pricing page safety — no write paths", () => {

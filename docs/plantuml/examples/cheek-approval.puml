@@ -1,0 +1,51 @@
+' Example: Cheek approval decision core (activity)
+' Render from any directory — the include below is resolved relative to
+' THIS file, not the plantuml launch directory:
+'   plantuml -tsvg docs/plantuml/examples/cheek-approval.puml
+
+@startuml cheek_approval_decision_core
+!include ../style.puml
+
+title Cheek approval decision core
+
+start
+:CHEEK_APPROVAL_PACKET\n+ required CI + security;
+if (Security FAIL?) then (yes)
+  #FFCDD2:STOP-SHIP\nremediate before re-ask;
+  stop
+else (no)
+  if (Required evidence OK?\nand domain decided?) then (yes)
+    switch (single_ask?)
+    case ( merge )
+      #C8E6C9:Merge to verdant-grow-diary;
+      :Optional production verify\nCURRENT_STATE discipline;
+    case ( close )
+      #BBDEFB:CLOSE_SUPERSEDED;
+    case ( reassign )
+      #E1BEE7:REASSIGN role / slice;
+    case ( domain )
+      #BBDEFB:DOMAIN_DECISION recorded;
+    endswitch
+  else (no)
+    #FFE0B2:HOLD / CHANGES_REQUESTED;
+  endif
+endif
+stop
+
+legend right
+  |= Style |= Meaning |
+  | <#FFCDD2> | stop-ship |
+  | <#FFE0B2> | hold / changes |
+  | <#C8E6C9> | merge / approve |
+  | <#BBDEFB> | process / packet |
+  | <#E1BEE7> | reassign (human) |
+endlegend
+
+note right
+  Shared look: ../style.puml
+  Authority + handoff rules: AGENTS.md and
+  docs/agents/HANDOFF_PROTOCOL.md.
+  GitHub-native agent docs still prefer Mermaid.
+end note
+
+@enduml

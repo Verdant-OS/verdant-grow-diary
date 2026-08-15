@@ -20,6 +20,7 @@ import type { EcUnit } from "@/constants/units";
 import {
   buildEnvironmentCheckTimelineViewModel,
   ENVIRONMENT_CHECK_TIMELINE_SOURCE_LABEL,
+  resolveEffectiveQuickLogCareType,
   type EnvironmentCheckTimelineRawEntry,
 } from "@/lib/environmentCheckTimelineViewModel";
 import { TRAINING_INTENSITIES, TRAINING_TECHNIQUES } from "@/lib/quickLogTypedEventPayloadRules";
@@ -164,6 +165,8 @@ export interface DiaryCalendarRawEntry {
   id: string;
   entry_at?: string | null;
   occurred_at?: string | null;
+  entry_type?: string | null;
+  entryType?: string | null;
   /**
    * Optional manual grow stage recorded with the entry. Only the calendar's
    * four explicit color stages are carried into the display model; unfamiliar
@@ -172,6 +175,7 @@ export interface DiaryCalendarRawEntry {
   stage?: string | null;
   /** Optional explicit kind; otherwise read from details.event_type. */
   event_type?: string | null;
+  eventType?: string | null;
   note?: string | null;
   details?: unknown;
 }
@@ -510,13 +514,7 @@ function buildEventDetails(
 }
 
 function extractKind(entry: DiaryCalendarRawEntry): DiaryCalendarEventKind | null {
-  const direct = normalizeKind(entry.event_type);
-  if (direct) return direct;
-  if (entry.details && typeof entry.details === "object") {
-    const et = (entry.details as Record<string, unknown>).event_type;
-    return normalizeKind(et);
-  }
-  return null;
+  return normalizeKind(resolveEffectiveQuickLogCareType(entry));
 }
 
 function toIso(value: string | null | undefined): string | null {

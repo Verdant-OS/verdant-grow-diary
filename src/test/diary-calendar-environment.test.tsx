@@ -119,6 +119,74 @@ describe("Diary Calendar — Environment Check", () => {
     }
     expect(liveMatches.length).toBeLessThanOrEqual(2);
   });
+
+  it("classifies a legacy Observation carrying an environment envelope as Environment", () => {
+    const groups = buildDiaryCalendarViewModel([
+      {
+        id: "legacy-env",
+        entry_at: "2026-06-10T11:00:00Z",
+        event_type: "observation",
+        details: { event_type: "observation", environment_check: { temp_c: 23, humidity_pct: 54 } },
+      },
+    ]);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].events).toHaveLength(1);
+    expect(groups[0].events[0].kind).toBe("environment");
+    expect(groups[0].counts.environment).toBe(1);
+  });
+
+  it("keeps Watering classified as Watering when sensor context is attached", () => {
+    const groups = buildDiaryCalendarViewModel([
+      {
+        id: "water-with-context",
+        entry_at: "2026-06-10T12:00:00Z",
+        event_type: "watering",
+        details: {
+          event_type: "watering",
+          sensor: { source: "manual" },
+          environment_check: { temp_c: 23 },
+        },
+      },
+    ]);
+    expect(groups[0].events[0].kind).toBe("watering");
+    expect(groups[0].counts.watering).toBe(1);
+    expect(groups[0].counts.environment).toBe(0);
+  });
+
+  it("keeps details-only Watering classified as Watering when environment context is attached", () => {
+    const groups = buildDiaryCalendarViewModel([
+      {
+        id: "details-only-water-with-context",
+        entry_at: "2026-06-10T12:30:00Z",
+        details: {
+          event_type: "watering",
+          environment_check: { temp_c: 23 },
+        },
+      },
+    ]);
+    expect(groups[0].events[0].kind).toBe("watering");
+    expect(groups[0].counts.watering).toBe(1);
+    expect(groups[0].counts.environment).toBe(0);
+  });
+
+  it("excludes ordinary Observations and malformed envelope lookalikes", () => {
+    expect(
+      buildDiaryCalendarViewModel([
+        {
+          id: "ordinary-observation",
+          entry_at: "2026-06-10T13:00:00Z",
+          event_type: "observation",
+          details: { note_kind: "visual" },
+        },
+        {
+          id: "malformed-environment",
+          entry_at: "2026-06-10T14:00:00Z",
+          event_type: "observation",
+          details: { environment_check: [] },
+        },
+      ]),
+    ).toEqual([]);
+  });
 });
 
 describe("Static safety: diaryCalendarViewModel + envCheckCalendarViewModel", () => {

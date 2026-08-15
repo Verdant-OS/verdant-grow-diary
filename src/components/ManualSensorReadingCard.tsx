@@ -161,6 +161,7 @@ export default function ManualSensorReadingCard({
   const [form, setForm] = useState<ManualEntryInput>(() =>
     correctionToPrefill(correction, airTempUnit),
   );
+  const [hasEditedReading, setHasEditedReading] = useState(false);
   const [devicePreset, setDevicePreset] = useState<string>("none");
   const [deviceCustom, setDeviceCustom] = useState<string>("");
   const [reviewOpen, setReviewOpen] = useState(false);
@@ -183,6 +184,7 @@ export default function ManualSensorReadingCard({
       interactionRevisionRef.current += 1;
       setTentId(nextTentId);
       setForm(nextForm);
+      setHasEditedReading(false);
       setDevicePreset("none");
       setDeviceCustom("");
       setReviewOpen(false);
@@ -336,6 +338,7 @@ export default function ManualSensorReadingCard({
 
   function update<K extends keyof ManualEntryInput>(key: K, value: string) {
     interactionRevisionRef.current += 1;
+    setHasEditedReading(true);
     setForm((f) => ({ ...f, [key]: value }));
     // Any edit invalidates a previously-shown review prompt so it must be
     // re-triggered on the next save attempt against the new values.
@@ -445,6 +448,7 @@ export default function ManualSensorReadingCard({
       if (submissionStillOwnsDraft) {
         setLastSaved({ line: successLine, capturedAt: createdAt, tentId: submissionTentId });
         setForm(EMPTY);
+        setHasEditedReading(false);
         setDevicePreset("none");
         setDeviceCustom("");
         setReviewOpen(false);
@@ -811,7 +815,7 @@ export default function ManualSensorReadingCard({
                 ))}
               </ul>
             )}
-            {validation.errors.length > 0 && (
+            {(isCorrection || hasEditedReading) && validation.errors.length > 0 && (
               <ul className="space-y-1" data-testid="manual-reading-errors">
                 {validation.errors.map((e, i) => (
                   <li key={i} className="flex items-start gap-2 text-xs text-destructive">

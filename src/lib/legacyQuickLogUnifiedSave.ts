@@ -237,6 +237,9 @@ export function buildLegacyQuickLogUnifiedPayload(
   const envelopeFields: Record<string, unknown> = canAttachPhenoReceipt
     ? { ...input.phenoEvidenceReceipt }
     : {};
+  if (input.eventType === "environment") {
+    envelopeFields.event_type = "environment";
+  }
   if (input.sensorAttachPayload != null) {
     envelopeFields.sensor = input.sensorAttachPayload;
   }

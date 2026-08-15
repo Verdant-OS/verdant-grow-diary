@@ -21,6 +21,8 @@ import {
   loadTemperatureUnitPreference,
   type TemperatureUnitPreference,
 } from "@/lib/temperatureUnitPreference";
+import type { EnvironmentCheckEntryInput } from "@/lib/environmentCheckViewModel";
+import { isAirTempCRealistic, isHumidityRealistic, isVpdRealistic } from "@/lib/sensorTruthRules";
 
 export const ENVIRONMENT_CHECK_TIMELINE_TITLE = "Environment check" as const;
 export const ENVIRONMENT_CHECK_TIMELINE_SOURCE_LABEL =
@@ -32,7 +34,11 @@ export interface EnvironmentCheckTimelineRawEntry {
   id?: unknown;
   entry_at?: unknown;
   occurred_at?: unknown;
+  created_at?: unknown;
+  entry_type?: unknown;
+  entryType?: unknown;
   event_type?: unknown;
+  eventType?: unknown;
   note?: unknown;
   details?: unknown;
 }
@@ -70,6 +76,56 @@ function asString(v: unknown): string | null {
   return t.length > 0 ? t : null;
 }
 
+/**
+ * Resolve the care type a grower should see for one Quick Log row.
+ *
+ * Legacy Environment checks were written through the RPC's `note` action,
+ * leaving an Observation spine plus `details.environment_check`. That
+ * envelope is authoritative only for generic note/observation rows. A real
+ * typed care event such as Watering stays Watering even when it carries
+ * sensor or environment context.
+ */
+export function resolveEffectiveQuickLogCareType(
+  entry: EnvironmentCheckTimelineRawEntry | null | undefined,
+): string | null {
+  if (!entry || typeof entry !== "object") return null;
+
+  const direct =
+    asString(entry.entry_type) ??
+    asString(entry.entryType) ??
+    asString(entry.event_type) ??
+    asString(entry.eventType);
+  const directKind = direct?.toLowerCase() ?? null;
+
+  const details =
+    entry.details && typeof entry.details === "object" && !Array.isArray(entry.details)
+      ? (entry.details as Record<string, unknown>)
+      : null;
+  const detailKind =
+    (asString(details?.event_type) ?? asString(details?.eventType))?.toLowerCase() ?? null;
+
+  if (directKind && directKind !== "observation" && directKind !== "note") {
+    return ENV_KIND_ALIASES.has(directKind) ? "environment" : directKind;
+  }
+
+  if (detailKind && detailKind !== "observation" && detailKind !== "note") {
+    return ENV_KIND_ALIASES.has(detailKind) ? "environment" : detailKind;
+  }
+
+  const environmentEnvelope = details?.environment_check;
+  if (
+    environmentEnvelope &&
+    typeof environmentEnvelope === "object" &&
+    !Array.isArray(environmentEnvelope)
+  ) {
+    return "environment";
+  }
+
+  if (directKind) return directKind;
+  if (detailKind) return detailKind;
+  return null;
+}
+
 function asFiniteNumber(v: unknown): number | null {
   if (typeof v === "number" && Number.isFinite(v)) return v;
   if (typeof v === "string" && v.trim() !== "") {
@@ -98,16 +154,7 @@ function clipNote(v: unknown): string | null {
 export function isEnvironmentCheckTimelineEntry(
   entry: EnvironmentCheckTimelineRawEntry | null | undefined,
 ): boolean {
-  if (!entry || typeof entry !== "object") return false;
-  const direct = asString(entry.event_type);
-  if (direct && ENV_KIND_ALIASES.has(direct.toLowerCase())) return true;
-  if (entry.details && typeof entry.details === "object") {
-    const et = asString((entry.details as Record<string, unknown>).event_type);
-    if (et && ENV_KIND_ALIASES.has(et.toLowerCase())) return true;
-    const env = (entry.details as Record<string, unknown>).environment_check;
-    if (env && typeof env === "object") return true;
-  }
-  return false;
+  return resolveEffectiveQuickLogCareType(entry) === "environment";
 }
 
 function pickEnvelope(details: unknown): Record<string, unknown> | null {
@@ -117,6 +164,53 @@ function pickEnvelope(details: unknown): Record<string, unknown> | null {
     return ec as Record<string, unknown>;
   }
   return null;
+}
+
+/**
+ * Adapt one diary row into the canonical Environment Check rule input.
+ * Measurements stay nested under `details.environment_check`; generic diary
+ * fields never masquerade as live telemetry. Invalid rows return null.
+ */
+export function buildEnvironmentCheckDiaryEntryInput(
+  raw: EnvironmentCheckTimelineRawEntry | null | undefined,
+): EnvironmentCheckEntryInput | null {
+  if (!raw || typeof raw !== "object" || !isEnvironmentCheckTimelineEntry(raw)) return null;
+  const entryId = asString(raw.id);
+  const occurredAt = toIso(raw.entry_at ?? raw.occurred_at ?? raw.created_at);
+  if (!entryId || !occurredAt) return null;
+
+  const details =
+    raw.details && typeof raw.details === "object" && !Array.isArray(raw.details)
+      ? (raw.details as Record<string, unknown>)
+      : null;
+  const envelope = pickEnvelope(details);
+  const tempC = asFiniteNumber(envelope?.temp_c ?? envelope?.tempC ?? envelope?.air_temp_c);
+  const tempF = asFiniteNumber(envelope?.room_temp_f ?? envelope?.tempF ?? envelope?.air_temp_f);
+  const normalizedTempC = tempC ?? (tempF == null ? null : fahrenheitToCelsius(tempF));
+  const rhPercent = asFiniteNumber(
+    envelope?.humidity_pct ?? envelope?.rhPercent ?? envelope?.rh_percent ?? envelope?.humidity,
+  );
+  const vpdKpa = asFiniteNumber(envelope?.vpd_kpa ?? envelope?.vpdKpa);
+
+  if (
+    !isAirTempCRealistic(normalizedTempC) ||
+    !isHumidityRealistic(rhPercent) ||
+    !isVpdRealistic(vpdKpa)
+  ) {
+    return null;
+  }
+
+  return {
+    entryId,
+    occurredAt,
+    kind: "environment",
+    snapshot: {
+      source: "manual",
+      tempC: normalizedTempC,
+      rhPercent,
+      vpdKpa,
+    },
+  };
 }
 
 function buildFields(

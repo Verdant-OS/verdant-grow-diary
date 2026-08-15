@@ -25,6 +25,10 @@ import {
 } from "@/lib/rootZoneObservationRules";
 import type { TimelineMemoryItem } from "@/lib/timelineFilterRules";
 import { classifyTimelineMemoryItem } from "@/lib/timelineFilterRules";
+import {
+  manualTentSensorRowsToAiDoctorContextSnapshots,
+  type AiDoctorManualTentSensorRowLike,
+} from "@/lib/aiDoctorManualTentSensorSnapshotAdapter";
 
 export interface AiDoctorContextPlantSource {
   id?: string | null;
@@ -171,12 +175,24 @@ export interface BuildAiDoctorContextArgs {
   timelineItems: readonly TimelineMemoryItem[] | null | undefined;
   /** Successful, RLS-scoped root-zone read; never treated as sensor truth. */
   rootZoneObservations?: readonly RootZoneObservationV1[] | null;
+  /** Bounded current tent rows; only validated manual evidence can affect readiness. */
+  currentSensorRows?: readonly AiDoctorManualTentSensorRowLike[] | null;
+  /** Exact tent scope required before persisted sensor rows can affect readiness. */
+  tentId?: string | null;
   now?: number;
 }
 
 export function buildAiDoctorContextInput(args: BuildAiDoctorContextArgs): AiDoctorContextInput {
   const { events, snapshots } = timelineItemsToAiDoctorContextSources(args.timelineItems);
   const now = typeof args.now === "number" && Number.isFinite(args.now) ? args.now : Date.now();
+  const currentManualSnapshots = manualTentSensorRowsToAiDoctorContextSnapshots(
+    args.currentSensorRows,
+    {
+      tentId: args.tentId ?? "",
+      now,
+      existingSnapshots: snapshots,
+    },
+  );
   const rootZoneEvents = rootZoneObservationsToAiDoctorContextEvents(args.rootZoneObservations, {
     now,
   });
@@ -195,7 +211,7 @@ export function buildAiDoctorContextInput(args: BuildAiDoctorContextArgs): AiDoc
   return {
     plant: plantToAiDoctorContextPlant(args.plant),
     recentEvents: [...timelineEventsWithoutRootZoneCompanions, ...rootZoneEvents],
-    recentManualSnapshots: snapshots,
+    recentManualSnapshots: [...snapshots, ...currentManualSnapshots],
     // Settled root-zone observations double as the root-zone-history signal:
     // feed guidance stays withheld until at least one exists.
     recentRootZoneObservations: rootZoneEvents.length,

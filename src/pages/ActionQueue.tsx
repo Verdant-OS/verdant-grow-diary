@@ -33,6 +33,8 @@ import {
   Ban,
   RefreshCw,
 } from "lucide-react";
+import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
+import { pickFirstLoadedId } from "@/lib/oneTentLoopHandoffIds";
 import ScopedGrowBanner from "@/components/ScopedGrowBanner";
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import PageHeader from "@/components/PageHeader";
@@ -1019,6 +1021,20 @@ export default function ActionQueue() {
           Verdant suggests. Grower approves.
         </p>
       </div>
+      <OneTentLoopNextStepCard
+        current="action-queue"
+        ids={{
+          growId: effectiveGrowId,
+          actionId: pickFirstLoadedId([
+            drawerRow?.id,
+            focusedActionId,
+            highlightedActionId,
+          ]),
+          alertId: alertContextId,
+        }}
+        testId="action-queue-one-tent-loop-next-step-card"
+        className="mb-4"
+      />
       <div className="mb-5">
         <PageHeader
           title="Action Queue"

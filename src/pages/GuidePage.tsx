@@ -17,19 +17,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import {
-  findGuideBySlug,
-  VERDANT_GUIDES_BREADCRUMB_ITEMS,
-  VERDANT_SEO_GUIDES,
-  VERDANT_SITE_ORIGIN,
-} from "@/constants/verdantSeoContent";
-import {
-  buildArticleJsonLd,
-  buildBreadcrumbListJsonLd,
-  buildFaqPageJsonLd,
-  buildWebPageJsonLd,
-  safeJsonLdStringify,
-} from "@/lib/seoStructuredData";
+import { findGuideBySlug, VERDANT_SEO_GUIDES } from "@/constants/verdantSeoContent";
 import { buildGuideQuickLogStarterHref } from "@/lib/quickLogStarterLinks";
 import { resolveGuideFaqFromHash } from "@/lib/guideFaqHashResolver";
 import { OREOZ_GELONADE_GUIDE_SLUG } from "@/constants/oreozGelonadeExperience";
@@ -81,60 +69,6 @@ export default function GuidePage() {
     path: guide ? `/guides/${guide.slug}` : "/guides",
     ogType: guide ? "article" : "website",
   });
-
-  useEffect(() => {
-    if (!guide) return;
-    const guideUrl = `${VERDANT_SITE_ORIGIN}/guides/${guide.slug}`;
-    const webpage = buildWebPageJsonLd({
-      title: guide.title,
-      description: guide.description,
-      url: guideUrl,
-      siteUrl: VERDANT_SITE_ORIGIN,
-    });
-    const faq = buildFaqPageJsonLd({
-      pageUrl: guideUrl,
-      questions: guide.faq,
-    });
-    const crumbs = buildBreadcrumbListJsonLd({
-      items: [...VERDANT_GUIDES_BREADCRUMB_ITEMS, { name: guide.h1, url: guideUrl }],
-    });
-    const article = guide.publishedOn
-      ? buildArticleJsonLd({
-          headline: guide.h1,
-          description: guide.description,
-          url: guideUrl,
-          datePublished: guide.publishedOn,
-          dateModified: guide.modifiedOn,
-          image: "https://verdantgrowdiary.com/brand/verdant-logo-512.png",
-          authorName: "Verdant Grow Diary",
-          publisherName: "Verdant Grow Diary",
-          siteUrl: VERDANT_SITE_ORIGIN,
-        })
-      : null;
-    // Clean up the route-local JSON-LD baked into the initial HTML before
-    // React assumes ownership. Otherwise hydration duplicates the same FAQ,
-    // breadcrumb, and article, while later SPA navigation leaves a stale
-    // WebPage identity from the first route in the document head.
-    document
-      .querySelectorAll('script[type="application/ld+json"][data-static-route-ldjson]')
-      .forEach((script) => script.remove());
-
-    const docs: Array<[string, unknown]> = [
-      [`guide-${guide.slug}-webpage`, webpage],
-      [`guide-${guide.slug}-faq`, faq],
-      [`guide-${guide.slug}-breadcrumb`, crumbs],
-    ];
-    if (article) docs.push([`guide-${guide.slug}-article`, article]);
-    const scripts = docs.map(([id, data]) => {
-      const script = document.createElement("script");
-      script.type = "application/ld+json";
-      script.setAttribute("data-page-ldjson", id);
-      script.text = safeJsonLdStringify(data);
-      document.head.appendChild(script);
-      return script;
-    });
-    return () => scripts.forEach((script) => script.remove());
-  }, [guide]);
 
   if (!guide) {
     return <Navigate to="/guides" replace />;

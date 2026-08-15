@@ -205,19 +205,26 @@ describe("structured-feed Quick Log success telemetry", () => {
 });
 
 describe("PlantQuickLog success telemetry", () => {
-  it("emits exactly once and only after the diary insert confirms success", async () => {
-    const insert = deferred<{ data: null; error: null }>();
-    diaryInsertMock.mockReturnValueOnce(insert.promise);
+  it("emits exactly once and only after quicklog_save_manual confirms success", async () => {
+    const rpc = deferred<{
+      data: { ok: true; grow_event_id: string; reused: false };
+      error: null;
+    }>();
+    rpcMock.mockReturnValueOnce(rpc.promise);
     renderPlantQuickLog();
     fireEvent.click(screen.getByRole("button", { name: /log action watered/i }));
     fireEvent.click(screen.getByRole("button", { name: /save quick log/i }));
 
-    await waitFor(() => expect(diaryInsertMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(1));
+    expect(rpcMock).toHaveBeenCalledWith("quicklog_save_manual", expect.any(Object));
     expect(gtagMock()).not.toHaveBeenCalled();
 
     await act(async () => {
-      insert.resolve({ data: null, error: null });
-      await insert.promise;
+      rpc.resolve({
+        data: { ok: true, grow_event_id: "ge-1", reused: false },
+        error: null,
+      });
+      await rpc.promise;
     });
 
     await waitFor(() => expect(gtagMock()).toHaveBeenCalledTimes(1));
@@ -226,17 +233,17 @@ describe("PlantQuickLog success telemetry", () => {
     });
   });
 
-  it("emits zero events when the diary insert is rejected", async () => {
+  it("emits zero events when quicklog_save_manual is rejected", async () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
-    diaryInsertMock.mockResolvedValueOnce({
+    rpcMock.mockResolvedValueOnce({
       data: null,
-      error: { message: "insert rejected" },
+      error: { message: "rpc rejected" },
     });
     renderPlantQuickLog();
     fireEvent.click(screen.getByRole("button", { name: /log action watered/i }));
     fireEvent.click(screen.getByRole("button", { name: /save quick log/i }));
 
-    await waitFor(() => expect(diaryInsertMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(1));
     await waitFor(() =>
       expect(screen.getByTestId("plant-quick-log-error")).toHaveTextContent(/could not save/i),
     );
@@ -244,11 +251,11 @@ describe("PlantQuickLog success telemetry", () => {
     consoleError.mockRestore();
   });
 
-  it("does not count a successful attachment upload when the diary insert fails", async () => {
+  it("does not count a successful attachment upload when quicklog_save_manual fails", async () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
-    diaryInsertMock.mockResolvedValueOnce({
+    rpcMock.mockResolvedValueOnce({
       data: null,
-      error: { message: "insert rejected" },
+      error: { message: "rpc rejected" },
     });
     renderPlantQuickLog();
     const file = new File([new Uint8Array([1, 2, 3])], "plant.jpg", {
@@ -260,7 +267,7 @@ describe("PlantQuickLog success telemetry", () => {
     fireEvent.click(screen.getByRole("button", { name: /save quick log/i }));
 
     await waitFor(() => expect(storageUploadMock).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(diaryInsertMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(1));
     await waitFor(() =>
       expect(screen.getByTestId("plant-quick-log-error")).toHaveTextContent(/could not save/i),
     );

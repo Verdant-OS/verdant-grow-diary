@@ -26,6 +26,12 @@ import {
   StarterSetupError,
   type StarterSetupDataAccess,
 } from "@/lib/starterSetupService";
+import { FREE_CAPABILITIES } from "@/lib/entitlements/capabilities";
+import { PLAN_CATALOG } from "@/lib/entitlements/planCatalog";
+import {
+  FREE_GROW_LIMIT_BLOCKED_COPY,
+  FREE_TENT_LIMIT_BLOCKED_COPY,
+} from "@/lib/entitlements/freeTierGates";
 
 const FORBIDDEN_COPY_PHRASES = [
   "autopilot",
@@ -45,6 +51,7 @@ function makeAdapter(overrides: Partial<StarterSetupDataAccess> = {}): {
   const spies = {
     listOwnedGrows: vi.fn(async () => []),
     listOwnedTents: vi.fn(async () => []),
+    countOwnedTents: vi.fn(async () => 0),
     listOwnedPlants: vi.fn(async () => []),
     createStarterGrow: vi.fn(async () => ({ id: "grow-1", name: STARTER_GROW_NAME })),
     createStarterTent: vi.fn(async () => ({ id: "tent-1", name: STARTER_TENT_NAME })),
@@ -103,13 +110,18 @@ describe("starterSetupRules", () => {
 describe("runStarterSetup", () => {
   it("throws auth error when userId is missing", async () => {
     const { db } = makeAdapter();
-    await expect(runStarterSetup(null, db)).rejects.toBeInstanceOf(StarterSetupError);
+    await expect(
+      runStarterSetup(null, db, { capabilities: FREE_CAPABILITIES }),
+    ).rejects.toBeInstanceOf(StarterSetupError);
   });
 
   it("creates all three records when nothing exists", async () => {
     const { db, spies } = makeAdapter();
     const onCreated = vi.fn();
-    const result = await runStarterSetup("user-1", db, { onCreated });
+    const result = await runStarterSetup("user-1", db, {
+      capabilities: FREE_CAPABILITIES,
+      onCreated,
+    });
     expect(result).toEqual({
       growId: "grow-1",
       tentId: "tent-1",
@@ -128,7 +140,7 @@ describe("runStarterSetup", () => {
       listOwnedTents: vi.fn(async () => [{ id: "tent-99", name: STARTER_TENT_NAME }]),
       listOwnedPlants: vi.fn(async () => [{ id: "plant-99", name: STARTER_PLANT_NAME }]),
     });
-    const result = await runStarterSetup("user-1", db);
+    const result = await runStarterSetup("user-1", db, { capabilities: FREE_CAPABILITIES });
     expect(result.growId).toBe("grow-99");
     expect(result.tentId).toBe("tent-99");
     expect(result.plantId).toBe("plant-99");
@@ -142,7 +154,7 @@ describe("runStarterSetup", () => {
     const { db, spies } = makeAdapter({
       listOwnedGrows: vi.fn(async () => [{ id: "grow-77", name: STARTER_GROW_NAME }]),
     });
-    const result = await runStarterSetup("user-1", db);
+    const result = await runStarterSetup("user-1", db, { capabilities: FREE_CAPABILITIES });
     expect(result.reused).toEqual({ grow: true, tent: false, plant: false });
     expect(spies.createStarterGrow).not.toHaveBeenCalled();
     expect(spies.createStarterTent).toHaveBeenCalledWith("user-1", "grow-77");
@@ -155,7 +167,9 @@ describe("runStarterSetup", () => {
         throw new Error("db down");
       }),
     });
-    await expect(runStarterSetup("user-1", db)).rejects.toMatchObject({
+    await expect(
+      runStarterSetup("user-1", db, { capabilities: FREE_CAPABILITIES }),
+    ).rejects.toMatchObject({
       name: "StarterSetupError",
       step: "tent",
     });
@@ -169,7 +183,9 @@ describe("runStarterSetup", () => {
     });
     const onCreated = vi.fn();
 
-    await expect(runStarterSetup("user-1", db, { onCreated })).rejects.toMatchObject({
+    await expect(
+      runStarterSetup("user-1", db, { capabilities: FREE_CAPABILITIES, onCreated }),
+    ).rejects.toMatchObject({
       step: "tent",
     });
     expect(onCreated.mock.calls).toEqual([["grow"]]);
@@ -178,6 +194,7 @@ describe("runStarterSetup", () => {
   it("never lets an observability callback break a durable starter setup", async () => {
     const { db } = makeAdapter();
     const result = await runStarterSetup("user-1", db, {
+      capabilities: FREE_CAPABILITIES,
       onCreated() {
         throw new Error("analytics unavailable");
       },
@@ -186,12 +203,121 @@ describe("runStarterSetup", () => {
     expect(result).toMatchObject({ growId: "grow-1", tentId: "tent-1", plantId: "plant-1" });
   });
 
+  it("blocks a differently named second grow for a Free account before any create", async () => {
+    const { db, spies } = makeAdapter({
+      listOwnedGrows: vi.fn(async () => [{ id: "grow-real", name: "My real grow" }]),
+    });
+
+    await expect(
+      runStarterSetup("user-1", db, { capabilities: FREE_CAPABILITIES }),
+    ).rejects.toMatchObject({
+      step: "grow",
+      message: FREE_GROW_LIMIT_BLOCKED_COPY,
+    });
+    expect(spies.createStarterGrow).not.toHaveBeenCalled();
+    expect(spies.createStarterTent).not.toHaveBeenCalled();
+    expect(spies.createStarterPlant).not.toHaveBeenCalled();
+  });
+
+  it("blocks a differently named second tent for a Free account before tent creation", async () => {
+    const { db, spies } = makeAdapter({
+      listOwnedGrows: vi.fn(async () => [{ id: "grow-1", name: STARTER_GROW_NAME }]),
+      countOwnedTents: vi.fn(async () => 1),
+    });
+
+    await expect(
+      runStarterSetup("user-1", db, { capabilities: FREE_CAPABILITIES }),
+    ).rejects.toMatchObject({
+      step: "tent",
+      message: FREE_TENT_LIMIT_BLOCKED_COPY,
+    });
+    expect(spies.createStarterGrow).not.toHaveBeenCalled();
+    expect(spies.createStarterTent).not.toHaveBeenCalled();
+    expect(spies.createStarterPlant).not.toHaveBeenCalled();
+  });
+
+  it("blocks an orphan active tent before creating the first starter grow", async () => {
+    const { db, spies } = makeAdapter({
+      countOwnedTents: vi.fn(async () => 1),
+    });
+
+    await expect(
+      runStarterSetup("user-1", db, { capabilities: FREE_CAPABILITIES }),
+    ).rejects.toMatchObject({
+      step: "tent",
+      message: FREE_TENT_LIMIT_BLOCKED_COPY,
+    });
+    expect(spies.createStarterGrow).not.toHaveBeenCalled();
+    expect(spies.createStarterTent).not.toHaveBeenCalled();
+    expect(spies.createStarterPlant).not.toHaveBeenCalled();
+  });
+
+  it("does not create a grow when the active-tent verification fails", async () => {
+    const { db, spies } = makeAdapter({
+      countOwnedTents: vi.fn(async () => {
+        throw new Error("tent count unavailable");
+      }),
+    });
+
+    await expect(
+      runStarterSetup("user-1", db, { capabilities: FREE_CAPABILITIES }),
+    ).rejects.toBeInstanceOf(Error);
+    expect(spies.createStarterGrow).not.toHaveBeenCalled();
+    expect(spies.createStarterTent).not.toHaveBeenCalled();
+    expect(spies.createStarterPlant).not.toHaveBeenCalled();
+  });
+
+  it("fails closed before a limited create when capabilities are unavailable", async () => {
+    const { db, spies } = makeAdapter();
+
+    await expect(runStarterSetup("user-1", db, { capabilities: null })).rejects.toMatchObject({
+      step: "grow",
+    });
+    expect(spies.createStarterGrow).not.toHaveBeenCalled();
+    expect(spies.createStarterTent).not.toHaveBeenCalled();
+    expect(spies.createStarterPlant).not.toHaveBeenCalled();
+  });
+
+  it("preserves paid creation when other grow and tent rows already exist", async () => {
+    const { db, spies } = makeAdapter({
+      listOwnedGrows: vi.fn(async () => [{ id: "grow-real", name: "My real grow" }]),
+      countOwnedTents: vi.fn(async () => 1),
+    });
+
+    const result = await runStarterSetup("user-1", db, {
+      capabilities: PLAN_CATALOG.pro_monthly,
+    });
+
+    expect(result).toMatchObject({ growId: "grow-1", tentId: "tent-1", plantId: "plant-1" });
+    expect(spies.createStarterGrow).toHaveBeenCalledTimes(1);
+    expect(spies.createStarterTent).toHaveBeenCalledTimes(1);
+    expect(spies.createStarterPlant).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not make paid multi-tent setup depend on a limited-plan tent count", async () => {
+    const { db, spies } = makeAdapter({
+      countOwnedTents: vi.fn(async () => {
+        throw new Error("count unavailable");
+      }),
+    });
+
+    const result = await runStarterSetup("user-1", db, {
+      capabilities: PLAN_CATALOG.pro_monthly,
+    });
+
+    expect(result).toMatchObject({ growId: "grow-1", tentId: "tent-1", plantId: "plant-1" });
+    expect(spies.countOwnedTents).not.toHaveBeenCalled();
+    expect(spies.createStarterGrow).toHaveBeenCalledTimes(1);
+    expect(spies.createStarterTent).toHaveBeenCalledTimes(1);
+  });
+
   it("never references sensor/AI/action/alert paths on the adapter interface", () => {
     // Compile-time + runtime fence: the adapter surface exposes only
     // grow/tent/plant helpers. This test documents that intentionally.
     const adapterMethods: Array<keyof StarterSetupDataAccess> = [
       "listOwnedGrows",
       "listOwnedTents",
+      "countOwnedTents",
       "listOwnedPlants",
       "createStarterGrow",
       "createStarterTent",

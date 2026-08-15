@@ -20,6 +20,8 @@ import { usePhenoHuntWorkspace, CANDIDATE_PAGE_SIZE } from "@/hooks/usePhenoHunt
 import { buildPhenoHuntCsv, phenoHuntCsvFilename } from "@/lib/phenoHuntCsvExport";
 import { LOUD_TRAIT_AXES } from "@/lib/phenoExpressionRules";
 import PhenoBreedingObjectiveEditor from "@/components/PhenoBreedingObjectiveEditor";
+import PhenoGenerationProgress from "@/components/PhenoGenerationProgress";
+import { usePhenoGenerationProgress } from "@/hooks/usePhenoGenerationProgress";
 import {
   candidateObjectiveCopy,
   summarizeCandidateObjective,
@@ -1146,6 +1148,9 @@ export default function PhenoHuntWorkspace() {
   const ws = usePhenoHuntWorkspace(id);
   const herm = usePhenoHermCullSuggestion();
   const stress = usePhenoStressObservations(ws.hunt?.id ?? null);
+  // How each generation of this line landed against its own objective.
+  // Renders only once a parent hunt is linked; otherwise it stays silent.
+  const generationProgress = usePhenoGenerationProgress(ws.hunt?.id ?? null);
   // Manual evidence packets for the LOADED candidates only — one bounded
   // batch read per (hunt, id-set); Quick Log saves invalidate its key family.
   const loadedCandidateIds = useMemo(
@@ -1508,6 +1513,10 @@ export default function PhenoHuntWorkspace() {
             onSave={handleSaveBreedingObjective}
             saving={objectiveSaving}
           />
+        ) : null}
+
+        {ws.hunt && generationProgress.generations.length > 1 ? (
+          <PhenoGenerationProgress model={generationProgress} />
         ) : null}
 
         {ws.hunt ? <PhenoCompareCandidatesAction state={comparisonState} /> : null}

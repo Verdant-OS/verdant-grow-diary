@@ -5,7 +5,6 @@
  * no device control. Content comes from shared SEO content constants
  * so visible copy and FAQPage JSON-LD cannot drift.
  */
-import { useEffect } from "react";
 import { Link } from "@/lib/react-router-compat";
 import BrandLogo from "@/components/BrandLogo";
 import DiaryFaqLinkStatsPanel from "@/components/DiaryFaqLinkStatsPanel";
@@ -16,18 +15,11 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import {
-  VERDANT_GROWER_GUIDE_FAQ,
-  VERDANT_GUIDES_BREADCRUMB_ITEMS,
-  VERDANT_SEO_GUIDES,
-} from "@/constants/verdantSeoContent";
-import {
-  buildBreadcrumbListJsonLd,
-  buildFaqPageJsonLd,
-  safeJsonLdStringify,
-} from "@/lib/seoStructuredData";
+import { VERDANT_GROWER_GUIDE_FAQ, VERDANT_SEO_GUIDES } from "@/constants/verdantSeoContent";
 
-const PAGE_URL = "https://verdantgrowdiary.com/guides";
+const PAGE_TITLE = "Grower Guides: Diary, Lighting & Sensor Truth | Verdant";
+const PAGE_DESCRIPTION =
+  "Practical grower guides for plant timelines, grow-light distance, PPFD, DLI, source-labeled sensor data, VPD context, and cautious troubleshooting.";
 const FEATURED_GUIDE_SLUGS = new Set([
   "cannabis-leaf-symptoms",
   "cannabis-grow-light-distance-and-schedule",
@@ -36,35 +28,10 @@ const FEATURED_GUIDE_SLUGS = new Set([
 
 export default function GuidesIndex() {
   usePageSeo({
-    title: "Grower Guides: Diary, Lighting & Sensor Truth | Verdant",
-    description:
-      "Practical grower guides for plant timelines, grow-light distance, PPFD, DLI, source-labeled sensor data, VPD context, and cautious troubleshooting.",
+    title: PAGE_TITLE,
+    description: PAGE_DESCRIPTION,
     path: "/guides",
   });
-
-  useEffect(() => {
-    const faq = buildFaqPageJsonLd({
-      pageUrl: PAGE_URL,
-      questions: VERDANT_GROWER_GUIDE_FAQ,
-    });
-    const crumbs = buildBreadcrumbListJsonLd({
-      items: VERDANT_GUIDES_BREADCRUMB_ITEMS,
-    });
-    const faqScript = document.createElement("script");
-    faqScript.type = "application/ld+json";
-    faqScript.setAttribute("data-page-ldjson", "guides-index-faq");
-    faqScript.text = safeJsonLdStringify(faq);
-    document.head.appendChild(faqScript);
-    const crumbScript = document.createElement("script");
-    crumbScript.type = "application/ld+json";
-    crumbScript.setAttribute("data-page-ldjson", "guides-index-breadcrumb");
-    crumbScript.text = safeJsonLdStringify(crumbs);
-    document.head.appendChild(crumbScript);
-    return () => {
-      faqScript.remove();
-      crumbScript.remove();
-    };
-  }, []);
 
   return (
     <main data-testid="guides-index-page" className="min-h-screen bg-background text-foreground">

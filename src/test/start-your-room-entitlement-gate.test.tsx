@@ -19,6 +19,11 @@ const testState = vi.hoisted(() => ({
   refreshGrows: vi.fn(async () => undefined),
   refetchTents: vi.fn(async () => undefined),
   refetchEntitlements: vi.fn(async () => false),
+  invalidateQueries: vi.fn(async () => undefined),
+}));
+
+vi.mock("@tanstack/react-query", () => ({
+  useQueryClient: () => ({ invalidateQueries: testState.invalidateQueries }),
 }));
 
 vi.mock("@/store/auth", () => ({
@@ -116,6 +121,7 @@ describe("StartYourRoom entitlement creation gates", () => {
     testState.refreshGrows.mockClear();
     testState.refetchTents.mockClear();
     testState.refetchEntitlements.mockClear();
+    testState.invalidateQueries.mockClear();
   });
 
   it("does not insert another grow when a Free account already has one active grow", () => {

@@ -20,13 +20,14 @@ describe("Auth signup marketing opt-in default", () => {
     expect(AUTH).toMatch(/const \[marketingOptIn, setMarketingOptIn\] = useState\(false\)/);
   });
 
-  it("sends the explicit state through signup metadata before any session exists", () => {
-    // The metadata object also carries the referral ride-along
-    // (...referralMetadata, attribution-only) between the acquisition spread
-    // and the explicit marketing boolean.
+  it("sends the explicit state without coupling analytics attribution to signup", () => {
+    // Referral and explicit consent still need the pre-session metadata path.
+    // Acquisition is queued separately and covered behaviorally by
+    // auth-signup-acquisition-handoff.test.tsx.
     expect(AUTH).toMatch(
-      /data:\s*\{\s*\.\.\.signupUserMetadata,\s*\.\.\.referralMetadata,\s*marketing_opt_in:\s*marketingOptIn\s*\}/,
+      /data:\s*\{\s*\.\.\.referralMetadata,\s*marketing_opt_in:\s*marketingOptIn\s*\}/,
     );
+    expect(AUTH).not.toMatch(/data:\s*\{[^}]*signupUserMetadata/);
   });
 
   it("keeps a session-path backup and only timestamps when opted in", () => {

@@ -133,12 +133,13 @@ jobs:
           code=$?
           set -e
           echo "exit_code=$code" >> "$GITHUB_OUTPUT"
-          # The probe redacts connection strings from everything it emits
-          # (scripts/lib/redactDbUrl.mjs). It did NOT always: a psql failure
-          # that wrote no stderr fell back to String(error), whose command text
-          # carries the URL passed as argv. Actions masks registered secrets in
-          # log output, but that masking does not reach the issue body this
-          # same file is copied into -- so redaction happens at the source.
+          # The probe validates the URL against the pinned production project,
+          # gives psql discrete libpq environment fields instead of URL argv,
+          # and redacts connection strings from everything it emits
+          # (scripts/lib/redactDbUrl.mjs). The redaction remains essential as a
+          # second line of defence: Actions masks registered secrets in log
+          # output, but that masking does not reach the issue body this same
+          # file is copied into.
           cat drift.json 2>/dev/null || true
           cat drift.err  2>/dev/null || true
           {

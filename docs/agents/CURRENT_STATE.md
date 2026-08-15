@@ -1,10 +1,31 @@
 # Verdant — Current Operating State
 
 **Last updated:** 2026-08-15 UTC
+**Updated by:** Grok (2026-08-15 merge: resolved two simple `CURRENT_STATE.md`
+conflicts against origin `1c094a2a3`. Incoming since `89ddea93f`:
+`74be85232` (#967 verdant-grow-os Cursor plugin scaffold — no overlap)
+and `1c094a2a3` (#970 DIRTY PR conflict-reconciliation dispositions —
+overlapping header plus topology row; the DIRTY-PR section auto-merged).
+Topology tip is now `1c094a2a3`. Production `/version.json` was **not**
+re-measured in this merge; the 2026-08-15 observation `5e2fcedd4271`
+(#984) still stands. Does **not** apply migrations or set Day 0.)
+
+**Prior same-day update:** 2026-08-15 UTC
 **Updated by:** Grok (merge-conflict resolve of #970 onto fetched deploy tip
 `89ddea93f` (#993). Takes the incoming Claude migration-drift header as prior
 identity. Unique surviving work remains the DIRTY-PR reconciliation section.
 No production, GA4, GSC, sitemap, or release-identity row was re-measured.)
+
+**Prior same-day update:** 2026-08-15 UTC
+**Updated by:** Grok (2026-08-15 merge: resolved the `CURRENT_STATE.md`
+attribution-header conflict against origin `89ddea93f`. Incoming since
+`bb66f4302`: `f3324a2b0` (#992 migration-drift alarm — the overlapping
+header plus the new ⚠️ section, which auto-merged) and `89ddea93f`
+(#993 protected signup-repair delivery path). Topology tip is now
+`89ddea93f`. #993 does **not** apply the signup repair; the attributed-
+signup incident stays OPEN. Production `/version.json` was **not**
+re-measured in this merge; the 2026-08-15 observation `5e2fcedd4271`
+(#984) still stands. Does **not** apply migrations or set Day 0.)
 
 **Prior same-day update:** 2026-08-15 UTC
 **Updated by:** Claude (2026-08-15, additive: answers Cheek's "migration ledger
@@ -27,12 +48,37 @@ other section was touched. No production, GA4, GSC, sitemap, or release-identity
 row was re-measured in this edit.)
 
 **Prior same-day update:** 2026-08-15 UTC
+**Updated by:** Grok (2026-08-15 merge: resolved the `CURRENT_STATE.md`
+conflict against origin `bb66f4302`. Incoming since this branch's previous
+base `0522eefb1` (#990): `a54040c30` (#989 pgmq / PUBLIC EXECUTE restrict),
+`22c130600` (#986 One-Tent Loop operating-order — the overlapping
+CURRENT_STATE edit), `bb66f4302` (#960 zero-defect board refresh). Topology
+tip is now `bb66f4302`. Production `/version.json` was **not** re-measured
+in this merge; the 2026-08-15 observation `5e2fcedd4271` (#984) still
+stands. Agent row keeps both the Lovable Knowledge rewrite and the merged
+`ONE_TENT_LOOP_OPERATING_ORDER` assignment. Does **not** apply migrations
+or set Day 0.)
+
+**Prior update:** 2026-08-15 UTC
+**Updated by:** Grok (2026-08-15, later additive: refresh the stale cited
+rows — topology still named `f2a03998f` / older buffers still showed
+`6434ea2a8`; production identity still named `3f773b680dcc` (2026-08-05);
+`/` still `FAIL` (2026-08-07); agent table still said Grok Unassigned /
+Claude spec-only / Council Chair waiting. Live re-measure 2026-08-15:
+production `/version.json` serves `5e2fcedd4271` (#984) with treeHash MATCH;
+`/` SSR is `PASS` (landing h1 + canonical, 1141 body words) after #949.
+Origin tip at that refresh was `0522eefb1` (#990). Publish lags git.
+GA4/GSC/Day 0 were not re-opened. Lovable Knowledge pack updated to match.
+Does **not** apply migrations or set Day 0.)
+
+**Prior same-day update:** 2026-08-15 UTC
 **Updated by:** Grok (2026-08-15 merge: combined `ONE_TENT_LOOP_OPERATING_ORDER`
 on this branch with deploy tip `534b28434` — Cursor SDK local-orchestration
 spike #985, Free signup / Quick Log handoff #987, AI Doctor E2E path #988,
 and nanoid pin #966. Both programs stay active; neither pauses Convex or
 Postgres spikes. No production, GA4, GSC, sitemap, or release-identity row
-was re-measured in this edit; those retain their earlier verification dates.)
+was re-measured in this edit; those retain their earlier verification dates.
+Superseded as the tip row by the later merge to `bb66f4302`.)
 
 **Prior same-day update:** 2026-08-15 UTC
 **Updated by:** Grok (2026-08-15, later additive: next gates on
@@ -189,7 +235,7 @@ the one that exists.** `scripts/probe-migration-drift.mjs` and
 six-day outage precisely so six days could never pass unnoticed again, and they
 are the right shape for this job. But the probe has **never returned a
 measurement**, and — corrected here after a Codex review, see defect 3 — it
-would not yet return a *correct* one even if it connected.
+would not yet return a _correct_ one even if it connected.
 
 **So the ledger stays `NOT_MEASURED` behind two independent blockers, not one:**
 an owner-side secret that points at the wrong database over an unreachable
@@ -202,8 +248,8 @@ half was wrong.
 `established fact`, from the Actions API on 2026-08-15: the workflow has four
 scheduled runs in its entire history, and all four concluded `failure`.
 
-| Run           | Date (UTC)          | Outcome                                            |
-| ------------- | ------------------- | -------------------------------------------------- |
+| Run           | Date (UTC)          | Outcome                                             |
+| ------------- | ------------------- | --------------------------------------------------- |
 | `31576932687` | 2026-08-12T08:07:36 | `failure` — probe step `skipped`, nothing attempted |
 | `31680785295` | 2026-08-13T08:08:58 | `failure` — probe step `skipped`, nothing attempted |
 | `31782504195` | 2026-08-14T08:05:40 | `failure` — `could_not_probe`, connection refused   |
@@ -307,7 +353,7 @@ whoever repoints the secret should take the host from the Supabase dashboard's
 connection panel rather than from this paragraph.
 
 **Judge the fix by the probe's status, never by the run colour.** The connection
-is proven the moment the probe *completes a query* — `status: "current"` (exit 0)
+is proven the moment the probe _completes a query_ — `status: "current"` (exit 0)
 or `status: "drift"` (exit 1). Only `could_not_probe` (exit 2) means the
 connection is still broken. This distinction is not pedantry here: this file
 already records at least two unapplied migrations, so the first genuinely
@@ -355,7 +401,7 @@ wrong one. Match by name, with no window: for a file `<ts>_<slug>.sql`, accept
 `m.name = <stem>` (Lovable) **or** `m.name = <slug>` (hand-authored) **or**
 `m.version = <ts>`. Do **not** widen the version comparison to a tolerance — the
 runbook's Trap 2 shows this repo contains `20260806230020_…` and
-`20260806230021_…` one second apart, so a window would report an *unapplied*
+`20260806230021_…` one second apart, so a window would report an _unapplied_
 migration as applied. That is the worse error, and it is the exact shape of the
 2026-08-05 blind spot.
 
@@ -388,7 +434,7 @@ Until **both** the secret is corrected and the probe's matching is name-bound,
 the **applied-migration ledger** is `NOT_MEASURED` — and so is any claim whose
 only evidence would have come from this probe, which means every statement of
 the form "migration X is/is not live in production" that is not backed by a
-direct observation. Note the second condition: a *completed* probe run from the
+direct observation. Note the second condition: a _completed_ probe run from the
 current code — whatever colour the workflow tick ends up — would be measuring the
 wrong thing, because its unapplied list would be inflated by every
 Lovable-recorded migration it failed to match.
@@ -412,10 +458,10 @@ way.
 
 ## Branch topology
 
-| Branch               | Role                                             | Verified head                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| -------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `verdant-grow-diary` | **Deploy branch. Production ships from here.**   | `89ddea93f495f3a2d3d31cba9aa824d519c27158` (#993), verified 2026-08-15 with `git fetch origin verdant-grow-diary && git rev-parse origin/verdant-grow-diary`. Supersedes `bb66f4302` (#960) recorded earlier this day. After #960 this fetch observed `f3324a2b0` (#992), `89ddea93f` (#993). PR numbers on this branch do not order by merge time — order commits with `git log`, never by PR number. Do not carry older validation tables forward |
-| `main`               | Integration branch. It is not production parity. | `b6d747941948ce68157185a2b0847acea6970d44` (#779), verified 2026-08-07                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| Branch               | Role                                             | Verified head                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| -------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `verdant-grow-diary` | **Deploy branch. Production ships from here.**   | `1c094a2a36a1f576ee95e2c46d70777ae24a3e53` (#970), verified 2026-08-15 with `git fetch origin verdant-grow-diary && git rev-parse origin/verdant-grow-diary`. Supersedes `89ddea93f` (#993). After #982, in `git log` merge order oldest-first: `883bee2ff` (#983), `5e2fcedd4` (#984), `9c1ada616` (#987), `24382b5ad` (#988), `f1e097740` (#985), `534b28434` (#966), `0522eefb1` (#990), `a54040c30` (#989), `22c130600` (#986), `bb66f4302` (#960), `f3324a2b0` (#992), `89ddea93f` (#993), `74be85232` (#967), `1c094a2a3` (#970). **Live production is not this tip** — `/version.json` on 2026-08-15 served `5e2fcedd4271` (#984) and was not re-fetched in this merge. #993 adds a protected PREFLIGHT/APPLY path and does **not** apply the signup repair. Merging is not a publish. PR numbers on this branch do not order by merge time — order commits with `git log`, never by PR number. Do not carry older validation tables forward. Older buffers that still show `6434ea2a8` (#942) are the 2026-08-13 snapshot; discard them |
+| `main`               | Integration branch. It is not production parity. | `b6d747941948ce68157185a2b0847acea6970d44` (#779), verified 2026-08-07                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 
 `main` and `verdant-grow-diary` are divergent. Do not infer production behavior from
 `main`, and do not backport deploy-only governance or data rules without a scoped branch
@@ -453,13 +499,13 @@ Never hybrid-patch only to become mergeable
 Never reuse green checks from pre-resolution SHA
 ```
 
-| PR | State | Disposition | Head | Unique surviving work (from the comment) | Comment |
-| -- | ----- | ----------- | ---- | ---------------------------------------- | ------- |
-| [#913](https://github.com/Verdant-OS/verdant-grow-diary/pull/913) | OPEN | REBASE | `grok/seo-public-surface-docs-20260812` | Live-host evidence that `vercel.json` public-alias redirects are not firing in production (HTTP 200 soft shells) plus `docs/seo/vercel-host-redirect-fix-steps.md`. Drop the duplicate Ahrefs / `/` vs `/welcome` material already shipped via #914 / #949 | [comment](https://github.com/Verdant-OS/verdant-grow-diary/pull/913#issuecomment-5285119408) |
-| [#817](https://github.com/Verdant-OS/verdant-grow-diary/pull/817) | OPEN | REBASE | `grok/tent-alert-history-pro` | `TentAlertHistoryPanel` and history helpers. Keep base's `isActive` / `openCount` / `activeCount` and the Doctor / Blueprint CTAs from #816 / #888 / #928 | [comment](https://github.com/Verdant-OS/verdant-grow-diary/pull/817#issuecomment-5285121690) |
-| [#710](https://github.com/Verdant-OS/verdant-grow-diary/pull/710) | MERGED | REBASE completed | `claude/docs-cheek-approval-workflow` | Landed 2026-08-14 as `1a3a70d1b`. Added `docs/agents/cheek-approval-workflow.md`; Sentinel-Version moved to 2026-08-09.3 | [comment](https://github.com/Verdant-OS/verdant-grow-diary/pull/710#issuecomment-5285129001) |
-| [#699](https://github.com/Verdant-OS/verdant-grow-diary/pull/699) | OPEN | REBASE | `chore/adopt-biome-lint` | Tooling swap only (`package.json` / `biome.json` / lint-staged). Drop the 327-commit-stale format commit; regenerate after rebase; hand-reconcile `src/test/helpers/reactRouterCompat.vitest.tsx`; add a Biome ignore for `supabase/functions/mcp/index.ts` | [comment](https://github.com/Verdant-OS/verdant-grow-diary/pull/699#issuecomment-5285131401) |
-| [#933](https://github.com/Verdant-OS/verdant-grow-diary/pull/933) | CLOSED | CLOSE_SUPERSEDED | `claude/strange-keller-036221` | Complete intent already shipped as #930 (`ai_doctor_cta_clicked`). Closing avoids two competing funnel events on the same click | [comment](https://github.com/Verdant-OS/verdant-grow-diary/pull/933#issuecomment-5285025091) |
+| PR                                                                | State  | Disposition      | Head                                    | Unique surviving work (from the comment)                                                                                                                                                                                                                    | Comment                                                                                      |
+| ----------------------------------------------------------------- | ------ | ---------------- | --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| [#913](https://github.com/Verdant-OS/verdant-grow-diary/pull/913) | OPEN   | REBASE           | `grok/seo-public-surface-docs-20260812` | Live-host evidence that `vercel.json` public-alias redirects are not firing in production (HTTP 200 soft shells) plus `docs/seo/vercel-host-redirect-fix-steps.md`. Drop the duplicate Ahrefs / `/` vs `/welcome` material already shipped via #914 / #949  | [comment](https://github.com/Verdant-OS/verdant-grow-diary/pull/913#issuecomment-5285119408) |
+| [#817](https://github.com/Verdant-OS/verdant-grow-diary/pull/817) | OPEN   | REBASE           | `grok/tent-alert-history-pro`           | `TentAlertHistoryPanel` and history helpers. Keep base's `isActive` / `openCount` / `activeCount` and the Doctor / Blueprint CTAs from #816 / #888 / #928                                                                                                   | [comment](https://github.com/Verdant-OS/verdant-grow-diary/pull/817#issuecomment-5285121690) |
+| [#710](https://github.com/Verdant-OS/verdant-grow-diary/pull/710) | MERGED | REBASE completed | `claude/docs-cheek-approval-workflow`   | Landed 2026-08-14 as `1a3a70d1b`. Added `docs/agents/cheek-approval-workflow.md`; Sentinel-Version moved to 2026-08-09.3                                                                                                                                    | [comment](https://github.com/Verdant-OS/verdant-grow-diary/pull/710#issuecomment-5285129001) |
+| [#699](https://github.com/Verdant-OS/verdant-grow-diary/pull/699) | OPEN   | REBASE           | `chore/adopt-biome-lint`                | Tooling swap only (`package.json` / `biome.json` / lint-staged). Drop the 327-commit-stale format commit; regenerate after rebase; hand-reconcile `src/test/helpers/reactRouterCompat.vitest.tsx`; add a Biome ignore for `supabase/functions/mcp/index.ts` | [comment](https://github.com/Verdant-OS/verdant-grow-diary/pull/699#issuecomment-5285131401) |
+| [#933](https://github.com/Verdant-OS/verdant-grow-diary/pull/933) | CLOSED | CLOSE_SUPERSEDED | `claude/strange-keller-036221`          | Complete intent already shipped as #930 (`ai_doctor_cta_clicked`). Closing avoids two competing funnel events on the same click                                                                                                                             | [comment](https://github.com/Verdant-OS/verdant-grow-diary/pull/933#issuecomment-5285025091) |
 
 Follow-up outcome: [#936](https://github.com/Verdant-OS/verdant-grow-diary/pull/936)
 (`claude/alert-doctor-credit-gate`) closed 2026-08-13 without merge. The
@@ -473,27 +519,27 @@ not land a hybrid patch on any of them solely to clear `DIRTY`.
 
 ## Production status
 
-Analytics axes verified directly on 2026-08-02; release identity re-verified 2026-08-05;
-public-surface axes (sitemap, root route, indexable-route coverage) re-measured
-2026-08-07 with a live sitemap re-count 2026-08-12. Each row carries its own
-verification date where they differ:
+Analytics axes verified directly on 2026-08-02; release identity and public
+root were re-measured 2026-08-15. Sitemap loc-count re-counted 2026-08-15.
+GA4 lighting / singleton rows retain their 2026-08-02 dates — they were not
+re-opened this turn. Each row carries its own verification date:
 
-| Axis                                        | Status                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `https://verdantgrowdiary.com/version.json` | `PASS` — HTTP 200 (re-verified 2026-08-05)                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| Production commit                           | `PASS` — verified 2026-08-05 ~22:10Z: production serves real SHA `3f773b680dcc` with the resilient stamp live (`commitSource: "git"`, `treeHash: c8fc076f0011…`, `ref: "__orphan__"`, `dirty: false`); resolver matched the served treeHash to this exact commit via tag annotation. Incident context: the same day's 15:47:45Z build had stamped `commit: "unknown"` (see blocker 6 — resolved and live-verified); single observations remain point-in-time |
-| Production build time                       | `2026-08-05T22:06:15.869Z` at the ~22:10Z verification; earlier that day: 15:47:45Z (degraded), 15:52:18Z (healthy pre-resilience)                                                                                                                                                                                                                                                                                                                           |
-| Public sitemap                              | `PASS` — HTTP 200, **56** `<loc>` entries (live re-count 2026-08-12; supersedes the 51 of 2026-08-02 and the 55 measured 2026-08-07 — `/tools/blueprint-targets` shipped 2026-08-11 via #892). All 55 URLs of the 2026-08-07 set returned HTTP 200 with zero redirects and no `noindex`; the 56th postdates that crawl                                                                                                                                       |
-| Public root route `/`                       | `FAIL` — measured 2026-08-07. The SSR response body is a suspended skeleton (`role="status"` … `Loading…`): 7 body words, no `<h1>`, no `<link rel="canonical">`, zero outgoing links. Every other public route SSRs 250–1500 words. `/` is also orphaned — no internal link targets it; navigation points "home" at `/welcome` (52 incoming). Root cause isolated; decision made — see blocker 7                                                            |
-| Indexable routes outside the sitemap        | `FAIL` — four routes serve HTTP 200 with `robots: index, follow` yet are absent from the sitemap (re-confirmed against the deploy sitemap 2026-08-12): `/glossary`, `/breeder-beta`, `/creator-beta`, `/pheno-comparison`. Two are beta surfaces and one is a preview; none has a recorded eligibility decision — see blocker 8's sibling note                                                                                                               |
-| robots.txt                                  | `PASS` — HTTP 200, production sitemap declared; neither lighting route is disallowed                                                                                                                                                                                                                                                                                                                                                                         |
-| Lighting route technical SEO                | `PASS` — two HTTP 200 routes; page metadata and route-scoped JSON-LD verified                                                                                                                                                                                                                                                                                                                                                                                |
-| GA4 explicit lighting-page identity         | `PASS` — nine exact intercepted SPA page-view events; no test traffic transmitted                                                                                                                                                                                                                                                                                                                                                                            |
-| GA4 page-view singleton contract            | `FAIL` — five automatic tag-generated events observed beside explicit application events                                                                                                                                                                                                                                                                                                                                                                     |
-| GA4 authenticated baseline                  | `BLOCKED` — authenticated access unavailable                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| GSC authenticated baseline                  | `BLOCKED` — authenticated access unavailable                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| Measurement Day 0                           | `UNSET`                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| Four-week measurement clock                 | `NOT_STARTED`                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| Axis                                        | Status                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `https://verdantgrowdiary.com/version.json` | `PASS` — HTTP 200 (re-verified 2026-08-15)                                                                                                                                                                                                                                                                                                                                                                                               |
+| Production commit                           | `PASS` — verified 2026-08-15: production serves real SHA `5e2fcedd4271` (#984) (`commitSource: "git"`, `treeHash: 761818d8a191…`, `ref: "__orphan__"`, `dirty: false`); `scripts/resolve-release-provenance.mjs --hash=<treeHash> --ref=5e2fcedd4271 --scan=1` returned MATCH. This supersedes the 2026-08-05 stamp `3f773b680dcc`. Origin tip is later (`89ddea93f`, #993) — publish lags git. Single observations remain point-in-time |
+| Production build time                       | `2026-08-15T00:34:11.592Z` (from the same `/version.json`). Prior live stamp `2026-08-05T22:06:15.869Z` is historical                                                                                                                                                                                                                                                                                                                    |
+| Public sitemap                              | `PASS` — HTTP 200, **56** `<loc>` entries (live re-count 2026-08-15; same count as 2026-08-12). First loc is `https://verdantgrowdiary.com/`                                                                                                                                                                                                                                                                                             |
+| Public root route `/`                       | `PASS` — measured 2026-08-15. SSR body is the public landing: HTTP 200, `<h1>` “See what changed. Decide what to do next.”, `<link rel="canonical">` present, 1141 body words, no loading skeleton. This supersedes the 2026-08-07 empty-shell `FAIL`. Slice 1 of Option A (#949 `741f99e1b`) is live. Slice 2 (`/welcome` → `/` consolidation) remains unapproved — see blocker 7                                                       |
+| Indexable routes outside the sitemap        | `FAIL` — four routes still serve HTTP 200 with `robots: index, follow` and are absent from the sitemap (re-confirmed 2026-08-15): `/glossary`, `/breeder-beta`, `/creator-beta`, `/pheno-comparison`. Two are beta surfaces and one is a preview; none has a recorded eligibility decision — see blocker 8's sibling note                                                                                                                |
+| robots.txt                                  | `PASS` — HTTP 200, production sitemap declared; neither lighting route is disallowed (not re-measured 2026-08-15; last verified with the lighting-route crawl)                                                                                                                                                                                                                                                                           |
+| Lighting route technical SEO                | `PASS` — two HTTP 200 routes; page metadata and route-scoped JSON-LD verified (not re-measured 2026-08-15)                                                                                                                                                                                                                                                                                                                               |
+| GA4 explicit lighting-page identity         | `PASS` — nine exact intercepted SPA page-view events; no test traffic transmitted (2026-08-02; not re-measured 2026-08-15)                                                                                                                                                                                                                                                                                                               |
+| GA4 page-view singleton contract            | `FAIL` — five automatic tag-generated events observed beside explicit application events (2026-08-02; not re-measured 2026-08-15)                                                                                                                                                                                                                                                                                                        |
+| GA4 authenticated baseline                  | `BLOCKED` — authenticated access unavailable                                                                                                                                                                                                                                                                                                                                                                                             |
+| GSC authenticated baseline                  | `BLOCKED` — authenticated access unavailable                                                                                                                                                                                                                                                                                                                                                                                             |
+| Measurement Day 0                           | `UNSET`                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Four-week measurement clock                 | `NOT_STARTED`                                                                                                                                                                                                                                                                                                                                                                                                                            |
 
 No page-level traffic, impression, click, position, or CTR claim is authorized while the
 authenticated GA4/GSC baseline remains blocked. Stream identity alone is not an
@@ -659,7 +705,7 @@ succeed. Two different findings stop it instead:
 
 1. **The JWT secret is unobtainable on Lovable Cloud**, so a role-claim JWT
    cannot be minted in production. P3 proved the PostgREST mechanism works
-   *locally*; in production the role would be created and then **unreachable**.
+   _locally_; in production the role would be created and then **unreachable**.
    A fence nobody can route through is not a fence.
 2. **Role durability across rebuilds is `UNKNOWN`**, and roles sit outside
    migrations and schema dumps entirely. Combined with the confirmed rule that a
@@ -680,7 +726,7 @@ land first:
   an unguarded migration **aborts the apply chain** — the same failure that
   disqualified `claude/cultivar-library-p1` today, and the same class as the open
   signup-attribution incident at the top of this file.
-- **Gate B — does the *hosted* PostgREST honour a custom `role` claim?** P3
+- **Gate B — does the _hosted_ PostgREST honour a custom `role` claim?** P3
   passed on the **local** stack only. A move to opaque `sb_secret_…` keys would
   remove role-claim JWTs entirely.
 - **Gate C — Security review**, per `HANDOFF_PROTOCOL.md`, before any new
@@ -890,6 +936,17 @@ claim the pack that replaced it on 2026-08-13 (which no agent session has read) 
 accurate — only that the mechanism now exists in governance memory and that its prior
 content's accuracy has been checked once.
 
+**Completed, out of slice (recorded 2026-08-15):** Cheek asked Grok to rewrite the
+Lovable project Knowledge field from current CURRENT_STATE rather than restore the
+July backup. Applied 2026-08-15 via Lovable `set_project_knowledge` to
+`verdantgrowdiary-com` (`66255e7b-892c-4be5-8686-ab1cfc3666db`). Same-day follow-up:
+Cheek cited the stale 2026-08-13 buffer rows (topology `6434ea2a8`, Claude Convex
+header, `/` `FAIL`, Grok Unassigned). Those rows were refreshed from live
+production and origin tip; Lovable Knowledge re-applied as Version 2026-08-15.1.
+Dated snapshot: `docs/lovable/verdant-project-knowledge-2026-08-15.md`. This still
+does not authorize a sync bot. Workspace knowledge was not changed. Migrations
+were not applied. Day 0 remains `UNSET`.
+
 In scope — these bullets scope the **Mode A SEO parent program above**, not the completed
 #809 entry:
 
@@ -945,16 +1002,16 @@ Out of scope:
    items (optional): raise the intermittent history-less sandbox with Lovable;
    retire the stale pre-SSR `vercel.json`.
    See the release-provenance runbook below for how to read and resolve stamps.
-7. **Public root route `/` serves crawlers an empty shell.** Found 2026-08-07 while
+7. **Public root route `/` empty-shell — Slice 1 live-verified 2026-08-15.** Found 2026-08-07 while
    reconciling the Ahrefs site audit (project `10204962`, crawl `2026-08-07T07:14:05Z`).
    Root cause isolated 2026-08-12: the deliberate loading-until-hydrated gate in
    `src/components/RootEntry.tsx` (the fix for a navigation-freezing hydration
-   mismatch), not an SSR defect. `/welcome` renders the identical `Landing` component,
-   SSR'd correctly, and carries the navigation's "home" link plus 52 inbound internal
-   links. **Cheek selected Option A on 2026-08-12** (`/` becomes the canonical home).
-   Slice 1 (SSR the landing surface at `/`, no URL changes) is approved and handed to
-   Codex; slice 2 (the `/welcome` → `/` consolidation, 35 pinned files) remains
-   unapproved until slice 1 verifies live. Spec and handoff:
+   mismatch), not an SSR defect. **Cheek selected Option A on 2026-08-12** (`/` becomes
+   the canonical home). Slice 1 shipped as [PR #949](https://github.com/Verdant-OS/verdant-grow-diary/pull/949)
+   (`741f99e1b`). Live `/` on 2026-08-15 SSRs the landing (`PASS` — h1, canonical,
+   1141 body words). Do not keep citing the 2026-08-07 empty-shell `FAIL` as current.
+   Slice 2 (the `/welcome` → `/` consolidation, 35 pinned files) remains
+   unapproved. Spec and handoff:
    `docs/seo/root-route-canonical-home-spec.md`. Full audit evidence:
    `docs/seo/ahrefs-site-audit-2026-08-07.md`.
 8. **Ahrefs structured-data findings must be triaged, not bulk-fixed.** All 56
@@ -1013,11 +1070,11 @@ schema change and does not authorize production writes.
 
 ## Agents currently assigned
 
-| Agent             | Assignment                                                                                                                                                                                                                                                                                    |
-| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Codex             | Standing SEO measurement readiness and analytics integrity. Convex Phase 1 of `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` is in review: PR #977, opened 2026-08-14, not a draft. Scope stays Phase 1 only, under `spikes/convex-component-sandbox/`. **Do NOT build a Postgres domain-reach detector — Phase 0 of `POSTGRES_RESTRICTED_ROLE_SPIKE` is already delivered by Claude (see slices above). Phase 1 of that arm is `HOLD` pending its own Cheek decision** |
-| Claude            | `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` specification — delivered. `POSTGRES_RESTRICTED_ROLE_SPIKE`: spec delivered, **Phase 0 detector measured and Phase 1 role harness delivered (local-only)**, 2026-08-14 under Cheek's approval and full-authority grant (see slices above). Prior completed out-of-slice work (#586/#809/#812/#885) unchanged |
-| Grok              | `ONE_TENT_LOOP_OPERATING_ORDER` — repo slices delivered (0 baseline, 2 handoff ids, 3 PlantQuickLog persist-path, 4 smoke-audit alignment). Slices 1 and 5 remain owner-`BLOCKED` (signup apply + managed e2e session); Slice 5 receipt is `missing_session_json` with `fabricated_login_used: false`. Also recorded isolated `VERDANT_CURSOR_SDK_LOCAL_ORCHESTRATION_SPIKE` next gates on deploy (#985): dispatcher security review recorded; host receipt integrity closed; live Cursor SDK proof still `BLOCKED` without a local `CURSOR_API_KEY`. Reuse of the dispatcher is not approved. Does not pause Convex/Postgres spikes. Production Convex remains HOLD |
-| Security reviewer | Unassigned until Phase 1 spike code exists; then review before any Convex cloud credential                                                                                                                                                                                                    |
-| Gemini            | Unassigned                                                                                                                                                                                                                                                                                    |
-| Council Chair     | Convex-vs-Postgres comparison: **recommendation delivered in spec §10 — adopt Postgres incrementally, hold Convex.** The Postgres arm has a measured number (8 cross-domain reaches across 22 service-role functions, `docs/specs/postgres-restricted-role-alternative.md` §5.1.1); the Convex arm remains `NOT_MEASURED` pending #977. Do not issue a recommendation until both arms carry evidence — and note that `ai-coach`'s five reaches are the case neither architecture removes cheaply |
+| Agent             | Assignment                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Codex             | Standing SEO measurement readiness and analytics integrity. Option A slice 1 (#949) is live-verified. Convex Phase 1 of `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` remains in review: PR #977, still OPEN 2026-08-15. Scope stays Phase 1 only, under `spikes/convex-component-sandbox/`. **Do NOT rebuild the Postgres domain-reach detector — Phase 0 and Phase 1 of `POSTGRES_RESTRICTED_ROLE_SPIKE` are already delivered by Claude.** Incoming #986 still said Phase 1 was `HOLD`; that row was stale. Phase 2 of that arm is HOLD (JWT secret unobtainable on Lovable Cloud; role durability `UNKNOWN`)                                                                            |
+| Claude            | `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` specification — delivered. `POSTGRES_RESTRICTED_ROLE_SPIKE`: spec delivered, **Phase 0 detector measured and Phase 1 role harness delivered (local-only)**, 2026-08-14 under Cheek's approval and full-authority grant. Not the 2026-08-13 “spec-only / not implementation” row. Prior completed out-of-slice work (#586/#809/#812/#885) unchanged                                                                                                                                                                                                                                                                                            |
+| Grok              | `ONE_TENT_LOOP_OPERATING_ORDER` — repo slices delivered (0 baseline, 2 handoff ids, 3 PlantQuickLog persist-path, 4 smoke-audit alignment). Slices 1 and 5 remain owner-`BLOCKED` (signup apply + managed e2e session); Slice 5 receipt is `missing_session_json` with `fabricated_login_used: false`. Isolated `VERDANT_CURSOR_SDK_LOCAL_ORCHESTRATION_SPIKE` next gates on deploy (#985): live Cursor SDK proof still `BLOCKED` without a local `CURSOR_API_KEY`. Also recorded the 2026-08-15 Lovable Knowledge rewrite and this CURRENT_STATE merge. Not Unassigned. Reuse of the dispatcher is not approved. Does not pause Convex/Postgres spikes. Production Convex remains HOLD |
+| Security reviewer | Unassigned until Convex Phase 1 spike code is ready for review before any Convex cloud credential                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| Gemini            | Unassigned                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| Council Chair     | Convex-vs-Postgres comparison: **recommendation delivered in spec §10 — adopt Postgres incrementally, hold Convex.** Postgres arm has a measured number (8 cross-domain reaches across 22 service-role functions). Convex arm remains `NOT_MEASURED` pending #977 isolation proofs (green CI on #977 is not those proofs). Incoming #986 still said “do not issue a recommendation until both arms carry evidence”; that sentence is stale — the recommendation already shipped. `ai-coach`'s five reaches are the case neither architecture removes cheaply                                                                                                                            |

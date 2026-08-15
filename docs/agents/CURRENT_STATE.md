@@ -298,8 +298,16 @@ IPv6-only, so the connection string needs the IPv4 Supavisor pooler host
 recognises and already knows how to bind to a pinned ref. Neither the
 runner-egress claim nor the exact replacement host was verified from this repo;
 whoever repoints the secret should take the host from the Supabase dashboard's
-connection panel rather than from this paragraph, and the first green run is
-what confirms the diagnosis.
+connection panel rather than from this paragraph.
+
+**Judge the fix by the probe's status, never by the run colour.** The connection
+is proven the moment the probe *completes a query* — `status: "current"` (exit 0)
+or `status: "drift"` (exit 1). Only `could_not_probe` (exit 2) means the
+connection is still broken. This distinction is not pedantry here: this file
+already records at least two unapplied migrations, so the first genuinely
+successful run will very likely return `drift` and exit 1, and the workflow will
+go **red**. An operator watching the tick rather than the payload would read that
+red as "my secret fix did not work" and revert a change that in fact worked.
 
 **The failure mode changed between 13 and 14 August**, which is itself evidence:
 on 12–13 Aug the probe step was `skipped`, meaning `Require SUPABASE_DB_URL`
@@ -374,8 +382,10 @@ Until **both** the secret is corrected and the probe's matching is name-bound,
 the **applied-migration ledger** is `NOT_MEASURED` — and so is any claim whose
 only evidence would have come from this probe, which means every statement of
 the form "migration X is/is not live in production" that is not backed by a
-direct observation. Note the second condition: a green run from the current code
-would be a measurement of the wrong thing, not a measurement.
+direct observation. Note the second condition: a *completed* probe run from the
+current code — whatever colour the workflow tick ends up — would be measuring the
+wrong thing, because its unapplied list would be inflated by every
+Lovable-recorded migration it failed to match.
 
 That is deliberately narrower than "every production-schema statement in this
 file". It does **not** downgrade the independent evidence recorded above: the
@@ -385,9 +395,10 @@ object lookup, and those keep their own labels. A blocked ledger check and a
 directly-observed missing table are different findings, and flattening both to
 `NOT_MEASURED` would erase a verified defect rather than preserve caution.
 
-Four red runs are not four absent measurements; they are four days in which the
-mechanism built to catch an invisible outage was itself unable to see, and was
-left that way.
+Four red runs are four absent measurements — `NOT_MEASURED`, in the literal
+sense this repo's status vocabulary requires — but they are not **merely** that.
+They are also four days in which the mechanism built to catch an invisible
+outage was itself unable to see, and was left that way.
 
 ---
 

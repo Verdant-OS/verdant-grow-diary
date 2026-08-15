@@ -10,13 +10,12 @@
  * the creation seams (Grows page, CreateTentDialog).
  *
  * Design rules:
- *  - UX honesty, not security: the gate blocks the button and the submit
- *    handler. A server-side backstop (RLS/trigger) is a separate,
- *    explicitly-approved migration.
- *  - FAIL OPEN on uncertainty: while entitlements are loading (or the
- *    resolver is unavailable) creation stays allowed — a paying grower
- *    must never be locked out by a resolver hiccup. The count check only
- *    bites when we have a settled capabilities object.
+ *  - UX honesty: the client gate blocks the button and submit handler; the
+ *    server-side Free creation cap remains authoritative for concurrency.
+ *  - The base single-dialog helpers FAIL OPEN when capabilities are
+ *    unresolved so a paying grower is not locked out by a resolver hiccup.
+ *  - The verified wrappers used by multi-row setup flows FAIL CLOSED until
+ *    every required plan/count read settles, preventing partial setup writes.
  *  - Existing data is never touched: a grower already over the limit
  *    keeps full access to existing grows/tents; only NEW creation gates.
  *  - Pure. No React, no Supabase, no fetch, no time reads.
@@ -25,7 +24,7 @@
 import type { Capabilities } from "./types";
 
 export interface CreationGateResult {
-  /** False only when a settled capability limit is already reached. */
+  /** False when a settled limit is reached or a verified flow cannot confirm required inputs. */
   allowed: boolean;
   /** The numeric limit that applied, or null when unlimited. */
   limit: number | null;
@@ -41,10 +40,19 @@ export const FREE_TENT_LIMIT_BLOCKED_COPY =
 
 export const FREE_TIER_UPGRADE_PATH = "/pricing" as const;
 
+export const CREATION_ENTITLEMENT_UNAVAILABLE_COPY =
+  "We couldn't verify your plan limits. Retry the plan check before creating another grow or tent." as const;
+
 const ALLOWED: CreationGateResult = Object.freeze({
   allowed: true,
   limit: null,
   blockedCopy: null,
+});
+
+const UNVERIFIED: CreationGateResult = Object.freeze({
+  allowed: false,
+  limit: null,
+  blockedCopy: CREATION_ENTITLEMENT_UNAVAILABLE_COPY,
 });
 
 /**
@@ -71,6 +79,21 @@ export function evaluateGrowCreationGate(
 }
 
 /**
+ * Fail-closed wrapper for multi-row setup flows. Unlike the canonical
+ * single-dialog UX gate, these flows can create several durable rows in one
+ * pass, so they must not begin until both plan and active-row counts are
+ * verified.
+ */
+export function evaluateVerifiedGrowCreationGate(
+  capabilities: Capabilities | null | undefined,
+  activeGrowCount: number,
+  verificationReady: boolean,
+): CreationGateResult {
+  if (!verificationReady || !capabilities) return UNVERIFIED;
+  return evaluateGrowCreationGate(capabilities, activeGrowCount);
+}
+
+/**
  * Gate for creating a NEW tent. Free (multiTent=false) means one active
  * tent; any plan with multiTent=true is unlimited.
  */
@@ -87,6 +110,16 @@ export function evaluateTentCreationGate(
     limit,
     blockedCopy: FREE_TENT_LIMIT_BLOCKED_COPY,
   };
+}
+
+/** Fail-closed counterpart to evaluateVerifiedGrowCreationGate for tents. */
+export function evaluateVerifiedTentCreationGate(
+  capabilities: Capabilities | null | undefined,
+  activeTentCount: number,
+  verificationReady: boolean,
+): CreationGateResult {
+  if (!verificationReady || !capabilities) return UNVERIFIED;
+  return evaluateTentCreationGate(capabilities, activeTentCount);
 }
 
 /**

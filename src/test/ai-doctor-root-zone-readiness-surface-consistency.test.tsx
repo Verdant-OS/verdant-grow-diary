@@ -33,6 +33,15 @@ vi.mock("@/hooks/useRootZoneObservations", () => ({
   },
 }));
 
+vi.mock("@/hooks/use-sensor-readings", () => ({
+  useSensorReadingsByTents: (tentIds: string[]) => ({
+    byTent: Object.fromEntries(tentIds.map((tentId) => [tentId, []])),
+    statusByTent: Object.fromEntries(tentIds.map((tentId) => [tentId, "success"])),
+    isLoading: false,
+    isError: false,
+  }),
+}));
+
 const PLANT_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const TENT_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const GROW_ID = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";

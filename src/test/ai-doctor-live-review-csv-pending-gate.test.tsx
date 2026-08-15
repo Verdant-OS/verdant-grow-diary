@@ -183,6 +183,19 @@ function strongTimeline(): TimelineMemoryItem[] {
   ] as TimelineMemoryItem[];
 }
 
+function oneRecentNoteTimeline(): TimelineMemoryItem[] {
+  return [
+    {
+      kind: "diary",
+      key: "first-note",
+      occurredAt: new Date(Date.now() - 60 * 60_000).toISOString(),
+      eventType: "note",
+      hasPhoto: false,
+      note: "First plant check",
+    },
+  ];
+}
+
 const csvRows = [
   {
     metric: "temperature_c",
@@ -539,6 +552,112 @@ describe("CSV history pending/error gating", () => {
     mount();
     const start = screen.getByTestId("plant-ai-doctor-live-review-start") as HTMLButtonElement;
     expect(start.disabled).toBe(true);
+  });
+
+  it("lets one plant note plus a fresh manual tent reading unlock a cautious review", async () => {
+    const capturedAt = new Date(Date.now() - 60_000).toISOString();
+    itemsRef.current = oneRecentNoteTimeline();
+    sensorQueryState.currentRows = [
+      {
+        id: "manual-temperature",
+        tent_id: TENT_ID,
+        metric: "temperature_c",
+        value: 24,
+        captured_at: capturedAt,
+        ts: capturedAt,
+        created_at: capturedAt,
+        source: "manual",
+        quality: "ok",
+      },
+    ];
+    const invoke = vi.fn<InvokeFn>(async () => ({
+      data: { ok: false, reason: "http" },
+      error: null,
+    }));
+
+    render(reviewElement(invoke));
+
+    const root = screen.getByTestId("plant-ai-doctor-live-review");
+    expect(root).toHaveAttribute("data-readiness", "partial");
+    expect(root).toHaveAttribute("data-review-mode", "standard");
+    const start = screen.getByTestId("plant-ai-doctor-live-review-start") as HTMLButtonElement;
+    expect(start.disabled).toBe(false);
+
+    fireEvent.click(start);
+    await waitFor(() => expect(invoke).toHaveBeenCalledTimes(1));
+    const packet = invoke.mock.calls[0][1].body.packet;
+    expect(packet.recentSensorSnapshotAnnotation?.source).toBe("manual");
+    expect(packet.missingLiveSensorReadings).toBe(true);
+  });
+
+  it("does not let a manual reading from another tent unlock this plant's review", () => {
+    const capturedAt = new Date(Date.now() - 60_000).toISOString();
+    itemsRef.current = oneRecentNoteTimeline();
+    sensorQueryState.currentRows = [
+      {
+        id: "wrong-tent-temperature",
+        tent_id: "6b2d7f10-3c4e-4d5f-8a01-2b3c4d5e6f88",
+        metric: "temperature_c",
+        value: 24,
+        captured_at: capturedAt,
+        ts: capturedAt,
+        created_at: capturedAt,
+        source: "manual",
+        quality: "ok",
+      },
+    ];
+    const invoke = mount();
+
+    expect(screen.queryByTestId("plant-ai-doctor-live-review")).toBeNull();
+    expect(invoke).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      "a reading older than seven days",
+      {
+        source: "manual",
+        quality: "ok",
+        metric: "temperature_c",
+        value: 24,
+        captured_at: new Date(Date.now() - 8 * 24 * 60 * 60_000).toISOString(),
+      },
+    ],
+    [
+      "implausible humidity",
+      {
+        source: "manual",
+        quality: "ok",
+        metric: "humidity_pct",
+        value: 101,
+        captured_at: new Date(Date.now() - 60_000).toISOString(),
+      },
+    ],
+    [
+      "unknown persisted quality",
+      {
+        source: "manual",
+        quality: "unknown",
+        metric: "temperature_c",
+        value: 24,
+        captured_at: new Date(Date.now() - 60_000).toISOString(),
+      },
+    ],
+  ])("does not unlock a review with %s", (_label, row) => {
+    itemsRef.current = oneRecentNoteTimeline();
+    sensorQueryState.currentRows = [
+      {
+        id: "rejected-manual-row",
+        tent_id: TENT_ID,
+        ts: row.captured_at,
+        created_at: row.captured_at,
+        ...row,
+      },
+    ];
+    const invoke = mount();
+
+    expect(screen.queryByTestId("plant-ai-doctor-live-review")).toBeNull();
+    expect(invoke).not.toHaveBeenCalled();
   });
 
   it("sends fresh live temperature, humidity, and soil values without raw payload", async () => {

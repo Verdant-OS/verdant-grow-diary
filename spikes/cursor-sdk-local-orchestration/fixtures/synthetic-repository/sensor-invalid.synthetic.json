@@ -1,0 +1,13 @@
+{
+  "synthetic": true,
+  "label": "SYNTHETIC_SENSOR_INVALID",
+  "kind": "sensor_reading",
+  "source": "invalid",
+  "tentId": "SYN-TENT-0001",
+  "capturedAt": "2026-01-15T12:07:00.000Z",
+  "temperatureC": 999,
+  "humidityPct": 100,
+  "stuckHumidity": true,
+  "confidence": "rejected",
+  "notes": "SYNTHETIC invalid reading. Humidity stuck at 100. Must never be classified healthy."
+}

@@ -140,6 +140,26 @@ const FUNCTION_CONTRACTS: FunctionContract[] = [
     // still has EXECUTE.
     expectedExecute: { anon: false, authenticated: true, service_role: true },
   },
+  {
+    name: "public.enqueue_email",
+    mustExist: true,
+    expectedExecute: { anon: false, authenticated: false, service_role: true },
+  },
+  {
+    name: "public.read_email_batch",
+    mustExist: true,
+    expectedExecute: { anon: false, authenticated: false, service_role: true },
+  },
+  {
+    name: "public.delete_email",
+    mustExist: true,
+    expectedExecute: { anon: false, authenticated: false, service_role: true },
+  },
+  {
+    name: "public.move_to_dlq",
+    mustExist: true,
+    expectedExecute: { anon: false, authenticated: false, service_role: true },
+  },
 ];
 
 // ─── Query helpers ────────────────────────────────────────────────────────────

@@ -1,0 +1,21 @@
+-- NO-OP (recorded migration history).
+--
+-- During the 2026-08-15 Security Advisor remediation on the linked sandbox,
+-- this timestamp was applied with REVOKE EXECUTE ... FROM anon, authenticated
+-- on trigger-only functions (grant_staff_role_for_verified_email,
+-- profiles_block_gamification_updates). Supabase reported {"success": true},
+-- but has_function_privilege('anon', ...) still returned true afterward.
+--
+-- Root cause: those functions carried the default PUBLIC grant (=X/postgres).
+-- Revoking only from anon/authenticated leaves PUBLIC in place, and anon
+-- inherits EXECUTE through it. proacl entries that look like "=X/postgres"
+-- mean PUBLIC, not "owned by postgres".
+--
+-- The effective fix is 20260815054645_revoke_public_and_anon_execute_on_definer_functions.sql,
+-- which revokes FROM PUBLIC explicitly. This file intentionally performs no DDL
+-- so the migration ledger matches sandbox history and documents the lesson.
+--
+-- If you are reading this on a fresh replay: nothing to do here — proceed to
+-- 20260815054645.
+
+SELECT 1;

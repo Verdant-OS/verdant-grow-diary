@@ -154,10 +154,27 @@ Computed with FAO-56 Eq. 11, reproducible from the numbers below. Base state: **
 
 Two readings a reviewer should not skip:
 
-1. **A ±3% RH error moves VPD roughly 2.5× as much as a ±0.5 °C temperature error.** For
-   VPD purposes the humidity sensor is the one that matters most, and RH sensors are the
-   ones that drift — which is why `content-standards.md` requires a verification at or
-   above **75% RH** specifically, not a convenient mid-range check.
+1. **At this operating point and under this budget, a ±3% RH error moves VPD roughly 2.5×
+   as much as a ±0.5 °C temperature error — but the ordering is not universal.** Which
+   sensor matters more depends on both the operating point and the two instruments' actual
+   accuracies. The break-even is the ratio of sensitivities, `(∂VPD/∂T)/(∂VPD/∂RH)`, in
+   **%RH per °C** (author computation from C01):
+
+   | Operating point | Break-even (%RH per 1 °C) | RH dominates when                                    |
+   | --------------- | ------------------------: | ---------------------------------------------------- |
+   | 26 °C, 40% RH   |                      3.55 | RH error exceeds 3.55% per 1 °C of temperature error |
+   | 26 °C, 60% RH   |                      2.36 | RH error exceeds 2.36% per 1 °C                      |
+   | 26 °C, 80% RH   |                      1.18 | RH error exceeds 1.18% per 1 °C                      |
+   | 20 °C, 60% RH   |                      2.48 | RH error exceeds 2.48% per 1 °C                      |
+   | 30 °C, 60% RH   |                      2.29 | RH error exceeds 2.29% per 1 °C                      |
+
+   The example's ±3%/±0.5 °C budget gives a ratio of 6.0 %RH per °C, which clears every
+   break-even above — hence "2.5×" here. **A room with a better RH sensor or a worse
+   temperature probe can invert it.** Compute the ratio for your own instruments rather than
+   inheriting this ordering. Independently of that ordering, `content-standards.md` requires
+   RH verification at or above **75% RH**, because that is where RH sensors drift — a
+   requirement about _where to check_, not about which sensor matters more.
+
 2. **Under the ±0.5 °C / ±3% RH error budget assumed above, the plausible range is
    1.207–1.489 kPa — a span of 0.282 kPa.** The shipped `mid_late_flower` band is
    1.1–1.5 kPa, i.e. 0.4 kPa wide. **That assumed uncertainty spans about 70% of the entire
@@ -199,10 +216,10 @@ understates it. FAO-56 makes this explicit and requires the mean of `e°(Tmax)` 
   0.044 kPa**;
 - VPD from averaged temperature = 1.267 kPa; mean of the two true VPDs = 1.285 kPa.
 
-**But the direction of that error is data-dependent, and the convexity term is the small
-one.** Because `VPD = e°(T)·(1 − RH/100)`, temperature and humidity **covary**, and the
-covariance dominates. Holding the same 28 °C / 22 °C samples and varying only how RH tracks
-temperature:
+**But the direction of that error is data-dependent.** Because `VPD = e°(T)·(1 − RH/100)`,
+temperature and humidity **covary**, and that covariance term can outweigh the convexity
+term — or vanish entirely. Holding the same 28 °C / 22 °C samples and varying only how RH
+tracks temperature:
 
 | Case                                                 | Mean of true VPDs | VPD from averaged inputs | Error             |
 | ---------------------------------------------------- | ----------------: | -----------------------: | ----------------- |
@@ -210,8 +227,12 @@ temperature:
 | RH rises with temperature (28 °C/80%, 22 °C/40%)     |             1.171 |                    1.267 | **high by 0.096** |
 | RH falls as temperature rises (28 °C/40%, 22 °C/80%) |             1.398 |                    1.267 | low by 0.131      |
 
-So averaging can bias the result **either way**, by roughly 5–7× the pure convexity effect.
-The middle row is a genuine counterexample to any "always understates" claim. The last row
+So averaging can bias the result **either way**. In the two rows where RH swings 40 points
+across the cycle, the covariance term is 5–7× the pure convexity effect; **in the first row
+RH is constant, the covariance term is exactly zero, and convexity is the entire 0.018 kPa
+error.** Dominance is a property of how much RH actually varies in a given room, not a
+general rule — with small RH variation the convexity term can be the larger of the two. The
+middle row is a genuine counterexample to any "always understates" claim. The last row
 resembles the common indoor pattern — RH climbing as the room cools at lights-off — which
 is why the error is _usually_ low in practice, but that is an empirical tendency of a
 particular room's data, **not a property of the arithmetic**, and it inverts whenever

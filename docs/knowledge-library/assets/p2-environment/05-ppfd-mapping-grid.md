@@ -19,9 +19,11 @@ dry-matter production likewise rising from 600 to 1,200 µmol·m⁻²·s⁻¹ [c
 **But do not translate that into a proportional yield penalty — the evidence does not support
 it.** In the same trial PPFD rose **15×** (120→1,800) while yield rose only **4.5×**, so the
 linear fit carries a large positive intercept and a fractional light deficit produces a
-**smaller** fractional yield deficit. Working the published endpoints through that fit
-(author computation from C04a), a corner 20% dimmer than the canopy mean gives roughly a
-**12–16%** yield deficit, not 20%.
+**smaller** fractional yield deficit. **This asset states no percentage for that deficit.**
+An earlier revision gave "12–16%," which cannot be derived without naming the baseline it
+assumes: applying the endpoint fit, a corner 20% dimmer yields about **5%** at a mean near
+the low endpoint and reaches the mid-teens only near the high one. Any single figure silently
+picks a baseline, so none is given.
 
 Two further limits on any such estimate:
 
@@ -42,11 +44,12 @@ living.** Locate them; do not price them.
 
 ## Instrument reality check — read this before recording
 
-| Question                                       | Why it matters                                                                                                                                                    |
-| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Is it a quantum sensor or a lux meter / phone? | Lux and phone apps are weighted for human vision, not photosynthesis. A lux-to-PPFD conversion factor is **spectrum-specific** and wrong for a different fixture. |
-| What is its stated accuracy?                   | Record it. It bounds every uniformity conclusion below.                                                                                                           |
-| Calibration date?                              | Quantum sensors drift. An uncalibrated map is ordinal, not absolute.                                                                                              |
+| Question                                       | Why it matters                                                                                                                                                                                                                                         |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Is it a quantum sensor or a lux meter / phone? | Lux and phone apps are weighted for human vision, not photosynthesis. A lux-to-PPFD conversion factor is **spectrum-specific** and wrong for a different fixture.                                                                                      |
+| What is its stated accuracy?                   | Record it — it bounds the **absolute** PPFD and DLI values. It does **not** bound uniformity: for a grid walked with one sensor, a stable bias cancels, so repeatability and drift govern whether a spatial difference is real (see Uniformity below). |
+| What is its repeatability?                     | Record it if published. This is the figure that decides whether a cell-to-cell difference is resolvable.                                                                                                                                               |
+| Calibration date?                              | Quantum sensors drift. An uncalibrated map is ordinal, not absolute.                                                                                                                                                                                   |
 
 **If you are using a lux meter or a phone, record that.** Your map is still useful for
 _uniformity_ — the relative pattern across cells — but the absolute numbers are not PPFD and

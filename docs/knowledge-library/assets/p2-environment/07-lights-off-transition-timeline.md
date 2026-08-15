@@ -9,9 +9,16 @@
 
 ## The window this asset captures
 
-At lights-off, sensible (heat) load falls quickly while latent (moisture) load does not.
-Equipment that removes moisture as a by-product of cooling loses its moisture-removal
-capability exactly when the room needs it most — and that is invisible in a daily average.
+**This asset records what happens after lights-off; it does not explain it.** Rooms commonly
+behave differently in that window than during the light period, and a daily average hides the
+difference entirely — so the window is worth measuring on its own terms.
+
+> **Why the explanation is not here.** The mechanism usually offered — that cooling-driven
+> dehumidification loses capability as sensible load falls — is claim **C08**, which the
+> pillar classifies **R3** and marks **blocked** (trade press only, below the evidence tier).
+> Stating it here would import a blocked R3 claim into an R2 asset and let it bypass the
+> qualified-safety lane. **Capacity interpretation belongs in asset 6**, which carries the
+> pending-safety banner. This asset stays a neutral observation template.
 
 **This asset states no duration for that window, because no source in the claim map
 establishes one.** An earlier revision asserted "the first one to two hours," which was an
@@ -27,10 +34,13 @@ Two reasons this window matters beyond equipment:
 
 - **Condensation is governed by surface temperature, not room RH.** A cold wall, duct, or
   fixture housing can be below dew point while the room reads acceptable.
-- **_Botrytis_ prefers cool.** Extension guidance puts infection risk at **65–75 °F (68 °F
-  optimal)** with high humidity and free water on surfaces [claim C09 — **hemp,
-  greenhouse-framed**, so treat as risk direction, not an indoor setpoint]. The post-lights-off
-  window is cool _and_ humid at the same time.
+- **_Botrytis_ prefers cool.** Extension guidance puts infection risk at **65–75 °F** with
+  high humidity and free water on surfaces [claim C09, source **S6a**, read at source —
+  **hemp, greenhouse-framed**, so treat as risk direction, not an indoor setpoint]. The
+  post-lights-off window is cool _and_ humid at the same time. **A "68 °F optimum" appears in
+  the wider extension literature but rests on S6b, which returned HTTP 403 and has not been
+  read — it is deliberately omitted here** and must not be reinstated until an editor opens
+  that source.
 
 ## Setup
 

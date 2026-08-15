@@ -1,6 +1,18 @@
 # Verdant — Current Operating State
 
 **Last updated:** 2026-08-15 UTC
+**Updated by:** Claude (2026-08-15, additive: answers Cheek's "migration ledger
+reconciliation" ask with the finding that the reconciliation tool **already
+exists and has never once completed a measurement** — four scheduled runs since
+2026-08-12, all `failure`; issues #912 and #916 open and unactioned; the
+`verdant-production` environment's `SUPABASE_DB_URL` resolves to the **sandbox**
+project ref and to an unreachable IPv6 address. New section
+"The migration-drift alarm has never once completed a measurement". No new tool
+was built and none should be. No production, GA4, GSC, sitemap, or
+release-identity row was re-measured in this edit; the Grok note below is
+retained unchanged.)
+
+**Prior update:** 2026-08-15 UTC
 **Updated by:** Grok (2026-08-15, later additive: next gates on
 `VERDANT_CURSOR_SDK_LOCAL_ORCHESTRATION_SPIKE`. `POSTGRES_RESTRICTED_ROLE_SPIKE`
 was not touched. Optional live proof remains `BLOCKED` — `CURSOR_API_KEY` is
@@ -121,9 +133,97 @@ in some ways worse shape than the signup outage, which at least fails loudly.
 
 Exact drift count is `NOT_MEASURED`: `supabase_migrations.schema_migrations` was
 `permission denied` for both roles available to the investigation, so only
-"≥ 1 beyond signup" is proven, by object absence. **Someone should reconcile the
-full migration ledger against production before assuming anything else in the
-265-file directory is live.**
+"≥ 1 beyond signup" is proven, by object absence. The full migration ledger must
+be reconciled against production before assuming anything else in the 265-file
+directory is live — **and the tool that does exactly that already exists and has
+never worked. Read the next section before building anything.**
+
+---
+
+## ⚠️ The migration-drift alarm has never once completed a measurement
+
+**Recorded 2026-08-15 by Claude, answering Cheek's "migration ledger
+reconciliation" ask.** The conclusion is that **no new tool is needed and none
+should be built.** `scripts/probe-migration-drift.mjs` and
+`.github/workflows/migration-drift-probe.yml` already do this job — they were
+written after the 2026-08-05 six-day outage precisely so six days could never
+pass unnoticed again. The problem is that the probe has **never returned a
+measurement**.
+
+`established fact`, from the Actions API on 2026-08-15: the workflow has four
+scheduled runs in its entire history, and all four concluded `failure`.
+
+| Run           | Date (UTC)          | Outcome                                            |
+| ------------- | ------------------- | -------------------------------------------------- |
+| `31576932687` | 2026-08-12T08:07:36 | `failure` — probe step `skipped`, nothing attempted |
+| `31680785295` | 2026-08-13T08:08:58 | `failure` — probe step `skipped`, nothing attempted |
+| `31782504195` | 2026-08-14T08:05:40 | `failure` — `could_not_probe`, connection refused   |
+| `31871667855` | 2026-08-15T07:19:42 | `failure` — `could_not_probe`, connection refused   |
+
+**The alarm itself is working correctly and is being ignored.** The probe exits 2
+for "could not check" rather than 0, exactly as its own header demands ("A probe
+that cannot reach the database must never be mistaken for a probe that found
+nothing wrong — that is exactly how a six-day outage stays invisible"), and it
+opened a tracking issue on the first failure. Two issues are open and unactioned:
+
+- **#912** — "Migration drift: production is not running every committed
+  migration", open since 2026-08-12, last updated 2026-08-15T07:20:04Z, three bot
+  comments.
+- **#916** — "Money migration check (production) requires attention", open since
+  2026-08-12.
+
+So the reconciliation question is not "how do we measure drift" but "why has the
+existing measurement been red for four days with nobody reading it".
+
+### Two stacked defects, both `established fact` from run output and source
+
+**1. The workflow named "production" is pointed at the SANDBOX project.** The
+verbatim `detail` in #912's last two comments names the host
+`db.bzatgtgjvuojpoxcknaa.supabase.co`.
+`scripts/lib/supabaseDatabaseTargetIdentity.mjs` pins `bzatgtgjvuojpoxcknaa` as
+**`sandbox`** (line 11) and production as `knkwiiywfkbqznbxwqfh` (line 15). The
+`verdant-production` GitHub environment's `SUPABASE_DB_URL` therefore holds a
+sandbox connection string. Even once it connects, it would measure the wrong
+database and report the result as production.
+
+The reason nothing caught that: `scripts/probe-migration-drift.mjs` **does not
+import `supabaseDatabaseTargetIdentity.mjs` at all** — verified by search, zero
+references. Every other remote-database gate in this repo binds its credential to
+a pinned project ref before psql runs. This one trusts the secret's name. That
+module's own header states the principle it is missing: _"A secret name is not
+proof of where its connection string points."_
+
+**2. IPv6 egress.** The resolved address is
+`2600:1f18:6f7d:e800:d9c0:aca3:3925:8f6` and the failure is `Network is
+unreachable`. GitHub-hosted runners have no IPv6 egress, and Supabase direct
+`db.<ref>.supabase.co` hosts are IPv6-only. `inference`, high confidence: the
+connection string needs the IPv4 Supavisor pooler host
+(`aws-<n>-<region>.pooler.supabase.com`) — a form the identity module already
+recognises and already knows how to bind to a pinned ref.
+
+**The failure mode changed between 13 and 14 August**, which is itself evidence:
+on 12–13 Aug the probe step was `skipped`, meaning `Require SUPABASE_DB_URL`
+hard-failed on an absent secret; from 14 Aug that guard passes and the connection
+fails instead. `inference`: someone added the secret in that window and supplied
+the sandbox URL.
+
+### What this does and does not license
+
+It does **not** license an agent to fix it. Every remedy is an owner action on
+protected infrastructure: rotating a GitHub environment secret, and reading a
+production connection string. Both are outside every agent role in this repo, and
+the credential must never enter an agent session.
+
+The one repository-side change an agent could correctly make is adding the
+target-identity assertion to `probe-migration-drift.mjs`, so a sandbox URL in the
+production environment fails loudly as a mismatch instead of being measured and
+reported as production. That is a scoped, testable change — but it is **not
+approved**, and is recorded here as a candidate slice, not as work in progress.
+
+Until the secret is corrected, treat every production-schema statement in this
+file as `NOT_MEASURED`. Four red runs are not four absent measurements; they are
+four days in which the mechanism built to prevent an invisible outage was itself
+invisible.
 
 ---
 

@@ -4,15 +4,20 @@
 `sourced → drafted` transition. It has **not** reached `drafted` and must not be routed to
 `evidence_review` yet. `editorial-workflow.md`'s state table sets that transition's exit
 proof as "complete draft, **original asset**, limitations, non-product next step,
-disclosures" — and **§7's assets are specifications, not artifacts.** No diagram, grid,
-card, or worksheet has been produced, so a reviewer cannot verify the methods, safety
-boundaries, or outputs the page would render. The same row's _entry_ artifact ("approved
-brief and claim map") is also unmet: `KL-002`'s brief is at `draft`, not `reviewed`, and no
-evidence editor has approved §8.
+disclosures." **The original assets are now built** — all eight, in
+[`assets/p2-environment/`](knowledge-library/assets/p2-environment/README.md) — so that half
+of the exit proof is satisfied and §7 is no longer the blocker.
+
+**What still blocks `drafted` is the row's _entry_ artifact:** "approved brief and claim
+map." `KL-002`'s brief is at `draft`, not `reviewed`, and **no evidence editor has approved
+§8.** That is not something an author can supply for themselves. Two evidence blockers also
+stand open (C05 single-source, C04b conflicted — §8.5).
 
 An earlier revision of this document labelled itself `drafted`. That was wrong against the
-contract above, and is corrected here. **Reaching `drafted` requires building all eight §7
-assets** — real, scoped, separable work, not a labelling exercise.
+contract above, and is corrected here. The asset work that revision identified as the next
+unit of work **has since been done** (§7), under the owner's standing authority to build in
+Codex's place where Codex has not started — verified before starting: no Codex branch or PR
+touches `docs/knowledge-library/`.
 
 A second correction, raised in review of PR #994: an earlier revision said the two **†**
 assets needed qualified R3 approval _before_ an author should draw them. **That created a
@@ -447,20 +452,34 @@ photosynthesis and transpiration physiology this pillar only gestures at. P9 own
 room as its own controlled environment. P10 owns the equipment and its installation
 boundaries.
 
-## 7. Original field assets — SPECIFIED, NOT BUILT
+## 7. Original field assets — BUILT
 
-**These are specifications for assets, not the assets.** Nothing below has been drawn,
-built, or filled in. `editorial-workflow.md` makes a completed original asset part of the
-`sourced → drafted` exit proof, which is why this document is **pre-`drafted`** (see the
-state notice at the top): a reviewer cannot verify a method, a safety boundary, or an
-output from a description of a worksheet.
+**All eight assets are built** and live in
+[`docs/knowledge-library/assets/p2-environment/`](knowledge-library/assets/p2-environment/README.md).
+They are text and tables throughout, with no images: `pillar-pages.md` requires each original
+asset to ship a non-image equivalent, so building that form first makes the equivalent the
+artifact rather than an afterthought.
 
-Per `pillar-pages.md`'s required-assets list for P2. Each needs a cultivation reviewer and
-an evidence editor before it is real. The two marked **†** sit inside the R3 boundary and
-additionally require `safety_review` approval — **but that approval comes after drafting,
-not before it.** All eight are author-buildable now; the two † assets must be drafted with
-a visible _pending qualified-safety approval_ marker on their face, and must not be used
-operationally until that lane clears them.
+| #   | Asset                                                                                                                | R3    | Output                                                   |
+| --- | -------------------------------------------------------------------------------------------------------------------- | ----- | -------------------------------------------------------- |
+| 1   | [Canopy sensor-placement record](knowledge-library/assets/p2-environment/01-canopy-sensor-placement.md)              | no    | A position a stranger could reproduce                    |
+| 2   | [Leaf-offset method card](knowledge-library/assets/p2-environment/02-leaf-offset-method-card.md)                     | no    | An offset with its uncertainty, or an honest "air basis" |
+| 3   | [VPD input and uncertainty worksheet](knowledge-library/assets/p2-environment/03-vpd-input-uncertainty-worksheet.md) | no    | A VPD **range** and the sensor that limits it            |
+| 4   | [Airflow and microclimate map](knowledge-library/assets/p2-environment/04-airflow-microclimate-map.md)               | no    | Spread and the location of extremes                      |
+| 5   | [PPFD mapping grid](knowledge-library/assets/p2-environment/05-ppfd-mapping-grid.md)                                 | no    | Mean **with** min÷mean uniformity                        |
+| 6   | [Peak-load evidence worksheet](knowledge-library/assets/p2-environment/06-peak-load-evidence-worksheet.md)           | **†** | Evidence for a qualified designer — never a size         |
+| 7   | [Lights-off transition timeline](knowledge-library/assets/p2-environment/07-lights-off-transition-timeline.md)       | no    | The window where latent load outlives sensible           |
+| 8   | [CO2 monitoring and escalation card](knowledge-library/assets/p2-environment/08-co2-monitoring-escalation-card.md)   | **†** | Monitor, alarm, egress, escalate                         |
+
+**Assets 6 and 8 carry a pending-qualified-safety-approval banner on their face.** They sit
+inside the R3 boundary (`hvac_safety`, `co2_safety`); `safety_review` runs after `drafted`,
+so they are drafted now and must not be used operationally until that lane clears them.
+
+Three properties hold across the whole set, and are the point of building them this way:
+**no asset states a target value** of any kind; **no asset introduces a number that is not in
+the §8 claim map**; and where a figure would be needed but none is verified, the field is a
+blank for the user's own instrument rather than a default. Asset 8 carries the unverified
+ACGIH period forward as an explicit gap for its reviewer rather than filling it.
 
 - **Canopy sensor-placement diagram** — representative height, radiant shielding, distance
   from equipment extremes, and the explicit statement that one probe describes one point.
@@ -777,10 +796,10 @@ mine — but it belongs in the decision.
 ---
 
 **Handoff.** This revision is **not** ready for `evidence_review` — it is pre-`drafted`,
-and the blocker is concrete: **none of the eight original assets in §7 has been built.**
-That is the next unit of work and it needs no decision from anyone — including the two
-R3-boundary assets, which the author drafts with a pending-safety marker and the
-`safety_review` lane clears afterwards.
+**All eight §7 assets are now built**, which clears the exit-proof half of the
+`sourced → drafted` transition. What remains is not author work: the transition's **entry**
+artifact requires an approved brief and claim map, and only an evidence editor can supply
+that.
 
 Two **evidence blockers** also sit ahead of `evidence_review` and are recorded in §8.5:
 C05 is single-source and cannot satisfy R2's corroboration requirement as it stands, and

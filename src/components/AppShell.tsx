@@ -24,7 +24,10 @@ import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 import { readQuickLogStartEventType } from "@/lib/globalSearchQuickLogFallbackRules";
 import { readGuidePhenoQuickLogPrefill } from "@/lib/guidePhenoQuickLogHandoffRules";
 import { isEmailVerificationPending } from "@/lib/emailVerificationRules";
-import { resolveMobileQuickLogTarget } from "@/lib/quickLogRouteTargetRules";
+import {
+  resolveMobileQuickLogTarget,
+  resolvePlantQuickLogRouteTarget,
+} from "@/lib/quickLogRouteTargetRules";
 import { consumeQuickLogStartIntent } from "@/lib/startScreenPreferences";
 import { useCheckoutReturnCompletionTracking } from "@/hooks/useCheckoutReturnCompletionTracking";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
@@ -141,12 +144,17 @@ export default function AppShell({ children }: { children?: ReactNode }) {
     // consumeQuickLogStartIntent strips both companion markers.
     const guidePrefill = readGuidePhenoQuickLogPrefill(location.search);
     const startEventType = readQuickLogStartEventType(location.search);
+    const routePlantId = resolvePlantQuickLogRouteTarget(location.pathname);
     const nextSearch = consumeQuickLogStartIntent(location.search);
     if (nextSearch === null) return;
     // A guide may seed a static draft prompt as well as the activity. No plant
     // or private context is encoded in the URL — the grower still selects the
     // target, reviews the note, and saves explicitly.
-    setPrefill(guidePrefill ?? (startEventType ? { eventType: startEventType } : null));
+    const routePrefill: QuickLogPrefill | null = routePlantId ? { plantId: routePlantId } : null;
+    const startPrefill: QuickLogPrefill | null = startEventType
+      ? { ...(routePrefill ?? {}), eventType: startEventType }
+      : routePrefill;
+    setPrefill(guidePrefill ?? startPrefill);
     setOpenLog(true);
     nav(
       {

@@ -22,6 +22,7 @@ import {
   type PostGrowLearningReportViewModel,
   type PostGrowSensorReadingLike,
 } from "@/lib/postGrowLearningReportRules";
+import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
 
 export type PostGrowReportStatus = "idle" | "loading" | "ready" | "unavailable";
 
@@ -92,13 +93,14 @@ export function usePostGrowLearningReportData(
           .select("harvested_at,yield_grams,medium,notes")
           .eq("grow_id", growId)
           .order("harvested_at", { ascending: false }),
-        supabase
-          .from("diary_entries")
-          .select("id,note,photo_url,entry_at,details")
-          .eq("grow_id", growId)
-          .is("retracted_at", null)
-          .order("entry_at", { ascending: false })
-          .limit(250),
+        selectWithRetractionCompat((withRetractionFilter) => {
+          let query = supabase
+            .from("diary_entries")
+            .select("id,note,photo_url,entry_at,details")
+            .eq("grow_id", growId);
+          if (withRetractionFilter) query = query.is("retracted_at", null);
+          return query.order("entry_at", { ascending: false }).limit(250);
+        }),
         tentIds.length > 0
           ? supabase
               .from("sensor_readings")

@@ -25,6 +25,7 @@ import {
 import { QUICK_LOG_V2_ENTRY_CREATED_EVENT } from "@/lib/quickLogV2EntryCreatedEvent";
 import { useAuth } from "@/store/auth";
 import { buildPrivateGrowQueryKey } from "@/lib/growDataQueryKeyRules";
+import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
 
 /**
  * A scope whose ids are all present. `Required<>` only strips optionality, not
@@ -68,17 +69,25 @@ export function oneTentActivationEvidenceQueryKey(
   ]);
 }
 
+export async function fetchConnectedActivationDiaryRows(growId: string) {
+  const { data, error } = await selectWithRetractionCompat((withRetractionFilter) => {
+    let query = supabase
+      .from("diary_entries")
+      .select("id,grow_id,tent_id,plant_id,entry_at,details")
+      .eq("grow_id", growId);
+    if (withRetractionFilter) query = query.is("retracted_at", null);
+    return query.order("entry_at", { ascending: false }).limit(ONE_TENT_ACTIVATION_EVIDENCE_LIMIT);
+  });
+
+  if (error) throw error;
+  return (data ?? []) as ConnectedActivationDiaryEntryRow[];
+}
+
 async function loadConnectedActivationEvidence(
   scope: QueryableActivationScope,
 ): Promise<ConnectedActivationEvidenceSummary> {
-  const [diaryResult, growEventResult] = await Promise.all([
-    supabase
-      .from("diary_entries")
-      .select("id,grow_id,tent_id,plant_id,entry_at,details")
-      .eq("grow_id", scope.growId)
-      .is("retracted_at", null)
-      .order("entry_at", { ascending: false })
-      .limit(ONE_TENT_ACTIVATION_EVIDENCE_LIMIT),
+  const [diaryEntries, growEventResult] = await Promise.all([
+    fetchConnectedActivationDiaryRows(scope.growId),
     supabase
       .from("grow_events")
       .select("id,grow_id,tent_id,plant_id,occurred_at,event_type,source,is_deleted")
@@ -89,12 +98,11 @@ async function loadConnectedActivationEvidence(
       .limit(ONE_TENT_ACTIVATION_EVIDENCE_LIMIT),
   ]);
 
-  if (diaryResult.error) throw diaryResult.error;
   if (growEventResult.error) throw growEventResult.error;
 
   return summarizeConnectedActivationEvidence({
     ...scope,
-    diaryEntries: (diaryResult.data ?? []) as ConnectedActivationDiaryEntryRow[],
+    diaryEntries,
     growEvents: (growEventResult.data ?? []) as ConnectedActivationGrowEventRow[],
   });
 }

@@ -43,6 +43,7 @@ import {
   type ConnectedActivationDiaryEntryRow,
   type ConnectedActivationGrowEventRow,
 } from "@/lib/connectedOneTentActivationRules";
+import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
 
 /** Bounded dedupe window for merging diary rows with the grow_events spine. */
 const REPORTS_HUB_ACTIVITY_MERGE_WINDOW = 1_000;
@@ -326,27 +327,35 @@ export function useReportsHubData(growId: string | null | undefined): ReportsHub
           .eq("grow_id", growId)
           .eq("status", "open")
           .eq("severity", "warning"),
-        supabase
-          .from("diary_entries")
-          .select("id", { count: "exact", head: true })
-          .eq("grow_id", growId)
-          .is("retracted_at", null),
-        supabase
-          .from("diary_entries")
-          .select("id", { count: "exact", head: true })
-          .eq("grow_id", growId)
-          .is("retracted_at", null)
-          .gte("entry_at", sevenDaysAgo),
+        selectWithRetractionCompat((withRetractionFilter) => {
+          let query = supabase
+            .from("diary_entries")
+            .select("id", { count: "exact", head: true })
+            .eq("grow_id", growId);
+          if (withRetractionFilter) query = query.is("retracted_at", null);
+          return query;
+        }),
+        selectWithRetractionCompat((withRetractionFilter) => {
+          let query = supabase
+            .from("diary_entries")
+            .select("id", { count: "exact", head: true })
+            .eq("grow_id", growId);
+          if (withRetractionFilter) query = query.is("retracted_at", null);
+          return query.gte("entry_at", sevenDaysAgo);
+        }),
         // Bounded row windows for the diary + grow_events spine merge. The
         // spine is the canonical Quick Log record; companion diary rows are
         // deduped by linkage and identical (plant_id, timestamp) pairs.
-        supabase
-          .from("diary_entries")
-          .select("id,plant_id,entry_at,created_at,details")
-          .eq("grow_id", growId)
-          .is("retracted_at", null)
-          .order("entry_at", { ascending: false })
-          .limit(REPORTS_HUB_ACTIVITY_MERGE_WINDOW),
+        selectWithRetractionCompat((withRetractionFilter) => {
+          let query = supabase
+            .from("diary_entries")
+            .select("id,plant_id,entry_at,created_at,details")
+            .eq("grow_id", growId);
+          if (withRetractionFilter) query = query.is("retracted_at", null);
+          return query
+            .order("entry_at", { ascending: false })
+            .limit(REPORTS_HUB_ACTIVITY_MERGE_WINDOW);
+        }),
         supabase
           .from("grow_events")
           .select(

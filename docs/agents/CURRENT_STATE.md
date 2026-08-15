@@ -1,6 +1,26 @@
 # Verdant — Current Operating State
 
 **Last updated:** 2026-08-15 UTC
+**Updated by:** Claude (2026-08-15, additive: answers Cheek's "migration ledger
+reconciliation" ask with the finding that the reconciliation tool **already
+exists and has never once completed a measurement** — four scheduled runs since
+2026-08-12, all `failure`, plus an on-demand re-run at Cheek's instruction that
+reproduced the connection failure byte-for-byte (three of the five runs reach
+the socket; the other two never got that far); issues #912 and #916 open and
+unactioned;
+the `verdant-production` environment's `SUPABASE_DB_URL` resolves to the
+**sandbox** project ref and to an unreachable IPv6 address — **and**, found in review, the
+probe's exact-version matching would misreport Lovable-recorded migrations as
+drift even once it connects, so the ledger is blocked behind two independent
+faults, not one. New section
+"The migration-drift alarm has never once completed a measurement". No new tool
+was built and none should be; the existing one needs repairing. Merged with
+deploy tip `bb66f4302` to resolve an
+attribution-header conflict; every Grok note below is retained unchanged and no
+other section was touched. No production, GA4, GSC, sitemap, or release-identity
+row was re-measured in this edit.)
+
+**Prior same-day update:** 2026-08-15 UTC
 **Updated by:** Grok (2026-08-15 merge: combined `ONE_TENT_LOOP_OPERATING_ORDER`
 on this branch with deploy tip `534b28434` — Cursor SDK local-orchestration
 spike #985, Free signup / Quick Log handoff #987, AI Doctor E2E path #988,
@@ -147,9 +167,240 @@ in some ways worse shape than the signup outage, which at least fails loudly.
 
 Exact drift count is `NOT_MEASURED`: `supabase_migrations.schema_migrations` was
 `permission denied` for both roles available to the investigation, so only
-"≥ 1 beyond signup" is proven, by object absence. **Someone should reconcile the
-full migration ledger against production before assuming anything else in the
-265-file directory is live.**
+"≥ 1 beyond signup" is proven, by object absence. The full migration ledger must
+be reconciled against production before assuming anything else in the 265-file
+directory is live — **and the tool that does exactly that already exists and has
+never worked. Read the next section before building anything.**
+
+---
+
+## ⚠️ The migration-drift alarm has never once completed a measurement
+
+**Recorded 2026-08-15 by Claude, answering Cheek's "migration ledger
+reconciliation" ask.** The conclusion is **do not build a second tool — repair
+the one that exists.** `scripts/probe-migration-drift.mjs` and
+`.github/workflows/migration-drift-probe.yml` were written after the 2026-08-05
+six-day outage precisely so six days could never pass unnoticed again, and they
+are the right shape for this job. But the probe has **never returned a
+measurement**, and — corrected here after a Codex review, see defect 3 — it
+would not yet return a *correct* one even if it connected.
+
+**So the ledger stays `NOT_MEASURED` behind two independent blockers, not one:**
+an owner-side secret that points at the wrong database over an unreachable
+address (defects 1 and 2), and a repo-side matching defect that would misreport
+Lovable-recorded migrations as drift (defect 3). Fixing the secret alone would
+produce output, not truth. An earlier version of this section said "no new tool
+is needed and none should be built" full stop; the first half stands, the second
+half was wrong.
+
+`established fact`, from the Actions API on 2026-08-15: the workflow has four
+scheduled runs in its entire history, and all four concluded `failure`.
+
+| Run           | Date (UTC)          | Outcome                                            |
+| ------------- | ------------------- | -------------------------------------------------- |
+| `31576932687` | 2026-08-12T08:07:36 | `failure` — probe step `skipped`, nothing attempted |
+| `31680785295` | 2026-08-13T08:08:58 | `failure` — probe step `skipped`, nothing attempted |
+| `31782504195` | 2026-08-14T08:05:40 | `failure` — `could_not_probe`, connection refused   |
+| `31871667855` | 2026-08-15T07:19:42 | `failure` — `could_not_probe`, connection refused   |
+
+**Re-run on demand 2026-08-15 at Cheek's instruction: identical.** Run
+`31878986411`, `workflow_dispatch` on `verdant-grow-diary`, produced a
+byte-for-byte identical `could_not_probe` payload — same sandbox host, same IPv6
+address, same `Network is unreachable`. Steps 1–5 (checkout, Node, psql install,
+`Require SUPABASE_DB_URL`) all passed; step 6 failed in **zero seconds**, dying
+at the socket before its single `SELECT`. It also means there is no partial
+result to salvage — the ledger question stays unanswerable from CI until the
+secret is repointed.
+
+Be precise about what the re-run rules out. The five runs share an outcome, not
+a cause: **three** of them reached the socket and failed there identically
+(14 Aug scheduled, 15 Aug scheduled, 15 Aug dispatch), while the 12–13 Aug pair
+never reached it at all — the secret guard stopped them first. So the on-demand
+re-run rules out a transient **in the connection failure**, on a sample of
+three, and says nothing about the earlier pair. The 12–13 Aug failures are
+already explained separately below.
+
+**The alarm itself is working correctly. What is missing is remediation.** The
+probe exits 2 for "could not check" rather than 0, exactly as its own header
+demands ("A probe that cannot reach the database must never be mistaken for a
+probe that found nothing wrong — that is exactly how a six-day outage stays
+invisible"), and it opened a tracking issue on the first failure. Two issues are
+open, with no human comment and no corrective action on either:
+
+- **#912** — "Migration drift: production is not running every committed
+  migration", open since 2026-08-12, last updated 2026-08-15T07:20:04Z, three bot
+  comments.
+- **#916** — "Money migration check (production) requires attention", open since
+  2026-08-12.
+
+State the gap precisely, because the two diagnoses lead somewhere different. What
+is established is that the alarm went red on 2026-08-12 and the underlying secret
+was still wrong on 2026-08-15 — an unremediated fault, four days running. What is
+**not** established is that nobody read it: open issues and an uncorrected secret
+do not measure readership, and in fact the alert has demonstrably been read, since
+Cheek ordered the on-demand re-run recorded above. So the reconciliation question
+is not "how do we measure drift", and not "why did nobody see the alert" — it is
+"why has a seen, correctly-raised alarm gone four days without the secret edit
+that would let it run". Point the next owner at infrastructure remediation, not
+at notification plumbing — and note that the secret edit alone is necessary but
+not sufficient, per defect 3 below.
+
+### Two stacked defects — observations are `established fact`, remedies are not
+
+Each defect below separates what the run output and the source actually show
+from what is reasoned on top of it. The observations are `established fact`; the
+proposed fixes are `inference` and are labelled as such.
+
+**1. The workflow named "production" is pointed at the SANDBOX project.** The
+verbatim `detail` in #912's last two comments names the host
+`db.bzatgtgjvuojpoxcknaa.supabase.co`.
+`scripts/lib/supabaseDatabaseTargetIdentity.mjs` pins `bzatgtgjvuojpoxcknaa` as
+**`sandbox`** (line 11) and production as `knkwiiywfkbqznbxwqfh` (line 15). The
+`verdant-production` GitHub environment's `SUPABASE_DB_URL` therefore holds a
+sandbox connection string. Even once it connects, it would measure the wrong
+database and report the result as production.
+
+The reason nothing caught that: `scripts/probe-migration-drift.mjs` **does not
+import `supabaseDatabaseTargetIdentity.mjs` at all** — verified by search, zero
+references. It trusts the secret's name, and that module's own header states the
+principle it is missing: _"A secret name is not proof of where its connection
+string points."_
+
+**Do not read that as "every other gate is protected" — it is not.** An earlier
+draft of this section claimed exactly that and it is false, corrected here after
+a Codex review challenged it. Measured 2026-08-15: **14** files reference the
+identity module — the money/core migration gates
+(`required-money-migrations.yml`, `required-core-migrations.yml`,
+`prefix-diff-sarif.yml`) and the pinned-apply and candidate-number tooling —
+while **25** scripts consume a `SUPABASE_DB_URL`. The binding discipline is
+real, but it covers the money/schema gate family, not the repository.
+
+A second unbound remote workflow, surfaced by that same review and verified
+here: `.github/workflows/sandbox-credit-packs-smoke.yml` passes
+`SUPABASE_DB_URL_SANDBOX` into `scripts/sandbox-credit-packs-smoke.ts`, whose
+`psqlJson` pushes `process.env.SUPABASE_DB_URL` straight into the `psql` argv
+with no identity check. Recorded so it is not lost — it carries the same
+wrong-target class of risk, though its blast radius is smaller (a sandbox
+credential, a read-only smoke). It is **not** part of any approved slice, and
+nothing here authorizes changing it.
+
+**2. The connection dies at the socket, on an IPv6 address.**
+
+`established fact`, from the run output: the host resolved to
+`2600:1f18:6f7d:e800:d9c0:aca3:3925:8f6`, the failure was `Network is
+unreachable`, and the step took zero seconds. That is a routing failure before
+any authentication or query, and it is all the run output proves.
+
+`inference`, high confidence, but **not measured here**: GitHub-hosted runners
+have no IPv6 egress and Supabase direct `db.<ref>.supabase.co` hosts are
+IPv6-only, so the connection string needs the IPv4 Supavisor pooler host
+(`aws-<n>-<region>.pooler.supabase.com`) — a form the identity module already
+recognises and already knows how to bind to a pinned ref. Neither the
+runner-egress claim nor the exact replacement host was verified from this repo;
+whoever repoints the secret should take the host from the Supabase dashboard's
+connection panel rather than from this paragraph.
+
+**Judge the fix by the probe's status, never by the run colour.** The connection
+is proven the moment the probe *completes a query* — `status: "current"` (exit 0)
+or `status: "drift"` (exit 1). Only `could_not_probe` (exit 2) means the
+connection is still broken. This distinction is not pedantry here: this file
+already records at least two unapplied migrations, so the first genuinely
+successful run will very likely return `drift` and exit 1, and the workflow will
+go **red**. An operator watching the tick rather than the payload would read that
+red as "my secret fix did not work" and revert a change that in fact worked.
+
+**The failure mode changed between 13 and 14 August**, which is itself evidence:
+on 12–13 Aug the probe step was `skipped`, meaning `Require SUPABASE_DB_URL`
+hard-failed on an absent secret; from 14 Aug that guard passes and the connection
+fails instead. `inference`: someone added the secret in that window and supplied
+the sandbox URL.
+
+**3. Even connected, the probe's matching would misreport Lovable migrations.**
+
+Raised by Codex review 2026-08-15 and verified here against source. This one is
+independent of the secret: it is a defect in the probe itself, and it is why
+"fix the secret and read the answer" is not the whole story.
+
+`established fact`, from the code: `probe-migration-drift.mjs:106` selects only
+`version` (`SELECT version FROM supabase_migrations.schema_migrations`), and
+line 166 diffs it by exact string equality against the 14-digit timestamp
+parsed off each filename.
+
+`established fact`, from `docs/signup-attribution-outage-operator-runbook.md`
+§"Ledger hazard": **Lovable records a migration under a version ~2 seconds later
+than its filename timestamp, carrying the filename stem in the `name` column.**
+The runbook's worked example is `20260721194325_f96507e6-…`, which sits in the
+ledger as version `20260721194327`. Hand-authored migrations use the exact
+timestamp with a slug name, so **both conventions coexist in one table**.
+
+`established fact`, measured here: **157 of 268** migration files use the
+Lovable UUID-suffixed convention. Whether every one of them is version-shifted
+is `NOT_MEASURED` — the runbook proves the mechanism and one instance, not the
+population.
+
+The consequence: an exact-version diff reports an applied Lovable migration as
+**unapplied**. That is a false DRIFT — noisy rather than dangerous, the opposite
+polarity to the failure that caused the 2026-08-05 outage — but it makes the
+reconciliation untrustworthy in both directions, because a reader who learns to
+discount the false entries will discount a real one too.
+
+The runbook already prescribes the fix and, importantly, forecloses the obvious
+wrong one. Match by name, with no window: for a file `<ts>_<slug>.sql`, accept
+`m.name = <stem>` (Lovable) **or** `m.name = <slug>` (hand-authored) **or**
+`m.version = <ts>`. Do **not** widen the version comparison to a tolerance — the
+runbook's Trap 2 shows this repo contains `20260806230020_…` and
+`20260806230021_…` one second apart, so a window would report an *unapplied*
+migration as applied. That is the worse error, and it is the exact shape of the
+2026-08-05 blind spot.
+
+### What this does and does not license
+
+**Defects 1 and 2 are owner-only.** Rotating a GitHub environment secret and
+reading a production connection string are outside every agent role in this
+repo, and the credential must never enter an agent session. No agent should
+attempt them.
+
+**Defect 3 is repo-side and an agent could fix it** — it needs no credential and
+is provable on fixtures. Two scoped candidate changes now exist, both **not
+approved**, recorded so they are not lost and not mistaken for work in progress:
+
+- **C1 — name-bound matching.** Select `name` alongside `version` and match by
+  stem-or-slug-or-version per the runbook, with no tolerance window. Testable
+  offline against both conventions, including the `20260806230020` /
+  `20260806230021` adjacent pair as the regression that pins Trap 2 shut.
+- **C2 — target-identity assertion.** Import `supabaseDatabaseTargetIdentity.mjs`
+  in the probe so a sandbox URL supplied to the production environment fails
+  loudly as a mismatch instead of being measured and reported as production.
+
+Sequencing matters if both are taken: **C1 before the secret is corrected.** If
+the secret is fixed first, the probe's first successful run publishes a large
+false-drift list into #912, and the most likely human response to an alarm that
+cries wolf on its debut is to stop reading it — which is how this whole section
+started. C2 is independent and can land either side.
+
+Until **both** the secret is corrected and the probe's matching is name-bound,
+the **applied-migration ledger** is `NOT_MEASURED` — and so is any claim whose
+only evidence would have come from this probe, which means every statement of
+the form "migration X is/is not live in production" that is not backed by a
+direct observation. Note the second condition: a *completed* probe run from the
+current code — whatever colour the workflow tick ends up — would be measuring the
+wrong thing, because its unapplied list would be inflated by every
+Lovable-recorded migration it failed to match.
+
+That is deliberately narrower than "every production-schema statement in this
+file". It does **not** downgrade the independent evidence recorded above: the
+Lovable read-only investigation observed `public.quicklog_entry_revisions`
+absent and `diary_entries.retracted_at` / `.retraction_reason` absent by direct
+object lookup, and those keep their own labels. A blocked ledger check and a
+directly-observed missing table are different findings, and flattening both to
+`NOT_MEASURED` would erase a verified defect rather than preserve caution.
+
+Five red runs — the four scheduled plus the 2026-08-15 dispatch — are five
+absent measurements, `NOT_MEASURED` in the literal sense this repo's status
+vocabulary requires, since not one of them completed a query. But they are not
+**merely** that. They are also four days (12–15 August) in which the mechanism
+built to catch an invisible outage was itself unable to see, and was left that
+way.
 
 ---
 

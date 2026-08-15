@@ -34,6 +34,16 @@ export const starterSetupSupabaseAdapter: StarterSetupDataAccess = {
     return (data ?? []) as ReadonlyArray<{ id: string; name: string | null }>;
   },
 
+  async countOwnedTents(userId) {
+    const { data, error } = await supabase
+      .from("tents")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("is_archived", false);
+    if (error) throw error;
+    return data?.length ?? 0;
+  },
+
   async listOwnedPlants(userId, tentId) {
     const { data, error } = await supabase
       .from("plants")

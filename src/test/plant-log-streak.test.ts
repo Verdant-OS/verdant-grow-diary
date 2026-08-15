@@ -139,6 +139,18 @@ describe("buildPlantLogStreakView — teaser eligibility", () => {
   it("teaser copy is calm — no banned marketing words", () => {
     expect(paywallCtaHasBannedWords(PLANT_LOG_TEASER_COPY)).toBe(false);
   });
+
+  it("states the Free history and AI Doctor allowances without assigning them to Pro", () => {
+    const v = buildPlantLogStreakView({
+      entryAts: threeDays,
+      now: NOW,
+      isFreePlan: true,
+    });
+
+    expect(v.teaser.copy).toBe(
+      "This plant's memory is building. Free keeps plant history forever and includes 3 AI Doctor reviews per grow; Pro adds more monthly AI reviews and advanced tools.",
+    );
+  });
 });
 
 describe("wiring guardrails", () => {

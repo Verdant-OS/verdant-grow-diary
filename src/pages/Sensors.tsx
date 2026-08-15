@@ -205,6 +205,10 @@ export default function Sensors() {
     tentId: activeTentId,
   });
   const { data: soilMoistureCalibrations = [] } = soilMoistureCalibrationsQuery;
+  const soilMoistureCalibrationSchemaUnavailable =
+    soilMoistureCalibrationsQuery.availability === "schema_unavailable";
+  const soilMoistureCalibrationUnavailable =
+    soilMoistureCalibrationSchemaUnavailable || soilMoistureCalibrationsQuery.isError;
   const selectedTentStage =
     (selectedTent as unknown as { stage?: string | null } | null)?.stage ?? null;
   const latestObservedVpd = readObservedSensorMetric(vpdStabilityReadings[0] ?? null, "vpd");
@@ -413,7 +417,7 @@ export default function Sensors() {
             latestMetricReading &&
             rawValue !== null &&
             !soilMoistureCalibrationsQuery.isLoading &&
-            !soilMoistureCalibrationsQuery.isError
+            !soilMoistureCalibrationUnavailable
               ? buildSoilMoistureReadingViewModel({
                   rawSoilMoisture: rawValue,
                   rawSource: metricSource,
@@ -517,7 +521,7 @@ export default function Sensors() {
                       Checking calibration…
                     </span>
                   )}
-                  {m.key === "soil" && soilMoistureCalibrationsQuery.isError && (
+                  {m.key === "soil" && soilMoistureCalibrationUnavailable && (
                     <span
                       data-testid="sensors-soil-moisture-calibration-error-badge"
                       className="inline-flex items-center rounded-full border border-destructive/60 px-2 py-0.5 text-[10px] text-destructive"
@@ -611,25 +615,28 @@ export default function Sensors() {
                   Checking calibration records before labeling this reading.
                 </p>
               )}
-              {m.key === "soil" && soilMoistureCalibrationsQuery.isError && (
+              {m.key === "soil" && soilMoistureCalibrationUnavailable && (
                 <div
                   className="mt-2 rounded-lg border border-destructive/40 bg-destructive/5 p-2 text-[11px] text-muted-foreground"
                   role="alert"
                   data-testid="sensors-soil-moisture-calibration-error"
                 >
                   <p>
-                    Calibration records couldn't be loaded. Raw sensor history remains visible, but
-                    Verdant will not infer calibration status from a failed read.
+                    {soilMoistureCalibrationSchemaUnavailable
+                      ? "Calibration records aren't available on this deployment. Raw sensor history remains visible, but Verdant will not infer calibration status."
+                      : "Calibration records couldn't be loaded. Raw sensor history remains visible, but Verdant will not infer calibration status from a failed read."}
                   </p>
-                  <button
-                    type="button"
-                    className="mt-1 font-medium text-foreground underline underline-offset-2"
-                    onClick={() => {
-                      void soilMoistureCalibrationsQuery.refetch();
-                    }}
-                  >
-                    Try calibration again
-                  </button>
+                  {soilMoistureCalibrationsQuery.isError && (
+                    <button
+                      type="button"
+                      className="mt-1 font-medium text-foreground underline underline-offset-2"
+                      onClick={() => {
+                        void soilMoistureCalibrationsQuery.refetch();
+                      }}
+                    >
+                      Try calibration again
+                    </button>
+                  )}
                 </div>
               )}
               {m.key === "vpd" && (
@@ -648,13 +655,24 @@ export default function Sensors() {
         })}
       </div>
       <div className="mt-4 max-w-xl" data-testid="sensors-soil-calibration-capture-anchor">
-        <SoilMoistureCalibrationCaptureCard
-          growId={selectedGrowId}
-          tentId={activeTentId}
-          tentName={selectedTent?.name ?? null}
-          latestRawSoilMoisture={recentSoilValues[0] ?? null}
-          calibrations={soilMoistureCalibrations}
-        />
+        {soilMoistureCalibrationSchemaUnavailable ? (
+          <div
+            className="rounded-xl border border-border/60 bg-secondary/20 p-4 text-sm text-muted-foreground"
+            role="status"
+            data-testid="sensors-soil-calibration-capture-unavailable"
+          >
+            Calibration capture is unavailable on this deployment. Raw sensor logging remains
+            available.
+          </div>
+        ) : (
+          <SoilMoistureCalibrationCaptureCard
+            growId={selectedGrowId}
+            tentId={activeTentId}
+            tentName={selectedTent?.name ?? null}
+            latestRawSoilMoisture={recentSoilValues[0] ?? null}
+            calibrations={soilMoistureCalibrations}
+          />
+        )}
       </div>
       <div
         id="manual-reading"

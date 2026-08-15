@@ -242,7 +242,9 @@ function makeSupabaseMock(
   rows: Array<Record<string, unknown>>,
   error: unknown = null,
   calls?: Array<{ method: string; args: unknown[] }>,
+  sequence?: Array<{ data: unknown; error: unknown }>,
 ) {
+  const remaining = [...(sequence ?? [])];
   const record =
     (method: string) =>
     (...args: unknown[]) => {
@@ -258,7 +260,8 @@ function makeSupabaseMock(
     limit: () => {
       const __c: any = {
         abortSignal: () => __c,
-        then: (r: any, j?: any) => Promise.resolve({ data: rows, error }).then(r, j),
+        then: (r: any, j?: any) =>
+          Promise.resolve(remaining.shift() ?? { data: rows, error }).then(r, j),
       };
       return __c;
     },
@@ -314,6 +317,32 @@ describe("loadActionFollowUpExistingPhotoCandidates", () => {
       supabase: makeSupabaseMock([], { message: "boom" }),
     });
     expect(res).toEqual({ status: "failed", reason: "query_failed" });
+  });
+
+  it("retries once without retracted_at when production is pre-migration", async () => {
+    const calls: Array<{ method: string; args: unknown[] }> = [];
+    const legacyRow = {
+      id: "legacy-photo",
+      grow_id: GROW,
+      tent_id: TENT,
+      plant_id: PLANT,
+      entry_at: "2026-07-01T00:00:00Z",
+      photo_url: REF_PLANT,
+    };
+    const result = await loadActionFollowUpExistingPhotoCandidates(CTX, {
+      supabase: makeSupabaseMock([], null, calls, [
+        {
+          data: null,
+          error: { code: "42703", message: "column diary_entries.retracted_at does not exist" },
+        },
+        { data: [legacyRow], error: null },
+      ]),
+    });
+
+    expect(result.status).toBe("loaded");
+    expect(calls.filter((call) => call.method === "is")).toEqual([
+      { method: "is", args: ["retracted_at", null] },
+    ]);
   });
 
   it("returns sanitized failure on thrown exception", async () => {

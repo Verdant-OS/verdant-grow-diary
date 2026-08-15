@@ -20,6 +20,7 @@ import {
   adaptQuickLogRevisionDatabaseRows,
   QUICKLOG_REVISION_TABLE,
 } from "@/lib/quickLogRevisionService";
+import { isMissingRetractedColumnError } from "@/lib/quick-log/retractionFilterCompat";
 
 export interface RetractedQuickLogEntry {
   diaryEntryId: string;
@@ -55,6 +56,9 @@ export function useRetractedQuickLogEntries(growId: string | null | undefined) {
         .not("retracted_at", "is", null)
         .order("retracted_at", { ascending: false })
         .limit(RETRACTED_DISCLOSURE_LIMIT);
+      if (isMissingRetractedColumnError(error)) {
+        return { entries: [], totalCount: 0 };
+      }
       if (error) throw error;
       const rows = (data ?? []).filter(
         (r): r is typeof r & { retracted_at: string } =>

@@ -23,6 +23,7 @@ import {
   selectWindow,
 } from "@/lib/environmentTrends";
 import { isDiaryRowInTentScope } from "@/lib/diaryEvidenceTentScopeRules";
+import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
 
 export type TrendsState =
   | { status: "idle"; trends: EnvironmentTrends }
@@ -119,13 +120,13 @@ export function useEnvironmentTrends(
         }
       }
 
-      const { data: diaryRows, error: diaryErr } = await supabase
-        .from("diary_entries")
-        .select("entry_at,details,tent_id")
-        .is("retracted_at", null)
-        .eq("grow_id", growId)
-        .order("entry_at", { ascending: false })
-        .limit(50);
+      const { data: diaryRows, error: diaryErr } = await selectWithRetractionCompat(
+        (withRetractionFilter) => {
+          let query = supabase.from("diary_entries").select("entry_at,details,tent_id");
+          if (withRetractionFilter) query = query.is("retracted_at", null);
+          return query.eq("grow_id", growId).order("entry_at", { ascending: false }).limit(50);
+        },
+      );
       if (diaryErr) {
         setState({ status: "unavailable", trends: EMPTY_TRENDS });
         return;

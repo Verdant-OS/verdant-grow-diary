@@ -10,7 +10,7 @@ const supabaseMock = vi.hoisted(() => ({
   rpc: vi.fn(),
   diaryResult: {
     data: [] as unknown[],
-    error: null as { code?: string } | null,
+    error: null as { code?: string; message?: string } | null,
     count: 0 as number | null,
   },
   revisionResult: {
@@ -257,5 +257,38 @@ describe("Quick Log revision client contract", () => {
     expect(result.current.entries).toHaveLength(1);
     expect(result.current.entries[0]?.retraction).toBeNull();
     expect(result.current.isError).toBe(false);
+  });
+
+  it("shows an empty disclosure without error when retracted_at is not deployed yet", async () => {
+    supabaseMock.diaryResult = {
+      data: [],
+      error: { code: "42703", message: "column diary_entries.retracted_at does not exist" },
+      count: null,
+    };
+
+    const { result } = renderHook(() => useRetractedQuickLogEntries("grow-1"), {
+      wrapper: makeWrapper(),
+    });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    expect(result.current.entries).toEqual([]);
+    expect(result.current.totalCount).toBe(0);
+    expect(result.current.isError).toBe(false);
+    expect(supabaseMock.from).toHaveBeenCalledTimes(1);
+  });
+
+  it("preserves unrelated disclosure query failures", async () => {
+    supabaseMock.diaryResult = {
+      data: [],
+      error: { code: "PGRST301", message: "JWT expired" },
+      count: null,
+    };
+
+    const { result } = renderHook(() => useRetractedQuickLogEntries("grow-1"), {
+      wrapper: makeWrapper(),
+    });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    expect(result.current.isError).toBe(true);
   });
 });

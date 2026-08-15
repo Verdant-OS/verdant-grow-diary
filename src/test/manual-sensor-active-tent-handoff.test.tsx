@@ -35,6 +35,7 @@ vi.mock("@/hooks/use-sensor-readings", () => ({
 vi.mock("@/hooks/useSoilMoistureCalibrations", () => ({
   useSoilMoistureCalibrations: () => ({
     data: [],
+    availability: "available",
     isLoading: false,
     isError: false,
     refetch: vi.fn(),
@@ -186,33 +187,45 @@ describe("Sensors manual reading target handoff", () => {
     expect(screen.queryByTestId("csv-import-writer")).not.toBeInTheDocument();
   });
 
-  it.skip("does not reuse a prior replacement when the exact-target route is opened again", { timeout: 15000 }, async () => {
-    // TODO(TanStack MemoryRouter): exact-target return loses Tent A selection under compat router; product path covered by neighboring handoff tests.
-    // MemoryRouter handoff under TanStack compat is timing-sensitive; keep assertion but allow longer settle.
-    renderSensors(
-      `/sensors?tentId=${TENT_A}&tentIntent=required#manual-reading`,
-      "/sensors",
-      `/sensors?tentId=${TENT_A}&tentIntent=required#manual-reading`,
-    );
-    await waitFor(() =>
-      expect(screen.getByTestId("manual-reading-tent-row")).toHaveTextContent("Saving to: Tent A"),
-    );
+  it.skip(
+    "does not reuse a prior replacement when the exact-target route is opened again",
+    { timeout: 15000 },
+    async () => {
+      // TODO(TanStack MemoryRouter): exact-target return loses Tent A selection under compat router; product path covered by neighboring handoff tests.
+      // MemoryRouter handoff under TanStack compat is timing-sensitive; keep assertion but allow longer settle.
+      renderSensors(
+        `/sensors?tentId=${TENT_A}&tentIntent=required#manual-reading`,
+        "/sensors",
+        `/sensors?tentId=${TENT_A}&tentIntent=required#manual-reading`,
+      );
+      await waitFor(() =>
+        expect(screen.getByTestId("manual-reading-tent-row")).toHaveTextContent(
+          "Saving to: Tent A",
+        ),
+      );
 
-    fireEvent.click(screen.getByRole("button", { name: "Tent B" }));
-    await waitFor(() =>
-      expect(screen.getByTestId("manual-reading-tent-row")).toHaveTextContent("Saving to: Tent B"),
-    );
+      fireEvent.click(screen.getByRole("button", { name: "Tent B" }));
+      await waitFor(() =>
+        expect(screen.getByTestId("manual-reading-tent-row")).toHaveTextContent(
+          "Saving to: Tent B",
+        ),
+      );
 
-    fireEvent.click(screen.getByTestId("sensor-route-change"));
-    await waitFor(() =>
-      expect(screen.getByTestId("manual-reading-tent-row")).toHaveTextContent("Saving to: Tent B"),
-    );
+      fireEvent.click(screen.getByTestId("sensor-route-change"));
+      await waitFor(() =>
+        expect(screen.getByTestId("manual-reading-tent-row")).toHaveTextContent(
+          "Saving to: Tent B",
+        ),
+      );
 
-    fireEvent.click(screen.getByTestId("sensor-route-return"));
-    await waitFor(() =>
-      expect(screen.getByTestId("manual-reading-tent-row")).toHaveTextContent("Saving to: Tent A"),
-    );
-  });
+      fireEvent.click(screen.getByTestId("sensor-route-return"));
+      await waitFor(() =>
+        expect(screen.getByTestId("manual-reading-tent-row")).toHaveTextContent(
+          "Saving to: Tent A",
+        ),
+      );
+    },
+  );
 
   it("returns to conscious selection when a required tent disappears on refetch", async () => {
     Object.assign(growTentsQuery, {

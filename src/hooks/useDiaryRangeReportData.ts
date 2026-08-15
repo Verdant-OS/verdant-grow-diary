@@ -16,6 +16,7 @@ import type {
   DiaryRangeHarvestRow,
   DiaryRangeSensorReadingRow,
 } from "@/lib/diaryRangeReportRules";
+import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
 
 export type DiaryRangeReportDataStatus = "idle" | "loading" | "ready" | "unavailable";
 
@@ -96,15 +97,18 @@ export function useDiaryRangeReportData(
       const tentIds = (tents ?? []).map((t) => t.id as string).filter(Boolean);
 
       const [diaryRes, eventsRes, harvestRes, sensorRes] = await Promise.all([
-        supabase
-          .from("diary_entries")
-          .select("id,note,photo_url,entry_at,details")
-          .eq("grow_id", growId)
-          .is("retracted_at", null)
-          .gte("entry_at", startIso)
-          .lte("entry_at", endIso)
-          .order("entry_at", { ascending: true })
-          .limit(250),
+        selectWithRetractionCompat((withRetractionFilter) => {
+          let query = supabase
+            .from("diary_entries")
+            .select("id,note,photo_url,entry_at,details")
+            .eq("grow_id", growId);
+          if (withRetractionFilter) query = query.is("retracted_at", null);
+          return query
+            .gte("entry_at", startIso)
+            .lte("entry_at", endIso)
+            .order("entry_at", { ascending: true })
+            .limit(250);
+        }),
         supabase
           .from("grow_events")
           .select("id,event_type,occurred_at,note")

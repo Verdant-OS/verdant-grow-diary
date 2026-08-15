@@ -36,6 +36,7 @@ import {
 } from "@/lib/sensorSnapshot";
 import { isDiaryRowInTentScope } from "@/lib/diaryEvidenceTentScopeRules";
 import { selectDashboardSensorEvidenceRows } from "@/lib/dashboardSensorEvidenceRules";
+import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
 
 /**
  * A stale sensor snapshot must not suppress fresher grower evidence (Codex
@@ -116,13 +117,13 @@ export function useLatestSensorSnapshot(
         // evidence ref for alert persistence (#603). Select `tent_id` so
         // tent-scoped views reject foreign/null attribution (#602).
         if (!growId) return staleSensorCandidate ?? EMPTY_SNAPSHOT;
-        const { data: diaryRows, error: diaryErr } = await supabase
-          .from("diary_entries")
-          .select("id,entry_at,details,tent_id")
-          .is("retracted_at", null)
-          .eq("grow_id", growId)
-          .order("entry_at", { ascending: false })
-          .limit(20);
+        const { data: diaryRows, error: diaryErr } = await selectWithRetractionCompat(
+          (withRetractionFilter) => {
+            let query = supabase.from("diary_entries").select("id,entry_at,details,tent_id");
+            if (withRetractionFilter) query = query.is("retracted_at", null);
+            return query.eq("grow_id", growId).order("entry_at", { ascending: false }).limit(20);
+          },
+        );
         if (diaryErr) throw diaryErr;
         for (const row of diaryRows ?? []) {
           const details = (row.details ?? null) as Record<string, unknown> | null;

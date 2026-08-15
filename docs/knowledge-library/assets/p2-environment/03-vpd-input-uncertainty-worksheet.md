@@ -21,13 +21,27 @@ air VPD  = e°(T_air)  · (1 − RH/100)
 leaf VPD = e°(T_leaf) − e°(T_air) · (RH/100)
 ```
 
+## Step 0 — grow context (required by Verdant's sensor-truth record)
+
+A completed worksheet becomes the evidence behind a VPD conclusion, so it must carry the same
+provenance a sensor reading does — otherwise a calculated range floats free of the grow it
+describes.
+
+| Field                                                                      | Value |
+| -------------------------------------------------------------------------- | ----- |
+| Tent / room ID                                                             |       |
+| Plant ID(s), where relevant                                                |       |
+| Grow / cycle and stage                                                     |       |
+| Recorded by                                                                |       |
+| Raw payload or export reference, if the readings came from a device or CSV |       |
+
 ## Step 1 — inputs and their provenance
 
-| Field                                     | Value | Source label | Captured at | Accuracy (absolute) | Repeatability |
-| ----------------------------------------- | ----- | ------------ | ----------- | ------------------- | ------------- |
-| Air temperature (°C)                      |       |              |             | ±                   | ±             |
-| Relative humidity (%)                     |       |              |             | ±                   | ±             |
-| Leaf temperature (°C) — or "not measured" |       |              |             | ±                   | ±             |
+| Field                                     | Value | Source label | Captured at | Confidence | Accuracy (absolute) | Repeatability |
+| ----------------------------------------- | ----- | ------------ | ----------- | ---------- | ------------------- | ------------- |
+| Air temperature (°C)                      |       |              |             |            | ±                   | ±             |
+| Relative humidity (%)                     |       |              |             |            | ±                   | ±             |
+| Leaf temperature (°C) — or "not measured" |       |              |             |            | ±                   | ±             |
 
 **Accuracy and repeatability are different numbers and answer different questions** — see the
 decision rule in step 4. If the datasheet gives only one, record which one it is.

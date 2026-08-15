@@ -42,7 +42,7 @@ own accessibility note.
 | 4   | [Airflow and microclimate map](04-airflow-microclimate-map.md)                   | no          | Find stagnant pockets instead of averaging them away           |
 | 5   | [PPFD mapping grid](05-ppfd-mapping-grid.md)                                     | no          | Uniformity, not only a mean                                    |
 | 6   | [Peak-load evidence worksheet](06-peak-load-evidence-worksheet.md) **†**         | **yes**     | Evidence to hand a qualified designer — never a sizing output  |
-| 7   | [Lights-off transition timeline](07-lights-off-transition-timeline.md)           | no          | Record the window where latent load outlives sensible load     |
+| 7   | [Lights-off transition timeline](07-lights-off-transition-timeline.md)           | no          | A neutral record of the lights-off transition                  |
 | 8   | [CO2 monitoring and escalation card](08-co2-monitoring-escalation-card.md) **†** | **yes**     | Monitor, alarm, egress, escalate. No enrichment procedure      |
 
 **† Pending qualified-safety approval.** Assets 6 and 8 sit inside the R3 boundary

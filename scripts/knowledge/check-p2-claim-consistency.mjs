@@ -94,18 +94,28 @@ const RULES = [
   },
 ];
 
-/** Lines that document a withdrawal are not assertions of it. */
-const WITHDRAWAL_MARKERS = new RegExp(
-  [
-    // explicit withdrawal vocabulary
-    "withdrawn|superseded|omitted here|is withheld|is corrected here|earlier revision",
-    "NOT stated|not read|UNQUANTIFIED|blocked",
-    // any negation of the claim on the same line
-    "\\bdo(es)? not\\b|\\bdon't\\b|\\bcannot\\b|\\bmust not\\b|\\bnever\\b|\\bis wrong\\b|\\bwas wrong\\b",
-    "\\bno claim\\b|\\bnot a threshold\\b|\\bnot established\\b|\\bunsupported\\b",
-  ].join("|"),
-  "i",
-);
+/**
+ * Exemptions are EXPLICIT, never inferred.
+ *
+ * An earlier revision guessed from vocabulary — a line containing "blocked",
+ * "not read", "unsupported" and so on was assumed to be documenting a withdrawal.
+ * That is unsound: `68 °F is optimal, although its source is blocked` passes it,
+ * which is the same file-scope hole in a different mechanism. Review of PR #994
+ * caught it; the heuristic is gone.
+ *
+ * To document a withdrawn claim, put this HTML comment on the line (invisible in
+ * rendered markdown, and impossible to trigger by accident):
+ *
+ *   <!-- claim-check: allow <rule-id> -->
+ *
+ * Rules may additionally carry `allowLine` for structured §8 metadata rows.
+ */
+const ALLOW_TOKEN = /<!--\s*claim-check:\s*allow\s+([a-z0-9-]+)\s*-->/i;
+
+function explicitlyAllowed(line, ruleId) {
+  const m = line.match(ALLOW_TOKEN);
+  return m ? m[1].toLowerCase() === ruleId.toLowerCase() : false;
+}
 
 function filesToCheck() {
   const assets = readdirSync(ASSET_DIR)
@@ -122,7 +132,7 @@ for (const file of filesToCheck()) {
   checked += 1;
   for (const rule of RULES) {
     lines.forEach((line, i) => {
-      if (WITHDRAWAL_MARKERS.test(line)) return;
+      if (explicitlyAllowed(line, rule.id)) return;
       if (rule.allowLine?.(line, file)) return;
       if (rule.forbid.test(line)) {
         failures += 1;

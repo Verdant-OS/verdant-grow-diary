@@ -21,7 +21,7 @@ difference entirely — so the window is worth measuring on its own terms.
 > pending-safety banner. This asset stays a neutral observation template.
 
 **This asset states no duration for that window, because no source in the claim map
-establishes one.** An earlier revision asserted "the first one to two hours," which was an
+establishes one.** An earlier revision asserted "the first one to two hours," which was an <!-- claim-check: allow fixed-lights-off-window -->
 unmapped number and is withdrawn — the pillar's own rule is that assets introduce no figure
 absent from §8. **When the peak occurs, and how long it lasts, is a property of your room's
 moisture release and equipment cycling.** Rooms whose HVAC cycles slowly, or whose substrate
@@ -136,12 +136,21 @@ u_margin = sqrt(u_surface² + u_dewpoint²)      combined standard uncertainty (
 U_margin = k · u_margin,   k = 2 for ~95%      expanded — use this for the verdict
 ```
 
-| Field                                              | Raw figure | Type  | Standard uncertainty (°C) |
-| -------------------------------------------------- | ---------- | ----- | ------------------------- |
-| Surface thermometer                                | ±...       | bound | `a ÷ √3` = ......         |
-| Dew point — instrument-stated, or **UNQUANTIFIED** | ±...       | bound | `a ÷ √3` = ......         |
-| `u_margin` (1σ)                                    |            |       | ......                    |
-| `U_margin` at k = 2                                |            |       | ......                    |
+| Field                                                                      | Raw figure | Type  | Standard uncertainty (°C) |
+| -------------------------------------------------------------------------- | ---------- | ----- | ------------------------- |
+| Surface thermometer — datasheet accuracy                                   | ±...       | bound | `a ÷ √3` = ......         |
+| Surface **method** error — emissivity, reflected temp, distance, spot size | ±...       | bound | `a ÷ √3` = ......         |
+| Dew point — instrument-stated, or **UNQUANTIFIED**                         | ±...       | bound | `a ÷ √3` = ......         |
+| `u_margin` (1σ)                                                            |            |       | ......                    |
+| `U_margin` at k = 2                                                        |            |       | ......                    |
+
+> **The surface-method row is not optional, and it is usually the larger one.** You are
+> scanning ducts, fixture housings, and glass — **reflective surfaces with unknown
+> emissivity**, often at an angle and at distance. Asset 2's own analysis shows those method
+> contributions can **equal or exceed** the instrument's datasheet accuracy: a 0.01
+> emissivity error alone reaches 0.30 °C at 50 °C reflected. Build the same budget asset 2
+> uses, or record this row **UNQUANTIFIED** — in which case the verdict below cannot be
+> reached.
 
 **If either input is UNQUANTIFIED, the verdict below cannot be reached** — record the margin
 and say the comparison is undecidable, rather than assigning a conclusion.

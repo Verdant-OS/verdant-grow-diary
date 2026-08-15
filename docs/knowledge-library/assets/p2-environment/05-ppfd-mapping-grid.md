@@ -16,7 +16,7 @@ there is direct cannabis evidence for why. In one indoor trial, inflorescence yi
 1,800 µmol·m⁻²·s⁻¹**, with no plateau inside that range, and an independent group reported
 dry-matter production likewise rising from 600 to 1,200 µmol·m⁻²·s⁻¹ [claim C04a].
 
-**But do not translate that into a proportional yield penalty — the evidence does not support
+**But do not translate that into a proportional yield penalty — the evidence does not support <!-- claim-check: allow proportional-corner-yield -->
 it.** In the same trial PPFD rose **15×** (120→1,800) while yield rose only **4.5×**, so the
 linear fit carries a large positive intercept and a fractional light deficit produces a
 **smaller** fractional yield deficit. **This asset publishes no percentage for that deficit,
@@ -107,9 +107,11 @@ quantity).
 | Sensor **repeatability** (if published)                |       |
 | **Uncertainty of a difference** = `√2 ×` repeatability |       |
 | Did you **re-measure** the min and max cells?          | y / n |
-| Repeat readings — min cell                             |       |
-| Repeat readings — max cell                             |       |
-| **Does the gap survive re-measurement?**               | y / n |
+| `m` — repeats per cell                                 |       |
+| Repeat mean and SD — min cell                          |       |
+| Repeat mean and SD — max cell                          |       |
+| `u_confirm`, and `U_confirm` at stated k               |       |
+| **Confirmed gap greater than `U_confirm`?**            | y / n |
 
 **Report the mean with the min÷mean ratio beside it, always.** A mean quoted alone is the
 failure this asset exists to prevent.
@@ -158,9 +160,20 @@ all (author computation, deterministic seed, 200,000 trials per row):
 threshold.** Testing `max − min` against `√2·u` would declare non-uniformity in a uniform
 room most of the time.
 
-**What to do instead needs no distributional assumption: re-measure the min and max cells.**
-Take several fresh readings at each. If the gap persists across repeats it is real; if it
-collapses, you selected noise. Record both passes.
+**What to do instead: re-measure the min and max cells, and apply a stated criterion.**
+"The gap persists" is not a test — two truly equal cells still show a nonzero gap on repeat,
+and the false-positive rate depends on how many repeats you took. Take `m` fresh readings at
+each of the two cells and compare their **means**:
+
+```text
+u_confirm = sqrt(SD_min^2 / m  +  SD_max^2 / m)     combined standard uncertainty of the gap
+U_confirm = k * u_confirm,   k = 2 for roughly 95%
+```
+
+**Declare non-uniformity only if the confirmed gap exceeds `U_confirm`**, and record `m`,
+both SDs, and the coverage factor. Because the two cells were _selected_, the confirmation
+must run on **fresh, pre-designated** measurements — that is what removes the selection
+effect. If the gap fails the test, you selected noise; say so.
 
 **Only claim non-uniformity when the extreme cells survive re-measurement.** If you used more
 than one sensor, their biases do **not** cancel: combine their full uncertainties instead.

@@ -191,18 +191,23 @@ Two readings a reviewer should not skip:
    **But be careful what that span does and does not tell you — two different questions need
    two different uncertainties:**
 
-   | Question                                  | Which uncertainty applies                                        | Why                                                                                                       |
-   | ----------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-   | "Where does my room sit inside the band?" | **Absolute accuracy** — the full datasheet figure, bias included | Bias shifts every reading the same way, so it moves your true position within the band                    |
-   | "Did the change I just made do anything?" | **Repeatability / noise** — usually much smaller than accuracy   | A stable calibration bias **largely cancels** when you difference two readings from the _same_ instrument |
+   | Question                                  | Which uncertainty applies                                                          | Why                                                                                                                                     |
+   | ----------------------------------------- | ---------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+   | "Where does my room sit inside the band?" | **Absolute accuracy** — the full datasheet figure, bias included                   | Bias shifts every reading the same way, so it moves your true position within the band                                                  |
+   | "Did the change I just made do anything?" | **Uncertainty of the difference** = `sqrt2 * u_rep` for equal independent readings | Bias **largely cancels** when you difference two readings from the _same_ instrument, but random error is present at **both** endpoints |
 
    So the 70% figure is about **absolute placement**, not about change detection. A room
-   whose sensor is 0.4 kPa off in absolute terms can still resolve a 0.05 kPa change
-   perfectly well, if that sensor is repeatable. **Conflating the two would tell a grower
-   that no adjustment is ever measurable, which is false and would discourage exactly the
-   one-change-at-a-time discipline this pillar wants.** Judge a change against repeatability;
-   judge a band comparison against accuracy. Where a datasheet gives no repeatability figure,
-   that absence is itself worth recording.
+   whose sensor is 0.4 kPa off in absolute terms can still resolve a much smaller change, if
+   that sensor is repeatable. **Conflating the two would tell a grower that no adjustment is
+   ever measurable, which is false and would discourage exactly the one-change-at-a-time
+   discipline this pillar wants.**
+
+   But the change threshold is **not** one reading's repeatability either. Random error
+   appears in **both** the before and the after reading, so the difference carries
+   `sqrt(u_before^2 + u_after^2)` — **`sqrt2 * u_rep`** for equal independent readings, plus
+   any drift between them. Judge a **band comparison** against absolute accuracy; judge
+   **"did my change do anything"** against `sqrt2 * u_rep`. Where a datasheet gives no
+   repeatability figure, that absence is itself worth recording.
 
 ### 3.3 The same room, two verdicts
 
@@ -389,7 +394,8 @@ pillar acceptance gate.
   that assumption, not a universal fact. The failure mode is not "the number is big"; it is
   applying **absolute accuracy** (bias included) to a question about **change**, where a
   stable bias largely cancels between two readings from the same instrument. Judge "where am
-  I in the band" against accuracy; judge "did my change do anything" against repeatability.
+  I in the band" against accuracy; judge "did my change do anything" against
+  `sqrt2 * u_rep`, since random error is present at both endpoints of a difference.
   Treating them as one number either invents precision you do not have, or talks you out of
   a change you could actually measure.
 - **Averaging inputs before deriving.** §3.4 — wrong by an unpredictable amount _and sign_.
@@ -502,7 +508,7 @@ artifact rather than an afterthought.
 | 4   | [Airflow and microclimate map](knowledge-library/assets/p2-environment/04-airflow-microclimate-map.md)               | no    | Spread and the location of extremes                      |
 | 5   | [PPFD mapping grid](knowledge-library/assets/p2-environment/05-ppfd-mapping-grid.md)                                 | no    | Mean **with** min÷mean uniformity                        |
 | 6   | [Peak-load evidence worksheet](knowledge-library/assets/p2-environment/06-peak-load-evidence-worksheet.md)           | **†** | Evidence for a qualified designer — never a size         |
-| 7   | [Lights-off transition timeline](knowledge-library/assets/p2-environment/07-lights-off-transition-timeline.md)       | no    | The window where latent load outlives sensible           |
+| 7   | [Lights-off transition timeline](knowledge-library/assets/p2-environment/07-lights-off-transition-timeline.md)       | no    | A neutral record of the lights-off transition            |
 | 8   | [CO2 monitoring and escalation card](knowledge-library/assets/p2-environment/08-co2-monitoring-escalation-card.md)   | **†** | Monitor, alarm, egress, escalate                         |
 
 **Assets 6 and 8 carry a pending-qualified-safety-approval banner on their face.** They sit
@@ -598,7 +604,7 @@ pre-filled here.
 | C04a | Cannabis, indoor; DWC (S2) and a separate medicinal-cannabis system (S9); different cultivars                                                          | µmol·m⁻²·s⁻¹, g·m⁻²                             | Two facilities, two cultivars, non-overlapping intensity ranges; no plateau seen within either                                                                                                                                                                        | That yield keeps scaling past 1,800 µmol·m⁻²·s⁻¹, or that either trial's absolute g·m⁻² transfers to another room                                             |
 | C04b | Same two trials                                                                                                                                        | Cannabinoid/terpenoid concentration (%, mg·g⁻¹) | **Direct conflict**: no effect across 120–1,800 (S2) versus +60%/+40% across 600–1,200 (S9); different cultivars, facilities, and ranges                                                                                                                              | **Either direction.** Do not tell a grower that raising light raises potency, and do not tell them it cannot — the evidence does not support either statement |
 | C05  | Cannabis, **single CBD-dominant genotype ("Cherry Berry"), n=10 per treatment, controlled growth chambers** — the authors' own stated limitation       | % RH, kPa, mg/g                                 | One genotype; chamber, not a production room; severe contrast only; **no independent corroboration found — single-source**                                                                                                                                            | **That any mid-range kPa target follows.** The study cannot distinguish 1.1 from 1.4 kPa                                                                      |
-| C06  | US workplaces; jurisdiction-specific                                                                                                                   | ppm; 8-hr TWA and short-term                    | Cal/OSHA applies only in California; NIOSH and ACGIH are non-binding                                                                                                                                                                                                  | That federal OSHA sets a 30,000 ppm STEL — it does not                                                                                                        |
+| C06  | US workplaces; jurisdiction-specific                                                                                                                   | ppm; 8-hr TWA and short-term                    | Cal/OSHA applies only in California; NIOSH and ACGIH are non-binding                                                                                                                                                                                                  | That federal OSHA sets a 30,000 ppm STEL — it does not <!-- claim-check: allow federal-osha-stel -->                                                          |
 | C08  | Commercial indoor cannabis                                                                                                                             | No quantitative figure carried                  | Trade press; the ASHRAE method was not read                                                                                                                                                                                                                           | **Any numeric load, sizing, or capacity figure.** Mechanism only                                                                                              |
 | C09  | Hemp, greenhouse-framed                                                                                                                                | °F, % RH                                        | Greenhouse is not a sealed indoor room; hemp is not all cannabis; "below 50%" is greenhouse guidance                                                                                                                                                                  | Greenhouse is not a sealed indoor room; hemp is not all cannabis; "below 50%" is greenhouse guidance. **No unread-source figure survives in the prose**       |
 | C10  | _Phalaenopsis_, _Paphiopedilum_, Malabar chestnut (S7a); tomato, pepper, cucumber, courgette, aubergine, melon, watermelon, green bean, red bean (S7b) | Emissivity (dimensionless), °C, µm              | **No cannabis emissivity figure exists in either study**; S7b full text not read                                                                                                                                                                                      | That ~0.98 is verified for cannabis, or that instrument error is negligible — at ~0.35 °C it is comparable to the §3.2 air-temperature budget                 |

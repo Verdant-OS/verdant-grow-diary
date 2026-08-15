@@ -2,11 +2,17 @@
 
 Sprint contract: audit broadly, implement narrowly. This document is the audit
 record for the 2026-07-30 stabilization sprint (branch
-`chore/verdant-stabilization`). The live defect board is the GitHub issue set
-labeled `zero-defect` (org project 2, "Zero-Defect Board"); the snapshot table
-lives in [zero-known-defects-board.md](./zero-known-defects-board.md), and the
+`chore/verdant-stabilization`). It is **historical**. The live snapshot as of
+2026-08-13 is [zero-known-defects-board.md](./zero-known-defects-board.md), with
+evidence in
+[full-application-zero-defect-audit-2026-08-13.md](./full-application-zero-defect-audit-2026-08-13.md).
+The GitHub issue set labeled `zero-defect` still wins when this file disagrees.
+
+The live defect board is the GitHub issue set labeled `zero-defect`; org
+project 2 was not resolvable from the 2026-08-13 refresh token. The 2026-07-30
 release gate status in
-[release-readiness-checklist.md](./release-readiness-checklist.md).
+[release-readiness-checklist.md](./release-readiness-checklist.md) was not
+re-issued this pass.
 
 Scope audited: repository identity/baseline, routes and navigation,
 public/auth/demo safety, the One-Tent Loop (Quick Log, Timeline, sensor

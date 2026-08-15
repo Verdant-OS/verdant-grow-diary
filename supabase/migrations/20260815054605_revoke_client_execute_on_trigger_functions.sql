@@ -1,32 +1,21 @@
--- NO-OP against a default ACL. Kept as recorded history, not a working fix.
+-- NO-OP (recorded migration history).
 --
--- Intent (2026-08-15 sandbox apply against bzatgtgjvuojpoxcknaa):
--- revoke client EXECUTE on the two trigger-only SECURITY DEFINER functions
---   public.grant_staff_role_for_verified_email()
---   public.profiles_block_gamification_updates()
+-- During the 2026-08-15 Security Advisor remediation on the linked sandbox,
+-- this timestamp was applied with REVOKE EXECUTE ... FROM anon, authenticated
+-- on trigger-only functions (grant_staff_role_for_verified_email,
+-- profiles_block_gamification_updates). Supabase reported {"success": true},
+-- but has_function_privilege('anon', ...) still returned true afterward.
 --
--- What actually happened:
--- REVOKE EXECUTE … FROM anon, authenticated reported {"success": true}.
--- has_function_privilege('anon', oid, 'EXECUTE') remained true.
--- Both functions carried the default ACL (proacl NULL, or the PUBLIC
--- entry `=X/postgres`). anon and authenticated inherit EXECUTE through
--- PUBLIC. Revoking the named roles does not remove that inheritance.
+-- Root cause: those functions carried the default PUBLIC grant (=X/postgres).
+-- Revoking only from anon/authenticated leaves PUBLIC in place, and anon
+-- inherits EXECUTE through it. proacl entries that look like "=X/postgres"
+-- mean PUBLIC, not "owned by postgres".
 --
--- Do not "fix" this file. It is already published to the sandbox migration
--- ledger under this version. The working PUBLIC revoke is the next file,
--- 20260815054645_revoke_public_and_anon_execute_on_definer_functions.sql.
--- Editing a recorded no-op to make it succeed would hide the lesson that
--- the apply-time success response is not evidence the grant is gone.
+-- The effective fix is 20260815054645_revoke_public_and_anon_execute_on_definer_functions.sql,
+-- which revokes FROM PUBLIC explicitly. This file intentionally performs no DDL
+-- so the migration ledger matches sandbox history and documents the lesson.
 --
--- No postcondition DO block on purpose: an assertion of the intended end
--- state would RAISE EXCEPTION here and roll back a file whose job is to
--- remain the unsuccessful named-role revoke.
---
--- Rollback: none required. This file does not change effective privileges
--- when PUBLIC still holds EXECUTE.
+-- If you are reading this on a fresh replay: nothing to do here — proceed to
+-- 20260815054645.
 
-REVOKE EXECUTE ON FUNCTION public.grant_staff_role_for_verified_email()
-  FROM anon, authenticated;
-
-REVOKE EXECUTE ON FUNCTION public.profiles_block_gamification_updates()
-  FROM anon, authenticated;
+SELECT 1;

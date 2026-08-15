@@ -9,10 +9,11 @@
  *
  *   1. 20260815054529 closes PUBLIC+anon on the four pgmq wrappers and
  *      keeps the service role.
- *   2. 20260815054605 does NOT close PUBLIC on the two trigger definers
- *      (recorded no-op — named-role revoke while PUBLIC remains).
- *   3. 20260815054645 closes PUBLIC on those trigger definers and aligns
- *      quicklog_save_manual with quicklog_save_event.
+ *   2. 20260815054605 does NOT close PUBLIC on the trigger definers
+ *      (recorded no-op — SELECT 1; PUBLIC remains).
+ *   3. 20260815054645 closes PUBLIC on those trigger definers (including
+ *      grant_staff_role_for_verified_allowlist), forbids service-role
+ *      EXECUTE on them, and repairs quicklog_save_manual overloads.
  *
  * Privilege probes use has_function_privilege / aclexplode(grantee=0),
  * never by invoking the RPCs (that would run real queue / trigger logic).
@@ -189,16 +190,30 @@ function restoreIntendedGrants(): { ok: boolean; detail?: string } {
      DECLARE fn RECORD;
      BEGIN
        FOR fn IN
-         SELECT p.oid::regprocedure AS sig, p.proname FROM pg_proc p
+         SELECT p.oid::regprocedure AS sig FROM pg_proc p
          JOIN pg_namespace n ON n.oid = p.pronamespace
          WHERE n.nspname = 'public'
            AND p.proname IN (
-             'enqueue_email', 'read_email_batch', 'delete_email', 'move_to_dlq',
-             'grant_staff_role_for_verified_email', 'profiles_block_gamification_updates'
+             'enqueue_email', 'read_email_batch', 'delete_email', 'move_to_dlq'
            )
        LOOP
          EXECUTE format('REVOKE EXECUTE ON FUNCTION %s FROM PUBLIC, anon, authenticated', fn.sig);
          EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO service_role', fn.sig);
+       END LOOP;
+       FOR fn IN
+         SELECT p.oid::regprocedure AS sig FROM pg_proc p
+         JOIN pg_namespace n ON n.oid = p.pronamespace
+         WHERE n.nspname = 'public'
+           AND p.proname IN (
+             'grant_staff_role_for_verified_email',
+             'grant_staff_role_for_verified_allowlist',
+             'profiles_block_gamification_updates'
+           )
+       LOOP
+         EXECUTE format(
+           'REVOKE EXECUTE ON FUNCTION %s FROM PUBLIC, anon, authenticated, service_role',
+           fn.sig
+         );
        END LOOP;
        FOR fn IN
          SELECT p.oid::regprocedure AS sig FROM pg_proc p
@@ -282,7 +297,7 @@ try {
   check(
     "20260815054605 is a no-op against PUBLIC: trigger definers still inherit EXECUTE",
     publicHasExecute(triggerNames) === true,
-    "named-role revoke closed PUBLIC — this file is supposed to stay the unsuccessful lesson",
+    "SELECT 1 closed PUBLIC — this file is supposed to stay the recorded no-op",
   );
 
   const appliedPublic = psqlFile(PGMQ_EMAIL_WRAPPER_GRANT_MIGRATIONS.publicRevoke);
@@ -296,8 +311,8 @@ try {
     roleHasExecute("anon", triggerNames) === false,
   );
   check(
-    "20260815054645 keeps service-role EXECUTE on trigger definers",
-    roleHasExecute("service_role", triggerNames) === true,
+    "20260815054645 forbids service-role EXECUTE on trigger definers",
+    roleHasExecute("service_role", triggerNames) === false,
   );
   check(
     "20260815054645 closes anon EXECUTE on quicklog_save_manual",

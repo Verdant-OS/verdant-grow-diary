@@ -1,72 +1,37 @@
--- Restrict the four SECURITY DEFINER pgmq email wrappers to service_role.
+-- Restrict pgmq email queue RPC wrappers to service_role only.
 --
--- Background
--- ----------
--- public.enqueue_email / read_email_batch / delete_email / move_to_dlq are
--- PostgREST RPC wrappers around pgmq (created in 20260707153206_email_infra.sql).
--- They run as the owner, so EXECUTE is the authorization check. The email
--- worker (process-email-queue) is the only runtime caller: it builds a client
--- from SUPABASE_SERVICE_ROLE_KEY, sets verify_jwt, and additionally rejects
--- any JWT whose claims.role is not the service role. auth-email-hook and
--- send-transactional-email enqueue the same way. No database function in any
--- schema calls these wrappers, and supabase_auth_admin holds no EXECUTE —
--- the queue name auth_emails does not imply an Auth-hook dependency.
+-- Context: public.enqueue_email / read_email_batch / delete_email / move_to_dlq
+-- are SECURITY DEFINER wrappers around pgmq. PostgREST exposes any function in
+-- public with EXECUTE to the caller's role. Prior hardening
+-- (20260804091142_da8cef1f) revoked FROM anon, authenticated but left
+-- Postgres's default PUBLIC grant (=X/postgres) in proacl, so anon still
+-- inherited EXECUTE via PUBLIC.
 --
--- Why this file exists even though 20260707153206 already REVOKEd PUBLIC
--- and 20260804091142 already REVOKEd anon/authenticated:
--- a live Security Advisor sweep against sandbox bzatgtgjvuojpoxcknaa on
--- 2026-08-15 still showed Public Can Execute, and has_function_privilege()
--- confirmed anon EXECUTE. Publishing does not replay supabase/migrations/
--- (see docs/agents/CURRENT_STATE.md, 2026-08-15 drift note). This additive
--- file is the production apply vehicle.
+-- Caller audit (2026-08-15): no function in any schema calls these wrappers;
+-- the sole runtime caller is the process-email-queue edge function, which uses
+-- SUPABASE_SERVICE_ROLE_KEY and rejects non-service_role JWTs. The auth_emails
+-- queue name does not imply a supabase_auth_admin dependency — that role holds
+-- no EXECUTE on these functions.
 --
--- This file also REVOKEs PUBLIC, not only the named roles. A REVOKE that
--- names only anon, authenticated reports success while PUBLIC's grant
--- remains (proacl entry `=X/postgres`) and both roles inherit EXECUTE
--- right back. That is the lesson recorded in the next migration
--- (20260815054605), which was applied as a no-op for that reason.
---
--- Rollback (email worker lock-out only — do not re-open the anon hole):
---   GRANT EXECUTE ON FUNCTION public.enqueue_email(text, jsonb) TO service_role;
---   (and the same GRANT for read_email_batch, delete_email, move_to_dlq)
+-- Rollback (emergency only — re-exposes queue manipulation to anon):
+--   GRANT EXECUTE ON FUNCTION public.enqueue_email(text, jsonb) TO PUBLIC, anon, authenticated;
+--   GRANT EXECUTE ON FUNCTION public.read_email_batch(text, integer, integer) TO PUBLIC, anon, authenticated;
+--   GRANT EXECUTE ON FUNCTION public.delete_email(text, bigint) TO PUBLIC, anon, authenticated;
+--   GRANT EXECUTE ON FUNCTION public.move_to_dlq(text, text, bigint, jsonb) TO PUBLIC, anon, authenticated;
 
 BEGIN;
 
-DO $$
-DECLARE
-  fn RECORD;
-  found_names text[] := ARRAY[]::text[];
-  required_names text[] := ARRAY[
-    'enqueue_email',
-    'read_email_batch',
-    'delete_email',
-    'move_to_dlq'
-  ];
-  missing text;
-BEGIN
-  FOR fn IN
-    SELECT p.oid::regprocedure AS sig, p.proname
-      FROM pg_proc p
-      JOIN pg_namespace n ON n.oid = p.pronamespace
-     WHERE n.nspname = 'public'
-       AND p.proname = ANY (required_names)
-  LOOP
-    EXECUTE format(
-      'REVOKE EXECUTE ON FUNCTION %s FROM PUBLIC, anon, authenticated',
-      fn.sig
-    );
-    EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO service_role', fn.sig);
-    found_names := array_append(found_names, fn.proname);
-  END LOOP;
+REVOKE EXECUTE ON FUNCTION public.enqueue_email(text, jsonb) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.enqueue_email(text, jsonb) TO service_role;
 
-  FOREACH missing IN ARRAY required_names LOOP
-    IF NOT (missing = ANY (found_names)) THEN
-      RAISE EXCEPTION
-        'pgmq email wrapper % missing — refuse to leave a hole',
-        missing;
-    END IF;
-  END LOOP;
-END $$;
+REVOKE EXECUTE ON FUNCTION public.read_email_batch(text, integer, integer) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.read_email_batch(text, integer, integer) TO service_role;
+
+REVOKE EXECUTE ON FUNCTION public.delete_email(text, bigint) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.delete_email(text, bigint) TO service_role;
+
+REVOKE EXECUTE ON FUNCTION public.move_to_dlq(text, text, bigint, jsonb) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.move_to_dlq(text, text, bigint, jsonb) TO service_role;
 
 DO $$
 DECLARE
@@ -74,29 +39,21 @@ DECLARE
 BEGIN
   FOR bad IN
     SELECT p.proname,
-           p.oid,
-           has_function_privilege('anon',          p.oid, 'EXECUTE') AS anon_exec,
+           has_function_privilege('anon', p.oid, 'EXECUTE') AS anon_exec,
            has_function_privilege('authenticated', p.oid, 'EXECUTE') AS auth_exec,
-           has_function_privilege('service_role',  p.oid, 'EXECUTE') AS svc_exec
+           has_function_privilege('service_role', p.oid, 'EXECUTE') AS svc_exec
       FROM pg_proc p
       JOIN pg_namespace n ON n.oid = p.pronamespace
      WHERE n.nspname = 'public'
-       AND p.proname IN (
-         'enqueue_email',
-         'read_email_batch',
-         'delete_email',
-         'move_to_dlq'
-       )
+       AND p.proname = ANY(ARRAY[
+         'enqueue_email', 'read_email_batch', 'delete_email', 'move_to_dlq'
+       ])
   LOOP
-    IF bad.anon_exec THEN
-      RAISE EXCEPTION '% oid=% still executable by anon', bad.proname, bad.oid;
-    END IF;
-    IF bad.auth_exec THEN
-      RAISE EXCEPTION '% oid=% still executable by authenticated', bad.proname, bad.oid;
+    IF bad.anon_exec OR bad.auth_exec THEN
+      RAISE EXCEPTION '% still executable by anon/authenticated after revoke', bad.proname;
     END IF;
     IF NOT bad.svc_exec THEN
-      RAISE EXCEPTION '% oid=% not executable by service_role — would break the email worker',
-        bad.proname, bad.oid;
+      RAISE EXCEPTION '% not executable by service_role after grant', bad.proname;
     END IF;
   END LOOP;
 END $$;

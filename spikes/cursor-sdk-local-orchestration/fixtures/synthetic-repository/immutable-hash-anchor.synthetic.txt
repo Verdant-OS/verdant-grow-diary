@@ -1,0 +1,4 @@
+SYNTHETIC IMMUTABLE HASH ANCHOR
+This file must remain byte-identical for the duration of a proof run.
+Do not edit. Do not rewrite. Hash before must equal hash after.
+anchor-bytes: v1-verdant-synthetic-immutable-fixture

@@ -8,9 +8,11 @@ import {
   QUICKLOG_WRITER_FUNCTIONS,
   TRIGGER_DEFINER_FUNCTIONS,
   authenticatedAndServiceRoleExecute,
+  authenticatedOnlyExecute,
   clientRoleMayExecutePgmqWrapper,
   executeMatricesMatch,
   expectedExecuteForHardenableDefiner,
+  noClientExecute,
   publicSchemaFunctionName,
   serviceRoleOnlyExecute,
   type HardenableDefinerFunction,
@@ -29,19 +31,29 @@ describe("pgmqEmailWrapperGrantRules — resolved grant contract", () => {
     expect(matrix[EXECUTE_ROLE_SERVICE]).toBe(true);
   });
 
-  it("quicklog writer matrix keeps authenticated and the service role", () => {
+  it("trigger-only matrix denies every client role including the service role", () => {
+    const matrix = noClientExecute();
+    expect(matrix.anon).toBe(false);
+    expect(matrix.authenticated).toBe(false);
+    expect(matrix[EXECUTE_ROLE_SERVICE]).toBe(false);
+  });
+
+  it("quicklog_save_manual keeps authenticated and the service role", () => {
     const matrix = authenticatedAndServiceRoleExecute();
     expect(matrix.anon).toBe(false);
     expect(matrix.authenticated).toBe(true);
     expect(matrix[EXECUTE_ROLE_SERVICE]).toBe(true);
   });
 
-  it("assigns the service-role-only posture to every wrapper and trigger definer", () => {
-    const names: HardenableDefinerFunction[] = [
-      ...PGMQ_EMAIL_WRAPPER_FUNCTIONS,
-      ...TRIGGER_DEFINER_FUNCTIONS,
-    ];
-    for (const name of names) {
+  it("quicklog_save_event is authenticated-only (no service-role EXECUTE)", () => {
+    const matrix = authenticatedOnlyExecute();
+    expect(matrix.anon).toBe(false);
+    expect(matrix.authenticated).toBe(true);
+    expect(matrix[EXECUTE_ROLE_SERVICE]).toBe(false);
+  });
+
+  it("assigns the service-role-only posture to every pgmq wrapper", () => {
+    for (const name of PGMQ_EMAIL_WRAPPER_FUNCTIONS) {
       expect(
         executeMatricesMatch(expectedExecuteForHardenableDefiner(name), serviceRoleOnlyExecute()),
         name,
@@ -49,11 +61,22 @@ describe("pgmqEmailWrapperGrantRules — resolved grant contract", () => {
     }
   });
 
-  it("assigns identical three-role ACLs to quicklog_save_manual and quicklog_save_event", () => {
+  it("assigns the trigger-only no-client posture to every trigger definer", () => {
+    for (const name of TRIGGER_DEFINER_FUNCTIONS) {
+      expect(
+        executeMatricesMatch(expectedExecuteForHardenableDefiner(name), noClientExecute()),
+        name,
+      ).toBe(true);
+    }
+    expect(TRIGGER_DEFINER_FUNCTIONS).toContain("grant_staff_role_for_verified_allowlist");
+  });
+
+  it("does not claim identical ACLs for quicklog_save_manual and quicklog_save_event", () => {
     const manual = expectedExecuteForHardenableDefiner("quicklog_save_manual");
     const event = expectedExecuteForHardenableDefiner("quicklog_save_event");
-    expect(executeMatricesMatch(manual, event)).toBe(true);
+    expect(executeMatricesMatch(manual, event)).toBe(false);
     expect(executeMatricesMatch(manual, authenticatedAndServiceRoleExecute())).toBe(true);
+    expect(executeMatricesMatch(event, authenticatedOnlyExecute())).toBe(true);
   });
 
   it("covers every hardenable name through the exhaustive helper", () => {
@@ -69,7 +92,7 @@ describe("pgmqEmailWrapperGrantRules — resolved grant contract", () => {
       }
       expect(publicSchemaFunctionName(name)).toBe(`public.${name}`);
     }
-    expect(all).toHaveLength(8);
+    expect(all).toHaveLength(9);
   });
 
   it("names the three additive migrations in apply order", () => {

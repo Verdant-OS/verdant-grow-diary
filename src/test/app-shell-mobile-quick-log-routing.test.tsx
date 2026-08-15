@@ -12,6 +12,7 @@ import { describe, expect, it, vi } from "vitest";
 
 const TENT_ID = "30000000-0000-4000-8000-000000000001";
 const SECOND_TENT_ID = "30000000-0000-4000-8000-000000000002";
+const PLANT_ID = "40000000-0000-4000-8000-000000000001";
 
 vi.mock("@/store/auth", () => ({
   useAuth: () => ({
@@ -52,6 +53,7 @@ vi.mock("@/components/QuickLog", () => ({
   }: {
     open: boolean;
     prefill?: {
+      plantId?: string | null;
       eventType?: string | null;
       note?: string | null;
       source?: string | null;
@@ -61,6 +63,7 @@ vi.mock("@/components/QuickLog", () => ({
     open ? (
       <div
         data-testid="legacy-quick-log"
+        data-plant-id={prefill?.plantId ?? ""}
         data-event-type={prefill?.eventType ?? ""}
         data-source={prefill?.source ?? ""}
         data-suppress-plant-default={String(prefill?.suppressPlantDefault ?? false)}
@@ -334,6 +337,15 @@ describe("AppShell mobile Quick Log routing", () => {
     renderAt("/dashboard?open=quick-log");
 
     await waitFor(() => expect(screen.getByTestId("legacy-quick-log")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByTestId("current-search").textContent).toBe(""));
+    expect(screen.queryByTestId("scoped-quick-log")).not.toBeInTheDocument();
+  });
+
+  it("binds a consumed Plant Detail Quick Log intent to the plant in the route", async () => {
+    renderAt(`/plants/${PLANT_ID}?open=quick-log`);
+
+    const dialog = await screen.findByTestId("legacy-quick-log");
+    expect(dialog).toHaveAttribute("data-plant-id", PLANT_ID);
     await waitFor(() => expect(screen.getByTestId("current-search").textContent).toBe(""));
     expect(screen.queryByTestId("scoped-quick-log")).not.toBeInTheDocument();
   });

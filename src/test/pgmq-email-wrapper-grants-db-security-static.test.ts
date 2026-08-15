@@ -74,4 +74,12 @@ describe("pgmq email wrapper grants DB security harness wiring", () => {
     expect(harness).toContain("has_function_privilege(");
     expect(harness).not.toMatch(/\.rpc\(/);
   });
+
+  it("matches published #989 trigger posture: no service-role EXECUTE after restore", () => {
+    expect(harness).toContain("grant_staff_role_for_verified_allowlist");
+    expect(harness).toContain("forbids service-role EXECUTE on trigger definers");
+    expect(harness).toMatch(
+      /REVOKE EXECUTE ON FUNCTION %s FROM PUBLIC, anon, authenticated, service_role/,
+    );
+  });
 });

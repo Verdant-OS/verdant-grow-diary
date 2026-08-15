@@ -136,8 +136,9 @@ const FUNCTION_CONTRACTS: FunctionContract[] = [
   {
     name: "public.quicklog_save_event",
     mustExist: true,
-    // Canonical typed-event writer for authenticated clients.
-    expectedExecute: { anon: false, authenticated: true, service_role: true },
+    // Canonical typed-event writer for authenticated clients only
+    // (20260725024026 / 20260703093500 — never granted to service_role).
+    expectedExecute: { anon: false, authenticated: true, service_role: false },
   },
   {
     name: "public.quicklog_save_manual",

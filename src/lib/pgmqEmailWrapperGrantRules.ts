@@ -1,6 +1,6 @@
 /**
  * Execute-grant contract for SECURITY DEFINER routines hardened in
- * 20260815054529 / 20260815054605 / 20260815054645.
+ * 20260815054529 / 20260815054605 / 20260815054645 (merged via #989).
  *
  * Pure data. No I/O. No React. No Supabase.
  *
@@ -10,6 +10,11 @@
  * success while `has_function_privilege()` stays true. The durable posture
  * is REVOKE FROM PUBLIC (and the named roles), then GRANT the intended
  * callers back.
+ *
+ * These matrices follow the published SQL on `verdant-grow-diary` (#989),
+ * not the competing bodies that briefly lived on this branch. Trigger-only
+ * functions are not executable by `service_role` either — PostgREST RPC
+ * must stay closed, and trigger firing does not need EXECUTE.
  *
  * Client-secret boundary: this file must not use the billing/control role
  * name as a bare identifier. Quoted string literals and computed keys are
@@ -39,6 +44,7 @@ export type PgmqEmailWrapperFunction = (typeof PGMQ_EMAIL_WRAPPER_FUNCTIONS)[num
 
 export const TRIGGER_DEFINER_FUNCTIONS = [
   "grant_staff_role_for_verified_email",
+  "grant_staff_role_for_verified_allowlist",
   "profiles_block_gamification_updates",
 ] as const;
 
@@ -67,11 +73,27 @@ export function serviceRoleOnlyExecute(): ExecuteGrantMatrix {
   };
 }
 
+export function noClientExecute(): ExecuteGrantMatrix {
+  return {
+    anon: false,
+    authenticated: false,
+    [EXECUTE_ROLE_SERVICE]: false,
+  };
+}
+
 export function authenticatedAndServiceRoleExecute(): ExecuteGrantMatrix {
   return {
     anon: false,
     authenticated: true,
     [EXECUTE_ROLE_SERVICE]: true,
+  };
+}
+
+export function authenticatedOnlyExecute(): ExecuteGrantMatrix {
+  return {
+    anon: false,
+    authenticated: true,
+    [EXECUTE_ROLE_SERVICE]: false,
   };
 }
 
@@ -83,12 +105,15 @@ export function expectedExecuteForHardenableDefiner(
     case "read_email_batch":
     case "delete_email":
     case "move_to_dlq":
-    case "grant_staff_role_for_verified_email":
-    case "profiles_block_gamification_updates":
       return serviceRoleOnlyExecute();
+    case "grant_staff_role_for_verified_email":
+    case "grant_staff_role_for_verified_allowlist":
+    case "profiles_block_gamification_updates":
+      return noClientExecute();
     case "quicklog_save_manual":
-    case "quicklog_save_event":
       return authenticatedAndServiceRoleExecute();
+    case "quicklog_save_event":
+      return authenticatedOnlyExecute();
     default: {
       const exhaustive: never = name;
       throw new Error(`unhandled definer function: ${String(exhaustive)}`);

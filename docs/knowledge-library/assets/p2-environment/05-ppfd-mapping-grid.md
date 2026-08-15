@@ -85,22 +85,31 @@ quantity).
 
 ## Uniformity
 
-| Metric                                         | Value |
-| ---------------------------------------------- | ----- |
-| Mean of all cells                              |       |
-| Minimum cell (and which)                       |       |
-| Maximum cell (and which)                       |       |
-| **Min ÷ mean** (uniformity ratio)              |       |
-| **Min ÷ max**                                  |       |
-| Spread (max − min)                             |       |
-| Sensor accuracy (from above)                   |       |
-| Is the spread larger than the sensor accuracy? | y / n |
+| Metric                                        | Value |
+| --------------------------------------------- | ----- |
+| Mean of all cells                             |       |
+| Minimum cell (and which)                      |       |
+| Maximum cell (and which)                      |       |
+| **Min ÷ mean** (uniformity ratio)             |       |
+| **Min ÷ max**                                 |       |
+| Spread (max − min)                            |       |
+| Sensor accuracy (absolute, from above)        |       |
+| Sensor **repeatability** (if published)       |       |
+| Is the spread larger than that repeatability? | y / n |
 
 **Report the mean with the min÷mean ratio beside it, always.** A mean quoted alone is the
 failure this asset exists to prevent.
 
-**If the spread is not larger than your sensor's accuracy, you have not demonstrated
-non-uniformity** — you have measured noise. Say so rather than acting on it.
+**Judge the spread against repeatability, not absolute accuracy.** One sensor carried around
+the grid keeps the same calibration bias at every cell, and that bias cancels out of a
+cell-to-cell comparison — so a sensor well off in absolute terms can still map uniformity
+reliably. What limits you is its repeatability, plus drift over the minutes the survey took,
+plus anything that changed in the room meanwhile.
+
+**If the spread is not larger than that, you have not demonstrated non-uniformity** — say so
+rather than acting on it. If you used more than one sensor, their biases do **not** cancel:
+combine their uncertainties and compare against that instead. (Absolute accuracy still
+governs the _absolute_ PPFD and DLI values below, just not the uniformity comparison.)
 
 ## DLI (only if your readings are true PPFD)
 

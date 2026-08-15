@@ -818,15 +818,34 @@ mine — but it belongs in the decision.
 artifact requires an approved brief and claim map, and only an evidence editor can supply
 that.
 
-**Three evidence blockers** sit ahead of `evidence_review`, all recorded in §8.5:
+**Five evidence blockers** sit ahead of `evidence_review`, all recorded in §8.5. They fall
+into two kinds:
+
+**Evidence that does not exist or conflicts:**
 
 - **C05** is single-source and cannot satisfy R2's corroboration requirement as it stands;
 - **C04b** is a live conflict between two independent groups, licensing no recommendation in
   either direction;
 - **C08** — the R3 HVAC latent-load claim — rests only on trade press, which is **not an
   evidence tier**, so it can pass neither evidence nor safety review as sourced. Either an
-  A/B-tier load source is obtained or the claim is dropped. Clearing C05 and C04b alone does
-  **not** make this draft reviewable.
+  A/B-tier load source is obtained or the claim is dropped.
+
+**Sources cited but not read (HTTP 403 to this author) — these need obtaining, not
+researching:**
+
+- **C04a** rests partly on **S9**, whose publisher page 403'd; it is cited from its
+  institutional record, and **its exact locators are missing**. C04a is described as
+  multi-source, which is true — but one of those sources has not been read;
+- **C10** rests partly on **S7b**, same situation: per-crop values from an institutional
+  record, full text unread, no page locator.
+
+Both of the second group otherwise read `PENDING` in §8.4, which is why they are named here:
+without this line an editor could reasonably treat them as ready. **Clearing the first three
+alone does not make this draft reviewable.**
+
+Two further unread-source items are already blocked rather than pending and so are not
+counted above: **S6b** (OSU, source of the 68 °F optimum in C09, marked must-not-publish)
+and the withdrawn **C07**.
 
 Four items do need a decision, and all four can be settled in parallel with the asset work:
 the **risk-class question at the top of this document** (ship the pillar R3, or move its

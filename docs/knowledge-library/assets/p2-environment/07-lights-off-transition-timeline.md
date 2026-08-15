@@ -115,8 +115,16 @@ whether room RH looks acceptable. Record it; do not respond with plant intervent
 
 ## Interpretation rules
 
-- **Compare every change to your instrument accuracy first.** A 2% RH movement measured with
-  a ±3% sensor is not a trend.
+- **Judge a difference against repeatability, not absolute accuracy.** A stable calibration
+  bias shifts every reading the same way, so **it cancels when you compare two readings from
+  the same instrument** — a repeatable ±0.5 °C probe can resolve a real 0.3 °C difference
+  perfectly well. Absolute accuracy governs "what is the true value here"; **repeatability,
+  drift over the survey, and any room change during it** govern "is this difference real."
+  - **One instrument, left in place across the timeline:** compare against its **repeatability** (plus drift across the hours the timeline spans).
+  - **Two or more fixed instruments:** their biases do **not** cancel — combine their
+    individual uncertainties (in quadrature if independent) and compare against that.
+  - Where a datasheet gives no repeatability figure, **record that absence**; you then cannot
+    state how small a difference you can resolve.
 - **A room that never recovers is a capacity finding**, not a plant problem. It belongs in
   asset 6, to hand to a qualified designer.
 - **Stabilise the environment; do not respond with defoliation, irrigation, or feeding

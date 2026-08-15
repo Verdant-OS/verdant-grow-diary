@@ -88,9 +88,17 @@ Vertical gradients are the ones most often missed, because the probe lives at on
 
 ## Interpretation rules
 
-- **Compare the spread to your instrument accuracy first.** A 0.3 °C spread measured with a
-  ±0.5 °C probe is not a gradient — it is noise. Only spreads larger than your combined
-  instrument error are evidence of a real microclimate.
+- **Judge a difference against repeatability, not absolute accuracy.** A stable calibration
+  bias shifts every reading the same way, so **it cancels when you compare two readings from
+  the same instrument** — a repeatable ±0.5 °C probe can resolve a real 0.3 °C difference
+  perfectly well. Absolute accuracy governs "what is the true value here"; **repeatability,
+  drift over the survey, and any room change during it** govern "is this difference real."
+  - **One instrument, walked around:** compare against its **repeatability** (plus any drift
+    over the time the survey took).
+  - **Two or more fixed instruments:** their biases do **not** cancel — combine their
+    individual uncertainties (in quadrature if independent) and compare against that.
+  - Where a datasheet gives no repeatability figure, **record that absence**; you then cannot
+    state how small a difference you can resolve.
 - **A `still` cell is a finding, not a gap.** Stagnant pockets are where boundary-layer and
   condensation problems begin.
 - **A single probe's reading is now interpretable.** Note which cell your fixed probe sits

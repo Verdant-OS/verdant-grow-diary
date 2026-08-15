@@ -55,17 +55,20 @@ general — which one dominates is a property of your room.** Measure the backgr
 **Room / tent:** ............ **Date / time:** ............ **Recorded by:** ............
 **Light state:** on / off / transition · **Minutes since state change:** ............
 
-| Field                                   | Value |
-| --------------------------------------- | ----- |
-| IR instrument make / model              |       |
-| Instrument spectral band (µm)           |       |
-| Instrument stated accuracy (°C)         |       |
-| Last calibration / verification date    |       |
-| Emissivity setting used                 |       |
-| Distance to leaf (cm)                   |       |
-| Spot size at that distance (cm)         |       |
-| Background / reflected temperature (°C) |       |
-| Air-temperature instrument              |       |
+| Field                                      | Value |
+| ------------------------------------------ | ----- |
+| IR instrument make / model                 |       |
+| Instrument spectral band (µm)              |       |
+| Instrument stated accuracy (°C)            |       |
+| Last calibration / verification date       |       |
+| Emissivity setting used                    |       |
+| Distance to leaf (cm)                      |       |
+| Spot size at that distance (cm)            |       |
+| Background / reflected temperature (°C)    |       |
+| Air-temperature instrument                 |       |
+| Air-probe stated accuracy (°C)             |       |
+| Air-probe repeatability (°C, if published) |       |
+| IR repeatability (°C, if published)        |       |
 
 | Sample | Position (written locator) | Leaf T (°C) | Air T at same instant (°C) | Offset (leaf − air, °C) |
 | ------ | -------------------------- | ----------- | -------------------------- | ----------------------- |
@@ -77,10 +80,40 @@ general — which one dominates is a property of your room.** Measure the backgr
 
 **Mean offset:** ...... °C · **Min:** ...... · **Max:** ...... · **Spread (max − min):** ...... °C
 
+## Uncertainty budget — the offset uses TWO instruments, so combine both
+
+The offset is a **difference between two separately measured quantities**, taken with two
+different devices. Its uncertainty is therefore not either instrument's accuracy alone.
+Four contributions, all of which belong in the number you carry into asset 3:
+
+| Contribution                        | Where it comes from                                                     | Value (°C) |
+| ----------------------------------- | ----------------------------------------------------------------------- | ---------- |
+| a. IR thermometer                   | Its accuracy — or repeatability if you only compare offsets over time   |            |
+| b. Air probe                        | Its accuracy — the offset inherits this in full                         |            |
+| c. Emissivity × background          | From the reflected-temperature table above, at your measured background |            |
+| d. Sampling variation across canopy | The spread (max − min) from your samples, above                         |            |
+
+**Combine them.** If the four are independent, add in quadrature:
+
+```text
+offset uncertainty = sqrt(a² + b² + c² + d²)
+```
+
+Quadrature assumes independence; **if two contributions share a cause — for example both
+instruments calibrated against the same reference — they are correlated and adding them
+linearly is the conservative choice.** Record which you used.
+
+> **Worked shape (illustrative, using this card's own figures):** IR 0.35 °C, air probe
+> 0.5 °C, emissivity/background 0.30 °C at 50 °C reflected, sampling spread 0.4 °C →
+> `sqrt(0.35² + 0.5² + 0.30² + 0.4²)` ≈ **0.79 °C**. **More than double any single term** —
+> which is exactly why recording only one instrument's accuracy produces a falsely narrow
+> leaf-VPD range downstream.
+
 ## Uncertainty statement (required — copy into the VPD worksheet)
 
-> Offset **......** °C ± **......** °C, from **......** samples, at emissivity **......**,
-> background **......** °C, instrument accuracy **......** °C, measured **......** minutes
+> Offset **......** °C ± **......** °C (combined, from a–d above), from **......** samples,
+> at emissivity **......**, background **......** °C, IR instrument **......** °C, air probe
+> **......** °C, combined by **quadrature / linear addition**, measured **......** minutes
 > into **lights-on / lights-off**.
 
 If you cannot fill that sentence, **you do not have a leaf basis.** Label the result air VPD

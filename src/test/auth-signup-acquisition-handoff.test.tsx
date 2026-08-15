@@ -56,11 +56,9 @@ beforeEach(() => {
   });
 });
 
-function renderSignup(redirectTo = founderRedirectTo) {
+function renderSignupSearch(search: string) {
   return render(
-    <MemoryRouter
-      initialEntries={[`/auth?mode=signup&redirectTo=${encodeURIComponent(redirectTo)}`]}
-    >
+    <MemoryRouter initialEntries={[search]}>
       <Routes>
         <Route path="/auth" element={<Auth />} />
         <Route path="/pricing" element={<div data-testid="pricing-return" />} />
@@ -68,6 +66,10 @@ function renderSignup(redirectTo = founderRedirectTo) {
       </Routes>
     </MemoryRouter>,
   );
+}
+
+function renderSignup(redirectTo = founderRedirectTo) {
+  return renderSignupSearch(`/auth?mode=signup&redirectTo=${encodeURIComponent(redirectTo)}`);
 }
 
 function completeSignupForm({ marketingOptIn = false } = {}) {
@@ -85,7 +87,26 @@ function completeSignupForm({ marketingOptIn = false } = {}) {
 }
 
 describe("Auth signup acquisition handoff", () => {
-  it("opens signup, preserves paid intent through verification, and emits no PII", async () => {
+  it("keeps the exact landing CTA attribution out of auth.users metadata", async () => {
+    renderSignupSearch(
+      "/auth?mode=signup&utm_source=landing_page&utm_medium=owned&utm_campaign=paid_launch",
+    );
+
+    completeSignupForm();
+
+    await waitFor(() => expect(mocks.signUp).toHaveBeenCalledTimes(1));
+    expect(mocks.signUp).toHaveBeenCalledWith(
+      expect.objectContaining({
+        options: expect.objectContaining({ data: { marketing_opt_in: false } }),
+      }),
+    );
+    expect(JSON.stringify(mocks.signUp.mock.calls)).not.toContain("verdant_signup_source");
+    expect(
+      JSON.parse(window.sessionStorage.getItem(OAUTH_SIGNUP_ACQUISITION_STORAGE_KEY) ?? "{}"),
+    ).toMatchObject({ source: "landing_page" });
+  });
+
+  it("queues attribution separately so signup metadata cannot block account creation", async () => {
     renderSignup();
 
     expect(screen.getByRole("tab", { name: "Create account" })).toHaveAttribute(
@@ -100,9 +121,13 @@ describe("Auth signup acquisition handoff", () => {
       password: "correct-horse-battery-staple",
       options: {
         emailRedirectTo: `${window.location.origin}${founderRedirectTo}`,
-        data: { verdant_signup_source: "founder_share", marketing_opt_in: false },
+        data: { marketing_opt_in: false },
       },
     });
+    const pending = window.sessionStorage.getItem(OAUTH_SIGNUP_ACQUISITION_STORAGE_KEY);
+    expect(pending).not.toBeNull();
+    expect(JSON.parse(pending ?? "{}")).toMatchObject({ source: "founder_share" });
+    expect(JSON.stringify(mocks.signUp.mock.calls)).not.toContain("verdant_signup_source");
     expect(mocks.track).toHaveBeenCalledWith("signup_page_view", {
       source: "founder_share",
     });
@@ -132,13 +157,13 @@ describe("Auth signup acquisition handoff", () => {
     expect(mocks.signUp).toHaveBeenCalledWith(
       expect.objectContaining({
         options: expect.objectContaining({
-          data: {
-            verdant_signup_source: "founder_share",
-            marketing_opt_in: true,
-          },
+          data: { marketing_opt_in: true },
         }),
       }),
     );
+    expect(
+      JSON.parse(window.sessionStorage.getItem(OAUTH_SIGNUP_ACQUISITION_STORAGE_KEY) ?? "{}"),
+    ).toMatchObject({ source: "founder_share" });
     expect(screen.getByRole("status")).toHaveTextContent(/check your inbox/i);
   });
 
@@ -189,5 +214,53 @@ describe("Auth signup acquisition handoff", () => {
 
     expect(await screen.findByTestId("pricing-return")).toBeInTheDocument();
     expect(mocks.track).not.toHaveBeenCalledWith("signup_verification_required", expect.anything());
+  });
+
+  it("clears queued attribution when signup fails", async () => {
+    mocks.signUp.mockResolvedValue({
+      data: { user: null, session: null },
+      error: { message: "Database error saving new user" },
+    });
+    renderSignupSearch(
+      "/auth?mode=signup&utm_source=landing_page&utm_medium=owned&utm_campaign=paid_launch",
+    );
+
+    completeSignupForm();
+
+    await waitFor(() => expect(mocks.signUp).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(window.sessionStorage.getItem(OAUTH_SIGNUP_ACQUISITION_STORAGE_KEY)).toBeNull(),
+    );
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).not.toHaveTextContent("Database error saving new user");
+  });
+
+  it("clears stale queued attribution before a direct signup", async () => {
+    window.sessionStorage.setItem(
+      OAUTH_SIGNUP_ACQUISITION_STORAGE_KEY,
+      JSON.stringify({ source: "founder_share", capturedAt: Date.now() }),
+    );
+    renderSignupSearch("/auth?mode=signup");
+
+    completeSignupForm();
+
+    await waitFor(() => expect(mocks.signUp).toHaveBeenCalledTimes(1));
+    expect(window.sessionStorage.getItem(OAUTH_SIGNUP_ACQUISITION_STORAGE_KEY)).toBeNull();
+  });
+
+  it("preserves a sanitized referral without reintroducing acquisition metadata", async () => {
+    renderSignupSearch("/auth?mode=signup&ref=ABCDEF1234");
+
+    completeSignupForm();
+
+    await waitFor(() => expect(mocks.signUp).toHaveBeenCalledTimes(1));
+    expect(mocks.signUp).toHaveBeenCalledWith(
+      expect.objectContaining({
+        options: expect.objectContaining({
+          data: { verdant_ref_code: "abcdef1234", marketing_opt_in: false },
+        }),
+      }),
+    );
+    expect(JSON.stringify(mocks.signUp.mock.calls)).not.toContain("verdant_signup_source");
   });
 });

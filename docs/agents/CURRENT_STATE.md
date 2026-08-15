@@ -2,11 +2,27 @@
 
 **Last updated:** 2026-08-15 UTC
 **Updated by:** Grok (merge-conflict resolve of #970 onto fetched deploy tip
-`9c1ada616` (#987). Unique surviving work from this PR is the DIRTY-PR
-reconciliation section; outcomes refreshed this edit: #710 merged, #936 closed
-with the credit-gate work landing as #971. Takes the 2026-08-14 Claude header
-and topology as the prior shift-report identity. No production, GA4, GSC,
-sitemap, or release-identity row was re-measured.)
+`534b28434` (#966). Takes the incoming Cursor-SDK spike header as prior
+identity. Unique surviving work remains the DIRTY-PR reconciliation section.
+No production, GA4, GSC, sitemap, or release-identity row was re-measured.)
+
+**Prior update:** 2026-08-15 UTC
+**Updated by:** Grok (2026-08-15, later additive: next gates on
+`VERDANT_CURSOR_SDK_LOCAL_ORCHESTRATION_SPIKE`. `POSTGRES_RESTRICTED_ROLE_SPIKE`
+was not touched. Optional live proof remains `BLOCKED` — `CURSOR_API_KEY` is
+absent here. Dispatcher security review is at
+`spikes/cursor-sdk-local-orchestration/docs/dispatcher-security-review.md`.
+Host receipt-integrity findings are closed; live SDK tool enforcement stays
+`NOT_MEASURED`; reuse is not approved. No production, GA4, GSC, sitemap, or
+release-identity row was re-measured in this edit.)
+
+**Prior update:** 2026-08-15 UTC
+**Updated by:** Grok (2026-08-15, additive: records implementation of isolated
+`VERDANT_CURSOR_SDK_LOCAL_ORCHESTRATION_SPIKE` under
+`spikes/cursor-sdk-local-orchestration/`. This spike does **not** replace,
+pause, or delay `POSTGRES_RESTRICTED_ROLE_SPIKE`. Manual Cursor SDK live proof
+is `BLOCKED` without `CURSOR_API_KEY`. No production, GA4, GSC, sitemap, or
+release-identity row was re-measured in this edit.)
 
 **Prior update:** 2026-08-14 UTC
 **Updated by:** Claude (2026-08-14, later edit: records Cheek's in-session
@@ -121,7 +137,7 @@ full migration ledger against production before assuming anything else in the
 
 | Branch               | Role                                             | Verified head                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | -------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `verdant-grow-diary` | **Deploy branch. Production ships from here.**   | `9c1ada61673e216767f464b99ba2b0211091f67e` (#987), verified 2026-08-15 with `git fetch origin verdant-grow-diary && git rev-parse origin/verdant-grow-diary`. Supersedes `f2a03998f` (#982) recorded 2026-08-14. After #982 this fetch observed `883bee2ff` (#983), `5e2fcedd4` (#984), `9c1ada616` (#987). The 2026-08-14 seven-commit list (`623edf17b` #979, `e200d7561` #815, `1a3a70d1b` #710, `cba42c6d4` #795, `e1214d3df` #980, `7843a3fcb` #981, `f2a03998f` #982) remains ancestral. PR numbers on this branch do not order by merge time — order commits with `git log`, never by PR number. Do not carry older validation tables forward |
+| `verdant-grow-diary` | **Deploy branch. Production ships from here.**   | `534b284345651f97991c7959abdaac8c6e10eb23` (#966), verified 2026-08-15 with `git fetch origin verdant-grow-diary && git rev-parse origin/verdant-grow-diary`. Supersedes `9c1ada616` (#987) recorded earlier this day. After #987 this fetch observed `24382b5ad` (#988), `f1e097740` (#985), `534b28434` (#966). PR numbers on this branch do not order by merge time — order commits with `git log`, never by PR number. Do not carry older validation tables forward |
 | `main`               | Integration branch. It is not production parity. | `b6d747941948ce68157185a2b0847acea6970d44` (#779), verified 2026-08-07                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 
 `main` and `verdant-grow-diary` are divergent. Do not infer production behavior from
@@ -710,7 +726,7 @@ schema change and does not authorize production writes.
 | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Codex             | Standing SEO measurement readiness and analytics integrity. Convex Phase 1 of `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` is in review: PR #977, opened 2026-08-14, not a draft. Scope stays Phase 1 only, under `spikes/convex-component-sandbox/`. **Do NOT build a Postgres domain-reach detector — Phase 0 of `POSTGRES_RESTRICTED_ROLE_SPIKE` is already delivered by Claude (see slices above). Phase 1 of that arm is `HOLD` pending its own Cheek decision** |
 | Claude            | `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` specification — delivered. `POSTGRES_RESTRICTED_ROLE_SPIKE`: spec delivered, **Phase 0 detector measured and Phase 1 role harness delivered (local-only)**, 2026-08-14 under Cheek's approval and full-authority grant (see slices above). Prior completed out-of-slice work (#586/#809/#812/#885) unchanged |
-| Grok              | Unassigned. Prior same-session HOLD on unapproved Convex expansion is superseded only for this named isolated spike; production Convex remains HOLD                                                                                                                                           |
+| Grok              | Isolated `VERDANT_CURSOR_SDK_LOCAL_ORCHESTRATION_SPIKE` next gates: dispatcher security review recorded; host receipt integrity closed; live Cursor SDK proof still `BLOCKED` without a local `CURSOR_API_KEY`. Does **not** delay `POSTGRES_RESTRICTED_ROLE_SPIKE`. Reuse of the dispatcher is not approved. Production Convex remains HOLD |
 | Security reviewer | Unassigned until Phase 1 spike code exists; then review before any Convex cloud credential                                                                                                                                                                                                    |
 | Gemini            | Unassigned                                                                                                                                                                                                                                                                                    |
 | Council Chair     | Convex-vs-Postgres comparison: **recommendation delivered in spec §10 — adopt Postgres incrementally, hold Convex.** The Postgres arm has a measured number (8 cross-domain reaches across 22 service-role functions, `docs/specs/postgres-restricted-role-alternative.md` §5.1.1); the Convex arm remains `NOT_MEASURED` pending #977. Do not issue a recommendation until both arms carry evidence — and note that `ai-coach`'s five reaches are the case neither architecture removes cheaply |

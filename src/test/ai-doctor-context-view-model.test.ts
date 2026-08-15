@@ -16,6 +16,7 @@ import type { ManualSnapshotTimelineCard } from "@/lib/manualSensorSnapshotViewM
 const NOW = Date.UTC(2026, 5, 1, 12, 0, 0);
 const iso = (offsetMs: number) => new Date(NOW + offsetMs).toISOString();
 const HOUR = 60 * 60 * 1000;
+const TENT_ID = "11111111-1111-4111-8111-111111111111";
 
 function makeRootZoneObservation(
   overrides: Partial<RootZoneObservationV1> = {},
@@ -209,6 +210,111 @@ describe("evaluateAiDoctorContextFromSources", () => {
     expect(result.counts.recentWateringOrFeeding).toBe(1);
     expect(result.readiness).toBe("insufficient");
     expect(result.missing).toContain("recent-timeline-activity");
+  });
+
+  it("uses one fresh manual tent reading with one recent plant note as partial context", () => {
+    const capturedAt = iso(-HOUR);
+    const result = evaluateAiDoctorContextFromSources({
+      plant: { stage: "seedling", strain: null, medium: null },
+      timelineItems: [
+        {
+          kind: "diary",
+          key: "first-note",
+          occurredAt: iso(-2 * HOUR),
+          eventType: "note",
+          hasPhoto: false,
+          note: "First plant check",
+        },
+      ],
+      currentSensorRows: [
+        {
+          tent_id: TENT_ID,
+          source: "manual",
+          metric: "temperature_c",
+          value: 25,
+          quality: "ok",
+          captured_at: capturedAt,
+        },
+        {
+          tent_id: TENT_ID,
+          source: "manual",
+          metric: "humidity_pct",
+          value: 58,
+          quality: "ok",
+          captured_at: capturedAt,
+        },
+      ],
+      tentId: TENT_ID,
+      now: NOW,
+    });
+
+    expect(result.readiness).toBe("partial");
+    expect(result.counts.recentManualSnapshots).toBe(1);
+    expect(result.latest.manualSnapshotAt).toBe(capturedAt);
+    expect(result.evidence).toContain("recent-manual-sensor-snapshot");
+    expect(result.evidence).toContain("fresh-manual-sensor-snapshot");
+  });
+
+  it("does not let a manual tent reading outside the seven-day window unlock readiness", () => {
+    const result = evaluateAiDoctorContextFromSources({
+      plant: { stage: "seedling" },
+      timelineItems: [
+        {
+          kind: "diary",
+          key: "first-note",
+          occurredAt: iso(-HOUR),
+          eventType: "note",
+          hasPhoto: false,
+          note: "First plant check",
+        },
+      ],
+      currentSensorRows: [
+        {
+          tent_id: TENT_ID,
+          source: "manual",
+          metric: "temperature_c",
+          value: 25,
+          quality: "ok",
+          captured_at: iso(-8 * 24 * HOUR),
+        },
+      ],
+      tentId: TENT_ID,
+      now: NOW,
+    });
+
+    expect(result.readiness).toBe("insufficient");
+    expect(result.counts.recentManualSnapshots).toBe(0);
+    expect(result.missing).toContain("recent-manual-sensor-snapshot");
+  });
+
+  it("does not double-count the same manual snapshot from diary and sensor rows", () => {
+    const capturedAt = iso(-HOUR);
+    const result = evaluateAiDoctorContextFromSources({
+      plant: { stage: "seedling" },
+      timelineItems: [
+        {
+          kind: "manual_sensor_snapshot",
+          key: "attached-snapshot",
+          occurredAt: capturedAt,
+          card: makeManualCard(capturedAt),
+        },
+      ],
+      currentSensorRows: [
+        {
+          tent_id: TENT_ID,
+          source: "manual",
+          metric: "temperature_c",
+          value: 25,
+          quality: "ok",
+          captured_at: capturedAt,
+        },
+      ],
+      tentId: TENT_ID,
+      now: NOW,
+    });
+
+    expect(result.counts.recentManualSnapshots).toBe(1);
+    expect(result.latest.manualSnapshotAt).toBe(capturedAt);
   });
 
   it("counts a same-instant Quick Log note companion and root-zone row as one logical action", () => {

@@ -1,0 +1,9 @@
+{
+  "synthetic": true,
+  "label": "SYNTHETIC_BILLING_RECORD",
+  "kind": "billing_record",
+  "plan": "SYN-PLAN-NOT-REAL",
+  "status": "sandbox-shaped",
+  "providerCustomerId": "cus_SYNTHETIC_NOT_A_CUSTOMER",
+  "notes": "SYNTHETIC billing-shaped row. Not a subscriptions entitlement. Not live billing."
+}

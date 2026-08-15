@@ -49,6 +49,7 @@
     "check:edge-domain-reach": "node scripts/check-edge-function-domain-reach.mjs",
     "test:restricted-role": "bun run scripts/run-restricted-role-harness.ts --confirm-local-security-lane",
     "test:restricted-role-fixture": "node --test scripts/check-restricted-role-fixture.test.mjs",
+    "test:cursor-sdk-local-orchestration": "bun run --cwd=spikes/cursor-sdk-local-orchestration validate",
     "report:edge-domain-reach": "node scripts/check-edge-function-domain-reach.mjs --report",
     "test:edge-domain-reach": "node --test scripts/check-edge-function-domain-reach.test.mjs",
     "check:stale-contract-pins": "node scripts/check-stale-contract-pins.mjs",

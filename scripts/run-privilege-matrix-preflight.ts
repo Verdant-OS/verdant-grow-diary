@@ -129,8 +129,9 @@ const FUNCTION_CONTRACTS: FunctionContract[] = [
   {
     name: "public.quicklog_save_event",
     mustExist: true,
-    // Canonical typed-event writer for authenticated clients.
-    expectedExecute: { anon: false, authenticated: true, service_role: true },
+    // Canonical typed-event writer for authenticated clients only
+    // (20260725024026 / 20260703093500 — never granted to service_role).
+    expectedExecute: { anon: false, authenticated: true, service_role: false },
   },
   {
     name: "public.quicklog_save_manual",
@@ -139,6 +140,26 @@ const FUNCTION_CONTRACTS: FunctionContract[] = [
     // POST-remediation state; preflight will flag current drift if anon
     // still has EXECUTE.
     expectedExecute: { anon: false, authenticated: true, service_role: true },
+  },
+  {
+    name: "public.enqueue_email",
+    mustExist: true,
+    expectedExecute: { anon: false, authenticated: false, service_role: true },
+  },
+  {
+    name: "public.read_email_batch",
+    mustExist: true,
+    expectedExecute: { anon: false, authenticated: false, service_role: true },
+  },
+  {
+    name: "public.delete_email",
+    mustExist: true,
+    expectedExecute: { anon: false, authenticated: false, service_role: true },
+  },
+  {
+    name: "public.move_to_dlq",
+    mustExist: true,
+    expectedExecute: { anon: false, authenticated: false, service_role: true },
   },
 ];
 

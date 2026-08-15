@@ -12,8 +12,8 @@ product spine. Any change that ships must keep this loop trustworthy.
 ## Core loop (what we protect)
 
 ```
-Grow → Tent → Plant → Manual Sensor Reading → Latest Snapshot
-     → Persisted Alert → Alert Detail → Add to Action Queue
+Grow → Tent → Plant → Quick Log → Timeline → Sensor Snapshot
+     → AI Doctor → Persisted Alert → Alert Detail → Add to Action Queue
      → Approval / Completion → Follow-up Diary Entry → Timeline / Action Detail Links
 ```
 
@@ -27,17 +27,20 @@ demo, partner story, and grower trust depend on.
 
 | # | Loop step                              | Suite(s)                                                                                                          | Status |
 | - | -------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ------ |
-| 1 | Manual reading entry                   | `manual-sensor-reading-entry.test.ts`                                                                              | PASS   |
-| 2 | Manual source labeling (never "Live")  | `manual-sensor-source-label.test.ts`, `manual-sensor-display-labels.test.ts`                                       | PASS   |
-| 3 | Latest snapshot reflects manual        | `manual-sensor-snapshot-rules.test.ts`, `manual-sensor-snapshot-view-model.test.ts`                                | PASS   |
-| 4 | Target breach → alert persistence      | `environment-alerts-persistence.test.ts`, `environment-alerts-v1.test.ts`                                          | PASS   |
-| 5 | Alert "why" context                    | `alert-why-context.test.tsx`                                                                                       | PASS   |
-| 6 | Alert → Action Queue (user-initiated)  | `alert-to-action-queue.test.ts`, `alert-detail-add-to-action-queue.test.tsx`, `alertActionQueueHandoffRules.test.ts` | PASS   |
-| 7 | Action Queue safety / approval         | `action-queue-safety.test.ts`, `action-queue-lifecycle-constraints.test.ts`, `action-queue-transitions.test.ts`    | PASS   |
-| 8 | Linked-alert visibility on queue rows  | `action-queue-row-linked-alert.test.tsx`, `alert-detail-linked-action-count.test.tsx`                              | PASS   |
-| 9 | Completion → follow-up diary           | `action-completion-followup.test.ts`                                                                               | PASS   |
-| 10 | Follow-up surfaces in UI + timeline   | `action-followup-visibility-ui.test.ts`, `action-followup-timeline-visibility.test.ts`                             | PASS   |
-| 11 | Grow targets editor + stage rules     | `grow-targets-editor.test.ts`, `environment-stage-target-rules.test.ts`                                            | PASS   |
+| 1 | Grow / tent / plant next-step cards    | `one-tent-loop-handoff-ids.test.ts`, `grow-detail-one-tent-loop-card.test.tsx`, `tent-detail-one-tent-loop-card.test.tsx`, `plant-detail-one-tent-loop-card.test.tsx` | PASS   |
+| 2 | Quick Log V2 payload + plant adapter   | `quick-log-v2-save-payload.test.ts`, `plant-quick-log-v2-save-adapter.test.ts`, `plant-detail-one-tent-loop-quick-log-handoff.test.tsx` | PASS   |
+| 3 | Timeline + AI Doctor next-step cards   | `timeline-one-tent-loop-card.test.tsx`, `ai-doctor-one-tent-loop-card.test.tsx`                                    | PASS   |
+| 4 | Manual reading entry                   | `manual-sensor-reading-entry.test.ts`                                                                              | PASS   |
+| 5 | Manual source labeling (never "Live")  | `manual-sensor-source-label.test.ts`, `manual-sensor-display-labels.test.ts`                                       | PASS   |
+| 6 | Latest snapshot reflects manual        | `manual-sensor-snapshot-rules.test.ts`, `manual-sensor-snapshot-view-model.test.ts`                                | PASS   |
+| 7 | Target breach → alert persistence      | `environment-alerts-persistence.test.ts`, `environment-alerts-v1.test.ts`                                          | PASS   |
+| 8 | Alert "why" context                    | `alert-why-context.test.tsx`                                                                                       | PASS   |
+| 9 | Alert → Action Queue (user-initiated)  | `alert-to-action-queue.test.ts`, `alert-detail-add-to-action-queue.test.tsx`, `alertActionQueueHandoffRules.test.ts` | PASS   |
+| 10 | Action Queue safety / approval + landing card | `action-queue-safety.test.ts`, `action-queue-lifecycle-constraints.test.ts`, `action-queue-transitions.test.ts`, `action-queue-landing-one-tent-loop.test.tsx` | PASS   |
+| 11 | Linked-alert visibility on queue rows  | `action-queue-row-linked-alert.test.tsx`, `alert-detail-linked-action-count.test.tsx`                              | PASS   |
+| 12 | Completion → follow-up diary           | `action-completion-followup.test.ts`                                                                               | PASS   |
+| 13 | Follow-up surfaces in UI + timeline   | `action-followup-visibility-ui.test.ts`, `action-followup-timeline-visibility.test.ts`                             | PASS   |
+| 14 | Grow targets editor + stage rules     | `grow-targets-editor.test.ts`, `environment-stage-target-rules.test.ts`                                            | PASS   |
 
 Run `bun run test:one-tent-loop-smoke` to refresh this table locally.
 
@@ -48,6 +51,17 @@ Run `bun run test:one-tent-loop-smoke` to refresh this table locally.
 These are the exact files the smoke script runs. They live on disk and
 are pure tests — no fixtures are seeded by the audit.
 
+- `src/test/one-tent-loop-navigation-rules.test.ts`
+- `src/test/one-tent-loop-handoff-ids.test.ts`
+- `src/test/grow-detail-one-tent-loop-card.test.tsx`
+- `src/test/tent-detail-one-tent-loop-card.test.tsx`
+- `src/test/plant-detail-one-tent-loop-card.test.tsx`
+- `src/test/plant-detail-one-tent-loop-quick-log-handoff.test.tsx`
+- `src/test/quick-log-v2-save-payload.test.ts`
+- `src/test/plant-quick-log-v2-save-adapter.test.ts`
+- `src/test/timeline-one-tent-loop-card.test.tsx`
+- `src/test/ai-doctor-one-tent-loop-card.test.tsx`
+- `src/test/action-queue-landing-one-tent-loop.test.tsx`
 - `src/test/manual-sensor-reading-entry.test.ts`
 - `src/test/manual-sensor-source-label.test.ts`
 - `src/test/manual-sensor-display-labels.test.ts`

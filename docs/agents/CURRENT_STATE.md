@@ -1,6 +1,18 @@
 # Verdant — Current Operating State
 
 **Last updated:** 2026-08-15 UTC
+**Updated by:** Grok (2026-08-15 merge: resolved the `CURRENT_STATE.md`
+conflict against origin `bb66f4302`. Incoming since this branch's previous
+base `0522eefb1` (#990): `a54040c30` (#989 pgmq / PUBLIC EXECUTE restrict),
+`22c130600` (#986 One-Tent Loop operating-order — the overlapping
+CURRENT_STATE edit), `bb66f4302` (#960 zero-defect board refresh). Topology
+tip is now `bb66f4302`. Production `/version.json` was **not** re-measured
+in this merge; the 2026-08-15 observation `5e2fcedd4271` (#984) still
+stands. Agent row keeps both the Lovable Knowledge rewrite and the merged
+`ONE_TENT_LOOP_OPERATING_ORDER` assignment. Does **not** apply migrations
+or set Day 0.)
+
+**Prior update:** 2026-08-15 UTC
 **Updated by:** Grok (2026-08-15, later additive: refresh the stale cited
 rows — topology still named `f2a03998f` / older buffers still showed
 `6434ea2a8`; production identity still named `3f773b680dcc` (2026-08-05);
@@ -8,11 +20,20 @@ rows — topology still named `f2a03998f` / older buffers still showed
 Claude spec-only / Council Chair waiting. Live re-measure 2026-08-15:
 production `/version.json` serves `5e2fcedd4271` (#984) with treeHash MATCH;
 `/` SSR is `PASS` (landing h1 + canonical, 1141 body words) after #949.
-Origin tip is `0522eefb1` (#990). Publish lags git. GA4/GSC/Day 0 were not
-re-opened. Lovable Knowledge pack updated to match. Does **not** apply
-migrations or set Day 0.)
+Origin tip at that refresh was `0522eefb1` (#990). Publish lags git.
+GA4/GSC/Day 0 were not re-opened. Lovable Knowledge pack updated to match.
+Does **not** apply migrations or set Day 0.)
 
-**Prior update:** 2026-08-15 UTC
+**Prior same-day update:** 2026-08-15 UTC
+**Updated by:** Grok (2026-08-15 merge: combined `ONE_TENT_LOOP_OPERATING_ORDER`
+on this branch with deploy tip `534b28434` — Cursor SDK local-orchestration
+spike #985, Free signup / Quick Log handoff #987, AI Doctor E2E path #988,
+and nanoid pin #966. Both programs stay active; neither pauses Convex or
+Postgres spikes. No production, GA4, GSC, sitemap, or release-identity row
+was re-measured in this edit; those retain their earlier verification dates.
+Superseded as the tip row by the later merge to `bb66f4302`.)
+
+**Prior same-day update:** 2026-08-15 UTC
 **Updated by:** Grok (2026-08-15, later additive: next gates on
 `VERDANT_CURSOR_SDK_LOCAL_ORCHESTRATION_SPIKE`. `POSTGRES_RESTRICTED_ROLE_SPIKE`
 was not touched. Optional live proof remains `BLOCKED` — `CURSOR_API_KEY` is
@@ -22,13 +43,31 @@ Host receipt-integrity findings are closed; live SDK tool enforcement stays
 `NOT_MEASURED`; reuse is not approved. No production, GA4, GSC, sitemap, or
 release-identity row was re-measured in this edit.)
 
-**Prior update:** 2026-08-15 UTC
+**Prior same-day update:** 2026-08-15 UTC
 **Updated by:** Grok (2026-08-15, additive: records implementation of isolated
 `VERDANT_CURSOR_SDK_LOCAL_ORCHESTRATION_SPIKE` under
 `spikes/cursor-sdk-local-orchestration/`. This spike does **not** replace,
 pause, or delay `POSTGRES_RESTRICTED_ROLE_SPIKE`. Manual Cursor SDK live proof
 is `BLOCKED` without `CURSOR_API_KEY`. No production, GA4, GSC, sitemap, or
 release-identity row was re-measured in this edit.)
+
+**Prior same-day update:** 2026-08-15 UTC
+**Updated by:** Grok (2026-08-15 later: `ONE_TENT_LOOP_OPERATING_ORDER`
+repo slices 2–4 landed; Slice 5 recorded as owner-`BLOCKED` with an
+honest `missing_session_json` browser-proof receipt — no fabricated
+login. Post-change smoke is 32 files / 512 tests. This does **not**
+pause Convex or Postgres spikes. No production, GA4, GSC, sitemap, or
+release-identity row was re-measured in this edit; those retain their
+earlier verification dates.)
+
+**Prior same-day update:** 2026-08-15 UTC
+**Updated by:** Grok (2026-08-15: records Cheek's in-session implement
+instruction for `ONE_TENT_LOOP_OPERATING_ORDER`. This does **not** pause
+`CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` or `POSTGRES_RESTRICTED_ROLE_SPIKE`.
+Slice 0 baseline measured on deploy tip `f2a03998f`. Colliding PRs #828 /
+#817 / #696 stay open and parked. No production, GA4, GSC, sitemap, or
+release-identity row was re-measured in this edit; those retain their earlier
+verification dates.)
 
 **Prior update:** 2026-08-14 UTC
 **Updated by:** Claude (2026-08-14, later edit: records Cheek's in-session
@@ -141,10 +180,10 @@ full migration ledger against production before assuming anything else in the
 
 ## Branch topology
 
-| Branch               | Role                                             | Verified head                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| -------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `verdant-grow-diary` | **Deploy branch. Production ships from here.**   | `0522eefb13e04e044d4cf2ab2480b97a5fb91298` (#990), verified 2026-08-15 with `git fetch origin verdant-grow-diary && git rev-parse origin/verdant-grow-diary`. Supersedes `f2a03998f` (#982). After #982, in `git log` merge order oldest-first: `883bee2ff` (#983), `5e2fcedd4` (#984), `9c1ada616` (#987), `24382b5ad` (#988), `f1e097740` (#985), `534b28434` (#966), `0522eefb1` (#990). **Live production is not this tip** — `/version.json` on 2026-08-15 served `5e2fcedd4271` (#984). Merging is not a publish. PR numbers on this branch do not order by merge time — order commits with `git log`, never by PR number. Do not carry older validation tables forward. Older buffers that still show `6434ea2a8` (#942) are the 2026-08-13 snapshot; discard them |
-| `main`               | Integration branch. It is not production parity. | `b6d747941948ce68157185a2b0847acea6970d44` (#779), verified 2026-08-07                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Branch               | Role                                             | Verified head                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| -------------------- | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `verdant-grow-diary` | **Deploy branch. Production ships from here.**   | `bb66f43026be50f1f18710fff4ded472eb8f30b9` (#960), verified 2026-08-15 with `git fetch origin verdant-grow-diary && git rev-parse origin/verdant-grow-diary`. Supersedes `0522eefb1` (#990) and the #986 CURRENT_STATE tip `534b28434` (#966). After #982, in `git log` merge order oldest-first: `883bee2ff` (#983), `5e2fcedd4` (#984), `9c1ada616` (#987), `24382b5ad` (#988), `f1e097740` (#985), `534b28434` (#966), `0522eefb1` (#990), `a54040c30` (#989), `22c130600` (#986), `bb66f4302` (#960). **Live production is not this tip** — `/version.json` on 2026-08-15 served `5e2fcedd4271` (#984) and was not re-fetched in this merge. Merging is not a publish. PR numbers on this branch do not order by merge time — order commits with `git log`, never by PR number. Do not carry older validation tables forward. Older buffers that still show `6434ea2a8` (#942) are the 2026-08-13 snapshot; discard them |
+| `main`               | Integration branch. It is not production parity. | `b6d747941948ce68157185a2b0847acea6970d44` (#779), verified 2026-08-07                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 
 `main` and `verdant-grow-diary` are divergent. Do not infer production behavior from
 `main`, and do not backport deploy-only governance or data rules without a scoped branch
@@ -168,7 +207,7 @@ re-opened this turn. Each row carries its own verification date:
 | Axis                                        | Status                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `https://verdantgrowdiary.com/version.json` | `PASS` — HTTP 200 (re-verified 2026-08-15)                                                                                                                                                                                                                                                                                                                                                                                               |
-| Production commit                           | `PASS` — verified 2026-08-15: production serves real SHA `5e2fcedd4271` (#984) (`commitSource: "git"`, `treeHash: 761818d8a191…`, `ref: "__orphan__"`, `dirty: false`); `scripts/resolve-release-provenance.mjs --hash=<treeHash> --ref=5e2fcedd4271 --scan=1` returned MATCH. This supersedes the 2026-08-05 stamp `3f773b680dcc`. Origin tip is later (`0522eefb1`, #990) — publish lags git. Single observations remain point-in-time |
+| Production commit                           | `PASS` — verified 2026-08-15: production serves real SHA `5e2fcedd4271` (#984) (`commitSource: "git"`, `treeHash: 761818d8a191…`, `ref: "__orphan__"`, `dirty: false`); `scripts/resolve-release-provenance.mjs --hash=<treeHash> --ref=5e2fcedd4271 --scan=1` returned MATCH. This supersedes the 2026-08-05 stamp `3f773b680dcc`. Origin tip is later (`bb66f4302`, #960) — publish lags git. Single observations remain point-in-time |
 | Production build time                       | `2026-08-15T00:34:11.592Z` (from the same `/version.json`). Prior live stamp `2026-08-05T22:06:15.869Z` is historical                                                                                                                                                                                                                                                                                                                    |
 | Public sitemap                              | `PASS` — HTTP 200, **56** `<loc>` entries (live re-count 2026-08-15; same count as 2026-08-12). First loc is `https://verdantgrowdiary.com/`                                                                                                                                                                                                                                                                                             |
 | Public root route `/`                       | `PASS` — measured 2026-08-15. SSR body is the public landing: HTTP 200, `<h1>` “See what changed. Decide what to do next.”, `<link rel="canonical">` present, 1141 body words, no loading skeleton. This supersedes the 2026-08-07 empty-shell `FAIL`. Slice 1 of Option A (#949 `741f99e1b`) is live. Slice 2 (`/welcome` → `/` consolidation) remains unapproved — see blocker 7                                                       |
@@ -244,6 +283,20 @@ deploy branch as fully green; they require their own scoped owner/integration fo
 ---
 
 ## Current approved slices
+
+**Approved slice (Cheek, 2026-08-15, in-session implement instruction):**
+`ONE_TENT_LOOP_OPERATING_ORDER`. Plan: walk the existing nine-step loop
+without dual write paths, dead next-step CTAs, or fabricated proof.
+Grok delivered the repo slices (handoff ids, PlantQuickLog →
+`quicklog_save_manual`, smoke-audit alignment). This does **not** pause
+the Convex or Postgres spikes below. Owner-only gates remain `BLOCKED`:
+Lovable-apply of `20260813030000_signup_acquisition_forward_repair.sql`,
+and a managed `e2e:one-tent:ui` session. Slice 5 recorded the honest
+`missing_session_json` receipt rather than fabricating a walk. Colliding
+PRs **#828**, **#817**, **#696** stay open and parked — do not start a
+competing Timeline / Alerts / Action Queue UI rewrite. Baseline and
+post-change receipts: `docs/one-tent-loop-operating-order-baseline.md`.
+Persist-path spec: `docs/specs/one-tent-loop-quicklog-single-write-path.md`.
 
 **Named isolated spike (approved 2026-08-13, not SEO):**
 `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE`. Cheek approved a spec-first,
@@ -697,11 +750,11 @@ schema change and does not authorize production writes.
 
 ## Agents currently assigned
 
-| Agent             | Assignment                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Codex             | Standing SEO measurement readiness and analytics integrity. Option A slice 1 (#949) is live-verified. Convex Phase 1 of `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` remains in review: PR #977, still OPEN 2026-08-15. Scope stays Phase 1 only, under `spikes/convex-component-sandbox/`. **Do NOT rebuild the Postgres domain-reach detector — Phase 0 and Phase 1 of `POSTGRES_RESTRICTED_ROLE_SPIKE` are already delivered by Claude.** Phase 2 of that arm is HOLD (JWT secret unobtainable on Lovable Cloud; role durability `UNKNOWN`) |
-| Claude            | `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` specification — delivered. `POSTGRES_RESTRICTED_ROLE_SPIKE`: spec delivered, **Phase 0 detector measured and Phase 1 role harness delivered (local-only)**, 2026-08-14. Not the 2026-08-13 “spec-only / not implementation” row. Prior completed out-of-slice work (#586/#809/#812/#885) unchanged                                                                                                                                                                                                |
-| Grok              | Isolated `VERDANT_CURSOR_SDK_LOCAL_ORCHESTRATION_SPIKE` next gates: live Cursor SDK proof still `BLOCKED` without a local `CURSOR_API_KEY`. Also recorded the 2026-08-15 Lovable Knowledge rewrite and this CURRENT_STATE refresh. Not Unassigned. Reuse of the dispatcher is not approved. Production Convex remains HOLD                                                                                                                                                                                                                  |
-| Security reviewer | Unassigned until Convex Phase 1 spike code is ready for review before any Convex cloud credential                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| Gemini            | Unassigned                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| Council Chair     | Convex-vs-Postgres comparison: **recommendation delivered in spec §10 — adopt Postgres incrementally, hold Convex.** Not waiting for Phase 1 proofs to start. Convex arm remains `NOT_MEASURED` pending #977 isolation proofs (green CI on #977 is not those proofs). `ai-coach`'s five reaches are the case neither architecture removes cheaply                                                                                                                                                                                           |
+| Agent             | Assignment                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Codex             | Standing SEO measurement readiness and analytics integrity. Option A slice 1 (#949) is live-verified. Convex Phase 1 of `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` remains in review: PR #977, still OPEN 2026-08-15. Scope stays Phase 1 only, under `spikes/convex-component-sandbox/`. **Do NOT rebuild the Postgres domain-reach detector — Phase 0 and Phase 1 of `POSTGRES_RESTRICTED_ROLE_SPIKE` are already delivered by Claude.** Incoming #986 still said Phase 1 was `HOLD`; that row was stale. Phase 2 of that arm is HOLD (JWT secret unobtainable on Lovable Cloud; role durability `UNKNOWN`)                                                                            |
+| Claude            | `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` specification — delivered. `POSTGRES_RESTRICTED_ROLE_SPIKE`: spec delivered, **Phase 0 detector measured and Phase 1 role harness delivered (local-only)**, 2026-08-14 under Cheek's approval and full-authority grant. Not the 2026-08-13 “spec-only / not implementation” row. Prior completed out-of-slice work (#586/#809/#812/#885) unchanged                                                                                                                                                                                                                                                                                            |
+| Grok              | `ONE_TENT_LOOP_OPERATING_ORDER` — repo slices delivered (0 baseline, 2 handoff ids, 3 PlantQuickLog persist-path, 4 smoke-audit alignment). Slices 1 and 5 remain owner-`BLOCKED` (signup apply + managed e2e session); Slice 5 receipt is `missing_session_json` with `fabricated_login_used: false`. Isolated `VERDANT_CURSOR_SDK_LOCAL_ORCHESTRATION_SPIKE` next gates on deploy (#985): live Cursor SDK proof still `BLOCKED` without a local `CURSOR_API_KEY`. Also recorded the 2026-08-15 Lovable Knowledge rewrite and this CURRENT_STATE merge. Not Unassigned. Reuse of the dispatcher is not approved. Does not pause Convex/Postgres spikes. Production Convex remains HOLD |
+| Security reviewer | Unassigned until Convex Phase 1 spike code is ready for review before any Convex cloud credential                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| Gemini            | Unassigned                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| Council Chair     | Convex-vs-Postgres comparison: **recommendation delivered in spec §10 — adopt Postgres incrementally, hold Convex.** Postgres arm has a measured number (8 cross-domain reaches across 22 service-role functions). Convex arm remains `NOT_MEASURED` pending #977 isolation proofs (green CI on #977 is not those proofs). Incoming #986 still said “do not issue a recommendation until both arms carry evidence”; that sentence is stale — the recommendation already shipped. `ai-coach`'s five reaches are the case neither architecture removes cheaply                                                                                                                            |

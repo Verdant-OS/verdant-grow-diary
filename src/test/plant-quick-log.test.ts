@@ -148,6 +148,12 @@ describe("PlantQuickLog presenter — safety contract (source-level)", () => {
       expect(["diary_entries", "diary-photos"]).toContain(t);
     }
   });
+  it("persists through useQuickLogV2Save and never calls .rpc or .insert in this file", () => {
+    expect(COMP).toMatch(/useQuickLogV2Save/);
+    expect(COMP).toMatch(/buildPlantQuickLogV2SavePayload/);
+    expect(COMP).not.toMatch(/\.rpc\(/);
+    expect(COMP).not.toMatch(/\.insert\(/);
+  });
   it("never writes user_id in the insert payload", () => {
     expect(COMP).not.toMatch(/user_id\s*:/);
   });

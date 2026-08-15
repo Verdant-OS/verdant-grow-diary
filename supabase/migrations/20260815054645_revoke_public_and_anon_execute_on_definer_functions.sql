@@ -1,6 +1,7 @@
--- Revoke PUBLIC EXECUTE on trigger-only SECURITY DEFINER functions and align
--- quicklog_save_manual overload grants with the already-hardened
--- quicklog_save_event sibling (20260703093500_harden_quicklog_save_event_grants).
+-- Revoke PUBLIC EXECUTE on trigger-only SECURITY DEFINER functions and repair
+-- quicklog_save_manual overload grants (PUBLIC/anon revoked; authenticated +
+-- service_role retained per 20260807150000). quicklog_save_event stays
+-- authenticated-only (20260725024026) and is out of scope here.
 --
 -- Prior work (20260804091142, 20260804091217) revoked FROM anon/authenticated
 -- and partially FROM PUBLIC on some trigger functions, but quicklog_save_manual
@@ -47,7 +48,9 @@ BEGIN
 END $$;
 
 -- Postcondition: trigger functions must not be client-executable; quicklog_save_manual
--- must match quicklog_save_event (anon=false, authenticated=true, service_role=true).
+-- overloads must be anon=false, authenticated=true, service_role=true (per
+-- 20260807150000). quicklog_save_event is intentionally authenticated-only
+-- (20260725024026 / 20260703093500) and is not asserted here.
 DO $$
 DECLARE
   bad RECORD;
@@ -89,28 +92,6 @@ BEGIN
     END IF;
     IF NOT bad.svc_exec THEN
       RAISE EXCEPTION 'quicklog_save_manual oid=% not executable by service_role', bad.oid;
-    END IF;
-  END LOOP;
-
-  -- quicklog_save_event sibling should already match; assert rather than mutate.
-  FOR bad IN
-    SELECT p.oid,
-           has_function_privilege('anon', p.oid, 'EXECUTE') AS anon_exec,
-           has_function_privilege('authenticated', p.oid, 'EXECUTE') AS auth_exec,
-           has_function_privilege('service_role', p.oid, 'EXECUTE') AS svc_exec
-      FROM pg_proc p
-      JOIN pg_namespace n ON n.oid = p.pronamespace
-     WHERE n.nspname = 'public'
-       AND p.proname = 'quicklog_save_event'
-  LOOP
-    IF bad.anon_exec THEN
-      RAISE EXCEPTION 'quicklog_save_event oid=% still executable by anon', bad.oid;
-    END IF;
-    IF NOT bad.auth_exec THEN
-      RAISE EXCEPTION 'quicklog_save_event oid=% not executable by authenticated', bad.oid;
-    END IF;
-    IF NOT bad.svc_exec THEN
-      RAISE EXCEPTION 'quicklog_save_event oid=% not executable by service_role', bad.oid;
     END IF;
   END LOOP;
 END $$;

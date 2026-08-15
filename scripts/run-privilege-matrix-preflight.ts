@@ -30,6 +30,13 @@
  * of any automatic pre-migration hook — an operator runs it explicitly.
  */
 import { SQL } from "bun";
+import {
+  EXECUTE_ROLE_SERVICE,
+  PGMQ_EMAIL_WRAPPER_FUNCTIONS,
+  TRIGGER_DEFINER_FUNCTIONS,
+  expectedExecuteForHardenableDefiner,
+  publicSchemaFunctionName,
+} from "../src/lib/pgmqEmailWrapperGrantRules";
 
 // ─── Args & env ──────────────────────────────────────────────────────────────
 const args = process.argv.slice(2);
@@ -140,6 +147,32 @@ const FUNCTION_CONTRACTS: FunctionContract[] = [
     // still has EXECUTE.
     expectedExecute: { anon: false, authenticated: true, service_role: true },
   },
+  ...PGMQ_EMAIL_WRAPPER_FUNCTIONS.map((name) => {
+    const matrix = expectedExecuteForHardenableDefiner(name);
+    return {
+      name: publicSchemaFunctionName(name),
+      mustExist: true,
+      expectedExecute: {
+        anon: matrix.anon,
+        authenticated: matrix.authenticated,
+        service_role: matrix[EXECUTE_ROLE_SERVICE],
+      },
+      expectedSecurityDefiner: true,
+    };
+  }),
+  ...TRIGGER_DEFINER_FUNCTIONS.map((name) => {
+    const matrix = expectedExecuteForHardenableDefiner(name);
+    return {
+      name: publicSchemaFunctionName(name),
+      mustExist: true,
+      expectedExecute: {
+        anon: matrix.anon,
+        authenticated: matrix.authenticated,
+        service_role: matrix[EXECUTE_ROLE_SERVICE],
+      },
+      expectedSecurityDefiner: true,
+    };
+  }),
 ];
 
 // ─── Query helpers ────────────────────────────────────────────────────────────

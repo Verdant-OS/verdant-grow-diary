@@ -5,9 +5,29 @@
 asset, disclosures, and revision response." It has **not** passed `evidence_review`,
 `cultivation_review`, `product_truth_review`, `technical_review`, or
 `copy_accessibility_review`. Per that document's role table the author cannot be the sole
-evidence or cultivation approver for R2 material, and this pillar additionally carries **4
-`R3` records** that cannot pass without a qualified human reviewer (see §11). Treat every
-citation here as a starting claim map, not a cleared source list.
+evidence or cultivation approver for R2 material. Treat every citation here as a starting
+claim map, not a cleared source list.
+
+> **Risk-class notice — read before routing this for review.** `roadmap-500.json` records
+> `KL-002` as `claimRiskClass: R2`. **As drafted, this page is R3.** `content-standards.md`
+> states that "a page inherits the highest risk of any material claim," and §4 and §8 of
+> this draft make material claims about occupational CO2 exposure limits and HVAC failure
+> behaviour — squarely inside R3's "electrical, fire, structural, HVAC refrigerant,
+> compressed CO2, worker exposure" scope. It therefore **cannot pass on an R2 manifest, and
+> an N/A receipt cannot be used to bypass the safety gate.** Two honest resolutions, for the
+> managing editor rather than by author fiat:
+>
+> 1. **Ship it R3** — reclassify `KL-002`, and route it to the qualified reviewer alongside
+>    its four R3 descendants (§11.5).
+> 2. **Return it to R2** — move every material CO2 and HVAC claim out of §4 and §8 into
+>    those descendants, leaving the pillar with referral language only ("this leaves the
+>    pillar's authority; see `KL-202`") and no exposure limits or failure-mode assertions of
+>    its own.
+>
+> Option 2 keeps the roadmap record accurate and the pillar shippable sooner; option 1 keeps
+> the pillar self-contained for the reader. This draft is written the R3 way and does not
+> silently assume either. Flagged in review of PR #994 and recorded here rather than
+> resolved unilaterally, since changing a recorded risk class is a governance act.
 
 **Target route:** `/guides/grow-room-environment-fundamentals` (roadmap `KL-002`, `pillar`
 field `environment`, `pageFamily: pillar`, `routeStatus: planned`, `claimRiskClass: R2`,
@@ -120,9 +140,12 @@ Two readings a reviewer should not skip:
    VPD purposes the humidity sensor is the one that matters most, and RH sensors are the
    ones that drift — which is why `content-standards.md` requires a verification at or
    above **75% RH** specifically, not a convenient mid-range check.
-2. **The plausible range from modest, unremarkable sensor error is 1.207–1.489 kPa — a
-   span of 0.282 kPa.** The shipped `mid_late_flower` band is 1.1–1.5 kPa, i.e. 0.4 kPa
-   wide. **Ordinary instrument uncertainty spans about 70% of the entire target band.**
+2. **Under the ±0.5 °C / ±3% RH error budget assumed above, the plausible range is
+   1.207–1.489 kPa — a span of 0.282 kPa.** The shipped `mid_late_flower` band is
+   1.1–1.5 kPa, i.e. 0.4 kPa wide. **That assumed uncertainty spans about 70% of the entire
+   target band.** The error budget is an assumption of this worked example, not a sourced
+   claim about any particular instrument — a reviewer should substitute the actual
+   datasheet accuracy of the room's own sensors, which will move this number.
    Any page that tells a reader to chase a number inside that band, without stating this,
    is teaching false precision.
 
@@ -137,8 +160,12 @@ Same base state (air 26.0 °C, RH 60%), varying only the **measured leaf offset*
 | Leaf −2.0 °C (24.0 °C)          |      **0.967** | **below band**                                   |
 | Leaf −3.0 °C (23.0 °C)          |          0.793 | well below band                                  |
 
-A −2 °C leaf offset is unremarkable under load. **The same room, the same instant, reads
-"in target" on air basis and "below target" on leaf basis.** This is the single most
+The offsets above are **hypothetical measured inputs chosen to span a range, not expected
+values** — §8 records that no acceptable cannabis-specific source for offset magnitude was
+found, so this draft asserts none. What the arithmetic shows is conditional and does not
+depend on any offset being typical: **if** a −2 °C offset is what you measured, then the
+same room, at the same instant, reads "in target" on air basis and "below target" on leaf
+basis. This is the single most
 important thing this pillar exists to teach, and it is why the shipped calculator's refusal
 to compare to a stage target without a contemporaneous leaf measurement (§9) is correct
 behaviour rather than an inconvenience.
@@ -193,10 +220,22 @@ offset is an anecdote.
   qualified designer rather than performing it.
 - **Safety/professional referral — mandatory, not optional.** Compressed or generated
   **CO2**, electrical load, refrigerant, structural mounting, condensate drainage and
-  standing water, and fire all leave this pillar's authority immediately. **OSHA's PEL for
-  carbon dioxide is 5,000 ppm as an 8-hour TWA with a 30,000 ppm STEL; NIOSH's REL is
-  identical** [OSHA Table Z-1]. Enrichment setpoints commonly discussed in horticulture
-  (1,000–1,500 ppm) sit below the occupational limit, **but the hazard is not the setpoint
+  standing water, and fire all leave this pillar's authority immediately. Occupational
+  carbon-dioxide limits differ by authority, and the difference is material — **the
+  federal enforceable limit has no short-term component at all**:
+
+  | Authority            | 8-hour TWA              | Short-term              | Status                    |
+  | -------------------- | ----------------------- | ----------------------- | ------------------------- |
+  | **Federal OSHA PEL** | 5,000 ppm (9,000 mg/m³) | **none listed**         | Enforceable federal limit |
+  | Cal/OSHA PEL         | 5,000 ppm               | 30,000 ppm (ST)         | Enforceable in California |
+  | NIOSH REL            | 5,000 ppm               | 30,000 ppm (ST, 15-min) | Recommendation, not law   |
+  | ACGIH TLV            | 5,000 ppm               | 30,000 ppm (ST)         | Consensus guideline       |
+
+  Source: OSHA Annotated PELs, Table Z-1, CAS 124-38-9. A page that attributes the
+  30,000 ppm short-term value to federal OSHA is citing the wrong authority, and the
+  alarm/escalation card in §7 must carry the jurisdiction with each number rather than a
+  single blended limit. Enrichment setpoints commonly discussed in horticulture
+  (1,000–1,500 ppm) sit below every limit above, **but the hazard is not the setpoint
   — it is the failure mode**: a stuck valve, a regulator failure, or an unventilated room
   can reach the occupational limit and beyond. These pages teach monitoring, alarm, egress,
   and escalation only. Zero product CTA (§10).
@@ -288,16 +327,16 @@ R3 reviewer.
 Claim map — author's initial pass. Each row needs an evidence-editor role assignment per
 `content-standards.md` (`supports` / `limits` / `defines_method` / `controls_requirement`).
 
-| Claim                                                                                                                                                                                                                                                                            | Source                                                                                                                                                                                                                                                             | Tier / role                                                                | Applicability note                                                                                                                                                                                                                                                                                           |
-| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Saturation vapour pressure `e°(T) = 0.6108·exp[17.27T/(T+237.3)]` kPa, T in °C; mean saturation vapour pressure must be computed as the mean of `e°(Tmax)` and `e°(Tmin)` rather than `e°(Tmean)` because the curve is non-linear                                                | FAO Irrigation and Drainage Paper 56, _Crop evapotranspiration_, Ch. 3, Eq. 11 and Eq. 12, <https://www.fao.org/4/x0490e/x0490e07.htm>                                                                                                                             | A — `defines_method`                                                       | Domain-general physics; directly governs §2, §3.2, §3.4, and matches the shipped implementation exactly (§9)                                                                                                                                                                                                 |
-| Indoor cannabis inflorescence yield increased **linearly from 116 to 519 g·m⁻² (4.5×) as canopy PPFD rose from 120 to 1,800 µmol·m⁻²·s⁻¹** across an 81-day flowering stage, with no saturation plateau; **no treatment effect on the potency of any measured cannabinoid**      | Rodriguez-Morrison, V., Llewellyn, D. & Zheng, Y., "Cannabis Yield, Potency, and Leaf Photosynthesis Respond Differently to Increasing Light Levels in an Indoor Environment," _Frontiers in Plant Science_ 12:646020, 2021, doi:10.3389/fpls.2021.646020          | A — `supports`, `limits`                                                   | Cannabis-specific, indoor, deep-water culture. Supports "measure light, and measure uniformity"; **limits** any claim that light intensity raises potency                                                                                                                                                    |
-| Cannabis grown at **78–98% RH** (VPD 0.05 kPa vegetative / 0.25 kPa flowering) versus **37–58% RH** (VPD 1.29 / 0.92 kPa) showed **total CBD reduced 4.6-fold**, flowering onset **delayed ~3 weeks**, and **total dry biomass 2.71× lower**; flower biomass fell 71%            | Corredor-Perilla, I.C., Kwon, T.-H. & Park, S.-H., "Elevated relative humidity significantly decreases cannabinoid concentrations while delaying flowering development in _Cannabis sativa_ L.," _Frontiers in Plant Science_, 2025, doi:10.3389/fpls.2025.1678142 | A — `supports`, `limits`                                                   | Cannabis-specific. **Authors' own stated limitation: single CBD-dominant genotype ("Cherry Berry"), n=10 per treatment, controlled growth chambers.** Establishes the _direction_ of a severe-humidity effect; **licenses no kPa target** and does not test the mid-range where the shipped bands sit        |
-| OSHA PEL for carbon dioxide is **5,000 ppm 8-hour TWA with a 30,000 ppm STEL**; NIOSH REL identical; Cal/OSHA equivalent                                                                                                                                                         | OSHA Annotated PELs, Table Z-1 (CAS 124-38-9), <https://www.osha.gov/annotated-pels/table-z-1>                                                                                                                                                                     | A — `controls_requirement`                                                 | Controlling US occupational limit; governs §4's referral boundary and the R3 CO2 records                                                                                                                                                                                                                     |
-| NIOSH IDLH for carbon dioxide is **40,000 ppm**                                                                                                                                                                                                                                  | NIOSH IDLH documentation, CAS 124-38-9, <https://www.cdc.gov/niosh/idlh/124389.html>                                                                                                                                                                               | A — `controls_requirement`                                                 | **VERIFICATION INCOMPLETE.** The CDC page returned HTTP 403 to this author; the value is reported from search-result summaries, not read at source. The evidence editor must open the page directly before this number is published                                                                          |
-| _Botrytis cinerea_ infection is favoured by cool temperatures (**65–75 °F**), high relative humidity, and free water on plant surfaces; extension guidance recommends holding greenhouse RH **below 50%** and improving airflow                                                  | Utah State University Extension, "Bud Rot" (hemp IPM note), <https://extension.usu.edu/planthealth/ipm/notes_ag/hemp-bud-rot>; corroborating: Oregon State University Extension gray-mold-in-hemp series                                                           | A (extension) — `supports`                                                 | **Hemp-focused**, greenhouse-framed. Transfers to indoor cannabis as a risk-direction claim, not as an indoor RH prescription. The OSU pages returned 403 to this author and are cited from search summaries — evidence editor must read them directly                                                       |
-| Crop canopy emissivity ≈ 0.98; single leaves of snap bean and tobacco 0.96 and 0.97; dense alfalfa/sudangrass canopies 0.97–0.98; 8–13 µm band-pass instruments achieve **0.1–0.3 °C** error; emissivity-determination error of order **0.01** expected under careful conditions | Leaf-emissivity infrared thermometry literature (López et al., _Determining the Leaf Emissivity of Three Crops by Infrared Thermometry_, PMC4481894; and related horticultural-crop emissivity work)                                                               | A — `limits` (**proxy crop**)                                              | **Not cannabis.** Bounds the leaf-offset method's uncertainty in §3.5. Label as proxy per `content-standards.md`; seek a cannabis-specific emissivity figure before publication                                                                                                                              |
-| Cannabis transpires the large majority of applied irrigation water back into room air, so latent load persists after lights-off when sensible load collapses; peak dehumidification sizing follows ASHRAE load methods                                                           | Cannabis HVAC/HVACD trade literature (HPAC Engineering; NCIA committee blog; Resource Innovation Institute guidance), with ASHRAE Handbook as the controlling method reference                                                                                     | **C — trade press**, plus B (ASHRAE) named but **not read for this draft** | **Weakest row in this table.** Trade publications are not an evidence tier under `content-standards.md`. The mechanism is physically sound and uncontroversial, but **no quantitative load figure from this row may be published.** The R3 reviewer for `KL-102`/`KL-382` must supply the controlling source |
+| Claim                                                                                                                                                                                                                                                                            | Source                                                                                                                                                                                                                                                             | Tier / role                                                                | Applicability note                                                                                                                                                                                                                                                                                                                                                                       |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Saturation vapour pressure `e°(T) = 0.6108·exp[17.27T/(T+237.3)]` kPa, T in °C; mean saturation vapour pressure must be computed as the mean of `e°(Tmax)` and `e°(Tmin)` rather than `e°(Tmean)` because the curve is non-linear                                                | FAO Irrigation and Drainage Paper 56, _Crop evapotranspiration_, Ch. 3, Eq. 11 and Eq. 12, <https://www.fao.org/4/x0490e/x0490e07.htm>                                                                                                                             | A — `defines_method`                                                       | Domain-general physics; directly governs §2, §3.2, §3.4, and matches the shipped implementation exactly (§9)                                                                                                                                                                                                                                                                             |
+| Indoor cannabis inflorescence yield increased **linearly from 116 to 519 g·m⁻² (4.5×) as canopy PPFD rose from 120 to 1,800 µmol·m⁻²·s⁻¹** across an 81-day flowering stage, with no saturation plateau; **no treatment effect on the potency of any measured cannabinoid**      | Rodriguez-Morrison, V., Llewellyn, D. & Zheng, Y., "Cannabis Yield, Potency, and Leaf Photosynthesis Respond Differently to Increasing Light Levels in an Indoor Environment," _Frontiers in Plant Science_ 12:646020, 2021, doi:10.3389/fpls.2021.646020          | A — `supports`, `limits`                                                   | Cannabis-specific, indoor, deep-water culture. Supports "measure light, and measure uniformity"; **limits** any claim that light intensity raises potency                                                                                                                                                                                                                                |
+| Cannabis grown at **78–98% RH** (VPD 0.05 kPa vegetative / 0.25 kPa flowering) versus **37–58% RH** (VPD 1.29 / 0.92 kPa) showed **total CBD reduced 4.6-fold**, flowering onset **delayed ~3 weeks**, and **total dry biomass 2.71× lower**; flower biomass fell 71%            | Corredor-Perilla, I.C., Kwon, T.-H. & Park, S.-H., "Elevated relative humidity significantly decreases cannabinoid concentrations while delaying flowering development in _Cannabis sativa_ L.," _Frontiers in Plant Science_, 2025, doi:10.3389/fpls.2025.1678142 | A — `supports`, `limits`                                                   | Cannabis-specific. **Authors' own stated limitation: single CBD-dominant genotype ("Cherry Berry"), n=10 per treatment, controlled growth chambers.** Establishes the _direction_ of a severe-humidity effect; **licenses no kPa target** and does not test the mid-range where the shipped bands sit                                                                                    |
+| Carbon dioxide occupational limits **differ by authority**: federal OSHA PEL is **5,000 ppm 8-hour TWA with no short-term limit listed**; Cal/OSHA, NIOSH, and ACGIH each add a **30,000 ppm short-term** value (NIOSH's is a 15-minute ST)                                      | OSHA Annotated PELs, Table Z-1 (CAS 124-38-9), <https://www.osha.gov/annotated-pels/table-z-1> — the four authority columns read separately                                                                                                                        | A — `controls_requirement`                                                 | Governs §4's referral boundary and the R3 CO2 records. **The annotated table places four authorities in adjacent columns; any summary that merges them wrongly attributes the 30,000 ppm short-term value to federal OSHA. An earlier revision of this draft made exactly that error — corrected 2026-08-15 after review.** Publish each number with its jurisdiction and enforceability |
+| NIOSH IDLH for carbon dioxide is **40,000 ppm**                                                                                                                                                                                                                                  | NIOSH IDLH documentation, CAS 124-38-9, <https://www.cdc.gov/niosh/idlh/124389.html>                                                                                                                                                                               | A — `controls_requirement`                                                 | **VERIFICATION INCOMPLETE.** The CDC page returned HTTP 403 to this author; the value is reported from search-result summaries, not read at source. The evidence editor must open the page directly before this number is published                                                                                                                                                      |
+| _Botrytis cinerea_ infection is favoured by cool temperatures (**65–75 °F**), high relative humidity, and free water on plant surfaces; extension guidance recommends holding greenhouse RH **below 50%** and improving airflow                                                  | Utah State University Extension, "Bud Rot" (hemp IPM note), <https://extension.usu.edu/planthealth/ipm/notes_ag/hemp-bud-rot>; corroborating: Oregon State University Extension gray-mold-in-hemp series                                                           | A (extension) — `supports`                                                 | **Hemp-focused**, greenhouse-framed. Transfers to indoor cannabis as a risk-direction claim, not as an indoor RH prescription. The OSU pages returned 403 to this author and are cited from search summaries — evidence editor must read them directly                                                                                                                                   |
+| Crop canopy emissivity ≈ 0.98; single leaves of snap bean and tobacco 0.96 and 0.97; dense alfalfa/sudangrass canopies 0.97–0.98; 8–13 µm band-pass instruments achieve **0.1–0.3 °C** error; emissivity-determination error of order **0.01** expected under careful conditions | Leaf-emissivity infrared thermometry literature (López et al., _Determining the Leaf Emissivity of Three Crops by Infrared Thermometry_, PMC4481894; and related horticultural-crop emissivity work)                                                               | A — `limits` (**proxy crop**)                                              | **Not cannabis.** Bounds the leaf-offset method's uncertainty in §3.5. Label as proxy per `content-standards.md`; seek a cannabis-specific emissivity figure before publication                                                                                                                                                                                                          |
+| Cannabis transpires the large majority of applied irrigation water back into room air, so latent load persists after lights-off when sensible load collapses; peak dehumidification sizing follows ASHRAE load methods                                                           | Cannabis HVAC/HVACD trade literature (HPAC Engineering; NCIA committee blog; Resource Innovation Institute guidance), with ASHRAE Handbook as the controlling method reference                                                                                     | **C — trade press**, plus B (ASHRAE) named but **not read for this draft** | **Weakest row in this table.** Trade publications are not an evidence tier under `content-standards.md`. The mechanism is physically sound and uncontroversial, but **no quantitative load figure from this row may be published.** The R3 reviewer for `KL-102`/`KL-382` must supply the controlling source                                                                             |
 
 **Missing evidence, explicit:**
 
@@ -455,9 +494,17 @@ pre-classified `R3` with `sourceRoles: ["official_code_or_authority",
 `editorial-workflow.md` names that reviewer's scope as "electrical, fire, structural, HVAC,
 compressed CO2, pesticide, laboratory, or legal," **explicitly a qualified human, not an
 agent**. This is the concrete difference between P2 and P7: P7 had zero R3 records and
-could be moved by spec-first authoring alone. **P2 cannot.** The pillar page itself is R2
-and can proceed to review now; those four descendants are blocked on a resourcing decision
-that only Cheek can make, independent of the GA4/GSC blocker.
+could be moved by spec-first authoring alone. **P2 cannot.**
+
+And the gate reaches further than those four descendants. **As drafted, the pillar page
+itself is R3** — see the risk-class notice at the top of this document. §4's occupational
+CO2 limits and §8's HVAC failure-behaviour row are material claims inside R3's declared
+scope, and `content-standards.md` makes a page inherit the highest risk of any material
+claim it carries. So either the pillar goes to the qualified reviewer too (option 1), or
+those claims move out to the descendants and the pillar keeps referral language only
+(option 2). **What is not available is publishing the pillar on its recorded R2 manifest
+while it still states exposure limits.** Either way this is a resourcing decision only
+Cheek can make, independent of the GA4/GSC blocker.
 
 **A note on sequencing, offered rather than assumed.** The audit ranked P2 fifth by
 unlock-per-effort (1 record unlocked, highest R3 density). That ranking is defensible on
@@ -470,7 +517,9 @@ mine — but it belongs in the decision.
 ---
 
 **Handoff.** This draft is ready for evidence-editor and cultivation-reviewer assignment.
-Three items need a decision before authoring resumes: the §9 VPD-band option (1, 2, or 3),
-the §11.2 L1-cluster structural question, and the §11.5 R3 reviewer resourcing. The
+Four items need a decision before authoring resumes: the **risk-class question at the top
+of this document** (ship the pillar R3, or move its CO2/HVAC claims out and keep it R2),
+the §9 VPD-band option (1, 2, or 3), the §11.2 L1-cluster structural question, and the
+§11.5 R3 reviewer resourcing. The
 `KL-002` search brief is already at `draft` and needs no GA4/GSC access to stay there —
 only advancing it to `validated` does.

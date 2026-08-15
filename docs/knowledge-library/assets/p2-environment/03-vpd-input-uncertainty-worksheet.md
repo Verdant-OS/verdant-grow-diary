@@ -39,7 +39,7 @@ comparison may be made from it.**
 **Instrument accuracy comes from the datasheet, not from this worksheet.** The example in the
 pillar draft assumes ±0.5 °C and ±3% RH purely to illustrate; your instruments differ.
 
-## Step 2 — which sensor is your limiting one
+## Step 2 — which sensor is your limiting one (**air basis only**)
 
 This ordering is **not universal** — it depends on the operating point _and_ on your two
 instruments. The break-even is the sensitivity ratio in **%RH per °C** (author computation,
@@ -54,9 +54,20 @@ claim C02/C03):
 | 30 °C, 60% RH   |                      2.29 |
 
 **Your ratio** = (RH accuracy in %) ÷ (temperature accuracy in °C) = ..........
-Compare it with the break-even nearest your operating point. Above it, RH is your limiting
-sensor; below it, temperature is. **A better RH sensor or a worse temperature probe reverses
-the answer.**
+
+> **Do not apply this table to a leaf-basis calculation.** The sensitivities are structurally
+> different: for air VPD the air-temperature term scales with `(1 − RH/100)`, but for
+> `leaf VPD = e°(T_leaf) − e°(T_air)·(RH/100)` the air-temperature term scales with `RH/100`
+> — so the break-even moves the **opposite way** as RH rises. At `T_air` 26 °C with `T_leaf`
+> 24 °C (author computation): air basis gives 3.55 / 2.36 / 1.18 %RH per °C at 40 / 60 / 80%
+> RH, while the leaf-basis air-temperature break-even runs 2.36 / 3.55 / 4.73 across the same
+> points. **Using the air table at high RH would name the wrong limiting sensor.** Leaf VPD
+> also has a _third_ input — `T_leaf` itself, the largest sensitivity of the three
+> (break-even ≈ 5.33 %RH per °C at these conditions). For leaf basis, skip this shortcut and
+> use the three-input corner propagation in step 3.
+> Compare it with the break-even nearest your operating point. Above it, RH is your limiting
+> sensor; below it, temperature is. **A better RH sensor or a worse temperature probe reverses
+> the answer.**
 
 ## Step 3 — compute the range
 

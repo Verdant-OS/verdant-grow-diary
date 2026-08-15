@@ -328,10 +328,12 @@ number and location of samples — or the offset is an anecdote.
   a canopy map (§7) before any target discussion is meaningful. Change one variable, define
   the observation window, and define the rollback condition in advance.
 - **Commercial-SOP.** Treat latent (moisture) and sensible (heat) load as separate problems
-  with separate failure modes. The hazard case is **lights-off in late flower**: cooling
-  demand falls while transpiration continues, so a system that dehumidifies only as a
-  by-product of cooling loses moisture-removal capability exactly when condensation and
-  _Botrytis_ risk peak [HVACD trade practice — Tier C, see §8]. Peak-load sizing is an
+  with separate failure modes, and **find your own binding window by measuring it** — record
+  the transition across the stages you care about (asset 7) rather than assuming which one
+  binds. A mechanism is commonly offered for why lights-off in late flower should be the
+  hazard case, but that is claim **C08**: trade press only, **below the evidence tier, and
+  blocked** (§8.5). It is carried as a flagged hypothesis in asset 6, behind the
+  qualified-safety banner, and **this pillar does not assert it**. Peak-load sizing is an
   ASHRAE-method engineering calculation, not a rule of thumb, and this pillar routes to a
   qualified designer rather than performing it.
 - **Safety/professional referral — mandatory, not optional.** Compressed or generated
@@ -394,8 +396,11 @@ pillar acceptance gate.
 - **Treating a controller setpoint as a measurement.** The setpoint is what was asked for.
   The sensor is what happened. They disagree constantly, and the disagreement is the
   signal.
-- **Sizing dehumidification from lights-on conditions.** The binding constraint is usually
-  lights-off in late flower, when sensible load collapses and latent load does not.
+- **Assuming which window binds instead of measuring it.** Sizing or judging capacity from
+  lights-on conditions alone leaves the lights-off transition unmeasured — but the converse
+  error is assuming late flower binds because it is commonly said to. **Neither is
+  established here**: C08 is blocked below tier, so which window and which stage actually
+  bind is a finding of your own room's data (asset 7), not an inherited assumption.
 - **Treating sustained high humidity as only a mould risk.** It is also a direct
   developmental and chemical problem, stated as a bounded claim [C05]: cannabis held at
   **78–98% RH** (VPD 0.05 kPa vegetative, 0.25 kPa flowering) versus **37–58% RH** (VPD

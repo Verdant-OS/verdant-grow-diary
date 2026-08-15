@@ -104,9 +104,12 @@ Vertical gradients are the ones most often missed, because the probe lives at on
     state how small a difference you can resolve.
 - **A `still` cell is a finding, not a gap.** Stagnant pockets are where boundary-layer and
   condensation problems begin.
-- **A single probe's reading is now interpretable.** Note which cell your fixed probe sits
-  in and how far that cell is from the extremes — that difference is the correction you have
-  been unknowingly applying to every historical reading.
+- **A single probe's reading becomes interpretable — for the conditions you just measured.**
+  Note which cell your fixed probe occupies and how far that cell sits from the extremes.
+  **That offset applies to this canopy, this equipment layout, and this stage only.** It is
+  not a retrospective correction for past readings: the gradient under an open canopy is not
+  the gradient under a closed one, so applying today's map backwards would rewrite history
+  with a measurement that never described it.
 
 | Question                                                        | Answer |
 | --------------------------------------------------------------- | ------ |

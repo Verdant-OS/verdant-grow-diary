@@ -64,8 +64,10 @@ blocked, and it belongs in asset 6.
 
 **First run: record through the entire lights-off period**, not to a fixed cut-off — you are
 locating your peak, and a template that stops early will report a peak that is merely the
-last point you measured. Rows below run to +120 minutes as a starting scaffold; **add rows
-to the end of your dark period** and keep going until RH has clearly turned and recovered.
+last point you measured. Rows below run to +120 minutes as a **starting scaffold — an
+illustrative layout choice, not a sourced interval; no claim in §8 establishes one**; **add
+rows to the end of your dark period** and keep going until RH has clearly turned and
+recovered.
 Note in the findings table whether the peak fell inside the sampled window or at its edge.
 
 Compute VPD per row using asset 3 — **do not average the inputs first** (claims C01, C02).

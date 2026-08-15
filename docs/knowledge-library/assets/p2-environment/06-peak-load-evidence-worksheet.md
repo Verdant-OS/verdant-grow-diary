@@ -60,8 +60,16 @@ do not convert it into a capacity figure yourself.
 > upper bound on it either.** The full balance over a measurement period is
 >
 > ```text
-> input − runoff = transpiration + evaporation + Δ(substrate storage)
+> input − runoff_collected
+>     = transpiration + evaporation
+>     + Δ(substrate storage) + Δ(plant tissue water)
+>     + uncollected runoff, leaks, and spillage
 > ```
+>
+> **The last two terms are usually unmeasured, which is why this is a proxy and not a
+> balance you can close.** Plant tissue gains water as the crop bulks and can release it
+> late; runoff that never reaches the collection point looks identical to transpiration in
+> this arithmetic. Both inflate the apparent figure.
 >
 > Evaporation from media surfaces and containers inflates the figure, **but a falling
 > substrate water content makes Δstorage negative — and then transpiration can exceed
@@ -77,10 +85,11 @@ do not convert it into a capacity figure yourself.
 > | Direction of storage change (rising / falling / measured steady)    |       |
 > | Was the period a full irrigation cycle returning to the same state? | y / n |
 >
-> **If you measured a full cycle that begins and ends at the same substrate state, Δstorage
-> is approximately zero and the figure becomes an upper bound on transpiration** (evaporation
-> is then the only inflating term). Say which case you are in when you hand this over — an
-> HVAC designer sizing from a figure mislabelled as a ceiling can undersize the room.
+> **Even across a full cycle returning to the same substrate state, this is only an upper
+> bound if tissue-water change is negligible and runoff collection is complete.** During
+> rapid bulking neither holds. State which of those you have actually verified when you hand
+> this over — an HVAC designer sizing from a figure mislabelled as a ceiling can undersize
+> the room, and a ceiling that quietly assumes complete runoff collection is not a ceiling.
 
 ## Part C — equipment as installed
 

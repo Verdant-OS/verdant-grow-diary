@@ -121,6 +121,12 @@ governs the _absolute_ PPFD and DLI values below, just not the uniformity compar
 DLI (mol·m⁻²·d⁻¹) = PPFD (µmol·m⁻²·s⁻¹) × photoperiod (h) × 3600 ÷ 1,000,000
 ```
 
+**This form is valid only if PPFD is constant for the whole photoperiod.** This worksheet
+records a single spot map, so it gives you one instant. If the fixture dims, ramps at
+sunrise/sunset, or changes output through the cycle, that multiplication is wrong — you need
+to **sum over intervals** instead: map at each distinct output level, multiply each by the
+hours spent there, and add. Record which case you are in.
+
 | Cell | PPFD | Photoperiod (h) | DLI |
 | ---- | ---- | --------------- | --- |
 | Mean |      |                 |     |

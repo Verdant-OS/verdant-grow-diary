@@ -1,7 +1,15 @@
 # P2 Environment — original field assets
 
-The eight original assets required by `pillar-pages.md`'s P2 section, built to satisfy the
-`sourced → drafted` exit proof in `editorial-workflow.md`.
+**Seven** original assets required by `pillar-pages.md`'s P2 section, plus **one additional
+safety card this draft adds** — built to satisfy the `sourced → drafted` exit proof in
+`editorial-workflow.md`.
+
+`pillar-pages.md:102` lists seven required P2 assets: canopy sensor-placement diagram,
+leaf-offset method card, VPD input/uncertainty worksheet, airflow and microclimate map, PPFD
+mapping grid, peak-load planning worksheet, and lights-off transition timeline. **Asset 8,
+the CO2 monitoring and escalation card, is not on that list** — it is added here because §4
+routes CO2 to a monitoring-and-egress boundary and that boundary needed somewhere to live.
+Do not cite it as a `pillar-pages.md` requirement.
 
 **Authored by:** Claude (Knowledge Library and Product Specification Architect), 2026-08-15,
 under the owner's standing authority to build in Codex's place where Codex has not started.
@@ -51,6 +59,7 @@ must not be used operationally until a qualified reviewer clears them.
   safety, or measurement** figure cites its claim ID; where a figure would be needed but none
   is verified, the field is a blank for the user's own instrument rather than a default.
   **The exception is template structure** — how many sample rows, grid cells, or timeline
-  intervals an asset happens to lay out. Those are **illustrative layout choices, not
+  intervals an asset happens to lay out — asset 2's five sample rows, asset 4's 3 × 3 grid,
+  asset 7's +120-minute row scaffold. Those are **illustrative layout choices, not
   thresholds**; no claim in §8 establishes them, and each asset says so where it uses one.
-  **Do not read a row count as a sampling minimum.**
+  **Do not read a row count, a grid size, or a scaffold length as a minimum.**

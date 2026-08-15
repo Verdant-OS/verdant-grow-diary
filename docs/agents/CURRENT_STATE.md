@@ -9,9 +9,13 @@ reproduced the connection failure byte-for-byte (three of the five runs reach
 the socket; the other two never got that far); issues #912 and #916 open and
 unactioned;
 the `verdant-production` environment's `SUPABASE_DB_URL` resolves to the
-**sandbox** project ref and to an unreachable IPv6 address. New section
+**sandbox** project ref and to an unreachable IPv6 address — **and**, found in review, the
+probe's exact-version matching would misreport Lovable-recorded migrations as
+drift even once it connects, so the ledger is blocked behind two independent
+faults, not one. New section
 "The migration-drift alarm has never once completed a measurement". No new tool
-was built and none should be. Merged with deploy tip `bb66f4302` to resolve an
+was built and none should be; the existing one needs repairing. Merged with
+deploy tip `bb66f4302` to resolve an
 attribution-header conflict; every Grok note below is retained unchanged and no
 other section was touched. No production, GA4, GSC, sitemap, or release-identity
 row was re-measured in this edit.)
@@ -173,12 +177,21 @@ never worked. Read the next section before building anything.**
 ## ⚠️ The migration-drift alarm has never once completed a measurement
 
 **Recorded 2026-08-15 by Claude, answering Cheek's "migration ledger
-reconciliation" ask.** The conclusion is that **no new tool is needed and none
-should be built.** `scripts/probe-migration-drift.mjs` and
-`.github/workflows/migration-drift-probe.yml` already do this job — they were
-written after the 2026-08-05 six-day outage precisely so six days could never
-pass unnoticed again. The problem is that the probe has **never returned a
-measurement**.
+reconciliation" ask.** The conclusion is **do not build a second tool — repair
+the one that exists.** `scripts/probe-migration-drift.mjs` and
+`.github/workflows/migration-drift-probe.yml` were written after the 2026-08-05
+six-day outage precisely so six days could never pass unnoticed again, and they
+are the right shape for this job. But the probe has **never returned a
+measurement**, and — corrected here after a Codex review, see defect 3 — it
+would not yet return a *correct* one even if it connected.
+
+**So the ledger stays `NOT_MEASURED` behind two independent blockers, not one:**
+an owner-side secret that points at the wrong database over an unreachable
+address (defects 1 and 2), and a repo-side matching defect that would misreport
+Lovable-recorded migrations as drift (defect 3). Fixing the secret alone would
+produce output, not truth. An earlier version of this section said "no new tool
+is needed and none should be built" full stop; the first half stands, the second
+half was wrong.
 
 `established fact`, from the Actions API on 2026-08-15: the workflow has four
 scheduled runs in its entire history, and all four concluded `failure`.
@@ -227,9 +240,10 @@ was still wrong on 2026-08-15 — an unremediated fault, four days running. What
 do not measure readership, and in fact the alert has demonstrably been read, since
 Cheek ordered the on-demand re-run recorded above. So the reconciliation question
 is not "how do we measure drift", and not "why did nobody see the alert" — it is
-"why has a seen, correctly-raised alarm gone four days without the one secret edit
-that would clear it". Point the next owner at infrastructure remediation, not at
-notification plumbing.
+"why has a seen, correctly-raised alarm gone four days without the secret edit
+that would let it run". Point the next owner at infrastructure remediation, not
+at notification plumbing — and note that the secret edit alone is necessary but
+not sufficient, per defect 3 below.
 
 ### Two stacked defects — observations are `established fact`, remedies are not
 
@@ -293,23 +307,75 @@ hard-failed on an absent secret; from 14 Aug that guard passes and the connectio
 fails instead. `inference`: someone added the secret in that window and supplied
 the sandbox URL.
 
+**3. Even connected, the probe's matching would misreport Lovable migrations.**
+
+Raised by Codex review 2026-08-15 and verified here against source. This one is
+independent of the secret: it is a defect in the probe itself, and it is why
+"fix the secret and read the answer" is not the whole story.
+
+`established fact`, from the code: `probe-migration-drift.mjs:106` selects only
+`version` (`SELECT version FROM supabase_migrations.schema_migrations`), and
+line 166 diffs it by exact string equality against the 14-digit timestamp
+parsed off each filename.
+
+`established fact`, from `docs/signup-attribution-outage-operator-runbook.md`
+§"Ledger hazard": **Lovable records a migration under a version ~2 seconds later
+than its filename timestamp, carrying the filename stem in the `name` column.**
+The runbook's worked example is `20260721194325_f96507e6-…`, which sits in the
+ledger as version `20260721194327`. Hand-authored migrations use the exact
+timestamp with a slug name, so **both conventions coexist in one table**.
+
+`established fact`, measured here: **157 of 268** migration files use the
+Lovable UUID-suffixed convention. Whether every one of them is version-shifted
+is `NOT_MEASURED` — the runbook proves the mechanism and one instance, not the
+population.
+
+The consequence: an exact-version diff reports an applied Lovable migration as
+**unapplied**. That is a false DRIFT — noisy rather than dangerous, the opposite
+polarity to the failure that caused the 2026-08-05 outage — but it makes the
+reconciliation untrustworthy in both directions, because a reader who learns to
+discount the false entries will discount a real one too.
+
+The runbook already prescribes the fix and, importantly, forecloses the obvious
+wrong one. Match by name, with no window: for a file `<ts>_<slug>.sql`, accept
+`m.name = <stem>` (Lovable) **or** `m.name = <slug>` (hand-authored) **or**
+`m.version = <ts>`. Do **not** widen the version comparison to a tolerance — the
+runbook's Trap 2 shows this repo contains `20260806230020_…` and
+`20260806230021_…` one second apart, so a window would report an *unapplied*
+migration as applied. That is the worse error, and it is the exact shape of the
+2026-08-05 blind spot.
+
 ### What this does and does not license
 
-It does **not** license an agent to fix it. Every remedy is an owner action on
-protected infrastructure: rotating a GitHub environment secret, and reading a
-production connection string. Both are outside every agent role in this repo, and
-the credential must never enter an agent session.
+**Defects 1 and 2 are owner-only.** Rotating a GitHub environment secret and
+reading a production connection string are outside every agent role in this
+repo, and the credential must never enter an agent session. No agent should
+attempt them.
 
-The one repository-side change an agent could correctly make is adding the
-target-identity assertion to `probe-migration-drift.mjs`, so a sandbox URL in the
-production environment fails loudly as a mismatch instead of being measured and
-reported as production. That is a scoped, testable change — but it is **not
-approved**, and is recorded here as a candidate slice, not as work in progress.
+**Defect 3 is repo-side and an agent could fix it** — it needs no credential and
+is provable on fixtures. Two scoped candidate changes now exist, both **not
+approved**, recorded so they are not lost and not mistaken for work in progress:
 
-Until the secret is corrected, the **applied-migration ledger** is
-`NOT_MEASURED` — and so is any claim whose only evidence would have come from
-this probe, which means every statement of the form "migration X is/is not live
-in production" that is not backed by a direct observation.
+- **C1 — name-bound matching.** Select `name` alongside `version` and match by
+  stem-or-slug-or-version per the runbook, with no tolerance window. Testable
+  offline against both conventions, including the `20260806230020` /
+  `20260806230021` adjacent pair as the regression that pins Trap 2 shut.
+- **C2 — target-identity assertion.** Import `supabaseDatabaseTargetIdentity.mjs`
+  in the probe so a sandbox URL supplied to the production environment fails
+  loudly as a mismatch instead of being measured and reported as production.
+
+Sequencing matters if both are taken: **C1 before the secret is corrected.** If
+the secret is fixed first, the probe's first successful run publishes a large
+false-drift list into #912, and the most likely human response to an alarm that
+cries wolf on its debut is to stop reading it — which is how this whole section
+started. C2 is independent and can land either side.
+
+Until **both** the secret is corrected and the probe's matching is name-bound,
+the **applied-migration ledger** is `NOT_MEASURED` — and so is any claim whose
+only evidence would have come from this probe, which means every statement of
+the form "migration X is/is not live in production" that is not backed by a
+direct observation. Note the second condition: a green run from the current code
+would be a measurement of the wrong thing, not a measurement.
 
 That is deliberately narrower than "every production-schema statement in this
 file". It does **not** downgrade the independent evidence recorded above: the

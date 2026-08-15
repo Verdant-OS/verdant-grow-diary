@@ -21,13 +21,13 @@ Emissivity error converts into temperature error **through the reflected tempera
 a hot fixture above the canopy is exactly the case where the term stops being small.
 Author computation (draft §3.5), leaf at 24 °C, Δε = 0.01 on ε = 0.98:
 
-| Background / reflected temperature | Temperature error from a 0.01 emissivity error |
-| ---------------------------------- | ---------------------------------------------: |
-| 24 °C (no gradient)                |                                       0.000 °C |
-| 30 °C                              |                                       0.063 °C |
-| 40 °C                              |                                       0.177 °C |
-| 50 °C                              |                                       0.302 °C |
-| 60 °C                              |                                       0.440 °C |
+| Effective reflected temperature at the leaf plane | Temperature error from a 0.01 emissivity error |
+| ------------------------------------------------- | ---------------------------------------------: |
+| 24 °C (no gradient)                               |                                       0.000 °C |
+| 30 °C                                             |                                       0.063 °C |
+| 40 °C                                             |                                       0.177 °C |
+| 50 °C                                             |                                       0.302 °C |
+| 60 °C                                             |                                       0.440 °C |
 
 For scale, the instrument in claim C10 had a **0.35 °C** post-calibration accuracy. So
 emissivity uncertainty is negligible in a uniform room and **equal to or larger than the
@@ -38,8 +38,27 @@ general — which one dominates is a property of your room.** Measure the backgr
 
 1. Bring the room to its normal operating state — normal light, airflow, and irrigation.
    An offset measured in an abnormal state describes nothing you will act on.
-2. Record the **background/reflected temperature** (aim the instrument at the surface above
-   the canopy — fixture housing, ceiling, or reflector).
+2. Record the **effective reflected temperature at the leaf plane** — not a fixture's
+   apparent temperature.
+
+   **Aiming the IR thermometer at the fixture housing, ceiling, or reflector is wrong**, and
+   it is what an earlier revision of this card said. What that reports is _that surface's_
+   apparent temperature, which depends on the surface's own emissivity and on how much of the
+   leaf's field of view it actually occupies. Several surfaces at different temperatures
+   contribute, weighted by view factor; one of them is not the answer.
+
+   **The standard workaround** is a diffuse reflector at the leaf plane: place a crumpled
+   then re-flattened sheet of aluminium foil where the leaf is, facing the same way, set the
+   instrument's emissivity to 1.0, and read its apparent temperature — that reading _is_ the
+   effective reflected temperature. **The evidence editor should confirm and cite the
+   controlling method reference** (thermography practice standards cover this); this card
+   describes the technique but **claims no standard for it**, and §8 carries no such source
+   yet.
+
+   **If you cannot do this, record the reflected-temperature contribution as UNQUANTIFIED**
+   rather than substituting a fixture reading — an unquantified term you have flagged is
+   safer than a quantified one that is wrong.
+
 3. Set the instrument's emissivity. Absent a cannabis figure, **0.98 is a proxy starting
    point to verify, not an established value** — claim C10 covers twelve non-cannabis
    species at 0.973–0.985 and **neither source measured cannabis.**
@@ -58,20 +77,21 @@ general — which one dominates is a property of your room.** Measure the backgr
 **Room / tent:** ............ **Date / time:** ............ **Recorded by:** ............
 **Light state:** on / off / transition · **Minutes since state change:** ............
 
-| Field                                      | Value |
-| ------------------------------------------ | ----- |
-| IR instrument make / model                 |       |
-| Instrument spectral band (µm)              |       |
-| Instrument stated accuracy (°C)            |       |
-| Last calibration / verification date       |       |
-| Emissivity setting used                    |       |
-| Distance to leaf (cm)                      |       |
-| Spot size at that distance (cm)            |       |
-| Background / reflected temperature (°C)    |       |
-| Air-temperature instrument                 |       |
-| Air-probe stated accuracy (°C)             |       |
-| Air-probe repeatability (°C, if published) |       |
-| IR repeatability (°C, if published)        |       |
+| Field                                              | Value |
+| -------------------------------------------------- | ----- |
+| IR instrument make / model                         |       |
+| Instrument spectral band (µm)                      |       |
+| Instrument stated accuracy (°C)                    |       |
+| Last calibration / verification date               |       |
+| Emissivity setting used                            |       |
+| Distance to leaf (cm)                              |       |
+| Spot size at that distance (cm)                    |       |
+| Effective reflected temperature at leaf plane (°C) |       |
+| Method used (foil reflector / UNQUANTIFIED)        |       |
+| Air-temperature instrument                         |       |
+| Air-probe stated accuracy (°C)                     |       |
+| Air-probe repeatability (°C, if published)         |       |
+| IR repeatability (°C, if published)                |       |
 
 | Sample | Position (written locator) | Leaf T (°C) | Air T at same instant (°C) | Offset (leaf − air, °C) |
 | ------ | -------------------------- | ----------- | -------------------------- | ----------------------- |
@@ -104,12 +124,12 @@ incompatible quantities and produces a ± with no defined confidence level.
 **Step 1 — convert each bound to a standard uncertainty.** For a stated bound ±a with no
 distribution given, the conventional assumption is rectangular, so `u = a ÷ √3`.
 
-| Contribution            | Symbol   | Raw figure                          | Type   | Standard uncertainty (°C) |
-| ----------------------- | -------- | ----------------------------------- | ------ | ------------------------- |
-| IR thermometer          | `u_ir`   | datasheet bound ±...                | bound  | `a ÷ √3` = ......         |
-| Air probe               | `u_air`  | datasheet bound ±...                | bound  | `a ÷ √3` = ......         |
-| Emissivity × background | `u_emis` | estimated bound ± ... (table above) | bound  | `a ÷ √3` = ......         |
-| Sampling                | `u_samp` | `SD ÷ √n` of your per-leaf offsets  | **1σ** | use as-is = ......        |
+| Contribution           | Symbol   | Raw figure                                                                                           | Type   | Standard uncertainty (°C) |
+| ---------------------- | -------- | ---------------------------------------------------------------------------------------------------- | ------ | ------------------------- |
+| IR thermometer         | `u_ir`   | datasheet bound ±...                                                                                 | bound  | `a ÷ √3` = ......         |
+| Air probe              | `u_air`  | datasheet bound ±...                                                                                 | bound  | `a ÷ √3` = ......         |
+| Emissivity × reflected | `u_emis` | estimated bound ± ... (table above), **or record UNQUANTIFIED if the reflector method was not used** | bound  | `a ÷ √3` = ......         |
+| Sampling               | `u_samp` | `SD ÷ √n` of your per-leaf offsets                                                                   | **1σ** | use as-is = ......        |
 
 **Step 2 — combine.**
 
@@ -161,7 +181,8 @@ care about instead of one room number.
 > Mean offset **......** °C ± **......** °C (**expanded** uncertainty in the mean, k = **...**,
 > from a–d above), from **......** leaves with SD **......** °C and range **......** to
 > **......** °C, at
-> emissivity **......**, background **......** °C, IR instrument **......** °C, air probe
+> emissivity **......**, effective reflected temperature **......** °C (method: **......**),
+> IR instrument **......** °C, air probe
 > **......** °C, combined by **quadrature / linear addition**, measured **......** minutes
 > into **lights-on / lights-off**.
 

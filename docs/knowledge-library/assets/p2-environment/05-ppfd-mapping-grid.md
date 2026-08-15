@@ -33,9 +33,13 @@ Two further limits on any such estimate:
   behaves — neighbouring plants, edge effects, and airflow all differ there.
 - The fit is bounded to that trial's cultivar, medium, facility, and range.
 
-So the honest argument for mapping is not a yield multiplier: **a room-average PPFD figure
-hides where the extremes are, and the extremes are where the plants that underperform are
-living.** Locate them; do not price them.
+So the honest argument for mapping is narrower than any of those: **a room-average PPFD
+figure hides where the spatial extremes are.** That is all the cited evidence supports.
+Whether plants at an extreme cell actually underperform is a **within-canopy outcome
+question**, and the trials compared whole treatments — they never measured it. An earlier
+revision asserted the extremes are "where the plants that underperform are living"; that was
+still the same unsupported inference in gentler words, and is withdrawn. Locate the extremes;
+do not price them, and do not predict them.
 
 > **What this asset will not tell you: whether light affects potency.** The evidence
 > conflicts. One trial found **no** effect of PPFD on the potency of any measured cannabinoid
@@ -97,12 +101,26 @@ quantity).
 | **Min ÷ mean** (uniformity ratio)             |       |
 | **Min ÷ max**                                 |       |
 | Spread (max − min)                            |       |
+| **Equal-area cells?** (y / n)                 |       |
+| If no — area-weighted mean                    |       |
 | Sensor accuracy (absolute, from above)        |       |
 | Sensor **repeatability** (if published)       |       |
 | Is the spread larger than that repeatability? | y / n |
 
 **Report the mean with the min÷mean ratio beside it, always.** A mean quoted alone is the
 failure this asset exists to prevent.
+
+**Both metrics assume every cell covers the same canopy area.** If you refined the grid where
+gradients appeared — which asset 4 tells you to do — your cells are **not** equal-area, and an
+unweighted mean over-represents the refined region while `min ÷ mean` is biased with it.
+Either keep cells equal-area, or record each cell's area and compute
+
+```text
+area-weighted mean = Σ(reading_i × area_i) ÷ Σ(area_i)
+```
+
+and state which you did. A refined-then-unweighted map can report worse uniformity than the
+room actually has, purely because you sampled the bad region more densely.
 
 **Judge the spread against the uncertainty of a _difference_, not against absolute accuracy —
 and not against a single reading's repeatability either.** One sensor carried around the grid

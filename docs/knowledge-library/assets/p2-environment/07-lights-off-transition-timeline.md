@@ -40,7 +40,11 @@ Two reasons this window matters beyond equipment:
   post-lights-off window is cool _and_ humid at the same time. **A narrower optimum is quoted
   in the wider extension literature; the value is withheld here because its source (S6b) has
   not been read** — see the §8 source register. Do not reinstate it from memory or from a
-  secondary summary.
+  secondary summary. **Whether your post-lights-off window is actually both cool and humid is
+  a question this timeline answers, not an assumption it starts from** — a room with active
+  heating, aggressive dehumidification, or slow thermal lag may enter neither condition. C09
+  supports which conditions favour the pathogen; it does not establish that any given room
+  reaches them.
 
 ## Setup
 
@@ -119,8 +123,30 @@ air**, not a room RH threshold.
 | Was liquid water observed anywhere?            | y / n |
 | Where                                          |       |
 
-**A negative or near-zero margin means condensation is occurring or imminent**, regardless of
-whether room RH looks acceptable. Record it; do not respond with plant intervention.
+**Evaluate the margin as an interval, not a number.** Both inputs carry error, and near zero
+those errors decide the verdict:
+
+```text
+u_margin = sqrt(u_surface² + u_dewpoint²)
+```
+
+| Field                                                           | Value |
+| --------------------------------------------------------------- | ----- |
+| Surface-thermometer accuracy (°C)                               |       |
+| Dew-point uncertainty (°C) — instrument-stated, or unquantified |       |
+| `u_margin` (°C)                                                 |       |
+
+- **Margin more negative than `u_margin`** — condensation is occurring or imminent. Record it;
+  **do not respond with plant intervention.**
+- **Margin within ±`u_margin` of zero** — **the measurement cannot decide.** Say so rather
+  than reporting condensation. Look for the direct evidence instead: liquid water, and the
+  surfaces where it appears.
+- **Margin more positive than `u_margin`** — no condensation indicated at the surfaces you
+  actually measured, which is not the same as none in the room.
+
+A measured near-zero margin with comparable instrument error is an **uncertain** comparison,
+and reporting it as confirmed condensation would be exactly the false-confidence failure this
+pillar objects to elsewhere.
 
 > **Dew point:** if your instrument does not report it, an evidence editor should supply a
 > method reference before this row is published — this draft carries **no verified dew-point

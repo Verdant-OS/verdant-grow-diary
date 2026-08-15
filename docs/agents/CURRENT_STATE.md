@@ -160,6 +160,16 @@ scheduled runs in its entire history, and all four concluded `failure`.
 | `31782504195` | 2026-08-14T08:05:40 | `failure` — `could_not_probe`, connection refused   |
 | `31871667855` | 2026-08-15T07:19:42 | `failure` — `could_not_probe`, connection refused   |
 
+**Re-run on demand 2026-08-15 at Cheek's instruction: identical.** Run
+`31878986411`, `workflow_dispatch` on `verdant-grow-diary`, produced a
+byte-for-byte identical `could_not_probe` payload — same sandbox host, same IPv6
+address, same `Network is unreachable`. Steps 1–5 (checkout, Node, psql install,
+`Require SUPABASE_DB_URL`) all passed; step 6 failed in **zero seconds**, dying
+at the socket before its single `SELECT`. This rules out a transient: five runs,
+one failure mode, reproducible on demand. It also means there is no partial
+result to salvage — the ledger question stays unanswerable from CI until the
+secret is repointed.
+
 **The alarm itself is working correctly and is being ignored.** The probe exits 2
 for "could not check" rather than 0, exactly as its own header demands ("A probe
 that cannot reach the database must never be mistaken for a probe that found

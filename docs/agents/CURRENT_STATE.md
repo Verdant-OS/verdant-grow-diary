@@ -1,6 +1,22 @@
 # Verdant — Current Operating State
 
 **Last updated:** 2026-08-15 UTC
+**Updated by:** Grok (2026-08-15 merge: resolved two simple `CURRENT_STATE.md`
+conflicts against origin `1c094a2a3`. Incoming since `89ddea93f`:
+`74be85232` (#967 verdant-grow-os Cursor plugin scaffold — no overlap)
+and `1c094a2a3` (#970 DIRTY PR conflict-reconciliation dispositions —
+overlapping header plus topology row; the DIRTY-PR section auto-merged).
+Topology tip is now `1c094a2a3`. Production `/version.json` was **not**
+re-measured in this merge; the 2026-08-15 observation `5e2fcedd4271`
+(#984) still stands. Does **not** apply migrations or set Day 0.)
+
+**Prior same-day update:** 2026-08-15 UTC
+**Updated by:** Grok (merge-conflict resolve of #970 onto fetched deploy tip
+`89ddea93f` (#993). Takes the incoming Claude migration-drift header as prior
+identity. Unique surviving work remains the DIRTY-PR reconciliation section.
+No production, GA4, GSC, sitemap, or release-identity row was re-measured.)
+
+**Prior same-day update:** 2026-08-15 UTC
 **Updated by:** Grok (2026-08-15 merge: resolved the `CURRENT_STATE.md`
 attribution-header conflict against origin `89ddea93f`. Incoming since
 `bb66f4302`: `f3324a2b0` (#992 migration-drift alarm — the overlapping
@@ -442,10 +458,10 @@ way.
 
 ## Branch topology
 
-| Branch               | Role                                             | Verified head                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| -------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `verdant-grow-diary` | **Deploy branch. Production ships from here.**   | `89ddea93f495f3a2d3d31cba9aa824d519c27158` (#993), verified 2026-08-15 with `git fetch origin verdant-grow-diary && git rev-parse origin/verdant-grow-diary`. Supersedes `bb66f4302` (#960). After #982, in `git log` merge order oldest-first: `883bee2ff` (#983), `5e2fcedd4` (#984), `9c1ada616` (#987), `24382b5ad` (#988), `f1e097740` (#985), `534b28434` (#966), `0522eefb1` (#990), `a54040c30` (#989), `22c130600` (#986), `bb66f4302` (#960), `f3324a2b0` (#992), `89ddea93f` (#993). **Live production is not this tip** — `/version.json` on 2026-08-15 served `5e2fcedd4271` (#984) and was not re-fetched in this merge. #993 adds a protected PREFLIGHT/APPLY path and does **not** apply the signup repair. Merging is not a publish. PR numbers on this branch do not order by merge time — order commits with `git log`, never by PR number. Do not carry older validation tables forward. Older buffers that still show `6434ea2a8` (#942) are the 2026-08-13 snapshot; discard them |
-| `main`               | Integration branch. It is not production parity. | `b6d747941948ce68157185a2b0847acea6970d44` (#779), verified 2026-08-07                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Branch               | Role                                             | Verified head                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| -------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `verdant-grow-diary` | **Deploy branch. Production ships from here.**   | `1c094a2a36a1f576ee95e2c46d70777ae24a3e53` (#970), verified 2026-08-15 with `git fetch origin verdant-grow-diary && git rev-parse origin/verdant-grow-diary`. Supersedes `89ddea93f` (#993). After #982, in `git log` merge order oldest-first: `883bee2ff` (#983), `5e2fcedd4` (#984), `9c1ada616` (#987), `24382b5ad` (#988), `f1e097740` (#985), `534b28434` (#966), `0522eefb1` (#990), `a54040c30` (#989), `22c130600` (#986), `bb66f4302` (#960), `f3324a2b0` (#992), `89ddea93f` (#993), `74be85232` (#967), `1c094a2a3` (#970). **Live production is not this tip** — `/version.json` on 2026-08-15 served `5e2fcedd4271` (#984) and was not re-fetched in this merge. #993 adds a protected PREFLIGHT/APPLY path and does **not** apply the signup repair. Merging is not a publish. PR numbers on this branch do not order by merge time — order commits with `git log`, never by PR number. Do not carry older validation tables forward. Older buffers that still show `6434ea2a8` (#942) are the 2026-08-13 snapshot; discard them |
+| `main`               | Integration branch. It is not production parity. | `b6d747941948ce68157185a2b0847acea6970d44` (#779), verified 2026-08-07                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 
 `main` and `verdant-grow-diary` are divergent. Do not infer production behavior from
 `main`, and do not backport deploy-only governance or data rules without a scoped branch
@@ -456,6 +472,48 @@ The deploy-branch governance integration is complete in PR #626, and reconciliat
 [PR #679](https://github.com/Verdant-OS/verdant-grow-diary/pull/679)
 (`codex/seo-readiness-evidence-20260802`) merged 2026-08-02 as `bff64896679d`. It
 changed readiness evidence, artifacts, and tests only; it is **not** deployment evidence.
+
+---
+
+## DIRTY PR conflict reconciliation (recorded 2026-08-13)
+
+Owner-posted `CONFLICT_RECONCILIATION` comments on four then-open DIRTY PRs.
+No rebases, merges, or closes happened in that comment pass. [#933](https://github.com/Verdant-OS/verdant-grow-diary/pull/933)
+was already closed as superseded. This is an ownership/serialisation
+signal (`docs/agents/merge-queue.md`: empty queue + high `DIRTY` count), not
+queue latency. Branch-name authorship is not a role assignment: Grok remains
+Unassigned in the agents table below. The comments handed a recommended rebase
+path to whoever next owned each branch.
+
+**Outcomes since recording (verified 2026-08-15 with `gh pr view`):**
+#710 merged 2026-08-14 as `1a3a70d1b`. #936 closed 2026-08-13 without merge;
+its credit-gate work landed as [#971](https://github.com/Verdant-OS/verdant-grow-diary/pull/971)
+(`claude/alert-doctor-credit-gate-v2`, merged 2026-08-13). #913, #817, and #699
+were still OPEN at this verification. #933 remains CLOSED (superseded).
+
+Locked rule still in force:
+
+```text
+Same complete intent already on base → CLOSE SUPERSEDED
+Never hybrid-patch only to become mergeable
+Never reuse green checks from pre-resolution SHA
+```
+
+| PR                                                                | State  | Disposition      | Head                                    | Unique surviving work (from the comment)                                                                                                                                                                                                                    | Comment                                                                                      |
+| ----------------------------------------------------------------- | ------ | ---------------- | --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| [#913](https://github.com/Verdant-OS/verdant-grow-diary/pull/913) | OPEN   | REBASE           | `grok/seo-public-surface-docs-20260812` | Live-host evidence that `vercel.json` public-alias redirects are not firing in production (HTTP 200 soft shells) plus `docs/seo/vercel-host-redirect-fix-steps.md`. Drop the duplicate Ahrefs / `/` vs `/welcome` material already shipped via #914 / #949  | [comment](https://github.com/Verdant-OS/verdant-grow-diary/pull/913#issuecomment-5285119408) |
+| [#817](https://github.com/Verdant-OS/verdant-grow-diary/pull/817) | OPEN   | REBASE           | `grok/tent-alert-history-pro`           | `TentAlertHistoryPanel` and history helpers. Keep base's `isActive` / `openCount` / `activeCount` and the Doctor / Blueprint CTAs from #816 / #888 / #928                                                                                                   | [comment](https://github.com/Verdant-OS/verdant-grow-diary/pull/817#issuecomment-5285121690) |
+| [#710](https://github.com/Verdant-OS/verdant-grow-diary/pull/710) | MERGED | REBASE completed | `claude/docs-cheek-approval-workflow`   | Landed 2026-08-14 as `1a3a70d1b`. Added `docs/agents/cheek-approval-workflow.md`; Sentinel-Version moved to 2026-08-09.3                                                                                                                                    | [comment](https://github.com/Verdant-OS/verdant-grow-diary/pull/710#issuecomment-5285129001) |
+| [#699](https://github.com/Verdant-OS/verdant-grow-diary/pull/699) | OPEN   | REBASE           | `chore/adopt-biome-lint`                | Tooling swap only (`package.json` / `biome.json` / lint-staged). Drop the 327-commit-stale format commit; regenerate after rebase; hand-reconcile `src/test/helpers/reactRouterCompat.vitest.tsx`; add a Biome ignore for `supabase/functions/mcp/index.ts` | [comment](https://github.com/Verdant-OS/verdant-grow-diary/pull/699#issuecomment-5285131401) |
+| [#933](https://github.com/Verdant-OS/verdant-grow-diary/pull/933) | CLOSED | CLOSE_SUPERSEDED | `claude/strange-keller-036221`          | Complete intent already shipped as #930 (`ai_doctor_cta_clicked`). Closing avoids two competing funnel events on the same click                                                                                                                             | [comment](https://github.com/Verdant-OS/verdant-grow-diary/pull/933#issuecomment-5285025091) |
+
+Follow-up outcome: [#936](https://github.com/Verdant-OS/verdant-grow-diary/pull/936)
+(`claude/alert-doctor-credit-gate`) closed 2026-08-13 without merge. The
+credit-gate work landed as [#971](https://github.com/Verdant-OS/verdant-grow-diary/pull/971)
+from `claude/alert-doctor-credit-gate-v2`.
+
+Do not unilaterally close the remaining REBASE PRs (#913, #817, #699), and do
+not land a hybrid patch on any of them solely to clear `DIRTY`.
 
 ---
 

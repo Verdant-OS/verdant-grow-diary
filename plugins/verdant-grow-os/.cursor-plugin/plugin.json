@@ -1,0 +1,28 @@
+{
+  "name": "verdant-grow-os",
+  "displayName": "Verdant Grow OS",
+  "version": "0.1.0",
+  "description": "Keep Cursor agents inside Verdant's Grow OS product law: diary first, sensor truth, cautious AI, and grower-approved actions.",
+  "author": {
+    "name": "Verdant OS",
+    "email": "matt@verdantgrowdiary.com"
+  },
+  "homepage": "https://verdantgrowdiary.com",
+  "repository": "https://github.com/Verdant-OS/verdant-grow-diary",
+  "license": "MIT",
+  "keywords": [
+    "verdant",
+    "grow-os",
+    "grow-diary",
+    "horticulture",
+    "sensors",
+    "plant-memory"
+  ],
+  "category": "developer-tools",
+  "tags": [
+    "grow-os",
+    "safety",
+    "sensors",
+    "research"
+  ]
+}

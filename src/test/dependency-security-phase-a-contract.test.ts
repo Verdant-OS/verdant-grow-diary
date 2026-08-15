@@ -96,6 +96,7 @@ describe("dependency security Phase A resolution floors", () => {
     ["picomatch", [2, 3, 2] as const],
     ["rollup", [4, 59, 0] as const],
     ["vitest", [3, 2, 6] as const],
+    ["nanoid", [3, 3, 18] as const],
   ])("resolves every %s instance at or above %s in both locks", (packageName, minimum) => {
     for (const [lockName, versions] of [
       ["bun.lock", resolvedVersions(packageName)],
@@ -164,6 +165,7 @@ describe("dependency security Phase A resolution floors", () => {
       "fast-uri": "3.1.5",
       "form-data": "4.0.6",
       "js-yaml": "4.3.1",
+      nanoid: "3.3.18",
     });
     expect(packageJson.overrides?.postcss).toBeUndefined();
     expect(packageJson.overrides?.vite).toBeUndefined();

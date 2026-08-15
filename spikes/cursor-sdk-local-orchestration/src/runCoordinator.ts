@@ -16,7 +16,12 @@ import {
   removeSyntheticWorkspace,
   type SyntheticWorkspace,
 } from "./fixtureBuilder.ts";
-import { createBoundedAgents, disposeAgents, inspectorPrompt, reviewerPrompt } from "./agentFactory.ts";
+import {
+  createBoundedAgents,
+  disposeAgents,
+  inspectorPrompt,
+  reviewerPrompt,
+} from "./agentFactory.ts";
 import { resolveLiveProofStatus } from "./liveProofStatus.ts";
 import {
   detectInvalidPresentedAsHealthy,
@@ -143,6 +148,7 @@ export async function runOrchestration(config: OrchestrationConfig): Promise<Orc
   let cleanupStatus: "PASS" | "FAIL" = "FAIL";
   let policy: HostAgentPolicy | undefined;
   let invalidPresentedAsHealthy = false;
+  let afterHash = "missing";
 
   try {
     policy = validatePolicy({
@@ -203,7 +209,7 @@ export async function runOrchestration(config: OrchestrationConfig): Promise<Orc
     } catch {
       notes.push("disposal error");
     }
-    const afterHash = existsSync(workspace.cwd) ? hashDirectory(workspace.cwd) : "missing";
+    afterHash = existsSync(workspace.cwd) ? hashDirectory(workspace.cwd) : "missing";
     const fixtureMutated = afterHash !== workspace.fixtureHashBefore;
     if (inspectorOutput && hostVerdict !== "REJECT" && hostVerdict !== "TIMEOUT") {
       const judged = hostAdjudicate(reviewerOutput, fixtureMutated);
@@ -240,50 +246,51 @@ export async function runOrchestration(config: OrchestrationConfig): Promise<Orc
     if (!config.liveProof) {
       notes.push("SDK LIVE PROOF: BLOCKED — CURSOR_API_KEY NOT PROVIDED");
     }
-    const receipt = buildReceipt({
-      repositoryBaseCommit: repositoryBaseCommit(config.repoRoot),
-      fixtureHashBefore: workspace.fixtureHashBefore,
-      fixtureHashAfter: afterHash,
-      policyHash: policy ? policyHash(policy) : "policy-not-validated",
-      fixedModelId: FIXED_CATALOG_MODEL_ID,
-      inspectorIds: {
-        agent: inspectorOutcome?.hashedAgentId ?? "inspector-missing",
-        run: inspectorOutcome?.hashedRunId ?? "inspector-run-missing",
-        request: inspectorOutcome?.hashedRequestId ?? "inspector-request-missing",
-      },
-      reviewerIds: {
-        agent: reviewerOutcome?.hashedAgentId ?? "reviewer-missing",
-        run: reviewerOutcome?.hashedRunId ?? "reviewer-run-missing",
-        request: reviewerOutcome?.hashedRequestId ?? "reviewer-request-missing",
-      },
+  }
+
+  const receipt = buildReceipt({
+    repositoryBaseCommit: repositoryBaseCommit(config.repoRoot),
+    fixtureHashBefore: workspace.fixtureHashBefore,
+    fixtureHashAfter: afterHash,
+    policyHash: policy ? policyHash(policy) : "policy-not-validated",
+    fixedModelId: FIXED_CATALOG_MODEL_ID,
+    inspectorIds: {
+      agent: inspectorOutcome?.hashedAgentId ?? "inspector-missing",
+      run: inspectorOutcome?.hashedRunId ?? "inspector-run-missing",
+      request: inspectorOutcome?.hashedRequestId ?? "inspector-request-missing",
+    },
+    reviewerIds: {
+      agent: reviewerOutcome?.hashedAgentId ?? "reviewer-missing",
+      run: reviewerOutcome?.hashedRunId ?? "reviewer-run-missing",
+      request: reviewerOutcome?.hashedRequestId ?? "reviewer-request-missing",
+    },
+    inspectorStatus,
+    reviewerStatus,
+    hostVerdict,
+    liveProofStatus: resolveLiveProofStatus({
+      liveProofRequested: Boolean(config.liveProof),
+      adapterKind: config.adapter.kind,
+      hostVerdict,
+      cleanupStatus,
       inspectorStatus,
       reviewerStatus,
-      hostVerdict,
-      liveProofStatus: resolveLiveProofStatus({
-        liveProofRequested: Boolean(config.liveProof),
-        adapterKind: config.adapter.kind,
-        hostVerdict,
-        cleanupStatus,
-        inspectorStatus,
-        reviewerStatus,
-      }),
-      inspectorDurationMs: inspectorOutcome?.durationMs ?? null,
-      reviewerDurationMs: reviewerOutcome?.durationMs ?? null,
-      inspectorTokenTotal: inspectorOutcome?.usage?.totalTokens ?? null,
-      reviewerTokenTotal: reviewerOutcome?.usage?.totalTokens ?? null,
-      toolCalls,
-      cleanupStatus,
-      inspector: inspectorOutput,
-      reviewer: reviewerOutput,
-      invalidPresentedAsHealthy,
-      notes,
-    });
-    return {
-      receipt,
-      inspector: inspectorOutput,
-      reviewer: reviewerOutput,
-      policy: policy ?? null,
-      workspace,
-    };
-  }
+    }),
+    inspectorDurationMs: inspectorOutcome?.durationMs ?? null,
+    reviewerDurationMs: reviewerOutcome?.durationMs ?? null,
+    inspectorTokenTotal: inspectorOutcome?.usage?.totalTokens ?? null,
+    reviewerTokenTotal: reviewerOutcome?.usage?.totalTokens ?? null,
+    toolCalls,
+    cleanupStatus,
+    inspector: inspectorOutput,
+    reviewer: reviewerOutput,
+    invalidPresentedAsHealthy,
+    notes,
+  });
+  return {
+    receipt,
+    inspector: inspectorOutput,
+    reviewer: reviewerOutput,
+    policy: policy ?? null,
+    workspace,
+  };
 }

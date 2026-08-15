@@ -1,7 +1,9 @@
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { rootCertificates } from "node:tls";
 import { afterEach, describe, expect, it } from "vitest";
+import { PRODUCTION_SUPABASE_CA_FILENAME } from "../../scripts/lib/productionSupabaseTls.mjs";
 import {
   assertSupabaseDatabaseTargetIdentity,
   databaseTargetForEnvironment,
@@ -13,6 +15,7 @@ import {
   EXIT,
   runRequiredCoreMigrationsApplied,
 } from "../../scripts/assert-required-core-migrations-applied.mjs";
+import { PREFLIGHT_SQL } from "../../scripts/apply-quicklog-corrections-retractions.mjs";
 import {
   ADVISORY_SCHEMA,
   REQUIRED_CORE_MIGRATIONS,
@@ -46,10 +49,64 @@ const SOIL_MOISTURE_CALIBRATION_COLUMNS = [
   "updated_at",
 ];
 const PHENO_CROSSES_TAXONOMY_COLUMNS = ["channel", "generation", "recurrent_parent_id"];
-const EXPECTED_CORE_COLUMN_COUNT = 37;
+const QUICKLOG_CORRECTIONS_MIGRATION = "20260811090000_quicklog_corrections_retractions.sql";
+const QUICKLOG_REVISION_COLUMNS = [
+  "id",
+  "grow_event_id",
+  "diary_entry_id",
+  "root_id",
+  "user_id",
+  "actor_id",
+  "revision_no",
+  "kind",
+  "reason_code",
+  "reason_note",
+  "previous_state",
+  "new_state",
+  "created_at",
+];
+const EXPECTED_CORE_COLUMN_COUNT = 51;
 const EXPECTED_ADVISORY_COLUMN_COUNT = 4;
+const EXPECTED_MIGRATION_COUNT = 8;
+const CANONICAL_QUICKLOG_CATALOG_CONTRACT = Object.freeze({
+  authenticated_role_contract: true,
+  app_role_contract: true,
+  auth_uid_contract: true,
+  has_role_contract: true,
+  user_roles_contract: true,
+  quicklog_try_parse_uuid_contract: true,
+  gen_random_uuid_contract: true,
+  target_table_contract: true,
+  retracted_at_contract: true,
+  target_constraints_contract: true,
+  target_indexes_contract: true,
+  diary_retracted_index_contract: true,
+  target_policies_contract: true,
+  target_triggers_rules_contract: true,
+  target_functions_contract: true,
+  target_function_overloads_contract: true,
+  target_function_security_contract: true,
+  target_acl_contract: true,
+  client_access_contract: true,
+});
+const QUICKLOG_CATALOG_CONTRACT_KEYS = Object.keys(CANONICAL_QUICKLOG_CATALOG_CONTRACT) as Array<
+  keyof typeof CANONICAL_QUICKLOG_CATALOG_CONTRACT
+>;
 
 const tempDirs: string[] = [];
+
+function productionTlsEnv() {
+  const runnerTemp = mkdtempSync(join(tmpdir(), "verdant-production-tls-test-"));
+  tempDirs.push(runnerTemp);
+  const caPath = join(runnerTemp, PRODUCTION_SUPABASE_CA_FILENAME);
+  const testCa = rootCertificates[0];
+  if (!testCa) throw new Error("Node did not provide a test root certificate.");
+  writeFileSync(caPath, testCa, { mode: 0o600 });
+  return {
+    RUNNER_TEMP: runnerTemp,
+    SUPABASE_DB_CA_CERT_PATH: caPath,
+  };
+}
 
 afterEach(() => {
   for (const dir of tempDirs.splice(0)) {
@@ -78,6 +135,82 @@ function captureLogger() {
       error: (...args: unknown[]) => lines.push(args.map(String).join(" ")),
     },
   };
+}
+
+function successfulCoreQueryResult(callNumber: number) {
+  return callNumber === 1
+    ? {
+        status: 0,
+        stdout: REQUIRED_CORE_SCHEMA.map(schemaKey).join("\n"),
+        stderr: "",
+      }
+    : {
+        status: 0,
+        stdout: `${JSON.stringify(CANONICAL_QUICKLOG_CATALOG_CONTRACT)}\n`,
+        stderr: "",
+      };
+}
+
+function exactQuickLogCatalogKeys(sql: string) {
+  const expected = new Set<string>(QUICKLOG_CATALOG_CONTRACT_KEYS);
+  return [...sql.matchAll(/^ {2}'([a-z_]+)',/gm)]
+    .map((match) => match[1])
+    .filter((key) => expected.has(key));
+}
+
+function runQuickLogCatalogFixture(catalogStdout: string) {
+  const dir = mkdtempSync(join(tmpdir(), "core-schema-quicklog-contract-"));
+  tempDirs.push(dir);
+  const reportPath = join(dir, "report.md");
+  const auditPath = join(dir, "audit.json");
+  const { logger } = captureLogger();
+  let psqlCalls = 0;
+
+  const status = runRequiredCoreMigrationsApplied({
+    env: {
+      ...productionTlsEnv(),
+      TARGET_ENV: "production",
+      SUPABASE_DB_URL: directUrl(PRODUCTION_REF),
+      REPORT_PATH: reportPath,
+      AUDIT_PATH: auditPath,
+    },
+    spawnImpl: () => {
+      psqlCalls += 1;
+      return psqlCalls === 1
+        ? successfulCoreQueryResult(1)
+        : { status: 0, stdout: catalogStdout, stderr: "" };
+    },
+    logger,
+  });
+
+  return {
+    status,
+    psqlCalls,
+    report: readFileSync(reportPath, "utf8"),
+    audit: JSON.parse(readFileSync(auditPath, "utf8")),
+  };
+}
+
+function emittedQuickLogCatalogSql() {
+  const { logger } = captureLogger();
+  const calls: Array<{ args: string[] }> = [];
+
+  const status = runRequiredCoreMigrationsApplied({
+    env: {
+      ...productionTlsEnv(),
+      TARGET_ENV: "production",
+      SUPABASE_DB_URL: directUrl(PRODUCTION_REF),
+    },
+    spawnImpl: (_command, args) => {
+      calls.push({ args: [...args] });
+      return successfulCoreQueryResult(calls.length);
+    },
+    logger,
+  });
+
+  expect(status).toBe(EXIT.OK);
+  expect(calls).toHaveLength(2);
+  return calls[1].args.at(-1) ?? "";
 }
 
 describe("Supabase database target identity", () => {
@@ -267,6 +400,7 @@ describe("Supabase database target identity", () => {
   it("preserves only the exact sandbox read-only verifier identity", () => {
     const url = genericSharedUrl(5432, PASSWORD, `${SANDBOX_SCHEMA_VERIFIER_ROLE}.${SANDBOX_REF}`);
     let childEnv: Record<string, string | undefined> | undefined;
+    let psqlCalls = 0;
     const { logger } = captureLogger();
 
     const status = runRequiredCoreMigrationsApplied({
@@ -276,12 +410,9 @@ describe("Supabase database target identity", () => {
         PATH: process.env.PATH,
       },
       spawnImpl: (_command, _args, options) => {
+        psqlCalls += 1;
         childEnv = { ...options.env };
-        return {
-          status: 0,
-          stdout: REQUIRED_CORE_SCHEMA.map(schemaKey).join("\n"),
-          stderr: "",
-        };
+        return successfulCoreQueryResult(psqlCalls);
       },
       logger,
     });
@@ -372,6 +503,21 @@ describe("required core schema manifest", () => {
     );
   });
 
+  it("blocks core signoff until the complete Quick Log revision schema is present", () => {
+    const revisionEntries = REQUIRED_CORE_SCHEMA.filter(
+      (candidate) => candidate.table === "quicklog_entry_revisions",
+    );
+    expect(revisionEntries.map((entry) => entry.column)).toEqual(QUICKLOG_REVISION_COLUMNS);
+    expect(new Set(revisionEntries.map((entry) => entry.migration))).toEqual(
+      new Set([QUICKLOG_CORRECTIONS_MIGRATION]),
+    );
+    expect(
+      REQUIRED_CORE_SCHEMA.find((entry) => schemaKey(entry) === "diary_entries.retracted_at"),
+    ).toMatchObject({ migration: QUICKLOG_CORRECTIONS_MIGRATION });
+    expect(REQUIRED_CORE_SCHEMA.map(schemaKey)).not.toContain("diary_entries.retraction_reason");
+    expect(REQUIRED_CORE_SCHEMA).toHaveLength(EXPECTED_CORE_COLUMN_COUNT);
+  });
+
   it("guards the full feeding INSERT contract, not only ALTER-added columns", () => {
     const feedingColumns = REQUIRED_CORE_SCHEMA.filter((entry) => entry.table === "feeding_events")
       .map((entry) => entry.column)
@@ -447,10 +593,308 @@ describe("required core schema manifest", () => {
       ).toBe(true);
     }
     expect(new Set(REQUIRED_CORE_MIGRATIONS).size).toBe(REQUIRED_CORE_MIGRATIONS.length);
+    expect(REQUIRED_CORE_MIGRATIONS).toHaveLength(EXPECTED_MIGRATION_COUNT);
   });
 });
 
 describe("remote applied-schema runner safety", () => {
+  it("verifies the canonical Quick Log catalog contract before core signoff", () => {
+    const dir = mkdtempSync(join(tmpdir(), "core-schema-quicklog-contract-"));
+    tempDirs.push(dir);
+    const reportPath = join(dir, "report.md");
+    const auditPath = join(dir, "audit.json");
+    const { logger } = captureLogger();
+    let psqlCalls = 0;
+
+    const status = runRequiredCoreMigrationsApplied({
+      env: {
+        ...productionTlsEnv(),
+        TARGET_ENV: "production",
+        SUPABASE_DB_URL: directUrl(PRODUCTION_REF),
+        REPORT_PATH: reportPath,
+        AUDIT_PATH: auditPath,
+      },
+      spawnImpl: () => {
+        psqlCalls += 1;
+        return psqlCalls === 1
+          ? {
+              status: 0,
+              stdout: REQUIRED_CORE_SCHEMA.map(schemaKey).join("\n"),
+              stderr: "",
+            }
+          : {
+              status: 0,
+              stdout: `${JSON.stringify(CANONICAL_QUICKLOG_CATALOG_CONTRACT)}\n`,
+              stderr: "",
+            };
+      },
+      logger,
+    });
+
+    const audit = JSON.parse(readFileSync(auditPath, "utf8"));
+    expect(status).toBe(EXIT.OK);
+    expect(psqlCalls).toBe(2);
+    expect(readFileSync(reportPath, "utf8")).toContain("exact Quick Log catalog contract");
+    expect(readFileSync(reportPath, "utf8")).toContain("Migration ledger: `NOT_MEASURED`");
+    expect(audit).toMatchObject({
+      outcome: "verified",
+      schema_verified: true,
+      quicklog_catalog_contract_verified: true,
+      quicklog_catalog_contract_failures: [],
+      migration_ledger_status: "not_measured",
+    });
+  });
+
+  it("keeps pg_catalog ahead of public so shadow objects cannot forge the verdict", () => {
+    const catalogSql = emittedQuickLogCatalogSql();
+    expect(catalogSql).toMatch(/set local search_path\s*=\s*pg_catalog,\s*public;/i);
+    expect(catalogSql).not.toMatch(/set local search_path\s*=\s*public,\s*pg_catalog;/i);
+  });
+
+  it("attests the user_roles authorization chain used by the operator read policy", () => {
+    const catalogSql = emittedQuickLogCatalogSql();
+    expect(catalogSql).toContain("'user_roles_contract'");
+  });
+
+  it("rejects inherited descendants of user_roles and the Quick Log revision ledger", () => {
+    const catalogSql = emittedQuickLogCatalogSql();
+    const userRolesContract = catalogSql.slice(
+      catalogSql.indexOf("'user_roles_contract'"),
+      catalogSql.indexOf("'quicklog_try_parse_uuid_contract'"),
+    );
+    const targetTableContract = catalogSql.slice(
+      catalogSql.indexOf("'target_table_contract'"),
+      catalogSql.indexOf("'retracted_at_contract'"),
+    );
+
+    for (const contract of [userRolesContract, targetTableContract]) {
+      expect(contract).toContain("not t.relhassubclass");
+      expect(contract).toMatch(
+        /not exists\s*\(select 1 from pg_inherits i where i\.inhparent\s*=\s*t\.oid\)/,
+      );
+    }
+  });
+
+  it("rejects an authenticated role that can bypass row-level security", () => {
+    const catalogSql = emittedQuickLogCatalogSql();
+    expect(catalogSql).toContain("'authenticated_role_contract'");
+    expect(catalogSql).toContain("rolbypassrls");
+  });
+
+  it("compares exact function ACLs so an unexpected grantee cannot call a definer", () => {
+    const catalogSql = emittedQuickLogCatalogSql();
+    expect(catalogSql).toContain("proacl");
+  });
+
+  it("requires every pinned index to be valid, ready, and live", () => {
+    const catalogSql = emittedQuickLogCatalogSql();
+    expect(catalogSql).toContain("indisvalid");
+    expect(catalogSql).toContain("indisready");
+    expect(catalogSql).toContain("indislive");
+  });
+
+  it.each([
+    ["RLS is disabled", { target_table_contract: false }, ["target_table_contract"]],
+    [
+      "an owner policy is missing",
+      { target_policies_contract: false },
+      ["target_policies_contract"],
+    ],
+    [
+      "authenticated SELECT is broadened beyond the exact owner/operator policies",
+      { target_policies_contract: false },
+      ["target_policies_contract"],
+    ],
+    [
+      "authenticated receives broad table access",
+      { target_acl_contract: false, client_access_contract: false },
+      ["target_acl_contract", "client_access_contract"],
+    ],
+    [
+      "the operator-policy has_role dependency drifts permissive",
+      { has_role_contract: false },
+      ["has_role_contract"],
+    ],
+    [
+      "authenticated can bypass row-level security",
+      { authenticated_role_contract: false },
+      ["authenticated_role_contract"],
+    ],
+    [
+      "the user_roles authorization chain permits self-grant",
+      { user_roles_contract: false },
+      ["user_roles_contract"],
+    ],
+    [
+      "a ledger constraint is missing",
+      { target_constraints_contract: false },
+      ["target_constraints_contract"],
+    ],
+    ["an index is missing", { target_indexes_contract: false }, ["target_indexes_contract"]],
+    [
+      "an exact-named index is invalid or not ready for writes",
+      { target_indexes_contract: false },
+      ["target_indexes_contract"],
+    ],
+    [
+      "one of the five functions is missing",
+      { target_functions_contract: false, target_function_overloads_contract: false },
+      ["target_functions_contract", "target_function_overloads_contract"],
+    ],
+    [
+      "an unexpected role can execute a Quick Log function",
+      { target_function_security_contract: false },
+      ["target_function_security_contract"],
+    ],
+  ])("blocks an all-columns core signoff when %s", (_label, overrides, expectedFailures) => {
+    const secretSentinel = "QUICKLOG-CONTRACT-SECRET-SENTINEL";
+    const databaseUrl = directUrl(PRODUCTION_REF, 5432, secretSentinel);
+    const dir = mkdtempSync(join(tmpdir(), "core-schema-quicklog-contract-"));
+    tempDirs.push(dir);
+    const reportPath = join(dir, "report.md");
+    const auditPath = join(dir, "audit.json");
+    const { logger, lines } = captureLogger();
+    let psqlCalls = 0;
+
+    const status = runRequiredCoreMigrationsApplied({
+      env: {
+        ...productionTlsEnv(),
+        TARGET_ENV: "production",
+        SUPABASE_DB_URL: databaseUrl,
+        REPORT_PATH: reportPath,
+        AUDIT_PATH: auditPath,
+      },
+      spawnImpl: () => {
+        psqlCalls += 1;
+        return psqlCalls === 1
+          ? {
+              status: 0,
+              stdout: REQUIRED_CORE_SCHEMA.map(schemaKey).join("\n"),
+              stderr: "",
+            }
+          : {
+              status: 0,
+              stdout: `${JSON.stringify({
+                ...CANONICAL_QUICKLOG_CATALOG_CONTRACT,
+                ...overrides,
+              })}\n`,
+              stderr: "",
+            };
+      },
+      logger,
+    });
+
+    const report = readFileSync(reportPath, "utf8");
+    const audit = JSON.parse(readFileSync(auditPath, "utf8"));
+    const observable = [...lines, report, JSON.stringify(audit)].join("\n");
+
+    expect(status).toBe(EXIT.QUICKLOG_CATALOG_CONTRACT_FAILED);
+    expect(psqlCalls).toBe(2);
+    expect(report).not.toContain("**Status:** PASSED");
+    expect(report).toContain("Migration ledger: `NOT_MEASURED`");
+    expect(audit).toMatchObject({
+      outcome: "quicklog_catalog_contract_failed",
+      schema_verified: false,
+      quicklog_catalog_contract_verified: false,
+      quicklog_catalog_contract_failures: expectedFailures,
+      migration_ledger_status: "not_measured",
+    });
+    expect(observable).not.toContain(secretSentinel);
+    expect(observable).not.toContain(databaseUrl);
+  });
+
+  it.each(QUICKLOG_CATALOG_CONTRACT_KEYS)(
+    "fails closed when exact Quick Log catalog postcondition %s is false",
+    (contractKey) => {
+      const result = runQuickLogCatalogFixture(
+        `${JSON.stringify({
+          ...CANONICAL_QUICKLOG_CATALOG_CONTRACT,
+          [contractKey]: false,
+        })}\n`,
+      );
+
+      expect(result.status).toBe(EXIT.QUICKLOG_CATALOG_CONTRACT_FAILED);
+      expect(result.psqlCalls).toBe(2);
+      expect(result.report).not.toContain("**Status:** PASSED");
+      expect(result.audit).toMatchObject({
+        outcome: "quicklog_catalog_contract_failed",
+        quicklog_catalog_contract_verified: false,
+        quicklog_catalog_contract_failures: [contractKey],
+        migration_ledger_status: "not_measured",
+      });
+    },
+  );
+
+  it.each(QUICKLOG_CATALOG_CONTRACT_KEYS)(
+    "rejects exact Quick Log catalog output when postcondition %s is missing",
+    (contractKey) => {
+      const incompleteContract = { ...CANONICAL_QUICKLOG_CATALOG_CONTRACT } as Record<
+        string,
+        boolean
+      >;
+      delete incompleteContract[contractKey];
+      const result = runQuickLogCatalogFixture(`${JSON.stringify(incompleteContract)}\n`);
+
+      expect(result.status).toBe(EXIT.QUICKLOG_CATALOG_CONTRACT_FAILED);
+      expect(result.psqlCalls).toBe(2);
+      expect(result.report).not.toContain("**Status:** PASSED");
+      expect(result.audit).toMatchObject({
+        outcome: "quicklog_catalog_contract_failed",
+        quicklog_catalog_contract_verified: false,
+        quicklog_catalog_contract_failures: ["catalog_result_malformed"],
+        migration_ledger_status: "not_measured",
+      });
+    },
+  );
+
+  it("rejects malformed Quick Log catalog output without persisting raw database text", () => {
+    const secretSentinel = "MALFORMED-QUICKLOG-CONTRACT-SECRET";
+    const databaseUrl = directUrl(PRODUCTION_REF, 5432, secretSentinel);
+    const dir = mkdtempSync(join(tmpdir(), "core-schema-quicklog-contract-"));
+    tempDirs.push(dir);
+    const reportPath = join(dir, "report.md");
+    const auditPath = join(dir, "audit.json");
+    const { logger, lines } = captureLogger();
+    let psqlCalls = 0;
+
+    const status = runRequiredCoreMigrationsApplied({
+      env: {
+        ...productionTlsEnv(),
+        TARGET_ENV: "production",
+        SUPABASE_DB_URL: databaseUrl,
+        REPORT_PATH: reportPath,
+        AUDIT_PATH: auditPath,
+      },
+      spawnImpl: () => {
+        psqlCalls += 1;
+        return psqlCalls === 1
+          ? successfulCoreQueryResult(1)
+          : {
+              status: 0,
+              stdout: `not-json:${secretSentinel}\n`,
+              stderr: "",
+            };
+      },
+      logger,
+    });
+
+    const report = readFileSync(reportPath, "utf8");
+    const audit = JSON.parse(readFileSync(auditPath, "utf8"));
+    const observable = [...lines, report, JSON.stringify(audit)].join("\n");
+
+    expect(status).toBe(EXIT.QUICKLOG_CATALOG_CONTRACT_FAILED);
+    expect(psqlCalls).toBe(2);
+    expect(audit).toMatchObject({
+      outcome: "quicklog_catalog_contract_failed",
+      quicklog_catalog_contract_verified: false,
+      quicklog_catalog_contract_failures: ["catalog_result_malformed"],
+      migration_ledger_status: "not_measured",
+    });
+    expect(observable).not.toContain(secretSentinel);
+    expect(observable).not.toContain(databaseUrl);
+    expect(observable).not.toContain("not-json");
+  });
+
   it("blocks core signoff when the soil calibration contract is absent", () => {
     const secretSentinel = "SOIL-GATE-SECRET-SENTINEL";
     const soilKeys = new Set(
@@ -466,6 +910,7 @@ describe("remote applied-schema runner safety", () => {
 
     const status = runRequiredCoreMigrationsApplied({
       env: {
+        ...productionTlsEnv(),
         TARGET_ENV: "production",
         SUPABASE_DB_URL: directUrl(PRODUCTION_REF, 5432, secretSentinel),
         REPORT_PATH: reportPath,
@@ -501,7 +946,7 @@ describe("remote applied-schema runner safety", () => {
     );
     expect(audit).toMatchObject({
       outcome: "missing_columns",
-      schema_verified: true,
+      schema_verified: false,
       expected_count: EXPECTED_CORE_COLUMN_COUNT,
       present_count: EXPECTED_CORE_COLUMN_COUNT - SOIL_MOISTURE_CALIBRATION_COLUMNS.length,
       missing_count: SOIL_MOISTURE_CALIBRATION_COLUMNS.length,
@@ -528,6 +973,7 @@ describe("remote applied-schema runner safety", () => {
 
     const status = runRequiredCoreMigrationsApplied({
       env: {
+        ...productionTlsEnv(),
         TARGET_ENV: "production",
         MANIFEST_SCOPE: "advisory",
         SUPABASE_DB_URL: directUrl(PRODUCTION_REF),
@@ -560,7 +1006,7 @@ describe("remote applied-schema runner safety", () => {
     );
     expect(audit).toMatchObject({
       outcome: "missing_columns",
-      schema_verified: true,
+      schema_verified: false,
       expected_count: EXPECTED_ADVISORY_COLUMN_COUNT,
       present_count: 1,
       missing_count: PHENO_CROSSES_TAXONOMY_COLUMNS.length,
@@ -611,6 +1057,86 @@ describe("remote applied-schema runner safety", () => {
     expect(psqlCalls).toBe(0);
   });
 
+  it("rejects missing or malformed production CA material before psql", () => {
+    for (const scenario of ["missing", "malformed"] as const) {
+      const tls = productionTlsEnv();
+      const reportPath = join(tls.RUNNER_TEMP, `tls-${scenario}-report.md`);
+      const auditPath = join(tls.RUNNER_TEMP, `tls-${scenario}-audit.json`);
+      const malformedSentinel = "MALFORMED-PRODUCTION-CA-SENTINEL";
+      if (scenario === "missing") {
+        rmSync(tls.SUPABASE_DB_CA_CERT_PATH, { force: true });
+      } else {
+        writeFileSync(tls.SUPABASE_DB_CA_CERT_PATH, malformedSentinel, { mode: 0o600 });
+      }
+      const { logger, lines } = captureLogger();
+      let psqlCalls = 0;
+
+      const status = runRequiredCoreMigrationsApplied({
+        env: {
+          ...tls,
+          TARGET_ENV: "production",
+          SUPABASE_DB_URL: directUrl(PRODUCTION_REF, 5432, "tls-db-secret-sentinel"),
+          SUPABASE_DB_CA_CERT_B64: "raw-ca-secret-sentinel",
+          REPORT_PATH: reportPath,
+          AUDIT_PATH: auditPath,
+        },
+        spawnImpl: () => {
+          psqlCalls += 1;
+          return successfulCoreQueryResult(psqlCalls);
+        },
+        logger,
+      });
+
+      const observable = [
+        ...lines,
+        readFileSync(reportPath, "utf8"),
+        readFileSync(auditPath, "utf8"),
+      ].join("\n");
+      expect(status).toBe(EXIT.TLS_TRUST_REJECTED);
+      expect(psqlCalls).toBe(0);
+      expect(observable).toContain("production TLS trust rejected");
+      expect(observable).not.toContain(malformedSentinel);
+      expect(observable).not.toContain("raw-ca-secret-sentinel");
+      expect(observable).not.toContain("tls-db-secret-sentinel");
+    }
+  });
+
+  it("forces verify-full for production while forwarding only the fixed CA path", () => {
+    const tls = productionTlsEnv();
+    const childEnvs: Array<Record<string, string | undefined>> = [];
+    const args: string[][] = [];
+    const { logger } = captureLogger();
+
+    const status = runRequiredCoreMigrationsApplied({
+      env: {
+        ...tls,
+        TARGET_ENV: "production",
+        SUPABASE_DB_URL: directUrl(PRODUCTION_REF, 5432, "production-db-secret-sentinel"),
+        SUPABASE_DB_CA_CERT_B64: "raw-ca-secret-sentinel",
+        PGSSLMODE: "disable",
+        PGSSLROOTCERT: "C:\\attacker\\root.crt",
+        PATH: process.env.PATH,
+      },
+      spawnImpl: (_command, nextArgs, options) => {
+        args.push([...nextArgs]);
+        childEnvs.push({ ...options.env });
+        return successfulCoreQueryResult(childEnvs.length);
+      },
+      logger,
+    });
+
+    expect(status).toBe(EXIT.OK);
+    expect(childEnvs).toHaveLength(2);
+    for (const childEnv of childEnvs) {
+      expect(childEnv.PGSSLMODE).toBe("verify-full");
+      expect(childEnv.PGSSLROOTCERT).toBe(tls.SUPABASE_DB_CA_CERT_PATH);
+      expect(childEnv).not.toHaveProperty("SUPABASE_DB_CA_CERT_B64");
+      expect(JSON.stringify(childEnv)).not.toContain("raw-ca-secret-sentinel");
+    }
+    expect(JSON.stringify(args)).not.toContain("production-db-secret-sentinel");
+    expect(JSON.stringify(args)).not.toContain(tls.SUPABASE_DB_CA_CERT_PATH);
+  });
+
   it("canonicalizes the child URL, strips routing options and ambient env, and queries only tables", () => {
     const canonicalUrl = directUrl(SANDBOX_REF, 5432, "argv-secret-sentinel").replace(
       "?sslmode=require",
@@ -624,7 +1150,6 @@ describe("remote applied-schema runner safety", () => {
       args: string[];
       env: Record<string, string | undefined>;
     }> = [];
-    const stdout = REQUIRED_CORE_SCHEMA.map(schemaKey).join("\n");
     const { logger } = captureLogger();
 
     const status = runRequiredCoreMigrationsApplied({
@@ -644,13 +1169,13 @@ describe("remote applied-schema runner safety", () => {
           args: [...args],
           env: { ...options.env },
         });
-        return { status: 0, stdout, stderr: "" };
+        return successfulCoreQueryResult(calls.length);
       },
       logger,
     });
 
     expect(status).toBe(EXIT.OK);
-    expect(calls).toHaveLength(1);
+    expect(calls).toHaveLength(2);
     expect(calls[0].command).toBe("psql");
     expect(calls[0].args.join(" ")).not.toContain(url);
     expect(calls[0].args.join(" ")).not.toContain("argv-secret-sentinel");
@@ -670,6 +1195,16 @@ describe("remote applied-schema runner safety", () => {
     expect(sql).not.toMatch(/c\.relkind IN \([^)]*['"]v['"]/);
     expect(sql).not.toMatch(/c\.relkind IN \([^)]*['"]m['"]/);
     expect(sql).not.toMatch(/c\.relkind IN \([^)]*['"]f['"]/);
+    expect(calls[1].args).toContain("--single-transaction");
+    expect(calls[1].args.join(" ")).not.toContain(url);
+    const catalogSql = calls[1].args.at(-1) ?? "";
+    expect(catalogSql).toContain("set transaction read only");
+    expect(catalogSql).toContain("pg_get_expr(p.polwithcheck,p.polrelid)");
+    expect(catalogSql).not.toContain("p.polwithcheck is null");
+    expect(catalogSql).toContain("d1d3c1bab8cfb8d7aed032a1b9efa698");
+    expect(exactQuickLogCatalogKeys(PREFLIGHT_SQL)).toEqual(QUICKLOG_CATALOG_CONTRACT_KEYS);
+    expect(exactQuickLogCatalogKeys(catalogSql)).toEqual(QUICKLOG_CATALOG_CONTRACT_KEYS);
+    expect(calls[1].env).toEqual(calls[0].env);
   });
 
   it("preserves the strongest validated TLS mode while stripping every URL option", () => {
@@ -678,6 +1213,7 @@ describe("remote applied-schema runner safety", () => {
       `${canonicalUrl}?sslmode=require&sslmode=verify-full` +
       "&sslmode=verify-ca&application_name=verdant-gate";
     let childEnv: Record<string, string | undefined> | undefined;
+    let psqlCalls = 0;
     const { logger } = captureLogger();
 
     const status = runRequiredCoreMigrationsApplied({
@@ -687,12 +1223,9 @@ describe("remote applied-schema runner safety", () => {
         PATH: process.env.PATH,
       },
       spawnImpl: (_command, _args, options) => {
+        psqlCalls += 1;
         childEnv = { ...options.env };
-        return {
-          status: 0,
-          stdout: REQUIRED_CORE_SCHEMA.map(schemaKey).join("\n"),
-          stderr: "",
-        };
+        return successfulCoreQueryResult(psqlCalls);
       },
       logger,
     });
@@ -748,22 +1281,21 @@ describe("remote applied-schema runner safety", () => {
         `${genericSharedUrl(port, sentinel, encodedUsername)}` +
         "&host=attacker.invalid&sslmode=verify-full";
       let childEnv: Record<string, string | undefined> | undefined;
+      let psqlCalls = 0;
       const { logger, lines } = captureLogger();
 
       const status = runRequiredCoreMigrationsApplied({
         env: {
+          ...(targetEnv === "production" ? productionTlsEnv() : {}),
           TARGET_ENV: targetEnv,
           SUPABASE_DB_URL: url,
           PATH: process.env.PATH,
         },
         spawnImpl: (_command, args, options) => {
+          psqlCalls += 1;
           expect(args.join(" ")).not.toContain("shared/secret");
           childEnv = { ...options.env };
-          return {
-            status: 0,
-            stdout: REQUIRED_CORE_SCHEMA.map(schemaKey).join("\n"),
-            stderr: "",
-          };
+          return successfulCoreQueryResult(psqlCalls);
         },
         logger,
       });
@@ -924,6 +1456,16 @@ describe("required-core-migrations workflow trust boundary", () => {
   const manifestBlock = workflow.slice(manifestStart, sandboxStart);
   const sandboxBlock = workflow.slice(sandboxStart, productionStart);
   const productionBlock = workflow.slice(productionStart);
+
+  it("reruns when any transitive Quick Log catalog dependency changes", () => {
+    for (const path of [
+      "scripts/apply-quicklog-corrections-retractions.mjs",
+      "scripts/apply-pinned-production-migrations.mjs",
+      "scripts/lib/candidateNumberToolRuntime.mjs",
+    ]) {
+      expect(workflow).toContain(`- "${path}"`);
+    }
+  });
 
   it("gives pull requests one offline job with no remote secret or environment", () => {
     expect(workflow).toMatch(/\n {2}pull_request:\s*\n/);

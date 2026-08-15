@@ -5,10 +5,15 @@ on:
     paths:
       - "supabase/migrations/**"
       - "scripts/lib/supabaseDatabaseTargetIdentity.mjs"
+      - "scripts/lib/productionSupabaseTls.mjs"
       - "scripts/assert-required-core-migrations.mjs"
       - "scripts/assert-required-core-migrations-applied.mjs"
       - "scripts/required-core-migrations.mjs"
+      - "scripts/apply-quicklog-corrections-retractions.mjs"
+      - "scripts/apply-pinned-production-migrations.mjs"
+      - "scripts/lib/candidateNumberToolRuntime.mjs"
       - "src/test/required-core-migrations-gate.test.ts"
+      - "src/test/production-supabase-tls.test.ts"
       - ".github/workflows/required-core-migrations.yml"
   push:
     branches:
@@ -115,10 +120,36 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
       - name: Prepare audit directory
         run: mkdir -p "${{ github.workspace }}/audit/core-production"
+      - name: Require the protected Supabase production CA
+        uses: ./.github/actions/require-ci-secret
+        with:
+          secret-name: SUPABASE_DB_CA_CERT_B64
+          secret-value: ${{ secrets.SUPABASE_DB_CA_CERT_B64 }}
+          guard-heading: "Required production core schema gate"
+          report-path: ${{ github.workspace }}/audit/core-production/core-report.md
+          log-prefix: required-core-production-ca
+          fix-steps-json: >-
+            ["1. Download the Server root certificate from the production Supabase project Dashboard.",
+             "2. Base64-encode the certificate without changing its bytes.",
+             "3. Save it as the verdant-production environment secret SUPABASE_DB_CA_CERT_B64, then dispatch verification again."]
+          reason-lines-json: >-
+            ["PostgreSQL 15 requires an explicit trusted root for sslmode=verify-full.",
+             "No production schema query is allowed without certificate and hostname verification."]
+      - name: Materialize verified Supabase production CA
+        env:
+          SUPABASE_DB_CA_CERT_B64: ${{ secrets.SUPABASE_DB_CA_CERT_B64 }}
+          SUPABASE_DB_CA_CERT_PATH: ${{ runner.temp }}/verdant-production-supabase-root.crt
+        run: |
+          set -euo pipefail
+          umask 077
+          printf '%s' "$SUPABASE_DB_CA_CERT_B64" | base64 --decode > "$SUPABASE_DB_CA_CERT_PATH"
+          chmod 600 "$SUPABASE_DB_CA_CERT_PATH"
+          openssl x509 -in "$SUPABASE_DB_CA_CERT_PATH" -noout
       - name: Verify blocking core schema
         env:
           TARGET_ENV: production
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          SUPABASE_DB_CA_CERT_PATH: ${{ runner.temp }}/verdant-production-supabase-root.crt
           REPORT_PATH: ${{ github.workspace }}/audit/core-production/core-report.md
           AUDIT_PATH: ${{ github.workspace }}/audit/core-production/core-audit.json
         run: node scripts/assert-required-core-migrations-applied.mjs
@@ -130,6 +161,7 @@ jobs:
           TARGET_ENV: production
           MANIFEST_SCOPE: advisory
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          SUPABASE_DB_CA_CERT_PATH: ${{ runner.temp }}/verdant-production-supabase-root.crt
           REPORT_PATH: ${{ github.workspace }}/audit/core-production/advisory-report.md
           AUDIT_PATH: ${{ github.workspace }}/audit/core-production/advisory-audit.json
         run: node scripts/assert-required-core-migrations-applied.mjs
@@ -151,3 +183,8 @@ jobs:
           name: required-core-schema-production
           path: audit/core-production
           if-no-files-found: error
+      - name: Remove Supabase production CA
+        if: always()
+        env:
+          SUPABASE_DB_CA_CERT_PATH: ${{ runner.temp }}/verdant-production-supabase-root.crt
+        run: rm -f -- "$SUPABASE_DB_CA_CERT_PATH"

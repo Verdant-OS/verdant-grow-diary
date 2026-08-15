@@ -126,22 +126,32 @@ air**, not a room RH threshold.
 **Evaluate the margin as an interval, not a number.** Both inputs carry error, and near zero
 those errors decide the verdict:
 
+**Normalize both inputs first — the same rule asset 2 uses.** A datasheet "±0.4 °C accuracy"
+is a maximum-error **bound**, not a 1σ standard uncertainty, and two figures quoted at
+different coverage factors cannot be combined as they stand. Convert each bound with
+`u = a ÷ √3` (rectangular assumption, stated), then:
+
 ```text
-u_margin = sqrt(u_surface² + u_dewpoint²)
+u_margin = sqrt(u_surface² + u_dewpoint²)      combined standard uncertainty (1σ)
+U_margin = k · u_margin,   k = 2 for ~95%      expanded — use this for the verdict
 ```
 
-| Field                                                           | Value |
-| --------------------------------------------------------------- | ----- |
-| Surface-thermometer accuracy (°C)                               |       |
-| Dew-point uncertainty (°C) — instrument-stated, or unquantified |       |
-| `u_margin` (°C)                                                 |       |
+| Field                                              | Raw figure | Type  | Standard uncertainty (°C) |
+| -------------------------------------------------- | ---------- | ----- | ------------------------- |
+| Surface thermometer                                | ±...       | bound | `a ÷ √3` = ......         |
+| Dew point — instrument-stated, or **UNQUANTIFIED** | ±...       | bound | `a ÷ √3` = ......         |
+| `u_margin` (1σ)                                    |            |       | ......                    |
+| `U_margin` at k = 2                                |            |       | ......                    |
 
-- **Margin more negative than `u_margin`** — condensation is occurring or imminent. Record it;
-  **do not respond with plant intervention.**
-- **Margin within ±`u_margin` of zero** — **the measurement cannot decide.** Say so rather
+**If either input is UNQUANTIFIED, the verdict below cannot be reached** — record the margin
+and say the comparison is undecidable, rather than assigning a conclusion.
+
+- **Margin more negative than `U_margin`** — condensation is occurring or imminent. Record
+  it; **do not respond with plant intervention.**
+- **Margin within ±`U_margin` of zero** — **the measurement cannot decide.** Say so rather
   than reporting condensation. Look for the direct evidence instead: liquid water, and the
   surfaces where it appears.
-- **Margin more positive than `u_margin`** — no condensation indicated at the surfaces you
+- **Margin more positive than `U_margin`** — no condensation indicated at the surfaces you
   actually measured, which is not the same as none in the room.
 
 A measured near-zero margin with comparable instrument error is an **uncertain** comparison,

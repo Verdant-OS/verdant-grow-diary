@@ -113,7 +113,9 @@ This is the highest-value section. It is your room telling you where its limit i
 | Observation                                                          | Value / notes |
 | -------------------------------------------------------------------- | ------------- |
 | Highest RH observed in the last cycle, and when in the light period  |               |
-| How long RH stayed above that level                                  |               |
+| Your RH threshold or setpoint of concern (state which)               |               |
+| How long RH stayed **at or above that threshold**                    |               |
+| How long RH stayed within 2% of the peak                             |               |
 | Time for RH to recover after lights-off                              |               |
 | Does equipment reach 100% duty and stay there? When?                 |               |
 | Any period where setpoint was not held — when, how long, how far off |               |

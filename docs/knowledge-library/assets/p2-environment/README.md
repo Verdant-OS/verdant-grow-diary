@@ -19,7 +19,9 @@ Verified before starting: no Codex branch or PR touches `docs/knowledge-library/
 **Revision:** r1. **Licence:** same as the repository. **Sources:** every figure traces to a
 claim ID in
 [the P2 pillar draft](../../../knowledge-library-pillar-p2-environment-draft.md) §8.
-No asset introduces a number that is not in that claim map.
+**Every cultivation, safety, or measurement figure** traces to a claim ID there. **One
+bounded exception, detailed below:** template structure — asset 2's five sample rows, asset
+4's 3 × 3 grid, asset 7's +120-minute scaffold — is not in §8 and is not a threshold.
 
 ## Accessibility
 

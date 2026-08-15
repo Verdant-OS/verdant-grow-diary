@@ -93,19 +93,20 @@ quantity).
 
 ## Uniformity
 
-| Metric                                        | Value |
-| --------------------------------------------- | ----- |
-| Mean of all cells                             |       |
-| Minimum cell (and which)                      |       |
-| Maximum cell (and which)                      |       |
-| **Min ÷ mean** (uniformity ratio)             |       |
-| **Min ÷ max**                                 |       |
-| Spread (max − min)                            |       |
-| **Equal-area cells?** (y / n)                 |       |
-| If no — area-weighted mean                    |       |
-| Sensor accuracy (absolute, from above)        |       |
-| Sensor **repeatability** (if published)       |       |
-| Is the spread larger than that repeatability? | y / n |
+| Metric                                                 | Value |
+| ------------------------------------------------------ | ----- |
+| Mean of all cells                                      |       |
+| Minimum cell (and which)                               |       |
+| Maximum cell (and which)                               |       |
+| **Min ÷ mean** (uniformity ratio)                      |       |
+| **Min ÷ max**                                          |       |
+| Spread (max − min)                                     |       |
+| **Equal-area cells?** (y / n)                          |       |
+| If no — area-weighted mean                             |       |
+| Sensor accuracy (absolute, from above)                 |       |
+| Sensor **repeatability** (if published)                |       |
+| **Uncertainty of a difference** = `√2 ×` repeatability |       |
+| Is the spread larger than **that**?                    | y / n |
 
 **Report the mean with the min÷mean ratio beside it, always.** A mean quoted alone is the
 failure this asset exists to prevent.

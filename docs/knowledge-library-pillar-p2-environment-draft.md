@@ -457,9 +457,11 @@ visit:
    deficit produces a _smaller_ fractional yield deficit — and more fundamentally, both
    trials varied intensity **across whole treatments**, never across positions within one
    canopy, so neither measures a shaded corner's behaviour at all. The supported consequence
-   is narrower and still sufficient: **a room-average PPFD figure hides where the extremes
-   are, and the extremes are where the underperforming plants live** — which is why the
-   acceptance gate demands uniformity rather than a mean. Bounded to indoor trials, specific
+   is narrower and still sufficient: **a room-average PPFD figure hides where the spatial
+   extremes are** — which is why the acceptance gate demands uniformity rather than a mean.
+   **Whether the plants at those extremes underperform is a within-canopy outcome question
+   the cited work does not answer**, and asserting it would be the same untested
+   extrapolation as the yield percentages withdrawn from asset 5. Bounded to indoor trials, specific
    cultivars and media, and the tested ranges; no plateau was observed within them, which is
    not evidence that none exists beyond them.
 

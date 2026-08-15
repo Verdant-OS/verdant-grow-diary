@@ -2,10 +2,17 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
+// Normalized to LF: on a Windows checkout with autocrlf on, this file reads
+// back with \r\n line endings. Without normalizing, `/--.*$/` below (and any
+// other end-of-line-anchored regex) silently fails to match — `$` doesn't
+// match immediately before a trailing \r, only before \n or absolute EOF —
+// so the comment-stripping check would stop stripping without erroring, and
+// a real future user_id leak in the RPC body could slip past this exact
+// check undetected on such a checkout.
 const SQL = readFileSync(
   resolve(process.cwd(), "supabase/migrations/20260813020000_funnel_events_sink.sql"),
   "utf8",
-);
+).replace(/\r\n/g, "\n");
 
 describe("funnel_events sink migration safety", () => {
   it("is client-writable ONLY for the caller's own row, never readable back", () => {

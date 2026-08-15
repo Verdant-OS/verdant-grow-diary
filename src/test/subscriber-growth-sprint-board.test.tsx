@@ -64,6 +64,7 @@ describe("SubscriberGrowthSprintBoard", () => {
             contextCheck: 1,
             vpdCalculator: 3,
             csvHistory: 4,
+            blueprintTargets: 2,
           }}
         />
       </MemoryRouter>,

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import { findGuideBySlug } from "@/constants/verdantSeoContent";
+import { staticRouteHead } from "@/lib/build/staticRouteHead";
 import GuidePage from "@/pages/GuidePage";
 
 afterEach(() => {
@@ -64,23 +65,20 @@ describe("public VPD and sensor-truth evidence contract", () => {
     expect(within(table).getAllByText(/untrusted/i).length).toBeGreaterThan(0);
   });
 
-  it("keeps the visible FAQ and JSON-LD honest about air VPD without leaf temperature", async () => {
+  it("keeps the visible FAQ and route-head JSON-LD honest about air VPD without leaf temperature", () => {
     renderGuide("grow-room-vpd-tracker");
 
     expect(
       screen.getByRole("button", { name: /can i use vpd without measuring leaf temperature/i }),
     ).toBeVisible();
 
-    const faqScript = await screen
-      .findByTestId("guide-page")
-      .then(() =>
-        document.head.querySelector<HTMLScriptElement>(
-          'script[data-page-ldjson="guide-grow-room-vpd-tracker-faq"]',
-        ),
-      );
-    expect(faqScript).not.toBeNull();
-    expect(faqScript?.textContent?.toLowerCase()).toContain("air vpd");
-    expect(faqScript?.textContent?.toLowerCase()).toContain("not leaf vpd");
+    const faq = staticRouteHead("/guides/grow-room-vpd-tracker")
+      .scripts.map((script) => JSON.parse(script.children))
+      .find((node) => node["@type"] === "FAQPage");
+    expect(faq).toBeTruthy();
+    const serializedFaq = JSON.stringify(faq).toLowerCase();
+    expect(serializedFaq).toContain("air vpd");
+    expect(serializedFaq).toContain("not leaf vpd");
   });
 
   it("shows authoritative scope sources and does not claim a universal VPD target", () => {

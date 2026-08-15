@@ -51,6 +51,105 @@ export interface UseMyEntitlementsResult {
 
 const FREE_NOW = (): ResolvedEntitlement => resolveEntitlements(null, new Date());
 
+interface EntitlementSnapshot {
+  lookupFailed: boolean;
+  lovableRow: LovableSubscriptionRow | null;
+  resolvedEnvironment: "live" | "sandbox";
+  isStaff: boolean;
+  now: Date;
+}
+
+/**
+ * One in-flight snapshot fetch per (user, sandbox-expectation). Plant Detail
+ * mounts several consumers of this hook in the same render turn (Blueprint
+ * section, AI Doctor review, the page's credit gate), and without coalescing
+ * each fired its own subscriptions + user_roles reads. Entries are removed
+ * as soon as the fetch settles: this shares CONCURRENT work only, never
+ * serves a completed response as a cache — a later mount or refetch still
+ * observes fresh rows, so the soft-revalidate semantics above are unchanged.
+ */
+const inflightSnapshots = new Map<string, Promise<EntitlementSnapshot>>();
+
+function fetchEntitlementSnapshot(
+  userId: string,
+  wantsSandbox: boolean,
+): Promise<EntitlementSnapshot> {
+  const key = `${userId}:${wantsSandbox ? "sandbox" : "live"}`;
+  const existing = inflightSnapshots.get(key);
+  if (existing) return existing;
+
+  const load = (async (): Promise<EntitlementSnapshot> => {
+    // All reads are RLS-protected (select-own) and PRESENTATION-ONLY.
+    // Subscription reads use bounded newest-first WINDOWS, not limit(1):
+    // public.subscriptions is unique per paddle_subscription_id, so a newer
+    // canceled row (e.g. Pro) must not shadow an older entitling row (e.g.
+    // Founder Lifetime). Same semantics as the server helper
+    // supabase/functions/_shared/unionEntitlementLookup.ts.
+    const subscriptionRows = (environment: "live" | "sandbox") =>
+      supabase
+        .from("subscriptions")
+        .select("*")
+        .eq("user_id", userId)
+        .eq("environment", environment)
+        // created_at is not unique; paddle_subscription_id is — without the
+        // tiebreak, equal timestamps make the window order (and therefore
+        // the picked row) nondeterministic.
+        .order("created_at", { ascending: false })
+        .order("paddle_subscription_id", { ascending: false })
+        .limit(SUBSCRIPTION_ROW_SCAN_LIMIT);
+
+    // Live rows are canonical production evidence and unlock regardless of
+    // a sandbox-configured client. Sandbox rows unlock only when this client
+    // explicitly expects sandbox. This mirrors the shared Edge helper and
+    // the database entitlement gates.
+    const [liveRes, sandboxRes, rolesRes] = await Promise.all([
+      subscriptionRows("live"),
+      wantsSandbox
+        ? subscriptionRows("sandbox")
+        : Promise.resolve({ data: [] as LovableSubscriptionRow[], error: null }),
+      supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", userId)
+        .eq("role", "staff")
+        .maybeSingle(),
+    ]);
+
+    const now = new Date();
+    const isStaff = !rolesRes.error && rolesRes.data != null;
+    const liveRows = liveRes.error ? [] : ((liveRes.data ?? []) as LovableSubscriptionRow[]);
+    const sandboxRows = sandboxRes.error
+      ? []
+      : ((sandboxRes.data ?? []) as LovableSubscriptionRow[]);
+    const liveRow = pickEntitlingLovableRow(liveRows, "live", now);
+    const sandboxRow = wantsSandbox ? pickEntitlingLovableRow(sandboxRows, "sandbox", now) : null;
+    const liveRowEntitles = liveRow != null && lovableRowEntitles(liveRow, "live", now);
+    const sandboxRowEntitles = sandboxRow != null && lovableRowEntitles(sandboxRow, "sandbox", now);
+
+    const resolvedEnvironment = liveRowEntitles
+      ? "live"
+      : sandboxRowEntitles || wantsSandbox
+        ? "sandbox"
+        : "live";
+    const lovableRow = liveRowEntitles
+      ? liveRow
+      : sandboxRowEntitles || wantsSandbox
+        ? sandboxRow
+        : liveRow;
+    const paidRowProven = liveRowEntitles || sandboxRowEntitles;
+    const lookupFailed =
+      !paidRowProven && (liveRes.error != null || (wantsSandbox && sandboxRes.error != null));
+
+    return { lookupFailed, lovableRow, resolvedEnvironment, isStaff, now };
+  })();
+
+  const tracked = load.finally(() => {
+    if (inflightSnapshots.get(key) === tracked) inflightSnapshots.delete(key);
+  });
+  inflightSnapshots.set(key, tracked);
+  return tracked;
+}
+
 export function useMyEntitlements(): UseMyEntitlementsResult {
   const { user, loading: authLoading } = useAuth();
   // Key loads on user id, never the session user object reference. TOKEN_REFRESHED
@@ -99,82 +198,23 @@ export function useMyEntitlements(): UseMyEntitlementsResult {
     }
     setLookupFailed(false);
 
-    // All reads are RLS-protected (select-own) and PRESENTATION-ONLY.
-    // Subscription reads use bounded newest-first WINDOWS, not limit(1):
-    // public.subscriptions is unique per paddle_subscription_id, so a newer
-    // canceled row (e.g. Pro) must not shadow an older entitling row (e.g.
-    // Founder Lifetime). Same semantics as the server helper
-    // supabase/functions/_shared/unionEntitlementLookup.ts.
-    const subscriptionRows = (environment: "live" | "sandbox") =>
-      supabase
-        .from("subscriptions")
-        .select("*")
-        .eq("user_id", userId)
-        .eq("environment", environment)
-        // created_at is not unique; paddle_subscription_id is — without the
-        // tiebreak, equal timestamps make the window order (and therefore
-        // the picked row) nondeterministic.
-        .order("created_at", { ascending: false })
-        .order("paddle_subscription_id", { ascending: false })
-        .limit(SUBSCRIPTION_ROW_SCAN_LIMIT);
-
-    // Live rows are canonical production evidence and unlock regardless of
-    // a sandbox-configured client. Sandbox rows unlock only when this client
-    // explicitly expects sandbox. This mirrors the shared Edge helper and
-    // the database entitlement gates.
     const wantsSandbox = expectedBillingEnvironment === "sandbox";
-    const [liveRes, sandboxRes, rolesRes] = await Promise.all([
-      subscriptionRows("live"),
-      wantsSandbox
-        ? subscriptionRows("sandbox")
-        : Promise.resolve({ data: [] as LovableSubscriptionRow[], error: null }),
-      supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", userId)
-        .eq("role", "staff")
-        .maybeSingle(),
-    ]);
+    const snapshot = await fetchEntitlementSnapshot(userId, wantsSandbox);
 
-    const now = new Date();
-    const isStaff = !rolesRes.error && rolesRes.data != null;
-    const liveRows = liveRes.error ? [] : ((liveRes.data ?? []) as LovableSubscriptionRow[]);
-    const sandboxRows = sandboxRes.error
-      ? []
-      : ((sandboxRes.data ?? []) as LovableSubscriptionRow[]);
-    const liveRow = pickEntitlingLovableRow(liveRows, "live", now);
-    const sandboxRow = wantsSandbox ? pickEntitlingLovableRow(sandboxRows, "sandbox", now) : null;
-    const liveRowEntitles = liveRow != null && lovableRowEntitles(liveRow, "live", now);
-    const sandboxRowEntitles = sandboxRow != null && lovableRowEntitles(sandboxRow, "sandbox", now);
-
-    const resolvedEnvironment = liveRowEntitles
-      ? "live"
-      : sandboxRowEntitles || wantsSandbox
-        ? "sandbox"
-        : "live";
-    const lovableRow = liveRowEntitles
-      ? liveRow
-      : sandboxRowEntitles || wantsSandbox
-        ? sandboxRow
-        : liveRow;
-    const paidRowProven = liveRowEntitles || sandboxRowEntitles;
-    const lookupFailed =
-      !paidRowProven && (liveRes.error != null || (wantsSandbox && sandboxRes.error != null));
-
-    if (!mountedRef.current) return lookupFailed;
-    setLookupFailed(lookupFailed);
+    if (!mountedRef.current) return snapshot.lookupFailed;
+    setLookupFailed(snapshot.lookupFailed);
     setEntitlement(
       resolveUnionEntitlements({
         byoRow: null,
-        lovableRow,
-        expectedBillingEnvironment: resolvedEnvironment,
-        now,
-        opts: { isStaff },
+        lovableRow: snapshot.lovableRow,
+        expectedBillingEnvironment: snapshot.resolvedEnvironment,
+        now: snapshot.now,
+        opts: { isStaff: snapshot.isStaff },
       }),
     );
     settledUserIdRef.current = userId;
     setLoading(false);
-    return lookupFailed;
+    return snapshot.lookupFailed;
   }, [userId, expectedBillingEnvironment]);
 
   useEffect(() => {

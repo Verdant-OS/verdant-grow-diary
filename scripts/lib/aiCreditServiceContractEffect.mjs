@@ -434,8 +434,18 @@ function summarizeFunction(row, checks) {
   };
 }
 
+function normalizeSiblingOverloads(rawSiblingOverloads) {
+  return rawSiblingOverloads.map((row) => ({
+    name: typeof row?.name === "string" ? row.name : "unknown",
+    identity_arguments: typeof row?.identity_arguments === "string" ? row.identity_arguments : null,
+    execute_grantees: Array.isArray(row?.execute_grantees)
+      ? row.execute_grantees.filter((grantee) => typeof grantee === "string").sort()
+      : [],
+  }));
+}
+
 /**
- * Convert one database observation into four independent, tri-state statuses.
+ * Convert one database observation into five independent, tri-state statuses.
  * `null` means unknown; it is never serialized as a reassuring `false`.
  */
 export function evaluateAiCreditServiceContractObservation(observation) {
@@ -447,6 +457,9 @@ export function evaluateAiCreditServiceContractObservation(observation) {
   }
   if (!Array.isArray(observation.functions)) {
     throw new TypeError("Database observation did not include a functions array.");
+  }
+  if (!Array.isArray(observation.sibling_overloads)) {
+    throw new TypeError("Database observation did not include a sibling_overloads array.");
   }
 
   const rowsBySignature = new Map(observation.functions.map((row) => [row?.signature, row]));
@@ -466,6 +479,7 @@ export function evaluateAiCreditServiceContractObservation(observation) {
   const refund = summarizeFunction(refundRow, refundChecks(refundRow));
   const functionSummaries = [spend, refund];
   const sidecar = sidecarChecks(observation.result_sidecar);
+  const siblingOverloads = normalizeSiblingOverloads(observation.sibling_overloads);
 
   const allFailures = [
     ...functionSummaries.flatMap((item) => item.failed_checks),
@@ -484,6 +498,7 @@ export function evaluateAiCreditServiceContractObservation(observation) {
       migration_applied: observation.migration_applied,
       contract_effective: contractFailure ? false : readabilityBlocked ? null : true,
       definition_drift_detected: definitionDrift ? true : readabilityBlocked ? null : false,
+      sibling_overloads_detected: siblingOverloads.length > 0,
       verification_blocked: readabilityBlocked,
     },
     migration: AI_CREDIT_SERVICE_CONTRACT_MIGRATION,
@@ -494,6 +509,7 @@ export function evaluateAiCreditServiceContractObservation(observation) {
         .filter((check) => !check.passed)
         .map(({ id, category }) => ({ id, category })),
     },
+    sibling_overloads: siblingOverloads,
   };
 }
 
@@ -507,11 +523,13 @@ export function blockedAiCreditServiceContractReport(targetEnv, reason) {
       migration_applied: null,
       contract_effective: null,
       definition_drift_detected: null,
+      sibling_overloads_detected: null,
       verification_blocked: true,
     },
     migration: AI_CREDIT_SERVICE_CONTRACT_MIGRATION,
     functions: [],
     result_sidecar: { check_count: 0, failed_checks: [] },
+    sibling_overloads: [],
     blocked_reason: reason,
   };
 }

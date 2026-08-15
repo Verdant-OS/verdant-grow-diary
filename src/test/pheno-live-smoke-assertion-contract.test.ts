@@ -37,7 +37,11 @@ const SLICES: Array<{ name: string; slice: string; requiredSelectors: string[] }
       'getByTestId("pheno-tracker-upgrade-gate")',
       'getByTestId("pheno-tracker-upgrade-gate-upgrade-link")',
       'getByTestId("pheno-hunt-onboarding")',
-      "/pricing?returnTo=%2Fpheno-hunts%2Fnew",
+      // Both params, in URLSearchParams order: `plan` preselect (#940) then
+      // the sanitized returnTo. Pinning the full href keeps this contract
+      // strict — a substring pin on returnTo alone would still pass if the
+      // spec stopped asserting the href exactly.
+      "/pricing?plan=pro_annual&returnTo=%2Fpheno-hunts%2Fnew",
     ],
   },
   {

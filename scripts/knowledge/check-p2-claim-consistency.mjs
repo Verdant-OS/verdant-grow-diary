@@ -42,7 +42,10 @@ const RULES = [
     id: "unverified-botrytis-optimum",
     forbid: /68\s*°?F/i,
     why: "S6b returned HTTP 403 and was never read; the value must not appear in prose.",
-    allowIn: [DRAFT], // §8 register/claim map may name it as a blocked source
+    // The §8 source register and claim map may NAME the value as a blocked source.
+    // Scope that exemption to those specific table rows — a file-level exemption would
+    // let the value reappear in publishable §5 prose with the checker still reporting OK.
+    allowLine: (line, file) => file === DRAFT && /^\|\s*(S6b|C09)\b/.test(line.trim()),
   },
   {
     id: "federal-osha-stel",
@@ -118,9 +121,9 @@ for (const file of filesToCheck()) {
   const lines = readFileSync(file, "utf8").split("\n");
   checked += 1;
   for (const rule of RULES) {
-    if (rule.allowIn?.includes(file)) continue;
     lines.forEach((line, i) => {
       if (WITHDRAWAL_MARKERS.test(line)) return;
+      if (rule.allowLine?.(line, file)) return;
       if (rule.forbid.test(line)) {
         failures += 1;
         console.error(`FAIL [${rule.id}] ${file}:${i + 1}`);

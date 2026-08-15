@@ -131,10 +131,11 @@ they are rarely the same.
 **Decision rule — and it is two rules, not one.** The span above is built from _absolute_
 accuracy, so it answers only one of the two questions you are likely to ask:
 
-| Question                                | Use                           | Record it here        |
-| --------------------------------------- | ----------------------------- | --------------------- |
-| Where does my room sit inside the band? | **Absolute accuracy** (above) | Span: ......          |
-| Did the change I just made do anything? | **Repeatability / noise**     | Repeatability: ...... |
+| Question                                | Use                                              | Record it here                |
+| --------------------------------------- | ------------------------------------------------ | ----------------------------- |
+| Where does my room sit inside the band? | **Absolute accuracy** (above)                    | Span: ......                  |
+| Did the change I just made do anything? | **Uncertainty of the difference** = `√2 × u_rep` | Repeatability `u_rep`: ...... |
+|                                         |                                                  | `√2 × u_rep`: ......          |
 
 A stable calibration bias shifts every reading the same way, so it dominates _placement_
 within a band but **largely cancels** when you difference two readings from the same
@@ -142,8 +143,13 @@ instrument. **A sensor that is badly off in absolute terms can still resolve a s
 reliably, provided it is repeatable.**
 
 - Judge a **band comparison** against the absolute span.
-- Judge **"did my adjustment do anything"** against repeatability, which is usually much
-  smaller.
+- Judge **"did my adjustment do anything"** against the uncertainty of the _difference_.
+  Random error is present in **both** the before and the after reading, so for equal
+  independent repeatability `u_rep` the difference carries **`√2 · u_rep`**, not `u_rep`.
+  Add drift between the two readings and anything else that changed meanwhile. This matches
+  assets 4, 5 and 7; an earlier revision of this worksheet compared against a single
+  reading's repeatability and would have reported small adjustments as resolved when they
+  were not.
 - If the datasheet gives no repeatability figure, **record that absence** — you then cannot
   say how small a change you can detect.
 

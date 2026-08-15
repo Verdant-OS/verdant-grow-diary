@@ -871,7 +871,8 @@ without this line an editor could reasonably treat them as ready. **Clearing the
 alone does not make this draft reviewable.**
 
 Two further unread-source items are already blocked rather than pending and so are not
-counted above: **S6b** (OSU, source of the 68 °F optimum in C09, marked must-not-publish)
+counted above: **S6b** (OSU, the unread source behind C09's withheld optimum — the value
+itself is deliberately not restated here either)
 and the withdrawn **C07**.
 
 Four items do need a decision, and all four can be settled in parallel with the asset work:

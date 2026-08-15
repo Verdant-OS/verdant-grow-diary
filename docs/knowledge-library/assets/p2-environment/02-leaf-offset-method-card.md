@@ -159,8 +159,12 @@ rectangular distributions.
 > An earlier revision root-sum-squared the raw bounds against the SEM and reported
 > **0.70 °C** with no stated coverage — a figure that sits between the 1σ and 95% values and
 > means neither. **The ± you carry into asset 3 should be U with its k stated**, or the
-> leaf-VPD range built from it is narrower than it appears. (A fully conservative
-> alternative — linear addition of the raw bounds plus the SEM — gives 1.33 °C.)
+> leaf-VPD range built from it is narrower than it appears. (A conservative
+> alternative propagates the **bounds linearly and expands the sampling term to match**:
+> `0.35 + 0.5 + 0.30 + k·SEM` with k = 2 gives **1.51 °C**. Adding the raw 1σ SEM to three
+> hard bounds — as an earlier revision did, reporting 1.33 °C — mixes coverage levels and can
+> come out **smaller** than the properly expanded `U`, which defeats the point of a
+> conservative bound.)
 
 ### Canopy distribution — reported separately, never combined
 

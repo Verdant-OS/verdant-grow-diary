@@ -106,7 +106,10 @@ quantity).
 | Sensor accuracy (absolute, from above)                 |       |
 | Sensor **repeatability** (if published)                |       |
 | **Uncertainty of a difference** = `√2 ×` repeatability |       |
-| Is the spread larger than **that**?                    | y / n |
+| Did you **re-measure** the min and max cells?          | y / n |
+| Repeat readings — min cell                             |       |
+| Repeat readings — max cell                             |       |
+| **Does the gap survive re-measurement?**               | y / n |
 
 **Report the mean with the min÷mean ratio beside it, always.** A mean quoted alone is the
 failure this asset exists to prevent.
@@ -138,10 +141,31 @@ Add drift over the minutes the survey took, plus anything that changed in the ro
 **Better still, measure it:** re-read one cell several times without moving anything and use
 the spread of those differences.
 
-**If the spread is not larger than that, you have not demonstrated non-uniformity** — say so
-rather than acting on it. If you used more than one sensor, their biases do **not** cancel:
-combine their full uncertainties instead. (Absolute accuracy still governs the _absolute_
-PPFD and DLI values below, just not the uniformity comparison.)
+**But `√2 · u` is still the wrong threshold for `max − min`, because those two cells were
+selected for being extreme.** A pairwise threshold applies to a pair chosen in advance. Pick
+the largest and smallest of many noisy cells and the gap is wide **even with no real
+gradient** — and it widens as you add cells. Monte Carlo on pure noise, σ = 1, no gradient at
+all (author computation, deterministic seed, 200,000 trials per row):
+
+| Grid size     | Mean observed `max − min`, pure noise | Pairwise `√2·u` threshold |
+| ------------- | ------------------------------------: | ------------------------: |
+| 4 cells       |                                2.08 σ |                    1.41 σ |
+| 9 cells (3×3) |                                3.00 σ |                    1.41 σ |
+| 16 cells      |                                3.56 σ |                    1.41 σ |
+| 25 cells      |                                3.96 σ |                    1.41 σ |
+
+**A perfectly uniform 3 × 3 grid typically shows a range about twice the pairwise
+threshold.** Testing `max − min` against `√2·u` would declare non-uniformity in a uniform
+room most of the time.
+
+**What to do instead needs no distributional assumption: re-measure the min and max cells.**
+Take several fresh readings at each. If the gap persists across repeats it is real; if it
+collapses, you selected noise. Record both passes.
+
+**Only claim non-uniformity when the extreme cells survive re-measurement.** If you used more
+than one sensor, their biases do **not** cancel: combine their full uncertainties instead.
+(Absolute accuracy still governs the _absolute_ PPFD and DLI values below, just not the
+uniformity comparison.)
 
 ## DLI (only if your readings are true PPFD)
 

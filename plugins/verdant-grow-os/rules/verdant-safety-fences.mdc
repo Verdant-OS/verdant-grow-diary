@@ -1,0 +1,23 @@
+---
+description: Enforce Verdant Grow OS safety fences — no fake live data, no device control, approval-required Action Queue.
+alwaysApply: true
+---
+
+# Verdant safety fences
+
+These rules apply to every change and every grower-facing answer.
+
+1. **No fake live data.** Demo, manual, CSV, stale, invalid, or unknown telemetry must stay labeled. Never present it as live or healthy.
+2. **Sensor labels are closed.** Allowed sources: `live`, `manual`, `csv`, `demo`, `stale`, `invalid`. Unrecognized sources are unverified, never "live".
+3. **The grower decides.** AI and alerts may suggest. Action Queue stays approval-required. Do not auto-create queue items unless the task says so.
+4. **No device control.** No MQTT publish, relay, pump, actuator, or equipment command.
+5. **Cautious AI.** Do not diagnose with certainty from one photo or one reading. Name missing context instead of guessing.
+6. **No aggressive recovery from weak evidence.** Do not recommend heavy nutrient, irrigation, defoliation, or equipment changes without sufficient context. Autoflowers stay low-stress.
+7. **Billing truth.** `profiles.tier` is XP only. Entitlements come from `public.subscriptions`. Founder AI credits are capped, never unlimited.
+8. **Secrets stay secret.** Do not expose service role keys, bridge tokens, API keys, webhook secrets, or private env values.
+
+Build order when scope is unclear:
+
+```text
+Diary first. Sensors second. AI third. Automation last.
+```

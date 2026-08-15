@@ -11,8 +11,17 @@
 
 At lights-off, sensible (heat) load falls quickly while latent (moisture) load does not.
 Equipment that removes moisture as a by-product of cooling loses its moisture-removal
-capability exactly when the room needs it most. **The first one to two hours after lights-off
-is where a room's real humidity limit shows itself** — and it is invisible in a daily average.
+capability exactly when the room needs it most — and that is invisible in a daily average.
+
+**This asset states no duration for that window, because no source in the claim map
+establishes one.** An earlier revision asserted "the first one to two hours," which was an
+unmapped number and is withdrawn — the pillar's own rule is that assets introduce no figure
+absent from §8. **When the peak occurs, and how long it lasts, is a property of your room's
+moisture release and equipment cycling.** Rooms whose HVAC cycles slowly, or whose substrate
+releases moisture late, can peak well after any fixed template would stop watching. **Record
+through the full lights-off period at least once** to find out where your own peak sits;
+only then is a shorter recurring template defensible, and only at the interval your own data
+justifies.
 
 Two reasons this window matters beyond equipment:
 
@@ -40,8 +49,13 @@ Two reasons this window matters beyond equipment:
 
 ## Timeline
 
-Record from 15 minutes before lights-off through at least 120 minutes after. Compute VPD per
-row using asset 3 — **do not average the inputs first** (claims C01, C02).
+**First run: record through the entire lights-off period**, not to a fixed cut-off — you are
+locating your peak, and a template that stops early will report a peak that is merely the
+last point you measured. Rows below run to +120 minutes as a starting scaffold; **add rows
+to the end of your dark period** and keep going until RH has clearly turned and recovered.
+Note in the findings table whether the peak fell inside the sampled window or at its edge.
+
+Compute VPD per row using asset 3 — **do not average the inputs first** (claims C01, C02).
 
 | Minutes from lights-off | Air T (°C) | RH (%) | VPD (kPa) | Coldest surface T (°C) | Equipment state | Notes |
 | ----------------------: | ---------- | ------ | --------- | ---------------------- | --------------- | ----- |
@@ -69,6 +83,9 @@ housings after cool-down, uninsulated pipework, glass.
 | Peak RH                                                     |       |           |
 | Minimum VPD                                                 |       |           |
 | Time for RH to peak                                         |       |           |
+| **Did the peak fall at the edge of the sampled window?**    | y / n |           |
+| Full dark-period length                                     |       |           |
+| Was the whole dark period sampled?                          | y / n |           |
 | Time for RH to return to its lights-on level (or "did not") |       |           |
 | Lowest surface temperature observed                         |       |           |
 | Did any equipment reach continuous duty?                    |       |           |

@@ -60,14 +60,34 @@ the answer.**
 
 ## Step 3 — compute the range
 
-Compute VPD at the nominal inputs, then at the two corners that push VPD furthest apart:
-warm-and-dry (T + accuracy, RH − accuracy) and cool-and-wet (T − accuracy, RH + accuracy).
+**The corners differ for air basis and leaf basis. Use the right table.**
 
-| Case                | T (°C) | RH (%) | VPD (kPa) |
-| ------------------- | ------ | ------ | --------- |
-| Nominal             |        |        |           |
-| Warm and dry corner |        |        |           |
-| Cool and wet corner |        |        |           |
+### Air basis — `air VPD = e°(T_air) · (1 − RH/100)`
+
+Both terms move the same way with air temperature, so the corners are warm-and-dry and
+cool-and-wet.
+
+| Case                | T_air (°C) | RH (%)   | Air VPD (kPa) |
+| ------------------- | ---------- | -------- | ------------- |
+| Nominal             |            |          |               |
+| Warm and dry corner | T + acc    | RH − acc |               |
+| Cool and wet corner | T − acc    | RH + acc |               |
+
+### Leaf basis — `leaf VPD = e°(T_leaf) − e°(T_air) · (RH/100)`
+
+**Air and leaf temperature are two independently measured quantities and must be varied
+independently — in opposite directions.** Leaf VPD rises with leaf temperature and falls
+with air temperature and RH, so:
+
+| Case           | T_leaf (°C)  | T_air (°C)  | RH (%)   | Leaf VPD (kPa) |
+| -------------- | ------------ | ----------- | -------- | -------------- |
+| Nominal        |              |             |          |                |
+| Maximum corner | T_leaf + acc | T_air − acc | RH − acc |                |
+| Minimum corner | T_leaf − acc | T_air + acc | RH + acc |                |
+
+**Moving a single "temperature" up or down conflates the two and understates the range.**
+If your leaf and air instruments are different devices, use each one's own accuracy figure;
+they are rarely the same.
 
 **Reported result:** VPD = ...... kPa, plausible range ...... to ...... kPa (span ...... kPa).
 

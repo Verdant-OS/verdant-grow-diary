@@ -16,9 +16,23 @@ there is direct cannabis evidence for why. In one indoor trial, inflorescence yi
 1,800 µmol·m⁻²·s⁻¹**, with no plateau inside that range, and an independent group reported
 dry-matter production likewise rising from 600 to 1,200 µmol·m⁻²·s⁻¹ [claim C04a].
 
-If yield tracks intensity roughly proportionally over the working range, **a dim corner is a
-proportional yield loss — and a room-average PPFD figure hides it completely.** That is the
-entire argument for mapping.
+**But do not translate that into a proportional yield penalty — the evidence does not support
+it.** In the same trial PPFD rose **15×** (120→1,800) while yield rose only **4.5×**, so the
+linear fit carries a large positive intercept and a fractional light deficit produces a
+**smaller** fractional yield deficit. Working the published endpoints through that fit
+(author computation from C04a), a corner 20% dimmer than the canopy mean gives roughly a
+**12–16%** yield deficit, not 20%.
+
+Two further limits on any such estimate:
+
+- The trial varied intensity **across whole treatments**, not across positions within one
+  canopy. It does not directly measure how a shaded corner of an otherwise bright room
+  behaves — neighbouring plants, edge effects, and airflow all differ there.
+- The fit is bounded to that trial's cultivar, medium, facility, and range.
+
+So the honest argument for mapping is not a yield multiplier: **a room-average PPFD figure
+hides where the extremes are, and the extremes are where the plants that underperform are
+living.** Locate them; do not price them.
 
 > **What this asset will not tell you: whether light affects potency.** The evidence
 > conflicts. One trial found **no** effect of PPFD on the potency of any measured cannabinoid

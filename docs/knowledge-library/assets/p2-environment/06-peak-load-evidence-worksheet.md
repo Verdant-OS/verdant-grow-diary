@@ -56,10 +56,31 @@ do not convert it into a capacity figure yourself.
 | Stage at peak                                  |       |              |
 | Plant count and canopy area at peak            |       |              |
 
-> The difference between input and runoff is **not** the transpiration load. It also
-> includes evaporation from media surfaces and containers, and it ignores water still held in
-> the substrate. It is an upper bound on plant transpiration and a useful measured input —
-> label it that way when you hand it over.
+> **The difference between input and runoff is not the transpiration load, and it is not an
+> upper bound on it either.** The full balance over a measurement period is
+>
+> ```text
+> input − runoff = transpiration + evaporation + Δ(substrate storage)
+> ```
+>
+> Evaporation from media surfaces and containers inflates the figure, **but a falling
+> substrate water content makes Δstorage negative — and then transpiration can exceed
+> input − runoff.** The two terms push in opposite directions, so the difference is neither
+> a ceiling nor a floor.
+>
+> **Label it an incomplete proxy**, and record which way it is likely to be wrong:
+>
+> | Field                                                               | Value |
+> | ------------------------------------------------------------------- | ----- |
+> | Substrate water content at start of period (method: ......)         |       |
+> | Substrate water content at end of period                            |       |
+> | Direction of storage change (rising / falling / measured steady)    |       |
+> | Was the period a full irrigation cycle returning to the same state? | y / n |
+>
+> **If you measured a full cycle that begins and ends at the same substrate state, Δstorage
+> is approximately zero and the figure becomes an upper bound on transpiration** (evaporation
+> is then the only inflating term). Say which case you are in when you hand this over — an
+> HVAC designer sizing from a figure mislabelled as a ceiling can undersize the room.
 
 ## Part C — equipment as installed
 

@@ -23,11 +23,14 @@ leaf VPD = e°(T_leaf) − e°(T_air) · (RH/100)
 
 ## Step 1 — inputs and their provenance
 
-| Field                                     | Value | Source label | Captured at | Instrument accuracy |
-| ----------------------------------------- | ----- | ------------ | ----------- | ------------------- |
-| Air temperature (°C)                      |       |              |             | ±                   |
-| Relative humidity (%)                     |       |              |             | ±                   |
-| Leaf temperature (°C) — or "not measured" |       |              |             | ±                   |
+| Field                                     | Value | Source label | Captured at | Accuracy (absolute) | Repeatability |
+| ----------------------------------------- | ----- | ------------ | ----------- | ------------------- | ------------- |
+| Air temperature (°C)                      |       |              |             | ±                   | ±             |
+| Relative humidity (%)                     |       |              |             | ±                   | ±             |
+| Leaf temperature (°C) — or "not measured" |       |              |             | ±                   | ±             |
+
+**Accuracy and repeatability are different numbers and answer different questions** — see the
+decision rule in step 4. If the datasheet gives only one, record which one it is.
 
 Source label is one of `live`, `manual`, `csv`, `demo`, `stale`, `invalid`. **If any input
 is `stale`, `invalid`, or `demo`, stop — the result is not authoritative and no target
@@ -77,10 +80,28 @@ warm-and-dry (T + accuracy, RH − accuracy) and cool-and-wet (T − accuracy, R
 | Your uncertainty span (kPa, from step 3) |       |
 | Span as a percentage of band width       |       |
 
-**Decision rule:** if your span is a large fraction of the band width, **an adjustment
-smaller than the span is indistinguishable from measurement error.** In the pillar's worked
-example the span was about 70% of a 0.4 kPa band — under that assumed budget, most of the
-band is noise.
+**Decision rule — and it is two rules, not one.** The span above is built from _absolute_
+accuracy, so it answers only one of the two questions you are likely to ask:
+
+| Question                                | Use                           | Record it here        |
+| --------------------------------------- | ----------------------------- | --------------------- |
+| Where does my room sit inside the band? | **Absolute accuracy** (above) | Span: ......          |
+| Did the change I just made do anything? | **Repeatability / noise**     | Repeatability: ...... |
+
+A stable calibration bias shifts every reading the same way, so it dominates _placement_
+within a band but **largely cancels** when you difference two readings from the same
+instrument. **A sensor that is badly off in absolute terms can still resolve a small change
+reliably, provided it is repeatable.**
+
+- Judge a **band comparison** against the absolute span.
+- Judge **"did my adjustment do anything"** against repeatability, which is usually much
+  smaller.
+- If the datasheet gives no repeatability figure, **record that absence** — you then cannot
+  say how small a change you can detect.
+
+In the pillar's worked example the absolute span was about 70% of a 0.4 kPa band. That means
+placement within the band is poorly determined under that assumed budget; **it does not mean
+no adjustment is measurable.**
 
 > **On the band itself.** This worksheet does not supply one. Verdant ships stage bands whose
 > origin is unrecorded (draft §9, claim C11) — no source, method, or reviewer, and the

@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveMobileQuickLogTarget } from "@/lib/quickLogRouteTargetRules";
+import {
+  resolveMobileQuickLogTarget,
+  resolvePlantQuickLogRouteTarget,
+} from "@/lib/quickLogRouteTargetRules";
 
 const TENT_ID = "30000000-0000-4000-8000-000000000001";
+const PLANT_ID = "40000000-0000-4000-8000-000000000001";
 
 describe("resolveMobileQuickLogTarget", () => {
   it("returns a tent-scoped target for a real Tent Detail UUID", () => {
@@ -21,5 +25,23 @@ describe("resolveMobileQuickLogTarget", () => {
     expect(resolveMobileQuickLogTarget("/tents/t1")).toBeNull();
     expect(resolveMobileQuickLogTarget("/tents/%2Fetc")).toBeNull();
     expect(resolveMobileQuickLogTarget(null)).toBeNull();
+  });
+});
+
+describe("resolvePlantQuickLogRouteTarget", () => {
+  it("returns the exact plant UUID from Plant Detail", () => {
+    expect(resolvePlantQuickLogRouteTarget(`/plants/${PLANT_ID}`)).toBe(PLANT_ID);
+    expect(resolvePlantQuickLogRouteTarget(`/plants/${PLANT_ID}/`)).toBe(PLANT_ID);
+  });
+
+  it.each(["/plants", "/plants/new", "/tents/plant-1", "/plants/%2Fetc", "/plants/%E0%A4%A"])(
+    "fails closed for %s",
+    (pathname) => {
+      expect(resolvePlantQuickLogRouteTarget(pathname)).toBeNull();
+    },
+  );
+
+  it("fails closed for non-string input", () => {
+    expect(resolvePlantQuickLogRouteTarget(null)).toBeNull();
   });
 });

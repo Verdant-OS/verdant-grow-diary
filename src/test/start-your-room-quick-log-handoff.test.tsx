@@ -5,15 +5,25 @@ import { FREE_CAPABILITIES } from "@/lib/entitlements/capabilities";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { clearLocalStorageForTest } from "./helpers/localStorageTestHelper";
 
-const { navMock, fromMock, refreshMock, setActiveGrowIdMock, entitlementState } = vi.hoisted(
-  () => ({
-    navMock: vi.fn(),
-    fromMock: vi.fn(),
-    refreshMock: vi.fn(async () => undefined),
-    setActiveGrowIdMock: vi.fn(),
-    entitlementState: { capabilities: null as unknown },
-  }),
-);
+const {
+  navMock,
+  fromMock,
+  refreshMock,
+  invalidateQueriesMock,
+  setActiveGrowIdMock,
+  entitlementState,
+} = vi.hoisted(() => ({
+  navMock: vi.fn(),
+  fromMock: vi.fn(),
+  refreshMock: vi.fn(async () => undefined),
+  invalidateQueriesMock: vi.fn(async () => undefined),
+  setActiveGrowIdMock: vi.fn(),
+  entitlementState: { capabilities: null as unknown },
+}));
+
+vi.mock("@tanstack/react-query", () => ({
+  useQueryClient: () => ({ invalidateQueries: invalidateQueriesMock }),
+}));
 
 vi.mock("@/lib/react-router-compat", async () => {
   const actual = await vi.importActual<typeof import("@/lib/react-router-compat")>(
@@ -79,6 +89,7 @@ beforeEach(() => {
   navMock.mockClear();
   fromMock.mockReset();
   refreshMock.mockClear();
+  invalidateQueriesMock.mockClear();
   setActiveGrowIdMock.mockClear();
   entitlementState.capabilities = FREE_CAPABILITIES;
   clearLocalStorageForTest();
@@ -112,6 +123,9 @@ describe("Start Your Room Quick Log handoff", () => {
     await user.type(screen.getByTestId("start-room-plant-name"), "E2E Plant");
     await user.click(screen.getByTestId("start-room-plant-submit"));
     expect(await screen.findByTestId("start-your-room-step-done")).toBeInTheDocument();
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: ["tents"] });
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: ["plants"] });
+    expect(refreshMock).toHaveBeenCalledTimes(2);
 
     await user.click(screen.getByTestId("start-room-finish"));
 

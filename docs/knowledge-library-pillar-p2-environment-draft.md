@@ -1,12 +1,24 @@
 # P2 pillar draft — Environment, climate, and light
 
-**Editorial-workflow state:** `drafted`. This is an **Author-role draft** in
-`editorial-workflow.md`'s sense — accountable for "accurate synthesis, claim map, original
-asset, disclosures, and revision response." It has **not** passed `evidence_review`,
-`cultivation_review`, `product_truth_review`, `technical_review`, or
-`copy_accessibility_review`. Per that document's role table the author cannot be the sole
-evidence or cultivation approver for R2 material. Treat every citation here as a starting
-claim map, not a cleared source list.
+**Editorial-workflow state: pre-`drafted`.** This is an author working revision on the
+`sourced → drafted` transition. It has **not** reached `drafted` and must not be routed to
+`evidence_review` yet. `editorial-workflow.md`'s state table sets that transition's exit
+proof as "complete draft, **original asset**, limitations, non-product next step,
+disclosures" — and **§7's assets are specifications, not artifacts.** No diagram, grid,
+card, or worksheet has been produced, so a reviewer cannot verify the methods, safety
+boundaries, or outputs the page would render. The same row's _entry_ artifact ("approved
+brief and claim map") is also unmet: `KL-002`'s brief is at `draft`, not `reviewed`, and no
+evidence editor has approved §8.
+
+An earlier revision of this document labelled itself `drafted`. That was wrong against the
+contract above. It is corrected by relabelling rather than by hurriedly finishing the
+assets, because two of them (§7's **†** items) need the qualified R3 reviewer before an
+author should draw them at all. **Reaching `drafted` requires building the six author-buildable
+assets** (two of the eight are R3-gated) — real, scoped, separable work, not a labelling exercise.
+
+Treat every citation here as a starting claim map, not a cleared source list. Per
+`editorial-workflow.md`'s role table the author cannot be the sole evidence or cultivation
+approver for R2 material, and this document has passed no review lane.
 
 > **Risk-class notice — read before routing this for review.** `roadmap-500.json` records
 > `KL-002` as `claimRiskClass: R2`. **As drafted, this page is R3.** `content-standards.md`
@@ -277,14 +289,28 @@ pillar acceptance gate.
   not. Presenting one as the other is a source-truth violation, not a wording preference.
 - **Applying an assumed leaf offset.** A guessed offset produces a number with a leaf label
   and no leaf evidence. §3.3 shows it can invert the verdict.
-- **Chasing a target inside the noise band.** §3.2: ordinary uncertainty spans ~70% of the
-  shipped band width. Tuning inside that is chasing instrument error.
+- **Chasing a target change smaller than your own measurement uncertainty.** §3.2's worked
+  example uses an _assumed_ ±0.5 °C / ±3% RH budget, under which the plausible range spans
+  ~70% of the shipped band. That percentage is a property of that assumption, not a
+  universal fact — a better instrument narrows it and a worse one widens it. The durable
+  rule is the comparison, not the number: **compute your own sensors' budget from their
+  datasheet accuracy and repeatability, and treat any adjustment smaller than that span as
+  indistinguishable from measurement error** until a better instrument says otherwise.
 - **Averaging inputs before deriving.** §3.4 — wrong by an unpredictable amount _and sign_.
 - **Treating a controller setpoint as a measurement.** The setpoint is what was asked for.
   The sensor is what happened. They disagree constantly, and the disagreement is the
   signal.
 - **Sizing dehumidification from lights-on conditions.** The binding constraint is usually
   lights-off in late flower, when sensible load collapses and latent load does not.
+- **Treating sustained high humidity as only a mould risk.** It is also a direct
+  developmental and chemical problem, stated as a bounded claim [C05]: cannabis held at
+  **78–98% RH** (VPD 0.05 kPa vegetative, 0.25 kPa flowering) versus **37–58% RH** (VPD
+  1.29 / 0.92 kPa) showed **total CBD reduced 4.6-fold, flowering onset delayed by roughly
+  three weeks, and total dry biomass 2.71× lower** [Corredor-Perilla et al. 2025]. The
+  authors' own limits apply and matter: **one CBD-dominant genotype, n=10 per treatment,
+  controlled growth chambers.** Read it as direction and severity, not as a target — it is
+  a severe contrast and **cannot** adjudicate a mid-range kPa setpoint. A room that only
+  scouts for _Botrytis_ when RH climbs is watching one of several consequences.
 - **Chasing humidity down without checking surface temperature.** Condensation is governed
   by surface temperature relative to dew point, not by room RH alone. A cold wall, a duct,
   or a fixture housing can be at risk while the room reads acceptable.
@@ -306,7 +332,17 @@ visit:
 4. **Capacity and transitions** — transpiration load, HVAC/dehumidification capacity and
    margin, lights-on/off transitions, recovery time, condensate.
 5. **Lighting and photobiology** — PPFD, DLI, photoperiod, spectrum context, and
-   **uniformity, not only an average** (the acceptance gate is explicit on this).
+   **uniformity, not only an average** (the acceptance gate is explicit on this). The
+   evidence for why uniformity is the measurement that matters, stated as a bounded claim
+   [C04]: in one indoor trial, cannabis inflorescence yield **increased linearly from 116
+   to 519 g·m⁻² (4.5×) as canopy PPFD rose from 120 to 1,800 µmol·m⁻²·s⁻¹** over an 81-day
+   flowering stage, with **no effect on the potency of any measured cannabinoid**
+   [Rodriguez-Morrison et al. 2021]. Two consequences for this pillar: a dim corner of the
+   canopy is a proportional yield loss that a room-average PPFD number hides entirely, and
+   **light intensity is not a potency lever** — a page that implies otherwise is
+   contradicted by the same study that supports the yield claim. Bounded to one facility,
+   deep-water culture, and the tested range; no plateau was observed within it, which is
+   not evidence that none exists beyond it.
 6. **Drift and failure response** — setpoint versus measured state, alarm evidence, stale
    sensors, outage and overshoot, condensation and mould risk.
 
@@ -318,11 +354,19 @@ photosynthesis and transpiration physiology this pillar only gestures at. P9 own
 room as its own controlled environment. P10 owns the equipment and its installation
 boundaries.
 
-## 7. Original field assets (sketched, not finished)
+## 7. Original field assets — SPECIFIED, NOT BUILT
+
+**These are specifications for assets, not the assets.** Nothing below has been drawn,
+built, or filled in. `editorial-workflow.md` makes a completed original asset part of the
+`sourced → drafted` exit proof, which is why this document is **pre-`drafted`** (see the
+state notice at the top): a reviewer cannot verify a method, a safety boundary, or an
+output from a description of a worksheet.
 
 Per `pillar-pages.md`'s required-assets list for P2. Each needs a cultivation reviewer and
 an evidence editor before it is real; the two marked **†** additionally need the qualified
-R3 reviewer.
+R3 reviewer **before an author should draw them at all**, since their content is inside the
+R3 boundary. That is why finishing all eight is not simply a matter of more author time —
+**six are author-buildable now; two are gated.**
 
 - **Canopy sensor-placement diagram** — representative height, radiant shielding, distance
   from equipment extremes, and the explicit statement that one probe describes one point.
@@ -378,7 +422,7 @@ pre-filled here.
 | C02 | §3.4           | Averaging temperature and RH before deriving VPD produces an error whose **sign and magnitude are data-dependent**, driven mainly by T–RH covariance rather than convexity alone                     | R1     | method/arithmetic       | Derived                                      | S1 (`limits`) plus author computation           | Author-computed, reproducible                                                       |
 | C03 | §3.2, §3.3     | The worked air/leaf VPD values, and the span produced by a ±0.5 °C / ±3% RH error budget, computed from C01                                                                                          | R1     | worked example          | Derived                                      | S1 (`defines_method`)                           | Author-computed; the error budget is a **stated assumption**, not a datasheet claim |
 | C04 | §6             | Indoor cannabis inflorescence yield rose linearly 116→519 g·m⁻² (4.5×) as canopy PPFD rose 120→1,800 µmol·m⁻²·s⁻¹ over an 81-day flowering stage, with **no** effect on measured cannabinoid potency | R2     | cultivation outcome     | Supported across sources (single primary)    | S2 (`supports`, `limits`)                       | **Direct cannabis**                                                                 |
-| C05 | §5, §6         | Cannabis at 78–98% RH (VPD 0.05/0.25 kPa) versus 37–58% RH (VPD 1.29/0.92 kPa) showed total CBD reduced 4.6×, flowering delayed ~3 weeks, dry biomass 2.71× lower                                    | R2     | cultivation outcome     | Supported across sources (single primary)    | S3 (`supports`, `limits`)                       | **Direct cannabis**                                                                 |
+| C05 | §5             | Cannabis at 78–98% RH (VPD 0.05/0.25 kPa) versus 37–58% RH (VPD 1.29/0.92 kPa) showed total CBD reduced 4.6×, flowering delayed ~3 weeks, dry biomass 2.71× lower                                    | R2     | cultivation outcome     | Supported across sources (single primary)    | S3 (`supports`, `limits`)                       | **Direct cannabis**                                                                 |
 | C06 | §4, §7         | Federal OSHA PEL for CO2 is 5,000 ppm 8-hr TWA with **no** short-term limit listed; Cal/OSHA, NIOSH (15-min ST) and ACGIH each add 30,000 ppm short-term                                             | **R3** | controlling requirement | Controlling requirement                      | S4 (`controls_requirement`)                     | Regulation                                                                          |
 | C07 | §4, §7         | NIOSH IDLH for CO2 is 40,000 ppm                                                                                                                                                                     | **R3** | controlling requirement | Unknown or disputed **pending verification** | S5 (`controls_requirement`)                     | **UNVERIFIED — see 8.5**                                                            |
 | C08 | §4             | Cannabis transpires most applied irrigation water into room air, so latent load persists after lights-off when sensible load collapses                                                               | **R3** | equipment/capacity      | Field tendency                               | S8 (`supports`)                                 | **Trade press — below tier**                                                        |
@@ -602,10 +646,14 @@ mine — but it belongs in the decision.
 
 ---
 
-**Handoff.** This draft is ready for evidence-editor and cultivation-reviewer assignment.
-Four items need a decision before authoring resumes: the **risk-class question at the top
-of this document** (ship the pillar R3, or move its CO2/HVAC claims out and keep it R2),
-the §9 VPD-band option (1, 2, or 3), the §11.2 L1-cluster structural question, and the
-§11.5 R3 reviewer resourcing. The
+**Handoff.** This revision is **not** ready for `evidence_review` — it is pre-`drafted`,
+and the blocker is concrete: **six author-buildable original assets in §7 have not been
+built.** That is the next unit of work, and it needs no decision from anyone; the remaining
+two are R3-gated and wait on the reviewer.
+
+Four items do need a decision, and all four can be settled in parallel with the asset work:
+the **risk-class question at the top of this document** (ship the pillar R3, or move its
+CO2/HVAC claims out and keep it R2), the §9 VPD-band option (1, 2, or 3), the §11.2
+L1-cluster structural question, and the §11.5 R3 reviewer resourcing. The
 `KL-002` search brief is already at `draft` and needs no GA4/GSC access to stay there —
 only advancing it to `validated` does.

@@ -95,6 +95,17 @@ Compute VPD per row using asset 3 — **do not average the inputs first** (claim
 _lowest_ reading you find, plus where. Candidates: exterior walls, duct runs, fixture
 housings after cool-down, uninsulated pipework, glass.
 
+> **That lowest reading is a _selected_ extremum, exactly like the PPFD min/max cell** — you
+> scanned many surfaces and kept the smallest number, so you selected measurement noise along
+> with the cold surface. A single-reading comparison against `U_margin` therefore produces
+> false condensation calls far more often than its stated coverage implies.
+>
+> **Confirm before judging:** go back to the selected location and take `m` **fresh,
+> pre-designated** readings. Use the confirmed **mean** in the margin comparison, and its
+> standard error `SD ÷ √m` as `u_instrument` in the budget below. Record `m`, the mean, and
+> the SD. This is the same selection-aware procedure asset 5 uses for the PPFD extrema; a
+> single scan reading is not enough to assign a condensation verdict.
+
 ## Findings
 
 | Metric                                                      | Value | At minute |
@@ -132,8 +143,9 @@ different coverage factors cannot be combined as they stand. Convert each bound 
 `u = a ÷ √3` (rectangular assumption, stated), then:
 
 ```text
-u_margin = sqrt(u_surface² + u_dewpoint²)      combined standard uncertainty (1σ)
-U_margin = k · u_margin,   k = 2 for ~95%      expanded — use this for the verdict
+u_surface = sqrt(u_instrument² + u_method²)          instrument AND method, both required
+u_margin  = sqrt(u_surface² + u_dewpoint²)           combined standard uncertainty (1σ)
+U_margin  = k · u_margin,   k = 2 for ~95%           expanded — use this for the verdict
 ```
 
 | Field                                                                      | Raw figure | Type  | Standard uncertainty (°C) |

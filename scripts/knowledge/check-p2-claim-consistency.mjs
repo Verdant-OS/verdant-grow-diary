@@ -124,23 +124,122 @@ function filesToCheck() {
   return [DRAFT, ...assets];
 }
 
+/**
+ * Scan units: one per LINE (catches table rows) and one per PARAGRAPH with its
+ * lines joined (catches claims that ordinary Markdown wrapping splits across
+ * lines — `68` ending one line and `°F` starting the next renders as one
+ * sentence but evaded a line-by-line scan).
+ *
+ * A paragraph inherits an exemption if ANY of its lines carries the token, so a
+ * documented withdrawal keeps working after re-wrapping.
+ */
+export function scanUnits(text) {
+  const lines = text.split(/\r?\n/);
+  const units = lines.map((line, i) => ({ text: line, line: i + 1, lines: [line] }));
+
+  // Paragraph units join only wrappable PROSE. Table rows and fenced code do not
+  // wrap in Markdown, so joining them would splice unrelated cells into one
+  // sentence and manufacture false positives.
+  const isProse = (l) => {
+    const t = l.trim();
+    return t !== "" && !t.startsWith("|") && !t.startsWith("```");
+  };
+
+  let start = 0;
+  for (let i = 0; i <= lines.length; i += 1) {
+    const atBreak = i === lines.length || !isProse(lines[i]);
+    if (!atBreak) continue;
+    if (i - start > 1) {
+      const block = lines.slice(start, i);
+      units.push({
+        text: block.join(" ").replace(/\s+/g, " "),
+        line: start + 1,
+        lines: block,
+      });
+    }
+    start = i + 1;
+  }
+  return units;
+}
+
+export function findViolations(text, file, rules = RULES) {
+  const out = [];
+  for (const unit of scanUnits(text)) {
+    for (const rule of rules) {
+      if (unit.lines.some((l) => explicitlyAllowed(l, rule.id))) continue;
+      if (unit.lines.every((l) => rule.allowLine?.(l, file))) continue;
+      if (rule.forbid.test(unit.text)) {
+        out.push({ rule, line: unit.line, text: unit.text });
+      }
+    }
+  }
+  // one report per (rule, line) — a claim on a single line also appears in its paragraph
+  const seen = new Set();
+  return out.filter((v) => {
+    const key = `${v.rule.id}:${v.line}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 let failures = 0;
 let checked = 0;
 
 for (const file of filesToCheck()) {
-  const lines = readFileSync(file, "utf8").split("\n");
+  const text = readFileSync(file, "utf8");
   checked += 1;
-  for (const rule of RULES) {
-    lines.forEach((line, i) => {
-      if (explicitlyAllowed(line, rule.id)) return;
-      if (rule.allowLine?.(line, file)) return;
-      if (rule.forbid.test(line)) {
-        failures += 1;
-        console.error(`FAIL [${rule.id}] ${file}:${i + 1}`);
-        console.error(`     ${line.trim().slice(0, 120)}`);
-        console.error(`     why: ${rule.why}`);
-      }
-    });
+  for (const v of findViolations(text, file)) {
+    failures += 1;
+    console.error(`FAIL [${v.rule.id}] ${file}:${v.line}`);
+    console.error(`     ${v.text.trim().slice(0, 120)}`);
+    console.error(`     why: ${v.rule.why}`);
+  }
+}
+
+// Regression cases — a fence that can be bypassed by formatting is not a fence.
+const SELF_TESTS = [
+  {
+    name: "wrapped claim across a line break is caught",
+    text: ["Infection risk peaks around 68", "°F in a cool room."].join("\n"),
+    rule: "unverified-botrytis-optimum",
+    expect: true,
+  },
+  {
+    name: "single-line claim is caught",
+    text: "A dim corner is a proportional yield loss.",
+    rule: "proportional-corner-yield",
+    expect: true,
+  },
+  {
+    name: "explicit token exempts its own rule",
+    text: "A dim corner is a proportional yield loss. <!-- claim-check: allow proportional-corner-yield -->",
+    rule: "proportional-corner-yield",
+    expect: false,
+  },
+  {
+    name: "token naming a different rule does not exempt",
+    text: "A dim corner is a proportional yield loss. <!-- claim-check: allow circular-uc -->",
+    rule: "proportional-corner-yield",
+    expect: true,
+  },
+  {
+    name: "token anywhere in a wrapped paragraph exempts that paragraph",
+    text: [
+      "Infection risk peaks around 68",
+      "°F. <!-- claim-check: allow unverified-botrytis-optimum -->",
+    ].join("\n"),
+    rule: "unverified-botrytis-optimum",
+    expect: false,
+  },
+];
+
+let selfFailures = 0;
+for (const t of SELF_TESTS) {
+  const hit = findViolations(t.text, "<self-test>").some((v) => v.rule.id === t.rule);
+  if (hit !== t.expect) {
+    selfFailures += 1;
+    console.error(`SELF-TEST FAIL: ${t.name} (expected ${t.expect ? "caught" : "exempt"})`);
   }
 }
 
@@ -149,4 +248,9 @@ console.log(
     ? `P2 claim consistency: OK — ${RULES.length} withdrawn claims stay withdrawn across ${checked} files`
     : `P2 claim consistency: ${failures} reintroduced claim(s)`,
 );
-process.exit(failures === 0 ? 0 : 1);
+console.log(
+  selfFailures === 0
+    ? `Self-tests: ${SELF_TESTS.length}/${SELF_TESTS.length} pass`
+    : `Self-tests: ${selfFailures} FAILED — the fence itself is broken`,
+);
+process.exit(failures === 0 && selfFailures === 0 ? 0 : 1);

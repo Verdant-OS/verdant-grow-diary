@@ -458,7 +458,7 @@ visit:
    [Rodriguez-Morrison et al. 2021, "Yield and Quality," Fig. 7A], and an **independent
    group** reported inflorescence dry-matter production likewise rising from 600 to
    1,200 µmol·m⁻²·s⁻¹ [Sae-Tang et al. 2024]. **What that does not license is a proportional
-   yield penalty for a dim corner.** PPFD rose **15×** in the first trial while yield rose
+   yield penalty for a dim corner.** PPFD rose **15×** in the first trial while yield rose <!-- claim-check: allow proportional-corner-yield -->
    **4.5×**, so the linear fit carries a large positive intercept and a fractional light
    deficit produces a _smaller_ fractional yield deficit — and more fundamentally, both
    trials varied intensity **across whole treatments**, never across positions within one

@@ -170,10 +170,27 @@ u_confirm = sqrt(SD_min^2 / m  +  SD_max^2 / m)     combined standard uncertaint
 U_confirm = k * u_confirm,   k = 2 for roughly 95%
 ```
 
+**`k = 2` is only valid when the SDs are well determined.** With few repeats they are
+estimates, so the factor must come from the **t distribution** at the Welch-Satterthwaite
+degrees of freedom — at most `2(m - 1)` here. Two-sided 95% factors:
+
+| `m` repeats per cell | max dof | 95% factor | vs `k = 2` |
+| -------------------: | ------: | ---------: | ---------: |
+|                    2 |       2 |      4.303 |     2.15 x |
+|                    3 |       4 |      2.776 |     1.39 x |
+|                    4 |       6 |      2.447 |     1.22 x |
+|                    6 |      10 |      2.228 |     1.11 x |
+|                   11 |      20 |      2.086 |     1.04 x |
+|                   31 |      60 |      2.000 |     1.00 x |
+
+**At `m = 2`, using `k = 2` would confirm a gap less than half the size the evidence
+supports.** Take **at least 4-6 repeats per cell**, or read the factor from this table and
+use it — but do not default to 2.
+
 **Declare non-uniformity only if the confirmed gap exceeds `U_confirm`**, and record `m`,
-both SDs, and the coverage factor. Because the two cells were _selected_, the confirmation
-must run on **fresh, pre-designated** measurements — that is what removes the selection
-effect. If the gap fails the test, you selected noise; say so.
+both SDs, and **the factor you used and where it came from**. Because the two cells were
+_selected_, the confirmation must run on **fresh, pre-designated** measurements — that is
+what removes the selection effect. If the gap fails the test, you selected noise; say so.
 
 **Only claim non-uniformity when the extreme cells survive re-measurement.** If you used more
 than one sensor, their biases do **not** cancel: combine their full uncertainties instead.

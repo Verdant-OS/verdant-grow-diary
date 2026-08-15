@@ -1,0 +1,8 @@
+{
+  "synthetic": true,
+  "label": "SYNTHETIC_AI_CREDIT_RECORD",
+  "kind": "ai_credit_record",
+  "feature": "synthetic-review",
+  "weight": 1,
+  "notes": "SYNTHETIC AI-credit-shaped row. Not a spend ledger. Not a real user_id."
+}

@@ -395,10 +395,12 @@ object lookup, and those keep their own labels. A blocked ledger check and a
 directly-observed missing table are different findings, and flattening both to
 `NOT_MEASURED` would erase a verified defect rather than preserve caution.
 
-Four red runs are four absent measurements — `NOT_MEASURED`, in the literal
-sense this repo's status vocabulary requires — but they are not **merely** that.
-They are also four days in which the mechanism built to catch an invisible
-outage was itself unable to see, and was left that way.
+Five red runs — the four scheduled plus the 2026-08-15 dispatch — are five
+absent measurements, `NOT_MEASURED` in the literal sense this repo's status
+vocabulary requires, since not one of them completed a query. But they are not
+**merely** that. They are also four days (12–15 August) in which the mechanism
+built to catch an invisible outage was itself unable to see, and was left that
+way.
 
 ---
 

@@ -70,6 +70,45 @@ already deployed ahead of the repo.
 
 ---
 
+## ⚠️ Second production drift — committed migrations are NOT auto-applied
+
+**Recorded 2026-08-15 from a Lovable read-only investigation of production
+`knkwiiywfkbqznbxwqfh`.** `source claim` for the production measurements; the
+repository-side facts below were verified directly.
+
+**Publishing does not replay `supabase/migrations/`.** It deploys the frontend
+and edge functions only. Migrations reach production solely through the
+operator's own apply path. This corrects an assumption stated repeatedly in
+`docs/specs/postgres-restricted-role-alternative.md` (now fixed in its §5.4.1)
+and it explains why the signup-attribution fix above is "merged, NOT applied".
+
+**At least one further migration is unapplied, and it is not the signup one.**
+`supabase/migrations/20260811090000_quicklog_corrections_retractions.sql` is
+committed, but in production:
+
+- `to_regclass('public.quicklog_entry_revisions')` → `null` (table absent)
+- `public.diary_entries.retracted_at` / `.retraction_reason` → absent
+
+**Shipped code depends on those objects.** Verified in this repo:
+`useQuickLogRevisionBadges.ts` and `useRetractedQuickLogEntries.ts` both
+`.from("quicklog_entry_revisions")`, and they mount through
+`QuickLogHistoryPanels` / `QuickLogGroupedTimelineSection` onto **Timeline**,
+**TentDetail** and **PlantDetail** — the One-Tent Loop spine.
+
+**Failure mode is silent, not loud.** `useQuickLogRevisionBadges` does
+`if (error) return new Map();`. So Quick Log revision badges and retracted
+entries simply never render in production. No crash, no error surface, no
+telemetry — the feature looks shipped and is invisible. That is a different and
+in some ways worse shape than the signup outage, which at least fails loudly.
+
+Exact drift count is `NOT_MEASURED`: `supabase_migrations.schema_migrations` was
+`permission denied` for both roles available to the investigation, so only
+"≥ 1 beyond signup" is proven, by object absence. **Someone should reconcile the
+full migration ledger against production before assuming anything else in the
+265-file directory is live.**
+
+---
+
 ## Branch topology
 
 | Branch               | Role                                             | Verified head                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
@@ -252,8 +291,27 @@ derives it from `supabase status` where available, and the harness reports
 `BLOCKED` (never `PASS`) when it is absent. Do not record the PostgREST
 role-switching mechanism as available until P3 actually passes.
 
-**Phase 2 (production adoption) is APPROVED IN PRINCIPLE by Cheek, 2026-08-14 —
-execution is GATED, and the gate is not a formality.** Contract: spec §5.4.
+**Phase 2 (production adoption): APPROVED IN PRINCIPLE by Cheek 2026-08-14, but
+now on HOLD after the 2026-08-15 gate answers.** Contract: spec §5.4, §5.4.1,
+§5.4.2.
+
+**Gate A came back favourable and is no longer the blocker.** Production
+`postgres` holds `rolcreaterole = t` and is not superuser, so a plain
+`CREATE ROLE x NOLOGIN NOINHERIT` — exactly the drafted shape — is expected to
+succeed. Two different findings stop it instead:
+
+1. **The JWT secret is unobtainable on Lovable Cloud**, so a role-claim JWT
+   cannot be minted in production. P3 proved the PostgREST mechanism works
+   *locally*; in production the role would be created and then **unreachable**.
+   A fence nobody can route through is not a fence.
+2. **Role durability across rebuilds is `UNKNOWN`**, and roles sit outside
+   migrations and schema dumps entirely. Combined with the confirmed rule that a
+   role cannot be hardened after creation, a silent drop-and-recreate would
+   restore the principal **without its grants**, with nothing in-database
+   signalling it.
+
+Phases 0 and 1 keep their value regardless: the detector runs on every PR and the
+10/10 demonstration stands. The original gate text follows.
 
 A production role can only be created by a migration under
 `supabase/migrations/`, which is exactly what Phase 1 avoided. Three things must

@@ -59,9 +59,11 @@ mine to overturn.
 **Verdict for Phase 0:** `DONE` — approved and delivered 2026-08-14 (§5.1.1).
 **Verdict for Phase 1:** `DONE` — approved and delivered 2026-08-14 (§5.2.1).
 Runtime proofs execute in the `security-db-local` replay lane.
-**Verdict for production roles:** `APPROVED IN PRINCIPLE` — Cheek, 2026-08-14.
-Execution gated on §5.4 Gates A/B/C. Re-pointing any edge function at the role
-remains a separate, later decision.
+**Verdict for production roles:** `APPROVED IN PRINCIPLE` (Cheek, 2026-08-14),
+but **HOLD on execution** after the 2026-08-15 gate answers — see §5.4.2. The
+blocker is not `CREATE ROLE`; it is that the JWT secret is unobtainable on
+Lovable Cloud, so the role would be unreachable, and role durability across
+rebuilds is unverified.
 
 ---
 
@@ -612,6 +614,70 @@ Note what it still does **not** do: no table grants, no `ALTER ROLE` naming a
 superuser-only attribute, and **no edge function re-pointed at the role.**
 Creating the principal and cutting traffic over to it are separate decisions;
 §9 keeps the second one `REJECT` until the first has baked in production.
+
+### 5.4.1 Gate answers — Lovable read-only investigation, 2026-08-15
+
+Measured against **production** `knkwiiywfkbqznbxwqfh` (PG 17.6) by Lovable, at
+Cheek's request. `source claim` throughout — I did not run these myself and the
+answers below carry Lovable's own status words, not upgraded ones.
+
+**A correction I owe first.** This spec asserted, repeatedly and as the
+justification for keeping Phase 1 out of `supabase/migrations/`, that "anything
+under `supabase/migrations/` reaches production on the next Lovable apply."
+**That is CONTRADICTED.** Publishing deploys the frontend and edge functions; it
+does **not** replay the migration directory. Migrations reach production only
+through the operator's own apply path. `source claim`, with proof by object
+absence (below).
+
+The Phase 1 outcome survives the correction — a disposable spike does not belong
+in migration history regardless — but the stated *reason* was wrong, and the
+urgency framing ("silently, with no further decision from anyone") was wrong with
+it. There is a further decision: an operator running the apply chain.
+
+| Gate | Answer | Status |
+| --- | --- | --- |
+| **A** — can migrations `CREATE ROLE`? | `postgres` has `rolcreaterole = t` and is **not** superuser. A plain `CREATE ROLE x NOLOGIN;` is expected to succeed. Any elevated attribute (`SUPERUSER`/`BYPASSRLS`/`REPLICATION`) is refused | **Expected PASS**, inferred from catalog attributes — **not a measured apply** |
+| **A′** — supautils interference | Supabase runs `supautils` with a role-privilege guard that can block role DDL even for `postgres`. Its active `reserved_roles`/`privileged_role` config was unreadable | `UNKNOWN` |
+| **2** — is post-hoc hardening impossible? | **CONFIRMED as a PostgreSQL rule.** PG 17 requires superuser to set *or clear* `SUPERUSER`/`REPLICATION`/`BYPASSRLS`. `postgres` is `rolsuper = f`. `supabase_admin` could, but migrations do not run as it and there is no path to it on Lovable Cloud | `CONFIRMED` (rule), `NOT_MEASURED` (host) |
+| **B** — does PostgREST honour the `role` claim? | No `pgrst.*` setting exists in `pg_db_role_setting`; PostgREST is configured from platform env vars that are unreadable. Lovable declined to infer the documented default | `UNKNOWN` |
+| **B′** — grant to `authenticator` | **Structurally CONFIRMED as required**: `authenticator`'s memberships are exactly `{anon, authenticated, service_role}`, and `SET LOCAL ROLE` needs membership. Permitted: expected PASS, same supautils caveat | Needed: `CONFIRMED`. Permitted: not measured |
+| **4** — key era | Legacy `eyJ…` JWT keys `CONFIRMED`; no `sb_publishable_`/`sb_secret_` anywhere | `CONFIRMED` |
+| **5b** — role durability | Roles are cluster-level, outside migrations and schema dumps. The project has **zero** custom roles today, so no precedent exists | `UNKNOWN`; honest default "no" |
+
+### 5.4.2 What the answers do to Phase 2
+
+Gate A came back **favourable** and the drafted migration in §5.4 is already the
+right shape: `CREATE ROLE verdant_ingest_writer NOLOGIN NOINHERIT` names no
+elevated attribute, so it lands in the "expected PASS" case rather than the
+refused one. Gate 2 confirms the design decision to *verify* attributes rather
+than `ALTER` them.
+
+**But two findings move Phase 2 from "gated" to "should not proceed yet", and
+neither is `CREATE ROLE`:**
+
+**1. We cannot mint the token in production.** P3 proved PostgREST role-claim
+switching works *on the local stack*. On Lovable Cloud, `SUPABASE_JWT_SECRET` is
+not exposed to Cheek or to Lovable. `source claim`. So even if Gate B resolves
+favourably, **the role would be created and then unreachable** by the mechanism
+§5.3 specifies. A security control nobody can route traffic through is not a
+control; it is an unused principal.
+
+The fallback, if Phase 2 is still wanted: a `LOGIN` role with a password reached
+over a **direct Postgres connection string**, bypassing PostgREST entirely. That
+is a different design with its own credential-custody problem, and it is not what
+Phases 0–1 measured. It would need its own spec and Security review.
+
+**2. A silently recreated role fails open.** Roles live outside everything
+`supabase/migrations/` describes. Combine that with Gate 2 — a role cannot be
+hardened after creation — and the failure mode is specific and bad: a rebuild
+drops and recreates the principal **without its grants**, and nothing in the
+database signals it. For a privilege fence, silent restoration to a
+wrong-but-plausible state is worse than absence.
+
+**Revised recommendation:** hold Phase 2. Not because it would break the apply
+chain — Gate A says it probably would not — but because the role would be
+unreachable and its persistence is unverified. Phases 0 and 1 keep their value
+regardless: the detector runs on every PR, and the demonstration stands.
 
 ### 5.3 How a restricted role is actually reached
 

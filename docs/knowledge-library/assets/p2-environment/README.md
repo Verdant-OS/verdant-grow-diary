@@ -47,6 +47,10 @@ must not be used operationally until a qualified reviewer clears them.
   about the shipped stage bands (draft §9) is unresolved, and nothing here presumes it.
 - **No sizing, no device control, no automation.** Asset 6 produces inputs for a qualified
   designer and says so on every page.
-- **No unsourced numbers.** Where an asset needs a figure it cites the claim ID; where a
-  figure would be needed but none is verified, the field is a blank for the user's own
-  instrument rather than a default.
+- **No unsourced numbers — with one bounded exception, stated here.** Every **cultivation,
+  safety, or measurement** figure cites its claim ID; where a figure would be needed but none
+  is verified, the field is a blank for the user's own instrument rather than a default.
+  **The exception is template structure** — how many sample rows, grid cells, or timeline
+  intervals an asset happens to lay out. Those are **illustrative layout choices, not
+  thresholds**; no claim in §8 establishes them, and each asset says so where it uses one.
+  **Do not read a row count as a sampling minimum.**

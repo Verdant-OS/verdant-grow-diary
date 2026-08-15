@@ -43,8 +43,11 @@ general — which one dominates is a property of your room.** Measure the backgr
 3. Set the instrument's emissivity. Absent a cannabis figure, **0.98 is a proxy starting
    point to verify, not an established value** — claim C10 covers twelve non-cannabis
    species at 0.973–0.985 and **neither source measured cannabis.**
-4. Sample at least five leaves spread across the canopy, at the height the reading is meant
-   to describe. Record each position.
+4. Sample several leaves spread across the canopy, at the height the reading is meant to
+   describe, and record each position. **This card sets no sourced minimum** — no claim in §8
+   establishes one. The template below lays out five rows as an illustrative starting point,
+   not a threshold; what matters is that `u_samp = SD ÷ √n` shrinks as `n` grows, so **let
+   your own spread tell you whether you have sampled enough** rather than hitting a count.
 5. Record air temperature **at the same instant and the same location** — the offset is a
    difference, and a difference taken across two times is not an offset.
 6. Compute offset per sample, then report the mean **and the spread**. A single number
@@ -101,19 +104,22 @@ incompatible quantities and produces a ± with no defined confidence level.
 **Step 1 — convert each bound to a standard uncertainty.** For a stated bound ±a with no
 distribution given, the conventional assumption is rectangular, so `u = a ÷ √3`.
 
-| Contribution               | Raw figure                          | Type   | Standard uncertainty u (°C) |
-| -------------------------- | ----------------------------------- | ------ | --------------------------- |
-| a. IR thermometer          | datasheet bound ±...                | bound  | `a ÷ √3` = ......           |
-| b. Air probe               | datasheet bound ±...                | bound  | `a ÷ √3` = ......           |
-| c. Emissivity × background | estimated bound ± ... (table above) | bound  | `a ÷ √3` = ......           |
-| d. Sampling                | `SD ÷ √n` of your per-leaf offsets  | **1σ** | use as-is = ......          |
+| Contribution            | Symbol   | Raw figure                          | Type   | Standard uncertainty (°C) |
+| ----------------------- | -------- | ----------------------------------- | ------ | ------------------------- |
+| IR thermometer          | `u_ir`   | datasheet bound ±...                | bound  | `a ÷ √3` = ......         |
+| Air probe               | `u_air`  | datasheet bound ±...                | bound  | `a ÷ √3` = ......         |
+| Emissivity × background | `u_emis` | estimated bound ± ... (table above) | bound  | `a ÷ √3` = ......         |
+| Sampling                | `u_samp` | `SD ÷ √n` of your per-leaf offsets  | **1σ** | use as-is = ......        |
 
 **Step 2 — combine.**
 
 ```text
-u_c = sqrt(u_a² + u_b² + u_c² + u_d²)        combined standard uncertainty (1σ)
-U   = k · u_c,  with k = 2 for roughly 95%   expanded uncertainty
+u_c = sqrt(u_ir² + u_air² + u_emis² + u_samp²)   combined standard uncertainty (1σ)
+U   = k · u_c,   k = 2 for roughly 95%           expanded uncertainty
 ```
+
+`u_c` is the GUM symbol for the **combined** uncertainty; each contribution above carries
+its own name so the formula is not circular.
 
 **Report U and state k.** A ± with no coverage factor is not interpretable.
 
@@ -149,15 +155,6 @@ rectangular distributions.
 apply at all.** The canopy is not uniform, and the right response is a microclimate map
 (asset 4), not a tighter error bar — consider carrying separate offsets for the zones you
 care about instead of one room number.
-
-> **Worked shape (illustrative, using this card's own figures):** IR 0.35 °C, air probe
-> 0.5 °C, emissivity/background 0.30 °C at 50 °C reflected, and five leaves whose offsets
-> have an SD of 0.4 °C, giving SEM = 0.4 ÷ √5 = **0.18 °C** →
-> `sqrt(0.35² + 0.5² + 0.30² + 0.18²)` ≈ **0.70 °C**. Still larger than any single term, which
-> is why recording only one instrument's accuracy produces a falsely narrow leaf-VPD range
-> downstream. Note the SEM contributes far less than the raw spread would have — **0.18
-> rather than 0.4** — and the 0.4 °C spread is still reported, in the distribution table,
-> where it belongs.
 
 ## Uncertainty statement (required — copy into the VPD worksheet)
 

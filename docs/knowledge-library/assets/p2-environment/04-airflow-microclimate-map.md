@@ -16,8 +16,11 @@ asset is the spread and the location of the extremes, not a room number.**
 
 ## Define your grid first
 
-Divide the canopy into cells and name them in writing. Three columns × three rows is the
-practical minimum for a tent; larger rooms need more.
+Divide the canopy into cells and name them in writing. **This asset sets no sourced minimum
+grid size** — no claim in §8 establishes one. The 3 × 3 layout below is an illustrative
+template choice, not a threshold; what matters is whether your cells are fine enough to catch
+the gradients your room actually has, which you learn by mapping and then refining where the
+differences turn up.
 
 **Columns (left→right, facing the room from the door):** A, B, C …
 **Rows (front→back):** 1, 2, 3 …

@@ -107,6 +107,7 @@ jobs:
                 migration_applied: null,
                 contract_effective: null,
                 definition_drift_detected: null,
+                sibling_overloads_detected: null,
                 verification_blocked: true,
               },
               migration: {
@@ -115,6 +116,7 @@ jobs:
               },
               functions: [],
               result_sidecar: { check_count: 0, failed_checks: [] },
+              sibling_overloads: [],
               blocked_reason: "audit_unreadable_or_checker_never_ran",
             };
             fs.writeFileSync(path, JSON.stringify(audit, null, 2) + "\n");
@@ -124,12 +126,14 @@ jobs:
             s.migration_applied === true &&
             s.contract_effective === true &&
             s.definition_drift_detected === false &&
+            s.sibling_overloads_detected === false &&
             s.verification_blocked === false;
           fs.appendFileSync(process.env.GITHUB_OUTPUT, `healthy=${healthy}\n`);
           for (const key of [
             "migration_applied",
             "contract_effective",
             "definition_drift_detected",
+            "sibling_overloads_detected",
             "verification_blocked",
           ]) {
             fs.appendFileSync(process.env.GITHUB_OUTPUT, `${key}=${String(s[key] ?? "unknown")}\n`);
@@ -175,6 +179,7 @@ jobs:
               migration_applied: null,
               contract_effective: null,
               definition_drift_detected: null,
+              sibling_overloads_detected: null,
               verification_blocked: true,
             };
             const healthy =
@@ -182,6 +187,7 @@ jobs:
               statuses.migration_applied === true &&
               statuses.contract_effective === true &&
               statuses.definition_drift_detected === false &&
+              statuses.sibling_overloads_detected === false &&
               statuses.verification_blocked === false;
 
             const existing = await github.paginate(github.rest.issues.listForRepo, {
@@ -213,6 +219,7 @@ jobs:
                 (check) => `- result sidecar: \`${check.id}\``
               ),
             ];
+            const siblingOverloads = audit?.sibling_overloads ?? [];
             const format = (value) => value === null || value === undefined ? "unknown" : String(value);
             const body = [
               statuses.verification_blocked
@@ -222,9 +229,23 @@ jobs:
               `- migration_applied: \`${format(statuses.migration_applied)}\``,
               `- contract_effective: \`${format(statuses.contract_effective)}\``,
               `- definition_drift_detected: \`${format(statuses.definition_drift_detected)}\``,
+              `- sibling_overloads_detected: \`${format(statuses.sibling_overloads_detected)}\``,
               `- verification_blocked: \`${format(statuses.verification_blocked)}\``,
               ...(audit?.blocked_reason ? ["", `Blocked reason: \`${audit.blocked_reason}\``] : []),
               ...(failedChecks.length ? ["", "Failed checks:", "", ...failedChecks] : []),
+              ...(siblingOverloads.length
+                ? [
+                    "",
+                    "Sibling overloads (same function name, different argument signature):",
+                    "",
+                    ...siblingOverloads.map((row) => {
+                      const grantees = (row.execute_grantees ?? []).length
+                        ? row.execute_grantees.map((grantee) => `\`${grantee}\``).join(", ")
+                        : "no roles";
+                      return `- \`public.${row.name}(${row.identity_arguments ?? "unknown arguments"})\`: EXECUTE granted to ${grantees}`;
+                    }),
+                  ]
+                : []),
               "",
               `Run: ${runUrl}`,
               "",

@@ -253,14 +253,15 @@ describe("static safety — recovery-loop surface", () => {
     "src/lib/plantStabilizeModeViewModel.ts",
   ];
 
-  it("FAILED saves stay failed: the Timeline signal only fires after a successful insert", () => {
-    // The success dispatch must appear AFTER the insert-error guard, and the
-    // error branch must return before any success dispatch/toast.
-    const insertIdx = QUICK_LOG.indexOf('.from("diary_entries").insert');
-    const errorGuardIdx = QUICK_LOG.indexOf("if (insErr)");
+  it("FAILED saves stay failed: the Timeline signal only fires after a successful save", () => {
+    // Persist goes through useQuickLogV2Save. The success dispatch must appear
+    // AFTER the result.ok guard, and the error branch must return before any
+    // success dispatch/toast.
+    const saveIdx = QUICK_LOG.indexOf("const result = await save(");
+    const errorGuardIdx = QUICK_LOG.indexOf("if (!result.ok)");
     const dispatchIdx = QUICK_LOG.indexOf('"verdant:entry-created"');
-    expect(insertIdx).toBeGreaterThan(-1);
-    expect(errorGuardIdx).toBeGreaterThan(insertIdx);
+    expect(saveIdx).toBeGreaterThan(-1);
+    expect(errorGuardIdx).toBeGreaterThan(saveIdx);
     expect(dispatchIdx).toBeGreaterThan(errorGuardIdx);
     // The error path surfaces a calm message and returns (no success side effects).
     const errorBlock = QUICK_LOG.slice(errorGuardIdx, dispatchIdx);
@@ -269,10 +270,12 @@ describe("static safety — recovery-loop surface", () => {
   });
 
   it("reuses the single diary path — no second persistence path or grow_events write", () => {
-    for (const src of [QUICK_LOG, RECAP]) {
-      expect(src).not.toMatch(/quicklog_save_manual|quicklog_save_event/);
-      expect(src).not.toMatch(/\.from\(["']grow_events["']\)/);
-    }
+    expect(QUICK_LOG).toMatch(/useQuickLogV2Save/);
+    expect(QUICK_LOG).not.toMatch(/\.rpc\(/);
+    expect(QUICK_LOG).not.toMatch(/\.insert\(/);
+    expect(QUICK_LOG).not.toMatch(/\.from\(["']grow_events["']\)/);
+    expect(RECAP).not.toMatch(/quicklog_save_manual|quicklog_save_event/);
+    expect(RECAP).not.toMatch(/\.from\(["']grow_events["']\)/);
   });
 
   it("no Action Queue / alert writes, no device control, no automation anywhere in the loop", () => {

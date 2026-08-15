@@ -30,10 +30,16 @@ import {
   type StarterOwnedRow,
   type StarterSetupResult,
 } from "@/lib/starterSetupRules";
+import type { Capabilities } from "@/lib/entitlements/types";
+import {
+  evaluateVerifiedGrowCreationGate,
+  evaluateVerifiedTentCreationGate,
+} from "@/lib/entitlements/freeTierGates";
 
 export interface StarterSetupDataAccess {
   listOwnedGrows(userId: string): Promise<ReadonlyArray<StarterOwnedRow>>;
   listOwnedTents(userId: string, growId: string): Promise<ReadonlyArray<StarterOwnedRow>>;
+  countOwnedTents(userId: string): Promise<number>;
   listOwnedPlants(userId: string, tentId: string): Promise<ReadonlyArray<StarterOwnedRow>>;
   createStarterGrow(userId: string): Promise<StarterOwnedRow>;
   createStarterTent(userId: string, growId: string): Promise<StarterOwnedRow>;
@@ -44,6 +50,7 @@ export class StarterSetupError extends Error {
   constructor(
     message: string,
     public readonly step: "grow" | "tent" | "plant" | "auth",
+    public readonly kind: "auth" | "plan_gate" | "operation" = "operation",
   ) {
     super(message);
     this.name = "StarterSetupError";
@@ -60,6 +67,11 @@ export interface StarterSetupCallbacks {
   onCreated?: (entity: StarterSetupCreatedEntity) => void;
 }
 
+export interface StarterSetupOptions extends StarterSetupCallbacks {
+  /** Null means the plan lookup could not be verified; limited creates fail closed. */
+  capabilities: Capabilities | null | undefined;
+}
+
 function notifyCreated(callbacks: StarterSetupCallbacks, entity: StarterSetupCreatedEntity): void {
   try {
     callbacks.onCreated?.(entity);
@@ -71,21 +83,76 @@ function notifyCreated(callbacks: StarterSetupCallbacks, entity: StarterSetupCre
 export async function runStarterSetup(
   userId: string | null | undefined,
   db: StarterSetupDataAccess,
-  callbacks: StarterSetupCallbacks = {},
+  callbacks: StarterSetupOptions,
 ): Promise<StarterSetupResult> {
   if (!userId) {
-    throw new StarterSetupError("Not signed in.", "auth");
+    throw new StarterSetupError("Not signed in.", "auth", "auth");
   }
 
-  // 1) Grow.
+  // Read every existing row needed to decide the multi-row setup before the
+  // first durable write. A Free grow must never be created only to discover
+  // afterward that the required tent is already over its active-row limit.
   const grows = await db.listOwnedGrows(userId);
   const existingGrow = findStarterRowByName(grows, STARTER_GROW_NAME);
-  let growId: string;
-  let reusedGrow = false;
+  let growId = existingGrow?.id ?? null;
+  const reusedGrow = existingGrow != null;
+
+  let existingTent: StarterOwnedRow | null = null;
   if (existingGrow) {
-    growId = existingGrow.id;
-    reusedGrow = true;
-  } else {
+    const tents = await db.listOwnedTents(userId, existingGrow.id);
+    existingTent = findStarterRowByName(tents, STARTER_TENT_NAME);
+  }
+  let tentId = existingTent?.id ?? null;
+  const reusedTent = existingTent != null;
+
+  if (!growId) {
+    const gate = evaluateVerifiedGrowCreationGate(
+      callbacks.capabilities,
+      grows.length,
+      !!callbacks.capabilities,
+    );
+    if (!gate.allowed) {
+      throw new StarterSetupError(
+        gate.blockedCopy ?? "Grow creation is unavailable.",
+        "grow",
+        "plan_gate",
+      );
+    }
+  }
+
+  if (!tentId) {
+    if (!callbacks.capabilities) {
+      const gate = evaluateVerifiedTentCreationGate(callbacks.capabilities, 0, false);
+      throw new StarterSetupError(
+        gate.blockedCopy ?? "Tent creation is unavailable.",
+        "tent",
+        "plan_gate",
+      );
+    }
+
+    let activeTentCount = 0;
+    if (!callbacks.capabilities.multiTent) {
+      try {
+        activeTentCount = await db.countOwnedTents(userId);
+      } catch (err) {
+        throw new StarterSetupError(
+          err instanceof Error ? err.message : "Failed to verify active tents.",
+          "tent",
+        );
+      }
+    }
+    const gate = evaluateVerifiedTentCreationGate(callbacks.capabilities, activeTentCount, true);
+    if (!gate.allowed) {
+      throw new StarterSetupError(
+        gate.blockedCopy ?? "Tent creation is unavailable.",
+        "tent",
+        "plan_gate",
+      );
+    }
+  }
+
+  // All required plan/count checks have passed. Durable creation can begin.
+  if (!growId) {
     try {
       const created = await db.createStarterGrow(userId);
       growId = created.id;
@@ -98,15 +165,7 @@ export async function runStarterSetup(
     }
   }
 
-  // 2) Tent, scoped to that grow.
-  const tents = await db.listOwnedTents(userId, growId);
-  const existingTent = findStarterRowByName(tents, STARTER_TENT_NAME);
-  let tentId: string;
-  let reusedTent = false;
-  if (existingTent) {
-    tentId = existingTent.id;
-    reusedTent = true;
-  } else {
+  if (!tentId) {
     try {
       const created = await db.createStarterTent(userId, growId);
       tentId = created.id;

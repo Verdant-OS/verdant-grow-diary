@@ -47,8 +47,19 @@ import { GrowFollowUpReviewSection } from "@/components/GrowFollowUpReviewSectio
  * No writes. No ai-coach call. No device-control surface.
  */
 export default function GrowDetail() {
-  const { grow, growId, loading, notFound, error, counts, recent, status, outcomes, refetch } =
-    useGrowDetailData();
+  const {
+    grow,
+    growId,
+    loading,
+    notFound,
+    error,
+    counts,
+    recent,
+    status,
+    outcomes,
+    refetch,
+    soleTentId,
+  } = useGrowDetailData();
   const [targetsEditorOpen, setTargetsEditorOpen] = useState(false);
 
   if (loading) {
@@ -197,12 +208,12 @@ export default function GrowDetail() {
         </div>
       </header>
 
-      {/* One-Tent Loop continuity card. No specific tent is "selected"
-          on the grow hub, so this intentionally renders the calm safe
-          disabled state instead of inventing a tent route. */}
+      {/* One-Tent Loop continuity card. Pass the grow's tent only when
+          exactly one tent is already loaded. Several tents stay disabled
+          — do not invent a default. */}
       <OneTentLoopNextStepCard
         current="grow"
-        ids={{ growId: grow.id }}
+        ids={{ growId: grow.id, tentId: soleTentId }}
         testId="grow-detail-one-tent-loop-next-step-card"
         className="mb-4"
       />

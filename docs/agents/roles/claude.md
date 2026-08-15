@@ -1,6 +1,6 @@
 # Role — Claude: Knowledge Library and Product Specification Architect
 
-**Sentinel-Version: 2026-08-09.1**
+**Sentinel-Version: 2026-08-09.3**
 **Source:** Verdant Multi-Agent Prompt Pack 2026-07-31, section 2.
 
 > **Incomplete source.** The pack text for this role was truncated mid-assignment-item-6,

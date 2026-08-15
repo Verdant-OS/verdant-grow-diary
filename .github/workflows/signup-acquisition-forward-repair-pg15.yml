@@ -1,0 +1,80 @@
+name: Signup acquisition forward repair PG15
+
+on:
+  pull_request:
+    paths:
+      - "scripts/apply-signup-acquisition-forward-repair.mjs"
+      - "scripts/apply-pinned-production-migrations.mjs"
+      - "scripts/lib/candidateNumberToolRuntime.mjs"
+      - "scripts/lib/supabaseDatabaseTargetIdentity.mjs"
+      - ".github/workflows/apply-signup-acquisition-forward-repair.yml"
+      - "scripts/run-signup-acquisition-forward-repair-pg15-harness.mjs"
+      - ".github/workflows/signup-acquisition-forward-repair-pg15.yml"
+      - "supabase/migrations/20260813030000_signup_acquisition_forward_repair.sql"
+      - "supabase/migrations/20260721194325_f96507e6-a612-4d26-a99d-2a261f2c0ad5.sql"
+      - "supabase/migrations/20260721194239_18592b2d-3ca9-4608-bbf5-c2262e422c70.sql"
+      - "supabase/migrations/20260517010926_65004f70-4e2c-48b3-bfcb-37bb8d2f0040.sql"
+      - "supabase/migrations/20260518154114_0694692d-c860-4083-93ec-c5161950bd9d.sql"
+      - "src/test/apply-signup-acquisition-forward-repair.test.ts"
+      - "src/test/signup-acquisition-forward-repair-pg15-harness.test.ts"
+  push:
+    branches:
+      - verdant-grow-diary
+    paths:
+      - "scripts/apply-signup-acquisition-forward-repair.mjs"
+      - "scripts/apply-pinned-production-migrations.mjs"
+      - "scripts/lib/candidateNumberToolRuntime.mjs"
+      - "scripts/lib/supabaseDatabaseTargetIdentity.mjs"
+      - ".github/workflows/apply-signup-acquisition-forward-repair.yml"
+      - "scripts/run-signup-acquisition-forward-repair-pg15-harness.mjs"
+      - ".github/workflows/signup-acquisition-forward-repair-pg15.yml"
+      - "supabase/migrations/20260813030000_signup_acquisition_forward_repair.sql"
+      - "supabase/migrations/20260721194325_f96507e6-a612-4d26-a99d-2a261f2c0ad5.sql"
+      - "supabase/migrations/20260721194239_18592b2d-3ca9-4608-bbf5-c2262e422c70.sql"
+      - "supabase/migrations/20260517010926_65004f70-4e2c-48b3-bfcb-37bb8d2f0040.sql"
+      - "supabase/migrations/20260518154114_0694692d-c860-4083-93ec-c5161950bd9d.sql"
+      - "src/test/apply-signup-acquisition-forward-repair.test.ts"
+      - "src/test/signup-acquisition-forward-repair-pg15-harness.test.ts"
+  merge_group:
+
+permissions:
+  contents: read
+
+jobs:
+  pg15_runtime:
+    name: PostgreSQL 15 runtime contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:15.18@sha256:bb0df8b69f086efa2cbe4b8128df2f368a362bbdadef743731a63dd0f2f24c9e
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: verdant-runtime-only
+          POSTGRES_DB: verdant_signup_repair
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d verdant_signup_repair"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      SIGNUP_REPAIR_PG15_URL: postgresql://postgres:verdant-runtime-only@127.0.0.1:5432/verdant_signup_repair
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: "22"
+
+      - name: Install and verify PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends postgresql-client
+          psql --version
+
+      - name: Run isolated PostgreSQL 15 harness
+        run: node scripts/run-signup-acquisition-forward-repair-pg15-harness.mjs

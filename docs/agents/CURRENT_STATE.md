@@ -26,11 +26,14 @@ against deploy tip `e1214d3df`. Records Cheek's decision to abandon
 `claude/breeder-mode-genetics` and `claude/cultivar-library-p1`. Refreshes the
 Branch topology row from `cbbd7122` to `e1214d3df` after five merges this
 session (#979, #815, #710, #795, #980). Sentinel-Version moved to 2026-08-09.3
-via #710, and the tip has since moved again to `7843a3fcb` (#981, Phase 0) —
-Phase 1 lands on top of that. Records Cheek's "execute phase 1" decision and
-the delivered local-only role harness. No production, GA4, GSC, sitemap, or
-release-identity row was re-measured in this edit; those retain their earlier
-verification dates.)
+via #710; the tip then moved to `7843a3fcb` (#981, Phase 0) and `f2a03998f`
+(#982, Phase 1). Records Cheek's "execute phase 1" decision and the
+**demonstrated** local-only role harness — 10/10 proofs. Also records Cheek's
+2026-08-14 approval-in-principle of **Phase 2 production adoption** (execution
+gated on three items, see the slice entry) and the **Convex-vs-Postgres
+recommendation**: adopt Postgres incrementally, hold Convex. No production, GA4,
+GSC, sitemap, or release-identity row was re-measured in this edit; those retain
+their earlier verification dates.)
 
 **Prior update:** 2026-08-13 UTC
 **Updated by:** Claude (records Cheek's 2026-08-13 in-session approval of the
@@ -85,11 +88,50 @@ already deployed ahead of the repo.
 
 ---
 
+## ⚠️ Second production drift — committed migrations are NOT auto-applied
+
+**Recorded 2026-08-15 from a Lovable read-only investigation of production
+`knkwiiywfkbqznbxwqfh`.** `source claim` for the production measurements; the
+repository-side facts below were verified directly.
+
+**Publishing does not replay `supabase/migrations/`.** It deploys the frontend
+and edge functions only. Migrations reach production solely through the
+operator's own apply path. This corrects an assumption stated repeatedly in
+`docs/specs/postgres-restricted-role-alternative.md` (now fixed in its §5.4.1)
+and it explains why the signup-attribution fix above is "merged, NOT applied".
+
+**At least one further migration is unapplied, and it is not the signup one.**
+`supabase/migrations/20260811090000_quicklog_corrections_retractions.sql` is
+committed, but in production:
+
+- `to_regclass('public.quicklog_entry_revisions')` → `null` (table absent)
+- `public.diary_entries.retracted_at` / `.retraction_reason` → absent
+
+**Shipped code depends on those objects.** Verified in this repo:
+`useQuickLogRevisionBadges.ts` and `useRetractedQuickLogEntries.ts` both
+`.from("quicklog_entry_revisions")`, and they mount through
+`QuickLogHistoryPanels` / `QuickLogGroupedTimelineSection` onto **Timeline**,
+**TentDetail** and **PlantDetail** — the One-Tent Loop spine.
+
+**Failure mode is silent, not loud.** `useQuickLogRevisionBadges` does
+`if (error) return new Map();`. So Quick Log revision badges and retracted
+entries simply never render in production. No crash, no error surface, no
+telemetry — the feature looks shipped and is invisible. That is a different and
+in some ways worse shape than the signup outage, which at least fails loudly.
+
+Exact drift count is `NOT_MEASURED`: `supabase_migrations.schema_migrations` was
+`permission denied` for both roles available to the investigation, so only
+"≥ 1 beyond signup" is proven, by object absence. **Someone should reconcile the
+full migration ledger against production before assuming anything else in the
+265-file directory is live.**
+
+---
+
 ## Branch topology
 
 | Branch               | Role                                             | Verified head                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | -------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `verdant-grow-diary` | **Deploy branch. Production ships from here.**   | `e1214d3df390eeba3b277f8a40d7e1fae9030bb9` (#980), verified 2026-08-14 with `git fetch origin verdant-grow-diary && git rev-parse origin/verdant-grow-diary`. This supersedes `cbbd7122` (#978), which superseded `fb42ce00e` (#968), `6434ea2a8` (#942) and `e7690396e` (#943). Five commits landed this session, in `git log` merge order oldest-first: `623edf17b` (#979), `e200d7561` (#815), `1a3a70d1b` (#710), `cba42c6d4` (#795), `e1214d3df` (#980). PR numbers on this branch do not order by merge time — order commits with `git log`, never by PR number. Do not carry older validation tables forward |
+| `verdant-grow-diary` | **Deploy branch. Production ships from here.**   | `f2a03998f46f9e3827a593af100969a2f967f932` (#982), verified 2026-08-14 with `git fetch origin verdant-grow-diary && git rev-parse origin/verdant-grow-diary`. Supersedes `e1214d3df` (#980), `cbbd7122` (#978) and `fb42ce00e` (#968). Seven commits landed this session, in `git log` merge order oldest-first: `623edf17b` (#979), `e200d7561` (#815), `1a3a70d1b` (#710), `cba42c6d4` (#795), `e1214d3df` (#980), `7843a3fcb` (#981), `f2a03998f` (#982). PR numbers on this branch do not order by merge time — order commits with `git log`, never by PR number. Do not carry older validation tables forward |
 | `main`               | Integration branch. It is not production parity. | `b6d747941948ce68157185a2b0847acea6970d44` (#779), verified 2026-08-07                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 
 `main` and `verdant-grow-diary` are divergent. Do not infer production behavior from
@@ -281,10 +323,61 @@ derives it from `supabase status` where available, and the harness reports
 `BLOCKED` (never `PASS`) when it is absent. Do not record the PostgREST
 role-switching mechanism as available until P3 actually passes.
 
-**Production roles, dropping `service_role` from any function, and default-deny
-table grants all remain `REJECT`** — the last would reverse the 2026-08-06
-founder decision recorded in migration `20260807003500`. Phase 2 needs its own
-Cheek decision plus Security review.
+**Phase 2 (production adoption): APPROVED IN PRINCIPLE by Cheek 2026-08-14, but
+now on HOLD after the 2026-08-15 gate answers.** Contract: spec §5.4, §5.4.1,
+§5.4.2.
+
+**Gate A came back favourable and is no longer the blocker.** Production
+`postgres` holds `rolcreaterole = t` and is not superuser, so a plain
+`CREATE ROLE x NOLOGIN NOINHERIT` — exactly the drafted shape — is expected to
+succeed. Two different findings stop it instead:
+
+1. **The JWT secret is unobtainable on Lovable Cloud**, so a role-claim JWT
+   cannot be minted in production. P3 proved the PostgREST mechanism works
+   *locally*; in production the role would be created and then **unreachable**.
+   A fence nobody can route through is not a fence.
+2. **Role durability across rebuilds is `UNKNOWN`**, and roles sit outside
+   migrations and schema dumps entirely. Combined with the confirmed rule that a
+   role cannot be hardened after creation, a silent drop-and-recreate would
+   restore the principal **without its grants**, with nothing in-database
+   signalling it.
+
+Phases 0 and 1 keep their value regardless: the detector runs on every PR and the
+10/10 demonstration stands. The original gate text follows.
+
+A production role can only be created by a migration under
+`supabase/migrations/`, which is exactly what Phase 1 avoided. Three things must
+land first:
+
+- **Gate A — does hosted Supabase permit `CREATE ROLE`?** `unknown`. We measured
+  that the Supabase `postgres` role cannot even set `NOSUPERUSER` /
+  `NOREPLICATION` / `NOBYPASSRLS` (§5.2.1). If `CREATE ROLE` is likewise refused,
+  an unguarded migration **aborts the apply chain** — the same failure that
+  disqualified `claude/cultivar-library-p1` today, and the same class as the open
+  signup-attribution incident at the top of this file.
+- **Gate B — does the *hosted* PostgREST honour a custom `role` claim?** P3
+  passed on the **local** stack only. A move to opaque `sb_secret_…` keys would
+  remove role-claim JWTs entirely.
+- **Gate C — Security review**, per `HANDOFF_PROTOCOL.md`, before any new
+  database principal plus JWT minting exists.
+
+Gates A and B are the subject of a read-only Lovable investigation prompt Cheek
+holds. The spec carries the exact guarded migration to write once they return;
+it degrades to a no-op rather than aborting if `CREATE ROLE` is refused.
+
+**Still `REJECT` regardless:** re-pointing any edge function at the role (a
+separate later decision, after the principal has baked), and default-deny table
+grants — the last would reverse the 2026-08-06 founder decision recorded in
+migration `20260807003500`.
+
+**Convex-vs-Postgres recommendation (spec §10, 2026-08-14): adopt the Postgres
+arm incrementally, hold Convex.** The Postgres arm is DEMONSTRATED (10/10
+proofs). The Convex arm is `NOT_MEASURED` — and note carefully that PR #977 is
+green across 99 checks while **no lane executes the spike's own P1–P9 isolation
+proofs**; green there means the repo still builds with a `spikes/` folder, not
+that isolation was shown. Convex is unmeasured, **not refuted** — its isolation
+property is genuinely stronger — and neither architecture removes `ai-coach`'s
+five cross-domain reaches cheaply. Council Chair advises; Cheek approves.
 
 Two audit results from that spec update facts recorded elsewhere in this file's
 orbit: the Convex spec's open `uncertainty` about `supabase/functions/_shared/`
@@ -602,4 +695,4 @@ schema change and does not authorize production writes.
 | Grok              | `ONE_TENT_LOOP_OPERATING_ORDER` — repo slices delivered (0 baseline, 2 handoff ids, 3 PlantQuickLog persist-path, 4 smoke-audit alignment). Slices 1 and 5 remain owner-`BLOCKED` (signup apply + managed e2e session); Slice 5 receipt is `missing_session_json` with `fabricated_login_used: false`. Does not pause Convex/Postgres spikes. Production Convex remains HOLD                                                                                                                                           |
 | Security reviewer | Unassigned until Phase 1 spike code exists; then review before any Convex cloud credential                                                                                                                                                                                                    |
 | Gemini            | Unassigned                                                                                                                                                                                                                                                                                    |
-| Council Chair     | Convex-vs-Postgres comparison: **now partly decidable.** The Postgres arm has a measured number (8 cross-domain reaches across 22 service-role functions, `docs/specs/postgres-restricted-role-alternative.md` §5.1.1); the Convex arm remains `NOT_MEASURED` pending #977. Do not issue a recommendation until both arms carry evidence — and note that `ai-coach`'s five reaches are the case neither architecture removes cheaply |
+| Council Chair     | Convex-vs-Postgres comparison: **recommendation delivered in spec §10 — adopt Postgres incrementally, hold Convex.** The Postgres arm has a measured number (8 cross-domain reaches across 22 service-role functions, `docs/specs/postgres-restricted-role-alternative.md` §5.1.1); the Convex arm remains `NOT_MEASURED` pending #977. Do not issue a recommendation until both arms carry evidence — and note that `ai-coach`'s five reaches are the case neither architecture removes cheaply |

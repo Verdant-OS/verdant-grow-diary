@@ -2,10 +2,28 @@
 
 **Last updated:** 2026-08-15 UTC
 **Updated by:** Grok (merge of `cursor/verdant-grow-os-plugin-32a0` onto
-`origin/verdant-grow-diary` at `9c1ada616`. Takes the 2026-08-14 operating-state
-facts as-is. Records Grok's assignment for the `verdant-grow-os` Cursor plugin
-scaffold. No production, GA4, GSC, sitemap, or release-identity row was
-re-measured in this merge.)
+`origin/verdant-grow-diary` at `534b28434`. Takes incoming Cursor SDK spike
+operating-state facts as-is. Records this PR's `verdant-grow-os` plugin
+scaffold alongside the already-landed SDK spike assignment. No production,
+GA4, GSC, sitemap, or release-identity row was re-measured in this merge.)
+
+**Prior update:** 2026-08-15 UTC
+**Updated by:** Grok (2026-08-15, later additive: next gates on
+`VERDANT_CURSOR_SDK_LOCAL_ORCHESTRATION_SPIKE`. `POSTGRES_RESTRICTED_ROLE_SPIKE`
+was not touched. Optional live proof remains `BLOCKED` — `CURSOR_API_KEY` is
+absent here. Dispatcher security review is at
+`spikes/cursor-sdk-local-orchestration/docs/dispatcher-security-review.md`.
+Host receipt-integrity findings are closed; live SDK tool enforcement stays
+`NOT_MEASURED`; reuse is not approved. No production, GA4, GSC, sitemap, or
+release-identity row was re-measured in this edit.)
+
+**Prior update:** 2026-08-15 UTC
+**Updated by:** Grok (2026-08-15, additive: records implementation of isolated
+`VERDANT_CURSOR_SDK_LOCAL_ORCHESTRATION_SPIKE` under
+`spikes/cursor-sdk-local-orchestration/`. This spike does **not** replace,
+pause, or delay `POSTGRES_RESTRICTED_ROLE_SPIKE`. Manual Cursor SDK live proof
+is `BLOCKED` without `CURSOR_API_KEY`. No production, GA4, GSC, sitemap, or
+release-identity row was re-measured in this edit.)
 
 **Prior update:** 2026-08-14 UTC
 **Updated by:** Claude (2026-08-14, later edit: records Cheek's in-session
@@ -667,7 +685,7 @@ schema change and does not authorize production writes.
 | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Codex             | Standing SEO measurement readiness and analytics integrity. Convex Phase 1 of `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` is in review: PR #977, opened 2026-08-14, not a draft. Scope stays Phase 1 only, under `spikes/convex-component-sandbox/`. **Do NOT build a Postgres domain-reach detector — Phase 0 of `POSTGRES_RESTRICTED_ROLE_SPIKE` is already delivered by Claude (see slices above). Phase 1 of that arm is `HOLD` pending its own Cheek decision** |
 | Claude            | `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` specification — delivered. `POSTGRES_RESTRICTED_ROLE_SPIKE`: spec delivered, **Phase 0 detector measured and Phase 1 role harness delivered (local-only)**, 2026-08-14 under Cheek's approval and full-authority grant (see slices above). Prior completed out-of-slice work (#586/#809/#812/#885) unchanged |
-| Grok              | Cursor plugin scaffold `verdant-grow-os` (local plugin + repo mirror). Not SEO implementation and not Convex. Prior same-session HOLD on unapproved Convex expansion is superseded only for the named isolated spike; production Convex remains HOLD |
+| Grok              | Two concurrent items: (1) Cursor plugin scaffold `verdant-grow-os` (this PR, local plugin + repo mirror). (2) Isolated `VERDANT_CURSOR_SDK_LOCAL_ORCHESTRATION_SPIKE` next gates: dispatcher security review recorded; host receipt integrity closed; live Cursor SDK proof still `BLOCKED` without a local `CURSOR_API_KEY`. Neither delays `POSTGRES_RESTRICTED_ROLE_SPIKE`. Dispatcher reuse is not approved. Production Convex remains HOLD |
 | Security reviewer | Unassigned until Phase 1 spike code exists; then review before any Convex cloud credential                                                                                                                                                                                                    |
 | Gemini            | Unassigned                                                                                                                                                                                                                                                                                    |
 | Council Chair     | Convex-vs-Postgres comparison: **recommendation delivered in spec §10 — adopt Postgres incrementally, hold Convex.** The Postgres arm has a measured number (8 cross-domain reaches across 22 service-role functions, `docs/specs/postgres-restricted-role-alternative.md` §5.1.1); the Convex arm remains `NOT_MEASURED` pending #977. Do not issue a recommendation until both arms carry evidence — and note that `ai-coach`'s five reaches are the case neither architecture removes cheaply |

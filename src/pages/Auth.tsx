@@ -36,7 +36,6 @@ import {
 import { resolveKnownRouteReturnTo } from "@/lib/authRedirectRules";
 import {
   buildSignupEmailRedirectUrl,
-  buildSignupUserMetadata,
   resolveSignupAcquisitionSource,
 } from "@/lib/signupAcquisitionRules";
 import { trackPricingEvent } from "@/lib/pricingAnalytics";
@@ -91,7 +90,6 @@ export default function Auth() {
   }, [search]);
   const redirectTo = explicitRedirect ?? "/";
   const signupSource = useMemo(() => resolveSignupAcquisitionSource(search), [search]);
-  const signupUserMetadata = useMemo(() => buildSignupUserMetadata(search), [search]);
   // Referral claim (?ref=<code>) — attribution-only ride-along; the grant is
   // server-gated on email confirmation (see referralCaptureRules).
   const referralMetadata = useMemo(() => buildSignupReferralMetadata(search), [search]);
@@ -338,6 +336,15 @@ export default function Auth() {
       setSignUpError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
       return;
     }
+    // Acquisition reporting must never participate in the auth.users INSERT.
+    // Queue the allowlisted source for the existing auth.uid()-scoped RPC after
+    // a session exists; production may temporarily lack analytics objects, but
+    // that must not roll back account creation.
+    if (signupSource) {
+      savePendingOAuthSignupAcquisition(signupSource);
+    } else {
+      clearPendingOAuthSignupAcquisition();
+    }
     setBusy(true);
     trackPricingEvent("signup_started", { source: signupSource ?? "direct" });
     const { data, error } = await supabase.auth.signUp({
@@ -349,10 +356,11 @@ export default function Auth() {
         // must never be used for roles, billing, credits, or entitlements.
         // The explicit boolean opt-in is copied by the auth trigger so it also
         // survives confirmation-required signups that have no session yet.
-        data: { ...signupUserMetadata, ...referralMetadata, marketing_opt_in: marketingOptIn },
+        data: { ...referralMetadata, marketing_opt_in: marketingOptIn },
       },
     });
     if (error) {
+      if (signupSource) clearPendingOAuthSignupAcquisition();
       setBusy(false);
       trackPricingEvent("signup_failed", {
         source: signupSource ?? "direct",

@@ -257,8 +257,10 @@ function PlantDetailAiDoctorLiveReviewScope({
         plant,
         timelineItems: evidenceItems,
         rootZoneObservations: queryRootZoneObservations,
+        currentSensorRows,
+        tentId,
       }),
-    [plant, evidenceItems, queryRootZoneObservations],
+    [plant, evidenceItems, queryRootZoneObservations, currentSensorRows, tentId],
   );
 
   // Row-level, provenance-aware classification. The ingest audit only knows

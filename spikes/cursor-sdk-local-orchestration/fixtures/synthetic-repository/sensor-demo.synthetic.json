@@ -1,0 +1,12 @@
+{
+  "synthetic": true,
+  "label": "SYNTHETIC_SENSOR_DEMO",
+  "kind": "sensor_reading",
+  "source": "demo",
+  "tentId": "SYN-TENT-0001",
+  "capturedAt": "2026-01-15T12:06:00.000Z",
+  "temperatureC": 25,
+  "humidityPct": 55,
+  "confidence": "demo-fixture",
+  "notes": "SYNTHETIC demo reading. Must never be labeled live or healthy-live."
+}

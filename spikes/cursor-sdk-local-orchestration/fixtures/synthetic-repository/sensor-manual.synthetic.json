@@ -1,0 +1,12 @@
+{
+  "synthetic": true,
+  "label": "SYNTHETIC_SENSOR_MANUAL",
+  "kind": "sensor_reading",
+  "source": "manual",
+  "tentId": "SYN-TENT-0001",
+  "capturedAt": "2026-01-15T12:05:00.000Z",
+  "temperatureC": 24.1,
+  "humidityPct": 58,
+  "confidence": "grower-entered",
+  "notes": "SYNTHETIC manual reading. Not live hardware."
+}

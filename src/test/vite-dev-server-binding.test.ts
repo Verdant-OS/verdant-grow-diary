@@ -30,4 +30,16 @@ describe("Vite dev-server binding", () => {
     }
     expect(String(packageJson.scripts.dev)).not.toContain("--host 0.0.0.0");
   });
+
+  it("imports the ESM tanstack-config entry, not the CJS main", () => {
+    // Bare `@lovable.dev/vite-tanstack-config` resolves `main` → dist/index.cjs,
+    // which `require("vite")`s and throws ERR_REQUIRE_CYCLE_MODULE on Node 22.
+    expect(config).toMatch(/from ["']@lovable\.dev\/vite-tanstack-config\/dist\/index\.js["']/);
+    expect(config).not.toMatch(/from ["']@lovable\.dev\/vite-tanstack-config["']/);
+  });
+
+  it("resolves defineConfig from the ESM entry", async () => {
+    const mod = await import("@lovable.dev/vite-tanstack-config/dist/index.js");
+    expect(typeof mod.defineConfig).toBe("function");
+  });
 });

@@ -28,6 +28,7 @@ import { Link } from "@/lib/react-router-compat";
 import BrandLogo from "@/components/BrandLogo";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import { VERDANT_BLUEPRINT_TARGETS_FAQ } from "@/constants/verdantSeoContent";
+import { buildAttributedSignupPath } from "@/lib/signupAcquisitionRules";
 import { buildBlueprintTargetsViewModel } from "@/lib/blueprintTargetsViewModel";
 
 /**
@@ -43,7 +44,7 @@ import { buildBlueprintTargetsViewModel } from "@/lib/blueprintTargetsViewModel"
  * working while recording nothing. Signups from this page therefore land in
  * the "unattributed" bucket by design rather than by accident.
  */
-const SIGNUP_PATH = "/auth?mode=signup";
+const SIGNUP_PATH = buildAttributedSignupPath({ source: "blueprint_targets" });
 
 /**
  * Built once at module scope: the view model is pure and input-free, so there

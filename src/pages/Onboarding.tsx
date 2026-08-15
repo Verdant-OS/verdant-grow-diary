@@ -36,6 +36,8 @@ import {
 } from "@/lib/starterSetupRules";
 import { runStarterSetup, StarterSetupError } from "@/lib/starterSetupService";
 import { starterSetupSupabaseAdapter } from "@/lib/starterSetupSupabaseAdapter";
+import { useMyEntitlements } from "@/hooks/useMyEntitlements";
+import { CREATION_ENTITLEMENT_UNAVAILABLE_COPY } from "@/lib/entitlements/freeTierGates";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 import PublicQuickLogHandoffCard from "@/components/PublicQuickLogHandoffCard";
@@ -53,11 +55,18 @@ import {
 export default function Onboarding() {
   const { user, loading } = useAuth();
   const { grows = [], loading: growsLoading, refresh: refreshGrows } = useGrows();
+  const {
+    loading: entitlementLoading,
+    lookupFailed: entitlementLookupFailed,
+    entitlement,
+    refetch: refetchEntitlements,
+  } = useMyEntitlements();
   const queryClient = useQueryClient();
   const nav = useNavigate();
   const [searchParams] = useSearchParams();
   const [choice, setChoice] = useState<StartScreenChoice>(DEFAULT_START_SCREEN);
   const [starterBusy, setStarterBusy] = useState(false);
+  const [starterRetrying, setStarterRetrying] = useState(false);
   const [starterError, setStarterError] = useState<string | null>(null);
   const [csvHistoryImportHref, setCsvHistoryImportHref] = useState<string | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -79,11 +88,17 @@ export default function Onboarding() {
   }
 
   async function handleStarterSetup(next: "quick_log" | "csv_history") {
-    if (starterBusy || !user) return;
+    if (starterBusy || starterRetrying || !user) return;
+    if (entitlementLoading || entitlementLookupFailed) {
+      setStarterError(CREATION_ENTITLEMENT_UNAVAILABLE_COPY);
+      return;
+    }
     setStarterError(null);
     setStarterBusy(true);
     try {
       const result = await runStarterSetup(user.id, starterSetupSupabaseAdapter, {
+        capabilities:
+          entitlementLoading || entitlementLookupFailed ? null : entitlement.capabilities,
         onCreated(entity) {
           if (entity === "grow") trackFunnelEvent("grow_created");
           if (entity === "tent") trackFunnelEvent("tent_created");
@@ -120,10 +135,23 @@ export default function Onboarding() {
       }
     } catch (err) {
       const message =
-        err instanceof StarterSetupError ? STARTER_SETUP_ERROR_COPY : STARTER_SETUP_ERROR_COPY;
+        err instanceof StarterSetupError && err.kind === "plan_gate"
+          ? err.message
+          : STARTER_SETUP_ERROR_COPY;
       setStarterError(message);
     } finally {
       setStarterBusy(false);
+    }
+  }
+
+  async function retryStarterEntitlement() {
+    if (starterBusy || starterRetrying) return;
+    setStarterRetrying(true);
+    setStarterError(null);
+    try {
+      await refetchEntitlements();
+    } finally {
+      setStarterRetrying(false);
     }
   }
 
@@ -266,7 +294,9 @@ export default function Onboarding() {
                 type="button"
                 variant="outline"
                 className="mt-3 w-full sm:w-auto"
-                disabled={starterBusy}
+                disabled={
+                  starterBusy || starterRetrying || entitlementLoading || entitlementLookupFailed
+                }
                 onClick={() => {
                   void handleStarterSetup("csv_history");
                 }}
@@ -274,6 +304,23 @@ export default function Onboarding() {
                 {starterBusy ? "Creating starter setup…" : CSV_HISTORY_ONBOARDING_SETUP_LABEL}
               </Button>
             )}
+            {entitlementLookupFailed ? (
+              <div className="mt-3 space-y-2">
+                <p role="alert" className="text-xs text-destructive">
+                  {CREATION_ENTITLEMENT_UNAVAILABLE_COPY}
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={starterRetrying}
+                  onClick={() => void retryStarterEntitlement()}
+                  data-testid="csv-history-onboarding-entitlement-retry"
+                >
+                  {starterRetrying ? "Checking again…" : "Retry plan check"}
+                </Button>
+              </div>
+            ) : null}
             {starterError ? (
               <p
                 data-testid="csv-history-onboarding-error"
@@ -298,13 +345,32 @@ export default function Onboarding() {
               type="button"
               variant="outline"
               className="mt-3 w-full sm:w-auto"
-              disabled={starterBusy}
+              disabled={
+                starterBusy || starterRetrying || entitlementLoading || entitlementLookupFailed
+              }
               onClick={() => {
                 void handleStarterSetup("quick_log");
               }}
             >
               {starterBusy ? "Creating starter setup…" : STARTER_SETUP_BUTTON_LABEL}
             </Button>
+            {entitlementLookupFailed ? (
+              <div className="mt-3 space-y-2">
+                <p role="alert" className="text-xs text-destructive">
+                  {CREATION_ENTITLEMENT_UNAVAILABLE_COPY}
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={starterRetrying}
+                  onClick={() => void retryStarterEntitlement()}
+                  data-testid="starter-setup-entitlement-retry"
+                >
+                  {starterRetrying ? "Checking again…" : "Retry plan check"}
+                </Button>
+              </div>
+            ) : null}
             {starterError ? (
               <p
                 data-testid="starter-setup-error"

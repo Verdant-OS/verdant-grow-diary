@@ -11,6 +11,8 @@ import { toast } from "sonner";
 
 import { useAuth } from "@/store/auth";
 import { useGrows } from "@/store/grows";
+import { useTents } from "@/hooks/use-tents";
+import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,6 +36,10 @@ import {
   type StartYourRoomStep,
 } from "@/lib/startYourRoomRules";
 import { setStartScreenChoice } from "@/lib/startScreenPreferences";
+import {
+  evaluateVerifiedGrowCreationGate,
+  evaluateVerifiedTentCreationGate,
+} from "@/lib/entitlements/freeTierGates";
 
 const STAGES = [
   { value: "seedling", label: "Seedling" },
@@ -43,7 +49,14 @@ const STAGES = [
 
 export default function StartYourRoom() {
   const { user, loading } = useAuth();
-  const { setActiveGrowId, refresh } = useGrows();
+  const { grows, setActiveGrowId, refresh, loading: growsLoading, error: growsError } = useGrows();
+  const tentsQuery = useTents();
+  const {
+    loading: entitlementLoading,
+    lookupFailed: entitlementLookupFailed,
+    entitlement,
+    refetch: refetchEntitlements,
+  } = useMyEntitlements();
   const nav = useNavigate();
   const headingRef = useRef<HTMLHeadingElement>(null);
 
@@ -51,6 +64,7 @@ export default function StartYourRoom() {
   const [form, setForm] = useState<StartYourRoomForm>({ ...DEFAULT_START_YOUR_ROOM_FORM });
   const [ids, setIds] = useState<StartYourRoomIds>({ ...EMPTY_START_YOUR_ROOM_IDS });
   const [busy, setBusy] = useState(false);
+  const [verificationRetrying, setVerificationRetrying] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -58,6 +72,35 @@ export default function StartYourRoom() {
   }, [step]);
 
   const progress = useMemo(() => progressLabel(step), [step]);
+  const growCountRequired = entitlement.capabilities.maxActiveGrows != null;
+  const tentCountRequired = !entitlement.capabilities.multiTent;
+  const creationVerificationLoading =
+    verificationRetrying ||
+    entitlementLoading ||
+    (growCountRequired && growsLoading) ||
+    (tentCountRequired && tentsQuery.isLoading);
+  const creationVerificationFailed =
+    entitlementLookupFailed ||
+    (growCountRequired && Boolean(growsError)) ||
+    (tentCountRequired && tentsQuery.isError);
+  const planVerificationReady = !entitlementLoading && !entitlementLookupFailed;
+  const growVerificationReady =
+    planVerificationReady && (!growCountRequired || (!growsLoading && !growsError));
+  const tentVerificationReady =
+    planVerificationReady && (!tentCountRequired || (!tentsQuery.isLoading && !tentsQuery.isError));
+  const growGate = evaluateVerifiedGrowCreationGate(
+    entitlement.capabilities,
+    grows.length,
+    growVerificationReady,
+  );
+  const tentGate = evaluateVerifiedTentCreationGate(
+    entitlement.capabilities,
+    tentsQuery.data?.length ?? 0,
+    tentVerificationReady,
+  );
+  const roomPreflightGate = growGate.allowed ? tentGate : growGate;
+  const currentCreationGate =
+    step === "grow" ? roomPreflightGate : step === "tent" ? tentGate : null;
 
   if (loading) return null;
   if (!user) return <Navigate to="/auth" replace />;
@@ -67,8 +110,23 @@ export default function StartYourRoom() {
     setError(null);
   }
 
+  async function retryCreationVerification() {
+    if (verificationRetrying) return;
+    setVerificationRetrying(true);
+    setError(null);
+    try {
+      await Promise.allSettled([refresh(), tentsQuery.refetch(), refetchEntitlements()]);
+    } finally {
+      setVerificationRetrying(false);
+    }
+  }
+
   async function submitGrow() {
     if (!user || busy) return;
+    if (!roomPreflightGate.allowed) {
+      setError(roomPreflightGate.blockedCopy);
+      return;
+    }
     const payload = buildStartRoomGrowPayload(form);
     if (!payload) {
       setError("Enter a grow name to continue.");
@@ -95,6 +153,10 @@ export default function StartYourRoom() {
 
   async function submitTent() {
     if (!user || busy) return;
+    if (!tentGate.allowed) {
+      setError(tentGate.blockedCopy);
+      return;
+    }
     const payload = buildStartRoomTentPayload(form, ids);
     if (!payload) {
       setError("Enter a tent name. Grow context is required.");
@@ -210,7 +272,7 @@ export default function StartYourRoom() {
             <Button
               type="button"
               className="w-full gradient-leaf text-primary-foreground"
-              disabled={busy || !canProceedGrow(form)}
+              disabled={busy || !roomPreflightGate.allowed || !canProceedGrow(form)}
               onClick={submitGrow}
               data-testid="start-room-grow-submit"
             >
@@ -248,7 +310,7 @@ export default function StartYourRoom() {
             <Button
               type="button"
               className="w-full gradient-leaf text-primary-foreground"
-              disabled={busy || !canProceedTent(form, ids)}
+              disabled={busy || !tentGate.allowed || !canProceedTent(form, ids)}
               onClick={submitTent}
               data-testid="start-room-tent-submit"
             >
@@ -333,6 +395,41 @@ export default function StartYourRoom() {
             </Button>
           </section>
         )}
+
+        {!error && currentCreationGate && creationVerificationLoading ? (
+          <p role="status" className="text-sm text-muted-foreground">
+            Checking your plan and active room limits…
+          </p>
+        ) : !error && currentCreationGate && creationVerificationFailed ? (
+          <div className="space-y-2" data-testid="start-room-creation-gate">
+            <p role="alert" className="text-sm text-muted-foreground">
+              {currentCreationGate.blockedCopy}
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => void retryCreationVerification()}
+              disabled={verificationRetrying}
+              data-testid="start-room-creation-retry"
+            >
+              {verificationRetrying ? "Checking again…" : "Retry plan and room check"}
+            </Button>
+          </div>
+        ) : !error && currentCreationGate && !currentCreationGate.allowed ? (
+          <div className="space-y-2" data-testid="start-room-creation-gate">
+            <p role="status" className="text-sm text-muted-foreground">
+              {currentCreationGate.blockedCopy}
+            </p>
+            <Link
+              to="/pricing"
+              className="inline-flex text-sm font-medium text-primary underline underline-offset-2"
+              data-testid="start-room-creation-upgrade"
+            >
+              See plan options
+            </Link>
+          </div>
+        ) : null}
 
         {error ? (
           <p role="alert" className="text-sm text-destructive" data-testid="start-your-room-error">

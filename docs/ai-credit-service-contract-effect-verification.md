@@ -18,9 +18,20 @@ The verifier resolves complete identity signatures rather than function names:
 - `public.ai_credit_spend(uuid,text,text,uuid,text,text,jsonb)`
 - `public.ai_credit_refund(uuid,uuid,text,text)`
 
-Other legacy overloads may exist during the documented rollback window. They do not make
-these exact targets ambiguous. Each exact identity signature must resolve to exactly one
-catalog object. A missing target or any non-unique exact resolution fails closed.
+Each exact identity signature must resolve to exactly one catalog object. A missing
+target or any non-unique exact resolution fails closed.
+
+`to_regprocedure()`, used to resolve the two lines above, only ever finds that one exact
+signature — by construction it cannot see a **sibling overload**: another `pg_proc` row
+sharing the same function name with a different argument list. That is precisely the
+failure mode `20260727050000_ai_credit_service_contract_forward_reassert.sql` exists to
+guard against — an export reintroducing an earlier, laxer-permissioned overload beside
+the current one. The verifier therefore runs a second, name-based query — `proname IN
+('ai_credit_spend', 'ai_credit_refund')`, filtered only by schema, excluding the two
+resolved OIDs above — and reports every other overload it finds, with its argument list
+and its full EXECUTE grantee list (via `aclexplode`, not a fixed role check, since an
+unexpected legacy overload may be granted to an unexpected role such as `postgres`).
+Any sibling overload found this way is reported, never silently ignored.
 
 ## What is compared
 
@@ -45,22 +56,28 @@ the forward reassertion ran.
 
 ## Status contract
 
-The JSON audit always carries four separate fields. Boolean `null` means unknown, never
+The JSON audit always carries five separate fields. Boolean `null` means unknown, never
 healthy.
 
-| Field                       | `true`                                                            | `false`                                                                           | `null`                              |
-| --------------------------- | ----------------------------------------------------------------- | --------------------------------------------------------------------------------- | ----------------------------------- |
-| `migration_applied`         | Version `20260727050000` is recorded                              | Version is not recorded                                                           | The migration tracker was not read  |
-| `contract_effective`        | Every body, metadata, and privilege check passed                  | At least one measured check failed                                                | Effect could not be fully inspected |
-| `definition_drift_detected` | A target/body/definition invariant failed                         | Definition checks passed; privilege drift may still make the contract ineffective | Definitions could not be read       |
-| `verification_blocked`      | Access, tooling, query, or readability blocked a complete verdict | The verification completed                                                        | Not used                            |
+| Field                        | `true`                                                            | `false`                                                                           | `null`                                            |
+| ---------------------------- | ----------------------------------------------------------------- | --------------------------------------------------------------------------------- | ------------------------------------------------- |
+| `migration_applied`          | Version `20260727050000` is recorded                              | Version is not recorded                                                           | The migration tracker was not read                |
+| `contract_effective`         | Every body, metadata, and privilege check passed                  | At least one measured check failed                                                | Effect could not be fully inspected               |
+| `definition_drift_detected`  | A target/body/definition invariant failed                         | Definition checks passed; privilege drift may still make the contract ineffective | Definitions could not be read                     |
+| `sibling_overloads_detected` | Another `pg_proc` row shares a pinned function name               | The pinned exact signature is the only entry point with that name                 | Sibling-overload enumeration did not run/complete |
+| `verification_blocked`       | Access, tooling, query, or readability blocked a complete verdict | The verification completed                                                        | Not used                                          |
 
 Examples that must remain distinguishable:
 
 - applied `true`, effective `false`, drift `true`: migration ran, but a function contract changed;
 - applied `true`, effective `false`, drift `false`: bodies are sound, but privileges drifted;
 - applied `false`, effective `true`, drift `false`: current bodies happen to be sound, but migration history is incomplete;
-- applied `null`, effective `null`, drift `null`, blocked `true`: no production conclusion is authorized.
+- applied `true`, effective `true`, drift `false`, sibling_overloads `true`: the pinned signature's own body and privileges are sound, but a second overload of the same name exists — the pinned contract is not the only entry point, and that alone fails the run;
+- applied `null`, effective `null`, drift `null`, sibling_overloads `null`, blocked `true`: no production conclusion is authorized.
+
+`sibling_overloads_detected` is intentionally independent of `contract_effective`: the
+two pinned functions can pass every one of their own checks while a stray overload still
+exists beside them. Both must be healthy for the run to pass.
 
 ## Running it
 
@@ -94,5 +111,11 @@ in memory only.
 3. If definition drift is detected, compare the current live definition with the latest
    committed forward contract and identify the later writer.
 4. If only privileges fail, inspect function/table grants separately from the bodies.
-5. Never edit the published `20260727050000` migration. Repair confirmed drift with a new,
+5. If `sibling_overloads_detected` is true, the audit's `sibling_overloads` array names
+   the extra signature(s) and their EXECUTE grantees. Determine whether the overload is
+   an expected artifact of an in-progress, documented rollback window or an
+   unauthorized reintroduction, then drop the stray overload with `DROP FUNCTION` in a
+   new migration — do not assume it is harmless because the pinned signature's own
+   checks pass.
+6. Never edit the published `20260727050000` migration. Repair confirmed drift with a new,
    additive forward migration and the normal security/runtime review.

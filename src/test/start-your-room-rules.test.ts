@@ -84,7 +84,7 @@ describe("startYourRoomRules", () => {
   });
 
   it("deep link opens Quick Log", () => {
-    expect(plantDetailQuickLogHref("abc")).toBe("/plants/abc?openQuickLog=1");
+    expect(plantDetailQuickLogHref("abc")).toBe("/plants/abc?open=quick-log");
   });
 
   it("prefer start room only when zero grows", () => {

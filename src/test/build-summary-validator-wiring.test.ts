@@ -161,7 +161,8 @@ describe("BUILD_SUMMARY_VALIDATORS is wired to real step outcomes", () => {
   });
 });
 
-describe("generate-build-summary verdict precedence", () => {
+// Each case launches nested Node processes and scans the Edge mirror; allow controlled-suite contention.
+describe("generate-build-summary verdict precedence", { timeout: 15_000 }, () => {
   /**
    * Run the generator against a synthetic validator set.
    *

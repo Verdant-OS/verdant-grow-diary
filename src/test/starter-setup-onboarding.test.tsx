@@ -11,6 +11,8 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
+import { FREE_CAPABILITIES } from "@/lib/entitlements/capabilities";
+import { CREATION_ENTITLEMENT_UNAVAILABLE_COPY } from "@/lib/entitlements/freeTierGates";
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: { from: () => ({}) },
@@ -23,6 +25,20 @@ vi.mock("@/store/auth", () => ({
 const refreshGrows = vi.hoisted(() => vi.fn());
 vi.mock("@/store/grows", () => ({
   useGrows: () => ({ refresh: refreshGrows }),
+}));
+
+const entitlementState = vi.hoisted(() => ({
+  loading: false,
+  lookupFailed: false,
+  refetch: vi.fn(async () => false),
+}));
+vi.mock("@/hooks/useMyEntitlements", () => ({
+  useMyEntitlements: () => ({
+    loading: entitlementState.loading,
+    lookupFailed: entitlementState.lookupFailed,
+    entitlement: { capabilities: FREE_CAPABILITIES },
+    refetch: entitlementState.refetch,
+  }),
 }));
 
 const invalidateQueries = vi.hoisted(() => vi.fn());
@@ -41,7 +57,7 @@ vi.mock("@/lib/starterSetupService", async (importActual) => {
     runStarterSetup: async (
       userId: string,
       db: unknown,
-      callbacks?: import("@/lib/starterSetupService").StarterSetupCallbacks,
+      callbacks: import("@/lib/starterSetupService").StarterSetupOptions,
     ) => {
       const result = await runStarterSetupMock(userId, db, callbacks);
       if (!result.reused.grow) callbacks?.onCreated?.("grow");
@@ -83,6 +99,9 @@ describe("Onboarding · guided starter setup", () => {
     trackFunnelEvent.mockReset();
     refreshGrows.mockReset().mockResolvedValue(undefined);
     invalidateQueries.mockReset().mockResolvedValue(undefined);
+    entitlementState.loading = false;
+    entitlementState.lookupFailed = false;
+    entitlementState.refetch.mockReset().mockResolvedValue(false);
   });
   afterEach(() => {
     vi.restoreAllMocks();
@@ -212,6 +231,36 @@ describe("Onboarding · guided starter setup", () => {
     expect(screen.getByTestId("starter-setup-block")).toBeTruthy();
     expect(screen.queryByTestId("dashboard-landing")).toBeNull();
     expect(trackFunnelEvent).not.toHaveBeenCalled();
+  });
+
+  it("blocks starter writes and offers entitlement recovery when the plan lookup failed", async () => {
+    entitlementState.lookupFailed = true;
+    entitlementState.refetch.mockImplementation(async () => {
+      entitlementState.lookupFailed = false;
+      return false;
+    });
+    renderPage();
+
+    expect(screen.getByTestId("starter-setup-button")).toBeDisabled();
+    expect(runStarterSetupMock).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByTestId("starter-setup-entitlement-retry"));
+    await waitFor(() => expect(entitlementState.refetch).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getByTestId("starter-setup-button")).toBeEnabled());
+    expect(screen.queryByTestId("starter-setup-entitlement-retry")).not.toBeInTheDocument();
+    expect(runStarterSetupMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps one calm verification alert when a retry still cannot resolve the plan", async () => {
+    entitlementState.lookupFailed = true;
+    entitlementState.refetch.mockResolvedValue(true);
+    renderPage();
+
+    await userEvent.click(screen.getByTestId("starter-setup-entitlement-retry"));
+
+    await waitFor(() => expect(entitlementState.refetch).toHaveBeenCalledTimes(1));
+    expect(screen.getAllByText(CREATION_ENTITLEMENT_UNAVAILABLE_COPY)).toHaveLength(1);
+    expect(runStarterSetupMock).not.toHaveBeenCalled();
   });
 
   it("preserves a CSV-history acquisition intent through explicit starter setup", async () => {

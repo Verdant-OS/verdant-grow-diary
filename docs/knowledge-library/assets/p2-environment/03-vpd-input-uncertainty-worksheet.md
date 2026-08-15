@@ -55,19 +55,36 @@ claim C02/C03):
 
 **Your ratio** = (RH accuracy in %) ÷ (temperature accuracy in °C) = ..........
 
-> **Do not apply this table to a leaf-basis calculation.** The sensitivities are structurally
-> different: for air VPD the air-temperature term scales with `(1 − RH/100)`, but for
-> `leaf VPD = e°(T_leaf) − e°(T_air)·(RH/100)` the air-temperature term scales with `RH/100`
-> — so the break-even moves the **opposite way** as RH rises. At `T_air` 26 °C with `T_leaf`
-> 24 °C (author computation): air basis gives 3.55 / 2.36 / 1.18 %RH per °C at 40 / 60 / 80%
-> RH, while the leaf-basis air-temperature break-even runs 2.36 / 3.55 / 4.73 across the same
-> points. **Using the air table at high RH would name the wrong limiting sensor.** Leaf VPD
-> also has a _third_ input — `T_leaf` itself, the largest sensitivity of the three
-> (break-even ≈ 5.33 %RH per °C at these conditions). For leaf basis, skip this shortcut and
-> use the three-input corner propagation in step 3.
-> Compare it with the break-even nearest your operating point. Above it, RH is your limiting
-> sensor; below it, temperature is. **A better RH sensor or a worse temperature probe reverses
-> the answer.**
+### Leaf basis — a separate budget, because the sensitivities differ structurally
+
+**Do not carry the air-basis table across.** For `leaf VPD = e°(T_leaf) − e°(T_air)·(RH/100)`
+there are **three** independent inputs, and the air-temperature term scales with `RH/100`
+rather than `(1 − RH/100)` — so its break-even moves the **opposite way** as RH rises.
+
+Break-even in **%RH per °C** at `T_air` 26 °C, `T_leaf` 24 °C (author computation from C01):
+
+| Operating point | `T_air` — air basis | `T_air` — **leaf basis** | `T_leaf` — leaf basis |
+| --------------- | ------------------: | -----------------------: | --------------------: |
+| 26 °C, 40% RH   |                3.55 |                     2.36 |                  5.33 |
+| 26 °C, 60% RH   |                2.36 |                     3.55 |                  5.33 |
+| 26 °C, 80% RH   |                1.18 |                     4.73 |                  5.33 |
+
+Read the middle column against the first: **they invert.** Using the air figure at 80% RH
+would understate the air probe's influence on a leaf-basis result by a factor of four.
+
+**Your leaf-basis comparison** — compute each ratio against its own break-even:
+
+| Input    | Your instrument's accuracy | Break-even above | Limiting? |
+| -------- | -------------------------- | ---------------- | --------- |
+| `T_leaf` | ...... °C                  | 5.33             |           |
+| `T_air`  | ...... °C                  | ......           |           |
+| RH       | ...... %                   | (reference)      |           |
+
+**`T_leaf` carries the largest sensitivity of the three** at these conditions, which is the
+practical headline: on leaf basis the leaf-temperature measurement usually deserves the most
+scrutiny, and it is also the one carrying the four-term uncertainty budget from asset 2.
+Then use the three-input corner propagation in step 3 — this table tells you where to spend
+effort, not what the range is.
 
 ## Step 3 — compute the range
 

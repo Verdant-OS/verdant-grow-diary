@@ -6,9 +6,10 @@
 `cbbd7122597358e4c6e55e14b7f6a769a3a69132` (fetched and verified this session)
 **Slice name:** `POSTGRES_RESTRICTED_ROLE_SPIKE` (approved 2026-08-14)
 **Capability gap:** `GAP-PGROLE-001`
-**Status:** APPROVED 2026-08-14 by Cheek. Phase 0 **delivered and measured**
-(§5.1.1) and Phase 1 **delivered, local-replay only** (§5.2.1). Production roles
-remain `REJECT`.
+**Status:** APPROVED 2026-08-14 by Cheek. Phase 0 **measured** (§5.1.1),
+Phase 1 **demonstrated 10/10, local-replay only** (§5.2.3), Phase 2 production
+adoption **approved in principle, execution gated** on two hosted-project facts
+and a Security review (§5.4).
 
 This document is the comparison arm that
 `docs/specs/convex-component-physical-sandbox-spike.md` §4.2 and §11 defer:
@@ -46,7 +47,9 @@ Concretely:
   in the local replay lane, never in production. Shipped as a local-only fixture
   plus harness rather than a migration — see §5.2.1 for why that distinction is
   load-bearing.
-- **Phase 2 (`REJECT` until Cheek + Security):** production role adoption.
+- **Phase 2 (APPROVED IN PRINCIPLE 2026-08-14, execution gated):** production
+  role adoption. See §5.4 for the two facts that gate writing the migration and
+  why shipping it blind would repeat a failure this repo is currently paying for.
 
 **Do not** ship a default-deny grant posture. A founder decision on 2026-08-06,
 recorded in a merged migration, already declined exactly that — see §3.4. That
@@ -56,7 +59,9 @@ mine to overturn.
 **Verdict for Phase 0:** `DONE` — approved and delivered 2026-08-14 (§5.1.1).
 **Verdict for Phase 1:** `DONE` — approved and delivered 2026-08-14 (§5.2.1).
 Runtime proofs execute in the `security-db-local` replay lane.
-**Verdict for production roles:** `REJECT` at this time.
+**Verdict for production roles:** `APPROVED IN PRINCIPLE` — Cheek, 2026-08-14.
+Execution gated on §5.4 Gates A/B/C. Re-pointing any edge function at the role
+remains a separate, later decision.
 
 ---
 
@@ -539,6 +544,75 @@ NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS`, `USAGE` on `public`,
 overload, `SECURITY DEFINER`, writes only `bridge_tokens`), and **zero table
 grants**. It contains no raising self-test, per the R1 rule in §3.5.
 
+### 5.4 Phase 2 — production adoption: approved, and what gates execution
+
+**Cheek approved production adoption on 2026-08-14.** This section records that
+decision and the two facts that must land before the change can be written
+safely. It is a sequencing note, not a hedge: once both are answered the
+migration below is a same-day change.
+
+**The mechanism problem.** Phase 1 deliberately avoided `supabase/migrations/`
+because a file there reaches production on the next Lovable apply. Phase 2
+*wants* that. So the local-only fixture cannot be promoted as-is — a production
+role can only be created by a migration, and that inverts the §8 fence by
+design rather than by accident.
+
+**Gate A — does hosted Supabase permit `CREATE ROLE` at all?** `unknown`.
+Measured facts that make this load-bearing rather than academic:
+
+- §5.2.1: the Supabase `postgres` role **cannot** set `NOSUPERUSER` /
+  `NOREPLICATION` / `NOBYPASSRLS`, because PostgreSQL requires superuser to
+  change them even to turn them off. `established fact`, measured.
+- If `CREATE ROLE` is likewise refused on the hosted project, a migration
+  containing it **aborts the apply**, and every migration after it in the chain
+  stops.
+
+That is not a hypothetical failure mode in this repository. It is the exact
+reason `claude/cultivar-library-p1` was abandoned on 2026-08-14 (unguarded
+`CREATE TABLE` → `42P07` → replay aborts), and the open production incident at
+the top of `CURRENT_STATE.md` is a live instance of a migration failing inside
+the chain. Shipping an unguardable `CREATE ROLE` on an unverified privilege
+assumption would be repeating a failure this repo is currently paying for.
+
+**Gate B — does the hosted PostgREST honour a custom `role` claim?** P3 passed,
+but **on the local stack only** (§5.2.3). The hosted project may differ, and it
+may also move to opaque `sb_secret_…` keys, which would remove the ability to
+mint a role-claim JWT at all. `uncertainty`.
+
+**Gate C — Security review.** `docs/agents/HANDOFF_PROTOCOL.md` places Security
+before Council and Cheek for exactly this class of change: a new database
+principal plus JWT minting and key custody.
+
+**The migration, ready to write once A and B return.** Defensive by default, so
+that a refusal degrades to a no-op instead of aborting the chain:
+
+```sql
+-- Phase 2. Guarded so a refused CREATE ROLE cannot abort the apply chain.
+DO $phase2$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'verdant_ingest_writer') THEN
+    BEGIN
+      CREATE ROLE verdant_ingest_writer NOLOGIN NOINHERIT;
+    EXCEPTION WHEN insufficient_privilege THEN
+      RAISE NOTICE 'CREATE ROLE refused; Phase 2 is a no-op on this project';
+      RETURN;
+    END;
+  END IF;
+  EXECUTE 'GRANT USAGE ON SCHEMA public TO verdant_ingest_writer';
+  EXECUTE 'GRANT EXECUTE ON FUNCTION public.bump_bridge_token_usage(uuid, integer)
+             TO verdant_ingest_writer';
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticator') THEN
+    EXECUTE 'GRANT verdant_ingest_writer TO authenticator';
+  END IF;
+END
+$phase2$;
+```
+
+Note what it still does **not** do: no table grants, no `ALTER ROLE` naming a
+superuser-only attribute, and **no edge function re-pointed at the role.**
+Creating the principal and cutting traffic over to it are separate decisions;
+§9 keeps the second one `REJECT` until the first has baked in production.
+
 ### 5.3 How a restricted role is actually reached
 
 This is the feasibility crux, and it is where a naive role proposal dies.
@@ -687,7 +761,7 @@ tree. Run `git status` before any commit that follows a review pass.
 | --- | --- | --- |
 | Phase 0 detector | **DONE** — approved and delivered 2026-08-14 | Complete; do not rebuild |
 | Phase 1 local role spike | **DONE** — approved and delivered 2026-08-14 | Complete. Proofs run in the `security-db-local` replay lane |
-| Role reachable via minted JWT in production | `REJECT` | P3 `PASS` locally + Security review of JWT minting and key custody |
+| Role reachable via minted JWT in production | **APPROVED IN PRINCIPLE (Cheek, 2026-08-14)** — execution gated, see §5.4 | P3 passed locally; two hosted-project facts and a Security review remain |
 | Re-point any money function to a restricted role | `REJECT` | Separate slice; money is the last domain to migrate, not the first |
 | Default-deny table grants | `REJECT` | Reverses a recorded founder decision (§3.4). Cheek only |
 | Roles for `delete-account` | `REJECT` | §5.5 — erasure legitimately spans domains |
@@ -699,38 +773,64 @@ promotion.
 
 ---
 
-## 10. Comparison arm — `GAP-PGROLE-001` vs `GAP-CONVEX-001`
+## 10. Comparison — `GAP-PGROLE-001` vs `GAP-CONVEX-001`
 
-This section exists for the Council Chair comparison that
-`CURRENT_STATE.md` reserves. It is a structured comparison, **not** a
-recommendation between them — Phase 0 has not run and #977 has not landed, so
-the evidence to decide does not yet exist.
+Updated 2026-08-14 after Phase 1. This section previously said the comparison
+was not decidable. **That has changed on one side only, and the asymmetry is
+itself the finding.**
 
-| Dimension | Postgres restricted roles | Convex components (#977) |
+### 10.1 Where each arm actually stands
+
+| | Postgres restricted roles | Convex components |
 | --- | --- | --- |
-| Isolation mechanism | Role privilege check → `42501` | Component boundary; parent tables unrepresentable |
-| Enforced by | The database Verdant already runs | A second runtime not currently in the repo |
-| Covers the 22 existing service-role functions | Yes, incrementally, in place | No — nothing in production moves |
-| Covers **new tables Lovable ships** | **No** (§3.4) — the known weak point | `NOT_APPLICABLE` — different data plane |
-| Covers what a `SECURITY DEFINER` fn does once running | **No** (§5.5) | Yes, within the component |
-| New runtime, dependency, lockfile | None | Yes |
-| New operational surface | JWT minting, role lifecycle, drift detector | Convex deployment, credentials, egress |
-| Reversibility | High — `DROP ROLE`, no data moves | High — spike is disposable |
-| Blocking unknown | Does PostgREST honor a custom `role` claim here (P3)? | Can `convex-test` express cross-component denial without a cloud deploy? |
-| Evidence available today | Phase 0 not run — `NOT_MEASURED` | #977 open, unmerged — `NOT_MEASURED` |
+| Gap statement | `GAP-PGROLE-001` | `GAP-CONVEX-001` |
+| Status | **DEMONSTRATED** — 10/10 proofs, all six §4.3 clauses, in the `security-db-local` replay lane | **`NOT_MEASURED`** |
+| Evidence | Postgres refuses cross-domain read *and* write with `42501`; refusal survives a table created after the role; PostgREST honours a custom role claim | PR #977 is green (99 checks) — but **no CI lane executes the spike's own P1–P9 isolation proofs** |
+| Covers today's 22 service-role functions | Yes, incrementally, in place | No — nothing in production moves |
+| New runtime / dependency | None | Yes |
+| Blocking unknown | Hosted `CREATE ROLE` permission (§5.4 Gate A) | Whether `convex-test` can express cross-component denial without a cloud deploy (Convex spec §11) |
 
-**Honest asymmetry.** Convex's isolation property is *stronger* — it constrains
-what component code can express, not merely which functions a caller may invoke.
-The restricted-role arm is *weaker but incumbent*: it adds no runtime, reuses 208
-existing definer functions and 28 existing harnesses, and improves the surface
-that actually ships today. Neither of these is established as the better call,
-and this document does not assert one.
+**On #977's green CI.** 99 checks pass and zero of them are named for convex or
+the spike. The spike lives under `spikes/` with its own nested lockfile and
+nothing wired to run it. Green there means *the repository still builds with a
+`spikes/` folder added* — it is not evidence that component isolation was
+demonstrated. `established fact`, checked this session. This is not a criticism
+of #977, which was scoped as Phase 1 scaffolding; it is a caution against
+reading its green tick as the missing measurement.
 
-**The comparison is not currently decidable.** Both arms are `NOT_MEASURED`. Any
-Council recommendation before Phase 0 evidence and #977 proof results would be an
-opinion, not a finding.
+### 10.2 Recommendation
 
----
+**Adopt the Postgres arm incrementally. Hold Convex.** `inference`, and the
+first recommendation in this document that goes beyond the evidence-gathering
+posture — offered because the evidence now supports one.
+
+Reasoning, in order of weight:
+
+1. **One arm is demonstrated and the other is not.** Not "looks better" —
+   measured against its own pre-registered success definition.
+2. **The demonstrated arm is the incumbent.** It adds no runtime, no
+   dependency, no second operational surface, and it improves the 22 functions
+   that actually ship today. Convex, by design, moves nothing in production.
+3. **P7 answers Verdant's specific constraint.** A table created after the role
+   existed was still refused. That is the 2026-08-06 founder decision — Lovable
+   ships tables without ACL awareness — surviving contact with a real database.
+4. **Reversibility.** `DROP ROLE` versus adopting a second backend.
+
+### 10.3 What this recommendation does not say
+
+- **Convex is not refuted.** Its isolation property is genuinely *stronger*: it
+  constrains what component code can express, where a role only constrains which
+  functions a caller may invoke. If #977's proofs run and pass, that stays true.
+  It is unmeasured, not disproven.
+- **Neither arm removes `ai-coach`'s five cross-domain reaches cheaply.** That
+  function reads grower diary, grows, plants, tents and sensor readings because
+  the AI Doctor rules in `AGENTS.md` require it to. It is the hardest case for
+  both architectures and no result here changes that.
+- **A role does not fence what a `SECURITY DEFINER` function does once running**
+  (§5.5), and `delete-account` legitimately spans domains. Real residual radius
+  remains after full adoption.
+- **This is a recommendation, not a decision.** Council Chair advises; Cheek
+  approves. Security reviews before any production principal exists.
 
 ## 11. Validation
 

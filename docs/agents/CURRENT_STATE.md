@@ -1,6 +1,6 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-13
+**Last updated:** 2026-08-15
 **Updated by:** Claude (Knowledge Library & Product Specification Architect)
 
 This is the shift report. It changes often. Permanent rules live in `/AGENTS.md` and must
@@ -75,6 +75,51 @@ invented finding.
 | 2   | GA4 / GSC access `BLOCKED`                                           | **Cheek (owner-only)** | No agent can clear this. Every measurement decision depends on it.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | 3   | `/cultivars/*` has no eligibility gate                               | Codex + Cheek          | 10 strain pages live; `docs/seo/content-taxonomy.md` contains no strain row. Shipped outside the scoring system that governs guides.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | 4   | `main` missing the Account Preferences feature that's live on deploy | Codex                  | `verdant-grow-diary` has `/account/preferences` registered in `appRouteManifest.ts` (a Settings page for marketing opt-in + agreement-acceptance history); `main`'s `App.tsx` doesn't mount the route and `Settings.tsx` has no such tile — `main`'s settings-tile-count test currently pins **4** tiles, not 7. Found 2026-08-13 while triaging a stray local branch (`fix/consent-auth-hardening`, not pushed to origin) for a cherry-pick; its lone route-manifest commit is not a safe isolated fix on its own — the whole feature needs backporting, not just the manifest line. Whoever picks this up needs the branch handed off manually or re-derives the feature from the deploy-branch source, since the branch exists only on the owner's machine. |
+| 5   | Deploy's AI Doctor→Action Queue back-pointer token is spoofable | Codex (security)       | `verdant-grow-diary`'s `src/lib/aiDoctorSessionToActionQueueRules.ts:176-185` builds `reason = ${reasonBody} — Review and approve before acting. ${backPointer}`, placing unsanitized model-derived `action.reason` text **before** the trusted `[session:id]` token — no `stripTokensOfKind`-equivalent sanitization call. `src/lib/actionQueueProvenanceRules.ts`'s `extractSourceAlertId` / `extractSourceAiDoctorSessionId` extract via a non-global `reason.match(REGEX)` (first-match semantics), so an AI-generated reason string containing a forged `[session:...]` / `[alert:...]` token earlier in the text would be read instead of the real trailing one. This is the identical vulnerability class a Copilot review flagged on `main` and PR #754 fixed there (via `stripTokensOfKind` + last-match extraction) — but it is **not a backport candidate**: deploy never built the alert-prefill feature #754 hardens, so the fix doesn't transplant directly. The vulnerability exists independently in deploy's own provenance/back-pointer code and needs its own fix. Found 2026-08-15 as a side-finding of the main/deploy divergence audit below, `evidence tier: code-level static finding`, not a confirmed exploited-in-the-wild incident. |
+
+---
+
+## Main / deploy divergence audit (2026-08-15)
+
+**Corrects the framing from earlier the same day.** A raw commit-graph diff was read as
+"70 unshipped commits" and reported that way in conversation. That overstated the real gap
+— see below. Treat this section as authoritative over anything said before it.
+
+Merge-base of `main` and `verdant-grow-diary`: `7048273bc` (2026-06-25, PR #111, the last
+sync merge). Since then: **117 commits exist on `main` that never reached deploy** (70 of
+them touch `src/`; the rest are docs/CI/scripts), and **~5,530 commits exist on deploy that
+aren't on `main`** — but 4,687 of those are `gpt-engineer-app[bot]` (Lovable's
+per-micro-edit auto-commit bot), not 4,687 distinct features. Raw commit counts overstate
+divergence in both directions.
+
+To find the real gap, 8 parallel agents each read **deploy's current code directly**
+(not git ancestry) for one thematic cluster of the 70 `src/`-touching main-only commits,
+searching for differently-named or differently-architected equivalents before concluding
+anything was missing. Verdicts:
+
+| Cluster                                              | Verdict     | Residual gap on deploy                                                                    |
+| ----------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------ |
+| AI Doctor output safety evaluator (#230)               | `SHIPPED`   | None. Landed via PR #229 the same day (that PR's title is misleading — it's a consent PR that also carried the full evaluator tree). Deploy is at parity or ahead (later safety hardening, broader static-scanner suite, CI wiring confirmed live). |
+| Photo strip signed-URL handling (3 commits)            | `SHIPPED`   | None. Deploy solved it independently **3 weeks before** main, via a shared `useDiaryPhotoDisplayRows` hook — arguably more robust (react-query loading/error state vs. hand-rolled effects). |
+| Breeding / genetics fixes (6 commits)                  | `SHIPPED`   | None. Deploy's independent implementation is more advanced (extra breeding-program layer, stricter fail-closed grow-binding state machine, dedicated regression tests main doesn't have). |
+| Verdant Grow OS MCP server + sensor snapshot (2 commits) | `SHIPPED`   | None. Explicitly dual-shipped by design — deploy mirror PR #256 landed the same week as main's #255 — and deploy has since gone further via the fold-helper work already tracked above (PR #917). |
+| Quick Log v2 data-integrity hardening (13 commits)     | `PARTIAL`   | **Real gap:** trichome percentages can still sum over 100% — `quickLogMaturityEvidenceRules.ts` caps each of clear/cloudy/amber individually at 0–100 but has no sum check anywhere in the chain. Everything else (pH/EC/runoff-volume bounds, duplicate-save-on-retry prevention, orphaned-photo cleanup) is independently shipped — the bounds check is even server-side RPC-enforced (`quicklog_save_event` in `20260725023000_core_schema_forward_repair.sql`), stronger than main's client-side fix. |
+| `alerts.tent_id` / alert-prefill (4 commits)           | `PARTIAL`   | `tent_id` population is shipped independently (plus a dedicated regression test main doesn't have). The alert-prefill-to-Coach race condition doesn't apply — deploy never built that feature; it solved the underlying UX goal with a plain context-free deep link instead of a prefilled chat box. See blocker #5 for the security finding this comparison surfaced. |
+| AI Doctor credits-exhausted teaser (3 commits)         | `PARTIAL`   | **Real gap:** the *proactive* "credits running low" warning is computed (`AI_DOCTOR_CREDITS_LOW_COPY`) but has zero UI consumers on deploy — only exhaustion-time interception ships, and only inside the tent-alerts panel CTA, not as a general Plant Detail marker like main's #758. Cache-refresh-after-spend is shipped independently. Low safety relevance — reads as a scope decision, not an oversight. |
+| Pheno Comparison Pro features (8 commits)              | `PARTIAL`   | **Real gap:** no general Plant Detail lab/COA panel with partial-total THC/CBD honesty math (acid-form × 0.877 + neutral-form, flagged as a lower bound when only one form is reported). Deploy's independent "Pheno Hunt Tracker Pro" product (150+ files) ships a real-data comparison page, Pro-gating, photo/sensor enrichment, and a structured trait scorecard — all superior to or at parity with main's version — but its lab-results panel is Pheno-Hunt-scoped only, with a flat schema that can't express "partial" evidence. |
+
+**Net: of the 70 `src/`-touching commits, roughly 4 clusters are fully covered, 4 are
+partially covered, and the genuinely actionable gaps are three specific items** — the
+trichome-percentage sum cap, the proactive AI-Doctor-credits-low warning, and the
+general-Plant-Detail lab/COA partial-total honesty math — plus the unrelated security
+finding logged as blocker #5. This is a small, scoped punch list, not a 70-commit backport
+project. `docs/ecowitt-*` items already tracked above (Phase 1.7/1.8) were not
+re-verified here — they're deliberately staged and already exhaustively documented.
+
+Full per-agent evidence (file:line citations, exact code quoted) is in this session's
+workflow transcript, not reproduced here — ask the implementing agent to re-run the same
+verification pattern (`git show origin/verdant-grow-diary:<path>` against deploy's current
+tip) rather than trusting this table's one-line summaries once deploy has moved further.
 
 ---
 

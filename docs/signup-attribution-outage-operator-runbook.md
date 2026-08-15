@@ -7,7 +7,7 @@
 
 This document exists because the migration's own header understates the problem, and that
 header is immutable once merged (`AGENTS.md` → Migration Immutability Rules). It says
-*"every signup has been unattributed"*, which reads as *signups succeed and lose analytics*.
+_"every signup has been unattributed"_, which reads as _signups succeed and lose analytics_.
 They do not succeed.
 
 ---
@@ -39,12 +39,12 @@ So the sequence is: allowlisted source present → `INSERT` raises `42P01` → u
 
 ### Evidence (live production, 2026-08-13)
 
-| Check | Result |
-| --- | --- |
-| `on_auth_user_created` trigger enabled | `tgenabled = 'O'` |
-| Live `handle_new_user` allowlists `landing_page` | yes |
-| `to_regclass('public.signup_acquisition_attributions')` | `NULL` (absent) |
-| Deployed front-door CTA emits the matching utm triple | yes, present in the live bundle |
+| Check                                                   | Result                          |
+| ------------------------------------------------------- | ------------------------------- |
+| `on_auth_user_created` trigger enabled                  | `tgenabled = 'O'`               |
+| Live `handle_new_user` allowlists `landing_page`        | yes                             |
+| `to_regclass('public.signup_acquisition_attributions')` | `NULL` (absent)                 |
+| Deployed front-door CTA emits the matching utm triple   | yes, present in the live bundle |
 
 ### Provenance
 
@@ -114,7 +114,7 @@ FROM spans;
 
 **Token counts alone cannot prove this, so the complete definition is preserved below.**
 A count of `total_exception=1` plus one `BEGIN` between the INSERT and the handler is
-*consistent with* the INSERT being unhandled — but it is equally consistent with a **safe**
+_consistent with_ the INSERT being unhandled — but it is equally consistent with a **safe**
 shape: outer `BEGIN` → INSERT → a fully closed inner `BEGIN ... END;` → outer `EXCEPTION`,
 in which the handler does catch the INSERT. Counting cannot separate those two, and an md5
 does not either unless the definition it fingerprints is actually recorded. So here it is.
@@ -222,7 +222,7 @@ The attribution INSERT sits in the outer block. The outer block reaches its `END
 an `EXCEPTION` clause. So the `42P01` is unhandled and propagates out of the trigger,
 aborting the `auth.users` INSERT.
 
-Read directly: the sole `EXCEPTION` clause pairs with the inner `BEGIN` that opens *after*
+Read directly: the sole `EXCEPTION` clause pairs with the inner `BEGIN` that opens _after_
 the attribution INSERT and closes immediately before `RETURN NEW`. It wraps only the
 referral logic. The outer block — which contains the INSERT — reaches its `END` with no
 `EXCEPTION` clause, so the 42P01 is unhandled and propagates out of the trigger.
@@ -345,6 +345,7 @@ body. `scripts/audit-subscriber-growth-live-parity.mjs` implements this techniqu
   > result — has their attribution **replaced** with `landing_page` by the fallback at
   > `Landing.tsx:60` before the CTA is even rendered, and then fails. Inbound utm params
   > offer no protection once a visitor touches the landing page.
+
 - `/tools/blueprint-targets` — see the ordering note below.
 
 ---
@@ -355,8 +356,8 @@ body. `scripts/audit-subscriber-growth-live-parity.mjs` implements this techniqu
 proven to have been exercised — do not claim lost signups, and do not call it harmless.
 
 `auth.users` holds 7 accounts, all with a `NULL` `verdant_signup_source`, the newest created
-**2026-07-02** — *before* the breaking function body landed on 2026-07-21. A failed signup
-rolls back and leaves no row, so *"nobody tried"* and *"everyone who tried failed"* are
+**2026-07-02** — _before_ the breaking function body landed on 2026-07-21. A failed signup
+rolls back and leaves no row, so _"nobody tried"_ and _"everyone who tried failed"_ are
 indistinguishable from the table.
 
 **There is no sound database falsifier — do not let the obvious query fool you.** An
@@ -364,27 +365,26 @@ earlier revision of this runbook proposed grouping `auth.users` by
 `raw_user_meta_data->>'verdant_signup_source'` and treating any allowlisted value created
 after 2026-07-21 as disproof. **That query is not valid as a falsifier**, for a reason that
 is easy to miss: `raw_user_meta_data` is **client-editable**, and the query observes the
-value *now*, not the value the trigger saw at creation time. Someone who signed up through
+value _now_, not the value the trigger saw at creation time. Someone who signed up through
 an unaffected path — Google OAuth, say — could later set that key to an allowlisted value,
 producing a row that appears to disprove the outage while the mechanism remains entirely
 intact. It measures the wrong thing at the wrong time.
 
 Sound evidence has to be **immutable and server-side**. The candidates:
 
-| Source | What it would show | Caveat |
-| --- | --- | --- |
-| **Postgres error logs** | `42P01` on `public.signup_acquisition_attributions` raised from `handle_new_user` at signup time. **This is the only incident-specific evidence that exists** | Subject to the retention window; absence past retention proves nothing |
-| GA4 `signup_failed` | That *some* signup failed — a **lead**, not proof | **Not incident-specific.** `Auth.tsx` emits `signup_failed` with `reason: "auth_rejected"` for **every** `supabase.auth.signUp` error: rate limiting, duplicate account, provider outage, weak password. A nonzero count is only meaningful if correlated with a server-side `42P01`. Also consent-gated and currently unreadable (baseline `BLOCKED`) |
-| `signup_acquisition_attributions` rows *(post-apply)* | Very little — see below | **Rows are NOT proof the trigger fired.** The table has no provenance column, and rows reach it three ways: the repair's own backfill from current `raw_user_meta_data`, `record_signup_acquisition_first_touch` (which an authenticated OAuth user can call with a source from client-controlled session storage), and the trigger. A row cannot be attributed to the failing email-signup path |
+| Source                                                | What it would show                                                                                                                                            | Caveat                                                                                                                                                                                                                                                                                                                                                                                           |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Postgres error logs**                               | `42P01` on `public.signup_acquisition_attributions` raised from `handle_new_user` at signup time. **This is the only incident-specific evidence that exists** | Subject to the retention window; absence past retention proves nothing                                                                                                                                                                                                                                                                                                                           |
+| GA4 `signup_failed`                                   | That _some_ signup failed — a **lead**, not proof                                                                                                             | **Not incident-specific.** `Auth.tsx` emits `signup_failed` with `reason: "auth_rejected"` for **every** `supabase.auth.signUp` error: rate limiting, duplicate account, provider outage, weak password. A nonzero count is only meaningful if correlated with a server-side `42P01`. Also consent-gated and currently unreadable (baseline `BLOCKED`)                                           |
+| `signup_acquisition_attributions` rows _(post-apply)_ | Very little — see below                                                                                                                                       | **Rows are NOT proof the trigger fired.** The table has no provenance column, and rows reach it three ways: the repair's own backfill from current `raw_user_meta_data`, `record_signup_acquisition_first_touch` (which an authenticated OAuth user can call with a source from client-controlled session storage), and the trigger. A row cannot be attributed to the failing email-signup path |
 
-An earlier revision of this runbook called that last row "trigger-written and not client-editable — the ideal evidence". That was wrong on both counts, and wrong in the same way as the retracted metadata falsifier: it assumed a value's *presence* implies the path that would have written it. **Database logs are the incident-specific evidence. Everything else is circumstantial.**
+An earlier revision of this runbook called that last row "trigger-written and not client-editable — the ideal evidence". That was wrong on both counts, and wrong in the same way as the retracted metadata falsifier: it assumed a value's _presence_ implies the path that would have written it. **Database logs are the incident-specific evidence. Everything else is circumstantial.**
 
 Note the structural bind: the one trustworthy database record is the very table whose
 absence causes the failure. **Until the migration is applied, no immutable database evidence
 of this outage can exist** — a failed signup rolls back and leaves nothing behind. That is
 why the diagnosis rests on the mechanism (proven above against the live function) rather
 than on a count of victims.
-
 
 ---
 
@@ -393,10 +393,13 @@ than on a count of victims.
 Two independent reasons, both worth internalising:
 
 1. **The apply gap.** Merging a migration never applies it to production (see
-   `docs/contributing-supabase-migrations.md`). Only an explicit Lovable apply does.
+   `docs/contributing-supabase-migrations.md`). At incident discovery, Lovable's explicit
+   apply was the only available operator path. The repository now carries the narrower,
+   protected `apply-signup-acquisition-forward-repair.yml` dispatch described below; a
+   merge still does not run it automatically.
 2. **The frontend half was already deployed.** The live bundle's attribution table already
-   carried `blueprint_targets` while the repo base branch did not — production was *ahead of
-   the repo*. So #969's frontend diff was repo-side catch-up to already-published Lovable
+   carried `blueprint_targets` while the repo base branch did not — production was _ahead of
+   the repo_. So #969's frontend diff was repo-side catch-up to already-published Lovable
    code, and changed nothing live.
 
 ---
@@ -404,7 +407,7 @@ Two independent reasons, both worth internalising:
 ## ⚠️ Ledger hazard — read before applying
 
 Applying `20260813030000` alone fixes the outage, but leaves a loaded gun. Three superseded
-migrations remain **absent from the ledger**, and every one of them carries a *lower* version
+migrations remain **absent from the ledger**, and every one of them carries a _lower_ version
 than the repair. If any future backlog catch-up executes pending migrations in version order,
 they run **after** the repair and clobber it.
 
@@ -453,20 +456,20 @@ FROM parsed p ORDER BY p.ts;
 Every migration in the repo that defines any of the four functions, and what each would do
 if it ran **after** the repair. Occurrence counts are from reading the files:
 
-| Migration | Defines | In ledger | Would revert |
-| --- | --- | --- | --- |
-| `20260515204616`, `20260515204637`, `20260515211702` | `handle_new_user` | **no** | referral system **and** attribution entirely — these predate both |
-| `20260714231627_signup_acquisition_attribution` | `handle_new_user`, acq snapshot | **no** | referral system; `blueprint_targets` |
-| `20260715002000_signup_to_paid_operator_snapshot` | paid snapshot | **no** | restores the `billing_subscriptions` branch |
-| `20260716215516_add_csv_history_signup_attribution` | **all four** | **no** | referral system; `blueprint_targets`; restores `billing_subscriptions` |
-| `20260721107000_referral_code_and_pending_capture` | `handle_new_user` | **no** | `blueprint_targets` only — it *has* the referral block (`referral_code` ×23, `convert_referral` ×6) |
-| `20260721194325_f96507e6-…` | `handle_new_user` | **yes** | — will not re-run |
-| `20260813030000_signup_acquisition_forward_repair` | **all four** | **no** | this is the repair. The **only** migration containing `blueprint_targets` |
+| Migration                                            | Defines                         | In ledger | Would revert                                                                                        |
+| ---------------------------------------------------- | ------------------------------- | --------- | --------------------------------------------------------------------------------------------------- |
+| `20260515204616`, `20260515204637`, `20260515211702` | `handle_new_user`               | **no**    | referral system **and** attribution entirely — these predate both                                   |
+| `20260714231627_signup_acquisition_attribution`      | `handle_new_user`, acq snapshot | **no**    | referral system; `blueprint_targets`                                                                |
+| `20260715002000_signup_to_paid_operator_snapshot`    | paid snapshot                   | **no**    | restores the `billing_subscriptions` branch                                                         |
+| `20260716215516_add_csv_history_signup_attribution`  | **all four**                    | **no**    | referral system; `blueprint_targets`; restores `billing_subscriptions`                              |
+| `20260721107000_referral_code_and_pending_capture`   | `handle_new_user`               | **no**    | `blueprint_targets` only — it _has_ the referral block (`referral_code` ×23, `convert_referral` ×6) |
+| `20260721194325_f96507e6-…`                          | `handle_new_user`               | **yes**   | — will not re-run                                                                                   |
+| `20260813030000_signup_acquisition_forward_repair`   | **all four**                    | **no**    | this is the repair. The **only** migration containing `blueprint_targets`                           |
 
 Note `20260721107000`: it is the subtle one. Because it carries the referral block, a reader
 checking "does a revert lose referrals?" would clear it — but it has **zero**
 `blueprint_targets`, so it silently reverts attribution for `/tools/blueprint-targets` while
-leaving referrals intact. Being *nearly* current is what makes it easy to miss.
+leaving referrals intact. Being _nearly_ current is what makes it easy to miss.
 
 The outage itself would not return — the table survives once created — but you would trade it
 for a quieter regression across referrals, attribution, and operator reporting.
@@ -533,8 +536,8 @@ outage in the first place.
 ### The repo's replay config contradicts this measurement — the config is wrong
 
 `config/local-supabase-replay-compatibility.json` states, for its `20260721107000` /
-`20260721194325` no-op pair: *"Production records 20260721107000; the later Lovable export
-repeats referral code generation and pending-referral capture functions and triggers."*
+`20260721194325` no-op pair: _"Production records 20260721107000; the later Lovable export
+repeats referral code generation and pending-referral capture functions and triggers."_
 
 **That is the exact reverse of production.** Measured: no ledger row mentions `referral`,
 `pending_capture`, or `20260721107000` under any column or version range, while
@@ -546,22 +549,195 @@ The referral objects themselves do exist (`generate_referral_code`, `convert_ref
 (`referral_code` ×19, `convert_referral` ×3). So object presence does not disambiguate the
 two; only the ledger does, and the ledger says the config's rationale is stale.
 
-**Trust the live ledger over the config.** The config's *behaviour* — no-op the duplicate
+**Trust the live ledger over the config.** The config's _behaviour_ — no-op the duplicate
 during local replay — is unaffected either way, since both files install the referral
 objects; only its stated reason is wrong. Correcting that file is out of scope for this
 docs-only PR and needs its own change, because the entry carries pinned SHA-256 hashes.
 
 ## Applying the fix
 
-Apply `supabase/migrations/20260813030000_signup_acquisition_forward_repair.sql` through
-Lovable. It is a single self-contained, idempotent forward repair: it creates the table,
-re-asserts the CHECK allowlist separately, re-issues all four functions with
-`CREATE OR REPLACE`, and backfills historical attribution `ON CONFLICT DO NOTHING`.
+Use the dedicated protected GitHub Actions workflow. Do **not** paste the migration into a
+SQL editor, use the broad pinned-production runner, or ask Lovable to generate a new
+timestamp for it. The dedicated path binds the immutable repository file to its own exact
+version/name ledger identity.
+
+### Protected two-dispatch sequence
+
+> **OPERATIONAL STATUS: BLOCKED.** Do not dispatch PREFLIGHT until the
+> `verdant-production` environment has (1) an eligible required reviewer, (2)
+> prevent-self-review enabled, and (3) the corrected environment-scoped
+> `SUPABASE_DB_URL`. Never dispatch APPLY until that read-only PREFLIGHT also confirms the
+> migration-ledger compatibility contract described below. The repository pins Verdant's
+> established ledger contract, but this change has not independently measured production's
+> current schema/table owners or ACLs. GitHub's run and artifact APIs authenticate provenance;
+> they do not prove that a human reviewed the database state.
+
+1. Merge the delivery workflow to `verdant-grow-diary`. A pull-request or feature-branch
+   run is intentionally refused.
+2. Read the current full 40-character commit from `verdant-grow-diary`. It must remain the
+   reviewed commit for both stages. If the branch moves, start again from a new PREFLIGHT.
+3. Open **Actions → Apply signup-acquisition forward repair → Run workflow** and select
+   `verdant-grow-diary`.
+4. Run the read-only stage first:
+
+   | Input                 | PREFLIGHT value                                      |
+   | --------------------- | ---------------------------------------------------- |
+   | `operation`           | `PREFLIGHT`                                          |
+   | `expected_head_sha`   | the current 40-character `verdant-grow-diary` commit |
+   | `confirm_project_ref` | `knkwiiywfkbqznbxwqfh`                               |
+   | `confirm_apply`       | leave blank                                          |
+   | `preflight_run_id`    | leave blank                                          |
+
+5. After the eligible `verdant-production` reviewer (who is not the dispatcher) approves,
+   inspect the sanitized Markdown summary and run-scoped evidence artifact. PREFLIGHT makes one
+   transaction-enforced read-only query and never submits `--file`. Continue only when its
+   outcome is `SAFE_TO_APPLY`. If it reports `already_applied_verified`, stop; if it reports
+   any BLOCKED outcome, resolve that condition and run a new PREFLIGHT.
+6. Record the successful PREFLIGHT's numeric GitHub Actions run ID. Do not copy or type a
+   digest. The workflow uploads a single-file immutable receipt artifact named for that exact
+   run and attempt; APPLY authenticates and parses it itself. Start a **new** workflow dispatch:
+
+   | Input                 | APPLY value                                      |
+   | --------------------- | ------------------------------------------------ |
+   | `operation`           | `APPLY`                                          |
+   | `expected_head_sha`   | the same commit bound into the PREFLIGHT receipt |
+   | `confirm_project_ref` | `knkwiiywfkbqznbxwqfh`                           |
+   | `confirm_apply`       | `APPLY SIGNUP ACQUISITION FORWARD REPAIR`        |
+   | `preflight_run_id`    | successful SAFE_TO_APPLY run ID from step 6      |
+
+7. APPLY validates that the supplied ID belongs to a different, completed-success
+   `workflow_dispatch` run of this exact active workflow, repository, branch, and commit. It
+   accepts exactly one unexpired, API-digest-matched, run/attempt-scoped artifact containing
+   only `preflight-receipt.json`; the dependency-free Node verifier validates the ZIP directory,
+   member type/name, compression method, declared and actual size, and CRC before parsing. The
+   signed archive download receives no GitHub credential and is byte- and
+   decompression-bounded. APPLY then installs its local Postgres client and
+   re-resolves `refs/heads/verdant-grow-diary` at the last step before the runner. If the branch
+   advanced or cannot be resolved, the runner emits fixed sanitized `DEPLOY_HEAD_ADVANCED`
+   evidence and stops before database access. Otherwise it repeats the read-only preflight and
+   compares the current state digest with the authenticated artifact digest. Any mismatch stops
+   before `--file` and requires a new PREFLIGHT.
+8. Require a green **Run protected preflight or atomic apply** job. Inspect its sanitized
+   summary and evidence artifact before performing the separate disposable-account E2E.
+
+The environment-scoped `SUPABASE_DB_URL` must contain the pooled Postgres URL for the exact
+project. Never paste that URL into a workflow input, log, issue, or artifact. Environment
+approval is the human authorization gate; the receipt binding is a machine provenance and
+state-continuity gate, not a substitute for review.
+
+The workflow runs
+`scripts/apply-signup-acquisition-forward-repair.mjs`, which is intentionally not a generic
+migration runner. Its reviewed identity is:
+
+| Fact                    | Pinned value                                                       |
+| ----------------------- | ------------------------------------------------------------------ |
+| Version                 | `20260813030000`                                                   |
+| Canonical written name  | `signup_acquisition_forward_repair`                                |
+| Accepted existing alias | `20260813030000_signup_acquisition_forward_repair`                 |
+| File                    | `20260813030000_signup_acquisition_forward_repair.sql`             |
+| SHA-256                 | `6C002AB676218C32C27E41E7A8E90FF4F452C41D7EDB446B0FCB950B93D3DEBA` |
+
+Both names are accepted only when bound to version `20260813030000`. The bare slug is what
+this runner writes; the full migration stem is an accepted, verified name-bound alias. A
+different version using either name, or the version using any other name, is a collision and
+blocks both PREFLIGHT and the locked APPLY guard.
+
+The runner fails closed in this order:
+
+1. exact operation, production target, lowercase 40-character commit, and checked-out SHA;
+2. for APPLY only, the exact phrase, authenticated prior PREFLIGHT run/artifact, and freshly
+   resolved deploy branch head;
+3. exact Supabase project identity derived from the protected URL;
+4. exact LF migration bytes, final newline, SHA-256, and transaction-safety scan;
+5. a bounded, transaction-enforced **read-only** preflight over every accepted ledger
+   identity, prerequisite, and postcondition;
+6. for an existing partial target table, exact non-repairable compatibility: an ordinary
+   permanent, non-partitioned, non-FORCE-RLS table with the three exact columns, PK, FK,
+   expected owner relationship, no extra constraints, no unexpected unique/exclusion index,
+   no user trigger/rewrite rule/policy/publication/reloption, only repairable ACL principals,
+   and only allowlisted existing sources. An absent table is also safe. RLS, client grants,
+   the named source CHECK, and functions are repairable by the migration;
+7. exact prerequisites: ordinary permanent `auth.users`, `public.profiles`,
+   `public.subscriptions`, and `public.user_roles` relations with every used typed column;
+   the full 11-column profile order, types, nullability, defaults, generated/identity state;
+   usable exact `profiles_pkey(user_id)` conflict support; the exact partial referral-code
+   unique index; no unexpected CHECK/FK/UNIQUE/EXCLUDE constraint, index, INSERT trigger, or
+   INSERT rule; a SECURITY DEFINER owner that can insert the supplied profile fields; the
+   `public.app_role` operator label; pinned dependency definitions, owners, search paths, ACLs,
+   effective privilege denials, and usable `user_roles` read access for `has_role`; and the
+   enabled, fingerprinted `on_auth_user_created` trigger targeting `handle_new_user`;
+8. a deliberately narrow migration-ledger compatibility contract matching Verdant's existing
+   pinned production runner: current role `postgres`; ordinary permanent
+   `supabase_migrations.schema_migrations`; ordered `version`, `name`, `statements` columns with
+   exact types/nullability and no defaults/generated identity; exact `PRIMARY KEY(version)` and
+   backing index; current-role schema/table ownership and owner-only ACLs; no RLS, policies,
+   publication, inheritance, reloptions, user trigger, or rewrite rule; and effective
+   SELECT/INSERT/lock capability. This is a compatibility requirement evaluated by PREFLIGHT,
+   not a claim that this change measured today's live catalog;
+9. a boolean creation-default ACL contract over applicable `pg_default_acl` rows for the
+   current owner and `public` schema. Hardened defaults and the documented legacy
+   PUBLIC/anon/authenticated/service-role table/function defaults are accepted only because
+   the protected wrapper deterministically normalizes them; any other grantee, grantor, or
+   privilege blocks SAFE_TO_APPLY;
+10. pre-apply compatibility for all four replaceable function signatures: `handle_new_user`
+    must exist, and every existing target function must have the expected unchangeable return
+    shape, owner `postgres`, and only ACL/grantor entries the migration explicitly normalizes;
+11. the SHA/project/state-bound receipt comparison;
+12. the exact migration body, protected ACL normalization, and canonical bare-name ledger
+    insert in one
+    `psql --single-transaction` file under explicit READ COMMITTED isolation and bounded lock
+    and statement timeouts. The same transaction takes SHARE ROW EXCLUSIVE locks on the
+    migration ledger, `auth.users`, and `public.profiles`, then repeats the non-repairable ledger
+    and profile guards before the migration body. The `auth.users` lock closes the gap between
+    the historical backfill and installation of the new insert trigger;
+13. an in-transaction exact ACL postcondition before the ledger insert, followed by the same
+    bounded read-only query as postflight.
+
+An accepted exact ledger identity plus the full live schema contract returns
+`already_applied_verified` without attempting a write. A collision, incompatible partial
+table, missing prerequisite, malformed result, changed receipt state, or recorded schema
+drift blocks instead of deleting history or guessing. A failed apply transaction rolls back
+both the migration body and ledger insert. A successful transaction whose postflight cannot
+prove the complete contract remains **FAIL**, not PASS.
+
+The uploaded evidence contains only allowlisted fixed identifiers, hashes/receipts,
+boolean/classification results, timestamps, and enumerated reason codes. It never includes a
+connection string, password, token, email, database row, raw query output, or raw `psql`
+error. The same sanitized report is the only content copied into the workflow summary.
+
+The immutable migration bytes and SHA remain unchanged. The protected transaction wrapper
+adds only explicit revokes needed to neutralize legacy hosted default grants: direct
+`service_role` access to the attribution table and unintended `service_role` execution of the
+four repaired functions. The authenticated first-touch and operator snapshot grants remain
+intentional. The migration-ledger `statements` array records two fixed markers: the exact
+pinned-file SHA and `acl-normalization=v1;service_role=revoked`, so the ledger does not imply
+that the file was the transaction's only statement.
+
+The separate `Signup acquisition forward repair PG15` required gate uses the exact pinned
+PostgreSQL 15.18 container image and a loopback-only disposable database. It scaffolds only
+the required Supabase/auth dependencies, runs the real preflight SQL, and applies the immutable
+migration plus ledger in one transaction. It proves exact postflight fingerprints; historical
+user backfill; trigger attribution; valid, invalid, and expired first-touch RPC calls under the
+authenticated role; operator and non-operator snapshots against paid/noise fixtures; direct
+anon/authenticated table denial; application over a compatible partial table; and a deliberate
+late-transaction failure that leaves neither schema nor ledger state. Its two-session race case
+observes the concurrent signup blocked by the `auth.users` lock, then proves that signup resumes
+under the newly installed trigger with both profile and attribution. Negative catalog cases
+cover profile column/default/constraint/index/INSERT-trigger/rule drift, migration-ledger
+shape/owner/ACL/trigger drift, dependencies, and target-table drift. The signup cases use no
+referral code and therefore prove the ordinary non-referral path; they do not claim an end-to-end
+credit grant through `convert_referral`. The gate never receives or contacts a Verdant database
+URL. On a workstation without PostgreSQL or Docker, this proof remains locally BLOCKED until CI
+runs it.
+
+The pinned migration itself remains a single self-contained, idempotent forward repair: it
+creates the table, re-asserts the CHECK allowlist separately, re-issues all four functions
+with `CREATE OR REPLACE`, and backfills historical attribution `ON CONFLICT DO NOTHING`.
 
 **Every partial-apply prefix is safe.** `CREATE TABLE IF NOT EXISTS` is at line 35; the
 `handle_new_user` re-issue that widens the allowlist is at line 91. There is no prefix in
 which the allowlist widens while the table is still absent. Fail between them and the main
-break is *already* fixed, with `blueprint_targets` still resolving to `NULL`.
+break is _already_ fixed, with `blueprint_targets` still resolving to `NULL`.
 
 This ordering is load-bearing, and it is why the two changes ship in one file:
 **`/tools/blueprint-targets` currently succeeds precisely because the live allowlist omits
@@ -574,6 +750,14 @@ That is success, not a failed apply. The backfill replays `auth.users` rows carr
 allowlisted metadata — but under the mechanism above, those accounts were never created.
 
 ### Verifying the apply worked
+
+The workflow's read-only postflight is the authoritative first gate. It requires the exact
+accepted version/name identity; exact table columns, PK, FK, validated CHECK, and no-policy
+shape; RLS and client-access fences; the exact 11-source allowlist; the measured
+`pg_get_functiondef` fingerprints and security/search-path/grant metadata for all four
+functions; the authoritative `public.subscriptions` paid source; and explicit absence of a
+retired `billing_subscriptions` query branch. The compact query below remains useful for a
+human spot-check, but it is weaker than the protected postflight and must not replace it.
 
 ```sql
 SELECT to_regclass('public.signup_acquisition_attributions') IS NOT NULL AS table_exists,
@@ -593,10 +777,30 @@ SELECT to_regclass('public.signup_acquisition_attributions') IS NOT NULL AS tabl
 
 Expect `true`, `3`, `1`. Then confirm end to end by completing a signup from the homepage CTA.
 
+Use a new disposable email address, confirm that account creation returns success rather
+than GoTrue HTTP 500, complete the initial grow/tent/plant setup, then remove the disposable
+account through the approved cleanup path. Record the observed HTTP/result classification;
+do not put the email address, access token, or user ID into the workflow artifact.
+
 If `migration_recorded` is `0` but `table_exists` is `true` and `functions_present` is `3`,
 the apply **worked** and only the ledger row is missing — treat the object state as
 authoritative, and see the "Ledger hazard" section above, because an unrecorded repair is
 exactly the condition that lets a later catch-up re-run it out of order.
+
+### Failure and rollback notes
+
+- Before the apply transaction commits, rerun after correcting the enumerated blocker; no
+  persistent write is assumed.
+- A moved branch, rejected artifact, or receipt mismatch is not an APPLY retry signal. Run a
+  fresh PREFLIGHT, approve it through a different eligible reviewer, and start a separate
+  APPLY dispatch using the new run ID.
+- After a successful commit, do not delete the ledger row and do not edit the merged
+  migration. Any genuine regression requires a separately reviewed additive forward
+  migration.
+- The workflow does not disposition the seven legacy ledger rows discussed above. That is a
+  separate founder decision after this exact repair is applied and verified.
+- The workflow does not publish the frontend, deploy Edge Functions, change secrets, or
+  claim the browser signup journey passed. Those are separate release/e2e gates.
 
 ### Also fixed by the same apply
 
@@ -612,7 +816,7 @@ apply resolves it.
 Worth recording, because it is the reusable lesson rather than a detail of this incident:
 
 - **The failure signal has no first-party persistence — and it is blocked FOUR ways, not
-  one.** A sink exists *in the repo*: `src/components/FunnelEventDbSink.tsx` is mounted in
+  one.** A sink exists _in the repo_: `src/components/FunnelEventDbSink.tsx` is mounted in
   `src/routes/__root.tsx` and subscribes to the same `verdant:analytics` bridge, writing
   catalogued events into `public.funnel_events` (migration `20260813020000`). Extend it rather
   than building a second one — but every one of the following must be cleared, and the
@@ -632,7 +836,7 @@ Worth recording, because it is the reusable lesson rather than a detail of this 
 
   1. **Identity gate — the blocker that defeats the obvious fix.**
      `decideFunnelEventSinkWrite` (`src/lib/funnelEventDbSinkRules.ts:73-74`) rejects a null
-     `userId` *before* it inspects the event at all. And `signup_failed` is emitted at
+     `userId` _before_ it inspects the event at all. And `signup_failed` is emitted at
      `src/pages/Auth.tsx:355-360`, inside the `if (error)` branch — i.e. precisely when
      `signUp` failed and there is **no authenticated user**. So the row is refused on
      identity, ahead of any catalogue question.
@@ -670,8 +874,9 @@ Worth recording, because it is the reusable lesson rather than a detail of this 
   would not demonstrate it; it only becomes evidence when correlated with a server-side
   `42P01` in the database logs for the same window. A **zero** count would be the more
   informative result, since it would be hard to reconcile with anyone having hit this at all.
+
 - **No test could catch it.** Every repo test touching this subsystem is a static scan that
-  pins SQL text in migration *files*. The runtime lane (`test:security-db-local`) does a
+  pins SQL text in migration _files_. The runtime lane (`test:security-db-local`) does a
   `supabase db reset`, which applies **every** migration to a fresh database — where the table
   exists. Production's partial-apply state is unreproducible in CI by construction.
 - **Documented precedent.** `scripts/probe-migration-drift.mjs` records the identical class on

@@ -179,4 +179,26 @@ describe("ActionQueue — One-Tent Loop landing polish", () => {
     const banner = await screen.findByTestId("one-tent-loop-action-queue-landing");
     expect(UUID_RE.test(banner.textContent ?? "")).toBe(false);
   });
+
+  it("mounts the next-step card as Review approval-required action without auto-create", async () => {
+    renderPage();
+    const card = await screen.findByTestId("action-queue-one-tent-loop-next-step-card");
+    expect(card.getAttribute("data-current-step")).toBe("action-queue");
+    expect(card.textContent ?? "").toMatch(/Review approval-required action/);
+    const cta = screen.getByTestId("action-queue-one-tent-loop-next-step-card-cta");
+    expect(cta.getAttribute("href")).toBe("/actions");
+    expect(insertSpy).not.toHaveBeenCalled();
+  });
+
+  it("deep-links the next-step CTA when a focused action id is already on the URL", async () => {
+    render(
+      <MemoryRouter initialEntries={["/actions?focus=act-1"]}>
+        <ActionQueue />
+      </MemoryRouter>,
+    );
+    const cta = await screen.findByTestId("action-queue-one-tent-loop-next-step-card-cta");
+    expect(cta.getAttribute("href")).toBe("/actions/act-1");
+    expect(cta.textContent ?? "").toMatch(/Review approval-required action/);
+    expect(insertSpy).not.toHaveBeenCalled();
+  });
 });

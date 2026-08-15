@@ -53,6 +53,7 @@ import {
 } from "@/lib/connectedOneTentActivationRules";
 import { resolveQuickLogEventTimelineLabel } from "@/lib/quickLogActivityRules";
 import { buildGrowScopedPlantsOrFilter } from "@/lib/growAttributionRules";
+import { pickSoleLoadedId } from "@/lib/oneTentLoopHandoffIds";
 
 /** Bounded dedupe window for merging diary rows with the grow_events spine. */
 const ACTIVITY_MERGE_WINDOW = 1000;
@@ -123,6 +124,12 @@ export interface UseGrowDetailData {
   status: GrowStatus;
   outcomes: GrowOutcomesState;
   growId: string | undefined;
+  /**
+   * Sole tent on this grow, when the grow has exactly one tent.
+   * Null when the grow has zero or several tents, or tent lookup failed.
+   * Never invents a default among many.
+   */
+  soleTentId: string | null;
   refetch: () => void;
 }
 
@@ -137,6 +144,7 @@ export function useGrowDetailData(): UseGrowDetailData {
   const [counts, setCounts] = useState<GrowCounts>(EMPTY_COUNTS);
   const [recent, setRecent] = useState<RecentState>({ status: "loading" });
   const [outcomes, setOutcomes] = useState<GrowOutcomesState>(EMPTY_GROW_OUTCOMES_STATE);
+  const [soleTentId, setSoleTentId] = useState<string | null>(null);
   const [status, setStatus] = useState<GrowStatus>({
     level: "good",
     reason: "Loading…",
@@ -150,6 +158,7 @@ export function useGrowDetailData(): UseGrowDetailData {
     setLoading(true);
     setNotFound(false);
     setError(false);
+    setSoleTentId(null);
 
     const { data, error: gErr } = await supabase
       .from("grows")
@@ -204,20 +213,31 @@ export function useGrowDetailData(): UseGrowDetailData {
       }
     }
 
-    // Plants count resolves grow attribution (BUG-A): a plant belongs to
-    // this grow when its own grow_id matches OR it lives in one of the
-    // grow's tents (orphaned-tent rollup). Tent-id lookup failure degrades
-    // to "unavailable" — never a silent undercount.
+    // One tent-id lookup for both the plant count (BUG-A rollup) and the
+    // One-Tent Loop handoff. Failure degrades the count to "unavailable"
+    // and leaves soleTentId null — never a silent undercount or invented default.
+    let tErr: unknown = null;
+    let tentIds: string[] = [];
+    try {
+      const tentLookup = await supabase
+        .from("tents")
+        .select("id")
+        .eq("grow_id", growId!);
+      tErr = tentLookup.error;
+      tentIds = tErr
+        ? []
+        : (tentLookup.data ?? [])
+            .map((r) => (r as { id?: string | null }).id ?? "")
+            .filter((id): id is string => typeof id === "string" && id.length > 0);
+      setSoleTentId(tErr ? null : pickSoleLoadedId(tentIds));
+    } catch (err) {
+      tErr = err;
+      setSoleTentId(null);
+    }
+
     async function countGrowScopedPlants(): Promise<CountValue> {
       try {
-        const { data: tentRows, error: tErr } = await supabase
-          .from("tents")
-          .select("id")
-          .eq("grow_id", growId!);
         if (tErr) return "unavailable";
-        const tentIds = (tentRows ?? [])
-          .map((r) => (r as { id?: string | null }).id ?? "")
-          .filter((id): id is string => typeof id === "string" && id.length > 0);
         const { count, error: cErr } = await supabase
           .from("plants")
           .select("id", { count: "exact", head: true })
@@ -553,6 +573,7 @@ export function useGrowDetailData(): UseGrowDetailData {
     status,
     outcomes,
     growId,
+    soleTentId,
     refetch: load,
   };
 }

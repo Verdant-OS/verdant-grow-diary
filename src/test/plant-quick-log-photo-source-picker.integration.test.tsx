@@ -1,8 +1,8 @@
 /**
  * PlantQuickLog photo source picker + grower-model integration coverage.
  *
- * Drives the real PlantQuickLog component end-to-end against mocked Supabase
- * storage + diary_entries insert (no real network, no real DB writes).
+ * Drives the real PlantQuickLog component end-to-end against mocked
+ * diary-photos upload + useQuickLogV2Save (no real network, no real DB writes).
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
@@ -10,7 +10,19 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 
 const uploadCalls: Array<{ bucket: string; path: string; file: File }> = [];
-const insertCalls: Array<Record<string, unknown>> = [];
+const saveCalls: Array<Record<string, unknown>> = [];
+const updateCalls: Array<Record<string, unknown>> = [];
+
+vi.mock("@/hooks/useQuickLogV2Save", () => ({
+  useQuickLogV2Save: () => ({
+    save: async (payload: Record<string, unknown>) => {
+      saveCalls.push(payload);
+      return { ok: true, growEventId: "ge-1", reused: false };
+    },
+    saving: false,
+    error: null,
+  }),
+}));
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
@@ -24,9 +36,13 @@ vi.mock("@/integrations/supabase/client", () => ({
       }),
     },
     from: (table: string) => ({
-      insert: (payload: Record<string, unknown>) => {
-        insertCalls.push({ __table: table, ...payload });
-        return Promise.resolve({ data: null, error: null });
+      update: (payload: Record<string, unknown>) => {
+        updateCalls.push({ __table: table, ...payload });
+        const chain = {
+          eq: () => chain,
+          filter: () => Promise.resolve({ data: null, error: null }),
+        };
+        return chain;
       },
     }),
   },
@@ -46,7 +62,8 @@ vi.mock("sonner", () => ({
 
 beforeEach(() => {
   uploadCalls.length = 0;
-  insertCalls.length = 0;
+  saveCalls.length = 0;
+  updateCalls.length = 0;
   vi.restoreAllMocks();
   if (typeof URL.createObjectURL !== "function") {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -115,7 +132,7 @@ describe("PlantQuickLog action-first grower model", () => {
     fireEvent.click(screen.getByRole("button", { name: /log action watered/i }));
     expect(screen.getByTestId("plant-quick-log-note")).toHaveValue("Watered.");
     expect(screen.getByTestId("plant-quick-log-save")).not.toBeDisabled();
-    expect(insertCalls).toHaveLength(0);
+    expect(saveCalls).toHaveLength(0);
     expect(uploadCalls).toHaveLength(0);
   });
 
@@ -124,7 +141,7 @@ describe("PlantQuickLog action-first grower model", () => {
     fireEvent.click(screen.getByRole("button", { name: /response check better/i }));
     expect(screen.getByTestId("plant-quick-log-note")).toHaveValue("Response check: Better.");
     expect(screen.getByTestId("plant-quick-log-save")).not.toBeDisabled();
-    expect(insertCalls).toHaveLength(0);
+    expect(saveCalls).toHaveLength(0);
     expect(uploadCalls).toHaveLength(0);
   });
 
@@ -135,38 +152,40 @@ describe("PlantQuickLog action-first grower model", () => {
     expect(screen.getByTestId("plant-quick-log-note")).toHaveValue("Response check: Same.");
   });
 
-  it("saves an action with unchanged diary_entries payload shape", async () => {
+  it("saves an action through quicklog_save_manual as a plant note", async () => {
     renderSheet();
     fireEvent.click(screen.getByRole("button", { name: /log action watered/i }));
     fireEvent.click(screen.getByTestId("plant-quick-log-save"));
 
-    await waitFor(() => expect(insertCalls).toHaveLength(1));
+    await waitFor(() => expect(saveCalls).toHaveLength(1));
     expect(uploadCalls).toHaveLength(0);
-    expect(insertCalls[0]).toMatchObject({
-      __table: "diary_entries",
+    expect(saveCalls[0]).toMatchObject({
+      p_target_type: "plant",
+      p_target_id: "plant-1",
+      p_action: "note",
+      p_note: "Watered.",
+    });
+    expect(saveCalls[0].p_details).toMatchObject({
       grow_id: "grow-1",
       plant_id: "plant-1",
       tent_id: "tent-1",
-      note: "Watered.",
     });
-    expect(insertCalls[0].photo_url).toBeNull();
-    expect("user_id" in insertCalls[0]).toBe(false);
+    expect(JSON.stringify(saveCalls[0])).not.toContain("user_id");
   });
 
-  it("saves a response follow-up with unchanged diary_entries payload shape", async () => {
+  it("saves a response follow-up through the same RPC note path", async () => {
     renderSheet();
     fireEvent.click(screen.getByRole("button", { name: /response check better/i }));
     fireEvent.click(screen.getByTestId("plant-quick-log-save"));
 
-    await waitFor(() => expect(insertCalls).toHaveLength(1));
-    expect(insertCalls[0]).toMatchObject({
-      __table: "diary_entries",
-      grow_id: "grow-1",
-      plant_id: "plant-1",
-      tent_id: "tent-1",
-      note: "Response check: Better.",
+    await waitFor(() => expect(saveCalls).toHaveLength(1));
+    expect(saveCalls[0]).toMatchObject({
+      p_target_type: "plant",
+      p_target_id: "plant-1",
+      p_action: "note",
+      p_note: "Response check: Better.",
     });
-    expect("user_id" in insertCalls[0]).toBe(false);
+    expect(JSON.stringify(saveCalls[0])).not.toContain("user_id");
   });
 
   it("action chips append local note detail without saving", () => {
@@ -175,7 +194,7 @@ describe("PlantQuickLog action-first grower model", () => {
     fireEvent.click(screen.getByRole("button", { name: /log action fed/i }));
     fireEvent.click(screen.getByRole("button", { name: /log action fed/i }));
     expect(screen.getByTestId("plant-quick-log-note")).toHaveValue("Watered.\nFed.");
-    expect(insertCalls).toHaveLength(0);
+    expect(saveCalls).toHaveLength(0);
   });
 
   it("Photo only action does not weaken validation when no photo is selected", () => {
@@ -183,7 +202,7 @@ describe("PlantQuickLog action-first grower model", () => {
     fireEvent.click(screen.getByRole("button", { name: /log action photo only/i }));
     expect(screen.getByTestId("plant-quick-log-error").textContent).toMatch(/add a photo before/i);
     expect(screen.getByTestId("plant-quick-log-save")).toBeDisabled();
-    expect(insertCalls).toHaveLength(0);
+    expect(saveCalls).toHaveLength(0);
   });
 });
 
@@ -272,7 +291,7 @@ describe("PlantQuickLog photo source picker — accessible names + ARIA wiring",
 });
 
 describe("PlantQuickLog photo source picker — both sources reach same preview + save", () => {
-  it("Take Photo selection shows preview, uploads to diary-photos, inserts into diary_entries", async () => {
+  it("Take Photo selection shows preview, uploads to diary-photos, then saves via RPC", async () => {
     renderSheet();
     const camera = document.getElementById("plant-quick-log-photo-input") as HTMLInputElement;
     await pickFile(camera, makeImage("camera.jpg"));
@@ -286,16 +305,20 @@ describe("PlantQuickLog photo source picker — both sources reach same preview 
 
     await waitFor(() => {
       expect(uploadCalls).toHaveLength(1);
-      expect(insertCalls).toHaveLength(1);
+      expect(saveCalls).toHaveLength(1);
+      expect(updateCalls).toHaveLength(1);
     });
     expect(uploadCalls[0].bucket).toBe("diary-photos");
     expect(uploadCalls[0].path.startsWith("user-test-1/grow-1/")).toBe(true);
-    expect(insertCalls[0].__table).toBe("diary_entries");
-    expect(typeof insertCalls[0].photo_url).toBe("string");
-    expect("user_id" in insertCalls[0]).toBe(false);
+    expect(typeof (saveCalls[0].p_details as { photo_url?: string }).photo_url).toBe("string");
+    expect(updateCalls[0]).toMatchObject({
+      __table: "diary_entries",
+      photo_url: uploadCalls[0].path,
+    });
+    expect(JSON.stringify(saveCalls[0])).not.toContain("user_id");
   });
 
-  it("Choose from Library selection takes the identical preview + upload + insert path", async () => {
+  it("Choose from Library selection takes the identical preview + upload + RPC path", async () => {
     renderSheet();
     const library = document.getElementById(
       "plant-quick-log-photo-library-input",
@@ -310,13 +333,14 @@ describe("PlantQuickLog photo source picker — both sources reach same preview 
 
     await waitFor(() => {
       expect(uploadCalls).toHaveLength(1);
-      expect(insertCalls).toHaveLength(1);
+      expect(saveCalls).toHaveLength(1);
+      expect(updateCalls).toHaveLength(1);
     });
     expect(uploadCalls[0].bucket).toBe("diary-photos");
     expect(uploadCalls[0].path.startsWith("user-test-1/grow-1/")).toBe(true);
-    expect(insertCalls[0].__table).toBe("diary_entries");
-    expect(typeof insertCalls[0].photo_url).toBe("string");
-    expect("user_id" in insertCalls[0]).toBe(false);
+    expect(typeof (saveCalls[0].p_details as { photo_url?: string }).photo_url).toBe("string");
+    expect(updateCalls[0].__table).toBe("diary_entries");
+    expect(JSON.stringify(saveCalls[0])).not.toContain("user_id");
   });
 
   it("saves a library photo without requiring typed notes", async () => {
@@ -333,10 +357,10 @@ describe("PlantQuickLog photo source picker — both sources reach same preview 
 
     await waitFor(() => {
       expect(uploadCalls).toHaveLength(1);
-      expect(insertCalls).toHaveLength(1);
+      expect(saveCalls).toHaveLength(1);
     });
-    expect(insertCalls[0].note).toBe("Photo attached from Quick Log.");
-    expect(typeof insertCalls[0].photo_url).toBe("string");
+    expect(saveCalls[0].p_note).toBe("Photo attached from Quick Log.");
+    expect(typeof (saveCalls[0].p_details as { photo_url?: string }).photo_url).toBe("string");
   });
 
   it("saves manual readings without requiring typed notes or a photo", async () => {
@@ -350,10 +374,10 @@ describe("PlantQuickLog photo source picker — both sources reach same preview 
 
     await waitFor(() => {
       expect(uploadCalls).toHaveLength(0);
-      expect(insertCalls).toHaveLength(1);
+      expect(saveCalls).toHaveLength(1);
     });
-    expect(insertCalls[0].note).toBe("Manual readings captured from Quick Log.");
-    expect(insertCalls[0].details).toMatchObject({
+    expect(saveCalls[0].p_note).toBe("Manual readings captured from Quick Log.");
+    expect(saveCalls[0].p_details).toMatchObject({
       manual_sensor_snapshot: {
         temp_f: 78,
         source: "manual",
@@ -369,7 +393,7 @@ describe("PlantQuickLog photo source picker — both sources reach same preview 
     expect(screen.getByTestId("plant-quick-log-error").textContent).toMatch(
       /add what changed, a photo, or a reading/i,
     );
-    expect(insertCalls).toHaveLength(0);
+    expect(saveCalls).toHaveLength(0);
   });
 
   it("resets the library input value after selection so the same photo can be picked again", async () => {
@@ -399,7 +423,7 @@ describe("PlantQuickLog photo source picker — both sources reach same preview 
     expect(camera.value).toBe("");
   });
 
-  it("both sources produce structurally equivalent insert payloads", async () => {
+  it("both sources produce structurally equivalent RPC payloads", async () => {
     const first = renderSheet();
     await pickFile(
       document.getElementById("plant-quick-log-photo-input") as HTMLInputElement,
@@ -409,12 +433,13 @@ describe("PlantQuickLog photo source picker — both sources reach same preview 
       target: { value: "Same note both ways" },
     });
     fireEvent.click(screen.getByTestId("plant-quick-log-save"));
-    await waitFor(() => expect(insertCalls).toHaveLength(1));
-    const fromCamera = { ...insertCalls[0] };
+    await waitFor(() => expect(saveCalls).toHaveLength(1));
+    const fromCamera = { ...saveCalls[0] };
     first.unmount();
 
-    insertCalls.length = 0;
+    saveCalls.length = 0;
     uploadCalls.length = 0;
+    updateCalls.length = 0;
 
     renderSheet();
     await pickFile(
@@ -425,16 +450,18 @@ describe("PlantQuickLog photo source picker — both sources reach same preview 
       target: { value: "Same note both ways" },
     });
     fireEvent.click(screen.getByTestId("plant-quick-log-save"));
-    await waitFor(() => expect(insertCalls).toHaveLength(1));
-    const fromLibrary = { ...insertCalls[0] };
+    await waitFor(() => expect(saveCalls).toHaveLength(1));
+    const fromLibrary = { ...saveCalls[0] };
 
     const stripVolatile = (p: Record<string, unknown>) => {
-      const { photo_url: _p, ...rest } = p;
-      return rest;
+      const details = { ...(p.p_details as Record<string, unknown>) };
+      delete details.photo_url;
+      const { p_idempotency_key: _key, ...rest } = p;
+      return { ...rest, p_details: details };
     };
     expect(stripVolatile(fromCamera)).toEqual(stripVolatile(fromLibrary));
-    expect(typeof fromCamera.photo_url).toBe("string");
-    expect(typeof fromLibrary.photo_url).toBe("string");
+    expect(typeof (fromCamera.p_details as { photo_url?: string }).photo_url).toBe("string");
+    expect(typeof (fromLibrary.p_details as { photo_url?: string }).photo_url).toBe("string");
   });
 });
 

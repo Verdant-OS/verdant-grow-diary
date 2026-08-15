@@ -61,6 +61,11 @@ const QUICK_LOG_V2_SAVE_CALLERS = [
   },
   { file: "src/components/AiDoctorCheckInPreviewPanel.tsx", telemetryIntent: null },
   { file: "src/pages/EcowittIngestAudit.tsx", telemetryIntent: null },
+  {
+    file: "src/components/PlantQuickLog.tsx",
+    telemetryIntent:
+      /save\(built\.payload,\s*\{\s*telemetryIntent:\s*"plant_quick_log"\s*\}\)/,
+  },
 ] as const;
 
 const SEAMS: Array<{ event: string; file: string; extra?: RegExp[] }> = [
@@ -204,11 +209,6 @@ const QUICK_LOG_SUCCESS_SEAMS: Array<{
     calls: 2,
     extra:
       /trackQuickLogSuccess\("feed",\s*\{\s*reused:\s*result\.reused\s*\}\)[\s\S]*trackQuickLogSuccess\("water",\s*\{\s*reused:\s*wateringResult\.reused\s*\}\)/,
-  },
-  {
-    file: "src/components/PlantQuickLog.tsx",
-    calls: 1,
-    extra: /trackQuickLogSuccess\("plant_quick_log"\)/,
   },
 ];
 
@@ -358,9 +358,11 @@ describe("ordering and safety constraints at the seams", () => {
     expect(sheet).toMatch(/trackQuickLogSuccess\("water",\s*\{\s*reused:\s*wateringResult\.reused/);
 
     const plant = read("src/components/PlantQuickLog.tsx");
-    expect(plant.indexOf('trackQuickLogSuccess("plant_quick_log")')).toBeGreaterThan(
-      plant.indexOf("if (insErr)"),
-    );
+    const rejected = plant.indexOf("if (!result.ok)");
+    const savedToast = plant.indexOf('toast.success("Log saved to timeline.")');
+    expect(rejected).toBeGreaterThan(-1);
+    expect(savedToast).toBeGreaterThan(rejected);
+    expect(plant).toMatch(/telemetryIntent:\s*"plant_quick_log"/);
   });
 
   it("subscription_activated is gated on the server-confirmed flip and deduped", () => {

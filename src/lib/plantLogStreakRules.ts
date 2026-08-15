@@ -51,7 +51,7 @@ export interface PlantLogStreakView {
 export const PLANT_LOG_TEASER_MIN_DAYS = 3;
 
 export const PLANT_LOG_TEASER_COPY =
-  "This plant's memory is building. Pro keeps unlimited plant history and adds AI Doctor review.";
+  "This plant's memory is building. Free keeps plant history forever and includes 3 AI Doctor reviews per grow; Pro adds more monthly AI reviews and advanced tools.";
 
 export const PLANT_LOG_TEASER_CTA_LABEL = "See plans";
 // Copy pitches Pro by name; preselect the Pro card (annual = Pricing default).

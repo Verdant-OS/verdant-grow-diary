@@ -111,6 +111,8 @@ describe("AI Doctor One-Tent Loop next-step card wiring", () => {
       'import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard"',
     );
     expect(src).toContain('current="ai-doctor"');
+    expect(src).toContain("pickAiDoctorSessionLoopHandoffIds");
+    expect(src).toContain("ids={loopHandoffIds}");
     expect(src).toContain("AI Doctor uses available context. Missing context will be shown.");
   });
 });

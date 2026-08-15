@@ -97,15 +97,47 @@ describe("migration drift probe — detection contract", () => {
     // A runner that skips a failure and continues leaves a gap in the middle.
     // Comparing only max-applied would miss it entirely.
     expect(SRC).toContain("Full-set diff, not max-version");
-    expect(SRC).toMatch(/repo\.keys\(\)\]\.filter\(\(v\)\s*=>\s*!applied\.has\(v\)\)/);
+    // The diff moved into matchLedger() when matching became name-bound
+    // (2026-08-15): every record is walked and anything unmatched is pushed.
+    // Behavioural coverage of the same property lives in
+    // scripts/probe-migration-drift.test.mjs, which imports the module and
+    // asserts on resolved values rather than on this source text.
+    expect(SRC).toMatch(/for \(const r of records\)/);
+    expect(SRC).toMatch(/unapplied\.push\(r\)/);
   });
 
   it("distinguishes a mid-sequence GAP from a stopped tail", () => {
     // A gap means the live schema is in a state nobody authored — strictly
     // worse than a tail, and it needs different remediation.
-    expect(SRC).toMatch(/unapplied\.filter\(\(v\)\s*=>\s*v\s*<\s*maxApplied\)/);
+    expect(SRC).toMatch(/unapplied\.filter\(\(r\)\s*=>\s*r\.ts\s*<\s*maxApplied\)/);
     expect(SRC).toContain("GAP");
     expect(SRC).toContain("state nobody authored");
+  });
+
+  it("matches the ledger by NAME, never by version proximity", () => {
+    // Added 2026-08-15. Lovable records a migration ~2s after its filename
+    // timestamp with the stem in `name`; hand-authored ones use the exact
+    // timestamp with a slug name. Both conventions coexist, so a version-only
+    // diff reports applied migrations as drift. The runbook's "Ledger hazard"
+    // section also forbids the obvious wrong fix — widening the version
+    // comparison to a window — because that reports an UNAPPLIED migration as
+    // applied, which is the worse error.
+    expect(SRC).toContain("coalesce(name, '') AS name");
+    expect(SRC).toMatch(/names\.has\(r\.stem\)/);
+    expect(SRC).toMatch(/names\.has\(r\.slug\)/);
+
+    // Scan CODE, not prose. The forbidden-construct guard below would
+    // otherwise trip on the file's own comment explaining why a tolerance
+    // window is forbidden — a guard that fires on its own documentation
+    // asserts nothing about behaviour.
+    const CODE = SRC.split(/\r?\n/)
+      .filter((line) => {
+        const t = line.trim();
+        return !t.startsWith("//") && !t.startsWith("*") && !t.startsWith("/*");
+      })
+      .join("\n");
+    expect(CODE).not.toMatch(/Math\.abs\s*\(/);
+    expect(CODE).not.toMatch(/TOLERANCE|WINDOW_SECONDS|withinSeconds/i);
   });
 
   it("is read-only by construction", () => {

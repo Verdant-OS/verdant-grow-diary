@@ -321,7 +321,8 @@
     "typecheck:tsgo": "tsgo --noEmit",
     "seo:artifacts": "bun scripts/generate-seo-artifacts.ts dist",
     "seo:snapshots": "node scripts/capture-ssr-head-snapshots-with-server.mjs dist .output/server/index.mjs",
-    "probe:migration-drift": "node scripts/probe-migration-drift.mjs"
+    "probe:migration-drift": "node scripts/probe-migration-drift.mjs",
+    "test:migration-drift-probe": "node --test scripts/probe-migration-drift.test.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

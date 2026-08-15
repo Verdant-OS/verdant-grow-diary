@@ -1,0 +1,73 @@
+name: Migration drift probe tests
+
+# The scheduled probe (migration-drift-probe.yml) only runs against production on
+# a cron, so nothing on a PR exercises its matching logic. This lane does.
+#
+# What it protects, specifically: the probe matches the repository's migration
+# files against supabase_migrations.schema_migrations by NAME, because Lovable
+# records a migration ~2s after its filename timestamp while hand-authored ones
+# use the exact timestamp — both conventions coexist in one table. A regression
+# to version-only matching turns most of the repository into false DRIFT; a
+# "fix" that widens the version comparison into a tolerance window does the
+# opposite and reports an UNAPPLIED migration as applied, which is the error
+# that let the 2026-08-05 outage run for six days unnoticed.
+#
+# Both regressions are pinned by scripts/probe-migration-drift.test.mjs. Without
+# this lane those pins execute nowhere and protect nothing.
+on:
+  pull_request:
+    paths:
+      - "scripts/probe-migration-drift.mjs"
+      - "scripts/probe-migration-drift.test.mjs"
+      - "scripts/lib/redactDbUrl.mjs"
+      - ".github/workflows/migration-drift-probe.yml"
+      - ".github/workflows/migration-drift-probe-tests.yml"
+  push:
+    branches:
+      - main
+      - verdant-grow-diary
+    paths:
+      - "scripts/probe-migration-drift.mjs"
+      - "scripts/probe-migration-drift.test.mjs"
+      - "scripts/lib/redactDbUrl.mjs"
+      - ".github/workflows/migration-drift-probe.yml"
+      - ".github/workflows/migration-drift-probe-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  probe-tests:
+    name: Migration drift probe matching contract
+    runs-on: ubuntu-latest
+    steps:
+      # Org policy requires every action pinned to a full-length commit SHA.
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "20"
+
+      # No install step: the probe and its tests use only node: builtins, so
+      # this lane stays fast and cannot be broken by a dependency change.
+      - name: Test ledger matching (name-bound, no tolerance window)
+        run: node --test scripts/probe-migration-drift.test.mjs
+
+      # The probe must never mistake "could not check" for "nothing wrong".
+      # With no database URL it has to exit 2, not 0 — the distinction the whole
+      # script exists to preserve.
+      - name: Probe with no database URL must exit 2, never 0
+        run: |
+          set +e
+          output="$(node scripts/probe-migration-drift.mjs --json 2>&1)"
+          code=$?
+          set -e
+          echo "$output"
+          if [ "$code" != "2" ]; then
+            echo "::error::probe exited $code with no SUPABASE_DB_URL; it must exit 2 (COULD NOT PROBE)"
+            exit 1
+          fi
+          case "$output" in
+            *could_not_probe*) ;;
+            *) echo "::error::probe exited 2 but did not report could_not_probe"; exit 1 ;;
+          esac

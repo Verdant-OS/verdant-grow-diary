@@ -132,6 +132,13 @@ Optional and separately authorized. Absence of `CURSOR_API_KEY` prints:
 SDK LIVE PROOF: BLOCKED — CURSOR_API_KEY NOT PROVIDED
 ```
 
+A present key without `--authorize-live-proof` also exits `2` and does not
+import the live adapter.
+
+`liveProofStatus` is `PASS` only when the adapter kind is `live`, both agents
+finished, the host verdict is `HOLD`, and cleanup is `PASS`. Requesting live
+mode on the fake adapter is `FAIL`.
+
 CI never calls the Cursor API. Fake-adapter green is not a live SDK pass.
 
 ## 9. Acceptance
@@ -144,12 +151,15 @@ exists.
 availability, or usage evidence is incomplete.
 
 `REJECT` on production file access, mutation, shell/MCP, cloud fallback,
-secret exposure, unbounded retries, hidden persistent state, or a root SDK
-dependency.
+secret exposure, unbounded retries, hidden persistent state, a root SDK
+dependency, or raw inspector output that labels invalid telemetry healthy.
 
 ## 10. Next gate
 
-1. Land this isolated spike behind the production-isolation fence.
-2. Keep `POSTGRES_RESTRICTED_ROLE_SPIKE` on its own track.
-3. Optional authorized live proof with `CURSOR_API_KEY` in a local shell only.
-4. Security review before any later proposal to reuse the dispatcher.
+1. Isolated spike and production-isolation fence are in review on this branch.
+2. `POSTGRES_RESTRICTED_ROLE_SPIKE` remains on its own track.
+3. Optional authorized live proof is still `BLOCKED` without a local
+   `CURSOR_API_KEY`.
+4. Dispatcher security review: `spikes/cursor-sdk-local-orchestration/docs/dispatcher-security-review.md`.
+   Host receipt-integrity findings are closed. Live SDK tool enforcement is
+   `NOT_MEASURED`. Reuse is not approved.

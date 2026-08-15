@@ -47,7 +47,13 @@ Missing key:
 SDK LIVE PROOF: BLOCKED — CURSOR_API_KEY NOT PROVIDED
 ```
 
-Passing fake-adapter tests is not a live SDK pass.
+Passing fake-adapter tests is not a live SDK pass. `liveProofStatus: PASS`
+requires the live adapter, both finished runs, host `HOLD`, and cleanup
+`PASS`.
+
+Dispatcher security review:
+`docs/dispatcher-security-review.md`. Do not reuse this dispatcher in the
+Grow OS until that review's remaining live-path items are measured.
 
 ## Policy baseline
 

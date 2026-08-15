@@ -396,8 +396,13 @@ describe("AppShell intent consumption wiring", () => {
   it("seeds the guide prompt or activity from the intent instead of always clearing it", () => {
     // The pre-fix shape was an unconditional setPrefill(null) here, which
     // dropped the grower's chosen preset.
-    expect(body()).toMatch(
-      /setPrefill\(\s*guidePrefill\s*\?\?\s*\(\s*startEventType\s*\?\s*\{\s*eventType:\s*startEventType/,
+    const src = body();
+    expect(src).toMatch(
+      /const\s+routePrefill:\s*QuickLogPrefill\s*\|\s*null\s*=\s*routePlantId\s*\?\s*\{\s*plantId:\s*routePlantId\s*\}\s*:\s*null/,
     );
+    expect(src).toMatch(
+      /const\s+startPrefill:\s*QuickLogPrefill\s*\|\s*null\s*=\s*startEventType\s*\?\s*\{\s*\.\.\.\(routePrefill\s*\?\?\s*\{\}\),\s*eventType:\s*startEventType\s*\}\s*:\s*routePrefill/,
+    );
+    expect(src).toContain("setPrefill(guidePrefill ?? startPrefill)");
   });
 });

@@ -69,9 +69,9 @@ export const PRICING_TIERS: PricingTier[] = [
     priceSubtext: "free forever",
     billingPeriod: "free",
     paddlePriceId: null,
-    // Mirrors truthful entries from constants/pricing PRICING.free.features —
-    // the old "Local only / Single tent & plant" copy was wrong (data lives
-    // in Supabase for signed-in growers; no single-tent gate is enforced).
+    // Mirrors truthful entries from constants/pricing PRICING.free.features.
+    // Data lives in Supabase for signed-in growers; creation limits are one
+    // active grow and one active tent. Plants are not count-limited.
     features: [
       "Core One-Tent Loop",
       "Historical logs kept forever",
@@ -179,14 +179,14 @@ export const PLAN_COMPARISON: PlanComparisonRow[] = [
     },
   },
   {
-    label: "Plant & tent tracking",
+    label: "Grow & tent limits",
     values: {
-      free: "1 tent · 1 plant",
-      pro_monthly: "Multi-tent",
-      pro_annual: "Multi-tent",
-      craft_monthly: "Multi-tent",
-      craft_annual: "Multi-tent",
-      founder_lifetime: "Multi-tent",
+      free: "1 active grow · 1 active tent",
+      pro_monthly: "Unlimited grows · Multi-tent",
+      pro_annual: "Unlimited grows · Multi-tent",
+      craft_monthly: "Unlimited grows · Multi-tent",
+      craft_annual: "Unlimited grows · Multi-tent",
+      founder_lifetime: "Unlimited grows · Multi-tent",
     },
   },
   {

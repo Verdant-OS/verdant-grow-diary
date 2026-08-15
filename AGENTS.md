@@ -1,6 +1,6 @@
 # Verdant Agent Constitution
 
-**Sentinel-Version: 2026-08-09.1**
+**Sentinel-Version: 2026-08-09.3**
 
 This is Verdant's universal Sentinel Code. Every agent inherits these durable product,
 engineering, data, safety, and release rules. Platform-specific bootstraps live at the
@@ -399,6 +399,50 @@ For security/billing/RLS:
 - static scan tests are useful but not enough
 - add runtime harnesses when possible
 - prove client roles cannot mutate protected tables
+
+### Contract tests must assert against resolved values, not source text
+
+A contract test over a config or module MUST import it and assert on the
+resolved value. Matching a regex against the file's source text is not
+permitted for this purpose.
+
+Source-text matching cannot distinguish a live setting from one that is
+commented out, moved into a narrower scope, or duplicated — all three read
+identically to a text match while only the first still holds. This is not
+hypothetical: `playwright-action-timeout-fence` originally regex-matched
+`playwright.config.ts`, and replacing the setting with
+`// was actionTimeout: 15_000, …` left the guard **green**. A one-line
+comment-out, the most common way anyone disables a setting, defeated it.
+
+`scripts/check-contract-test-resolution.mjs` enforces this for tests that
+guard `playwright.config.ts` / `vitest.config.ts`. `src/test/playwright-config-retry-policy.test.ts`
+is the reference implementation: `await import()` the config, assert on the
+object.
+
+Where resolving is genuinely impossible, the test declares
+`@source-scan-justified: <reason>` so the exception is visible in the diff
+rather than silently absent, and the checker prints it on every run. State
+the blocker you actually hit — not a plausible one. The single current
+exception is `vitest-config-react-plugin-contract`: importing `vitest.config`
+under jsdom trips esbuild's TextEncoder invariant, and `@vitest-environment
+node` instead breaks the shared `src/test/setup.ts` (it defines
+`window.scrollTo`). An empty reason is rejected.
+
+Source-text scanning remains correct for what it is actually good at —
+proving a string, pattern, or forbidden construct is absent from a file
+(secret scans, "no `continue-on-error`", generated-artifact shape). The rule
+is about verifying _effective configuration_, not about banning `readFileSync`.
+
+### Never commit while an automated review is mutating the working tree
+
+Adversarial self-review passes verify that a new test genuinely fails without
+its fix by **reverting production files in place, running the test, and
+restoring them**. A commit taken during that window captures a reverted or
+half-restored tree.
+
+Before any `git commit` that follows or accompanies an automated review, run
+`git status` and confirm the tree contains only the intended changes. On a
+branch with auto-merge armed, a commit taken mid-experiment ships the revert.
 
 Report:
 

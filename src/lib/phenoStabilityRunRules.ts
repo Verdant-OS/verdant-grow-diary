@@ -44,12 +44,22 @@ const ISO_DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
 export const MAX_STABILITY_RUNS = 12;
 export const STABILITY_RUN_LABEL_MAX = 80;
 export const STABILITY_RUN_NOTE_MAX = 500;
+/** Bound on the stored provenance id (a uuid is 36 chars; this is a cap, not a format check). */
+export const STABILITY_RUN_SOURCE_PLANT_ID_MAX = 64;
 
 export interface StabilityRun {
   readonly runLabel: string;
   readonly observedAt: string | null;
   readonly traits: Readonly<Record<string, number>>;
   readonly note: string | null;
+  /**
+   * The plant this grow-out was observed on, when the grower linked one (see
+   * phenoGrowOutHandoffRules). OPTIONAL and omitted entirely for hand-typed
+   * runs, so a run recorded before linking existed stays byte-identical. Its
+   * only job is provenance + de-duplication: a plant already carried into the
+   * ledger is never proposed again. It never affects hold/drift evaluation.
+   */
+  readonly sourcePlantId?: string | null;
 }
 
 /**
@@ -109,7 +119,20 @@ export function sanitizeStabilityRuns(
       typeof r.note === "string" && r.note.trim() !== ""
         ? r.note.trim().slice(0, STABILITY_RUN_NOTE_MAX)
         : null;
-    out.push({ runLabel, observedAt, traits: sanitizeTraits(r.traits), note });
+    const run: StabilityRun = {
+      runLabel,
+      observedAt,
+      traits: sanitizeTraits(r.traits),
+      note,
+    };
+    // Provenance is ADDITIVE: only attach sourcePlantId when the stored row
+    // actually carries one, so a hand-typed run round-trips unchanged rather
+    // than gaining a null field it never had.
+    const sourcePlantId =
+      typeof r.sourcePlantId === "string" && r.sourcePlantId.trim() !== ""
+        ? r.sourcePlantId.trim().slice(0, STABILITY_RUN_SOURCE_PLANT_ID_MAX)
+        : null;
+    out.push(sourcePlantId === null ? run : { ...run, sourcePlantId });
   }
   return out;
 }

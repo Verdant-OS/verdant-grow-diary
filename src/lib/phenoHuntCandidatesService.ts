@@ -36,6 +36,10 @@ export interface PhenoHuntSummary {
   /** Grower-authored target trait axes + acceptance thresholds. Re-sanitized
    * on every read (defense in depth against a stale or manually-edited row). */
   breedingObjective?: BreedingObjectiveTarget[];
+  /** The earlier hunt this one continues from, when the grower linked one. */
+  parentHuntId?: string | null;
+  /** Free-text generation label the grower set (F1, F2, BX1…), if any. */
+  generationLabel?: string | null;
 }
 
 export type LoadPhenoHuntCandidatesResult =
@@ -205,6 +209,15 @@ function mapHuntSummary(huntRow: {
   const breedingObjective = sanitizeBreedingObjectiveTargets(
     Array.isArray(huntRow.breeding_objective) ? (huntRow.breeding_objective as unknown[]) : null,
   );
+  // Both tolerate a not-yet-applied migration / older row: absent → null.
+  const parentHuntId =
+    typeof huntRow.parent_hunt_id === "string" && huntRow.parent_hunt_id !== ""
+      ? huntRow.parent_hunt_id
+      : null;
+  const generationLabel =
+    typeof huntRow.generation === "string" && huntRow.generation.trim() !== ""
+      ? huntRow.generation.trim()
+      : null;
   return {
     id: huntRow.id,
     name: huntRow.name,
@@ -214,6 +227,8 @@ function mapHuntSummary(huntRow: {
     notes,
     setupCompletedAt,
     breedingObjective,
+    parentHuntId,
+    generationLabel,
   };
 }
 

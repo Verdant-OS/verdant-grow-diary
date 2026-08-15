@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "cursor-sdk-local-orchestration-receipt/1.1.0",
+  "syntheticDataDeclaration": "All fixtures and prompts in this spike are synthetic. No grower, billing, sensor, credential, or production source data was sent to any model.",
+  "repositoryBaseCommit": "UNSET-EXAMPLE",
+  "fixtureHashBefore": "0000000000000000000000000000000000000000000000000000000000000000",
+  "fixtureHashAfter": "0000000000000000000000000000000000000000000000000000000000000000",
+  "policyHash": "1111111111111111111111111111111111111111111111111111111111111111",
+  "fixedModelId": "composer-2.5",
+  "hashedInspectorAgentId": "aaaaaaaaaaaaaaaa",
+  "hashedReviewerAgentId": "bbbbbbbbbbbbbbbb",
+  "hashedInspectorRunId": "cccccccccccccccc",
+  "hashedReviewerRunId": "dddddddddddddddd",
+  "hashedInspectorRequestId": "eeeeeeeeeeeeeeee",
+  "hashedReviewerRequestId": "ffffffffffffffff",
+  "inspectorStatus": "finished",
+  "reviewerStatus": "finished",
+  "hostVerdict": "HOLD",
+  "liveProofStatus": "BLOCKED",
+  "inspectorDurationMs": null,
+  "reviewerDurationMs": null,
+  "inspectorTokenCounts": null,
+  "reviewerTokenCounts": null,
+  "toolCalls": [
+    {
+      "name": "read",
+      "verdict": "allowed"
+    }
+  ],
+  "cleanupStatus": "PASS",
+  "preRunSpendControl": "BLOCKED",
+  "findingCount": 0,
+  "invalidPresentedAsHealthy": false,
+  "notes": [
+    "SDK LIVE PROOF: BLOCKED — CURSOR_API_KEY NOT PROVIDED",
+    "example receipt only — not a live run"
+  ]
+}

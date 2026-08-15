@@ -80,41 +80,71 @@ general — which one dominates is a property of your room.** Measure the backgr
 
 **Mean offset:** ...... °C · **Min:** ...... · **Max:** ...... · **Spread (max − min):** ...... °C
 
-## Uncertainty budget — the offset uses TWO instruments, so combine both
+## Uncertainty budget — two instruments, and one thing that is not an error at all
 
 The offset is a **difference between two separately measured quantities**, taken with two
-different devices. Its uncertainty is therefore not either instrument's accuracy alone.
-Four contributions, all of which belong in the number you carry into asset 3:
+different devices, so its uncertainty is not either instrument's accuracy alone.
 
-| Contribution                        | Where it comes from                                                     | Value (°C) |
-| ----------------------------------- | ----------------------------------------------------------------------- | ---------- |
-| a. IR thermometer                   | Its accuracy — or repeatability if you only compare offsets over time   |            |
-| b. Air probe                        | Its accuracy — the offset inherits this in full                         |            |
-| c. Emissivity × background          | From the reflected-temperature table above, at your measured background |            |
-| d. Sampling variation across canopy | The spread (max − min) from your samples, above                         |            |
+**But canopy spread is not part of that budget.** Variation between leaves is **real spatial
+variation** — the leaves genuinely differ — not measurement error. Folding a range into an
+error budget both mislabels it and makes the answer depend on which extremes you happened to
+sample; a range also grows with sample size rather than shrinking, which is the opposite of
+how an uncertainty behaves.
 
-**Combine them.** If the four are independent, add in quadrature:
+### Measurement uncertainty of the mean offset
+
+| Contribution                  | Where it comes from                                                     | Value (°C) |
+| ----------------------------- | ----------------------------------------------------------------------- | ---------- |
+| a. IR thermometer             | Its accuracy — or repeatability if you only compare offsets over time   |            |
+| b. Air probe                  | Its accuracy — the offset inherits this in full                         |            |
+| c. Emissivity × background    | From the reflected-temperature table above, at your measured background |            |
+| d. Standard error of the mean | `SD of your per-leaf offsets ÷ √n` — **not** the range                  |            |
 
 ```text
-offset uncertainty = sqrt(a² + b² + c² + d²)
+uncertainty in the mean offset = sqrt(a² + b² + c² + d²)
 ```
+
+Term **d** is the standard error of the mean, which _is_ a standard uncertainty and belongs
+in quadrature. The range (max − min) does not.
 
 Quadrature assumes independence; **if two contributions share a cause — for example both
 instruments calibrated against the same reference — they are correlated and adding them
 linearly is the conservative choice.** Record which you used.
 
+### Canopy distribution — reported separately, never combined
+
+| Field                       | Value |
+| --------------------------- | ----- |
+| n (leaves sampled)          |       |
+| Mean offset (°C)            |       |
+| SD of per-leaf offsets (°C) |       |
+| Min / max (°C)              |       |
+
+**If the SD is large relative to the mean, a single canopy-wide offset is the wrong object to
+apply at all.** The canopy is not uniform, and the right response is a microclimate map
+(asset 4), not a tighter error bar — consider carrying separate offsets for the zones you
+care about instead of one room number.
+
 > **Worked shape (illustrative, using this card's own figures):** IR 0.35 °C, air probe
-> 0.5 °C, emissivity/background 0.30 °C at 50 °C reflected, sampling spread 0.4 °C →
-> `sqrt(0.35² + 0.5² + 0.30² + 0.4²)` ≈ **0.79 °C**. **More than double any single term** —
-> which is exactly why recording only one instrument's accuracy produces a falsely narrow
-> leaf-VPD range downstream.
+> 0.5 °C, emissivity/background 0.30 °C at 50 °C reflected, and five leaves whose offsets
+> have an SD of 0.4 °C, giving SEM = 0.4 ÷ √5 = **0.18 °C** →
+> `sqrt(0.35² + 0.5² + 0.30² + 0.18²)` ≈ **0.70 °C**. Still larger than any single term, which
+> is why recording only one instrument's accuracy produces a falsely narrow leaf-VPD range
+> downstream. Note the SEM contributes far less than the raw spread would have — **0.18
+> rather than 0.4** — and the 0.4 °C spread is still reported, in the distribution table,
+> where it belongs.
 
 ## Uncertainty statement (required — copy into the VPD worksheet)
 
-> Offset **......** °C ± **......** °C (combined, from a–d above), from **......** samples,
-> at emissivity **......**, background **......** °C, IR instrument **......** °C, air probe
+> Mean offset **......** °C ± **......** °C (uncertainty **in the mean**, from a–d above),
+> from **......** leaves with SD **......** °C and range **......** to **......** °C, at
+> emissivity **......**, background **......** °C, IR instrument **......** °C, air probe
 > **......** °C, combined by **quadrature / linear addition**, measured **......** minutes
 > into **lights-on / lights-off**.
+
+**The ± is uncertainty in the mean; the SD and range describe the canopy.** Asset 3 needs the
+first for its leaf-VPD corners; a reader deciding whether one offset applies at all needs the
+second.
 
 If you cannot fill that sentence, **you do not have a leaf basis.** Label the result air VPD
 and say so.

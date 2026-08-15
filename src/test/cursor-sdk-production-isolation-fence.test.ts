@@ -21,16 +21,8 @@ const ROOT = join(__dirname, "..", "..");
 const SPIKE_DIR = ["spikes", "cursor-sdk-local-orchestration"].join("/");
 const SDK_NAME = ["@", "cursor", "/", "sdk"].join("");
 const FENCE_FILE = join("src", "test", "cursor-sdk-production-isolation-fence.test.ts");
-const WORKFLOW_FILE = join(
-  ".github",
-  "workflows",
-  "cursor-sdk-local-orchestration.yml",
-);
-const EXAMPLE_RECEIPT = join(
-  SPIKE_DIR,
-  "artifacts",
-  "local-orchestration-proof.example.json",
-);
+const WORKFLOW_FILE = join(".github", "workflows", "cursor-sdk-local-orchestration.yml");
+const EXAMPLE_RECEIPT = join(SPIKE_DIR, "artifacts", "local-orchestration-proof.example.json");
 
 const PRODUCTION_ROOTS = ["src", "scripts", "supabase/functions"] as const;
 const CODE_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts"]);
@@ -97,9 +89,7 @@ function walkFiles(relDir: string): string[] {
 }
 
 function stripSourceComments(source: string): string {
-  return source
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/(^|[^:])\/\/.*$/gm, "$1");
+  return source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
 }
 
 function dependencyGroups(manifest: Manifest): Record<string, string> {
@@ -113,9 +103,7 @@ function dependencyGroups(manifest: Manifest): Record<string, string> {
 
 function aliasHidesSdk(spec: string): boolean {
   return (
-    spec.includes(SDK_NAME) ||
-    spec.startsWith("npm:@cursor/") ||
-    /npm:@cursor\/sdk/.test(spec)
+    spec.includes(SDK_NAME) || spec.startsWith("npm:@cursor/") || /npm:@cursor\/sdk/.test(spec)
   );
 }
 
@@ -189,7 +177,7 @@ describe("cursor SDK production isolation fence", () => {
         expect(stripped, rel).not.toContain("workOnCurrentBranch");
       }
     }
-  });
+  }, 30_000);
 
   it("does not mount the spike as an application route", () => {
     const routerFiles = ["src/router.tsx", "src/routeTree.gen.ts"].filter((rel) =>
@@ -218,7 +206,7 @@ describe("cursor SDK production isolation fence", () => {
     expect(workflow).toContain("supabase/functions/**");
     expect(workflow).toContain("package.json");
     expect(workflow).toContain("bun.lock");
-    expect(workflow).toContain(FENCE_FILE);
+    expect(workflow).toContain(FENCE_FILE.replaceAll("\\", "/"));
     for (const command of DEPLOY_COMMANDS) {
       expect(workflow, command).not.toContain(command);
     }

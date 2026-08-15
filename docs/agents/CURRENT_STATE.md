@@ -1,6 +1,15 @@
 # Verdant — Current Operating State
 
 **Last updated:** 2026-08-15 UTC
+**Updated by:** Grok (2026-08-15 later: `ONE_TENT_LOOP_OPERATING_ORDER`
+repo slices 2–4 landed; Slice 5 recorded as owner-`BLOCKED` with an
+honest `missing_session_json` browser-proof receipt — no fabricated
+login. Post-change smoke is 32 files / 512 tests. This does **not**
+pause Convex or Postgres spikes. No production, GA4, GSC, sitemap, or
+release-identity row was re-measured in this edit; those retain their
+earlier verification dates.)
+
+**Prior same-day update:** 2026-08-15 UTC
 **Updated by:** Grok (2026-08-15: records Cheek's in-session implement
 instruction for `ONE_TENT_LOOP_OPERATING_ORDER`. This does **not** pause
 `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` or `POSTGRES_RESTRICTED_ROLE_SPIKE`.
@@ -185,15 +194,16 @@ deploy branch as fully green; they require their own scoped owner/integration fo
 **Approved slice (Cheek, 2026-08-15, in-session implement instruction):**
 `ONE_TENT_LOOP_OPERATING_ORDER`. Plan: walk the existing nine-step loop
 without dual write paths, dead next-step CTAs, or fabricated proof.
-Grok implements the repo slices (handoff ids, PlantQuickLog →
+Grok delivered the repo slices (handoff ids, PlantQuickLog →
 `quicklog_save_manual`, smoke-audit alignment). This does **not** pause
 the Convex or Postgres spikes below. Owner-only gates remain `BLOCKED`:
 Lovable-apply of `20260813030000_signup_acquisition_forward_repair.sql`,
-and a managed `e2e:one-tent:ui` session. Colliding PRs **#828**, **#817**,
-**#696** stay open and parked — do not start a competing Timeline / Alerts /
-Action Queue UI rewrite. Baseline receipts:
-`docs/one-tent-loop-operating-order-baseline.md`. Persist-path spec:
-`docs/specs/one-tent-loop-quicklog-single-write-path.md`.
+and a managed `e2e:one-tent:ui` session. Slice 5 recorded the honest
+`missing_session_json` receipt rather than fabricating a walk. Colliding
+PRs **#828**, **#817**, **#696** stay open and parked — do not start a
+competing Timeline / Alerts / Action Queue UI rewrite. Baseline and
+post-change receipts: `docs/one-tent-loop-operating-order-baseline.md`.
+Persist-path spec: `docs/specs/one-tent-loop-quicklog-single-write-path.md`.
 
 **Named isolated spike (approved 2026-08-13, not SEO):**
 `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE`. Cheek approved a spec-first,
@@ -589,7 +599,7 @@ schema change and does not authorize production writes.
 | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Codex             | Standing SEO measurement readiness and analytics integrity. Convex Phase 1 of `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` is in review: PR #977, opened 2026-08-14, not a draft. Scope stays Phase 1 only, under `spikes/convex-component-sandbox/`. **Do NOT build a Postgres domain-reach detector — Phase 0 of `POSTGRES_RESTRICTED_ROLE_SPIKE` is already delivered by Claude (see slices above). Phase 1 of that arm is `HOLD` pending its own Cheek decision** |
 | Claude            | `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` specification — delivered. `POSTGRES_RESTRICTED_ROLE_SPIKE`: spec delivered, **Phase 0 detector measured and Phase 1 role harness delivered (local-only)**, 2026-08-14 under Cheek's approval and full-authority grant (see slices above). Prior completed out-of-slice work (#586/#809/#812/#885) unchanged |
-| Grok              | `ONE_TENT_LOOP_OPERATING_ORDER` — Slice 2 handoff ids, Slice 3 PlantQuickLog persist-path, Slice 4 smoke-audit alignment. Slice 0 measured. Slices 1 and 5 remain owner-`BLOCKED` (signup apply + managed e2e session). Does not pause Convex/Postgres spikes. Production Convex remains HOLD                                                                                                                                           |
+| Grok              | `ONE_TENT_LOOP_OPERATING_ORDER` — repo slices delivered (0 baseline, 2 handoff ids, 3 PlantQuickLog persist-path, 4 smoke-audit alignment). Slices 1 and 5 remain owner-`BLOCKED` (signup apply + managed e2e session); Slice 5 receipt is `missing_session_json` with `fabricated_login_used: false`. Does not pause Convex/Postgres spikes. Production Convex remains HOLD                                                                                                                                           |
 | Security reviewer | Unassigned until Phase 1 spike code exists; then review before any Convex cloud credential                                                                                                                                                                                                    |
 | Gemini            | Unassigned                                                                                                                                                                                                                                                                                    |
 | Council Chair     | Convex-vs-Postgres comparison: **now partly decidable.** The Postgres arm has a measured number (8 cross-domain reaches across 22 service-role functions, `docs/specs/postgres-restricted-role-alternative.md` §5.1.1); the Convex arm remains `NOT_MEASURED` pending #977. Do not issue a recommendation until both arms carry evidence — and note that `ai-coach`'s five reaches are the case neither architecture removes cheaply |

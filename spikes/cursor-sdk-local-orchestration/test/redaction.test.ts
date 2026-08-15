@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { FINDING_SCHEMA_VERSION } from "../src/constants.ts";
 import {
   containsSecretShaped,
+  detectInvalidPresentedAsHealthy,
   redactText,
   sanitizeInspectorOutput,
 } from "../src/outputSanitizer.ts";
@@ -72,5 +73,25 @@ describe("output sanitization", () => {
     expect(sanitized.findings.find((item) => item.findingId === "SYN-004")?.classification).toBe(
       "invalid",
     );
+  });
+
+  it("detects invalid-as-healthy on raw inspector output before sanitization", () => {
+    const raw = validateInspectorOutput({
+      schemaVersion: FINDING_SCHEMA_VERSION,
+      synthetic: true,
+      findings: [
+        {
+          findingId: "SYN-004",
+          sourceFile: "sensor-invalid.synthetic.json",
+          evidence: "SYNTHETIC invalid",
+          confidence: "high",
+          classification: "healthy",
+          missingInformation: [],
+          recommendedHumanReview: false,
+        },
+      ],
+    });
+    expect(detectInvalidPresentedAsHealthy(raw)).toBe(true);
+    expect(detectInvalidPresentedAsHealthy(sanitizeInspectorOutput(raw))).toBe(false);
   });
 });

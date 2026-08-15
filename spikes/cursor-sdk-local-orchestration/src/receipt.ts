@@ -1,5 +1,6 @@
 import { FORBIDDEN_RECEIPT_FIELD_NAMES, RECEIPT_SCHEMA_VERSION } from "./constants.ts";
 import { sha256Short } from "./hash.ts";
+import type { LiveProofStatus } from "./liveProofStatus.ts";
 import { containsSecretShaped } from "./outputSanitizer.ts";
 import type { InspectorOutput, ReviewerOutput, ToolCallRecord } from "./schemas.ts";
 
@@ -28,7 +29,7 @@ export type ProofReceipt = {
   inspectorStatus: OrchestrationStatus | "finished" | "cancelled" | "error" | "skipped";
   reviewerStatus: OrchestrationStatus | "finished" | "cancelled" | "error" | "skipped";
   hostVerdict: OrchestrationStatus;
-  liveProofStatus: "PASS" | "BLOCKED" | "NOT_RUN";
+  liveProofStatus: LiveProofStatus;
   inspectorDurationMs: number | null;
   reviewerDurationMs: number | null;
   inspectorTokenCounts: { totalTokens: number } | null;
@@ -37,7 +38,7 @@ export type ProofReceipt = {
   cleanupStatus: "PASS" | "FAIL";
   preRunSpendControl: "BLOCKED";
   findingCount: number;
-  invalidPresentedAsHealthy: false;
+  invalidPresentedAsHealthy: boolean;
   notes: string[];
 };
 
@@ -61,6 +62,7 @@ export function buildReceipt(input: {
   cleanupStatus: "PASS" | "FAIL";
   inspector?: InspectorOutput;
   reviewer?: ReviewerOutput;
+  invalidPresentedAsHealthy: boolean;
   notes: string[];
 }): ProofReceipt {
   const receipt: ProofReceipt = {
@@ -92,7 +94,7 @@ export function buildReceipt(input: {
     cleanupStatus: input.cleanupStatus,
     preRunSpendControl: "BLOCKED",
     findingCount: input.inspector?.findings.length ?? 0,
-    invalidPresentedAsHealthy: false,
+    invalidPresentedAsHealthy: input.invalidPresentedAsHealthy,
     notes: [...input.notes].sort(),
   };
   assertReceiptSafe(receipt);

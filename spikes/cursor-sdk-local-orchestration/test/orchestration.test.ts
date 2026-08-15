@@ -55,7 +55,8 @@ describe("host orchestration pipeline", () => {
       item.sourceFile.includes("invalid"),
     );
     expect(invalid?.classification).toBe("invalid");
-    expect(result.receipt.invalidPresentedAsHealthy).toBe(false);
+    expect(result.receipt.invalidPresentedAsHealthy).toBe(true);
+    expect(result.receipt.hostVerdict).toBe("REJECT");
   });
 
   it("records post-run duration and token counts when the adapter supplies them", async () => {
@@ -164,6 +165,17 @@ describe("host orchestration pipeline", () => {
     } finally {
       removeSyntheticWorkspace(workspace);
     }
+  });
+
+  it("does not treat a fake-adapter liveProof flag as a live PASS", async () => {
+    const result = await runOrchestration({
+      adapter: new FakeSdkAdapter(),
+      repoRoot: REPO_ROOT,
+      liveProof: true,
+    });
+    expect(result.receipt.liveProofStatus).toBe("FAIL");
+    expect(result.receipt.hostVerdict).toBe("HOLD");
+    expect(result.receipt.notes.some((note) => note.includes("adapter is not live"))).toBe(true);
   });
 
   it("keeps inspector and reviewer as separate agent instances", async () => {

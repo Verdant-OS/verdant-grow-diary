@@ -38,6 +38,7 @@ describe("nested package isolation", () => {
       "agentFactory.ts",
       "sdkAdapter.ts",
       "receipt.ts",
+      "liveProofStatus.ts",
       "fixtureBuilder.ts",
       "runManualProof.ts",
     ];

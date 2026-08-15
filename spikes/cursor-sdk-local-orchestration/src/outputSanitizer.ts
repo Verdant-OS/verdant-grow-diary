@@ -15,6 +15,13 @@ export function redactText(value: string): string {
   return next;
 }
 
+export function detectInvalidPresentedAsHealthy(output: InspectorOutput): boolean {
+  return output.findings.some((finding) => {
+    const sourceFile = finding.sourceFile.replaceAll("\\", "/").split("/").pop() ?? finding.sourceFile;
+    return sourceFile.includes("invalid") && finding.classification === "healthy";
+  });
+}
+
 export function sanitizeInspectorOutput(output: InspectorOutput): InspectorOutput {
   const findings = sortFindings(
     output.findings.map((finding) => sanitizeFinding(finding)),

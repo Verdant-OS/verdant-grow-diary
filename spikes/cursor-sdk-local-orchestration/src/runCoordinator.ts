@@ -17,7 +17,12 @@ import {
   type SyntheticWorkspace,
 } from "./fixtureBuilder.ts";
 import { createBoundedAgents, disposeAgents, inspectorPrompt, reviewerPrompt } from "./agentFactory.ts";
-import { sanitizeInspectorOutput, sanitizeReviewerOutput } from "./outputSanitizer.ts";
+import { resolveLiveProofStatus } from "./liveProofStatus.ts";
+import {
+  detectInvalidPresentedAsHealthy,
+  sanitizeInspectorOutput,
+  sanitizeReviewerOutput,
+} from "./outputSanitizer.ts";
 import { policyHash, validatePolicy, type HostAgentPolicy } from "./policy.ts";
 import { buildReceipt, type OrchestrationStatus, type ProofReceipt } from "./receipt.ts";
 import {
@@ -106,27 +111,19 @@ async function sendBounded(
 }
 
 function hostAdjudicate(
-  inspector: InspectorOutput,
   reviewer: ReviewerOutput | undefined,
   fixtureMutated: boolean,
-): { verdict: OrchestrationStatus; notes: string[]; invalidPresentedAsHealthy: boolean } {
+): { verdict: OrchestrationStatus; notes: string[] } {
   const notes: string[] = [];
-  let invalidPresentedAsHealthy = false;
-  for (const finding of inspector.findings) {
-    if (finding.sourceFile.includes("invalid") && finding.classification === "healthy") {
-      invalidPresentedAsHealthy = true;
-      notes.push("invalid telemetry presented as healthy");
-    }
-  }
-  if (fixtureMutated) notes.push("immutable fixture hash changed");
-  if (invalidPresentedAsHealthy || fixtureMutated) {
-    return { verdict: "REJECT", notes, invalidPresentedAsHealthy };
+  if (fixtureMutated) {
+    notes.push("immutable fixture hash changed");
+    return { verdict: "REJECT", notes };
   }
   if (!reviewer) {
-    return { verdict: "HOLD", notes, invalidPresentedAsHealthy };
+    return { verdict: "HOLD", notes };
   }
   notes.push("host normalized findings with stable ordering");
-  return { verdict: "HOLD", notes, invalidPresentedAsHealthy };
+  return { verdict: "HOLD", notes };
 }
 
 export async function runOrchestration(config: OrchestrationConfig): Promise<OrchestrationResult> {
@@ -145,6 +142,7 @@ export async function runOrchestration(config: OrchestrationConfig): Promise<Orc
   const toolCalls: ToolCallRecord[] = [];
   let cleanupStatus: "PASS" | "FAIL" = "FAIL";
   let policy: HostAgentPolicy | undefined;
+  let invalidPresentedAsHealthy = false;
 
   try {
     policy = validatePolicy({
@@ -165,9 +163,9 @@ export async function runOrchestration(config: OrchestrationConfig): Promise<Orc
     if (inspectorOutcome.status !== "finished") {
       notes.push("inspector did not finish");
     } else {
-      inspectorOutput = sanitizeInspectorOutput(
-        validateInspectorOutput(parseJsonObject(inspectorOutcome.text)),
-      );
+      const rawInspector = validateInspectorOutput(parseJsonObject(inspectorOutcome.text));
+      invalidPresentedAsHealthy = detectInvalidPresentedAsHealthy(rawInspector);
+      inspectorOutput = sanitizeInspectorOutput(rawInspector);
       const inspectorTokens = inspectorOutcome.usage?.totalTokens;
       if (inspectorTokens !== undefined && inspectorTokens > tokenBudget) {
         reviewerStatus = "skipped";
@@ -208,10 +206,13 @@ export async function runOrchestration(config: OrchestrationConfig): Promise<Orc
     const afterHash = existsSync(workspace.cwd) ? hashDirectory(workspace.cwd) : "missing";
     const fixtureMutated = afterHash !== workspace.fixtureHashBefore;
     if (inspectorOutput && hostVerdict !== "REJECT" && hostVerdict !== "TIMEOUT") {
-      const judged = hostAdjudicate(inspectorOutput, reviewerOutput, fixtureMutated);
+      const judged = hostAdjudicate(reviewerOutput, fixtureMutated);
       hostVerdict = hostVerdict === "BUDGET_EXCEEDED" ? hostVerdict : judged.verdict;
       notes.push(...judged.notes);
-      if (judged.invalidPresentedAsHealthy) hostVerdict = "REJECT";
+    }
+    if (invalidPresentedAsHealthy) {
+      hostVerdict = "REJECT";
+      notes.push("invalid telemetry presented as healthy");
     }
     try {
       removeSyntheticWorkspace(workspace);
@@ -224,8 +225,17 @@ export async function runOrchestration(config: OrchestrationConfig): Promise<Orc
     } catch {
       cleanupStatus = "FAIL";
     }
-    if (config.liveProof && inspectorOutput && reviewerOutput && hostVerdict === "HOLD") {
+    if (
+      config.liveProof &&
+      config.adapter.kind === "live" &&
+      inspectorOutput &&
+      reviewerOutput &&
+      hostVerdict === "HOLD"
+    ) {
       notes.push("live proof completed against synthetic fixtures only");
+    }
+    if (config.liveProof && config.adapter.kind !== "live") {
+      notes.push("live proof requested but adapter is not live");
     }
     if (!config.liveProof) {
       notes.push("SDK LIVE PROOF: BLOCKED — CURSOR_API_KEY NOT PROVIDED");
@@ -249,7 +259,14 @@ export async function runOrchestration(config: OrchestrationConfig): Promise<Orc
       inspectorStatus,
       reviewerStatus,
       hostVerdict,
-      liveProofStatus: config.liveProof ? "PASS" : "BLOCKED",
+      liveProofStatus: resolveLiveProofStatus({
+        liveProofRequested: Boolean(config.liveProof),
+        adapterKind: config.adapter.kind,
+        hostVerdict,
+        cleanupStatus,
+        inspectorStatus,
+        reviewerStatus,
+      }),
       inspectorDurationMs: inspectorOutcome?.durationMs ?? null,
       reviewerDurationMs: reviewerOutcome?.durationMs ?? null,
       inspectorTokenTotal: inspectorOutcome?.usage?.totalTokens ?? null,
@@ -258,6 +275,7 @@ export async function runOrchestration(config: OrchestrationConfig): Promise<Orc
       cleanupStatus,
       inspector: inspectorOutput,
       reviewer: reviewerOutput,
+      invalidPresentedAsHealthy,
       notes,
     });
     return {

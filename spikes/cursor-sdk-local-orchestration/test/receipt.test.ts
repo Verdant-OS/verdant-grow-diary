@@ -44,6 +44,7 @@ describe("sanitized proof receipt", () => {
       reviewerTokenTotal: 11,
       toolCalls: [{ name: "read", verdict: "allowed" }],
       cleanupStatus: "PASS",
+      invalidPresentedAsHealthy: false,
       notes: ["pre-run spend control: BLOCKED"],
     });
     expect(receipt.schemaVersion).toBe(RECEIPT_SCHEMA_VERSION);
@@ -78,6 +79,7 @@ describe("sanitized proof receipt", () => {
         reviewerTokenTotal: null,
         toolCalls: [],
         cleanupStatus: "PASS",
+        invalidPresentedAsHealthy: false,
         notes: ["SYNTHETIC_SECRET_CANARY=sk_test_FAKE_NOT_A_REAL_KEY_verdant_spike_only"],
       }),
     ).toThrow(/secret-shaped/);

@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "cursor-sdk-local-orchestration-receipt/1.0.0",
+  "schemaVersion": "cursor-sdk-local-orchestration-receipt/1.1.0",
   "syntheticDataDeclaration": "All fixtures and prompts in this spike are synthetic. No grower, billing, sensor, credential, or production source data was sent to any model.",
   "repositoryBaseCommit": "UNSET-EXAMPLE",
   "fixtureHashBefore": "0000000000000000000000000000000000000000000000000000000000000000",

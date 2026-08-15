@@ -1,6 +1,16 @@
 # Verdant — Current Operating State
 
 **Last updated:** 2026-08-15 UTC
+**Updated by:** Grok (2026-08-15, later additive: owner-requested rewrite of
+the Lovable project Knowledge field from this file. Applied to Lovable project
+`66255e7b-892c-4be5-8686-ab1cfc3666db` (`verdantgrowdiary-com`). Dated snapshot:
+`docs/lovable/verdant-project-knowledge-2026-08-15.md`. Does **not** authorize
+ongoing sync automation. Does **not** apply migrations or change workspace
+knowledge. Production, GA4, GSC, sitemap, and release-identity rows were not
+re-measured. Topology row in this file remains `f2a03998f`; origin tip at apply
+time was `0522eefb1` (#990).)
+
+**Prior update:** 2026-08-15 UTC
 **Updated by:** Grok (2026-08-15, later additive: next gates on
 `VERDANT_CURSOR_SDK_LOCAL_ORCHESTRATION_SPIKE`. `POSTGRES_RESTRICTED_ROLE_SPIKE`
 was not touched. Optional live proof remains `BLOCKED` — `CURSOR_API_KEY` is
@@ -129,10 +139,10 @@ full migration ledger against production before assuming anything else in the
 
 ## Branch topology
 
-| Branch               | Role                                             | Verified head                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| -------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Branch               | Role                                             | Verified head                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| -------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `verdant-grow-diary` | **Deploy branch. Production ships from here.**   | `f2a03998f46f9e3827a593af100969a2f967f932` (#982), verified 2026-08-14 with `git fetch origin verdant-grow-diary && git rev-parse origin/verdant-grow-diary`. Supersedes `e1214d3df` (#980), `cbbd7122` (#978) and `fb42ce00e` (#968). Seven commits landed this session, in `git log` merge order oldest-first: `623edf17b` (#979), `e200d7561` (#815), `1a3a70d1b` (#710), `cba42c6d4` (#795), `e1214d3df` (#980), `7843a3fcb` (#981), `f2a03998f` (#982). PR numbers on this branch do not order by merge time — order commits with `git log`, never by PR number. Do not carry older validation tables forward |
-| `main`               | Integration branch. It is not production parity. | `b6d747941948ce68157185a2b0847acea6970d44` (#779), verified 2026-08-07                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `main`               | Integration branch. It is not production parity. | `b6d747941948ce68157185a2b0847acea6970d44` (#779), verified 2026-08-07                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 
 `main` and `verdant-grow-diary` are divergent. Do not infer production behavior from
 `main`, and do not backport deploy-only governance or data rules without a scoped branch
@@ -320,7 +330,7 @@ succeed. Two different findings stop it instead:
 
 1. **The JWT secret is unobtainable on Lovable Cloud**, so a role-claim JWT
    cannot be minted in production. P3 proved the PostgREST mechanism works
-   *locally*; in production the role would be created and then **unreachable**.
+   _locally_; in production the role would be created and then **unreachable**.
    A fence nobody can route through is not a fence.
 2. **Role durability across rebuilds is `UNKNOWN`**, and roles sit outside
    migrations and schema dumps entirely. Combined with the confirmed rule that a
@@ -341,7 +351,7 @@ land first:
   an unguarded migration **aborts the apply chain** — the same failure that
   disqualified `claude/cultivar-library-p1` today, and the same class as the open
   signup-attribution incident at the top of this file.
-- **Gate B — does the *hosted* PostgREST honour a custom `role` claim?** P3
+- **Gate B — does the _hosted_ PostgREST honour a custom `role` claim?** P3
   passed on the **local** stack only. A move to opaque `sb_secret_…` keys would
   remove role-claim JWTs entirely.
 - **Gate C — Security review**, per `HANDOFF_PROTOCOL.md`, before any new
@@ -551,6 +561,19 @@ claim the pack that replaced it on 2026-08-13 (which no agent session has read) 
 accurate — only that the mechanism now exists in governance memory and that its prior
 content's accuracy has been checked once.
 
+**Completed, out of slice (recorded 2026-08-15):** Cheek asked Grok to rewrite the
+Lovable project Knowledge field from current CURRENT_STATE rather than restore the
+July backup. Applied 2026-08-15 via Lovable `set_project_knowledge` to
+`verdantgrowdiary-com` (`66255e7b-892c-4be5-8686-ab1cfc3666db`). Round-trip
+`get_project_knowledge` confirmed Version 2026-08-15. Applied body 9859 / 10000
+characters. Dated snapshot: `docs/lovable/verdant-project-knowledge-2026-08-15.md`.
+This still does not authorize a sync bot. The 2026-08-13 audit of the July pack
+remains the evidence for those eight claims. The 2026-08-15 pack encodes the open
+signup-attribution incident, the unapplied-migration drift, billing SoT as
+`public.subscriptions` (correcting the 2026-08-13 pointer pack's
+`billing_subscriptions` error), the three named spikes, and the abandoned genetics
+branches. Workspace knowledge was not changed. Migrations were not applied.
+
 In scope — these bullets scope the **Mode A SEO parent program above**, not the completed
 #809 entry:
 
@@ -674,11 +697,11 @@ schema change and does not authorize production writes.
 
 ## Agents currently assigned
 
-| Agent             | Assignment                                                                                                                                                                                                                                                                                    |
-| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Codex             | Standing SEO measurement readiness and analytics integrity. Convex Phase 1 of `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` is in review: PR #977, opened 2026-08-14, not a draft. Scope stays Phase 1 only, under `spikes/convex-component-sandbox/`. **Do NOT build a Postgres domain-reach detector — Phase 0 of `POSTGRES_RESTRICTED_ROLE_SPIKE` is already delivered by Claude (see slices above). Phase 1 of that arm is `HOLD` pending its own Cheek decision** |
-| Claude            | `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` specification — delivered. `POSTGRES_RESTRICTED_ROLE_SPIKE`: spec delivered, **Phase 0 detector measured and Phase 1 role harness delivered (local-only)**, 2026-08-14 under Cheek's approval and full-authority grant (see slices above). Prior completed out-of-slice work (#586/#809/#812/#885) unchanged |
-| Grok              | Isolated `VERDANT_CURSOR_SDK_LOCAL_ORCHESTRATION_SPIKE` next gates: dispatcher security review recorded; host receipt integrity closed; live Cursor SDK proof still `BLOCKED` without a local `CURSOR_API_KEY`. Does **not** delay `POSTGRES_RESTRICTED_ROLE_SPIKE`. Reuse of the dispatcher is not approved. Production Convex remains HOLD |
-| Security reviewer | Unassigned until Phase 1 spike code exists; then review before any Convex cloud credential                                                                                                                                                                                                    |
-| Gemini            | Unassigned                                                                                                                                                                                                                                                                                    |
+| Agent             | Assignment                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Codex             | Standing SEO measurement readiness and analytics integrity. Convex Phase 1 of `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` is in review: PR #977, opened 2026-08-14, not a draft. Scope stays Phase 1 only, under `spikes/convex-component-sandbox/`. **Do NOT build a Postgres domain-reach detector — Phase 0 of `POSTGRES_RESTRICTED_ROLE_SPIKE` is already delivered by Claude (see slices above). Phase 1 of that arm is `HOLD` pending its own Cheek decision**                               |
+| Claude            | `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` specification — delivered. `POSTGRES_RESTRICTED_ROLE_SPIKE`: spec delivered, **Phase 0 detector measured and Phase 1 role harness delivered (local-only)**, 2026-08-14 under Cheek's approval and full-authority grant (see slices above). Prior completed out-of-slice work (#586/#809/#812/#885) unchanged                                                                                                                                           |
+| Grok              | Isolated `VERDANT_CURSOR_SDK_LOCAL_ORCHESTRATION_SPIKE` next gates: dispatcher security review recorded; host receipt integrity closed; live Cursor SDK proof still `BLOCKED` without a local `CURSOR_API_KEY`. Does **not** delay `POSTGRES_RESTRICTED_ROLE_SPIKE`. Reuse of the dispatcher is not approved. Production Convex remains HOLD                                                                                                                                                     |
+| Security reviewer | Unassigned until Phase 1 spike code exists; then review before any Convex cloud credential                                                                                                                                                                                                                                                                                                                                                                                                       |
+| Gemini            | Unassigned                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | Council Chair     | Convex-vs-Postgres comparison: **recommendation delivered in spec §10 — adopt Postgres incrementally, hold Convex.** The Postgres arm has a measured number (8 cross-domain reaches across 22 service-role functions, `docs/specs/postgres-restricted-role-alternative.md` §5.1.1); the Convex arm remains `NOT_MEASURED` pending #977. Do not issue a recommendation until both arms carry evidence — and note that `ai-coach`'s five reaches are the case neither architecture removes cheaply |

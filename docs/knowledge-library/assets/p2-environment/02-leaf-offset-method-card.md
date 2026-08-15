@@ -93,23 +93,48 @@ how an uncertainty behaves.
 
 ### Measurement uncertainty of the mean offset
 
-| Contribution                  | Where it comes from                                                     | Value (°C) |
-| ----------------------------- | ----------------------------------------------------------------------- | ---------- |
-| a. IR thermometer             | Its accuracy — or repeatability if you only compare offsets over time   |            |
-| b. Air probe                  | Its accuracy — the offset inherits this in full                         |            |
-| c. Emissivity × background    | From the reflected-temperature table above, at your measured background |            |
-| d. Standard error of the mean | `SD of your per-leaf offsets ÷ √n` — **not** the range                  |            |
+**Convert everything to a common standard uncertainty before combining.** A datasheet
+"±0.35 °C accuracy" is a **maximum-error bound**, not a one-standard-deviation uncertainty,
+and a standard error of the mean **is** one. Root-sum-squaring them as they stand mixes
+incompatible quantities and produces a ± with no defined confidence level.
+
+**Step 1 — convert each bound to a standard uncertainty.** For a stated bound ±a with no
+distribution given, the conventional assumption is rectangular, so `u = a ÷ √3`.
+
+| Contribution               | Raw figure                          | Type   | Standard uncertainty u (°C) |
+| -------------------------- | ----------------------------------- | ------ | --------------------------- |
+| a. IR thermometer          | datasheet bound ±...                | bound  | `a ÷ √3` = ......           |
+| b. Air probe               | datasheet bound ±...                | bound  | `a ÷ √3` = ......           |
+| c. Emissivity × background | estimated bound ± ... (table above) | bound  | `a ÷ √3` = ......           |
+| d. Sampling                | `SD ÷ √n` of your per-leaf offsets  | **1σ** | use as-is = ......          |
+
+**Step 2 — combine.**
 
 ```text
-uncertainty in the mean offset = sqrt(a² + b² + c² + d²)
+u_c = sqrt(u_a² + u_b² + u_c² + u_d²)        combined standard uncertainty (1σ)
+U   = k · u_c,  with k = 2 for roughly 95%   expanded uncertainty
 ```
 
-Term **d** is the standard error of the mean, which _is_ a standard uncertainty and belongs
-in quadrature. The range (max − min) does not.
+**Report U and state k.** A ± with no coverage factor is not interpretable.
 
 Quadrature assumes independence; **if two contributions share a cause — for example both
-instruments calibrated against the same reference — they are correlated and adding them
-linearly is the conservative choice.** Record which you used.
+instruments calibrated against the same reference — they are correlated, and adding them
+linearly is the conservative choice.** Record which you used, and whether you assumed
+rectangular distributions.
+
+> **Worked shape (illustrative, using this card's own figures):** IR bound 0.35 °C, air-probe
+> bound 0.5 °C, emissivity/background bound 0.30 °C at 50 °C reflected, and five leaves with
+> SD 0.4 °C.
+>
+> - standard uncertainties: 0.35/√3 = **0.202**, 0.5/√3 = **0.289**, 0.30/√3 = **0.173**,
+>   SEM = 0.4/√5 = **0.179**
+> - combined: `u_c` = **0.43 °C (1σ)**; expanded at k = 2: **U ≈ 0.86 °C (~95%)**
+>
+> An earlier revision root-sum-squared the raw bounds against the SEM and reported
+> **0.70 °C** with no stated coverage — a figure that sits between the 1σ and 95% values and
+> means neither. **The ± you carry into asset 3 should be U with its k stated**, or the
+> leaf-VPD range built from it is narrower than it appears. (A fully conservative
+> alternative — linear addition of the raw bounds plus the SEM — gives 1.33 °C.)
 
 ### Canopy distribution — reported separately, never combined
 
@@ -136,8 +161,9 @@ care about instead of one room number.
 
 ## Uncertainty statement (required — copy into the VPD worksheet)
 
-> Mean offset **......** °C ± **......** °C (uncertainty **in the mean**, from a–d above),
-> from **......** leaves with SD **......** °C and range **......** to **......** °C, at
+> Mean offset **......** °C ± **......** °C (**expanded** uncertainty in the mean, k = **...**,
+> from a–d above), from **......** leaves with SD **......** °C and range **......** to
+> **......** °C, at
 > emissivity **......**, background **......** °C, IR instrument **......** °C, air probe
 > **......** °C, combined by **quadrature / linear addition**, measured **......** minutes
 > into **lights-on / lights-off**.

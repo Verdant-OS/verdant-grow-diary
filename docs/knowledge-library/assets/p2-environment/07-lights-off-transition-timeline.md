@@ -37,10 +37,10 @@ Two reasons this window matters beyond equipment:
 - **_Botrytis_ prefers cool.** Extension guidance puts infection risk at **65–75 °F** with
   high humidity and free water on surfaces [claim C09, source **S6a**, read at source —
   **hemp, greenhouse-framed**, so treat as risk direction, not an indoor setpoint]. The
-  post-lights-off window is cool _and_ humid at the same time. **A "68 °F optimum" appears in
-  the wider extension literature but rests on S6b, which returned HTTP 403 and has not been
-  read — it is deliberately omitted here** and must not be reinstated until an editor opens
-  that source.
+  post-lights-off window is cool _and_ humid at the same time. **A narrower optimum is quoted
+  in the wider extension literature; the value is withheld here because its source (S6b) has
+  not been read** — see the §8 source register. Do not reinstate it from memory or from a
+  secondary summary.
 
 ## Setup
 
@@ -55,7 +55,10 @@ Two reasons this window matters beyond equipment:
 | Surface thermometer used                |       |
 | Recorded by                             |       |
 
-**Record at least one full cycle in late flower.** That is the case that binds.
+**Record at least one full cycle at the stage you are actually concerned about**, and repeat
+across stages if you want to compare them. **This asset does not tell you which stage binds**
+— that is capacity interpretation derived from C08, which the pillar classifies R3 and marks
+blocked, and it belongs in asset 6.
 
 ## Timeline
 
@@ -147,5 +150,6 @@ whether room RH looks acceptable. Record it; do not respond with plant intervent
   observation and diagnosis belong to P6.
 - Not transferable between rooms, stages, or cycles.
 
-**Next observation:** repeat in late flower, the stage where the constraint binds hardest,
-and again after any equipment or canopy change.
+**Next observation:** repeat at each stage you want to compare, and again after any equipment
+or canopy change. Which stage turns out to be the hardest is a finding of your own data, not
+an assumption this asset supplies.

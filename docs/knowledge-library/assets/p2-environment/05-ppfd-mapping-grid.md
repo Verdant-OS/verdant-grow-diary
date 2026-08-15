@@ -19,11 +19,12 @@ dry-matter production likewise rising from 600 to 1,200 µmol·m⁻²·s⁻¹ [c
 **But do not translate that into a proportional yield penalty — the evidence does not support
 it.** In the same trial PPFD rose **15×** (120→1,800) while yield rose only **4.5×**, so the
 linear fit carries a large positive intercept and a fractional light deficit produces a
-**smaller** fractional yield deficit. **This asset states no percentage for that deficit.**
-An earlier revision gave "12–16%," which cannot be derived without naming the baseline it
-assumes: applying the endpoint fit, a corner 20% dimmer yields about **5%** at a mean near
-the low endpoint and reaches the mid-teens only near the high one. Any single figure silently
-picks a baseline, so none is given.
+**smaller** fractional yield deficit. **This asset publishes no percentage for that deficit,
+and earlier revisions that did are withdrawn.** Two independent reasons: any such figure
+depends entirely on the baseline PPFD it assumes, and — more fundamentally — the trial
+compared **whole treatments**, never positions within one canopy, so it cannot quantify a
+corner penalty at any baseline. A number here would be an unsupported extrapolation
+regardless of how it was framed.
 
 Two further limits on any such estimate:
 

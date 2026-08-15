@@ -411,10 +411,10 @@ pillar acceptance gate.
 - **Treating a high-humidity room as safe because it is cool.** _Botrytis cinerea_ is
   favoured by **cool** temperatures — **65–75 °F** in extension guidance — combined with high
   humidity and free water on plant surfaces, and extension advice is to hold greenhouse RH
-  **below 50%** and improve airflow [C09, source **S6a**, read at source]. **A "68 °F
-  optimum" circulates in the wider extension literature but rests on S6b, which returned
-  HTTP 403 and has not been read; it is omitted here and must not be reinstated until an
-  editor opens that source.**
+  **below 50%** and improve airflow [C09, source **S6a**, read at source]. **A narrower
+  optimum circulates in the wider extension literature; its value is withheld here because
+  its source (S6b) has not been read** — the blocker is recorded in §8's register, not
+  repeated as copy.
   Two bounds that must travel with those numbers: this is **hemp, greenhouse-framed**, so
   "below 50%" is a greenhouse recommendation and **not** an indoor cannabis setpoint, and
   cool does not mean safe — the temperature band that feels comfortable is inside the band

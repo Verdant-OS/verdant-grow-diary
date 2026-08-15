@@ -112,8 +112,14 @@ This is the highest-value section. It is your room telling you where its limit i
 | Surface temperatures measured where condensation appeared            |               |
 | Behaviour difference between early and late flower                   |               |
 
-**The binding constraint is usually lights-off in late flower**, when sensible load collapses
-and latent load does not — see asset 7, which records that window in detail. Attach it.
+> **Unverified working hypothesis, for the qualified reviewer to confirm or strike.** It is
+> commonly asserted that the binding constraint is lights-off in late flower, when sensible
+> load collapses while latent load does not. **That is claim C08** — trade press only, below
+> the evidence tier, and blocked. It is recorded here rather than in the R2 assets because
+> this worksheet already sits behind the qualified-safety banner, and because it tells the
+> reviewer which window to scrutinise. **Do not treat it as established, and do not let it
+> narrow what you measure** — asset 7 records the transition window across whatever stages
+> you care about, and which stage actually binds is a finding of your own data. Attach it.
 
 ## Part E — what to hand over
 

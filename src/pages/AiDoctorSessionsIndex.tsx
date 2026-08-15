@@ -11,6 +11,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
+import { pickAiDoctorSessionLoopHandoffIds } from "@/lib/oneTentLoopHandoffIds";
 import { Link, useSearchParams } from "@/lib/react-router-compat";
 import {
   Stethoscope,
@@ -380,6 +381,7 @@ export default function AiDoctorSessionsIndex() {
     () => countNeedsFollowUpVisible(rawRows, reviewStateBySession),
     [rawRows, reviewStateBySession],
   );
+  const loopHandoffIds = useMemo(() => pickAiDoctorSessionLoopHandoffIds(rows), [rows]);
 
   const writeParams = (next: SessionsIndexFilters, nextPage: number) => {
     const params = new URLSearchParams();
@@ -593,7 +595,7 @@ export default function AiDoctorSessionsIndex() {
     >
       <OneTentLoopNextStepCard
         current="ai-doctor"
-        ids={{}}
+        ids={loopHandoffIds}
         testId="ai-doctor-one-tent-loop-next-step-card"
       />
       <p

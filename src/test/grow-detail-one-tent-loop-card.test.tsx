@@ -104,6 +104,15 @@ describe("GrowDetail One-Tent Loop next-step card wiring", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
+  it("Grow Detail passes the sole loaded tent id and does not invent a default", async () => {
+    const fs = await import("node:fs/promises");
+    const page = await fs.readFile("src/pages/GrowDetail.tsx", "utf8");
+    const hook = await fs.readFile("src/hooks/useGrowDetailData.ts", "utf8");
+    expect(page).toContain("tentId: soleTentId");
+    expect(hook).toContain("pickSoleLoadedId");
+    expect(hook).toContain("soleTentId");
+  });
+
   it("does not introduce device-control or auto-execute wording", () => {
     renderCard(
       <OneTentLoopNextStepCard

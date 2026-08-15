@@ -508,9 +508,15 @@ inside the R3 boundary (`hvac_safety`, `co2_safety`); `safety_review` runs after
 so they are drafted now and must not be used operationally until that lane clears them.
 
 Three properties hold across the whole set, and are the point of building them this way:
-**no asset states a target value** of any kind; **no asset introduces a number that is not in
-the §8 claim map**; and where a figure would be needed but none is verified, the field is a
-blank for the user's own instrument rather than a default. Asset 8 carries the unverified
+**no asset states a target value** of any kind; **no asset introduces a cultivation, safety,
+or measurement number that is not in the §8 claim map**; and where a figure would be needed
+but none is verified, the field is a blank for the user's own instrument rather than a
+default.
+
+**One bounded exception, stated so an evidence editor does not approve an overclaim:**
+template structure — asset 2's five sample rows, asset 4's 3 × 3 grid, asset 7's +120-minute
+scaffold. Those are illustrative layout choices, **not thresholds and not in §8**, and each
+asset says so where it uses one. The same exception is recorded in the asset README. Asset 8 carries the unverified
 ACGIH period forward as an explicit gap for its reviewer rather than filling it.
 
 - **Canopy sensor-placement diagram** — representative height, radiant shielding, distance

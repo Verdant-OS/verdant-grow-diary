@@ -104,16 +104,25 @@ quantity).
 **Report the mean with the min÷mean ratio beside it, always.** A mean quoted alone is the
 failure this asset exists to prevent.
 
-**Judge the spread against repeatability, not absolute accuracy.** One sensor carried around
-the grid keeps the same calibration bias at every cell, and that bias cancels out of a
-cell-to-cell comparison — so a sensor well off in absolute terms can still map uniformity
-reliably. What limits you is its repeatability, plus drift over the minutes the survey took,
-plus anything that changed in the room meanwhile.
+**Judge the spread against the uncertainty of a _difference_, not against absolute accuracy —
+and not against a single reading's repeatability either.** One sensor carried around the grid
+keeps the same calibration bias at every cell, and that bias cancels from a cell-to-cell
+comparison, so a sensor well off in absolute terms can still map uniformity. But the random
+part appears at **both** cells:
+
+```text
+u_difference = sqrt(u₁² + u₂²) = √2 · u      for equal repeatability u
+```
+
+So a sensor with repeatability `u` resolves differences of roughly `√2·u` (1σ), not `u`.
+Add drift over the minutes the survey took, plus anything that changed in the room meanwhile.
+**Better still, measure it:** re-read one cell several times without moving anything and use
+the spread of those differences.
 
 **If the spread is not larger than that, you have not demonstrated non-uniformity** — say so
 rather than acting on it. If you used more than one sensor, their biases do **not** cancel:
-combine their uncertainties and compare against that instead. (Absolute accuracy still
-governs the _absolute_ PPFD and DLI values below, just not the uniformity comparison.)
+combine their full uncertainties instead. (Absolute accuracy still governs the _absolute_
+PPFD and DLI values below, just not the uniformity comparison.)
 
 ## DLI (only if your readings are true PPFD)
 

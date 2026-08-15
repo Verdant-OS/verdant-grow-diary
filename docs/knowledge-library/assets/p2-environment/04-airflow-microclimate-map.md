@@ -91,17 +91,28 @@ Vertical gradients are the ones most often missed, because the probe lives at on
 
 ## Interpretation rules
 
-- **Judge a difference against repeatability, not absolute accuracy.** A stable calibration
-  bias shifts every reading the same way, so **it cancels when you compare two readings from
-  the same instrument** — a repeatable ±0.5 °C probe can resolve a real 0.3 °C difference
-  perfectly well. Absolute accuracy governs "what is the true value here"; **repeatability,
-  drift over the survey, and any room change during it** govern "is this difference real."
-  - **One instrument, walked around:** compare against its **repeatability** (plus any drift
-    over the time the survey took).
-  - **Two or more fixed instruments:** their biases do **not** cancel — combine their
-    individual uncertainties (in quadrature if independent) and compare against that.
+- **Judge a difference against the uncertainty OF THE DIFFERENCE — which is bigger than one
+  reading's.** A stable calibration bias shifts every reading the same way, so **it cancels
+  when you compare two readings from the same instrument**. The _random_ part does not: it
+  appears at **both** endpoints, so
+
+  ```text
+  u_difference = sqrt(u₁² + u₂²) = √2 · u      for equal repeatability u
+  ```
+
+  **A ±0.5 °C repeatability therefore does not resolve a 0.3 °C difference** — the difference
+  carries ≈0.71 °C (1σ), and ≈1.41 °C at k = 2. An earlier revision of these assets claimed
+  the opposite; it was wrong and is corrected here.
+  - **Best practice: measure it empirically.** Take repeated readings of the _same_ spot
+    without moving anything, and look at the spread of the differences. That distribution is
+    your real resolving power and needs no distributional assumption.
+  - **One instrument, moved:** bias cancels; combine the two repeatability contributions as
+    above, and add any drift over the time the survey took.
+  - **Two or more fixed instruments:** biases do **not** cancel — combine their full
+    uncertainties, not just repeatability.
   - Where a datasheet gives no repeatability figure, **record that absence**; you then cannot
     state how small a difference you can resolve.
+
 - **A `still` cell is a finding, not a gap.** Stagnant pockets are where boundary-layer and
   condensation problems begin.
 - **A single probe's reading becomes interpretable — for the conditions you just measured.**

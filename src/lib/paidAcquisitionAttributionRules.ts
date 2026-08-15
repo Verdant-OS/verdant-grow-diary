@@ -10,7 +10,8 @@ export type PaidAcquisitionSource =
   | "grower_invite"
   | "context_check"
   | "vpd_calculator"
-  | "csv_history";
+  | "csv_history"
+  | "blueprint_targets";
 
 export type PaidInterestLeadSource =
   | "pricing_interest"
@@ -34,7 +35,8 @@ interface PaidAcquisitionAttribution {
     | "grower_invite"
     | "context_check"
     | "vpd_calculator"
-    | "csv_history";
+    | "csv_history"
+    | "blueprint_targets";
   leadSource: PaidInterestLeadSource;
 }
 
@@ -99,6 +101,15 @@ export const PAID_ACQUISITION_ATTRIBUTIONS: Readonly<
     source: "csv_history",
     medium: "owned",
     campaign: "csv_history",
+    leadSource: "pricing_interest",
+  }),
+  // Public per-stage target bands page (/tools/blueprint-targets).
+  // Own source + campaign, generic pricing_interest leadSource, per the
+  // csv_history precedent.
+  blueprint_targets: Object.freeze({
+    source: "blueprint_targets",
+    medium: "owned",
+    campaign: "blueprint_targets",
     leadSource: "pricing_interest",
   }),
 });

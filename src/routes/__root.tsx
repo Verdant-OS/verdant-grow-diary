@@ -15,6 +15,7 @@ import { useGoogleAnalyticsPageViews } from "@/hooks/useGoogleAnalyticsPageViews
 import { useAnalyticsConsent } from "@/hooks/useAnalyticsConsent";
 import { loadGoogleAnalytics } from "@/lib/googleAnalyticsLoader";
 import { AnalyticsConsentBanner } from "@/components/AnalyticsConsentBanner";
+import FunnelEventDbSink from "@/components/FunnelEventDbSink";
 import { clearGrowDataMeta } from "@/hooks/useGrowData";
 import { reportLovableError } from "@/lib/lovable-error-reporting";
 import { renderErrorPage } from "@/lib/error-page";
@@ -194,8 +195,19 @@ function RootComponent() {
                 <PaymentTestModeBanner />
                 <AgreementReconsentGate />
                 <Suspense fallback={<PageLoader />}>
-                  <Outlet />
+                  {/*
+                    AnalyticsShell and FunnelEventDbSink come BEFORE Outlet on
+                    purpose. React fires sibling mount effects in JSX order,
+                    and Outlet's route content is a sibling here, not a
+                    descendant of the sink. If the sink were positioned after
+                    Outlet, a page's own mount-effect trackFunnelEvent call
+                    (e.g. Pricing.tsx's paywall_viewed) would dispatch into a
+                    window with no listener yet on a cold/direct load, and
+                    the event would be silently lost.
+                  */}
                   <AnalyticsShell />
+                  <FunnelEventDbSink />
+                  <Outlet />
                 </Suspense>
               </GrowsProvider>
             </AuthProvider>

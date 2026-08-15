@@ -243,6 +243,16 @@ describe("each funnel event fires from its canonical seam", () => {
     // The impression must be stricter than the render: the locked branch also
     // shows on lookupFailed, but an unverified viewer may be entitled.
     expect(blueprintSection).toMatch(/!entLoading && !lookupFailed && !canUseCapability/);
+    // Tent-alerts credit gate: impression fires only when the gated state
+    // actually rendered (intercept + ready rows), deduped per EXPOSURE —
+    // the reused /plants/:id route component means a per-mount boolean
+    // would swallow the second plant's visibly-rendered paywall.
+    const alertsPanel = read("src/components/PlantAssignedTentAlertsPanel.tsx");
+    expect(alertsPanel).toMatch(
+      /trackFunnelEvent\("paywall_viewed",\s*\{\s*surface:\s*ALERT_DOCTOR_CREDIT_GATE_SURFACE\s*\}\)/,
+    );
+    expect(alertsPanel).toMatch(/if \(!showCreditsNote\) return;/);
+    expect(alertsPanel).toMatch(/if \(paywallTrackedForRef\.current === exposureKey\) return;/);
   });
 
   it("paywall_cta_clicked is wired only to explicit AI Doctor pricing actions", () => {
@@ -266,6 +276,14 @@ describe("each funnel event fires from its canonical seam", () => {
     );
     expect(aiDoctor).toMatch(/onPrimaryCtaClick=\{handlePostValuePlansClick\}/);
     expect(coach).not.toContain("onUpsellCtaClick");
+
+    // The one other paywall_cta_clicked emitter: the tent-alerts doctor-CTA
+    // credit gate. Fixed surface token only — no plan, no ids.
+    const alertsPanel = read("src/components/PlantAssignedTentAlertsPanel.tsx");
+    expect(alertsPanel).toMatch(
+      /trackFunnelEvent\("paywall_cta_clicked",\s*\{\s*surface:\s*ALERT_DOCTOR_CREDIT_GATE_SURFACE,?\s*\}\)/,
+    );
+    expect(alertsPanel).not.toMatch(/paywall_cta_clicked[\s\S]{0,200}plan:/);
   });
 
   it("quick_log_saved routes through the shared wrapper at every mounted success seam", () => {

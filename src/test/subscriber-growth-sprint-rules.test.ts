@@ -56,6 +56,7 @@ const ACQUISITION: SignupAcquisitionCounts = {
   contextCheck: 1,
   vpdCalculator: 3,
   csvHistory: 4,
+  blueprintTargets: 2,
 };
 
 describe("subscriber growth sprint rules", () => {

@@ -1,0 +1,216 @@
+{
+  "$comment": [
+    "Phase 0 of POSTGRES_RESTRICTED_ROLE_SPIKE (GAP-PGROLE-001).",
+    "Contract: docs/specs/postgres-restricted-role-alternative.md §5.1.",
+    "Enforced by scripts/check-edge-function-domain-reach.mjs.",
+    "",
+    "Every function listed here holds SUPABASE_SERVICE_ROLE_KEY, which bypasses",
+    "RLS and can reach all public tables. This file records what each one",
+    "ACTUALLY touches, measured from source on 2026-08-14 against deploy tip",
+    "e1214d3df. The checker fails on any reach not declared here, and equally on",
+    "a declaration that no longer matches reality.",
+    "",
+    "Declaring a cross-domain reach here does NOT bless it. It records it, with a",
+    "justification, so the Convex-vs-Postgres comparison argues from a measured",
+    "number instead of a capability claim. Do not widen a function's domain to",
+    "silence the checker."
+  ],
+  "domains": {
+    "money": "Billing, subscriptions, Paddle, founders, referrals, AI credit ledgers",
+    "ai": "AI Doctor and AI Coach request handling",
+    "email": "Transactional email queue, suppression, unsubscribe",
+    "ingest": "Sensor ingest, bridge tokens, ingest audit",
+    "grower": "Diary, grows, plants, tents, profiles, gamification",
+    "ops": "Operator/observability surfaces",
+    "cross": "Legitimately spans domains; exempt from the cross-domain report"
+  },
+  "tableDomains": {
+    "subscriptions": "money",
+    "billing_subscriptions": "money",
+    "billing_customer_links": "money",
+    "paddle_customers": "money",
+    "paddle_events": "money",
+    "paddle_event_processing": "money",
+    "lovable_paddle_events": "money",
+    "founders": "money",
+    "referrals": "money",
+    "ai_credit_grants": "money",
+    "ai_credit_spends": "money",
+    "email_send_log": "email",
+    "email_send_state": "email",
+    "email_unsubscribe_tokens": "email",
+    "suppressed_emails": "email",
+    "sensor_readings": "ingest",
+    "bridge_tokens": "ingest",
+    "sensor_ingest_audit_log": "ingest",
+    "diary_entries": "grower",
+    "grows": "grower",
+    "plants": "grower",
+    "tents": "grower",
+    "profiles": "grower",
+    "harvests": "grower",
+    "nug_events": "grower",
+    "unlocks": "grower",
+    "user_quests": "grower",
+    "edge_function_metric_events": "ops",
+    "edge_metrics_alert_dispatches": "ops",
+    "edge_metrics_webhook_attempts": "ops"
+  },
+  "functions": {
+    "ai-coach": {
+      "domain": "ai",
+      "tables": ["diary_entries", "grows", "plants", "sensor_readings", "tents"],
+      "rpcs": ["ai_credit_attach_result", "ai_credit_refund", "ai_credit_spend"],
+      "justification": "Reads grower and sensor context to build the coach prompt. AGENTS.md requires AI Doctor/Coach to use as much context as available, so this cross-domain read is intended, not drift. It is also the single widest AI-domain reach and would be the hardest function to move behind a restricted role."
+    },
+    "ai-doctor-review": {
+      "domain": "ai",
+      "tables": [],
+      "rpcs": [
+        "ai_credit_refund",
+        "ai_credit_spend",
+        "ai_doctor_finalize_review",
+        "record_ai_doctor_review_completion"
+      ],
+      "justification": "Zero direct table access; all writes go through SECURITY DEFINER RPCs. This is the shape a restricted role would find easiest to fence."
+    },
+    "auth-email-hook": {
+      "domain": "email",
+      "tables": ["email_send_log"],
+      "rpcs": ["enqueue_email"],
+      "justification": "Single-domain."
+    },
+    "checkout-status": {
+      "domain": "money",
+      "tables": ["lovable_paddle_events"],
+      "rpcs": [],
+      "justification": "Single-domain."
+    },
+    "delete-account": {
+      "domain": "cross",
+      "tables": ["billing_subscriptions", "paddle_customers", "subscriptions"],
+      "rpcs": [],
+      "justification": "Account erasure legitimately spans domains. Named in the spec §5.5 as the case a restricted role cannot improve — a role for it would be service_role with extra steps. Exempt from the cross-domain report by design."
+    },
+    "ecowitt-ingest": {
+      "domain": "ingest",
+      "tables": ["bridge_tokens", "sensor_readings", "tents"],
+      "rpcs": ["bump_bridge_token_usage"],
+      "justification": "Reads tents (grower) to route a reading to its tent. Narrow and structural to ingest."
+    },
+    "edge-metrics-alert-check": {
+      "domain": "ops",
+      "tables": [
+        "edge_function_metric_events",
+        "edge_metrics_alert_dispatches",
+        "edge_metrics_webhook_attempts"
+      ],
+      "rpcs": ["has_role"],
+      "justification": "Single-domain."
+    },
+    "founder-slots-remaining": {
+      "domain": "money",
+      "tables": [],
+      "rpcs": ["founder_lifetime_slots_remaining"],
+      "justification": "RPC-only."
+    },
+    "handle-email-suppression": {
+      "domain": "email",
+      "tables": ["email_send_log", "suppressed_emails"],
+      "rpcs": [],
+      "justification": "Single-domain."
+    },
+    "handle-email-unsubscribe": {
+      "domain": "email",
+      "tables": ["email_unsubscribe_tokens", "suppressed_emails"],
+      "rpcs": [],
+      "justification": "Single-domain."
+    },
+    "operator-credits-audit": {
+      "domain": "money",
+      "tables": ["ai_credit_grants", "ai_credit_spends", "referrals"],
+      "rpcs": ["has_role"],
+      "justification": "Single-domain; operator-gated by has_role."
+    },
+    "operator-ggs-real-payload-commit": {
+      "domain": "ingest",
+      "tables": ["bridge_tokens", "tents"],
+      "rpcs": ["has_role", "pi_ingest_commit_batch"],
+      "justification": "Reads tents (grower) for routing, same shape as ecowitt-ingest. Operator-gated."
+    },
+    "paddle-portal-session": {
+      "domain": "money",
+      "tables": ["subscriptions"],
+      "rpcs": [],
+      "justification": "Single-domain."
+    },
+    "paddle-webhook": {
+      "domain": "money",
+      "tables": ["billing_customer_links", "paddle_event_processing", "paddle_events"],
+      "rpcs": [],
+      "justification": "Single-domain."
+    },
+    "payments-webhook": {
+      "domain": "money",
+      "tables": ["lovable_paddle_events", "paddle_customers", "subscriptions"],
+      "rpcs": [
+        "allocate_lovable_founder_lifetime",
+        "grant_lovable_credit_pack",
+        "revoke_lovable_founder_lifetime_by_transaction"
+      ],
+      "justification": "Single-domain."
+    },
+    "pi-ingest-readings": {
+      "domain": "ingest",
+      "tables": [],
+      "rpcs": [],
+      "justification": "Holds a service-role client via readEnv in buildDefaultLookupClient but has no literal .from/.rpc target in its own source. Zero measured reach is not zero capability — this is precisely the blind spot a static scan cannot close."
+    },
+    "process-email-queue": {
+      "domain": "email",
+      "tables": ["email_send_log", "email_send_state"],
+      "rpcs": ["delete_email", "move_to_dlq", "read_email_batch"],
+      "justification": "Single-domain."
+    },
+    "redeem-referral": {
+      "domain": "money",
+      "tables": ["profiles", "referrals"],
+      "rpcs": ["convert_referral"],
+      "justification": "Reads profiles (grower) to resolve the referred user. Genuine cross-domain reach from a money function."
+    },
+    "rls-selftest": {
+      "domain": "cross",
+      "tables": [
+        "diary_entries",
+        "grows",
+        "harvests",
+        "nug_events",
+        "profiles",
+        "sensor_readings",
+        "tents",
+        "unlocks",
+        "user_quests"
+      ],
+      "rpcs": [],
+      "justification": "A self-test harness that deliberately probes RLS across nine tables in four domains. Widest reach of any service-role function. Legitimately cross-domain — it exists to test the fences — but it is also the clearest example of why one shared service_role identity has no natural boundary."
+    },
+    "save-founder-prefs": {
+      "domain": "money",
+      "tables": ["founders"],
+      "rpcs": [],
+      "justification": "Single-domain."
+    },
+    "send-transactional-email": {
+      "domain": "email",
+      "tables": ["email_send_log", "email_unsubscribe_tokens", "suppressed_emails"],
+      "rpcs": ["enqueue_email"],
+      "justification": "Single-domain."
+    },
+    "sensor-ingest-webhook": {
+      "domain": "ingest",
+      "tables": ["bridge_tokens", "sensor_ingest_audit_log", "sensor_readings"],
+      "rpcs": ["bump_bridge_token_usage"],
+      "justification": "Single-domain."
+    }
+  }
+}

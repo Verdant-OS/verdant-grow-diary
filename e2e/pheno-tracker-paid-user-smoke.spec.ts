@@ -176,11 +176,17 @@ test.describe("A. Free user gate", () => {
     await expect(page.getByTestId("pheno-hunt-onboarding")).toHaveCount(0);
     const cta = page.getByTestId("pheno-tracker-upgrade-gate-upgrade-link");
     await expect(cta, "upgrade CTA must exist on the gate").toBeVisible();
-    // returnTo is the ONLY query param production adds (URLSearchParams).
-    await expect(cta).toHaveAttribute("href", "/pricing?returnTo=%2Fpheno-hunts%2Fnew");
+    // Production adds exactly two query params, in URLSearchParams order:
+    // `plan` (card preselect, added by #940 — it never auto-opens checkout)
+    // then the sanitized `returnTo`. Assert both, so a silently-dropped
+    // returnTo or an unexpected third param still fails this test.
+    await expect(cta).toHaveAttribute(
+      "href",
+      "/pricing?plan=pro_annual&returnTo=%2Fpheno-hunts%2Fnew",
+    );
     const originBefore = new URL(page.url()).origin;
     await cta.click({ noWaitAfter: true });
-    await expect(page).toHaveURL(/\/pricing\?returnTo=%2Fpheno-hunts%2Fnew$/);
+    await expect(page).toHaveURL(/\/pricing\?plan=pro_annual&returnTo=%2Fpheno-hunts%2Fnew$/);
     expect(new URL(page.url()).origin, "CTA must never leave the app origin").toBe(originBefore);
     await expect(page).not.toHaveURL(/\/auth/);
     await expect(

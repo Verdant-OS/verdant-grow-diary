@@ -1,11 +1,38 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-13 UTC
+**Last updated:** 2026-08-14 UTC
+**Updated by:** Claude (2026-08-14, later edit: records Cheek's in-session
+approval of `POSTGRES_RESTRICTED_ROLE_SPIKE` and the **delivered, measured**
+Phase 0 detector — 22 service-role edge functions, 8 cross-domain table reaches
+against deploy tip `e1214d3df`. Records Cheek's decision to abandon
+`claude/breeder-mode-genetics` and `claude/cultivar-library-p1`. Refreshes the
+Branch topology row from `cbbd7122` to `e1214d3df` after five merges this
+session (#979, #815, #710, #795, #980). Sentinel-Version moved to 2026-08-09.3
+via #710; the tip then moved to `7843a3fcb` (#981, Phase 0) and `f2a03998f`
+(#982, Phase 1). Records Cheek's "execute phase 1" decision and the
+**demonstrated** local-only role harness — 10/10 proofs. Also records Cheek's
+2026-08-14 approval-in-principle of **Phase 2 production adoption** (execution
+gated on three items, see the slice entry) and the **Convex-vs-Postgres
+recommendation**: adopt Postgres incrementally, hold Convex. No production, GA4,
+GSC, sitemap, or release-identity row was re-measured in this edit; those retain
+their earlier verification dates.)
+
+**Prior update:** 2026-08-13 UTC
 **Updated by:** Claude (records Cheek's 2026-08-13 in-session approval of the
 named isolated Convex component sandbox spike, plus the deploy-branch HEAD
 observed while writing that spec. Public-surface, GA4, and release-identity
 rows retain their earlier verification dates; none were re-measured in this
-update)
+update. Same-day follow-up: records the previously-untracked Lovable
+knowledge-pack mechanism and this session's audit of its pre-2026-08-13
+backup content against deploy-branch HEAD `e7690396e` — see the new
+"Completed, out of slice (recorded 2026-08-13)" entry below; that audit's
+evidence is pinned to `e7690396e` and was not re-verified against a later
+tip. Second same-day follow-up, per Codex review on PR #975: the Branch
+topology row below was stale at `6434ea2a8` (#942) even before this file's
+own `e7690396e` (#943) reference was added, and the branch has since moved
+again — refreshed the row to the actual current tip, `fb42ce00e` (#968),
+verified with a fresh `git fetch` rather than by re-asserting either older
+number)
 
 This is the changing shift report. Permanent rules live in `/AGENTS.md`; do not edit
 that constitution to record branch, deployment, blocker, or assignment changes.
@@ -16,12 +43,78 @@ inside the active governance handoff.
 
 ---
 
+## ⚠️ Open production incident — attributed signups hard-fail
+
+**Status 2026-08-13: OPEN. Fix merged, NOT applied. Production is still broken.**
+
+Account creation aborts for any signup carrying an allowlisted acquisition source —
+including the front-door CTA on `/` and `/welcome`. The live `handle_new_user`
+INSERTs into `public.signup_acquisition_attributions`, which does not exist, and that
+INSERT sits outside the function's EXCEPTION block. Result: `42P01` → the AFTER INSERT
+trigger on `auth.users` aborts → the row rolls back → GoTrue returns HTTP 500
+"Database error saving new user". **The account is never created.**
+
+Not every signup: Google OAuth, magic link, and a bare `/auth?mode=signup` resolve to NULL
+and still succeed. **Do NOT extend that to "traffic carrying its own utm params is fine".**
+`Landing.tsx:60` falls back to `landing_page` for an absent, partial, or unrecognized inbound
+tuple and then rebuilds the signup URL with the exact allowlisted triple, so any visitor who
+lands on `/` or `/welcome` first — the normal path for an ad click or a search result — is
+re-attributed and fails. Only a non-exact tuple supplied **directly to `/auth`** is unaffected.
+
+Fix is `supabase/migrations/20260813030000_signup_acquisition_forward_repair.sql`, merged
+in #969. **Merging did not fix it** — only a Lovable apply does, and the frontend half was
+already deployed ahead of the repo.
+
+**Full detail, evidence, apply steps and post-apply verification:**
+`docs/signup-attribution-outage-operator-runbook.md`
+
+---
+
+## ⚠️ Second production drift — committed migrations are NOT auto-applied
+
+**Recorded 2026-08-15 from a Lovable read-only investigation of production
+`knkwiiywfkbqznbxwqfh`.** `source claim` for the production measurements; the
+repository-side facts below were verified directly.
+
+**Publishing does not replay `supabase/migrations/`.** It deploys the frontend
+and edge functions only. Migrations reach production solely through the
+operator's own apply path. This corrects an assumption stated repeatedly in
+`docs/specs/postgres-restricted-role-alternative.md` (now fixed in its §5.4.1)
+and it explains why the signup-attribution fix above is "merged, NOT applied".
+
+**At least one further migration is unapplied, and it is not the signup one.**
+`supabase/migrations/20260811090000_quicklog_corrections_retractions.sql` is
+committed, but in production:
+
+- `to_regclass('public.quicklog_entry_revisions')` → `null` (table absent)
+- `public.diary_entries.retracted_at` / `.retraction_reason` → absent
+
+**Shipped code depends on those objects.** Verified in this repo:
+`useQuickLogRevisionBadges.ts` and `useRetractedQuickLogEntries.ts` both
+`.from("quicklog_entry_revisions")`, and they mount through
+`QuickLogHistoryPanels` / `QuickLogGroupedTimelineSection` onto **Timeline**,
+**TentDetail** and **PlantDetail** — the One-Tent Loop spine.
+
+**Failure mode is silent, not loud.** `useQuickLogRevisionBadges` does
+`if (error) return new Map();`. So Quick Log revision badges and retracted
+entries simply never render in production. No crash, no error surface, no
+telemetry — the feature looks shipped and is invisible. That is a different and
+in some ways worse shape than the signup outage, which at least fails loudly.
+
+Exact drift count is `NOT_MEASURED`: `supabase_migrations.schema_migrations` was
+`permission denied` for both roles available to the investigation, so only
+"≥ 1 beyond signup" is proven, by object absence. **Someone should reconcile the
+full migration ledger against production before assuming anything else in the
+265-file directory is live.**
+
+---
+
 ## Branch topology
 
-| Branch               | Role                                             | Verified head                                                                                                                                |
-| -------------------- | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `verdant-grow-diary` | **Deploy branch. Production ships from here.**   | `6434ea2a8` (#942), verified 2026-08-13 with `git rev-parse HEAD` on this checkout (this session did not re-fetch; treat as the local tracking ref). Prior CURRENT_STATE snapshot was `1a9082bb1` (#885) on 2026-08-11 — the queue has advanced; do not carry older validation tables forward |
-| `main`               | Integration branch. It is not production parity. | `b6d747941948ce68157185a2b0847acea6970d44` (#779), verified 2026-08-07                                                                       |
+| Branch               | Role                                             | Verified head                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| -------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `verdant-grow-diary` | **Deploy branch. Production ships from here.**   | `f2a03998f46f9e3827a593af100969a2f967f932` (#982), verified 2026-08-14 with `git fetch origin verdant-grow-diary && git rev-parse origin/verdant-grow-diary`. Supersedes `e1214d3df` (#980), `cbbd7122` (#978) and `fb42ce00e` (#968). Seven commits landed this session, in `git log` merge order oldest-first: `623edf17b` (#979), `e200d7561` (#815), `1a3a70d1b` (#710), `cba42c6d4` (#795), `e1214d3df` (#980), `7843a3fcb` (#981), `f2a03998f` (#982). PR numbers on this branch do not order by merge time — order commits with `git log`, never by PR number. Do not carry older validation tables forward |
+| `main`               | Integration branch. It is not production parity. | `b6d747941948ce68157185a2b0847acea6970d44` (#779), verified 2026-08-07                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 
 `main` and `verdant-grow-diary` are divergent. Do not infer production behavior from
 `main`, and do not backport deploy-only governance or data rules without a scoped branch
@@ -135,6 +228,147 @@ credits, sensors, entitlements, Action Queue, and `npx convex deploy` remain
 `REJECT` until a later Cheek decision. This does **not** replace or pause the
 Mode A SEO parent program below.
 
+**Approved slice (Cheek, 2026-08-14):** `POSTGRES_RESTRICTED_ROLE_SPIKE`.
+Contract: `docs/specs/postgres-restricted-role-alternative.md`. This is the
+comparison arm the Convex spec defers in its §4.2 and §11. It was specified
+before approval existed (the only signal was a designated branch name, and the
+spec said so rather than assuming consent); Cheek approved it in session on
+2026-08-14.
+
+**Phase 0 is DELIVERED and MEASURED — do not rebuild it.** Claude implemented
+it, not Codex, because Codex is occupied with Convex Phase 1 in PR #977 and
+Cheek granted full authority in the approving turn. Shipped:
+`scripts/check-edge-function-domain-reach.mjs`,
+`config/edge-function-domain-reach.json`, and
+`scripts/check-edge-function-domain-reach.test.mjs` (16 tests, 16 pass locally),
+plus `check:/report:/test:edge-domain-reach` npm scripts.
+
+**The measurement, against deploy tip `e1214d3df`: 22 service-role edge
+functions, 8 cross-domain table reaches.** Concentrated in `ai-coach` (5 —
+grower diary/grows/plants/tents plus ingest sensor_readings) with one each from
+`ecowitt-ingest`, `operator-ggs-real-payload-commit`, and `redeem-referral`.
+Two further functions are declared `cross` and exempt by design: `delete-account`
+(erasure, 3 tables) and `rls-selftest` (**9 tables across four domains**, the
+widest reach of any service-role function). Reproduce with
+`node scripts/check-edge-function-domain-reach.mjs --report`.
+
+Read it carefully: most of those 8 reaches are **defensible** — `ai-coach` needs
+grower context per the AI Doctor rules, the `tents` reads are routing. The
+finding is not misconduct. It is that **nothing in the database distinguishes an
+intended cross-domain read from an unintended one**. Three limits are pinned in
+the spec's §5.1.1 and in the test suite: the scan is literal-only
+(`.from(variable)` is invisible), `pi-ingest-readings` holds a service-role
+client with zero measured literal reach (zero measured ≠ zero capability), and a
+green run means "no undeclared literal reach", never a runtime fence.
+
+**Phase 1 is APPROVED and DELIVERED (Cheek, 2026-08-14, "execute phase 1").**
+One restricted role, one domain, local replay only. Shipped as
+`scripts/sql/restricted-role-phase1-ingest.sql` (the role),
+`scripts/run-restricted-role-harness.ts` (the §7 proofs), and
+`scripts/check-restricted-role-fixture.test.mjs` (16 static safety tests, 16
+pass locally), wired into `security-db-local` as a non-required step.
+
+**Read this before touching it: the role is deliberately NOT a migration.**
+Anything under `supabase/migrations/` reaches production on the next Lovable
+apply, which would have violated the spec's own §8 fence (never create a role in
+production) and §9 (`REJECT` for production roles) — silently, with no further
+decision from anyone. So the role is created by a fixture applied only against a
+loopback database by the harness, and dropped in teardown. The harness refuses a
+non-loopback `SUPABASE_DB_URL` and has **no remote opt-in flag**, unlike the
+other harnesses in this repo. Three of the static tests exist purely to hold that
+line, including one asserting the repository still contains **zero** `CREATE ROLE`
+statements in migrations — the §3.1 audit fact the whole spec was built on.
+
+The role's shape: `NOLOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE
+NOREPLICATION NOBYPASSRLS`, `USAGE` on `public`, `EXECUTE` on exactly one
+function (`public.bump_bridge_token_usage(uuid, integer)`), and **zero table
+grants**. Partitioning by function grant rather than table grant is what survives
+the 2026-08-06 founder decision.
+
+**P3 — whether PostgREST honours a custom `role` JWT claim here — is the one
+proof that may not run.** It needs `SUPABASE_JWT_SECRET`; the workflow step
+derives it from `supabase status` where available, and the harness reports
+`BLOCKED` (never `PASS`) when it is absent. Do not record the PostgREST
+role-switching mechanism as available until P3 actually passes.
+
+**Phase 2 (production adoption): APPROVED IN PRINCIPLE by Cheek 2026-08-14, but
+now on HOLD after the 2026-08-15 gate answers.** Contract: spec §5.4, §5.4.1,
+§5.4.2.
+
+**Gate A came back favourable and is no longer the blocker.** Production
+`postgres` holds `rolcreaterole = t` and is not superuser, so a plain
+`CREATE ROLE x NOLOGIN NOINHERIT` — exactly the drafted shape — is expected to
+succeed. Two different findings stop it instead:
+
+1. **The JWT secret is unobtainable on Lovable Cloud**, so a role-claim JWT
+   cannot be minted in production. P3 proved the PostgREST mechanism works
+   *locally*; in production the role would be created and then **unreachable**.
+   A fence nobody can route through is not a fence.
+2. **Role durability across rebuilds is `UNKNOWN`**, and roles sit outside
+   migrations and schema dumps entirely. Combined with the confirmed rule that a
+   role cannot be hardened after creation, a silent drop-and-recreate would
+   restore the principal **without its grants**, with nothing in-database
+   signalling it.
+
+Phases 0 and 1 keep their value regardless: the detector runs on every PR and the
+10/10 demonstration stands. The original gate text follows.
+
+A production role can only be created by a migration under
+`supabase/migrations/`, which is exactly what Phase 1 avoided. Three things must
+land first:
+
+- **Gate A — does hosted Supabase permit `CREATE ROLE`?** `unknown`. We measured
+  that the Supabase `postgres` role cannot even set `NOSUPERUSER` /
+  `NOREPLICATION` / `NOBYPASSRLS` (§5.2.1). If `CREATE ROLE` is likewise refused,
+  an unguarded migration **aborts the apply chain** — the same failure that
+  disqualified `claude/cultivar-library-p1` today, and the same class as the open
+  signup-attribution incident at the top of this file.
+- **Gate B — does the *hosted* PostgREST honour a custom `role` claim?** P3
+  passed on the **local** stack only. A move to opaque `sb_secret_…` keys would
+  remove role-claim JWTs entirely.
+- **Gate C — Security review**, per `HANDOFF_PROTOCOL.md`, before any new
+  database principal plus JWT minting exists.
+
+Gates A and B are the subject of a read-only Lovable investigation prompt Cheek
+holds. The spec carries the exact guarded migration to write once they return;
+it degrades to a no-op rather than aborting if `CREATE ROLE` is refused.
+
+**Still `REJECT` regardless:** re-pointing any edge function at the role (a
+separate later decision, after the principal has baked), and default-deny table
+grants — the last would reverse the 2026-08-06 founder decision recorded in
+migration `20260807003500`.
+
+**Convex-vs-Postgres recommendation (spec §10, 2026-08-14): adopt the Postgres
+arm incrementally, hold Convex.** The Postgres arm is DEMONSTRATED (10/10
+proofs). The Convex arm is `NOT_MEASURED` — and note carefully that PR #977 is
+green across 99 checks while **no lane executes the spike's own P1–P9 isolation
+proofs**; green there means the repo still builds with a `spikes/` folder, not
+that isolation was shown. Convex is unmeasured, **not refuted** — its isolation
+property is genuinely stronger — and neither architecture removes `ai-coach`'s
+five cross-domain reaches cheaply. Council Chair advises; Cheek approves.
+
+Two audit results from that spec update facts recorded elsewhere in this file's
+orbit: the Convex spec's open `uncertainty` about `supabase/functions/_shared/`
+constructing service-role clients resolves to **zero** such helpers, and the
+2026-08-06 founder decision (declining default-deny table ACLs because Lovable
+ships tables without ACL awareness) is the binding constraint on any role design.
+
+**Abandoned by Cheek, 2026-08-14 — do not revive, do not merge:**
+
+- `claude/breeder-mode-genetics` — superseded. Deploy already carries every
+  `src/lib/genetics/*` module it adds, plus many it does not. Conflicts in ~30
+  files against a 2026-06-06 base.
+- `claude/cultivar-library-p1` — superseded **and unsafe**. Its migration
+  `20260724000000_cultivar_library_foundation.sql` uses bare `CREATE TABLE`
+  (9 unguarded, zero `IF NOT EXISTS`) for tables that already exist, shipped two
+  days earlier by `20260722203000_strain_reference_library_v1.sql`. Merging it
+  raises `42P07` and aborts the replay, taking `security-db-local` and the pgTAP
+  lanes with it. It is an earlier draft of a feature that already shipped.
+
+Neither branch could be deleted from this environment (the agent proxy refuses
+GitHub API writes and `git push --delete` alike), so both still exist on origin.
+They are dead by decision, not by absence — treat this entry as the disposition.
+
 **Parent program:** MODE A SEO measurement-readiness work.
 
 **Active SEO-evidence slice:** `P2 LIGHTING_GUIDE_CTA_ATTRIBUTION_CONTRACT` in PR #679,
@@ -220,6 +454,84 @@ Active status, OAuth 2.1 dashboard setting, endpoint reachability) remains
 `BLOCKED` from agent sessions — the doc's §6 lists the owner actions. Five rounds
 of automated (Codex-connector) inline review were verified against source and
 addressed pre-merge. This entry records the work; it does not open a new slice.
+
+**Completed, out of slice (recorded 2026-08-13):** Lovable knowledge-pack mechanism now
+tracked. Cheek supplied a backup of the pre-2026-08-13 Lovable "Workspace/Project
+Knowledge" pack content (`verdant_project_knowledge_BACKUP_pre-2026-08-13.md`, saved
+outside this repo before Lovable's connector overwrote it) with no other instruction.
+Claude audited its 8 factual claims against deploy-branch HEAD `e7690396e` (#943, this
+branch's tip observed at audit time). The Branch topology row above has since been
+refreshed to the branch's actual current tip, `fb42ce00e` (#968) — this audit's evidence
+remains pinned to `e7690396e` specifically and was not re-verified against the newer
+commits. On request, this entry records the mechanism here. This is the first appearance of
+this mechanism anywhere in governance docs: it is a separate, ungoverned knowledge
+surface (Lovable's project-level "Knowledge" field, populated via its own connector) that
+`AGENTS.md`, this file, and every role file were previously silent on.
+
+Audit verdicts (full evidence trail — file/line citations, git commits, PR numbers — lives
+in the originating Claude Code session; not reproduced here):
+
+- `PARTIALLY_ACCURATE` — public `/welcome` + `/demo` shipped with writes excluded from a
+  "demo mode": `/welcome` holds; `/demo` does not — the standalone Demo page was deleted
+  2026-06-03, six weeks before the pack's own ~2026-07-14 capture window, and `/demo` is
+  now only a client-side redirect to `/welcome`. No app-wide demo-mode write-exclusion
+  mechanism exists for any public surface.
+- `PARTIALLY_ACCURATE` — CSV/TSV handling is a read-only review surface with disabled
+  persistence: true for `CsvPreviewReviewGate.tsx` itself, which remains genuinely
+  unreachable (imported only by its own test files, no page or route mounts it) — but
+  that component is distinct from the public `/sensors/csv-preview` route, which is a
+  live, reachable page (`src/pages/SensorCsvPreview.tsx` mounting
+  `CsvSensorPreviewPanel.tsx`, linked from `/hardware-integrations` and
+  `/partners/csv-preview`). `/sensors/csv-preview` is read-only in the same sense —
+  no Supabase/network call in that component either — so the no-persistence verdict
+  holds, but "unreachable" does not; do not conflate the two components. Separately,
+  a live, authenticated write flow (`EnvironmentCsvImportLauncher` →
+  `environmentCsvImportPersistence.ts`, mounted in `src/pages/Sensors.tsx`) really
+  does insert into `sensor_readings` on confirm, shipped 2026-06-28, before the
+  pack's own capture date — so "CSV/TSV handling" as a whole is not read-only either.
+- `PARTIALLY_ACCURATE` — grower action follow-up evidence supported, outcomes never
+  inferred, automatic diary creation unsupported: the outcome-never-inferred half holds.
+  But `ActionDetail.tsx` does auto-insert (best-effort, not transactional — an insert
+  failure does not roll back the completed status) a templated, outcome-less
+  `diary_entries` marker row when an action is completed **from the Action Detail
+  page** — a mechanism from 2026-05-26, predating the pack. This is narrower than "every
+  Action Queue completion": completing via the Action Queue **list's** own "Mark
+  Complete" control (`ActionQueue.tsx`, calling the `action_queue_transition` RPC
+  directly) does not create a diary row at all.
+- `PARTIALLY_ACCURATE` — real-data One-Tent smoke test blocked pending an actual tent
+  reading, ghost seeding prohibited: the ghost-seeding prohibition is real and current.
+  The actual block condition is a missing authenticated managed Supabase session, not
+  literally an absent physical tent reading — once authenticated, the e2e spec enters a
+  scripted, labeled "manual" reading.
+- `STALE_NOW_DIFFERENT` — AI Doctor semantic output evaluator labeled an unmerged draft
+  PR: [PR #230](https://github.com/Verdant-OS/verdant-grow-diary/pull/230) is confirmed
+  **MERGED** (2026-07-14) and wired into required CI (`ci.yml` step
+  `ai_doctor_output_eval`). Its content landed on the deploy branch via squash commit
+  `0c4b3c1a4`, titled after unrelated PR #229 ("harden re-consent gate") — another
+  instance of this repo's known squash-merge title/content mismatch pattern (see the
+  #586/#809/#812 entry above for a prior example).
+- `PARTIALLY_ACCURATE` — expanded pheno taxonomy migration merged but unverified on the
+  live schema, cross-form UI gated pending confirmation: the migration-merged half holds,
+  and production-schema verification remains genuinely `BLOCKED` from any agent session
+  (same sandbox-vs-production Supabase MCP mismatch already documented in the #586 entry
+  above). But no schema-confirmation gate exists in the live `PhenoKeepersPage` code — it
+  silently degrades to an empty list / generic error on any Supabase error instead of
+  holding for confirmation.
+- `STILL_ACCURATE` — EcoWitt continuous live sync unverified until one real payload
+  completes the full payload → dry-run → webhook → in-app provenance path: the repo's own
+  acceptance ledger (`docs/ecowitt-hardware-validation-runbook.md`, "Final live proof
+  ledger") remains a blank template as of its last edit (2026-07-18); every EcoWitt CI
+  lane runs on fixtures/mocks only. This file carried zero EcoWitt mentions before this
+  edit.
+- `STILL_ACCURATE` — Quick Log legacy and V2 contracts remain separate with typecheck as
+  a stop-ship gate: unchanged since PR #156 (2026-07-06); `quicklog-gate.yml` still runs
+  `bun run typecheck` as a hard first gate before either note-sync test suite.
+
+This entry does not authorize any new automation to keep the Lovable pack synchronized
+with this repo, does not assign an owner for that mechanism going forward, and does not
+claim the pack that replaced it on 2026-08-13 (which no agent session has read) is
+accurate — only that the mechanism now exists in governance memory and that its prior
+content's accuracy has been checked once.
 
 In scope — these bullets scope the **Mode A SEO parent program above**, not the completed
 #809 entry:
@@ -344,11 +656,11 @@ schema change and does not authorize production writes.
 
 ## Agents currently assigned
 
-| Agent             | Assignment                                                            |
-| ----------------- | --------------------------------------------------------------------- |
-| Codex             | Standing SEO measurement readiness and analytics integrity. Queued after the Convex spec merges: Phase 1 of `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` only (see `docs/specs/convex-component-physical-sandbox-spike.md`). Do not start Convex work if it collides with an in-flight SEO slice |
-| Claude            | `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` specification (docs-only). Not implementation. Prior completed out-of-slice work (#586/#809/#812/#885) unchanged |
-| Grok              | Unassigned. Prior same-session HOLD on unapproved Convex expansion is superseded only for this named isolated spike; production Convex remains HOLD |
-| Security reviewer | Unassigned until Phase 1 spike code exists; then review before any Convex cloud credential |
-| Gemini            | Unassigned                                                            |
-| Council Chair     | Unassigned until Phase 1 proof tests exist; then compare Convex sandbox vs a possible Postgres-roles alternative (out of this slice) |
+| Agent             | Assignment                                                                                                                                                                                                                                                                                    |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Codex             | Standing SEO measurement readiness and analytics integrity. Convex Phase 1 of `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` is in review: PR #977, opened 2026-08-14, not a draft. Scope stays Phase 1 only, under `spikes/convex-component-sandbox/`. **Do NOT build a Postgres domain-reach detector — Phase 0 of `POSTGRES_RESTRICTED_ROLE_SPIKE` is already delivered by Claude (see slices above). Phase 1 of that arm is `HOLD` pending its own Cheek decision** |
+| Claude            | `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` specification — delivered. `POSTGRES_RESTRICTED_ROLE_SPIKE`: spec delivered, **Phase 0 detector measured and Phase 1 role harness delivered (local-only)**, 2026-08-14 under Cheek's approval and full-authority grant (see slices above). Prior completed out-of-slice work (#586/#809/#812/#885) unchanged |
+| Grok              | Unassigned. Prior same-session HOLD on unapproved Convex expansion is superseded only for this named isolated spike; production Convex remains HOLD                                                                                                                                           |
+| Security reviewer | Unassigned until Phase 1 spike code exists; then review before any Convex cloud credential                                                                                                                                                                                                    |
+| Gemini            | Unassigned                                                                                                                                                                                                                                                                                    |
+| Council Chair     | Convex-vs-Postgres comparison: **recommendation delivered in spec §10 — adopt Postgres incrementally, hold Convex.** The Postgres arm has a measured number (8 cross-domain reaches across 22 service-role functions, `docs/specs/postgres-restricted-role-alternative.md` §5.1.1); the Convex arm remains `NOT_MEASURED` pending #977. Do not issue a recommendation until both arms carry evidence — and note that `ai-coach`'s five reaches are the case neither architecture removes cheaply |

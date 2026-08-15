@@ -164,7 +164,7 @@ export function progressLabel(step: StartYourRoomStep): string {
 
 /** Plant Detail deep link that opens Quick Log once. */
 export function plantDetailQuickLogHref(plantId: string): string {
-  return `/plants/${encodeURIComponent(plantId)}?openQuickLog=1`;
+  return `/plants/${encodeURIComponent(plantId)}?open=quick-log`;
 }
 
 /**

@@ -2034,11 +2034,23 @@ export default function Timeline() {
       </div>
 
       <div className="mt-4">
-        <WateringHistoryPanel rawEntries={recentLaneRawEntries} limit={20} />
+        <WateringHistoryPanel
+          rawEntries={recentLaneRawEntries}
+          limit={20}
+          onEntryChanged={() => {
+            void load();
+          }}
+        />
       </div>
 
       <div className="mt-4">
-        <FeedingHistoryPanel rawEntries={recentLaneRawEntries} limit={20} />
+        <FeedingHistoryPanel
+          rawEntries={recentLaneRawEntries}
+          limit={20}
+          onEntryChanged={() => {
+            void load();
+          }}
+        />
       </div>
 
       <div className="mt-4">
@@ -2072,7 +2084,13 @@ export default function Timeline() {
       </div>
 
       <div className="mt-4">
-        <PhotoHistoryPanel rawEntries={entries} limit={24} />
+        <PhotoHistoryPanel
+          rawEntries={entries}
+          limit={24}
+          onEntryChanged={() => {
+            void load();
+          }}
+        />
       </div>
 
       <div className="mt-4">

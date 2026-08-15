@@ -3,9 +3,9 @@
  * One-Tent Loop smoke test audit.
  *
  * Runs the targeted Vitest suites that protect Verdant's core operating
- * loop (Grow → Tent → Plant → Quick Log → Manual Reading → Snapshot → Alert →
- * Action Queue → Completion → Follow-up Diary → Timeline) and prints a
- * pass/fail table to CI logs.
+ * loop (Grow → Tent → Plant → Quick Log → Timeline → Sensor Snapshot →
+ * AI Doctor → Alert → Action Queue → Completion → Follow-up Diary) and
+ * prints a pass/fail table to CI logs.
  *
  * - Fails nonzero if any required suite file is missing.
  * - Fails nonzero if any targeted suite fails.
@@ -23,8 +23,16 @@ const ROOT = process.cwd();
 /** Real, on-disk targeted suites for the One-Tent Loop smoke audit. */
 const SUITES = [
   "src/test/one-tent-loop-navigation-rules.test.ts",
+  "src/test/one-tent-loop-handoff-ids.test.ts",
+  "src/test/grow-detail-one-tent-loop-card.test.tsx",
+  "src/test/tent-detail-one-tent-loop-card.test.tsx",
   "src/test/plant-detail-one-tent-loop-card.test.tsx",
   "src/test/plant-detail-one-tent-loop-quick-log-handoff.test.tsx",
+  "src/test/quick-log-v2-save-payload.test.ts",
+  "src/test/plant-quick-log-v2-save-adapter.test.ts",
+  "src/test/timeline-one-tent-loop-card.test.tsx",
+  "src/test/ai-doctor-one-tent-loop-card.test.tsx",
+  "src/test/action-queue-landing-one-tent-loop.test.tsx",
   "src/test/manual-sensor-reading-entry.test.ts",
   "src/test/manual-sensor-source-label.test.ts",
   "src/test/manual-sensor-display-labels.test.ts",

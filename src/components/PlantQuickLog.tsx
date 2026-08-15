@@ -9,10 +9,11 @@
  *   4) Optional photo + manual readings
  *   5) Sticky mobile-safe "Save log" button
  *
- * Safety contract is enforced by src/test/plant-quick-log.test.ts — keep this
- * component a presenter writing only to diary_entries + diary-photos storage.
- * Manual sensor values are stored under details.manual_sensor_snapshot with
- * source set to "manual" by the pure helper in src/lib/quickLogRules.ts.
+ * Safety contract is enforced by src/test/plant-quick-log.test.ts — persist
+ * goes through useQuickLogV2Save → quicklog_save_manual. Photo bytes still
+ * upload to diary-photos; the companion photo_url column may be patched
+ * after a successful RPC. Manual sensor values stay under
+ * details.manual_sensor_snapshot with source "manual".
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -31,7 +32,6 @@ import { useAuth } from "@/store/auth";
 import { applyQuickLogV2Refresh } from "@/lib/quickLogV2RefreshRules";
 import {
   buildManualSensorSnapshot,
-  buildQuickLogInsertDraft,
   parseOptionalNumber,
   type QuickLogSensorInput,
 } from "@/lib/quickLogRules";
@@ -57,7 +57,9 @@ import {
   type QuickLogActionChip,
   type ResponseCheckStatus,
 } from "@/lib/tenSecondQuickCheckRules";
-import { trackQuickLogSuccess } from "@/lib/quickLogSuccessTelemetry";
+import { useQuickLogV2Save } from "@/hooks/useQuickLogV2Save";
+import { buildPlantQuickLogV2SavePayload } from "@/lib/plantQuickLogV2SaveAdapter";
+import { newQuickLogSaveKey } from "@/lib/quickLogIdempotencyKey";
 
 interface Props {
   open: boolean;
@@ -104,6 +106,8 @@ export default function PlantQuickLog({
 }: Props) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { save } = useQuickLogV2Save();
+  const [saveKey, setSaveKey] = useState<string | null>(null);
   const responseSectionRef = useRef<HTMLElement | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const libraryFileRef = useRef<HTMLInputElement | null>(null);
@@ -124,6 +128,14 @@ export default function PlantQuickLog({
   // Missed-log recovery / follow-up prompts open this sheet with the intent
   // to record a status. Land the tired grower on the Better/Same/Worse
   // section (scroll + focus). Focus only — never pre-selects a chip.
+  useEffect(() => {
+    if (open) {
+      setSaveKey((current) => current ?? newQuickLogSaveKey());
+      return;
+    }
+    setSaveKey(null);
+  }, [open]);
+
   useEffect(() => {
     if (!open || !focusResponseCheckOnOpen) return;
     const el = responseSectionRef.current;
@@ -275,16 +287,17 @@ export default function PlantQuickLog({
         uploadedPath = path;
       }
 
-      const result = buildQuickLogInsertDraft({
+      const built = buildPlantQuickLogV2SavePayload({
         plantId,
         plantName,
         growId,
         tentId: tentId ?? null,
         note: timelineNote,
-        photoPath: uploadedPath,
         sensors: sensorsForPayload,
+        photoUrl: uploadedPath,
+        idempotencyKey: saveKey ?? newQuickLogSaveKey(),
       });
-      if (!result.ok) {
+      if (!built.ok) {
         if (uploadedPath) {
           await supabase.storage
             .from("diary-photos")
@@ -295,10 +308,9 @@ export default function PlantQuickLog({
         return;
       }
 
-      const { error: insErr } = await supabase.from("diary_entries").insert(result.draft as never);
-
-      if (insErr) {
-        console.error("PlantQuickLog diary insert failed", insErr);
+      const result = await save(built.payload, { telemetryIntent: "plant_quick_log" });
+      if (!result.ok) {
+        console.error("PlantQuickLog quicklog_save_manual failed", result.reason);
         if (uploadedPath) {
           await supabase.storage
             .from("diary-photos")
@@ -309,7 +321,16 @@ export default function PlantQuickLog({
         return;
       }
 
-      trackQuickLogSuccess("plant_quick_log");
+      if (uploadedPath && result.growEventId) {
+        const { error: photoErr } = await supabase
+          .from("diary_entries")
+          .update({ photo_url: uploadedPath })
+          .filter("details->>linked_grow_event_id", "eq", result.growEventId);
+        if (photoErr) {
+          console.error("PlantQuickLog companion photo_url patch failed", photoErr);
+        }
+      }
+
       toast.success("Log saved to timeline.");
       applyQuickLogV2Refresh(queryClient, {
         targetType: "plant",

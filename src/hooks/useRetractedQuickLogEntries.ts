@@ -15,8 +15,11 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   parseQuickLogRevisionRow,
   type QuickLogRevision,
-  type QuickLogRevisionRow,
 } from "@/lib/quick-log/quickLogRevisionRules";
+import {
+  adaptQuickLogRevisionDatabaseRows,
+  QUICKLOG_REVISION_TABLE,
+} from "@/lib/quickLogRevisionService";
 
 export interface RetractedQuickLogEntry {
   diaryEntryId: string;
@@ -62,13 +65,13 @@ export function useRetractedQuickLogEntries(growId: string | null | undefined) {
 
       const ids = rows.map((r) => r.id);
       const { data: revData } = await supabase
-        .from("quicklog_entry_revisions")
+        .from(QUICKLOG_REVISION_TABLE)
         .select(
           "id, grow_event_id, diary_entry_id, root_id, user_id, actor_id, revision_no, kind, reason_code, reason_note, previous_state, new_state, created_at",
         )
         .eq("kind", "retraction")
         .or(`diary_entry_id.in.(${ids.join(",")}),root_id.in.(${ids.join(",")})`);
-      const revisions = ((revData ?? []) as QuickLogRevisionRow[])
+      const revisions = adaptQuickLogRevisionDatabaseRows(revData)
         .map(parseQuickLogRevisionRow)
         .filter((r): r is QuickLogRevision => r !== null);
       const byDiaryId = new Map<string, QuickLogRevision>();

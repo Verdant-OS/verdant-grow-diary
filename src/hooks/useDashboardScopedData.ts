@@ -25,6 +25,7 @@ import {
   type ConnectedActivationGrowEventRow,
 } from "@/lib/connectedOneTentActivationRules";
 import { resolveQuickLogEventTimelineLabel } from "@/lib/quickLogActivityRules";
+import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
 
 export interface PendingAction {
   id: string;
@@ -75,13 +76,16 @@ export function useDashboardScopedData(growId: string | null | undefined): UseDa
     // latest 5 action_queue_events.
     try {
       const [diaryRes, growEventsRes, eventsRes] = await Promise.all([
-        supabase
-          .from("diary_entries")
-          .select("id,plant_id,entry_at,stage,note,details")
-          .eq("grow_id", growId)
-          .is("retracted_at", null)
-          .order("entry_at", { ascending: false })
-          .limit(5),
+        selectWithRetractionCompat((withRetractionFilter) => {
+          let q = supabase
+            .from("diary_entries")
+            .select("id,plant_id,entry_at,stage,note,details")
+            .eq("grow_id", growId)
+            .order("entry_at", { ascending: false })
+            .limit(5);
+          if (withRetractionFilter) q = q.is("retracted_at", null);
+          return q;
+        }),
         supabase
           .from("grow_events")
           .select("id,tent_id,plant_id,event_type,occurred_at,source,is_deleted,deleted_at,note")

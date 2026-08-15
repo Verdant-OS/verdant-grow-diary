@@ -12,6 +12,7 @@
  */
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
 import {
   diaryRowsToManualSnapshotRecords,
   type ManualSnapshotDiaryRow,
@@ -26,26 +27,38 @@ export const MANUAL_SNAPSHOT_TIMELINE_DEFAULT_LIMIT = 50;
 export type ManualSnapshotTimelineScope =
   { kind: "plant"; plantId: string } | { kind: "tent"; tentId: string };
 
-async function fetchPlantRows(plantId: string, limit: number): Promise<ManualSnapshotDiaryRow[]> {
-  const { data, error } = await supabase
-    .from("diary_entries")
-    .select("id, plant_id, tent_id, entry_at, note, details")
-    .is("retracted_at", null)
-    .eq("plant_id", plantId)
-    .order("entry_at", { ascending: false })
-    .limit(limit);
+export async function fetchPlantManualSnapshotRows(
+  plantId: string,
+  limit: number,
+): Promise<ManualSnapshotDiaryRow[]> {
+  const { data, error } = await selectWithRetractionCompat((withRetractionFilter) => {
+    let q = supabase
+      .from("diary_entries")
+      .select("id, plant_id, tent_id, entry_at, note, details")
+      .eq("plant_id", plantId)
+      .order("entry_at", { ascending: false })
+      .limit(limit);
+    if (withRetractionFilter) q = q.is("retracted_at", null);
+    return q;
+  });
   if (error) throw error;
   return (data ?? []) as ManualSnapshotDiaryRow[];
 }
 
-async function fetchTentRows(tentId: string, limit: number): Promise<ManualSnapshotDiaryRow[]> {
-  const { data, error } = await supabase
-    .from("diary_entries")
-    .select("id, plant_id, tent_id, entry_at, note, details")
-    .is("retracted_at", null)
-    .eq("tent_id", tentId)
-    .order("entry_at", { ascending: false })
-    .limit(limit);
+export async function fetchTentManualSnapshotRows(
+  tentId: string,
+  limit: number,
+): Promise<ManualSnapshotDiaryRow[]> {
+  const { data, error } = await selectWithRetractionCompat((withRetractionFilter) => {
+    let q = supabase
+      .from("diary_entries")
+      .select("id, plant_id, tent_id, entry_at, note, details")
+      .eq("tent_id", tentId)
+      .order("entry_at", { ascending: false })
+      .limit(limit);
+    if (withRetractionFilter) q = q.is("retracted_at", null);
+    return q;
+  });
   if (error) throw error;
   return (data ?? []) as ManualSnapshotDiaryRow[];
 }
@@ -75,8 +88,8 @@ export function useManualSnapshotTimelineCards(
       if (!scope) return [];
       const rows =
         scope.kind === "plant"
-          ? await fetchPlantRows(scope.plantId, limit)
-          : await fetchTentRows(scope.tentId, limit);
+          ? await fetchPlantManualSnapshotRows(scope.plantId, limit)
+          : await fetchTentManualSnapshotRows(scope.tentId, limit);
       const records = diaryRowsToManualSnapshotRecords(rows);
       if (scope.kind === "plant") {
         return selectManualSnapshotsForTimeline({ records, plantId: scope.plantId });

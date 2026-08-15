@@ -15,6 +15,7 @@
  */
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
 import type { LatestManualReading, ManualSensorMetric } from "@/lib/manualSensorFreshnessRules";
 import { MANUAL_SENSOR_METRICS } from "@/lib/manualSensorFreshnessRules";
 import type { ManualSensorLog } from "@/lib/manualSensorChronologyDeltaRules";
@@ -99,14 +100,17 @@ export function deriveManualSensorLogs(rows: ReadonlyArray<DiaryRow>): ManualSen
   return out;
 }
 
-async function fetchRows(plantId: string): Promise<DiaryRow[]> {
-  const { data, error } = await supabase
-    .from("diary_entries")
-    .select("id, entry_at, details")
-    .is("retracted_at", null)
-    .eq("plant_id", plantId)
-    .order("entry_at", { ascending: false })
-    .limit(PLANT_MANUAL_SENSOR_HISTORY_LIMIT);
+export async function fetchPlantManualSensorDiaryRows(plantId: string): Promise<DiaryRow[]> {
+  const { data, error } = await selectWithRetractionCompat((withRetractionFilter) => {
+    let q = supabase
+      .from("diary_entries")
+      .select("id, entry_at, details")
+      .eq("plant_id", plantId)
+      .order("entry_at", { ascending: false })
+      .limit(PLANT_MANUAL_SENSOR_HISTORY_LIMIT);
+    if (withRetractionFilter) q = q.is("retracted_at", null);
+    return q;
+  });
   if (error) throw error;
   return (data ?? []) as DiaryRow[];
 }
@@ -116,7 +120,7 @@ export function usePlantManualSensorHistory(plantId: string | null | undefined) 
     queryKey: ["plant_manual_sensor_history", plantId ?? null],
     enabled: !!plantId,
     queryFn: async (): Promise<PlantManualSensorHistory> => {
-      const rows = await fetchRows(plantId as string);
+      const rows = await fetchPlantManualSensorDiaryRows(plantId as string);
       return deriveLatestManualReadings(rows);
     },
   });
@@ -127,7 +131,7 @@ export function usePlantManualSensorLogs(plantId: string | null | undefined) {
     queryKey: ["plant_manual_sensor_logs", plantId ?? null],
     enabled: !!plantId,
     queryFn: async (): Promise<ManualSensorLog[]> => {
-      const rows = await fetchRows(plantId as string);
+      const rows = await fetchPlantManualSensorDiaryRows(plantId as string);
       return deriveManualSensorLogs(rows);
     },
   });

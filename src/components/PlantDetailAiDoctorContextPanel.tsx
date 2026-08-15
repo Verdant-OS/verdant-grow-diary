@@ -32,6 +32,11 @@ import {
   selectSettledAiDoctorRootZoneObservations,
 } from "@/lib/aiDoctorRootZoneReadinessScopeRules";
 import { ROOT_ZONE_OBSERVATION_CAP } from "@/lib/rootZoneObservationRules";
+import { useSensorReadingsByTents } from "@/hooks/use-sensor-readings";
+import { AI_DOCTOR_CURRENT_SENSOR_ROW_CAP } from "@/lib/aiDoctorCurrentSensorSnapshotRules";
+import { isUuid } from "@/lib/isUuid";
+
+const AI_DOCTOR_CONTEXT_MANUAL_SENSOR_SOURCES = ["manual"] as const;
 
 export interface PlantDetailAiDoctorContextPanelProps {
   plantId: string;
@@ -82,6 +87,20 @@ export default function PlantDetailAiDoctorContextPanel({
   });
   const rootZoneHistory = useRootZoneObservations(rootZoneScope, ROOT_ZONE_OBSERVATION_CAP);
   const rootZoneObservations = selectSettledAiDoctorRootZoneObservations(rootZoneHistory);
+  const tentId = isUuid(plant?.tentId) ? plant.tentId : null;
+  const { byTent: currentReadingsByTent, statusByTent: currentSensorStatusByTent } =
+    useSensorReadingsByTents(
+      tentId ? [tentId] : [],
+      AI_DOCTOR_CURRENT_SENSOR_ROW_CAP,
+      AI_DOCTOR_CONTEXT_MANUAL_SENSOR_SOURCES,
+    );
+  const currentSensorRows = useMemo(
+    () =>
+      tentId && currentSensorStatusByTent[tentId] === "success"
+        ? (currentReadingsByTent[tentId] ?? [])
+        : [],
+    [currentReadingsByTent, currentSensorStatusByTent, tentId],
+  );
 
   const result = useMemo(
     () =>
@@ -89,8 +108,10 @@ export default function PlantDetailAiDoctorContextPanel({
         plant,
         timelineItems: evidenceItems,
         rootZoneObservations,
+        currentSensorRows,
+        tentId,
       }),
-    [plant, evidenceItems, rootZoneObservations],
+    [plant, evidenceItems, rootZoneObservations, currentSensorRows, tentId],
   );
 
   const style = READINESS_STYLES[result.readiness];

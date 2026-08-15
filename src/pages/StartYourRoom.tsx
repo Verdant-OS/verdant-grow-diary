@@ -8,6 +8,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useNavigate } from "@/lib/react-router-compat";
 import { Loader2, Sprout, Box, Leaf, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { useAuth } from "@/store/auth";
 import { useGrows } from "@/store/grows";
@@ -57,6 +58,7 @@ export default function StartYourRoom() {
     entitlement,
     refetch: refetchEntitlements,
   } = useMyEntitlements();
+  const queryClient = useQueryClient();
   const nav = useNavigate();
   const headingRef = useRef<HTMLHeadingElement>(null);
 
@@ -193,18 +195,29 @@ export default function StartYourRoom() {
       .insert({ user_id: user.id, ...payload } as never)
       .select("id,name,grow_id,tent_id")
       .single();
-    setBusy(false);
     if (err || !data) {
+      setBusy(false);
       setError(err?.message ?? "Could not create plant.");
       return;
     }
     // Fail closed if binding somehow dropped (should never happen with payload).
     if (!data.grow_id) {
+      setBusy(false);
       setError(
         "Plant was created without grow context. Use Plant Detail rescue or Lineage Repair.",
       );
       return;
     }
+    // Quick Log is permanently mounted and can still hold the pre-wizard
+    // empty lists. Settle every target selector refresh before exposing the
+    // Finish handoff. A failed refresh remains recoverable inside Quick Log;
+    // it must not create a second plant or strand this completed wizard.
+    await Promise.allSettled([
+      refresh(),
+      queryClient.invalidateQueries({ queryKey: ["tents"] }),
+      queryClient.invalidateQueries({ queryKey: ["plants"] }),
+    ]);
+    setBusy(false);
     setIds((prev) => ({ ...prev, plantId: data.id }));
     toast.success("Plant created and linked");
     setStep(nextStepAfter("plant"));

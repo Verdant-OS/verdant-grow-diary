@@ -37,6 +37,7 @@ import QuickLogEntryIntegrityControls, {
 } from "@/components/QuickLogEntryIntegrityControls";
 import RetractedQuickLogPanel from "@/components/RetractedQuickLogPanel";
 import { cn } from "@/lib/utils";
+import { resolveEffectiveQuickLogCareType } from "@/lib/environmentCheckTimelineViewModel";
 
 type Builder = (entries: ReturnType<typeof normalizeDiaryEntries>) => QuickLogHistoryRow[];
 
@@ -76,10 +77,8 @@ function fmtDate(iso: string | null, fallback: string): string {
 function liftEntries(rawEntries: NormalizeDiaryInput["rawEntries"]) {
   return (rawEntries ?? []).map((raw) => {
     const r = (raw ?? {}) as Record<string, unknown>;
-    if (r.entry_type || r.entryType || r.event_type || r.eventType) return r;
-    const det = (r.details ?? null) as Record<string, unknown> | null;
-    const lifted = det && typeof det === "object" ? det.event_type : undefined;
-    return typeof lifted === "string" && lifted.length > 0 ? { ...r, entry_type: lifted } : r;
+    const effectiveCareType = resolveEffectiveQuickLogCareType(r);
+    return effectiveCareType ? { ...r, entry_type: effectiveCareType } : r;
   });
 }
 

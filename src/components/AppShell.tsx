@@ -129,6 +129,8 @@ export default function AppShell({ children }: { children?: ReactNode }) {
   useEffect(() => {
     function onOpen(e: Event) {
       const detail = (e as CustomEvent<QuickLogPrefill>).detail ?? null;
+      setOpenScopedLog(false);
+      setStructuredOpenIntent(null);
       setPrefill(detail);
       setOpenLog(true);
     }
@@ -154,6 +156,8 @@ export default function AppShell({ children }: { children?: ReactNode }) {
     const startPrefill: QuickLogPrefill | null = startEventType
       ? { ...(routePrefill ?? {}), eventType: startEventType }
       : routePrefill;
+    setOpenScopedLog(false);
+    setStructuredOpenIntent(null);
     setPrefill(guidePrefill ?? startPrefill);
     setOpenLog(true);
     nav(
@@ -319,9 +323,14 @@ export default function AppShell({ children }: { children?: ReactNode }) {
         <button
           onClick={() => {
             if (mobileQuickLogTarget) {
+              setOpenLog(false);
+              setPrefill(null);
+              setLegacyQuickLogSession((session) => session + 1);
               setStructuredOpenIntent(null);
               setOpenScopedLog(true);
             } else {
+              setOpenScopedLog(false);
+              setStructuredOpenIntent(null);
               setPrefill(null);
               setOpenLog(true);
             }

@@ -30,7 +30,7 @@
  *     evidence-window checks that read it directly.
  */
 import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -51,9 +51,11 @@ import {
 } from "@/lib/diaryCalendarViewModel";
 import {
   isEnvironmentCheckTimelineEntry,
+  resolveEffectiveQuickLogCareType,
   type EnvironmentCheckTimelineRawEntry,
 } from "@/lib/environmentCheckTimelineViewModel";
 import WateringHistoryPanel from "@/components/WateringHistoryPanel";
+import { RecentQuickLogActivityPanel } from "@/components/QuickLogHistoryPanels";
 
 const TIMELINE_SRC = readFileSync(resolve(__dirname, "../pages/Timeline.tsx"), "utf8");
 
@@ -489,6 +491,25 @@ describe("recent lane end-to-end (audit #9/#10 regression)", () => {
     );
     expect(envelopeCarriers).toHaveLength(1);
     expect((envelopeCarriers[0] as { id?: unknown }).id).toBe("ge-obs");
+    expect(resolveEffectiveQuickLogCareType(envelopeCarriers[0])).toBe("environment");
+
+    const summary = summarizeDiaryCalendar(
+      buildDiaryCalendarViewModel(lane as unknown as DiaryCalendarRawEntry[]),
+    );
+    expect(summary.counts.environment).toBe(1);
+    expect(summary.totalEvents).toBe(1);
+
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+    render(
+      <QueryClientProvider client={client}>
+        <RecentQuickLogActivityPanel rawEntries={lane} />
+      </QueryClientProvider>,
+    );
+    const section = screen.getByTestId("quicklog-history-section-recent");
+    const rows = within(section).getAllByTestId("quicklog-history-row");
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toHaveAttribute("data-event-type", "environment");
+    expect(within(rows[0]).getByText("Environment check")).toBeInTheDocument();
   });
 
   it("keeps a quicklog_save_event linked companion standalone when its grow_event parent is never fetched (Symptom Check E2E regression)", () => {

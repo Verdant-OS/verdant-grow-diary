@@ -48,6 +48,42 @@ describe("ManualSensorReadingCard — mandatory review gate", () => {
     insertSpy.mockResolvedValue(undefined);
   });
 
+  it("keeps untouched empty-form guidance neutral", () => {
+    renderCard();
+
+    expect(screen.queryByTestId("manual-reading-errors")).toBeNull();
+    expect(screen.getByText("No metrics entered yet")).toBeInTheDocument();
+    expect(screen.getByTestId("manual-reading-helper-missing-readings")).toHaveTextContent(
+      /missing readings will stay unknown, not healthy/i,
+    );
+  });
+
+  it("shows validation errors after a metric is edited to an invalid value", () => {
+    renderCard();
+
+    setField(/Humidity/i, "120");
+
+    expect(screen.getByTestId("manual-reading-errors")).toHaveTextContent(
+      /humidity must be between 0% and 100%/i,
+    );
+    expect(screen.getByTestId("manual-reading-save")).toBeDisabled();
+    expect(insertSpy).not.toHaveBeenCalled();
+  });
+
+  it("returns validation messaging to pristine after a successful save resets the form", async () => {
+    renderCard();
+    setField(/Air temp/i, "76");
+    setField(/Humidity/i, "55");
+    fireEvent.click(screen.getByTestId("manual-reading-save"));
+    fireEvent.click(screen.getByTestId("manual-sensor-review-confirm"));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("manual-reading-saved-confirmation")).toBeInTheDocument(),
+    );
+    expect(screen.queryByTestId("manual-reading-errors")).toBeNull();
+    expect(screen.getByText("No metrics entered yet")).toBeInTheDocument();
+  });
+
   it("gate does not appear before any save attempt", () => {
     renderCard();
     setField(/Air temp/i, "76");

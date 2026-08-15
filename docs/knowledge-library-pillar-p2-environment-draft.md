@@ -11,10 +11,16 @@ brief and claim map") is also unmet: `KL-002`'s brief is at `draft`, not `review
 evidence editor has approved §8.
 
 An earlier revision of this document labelled itself `drafted`. That was wrong against the
-contract above. It is corrected by relabelling rather than by hurriedly finishing the
-assets, because two of them (§7's **†** items) need the qualified R3 reviewer before an
-author should draw them at all. **Reaching `drafted` requires building the six author-buildable
-assets** (two of the eight are R3-gated) — real, scoped, separable work, not a labelling exercise.
+contract above, and is corrected here. **Reaching `drafted` requires building all eight §7
+assets** — real, scoped, separable work, not a labelling exercise.
+
+A second correction, raised in review of PR #994: an earlier revision said the two **†**
+assets needed qualified R3 approval _before_ an author should draw them. **That created a
+deadlock and contradicted the workflow.** `safety_review` sits _after_ `drafted` in the
+state table (`drafted → evidence_review → cultivation_review → safety_review`), so an asset
+cannot be approved before it exists. The correct handling is the opposite: **the author
+drafts all eight, the two † assets carry a visible pending-safety-approval marker, and they
+are reviewed in the `safety_review` lane** where the contract puts them.
 
 Treat every citation here as a starting claim map, not a cleared source list. Per
 `editorial-workflow.md`'s role table the author cannot be the sole evidence or cultivation
@@ -233,14 +239,36 @@ independent studies covering twelve species between them:
   thermometer operated over **6.0–14.0 µm** with a **post-calibration accuracy of 0.35 °C**,
   against 0.15 °C for the reference thermocouple [S7a, §2.5].
 
-The practical consequence: assuming ~0.98 emissivity is defensible across every crop
-measured so far, and the residual spread (~0.01) contributes far less error than the
-instrument itself. **Note the scale — a ~0.35 °C instrument accuracy is comparable to the
-±0.5 °C air-temperature budget assumed in §3.2, and §3.3 shows that a 1 °C change in leaf
-basis moves leaf VPD by roughly 0.19 kPa.** The leaf measurement is not a free input; it
-carries error of the same order as everything else. Record the instrument, the assumed
-emissivity, the distance and spot size, the light state, and the number and location of
-samples — or the offset is an anecdote.
+**This is a proxy observation that needs verification, not setup guidance.** Emissivity
+clusters near 0.98 across the twelve species measured above; **neither study measured
+cannabis**, so ~0.98 is a starting assumption to be checked, not an established cannabis
+value.
+
+An earlier revision of this section claimed instrument accuracy dominates emissivity
+uncertainty. **That is wrong in a grow room, and the arithmetic shows why.** Emissivity
+error converts to temperature error through the _reflected_ temperature — a hot fixture
+overhead is exactly the case where the term stops being negligible. Using the standard
+radiometric approximation `ΔT ≈ (Δε/ε)·(T⁴ₒᵦⱼ − T⁴ᵣₑ𝆑ₗ)/(4·T³ₒᵦⱼ)` in kelvin, for a leaf at
+24 °C with Δε = 0.01 on ε = 0.98 (**author computation, not a sourced claim**):
+
+| Reflected temperature | Temperature error from a 0.01 emissivity error |
+| --------------------- | ---------------------------------------------: |
+| 24 °C (no gradient)   |                                       0.000 °C |
+| 30 °C                 |                                       0.063 °C |
+| 40 °C                 |                                       0.177 °C |
+| 50 °C                 |                                       0.302 °C |
+| 60 °C                 |                                       0.440 °C |
+
+So against Chen's 0.35 °C instrument accuracy, emissivity uncertainty is negligible in a
+uniform room and **equal to or larger than the instrument** once a fixture or surface above
+the canopy sits at 50–60 °C. Neither term dominates in general; **which one dominates is a
+property of the room**, and a leaf-offset method card that ignores reflected temperature is
+under-reporting its own error.
+
+For scale: §3.3 shows a 1 °C change in leaf basis moves leaf VPD by roughly 0.19 kPa. The
+leaf measurement is not a free input. Record the instrument, the assumed emissivity, **the
+reflected/background temperature**, the distance and spot size, the light state, and the
+number and location of samples — or the offset is an anecdote.
 
 ## 4. Start paths
 
@@ -271,14 +299,14 @@ samples — or the offset is an anecdote.
 
   **Each authority defines its own averaging period — they are not interchangeable:**
 
-  | Authority            | Long-term limit         | Its averaging period                      | Short-term                | Status                    |
-  | -------------------- | ----------------------- | ----------------------------------------- | ------------------------- | ------------------------- |
-  | **Federal OSHA PEL** | 5,000 ppm (9,000 mg/m³) | 8-hour TWA                                | **none listed**           | Enforceable federal limit |
-  | Cal/OSHA PEL         | 5,000 ppm               | 8-hour TWA                                | 30,000 ppm (STEL, 15-min) | Enforceable in California |
-  | NIOSH REL            | 5,000 ppm               | **up to a 10-hour workday, 40-hour week** | 30,000 ppm (ST, 15-min)   | Recommendation, not law   |
-  | ACGIH TLV            | 5,000 ppm               | 8-hour TWA                                | 30,000 ppm (ST)           | Consensus guideline       |
+  | Authority            | Long-term limit         | Its averaging period                      | Short-term                                          | Status                    |
+  | -------------------- | ----------------------- | ----------------------------------------- | --------------------------------------------------- | ------------------------- |
+  | **Federal OSHA PEL** | 5,000 ppm (9,000 mg/m³) | 8-hour TWA                                | **none listed**                                     | Enforceable federal limit |
+  | Cal/OSHA PEL         | 5,000 ppm               | 8-hour TWA                                | 30,000 ppm (STEL, 15-min)                           | Enforceable in California |
+  | NIOSH REL            | 5,000 ppm               | **up to a 10-hour workday, 40-hour week** | 30,000 ppm (ST, 15-min)                             | Recommendation, not law   |
+  | ACGIH TLV            | 5,000 ppm               | 8-hour TWA                                | 30,000 ppm — **period NOT VERIFIED for this draft** | Consensus guideline       |
 
-  The concentrations coincide at 5,000 ppm; **the periods do not.** NIOSH defines its REL
+  The concentrations coincide at 5,000 ppm; **the periods do not.** The ACGIH short-term period was not verified for this draft, so **that row must not be used in the §7 alarm card until the qualified reviewer supplies it** — a concentration without an exposure window cannot define an alarm. NIOSH defines its REL
   over a workday of up to 10 hours, so applying that number as an 8-hour average — or
   reading the four rows as one blended limit — misstates the exposure it governs. The
   alarm/escalation card in §7 must carry the authority, the period, and the enforceability
@@ -407,10 +435,11 @@ state notice at the top): a reviewer cannot verify a method, a safety boundary, 
 output from a description of a worksheet.
 
 Per `pillar-pages.md`'s required-assets list for P2. Each needs a cultivation reviewer and
-an evidence editor before it is real; the two marked **†** additionally need the qualified
-R3 reviewer **before an author should draw them at all**, since their content is inside the
-R3 boundary. That is why finishing all eight is not simply a matter of more author time —
-**six are author-buildable now; two are gated.**
+an evidence editor before it is real. The two marked **†** sit inside the R3 boundary and
+additionally require `safety_review` approval — **but that approval comes after drafting,
+not before it.** All eight are author-buildable now; the two † assets must be drafted with
+a visible _pending qualified-safety approval_ marker on their face, and must not be used
+operationally until that lane clears them.
 
 - **Canopy sensor-placement diagram** — representative height, radiant shielding, distance
   from equipment extremes, and the explicit statement that one probe describes one point.
@@ -468,7 +497,7 @@ pre-filled here.
 | C03  | §3.2, §3.3     | The worked air/leaf VPD values, and the span produced by a ±0.5 °C / ±3% RH error budget, computed from C01                                                                                                                                                | R1     | worked example          | Derived                                                                                               | S1 (`defines_method`)                                                                                                                                                          | Author-computed; the error budget is a **stated assumption**, not a datasheet claim |
 | C04a | §6             | Indoor cannabis inflorescence yield rose linearly 116→519 g·m⁻² (4.5×) as canopy PPFD rose 120→1,800 µmol·m⁻²·s⁻¹ over an 81-day flowering stage; an independent group reported inflorescence dry-matter production likewise rising 600→1,200 µmol·m⁻²·s⁻¹ | R2     | cultivation outcome     | Supported across sources                                                                              | S2 ("Yield and Quality", Fig. 7A — `supports`); S9 (`supports`, **independent group**)                                                                                         | **Direct cannabis, two independent groups**                                         |
 | C04b | §6             | Whether PPFD affects cannabinoid **potency** (concentration) is **unresolved**                                                                                                                                                                             | R2     | cultivation outcome     | **Unknown or disputed** — "evidence is limited or conflicting; Verdant does not assign a fixed value" | S2 ("Yield and Quality", Table 1 — no effect across 120–1,800; `supports` no-effect); S9 (+60% cannabinoid / +40% terpenoid concentration across 600–1,200; **`contradicts`**) | **Direct cannabis, two independent groups in conflict**                             |
-| C05  | §5             | Cannabis at 78–98% RH (VPD 0.05/0.25 kPa) versus 37–58% RH (VPD 1.29/0.92 kPa) showed total CBD reduced 4.6×, flowering delayed ~3 weeks, dry biomass 2.71× lower                                                                                          | R2     | cultivation outcome     | Supported across sources (single primary)                                                             | S3 (`supports`, `limits`)                                                                                                                                                      | **Direct cannabis**                                                                 |
+| C05  | §5             | Cannabis at 78–98% RH (VPD 0.05/0.25 kPa) versus 37–58% RH (VPD 1.29/0.92 kPa) showed total CBD reduced 4.6×, flowering delayed ~3 weeks, dry biomass 2.71× lower                                                                                          | R2     | cultivation outcome     | **Field tendency — single-source; cannot satisfy R2 corroboration (see 8.5)**                         | S3 only (Results §3.4/Fig. 5B, §3.3/Fig. 4, §3.2/Fig. 2A — `supports`, `limits`)                                                                                               | **Direct cannabis**                                                                 |
 | C06  | §4, §7         | Federal OSHA PEL for CO2 is 5,000 ppm 8-hr TWA with **no** short-term limit listed; Cal/OSHA, NIOSH (15-min ST) and ACGIH each add 30,000 ppm short-term                                                                                                   | **R3** | controlling requirement | Controlling requirement                                                                               | S4 (`controls_requirement`)                                                                                                                                                    | Regulation                                                                          |
 | C08  | §4             | Cannabis transpires most applied irrigation water into room air, so latent load persists after lights-off when sensible load collapses                                                                                                                     | **R3** | equipment/capacity      | Field tendency                                                                                        | S8 (`supports`)                                                                                                                                                                | **Trade press — below tier**                                                        |
 | C09  | §5             | _Botrytis cinerea_ is favoured by cool temperatures (65–75 °F), high RH, and free water on plant surfaces; extension guidance recommends holding greenhouse RH below 50%                                                                                   | R2     | pathogen risk           | Source-reported                                                                                       | S6 (`supports`)                                                                                                                                                                | Hemp/greenhouse **proxy setting**                                                   |
@@ -727,9 +756,10 @@ mine — but it belongs in the decision.
 ---
 
 **Handoff.** This revision is **not** ready for `evidence_review` — it is pre-`drafted`,
-and the blocker is concrete: **six author-buildable original assets in §7 have not been
-built.** That is the next unit of work, and it needs no decision from anyone; the remaining
-two are R3-gated and wait on the reviewer.
+and the blocker is concrete: **none of the eight original assets in §7 has been built.**
+That is the next unit of work and it needs no decision from anyone — including the two
+R3-boundary assets, which the author drafts with a pending-safety marker and the
+`safety_review` lane clears afterwards.
 
 Two **evidence blockers** also sit ahead of `evidence_review` and are recorded in §8.5:
 C05 is single-source and cannot satisfy R2's corroboration requirement as it stands, and

@@ -207,11 +207,12 @@ re-run rules out a transient **in the connection failure**, on a sample of
 three, and says nothing about the earlier pair. The 12–13 Aug failures are
 already explained separately below.
 
-**The alarm itself is working correctly and is being ignored.** The probe exits 2
-for "could not check" rather than 0, exactly as its own header demands ("A probe
-that cannot reach the database must never be mistaken for a probe that found
-nothing wrong — that is exactly how a six-day outage stays invisible"), and it
-opened a tracking issue on the first failure. Two issues are open and unactioned:
+**The alarm itself is working correctly. What is missing is remediation.** The
+probe exits 2 for "could not check" rather than 0, exactly as its own header
+demands ("A probe that cannot reach the database must never be mistaken for a
+probe that found nothing wrong — that is exactly how a six-day outage stays
+invisible"), and it opened a tracking issue on the first failure. Two issues are
+open, with no human comment and no corrective action on either:
 
 - **#912** — "Migration drift: production is not running every committed
   migration", open since 2026-08-12, last updated 2026-08-15T07:20:04Z, three bot
@@ -219,8 +220,16 @@ opened a tracking issue on the first failure. Two issues are open and unactioned
 - **#916** — "Money migration check (production) requires attention", open since
   2026-08-12.
 
-So the reconciliation question is not "how do we measure drift" but "why has the
-existing measurement been red for four days with nobody reading it".
+State the gap precisely, because the two diagnoses lead somewhere different. What
+is established is that the alarm went red on 2026-08-12 and the underlying secret
+was still wrong on 2026-08-15 — an unremediated fault, four days running. What is
+**not** established is that nobody read it: open issues and an uncorrected secret
+do not measure readership, and in fact the alert has demonstrably been read, since
+Cheek ordered the on-demand re-run recorded above. So the reconciliation question
+is not "how do we measure drift", and not "why did nobody see the alert" — it is
+"why has a seen, correctly-raised alarm gone four days without the one secret edit
+that would clear it". Point the next owner at infrastructure remediation, not at
+notification plumbing.
 
 ### Two stacked defects — observations are `established fact`, remedies are not
 
@@ -239,10 +248,27 @@ database and report the result as production.
 
 The reason nothing caught that: `scripts/probe-migration-drift.mjs` **does not
 import `supabaseDatabaseTargetIdentity.mjs` at all** — verified by search, zero
-references. Every other remote-database gate in this repo binds its credential to
-a pinned project ref before psql runs. This one trusts the secret's name. That
-module's own header states the principle it is missing: _"A secret name is not
-proof of where its connection string points."_
+references. It trusts the secret's name, and that module's own header states the
+principle it is missing: _"A secret name is not proof of where its connection
+string points."_
+
+**Do not read that as "every other gate is protected" — it is not.** An earlier
+draft of this section claimed exactly that and it is false, corrected here after
+a Codex review challenged it. Measured 2026-08-15: **14** files reference the
+identity module — the money/core migration gates
+(`required-money-migrations.yml`, `required-core-migrations.yml`,
+`prefix-diff-sarif.yml`) and the pinned-apply and candidate-number tooling —
+while **25** scripts consume a `SUPABASE_DB_URL`. The binding discipline is
+real, but it covers the money/schema gate family, not the repository.
+
+A second unbound remote workflow, surfaced by that same review and verified
+here: `.github/workflows/sandbox-credit-packs-smoke.yml` passes
+`SUPABASE_DB_URL_SANDBOX` into `scripts/sandbox-credit-packs-smoke.ts`, whose
+`psqlJson` pushes `process.env.SUPABASE_DB_URL` straight into the `psql` argv
+with no identity check. Recorded so it is not lost — it carries the same
+wrong-target class of risk, though its blast radius is smaller (a sandbox
+credential, a read-only smoke). It is **not** part of any approved slice, and
+nothing here authorizes changing it.
 
 **2. The connection dies at the socket, on an IPv6 address.**
 
@@ -294,7 +320,8 @@ directly-observed missing table are different findings, and flattening both to
 `NOT_MEASURED` would erase a verified defect rather than preserve caution.
 
 Four red runs are not four absent measurements; they are four days in which the
-mechanism built to prevent an invisible outage was itself invisible.
+mechanism built to catch an invisible outage was itself unable to see, and was
+left that way.
 
 ---
 

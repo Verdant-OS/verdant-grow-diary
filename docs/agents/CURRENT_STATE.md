@@ -5,7 +5,9 @@
 reconciliation" ask with the finding that the reconciliation tool **already
 exists and has never once completed a measurement** — four scheduled runs since
 2026-08-12, all `failure`, plus an on-demand re-run at Cheek's instruction that
-reproduced the failure byte-for-byte; issues #912 and #916 open and unactioned;
+reproduced the connection failure byte-for-byte (three of the five runs reach
+the socket; the other two never got that far); issues #912 and #916 open and
+unactioned;
 the `verdant-production` environment's `SUPABASE_DB_URL` resolves to the
 **sandbox** project ref and to an unreachable IPv6 address. New section
 "The migration-drift alarm has never once completed a measurement". No new tool
@@ -193,10 +195,17 @@ scheduled runs in its entire history, and all four concluded `failure`.
 byte-for-byte identical `could_not_probe` payload — same sandbox host, same IPv6
 address, same `Network is unreachable`. Steps 1–5 (checkout, Node, psql install,
 `Require SUPABASE_DB_URL`) all passed; step 6 failed in **zero seconds**, dying
-at the socket before its single `SELECT`. This rules out a transient: five runs,
-one failure mode, reproducible on demand. It also means there is no partial
+at the socket before its single `SELECT`. It also means there is no partial
 result to salvage — the ledger question stays unanswerable from CI until the
 secret is repointed.
+
+Be precise about what the re-run rules out. The five runs share an outcome, not
+a cause: **three** of them reached the socket and failed there identically
+(14 Aug scheduled, 15 Aug scheduled, 15 Aug dispatch), while the 12–13 Aug pair
+never reached it at all — the secret guard stopped them first. So the on-demand
+re-run rules out a transient **in the connection failure**, on a sample of
+three, and says nothing about the earlier pair. The 12–13 Aug failures are
+already explained separately below.
 
 **The alarm itself is working correctly and is being ignored.** The probe exits 2
 for "could not check" rather than 0, exactly as its own header demands ("A probe
@@ -213,7 +222,11 @@ opened a tracking issue on the first failure. Two issues are open and unactioned
 So the reconciliation question is not "how do we measure drift" but "why has the
 existing measurement been red for four days with nobody reading it".
 
-### Two stacked defects, both `established fact` from run output and source
+### Two stacked defects — observations are `established fact`, remedies are not
+
+Each defect below separates what the run output and the source actually show
+from what is reasoned on top of it. The observations are `established fact`; the
+proposed fixes are `inference` and are labelled as such.
 
 **1. The workflow named "production" is pointed at the SANDBOX project.** The
 verbatim `detail` in #912's last two comments names the host
@@ -231,13 +244,22 @@ a pinned project ref before psql runs. This one trusts the secret's name. That
 module's own header states the principle it is missing: _"A secret name is not
 proof of where its connection string points."_
 
-**2. IPv6 egress.** The resolved address is
-`2600:1f18:6f7d:e800:d9c0:aca3:3925:8f6` and the failure is `Network is
-unreachable`. GitHub-hosted runners have no IPv6 egress, and Supabase direct
-`db.<ref>.supabase.co` hosts are IPv6-only. `inference`, high confidence: the
-connection string needs the IPv4 Supavisor pooler host
+**2. The connection dies at the socket, on an IPv6 address.**
+
+`established fact`, from the run output: the host resolved to
+`2600:1f18:6f7d:e800:d9c0:aca3:3925:8f6`, the failure was `Network is
+unreachable`, and the step took zero seconds. That is a routing failure before
+any authentication or query, and it is all the run output proves.
+
+`inference`, high confidence, but **not measured here**: GitHub-hosted runners
+have no IPv6 egress and Supabase direct `db.<ref>.supabase.co` hosts are
+IPv6-only, so the connection string needs the IPv4 Supavisor pooler host
 (`aws-<n>-<region>.pooler.supabase.com`) — a form the identity module already
-recognises and already knows how to bind to a pinned ref.
+recognises and already knows how to bind to a pinned ref. Neither the
+runner-egress claim nor the exact replacement host was verified from this repo;
+whoever repoints the secret should take the host from the Supabase dashboard's
+connection panel rather than from this paragraph, and the first green run is
+what confirms the diagnosis.
 
 **The failure mode changed between 13 and 14 August**, which is itself evidence:
 on 12–13 Aug the probe step was `skipped`, meaning `Require SUPABASE_DB_URL`
@@ -258,10 +280,21 @@ production environment fails loudly as a mismatch instead of being measured and
 reported as production. That is a scoped, testable change — but it is **not
 approved**, and is recorded here as a candidate slice, not as work in progress.
 
-Until the secret is corrected, treat every production-schema statement in this
-file as `NOT_MEASURED`. Four red runs are not four absent measurements; they are
-four days in which the mechanism built to prevent an invisible outage was itself
-invisible.
+Until the secret is corrected, the **applied-migration ledger** is
+`NOT_MEASURED` — and so is any claim whose only evidence would have come from
+this probe, which means every statement of the form "migration X is/is not live
+in production" that is not backed by a direct observation.
+
+That is deliberately narrower than "every production-schema statement in this
+file". It does **not** downgrade the independent evidence recorded above: the
+Lovable read-only investigation observed `public.quicklog_entry_revisions`
+absent and `diary_entries.retracted_at` / `.retraction_reason` absent by direct
+object lookup, and those keep their own labels. A blocked ledger check and a
+directly-observed missing table are different findings, and flattening both to
+`NOT_MEASURED` would erase a verified defect rather than preserve caution.
+
+Four red runs are not four absent measurements; they are four days in which the
+mechanism built to prevent an invisible outage was itself invisible.
 
 ---
 

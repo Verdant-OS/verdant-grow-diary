@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import { FREE_CAPABILITIES } from "@/lib/entitlements/capabilities";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { clearLocalStorageForTest } from "./helpers/localStorageTestHelper";
 
 const { navMock, fromMock, refreshMock, setActiveGrowIdMock, entitlementState } = vi.hoisted(
   () => ({
@@ -80,7 +81,7 @@ beforeEach(() => {
   refreshMock.mockClear();
   setActiveGrowIdMock.mockClear();
   entitlementState.capabilities = FREE_CAPABILITIES;
-  window.localStorage.clear();
+  clearLocalStorageForTest();
 
   fromMock.mockImplementation((table: keyof typeof INSERT_RESULTS) => ({
     insert: () => ({

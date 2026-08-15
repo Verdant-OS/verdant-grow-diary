@@ -10,11 +10,9 @@
  *   - never reference SERVICE_ROLE / service_role / bridge tokens /
  *     Action Queue writes / AI Doctor / device control.
  *
- * This proves cross-user RLS isolation at the source-code layer: since
- * every query flows through the caller's forwarded OAuth token, User A
- * can never see User B's rows unless RLS is intentionally weakened at
- * the DB (a separate change out of scope for this slice). Combined
- * with existing user_roles / RLS harnesses, this guards the surface.
+ * Query ordering is verified by executing the exported tool and shared read
+ * model in dedicated recording-client tests. Source scans remain only for
+ * static trust-boundary properties that cannot be meaningfully exercised here.
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";

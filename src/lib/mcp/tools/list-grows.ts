@@ -3,6 +3,9 @@
  *
  * RLS-scoped through the caller's OAuth token. No writes, no AI calls,
  * no device control. Safe for cautious agent use.
+ *
+ * Ordering is deterministic: updated_at DESC, then id DESC as the unique
+ * tie-breaker so equal timestamps cannot flip order between calls.
  */
 import { defineTool } from "@lovable.dev/mcp-js";
 import { z } from "zod";
@@ -32,6 +35,7 @@ export default defineTool({
       .from("grows")
       .select("id,name,stage,grow_type,is_archived,started_at,created_at,updated_at")
       .order("updated_at", { ascending: false })
+      .order("id", { ascending: false })
       .limit(limit ?? 25);
     if (!includeArchived) query = query.eq("is_archived", false);
     const { data, error } = await query;

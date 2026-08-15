@@ -254,6 +254,21 @@ describe("owner-scoped Operator account read models", () => {
         method: "limit",
         args: [7],
       });
+      expect(calls).toContainEqual({
+        table: "diary_entries",
+        method: "order",
+        args: ["entry_at", { ascending: false }],
+      });
+      expect(calls).toContainEqual({
+        table: "diary_entries",
+        method: "order",
+        args: ["created_at", { ascending: false }],
+      });
+      expect(calls).toContainEqual({
+        table: "diary_entries",
+        method: "order",
+        args: ["id", { ascending: false }],
+      });
     });
 
     it.each([

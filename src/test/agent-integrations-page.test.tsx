@@ -434,6 +434,15 @@ describe("OAuthConsent route regression", () => {
     });
     expect(screen.getByRole("button", { name: /approve/i })).toBeTruthy();
     expect(screen.getByRole("button", { name: /deny/i })).toBeTruthy();
+    // Consent must disclose read-only scope, data categories, safety fence, revoke path.
+    expect(screen.getByTestId("oauth-consent-scope").textContent).toMatch(/grows/i);
+    expect(screen.getByTestId("oauth-consent-scope").textContent).toMatch(/diary/i);
+    expect(screen.getByTestId("oauth-consent-scope").textContent).toMatch(/sensor/i);
+    expect(screen.getByTestId("oauth-consent-safety").textContent).toMatch(/action queue/i);
+    expect(screen.getByTestId("oauth-consent-safety").textContent).toMatch(/ai doctor/i);
+    expect(screen.getByTestId("oauth-consent-safety").textContent).toMatch(/device/i);
+    expect(screen.getByTestId("oauth-consent-revoke").textContent).toMatch(/deny/i);
+    expect(screen.getByTestId("oauth-consent-client-copy").textContent).toMatch(/read-only/i);
     // No session token or details JSON leaks into the visible DOM.
     expect(document.body.textContent).not.toContain("SESSION_STUB");
     expect(document.body.textContent).not.toContain("access_token");

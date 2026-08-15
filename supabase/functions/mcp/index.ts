@@ -53,6 +53,7 @@ var list_grows_default = defineTool({
       .from("grows")
       .select("id,name,stage,grow_type,is_archived,started_at,created_at,updated_at")
       .order("updated_at", { ascending: false })
+      .order("id", { ascending: false })
       .limit(limit ?? 25);
     if (!includeArchived) query = query.eq("is_archived", false);
     const { data, error } = await query;
@@ -395,6 +396,8 @@ async function listRecentDiaryEntriesForOwnedGrow(client, growId, limit) {
     .eq("grow_id", growId)
     .is("retracted_at", null)
     .order("entry_at", { ascending: false })
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
     .limit(normalizeDiaryLimit(limit));
   if (error) {
     return { ok: false, reason: "unavailable", message: error.message };

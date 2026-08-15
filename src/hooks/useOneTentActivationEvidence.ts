@@ -25,6 +25,7 @@ import {
 import { QUICK_LOG_V2_ENTRY_CREATED_EVENT } from "@/lib/quickLogV2EntryCreatedEvent";
 import { useAuth } from "@/store/auth";
 import { buildPrivateGrowQueryKey } from "@/lib/growDataQueryKeyRules";
+import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
 
 /**
  * A scope whose ids are all present. `Required<>` only strips optionality, not
@@ -68,17 +69,22 @@ export function oneTentActivationEvidenceQueryKey(
   ]);
 }
 
+export async function fetchConnectedActivationDiaryRows(growId: string) {
+  return selectWithRetractionCompat((withRetractionFilter) => {
+    let q = supabase
+      .from("diary_entries")
+      .select("id,grow_id,tent_id,plant_id,entry_at,details")
+      .eq("grow_id", growId);
+    if (withRetractionFilter) q = q.is("retracted_at", null);
+    return q.order("entry_at", { ascending: false }).limit(ONE_TENT_ACTIVATION_EVIDENCE_LIMIT);
+  });
+}
+
 async function loadConnectedActivationEvidence(
   scope: QueryableActivationScope,
 ): Promise<ConnectedActivationEvidenceSummary> {
   const [diaryResult, growEventResult] = await Promise.all([
-    supabase
-      .from("diary_entries")
-      .select("id,grow_id,tent_id,plant_id,entry_at,details")
-      .eq("grow_id", scope.growId)
-      .is("retracted_at", null)
-      .order("entry_at", { ascending: false })
-      .limit(ONE_TENT_ACTIVATION_EVIDENCE_LIMIT),
+    fetchConnectedActivationDiaryRows(scope.growId),
     supabase
       .from("grow_events")
       .select("id,grow_id,tent_id,plant_id,occurred_at,event_type,source,is_deleted")

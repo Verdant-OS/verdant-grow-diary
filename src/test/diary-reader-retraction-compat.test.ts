@@ -70,6 +70,7 @@ import {
   fetchTentManualSnapshotRows,
 } from "@/hooks/useManualSnapshotTimelineCards";
 import { fetchPlantManualSensorDiaryRows } from "@/hooks/usePlantManualSensorHistory";
+import { fetchConnectedActivationDiaryRows } from "@/hooks/useOneTentActivationEvidence";
 
 beforeEach(() => {
   harness.results = [];
@@ -121,6 +122,18 @@ describe("manual snapshot / sensor diary readers retraction compat", () => {
       { id: "snap-t", tent_id: "t1" },
     ]);
     expect(harness.calls.map((c) => c.filtered)).toEqual([true, false]);
+  });
+
+  it("retries first-run activation diary evidence without retracted_at", async () => {
+    harness.results = [
+      { data: null, error: MISSING_COLUMN },
+      { data: [{ id: "act-1", grow_id: "g1" }], error: null },
+    ];
+    const result = await fetchConnectedActivationDiaryRows("g1");
+    expect(result.error).toBeNull();
+    expect(result.data).toEqual([{ id: "act-1", grow_id: "g1" }]);
+    expect(harness.calls.map((c) => c.filtered)).toEqual([true, false]);
+    expect(harness.calls[0]?.growId).toBe("g1");
   });
 
   it("retries plant manual-sensor history without retracted_at", async () => {

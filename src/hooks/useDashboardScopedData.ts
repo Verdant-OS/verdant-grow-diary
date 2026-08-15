@@ -80,11 +80,9 @@ export function useDashboardScopedData(growId: string | null | undefined): UseDa
           let q = supabase
             .from("diary_entries")
             .select("id,plant_id,entry_at,stage,note,details")
-            .eq("grow_id", growId)
-            .order("entry_at", { ascending: false })
-            .limit(5);
+            .eq("grow_id", growId);
           if (withRetractionFilter) q = q.is("retracted_at", null);
-          return q;
+          return q.order("entry_at", { ascending: false }).limit(5);
         }),
         supabase
           .from("grow_events")

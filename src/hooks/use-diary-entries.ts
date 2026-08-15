@@ -9,9 +9,9 @@ import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterComp
  */
 export async function fetchDiaryEntries() {
   const { data, error } = await selectWithRetractionCompat((withRetractionFilter) => {
-    let q = supabase.from("diary_entries").select("*").order("entry_at", { ascending: false });
+    let q = supabase.from("diary_entries").select("*");
     if (withRetractionFilter) q = q.is("retracted_at", null);
-    return q;
+    return q.order("entry_at", { ascending: false });
   });
 
   if (error) throw error;

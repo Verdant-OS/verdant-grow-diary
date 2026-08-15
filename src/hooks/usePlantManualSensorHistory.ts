@@ -102,14 +102,9 @@ export function deriveManualSensorLogs(rows: ReadonlyArray<DiaryRow>): ManualSen
 
 export async function fetchPlantManualSensorDiaryRows(plantId: string): Promise<DiaryRow[]> {
   const { data, error } = await selectWithRetractionCompat((withRetractionFilter) => {
-    let q = supabase
-      .from("diary_entries")
-      .select("id, entry_at, details")
-      .eq("plant_id", plantId)
-      .order("entry_at", { ascending: false })
-      .limit(PLANT_MANUAL_SENSOR_HISTORY_LIMIT);
+    let q = supabase.from("diary_entries").select("id, entry_at, details").eq("plant_id", plantId);
     if (withRetractionFilter) q = q.is("retracted_at", null);
-    return q;
+    return q.order("entry_at", { ascending: false }).limit(PLANT_MANUAL_SENSOR_HISTORY_LIMIT);
   });
   if (error) throw error;
   return (data ?? []) as DiaryRow[];

@@ -35,11 +35,9 @@ export async function fetchPlantManualSnapshotRows(
     let q = supabase
       .from("diary_entries")
       .select("id, plant_id, tent_id, entry_at, note, details")
-      .eq("plant_id", plantId)
-      .order("entry_at", { ascending: false })
-      .limit(limit);
+      .eq("plant_id", plantId);
     if (withRetractionFilter) q = q.is("retracted_at", null);
-    return q;
+    return q.order("entry_at", { ascending: false }).limit(limit);
   });
   if (error) throw error;
   return (data ?? []) as ManualSnapshotDiaryRow[];
@@ -53,11 +51,9 @@ export async function fetchTentManualSnapshotRows(
     let q = supabase
       .from("diary_entries")
       .select("id, plant_id, tent_id, entry_at, note, details")
-      .eq("tent_id", tentId)
-      .order("entry_at", { ascending: false })
-      .limit(limit);
+      .eq("tent_id", tentId);
     if (withRetractionFilter) q = q.is("retracted_at", null);
-    return q;
+    return q.order("entry_at", { ascending: false }).limit(limit);
   });
   if (error) throw error;
   return (data ?? []) as ManualSnapshotDiaryRow[];

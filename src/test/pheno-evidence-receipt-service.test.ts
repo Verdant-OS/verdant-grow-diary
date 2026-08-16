@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // so the tests can prove single-query behavior and filter composition.
 const calls: Array<{ method: string; args: unknown[] }> = [];
 let resolveWith: { data: unknown[] | null; error: unknown } = { data: [], error: null };
+let resolveQueue: Array<{ data: unknown[] | null; error: unknown }> = [];
 
 function makeChain() {
   const chain: Record<string, unknown> = {};
@@ -20,7 +21,7 @@ function makeChain() {
   };
   // Thenable terminal — matches PostgREST builder await.
   chain.then = (onFulfilled: (v: unknown) => unknown, onRejected?: (e: unknown) => unknown) =>
-    Promise.resolve(resolveWith).then(onFulfilled, onRejected);
+    Promise.resolve(resolveQueue.shift() ?? resolveWith).then(onFulfilled, onRejected);
   return chain;
 }
 
@@ -43,6 +44,7 @@ beforeEach(() => {
   calls.length = 0;
   fromMock.mockClear();
   resolveWith = { data: [], error: null };
+  resolveQueue = [];
 });
 
 describe("loadPhenoEvidenceReceiptRows — bounded batch read", () => {
@@ -123,6 +125,31 @@ describe("loadPhenoEvidenceReceiptRows — bounded batch read", () => {
     resolveWith = { data: null, error: { message: "boom" } };
     const res = await loadPhenoEvidenceReceiptRows({ huntId: "h", plantIds: ["p1"] });
     expect(res.ok).toBe(false);
+  });
+
+  it("retries without the retracted_at filter on the exact pre-migration error", async () => {
+    resolveQueue = [
+      {
+        data: null,
+        error: { code: "42703", message: "column diary_entries.retracted_at does not exist" },
+      },
+      { data: [{ id: "legacy-receipt" }], error: null },
+    ];
+
+    const result = await loadPhenoEvidenceReceiptRows({ huntId: "hunt-1", plantIds: ["p1"] });
+
+    expect(result.ok).toBe(true);
+    expect(fromMock).toHaveBeenCalledTimes(2);
+    expect(calls.filter((call) => call.method === "is")).toEqual([
+      { method: "is", args: ["retracted_at", null] },
+    ]);
+    expect(
+      calls
+        .filter((call) => call.method === "select")
+        .every((call) => {
+          return !String(call.args[0]).includes("retracted_at");
+        }),
+    ).toBe(true);
   });
 
   it("never sends a client-supplied owner/user id", async () => {

@@ -46,6 +46,16 @@ import { readdirSync, existsSync } from "node:fs";
 import { resolve, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { redactDbUrl } from "./lib/redactDbUrl.mjs";
+import {
+  migrationIdentityFromFilename,
+  parseMigrationLedgerRows,
+  reconcileMigrationLedger,
+} from "./lib/migrationLedgerMatching.mjs";
+import {
+  buildLibpqConnectionEnvironment,
+  sanitizeSupabaseDatabaseUrlForPsql,
+  SupabaseDatabaseTargetIdentityError,
+} from "./lib/supabaseDatabaseTargetIdentity.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const MIGRATIONS_DIR = join(ROOT, "supabase", "migrations");
@@ -59,9 +69,10 @@ const dbUrl =
   process.env.DATABASE_URL;
 
 // Every byte this script emits goes through one of these two. The connection
-// string is an argv element of the psql child, so a failure diagnostic can
-// quote it back at us -- and this output is not merely logged, it is published
-// verbatim into a GitHub issue body by the scheduled workflow.
+// string is sensitive, and this output is not merely logged: it is published
+// verbatim into a GitHub issue body by the scheduled workflow. The psql child
+// receives credentials through an allowlisted environment, never argv, while
+// redaction remains a second line of defence for unexpected diagnostics.
 const say = (line) => console.log(redactDbUrl(line, dbUrl));
 const warn = (line) => console.error(redactDbUrl(line, dbUrl));
 
@@ -88,29 +99,73 @@ function bail(message, detail) {
   process.exit(2);
 }
 
-/** Repo migration versions, from the leading timestamp of each filename. */
-function repoVersions() {
+/** Repo migration identities, derived from each timestamped SQL filename. */
+function repoMigrations() {
   if (!existsSync(MIGRATIONS_DIR)) bail(`missing ${MIGRATIONS_DIR}`);
   const out = new Map();
   for (const name of readdirSync(MIGRATIONS_DIR)) {
     if (!name.endsWith(".sql")) continue;
-    const m = /^(\d{14})/.exec(name);
-    if (!m) continue;
-    out.set(m[1], name);
+    const migration = migrationIdentityFromFilename(name);
+    if (!migration) continue;
+    if (out.has(migration.version)) {
+      bail(
+        "duplicate repository migration version",
+        `more than one SQL migration uses version ${migration.version}`,
+      );
+    }
+    out.set(migration.version, migration);
   }
   return out;
 }
 
-/** Applied versions, read-only, one SELECT. */
-function appliedVersions(url) {
-  const sql = "SELECT version FROM supabase_migrations.schema_migrations ORDER BY version;";
+function psqlEnvironment(connection) {
+  // psql needs process-location and locale basics, not every secret present in
+  // the protected GitHub environment. The explicit libpq fields are built
+  // only after the URL has been bound to Verdant's pinned production ref.
+  const childEnv = {};
+  const pathValue = process.env.PATH ?? process.env.Path;
+  if (typeof pathValue === "string") childEnv.PATH = pathValue;
+  for (const key of [
+    "HOME",
+    "USERPROFILE",
+    "SystemRoot",
+    "SYSTEMROOT",
+    "WINDIR",
+    "TEMP",
+    "TMP",
+    "TMPDIR",
+    "LANG",
+    "LC_ALL",
+    "LC_CTYPE",
+    "SSL_CERT_FILE",
+    "SSL_CERT_DIR",
+  ]) {
+    if (typeof process.env[key] === "string") childEnv[key] = process.env[key];
+  }
+  return {
+    ...childEnv,
+    ...buildLibpqConnectionEnvironment(connection),
+    PGOPTIONS: "-c default_transaction_read_only=on",
+  };
+}
+
+/** Applied migration identities, read-only, one SELECT. */
+function appliedMigrations(connection) {
+  const sql = `
+    SELECT json_build_object(
+      'version', version::text,
+      'name', name::text
+    )::text
+    FROM supabase_migrations.schema_migrations
+    ORDER BY version, name;
+  `;
   let raw;
   try {
-    raw = execFileSync("psql", [url, "-tAc", sql], {
+    raw = execFileSync("psql", ["-X", "-v", "ON_ERROR_STOP=1", "-tAc", sql], {
       stdio: ["ignore", "pipe", "pipe"],
       encoding: "utf8",
       // Belt-and-braces: the session cannot write regardless of this script.
-      env: { ...process.env, PGOPTIONS: "-c default_transaction_read_only=on" },
+      env: psqlEnvironment(connection),
     });
   } catch (error) {
     const stderr = (error && error.stderr) || "";
@@ -131,12 +186,11 @@ function appliedVersions(url) {
     }
     bail("psql query failed", (stderr || String(error)).trim().slice(0, 300));
   }
-  return new Set(
-    raw
-      .split("\n")
-      .map((l) => l.trim())
-      .filter(Boolean),
-  );
+  try {
+    return parseMigrationLedgerRows(raw);
+  } catch (error) {
+    bail("could not parse the migration ledger", String(error && error.message));
+  }
 }
 
 /** Days between a YYYYMMDDHHMMSS version stamp and now. */
@@ -157,19 +211,53 @@ function main() {
     );
   }
 
-  const repo = repoVersions();
-  const applied = appliedVersions(dbUrl);
+  let connection;
+  try {
+    connection = sanitizeSupabaseDatabaseUrlForPsql(dbUrl, "production");
+  } catch (error) {
+    const code =
+      error instanceof SupabaseDatabaseTargetIdentityError
+        ? error.code
+        : "identity_validation_failed";
+    bail(
+      "database URL does not identify the pinned production project",
+      `target identity rejected (${code}); no database query ran`,
+    );
+  }
 
-  // Full-set diff, not max-version: a runner that skips a failure and
-  // continues leaves a GAP in the middle, which a max comparison misses
-  // entirely.
-  const unapplied = [...repo.keys()].filter((v) => !applied.has(v)).sort();
+  const repo = repoMigrations();
+  const applied = appliedMigrations(connection);
+
+  // Full-set diff, not max-version. Historical source-contract markers retained
+  // for the existing regression suite:
+  // !isMigrationRecorded(migration, applied)
+  // unapplied.filter((v) => v < maxApplied)
+  //
+  // The implementation now reconciles both complete sets once. Per-migration
+  // OR matching lets one shifted Lovable row satisfy two adjacent repository
+  // migrations: its name identifies the migration that ran while its shifted
+  // numeric version can equal a second migration that never ran. Full-set
+  // reconciliation enforces one ledger row <-> one repository migration and
+  // makes exact names authoritative over shifted versions.
+  let reconciliation;
+  try {
+    reconciliation = reconcileMigrationLedger([...repo.values()], applied);
+  } catch (error) {
+    bail("could not reconcile the migration ledger", String(error && error.message));
+  }
+
+  const unappliedMigrations = reconciliation.unmatched_migrations;
+  const unapplied = unappliedMigrations.map((migration) => migration.version);
   const newestRepo = [...repo.keys()].sort().at(-1) ?? null;
-  const maxApplied = [...applied].sort().at(-1) ?? null;
+  // GAP status is based on matched repository identity, never raw ledger
+  // versions. A shifted ledger timestamp may be newer than a repository
+  // migration that has not actually run.
+  const maxApplied = reconciliation.latest_matched_migration?.version ?? null;
 
   // A gap is strictly worse than a tail: it means the runner moved PAST
   // something that never ran, so the schema is in a state no one authored.
-  const gaps = maxApplied ? unapplied.filter((v) => v < maxApplied) : [];
+  const gapFiles = new Set(reconciliation.gaps.map((migration) => migration.filename));
+  const gaps = reconciliation.gaps.map((migration) => migration.version);
 
   if (asJson) {
     say(
@@ -179,12 +267,15 @@ function main() {
           newest_repo_version: newestRepo,
           max_applied_version: maxApplied,
           unapplied_count: unapplied.length,
-          unapplied: unapplied.map((v) => ({
-            version: v,
-            file: repo.get(v),
-            age_days: ageInDays(v),
-            is_gap: gaps.includes(v),
+          unapplied: unappliedMigrations.map((migration) => ({
+            version: migration.version,
+            file: migration.filename,
+            age_days: ageInDays(migration.version),
+            is_gap: gapFiles.has(migration.filename),
           })),
+          identity_conflict_count: reconciliation.identity_conflicts.length,
+          identity_conflicts: reconciliation.identity_conflicts,
+          unmatched_ledger_row_count: reconciliation.unmatched_ledger_rows.length,
         },
         null,
         2,
@@ -210,8 +301,19 @@ function main() {
       (age !== null ? ` Oldest pending is ${age} day(s) old.` : ""),
   );
   say("\n  Unapplied:");
-  for (const v of unapplied) {
-    say(`    ${v}  ${repo.get(v)}${gaps.includes(v) ? "   <-- GAP" : ""}`);
+  for (const migration of unappliedMigrations) {
+    say(
+      `    ${migration.version}  ${migration.filename}${
+        gapFiles.has(migration.filename) ? "   <-- GAP" : ""
+      }`,
+    );
+  }
+
+  if (reconciliation.identity_conflicts.length > 0) {
+    say(
+      `\n  Note: ${reconciliation.identity_conflicts.length} ledger row(s) had shifted versions ` +
+        "that identified a different repository migration. Exact names won; each row counted once.",
+    );
   }
 
   if (gaps.length > 0) {

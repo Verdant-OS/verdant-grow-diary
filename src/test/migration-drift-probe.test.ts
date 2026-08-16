@@ -23,6 +23,12 @@ import {
   REDACTION_PLACEHOLDER,
   CONNECTION_URL,
 } from "../../scripts/lib/redactDbUrl.mjs";
+import {
+  isMigrationRecorded,
+  migrationIdentityFromFilename,
+  parseMigrationLedgerRows,
+} from "../../scripts/lib/migrationLedgerMatching.mjs";
+import { SUPABASE_DATABASE_TARGETS } from "../../scripts/lib/supabaseDatabaseTargetIdentity.mjs";
 
 const ROOT = resolve(__dirname, "../..");
 const PROBE = "scripts/probe-migration-drift.mjs";
@@ -74,9 +80,20 @@ describe("migration drift probe — cannot silently pass", () => {
     expect(SRC).not.toContain("process.env.SUPABASE_DB_URL_LIVE");
   });
 
-  it("exits 2 when psql is unavailable or the database is unreachable", () => {
+  it("exits 2 when the configured URL cannot identify production", () => {
     const { code } = runProbe(["--url", "postgresql://nobody@127.0.0.1:1/nope"]);
     expect(code).toBe(2);
+  });
+
+  it("rejects the pinned sandbox project before psql can run", () => {
+    const sandboxRef = SUPABASE_DATABASE_TARGETS.sandbox.projectRef;
+    const sandboxUrl = `postgresql://postgres:not-a-real-password@db.${sandboxRef}.supabase.co:5432/postgres`;
+    const { code, stderr } = runProbe(["--url", sandboxUrl]);
+
+    expect(code).toBe(2);
+    expect(stderr).toContain("does not identify the pinned production project");
+    expect(stderr).toContain("project_ref_mismatch");
+    expect(stderr).not.toContain("not-a-real-password");
   });
 
   // Timeout raised from the 5s default: this test spawns three node
@@ -97,7 +114,58 @@ describe("migration drift probe — detection contract", () => {
     // A runner that skips a failure and continues leaves a gap in the middle.
     // Comparing only max-applied would miss it entirely.
     expect(SRC).toContain("Full-set diff, not max-version");
-    expect(SRC).toMatch(/repo\.keys\(\)\]\.filter\(\(v\)\s*=>\s*!applied\.has\(v\)\)/);
+    expect(SRC).toContain("!isMigrationRecorded(migration, applied)");
+  });
+
+  it("accepts each exact ledger convention without a timestamp window", () => {
+    const migration = migrationIdentityFromFilename(
+      "20260721194325_f96507e6-a612-4d26-a99d-2a261f2c0ad5.sql",
+    );
+    expect(migration).not.toBeNull();
+    if (!migration) throw new Error("test migration did not parse");
+
+    expect(
+      isMigrationRecorded(migration, [{ version: "20260721194327", name: migration.stem }]),
+    ).toBe(true);
+    expect(
+      isMigrationRecorded(migration, [{ version: "20260721194327", name: migration.slug }]),
+    ).toBe(true);
+    expect(
+      isMigrationRecorded(migration, [{ version: migration.version, name: "different_name" }]),
+    ).toBe(true);
+  });
+
+  it("does not confuse migrations whose versions are one second apart", () => {
+    const first = migrationIdentityFromFilename(
+      "20260806230020_candidate_number_maintenance_paths.sql",
+    );
+    const second = migrationIdentityFromFilename(
+      "20260806230021_candidate_number_membership_validate.sql",
+    );
+    expect(first).not.toBeNull();
+    expect(second).not.toBeNull();
+    if (!first || !second) throw new Error("test migrations did not parse");
+
+    expect(isMigrationRecorded(first, [{ version: second.version, name: second.slug }])).toBe(
+      false,
+    );
+  });
+
+  it("fails closed when the migration ledger output is malformed", () => {
+    expect(
+      parseMigrationLedgerRows(
+        '{"version":"20260806230020","name":"candidate_number_maintenance_paths"}\n',
+      ),
+    ).toEqual([
+      {
+        version: "20260806230020",
+        name: "candidate_number_maintenance_paths",
+      },
+    ]);
+    expect(() => parseMigrationLedgerRows("not-json")).toThrow(/not valid JSON/);
+    expect(() => parseMigrationLedgerRows('{"version":"20260806230020","name":42}')).toThrow(
+      /invalid name/,
+    );
   });
 
   it("distinguishes a mid-sequence GAP from a stopped tail", () => {
@@ -122,11 +190,12 @@ describe("migration drift probe — detection contract", () => {
 });
 
 /**
- * The probe holds the production connection string and passes it to psql as an
- * argv element. Its output is not merely logged — the scheduled workflow copies
- * it verbatim into a GitHub issue body, which Actions secret masking does not
- * cover. So "does this ever print a credential" is a publication question, not
- * a logging one.
+ * The probe holds the production connection string. Its output is not merely
+ * logged — the scheduled workflow copies it verbatim into a GitHub issue body,
+ * which Actions secret masking does not cover. So "does this ever print a
+ * credential" is a publication question, not a logging one. The current probe
+ * also keeps the URL out of psql argv entirely; the redaction tests preserve a
+ * second line of defence for historical and unexpected failure shapes.
  *
  * The regression: when psql failed WITHOUT writing stderr, the diagnostic fell
  * back to String(error), and for an execFileSync failure that string contains
@@ -136,6 +205,13 @@ const SECRET_PASSWORD = "s3cret-pa55word-long-enough";
 const SECRET_URL = `postgresql://produser:${SECRET_PASSWORD}@db.example.com:5432/postgres`;
 
 describe("migration drift probe — never publishes credentials", () => {
+  it("keeps the database URL out of psql argv", () => {
+    expect(SRC).toContain('execFileSync("psql", ["-X", "-v", "ON_ERROR_STOP=1", "-tAc", sql]');
+    expect(SRC).toContain("buildLibpqConnectionEnvironment(connection)");
+    expect(SRC).not.toContain('execFileSync("psql", [url');
+    expect(SRC).not.toContain('execFileSync("psql", [dbUrl');
+  });
+
   it("redacts the exact String(error) shape that leaked the URL", () => {
     // Reproduce the real failure: a command that exists, exits non-zero, and
     // writes nothing to stderr (psql killed before emitting diagnostics).
@@ -313,7 +389,9 @@ describe("migration drift probe — never publishes credentials", () => {
     () => {
       const shimDir = mkdtempSync(join(tmpdir(), "drift-psql-shim-"));
       writeFileSync(join(shimDir, "psql"), "#!/bin/sh\nexit 3\n", { mode: 0o755 });
-      const { stdout, stderr, code } = runProbe(["--json", "--url", SECRET_URL], {
+      const productionRef = SUPABASE_DATABASE_TARGETS.production.projectRef;
+      const productionUrl = `postgresql://postgres:${SECRET_PASSWORD}@db.${productionRef}.supabase.co:5432/postgres`;
+      const { stdout, stderr, code } = runProbe(["--json", "--url", productionUrl], {
         PATH: `${shimDir}:${process.env.PATH}`,
       });
       expect(code).toBe(2);

@@ -20,10 +20,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "@/lib/react-router-compat";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  isMissingRetractedColumnError,
-  selectWithRetractionCompat,
-} from "@/lib/quick-log/retractionFilterCompat";
 import { useAuth } from "@/store/auth";
 import { alertDetailPath } from "@/lib/routes";
 import {
@@ -58,12 +54,60 @@ import {
 import { resolveQuickLogEventTimelineLabel } from "@/lib/quickLogActivityRules";
 import { buildGrowScopedPlantsOrFilter } from "@/lib/growAttributionRules";
 import { pickSoleLoadedId } from "@/lib/oneTentLoopHandoffIds";
+import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
 
 /** Bounded dedupe window for merging diary rows with the grow_events spine. */
 const ACTIVITY_MERGE_WINDOW = 1000;
 
 type MergeDiaryRow = ConnectedActivationDiaryEntryRow;
 type MergeGrowEventRow = ConnectedActivationGrowEventRow & { note?: string | null };
+
+export async function countGrowDiaryEntries(growId: string): Promise<CountValue> {
+  try {
+    const { count, error } = await selectWithRetractionCompat((withRetractionFilter) => {
+      let query = supabase
+        .from("diary_entries")
+        .select("id", { count: "exact", head: true })
+        .eq("grow_id", growId);
+      if (withRetractionFilter) query = query.is("retracted_at", null);
+      return query;
+    });
+    if (error) return "unavailable";
+    return count ?? 0;
+  } catch {
+    return "unavailable";
+  }
+}
+
+export function fetchGrowDiaryMergeWindow(growId: string) {
+  return selectWithRetractionCompat((withRetractionFilter) => {
+    let query = supabase
+      .from("diary_entries")
+      .select("id,plant_id,entry_at,created_at,details")
+      .eq("grow_id", growId);
+    if (withRetractionFilter) query = query.is("retracted_at", null);
+    return query.order("entry_at", { ascending: false }).limit(ACTIVITY_MERGE_WINDOW);
+  });
+}
+
+export function fetchGrowRecentDiaryRows(growId: string) {
+  return selectWithRetractionCompat((withRetractionFilter) => {
+    let query = supabase
+      .from("diary_entries")
+      .select("id,plant_id,entry_at,stage,note,details")
+      .eq("grow_id", growId);
+    if (withRetractionFilter) query = query.is("retracted_at", null);
+    return query.order("entry_at", { ascending: false }).limit(5);
+  });
+}
+
+export function fetchGrowLastDiaryRows(growId: string) {
+  return selectWithRetractionCompat((withRetractionFilter) => {
+    let query = supabase.from("diary_entries").select("entry_at").eq("grow_id", growId);
+    if (withRetractionFilter) query = query.is("retracted_at", null);
+    return query.order("entry_at", { ascending: false }).limit(1);
+  });
+}
 
 export type GrowOutcomesState = {
   status: "loading" | "ready" | "unavailable";
@@ -209,14 +253,9 @@ export function useGrowDetailData(): UseGrowDetailData {
           .select("id", { count: "exact", head: true })
           .eq("grow_id", growId!) as unknown as CountQuery;
         const q = extra ? extra(base) : base;
-        const first = await q;
-        if (!first.error) return first.count ?? 0;
-        if (table === "diary_entries" && isMissingRetractedColumnError(first.error)) {
-          const retry = await base;
-          if (retry.error) return "unavailable";
-          return retry.count ?? 0;
-        }
-        return "unavailable";
+        const { count, error: cErr } = await q;
+        if (cErr) return "unavailable";
+        return count ?? 0;
       } catch {
         return "unavailable";
       }
@@ -269,7 +308,7 @@ export function useGrowDetailData(): UseGrowDetailData {
     ] = await Promise.all([
       countGrowScopedPlants(),
       countFrom("tents"),
-      countFrom("diary_entries", (q) => q.is("retracted_at", null)),
+      countGrowDiaryEntries(growId),
       countFrom("grow_events", (q) => q.eq("source", "manual").eq("is_deleted", false)),
       countFrom("action_queue", (q) => q.eq("status", "pending_approval")),
       countFrom("action_queue"),
@@ -286,14 +325,7 @@ export function useGrowDetailData(): UseGrowDetailData {
     let diary: CountValue = diaryOnly;
     try {
       const [diaryRowsRes, spineRowsRes] = await Promise.all([
-        selectWithRetractionCompat((withRetractionFilter) => {
-          let q = supabase
-            .from("diary_entries")
-            .select("id,plant_id,entry_at,created_at,details")
-            .eq("grow_id", growId);
-          if (withRetractionFilter) q = q.is("retracted_at", null);
-          return q.order("entry_at", { ascending: false }).limit(ACTIVITY_MERGE_WINDOW);
-        }),
+        fetchGrowDiaryMergeWindow(growId),
         supabase
           .from("grow_events")
           .select(
@@ -342,14 +374,7 @@ export function useGrowDetailData(): UseGrowDetailData {
     // latest 5 action_queue_events + latest 5 alert_events (read-only merge).
     try {
       const [diaryRes, growEventsRes, eventsRes, alertEventsRes] = await Promise.all([
-        selectWithRetractionCompat((withRetractionFilter) => {
-          let q = supabase
-            .from("diary_entries")
-            .select("id,plant_id,entry_at,stage,note,details")
-            .eq("grow_id", growId);
-          if (withRetractionFilter) q = q.is("retracted_at", null);
-          return q.order("entry_at", { ascending: false }).limit(5);
-        }),
+        fetchGrowRecentDiaryRows(growId),
         supabase
           .from("grow_events")
           .select("id,tent_id,plant_id,event_type,occurred_at,source,is_deleted,deleted_at,note")
@@ -495,11 +520,7 @@ export function useGrowDetailData(): UseGrowDetailData {
         { data: lastDiaryRows, error: lastDiaryErr },
         { data: lastEventRows, error: lastEventErr },
       ] = await Promise.all([
-        selectWithRetractionCompat((withRetractionFilter) => {
-          let q = supabase.from("diary_entries").select("entry_at").eq("grow_id", growId);
-          if (withRetractionFilter) q = q.is("retracted_at", null);
-          return q.order("entry_at", { ascending: false }).limit(1);
-        }),
+        fetchGrowLastDiaryRows(growId),
         supabase
           .from("grow_events")
           .select("occurred_at")

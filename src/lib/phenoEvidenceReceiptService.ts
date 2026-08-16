@@ -23,6 +23,7 @@ import {
   type RawPhenoEvidenceDiaryRow,
 } from "@/lib/phenoEvidenceCaptureRules";
 import { applyPostgrestAbortSignal, rethrowIfAbortError } from "@/lib/supabaseAbort";
+import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
 
 /** Max candidates per batch read (≥ one workspace page, cohort max 6). */
 export const PHENO_EVIDENCE_PACKET_MAX_PLANT_IDS = 60;
@@ -86,21 +87,20 @@ export async function loadPhenoEvidenceReceiptRows(input: {
   // The generated types don't model JSON-path filters, so the two
   // `details->>…` filters use the same sanctioned `as never` cast as the
   // existing single-plant read in usePhenoEvidenceCaptureContext.
-  const q = applyPostgrestAbortSignal(
-    supabase
+  const { data, error } = await selectWithRetractionCompat((withRetractionFilter) => {
+    let q = supabase
       .from("diary_entries")
-      .select("id, plant_id, tent_id, grow_id, entry_at, photo_url, details, retracted_at")
-      .in("plant_id", plantIds)
-      .is("retracted_at", null)
+      .select("id, plant_id, tent_id, grow_id, entry_at, photo_url, details")
+      .in("plant_id", plantIds);
+    if (withRetractionFilter) q = q.is("retracted_at", null);
+    q = q
       .eq("details->>kind" as never, PHENO_EVIDENCE_RECEIPT_KIND as never)
       .eq("details->>hunt_id" as never, huntId as never)
       .order("entry_at", { ascending: false })
       .order("id", { ascending: true })
-      .limit(PHENO_EVIDENCE_PACKET_ROW_CAP),
-    input.signal,
-  );
-
-  const { data, error } = await q;
+      .limit(PHENO_EVIDENCE_PACKET_ROW_CAP);
+    return applyPostgrestAbortSignal(q, input.signal);
+  });
 
   rethrowIfAbortError(error);
   if (error) return { ok: false, error: "Could not load manual evidence receipts." };

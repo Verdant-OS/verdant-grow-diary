@@ -61,13 +61,14 @@ import GrowDataLoadError, { GrowDataLoadingState } from "@/components/GrowDataLo
 import DiaryEntryBadges from "@/components/DiaryEntryBadges";
 import EnvironmentCheckTimelineBadge from "@/components/EnvironmentCheckTimelineBadge";
 import EnvironmentCheckSnapshotLinkButton from "@/components/EnvironmentCheckSnapshotLinkButton";
+import {
+  buildEnvironmentCheckDiaryEntryInput,
+  resolveEffectiveQuickLogCareType,
+} from "@/lib/environmentCheckTimelineViewModel";
 import AiDoctorCheckInTimelineBadge from "@/components/AiDoctorCheckInTimelineBadge";
 import AiDoctorReadinessTimelineBadge from "@/components/AiDoctorReadinessTimelineBadge";
 import { isAiDoctorReadinessCheckEvent } from "@/lib/aiDoctorReadinessTimelineBadge";
-import {
-  buildEnvironmentCheckDiaryViewModel,
-  isEnvironmentCheckKind,
-} from "@/lib/environmentCheckViewModel";
+import { buildEnvironmentCheckDiaryViewModel } from "@/lib/environmentCheckViewModel";
 import WateringHistoryPanel from "@/components/WateringHistoryPanel";
 import FeedingHistoryPanel from "@/components/FeedingHistoryPanel";
 import PhotoHistoryPanel from "@/components/PhotoHistoryPanel";
@@ -2215,9 +2216,10 @@ export default function Timeline() {
                         }}
                       >
                         {(() => {
-                          const et = getEventType(
-                            (e.details?.event_type as string | undefined) ?? null,
-                          );
+                          const effectiveCareType = resolveEffectiveQuickLogCareType({
+                            details: e.details,
+                          });
+                          const et = getEventType(effectiveCareType);
                           const Icon = et.icon;
                           const plantName = e.details?.plant_name as string | undefined;
                           // QuickLog writes `sensor_snapshot`; older entries may still use `sensor`.
@@ -2232,8 +2234,7 @@ export default function Timeline() {
                               }
                             | undefined;
                           const remindAt = e.details?.remind_at as string | undefined;
-                          const eventTypeValue =
-                            (e.details?.event_type as string | undefined) ?? null;
+                          const eventTypeValue = effectiveCareType;
                           // Learning-loop rows (follow-up / outcome / decision) carry join
                           // ids (action_queue_id, *_entry_id, source_alert_id) that must
                           // never render as raw chips. Skip the denylist chip loop for them
@@ -2542,36 +2543,20 @@ export default function Timeline() {
                               <AiDoctorCheckInTimelineBadge event={e} />
                               <AiDoctorReadinessTimelineBadge event={e} />
                               {(() => {
-                                const kindValue =
-                                  (e.details?.event_type as string | undefined) ?? null;
-                                if (!isEnvironmentCheckKind(kindValue)) return null;
                                 const details =
                                   (e as { details?: Record<string, unknown> }).details ?? {};
-                                const num = (k: string): number | null => {
-                                  const v = details[k];
-                                  return typeof v === "number" && Number.isFinite(v) ? v : null;
-                                };
-                                const src =
-                                  typeof details.source === "string" ? details.source : "manual";
+                                const diaryInput = buildEnvironmentCheckDiaryEntryInput({
+                                  id: e.id,
+                                  entry_at: e.entry_at,
+                                  note: e.note,
+                                  details,
+                                });
+                                if (!diaryInput) return null;
                                 const vm = buildEnvironmentCheckDiaryViewModel(
-                                  {
-                                    entryId: e.id,
-                                    occurredAt: String(
-                                      (e as { occurred_at?: string; created_at?: string })
-                                        .occurred_at ??
-                                        (e as { created_at?: string }).created_at ??
-                                        "",
-                                    ),
-                                    kind: kindValue ?? "environment",
-                                    snapshot: {
-                                      source: src,
-                                      tempC: num("temp_c") ?? num("tempC"),
-                                      rhPercent: num("rh_percent") ?? num("humidity"),
-                                      vpdKpa: num("vpd_kpa") ?? num("vpdKpa"),
-                                    },
-                                  },
+                                  diaryInput,
                                   temperatureUnit,
                                 );
+                                const snapshotSource = diaryInput.snapshot?.source;
                                 return (
                                   <>
                                     <EnvironmentCheckTimelineBadge viewModel={vm} />
@@ -2580,19 +2565,17 @@ export default function Timeline() {
                                         id: e.id,
                                         tentId: e.tent_id ?? null,
                                         plantId: e.plant_id ?? null,
-                                        capturedAt: String(
-                                          (e as { occurred_at?: string; created_at?: string })
-                                            .occurred_at ??
-                                            (e as { created_at?: string }).created_at ??
-                                            "",
-                                        ),
+                                        capturedAt: diaryInput.occurredAt,
                                         sensorSnapshotId:
                                           typeof (details as { sensor_snapshot_id?: unknown })
                                             .sensor_snapshot_id === "string"
                                             ? ((details as { sensor_snapshot_id?: string })
                                                 .sensor_snapshot_id ?? null)
                                             : null,
-                                        source: typeof src === "string" ? src : null,
+                                        source:
+                                          typeof snapshotSource === "string"
+                                            ? snapshotSource
+                                            : null,
                                       }}
                                       snapshots={[]}
                                     />

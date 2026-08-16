@@ -2,11 +2,9 @@
  * Production diary readers must degrade when diary_entries.retracted_at is
  * missing (Postgres 42703 / migration 20260811090000 not applied).
  *
- * Live founder-dashboard evidence 2026-08-15: Daily Grow Check and Today's
- * Grow Checks went Unavailable because useDiaryEntries filtered the missing
- * column. Founder walk 2026-08-16: the paid date-range diary report showed
- * "Unable to load diary report data" for the same 42703. Timeline already
- * used selectWithRetractionCompat; these readers now share that contract.
+ * #1013 covers Free readers (Daily Grow Check, dashboard, activation,
+ * plant/tent activity). This branch also covers premium report fetchers
+ * that hit the same missing-column failure on the founder walk.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -21,26 +19,31 @@ type QueryResult = { data: unknown; error: { code: string; message: string } | n
 
 const harness = vi.hoisted(() => ({
   results: [] as QueryResult[],
-  calls: [] as Array<{ filtered: boolean; plantId?: string; tentId?: string; growId?: string }>,
+  calls: [] as Array<{
+    filtered: boolean;
+    growId?: string;
+    plantId?: string;
+    tentId?: string;
+  }>,
 }));
 
 function builder() {
   const state = {
     filtered: false,
+    growId: undefined as string | undefined,
     plantId: undefined as string | undefined,
     tentId: undefined as string | undefined,
-    growId: undefined as string | undefined,
   };
   const chain = {
     select: () => chain,
-    eq: (col: string, val: unknown) => {
-      if (col === "plant_id" && typeof val === "string") state.plantId = val;
-      if (col === "tent_id" && typeof val === "string") state.tentId = val;
-      if (col === "grow_id" && typeof val === "string") state.growId = val;
+    eq: (column: string, value: unknown) => {
+      if (column === "grow_id" && typeof value === "string") state.growId = value;
+      if (column === "plant_id" && typeof value === "string") state.plantId = value;
+      if (column === "tent_id" && typeof value === "string") state.tentId = value;
       return chain;
     },
-    is: (col: string) => {
-      if (col === "retracted_at") state.filtered = true;
+    is: (column: string) => {
+      if (column === "retracted_at") state.filtered = true;
       return chain;
     },
     gte: () => chain,
@@ -50,30 +53,31 @@ function builder() {
     then: (resolve: (value: QueryResult) => unknown) => {
       harness.calls.push({
         filtered: state.filtered,
+        growId: state.growId,
         plantId: state.plantId,
         tentId: state.tentId,
-        growId: state.growId,
       });
-      const next = harness.results.shift() ?? { data: [], error: null };
-      return Promise.resolve(next).then(resolve);
+      return Promise.resolve(harness.results.shift() ?? { data: [], error: null }).then(resolve);
     },
   };
   return chain;
 }
 
 vi.mock("@/integrations/supabase/client", () => ({
-  supabase: {
-    from: () => builder(),
-  },
+  supabase: { from: () => builder() },
 }));
 
-import { fetchDiaryEntries } from "@/hooks/use-diary-entries";
 import {
   fetchPlantManualSnapshotRows,
   fetchTentManualSnapshotRows,
 } from "@/hooks/useManualSnapshotTimelineCards";
 import { fetchPlantManualSensorDiaryRows } from "@/hooks/usePlantManualSensorHistory";
+import { fetchDiaryEntries } from "@/hooks/use-diary-entries";
+import { fetchDashboardDiaryRows } from "@/hooks/useDashboardScopedData";
 import { fetchConnectedActivationDiaryRows } from "@/hooks/useOneTentActivationEvidence";
+import { fetchPlantLogDays } from "@/hooks/usePlantLogDays";
+import { fetchPlantRecentActivityRows } from "@/hooks/usePlantRecentActivity";
+import { fetchTentPlantRosterActivityRows } from "@/hooks/useTentPlantRosterActivity";
 import { fetchDiaryRangeReportDiaryRows } from "@/hooks/useDiaryRangeReportData";
 import { fetchPostGrowLearningDiaryRows } from "@/hooks/usePostGrowLearningReportData";
 import {
@@ -87,78 +91,98 @@ beforeEach(() => {
   harness.calls = [];
 });
 
-describe("fetchDiaryEntries retraction compat", () => {
-  it("returns filtered rows when retracted_at exists", async () => {
-    harness.results = [{ data: [{ id: "d1" }], error: null }];
-    await expect(fetchDiaryEntries()).resolves.toEqual([{ id: "d1" }]);
-    expect(harness.calls).toEqual([{ filtered: true }]);
-  });
-
-  it("retries once without the filter on the missing-column error", async () => {
+describe("manual diary readers retraction compatibility", () => {
+  it("retries plant snapshots once without the missing column filter", async () => {
     harness.results = [
       { data: null, error: MISSING_COLUMN },
-      { data: [{ id: "legacy" }], error: null },
+      { data: [{ id: "legacy", plant_id: "plant-1" }], error: null },
     ];
-    await expect(fetchDiaryEntries()).resolves.toEqual([{ id: "legacy" }]);
-    expect(harness.calls.map((c) => c.filtered)).toEqual([true, false]);
+
+    await expect(fetchPlantManualSnapshotRows("plant-1", 50)).resolves.toEqual([
+      { id: "legacy", plant_id: "plant-1" },
+    ]);
+    expect(harness.calls).toEqual([
+      { filtered: true, growId: undefined, plantId: "plant-1", tentId: undefined },
+      { filtered: false, growId: undefined, plantId: "plant-1", tentId: undefined },
+    ]);
   });
 
-  it("does not mask a non-column failure", async () => {
+  it("retries tent snapshots once without the missing column filter", async () => {
+    harness.results = [
+      { data: null, error: MISSING_COLUMN },
+      { data: [{ id: "legacy", tent_id: "tent-1" }], error: null },
+    ];
+
+    await expect(fetchTentManualSnapshotRows("tent-1", 50)).resolves.toEqual([
+      { id: "legacy", tent_id: "tent-1" },
+    ]);
+    expect(harness.calls.map((call) => call.filtered)).toEqual([true, false]);
+  });
+
+  it("keeps manual sensor history available before the migration", async () => {
+    const row = { id: "legacy", entry_at: "2026-08-15T00:00:00.000Z", details: {} };
+    harness.results = [
+      { data: null, error: MISSING_COLUMN },
+      { data: [row], error: null },
+    ];
+
+    await expect(fetchPlantManualSensorDiaryRows("plant-1")).resolves.toEqual([row]);
+    expect(harness.calls.map((call) => call.filtered)).toEqual([true, false]);
+  });
+
+  it("does not hide unrelated provider errors", async () => {
     harness.results = [{ data: null, error: OTHER_ERROR }];
-    await expect(fetchDiaryEntries()).rejects.toMatchObject(OTHER_ERROR);
-    expect(harness.calls).toHaveLength(1);
+
+    await expect(fetchPlantManualSensorDiaryRows("plant-1")).rejects.toMatchObject(OTHER_ERROR);
+    expect(harness.calls.map((call) => call.filtered)).toEqual([true]);
   });
 });
 
-describe("manual snapshot / sensor diary readers retraction compat", () => {
-  it("retries plant snapshot rows without retracted_at", async () => {
+describe("core Free diary readers retraction compatibility", () => {
+  it.each([
+    ["account diary", () => fetchDiaryEntries(), undefined, [{ id: "legacy" }]],
+    ["dashboard", () => fetchDashboardDiaryRows("grow-1"), "grow-1", [{ id: "legacy" }]],
+    [
+      "activation evidence",
+      () => fetchConnectedActivationDiaryRows("grow-1"),
+      "grow-1",
+      [{ id: "legacy" }],
+    ],
+    [
+      "plant recent activity",
+      () => fetchPlantRecentActivityRows("plant-1"),
+      undefined,
+      [{ id: "legacy" }],
+    ],
+    [
+      "tent roster activity",
+      () => fetchTentPlantRosterActivityRows("plant-1"),
+      undefined,
+      [{ id: "legacy" }],
+    ],
+  ] as const)("keeps %s available before the migration", async (_name, load, growId, expected) => {
     harness.results = [
       { data: null, error: MISSING_COLUMN },
-      { data: [{ id: "snap-1", plant_id: "p1" }], error: null },
+      { data: expected, error: null },
     ];
-    await expect(fetchPlantManualSnapshotRows("p1", 50)).resolves.toEqual([
-      { id: "snap-1", plant_id: "p1" },
-    ]);
-    expect(harness.calls.map((c) => c.filtered)).toEqual([true, false]);
-    expect(harness.calls[0]?.plantId).toBe("p1");
+
+    await expect(load()).resolves.toEqual(expected);
+    expect(harness.calls.map((call) => call.filtered)).toEqual([true, false]);
+    if (growId) expect(harness.calls.every((call) => call.growId === growId)).toBe(true);
   });
 
-  it("retries tent snapshot rows without retracted_at", async () => {
+  it("keeps plant log days available before the migration", async () => {
     harness.results = [
       { data: null, error: MISSING_COLUMN },
-      { data: [{ id: "snap-t", tent_id: "t1" }], error: null },
+      { data: [{ entry_at: "2026-08-15T00:00:00.000Z" }], error: null },
     ];
-    await expect(fetchTentManualSnapshotRows("t1", 50)).resolves.toEqual([
-      { id: "snap-t", tent_id: "t1" },
-    ]);
-    expect(harness.calls.map((c) => c.filtered)).toEqual([true, false]);
-  });
 
-  it("retries first-run activation diary evidence without retracted_at", async () => {
-    harness.results = [
-      { data: null, error: MISSING_COLUMN },
-      { data: [{ id: "act-1", grow_id: "g1" }], error: null },
-    ];
-    const result = await fetchConnectedActivationDiaryRows("g1");
-    expect(result.error).toBeNull();
-    expect(result.data).toEqual([{ id: "act-1", grow_id: "g1" }]);
-    expect(harness.calls.map((c) => c.filtered)).toEqual([true, false]);
-    expect(harness.calls[0]?.growId).toBe("g1");
-  });
-
-  it("retries plant manual-sensor history without retracted_at", async () => {
-    harness.results = [
-      { data: null, error: MISSING_COLUMN },
-      { data: [{ id: "hist-1", entry_at: "2026-08-15T00:00:00.000Z", details: {} }], error: null },
-    ];
-    await expect(fetchPlantManualSensorDiaryRows("p1")).resolves.toEqual([
-      { id: "hist-1", entry_at: "2026-08-15T00:00:00.000Z", details: {} },
-    ]);
-    expect(harness.calls.map((c) => c.filtered)).toEqual([true, false]);
+    await expect(fetchPlantLogDays("plant-1")).resolves.toEqual(["2026-08-15T00:00:00.000Z"]);
+    expect(harness.calls.map((call) => call.filtered)).toEqual([true, false]);
   });
 });
 
-describe("premium report diary readers retraction compat", () => {
+describe("premium report diary readers retraction compatibility", () => {
   it("retries date-range diary report rows without retracted_at", async () => {
     harness.results = [
       { data: null, error: MISSING_COLUMN },

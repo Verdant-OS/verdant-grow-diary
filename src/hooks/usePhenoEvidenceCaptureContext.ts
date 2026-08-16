@@ -12,6 +12,7 @@ import {
   type RawPhenoEvidenceDiaryRow,
 } from "@/lib/phenoEvidenceCaptureRules";
 import { applyPostgrestAbortSignal, rethrowIfAbortError } from "@/lib/supabaseAbort";
+import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
 
 export const PHENO_EVIDENCE_CAPTURE_RECEIPT_LIMIT = 200;
 
@@ -44,19 +45,20 @@ async function loadPhenoEvidenceCaptureContext(
     throw new Error("pheno_hunt_unavailable");
   }
 
-  const diaryQuery = applyPostgrestAbortSignal(
-    supabase
-      .from("diary_entries")
-      .select("id, plant_id, tent_id, grow_id, entry_at, photo_url, details, retracted_at")
-      .eq("plant_id", plantId)
-      .is("retracted_at", null)
-      .eq("details->>kind" as never, PHENO_EVIDENCE_RECEIPT_KIND as never)
-      .order("entry_at", { ascending: false })
-      .limit(PHENO_EVIDENCE_CAPTURE_RECEIPT_LIMIT),
-    signal,
+  const { data: diaryRows, error: diaryError } = await selectWithRetractionCompat(
+    (withRetractionFilter) => {
+      let diaryQuery = supabase
+        .from("diary_entries")
+        .select("id, plant_id, tent_id, grow_id, entry_at, photo_url, details")
+        .eq("plant_id", plantId);
+      if (withRetractionFilter) diaryQuery = diaryQuery.is("retracted_at", null);
+      diaryQuery = diaryQuery
+        .eq("details->>kind" as never, PHENO_EVIDENCE_RECEIPT_KIND as never)
+        .order("entry_at", { ascending: false })
+        .limit(PHENO_EVIDENCE_CAPTURE_RECEIPT_LIMIT);
+      return applyPostgrestAbortSignal(diaryQuery, signal);
+    },
   );
-
-  const { data: diaryRows, error: diaryError } = await diaryQuery;
 
   rethrowIfAbortError(diaryError);
   if (diaryError) {

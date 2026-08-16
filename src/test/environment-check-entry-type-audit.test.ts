@@ -105,6 +105,7 @@ describe("Environment Check Quick Log — save payload semantics", () => {
 
     const details = r.payload.p_details as Record<string, unknown> | null;
     expect(details).not.toBeNull();
+    expect(details).toHaveProperty("event_type", "environment");
     expect(details).toHaveProperty("environment_check");
     // CRITICAL: manual env-check is NEVER re-keyed as `sensor`.
     expect(details).not.toHaveProperty("sensor");
@@ -119,6 +120,22 @@ describe("Environment Check Quick Log — save payload semantics", () => {
       expect(json).not.toContain(verb);
     }
     assertNoSecrets(r.payload);
+  });
+
+  it("persists the environment discriminator for a note-only check", () => {
+    const r = buildLegacyQuickLogUnifiedPayload({
+      eventType: "environment",
+      idempotencyKey: "quicklog-v2-test-key-env-note",
+      noteWithHardware: "Tent feels stable today.",
+      plantId: "plant-1",
+      plantTentId: "tent-1",
+      details: {},
+      environmentCheck: null,
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.payload.p_action).toBe("note");
+    expect(r.payload.p_details).toEqual({ event_type: "environment" });
   });
 
   // Regression: the adapter used to hard-code p_temperature_c / p_humidity_pct /

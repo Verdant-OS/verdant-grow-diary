@@ -5,10 +5,16 @@
  * redirects the user here to approve or deny an OAuth client (e.g.
  * ChatGPT, Claude, Cursor) that requested access via the MCP server.
  *
- * Presenter-only: no schema/RLS/Edge/AI/Action Queue writes. Read-only
- * consent orchestration through the app's existing browser Supabase
- * client. If the user is not signed in, we preserve the FULL consent URL
- * (path + query) so /auth returns them here after sign-in.
+ * Presenter-only: no schema/RLS/Edge/AI/Action Queue writes. Consent
+ * orchestration uses the app's existing browser Supabase client. If the user
+ * is not signed in, we preserve the FULL consent URL (path + query) so /auth
+ * returns them here after sign-in.
+ *
+ * Important trust boundary: Verdant's currently exposed MCP TOOLS are
+ * read-only, but the OAuth credential is still an authenticated account
+ * credential. Until the credential is resource-bound, consent copy must not
+ * imply the bearer itself is technically incapable of normal account writes
+ * outside the MCP endpoint.
  */
 import { useEffect, useState } from "react";
 import { useSearchParams } from "@/lib/react-router-compat";
@@ -114,12 +120,53 @@ export default function OAuthConsent() {
   const clientName = details.client?.name ?? "an external app";
   return (
     <main className="min-h-dvh flex items-center justify-center px-6 py-10">
-      <div className="w-full max-w-md space-y-6 rounded-lg border p-6">
-        <div className="space-y-2">
+      <div className="w-full max-w-md space-y-6 rounded-lg border p-6" data-testid="oauth-consent-card">
+        <div className="space-y-3">
           <h1 className="text-xl font-semibold">Connect {clientName} to your Verdant account?</h1>
-          <p className="text-sm text-muted-foreground">
-            {clientName} will be able to use Verdant Grow OS tools as you. All available tools are
-            read-only — no writes, no Action Queue approvals, and no device control.
+          <p className="text-sm text-muted-foreground" data-testid="oauth-consent-client-copy">
+            <strong className="font-medium text-foreground">{clientName}</strong> is asking to
+            connect to your signed-in grower account. Verdant&apos;s current MCP tools provide only
+            the read-only operations listed below, and their queries remain limited by your
+            account&apos;s existing access rules.
+          </p>
+          <div className="rounded-md bg-muted/50 px-3 py-2 text-sm space-y-2" data-testid="oauth-consent-scope">
+            <p className="font-medium text-foreground">What Verdant&apos;s MCP tools can read</p>
+            <ul className="list-disc pl-5 text-muted-foreground space-y-1">
+              <li>Your grows (names, stage, archive status, timestamps)</li>
+              <li>Recent diary entries for grows you own</li>
+              <li>Latest sensor snapshots for tents you own</li>
+            </ul>
+          </div>
+          <div className="rounded-md border border-border px-3 py-2 text-sm space-y-2" data-testid="oauth-consent-safety">
+            <p className="font-medium text-foreground">What Verdant&apos;s current MCP tools do not expose</p>
+            <ul className="list-disc pl-5 text-muted-foreground space-y-1">
+              <li>Diary or grow-record write tools</li>
+              <li>Action Queue approval, dismissal, or editing tools</li>
+              <li>AI Doctor or AI Coach execution tools</li>
+              <li>Device, pump, light, fan, or automation controls</li>
+            </ul>
+          </div>
+          <p
+            className="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-muted-foreground"
+            data-testid="oauth-consent-credential-boundary"
+          >
+            Approval issues an authenticated account credential. Verdant does not currently
+            enforce that credential as usable only at the MCP endpoint. Approve only a client you
+            trust not to reuse it outside Verdant&apos;s MCP tools, where your normal signed-in account
+            permissions may apply.
+          </p>
+          <p className="text-xs text-muted-foreground" data-testid="oauth-consent-revoke">
+            Choose <strong className="font-medium text-foreground">Deny</strong> to cancel now.
+            Verdant does not yet provide a self-service authorized-app disconnect screen. To
+            request revocation of an approved client, contact {" "}
+            <a
+              href="/contact"
+              className="font-medium text-foreground underline underline-offset-2"
+              data-testid="oauth-consent-support-link"
+            >
+              Verdant Support
+            </a>
+            . Signing out is not presented as revoking the OAuth grant.
           </p>
         </div>
         <div className="flex gap-3">

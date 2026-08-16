@@ -9,6 +9,8 @@
 const FEEDING_BASE_MIGRATION = "20260518152526_4236167d-2942-4166-91f3-09be993ca92d.sql";
 const FEEDING_EXTENSION_MIGRATION = "20260612212323_568c55c7-3cd0-46f6-aef7-301e61e61362.sql";
 const QUICKLOG_AUDIT_MIGRATION = "20260610230856_e8544509-5a66-41bc-8beb-39c95d96dde5.sql";
+const QUICKLOG_CORRECTIONS_MIGRATION = "20260811090000_quicklog_corrections_retractions.sql";
+export const QUICKLOG_CORRECTIONS_CATALOG_CONTRACT = "quicklog_corrections_retractions_v1";
 const CORE_SCHEMA_FORWARD_REPAIR = "20260725023000_core_schema_forward_repair.sql";
 const PRODUCTION_SCHEMA_RECONCILIATION = "20260728090000_production_schema_reconciliation.sql";
 
@@ -28,6 +30,16 @@ const quicklogAuditColumn = (column) => ({
   reason:
     `The current Quick Log RPC writes quicklog_audit_events.${column} while ` +
     "recording save and validation outcomes. A partial audit table aborts the save path.",
+});
+
+const quicklogRevisionColumn = (column) => ({
+  table: "quicklog_entry_revisions",
+  column,
+  migration: QUICKLOG_CORRECTIONS_MIGRATION,
+  catalogContract: QUICKLOG_CORRECTIONS_CATALOG_CONTRACT,
+  reason:
+    `Quick Log correction/retraction history and badges read ` +
+    `quicklog_entry_revisions.${column}. A partial ledger silently hides revision truth.`,
 });
 
 const soilMoistureCalibrationColumn = (column) => ({
@@ -102,6 +114,33 @@ export const REQUIRED_CORE_SCHEMA = Object.freeze([
   ].map((column) => feedingColumn(column, FEEDING_EXTENSION_MIGRATION)),
 
   ...["user_id", "idempotency_key", "grow_event_id", "status", "reason"].map(quicklogAuditColumn),
+
+  // Complete append-only correction/retraction ledger contract. The table is
+  // read on Timeline, Tent Detail, and Plant Detail, so partial delivery is a
+  // One-Tent Loop blocker rather than an advisory paid-surface warning.
+  ...[
+    "id",
+    "grow_event_id",
+    "diary_entry_id",
+    "root_id",
+    "user_id",
+    "actor_id",
+    "revision_no",
+    "kind",
+    "reason_code",
+    "reason_note",
+    "previous_state",
+    "new_state",
+    "created_at",
+  ].map(quicklogRevisionColumn),
+  {
+    table: "diary_entries",
+    column: "retracted_at",
+    migration: QUICKLOG_CORRECTIONS_MIGRATION,
+    catalogContract: QUICKLOG_CORRECTIONS_CATALOG_CONTRACT,
+    reason:
+      "Quick Log active-history readers filter diary_entries.retracted_at; its absence silently restores retracted rows or forces compatibility fallbacks.",
+  },
   {
     table: "quicklog_idempotency",
     column: "request_hash",

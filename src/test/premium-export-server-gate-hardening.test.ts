@@ -15,6 +15,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { FunctionsHttpError } from "@supabase/supabase-js";
 
 const FN = readFileSync(
   resolve(process.cwd(), "supabase/functions/premium-export-entitlement/index.ts"),
@@ -101,6 +102,121 @@ describe("hook — reusable typed gate helper", () => {
 
 describe("hook runtime — typed state classification", () => {
   beforeEach(() => vi.resetModules());
+
+  it("classifies a real 403 upgrade_required FunctionsHttpError as denied", async () => {
+    vi.doMock("@/integrations/supabase/client", () => ({
+      supabase: {
+        functions: {
+          invoke: vi.fn(async () => ({
+            data: null,
+            error: new FunctionsHttpError(
+              new Response(
+                JSON.stringify({
+                  ok: false,
+                  reason: "upgrade_required",
+                  display_plan_id: "free",
+                }),
+                { status: 403, headers: { "Content-Type": "application/json" } },
+              ),
+            ),
+          })),
+        },
+      },
+    }));
+    const mod = await import("@/hooks/usePremiumExportServerGate");
+    const r = await mod.checkPremiumExportEntitlement("diary_range_report");
+    expect(r).toEqual({
+      ok: false,
+      state: "denied",
+      reason: "upgrade_required",
+      displayPlanId: "free",
+    });
+  });
+
+  it("keeps a real 403 entitlement_lookup_failed response fail-closed", async () => {
+    vi.doMock("@/integrations/supabase/client", () => ({
+      supabase: {
+        functions: {
+          invoke: vi.fn(async () => ({
+            data: null,
+            error: new FunctionsHttpError(
+              new Response(JSON.stringify({ ok: false, reason: "entitlement_lookup_failed" }), {
+                status: 403,
+                headers: { "Content-Type": "application/json" },
+              }),
+            ),
+          })),
+        },
+      },
+    }));
+    const mod = await import("@/hooks/usePremiumExportServerGate");
+    const r = await mod.checkPremiumExportEntitlement("diary_range_report");
+    expect(r).toEqual({
+      ok: false,
+      state: "verification_failed",
+      reason: "entitlement_lookup_failed",
+      displayPlanId: null,
+    });
+  });
+
+  it.each([
+    ["not_authenticated", 401],
+    ["config_missing", 500],
+    ["unexpected_provider_failure", 500],
+  ])("does not mislabel structured %s failures as upgrade denials", async (reason, status) => {
+    vi.doMock("@/integrations/supabase/client", () => ({
+      supabase: {
+        functions: {
+          invoke: vi.fn(async () => ({
+            data: null,
+            error: new FunctionsHttpError(
+              new Response(JSON.stringify({ ok: false, reason }), {
+                status,
+                headers: { "Content-Type": "application/json" },
+              }),
+            ),
+          })),
+        },
+      },
+    }));
+    const mod = await import("@/hooks/usePremiumExportServerGate");
+    const r = await mod.checkPremiumExportEntitlement("diary_range_report");
+    expect(r).toEqual({
+      ok: false,
+      state: "verification_failed",
+      reason,
+      displayPlanId: null,
+    });
+  });
+
+  it.each([
+    ["method_not_allowed", "invalid_request"],
+    ["scope_denied", "invalid_request"],
+  ])("classifies structured %s without inventing an upgrade result", async (reason, state) => {
+    vi.doMock("@/integrations/supabase/client", () => ({
+      supabase: {
+        functions: {
+          invoke: vi.fn(async () => ({
+            data: null,
+            error: new FunctionsHttpError(
+              new Response(JSON.stringify({ ok: false, reason }), {
+                status: reason === "method_not_allowed" ? 405 : 403,
+                headers: { "Content-Type": "application/json" },
+              }),
+            ),
+          })),
+        },
+      },
+    }));
+    const mod = await import("@/hooks/usePremiumExportServerGate");
+    const r = await mod.checkPremiumExportEntitlement("diary_range_report");
+    expect(r).toEqual({
+      ok: false,
+      state,
+      reason,
+      displayPlanId: null,
+    });
+  });
 
   it("classifies invalid_request denials separately from upgrade_required", async () => {
     vi.doMock("@/integrations/supabase/client", () => ({

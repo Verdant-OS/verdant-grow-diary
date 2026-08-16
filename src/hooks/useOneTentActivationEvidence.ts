@@ -70,20 +70,23 @@ export function oneTentActivationEvidenceQueryKey(
 }
 
 export async function fetchConnectedActivationDiaryRows(growId: string) {
-  return selectWithRetractionCompat((withRetractionFilter) => {
-    let q = supabase
+  const { data, error } = await selectWithRetractionCompat((withRetractionFilter) => {
+    let query = supabase
       .from("diary_entries")
       .select("id,grow_id,tent_id,plant_id,entry_at,details")
       .eq("grow_id", growId);
-    if (withRetractionFilter) q = q.is("retracted_at", null);
-    return q.order("entry_at", { ascending: false }).limit(ONE_TENT_ACTIVATION_EVIDENCE_LIMIT);
+    if (withRetractionFilter) query = query.is("retracted_at", null);
+    return query.order("entry_at", { ascending: false }).limit(ONE_TENT_ACTIVATION_EVIDENCE_LIMIT);
   });
+
+  if (error) throw error;
+  return (data ?? []) as ConnectedActivationDiaryEntryRow[];
 }
 
 async function loadConnectedActivationEvidence(
   scope: QueryableActivationScope,
 ): Promise<ConnectedActivationEvidenceSummary> {
-  const [diaryResult, growEventResult] = await Promise.all([
+  const [diaryEntries, growEventResult] = await Promise.all([
     fetchConnectedActivationDiaryRows(scope.growId),
     supabase
       .from("grow_events")
@@ -95,12 +98,11 @@ async function loadConnectedActivationEvidence(
       .limit(ONE_TENT_ACTIVATION_EVIDENCE_LIMIT),
   ]);
 
-  if (diaryResult.error) throw diaryResult.error;
   if (growEventResult.error) throw growEventResult.error;
 
   return summarizeConnectedActivationEvidence({
     ...scope,
-    diaryEntries: (diaryResult.data ?? []) as ConnectedActivationDiaryEntryRow[],
+    diaryEntries,
     growEvents: (growEventResult.data ?? []) as ConnectedActivationGrowEventRow[],
   });
 }

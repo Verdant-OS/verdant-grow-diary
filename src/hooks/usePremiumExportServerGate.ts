@@ -23,6 +23,7 @@
  */
 import { useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { readEdgeFunctionReasonPayload } from "@/lib/edgeFunctionError";
 
 export type PremiumExportFeature =
   | "ai_doctor_report"
@@ -55,14 +56,19 @@ export const PAYWALL_UPGRADE_COPY = "Upgrade required to export this report.";
 export const PREMIUM_EXPORT_PAYWALL_COPY = `${PAYWALL_HEADLINE} ${PAYWALL_UPGRADE_COPY}`;
 
 function classifyDenial(reason: string | null): PremiumExportGateState {
-  if (reason === "entitlement_lookup_failed") {
-    return "verification_failed";
-  }
-  if (reason === "invalid_request" || reason === "invalid_json") {
+  if (reason === "upgrade_required") return "denied";
+  if (
+    reason === "invalid_request" ||
+    reason === "invalid_json" ||
+    reason === "method_not_allowed" ||
+    reason === "scope_denied"
+  ) {
     return "invalid_request";
   }
   if (reason === "network_error") return "network_error";
-  return "denied";
+  // Authentication, configuration, entitlement lookup, and unknown provider
+  // failures deny the export without pretending the grower needs to upgrade.
+  return "verification_failed";
 }
 
 export async function checkPremiumExportEntitlement(
@@ -91,7 +97,10 @@ export async function checkPremiumExportEntitlement(
         displayPlanId: typeof d.display_plan_id === "string" ? d.display_plan_id : null,
       };
     }
-    const denial = (data ?? null) as Record<string, unknown> | null;
+    const denial =
+      data && typeof data === "object"
+        ? (data as Record<string, unknown>)
+        : await readEdgeFunctionReasonPayload(error);
     const structuredReason = denial && typeof denial.reason === "string" ? denial.reason : null;
     if (structuredReason === null) {
       return {

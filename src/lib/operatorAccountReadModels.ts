@@ -127,11 +127,14 @@ export async function listRecentDiaryEntriesForOwnedGrow(
     };
   }
 
+  // Deterministic: entry_at DESC, created_at DESC, id DESC (unique tie-breaker).
   const { data, error } = await client
     .from("diary_entries")
     .select(DIARY_COLUMNS)
     .eq("grow_id", growId)
     .order("entry_at", { ascending: false })
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
     .limit(normalizeDiaryLimit(limit));
 
   if (error) {
@@ -190,12 +193,15 @@ export async function listRecentDiaryEntriesForOwnedTent(
     };
   }
 
+  // Deterministic: entry_at DESC, created_at DESC, id DESC (unique tie-breaker).
   const { data, error } = await client
     .from("diary_entries")
     .select(DIARY_COLUMNS)
     .eq("grow_id", growId)
     .eq("tent_id", tentId)
     .order("entry_at", { ascending: false })
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
     .limit(normalizeDiaryLimit(limit));
 
   if (error) {

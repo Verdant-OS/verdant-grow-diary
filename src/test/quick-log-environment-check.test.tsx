@@ -156,8 +156,10 @@ describe("Quick Log Environment Check — save behavior", () => {
     expect(saveMock.mock.calls[0]?.[1]).toEqual({
       telemetryIntent: "environment",
     });
-    // No environment_check envelope when nothing measured.
-    expect(payload.p_details).toBeNull();
+    // No measurement envelope when nothing was measured, but the durable
+    // care-type discriminator must survive so Timeline/calendar do not render
+    // this Environment check as a generic Observation.
+    expect(payload.p_details).toEqual({ event_type: "environment" });
     expect(toastSuccess).toHaveBeenCalledWith(
       expect.stringMatching(/^Saved environment check for Verdant Test Plant$/),
     );
@@ -181,6 +183,7 @@ describe("Quick Log Environment Check — save behavior", () => {
     await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
     const payload = saveMock.mock.calls[0]?.[0] as Record<string, unknown>;
     const details = (payload.p_details ?? {}) as Record<string, unknown>;
+    expect(details.event_type).toBe("environment");
     const env = details.environment_check as Record<string, unknown>;
     expect(env.temp_c).toBe(24);
     expect(env.room_temp_f).toBe(75.2);

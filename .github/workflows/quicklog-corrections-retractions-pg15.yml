@@ -1,0 +1,89 @@
+name: Quick Log corrections/retractions PG15
+
+on:
+  pull_request:
+    paths: &quicklog_delivery_paths
+      - "scripts/apply-quicklog-corrections-retractions.mjs"
+      - "scripts/verify-quicklog-corrections-preflight-artifact.mjs"
+      - "scripts/run-quicklog-corrections-retractions-pg15-harness.mjs"
+      - "scripts/assert-required-core-migrations-applied.mjs"
+      - "scripts/apply-pinned-production-migrations.mjs"
+      - "scripts/lib/candidateNumberToolRuntime.mjs"
+      - "scripts/lib/supabaseDatabaseTargetIdentity.mjs"
+      - "scripts/lib/productionSupabaseTls.mjs"
+      - ".github/workflows/apply-quicklog-corrections-retractions.yml"
+      - ".github/workflows/quicklog-corrections-retractions-pg15.yml"
+      - ".github/workflows/required-core-migrations.yml"
+      - "supabase/migrations/20260811090000_quicklog_corrections_retractions.sql"
+      - "src/test/apply-quicklog-corrections-retractions.test.ts"
+      - "src/test/verify-quicklog-corrections-preflight-artifact.test.ts"
+      - "src/test/quicklog-corrections-retractions-pg15-harness.test.ts"
+      - "scripts/required-core-migrations.mjs"
+      - "src/test/required-core-migrations-gate.test.ts"
+      - "src/test/production-supabase-tls.test.ts"
+  push:
+    branches:
+      - verdant-grow-diary
+    paths: *quicklog_delivery_paths
+  merge_group:
+
+permissions:
+  contents: read
+
+jobs:
+  pg15_runtime:
+    name: PostgreSQL 15 runtime contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:15.18@sha256:bb0df8b69f086efa2cbe4b8128df2f368a362bbdadef743731a63dd0f2f24c9e
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: verdant-runtime-only
+          POSTGRES_DB: verdant_quicklog_delivery
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d verdant_quicklog_delivery"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      QUICKLOG_CORRECTIONS_PG15_URL: postgresql://postgres:verdant-runtime-only@127.0.0.1:5432/verdant_quicklog_delivery
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: "22"
+
+      - name: Install and verify PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends postgresql-client
+          psql --version
+
+      - name: Create disposable PostgreSQL harness sentinel
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: verdant-runtime-only
+          PGDATABASE: verdant_quicklog_delivery
+        run: |
+          psql -X -q -v ON_ERROR_STOP=1 --single-transaction --file=- <<'SQL'
+          create schema verdant_quicklog_harness authorization postgres;
+          revoke all on schema verdant_quicklog_harness from public;
+          create table verdant_quicklog_harness.runtime_sentinel (
+            sentinel text primary key
+          );
+          revoke all on table verdant_quicklog_harness.runtime_sentinel from public;
+          insert into verdant_quicklog_harness.runtime_sentinel(sentinel)
+          values ('verdant_quicklog_pg15_disposable_v1');
+          SQL
+
+      - name: Run isolated PostgreSQL 15 harness
+        run: node scripts/run-quicklog-corrections-retractions-pg15-harness.mjs

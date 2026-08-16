@@ -151,8 +151,14 @@ vi.mock("@/components/GrowBreadcrumbs", () => ({ default: () => null }));
 vi.mock("@/components/EntryEditDialog", () => ({ default: () => null }));
 vi.mock("@/components/ScopedGrowBanner", () => ({ default: () => null }));
 vi.mock("@/components/DiaryEntryBadges", () => ({ default: () => null }));
-vi.mock("@/components/EnvironmentCheckTimelineBadge", () => ({ default: () => null }));
-vi.mock("@/components/EnvironmentCheckSnapshotLinkButton", () => ({ default: () => null }));
+vi.mock("@/components/EnvironmentCheckSnapshotLinkButton", () => ({
+  default: ({ entry }: { entry: { capturedAt: string } }) => (
+    <output
+      data-testid="environment-check-snapshot-link-probe"
+      data-captured-at={entry.capturedAt}
+    />
+  ),
+}));
 vi.mock("@/components/AiDoctorCheckInTimelineBadge", () => ({ default: () => null }));
 vi.mock("@/components/AiDoctorReadinessTimelineBadge", () => ({ default: () => null }));
 vi.mock("@/components/WateringHistoryPanel", () => ({ default: () => null }));
@@ -486,6 +492,47 @@ describe("Timeline mounted read-state boundary", () => {
       "1 stage-tagged log",
     );
     expect(screen.getByTestId("timeline-one-tent-loop-next-step-card")).toBeInTheDocument();
+  });
+
+  it("renders measured legacy Environment details from the nested envelope and entry timestamp", async () => {
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "diary_entries") {
+        return {
+          data: [
+            {
+              ...diaryEntry(
+                "entry-environment",
+                "Measured room conditions",
+                "2026-07-20T12:34:56.000Z",
+              ),
+              details: {
+                event_type: "observation",
+                source: "manual",
+                environment_check: {
+                  temp_c: 24,
+                  humidity_pct: 55,
+                  vpd_kpa: 1.2,
+                },
+              },
+            },
+          ],
+          error: null,
+          count: 1,
+        };
+      }
+      return defaultResult(spec);
+    });
+
+    renderTimeline();
+
+    expect(await screen.findByText("Measured room conditions")).toBeInTheDocument();
+    expect(screen.getByTestId("environment-check-timeline-badge")).toBeInTheDocument();
+    expect(screen.getByTestId("environment-check-annotation-climate.vpd")).toBeInTheDocument();
+    expect(screen.queryByTestId("environment-check-annotation-snapshot.empty")).toBeNull();
+    expect(screen.getByTestId("environment-check-snapshot-link-probe")).toHaveAttribute(
+      "data-captured-at",
+      "2026-07-20T12:34:56.000Z",
+    );
   });
 
   it("applies and canonicalizes plantId with source/date params without cross-plant bleed", async () => {

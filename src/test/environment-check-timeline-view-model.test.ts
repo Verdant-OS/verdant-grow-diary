@@ -3,12 +3,15 @@
  * No I/O. No Supabase. No Action Queue. No AI.
  */
 import { describe, it, expect } from "vitest";
+import { buildEnvironmentCheckDiaryViewModel } from "@/lib/environmentCheckViewModel";
 import {
+  buildEnvironmentCheckDiaryEntryInput,
   buildEnvironmentCheckTimelineList,
   buildEnvironmentCheckTimelineViewModel,
   ENVIRONMENT_CHECK_TIMELINE_SOURCE_LABEL,
   ENVIRONMENT_CHECK_TIMELINE_TITLE,
   isEnvironmentCheckTimelineEntry,
+  resolveEffectiveQuickLogCareType,
 } from "@/lib/environmentCheckTimelineViewModel";
 
 const envEntry = {
@@ -120,5 +123,150 @@ describe("environmentCheckTimelineViewModel", () => {
     })!;
     expect(vm.fields).toEqual([]);
     expect(vm.noteSummary).toBe("Plants happy.");
+  });
+
+  it("resolves a legacy Observation with an environment envelope as Environment", () => {
+    expect(
+      resolveEffectiveQuickLogCareType({
+        entry_type: "observation",
+        details: { event_type: "observation", environment_check: { temp_c: 24 } },
+      }),
+    ).toBe("environment");
+  });
+
+  it("keeps Watering authoritative when sensor context is attached", () => {
+    expect(
+      resolveEffectiveQuickLogCareType({
+        entry_type: "watering",
+        details: {
+          event_type: "watering",
+          sensor: { source: "manual" },
+          environment_check: { temp_c: 24 },
+        },
+      }),
+    ).toBe("watering");
+  });
+
+  it("keeps a details-only Watering authoritative over an environment envelope", () => {
+    expect(
+      resolveEffectiveQuickLogCareType({
+        details: {
+          event_type: "watering",
+          environment_check: { temp_c: 24 },
+        },
+      }),
+    ).toBe("watering");
+  });
+
+  it("keeps a details-only Action Follow-up authoritative over environment context", () => {
+    expect(
+      resolveEffectiveQuickLogCareType({
+        details: {
+          event_type: "action_followup",
+          action_queue_id: "private-row-id",
+          environment_check: { temp_c: 24 },
+        },
+      }),
+    ).toBe("action_followup");
+  });
+
+  it("keeps an ordinary Observation out of the Environment lane", () => {
+    expect(
+      resolveEffectiveQuickLogCareType({
+        event_type: "observation",
+        details: { note_kind: "visual" },
+      }),
+    ).toBe("observation");
+  });
+
+  it("fails safely on malformed details without inventing a care type", () => {
+    expect(resolveEffectiveQuickLogCareType({ event_type: "observation", details: "bad" })).toBe(
+      "observation",
+    );
+    expect(resolveEffectiveQuickLogCareType({ details: { environment_check: [] } })).toBeNull();
+    expect(resolveEffectiveQuickLogCareType(null)).toBeNull();
+  });
+
+  it("adapts the nested measured envelope and canonical diary timestamp for rule evaluation", () => {
+    expect(
+      buildEnvironmentCheckDiaryEntryInput({
+        id: "env-measured",
+        entry_at: "2026-06-11T12:34:56Z",
+        details: {
+          event_type: "observation",
+          source: "manual",
+          environment_check: { temp_c: 24, humidity_pct: 55, vpd_kpa: 1.2 },
+        },
+      }),
+    ).toEqual({
+      entryId: "env-measured",
+      occurredAt: "2026-06-11T12:34:56.000Z",
+      kind: "environment",
+      snapshot: { source: "manual", tempC: 24, rhPercent: 55, vpdKpa: 1.2 },
+    });
+  });
+
+  it("keeps a forged live source manual before Timeline badge evaluation", () => {
+    const input = buildEnvironmentCheckDiaryEntryInput({
+      id: "env-forged-live",
+      entry_at: "2026-06-11T12:34:56Z",
+      details: {
+        event_type: "environment",
+        source: "live",
+        environment_check: {
+          source: "live",
+          temp_c: 24,
+          humidity_pct: 55,
+          vpd_kpa: 1.2,
+        },
+      },
+    });
+
+    expect(input?.snapshot?.source).toBe("manual");
+    expect(buildEnvironmentCheckDiaryViewModel(input!).sourceLabel).toBe("manual");
+  });
+
+  it.each([
+    ["temperature", { temp_c: 44, humidity_pct: 55, vpd_kpa: 1.2 }],
+    ["humidity", { temp_c: 24, humidity_pct: 101, vpd_kpa: 1.2 }],
+    ["VPD", { temp_c: 24, humidity_pct: 55, vpd_kpa: 3.01 }],
+  ])("rejects out-of-range nested %s before Timeline badge evaluation", (_metric, envelope) => {
+    expect(
+      buildEnvironmentCheckDiaryEntryInput({
+        id: "env-out-of-range",
+        entry_at: "2026-06-11T12:34:56Z",
+        details: {
+          event_type: "environment",
+          environment_check: envelope,
+        },
+      }),
+    ).toBeNull();
+  });
+
+  it("converts a legacy Fahrenheit-only envelope once and rejects unusable rows", () => {
+    const converted = buildEnvironmentCheckDiaryEntryInput({
+      id: "env-fahrenheit",
+      occurred_at: "2026-06-11T12:00:00Z",
+      details: {
+        event_type: "environment",
+        environment_check: { room_temp_f: 75.2 },
+      },
+    });
+    expect(converted?.snapshot?.tempC).toBeCloseTo(24, 8);
+    expect(converted?.snapshot?.source).toBe("manual");
+    expect(
+      buildEnvironmentCheckDiaryEntryInput({
+        id: "bad-time",
+        entry_at: "not-a-time",
+        details: { event_type: "environment", environment_check: { temp_c: 24 } },
+      }),
+    ).toBeNull();
+    expect(
+      buildEnvironmentCheckDiaryEntryInput({
+        id: "watering",
+        entry_at: "2026-06-11T12:00:00Z",
+        details: { event_type: "watering", environment_check: { temp_c: 24 } },
+      }),
+    ).toBeNull();
   });
 });

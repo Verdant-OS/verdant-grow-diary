@@ -9,7 +9,6 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
 import { useAuth } from "@/store/auth";
 import type {
   DiaryRangeDiaryRow,
@@ -17,6 +16,7 @@ import type {
   DiaryRangeHarvestRow,
   DiaryRangeSensorReadingRow,
 } from "@/lib/diaryRangeReportRules";
+import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
 
 export type DiaryRangeReportDataStatus = "idle" | "loading" | "ready" | "unavailable";
 

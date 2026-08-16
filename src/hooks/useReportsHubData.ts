@@ -19,7 +19,6 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
 import { useAuth } from "@/store/auth";
 import {
   EMPTY_GROW_OUTCOME_SUMMARY,
@@ -44,6 +43,7 @@ import {
   type ConnectedActivationDiaryEntryRow,
   type ConnectedActivationGrowEventRow,
 } from "@/lib/connectedOneTentActivationRules";
+import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
 
 /** Bounded dedupe window for merging diary rows with the grow_events spine. */
 export const REPORTS_HUB_ACTIVITY_MERGE_WINDOW = 1_000;

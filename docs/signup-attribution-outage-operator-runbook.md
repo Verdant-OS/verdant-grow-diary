@@ -451,6 +451,11 @@ FROM parsed p ORDER BY p.ts;
 -- => only 20260721194325 returns 1. All other eight return 0.
 ```
 
+The scheduled `scripts/probe-migration-drift.mjs` uses this same exact
+stem-or-slug-or-version contract. Its regression suite includes the adjacent
+`20260806230020` / `20260806230021` pair so a timestamp window cannot be
+introduced without failing CI.
+
 ### The full exposure — eight migrations, not three
 
 Every migration in the repo that defines any of the four functions, and what each would do

@@ -10,7 +10,6 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
 import { useAuth } from "@/store/auth";
 import {
   POST_GROW_LESSON_EVENT_TYPE,
@@ -23,6 +22,7 @@ import {
   type PostGrowLearningReportViewModel,
   type PostGrowSensorReadingLike,
 } from "@/lib/postGrowLearningReportRules";
+import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
 
 export type PostGrowReportStatus = "idle" | "loading" | "ready" | "unavailable";
 

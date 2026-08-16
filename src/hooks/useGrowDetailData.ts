@@ -20,6 +20,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "@/lib/react-router-compat";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  isMissingRetractedColumnError,
+  selectWithRetractionCompat,
+} from "@/lib/quick-log/retractionFilterCompat";
 import { useAuth } from "@/store/auth";
 import { alertDetailPath } from "@/lib/routes";
 import {
@@ -205,9 +209,14 @@ export function useGrowDetailData(): UseGrowDetailData {
           .select("id", { count: "exact", head: true })
           .eq("grow_id", growId!) as unknown as CountQuery;
         const q = extra ? extra(base) : base;
-        const { count, error: cErr } = await q;
-        if (cErr) return "unavailable";
-        return count ?? 0;
+        const first = await q;
+        if (!first.error) return first.count ?? 0;
+        if (table === "diary_entries" && isMissingRetractedColumnError(first.error)) {
+          const retry = await base;
+          if (retry.error) return "unavailable";
+          return retry.count ?? 0;
+        }
+        return "unavailable";
       } catch {
         return "unavailable";
       }
@@ -219,10 +228,7 @@ export function useGrowDetailData(): UseGrowDetailData {
     let tErr: unknown = null;
     let tentIds: string[] = [];
     try {
-      const tentLookup = await supabase
-        .from("tents")
-        .select("id")
-        .eq("grow_id", growId!);
+      const tentLookup = await supabase.from("tents").select("id").eq("grow_id", growId!);
       tErr = tentLookup.error;
       tentIds = tErr
         ? []
@@ -280,13 +286,14 @@ export function useGrowDetailData(): UseGrowDetailData {
     let diary: CountValue = diaryOnly;
     try {
       const [diaryRowsRes, spineRowsRes] = await Promise.all([
-        supabase
-          .from("diary_entries")
-          .select("id,plant_id,entry_at,created_at,details")
-          .eq("grow_id", growId)
-          .is("retracted_at", null)
-          .order("entry_at", { ascending: false })
-          .limit(ACTIVITY_MERGE_WINDOW),
+        selectWithRetractionCompat((withRetractionFilter) => {
+          let q = supabase
+            .from("diary_entries")
+            .select("id,plant_id,entry_at,created_at,details")
+            .eq("grow_id", growId);
+          if (withRetractionFilter) q = q.is("retracted_at", null);
+          return q.order("entry_at", { ascending: false }).limit(ACTIVITY_MERGE_WINDOW);
+        }),
         supabase
           .from("grow_events")
           .select(
@@ -335,13 +342,14 @@ export function useGrowDetailData(): UseGrowDetailData {
     // latest 5 action_queue_events + latest 5 alert_events (read-only merge).
     try {
       const [diaryRes, growEventsRes, eventsRes, alertEventsRes] = await Promise.all([
-        supabase
-          .from("diary_entries")
-          .select("id,plant_id,entry_at,stage,note,details")
-          .eq("grow_id", growId)
-          .is("retracted_at", null)
-          .order("entry_at", { ascending: false })
-          .limit(5),
+        selectWithRetractionCompat((withRetractionFilter) => {
+          let q = supabase
+            .from("diary_entries")
+            .select("id,plant_id,entry_at,stage,note,details")
+            .eq("grow_id", growId);
+          if (withRetractionFilter) q = q.is("retracted_at", null);
+          return q.order("entry_at", { ascending: false }).limit(5);
+        }),
         supabase
           .from("grow_events")
           .select("id,tent_id,plant_id,event_type,occurred_at,source,is_deleted,deleted_at,note")
@@ -487,13 +495,11 @@ export function useGrowDetailData(): UseGrowDetailData {
         { data: lastDiaryRows, error: lastDiaryErr },
         { data: lastEventRows, error: lastEventErr },
       ] = await Promise.all([
-        supabase
-          .from("diary_entries")
-          .select("entry_at")
-          .eq("grow_id", growId)
-          .is("retracted_at", null)
-          .order("entry_at", { ascending: false })
-          .limit(1),
+        selectWithRetractionCompat((withRetractionFilter) => {
+          let q = supabase.from("diary_entries").select("entry_at").eq("grow_id", growId);
+          if (withRetractionFilter) q = q.is("retracted_at", null);
+          return q.order("entry_at", { ascending: false }).limit(1);
+        }),
         supabase
           .from("grow_events")
           .select("occurred_at")

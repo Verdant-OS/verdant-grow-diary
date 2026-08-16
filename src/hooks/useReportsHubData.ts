@@ -19,6 +19,7 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
 import { useAuth } from "@/store/auth";
 import {
   EMPTY_GROW_OUTCOME_SUMMARY,
@@ -45,7 +46,40 @@ import {
 } from "@/lib/connectedOneTentActivationRules";
 
 /** Bounded dedupe window for merging diary rows with the grow_events spine. */
-const REPORTS_HUB_ACTIVITY_MERGE_WINDOW = 1_000;
+export const REPORTS_HUB_ACTIVITY_MERGE_WINDOW = 1_000;
+
+export async function fetchReportsHubDiaryTotal(growId: string) {
+  return selectWithRetractionCompat((withRetractionFilter) => {
+    let q = supabase
+      .from("diary_entries")
+      .select("id", { count: "exact", head: true })
+      .eq("grow_id", growId);
+    if (withRetractionFilter) q = q.is("retracted_at", null);
+    return q;
+  });
+}
+
+export async function fetchReportsHubDiaryLast7d(growId: string, sevenDaysAgo: string) {
+  return selectWithRetractionCompat((withRetractionFilter) => {
+    let q = supabase
+      .from("diary_entries")
+      .select("id", { count: "exact", head: true })
+      .eq("grow_id", growId);
+    if (withRetractionFilter) q = q.is("retracted_at", null);
+    return q.gte("entry_at", sevenDaysAgo);
+  });
+}
+
+export async function fetchReportsHubActivityDiaryRows(growId: string) {
+  return selectWithRetractionCompat((withRetractionFilter) => {
+    let q = supabase
+      .from("diary_entries")
+      .select("id,plant_id,entry_at,created_at,details")
+      .eq("grow_id", growId);
+    if (withRetractionFilter) q = q.is("retracted_at", null);
+    return q.order("entry_at", { ascending: false }).limit(REPORTS_HUB_ACTIVITY_MERGE_WINDOW);
+  });
+}
 
 export type ReportsHubDataStatus = "idle" | "loading" | "ready" | "unavailable";
 
@@ -326,27 +360,12 @@ export function useReportsHubData(growId: string | null | undefined): ReportsHub
           .eq("grow_id", growId)
           .eq("status", "open")
           .eq("severity", "warning"),
-        supabase
-          .from("diary_entries")
-          .select("id", { count: "exact", head: true })
-          .eq("grow_id", growId)
-          .is("retracted_at", null),
-        supabase
-          .from("diary_entries")
-          .select("id", { count: "exact", head: true })
-          .eq("grow_id", growId)
-          .is("retracted_at", null)
-          .gte("entry_at", sevenDaysAgo),
+        fetchReportsHubDiaryTotal(growId),
+        fetchReportsHubDiaryLast7d(growId, sevenDaysAgo),
         // Bounded row windows for the diary + grow_events spine merge. The
         // spine is the canonical Quick Log record; companion diary rows are
         // deduped by linkage and identical (plant_id, timestamp) pairs.
-        supabase
-          .from("diary_entries")
-          .select("id,plant_id,entry_at,created_at,details")
-          .eq("grow_id", growId)
-          .is("retracted_at", null)
-          .order("entry_at", { ascending: false })
-          .limit(REPORTS_HUB_ACTIVITY_MERGE_WINDOW),
+        fetchReportsHubActivityDiaryRows(growId),
         supabase
           .from("grow_events")
           .select(

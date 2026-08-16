@@ -10,6 +10,7 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
 import { useAuth } from "@/store/auth";
 import {
   POST_GROW_LESSON_EVENT_TYPE,
@@ -34,6 +35,17 @@ export interface UsePostGrowLearningReportDataResult {
   applyLessonToNextGrow: (
     lesson: string,
   ) => Promise<{ ok: true; actionId: string | null } | { ok: false; message: string }>;
+}
+
+export async function fetchPostGrowLearningDiaryRows(growId: string) {
+  return selectWithRetractionCompat((withRetractionFilter) => {
+    let q = supabase
+      .from("diary_entries")
+      .select("id,note,photo_url,entry_at,details")
+      .eq("grow_id", growId);
+    if (withRetractionFilter) q = q.is("retracted_at", null);
+    return q.order("entry_at", { ascending: false }).limit(250);
+  });
 }
 
 async function signPhotoUrls(rows: PostGrowDiaryLike[]): Promise<PostGrowDiaryLike[]> {
@@ -92,13 +104,7 @@ export function usePostGrowLearningReportData(
           .select("harvested_at,yield_grams,medium,notes")
           .eq("grow_id", growId)
           .order("harvested_at", { ascending: false }),
-        supabase
-          .from("diary_entries")
-          .select("id,note,photo_url,entry_at,details")
-          .eq("grow_id", growId)
-          .is("retracted_at", null)
-          .order("entry_at", { ascending: false })
-          .limit(250),
+        fetchPostGrowLearningDiaryRows(growId),
         tentIds.length > 0
           ? supabase
               .from("sensor_readings")

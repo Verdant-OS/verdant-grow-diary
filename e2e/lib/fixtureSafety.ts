@@ -48,6 +48,12 @@ export interface FixturePageRelationship {
   relatedTentName: string;
 }
 
+export interface QuickLogFixtureTargetTuple {
+  plantId: string;
+  tentId: string;
+  growId: string;
+}
+
 /**
  * Known patterns that indicate the URL points at a real / production grow.
  * Extend this list when new known-real plants are identified.
@@ -197,6 +203,36 @@ export function fixturePageRelationshipMatchesExpected(
     errors.push(
       `Expected related tent '${expected.tent}' was not rendered in the Plant Detail tent container.`,
     );
+  }
+
+  return { ok: errors.length === 0, errors };
+}
+
+/**
+ * Fence the alternate plant selected by the write-producing Quick Log smoke.
+ * The initial Plant Detail validation alone is insufficient: the smoke writes
+ * to a second target, so that target must also be visibly test-marked and must
+ * remain inside the exact disposable grow/tent relationship.
+ */
+export function validateSecondaryQuickLogTarget(
+  plantName: string,
+  initial: QuickLogFixtureTargetTuple,
+  selected: QuickLogFixtureTargetTuple,
+): { ok: boolean; errors: string[] } {
+  const errors: string[] = [];
+  const name = plantName.trim();
+
+  if (!name || !/e2e|test/i.test(name)) {
+    errors.push("Second Quick Log plant must include an E2E or Test marker.");
+  }
+  if (selected.plantId === initial.plantId) {
+    errors.push("Second Quick Log plant must differ from the route plant.");
+  }
+  if (selected.growId !== initial.growId) {
+    errors.push("Second Quick Log plant must remain in the exact fixture grow.");
+  }
+  if (selected.tentId !== initial.tentId) {
+    errors.push("Second Quick Log plant must remain in the exact fixture tent.");
   }
 
   return { ok: errors.length === 0, errors };

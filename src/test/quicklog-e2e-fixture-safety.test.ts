@@ -20,6 +20,7 @@ import {
   validateFixtureEnv,
   pageTextMatchesFixture,
   isLikelyRealPlantUrl,
+  validateSecondaryQuickLogTarget,
 } from "../../e2e/lib/fixtureSafety";
 
 const ROOT = path.resolve(__dirname, "../..");
@@ -177,6 +178,28 @@ describe("Disposable E2E fixture safety helpers", () => {
 
     expect(result.ok).toBe(false);
     expect(result.errors.join("\n")).toMatch(/related tent/i);
+  });
+
+  it("accepts only a distinct E2E-marked second plant in the exact same grow and tent", () => {
+    const initial = { plantId: "plant-1", tentId: "tent-1", growId: "grow-1" };
+    expect(
+      validateSecondaryQuickLogTarget("E2E Test Plant 2", initial, {
+        plantId: "plant-2",
+        tentId: "tent-1",
+        growId: "grow-1",
+      }),
+    ).toEqual({ ok: true, errors: [] });
+
+    for (const [label, name, selected] of [
+      ["real plant name", "Granddaddy Purple", { ...initial, plantId: "plant-2" }],
+      ["same plant", "E2E Test Plant", initial],
+      ["other tent", "E2E Test Plant 2", { ...initial, plantId: "plant-2", tentId: "tent-2" }],
+      ["other grow", "E2E Test Plant 2", { ...initial, plantId: "plant-2", growId: "grow-2" }],
+    ] as const) {
+      const result = validateSecondaryQuickLogTarget(name, initial, selected);
+      expect(result.ok, label).toBe(false);
+      expect(result.errors.length, label).toBeGreaterThan(0);
+    }
   });
 });
 
@@ -358,7 +381,11 @@ describe("Workflow: fixture verification gates smoke", () => {
     expect(smoke).toContain("await expect(targetOption).toHaveCount(1)");
     expect(smoke).not.toContain("exactAccessibleNameOptions");
     expect(smoke).not.toContain("new RegExp(TARGET_NAME");
-    expect(smoke).toMatch(/selectedTarget\.growId\s*!==\s*initialTarget\.growId/);
+    expect(smoke).toContain("validateSecondaryQuickLogTarget(");
+    const helper = read("e2e/lib/fixtureSafety.ts");
+    expect(helper).toMatch(/selected\.growId\s*!==\s*initial\.growId/);
+    expect(helper).toMatch(/selected\.tentId\s*!==\s*initial\.tentId/);
+    expect(helper).toMatch(/selected\.plantId\s*===\s*initial\.plantId/);
     expect(smoke).toContain("One-Tent Loop card's CTA dispatches the canonical global prefill");
     expect(smoke).not.toContain("simplified Target/Action/Photo");
     expect(checklist).toContain("second plant in the same tent/grow");

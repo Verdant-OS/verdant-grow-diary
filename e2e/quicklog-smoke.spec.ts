@@ -3,7 +3,11 @@ import fs from "node:fs";
 import path from "node:path";
 import type { Locator, Request } from "@playwright/test";
 import { SmokeChecklistReporter } from "./lib/smokeChecklistReporter";
-import { validateQuickLogFixturePage } from "./lib/fixtureSafety";
+import { validateQuickLogFixturePage, validateSecondaryQuickLogTarget } from "./lib/fixtureSafety";
+import {
+  buildSafeQuickLogRpcDiagnostic,
+  formatSafeQuickLogRpcDiagnostic,
+} from "./lib/quickLogSmokeRpcDiagnostics";
 import { ANALYTICS_CONSENT_STORAGE_KEY } from "../src/lib/analyticsConsent";
 
 /**
@@ -69,6 +73,16 @@ function readObservedQuickLogTargetId(request: Request): string | null {
   } catch {
     return null;
   }
+}
+
+async function readSafeQuickLogRpcDiagnostic(response: import("@playwright/test").Response) {
+  let body: unknown = null;
+  try {
+    body = await response.json();
+  } catch {
+    // Non-JSON PostgREST/proxy bodies remain opaque. Status is still useful.
+  }
+  return buildSafeQuickLogRpcDiagnostic(response.status(), body);
 }
 
 async function readTargetTuple(dialog: Locator): Promise<QuickLogTargetTuple> {
@@ -231,16 +245,18 @@ test.describe("Quick Log smoke checklist", () => {
           )
           .not.toBe(routePlantId);
         const selectedTarget = await readTargetTuple(dialog);
-        if (initialTarget && selectedTarget.growId !== initialTarget.growId) {
-          throw new Error("Selected target plant is not in the routed plant's grow.");
+        if (!initialTarget) {
+          throw new Error("Initial Quick Log target was not resolved before alternate selection.");
         }
-        if (
-          initialTarget &&
-          selectedTarget.plantId === initialTarget.plantId &&
-          selectedTarget.tentId === initialTarget.tentId &&
-          selectedTarget.growId === initialTarget.growId
-        ) {
-          throw new Error("Quick Log target tuple did not change after plant selection.");
+        const secondaryTargetCheck = validateSecondaryQuickLogTarget(
+          TARGET_NAME,
+          initialTarget,
+          selectedTarget,
+        );
+        if (!secondaryTargetCheck.ok) {
+          throw new Error(
+            `Unsafe alternate Quick Log fixture target: ${secondaryTargetCheck.errors.join(" ")}`,
+          );
         }
         return "selected grow/tent/plant target changed";
       });
@@ -374,11 +390,30 @@ test.describe("Quick Log smoke checklist", () => {
           throw new Error("Displayed Quick Log target is missing or invalid before Save.");
         }
         observedRpcTargetId = null;
+        const rpcResponsePromise = page.waitForResponse(
+          (response) => {
+            if (response.request().method() !== "POST") return false;
+            try {
+              return new URL(response.url()).pathname.endsWith("/rpc/quicklog_save_manual");
+            } catch {
+              return false;
+            }
+          },
+          { timeout: 15_000 },
+        );
         await dialog.getByTestId("quick-log-save").click();
         await expect.poll(() => observedRpcTargetId).toBe(displayedTargetId);
-        await expect(dialog.getByTestId("quick-log-post-save")).toBeVisible({
-          timeout: 15_000,
-        });
+        const rpcDiagnostic = await readSafeQuickLogRpcDiagnostic(await rpcResponsePromise);
+        try {
+          await expect(dialog.getByTestId("quick-log-post-save")).toBeVisible({
+            timeout: 15_000,
+          });
+        } catch (error) {
+          const assertion = error instanceof Error ? error.message : "post-save was not visible";
+          throw new Error(
+            `Quick Log RPC receipt: ${formatSafeQuickLogRpcDiagnostic(rpcDiagnostic)}\n${assertion}`,
+          );
+        }
         return "post-save shown and RPC target matched displayed target";
       });
 

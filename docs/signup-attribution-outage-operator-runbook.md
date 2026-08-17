@@ -571,11 +571,12 @@ version/name ledger identity.
 > **OPERATIONAL STATUS: BLOCKED.** Do not dispatch PREFLIGHT until the
 > `verdant-production` environment has (1) an eligible required reviewer, (2)
 > prevent-self-review enabled, and (3) the corrected environment-scoped
-> `SUPABASE_DB_URL`. Never dispatch APPLY until that read-only PREFLIGHT also confirms the
-> migration-ledger compatibility contract described below. The repository pins Verdant's
-> established ledger contract, but this change has not independently measured production's
-> current schema/table owners or ACLs. GitHub's run and artifact APIs authenticate provenance;
-> they do not prove that a human reviewed the database state.
+> `SUPABASE_DB_URL`, and (4) `SUPABASE_DB_CA_CERT_B64` containing the base64-encoded
+> Supabase production Server root certificate. Never dispatch APPLY until that read-only
+> PREFLIGHT also confirms the migration-ledger compatibility contract described below. The
+> repository pins Verdant's established ledger contract, but this change has not independently
+> measured production's current schema/table owners or ACLs. GitHub's run and artifact APIs
+> authenticate provenance; they do not prove that a human reviewed the database state.
 
 1. Merge the delivery workflow to `verdant-grow-diary`. A pull-request or feature-branch
    run is intentionally refused.
@@ -616,8 +617,10 @@ version/name ledger identity.
    only `preflight-receipt.json`; the dependency-free Node verifier validates the ZIP directory,
    member type/name, compression method, declared and actual size, and CRC before parsing. The
    signed archive download receives no GitHub credential and is byte- and
-   decompression-bounded. APPLY then installs its local Postgres client and
-   re-resolves `refs/heads/verdant-grow-diary` at the last step before the runner. If the branch
+   decompression-bounded. Both stages require the protected database URL and CA, decode the CA
+   to the fixed runner-temp path with owner-only permissions, and validate it with OpenSSL before
+   installing the local Postgres client. APPLY then re-resolves
+   `refs/heads/verdant-grow-diary` at the last step before the runner. If the branch
    advanced or cannot be resolved, the runner emits fixed sanitized `DEPLOY_HEAD_ADVANCED`
    evidence and stops before database access. Otherwise it repeats the read-only preflight and
    compares the current state digest with the authenticated artifact digest. Any mismatch stops
@@ -626,9 +629,13 @@ version/name ledger identity.
    summary and evidence artifact before performing the separate disposable-account E2E.
 
 The environment-scoped `SUPABASE_DB_URL` must contain the pooled Postgres URL for the exact
-project. Never paste that URL into a workflow input, log, issue, or artifact. Environment
-approval is the human authorization gate; the receipt binding is a machine provenance and
-state-continuity gate, not a substitute for review.
+project. The same environment must hold `SUPABASE_DB_CA_CERT_B64`, produced by base64-encoding
+the Server root certificate downloaded from that production Supabase project's Dashboard
+without changing its bytes. The workflow exposes only the fixed certificate path to the
+database runner, forces certificate and hostname verification there, and removes the temporary
+certificate on every outcome. Never paste either secret into a workflow input, log, issue, or
+artifact. Environment approval is the human authorization gate; the receipt binding is a
+machine provenance and state-continuity gate, not a substitute for review.
 
 The workflow runs
 `scripts/apply-signup-acquisition-forward-repair.mjs`, which is intentionally not a generic
@@ -653,16 +660,18 @@ The runner fails closed in this order:
 2. for APPLY only, the exact phrase, authenticated prior PREFLIGHT run/artifact, and freshly
    resolved deploy branch head;
 3. exact Supabase project identity derived from the protected URL;
-4. exact LF migration bytes, final newline, SHA-256, and transaction-safety scan;
-5. a bounded, transaction-enforced **read-only** preflight over every accepted ledger
+4. the fixed runner-temp Supabase production CA as an ordinary, non-symlinked, bounded,
+   parseable CA certificate, then forced `sslmode=verify-full` and hostname verification;
+5. exact LF migration bytes, final newline, SHA-256, and transaction-safety scan;
+6. a bounded, transaction-enforced **read-only** preflight over every accepted ledger
    identity, prerequisite, and postcondition;
-6. for an existing partial target table, exact non-repairable compatibility: an ordinary
+7. for an existing partial target table, exact non-repairable compatibility: an ordinary
    permanent, non-partitioned, non-FORCE-RLS table with the three exact columns, PK, FK,
    expected owner relationship, no extra constraints, no unexpected unique/exclusion index,
    no user trigger/rewrite rule/policy/publication/reloption, only repairable ACL principals,
    and only allowlisted existing sources. An absent table is also safe. RLS, client grants,
    the named source CHECK, and functions are repairable by the migration;
-7. exact prerequisites: ordinary permanent `auth.users`, `public.profiles`,
+8. exact prerequisites: ordinary permanent `auth.users`, `public.profiles`,
    `public.subscriptions`, and `public.user_roles` relations with every used typed column;
    the full 11-column profile order, types, nullability, defaults, generated/identity state;
    usable exact `profiles_pkey(user_id)` conflict support; the exact partial referral-code
@@ -671,7 +680,7 @@ The runner fails closed in this order:
    `public.app_role` operator label; pinned dependency definitions, owners, search paths, ACLs,
    effective privilege denials, and usable `user_roles` read access for `has_role`; and the
    enabled, fingerprinted `on_auth_user_created` trigger targeting `handle_new_user`;
-8. a deliberately narrow migration-ledger compatibility contract matching Verdant's existing
+9. a deliberately narrow migration-ledger compatibility contract matching Verdant's existing
    pinned production runner: current role `postgres`; ordinary permanent
    `supabase_migrations.schema_migrations`; ordered `version`, `name`, `statements` columns with
    exact types/nullability and no defaults/generated identity; exact `PRIMARY KEY(version)` and
@@ -679,23 +688,23 @@ The runner fails closed in this order:
    publication, inheritance, reloptions, user trigger, or rewrite rule; and effective
    SELECT/INSERT/lock capability. This is a compatibility requirement evaluated by PREFLIGHT,
    not a claim that this change measured today's live catalog;
-9. a boolean creation-default ACL contract over applicable `pg_default_acl` rows for the
-   current owner and `public` schema. Hardened defaults and the documented legacy
-   PUBLIC/anon/authenticated/service-role table/function defaults are accepted only because
-   the protected wrapper deterministically normalizes them; any other grantee, grantor, or
-   privilege blocks SAFE_TO_APPLY;
-10. pre-apply compatibility for all four replaceable function signatures: `handle_new_user`
+10. a boolean creation-default ACL contract over applicable `pg_default_acl` rows for the
+    current owner and `public` schema. Hardened defaults and the documented legacy
+    PUBLIC/anon/authenticated/service-role table/function defaults are accepted only because
+    the protected wrapper deterministically normalizes them; any other grantee, grantor, or
+    privilege blocks SAFE_TO_APPLY;
+11. pre-apply compatibility for all four replaceable function signatures: `handle_new_user`
     must exist, and every existing target function must have the expected unchangeable return
     shape, owner `postgres`, and only ACL/grantor entries the migration explicitly normalizes;
-11. the SHA/project/state-bound receipt comparison;
-12. the exact migration body, protected ACL normalization, and canonical bare-name ledger
+12. the SHA/project/state-bound receipt comparison;
+13. the exact migration body, protected ACL normalization, and canonical bare-name ledger
     insert in one
     `psql --single-transaction` file under explicit READ COMMITTED isolation and bounded lock
     and statement timeouts. The same transaction takes SHARE ROW EXCLUSIVE locks on the
     migration ledger, `auth.users`, and `public.profiles`, then repeats the non-repairable ledger
     and profile guards before the migration body. The `auth.users` lock closes the gap between
     the historical backfill and installation of the new insert trigger;
-13. an in-transaction exact ACL postcondition before the ledger insert, followed by the same
+14. an in-transaction exact ACL postcondition before the ledger insert, followed by the same
     bounded read-only query as postflight.
 
 An accepted exact ledger identity plus the full live schema contract returns

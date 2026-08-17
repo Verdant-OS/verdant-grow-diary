@@ -19,6 +19,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { findUnsafeSqlReason } from "./apply-pinned-production-migrations.mjs";
 import { buildPsqlEnvironment, writeTextFile } from "./lib/candidateNumberToolRuntime.mjs";
+import { hardenProductionPsqlEnvironment } from "./lib/productionSupabaseTls.mjs";
 import {
   assertSupabaseDatabaseTargetIdentity,
   SUPABASE_DATABASE_TARGETS,
@@ -148,6 +149,7 @@ export const EXIT = Object.freeze({
   DEPLOY_HEAD_ADVANCED: 12,
   RECEIPT_MISMATCH: 13,
   PREREQUISITE_DRIFT: 14,
+  TLS_TRUST_REJECTED: 15,
 });
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -236,6 +238,7 @@ export function buildApplySql(migration) {
     "set transaction isolation level read committed;",
     "set local lock_timeout = '8s';",
     "set local statement_timeout = '120s';",
+    "set local search_path = pg_catalog, public, pg_temp;",
     "lock table supabase_migrations.schema_migrations in share row exclusive mode;",
     "lock table auth.users in share row exclusive mode;",
     "lock table public.profiles in share row exclusive mode;",
@@ -566,7 +569,7 @@ export const PREFLIGHT_SQL = `
 set transaction read only;
 set local lock_timeout = '8s';
 set local statement_timeout = '30s';
-set local search_path = public, pg_catalog;
+set local search_path = pg_catalog, public, pg_temp;
 with target_ledger as (
   select sm.version, sm.name, sm.statements
   from supabase_migrations.schema_migrations sm
@@ -1914,6 +1917,7 @@ const AUDIT_REASON_CODES = new Set([
   "input_rejected",
   "database_secret_missing",
   "target_identity_rejected",
+  "tls_trust_rejected",
   "file_validation_rejected",
   "psql_not_invocable",
   "query_failed",
@@ -1950,14 +1954,23 @@ export function sanitizeAuditExtras(extra = {}) {
   return safe;
 }
 
+export function buildReadOnlyPsqlArgs({ includeCommand = true } = {}) {
+  return [
+    "-X",
+    "-q",
+    "-A",
+    "-t",
+    "-v",
+    "ON_ERROR_STOP=1",
+    "--single-transaction",
+    ...(includeCommand ? ["-c", PREFLIGHT_SQL] : []),
+  ];
+}
+
 function runReadOnlyQuery({ childEnv, spawnImpl }) {
   let result;
   try {
-    result = spawnImpl(
-      "psql",
-      ["-X", "-A", "-t", "-v", "ON_ERROR_STOP=1", "--single-transaction", "-c", PREFLIGHT_SQL],
-      { encoding: "utf8", env: childEnv },
-    );
+    result = spawnImpl("psql", buildReadOnlyPsqlArgs(), { encoding: "utf8", env: childEnv });
   } catch {
     return { ok: false, kind: "not_invocable" };
   }
@@ -2170,6 +2183,18 @@ export function runSignupAcquisitionForwardRepair({
     ]);
     writeAudit("target_rejected", base, { reason_code: "target_identity_rejected" });
     return EXIT.TARGET_REJECTED;
+  }
+
+  try {
+    childEnv = hardenProductionPsqlEnvironment({ sourceEnv: env, childEnv });
+  } catch {
+    logger.error("Production database TLS trust was rejected.");
+    writeReport("BLOCKED - production TLS trust rejected", [
+      "No database process was started.",
+      "Repair the protected production CA secret before running PREFLIGHT or APPLY.",
+    ]);
+    writeAudit("tls_trust_rejected", base, { reason_code: "tls_trust_rejected" });
+    return EXIT.TLS_TRUST_REJECTED;
   }
 
   let migration;

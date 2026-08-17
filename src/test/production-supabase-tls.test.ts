@@ -13,6 +13,10 @@ const APPLY_WORKFLOW_PATH = resolve(
   __dirname,
   "../../.github/workflows/apply-quicklog-corrections-retractions.yml",
 );
+const SIGNUP_APPLY_WORKFLOW_PATH = resolve(
+  __dirname,
+  "../../.github/workflows/apply-signup-acquisition-forward-repair.yml",
+);
 const CORE_WORKFLOW_PATH = resolve(
   __dirname,
   "../../.github/workflows/required-core-migrations.yml",
@@ -20,6 +24,10 @@ const CORE_WORKFLOW_PATH = resolve(
 const PG15_WORKFLOW_PATH = resolve(
   __dirname,
   "../../.github/workflows/quicklog-corrections-retractions-pg15.yml",
+);
+const SIGNUP_PG15_WORKFLOW_PATH = resolve(
+  __dirname,
+  "../../.github/workflows/signup-acquisition-forward-repair-pg15.yml",
 );
 const FIXED_WORKFLOW_CA_PATH = "${{ runner.temp }}/verdant-production-supabase-root.crt";
 const FAKE_CA_PEM = [
@@ -261,7 +269,7 @@ describe("production Supabase TLS hardening", () => {
 
 describe("production Supabase CA workflow boundary", () => {
   it("wires the production TLS helper and its contract test into required CI paths", () => {
-    for (const path of [CORE_WORKFLOW_PATH, PG15_WORKFLOW_PATH]) {
+    for (const path of [CORE_WORKFLOW_PATH, PG15_WORKFLOW_PATH, SIGNUP_PG15_WORKFLOW_PATH]) {
       const source = readFileSync(path, "utf8");
       expect(source).toContain('"scripts/lib/productionSupabaseTls.mjs"');
       expect(source).toContain('"src/test/production-supabase-tls.test.ts"');
@@ -275,6 +283,21 @@ describe("production Supabase CA workflow boundary", () => {
     expectProtectedCaWorkflow(job);
     const runner = job.steps.find(
       (step) => step.name === "Run the environment-gated Quick Log delivery gate",
+    );
+    expect(runner?.env).toEqual({
+      SUPABASE_DB_URL: "${{ secrets.SUPABASE_DB_URL }}",
+      SUPABASE_DB_CA_CERT_PATH: FIXED_WORKFLOW_CA_PATH,
+    });
+    expect(JSON.stringify(runner)).not.toContain("SUPABASE_DB_CA_CERT_B64");
+  });
+
+  it("protects, validates, and removes the CA in the signup repair delivery workflow", () => {
+    const parsed = workflow(SIGNUP_APPLY_WORKFLOW_PATH);
+    const job = parsed.jobs.apply;
+
+    expectProtectedCaWorkflow(job);
+    const runner = job.steps.find(
+      (step) => step.name === "Run the environment-gated signup-acquisition repair gate",
     );
     expect(runner?.env).toEqual({
       SUPABASE_DB_URL: "${{ secrets.SUPABASE_DB_URL }}",
@@ -299,7 +322,7 @@ describe("production Supabase CA workflow boundary", () => {
   });
 
   it("keeps raw CA material out of database steps and uploaded evidence", () => {
-    for (const path of [APPLY_WORKFLOW_PATH, CORE_WORKFLOW_PATH]) {
+    for (const path of [APPLY_WORKFLOW_PATH, SIGNUP_APPLY_WORKFLOW_PATH, CORE_WORKFLOW_PATH]) {
       const source = readFileSync(path, "utf8");
       expect(source.match(/secrets\.SUPABASE_DB_CA_CERT_B64/g) ?? []).toHaveLength(2);
       expect(source).not.toMatch(/(?:curl|wget)[^\n]*SUPABASE_DB_CA/i);

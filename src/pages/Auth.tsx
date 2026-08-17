@@ -93,12 +93,16 @@ export default function Auth() {
   // Referral claim (?ref=<code>) — attribution-only ride-along; the grant is
   // server-gated on email confirmation (see referralCaptureRules).
   const referralMetadata = useMemo(() => buildSignupReferralMetadata(search), [search]);
-  const initialMode: AuthMode = (() => {
+  const requestedMode: AuthMode = (() => {
     const raw = search.get("mode");
     if (raw === "signup" || raw === "forgot" || raw === "signin") return raw;
     return "signin";
   })();
-  const [mode, setMode] = useState<AuthMode>(initialMode);
+  const [mode, setMode] = useState<AuthMode>(requestedMode);
+
+  useEffect(() => {
+    setMode(requestedMode);
+  }, [requestedMode]);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

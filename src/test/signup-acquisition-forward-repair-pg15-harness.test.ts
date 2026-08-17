@@ -7,6 +7,7 @@ import {
   buildPsqlArgs,
   formatPsqlFailureCode,
 } from "../../scripts/run-signup-acquisition-forward-repair-pg15-harness.mjs";
+import { buildReadOnlyPsqlArgs } from "../../scripts/apply-signup-acquisition-forward-repair.mjs";
 
 const HARNESS_PATH = resolve("scripts/run-signup-acquisition-forward-repair-pg15-harness.mjs");
 const WORKFLOW_PATH = resolve(".github/workflows/signup-acquisition-forward-repair-pg15.yml");
@@ -15,15 +16,9 @@ const POSTGRES_IMAGE =
 
 describe("signup-acquisition forward-repair PostgreSQL 15 runtime gate", () => {
   it("suppresses command tags while retaining unaligned tuple output", () => {
-    expect(buildPsqlArgs({ quiet: false })).toEqual([
-      "-X",
-      "-q",
-      "-A",
-      "-t",
-      "-v",
-      "ON_ERROR_STOP=1",
-      "--single-transaction",
-    ]);
+    expect(buildPsqlArgs({ quiet: false })).toEqual(
+      buildReadOnlyPsqlArgs({ includeCommand: false }),
+    );
     expect(buildPsqlArgs({ quiet: true })).toEqual([
       "-X",
       "-q",
@@ -141,6 +136,7 @@ describe("signup-acquisition forward-repair PostgreSQL 15 runtime gate", () => {
       "unexpected_default_acl_rollback",
       "unexpected_creation_default_acl",
       "ledger_wrapper_markers_recorded",
+      "hostile_public_md5_shadow_ignored",
     ]) {
       expect(source).toContain(marker);
     }
@@ -169,6 +165,7 @@ describe("signup-acquisition forward-repair PostgreSQL 15 runtime gate", () => {
     expect(source).toContain("alter default privileges for role postgres in schema public");
     expect(source).toContain("proveUnexpectedDefaultAclRollback(env)");
     expect(source).toContain("proveUnsafeScenarios(env);");
+    expect(source).toContain("proveCatalogShadowIsolation(env);");
     expect(source).toContain(
       "grant execute on function public.record_signup_acquisition_first_touch(text) to signup_repair_drift_owner",
     );

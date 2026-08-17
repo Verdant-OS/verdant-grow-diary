@@ -171,6 +171,33 @@ jobs:
             ["The exact production target cannot be proven or reached without the protected database URL.",
              "No preflight or migration SQL is allowed to run when this secret is absent."]
 
+      - name: Require the protected Supabase production CA
+        uses: ./.github/actions/require-ci-secret
+        with:
+          secret-name: SUPABASE_DB_CA_CERT_B64
+          secret-value: ${{ secrets.SUPABASE_DB_CA_CERT_B64 }}
+          guard-heading: "Signup-acquisition forward-repair gate"
+          report-path: ${{ github.workspace }}/audit/signup-acquisition-forward-repair/report.md
+          log-prefix: signup-acquisition-forward-repair-ca
+          fix-steps-json: >-
+            ["1. Download the Server root certificate from the production Supabase project Dashboard.",
+             "2. Base64-encode the certificate without changing its bytes.",
+             "3. Save it as the verdant-production environment secret SUPABASE_DB_CA_CERT_B64, then run PREFLIGHT again."]
+          reason-lines-json: >-
+            ["PostgreSQL 15 requires an explicit trusted root for sslmode=verify-full.",
+             "No production database process is allowed to run without certificate and hostname verification."]
+
+      - name: Materialize verified Supabase production CA
+        env:
+          SUPABASE_DB_CA_CERT_B64: ${{ secrets.SUPABASE_DB_CA_CERT_B64 }}
+          SUPABASE_DB_CA_CERT_PATH: ${{ runner.temp }}/verdant-production-supabase-root.crt
+        run: |
+          set -euo pipefail
+          umask 077
+          printf '%s' "$SUPABASE_DB_CA_CERT_B64" | base64 --decode > "$SUPABASE_DB_CA_CERT_PATH"
+          chmod 600 "$SUPABASE_DB_CA_CERT_PATH"
+          openssl x509 -in "$SUPABASE_DB_CA_CERT_PATH" -noout
+
       - name: Install PostgreSQL client
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
 
@@ -190,6 +217,7 @@ jobs:
       - name: Run the environment-gated signup-acquisition repair gate
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          SUPABASE_DB_CA_CERT_PATH: ${{ runner.temp }}/verdant-production-supabase-root.crt
         run: node scripts/apply-signup-acquisition-forward-repair.mjs
 
       - name: Upload immutable PREFLIGHT receipt
@@ -215,3 +243,9 @@ jobs:
             audit/signup-acquisition-forward-repair/audit.json
           if-no-files-found: error
           retention-days: 30
+
+      - name: Remove Supabase production CA
+        if: always()
+        env:
+          SUPABASE_DB_CA_CERT_PATH: ${{ runner.temp }}/verdant-production-supabase-root.crt
+        run: rm -f -- "$SUPABASE_DB_CA_CERT_PATH"

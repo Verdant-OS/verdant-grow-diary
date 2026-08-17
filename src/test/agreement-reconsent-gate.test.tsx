@@ -77,6 +77,16 @@ describe("AgreementReconsentGate", () => {
     expect(await screen.findByTestId("agreement-reconsent-gate")).toBeInTheDocument();
   });
 
+  it("keeps the blocking form scrollable inside a short mobile viewport", async () => {
+    mockAcceptances = [];
+    renderGate();
+
+    expect(await screen.findByTestId("agreement-reconsent-gate")).toHaveClass(
+      "max-h-[calc(100dvh-2rem)]",
+      "overflow-y-auto",
+    );
+  });
+
   it("does not block when the user holds all current versions", async () => {
     mockAcceptances = CURRENT_ROWS;
     renderGate();

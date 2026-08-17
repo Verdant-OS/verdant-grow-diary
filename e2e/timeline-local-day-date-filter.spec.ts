@@ -16,8 +16,8 @@
 // SAFETY:
 // - All /auth/v1/** and /rest/v1/** traffic is intercepted via page.route().
 //   No real Supabase calls, no real accounts, no real rows.
-// - This spec only reads. Any non-GET request to /rest/v1/** or
-//   /rest/v1/rpc/** fails the test.
+// - This spec only reads. The exact read-only has_role RPC is fulfilled with
+//   false; every other non-GET request to /rest/v1/** fails the test.
 import { test, expect, type Page, type Route, type Request } from "@playwright/test";
 
 const MOCKED_PROJECT = "chromium-mocked";
@@ -101,6 +101,21 @@ function extractBounds(url: string, column: string): { gte: string | null; lte: 
   return { gte, lte };
 }
 
+const CORE_DIARY_SELECT = "id,note,photo_url,stage,details,entry_at,plant_id,tent_id";
+
+/** Selects Timeline's authoritative core page read, excluding supplemental diary queries. */
+function findCoreDiaryUrl(urls: string[]): string | undefined {
+  return urls.find((url) => {
+    const params = new URL(url).searchParams;
+    return (
+      params.get("select") === CORE_DIARY_SELECT &&
+      params.get("grow_id") === `eq.${GROW_ID}` &&
+      params.get("order") === "entry_at.desc" &&
+      params.get("limit") === "100"
+    );
+  });
+}
+
 interface Captured {
   diaryUrls: string[];
   growEventUrls: string[];
@@ -136,14 +151,9 @@ async function mockSignedInSupabase(page: Page, captured: Captured) {
     await route.fulfill({ status: 200, contentType: "application/json", body: "{}" });
   });
 
-  // Write guard FIRST: any non-GET rest/rpc call is a bug for a read-only
-  // Timeline load — record it instead of quietly succeeding it.
-  await page.route(/\/rest\/v1\//, async (route: Route, req: Request) => {
-    if (req.method() !== "GET") {
-      captured.nonGetRestCalls.push(`${req.method()} ${req.url()}`);
-      await route.fulfill({ status: 200, contentType: "application/json", body: "{}" });
-      return;
-    }
+  // Registered first so the final safety handler below can fall through to
+  // an empty fixture for otherwise-unhandled GET reads.
+  await page.route(/\/rest\/v1\//, async (route: Route) => {
     await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
   });
 
@@ -218,6 +228,23 @@ async function mockSignedInSupabase(page: Page, captured: Captured) {
       body: "[]",
     });
   });
+
+  // Playwright resolves matching routes in reverse registration order. Keep
+  // this safety handler LAST so no specific fixture can fulfill a mutation
+  // before the write fence sees it. Only the exact read-only role RPC may use
+  // POST; all GETs continue to their specific fixture (or the generic one).
+  await page.route(/\/rest\/v1\//, async (route: Route, req: Request) => {
+    if (req.method() === "POST" && new URL(req.url()).pathname === "/rest/v1/rpc/has_role") {
+      await route.fulfill({ status: 200, contentType: "application/json", body: "false" });
+      return;
+    }
+    if (req.method() !== "GET") {
+      captured.nonGetRestCalls.push(`${req.method()} ${req.url()}`);
+      await route.abort("blockedbyclient");
+      return;
+    }
+    await route.fallback();
+  });
 }
 
 test.describe("Timeline local-day date-range filter (issue #587, America/Chicago)", () => {
@@ -228,6 +255,54 @@ test.describe("Timeline local-day date-range filter (issue #587, America/Chicago
       test.info().project.name !== MOCKED_PROJECT,
       `local-day date-filter proof runs once, under the ${MOCKED_PROJECT} project`,
     );
+  });
+
+  test("write fence intercepts mutations before every specific REST fixture", async ({ page }) => {
+    const captured: Captured = { diaryUrls: [], growEventUrls: [], nonGetRestCalls: [] };
+    await mockSignedInSupabase(page, captured);
+
+    const outcomes = await page.evaluate(
+      async ({ baseUrl, paths }) => {
+        const results: string[] = [];
+        for (const path of paths) {
+          try {
+            await fetch(`${baseUrl}${path}`, { method: "POST", mode: "no-cors", body: "{}" });
+            results.push("fulfilled");
+          } catch {
+            results.push("rejected");
+          }
+        }
+        return results;
+      },
+      {
+        baseUrl: `https://${SB_PROJECT_REF}.supabase.co`,
+        paths: [
+          "/rest/v1/user_agreement_acceptances",
+          "/rest/v1/grows",
+          "/rest/v1/tents",
+          "/rest/v1/plants",
+          "/rest/v1/diary_entries",
+          "/rest/v1/grow_events",
+        ],
+      },
+    );
+
+    expect(outcomes).toEqual([
+      "rejected",
+      "rejected",
+      "rejected",
+      "rejected",
+      "rejected",
+      "rejected",
+    ]);
+    expect(captured.nonGetRestCalls).toEqual([
+      `POST https://${SB_PROJECT_REF}.supabase.co/rest/v1/user_agreement_acceptances`,
+      `POST https://${SB_PROJECT_REF}.supabase.co/rest/v1/grows`,
+      `POST https://${SB_PROJECT_REF}.supabase.co/rest/v1/tents`,
+      `POST https://${SB_PROJECT_REF}.supabase.co/rest/v1/plants`,
+      `POST https://${SB_PROJECT_REF}.supabase.co/rest/v1/diary_entries`,
+      `POST https://${SB_PROJECT_REF}.supabase.co/rest/v1/grow_events`,
+    ]);
   });
 
   test("selecting 2026-07-15 applies identical America/Chicago local-day bounds to diary_entries and grow_events, keeps the URL plain, and writes nothing", async ({
@@ -262,7 +337,9 @@ test.describe("Timeline local-day date-range filter (issue #587, America/Chicago
     expect(captured.diaryUrls.length, "diary_entries must have been queried").toBeGreaterThan(0);
     expect(captured.growEventUrls.length, "grow_events must have been queried").toBeGreaterThan(0);
 
-    const diaryBounds = extractBounds(captured.diaryUrls.at(-1)!, "entry_at");
+    const coreDiaryUrl = findCoreDiaryUrl(captured.diaryUrls);
+    expect(coreDiaryUrl, "authoritative core diary_entries query must be present").toBeDefined();
+    const diaryBounds = extractBounds(coreDiaryUrl!, "entry_at");
     const growEventBounds = extractBounds(captured.growEventUrls.at(-1)!, "occurred_at");
 
     expect(diaryBounds.gte, "diary_entries lower bound").toBe(LOCAL_DAY_START_ISO);
@@ -300,7 +377,9 @@ test.describe("Timeline local-day date-range filter (issue #587, America/Chicago
       .poll(() => captured.diaryUrls.length, { message: "diary_entries must have been queried" })
       .toBeGreaterThan(0);
 
-    const diaryBounds = extractBounds(captured.diaryUrls.at(-1)!, "entry_at");
+    const coreDiaryUrl = findCoreDiaryUrl(captured.diaryUrls);
+    expect(coreDiaryUrl, "authoritative core diary_entries query must be present").toBeDefined();
+    const diaryBounds = extractBounds(coreDiaryUrl!, "entry_at");
     expect(diaryBounds.gte, "an invalid range must not guess a lower bound").toBeNull();
     expect(diaryBounds.lte, "an invalid range must not guess an upper bound").toBeNull();
 

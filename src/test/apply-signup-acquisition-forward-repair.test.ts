@@ -1,9 +1,11 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { rootCertificates } from "node:tls";
 import { pathToFileURL } from "node:url";
 import { load as loadYaml } from "js-yaml";
 import { afterEach, describe, expect, it } from "vitest";
+import { PRODUCTION_SUPABASE_CA_FILENAME } from "../../scripts/lib/productionSupabaseTls.mjs";
 
 const RUNNER_PATH = resolve("scripts/apply-signup-acquisition-forward-repair.mjs");
 const WORKFLOW_PATH = resolve(".github/workflows/apply-signup-acquisition-forward-repair.yml");
@@ -29,6 +31,7 @@ const EXPECTED_RUN_ID = "99887766";
 const EXPECTED_RUN_ATTEMPT = "1";
 const DATABASE_SECRET = "signup-repair-database-secret";
 const DATABASE_URL = `postgres://postgres:${DATABASE_SECRET}@db.${PRODUCTION_PROJECT_REF}.supabase.co:5432/postgres?sslmode=require`;
+const RAW_CA_SECRET_SENTINEL = "raw-ca-secret-must-not-reach-psql";
 
 const EXPECTED_SOURCES = [
   "blueprint_targets",
@@ -198,6 +201,22 @@ function preflightStdout({
   })}\n`;
 }
 
+const temporaryRoots: string[] = [];
+
+function productionTlsEnv() {
+  const root = mkdtempSync(join(tmpdir(), "verdant-signup-repair-tls-test-"));
+  temporaryRoots.push(root);
+  const caPath = join(root, PRODUCTION_SUPABASE_CA_FILENAME);
+  const testCa = rootCertificates[0];
+  if (!testCa) throw new Error("Node did not provide a test root certificate.");
+  writeFileSync(caPath, testCa, { mode: 0o600 });
+  return {
+    RUNNER_TEMP: root,
+    SUPABASE_DB_CA_CERT_PATH: caPath,
+    SUPABASE_DB_CA_CERT_B64: RAW_CA_SECRET_SENTINEL,
+  };
+}
+
 function baseEnv(extra: Record<string, string> = {}) {
   return {
     OPERATION: "APPLY",
@@ -217,6 +236,7 @@ function baseEnv(extra: Record<string, string> = {}) {
     GITHUB_EVENT_NAME: "workflow_dispatch",
     GITHUB_REF_NAME: "verdant-grow-diary",
     PATH: process.env.PATH ?? "",
+    ...productionTlsEnv(),
     ...extra,
   };
 }
@@ -230,8 +250,6 @@ async function loadRunner() {
     );
   }
 }
-
-const temporaryRoots: string[] = [];
 
 function temporaryEvidenceEnv() {
   const root = mkdtempSync(join(tmpdir(), "verdant-signup-repair-test-"));
@@ -284,6 +302,11 @@ describe("signup-acquisition forward-repair migration pin", () => {
 
     expect(sql).toContain(migration.text);
     expect(sql).toContain("set transaction isolation level read committed;");
+    expect(sql).toContain("set local search_path = pg_catalog, public, pg_temp;");
+    expect(sql.indexOf("set local search_path = pg_catalog, public, pg_temp;")).toBeLessThan(
+      sql.indexOf("lock table supabase_migrations.schema_migrations"),
+    );
+    expect(sql).not.toContain("set local search_path = public, pg_catalog;");
     expect(sql).toContain("lock table supabase_migrations.schema_migrations");
     expect(sql).toContain("lock table auth.users in share row exclusive mode;");
     expect(sql).toContain("lock table public.profiles in share row exclusive mode;");
@@ -731,7 +754,8 @@ describe("signup-acquisition forward-repair read-only preflight", () => {
     const sql = runner.PREFLIGHT_SQL;
 
     expect(sql).toMatch(/set\s+transaction\s+read\s+only/i);
-    expect(sql).toMatch(/set local search_path = public, pg_catalog;/i);
+    expect(sql).toMatch(/set local search_path = pg_catalog, public, pg_temp;/i);
+    expect(sql).not.toMatch(/set local search_path = public, pg_catalog/i);
     expect(sql).toContain("supabase_migrations.schema_migrations");
     expect(sql).toContain("signup_acquisition_attributions");
     expect(sql).toContain("signup_acquisition_forward_repair");
@@ -849,6 +873,30 @@ describe("signup-acquisition forward-repair execution", () => {
       migration_sha256: EXPECTED_SHA256,
       state_digest: expect.stringMatching(/^[0-9a-f]{64}$/),
     });
+  });
+
+  it("suppresses psql command tags so the read-only JSON result stays machine-readable", async () => {
+    const runner = await loadRunner();
+    let observedArgs: string[] = [];
+    const spawnImpl = (_command: string, args: string[]) => {
+      observedArgs = args;
+      return {
+        status: 0,
+        stdout: args.includes("-q")
+          ? preflightStdout({ exact: 1, schema: LIVE_SCHEMA })
+          : `SET\nSET\nSET\nSET\n${preflightStdout({ exact: 1, schema: LIVE_SCHEMA })}`,
+        stderr: "",
+      };
+    };
+
+    expect(
+      runner.runSignupAcquisitionForwardRepair({
+        env: baseEnv({ OPERATION: "PREFLIGHT", CONFIRM_APPLY: "" }),
+        spawnImpl,
+        logger: { log: () => {}, error: () => {} },
+      }),
+    ).toBe(runner.EXIT.OK);
+    expect(observedArgs).toEqual(runner.buildReadOnlyPsqlArgs());
   });
 
   it("runs PREFLIGHT as read-only verification when the repair is already applied", async () => {
@@ -1226,46 +1274,85 @@ describe("signup-acquisition forward-repair execution", () => {
     ).toBe(runner.EXIT.POSTFLIGHT_CONTRACT_FAILED);
   });
 
-  it("passes psql only an identity-bound allowlisted environment", async () => {
-    const runner = await loadRunner();
-    let childEnv: Record<string, string> | undefined;
-    const spawnImpl = (
-      _command: string,
-      _args: string[],
-      options: { env: Record<string, string> },
-    ) => {
-      childEnv = options.env;
-      return {
-        status: 0,
-        stdout: preflightStdout({ exact: 1, schema: LIVE_SCHEMA }),
-        stderr: "",
+  it.each(["PREFLIGHT", "APPLY"] as const)(
+    "forces authenticated TLS and an allowlisted psql environment for %s",
+    async (operation) => {
+      const runner = await loadRunner();
+      let childEnv: Record<string, string> | undefined;
+      const spawnImpl = (
+        _command: string,
+        _args: string[],
+        options: { env: Record<string, string> },
+      ) => {
+        childEnv = options.env;
+        return {
+          status: 0,
+          stdout: preflightStdout({ exact: 1, schema: LIVE_SCHEMA }),
+          stderr: "",
+        };
       };
-    };
 
-    expect(
-      runner.runSignupAcquisitionForwardRepair({
-        env: baseEnv({
-          PREFLIGHT_RECEIPT_DIGEST: EXPECTED_LIVE_RECEIPT_DIGEST,
-          DATABASE_URL: "postgres://wrong-target",
-          PGHOST: "wrong-host",
-          SUPABASE_SERVICE_ROLE_KEY: "service-role-token-leak",
-          BRIDGE_TOKEN: "bridge-token-leak",
+      const tls = productionTlsEnv();
+      expect(
+        runner.runSignupAcquisitionForwardRepair({
+          env: baseEnv({
+            ...tls,
+            OPERATION: operation,
+            CONFIRM_APPLY: operation === "APPLY" ? APPLY_CONFIRMATION : "",
+            PREFLIGHT_RECEIPT_DIGEST: EXPECTED_LIVE_RECEIPT_DIGEST,
+            DATABASE_URL: "postgres://wrong-target",
+            PGHOST: "wrong-host",
+            SUPABASE_SERVICE_ROLE_KEY: "service-role-token-leak",
+            BRIDGE_TOKEN: "bridge-token-leak",
+          }),
+          spawnImpl,
+          logger: { log: () => {}, error: () => {} },
         }),
-        spawnImpl,
+      ).toBe(runner.EXIT.OK);
+      expect(childEnv).toMatchObject({
+        PGHOST: `db.${PRODUCTION_PROJECT_REF}.supabase.co`,
+        PGUSER: "postgres",
+        PGDATABASE: "postgres",
+        PGSSLMODE: "verify-full",
+        PGSSLROOTCERT: tls.SUPABASE_DB_CA_CERT_PATH,
+        PGGSSENCMODE: "disable",
+      });
+      expect(childEnv).not.toHaveProperty("DATABASE_URL");
+      expect(childEnv).not.toHaveProperty("SUPABASE_DB_URL");
+      expect(childEnv).not.toHaveProperty("SUPABASE_SERVICE_ROLE_KEY");
+      expect(childEnv).not.toHaveProperty("BRIDGE_TOKEN");
+      expect(childEnv).not.toHaveProperty("SUPABASE_DB_CA_CERT_B64");
+    },
+  );
+
+  it("rejects missing, displaced, or malformed production CA material before psql", async () => {
+    const runner = await loadRunner();
+    const malformedTls = productionTlsEnv();
+    writeFileSync(malformedTls.SUPABASE_DB_CA_CERT_PATH, "not a certificate", { mode: 0o600 });
+    const displacedTls = productionTlsEnv();
+    const scenarios = [
+      { RUNNER_TEMP: "", SUPABASE_DB_CA_CERT_PATH: "" },
+      {
+        ...displacedTls,
+        SUPABASE_DB_CA_CERT_PATH: join(displacedTls.RUNNER_TEMP, "attacker-root.crt"),
+      },
+      malformedTls,
+    ];
+
+    for (const tls of scenarios) {
+      let calls = 0;
+      const exitCode = runner.runSignupAcquisitionForwardRepair({
+        env: baseEnv(tls),
+        spawnImpl: () => {
+          calls += 1;
+          return { status: 0, stdout: preflightStdout(), stderr: "" };
+        },
         logger: { log: () => {}, error: () => {} },
-      }),
-    ).toBe(runner.EXIT.OK);
-    expect(childEnv).toMatchObject({
-      PGHOST: `db.${PRODUCTION_PROJECT_REF}.supabase.co`,
-      PGUSER: "postgres",
-      PGDATABASE: "postgres",
-      PGSSLMODE: "require",
-      PGGSSENCMODE: "disable",
-    });
-    expect(childEnv).not.toHaveProperty("DATABASE_URL");
-    expect(childEnv).not.toHaveProperty("SUPABASE_DB_URL");
-    expect(childEnv).not.toHaveProperty("SUPABASE_SERVICE_ROLE_KEY");
-    expect(childEnv).not.toHaveProperty("BRIDGE_TOKEN");
+      });
+
+      expect(exitCode).toBe(runner.EXIT.TLS_TRUST_REJECTED);
+      expect(calls).toBe(0);
+    }
   });
 });
 

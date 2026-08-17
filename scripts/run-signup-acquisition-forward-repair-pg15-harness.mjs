@@ -8,6 +8,7 @@ import {
   PREFLIGHT_SQL,
   LEDGER_STATEMENT_MARKERS,
   buildApplySql,
+  buildReadOnlyPsqlArgs,
   classifyPreflight,
   parsePreflightStdout,
   schemaEffectLive,
@@ -34,15 +35,8 @@ export function formatPsqlFailureCode(stage, stderr) {
 }
 
 export function buildPsqlArgs({ quiet }) {
-  return [
-    "-X",
-    "-q",
-    ...(quiet ? [] : ["-A"]),
-    "-t",
-    "-v",
-    "ON_ERROR_STOP=1",
-    "--single-transaction",
-  ];
+  if (!quiet) return buildReadOnlyPsqlArgs({ includeCommand: false });
+  return ["-X", "-q", "-t", "-v", "ON_ERROR_STOP=1", "--single-transaction"];
 }
 
 function loopbackConnection(value) {
@@ -1179,12 +1173,29 @@ function proveUnsafeScenarios(env) {
   );
 }
 
+function proveCatalogShadowIsolation(env) {
+  resetScaffold(env);
+  executeSql(
+    `create function public.md5(text)
+       returns text
+       language sql
+       immutable
+       as $$ select repeat('0', 32) $$;`,
+    env,
+  );
+
+  requireStatus("hostile_public_md5_shadow_ignored", readPreflight(env), "apply");
+  applyPinnedMigration(env);
+  requireStatus("hostile_public_md5_shadow_postflight", readPreflight(env), "verify_only");
+}
+
 export async function runPg15Harness({ databaseUrl = process.env.SIGNUP_REPAIR_PG15_URL } = {}) {
   const env = psqlEnvironment(loopbackConnection(databaseUrl));
   const version = Number(executeSql("show server_version_num;", env, { quiet: false }).trim());
   if (!Number.isInteger(version) || version < 150000 || version >= 160000) {
     fail("postgres_major_not_15");
   }
+  proveCatalogShadowIsolation(env);
   proveBaselineAndApply(env);
   proveFirstTouchRpc(env);
   proveSnapshotsAndAccess(env);

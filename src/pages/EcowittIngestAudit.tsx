@@ -11,7 +11,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useSearchParams } from "@/lib/react-router-compat";
+import { useLocation, useSearchParams } from "@/lib/react-router-compat";
 import { supabase } from "@/integrations/supabase/client";
 import { useTents } from "@/hooks/use-tents";
 import { useQuickLogV2Save } from "@/hooks/useQuickLogV2Save";
@@ -61,6 +61,7 @@ export function useEcowittAuditRows(tentId: string | null | undefined) {
 
 export default function EcowittIngestAudit() {
   const { data: tents = [] } = useTents();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const [userSelectedTentId, setUserSelectedTentId] = useState<string | null>(null);
   const urlTentId = readEcowittAuditTentIdFromSearch(searchParams);
@@ -85,15 +86,22 @@ export default function EcowittIngestAudit() {
   // Keep the URL in sync with the resolved selection on initial load so
   // refresh + share links open the same tent. Do NOT rewrite the URL when
   // the operator explicitly requested an invalid tent — keep the warning
-  // visible until they pick another tent from the dropdown.
+  // visible until they pick another tent from the dropdown. TanStack may
+  // mount this target while the source route is still committed; wait for
+  // the audit pathname so a default-tent sync cannot cancel that transition.
   useEffect(() => {
+    if (location.pathname !== "/sensors/ecowitt-audit") return;
     if (!effectiveTentId) return;
     if (selection.invalidRequested) return;
     if (urlTentId === effectiveTentId) return;
     setSearchParams((current) => applyEcowittAuditTentIdToSearch(current, effectiveTentId), {
       replace: true,
     });
-  }, [effectiveTentId, urlTentId, selection.invalidRequested, setSearchParams]);
+    // The compat setter is intentionally excluded: its identity changes on
+    // router-state renders, and reissuing here would restart the pending URL
+    // sync before the new search params can commit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [effectiveTentId, location.pathname, urlTentId, selection.invalidRequested]);
 
   const handleTentChange = (next: string | null) => {
     setUserSelectedTentId(next);

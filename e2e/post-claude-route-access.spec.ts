@@ -31,6 +31,12 @@ const FAKE_TENT = {
   is_archived: false,
   created_at: "2020-01-01T00:00:00.000Z",
 };
+// Mirrors src/constants/agreements.ts so this operator fixture represents an
+// already-consented grower and never performs a re-consent write.
+const CURRENT_AGREEMENT_ROWS = [
+  { agreement_type: "terms", version: "2026-07-13" },
+  { agreement_type: "privacy", version: "2026-07-13" },
+];
 
 async function seedFakeSession(page: Page) {
   await page.addInitScript(
@@ -78,6 +84,14 @@ async function mockSignedInSupabase(
       return;
     }
     const selectedColumns = new URL(url).searchParams.get("select") ?? "";
+    if (new URL(url).pathname.endsWith("/rest/v1/user_agreement_acceptances")) {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(CURRENT_AGREEMENT_ROWS),
+      });
+      return;
+    }
     if (new URL(url).pathname.endsWith("/rest/v1/tents")) {
       await route.fulfill({
         status: 200,

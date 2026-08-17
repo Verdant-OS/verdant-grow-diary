@@ -29,6 +29,7 @@ import {
   Link,
   MemoryRouter,
   Navigate,
+  NavLink,
   Outlet,
   Route,
   Routes,
@@ -167,6 +168,13 @@ describe("react-router-compat fragment handling (real product shim)", () => {
         >
           set search
         </button>
+        <button
+          type="button"
+          data-testid="set-numeric-search-button"
+          onClick={() => setSearchParams({ operator: "1", page: "2" })}
+        >
+          set numeric-looking search
+        </button>
       </div>
     );
   }
@@ -257,6 +265,31 @@ describe("react-router-compat fragment handling (real product shim)", () => {
     expect(router.state.location.hash).toBe("notes");
   });
 
+  it("useSearchParams setter preserves numeric-looking string values without JSON quoting", async () => {
+    const router = buildWorkspaceRouter();
+    const navigateSpy = vi.spyOn(router, "navigate");
+    render(<RouterProvider router={router} />);
+    await screen.findByTestId("workspace-page");
+
+    fireEvent.click(await screen.findByTestId("set-numeric-search-button"));
+
+    await waitFor(() => {
+      expect(router.state.location.searchStr).toBe("?operator=1&page=2");
+    });
+    expect(new URLSearchParams(router.state.location.searchStr).get("operator")).toBe("1");
+    expect(new URLSearchParams(router.state.location.searchStr).get("page")).toBe("2");
+
+    const searchCall = navigateSpy.mock.calls.find((call) => {
+      const options = call[0] as { to?: string } | undefined;
+      return typeof options?.to === "string" && options.to.startsWith("/hunts/55/workspace");
+    });
+    expect(searchCall).toBeDefined();
+    expect(searchCall?.[0]).toMatchObject({
+      to: "/hunts/55/workspace?operator=1&page=2",
+    });
+    expect((searchCall?.[0] as { search?: unknown } | undefined)?.search).toBeUndefined();
+  });
+
   it("clicking a same-page fragment Link commits a clean pathname + hash, no remount, no loop", async () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     const router = buildWorkspaceRouter();
@@ -280,5 +313,52 @@ describe("react-router-compat fragment handling (real product shim)", () => {
       call.some((arg) => typeof arg === "string" && arg.includes("Maximum update depth")),
     );
     expect(updateDepthErrors).toHaveLength(0);
+  });
+});
+
+describe("react-router-compat link active semantics (real product shim)", () => {
+  function LinkSemanticsFixture() {
+    return (
+      <nav>
+        <Link to="/sensors" data-testid="plain-parent-link">
+          Plain parent
+        </Link>
+        <Link to="/sensors/ecowitt-audit" data-testid="plain-exact-link">
+          Plain exact
+        </Link>
+        <NavLink to="/sensors" data-testid="prefix-nav-link">
+          Prefix nav
+        </NavLink>
+        <NavLink to="/sensors" end data-testid="exact-parent-nav-link">
+          Exact parent nav
+        </NavLink>
+        <NavLink to="/sensors/ecowitt-audit" end data-testid="exact-current-nav-link">
+          Exact current nav
+        </NavLink>
+      </nav>
+    );
+  }
+
+  function buildLinkSemanticsRouter() {
+    const rootRoute = createRootRoute({ component: () => <Outlet /> });
+    const auditRoute = createRoute({
+      getParentRoute: () => rootRoute,
+      path: "/sensors/ecowitt-audit",
+      component: LinkSemanticsFixture,
+    });
+    return createRouter({
+      routeTree: rootRoute.addChildren([auditRoute]),
+      history: createMemoryHistory({ initialEntries: ["/sensors/ecowitt-audit"] }),
+    });
+  }
+
+  it("keeps plain Links neutral while NavLink owns exact and prefix aria-current", async () => {
+    render(<RouterProvider router={buildLinkSemanticsRouter()} />);
+
+    expect(await screen.findByTestId("plain-parent-link")).not.toHaveAttribute("aria-current");
+    expect(screen.getByTestId("plain-exact-link")).not.toHaveAttribute("aria-current");
+    expect(screen.getByTestId("prefix-nav-link")).toHaveAttribute("aria-current", "page");
+    expect(screen.getByTestId("exact-parent-nav-link")).not.toHaveAttribute("aria-current");
+    expect(screen.getByTestId("exact-current-nav-link")).toHaveAttribute("aria-current", "page");
   });
 });

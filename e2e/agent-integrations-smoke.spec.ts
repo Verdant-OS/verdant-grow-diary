@@ -6,6 +6,7 @@
 // - Uses a mocked signed-in user (fake token strings clearly labeled).
 // - Asserts no visible token/secret-like strings render.
 import { test, expect, type Page } from "@playwright/test";
+import { denyAnalyticsConsent } from "./utils/analyticsConsent";
 
 // supabase-js derives its auth storage key as
 // `sb-${hostname.split(".")[0]}-auth-token` and (per this app's hardened
@@ -20,6 +21,10 @@ import { test, expect, type Page } from "@playwright/test";
 // expires_at). It is NOT wrapped in the legacy `{ currentSession }` shape.
 const SB_PROJECT_REF = "knkwiiywfkbqznbxwqfh";
 const SB_SESSION_KEY = `sb-${SB_PROJECT_REF}-auth-token`;
+const CURRENT_AGREEMENT_ROWS = [
+  { agreement_type: "terms", version: "2026-07-13" },
+  { agreement_type: "privacy", version: "2026-07-13" },
+];
 
 // Fake, clearly-labeled signed-in user. Carries email_confirmed_at +
 // user_metadata.email_verified so AppShell's isEmailVerificationPending
@@ -84,27 +89,18 @@ async function mockSignedInSupabase(page: Page) {
     }
     await route.fulfill({ status: 200, contentType: "application/json", body: "{}" });
   });
-  await page.route(/\/rest\/v1\//, (route) =>
-    route.fulfill({ status: 200, contentType: "application/json", body: "[]" }),
-  );
-}
-
-// The signed-in agreement re-consent gate renders as a blocking modal for
-// accounts with no recorded consent rows — which describes the mocked user
-// (the /rest/v1/ catch-all returns [] for user_agreement_acceptances), so
-// the gate always appears here and swallows all pointer events. Accept it
-// before interacting; the acceptance write is absorbed by the same
-// catch-all. Same helper as the Quick Log smoke.
-async function acceptReconsentGateIfShown(page: Page) {
-  const gate = page.getByTestId("agreement-reconsent-gate");
-  const shown = await gate
-    .waitFor({ state: "visible", timeout: 5_000 })
-    .then(() => true)
-    .catch(() => false);
-  if (!shown) return;
-  await gate.locator("#reconsent-accept").click();
-  await gate.getByRole("button", { name: /accept and continue/i }).click();
-  await gate.waitFor({ state: "hidden", timeout: 15_000 });
+  await page.route(/\/rest\/v1\//, (route, req) => {
+    const url = new URL(req.url());
+    const rows =
+      req.method() === "GET" && url.pathname.endsWith("/rest/v1/user_agreement_acceptances")
+        ? CURRENT_AGREEMENT_ROWS
+        : [];
+    return route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(rows),
+    });
+  });
 }
 
 const SECRET_PATTERNS: Array<{ label: string; re: RegExp }> = [
@@ -121,6 +117,7 @@ test.describe("Agent Integrations settings smoke (mocked, 1280x800)", () => {
   test.use({ viewport: { width: 1280, height: 800 } });
 
   test.beforeEach(async ({ page }) => {
+    await denyAnalyticsConsent(page);
     await seedFakeSession(page);
     await mockSignedInSupabase(page);
   });
@@ -129,7 +126,6 @@ test.describe("Agent Integrations settings smoke (mocked, 1280x800)", () => {
     page,
   }) => {
     await page.goto("/settings/agent-integrations");
-    await acceptReconsentGateIfShown(page);
 
     await expect(page.getByTestId("manifest-identity")).toBeVisible();
     await expect(page.getByTestId("manifest-version")).toBeVisible();

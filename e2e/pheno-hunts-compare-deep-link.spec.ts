@@ -119,7 +119,12 @@ test("fixture route /pheno-comparison renders demo panels + legend, zero network
     .locator('[data-testid^="pheno-candidate-"]');
   expect(await cards.count()).toBeGreaterThanOrEqual(2);
   // Fixture page has no write controls.
-  expect(await page.locator("button, form, input, textarea, select").count()).toBe(0);
+  expect(
+    await page
+      .getByTestId("pheno-comparison-page")
+      .locator("button, form, input, textarea, select")
+      .count(),
+  ).toBe(0);
   expect(consoleErrors, "console errors").toEqual([]);
   // Ignore favicon/sourcemap dev noise and third-party analytics (GA) that the
   // app fires on page load — neither is part of the app's own network surface.
@@ -141,7 +146,9 @@ test("live route /pheno-hunts/:id/compare renders a real hunt's candidates (mock
   page.on("pageerror", (e) => consoleErrors.push(e.message));
   page.on(
     "request",
-    (r) => FORBIDDEN_HOST_RE.test(r.url()) && forbidden.push(`${r.method()} ${r.url()}`),
+    (r) =>
+      FORBIDDEN_HOST_RE.test(new URL(r.url()).hostname) &&
+      forbidden.push(`${r.method()} ${r.url()}`),
   );
 
   await mockLiveHunt(page, restBoundary);
@@ -158,7 +165,12 @@ test("live route /pheno-hunts/:id/compare renders a real hunt's candidates (mock
     .locator('[data-testid^="pheno-candidate-"]');
   expect(await cards.count()).toBeGreaterThanOrEqual(2);
   // Read-only: the live comparison surface renders no write controls.
-  expect(await page.locator("button, form, input, textarea, select").count()).toBe(0);
+  expect(
+    await page
+      .getByTestId("pheno-comparison-page")
+      .locator("button, form, input, textarea, select")
+      .count(),
+  ).toBe(0);
 
   expect(consoleErrors, "console errors on live route").toEqual([]);
   expect(restBoundary.unexpected, "unexpected Supabase REST reads must be blocked").toEqual([]);

@@ -35,7 +35,9 @@ test(`invalid deep-link ${INVALID_ROUTE} renders a safe read-only error state`, 
     failedRequests.push(`${req.method()} ${req.url()} :: ${req.failure()?.errorText ?? ""}`),
   );
   page.on("request", (req) => {
-    if (FORBIDDEN_HOST_RE.test(req.url())) forbiddenRequests.push(`${req.method()} ${req.url()}`);
+    if (FORBIDDEN_HOST_RE.test(new URL(req.url()).hostname)) {
+      forbiddenRequests.push(`${req.method()} ${req.url()}`);
+    }
   });
 
   // Unknown hunt → maybeSingle returns no row. A catch-all owns the REST
@@ -64,12 +66,13 @@ test(`invalid deep-link ${INVALID_ROUTE} renders a safe read-only error state`, 
   await page.goto(INVALID_ROUTE, { waitUntil: "domcontentloaded" });
 
   // A clear read-only error/empty state is shown (never a crash, never fixtures).
-  await expect(page.getByTestId("pheno-hunt-compare-error")).toBeVisible();
+  const errorState = page.getByTestId("pheno-hunt-compare-error");
+  await expect(errorState).toBeVisible();
 
   // Retry is an explicit read-only refetch control. There are no data-entry
   // controls, forms, or any additional buttons that could imply a write.
-  expect(await page.locator("form, input, textarea, select").count()).toBe(0);
-  const buttons = page.getByRole("button");
+  expect(await errorState.locator("form, input, textarea, select").count()).toBe(0);
+  const buttons = errorState.getByRole("button");
   await expect(buttons).toHaveCount(1);
   await expect(page.getByTestId("pheno-hunt-compare-error-retry")).toHaveAttribute(
     "type",

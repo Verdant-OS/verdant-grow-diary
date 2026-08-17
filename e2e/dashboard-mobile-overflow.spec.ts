@@ -20,6 +20,10 @@ const FAKE_USER = {
 };
 const FAKE_GROW_ID = "11111111-1111-4111-8111-111111111111";
 const FAKE_TENT_ID = "22222222-2222-4222-8222-222222222222";
+const CURRENT_AGREEMENT_ROWS = [
+  { agreement_type: "terms", version: "2026-07-13" },
+  { agreement_type: "privacy", version: "2026-07-13" },
+];
 const FAKE_TENT = {
   id: FAKE_TENT_ID,
   grow_id: FAKE_GROW_ID,
@@ -83,21 +87,24 @@ async function mockSignedInSupabase(page: Page) {
   });
   await page.route(/\/rest\/v1\//, async (route, request) => {
     const pathname = new URL(request.url()).pathname;
-    const rows = pathname.endsWith("/rest/v1/tents")
-      ? [FAKE_TENT]
-      : pathname.endsWith("/rest/v1/plants")
-        ? [FAKE_PLANT]
-        : pathname.endsWith("/rest/v1/grows")
-          ? [
-              {
-                id: FAKE_GROW_ID,
-                name: "Mobile Proof Grow",
-                stage: "veg",
-                is_archived: false,
-                created_at: "2020-01-01T00:00:00.000Z",
-              },
-            ]
-          : [];
+    const rows =
+      request.method() === "GET" && pathname.endsWith("/rest/v1/user_agreement_acceptances")
+        ? CURRENT_AGREEMENT_ROWS
+        : pathname.endsWith("/rest/v1/tents")
+          ? [FAKE_TENT]
+          : pathname.endsWith("/rest/v1/plants")
+            ? [FAKE_PLANT]
+            : pathname.endsWith("/rest/v1/grows")
+              ? [
+                  {
+                    id: FAKE_GROW_ID,
+                    name: "Mobile Proof Grow",
+                    stage: "veg",
+                    is_archived: false,
+                    created_at: "2020-01-01T00:00:00.000Z",
+                  },
+                ]
+              : [];
     await route.fulfill({
       status: 200,
       contentType: "application/json",

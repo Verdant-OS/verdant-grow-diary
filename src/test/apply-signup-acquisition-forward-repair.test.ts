@@ -1383,7 +1383,7 @@ describe("signup-acquisition forward-repair protected workflow", () => {
     });
     expect(workflow.permissions).toEqual({ contents: "read", actions: "read" });
     expect(workflow.concurrency).toEqual({
-      group: "signup-acquisition-forward-repair",
+      group: "verdant-production-migration-writer",
       "cancel-in-progress": false,
     });
 

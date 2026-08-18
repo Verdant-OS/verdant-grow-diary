@@ -496,7 +496,7 @@ describe("runner source and workflow pins", () => {
     expect(workflowSource).not.toMatch(/\n\s{2}(push|pull_request|schedule):/);
     expect(workflowSource).toContain("refs/heads/verdant-grow-diary");
     expect(workflowSource).toContain("environment: verdant-production");
-    expect(workflowSource).toContain("group: pinned-production-migrations");
+    expect(workflowSource).toContain("group: verdant-production-migration-writer");
     expect(workflowSource).toContain("APPLY PINNED BREEDING RECONCILIATION");
     expect(workflowSource).toContain("knkwiiywfkbqznbxwqfh");
   });

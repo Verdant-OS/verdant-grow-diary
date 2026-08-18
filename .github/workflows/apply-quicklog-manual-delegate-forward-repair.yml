@@ -45,7 +45,7 @@ permissions:
   actions: read
 
 concurrency:
-  group: quicklog-manual-delegate-forward-repair-delivery
+  group: verdant-production-migration-writer
   cancel-in-progress: false
 
 jobs:

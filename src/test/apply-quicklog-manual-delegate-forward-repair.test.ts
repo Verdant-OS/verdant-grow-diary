@@ -593,6 +593,32 @@ describe("Quick Log manual delegate production delivery", () => {
     expect(runbook).toMatch(/repeat the active-writer check/i);
   });
 
+  it("serializes every production migration writer through one shared workflow group", () => {
+    const writers = [
+      "apply-candidate-number-maintenance-migrations.yml",
+      "apply-pinned-breeding-reconciliation.yml",
+      "apply-pinned-production-migrations.yml",
+      "apply-quicklog-corrections-retractions.yml",
+      "apply-signup-acquisition-forward-repair.yml",
+      "apply-quicklog-manual-delegate-forward-repair.yml",
+    ];
+
+    for (const writer of writers) {
+      const workflow = loadYaml(
+        readFileSync(resolve(".github/workflows", writer), "utf8"),
+      ) as Record<string, any>;
+      expect(workflow.concurrency, writer).toEqual({
+        group: "verdant-production-migration-writer",
+        "cancel-in-progress": false,
+      });
+    }
+
+    const runbook = readFileSync(RUNBOOK_PATH, "utf8");
+    expect(runbook).toContain("verdant-production-migration-writer");
+    expect(runbook).toMatch(/cancel-in-progress[^\n]*false/i);
+    expect(runbook).toMatch(/defen[cs]e in depth/i);
+  });
+
   it("requires APPLY to pin the reviewed PREFLIGHT attempt and artifact digest", () => {
     const source = readFileSync(WORKFLOW_PATH, "utf8");
     const parsed = loadYaml(source) as Record<string, any>;

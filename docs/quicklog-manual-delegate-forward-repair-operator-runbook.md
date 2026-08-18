@@ -63,10 +63,12 @@ are excluded from uploaded evidence.
 
 ## Mandatory active-writer gate
 
-There is no cross-workflow shared concurrency group covering every historical
-production migration writer. Immediately before approving and dispatching
-APPLY, require all of these workflows to have no `queued`, `in_progress`,
-`waiting`, `pending`, or `requested` run:
+All six registered production migration writers share the workflow-level group
+`verdant-production-migration-writer` with `cancel-in-progress: false`. This
+serializes their complete workflow lifetimes without cancelling an earlier
+writer. Immediately before approving and dispatching APPLY, still require all
+of these workflows to have no `queued`, `in_progress`, `waiting`, `pending`, or
+`requested` run:
 
 - `apply-candidate-number-maintenance-migrations.yml`
 - `apply-pinned-breeding-reconciliation.yml`
@@ -96,11 +98,12 @@ done
 ```
 
 Every command must return no rows, except the current reviewed APPLY run after
-it starts. The APPLY workflow repeats this snapshot automatically through the
-GitHub API and fails before database access if another writer is active or the
-complete result cannot be proven. Do not rely on this point-in-time snapshot as
-a lock: allow no other migration dispatch until APPLY is terminal. Record the
-empty command output and the APPLY terminal result in the change ticket.
+it starts. The shared group is the cross-workflow mutex. The APPLY workflow also
+repeats this point-in-time snapshot through the GitHub API as defense in depth,
+covering pre-change runs and detecting an incomplete writer inventory before
+database access. Do not manually bypass the shared group or use an out-of-band
+writer, and allow no other migration dispatch until APPLY is terminal. Record
+the empty command output and the APPLY terminal result in the change ticket.
 
 ## Dispatch 1: read-only PREFLIGHT
 

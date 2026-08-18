@@ -35,7 +35,7 @@ permissions:
   actions: read
 
 concurrency:
-  group: quicklog-corrections-retractions-delivery
+  group: verdant-production-migration-writer
   cancel-in-progress: false
 
 jobs:

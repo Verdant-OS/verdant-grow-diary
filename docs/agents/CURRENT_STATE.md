@@ -1,6 +1,20 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-15 UTC
+**Last updated:** 2026-08-18 UTC
+**Updated by:** Claude (2026-08-18, additive: records the Claude PR/branch
+cleanup sweep Cheek requested. Verified zero open Claude-authored PRs; triaged
+all 23 stale `claude/*` branches on origin to a terminal disposition
+(merged / closed-superseded / abandoned / content-identical-on-deploy); agent
+sessions still cannot delete branches (`git push --delete` → HTTP 403,
+branch-scoped credential), so Cheek deleted all 23 himself the same day, and a
+live `git ls-remote` then confirmed zero `claude/*` refs remain. Updates the
+2026-08-14 abandoned-branches entry (both branches now deleted) and adds a
+"Completed, out of slice (recorded 2026-08-18)" entry with the sweep detail.
+Topology row refreshed to fetched tip `3f2bfe2db` (#1021). No production, GA4,
+GSC, sitemap, or release-identity row was re-measured in this edit. Does
+**not** apply migrations or set Day 0.)
+
+**Prior update:** 2026-08-15 UTC
 **Updated by:** Grok (2026-08-15 merge: resolved two simple `CURRENT_STATE.md`
 conflicts against origin `1c094a2a3`. Incoming since `89ddea93f`:
 `74be85232` (#967 verdant-grow-os Cursor plugin scaffold — no overlap)
@@ -460,7 +474,7 @@ way.
 
 | Branch               | Role                                             | Verified head                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | -------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `verdant-grow-diary` | **Deploy branch. Production ships from here.**   | `1c094a2a36a1f576ee95e2c46d70777ae24a3e53` (#970), verified 2026-08-15 with `git fetch origin verdant-grow-diary && git rev-parse origin/verdant-grow-diary`. Supersedes `89ddea93f` (#993). After #982, in `git log` merge order oldest-first: `883bee2ff` (#983), `5e2fcedd4` (#984), `9c1ada616` (#987), `24382b5ad` (#988), `f1e097740` (#985), `534b28434` (#966), `0522eefb1` (#990), `a54040c30` (#989), `22c130600` (#986), `bb66f4302` (#960), `f3324a2b0` (#992), `89ddea93f` (#993), `74be85232` (#967), `1c094a2a3` (#970). **Live production is not this tip** — `/version.json` on 2026-08-15 served `5e2fcedd4271` (#984) and was not re-fetched in this merge. #993 adds a protected PREFLIGHT/APPLY path and does **not** apply the signup repair. Merging is not a publish. PR numbers on this branch do not order by merge time — order commits with `git log`, never by PR number. Do not carry older validation tables forward. Older buffers that still show `6434ea2a8` (#942) are the 2026-08-13 snapshot; discard them |
+| `verdant-grow-diary` | **Deploy branch. Production ships from here.**   | `3f2bfe2dbc139158c4ade35f7124f4e814803163` (#1021), verified 2026-08-18 with `git fetch origin verdant-grow-diary && git rev-parse origin/verdant-grow-diary`. Supersedes `1c094a2a3` (#970). After #970, in `git log --first-parent` merge order oldest-first: `efdd7461a` (#991), `e861560fe` (#994), `6e769d089` (#995), `4f4a908cb` (#999), `4c7427989` (#1000), `47f622555` (#996), `7c676f9cc` (#910), `1da0f401d` (#1010), `56fff6da2` (#1011), `c1d22b8a3` (#1012), `3b55651ea` (#1013), `7e49206cd` (#1015), `a6b8841c2` (#1017), `b4c23766d` (#1016), `3f2bfe2db` (#1021). **Live production was not re-fetched at this verification** — the 2026-08-15 observation (`/version.json` serving `5e2fcedd4271`, #984) is the last measurement and publish lags git. Merging is not a publish. PR numbers on this branch do not order by merge time — order commits with `git log`, never by PR number. Do not carry older validation tables forward. Older buffers that still show `1c094a2a3` (#970) are the 2026-08-15 snapshot; discard them |
 | `main`               | Integration branch. It is not production parity. | `b6d747941948ce68157185a2b0847acea6970d44` (#779), verified 2026-08-07                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 
 `main` and `verdant-grow-diary` are divergent. Do not infer production behavior from
@@ -768,9 +782,12 @@ ships tables without ACL awareness) is the binding constraint on any role design
   raises `42P07` and aborts the replay, taking `security-db-local` and the pgTAP
   lanes with it. It is an earlier draft of a feature that already shipped.
 
-Neither branch could be deleted from this environment (the agent proxy refuses
-GitHub API writes and `git push --delete` alike), so both still exist on origin.
-They are dead by decision, not by absence — treat this entry as the disposition.
+Update 2026-08-18: **both branches are now deleted from origin.** Agent
+sessions still cannot delete branches (re-confirmed: `git push --delete` →
+HTTP 403 from the branch-scoped push credential, and the GitHub MCP toolset
+exposes no ref-deletion endpoint), so Cheek deleted them himself during the
+2026-08-18 cleanup sweep recorded below, alongside 21 other stale `claude/*`
+branches. The dispositions above remain the record of *why* they died.
 
 **Parent program:** MODE A SEO measurement-readiness work.
 
@@ -946,6 +963,39 @@ production and origin tip; Lovable Knowledge re-applied as Version 2026-08-15.1.
 Dated snapshot: `docs/lovable/verdant-project-knowledge-2026-08-15.md`. This still
 does not authorize a sync bot. Workspace knowledge was not changed. Migrations
 were not applied. Day 0 remains `UNSET`.
+
+**Completed, out of slice (recorded 2026-08-18):** Claude PR/branch cleanup
+sweep, at Cheek's request ("Clean up all of your PRs and ensure your work tree
+is clean"). Findings, all `established fact` from same-day GitHub/API and
+`git ls-remote` measurements:
+
+- **Zero open Claude-authored PRs existed at sweep time.** The six open PRs
+  (#1020, #1019, #1018, #1008, #1014, #719) are Codex, Cursor, and Grok work
+  and were not touched.
+- **23 stale `claude/*` branches existed on origin**, every one with a
+  terminal disposition verified per-branch against PR history: seven squash-
+  merged (#880, #935, #896, #736, #767, #730, #979/#992), thirteen closed
+  without merge as superseded/rejected (#936→#971, #760, #766, #810, #802,
+  #799, #800, #973, #804, #793, #933, #777, #788 — plus #997 closed on the
+  spec branch), two abandoned by Cheek 2026-08-14 (`breeder-mode-genetics`,
+  `cultivar-library-p1`), and one never-PR'd scratch branch
+  (`vibrant-liskov-22927f`) whose three unique doc files were verified
+  byte-identical on the deploy branch before deletion.
+- **Branch deletion stays impossible from agent sessions.** `git push origin
+  --delete` returns HTTP 403 for any ref other than the session's designated
+  branch (branch-scoped push credential), and the GitHub MCP server has no
+  branch-deletion tool. This re-confirms the 2026-08-14 observation with a
+  fresh failure, and re-attaching the repo with push access did not widen the
+  scope.
+- **Cheek deleted all 23 branches himself on 2026-08-18** using the command
+  list Claude supplied. A live `git ls-remote --heads origin` afterwards
+  found **zero** `claude/*` refs remaining; 152 branches from other lanes
+  remain untouched. Branches that had PRs stay recoverable via GitHub's
+  `refs/pull/N/head`.
+
+This entry records housekeeping only: no application code, schema, or policy
+was touched, no PRs belonging to other agents were closed, and nothing here
+opens a new slice.
 
 In scope — these bullets scope the **Mode A SEO parent program above**, not the completed
 #809 entry:

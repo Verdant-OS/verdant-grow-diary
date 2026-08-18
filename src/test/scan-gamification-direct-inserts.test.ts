@@ -12,7 +12,7 @@
  * Mutable temp fixtures are still walked fresh in every scenario.
  */
 import { describe, it, expect } from "vitest";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import pkg from "../../package.json";
@@ -132,5 +132,11 @@ describe("scan-gamification-direct-inserts", () => {
     expect(scripts["scan:gamification-direct-inserts"]).toBeTruthy();
     expect(scripts["smoke:award-nugs"]).toBeTruthy();
     expect(scripts["test:security-gamification"]).toContain("scan-gamification-direct-inserts");
+  });
+
+  it("keeps CI independent from the obsolete ripgrep package install", () => {
+    const workflow = readFileSync(".github/workflows/ci.yml", "utf8");
+    expect(workflow).not.toContain("Install ripgrep");
+    expect(workflow).not.toMatch(/apt-get install[^\n]*ripgrep/);
   });
 });

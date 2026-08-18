@@ -67,6 +67,7 @@ const QUICKLOG_CATALOG_CONTRACT_KEYS = Object.freeze([
   "target_functions_contract",
   "target_function_overloads_contract",
   "target_function_security_contract",
+  "manual_delegate_contract",
   "target_acl_contract",
   "client_access_contract",
 ]);
@@ -116,6 +117,72 @@ with target as (
       'quicklog_revision_rebase_captured_at', 'quicklog_retract_entry',
       'quicklog_correct_entry'
     )
+), manual_contract_function_ids(kind, oid) as (
+  values
+    (
+      'wrapper',
+      to_regprocedure(
+        'public.quicklog_save_manual(text,uuid,text,numeric,text,numeric,numeric,numeric,timestamp with time zone,jsonb,text,text)'
+      )
+    ),
+    (
+      'delegate',
+      to_regprocedure(
+        'public.quicklog_save_manual_pre_logged_at(text,uuid,text,numeric,text,numeric,numeric,numeric,timestamp with time zone,jsonb,text,text)'
+      )
+    )
+), manual_contract_functions as (
+  select ids.kind, p.*, r.rolname as owner_name, l.lanname,
+         md5(translate(p.prosrc, chr(13), '')) as normalized_prosrc_md5,
+         length(translate(p.prosrc, chr(13), '')) as normalized_prosrc_bytes
+  from manual_contract_function_ids ids
+  join pg_proc p on p.oid = ids.oid
+  join pg_roles r on r.oid = p.proowner
+  join pg_language l on l.oid = p.prolang
+), manual_helper_function_ids(
+  signature, function_name, return_type, security_definer, is_strict,
+  volatility, argument_count, argument_names, function_config,
+  source_bytes, source_md5
+) as (
+  values
+    (
+      'public.quicklog_try_parse_logged_at(text)', 'quicklog_try_parse_logged_at',
+      'timestamp with time zone'::regtype, false, true, 'i', 1,
+      array['p_value']::text[], array['search_path=pg_catalog, pg_temp']::text[],
+      414, '77f1aa70a70a9714057ef226b6996149'
+    ),
+    (
+      'public.quicklog_try_parse_uuid(text)', 'quicklog_try_parse_uuid',
+      'uuid'::regtype, false, true, 'i', 1,
+      array['p_value']::text[], array['search_path=pg_catalog, pg_temp']::text[],
+      289, 'a34d120aad5c37a33ac05fd9597624f4'
+    ),
+    (
+      'public.quicklog_stamp_diary_logged_at()', 'quicklog_stamp_diary_logged_at',
+      'trigger'::regtype, true, false, 'v', 0,
+      null::text[], array['search_path=public, pg_temp']::text[],
+      276, 'd9df46d36eb5d7aac767a3c87e53e92f'
+    ),
+    (
+      'public.quicklog_stamp_grow_event_logged_at()', 'quicklog_stamp_grow_event_logged_at',
+      'trigger'::regtype, true, false, 'v', 0,
+      null::text[], array['search_path=public, pg_temp']::text[],
+      276, 'd9df46d36eb5d7aac767a3c87e53e92f'
+    )
+), manual_helper_functions as (
+  select expected.*, p.*, r.rolname as owner_name, l.lanname,
+         case expected.function_name
+           when 'quicklog_try_parse_uuid' then md5(p.prosrc)
+           else md5(translate(p.prosrc, chr(13), ''))
+         end as normalized_prosrc_md5,
+         case expected.function_name
+           when 'quicklog_try_parse_uuid' then length(p.prosrc)
+           else length(translate(p.prosrc, chr(13), ''))
+         end as normalized_prosrc_bytes
+  from manual_helper_function_ids expected
+  join pg_proc p on p.oid = to_regprocedure(expected.signature)
+  join pg_roles r on r.oid = p.proowner
+  join pg_language l on l.oid = p.prolang
 )
 select json_build_object(
 ${QUICKLOG_DEPENDENCY_CATALOG_EXPRESSIONS_SQL},
@@ -189,6 +256,267 @@ ${QUICKLOG_DEPENDENCY_CATALOG_EXPRESSIONS_SQL},
     and to_regprocedure('public.quicklog_retract_entry(text,uuid,uuid,text)') is not null
     and to_regprocedure('public.quicklog_correct_entry(text,jsonb,uuid,uuid,text)') is not null,
   'target_function_security_contract', ${QUICKLOG_TARGET_FUNCTION_SECURITY_CONTRACT_EXPRESSION_SQL},
+  'manual_delegate_contract', coalesce((
+    select count(*) = 2
+      and bool_and(
+        f.prokind = 'f'
+        and f.prorettype = 'jsonb'::regtype
+        and not f.proretset
+        and f.lanname = 'plpgsql'
+        and f.provolatile = 'v'
+        and f.prosecdef
+        and not f.proisstrict
+        and not f.proleakproof
+        and f.proparallel = 'u'
+        and f.pronargs = 12
+        and f.pronargdefaults = 9
+        and pg_get_function_arguments(f.oid) = 'p_target_type text, p_target_id uuid, p_action text, p_volume_ml numeric DEFAULT NULL::numeric, p_note text DEFAULT NULL::text, p_temperature_c numeric DEFAULT NULL::numeric, p_humidity_pct numeric DEFAULT NULL::numeric, p_vpd_kpa numeric DEFAULT NULL::numeric, p_occurred_at timestamp with time zone DEFAULT NULL::timestamp with time zone, p_details jsonb DEFAULT NULL::jsonb, p_idempotency_key text DEFAULT NULL::text, p_stage text DEFAULT NULL::text'
+        and f.proargnames = array[
+          'p_target_type','p_target_id','p_action','p_volume_ml','p_note',
+          'p_temperature_c','p_humidity_pct','p_vpd_kpa','p_occurred_at',
+          'p_details','p_idempotency_key','p_stage'
+        ]::text[]
+        and f.proconfig = array['search_path=public, pg_temp']::text[]
+        and f.owner_name = 'postgres'
+      )
+      and count(*) filter (
+        where f.kind = 'wrapper'
+          and f.normalized_prosrc_md5 = '0d3098b81787fa90898da921345c0dbc'
+          and f.normalized_prosrc_bytes = 7752
+      ) = 1
+      and count(*) filter (
+        where f.kind = 'delegate'
+          and f.normalized_prosrc_md5 = '7ec296e422f7f47c8b2793b051840798'
+          and f.normalized_prosrc_bytes = 6734
+      ) = 1
+      and (
+        select wrapper.proowner
+        from manual_contract_functions wrapper
+        where wrapper.kind = 'wrapper'
+      ) = (
+        select delegate.proowner
+        from manual_contract_functions delegate
+        where delegate.kind = 'delegate'
+      )
+      and (
+        select count(*) = 1
+        from pg_proc p
+        join pg_namespace n on n.oid = p.pronamespace
+        where n.nspname = 'public'
+          and p.proname = 'quicklog_save_manual_pre_logged_at'
+      )
+      and (
+        select count(*) = 1
+        from pg_proc p
+        join pg_namespace n on n.oid = p.pronamespace
+        where n.nspname = 'public'
+          and p.proname = 'quicklog_save_manual'
+      )
+      and coalesce((
+        select array_agg(
+          format(
+            '%s|%s|%s|%s', coalesce(grantee.rolname, 'PUBLIC'),
+            acl.privilege_type, acl.is_grantable, grantor.rolname
+          )
+          order by coalesce(grantee.rolname, 'PUBLIC'), acl.privilege_type
+        ) = array[
+          'authenticated|EXECUTE|f|postgres',
+          'postgres|EXECUTE|f|postgres',
+          'service_role|EXECUTE|f|postgres'
+        ]::text[]
+        from manual_contract_functions wrapper
+        cross join lateral aclexplode(
+          coalesce(wrapper.proacl, acldefault('f', wrapper.proowner))
+        ) acl
+        left join pg_roles grantee on grantee.oid = acl.grantee
+        join pg_roles grantor on grantor.oid = acl.grantor
+        where wrapper.kind = 'wrapper'
+      ), false)
+      and coalesce((
+        select array_agg(
+          format(
+            '%s|%s|%s|%s', coalesce(grantee.rolname, 'PUBLIC'),
+            acl.privilege_type, acl.is_grantable, grantor.rolname
+          )
+          order by coalesce(grantee.rolname, 'PUBLIC'), acl.privilege_type
+        ) = array['postgres|EXECUTE|f|postgres']::text[]
+        from manual_contract_functions delegate
+        cross join lateral aclexplode(
+          coalesce(delegate.proacl, acldefault('f', delegate.proowner))
+        ) acl
+        left join pg_roles grantee on grantee.oid = acl.grantee
+        join pg_roles grantor on grantor.oid = acl.grantor
+        where delegate.kind = 'delegate'
+      ), false)
+      and not exists (
+        select 1
+        from manual_contract_functions delegate
+        cross join lateral aclexplode(
+          coalesce(delegate.proacl, acldefault('f', delegate.proowner))
+        ) acl
+        where delegate.kind = 'delegate'
+          and acl.privilege_type = 'EXECUTE'
+          and acl.grantee <> delegate.proowner
+      )
+      and (
+        select count(*) = 4
+          and bool_and(
+            helper.prokind = 'f'
+            and helper.proname = helper.function_name
+            and not helper.proretset
+            and helper.prorettype = helper.return_type
+            and helper.lanname = 'plpgsql'
+            and helper.owner_name = 'postgres'
+            and helper.prosecdef = helper.security_definer
+            and helper.proisstrict = helper.is_strict
+            and not helper.proleakproof
+            and helper.provolatile::text = helper.volatility
+            and helper.proparallel = 'u'
+            and helper.pronargs = helper.argument_count
+            and helper.pronargdefaults = 0
+            and helper.proargmodes is null
+            and helper.proallargtypes is null
+            and helper.proargnames is not distinct from helper.argument_names
+            and helper.proconfig = helper.function_config
+            and (
+              (
+                helper.normalized_prosrc_bytes = helper.source_bytes
+                and helper.normalized_prosrc_md5 = helper.source_md5
+              )
+              or (
+                helper.function_name = 'quicklog_try_parse_uuid'
+                and helper.normalized_prosrc_bytes = 290
+                and helper.normalized_prosrc_md5 = '4b132ee2034f8e2887da1af582295ad8'
+              )
+            )
+            and coalesce((
+              select array_agg(
+                format(
+                  '%s|%s|%s|%s', coalesce(grantee.rolname, 'PUBLIC'),
+                  acl.privilege_type, acl.is_grantable, grantor.rolname
+                )
+                order by coalesce(grantee.rolname, 'PUBLIC'), acl.privilege_type
+              ) = array['postgres|EXECUTE|f|postgres']::text[]
+              from aclexplode(
+                coalesce(helper.proacl, acldefault('f', helper.proowner))
+              ) acl
+              left join pg_roles grantee on grantee.oid = acl.grantee
+              join pg_roles grantor on grantor.oid = acl.grantor
+            ), false)
+            and not has_function_privilege('anon', helper.oid, 'EXECUTE')
+            and not has_function_privilege('authenticated', helper.oid, 'EXECUTE')
+            and not has_function_privilege('service_role', helper.oid, 'EXECUTE')
+          )
+        from manual_helper_functions helper
+      )
+      and (
+        select count(*) = 4
+        from pg_proc p
+        join pg_namespace n on n.oid = p.pronamespace
+        where n.nspname = 'public'
+          and p.proname in (
+            'quicklog_try_parse_logged_at',
+            'quicklog_try_parse_uuid',
+            'quicklog_stamp_diary_logged_at',
+            'quicklog_stamp_grow_event_logged_at'
+          )
+      )
+      and not has_function_privilege(
+        'anon',
+        to_regprocedure('public.quicklog_save_manual(text,uuid,text,numeric,text,numeric,numeric,numeric,timestamp with time zone,jsonb,text,text)'),
+        'EXECUTE'
+      )
+      and has_function_privilege(
+        'authenticated',
+        to_regprocedure('public.quicklog_save_manual(text,uuid,text,numeric,text,numeric,numeric,numeric,timestamp with time zone,jsonb,text,text)'),
+        'EXECUTE'
+      )
+      and has_function_privilege(
+        'service_role',
+        to_regprocedure('public.quicklog_save_manual(text,uuid,text,numeric,text,numeric,numeric,numeric,timestamp with time zone,jsonb,text,text)'),
+        'EXECUTE'
+      )
+      and not has_function_privilege(
+        'anon',
+        to_regprocedure('public.quicklog_save_manual_pre_logged_at(text,uuid,text,numeric,text,numeric,numeric,numeric,timestamp with time zone,jsonb,text,text)'),
+        'EXECUTE'
+      )
+      and not has_function_privilege(
+        'authenticated',
+        to_regprocedure('public.quicklog_save_manual_pre_logged_at(text,uuid,text,numeric,text,numeric,numeric,numeric,timestamp with time zone,jsonb,text,text)'),
+        'EXECUTE'
+      )
+      and not has_function_privilege(
+        'service_role',
+        to_regprocedure('public.quicklog_save_manual_pre_logged_at(text,uuid,text,numeric,text,numeric,numeric,numeric,timestamp with time zone,jsonb,text,text)'),
+        'EXECUTE'
+      )
+      and (
+        select count(*) = 2
+        from pg_attribute a
+        where (a.attrelid, a.attname) in (
+          (to_regclass('public.grow_events'), 'logged_at'),
+          (to_regclass('public.diary_entries'), 'logged_at')
+        )
+          and a.attnum > 0
+          and not a.attisdropped
+          and format_type(a.atttypid, a.atttypmod) = 'timestamp with time zone'
+          and not a.attnotnull
+          and a.atttypmod = -1
+          and a.attgenerated = ''
+          and a.attidentity = ''
+          and not exists (
+            select 1 from pg_attrdef d
+            where d.adrelid = a.attrelid and d.adnum = a.attnum
+          )
+      )
+      and exists (
+        select 1
+        from pg_attribute a
+        where a.attrelid = to_regclass('public.quicklog_idempotency')
+          and a.attname = 'request_hash'
+          and a.attnum > 0
+          and not a.attisdropped
+          and format_type(a.atttypid, a.atttypmod) = 'text'
+          and not a.attnotnull
+          and a.atttypmod = -1
+          and a.attgenerated = ''
+          and a.attidentity = ''
+          and not exists (
+            select 1 from pg_attrdef d
+            where d.adrelid = a.attrelid and d.adnum = a.attnum
+          )
+      )
+      and exists (
+        select 1
+        from pg_trigger t
+        where t.tgrelid = to_regclass('public.grow_events')
+          and t.tgname = 'trg_quicklog_stamp_grow_event_logged_at'
+          and not t.tgisinternal
+          and t.tgenabled in ('O', 'A')
+          and t.tgtype = 7
+          and t.tgqual is null
+          and t.tgnargs = 0
+          and octet_length(t.tgargs) = 0
+          and t.tgparentid = 0
+          and t.tgfoid = to_regprocedure('public.quicklog_stamp_grow_event_logged_at()')
+      )
+      and exists (
+        select 1
+        from pg_trigger t
+        where t.tgrelid = to_regclass('public.diary_entries')
+          and t.tgname = 'trg_quicklog_stamp_diary_logged_at'
+          and not t.tgisinternal
+          and t.tgenabled in ('O', 'A')
+          and t.tgtype = 7
+          and t.tgqual is null
+          and t.tgnargs = 0
+          and octet_length(t.tgargs) = 0
+          and t.tgparentid = 0
+          and t.tgfoid = to_regprocedure('public.quicklog_stamp_diary_logged_at()')
+      )
+    from manual_contract_functions f
+  ), false),
   'target_acl_contract', coalesce((
     select array_agg(format('%s|%s|%s|%s', coalesce(grantee.rolname,'PUBLIC'), acl.privilege_type, acl.is_grantable, grantor.rolname) order by coalesce(grantee.rolname,'PUBLIC'), acl.privilege_type) = array[
       'authenticated|SELECT|f|postgres',

@@ -484,8 +484,8 @@ describe("authenticated signup-acquisition PREFLIGHT artifact", () => {
 
   it("strictly rejects missing, altered, mistyped, or extra solo-founder receipt authorization", async () => {
     const verifier = await loadVerifier();
-    const missingAuthorization = receipt();
-    delete missingAuthorization.environment_approval_verified;
+    const { environment_approval_verified: _environmentApprovalVerified, ...missingAuthorization } =
+      receipt();
     const cases = [
       missingAuthorization,
       receipt({ founder_github_login: "other" }),

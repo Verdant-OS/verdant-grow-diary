@@ -543,6 +543,39 @@ describe("Quick Log manual delegate production delivery", () => {
     }
   });
 
+  it('rejects GITHUB_RUN_ATTEMPT="2" with fixed authorization evidence before psql', async () => {
+    const runner = await loadRunner();
+    const evidence = evidenceEnv();
+    const lines: string[] = [];
+    let calls = 0;
+
+    const status = runner.runQuickLogManualDelegateForwardRepair({
+      env: baseEnv({ ...evidence, GITHUB_RUN_ATTEMPT: "2" }),
+      spawnImpl: () => {
+        calls += 1;
+        return { status: 0, stdout: stdout(DEFECTIVE_STATE), stderr: "" };
+      },
+      logger: {
+        log: (...args: unknown[]) => lines.push(args.map(String).join(" ")),
+        error: (...args: unknown[]) => lines.push(args.map(String).join(" ")),
+      },
+    });
+
+    expect(status).toBe(runner.EXIT.INPUT_REJECTED);
+    expect(calls).toBe(0);
+    expect(lines).toEqual(["solo_founder_authorization_rejected"]);
+    expect(readFileSync(evidence.REPORT_PATH, "utf8")).toContain(
+      "Reason code: solo_founder_authorization_rejected",
+    );
+    expect(JSON.parse(readFileSync(evidence.AUDIT_PATH, "utf8"))).toMatchObject({
+      schema_version: 1,
+      tool: "apply-quicklog-manual-delegate-forward-repair",
+      outcome: "authorization_rejected",
+      reason_code: "solo_founder_authorization_rejected",
+    });
+    expect(existsSync(evidence.PREFLIGHT_RECEIPT_PATH)).toBe(false);
+  });
+
   it("never records the ledger after migration or canonical-postflight failure", async () => {
     const runner = await loadRunner();
     const receipt = runner.buildPreflightReceipt({
@@ -709,14 +742,65 @@ describe("Quick Log manual delegate production delivery", () => {
     expect(source).toContain("Re-resolve current deploy branch head before database access");
     expect(source).toContain("SUPABASE_DB_CA_CERT_B64");
     expect(source).toContain("retention-days: 30");
-    const summary = apply.steps.find((step: Record<string, string>) =>
-      String(step.name ?? "").includes("Publish sanitized summary"),
+  });
+
+  it("fails a successful delivery closed when its immutable evidence upload fails", () => {
+    const parsed = loadYaml(readFileSync(WORKFLOW_PATH, "utf8")) as Record<string, any>;
+    const apply = parsed.jobs.apply;
+    const successUpload = apply.steps.find(
+      (step: Record<string, string>) =>
+        step.name === "Upload sanitized evidence after successful delivery",
     );
-    const upload = apply.steps.find((step: Record<string, string>) =>
-      String(step.name ?? "").includes("Upload sanitized evidence"),
+
+    expect(successUpload).toBeDefined();
+    expect(successUpload.if).toBe("success()");
+    expect(successUpload).not.toHaveProperty("continue-on-error");
+    expect(successUpload.uses).toBe(
+      "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
     );
+    expect(successUpload.with.name).toBe(
+      "quicklog-manual-delegate-forward-repair-evidence-${{ github.run_id }}-${{ github.run_attempt }}",
+    );
+    expect(successUpload.with.path).toContain(
+      "audit/quicklog-manual-delegate-forward-repair/report.md",
+    );
+    expect(successUpload.with.path).toContain(
+      "audit/quicklog-manual-delegate-forward-repair/audit.json",
+    );
+    expect(successUpload.with["if-no-files-found"]).toBe("error");
+    expect(successUpload.with["retention-days"]).toBe(30);
+  });
+
+  it("keeps failed or cancelled evidence publication best-effort without masking the failure", () => {
+    const parsed = loadYaml(readFileSync(WORKFLOW_PATH, "utf8")) as Record<string, any>;
+    const apply = parsed.jobs.apply;
+    const summary = apply.steps.find(
+      (step: Record<string, string>) => step.name === "Publish sanitized summary",
+    );
+    const failureUpload = apply.steps.find(
+      (step: Record<string, string>) =>
+        step.name === "Upload sanitized evidence after failed or cancelled delivery",
+    );
+    const cleanupIndex = apply.steps.findIndex(
+      (step: Record<string, string>) => step.name === "Remove Supabase production CA",
+    );
+    const failureUploadIndex = apply.steps.indexOf(failureUpload);
+
+    expect(summary.if).toContain("always()");
     expect(summary["continue-on-error"]).toBe(true);
-    expect(upload["continue-on-error"]).toBe(true);
+    expect(failureUpload).toBeDefined();
+    expect(failureUpload.if).toBe("failure() || cancelled()");
+    expect(failureUpload["continue-on-error"]).toBe(true);
+    expect(failureUpload.uses).toBe(
+      "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+    );
+    expect(failureUpload.with.name).toBe(
+      "quicklog-manual-delegate-forward-repair-evidence-${{ github.run_id }}-${{ github.run_attempt }}",
+    );
+    expect(failureUpload.with["if-no-files-found"]).toBe("error");
+    expect(failureUpload.with["retention-days"]).toBe(30);
+    expect(failureUploadIndex).toBeLessThan(cleanupIndex);
+    expect(apply.steps[cleanupIndex].if).toBe("always()");
   });
 
   it("requires exact founder self-review policy and an idle snapshot of every production writer", () => {

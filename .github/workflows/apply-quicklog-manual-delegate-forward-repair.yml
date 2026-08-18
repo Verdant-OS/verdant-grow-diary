@@ -369,8 +369,19 @@ jobs:
         continue-on-error: true
         run: cat audit/quicklog-manual-delegate-forward-repair/report.md >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Upload sanitized evidence
-        if: always()
+      - name: Upload sanitized evidence after successful delivery
+        if: success()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: quicklog-manual-delegate-forward-repair-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            audit/quicklog-manual-delegate-forward-repair/report.md
+            audit/quicklog-manual-delegate-forward-repair/audit.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload sanitized evidence after failed or cancelled delivery
+        if: failure() || cancelled()
         continue-on-error: true
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:

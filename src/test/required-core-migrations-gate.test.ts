@@ -86,6 +86,7 @@ const CANONICAL_QUICKLOG_CATALOG_CONTRACT = Object.freeze({
   target_functions_contract: true,
   target_function_overloads_contract: true,
   target_function_security_contract: true,
+  manual_delegate_contract: true,
   target_acl_contract: true,
   client_access_contract: true,
 });
@@ -686,6 +687,46 @@ describe("remote applied-schema runner safety", () => {
     expect(catalogSql).toContain("proacl");
   });
 
+  it("attests the exact Quick Log wrapper and repaired internal manual delegate", () => {
+    const catalogSql = emittedQuickLogCatalogSql();
+    const delegateContract = catalogSql.slice(
+      catalogSql.indexOf("'manual_delegate_contract'"),
+      catalogSql.indexOf("'target_acl_contract'"),
+    );
+
+    expect(delegateContract).toContain("quicklog_save_manual_pre_logged_at");
+    expect(delegateContract).toContain("quicklog_save_manual(text,uuid,text,numeric");
+    expect(delegateContract).toContain("0d3098b81787fa90898da921345c0dbc");
+    expect(delegateContract).toContain("7ec296e422f7f47c8b2793b051840798");
+    expect(delegateContract).toContain("search_path=public, pg_temp");
+    expect(delegateContract).toContain("quicklog_idempotency");
+    expect(delegateContract).toContain("request_hash");
+    expect(delegateContract.match(/not\s+a\.attnotnull/gi) ?? []).toHaveLength(2);
+    expect(delegateContract.match(/a\.atttypmod\s*=\s*-1/gi) ?? []).toHaveLength(2);
+    expect(delegateContract.match(/a\.attgenerated\s*=\s*''/gi) ?? []).toHaveLength(2);
+    expect(delegateContract.match(/a\.attidentity\s*=\s*''/gi) ?? []).toHaveLength(2);
+    expect(delegateContract.match(/pg_attrdef/gi) ?? []).toHaveLength(2);
+    expect(catalogSql).toContain("77f1aa70a70a9714057ef226b6996149");
+    expect(catalogSql).toContain("a34d120aad5c37a33ac05fd9597624f4");
+    expect(catalogSql).toContain("d9df46d36eb5d7aac767a3c87e53e92f");
+    expect(delegateContract).toContain("trg_quicklog_stamp_grow_event_logged_at");
+    expect(delegateContract).toContain("trg_quicklog_stamp_diary_logged_at");
+    expect(delegateContract).toContain("proisstrict");
+    expect(delegateContract).toContain("tgqual");
+    expect(delegateContract).toContain("tgnargs");
+    expect(delegateContract).toContain("tgargs");
+    expect(delegateContract).toContain("tgparentid");
+    expect(delegateContract).toContain("aclexplode");
+    expect(delegateContract).toContain("pg_get_function_arguments");
+    expect(delegateContract).toMatch(
+      /select\s+count\(\*\)\s*=\s*1[\s\S]*p\.proname\s*=\s*'quicklog_save_manual'/i,
+    );
+    expect(delegateContract).toMatch(/select\s+count\(\*\)\s*=\s*4[\s\S]*p\.proname\s+in/i);
+    expect(delegateContract).toMatch(/has_function_privilege\(\s*'anon'/);
+    expect(delegateContract).toMatch(/has_function_privilege\(\s*'authenticated'/);
+    expect(delegateContract).toMatch(/has_function_privilege\(\s*'service_role'/);
+  });
+
   it("requires every pinned index to be valid, ready, and live", () => {
     const catalogSql = emittedQuickLogCatalogSql();
     expect(catalogSql).toContain("indisvalid");
@@ -1202,7 +1243,9 @@ describe("remote applied-schema runner safety", () => {
     expect(catalogSql).toContain("pg_get_expr(p.polwithcheck,p.polrelid)");
     expect(catalogSql).not.toContain("p.polwithcheck is null");
     expect(catalogSql).toContain("d1d3c1bab8cfb8d7aed032a1b9efa698");
-    expect(exactQuickLogCatalogKeys(PREFLIGHT_SQL)).toEqual(QUICKLOG_CATALOG_CONTRACT_KEYS);
+    expect(exactQuickLogCatalogKeys(PREFLIGHT_SQL)).toEqual(
+      QUICKLOG_CATALOG_CONTRACT_KEYS.filter((key) => key !== "manual_delegate_contract"),
+    );
     expect(exactQuickLogCatalogKeys(catalogSql)).toEqual(QUICKLOG_CATALOG_CONTRACT_KEYS);
     expect(calls[1].env).toEqual(calls[0].env);
   });

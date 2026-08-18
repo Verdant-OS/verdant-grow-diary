@@ -1037,6 +1037,44 @@ describe("signup-acquisition forward-repair execution", () => {
     }
   });
 
+  it('rejects GITHUB_RUN_ATTEMPT="2" with fixed authorization evidence before psql', async () => {
+    const runner = await loadRunner();
+    const evidence = temporaryEvidenceEnv();
+    const logs: string[] = [];
+    let calls = 0;
+
+    const exitCode = runner.runSignupAcquisitionForwardRepair({
+      env: baseEnv({
+        GITHUB_RUN_ATTEMPT: "2",
+        REPORT_PATH: evidence.reportPath,
+        AUDIT_PATH: evidence.auditPath,
+        PREFLIGHT_RECEIPT_PATH: evidence.preflightReceiptPath,
+      }),
+      spawnImpl: () => {
+        calls += 1;
+        return { status: 0, stdout: preflightStdout(), stderr: "" };
+      },
+      logger: {
+        log: (line: string) => logs.push(line),
+        error: (line: string) => logs.push(line),
+      },
+    });
+
+    expect(exitCode).toBe(runner.EXIT.INPUT_REJECTED);
+    expect(calls).toBe(0);
+    expect(logs).toEqual(["solo_founder_authorization_rejected"]);
+    expect(readFileSync(evidence.reportPath, "utf8")).toContain(
+      "Reason code: solo_founder_authorization_rejected",
+    );
+    expect(JSON.parse(readFileSync(evidence.auditPath, "utf8"))).toMatchObject({
+      schema_version: 1,
+      tool: "apply-signup-acquisition-forward-repair",
+      outcome: "authorization_rejected",
+      reason_code: "solo_founder_authorization_rejected",
+    });
+    expect(existsSync(evidence.preflightReceiptPath)).toBe(false);
+  });
+
   it("rejects APPLY before database access when the deploy branch advanced during review", async () => {
     const runner = await loadRunner();
     let calls = 0;
@@ -1637,14 +1675,63 @@ describe("signup-acquisition forward-repair protected workflow", () => {
     expect(receiptUpload.with.name).toContain("${{ github.run_id }}");
     expect(receiptUpload.with.name).toContain("${{ github.run_attempt }}");
     expect(receiptUpload.with.path).toContain("preflight-receipt.json");
-    const upload = apply.steps.find(
-      (step: any) =>
-        String(step.uses ?? "").startsWith("actions/upload-artifact@") &&
-        String(step.name ?? "").includes("sanitized evidence"),
+  });
+
+  it("fails a successful delivery closed when its immutable evidence upload fails", () => {
+    const parsed = loadYaml(readFileSync(WORKFLOW_PATH, "utf8")) as Record<string, any>;
+    const apply = parsed.jobs.apply;
+    const successUpload = apply.steps.find(
+      (step: Record<string, string>) =>
+        step.name === "Upload sanitized evidence after successful delivery",
     );
-    expect(upload.if).toBe("always()");
-    expect(upload["continue-on-error"]).toBe(true);
-    expect(upload.with["if-no-files-found"]).toBe("error");
+
+    expect(successUpload).toBeDefined();
+    expect(successUpload.if).toBe("success()");
+    expect(successUpload).not.toHaveProperty("continue-on-error");
+    expect(successUpload.uses).toBe(
+      "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+    );
+    expect(successUpload.with.name).toBe(
+      "signup-acquisition-forward-repair-evidence-${{ github.run_id }}-${{ github.run_attempt }}",
+    );
+    expect(successUpload.with.path).toContain("audit/signup-acquisition-forward-repair/report.md");
+    expect(successUpload.with.path).toContain("audit/signup-acquisition-forward-repair/audit.json");
+    expect(successUpload.with["if-no-files-found"]).toBe("error");
+    expect(successUpload.with["retention-days"]).toBe(30);
+  });
+
+  it("keeps failed or cancelled evidence publication best-effort without masking the failure", () => {
+    const parsed = loadYaml(readFileSync(WORKFLOW_PATH, "utf8")) as Record<string, any>;
+    const apply = parsed.jobs.apply;
+    const summary = apply.steps.find(
+      (step: Record<string, string>) => step.name === "Publish sanitized summary",
+    );
+    const failureUpload = apply.steps.find(
+      (step: Record<string, string>) =>
+        step.name === "Upload sanitized evidence after failed or cancelled delivery",
+    );
+    const cleanupIndex = apply.steps.findIndex(
+      (step: Record<string, string>) => step.name === "Remove Supabase production CA",
+    );
+    const failureUploadIndex = apply.steps.indexOf(failureUpload);
+
+    expect(summary.if).toContain("always()");
+    expect(summary["continue-on-error"]).toBe(true);
+    expect(failureUpload).toBeDefined();
+    expect(failureUpload.if).toBe("failure() || cancelled()");
+    expect(failureUpload["continue-on-error"]).toBe(true);
+    expect(failureUpload.uses).toBe(
+      "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+    );
+    expect(failureUpload.with.name).toBe(
+      "signup-acquisition-forward-repair-evidence-${{ github.run_id }}-${{ github.run_attempt }}",
+    );
+    expect(failureUpload.with.path).toContain("audit/signup-acquisition-forward-repair/report.md");
+    expect(failureUpload.with.path).toContain("audit/signup-acquisition-forward-repair/audit.json");
+    expect(failureUpload.with["if-no-files-found"]).toBe("error");
+    expect(failureUpload.with["retention-days"]).toBe(30);
+    expect(failureUploadIndex).toBeLessThan(cleanupIndex);
+    expect(apply.steps[cleanupIndex].if).toBe("always()");
   });
 
   it("documents the exact solo-founder ceremony without authorizing browser/account E2E", () => {

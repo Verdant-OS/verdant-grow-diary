@@ -112,8 +112,8 @@ function cleanupStep(job: WorkflowJob) {
   return job.steps.find((step) => step.name === "Remove Supabase production CA");
 }
 
-function expectProtectedCaWorkflow(job: WorkflowJob) {
-  expect(job.environment).toBe("verdant-production");
+function expectProtectedCaWorkflow(job: WorkflowJob, expectedEnvironment = "verdant-production") {
+  expect(job.environment).toBe(expectedEnvironment);
 
   const guard = requireStep(job);
   expect(guard).toBeDefined();
@@ -308,7 +308,7 @@ describe("production Supabase CA workflow boundary", () => {
     const parsed = workflow(SIGNUP_APPLY_WORKFLOW_PATH);
     const job = parsed.jobs.apply;
 
-    expectProtectedCaWorkflow(job);
+    expectProtectedCaWorkflow(job, "verdant-production-solo-founder");
     const runner = job.steps.find(
       (step) => step.name === "Run the environment-gated signup-acquisition repair gate",
     );

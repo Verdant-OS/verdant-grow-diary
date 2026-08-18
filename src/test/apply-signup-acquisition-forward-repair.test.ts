@@ -9,6 +9,7 @@ import { PRODUCTION_SUPABASE_CA_FILENAME } from "../../scripts/lib/productionSup
 
 const RUNNER_PATH = resolve("scripts/apply-signup-acquisition-forward-repair.mjs");
 const WORKFLOW_PATH = resolve(".github/workflows/apply-signup-acquisition-forward-repair.yml");
+const RUNBOOK_PATH = resolve("docs/signup-attribution-outage-operator-runbook.md");
 const MIGRATION_PATH = resolve(
   "supabase/migrations/20260813030000_signup_acquisition_forward_repair.sql",
 );
@@ -32,6 +33,29 @@ const EXPECTED_RUN_ATTEMPT = "1";
 const DATABASE_SECRET = "signup-repair-database-secret";
 const DATABASE_URL = `postgres://postgres:${DATABASE_SECRET}@db.${PRODUCTION_PROJECT_REF}.supabase.co:5432/postgres?sslmode=require`;
 const RAW_CA_SECRET_SENTINEL = "raw-ca-secret-must-not-reach-psql";
+const SOLO_FOUNDER_ACKNOWLEDGEMENT = "I AM THE SOLE FOUNDER AND AUTHORIZE THIS PRODUCTION RUN";
+const SOLO_FOUNDER_AUTHORIZATION_ENV = Object.freeze({
+  SOLO_FOUNDER_DELIVERY_MODE: "solo_founder_self_review_v1",
+  SOLO_FOUNDER_VERIFIED_USER_ID: "72639960",
+  SOLO_FOUNDER_VERIFIED_LOGIN: "cheekhimself",
+  SOLO_FOUNDER_VERIFIED_ENVIRONMENT: "verdant-production-solo-founder",
+  SOLO_FOUNDER_ACKNOWLEDGEMENT_VERIFIED: "true",
+  SOLO_FOUNDER_ENVIRONMENT_CONTRACT_VERIFIED: "true",
+  SOLO_FOUNDER_ENVIRONMENT_APPROVAL_VERIFIED: "true",
+  SOLO_FOUNDER_MINIMUM_REVIEW_SECONDS: "900",
+  SOLO_FOUNDER_MAXIMUM_REVIEW_SECONDS: "86400",
+});
+const SOLO_FOUNDER_AUTHORIZATION_RECEIPT = Object.freeze({
+  delivery_mode: "solo_founder_self_review_v1",
+  founder_github_user_id: 72639960,
+  founder_github_login: "cheekhimself",
+  production_environment: "verdant-production-solo-founder",
+  solo_founder_acknowledgement_verified: true,
+  environment_contract_verified: true,
+  environment_approval_verified: true,
+  minimum_review_seconds: 900,
+  maximum_review_seconds: 86400,
+});
 
 const EXPECTED_SOURCES = [
   "blueprint_targets",
@@ -235,6 +259,8 @@ function baseEnv(extra: Record<string, string> = {}) {
     GITHUB_RUN_ATTEMPT: EXPECTED_RUN_ATTEMPT,
     GITHUB_EVENT_NAME: "workflow_dispatch",
     GITHUB_REF_NAME: "verdant-grow-diary",
+    SOLO_FOUNDER_ACKNOWLEDGEMENT,
+    ...SOLO_FOUNDER_AUTHORIZATION_ENV,
     PATH: process.env.PATH ?? "",
     ...productionTlsEnv(),
     ...extra,
@@ -852,6 +878,7 @@ describe("signup-acquisition forward-repair execution", () => {
       run_id: EXPECTED_RUN_ID,
       run_attempt: Number(EXPECTED_RUN_ATTEMPT),
       receipt_digest: expect.stringMatching(/^[0-9a-f]{64}$/),
+      ...SOLO_FOUNDER_AUTHORIZATION_RECEIPT,
     });
     expect(JSON.parse(readFileSync(evidence.preflightReceiptPath, "utf8"))).toEqual({
       schema_version: 1,
@@ -872,6 +899,7 @@ describe("signup-acquisition forward-repair execution", () => {
       migration_name: "signup_acquisition_forward_repair",
       migration_sha256: EXPECTED_SHA256,
       state_digest: expect.stringMatching(/^[0-9a-f]{64}$/),
+      ...SOLO_FOUNDER_AUTHORIZATION_RECEIPT,
     });
   });
 
@@ -957,6 +985,56 @@ describe("signup-acquisition forward-repair execution", () => {
       ).toBe(runner.EXIT.INPUT_REJECTED);
     }
     expect(calls).toBe(0);
+  });
+
+  it("rejects every missing or altered solo-founder authorization value before psql", async () => {
+    const runner = await loadRunner();
+    const protectedValues = {
+      GITHUB_RUN_ATTEMPT: EXPECTED_RUN_ATTEMPT,
+      SOLO_FOUNDER_ACKNOWLEDGEMENT,
+      ...SOLO_FOUNDER_AUTHORIZATION_ENV,
+    };
+    const cases = Object.entries(protectedValues).flatMap(([key, value]) => [
+      { key, value: undefined },
+      { key, value: value === "true" ? "false" : `${value}-altered` },
+    ]);
+
+    for (const { key, value } of cases) {
+      const evidence = temporaryEvidenceEnv();
+      const logs: string[] = [];
+      let calls = 0;
+      const env = baseEnv({
+        REPORT_PATH: evidence.reportPath,
+        AUDIT_PATH: evidence.auditPath,
+        PREFLIGHT_RECEIPT_PATH: evidence.preflightReceiptPath,
+        SUPABASE_DB_URL: `postgres://attacker:${DATABASE_SECRET}@attacker.invalid/db`,
+      });
+      if (value === undefined) delete (env as Record<string, string | undefined>)[key];
+      else (env as Record<string, string | undefined>)[key] = value;
+      const exitCode = runner.runSignupAcquisitionForwardRepair({
+        env,
+        spawnImpl: () => {
+          calls += 1;
+          return { status: 0, stdout: preflightStdout(), stderr: "" };
+        },
+        logger: {
+          log: (line: string) => logs.push(line),
+          error: (line: string) => logs.push(line),
+        },
+      });
+
+      expect(exitCode, key).toBe(runner.EXIT.INPUT_REJECTED);
+      expect(calls, key).toBe(0);
+      const surfaces = [
+        logs.join("\n"),
+        readFileSync(evidence.reportPath, "utf8"),
+        readFileSync(evidence.auditPath, "utf8"),
+      ].join("\n");
+      expect(surfaces, key).toContain("solo_founder_authorization_rejected");
+      expect(surfaces, key).not.toContain(DATABASE_SECRET);
+      expect(surfaces, key).not.toContain("attacker.invalid");
+      expect(existsSync(evidence.preflightReceiptPath), key).toBe(false);
+    }
   });
 
   it("rejects APPLY before database access when the deploy branch advanced during review", async () => {
@@ -1101,6 +1179,7 @@ describe("signup-acquisition forward-repair execution", () => {
       migration_version: "20260813030000",
       expected_head_sha: EXPECTED_HEAD_SHA,
       observed_head_sha: EXPECTED_HEAD_SHA,
+      ...SOLO_FOUNDER_AUTHORIZATION_RECEIPT,
     });
     const evidenceText = `${readFileSync(evidence.reportPath, "utf8")}\n${readFileSync(evidence.auditPath, "utf8")}`;
     expect(evidenceText).not.toContain(DATABASE_SECRET);
@@ -1378,9 +1457,26 @@ describe("signup-acquisition forward-repair protected workflow", () => {
             type: "string",
             default: "",
           }),
+          expected_preflight_run_attempt: expect.objectContaining({
+            required: false,
+            type: "string",
+            default: "",
+          }),
+          expected_preflight_artifact_sha256: expect.objectContaining({
+            required: false,
+            type: "string",
+            default: "",
+          }),
+          solo_founder_acknowledgement: expect.objectContaining({
+            required: true,
+            type: "string",
+          }),
         },
       },
     });
+    expect(workflow.on.workflow_dispatch.inputs.solo_founder_acknowledgement).not.toHaveProperty(
+      "default",
+    );
     expect(workflow.permissions).toEqual({ contents: "read", actions: "read" });
     expect(workflow.concurrency).toEqual({
       group: "verdant-production-migration-writer",
@@ -1400,10 +1496,21 @@ describe("signup-acquisition forward-repair protected workflow", () => {
     expect(validateCommands).toContain('"APPLY"');
     expect(validateCommands).toContain('"PREFLIGHT"');
     expect(validateCommands).toContain("PREFLIGHT_RUN_ID");
+    expect(validateCommands).toContain("EXPECTED_PREFLIGHT_RUN_ATTEMPT");
+    expect(validateCommands).toContain("EXPECTED_PREFLIGHT_ARTIFACT_SHA256");
+    expect(validateCommands).toContain(SOLO_FOUNDER_ACKNOWLEDGEMENT);
+    expect(validateCommands).toContain("GITHUB_ACTOR_ID");
+    expect(validateCommands).toContain("GITHUB_ACTOR");
+    expect(validateCommands).toContain("GITHUB_TRIGGERING_ACTOR");
+    expect(validateCommands).toContain("GITHUB_RUN_ATTEMPT");
+    expect(validateCommands).toContain("72639960");
+    expect(validateCommands).toContain("cheekhimself");
+    expect(validateCommands).toMatch(/PREFLIGHT[\s\S]*PREFLIGHT_RUN_ID[\s\S]*-n/);
+    expect(validateCommands).toMatch(/APPLY[\s\S]*PREFLIGHT_RUN_ID/);
 
     const apply = workflow.jobs.apply;
     expect(apply.needs).toBe("validate");
-    expect(apply.environment).toBe("verdant-production");
+    expect(apply.environment).toBe("verdant-production-solo-founder");
     expect(apply.env).toMatchObject({
       OPERATION: "${{ inputs.operation }}",
       TARGET_ENV: "production",
@@ -1411,7 +1518,16 @@ describe("signup-acquisition forward-repair protected workflow", () => {
       CONFIRM_PROJECT_REF: "${{ inputs.confirm_project_ref }}",
       CONFIRM_APPLY: "${{ inputs.confirm_apply }}",
       PREFLIGHT_RUN_ID: "${{ inputs.preflight_run_id }}",
+      EXPECTED_PREFLIGHT_RUN_ATTEMPT: "${{ inputs.expected_preflight_run_attempt }}",
+      EXPECTED_PREFLIGHT_ARTIFACT_SHA256: "${{ inputs.expected_preflight_artifact_sha256 }}",
+      SOLO_FOUNDER_ACKNOWLEDGEMENT: "${{ inputs.solo_founder_acknowledgement }}",
     });
+    const auditDirectoryIndex = apply.steps.findIndex((step: any) =>
+      String(step.name ?? "").includes("Prepare sanitized audit directory"),
+    );
+    const authorizationIndex = apply.steps.findIndex((step: any) =>
+      String(step.name ?? "").includes("solo-founder production authorization"),
+    );
     const headResolutionIndex = apply.steps.findIndex((step: any) =>
       String(step.name ?? "").includes("current deploy branch head"),
     );
@@ -1428,11 +1544,33 @@ describe("signup-acquisition forward-repair protected workflow", () => {
     const provenanceIndex = apply.steps.findIndex((step: any) =>
       String(step.name ?? "").includes("authenticated PREFLIGHT artifact"),
     );
+    expect(authorizationIndex).toBe(auditDirectoryIndex + 1);
+    const authorizationStep = apply.steps[authorizationIndex];
+    expect(authorizationStep.run).toContain(
+      'gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"',
+    );
+    expect(authorizationStep.run).toContain(
+      'gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/approvals"',
+    );
+    expect(authorizationStep.run).toContain(
+      'gh api "repos/${GITHUB_REPOSITORY}/environments/verdant-production-solo-founder"',
+    );
+    expect(authorizationStep.run).toContain("deployment-branch-policies?per_page=100");
+    expect(authorizationStep.run.match(/\bgh api\b/g) ?? []).toHaveLength(4);
+    expect(authorizationStep.run.match(/--jq/g) ?? []).toHaveLength(4);
+    expect(authorizationStep.run).toContain(
+      "node scripts/verify-solo-founder-production-authorization.mjs",
+    );
+    expect(authorizationStep.run).toContain('"outcome":"authorization_rejected"');
+    expect(authorizationStep.run).toContain('"reason_code":"solo_founder_authorization_rejected"');
     expect(provenanceIndex).toBeGreaterThan(-1);
     expect(apply.steps[provenanceIndex].run).toContain("$AUDIT_PATH");
     expect(apply.steps[provenanceIndex].run).toContain('"outcome":"artifact_rejected"');
     expect(apply.steps[provenanceIndex].run).toContain('"reason_code":"artifact_rejected"');
     expect(apply.steps[provenanceIndex].run).not.toContain('"reason_code":"receipt_missing"');
+    expect(authorizationIndex).toBeLessThan(provenanceIndex);
+    expect(authorizationIndex).toBeLessThan(secretGuardIndex);
+    expect(authorizationIndex).toBeLessThan(postgresInstallIndex);
     expect(provenanceIndex).toBeLessThan(headResolutionIndex);
     expect(secretGuardIndex).toBeLessThan(headResolutionIndex);
     expect(postgresInstallIndex).toBeLessThan(headResolutionIndex);
@@ -1474,6 +1612,34 @@ describe("signup-acquisition forward-repair protected workflow", () => {
         String(step.name ?? "").includes("sanitized evidence"),
     );
     expect(upload.if).toBe("always()");
+    expect(upload["continue-on-error"]).toBe(true);
     expect(upload.with["if-no-files-found"]).toBe("error");
+  });
+
+  it("documents the exact solo-founder ceremony without authorizing browser/account E2E", () => {
+    const runbook = readFileSync(RUNBOOK_PATH, "utf8");
+
+    for (const required of [
+      "verdant-production-solo-founder",
+      "cheekhimself",
+      "72639960",
+      "Prevent self-review OFF",
+      "administrator bypass OFF",
+      "verdant-grow-diary",
+      SOLO_FOUNDER_ACKNOWLEDGEMENT,
+      "15 minutes",
+      "24 hours",
+      "expected_preflight_run_attempt",
+      "expected_preflight_artifact_sha256",
+      "fresh dispatch",
+      "This proves founder identity, intent, provenance, and elapsed time; it is not independent human review.",
+    ]) {
+      expect(runbook).toContain(required);
+    }
+    expect(runbook).toMatch(/founder self-review/i);
+    expect(runbook).toMatch(/exactly one required reviewer/i);
+    expect(runbook).toMatch(/fresh (?:Verdant )?account or browser E2E[^\n]*(?:separate|outside)/i);
+    expect(runbook).not.toContain("reviewer (who is not the dispatcher)");
+    expect(runbook).not.toContain("prevent-self-review enabled");
   });
 });

@@ -671,22 +671,23 @@ blocks both PREFLIGHT and the locked APPLY guard.
 
 The runner fails closed in this order:
 
-1. exact operation, production target, lowercase 40-character commit, and checked-out SHA;
-2. for APPLY only, the exact phrase, authenticated prior PREFLIGHT run/artifact, and freshly
+1. exact solo-founder authorization evidence and protected workflow attempt `1`;
+2. exact operation, production target, lowercase 40-character commit, and checked-out SHA;
+3. for APPLY only, the exact phrase, authenticated prior PREFLIGHT run/artifact, and freshly
    resolved deploy branch head;
-3. exact Supabase project identity derived from the protected URL;
-4. the fixed runner-temp Supabase production CA as an ordinary, non-symlinked, bounded,
+4. exact Supabase project identity derived from the protected URL;
+5. the fixed runner-temp Supabase production CA as an ordinary, non-symlinked, bounded,
    parseable CA certificate, then forced `sslmode=verify-full` and hostname verification;
-5. exact LF migration bytes, final newline, SHA-256, and transaction-safety scan;
-6. a bounded, transaction-enforced **read-only** preflight over every accepted ledger
+6. exact LF migration bytes, final newline, SHA-256, and transaction-safety scan;
+7. a bounded, transaction-enforced **read-only** preflight over every accepted ledger
    identity, prerequisite, and postcondition;
-7. for an existing partial target table, exact non-repairable compatibility: an ordinary
+8. for an existing partial target table, exact non-repairable compatibility: an ordinary
    permanent, non-partitioned, non-FORCE-RLS table with the three exact columns, PK, FK,
    expected owner relationship, no extra constraints, no unexpected unique/exclusion index,
    no user trigger/rewrite rule/policy/publication/reloption, only repairable ACL principals,
    and only allowlisted existing sources. An absent table is also safe. RLS, client grants,
    the named source CHECK, and functions are repairable by the migration;
-8. exact prerequisites: ordinary permanent `auth.users`, `public.profiles`,
+9. exact prerequisites: ordinary permanent `auth.users`, `public.profiles`,
    `public.subscriptions`, and `public.user_roles` relations with every used typed column;
    the full 11-column profile order, types, nullability, defaults, generated/identity state;
    usable exact `profiles_pkey(user_id)` conflict support; the exact partial referral-code
@@ -695,31 +696,31 @@ The runner fails closed in this order:
    `public.app_role` operator label; pinned dependency definitions, owners, search paths, ACLs,
    effective privilege denials, and usable `user_roles` read access for `has_role`; and the
    enabled, fingerprinted `on_auth_user_created` trigger targeting `handle_new_user`;
-9. a deliberately narrow migration-ledger compatibility contract matching Verdant's existing
-   pinned production runner: current role `postgres`; ordinary permanent
-   `supabase_migrations.schema_migrations`; ordered `version`, `name`, `statements` columns with
-   exact types/nullability and no defaults/generated identity; exact `PRIMARY KEY(version)` and
-   backing index; current-role schema/table ownership and owner-only ACLs; no RLS, policies,
-   publication, inheritance, reloptions, user trigger, or rewrite rule; and effective
-   SELECT/INSERT/lock capability. This is a compatibility requirement evaluated by PREFLIGHT,
-   not a claim that this change measured today's live catalog;
-10. a boolean creation-default ACL contract over applicable `pg_default_acl` rows for the
+10. a deliberately narrow migration-ledger compatibility contract matching Verdant's existing
+    pinned production runner: current role `postgres`; ordinary permanent
+    `supabase_migrations.schema_migrations`; ordered `version`, `name`, `statements` columns with
+    exact types/nullability and no defaults/generated identity; exact `PRIMARY KEY(version)` and
+    backing index; current-role schema/table ownership and owner-only ACLs; no RLS, policies,
+    publication, inheritance, reloptions, user trigger, or rewrite rule; and effective
+    SELECT/INSERT/lock capability. This is a compatibility requirement evaluated by PREFLIGHT,
+    not a claim that this change measured today's live catalog;
+11. a boolean creation-default ACL contract over applicable `pg_default_acl` rows for the
     current owner and `public` schema. Hardened defaults and the documented legacy
     PUBLIC/anon/authenticated/service-role table/function defaults are accepted only because
     the protected wrapper deterministically normalizes them; any other grantee, grantor, or
     privilege blocks SAFE_TO_APPLY;
-11. pre-apply compatibility for all four replaceable function signatures: `handle_new_user`
+12. pre-apply compatibility for all four replaceable function signatures: `handle_new_user`
     must exist, and every existing target function must have the expected unchangeable return
     shape, owner `postgres`, and only ACL/grantor entries the migration explicitly normalizes;
-12. the SHA/project/state-bound receipt comparison;
-13. the exact migration body, protected ACL normalization, and canonical bare-name ledger
+13. the SHA/project/state-bound receipt comparison;
+14. the exact migration body, protected ACL normalization, and canonical bare-name ledger
     insert in one
     `psql --single-transaction` file under explicit READ COMMITTED isolation and bounded lock
     and statement timeouts. The same transaction takes SHARE ROW EXCLUSIVE locks on the
     migration ledger, `auth.users`, and `public.profiles`, then repeats the non-repairable ledger
     and profile guards before the migration body. The `auth.users` lock closes the gap between
     the historical backfill and installation of the new insert trigger;
-14. an in-transaction exact ACL postcondition before the ledger insert, followed by the same
+15. an in-transaction exact ACL postcondition before the ledger insert, followed by the same
     bounded read-only query as postflight.
 
 An accepted exact ledger identity plus the full live schema contract returns
@@ -816,8 +817,8 @@ exactly the condition that lets a later catch-up re-run it out of order.
 
 ### Failure and rollback notes
 
-- Before the apply transaction commits, rerun after correcting the enumerated blocker; no
-  persistent write is assumed.
+- Before the apply transaction commits, correct the enumerated blocker, then use a fresh
+  `workflow_dispatch` at attempt `1`; no persistent write is assumed.
 - A moved branch, rejected artifact, or receipt mismatch is not an APPLY retry signal. Run a
   fresh PREFLIGHT dispatch, approve it as the founder through
   `verdant-production-solo-founder`, and start a separate fresh APPLY dispatch using the new

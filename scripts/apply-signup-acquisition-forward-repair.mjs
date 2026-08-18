@@ -2244,7 +2244,7 @@ export function runSignupAcquisitionForwardRepair({
   if (!databaseUrl) {
     logger.error("The protected production database URL is not configured.");
     writeReport("BLOCKED - database secret missing", [
-      "The verdant-production environment did not provide SUPABASE_DB_URL.",
+      "The verdant-production-solo-founder environment did not provide SUPABASE_DB_URL.",
       "No database process was started.",
     ]);
     writeAudit("no_database_url", base, { reason_code: "database_secret_missing" });

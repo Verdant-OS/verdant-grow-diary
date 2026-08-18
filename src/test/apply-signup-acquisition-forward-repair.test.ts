@@ -1127,6 +1127,37 @@ describe("signup-acquisition forward-repair execution", () => {
     expect(calls).toBe(0);
   });
 
+  it("names only the dedicated solo-founder environment in missing-secret guidance", async () => {
+    const runner = await loadRunner();
+    const evidence = temporaryEvidenceEnv();
+    let calls = 0;
+
+    expect(
+      runner.runSignupAcquisitionForwardRepair({
+        env: baseEnv({
+          SUPABASE_DB_URL: "",
+          REPORT_PATH: evidence.reportPath,
+          AUDIT_PATH: evidence.auditPath,
+          PREFLIGHT_RECEIPT_PATH: evidence.preflightReceiptPath,
+        }),
+        spawnImpl: () => {
+          calls += 1;
+          return { status: 0, stdout: "", stderr: "" };
+        },
+        logger: { log: () => {}, error: () => {} },
+      }),
+    ).toBe(runner.EXIT.NO_DATABASE_URL);
+
+    const report = readFileSync(evidence.reportPath, "utf8");
+    expect(report).toContain(
+      "The verdant-production-solo-founder environment did not provide SUPABASE_DB_URL.",
+    );
+    expect(report).not.toContain(
+      "The verdant-production environment did not provide SUPABASE_DB_URL.",
+    );
+    expect(calls).toBe(0);
+  });
+
   it("runs preflight, exact migration plus ledger in one transaction, then postflight", async () => {
     const runner = await loadRunner();
     const evidence = temporaryEvidenceEnv();
@@ -1638,8 +1669,17 @@ describe("signup-acquisition forward-repair protected workflow", () => {
     }
     expect(runbook).toMatch(/founder self-review/i);
     expect(runbook).toMatch(/exactly one required reviewer/i);
+    expect(runbook).toContain(
+      "The runner fails closed in this order:\n\n1. exact solo-founder authorization evidence and protected workflow attempt `1`;",
+    );
+    expect(runbook).toMatch(
+      /Before the apply transaction commits, correct the enumerated blocker, then use a fresh\s+`workflow_dispatch` at attempt `1`; no persistent write is assumed\./,
+    );
     expect(runbook).toMatch(/fresh (?:Verdant )?account or browser E2E[^\n]*(?:separate|outside)/i);
     expect(runbook).not.toContain("reviewer (who is not the dispatcher)");
     expect(runbook).not.toContain("prevent-self-review enabled");
+    expect(runbook).not.toContain(
+      "Before the apply transaction commits, rerun after correcting the enumerated blocker",
+    );
   });
 });

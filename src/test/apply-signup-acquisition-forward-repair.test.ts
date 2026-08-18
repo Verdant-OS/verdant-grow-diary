@@ -1749,12 +1749,14 @@ describe("signup-acquisition forward-repair protected workflow", () => {
       "24 hours",
       "expected_preflight_run_attempt",
       "expected_preflight_artifact_sha256",
+      "signup-acquisition-forward-repair-preflight-run-<RUN_ID>-attempt-1",
       "fresh dispatch",
       "This proves founder identity, intent, provenance, and elapsed time; it is not independent human review.",
     ]) {
       expect(runbook).toContain(required);
     }
     expect(runbook).toMatch(/founder self-review/i);
+    expect(runbook).toMatch(/never use[^\n]*signup-acquisition-forward-repair-evidence/i);
     expect(runbook).toMatch(/exactly one required reviewer/i);
     expect(runbook).toContain(
       "The runner fails closed in this order:\n\n1. exact solo-founder authorization evidence and protected workflow attempt `1`;",

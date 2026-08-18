@@ -608,10 +608,15 @@ Administrator bypass is not an alternative approval path.
    transaction-enforced read-only query and never submits `--file`. Continue only when its
    outcome is `SAFE_TO_APPLY`. If it reports `already_applied_verified`, stop. Any BLOCKED or
    ambiguous outcome requires a fresh dispatch, not a rerun.
-6. Record the successful PREFLIGHT's numeric run ID, exact prior run attempt (`1`), and the
-   lowercase SHA-256 of the exact downloaded artifact archive. Wait at least **15 minutes**
-   after the authenticated PREFLIGHT completes before deciding to dispatch APPLY. The receipt
-   expires after **24 hours**; an older receipt requires a fresh PREFLIGHT.
+6. Record the successful PREFLIGHT's numeric run ID and exact prior run attempt (`1`). From the
+   run's artifacts API response, select exactly one non-expired artifact named
+   `signup-acquisition-forward-repair-preflight-run-<RUN_ID>-attempt-1`, replacing `<RUN_ID>`
+   with that numeric run ID, and record its lowercase `.digest` value without the `sha256:`
+   prefix. Never use the similarly named `signup-acquisition-forward-repair-evidence` artifact:
+   it contains sanitized operator evidence, not the immutable receipt authenticated by APPLY.
+   Wait at least **15 minutes** after the authenticated PREFLIGHT completes before deciding to
+   dispatch APPLY. The receipt expires after **24 hours**; an older receipt requires a fresh
+   PREFLIGHT.
 7. Start a fresh APPLY dispatch at attempt 1 and approve its dedicated environment gate:
 
    | Input                                | APPLY value                                               |
@@ -622,7 +627,7 @@ Administrator bypass is not an alternative approval path.
    | `confirm_apply`                      | `APPLY SIGNUP ACQUISITION FORWARD REPAIR`                 |
    | `preflight_run_id`                   | exact successful SAFE_TO_APPLY run ID                     |
    | `expected_preflight_run_attempt`     | exact prior run attempt `1`                               |
-   | `expected_preflight_artifact_sha256` | exact lowercase SHA-256 of the reviewed artifact ZIP      |
+   | `expected_preflight_artifact_sha256` | receipt artifact's exact lowercase API digest             |
    | `solo_founder_acknowledgement`       | `I AM THE SOLE FOUNDER AND AUTHORIZE THIS PRODUCTION RUN` |
 
 8. APPLY validates that all three supplied provenance values belong to a different,

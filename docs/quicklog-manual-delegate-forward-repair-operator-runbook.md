@@ -168,9 +168,15 @@ Before APPLY:
 1. Confirm the PREFLIGHT run concluded successfully.
 2. Confirm its repository, workflow path, branch, exact head SHA, run attempt,
    artifact SHA-256, project ref, migration pin, and state digest. Read the run
-   attempt from `gh api repos/Verdant-OS/verdant-grow-diary/actions/runs/RUN_ID`
-   and the `sha256:` artifact digest from
-   `gh api repos/Verdant-OS/verdant-grow-diary/actions/runs/RUN_ID/artifacts?per_page=100`.
+   attempt from `gh api repos/Verdant-OS/verdant-grow-diary/actions/runs/RUN_ID`.
+   In the artifacts response from
+   `gh api repos/Verdant-OS/verdant-grow-diary/actions/runs/RUN_ID/artifacts?per_page=100`,
+   require exactly one non-expired artifact named
+   `quicklog-manual-delegate-forward-repair-preflight-run-<RUN_ID>-attempt-1`,
+   replacing `<RUN_ID>` with the numeric run ID, and record its lowercase
+   `.digest` value without the `sha256:` prefix. Never use the similarly named
+   `quicklog-manual-delegate-forward-repair-evidence` artifact: it is sanitized
+   operator evidence, not the immutable receipt authenticated by APPLY.
 3. Confirm the deploy branch still points to the same reviewed SHA.
 4. Record the PREFLIGHT run ID, its exact prior run attempt `1`, and the exact
    lowercase artifact SHA-256 in the change ticket. Never substitute another

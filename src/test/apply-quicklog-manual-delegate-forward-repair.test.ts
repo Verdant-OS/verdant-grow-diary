@@ -921,6 +921,12 @@ describe("Quick Log manual delegate production delivery", () => {
     );
     expect(runbook).toContain("expected_preflight_run_attempt");
     expect(runbook).toContain("expected_preflight_artifact_sha256");
+    expect(runbook).toContain(
+      "quicklog-manual-delegate-forward-repair-preflight-run-<RUN_ID>-attempt-1",
+    );
+    expect(runbook).toMatch(
+      /never use[\s\S]{0,100}quicklog-manual-delegate-forward-repair-evidence/i,
+    );
     expect(runbook).toMatch(/record.*run attempt/i);
     expect(runbook).toMatch(/record[\s\S]{0,100}artifact SHA-256/i);
   });

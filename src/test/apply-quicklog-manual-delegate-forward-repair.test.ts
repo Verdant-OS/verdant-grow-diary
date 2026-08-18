@@ -237,6 +237,16 @@ describe("Quick Log manual delegate production delivery", () => {
       /case e\.function_name\s+when 'quicklog_try_parse_uuid' then p\.prosrc\s+else replace\(p\.prosrc, E'\\r', ''\)\s+end/g,
     );
     expect(sql.match(/when 'quicklog_try_parse_uuid' then p\.prosrc/g) ?? []).toHaveLength(2);
+    expect(runner.EXPECTED_FUNCTION_FINGERPRINTS.tryParseUuid).toEqual({
+      bytes: 289,
+      md5: "a34d120aad5c37a33ac05fd9597624f4",
+    });
+    expect(runner.EXPECTED_FUNCTION_FINGERPRINTS.tryParseUuidFreshReplay).toEqual({
+      bytes: 290,
+      md5: "4b132ee2034f8e2887da1af582295ad8",
+    });
+    expect(sql).toContain("a34d120aad5c37a33ac05fd9597624f4");
+    expect(sql).toContain("4b132ee2034f8e2887da1af582295ad8");
     expect(sql).toMatch(/when rolname='service_role' then[\s\S]*?and rolbypassrls/);
     expect(sql).toMatch(/else[\s\S]*?and not rolbypassrls end/);
     expect(sql).toContain("a.attgenerated,a.attidentity,d.oid is null");

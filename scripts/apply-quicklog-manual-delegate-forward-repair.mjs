@@ -37,7 +37,7 @@ export const PINNED_MIGRATION = Object.freeze({
   version: "20260818010000",
   name: "quicklog_manual_delegate_forward_repair",
   file: "20260818010000_quicklog_manual_delegate_forward_repair.sql",
-  sha256: "FCB59660C53D6FE6F227CE2386F3B37EAB2A0D436672F3FB218EE7855B49F54C",
+  sha256: "641C033A6453B180505CFB4EEAD8C97EC0C89C7EC0A501A64D4D5B1B71897B1C",
 });
 
 export const ACCEPTED_LEDGER_NAMES = Object.freeze([
@@ -65,6 +65,10 @@ export const EXPECTED_FUNCTION_FINGERPRINTS = Object.freeze({
     md5: "77f1aa70a70a9714057ef226b6996149",
   }),
   tryParseUuid: Object.freeze({ bytes: 289, md5: "a34d120aad5c37a33ac05fd9597624f4" }),
+  tryParseUuidFreshReplay: Object.freeze({
+    bytes: 290,
+    md5: "4b132ee2034f8e2887da1af582295ad8",
+  }),
   stampLoggedAt: Object.freeze({
     bytes: 276,
     md5: "d9df46d36eb5d7aac767a3c87e53e92f",
@@ -325,14 +329,23 @@ export const CATALOG_STATE_QUERY_SQL = `with target_ledger as (
     and p.proallargtypes is null
     and p.proargnames is not distinct from e.argument_names
     and p.proconfig = e.config
-    and octet_length(case e.function_name
-      when 'quicklog_try_parse_uuid' then p.prosrc
-      else replace(p.prosrc, E'\\r', '')
-    end) = e.source_length
-    and md5(case e.function_name
-      when 'quicklog_try_parse_uuid' then p.prosrc
-      else replace(p.prosrc, E'\\r', '')
-    end) = e.source_md5
+    and (
+      (
+        octet_length(case e.function_name
+          when 'quicklog_try_parse_uuid' then p.prosrc
+          else replace(p.prosrc, E'\\r', '')
+        end) = e.source_length
+        and md5(case e.function_name
+          when 'quicklog_try_parse_uuid' then p.prosrc
+          else replace(p.prosrc, E'\\r', '')
+        end) = e.source_md5
+      )
+      or (
+        e.function_name = 'quicklog_try_parse_uuid'
+        and octet_length(p.prosrc) = ${EXPECTED_FUNCTION_FINGERPRINTS.tryParseUuidFreshReplay.bytes}
+        and md5(p.prosrc) = '${EXPECTED_FUNCTION_FINGERPRINTS.tryParseUuidFreshReplay.md5}'
+      )
+    )
     and coalesce((
       select array_agg(
         format('%s|%s|%s|%s',coalesce(grantee.rolname,'PUBLIC'),acl.privilege_type,acl.is_grantable,grantor.rolname)

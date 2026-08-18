@@ -20,7 +20,7 @@ const DISPOSABLE_SENTINEL = "verdant_quicklog_delegate_repair_pg15_disposable_v1
 const PINNED_MIGRATION_VERSION = "20260818010000";
 const PINNED_MIGRATION_FILE = "20260818010000_quicklog_manual_delegate_forward_repair.sql";
 const EXPECTED_MIGRATION_SHA256 =
-  "fcb59660c53d6fe6f227ce2386f3b37eab2a0d436672f3fb218ee7855b49f54c";
+  "641c033a6453b180505cfb4eead8c97ec0c89c7ec0a501a64d4d5b1b71897b1c";
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 const OWNER_ID = "11111111-1111-4111-8111-111111111111";
@@ -177,6 +177,13 @@ const tryParseUuidDefinition = tryParseUuidSource.replace(
   "  END IF;\n  BEGIN",
 );
 if (tryParseUuidDefinition === tryParseUuidSource) {
+  throw new Error("dependency_source_shape_drift");
+}
+const tryParseUuidFreshReplayDefinition = tryParseUuidSource.replace(
+  "CREATE FUNCTION public.quicklog_try_parse_uuid",
+  "CREATE OR REPLACE FUNCTION public.quicklog_try_parse_uuid",
+);
+if (tryParseUuidFreshReplayDefinition === tryParseUuidSource) {
   throw new Error("dependency_source_shape_drift");
 }
 const stampDiaryDefinition = extractFunctionDefinition(
@@ -907,6 +914,45 @@ function proveMigrationReapply(env, spawnImpl) {
   if (before !== after) throw new Error("reapply:catalog_or_data_changed");
 }
 
+function proveFreshReplayUuidHelperLineage(env, spawnImpl) {
+  resetScaffold(env, spawnImpl);
+  executeSql(tryParseUuidFreshReplayDefinition, env, {
+    stage: "fresh_replay_uuid_helper_install",
+    spawnImpl,
+  });
+  requireSqlTrue(
+    "fresh_replay_uuid_helper_fingerprint",
+    `select octet_length(p.prosrc) = 290
+      and md5(p.prosrc) = '4b132ee2034f8e2887da1af582295ad8'
+     from pg_proc p
+     where p.oid = to_regprocedure('public.quicklog_try_parse_uuid(text)');`,
+    env,
+    spawnImpl,
+  );
+  requireDeliveryPreflightStatus("fresh_replay_uuid_helper", "apply", env, spawnImpl);
+  const wrapperBefore = functionIdentity("public.quicklog_save_manual", env, spawnImpl);
+  requireMigrationSuccess("fresh_replay_uuid_helper_apply", env, spawnImpl);
+  provePublicWrapperIdentityPreserved(
+    wrapperBefore,
+    functionIdentity("public.quicklog_save_manual", env, spawnImpl),
+  );
+  requireDeliveryPreflightStatus(
+    "fresh_replay_uuid_helper_postflight",
+    "schema_live_ledger_absent",
+    env,
+    spawnImpl,
+  );
+  requireSqlTrue(
+    "fresh_replay_uuid_helper_preserved",
+    `select octet_length(p.prosrc) = 290
+      and md5(p.prosrc) = '4b132ee2034f8e2887da1af582295ad8'
+     from pg_proc p
+     where p.oid = to_regprocedure('public.quicklog_try_parse_uuid(text)');`,
+    env,
+    spawnImpl,
+  );
+}
+
 function requireFailedApplyPreservesState(label, expectedMessage, env, spawnImpl) {
   const before = catalogDigest(env, spawnImpl);
   requireMigrationFailure(label, expectedMessage, env, spawnImpl);
@@ -1262,7 +1308,7 @@ function proveGuardedLedgerInsertAndCollision(env, spawnImpl) {
        version='20260818010000'
        and name='quicklog_manual_delegate_forward_repair'
        and statements=array[
-         '-- applied verbatim by protected GitHub workflow; sha256=FCB59660C53D6FE6F227CE2386F3B37EAB2A0D436672F3FB218EE7855B49F54C',
+         '-- applied verbatim by protected GitHub workflow; sha256=641C033A6453B180505CFB4EEAD8C97EC0C89C7EC0A501A64D4D5B1B71897B1C',
          '-- protected wrapper; self-transactional-migration=true;ledger-recovery=v1'
        ]::text[]
      ) from supabase_migrations.schema_migrations
@@ -1481,6 +1527,7 @@ export async function runPg15Harness({
     proveCrossUserFence(env, spawnImpl);
     proveFunctionAclFences(env, spawnImpl);
     proveMigrationReapply(env, spawnImpl);
+    proveFreshReplayUuidHelperLineage(env, spawnImpl);
     proveUnknownDelegateRejected(env, spawnImpl);
     proveWrongWrapperRejected(env, spawnImpl);
     proveMissingContractRejected(env, spawnImpl);

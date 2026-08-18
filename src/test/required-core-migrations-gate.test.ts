@@ -708,6 +708,7 @@ describe("remote applied-schema runner safety", () => {
     expect(delegateContract.match(/pg_attrdef/gi) ?? []).toHaveLength(2);
     expect(catalogSql).toContain("77f1aa70a70a9714057ef226b6996149");
     expect(catalogSql).toContain("a34d120aad5c37a33ac05fd9597624f4");
+    expect(catalogSql).toContain("4b132ee2034f8e2887da1af582295ad8");
     expect(catalogSql).toContain("d9df46d36eb5d7aac767a3c87e53e92f");
     expect(delegateContract).toContain("trg_quicklog_stamp_grow_event_logged_at");
     expect(delegateContract).toContain("trg_quicklog_stamp_diary_logged_at");

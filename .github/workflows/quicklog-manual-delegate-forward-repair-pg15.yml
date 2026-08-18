@@ -48,7 +48,6 @@ jobs:
           --health-retries 10
     env:
       QUICKLOG_MANUAL_DELEGATE_REPAIR_PG15_URL: postgresql://postgres:verdant-runtime-only@127.0.0.1:5432/verdant_quicklog_delegate_repair
-      QUICKLOG_MANUAL_DELEGATE_REPAIR_PG15_CONTAINER: ${{ job.services.postgres.id }}
     steps:
       - name: Checkout exact candidate
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
@@ -81,4 +80,6 @@ jobs:
           SQL
 
       - name: Run isolated PostgreSQL 15 harness
+        env:
+          QUICKLOG_MANUAL_DELEGATE_REPAIR_PG15_CONTAINER: ${{ job.services.postgres.id }}
         run: node scripts/run-quicklog-manual-delegate-forward-repair-pg15-harness.mjs

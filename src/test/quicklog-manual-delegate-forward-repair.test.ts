@@ -81,6 +81,7 @@ describe("quicklog manual delegate forward repair", () => {
     expect(preflight.match(/pg_catalog\.pg_attrdef/g) ?? []).toHaveLength(3);
     expect(preflight).toContain("77f1aa70a70a9714057ef226b6996149");
     expect(preflight).toContain("a34d120aad5c37a33ac05fd9597624f4");
+    expect(preflight).toContain("4b132ee2034f8e2887da1af582295ad8");
     expect(preflight).toContain("d9df46d36eb5d7aac767a3c87e53e92f");
     expect(preflight).toContain("postgres|EXECUTE|f|postgres");
     expect(preflight).toContain("v_helper_overload_count");
@@ -92,6 +93,9 @@ describe("quicklog manual delegate forward repair", () => {
     expect(preflight).toContain("quicklog_stamp_diary_logged_at()");
     expect(preflight).toContain("trg_quicklog_stamp_grow_event_logged_at");
     expect(preflight).toContain("quicklog_stamp_grow_event_logged_at()");
+    const postcondition = sql.slice(sql.indexOf("$quicklog_manual_delegate_postcondition$"));
+    expect(postcondition).toContain("a34d120aad5c37a33ac05fd9597624f4");
+    expect(postcondition).toContain("4b132ee2034f8e2887da1af582295ad8");
     expect(preflight).toMatch(/tg\.tgtype\s*=\s*7/);
     expect(preflight).toMatch(/tg\.tgenabled\s*<>\s*'D'/);
     expect(preflight).toMatch(/tg\.tgqual\s+IS\s+NULL/);

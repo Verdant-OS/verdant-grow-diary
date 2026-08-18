@@ -4,7 +4,7 @@ This runbook delivers exactly one reviewed production migration:
 
 - Version: `20260818010000`
 - File: `20260818010000_quicklog_manual_delegate_forward_repair.sql`
-- SHA-256: `FCB59660C53D6FE6F227CE2386F3B37EAB2A0D436672F3FB218EE7855B49F54C`
+- SHA-256: `641C033A6453B180505CFB4EEAD8C97EC0C89C7EC0A501A64D4D5B1B71897B1C`
 - Production project: `knkwiiywfkbqznbxwqfh`
 - Deploy branch: `verdant-grow-diary`
 - Protected GitHub environment: `verdant-production`

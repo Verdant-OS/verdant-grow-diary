@@ -138,7 +138,7 @@ describe("Quick Log manual delegate forward-repair PostgreSQL 15 runtime gate", 
     expect(migration.version).toBe("20260818010000");
     expect(migration.fileName).toBe("20260818010000_quicklog_manual_delegate_forward_repair.sql");
     expect(migration.sha256).toBe(
-      "fcb59660c53d6fe6f227ce2386f3b37eab2a0d436672f3fb218ee7855b49f54c",
+      "641c033a6453b180505cfb4eead8c97ec0c89c7ec0a501a64d4d5b1b71897b1c",
     );
     expect(createHash("sha256").update(migration.sql).digest("hex")).toBe(migration.sha256);
     expect(migration.sql).toContain("quicklog_save_manual_pre_logged_at");
@@ -191,6 +191,7 @@ describe("Quick Log manual delegate forward-repair PostgreSQL 15 runtime gate", 
     const source = readFileSync(HARNESS_PATH, "utf8");
     for (const proof of [
       "proveFunctionParallelAdversariesRejected",
+      "proveFreshReplayUuidHelperLineage",
       "proveHelperArgumentShapeAdversariesRejected",
       "proveHelperCarriageReturnFingerprintRules",
       "proveRequiredRoleAttributesRejected",
@@ -199,6 +200,9 @@ describe("Quick Log manual delegate forward-repair PostgreSQL 15 runtime gate", 
     ]) {
       expect(source.match(new RegExp(proof, "g")) ?? []).toHaveLength(2);
     }
+    expect(source).toContain("tryParseUuidSource");
+    expect(source).toContain("tryParseUuidDefinition");
+    expect(source).toContain("4b132ee2034f8e2887da1af582295ad8");
     for (const mutation of [
       "wrapper_parallel_safe",
       "delegate_parallel_safe",
@@ -271,7 +275,11 @@ describe("Quick Log manual delegate forward-repair PostgreSQL 15 runtime gate", 
     expect(trigger.merge_group ?? {}).toEqual({});
     expect(job.services.postgres.image).toBe(POSTGRES_IMAGE);
     expect(job.env.QUICKLOG_MANUAL_DELEGATE_REPAIR_PG15_URL).toBe(DISPOSABLE_DATABASE_URL);
-    expect(job.env.QUICKLOG_MANUAL_DELEGATE_REPAIR_PG15_CONTAINER).toBe(
+    expect(job.env.QUICKLOG_MANUAL_DELEGATE_REPAIR_PG15_CONTAINER).toBeUndefined();
+    const harnessStep = job.steps.find(
+      (step: Record<string, unknown>) => step.name === "Run isolated PostgreSQL 15 harness",
+    );
+    expect(harnessStep?.env?.QUICKLOG_MANUAL_DELEGATE_REPAIR_PG15_CONTAINER).toBe(
       "${{ job.services.postgres.id }}",
     );
     expect(source).not.toContain("continue-on-error");

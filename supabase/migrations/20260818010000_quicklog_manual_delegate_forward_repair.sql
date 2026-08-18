@@ -388,8 +388,13 @@ BEGIN
       AND p.proallargtypes IS NULL
       AND p.proargnames = ARRAY['p_value']::text[]
       AND p.proconfig = ARRAY['search_path=pg_catalog, pg_temp']::text[]
-      AND pg_catalog.octet_length(p.prosrc) = 289
-      AND pg_catalog.md5(p.prosrc) = 'a34d120aad5c37a33ac05fd9597624f4'
+      AND (
+        pg_catalog.octet_length(p.prosrc),
+        pg_catalog.md5(p.prosrc)
+      ) IN (
+        (289, 'a34d120aad5c37a33ac05fd9597624f4'),
+        (290, '4b132ee2034f8e2887da1af582295ad8')
+      )
       AND COALESCE((
         SELECT pg_catalog.array_agg(
           pg_catalog.format(
@@ -1200,17 +1205,26 @@ BEGIN
     AND p.proargnames IS NOT DISTINCT FROM expected.argument_names
     AND p.proconfig = expected.function_config
     AND (
-      CASE expected.function_name
-        WHEN 'quicklog_try_parse_uuid' THEN pg_catalog.octet_length(p.prosrc)
-        ELSE pg_catalog.octet_length(pg_catalog.replace(p.prosrc, E'\r', ''))
-      END
-    ) = expected.source_length
-    AND (
-      CASE expected.function_name
-        WHEN 'quicklog_try_parse_uuid' THEN pg_catalog.md5(p.prosrc)
-        ELSE pg_catalog.md5(pg_catalog.replace(p.prosrc, E'\r', ''))
-      END
-    ) = expected.source_md5
+      (
+        expected.function_name = 'quicklog_try_parse_uuid'
+        AND (
+          pg_catalog.octet_length(p.prosrc),
+          pg_catalog.md5(p.prosrc)
+        ) IN (
+          (289, 'a34d120aad5c37a33ac05fd9597624f4'),
+          (290, '4b132ee2034f8e2887da1af582295ad8')
+        )
+      )
+      OR (
+        expected.function_name <> 'quicklog_try_parse_uuid'
+        AND pg_catalog.octet_length(
+          pg_catalog.replace(p.prosrc, E'\r', '')
+        ) = expected.source_length
+        AND pg_catalog.md5(
+          pg_catalog.replace(p.prosrc, E'\r', '')
+        ) = expected.source_md5
+      )
+    )
     AND COALESCE((
       SELECT pg_catalog.array_agg(
         pg_catalog.format(

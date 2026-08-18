@@ -378,8 +378,17 @@ ${QUICKLOG_DEPENDENCY_CATALOG_EXPRESSIONS_SQL},
             and helper.proallargtypes is null
             and helper.proargnames is not distinct from helper.argument_names
             and helper.proconfig = helper.function_config
-            and helper.normalized_prosrc_bytes = helper.source_bytes
-            and helper.normalized_prosrc_md5 = helper.source_md5
+            and (
+              (
+                helper.normalized_prosrc_bytes = helper.source_bytes
+                and helper.normalized_prosrc_md5 = helper.source_md5
+              )
+              or (
+                helper.function_name = 'quicklog_try_parse_uuid'
+                and helper.normalized_prosrc_bytes = 290
+                and helper.normalized_prosrc_md5 = '4b132ee2034f8e2887da1af582295ad8'
+              )
+            )
             and coalesce((
               select array_agg(
                 format(

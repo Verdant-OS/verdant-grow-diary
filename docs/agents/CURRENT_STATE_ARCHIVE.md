@@ -13,7 +13,21 @@ unmodified; only the `## Archived` stamp lines below were added.
 
 ---
 
-## Archived 2026-08-18 — Update-attribution header chain (2026-08-13 → 2026-08-15)
+## Archived 2026-08-18 — Update-attribution header chain (2026-08-13 → 2026-08-18)
+
+**Prior same-day update:** 2026-08-18 UTC
+**Updated by:** Claude (2026-08-18, additive: records the Claude PR/branch
+cleanup sweep Cheek requested. Verified zero open Claude-authored PRs; triaged
+all 23 stale `claude/*` branches on origin to a terminal disposition
+(merged / closed-superseded / abandoned / content-identical-on-deploy); agent
+sessions still cannot delete branches (`git push --delete` → HTTP 403,
+branch-scoped credential), so Cheek deleted all 23 himself the same day, and a
+live `git ls-remote` then confirmed zero `claude/*` refs remain. Updates the
+2026-08-14 abandoned-branches entry (both branches now deleted) and adds a
+"Completed, out of slice (recorded 2026-08-18)" entry with the sweep detail.
+Topology row refreshed to fetched tip `3f2bfe2db` (#1021). No production, GA4,
+GSC, sitemap, or release-identity row was re-measured in this edit. Does
+**not** apply migrations or set Day 0.)
 
 **Prior update:** 2026-08-15 UTC
 **Updated by:** Grok (2026-08-15 merge: resolved two simple `CURRENT_STATE.md`

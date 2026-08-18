@@ -1,6 +1,18 @@
 # Verdant — Current Operating State
 
 **Last updated:** 2026-08-18 UTC
+**Updated by:** Claude (2026-08-18, third same-day edit: re-applies the Lovable
+project Knowledge as Version 2026-08-18.1 at Cheek's instruction, sourced from
+this file at deploy tip `87ae05e` (#1026) after the archival slice merged.
+Snapshot: `docs/lovable/verdant-project-knowledge-2026-08-18.md` (9,979/10,000
+chars). Pre-write read confirmed the live field matched the committed
+2026-08-15 snapshot exactly. Live `/version.json` re-measure was `BLOCKED`
+from the agent session (network policy 403), so the pack carries the
+2026-08-15 stamp labeled as last measurement. Topology row refreshed to
+fetched tip `87ae05e` (#1026). Still no Knowledge sync automation authorized.
+Does **not** apply migrations or set Day 0.)
+
+**Prior same-day update:** 2026-08-18 UTC
 **Updated by:** Claude (2026-08-18, later edit: executes the Cheek-approved
 Tranche 1 of `docs/specs/current-state-archival-slice.md`. Moves, verbatim, to
 the new `docs/agents/CURRENT_STATE_ARCHIVE.md`: the superseded
@@ -14,21 +26,7 @@ no open item moved. The archive is never imported by `CLAUDE.md`;
 changed. No production, GA4, GSC, sitemap, or release-identity row was
 re-measured in this edit. Does **not** apply migrations or set Day 0.)
 
-**Prior same-day update:** 2026-08-18 UTC
-**Updated by:** Claude (2026-08-18, additive: records the Claude PR/branch
-cleanup sweep Cheek requested. Verified zero open Claude-authored PRs; triaged
-all 23 stale `claude/*` branches on origin to a terminal disposition
-(merged / closed-superseded / abandoned / content-identical-on-deploy); agent
-sessions still cannot delete branches (`git push --delete` → HTTP 403,
-branch-scoped credential), so Cheek deleted all 23 himself the same day, and a
-live `git ls-remote` then confirmed zero `claude/*` refs remain. Updates the
-2026-08-14 abandoned-branches entry (both branches now deleted) and adds a
-"Completed, out of slice (recorded 2026-08-18)" entry with the sweep detail.
-Topology row refreshed to fetched tip `3f2bfe2db` (#1021). No production, GA4,
-GSC, sitemap, or release-identity row was re-measured in this edit. Does
-**not** apply migrations or set Day 0.)
-
-Older update-attribution entries (2026-08-13 → 2026-08-15) are archived
+Older update-attribution entries (2026-08-13 → 2026-08-18) are archived
 verbatim — see `docs/agents/CURRENT_STATE_ARCHIVE.md`.
 
 This is the changing shift report. Permanent rules live in `/AGENTS.md`; do not edit
@@ -341,7 +339,7 @@ way.
 
 | Branch               | Role                                             | Verified head                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | -------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `verdant-grow-diary` | **Deploy branch. Production ships from here.**   | `3f2bfe2dbc139158c4ade35f7124f4e814803163` (#1021), verified 2026-08-18 with `git fetch origin verdant-grow-diary && git rev-parse origin/verdant-grow-diary`. Supersedes `1c094a2a3` (#970). After #970, in `git log --first-parent` merge order oldest-first: `efdd7461a` (#991), `e861560fe` (#994), `6e769d089` (#995), `4f4a908cb` (#999), `4c7427989` (#1000), `47f622555` (#996), `7c676f9cc` (#910), `1da0f401d` (#1010), `56fff6da2` (#1011), `c1d22b8a3` (#1012), `3b55651ea` (#1013), `7e49206cd` (#1015), `a6b8841c2` (#1017), `b4c23766d` (#1016), `3f2bfe2db` (#1021). **Live production was not re-fetched at this verification** — the 2026-08-15 observation (`/version.json` serving `5e2fcedd4271`, #984) is the last measurement and publish lags git. Merging is not a publish. PR numbers on this branch do not order by merge time — order commits with `git log`, never by PR number. Do not carry older validation tables forward. Older buffers that still show `1c094a2a3` (#970) are the 2026-08-15 snapshot; discard them |
+| `verdant-grow-diary` | **Deploy branch. Production ships from here.**   | `87ae05e5bff419a443ea8f5679129223114e1d48` (#1026), verified 2026-08-18 with `git fetch origin verdant-grow-diary && git rev-parse origin/verdant-grow-diary`. Supersedes `3f2bfe2db` (#1021). After #1021, in `git log --first-parent` merge order oldest-first: `4dd7aed` (#1022), `e34086d` (#1023), `3970f31` (#1024), `e2800ee` (#1025), `87ae05e` (#1026). **Live production was not re-fetched at this verification** — a `/version.json` fetch from the agent session is `BLOCKED` (network policy 403); the 2026-08-15 observation (`/version.json` serving `5e2fcedd4271`, #984) is the last measurement and publish lags git. Merging is not a publish. PR numbers on this branch do not order by merge time — order commits with `git log`, never by PR number. Do not carry older validation tables forward. Older buffers that still show `3f2bfe2db` (#1021) or `1c094a2a3` (#970) are earlier snapshots; discard them |
 | `main`               | Integration branch. It is not production parity. | `b6d747941948ce68157185a2b0847acea6970d44` (#779), verified 2026-08-07                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 
 `main` and `verdant-grow-diary` are divergent. Do not infer production behavior from
@@ -650,6 +648,17 @@ Five **Completed, out of slice** records are archived verbatim in
 - 2026-08-18 — Claude PR/branch cleanup sweep: zero open Claude-authored PRs;
   all 23 stale `claude/*` branches deleted by Cheek; branch deletion remains
   impossible from agent sessions (HTTP 403, branch-scoped credential).
+
+**Completed, out of slice (recorded 2026-08-18):** Lovable project Knowledge
+re-applied as Version 2026-08-18.1 at Cheek's instruction, sourced from this
+file at deploy tip `87ae05e` (#1026) after the archival slice merged. Snapshot:
+`docs/lovable/verdant-project-knowledge-2026-08-18.md` (9,979/10,000 chars).
+The pre-write read confirmed the live Knowledge field still matched the
+committed 2026-08-15 snapshot, so nothing unrecorded was overwritten. Live
+`/version.json` could not be re-measured from the agent session (network
+policy 403 — `BLOCKED`); the pack carries the 2026-08-15 stamp `5e2fcedd4271`
+(#984) explicitly labeled as last measurement. Workspace knowledge unchanged.
+Still no Knowledge sync automation authorized and no owner assigned for one.
 
 In scope — these bullets scope the **Mode A SEO parent program above**, not the completed
 #809 entry:

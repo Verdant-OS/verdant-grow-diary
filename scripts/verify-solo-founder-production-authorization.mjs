@@ -13,7 +13,9 @@ function reject() {
 }
 
 function safePositiveInteger(value) {
-  return typeof value === "string" && /^[1-9]\d*$/.test(value) && Number.isSafeInteger(Number(value))
+  return typeof value === "string" &&
+    /^[1-9]\d*$/.test(value) &&
+    Number.isSafeInteger(Number(value))
     ? Number(value)
     : null;
 }
@@ -38,7 +40,12 @@ function requiredText(env, key) {
 function readJson(env, key, readFile, stat) {
   const path = requiredText(env, key);
   const metadata = stat(path);
-  if (!metadata || typeof metadata.size !== "number" || metadata.size < 0 || metadata.size > MAX_JSON_BYTES) {
+  if (
+    !metadata ||
+    typeof metadata.size !== "number" ||
+    metadata.size < 0 ||
+    metadata.size > MAX_JSON_BYTES
+  ) {
     reject();
   }
   if (typeof metadata.isFile === "function" && !metadata.isFile()) reject();

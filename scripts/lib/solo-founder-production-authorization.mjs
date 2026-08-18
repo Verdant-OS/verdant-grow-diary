@@ -116,19 +116,15 @@ function validCurrentRun(currentRun, expected) {
 function validRun(currentRun, expected) {
   if (!validCurrentRun(currentRun, expected)) return false;
   return (
-    currentRun.path === expected.workflowPath ||
-    currentRun.path === `${expected.workflowPath}@${SOLO_FOUNDER_POLICY.branchName}`
-  ) &&
+    (currentRun.path === expected.workflowPath ||
+      currentRun.path === `${expected.workflowPath}@${SOLO_FOUNDER_POLICY.branchName}`) &&
     currentRun.head_branch === SOLO_FOUNDER_POLICY.branchName &&
     currentRun.head_sha === expected.sha &&
     repository(currentRun.repository, expected.repositoryId, expected.repositoryFullName) &&
     repository(currentRun.head_repository, expected.repositoryId, expected.repositoryFullName) &&
     identity(currentRun.actor, expected.actorId, expected.actorLogin) &&
-    identity(
-      currentRun.triggering_actor,
-      expected.triggeringActorId,
-      expected.triggeringActorLogin,
-    );
+    identity(currentRun.triggering_actor, expected.triggeringActorId, expected.triggeringActorLogin)
+  );
 }
 
 function validEnvironment(environment) {
@@ -199,11 +195,7 @@ function validApprovals(approvals) {
     approvals[0].environments.length === 1 &&
     exactKeys(approvals[0].environments[0], ["name"]) &&
     approvals[0].environments[0].name === SOLO_FOUNDER_POLICY.environmentName &&
-    identity(
-      approvals[0].user,
-      SOLO_FOUNDER_POLICY.founderUserId,
-      SOLO_FOUNDER_POLICY.founderLogin,
-    )
+    identity(approvals[0].user, SOLO_FOUNDER_POLICY.founderUserId, SOLO_FOUNDER_POLICY.founderLogin)
   );
 }
 

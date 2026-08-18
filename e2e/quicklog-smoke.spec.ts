@@ -5,8 +5,15 @@ import type { Locator, Request } from "@playwright/test";
 import { SmokeChecklistReporter } from "./lib/smokeChecklistReporter";
 import { validateQuickLogFixturePage, validateSecondaryQuickLogTarget } from "./lib/fixtureSafety";
 import {
+  buildQuickLogKeyedAuditQueryUrl,
+  buildQuickLogUnkeyedAuditQueryUrl,
+  buildSafeQuickLogAuditDiagnostic,
   buildSafeQuickLogRpcDiagnostic,
+  extractQuickLogAuditStartedAt,
+  formatSafeQuickLogAuditDiagnostic,
   formatSafeQuickLogRpcDiagnostic,
+  readSafeQuickLogIdempotencyKey,
+  shouldReadQuickLogAuditDiagnostic,
 } from "./lib/quickLogSmokeRpcDiagnostics";
 import { ANALYTICS_CONSENT_STORAGE_KEY } from "../src/lib/analyticsConsent";
 
@@ -75,6 +82,14 @@ function readObservedQuickLogTargetId(request: Request): string | null {
   }
 }
 
+function readObservedQuickLogIdempotencyKey(request: Request): string | null {
+  try {
+    return readSafeQuickLogIdempotencyKey(request.postDataJSON());
+  } catch {
+    return null;
+  }
+}
+
 async function readSafeQuickLogRpcDiagnostic(response: import("@playwright/test").Response) {
   let body: unknown = null;
   try {
@@ -83,6 +98,63 @@ async function readSafeQuickLogRpcDiagnostic(response: import("@playwright/test"
     // Non-JSON PostgREST/proxy bodies remain opaque. Status is still useful.
   }
   return buildSafeQuickLogRpcDiagnostic(response.status(), body);
+}
+
+async function readJsonOrNull(response: import("@playwright/test").APIResponse) {
+  try {
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
+async function readSafeQuickLogAuditDiagnostic(
+  page: import("@playwright/test").Page,
+  rpcResponse: import("@playwright/test").Response,
+  idempotencyKey: string,
+) {
+  try {
+    const headers = await rpcResponse.request().allHeaders();
+    const authorization = headers.authorization;
+    const apikey = headers.apikey;
+    if (
+      typeof authorization !== "string" ||
+      !authorization.startsWith("Bearer ") ||
+      typeof apikey !== "string" ||
+      apikey.length === 0
+    ) {
+      return buildSafeQuickLogAuditDiagnostic(0, null);
+    }
+
+    const keyedResponse = await page
+      .context()
+      .request.get(buildQuickLogKeyedAuditQueryUrl(rpcResponse.url(), idempotencyKey), {
+        headers: { authorization, apikey },
+        timeout: 15_000,
+        failOnStatusCode: false,
+      });
+    const keyedBody = await readJsonOrNull(keyedResponse);
+    const startedAt = extractQuickLogAuditStartedAt(keyedBody);
+    if (!startedAt) {
+      return buildSafeQuickLogAuditDiagnostic(keyedResponse.status(), keyedBody);
+    }
+
+    const unkeyedResponse = await page
+      .context()
+      .request.get(buildQuickLogUnkeyedAuditQueryUrl(rpcResponse.url(), startedAt), {
+        headers: { authorization, apikey },
+        timeout: 15_000,
+        failOnStatusCode: false,
+      });
+    return buildSafeQuickLogAuditDiagnostic(
+      keyedResponse.status(),
+      keyedBody,
+      unkeyedResponse.status(),
+      await readJsonOrNull(unkeyedResponse),
+    );
+  } catch {
+    return buildSafeQuickLogAuditDiagnostic(0, null);
+  }
 }
 
 async function readTargetTuple(dialog: Locator): Promise<QuickLogTargetTuple> {
@@ -186,6 +258,7 @@ test.describe("Quick Log smoke checklist", () => {
   test("authenticated end-to-end checklist", async ({ page }, testInfo) => {
     const report = new SmokeChecklistReporter();
     let observedRpcTargetId: string | null = null;
+    let observedRpcIdempotencyKey: string | null = null;
 
     page.on("request", (request) => {
       let pathname: string;
@@ -197,6 +270,8 @@ test.describe("Quick Log smoke checklist", () => {
       if (!pathname.endsWith("/rpc/quicklog_save_manual")) return;
       const candidate = readObservedQuickLogTargetId(request);
       if (candidate) observedRpcTargetId = candidate;
+      const idempotencyKey = readObservedQuickLogIdempotencyKey(request);
+      if (idempotencyKey) observedRpcIdempotencyKey = idempotencyKey;
     });
 
     try {
@@ -390,6 +465,7 @@ test.describe("Quick Log smoke checklist", () => {
           throw new Error("Displayed Quick Log target is missing or invalid before Save.");
         }
         observedRpcTargetId = null;
+        observedRpcIdempotencyKey = null;
         const rpcResponsePromise = page.waitForResponse(
           (response) => {
             if (response.request().method() !== "POST") return false;
@@ -403,7 +479,12 @@ test.describe("Quick Log smoke checklist", () => {
         );
         await dialog.getByTestId("quick-log-save").click();
         await expect.poll(() => observedRpcTargetId).toBe(displayedTargetId);
-        const rpcDiagnostic = await readSafeQuickLogRpcDiagnostic(await rpcResponsePromise);
+        await expect.poll(() => observedRpcIdempotencyKey).not.toBeNull();
+        const rpcResponse = await rpcResponsePromise;
+        const rpcDiagnostic = await readSafeQuickLogRpcDiagnostic(rpcResponse);
+        const auditDiagnostic = shouldReadQuickLogAuditDiagnostic(rpcDiagnostic)
+          ? await readSafeQuickLogAuditDiagnostic(page, rpcResponse, observedRpcIdempotencyKey!)
+          : null;
         try {
           await expect(dialog.getByTestId("quick-log-post-save")).toBeVisible({
             timeout: 15_000,
@@ -411,7 +492,15 @@ test.describe("Quick Log smoke checklist", () => {
         } catch (error) {
           const assertion = error instanceof Error ? error.message : "post-save was not visible";
           throw new Error(
-            `Quick Log RPC receipt: ${formatSafeQuickLogRpcDiagnostic(rpcDiagnostic)}\n${assertion}`,
+            [
+              `Quick Log RPC receipt: ${formatSafeQuickLogRpcDiagnostic(rpcDiagnostic)}`,
+              auditDiagnostic
+                ? `Quick Log audit receipt: ${formatSafeQuickLogAuditDiagnostic(auditDiagnostic)}`
+                : null,
+              assertion,
+            ]
+              .filter((line): line is string => line !== null)
+              .join("\n"),
           );
         }
         return "post-save shown and RPC target matched displayed target";

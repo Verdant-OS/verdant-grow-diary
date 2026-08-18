@@ -4,6 +4,7 @@ import { appendFileSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { inflateRawSync } from "node:zlib";
+import { SOLO_FOUNDER_POLICY } from "./lib/solo-founder-production-authorization.mjs";
 
 export const WORKFLOW_PATH = ".github/workflows/apply-signup-acquisition-forward-repair.yml";
 export const ARTIFACT_PREFIX = "signup-acquisition-forward-repair-preflight";
@@ -21,11 +22,18 @@ const MIGRATION_SHA256 = "6C002AB676218C32C27E41E7A8E90FF4F452C41D7EDB446B0FCB95
 const RECEIPT_MEMBER = "preflight-receipt.json";
 const RECEIPT_KEYS = Object.freeze([
   "branch",
+  "delivery_mode",
+  "environment_approval_verified",
+  "environment_contract_verified",
   "event",
+  "founder_github_login",
+  "founder_github_user_id",
   "head_sha",
   "migration_name",
   "migration_sha256",
   "migration_version",
+  "maximum_review_seconds",
+  "minimum_review_seconds",
   "operation",
   "outcome",
   "project_ref",
@@ -35,9 +43,11 @@ const RECEIPT_KEYS = Object.freeze([
   "run_id",
   "safe_to_apply",
   "schema_version",
+  "solo_founder_acknowledgement_verified",
   "state_digest",
   "tool",
   "workflow_path",
+  "production_environment",
 ]);
 
 function reject() {
@@ -81,6 +91,15 @@ function repositoryMatches(value, expectedId, expectedName) {
   );
 }
 
+function founderIdentity(value) {
+  return (
+    value &&
+    typeof value === "object" &&
+    positiveInteger(value.id) === SOLO_FOUNDER_POLICY.founderUserId &&
+    value.login === SOLO_FOUNDER_POLICY.founderLogin
+  );
+}
+
 export function validatePreflightArtifactMetadata({
   priorRun,
   currentRun,
@@ -91,12 +110,16 @@ export function validatePreflightArtifactMetadata({
   const expectedRepositoryId = positiveInteger(expected?.repositoryId);
   const expectedCurrentRunId = positiveInteger(expected?.currentRunId);
   const expectedPreflightRunId = positiveInteger(expected?.preflightRunId);
+  const expectedPreflightRunAttempt = positiveInteger(expected?.preflightRunAttempt);
+  const expectedPreflightArtifactSha256 = lowercaseDigest(expected?.preflightArtifactSha256);
   const expectedHeadSha = lowercaseSha(expected?.headSha);
   const observedNow = timestamp(expected?.now);
   if (
     !expectedRepositoryId ||
     !expectedCurrentRunId ||
     !expectedPreflightRunId ||
+    !expectedPreflightRunAttempt ||
+    !expectedPreflightArtifactSha256 ||
     !expectedHeadSha ||
     expected?.repository !== "Verdant-OS/verdant-grow-diary" ||
     observedNow === null
@@ -107,6 +130,7 @@ export function validatePreflightArtifactMetadata({
   const priorRunId = positiveInteger(priorRun?.id);
   const currentRunId = positiveInteger(currentRun?.id);
   const runAttempt = positiveInteger(priorRun?.run_attempt);
+  const currentRunAttempt = positiveInteger(currentRun?.run_attempt);
   const workflowId = positiveInteger(workflow?.id);
   const priorCreatedAt = timestamp(priorRun?.created_at);
   const priorUpdatedAt = timestamp(priorRun?.updated_at);
@@ -116,12 +140,18 @@ export function validatePreflightArtifactMetadata({
     priorRunId !== expectedPreflightRunId ||
     currentRunId !== expectedCurrentRunId ||
     priorRunId === currentRunId ||
-    !runAttempt ||
+    runAttempt !== 1 ||
+    currentRunAttempt !== 1 ||
+    expectedPreflightRunAttempt !== runAttempt ||
     !workflowId ||
     priorRun?.workflow_id !== workflowId ||
     currentRun?.workflow_id !== workflowId ||
     !acceptedRunWorkflowPath(currentRun?.path) ||
     currentRun?.event !== "workflow_dispatch" ||
+    !founderIdentity(priorRun?.actor) ||
+    !founderIdentity(priorRun?.triggering_actor) ||
+    !founderIdentity(currentRun?.actor) ||
+    !founderIdentity(currentRun?.triggering_actor) ||
     currentRun?.head_branch !== "verdant-grow-diary" ||
     currentRun?.head_sha !== expectedHeadSha ||
     !acceptedRunWorkflowPath(priorRun?.path) ||
@@ -143,6 +173,13 @@ export function validatePreflightArtifactMetadata({
     priorCreatedAt >= priorUpdatedAt ||
     priorUpdatedAt > currentCreatedAt ||
     workflowUpdatedAt > priorCreatedAt
+  ) {
+    reject();
+  }
+  const reviewAgeMs = currentCreatedAt - priorUpdatedAt;
+  if (
+    reviewAgeMs < SOLO_FOUNDER_POLICY.minimumReviewSeconds * 1000 ||
+    reviewAgeMs > SOLO_FOUNDER_POLICY.maximumReviewSeconds * 1000
   ) {
     reject();
   }
@@ -175,6 +212,7 @@ export function validatePreflightArtifactMetadata({
     size > MAX_ARCHIVE_BYTES ||
     artifact.expired !== false ||
     !digest ||
+    digest !== expectedPreflightArtifactSha256 ||
     positiveInteger(artifactRun?.id) !== priorRunId ||
     positiveInteger(artifactRun?.repository_id) !== expectedRepositoryId ||
     positiveInteger(artifactRun?.head_repository_id) !== expectedRepositoryId ||
@@ -273,7 +311,7 @@ export async function downloadArtifactArchive({
   return readBoundedBody(archiveResponse);
 }
 
-function validateReceipt(value, expected, runAttempt) {
+function validateReceipt(value, expected, runAttempt, authenticatedFounderLogin) {
   if (!exactKeys(value, RECEIPT_KEYS)) reject();
   if (
     value.schema_version !== 1 ||
@@ -293,6 +331,16 @@ function validateReceipt(value, expected, runAttempt) {
     value.migration_version !== MIGRATION_VERSION ||
     value.migration_name !== MIGRATION_NAME ||
     value.migration_sha256 !== MIGRATION_SHA256 ||
+    value.delivery_mode !== SOLO_FOUNDER_POLICY.deliveryMode ||
+    value.founder_github_user_id !== SOLO_FOUNDER_POLICY.founderUserId ||
+    value.founder_github_login !== SOLO_FOUNDER_POLICY.founderLogin ||
+    value.founder_github_login !== authenticatedFounderLogin ||
+    value.production_environment !== SOLO_FOUNDER_POLICY.environmentName ||
+    value.solo_founder_acknowledgement_verified !== true ||
+    value.environment_contract_verified !== true ||
+    value.environment_approval_verified !== true ||
+    value.minimum_review_seconds !== SOLO_FOUNDER_POLICY.minimumReviewSeconds ||
+    value.maximum_review_seconds !== SOLO_FOUNDER_POLICY.maximumReviewSeconds ||
     !lowercaseDigest(value.state_digest)
   ) {
     reject();
@@ -479,7 +527,12 @@ export async function verifyPreflightArtifactBundle({
   } catch {
     reject();
   }
-  const receiptDigest = validateReceipt(receipt, expected, metadata.runAttempt);
+  const receiptDigest = validateReceipt(
+    receipt,
+    expected,
+    metadata.runAttempt,
+    priorRun.actor.login,
+  );
   return Object.freeze({ receiptDigest, artifactId: metadata.artifactId });
 }
 
@@ -494,6 +547,8 @@ async function main(env = process.env) {
       repositoryId: env.GITHUB_REPOSITORY_ID,
       currentRunId: env.GITHUB_RUN_ID,
       preflightRunId: env.PREFLIGHT_RUN_ID,
+      preflightRunAttempt: env.EXPECTED_PREFLIGHT_RUN_ATTEMPT,
+      preflightArtifactSha256: env.EXPECTED_PREFLIGHT_ARTIFACT_SHA256,
       headSha: env.EXPECTED_HEAD_SHA,
       now: new Date().toISOString(),
     };

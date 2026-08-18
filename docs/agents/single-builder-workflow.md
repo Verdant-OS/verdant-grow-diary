@@ -31,9 +31,10 @@ conflict.
 - **Hard safety rules are not workflow-optional.** No fake live data, no blind
   automation, approval-required Action Queue, migration immutability, secrets
   never in sessions — all of `AGENTS.md` §Hard Safety Rules binds the builder.
-- **Status vocabulary is literal.** `PASS` / `FAIL` / `BLOCKED` /
-  `NOT_MEASURED` / `SKIPPED` — never launder a blocked or unmeasured check
-  into a pass.
+- **Status vocabulary is literal.** All eight of `AGENTS.md` §Status
+  Vocabulary: `PASS` / `FAIL` / `BLOCKED` / `NO_BASELINE` / `NO_DATA` /
+  `NOT_MEASURED` / `SKIPPED` / `NOT_APPLICABLE` — never launder a blocked or
+  unmeasured check into a pass.
 
 ## 2. The slice loop
 
@@ -73,12 +74,12 @@ Every non-trivial PR fills the repo template
 summary — this is the core of the Codex discipline and the part most worth
 keeping verbatim:
 
-| Section          | Contract                                                                                                                                                                                                                       |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Summary**      | Bullet list of what changed, behavior-first, few lines.                                                                                                                                                                        |
-| **TDD evidence** | Each new test shown RED before its fix, with the failing count or symptom (e.g. "numeric query RED: 7 passed / 1 failed"). A test that was never seen failing is not evidence.                                                 |
-| **Validation**   | Exact counts, scoped honestly: focused Vitest `N/N`, typecheck, scoped ESLint with pre-existing warnings counted separately, Prettier, `git diff --check`, and mocked-browser E2E where UI changed. Name what was **not** run. |
-| **Safety**       | Explicit statement: schema / RLS / auth / billing / production data / device control touched or not. Browser validation notes it used a fake session and mocked Supabase — never real credentials.                             |
+| Section          | Contract                                                                                                                                                                                                                                                                                            |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Summary**      | Bullet list of what changed, behavior-first, few lines.                                                                                                                                                                                                                                             |
+| **TDD evidence** | Each new test shown RED before its fix, with the failing count or symptom (e.g. "numeric query RED: 7 passed / 1 failed"). A test that was never seen failing is not evidence.                                                                                                                      |
+| **Validation**   | Exact counts, scoped honestly: focused Vitest `N/N`, typecheck, scoped ESLint with pre-existing warnings counted separately, Prettier, `git diff --check`, and mocked-browser E2E where UI changed. Name what was **not** run.                                                                      |
+| **Safety**       | Explicit statement: schema / RLS / auth / billing / production data / device control touched or not. Name the browser lane actually used — `chromium-mocked` (fake session, mocked Supabase) or `chromium-authed` (seeded session per §4) — and never paste real credentials into an agent session. |
 
 Docs-only PRs state the docs-only exception in Tests-run instead of pretending
 suites ran.
@@ -91,7 +92,7 @@ Local, before every push (from the repo's real scripts — see
 ```bash
 bun run typecheck
 bunx vitest run <focused files>        # exact counts into the PR body
-bun run lint                            # scoped; count pre-existing warnings separately
+npx eslint <changed files>              # scoped to the diff; count pre-existing warnings separately (bun run lint is repo-wide)
 # UI slices: mocked-browser proof against the dev server
 E2E_BASE_URL=http://127.0.0.1:8080 bunx playwright test --project=chromium-mocked <spec>
 ```
@@ -124,13 +125,13 @@ Never reuse green checks from pre-resolution SHA
 Adaptations from the multi-agent constitution — trims of ceremony, not of
 discipline:
 
-| Multi-agent practice                                                             | Single-builder adaptation                                                                                                                                                           |
-| -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Check open PRs for a competing agent's implementation of the same slice          | Keep the audit; the competitor is now past-you, Lovable, or an owner session. Supersession rules unchanged.                                                                         |
-| Serial role handoffs (Research → Architecture → Build → Security → QA → Council) | Cheek may invoke any subset; the builder must still **flag** slices that need a security review (new trust boundary, credential, or principal) rather than absorbing that judgment. |
-| Codex "coordinates release gates, production verification, merge-on-green"       | This clause must be **explicitly transferred** in `CURRENT_STATE.md` at handoff. Until Cheek records it, the successor builder builds but does not coordinate release gates.        |
-| DIRTY-PR reconciliation sweeps across agents                                     | Mostly vestigial; the builder keeps their own branch/PR hygiene (zero stale branches after work lands or dies — the 2026-08-18 sweep is the reference).                             |
-| Agent-attribution headers in `CURRENT_STATE.md` merge-conflict chains            | Same discipline, fewer collisions: additive header, demote prior, state exactly what was and was not re-measured.                                                                   |
+| Multi-agent practice                                                             | Single-builder adaptation                                                                                                                                                                                                                                                                                         |
+| -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Check open PRs for a competing agent's implementation of the same slice          | Keep the audit; the competitor is now past-you, Lovable, or an owner session. Supersession rules unchanged.                                                                                                                                                                                                       |
+| Serial role handoffs (Research → Architecture → Build → Security → QA → Council) | Cheek may invoke any subset; the builder must still **flag** slices that need a security review (new trust boundary, credential, or principal) rather than absorbing that judgment.                                                                                                                               |
+| Codex "coordinates release gates, production verification, merge-on-green"       | This clause must be **explicitly transferred** in `CURRENT_STATE.md` at handoff. Until Cheek records it, the successor builder builds but does not coordinate release gates.                                                                                                                                      |
+| DIRTY-PR reconciliation sweeps across agents                                     | Mostly vestigial; the builder keeps their own branch/PR hygiene: triage every stale branch to a terminal disposition and hand Cheek the deletion list — agent push credentials are branch-scoped (`git push --delete` → HTTP 403), so deletion itself is an owner action (the 2026-08-18 sweep is the reference). |
+| Agent-attribution headers in `CURRENT_STATE.md` merge-conflict chains            | Same discipline, fewer collisions: additive header, demote prior, state exactly what was and was not re-measured.                                                                                                                                                                                                 |
 
 **Unchanged and non-negotiable in single-builder mode:** Cheek approval,
 merge queue, migration immutability, Sentinel gate, evidence labels, and the

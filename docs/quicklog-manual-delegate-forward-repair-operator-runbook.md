@@ -64,10 +64,11 @@ are excluded from uploaded evidence.
 ## Mandatory active-writer gate
 
 All six registered production migration writers share the workflow-level group
-`verdant-production-migration-writer` with `cancel-in-progress: false`. This
-serializes their complete workflow lifetimes without cancelling an earlier
-writer. Immediately before approving and dispatching APPLY, still require all
-of these workflows to have no `queued`, `in_progress`, `waiting`, `pending`, or
+`verdant-production-migration-writer` with `cancel-in-progress: false` and
+`queue: max`. This serializes their complete workflow lifetimes and retains a
+durable queue of pending writers instead of replacing an earlier pending run.
+Immediately before approving and dispatching APPLY, still require all of these
+workflows to have no `queued`, `in_progress`, `waiting`, `pending`, or
 `requested` run:
 
 - `apply-candidate-number-maintenance-migrations.yml`

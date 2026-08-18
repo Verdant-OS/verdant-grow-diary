@@ -1385,6 +1385,7 @@ describe("signup-acquisition forward-repair protected workflow", () => {
     expect(workflow.concurrency).toEqual({
       group: "verdant-production-migration-writer",
       "cancel-in-progress": false,
+      queue: "max",
     });
 
     const validate = workflow.jobs.validate;

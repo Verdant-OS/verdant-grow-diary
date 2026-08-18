@@ -610,12 +610,14 @@ describe("Quick Log manual delegate production delivery", () => {
       expect(workflow.concurrency, writer).toEqual({
         group: "verdant-production-migration-writer",
         "cancel-in-progress": false,
+        queue: "max",
       });
     }
 
     const runbook = readFileSync(RUNBOOK_PATH, "utf8");
     expect(runbook).toContain("verdant-production-migration-writer");
     expect(runbook).toMatch(/cancel-in-progress[^\n]*false/i);
+    expect(runbook).toMatch(/queue[^\n]*max/i);
     expect(runbook).toMatch(/defen[cs]e in depth/i);
   });
 

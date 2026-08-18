@@ -37,6 +37,7 @@ permissions:
 concurrency:
   group: verdant-production-migration-writer
   cancel-in-progress: false
+  queue: max
 
 jobs:
   validate:

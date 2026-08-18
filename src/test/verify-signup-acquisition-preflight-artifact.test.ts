@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { copyFileSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -8,17 +8,23 @@ import JSZip from "jszip";
 import { describe, expect, it } from "vitest";
 
 const VERIFIER_PATH = resolve("scripts/verify-signup-acquisition-preflight-artifact.mjs");
+const POLICY_PATH = resolve("scripts/lib/solo-founder-production-authorization.mjs");
 const REPOSITORY = "Verdant-OS/verdant-grow-diary";
 const REPOSITORY_ID = 123456789;
 const WORKFLOW_PATH = ".github/workflows/apply-signup-acquisition-forward-repair.yml";
+const ARTIFACT_PREFIX = "signup-acquisition-forward-repair-preflight";
 const WORKFLOW_ID = 654321;
 const HEAD_SHA = "a".repeat(40);
 const RUN_ID = 99887766;
-const RUN_ATTEMPT = 2;
+const RUN_ATTEMPT = 1;
 const CURRENT_RUN_ID = 99887799;
 const STATE_DIGEST = "b".repeat(64);
 const PROJECT_REF = "knkwiiywfkbqznbxwqfh";
 const MIGRATION_SHA256 = "6C002AB676218C32C27E41E7A8E90FF4F452C41D7EDB446B0FCB950B93D3DEBA";
+const FOUNDER_USER_ID = 72639960;
+const FOUNDER_LOGIN = "cheekhimself";
+const DELIVERY_MODE = "solo_founder_self_review_v1";
+const PRODUCTION_ENVIRONMENT = "verdant-production-solo-founder";
 
 async function loadVerifier() {
   return import(`${pathToFileURL(VERIFIER_PATH).href}?test=${Date.now()}-${Math.random()}`);
@@ -44,6 +50,15 @@ function receipt(extra: Record<string, unknown> = {}) {
     migration_name: "signup_acquisition_forward_repair",
     migration_sha256: MIGRATION_SHA256,
     state_digest: STATE_DIGEST,
+    delivery_mode: DELIVERY_MODE,
+    founder_github_user_id: FOUNDER_USER_ID,
+    founder_github_login: FOUNDER_LOGIN,
+    production_environment: PRODUCTION_ENVIRONMENT,
+    solo_founder_acknowledgement_verified: true,
+    environment_contract_verified: true,
+    environment_approval_verified: true,
+    minimum_review_seconds: 900,
+    maximum_review_seconds: 86400,
     ...extra,
   };
 }
@@ -61,6 +76,8 @@ function priorRun(extra: Record<string, unknown> = {}) {
     head_sha: HEAD_SHA,
     repository: { id: REPOSITORY_ID, full_name: REPOSITORY },
     head_repository: { id: REPOSITORY_ID, full_name: REPOSITORY },
+    actor: { id: FOUNDER_USER_ID, login: FOUNDER_LOGIN },
+    triggering_actor: { id: FOUNDER_USER_ID, login: FOUNDER_LOGIN },
     created_at: "2026-08-15T12:00:00.000Z",
     updated_at: "2026-08-15T12:03:00.000Z",
     ...extra,
@@ -78,7 +95,9 @@ function currentRun(extra: Record<string, unknown> = {}) {
     head_sha: HEAD_SHA,
     repository: { id: REPOSITORY_ID, full_name: REPOSITORY },
     head_repository: { id: REPOSITORY_ID, full_name: REPOSITORY },
-    created_at: "2026-08-15T12:05:00.000Z",
+    actor: { id: FOUNDER_USER_ID, login: FOUNDER_LOGIN },
+    triggering_actor: { id: FOUNDER_USER_ID, login: FOUNDER_LOGIN },
+    created_at: "2026-08-15T12:18:00.000Z",
     ...extra,
   };
 }
@@ -135,14 +154,16 @@ function artifactFor(archive: Buffer, extra: Record<string, unknown> = {}) {
   };
 }
 
-function expectedContext() {
+function expectedContext(archive: Buffer) {
   return {
     repository: REPOSITORY,
     repositoryId: String(REPOSITORY_ID),
     currentRunId: String(CURRENT_RUN_ID),
     preflightRunId: String(RUN_ID),
+    preflightRunAttempt: RUN_ATTEMPT,
+    preflightArtifactSha256: createHash("sha256").update(archive).digest("hex"),
     headSha: HEAD_SHA,
-    now: "2026-08-15T12:06:00.000Z",
+    now: "2026-08-15T12:19:00.000Z",
   };
 }
 
@@ -152,6 +173,8 @@ describe("authenticated signup-acquisition PREFLIGHT artifact", () => {
     const isolatedVerifier = join(isolated, "verify-signup-acquisition-preflight-artifact.mjs");
     try {
       copyFileSync(VERIFIER_PATH, isolatedVerifier);
+      mkdirSync(join(isolated, "lib"));
+      copyFileSync(POLICY_PATH, join(isolated, "lib", "solo-founder-production-authorization.mjs"));
       const source = readFileSync(isolatedVerifier, "utf8");
       expect(source).not.toMatch(/from\s+["'](?:jszip|adm-zip|yauzl|unzipper)["']/);
 
@@ -188,10 +211,116 @@ describe("authenticated signup-acquisition PREFLIGHT artifact", () => {
             workflow: workflow(),
             artifacts: { total_count: 1, artifacts: [artifactFor(archive)] },
             archive,
-            expected: expectedContext(),
+            expected: expectedContext(archive),
           }),
         ).toEqual({ receiptDigest: STATE_DIGEST, artifactId: 444333222 });
       }
+    }
+  });
+
+  it("rejects every non-founder run identity and any non-first run attempt", async () => {
+    const verifier = await loadVerifier();
+    const archive = await archiveFor();
+    const cases = [
+      { priorRun: priorRun({ actor: { id: 1, login: FOUNDER_LOGIN } }) },
+      { priorRun: priorRun({ actor: { login: FOUNDER_LOGIN } }) },
+      { priorRun: priorRun({ triggering_actor: { id: FOUNDER_USER_ID, login: "other" } }) },
+      { priorRun: priorRun({ triggering_actor: { login: FOUNDER_LOGIN } }) },
+      { currentRun: currentRun({ actor: { id: 1, login: FOUNDER_LOGIN } }) },
+      { currentRun: currentRun({ actor: { login: FOUNDER_LOGIN } }) },
+      { currentRun: currentRun({ triggering_actor: { id: FOUNDER_USER_ID, login: "other" } }) },
+      { currentRun: currentRun({ triggering_actor: { login: FOUNDER_LOGIN } }) },
+      {
+        priorRun: priorRun({ run_attempt: 2 }),
+        artifacts: {
+          total_count: 1,
+          artifacts: [
+            artifactFor(archive, {
+              name: `${ARTIFACT_PREFIX}-run-${RUN_ID}-attempt-2`,
+            }),
+          ],
+        },
+      },
+      { currentRun: currentRun({ run_attempt: 2 }) },
+    ];
+
+    for (const item of cases) {
+      expect(() =>
+        verifier.validatePreflightArtifactMetadata({
+          priorRun: item.priorRun ?? priorRun(),
+          currentRun: item.currentRun ?? currentRun(),
+          workflow: workflow(),
+          artifacts: item.artifacts ?? { total_count: 1, artifacts: [artifactFor(archive)] },
+          expected: expectedContext(archive),
+        }),
+      ).toThrow(/preflight_artifact_rejected/);
+    }
+  });
+
+  it("accepts only the inclusive authenticated 15-minute-to-24-hour review window", async () => {
+    const verifier = await loadVerifier();
+    const archive = await archiveFor();
+    const artifacts = { total_count: 1, artifacts: [artifactFor(archive)] };
+    const accepted = ["2026-08-15T12:18:00.000Z", "2026-08-16T12:03:00.000Z"];
+    const rejected = ["2026-08-15T12:17:59.999Z", "2026-08-16T12:03:00.001Z"];
+
+    for (const createdAt of accepted) {
+      expect(
+        verifier.validatePreflightArtifactMetadata({
+          priorRun: priorRun(),
+          currentRun: currentRun({ created_at: createdAt }),
+          workflow: workflow(),
+          artifacts,
+          expected: expectedContext(archive),
+        }),
+      ).toMatchObject({ artifactId: 444333222 });
+    }
+    for (const createdAt of rejected) {
+      expect(() =>
+        verifier.validatePreflightArtifactMetadata({
+          priorRun: priorRun(),
+          currentRun: currentRun({ created_at: createdAt }),
+          workflow: workflow(),
+          artifacts,
+          expected: expectedContext(archive),
+        }),
+      ).toThrow(/preflight_artifact_rejected/);
+    }
+  });
+
+  it("rejects an attempt or artifact digest other than the founder-pinned PREFLIGHT evidence", async () => {
+    const verifier = await loadVerifier();
+    const reviewedArchive = await archiveFor();
+    const replacementArchive = await archiveFor(receipt({ state_digest: "c".repeat(64) }));
+    const cases = [
+      {
+        archive: reviewedArchive,
+        expected: { ...expectedContext(reviewedArchive), preflightRunAttempt: 2 },
+      },
+      {
+        archive: reviewedArchive,
+        expected: expectedContext(reviewedArchive),
+        artifacts: {
+          total_count: 1,
+          artifacts: [artifactFor(reviewedArchive, { digest: `sha256:${"0".repeat(64)}` })],
+        },
+      },
+      {
+        archive: replacementArchive,
+        expected: expectedContext(reviewedArchive),
+      },
+    ];
+
+    for (const item of cases) {
+      expect(() =>
+        verifier.validatePreflightArtifactMetadata({
+          priorRun: priorRun(),
+          currentRun: currentRun(),
+          workflow: workflow(),
+          artifacts: item.artifacts ?? { total_count: 1, artifacts: [artifactFor(item.archive)] },
+          expected: item.expected,
+        }),
+      ).toThrow(/preflight_artifact_rejected/);
     }
   });
 
@@ -236,7 +365,7 @@ describe("authenticated signup-acquisition PREFLIGHT artifact", () => {
           workflow: mutation.workflow ?? workflow(),
           artifacts: { total_count: 1, artifacts: [artifact] },
           archive,
-          expected: expectedContext(),
+          expected: expectedContext(archive),
         }),
       ).rejects.toThrow(/preflight_artifact_rejected/);
     }
@@ -268,7 +397,7 @@ describe("authenticated signup-acquisition PREFLIGHT artifact", () => {
           workflow: workflow(),
           artifacts,
           archive,
-          expected: expectedContext(),
+          expected: expectedContext(archive),
         }),
       ).rejects.toThrow(/preflight_artifact_rejected/);
     }
@@ -307,7 +436,7 @@ describe("authenticated signup-acquisition PREFLIGHT artifact", () => {
           workflow: workflow(),
           artifacts: { total_count: 1, artifacts: [artifact] },
           archive: item.archive,
-          expected: expectedContext(),
+          expected: expectedContext(item.archive),
         }),
       ).rejects.toThrow(/preflight_artifact_rejected/);
     }
@@ -324,7 +453,7 @@ describe("authenticated signup-acquisition PREFLIGHT artifact", () => {
         workflow: workflow(),
         artifacts: { total_count: 1, artifacts: [artifactFor(archive)] },
         archive,
-        expected: expectedContext(),
+        expected: expectedContext(archive),
       }),
     ).rejects.toThrow(/preflight_artifact_rejected/);
   });
@@ -347,7 +476,33 @@ describe("authenticated signup-acquisition PREFLIGHT artifact", () => {
           workflow: workflow(),
           artifacts: { total_count: 1, artifacts: [artifactFor(archive)] },
           archive,
-          expected: expectedContext(),
+          expected: expectedContext(archive),
+        }),
+      ).rejects.toThrow(/preflight_artifact_rejected/);
+    }
+  });
+
+  it("strictly rejects missing, altered, mistyped, or extra solo-founder receipt authorization", async () => {
+    const verifier = await loadVerifier();
+    const missingAuthorization = receipt();
+    delete missingAuthorization.environment_approval_verified;
+    const cases = [
+      missingAuthorization,
+      receipt({ founder_github_login: "other" }),
+      receipt({ minimum_review_seconds: "900" }),
+      receipt({ authorization_scope: "replacement" }),
+    ];
+
+    for (const changed of cases) {
+      const archive = await archiveFor(changed);
+      await expect(
+        verifier.verifyPreflightArtifactBundle({
+          priorRun: priorRun(),
+          currentRun: currentRun(),
+          workflow: workflow(),
+          artifacts: { total_count: 1, artifacts: [artifactFor(archive)] },
+          archive,
+          expected: expectedContext(archive),
         }),
       ).rejects.toThrow(/preflight_artifact_rejected/);
     }

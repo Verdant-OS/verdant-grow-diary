@@ -18,6 +18,7 @@ import { fileURLToPath } from "node:url";
 import { findUnsafeSqlReason } from "./apply-pinned-production-migrations.mjs";
 import { buildPsqlEnvironment, writeTextFile } from "./lib/candidateNumberToolRuntime.mjs";
 import { hardenProductionPsqlEnvironment } from "./lib/productionSupabaseTls.mjs";
+import { SOLO_FOUNDER_POLICY } from "./lib/solo-founder-production-authorization.mjs";
 import {
   assertSupabaseDatabaseTargetIdentity,
   SUPABASE_DATABASE_TARGETS,
@@ -122,6 +123,69 @@ function safePositiveIntegerText(value) {
   const text = String(value ?? "").trim();
   if (!/^[1-9]\d*$/.test(text) || !Number.isSafeInteger(Number(text))) return null;
   return text;
+}
+
+function validateSoloFounderRunnerAuthorization(env) {
+  if (
+    env.GITHUB_RUN_ATTEMPT !== "1" ||
+    env.SOLO_FOUNDER_ACKNOWLEDGEMENT !== SOLO_FOUNDER_POLICY.acknowledgement ||
+    env.SOLO_FOUNDER_DELIVERY_MODE !== SOLO_FOUNDER_POLICY.deliveryMode ||
+    env.SOLO_FOUNDER_VERIFIED_USER_ID !== String(SOLO_FOUNDER_POLICY.founderUserId) ||
+    env.SOLO_FOUNDER_VERIFIED_LOGIN !== SOLO_FOUNDER_POLICY.founderLogin ||
+    env.SOLO_FOUNDER_VERIFIED_ENVIRONMENT !== SOLO_FOUNDER_POLICY.environmentName ||
+    env.SOLO_FOUNDER_ACKNOWLEDGEMENT_VERIFIED !== "true" ||
+    env.SOLO_FOUNDER_ENVIRONMENT_CONTRACT_VERIFIED !== "true" ||
+    env.SOLO_FOUNDER_ENVIRONMENT_APPROVAL_VERIFIED !== "true" ||
+    env.SOLO_FOUNDER_MINIMUM_REVIEW_SECONDS !== String(SOLO_FOUNDER_POLICY.minimumReviewSeconds) ||
+    env.SOLO_FOUNDER_MAXIMUM_REVIEW_SECONDS !== String(SOLO_FOUNDER_POLICY.maximumReviewSeconds)
+  ) {
+    return null;
+  }
+  return Object.freeze({
+    delivery_mode: SOLO_FOUNDER_POLICY.deliveryMode,
+    founder_github_user_id: SOLO_FOUNDER_POLICY.founderUserId,
+    founder_github_login: SOLO_FOUNDER_POLICY.founderLogin,
+    production_environment: SOLO_FOUNDER_POLICY.environmentName,
+    solo_founder_acknowledgement_verified: true,
+    environment_contract_verified: true,
+    environment_approval_verified: true,
+    minimum_review_seconds: SOLO_FOUNDER_POLICY.minimumReviewSeconds,
+    maximum_review_seconds: SOLO_FOUNDER_POLICY.maximumReviewSeconds,
+  });
+}
+
+function writeSoloFounderAuthorizationFailure({ env, logger, now }) {
+  const reasonCode = "solo_founder_authorization_rejected";
+  writeTextFile(
+    env.REPORT_PATH ?? "",
+    [
+      "### Quick Log manual delegate forward repair",
+      "",
+      "**Status:** BLOCKED - solo-founder authorization rejected",
+      "",
+      `Reason code: ${reasonCode}`,
+      "No database process was started. No untrusted authorization value is included.",
+      "",
+    ].join("\n"),
+    logger,
+    "Quick Log delegate delivery report",
+  );
+  writeTextFile(
+    env.AUDIT_PATH ?? "",
+    `${JSON.stringify(
+      {
+        schema_version: 1,
+        tool: "apply-quicklog-manual-delegate-forward-repair",
+        checked_at: now().toISOString(),
+        outcome: "authorization_rejected",
+        reason_code: reasonCode,
+      },
+      null,
+      2,
+    )}\n`,
+    logger,
+    "Quick Log delegate delivery audit",
+  );
 }
 
 export function validatePinnedMigrationFile({
@@ -751,7 +815,7 @@ const AUDIT_OUTCOMES = new Set([
   "applied_verified",
 ]);
 
-function makeArtifactWriters({ reportPath, auditPath, receiptPath, now, logger }) {
+function makeArtifactWriters({ reportPath, auditPath, receiptPath, authorization, now, logger }) {
   const writeReport = (status, lines) =>
     writeTextFile(
       reportPath,
@@ -790,6 +854,7 @@ function makeArtifactWriters({ reportPath, auditPath, receiptPath, now, logger }
           run_id: base.runId,
           run_attempt: base.runAttempt,
           operation: base.operation,
+          ...authorization,
           ...(safeDigest(extra.receipt_digest) ? { receipt_digest: extra.receipt_digest } : {}),
           ...(new Set(["migration_then_ledger", "ledger_only"]).has(extra.recovery_path)
             ? { recovery_path: extra.recovery_path }
@@ -824,6 +889,7 @@ function makeArtifactWriters({ reportPath, auditPath, receiptPath, now, logger }
           migration_name: PINNED_MIGRATION.name,
           migration_sha256: PINNED_MIGRATION.sha256,
           state_digest: digest,
+          ...authorization,
         },
         null,
         2,
@@ -849,6 +915,12 @@ export function runQuickLogManualDelegateForwardRepair({
   logger = console,
   now = () => new Date(),
 } = {}) {
+  const authorization = validateSoloFounderRunnerAuthorization(env);
+  if (!authorization) {
+    logger.error("solo_founder_authorization_rejected");
+    writeSoloFounderAuthorizationFailure({ env, logger, now });
+    return EXIT.INPUT_REJECTED;
+  }
   const operation = String(env.OPERATION ?? "").trim();
   const expectedHeadSha = String(env.EXPECTED_HEAD_SHA ?? "").trim();
   const observedHeadSha = String(env.GITHUB_SHA ?? "").trim();
@@ -875,6 +947,7 @@ export function runQuickLogManualDelegateForwardRepair({
     reportPath: env.REPORT_PATH ?? "",
     auditPath: env.AUDIT_PATH ?? "",
     receiptPath: env.PREFLIGHT_RECEIPT_PATH ?? "",
+    authorization,
     now,
     logger,
   });

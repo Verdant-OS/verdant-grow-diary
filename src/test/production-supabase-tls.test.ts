@@ -323,7 +323,7 @@ describe("production Supabase CA workflow boundary", () => {
     const parsed = workflow(DELEGATE_APPLY_WORKFLOW_PATH);
     const job = parsed.jobs.apply;
 
-    expectProtectedCaWorkflow(job);
+    expectProtectedCaWorkflow(job, "verdant-production-solo-founder");
     const runner = job.steps.find(
       (step) => step.name === "Run the environment-gated Quick Log delegate repair",
     );

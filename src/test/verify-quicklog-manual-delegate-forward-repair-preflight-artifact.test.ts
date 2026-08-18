@@ -18,10 +18,14 @@ const WORKFLOW_PATH = ".github/workflows/apply-quicklog-manual-delegate-forward-
 const WORKFLOW_ID = 654321;
 const HEAD_SHA = "a".repeat(40);
 const RUN_ID = 99887766;
-const RUN_ATTEMPT = 2;
+const RUN_ATTEMPT = 1;
 const CURRENT_RUN_ID = 99887799;
 const STATE_DIGEST = "b".repeat(64);
 const PROJECT_REF = "knkwiiywfkbqznbxwqfh";
+const FOUNDER_USER_ID = 72639960;
+const FOUNDER_LOGIN = "cheekhimself";
+const DELIVERY_MODE = "solo_founder_self_review_v1";
+const PRODUCTION_ENVIRONMENT = "verdant-production-solo-founder";
 const MIGRATION_SHA256 = createHash("sha256")
   .update(readFileSync(MIGRATION_PATH))
   .digest("hex")
@@ -60,6 +64,15 @@ function receipt(
     migration_name: "quicklog_manual_delegate_forward_repair",
     migration_sha256: MIGRATION_SHA256,
     state_digest: STATE_DIGEST,
+    delivery_mode: DELIVERY_MODE,
+    founder_github_user_id: FOUNDER_USER_ID,
+    founder_github_login: FOUNDER_LOGIN,
+    production_environment: PRODUCTION_ENVIRONMENT,
+    solo_founder_acknowledgement_verified: true,
+    environment_contract_verified: true,
+    environment_approval_verified: true,
+    minimum_review_seconds: 900,
+    maximum_review_seconds: 86400,
     ...extra,
   };
 }
@@ -77,6 +90,8 @@ function priorRun(extra: Record<string, unknown> = {}) {
     head_sha: HEAD_SHA,
     repository: { id: REPOSITORY_ID, full_name: REPOSITORY },
     head_repository: { id: REPOSITORY_ID, full_name: REPOSITORY },
+    actor: { id: FOUNDER_USER_ID, login: FOUNDER_LOGIN },
+    triggering_actor: { id: FOUNDER_USER_ID, login: FOUNDER_LOGIN },
     created_at: "2026-08-17T12:00:00.000Z",
     updated_at: "2026-08-17T12:03:00.000Z",
     ...extra,
@@ -94,7 +109,9 @@ function currentRun(extra: Record<string, unknown> = {}) {
     head_sha: HEAD_SHA,
     repository: { id: REPOSITORY_ID, full_name: REPOSITORY },
     head_repository: { id: REPOSITORY_ID, full_name: REPOSITORY },
-    created_at: "2026-08-17T12:05:00.000Z",
+    actor: { id: FOUNDER_USER_ID, login: FOUNDER_LOGIN },
+    triggering_actor: { id: FOUNDER_USER_ID, login: FOUNDER_LOGIN },
+    created_at: "2026-08-17T12:18:00.000Z",
     ...extra,
   };
 }
@@ -236,6 +253,91 @@ describe("authenticated Quick Log delegate PREFLIGHT artifact", () => {
     ).toThrow("preflight_artifact_rejected");
   });
 
+  it("rejects every non-founder identity and non-first attempt on both authenticated runs", async () => {
+    const verifier = await loadVerifier();
+    const archive = await archiveFor();
+    const artifact = artifactFor(archive);
+    const identities = ["actor", "triggering_actor"] as const;
+    const runKinds = ["priorRun", "currentRun"] as const;
+    const mutations: Array<{
+      priorRun?: Record<string, unknown>;
+      currentRun?: Record<string, unknown>;
+      artifacts?: { total_count: number; artifacts: Array<Record<string, unknown>> };
+    }> = [];
+
+    for (const runKind of runKinds) {
+      for (const identity of identities) {
+        mutations.push(
+          { [runKind]: { [identity]: { id: 1, login: FOUNDER_LOGIN } } },
+          { [runKind]: { [identity]: { login: FOUNDER_LOGIN } } },
+          { [runKind]: { [identity]: { id: FOUNDER_USER_ID, login: "other" } } },
+          { [runKind]: { [identity]: { id: FOUNDER_USER_ID } } },
+        );
+      }
+      for (const runAttempt of [0, 2]) {
+        mutations.push({
+          [runKind]: { run_attempt: runAttempt },
+          ...(runKind === "priorRun"
+            ? {
+                artifacts: {
+                  total_count: 1,
+                  artifacts: [
+                    {
+                      ...artifact,
+                      name: `quicklog-manual-delegate-forward-repair-preflight-run-${RUN_ID}-attempt-${runAttempt}`,
+                    },
+                  ],
+                },
+              }
+            : {}),
+        });
+      }
+    }
+
+    for (const mutation of mutations) {
+      expect(() =>
+        verifier.validatePreflightArtifactMetadata({
+          priorRun: priorRun(mutation.priorRun),
+          currentRun: currentRun(mutation.currentRun),
+          workflow: workflow(),
+          artifacts: mutation.artifacts ?? { total_count: 1, artifacts: [artifact] },
+          expected: expectedContext(archive),
+        }),
+      ).toThrow("preflight_artifact_rejected");
+    }
+  });
+
+  it("accepts only the inclusive authenticated 15-minute-to-24-hour review window", async () => {
+    const verifier = await loadVerifier();
+    const archive = await archiveFor();
+    const artifacts = { total_count: 1, artifacts: [artifactFor(archive)] };
+    const accepted = ["2026-08-17T12:18:00.000Z", "2026-08-18T12:03:00.000Z"];
+    const rejected = ["2026-08-17T12:17:59.999Z", "2026-08-18T12:03:00.001Z"];
+
+    for (const createdAt of accepted) {
+      expect(
+        verifier.validatePreflightArtifactMetadata({
+          priorRun: priorRun(),
+          currentRun: currentRun({ created_at: createdAt }),
+          workflow: workflow(),
+          artifacts,
+          expected: expectedContext(archive),
+        }),
+      ).toMatchObject({ artifactId: 444333222 });
+    }
+    for (const createdAt of rejected) {
+      expect(() =>
+        verifier.validatePreflightArtifactMetadata({
+          priorRun: priorRun(),
+          currentRun: currentRun({ created_at: createdAt }),
+          workflow: workflow(),
+          artifacts,
+          expected: expectedContext(archive, { now: "2026-08-19T12:17:59.999Z" }),
+        }),
+      ).toThrow("preflight_artifact_rejected");
+    }
+  });
+
   it.each(["safe_to_apply", "schema_live_ledger_absent"] as const)(
     "binds the archive and strict %s receipt",
     async (outcome) => {
@@ -286,6 +388,67 @@ describe("authenticated Quick Log delegate PREFLIGHT artifact", () => {
         expected: expectedContext(extra),
       }),
     ).rejects.toThrow("preflight_artifact_rejected");
+  });
+
+  it("strictly rejects missing, altered, mistyped, or extra solo-founder receipt authorization", async () => {
+    const verifier = await loadVerifier();
+    const authorization = {
+      delivery_mode: DELIVERY_MODE,
+      founder_github_user_id: FOUNDER_USER_ID,
+      founder_github_login: FOUNDER_LOGIN,
+      production_environment: PRODUCTION_ENVIRONMENT,
+      solo_founder_acknowledgement_verified: true,
+      environment_contract_verified: true,
+      environment_approval_verified: true,
+      minimum_review_seconds: 900,
+      maximum_review_seconds: 86400,
+    };
+    const missing = Object.entries(authorization).map(([key]) => {
+      const value = receipt();
+      delete value[key as keyof typeof value];
+      return value;
+    });
+    const altered = [
+      receipt("safe_to_apply", { delivery_mode: "replacement" }),
+      receipt("safe_to_apply", { founder_github_user_id: 1 }),
+      receipt("safe_to_apply", { founder_github_login: "other" }),
+      receipt("safe_to_apply", { production_environment: "other" }),
+      receipt("safe_to_apply", { solo_founder_acknowledgement_verified: false }),
+      receipt("safe_to_apply", { environment_contract_verified: false }),
+      receipt("safe_to_apply", { environment_approval_verified: false }),
+      receipt("safe_to_apply", { minimum_review_seconds: 1 }),
+      receipt("safe_to_apply", { maximum_review_seconds: 1 }),
+    ];
+    const mistyped = [
+      receipt("safe_to_apply", { delivery_mode: 1 }),
+      receipt("safe_to_apply", { founder_github_user_id: "72639960" }),
+      receipt("safe_to_apply", { founder_github_login: 1 }),
+      receipt("safe_to_apply", { production_environment: 1 }),
+      receipt("safe_to_apply", { solo_founder_acknowledgement_verified: "true" }),
+      receipt("safe_to_apply", { environment_contract_verified: "true" }),
+      receipt("safe_to_apply", { environment_approval_verified: "true" }),
+      receipt("safe_to_apply", { minimum_review_seconds: "900" }),
+      receipt("safe_to_apply", { maximum_review_seconds: "86400" }),
+    ];
+
+    for (const changed of [
+      ...missing,
+      ...altered,
+      ...mistyped,
+      receipt("safe_to_apply", { authorization_scope: "extra" }),
+    ]) {
+      const archive = await archiveFor(changed);
+      await expect(
+        verifier.verifyPreflightArtifactBundle({
+          priorRun: priorRun(),
+          currentRun: currentRun(),
+          workflow: workflow(),
+          artifacts: { total_count: 1, artifacts: [artifactFor(archive)] },
+          archive,
+          expected: expectedContext(archive),
+        }),
+      ).rejects.toThrow("preflight_artifact_rejected");
+    }
   });
 
   it("rejects duplicate, expired, oversized, or misnamed receipt artifacts", async () => {

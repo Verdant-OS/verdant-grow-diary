@@ -12,6 +12,9 @@ const RUNNER_PATH = resolve("scripts/apply-quicklog-manual-delegate-forward-repa
 const WORKFLOW_PATH = resolve(
   ".github/workflows/apply-quicklog-manual-delegate-forward-repair.yml",
 );
+const PG15_WORKFLOW_PATH = resolve(
+  ".github/workflows/quicklog-manual-delegate-forward-repair-pg15.yml",
+);
 const RUNBOOK_PATH = resolve("docs/quicklog-manual-delegate-forward-repair-operator-runbook.md");
 const MIGRATION_PATH = resolve(
   "supabase/migrations/20260818010000_quicklog_manual_delegate_forward_repair.sql",
@@ -23,10 +26,33 @@ const ADVANCED_HEAD_SHA = "b".repeat(40);
 const EXPECTED_REPOSITORY = "Verdant-OS/verdant-grow-diary";
 const EXPECTED_REPOSITORY_ID = "8675309";
 const EXPECTED_RUN_ID = "24680";
-const EXPECTED_RUN_ATTEMPT = "2";
+const EXPECTED_RUN_ATTEMPT = "1";
 const DATABASE_SECRET = "delegate-production-password-sentinel";
 const DATABASE_URL = `postgresql://postgres:${DATABASE_SECRET}@db.${PROJECT_REF}.supabase.co:5432/postgres?sslmode=require`;
 const CA_SECRET_SENTINEL = "raw-production-ca-secret-sentinel";
+const SOLO_FOUNDER_ACKNOWLEDGEMENT = "I AM THE SOLE FOUNDER AND AUTHORIZE THIS PRODUCTION RUN";
+const SOLO_FOUNDER_AUTHORIZATION_ENV = Object.freeze({
+  SOLO_FOUNDER_DELIVERY_MODE: "solo_founder_self_review_v1",
+  SOLO_FOUNDER_VERIFIED_USER_ID: "72639960",
+  SOLO_FOUNDER_VERIFIED_LOGIN: "cheekhimself",
+  SOLO_FOUNDER_VERIFIED_ENVIRONMENT: "verdant-production-solo-founder",
+  SOLO_FOUNDER_ACKNOWLEDGEMENT_VERIFIED: "true",
+  SOLO_FOUNDER_ENVIRONMENT_CONTRACT_VERIFIED: "true",
+  SOLO_FOUNDER_ENVIRONMENT_APPROVAL_VERIFIED: "true",
+  SOLO_FOUNDER_MINIMUM_REVIEW_SECONDS: "900",
+  SOLO_FOUNDER_MAXIMUM_REVIEW_SECONDS: "86400",
+});
+const SOLO_FOUNDER_AUTHORIZATION_RECEIPT = Object.freeze({
+  delivery_mode: "solo_founder_self_review_v1",
+  founder_github_user_id: 72639960,
+  founder_github_login: "cheekhimself",
+  production_environment: "verdant-production-solo-founder",
+  solo_founder_acknowledgement_verified: true,
+  environment_contract_verified: true,
+  environment_approval_verified: true,
+  minimum_review_seconds: 900,
+  maximum_review_seconds: 86400,
+});
 
 const DEFECTIVE_STATE = Object.freeze({
   ledger_exact_count: 0,
@@ -88,6 +114,8 @@ function baseEnv(extra: Record<string, string> = {}) {
     CONFIRM_APPLY: "APPLY QUICKLOG MANUAL DELEGATE FORWARD REPAIR",
     PREFLIGHT_RUN_ID: "13579",
     PREFLIGHT_RECEIPT_DIGEST: "",
+    SOLO_FOUNDER_ACKNOWLEDGEMENT,
+    ...SOLO_FOUNDER_AUTHORIZATION_ENV,
     SUPABASE_DB_URL: DATABASE_URL,
     PATH: process.env.PATH ?? "",
     ...extra,
@@ -308,6 +336,11 @@ describe("Quick Log manual delegate production delivery", () => {
       migration_version: "20260818010000",
       migration_sha256: runner.PINNED_MIGRATION.sha256,
       state_digest: expect.stringMatching(/^[0-9a-f]{64}$/),
+      ...SOLO_FOUNDER_AUTHORIZATION_RECEIPT,
+    });
+    expect(JSON.parse(readFileSync(evidence.AUDIT_PATH, "utf8"))).toMatchObject({
+      outcome,
+      ...SOLO_FOUNDER_AUTHORIZATION_RECEIPT,
     });
   });
 
@@ -361,6 +394,7 @@ describe("Quick Log manual delegate production delivery", () => {
       outcome: "applied_verified",
       recovery_path: "migration_then_ledger",
       migration_version: "20260818010000",
+      ...SOLO_FOUNDER_AUTHORIZATION_RECEIPT,
     });
   });
 
@@ -458,6 +492,90 @@ describe("Quick Log manual delegate production delivery", () => {
     }
   });
 
+  it("rejects every missing or altered solo-founder authorization value before psql", async () => {
+    const runner = await loadRunner();
+    const protectedValues = {
+      GITHUB_RUN_ATTEMPT: EXPECTED_RUN_ATTEMPT,
+      SOLO_FOUNDER_ACKNOWLEDGEMENT,
+      ...SOLO_FOUNDER_AUTHORIZATION_ENV,
+    };
+    const attackerValue = "attacker authorization comment https://attacker.invalid/secret";
+    const cases = Object.keys(protectedValues).flatMap((key) => [
+      { key, value: undefined },
+      { key, value: attackerValue },
+    ]);
+
+    for (const { key, value } of cases) {
+      const evidence = evidenceEnv();
+      const lines: string[] = [];
+      let calls = 0;
+      const env = baseEnv({
+        ...evidence,
+        SUPABASE_DB_URL: `postgresql://attacker:${DATABASE_SECRET}@attacker.invalid/db`,
+      });
+      if (value === undefined) delete (env as Record<string, string | undefined>)[key];
+      else (env as Record<string, string | undefined>)[key] = value;
+
+      const status = runner.runQuickLogManualDelegateForwardRepair({
+        env,
+        spawnImpl: () => {
+          calls += 1;
+          return { status: 0, stdout: stdout(DEFECTIVE_STATE), stderr: "" };
+        },
+        logger: {
+          log: (...args: unknown[]) => lines.push(args.map(String).join(" ")),
+          error: (...args: unknown[]) => lines.push(args.map(String).join(" ")),
+        },
+      });
+
+      expect(status, key).toBe(runner.EXIT.INPUT_REJECTED);
+      expect(calls, key).toBe(0);
+      const surfaces = [
+        ...lines,
+        readFileSync(evidence.REPORT_PATH, "utf8"),
+        readFileSync(evidence.AUDIT_PATH, "utf8"),
+      ].join("\n");
+      expect(surfaces, key).toContain("solo_founder_authorization_rejected");
+      expect(surfaces, key).not.toContain(attackerValue);
+      expect(surfaces, key).not.toContain(DATABASE_SECRET);
+      expect(surfaces, key).not.toContain("attacker.invalid");
+      expect(existsSync(evidence.PREFLIGHT_RECEIPT_PATH), key).toBe(false);
+    }
+  });
+
+  it('rejects GITHUB_RUN_ATTEMPT="2" with fixed authorization evidence before psql', async () => {
+    const runner = await loadRunner();
+    const evidence = evidenceEnv();
+    const lines: string[] = [];
+    let calls = 0;
+
+    const status = runner.runQuickLogManualDelegateForwardRepair({
+      env: baseEnv({ ...evidence, GITHUB_RUN_ATTEMPT: "2" }),
+      spawnImpl: () => {
+        calls += 1;
+        return { status: 0, stdout: stdout(DEFECTIVE_STATE), stderr: "" };
+      },
+      logger: {
+        log: (...args: unknown[]) => lines.push(args.map(String).join(" ")),
+        error: (...args: unknown[]) => lines.push(args.map(String).join(" ")),
+      },
+    });
+
+    expect(status).toBe(runner.EXIT.INPUT_REJECTED);
+    expect(calls).toBe(0);
+    expect(lines).toEqual(["solo_founder_authorization_rejected"]);
+    expect(readFileSync(evidence.REPORT_PATH, "utf8")).toContain(
+      "Reason code: solo_founder_authorization_rejected",
+    );
+    expect(JSON.parse(readFileSync(evidence.AUDIT_PATH, "utf8"))).toMatchObject({
+      schema_version: 1,
+      tool: "apply-quicklog-manual-delegate-forward-repair",
+      outcome: "authorization_rejected",
+      reason_code: "solo_founder_authorization_rejected",
+    });
+    expect(existsSync(evidence.PREFLIGHT_RECEIPT_PATH)).toBe(false);
+  });
+
   it("never records the ledger after migration or canonical-postflight failure", async () => {
     const runner = await loadRunner();
     const receipt = runner.buildPreflightReceipt({
@@ -534,17 +652,88 @@ describe("Quick Log manual delegate production delivery", () => {
     }
   });
 
-  it("uses a reviewed two-dispatch production workflow with exact provenance and TLS", () => {
+  it("uses the exact solo-founder workflow gate before provenance, writer, secret, or database work", () => {
     expect(existsSync(WORKFLOW_PATH)).toBe(true);
     const source = readFileSync(WORKFLOW_PATH, "utf8");
     const parsed = loadYaml(source) as Record<string, any>;
     const trigger = parsed.on ?? parsed.true;
     const apply = parsed.jobs.apply;
+    const inputs = trigger.workflow_dispatch.inputs;
 
     expect(Object.keys(trigger)).toEqual(["workflow_dispatch"]);
+    expect(inputs.solo_founder_acknowledgement).toMatchObject({
+      required: true,
+      type: "string",
+    });
+    expect(inputs.solo_founder_acknowledgement).not.toHaveProperty("default");
     expect(parsed.permissions).toEqual({ contents: "read", actions: "read" });
-    expect(parsed.concurrency["cancel-in-progress"]).toBe(false);
-    expect(apply.environment).toBe("verdant-production");
+    expect(parsed.concurrency).toEqual({
+      group: "verdant-production-migration-writer",
+      "cancel-in-progress": false,
+      queue: "max",
+    });
+    expect(apply.environment).toBe("verdant-production-solo-founder");
+    expect(parsed.jobs.validate.env.SOLO_FOUNDER_ACKNOWLEDGEMENT).toBe(
+      "${{ inputs.solo_founder_acknowledgement }}",
+    );
+    const validateCommands = parsed.jobs.validate.steps
+      .map((step: Record<string, string>) => step.run ?? "")
+      .join("\n");
+    for (const required of [
+      SOLO_FOUNDER_ACKNOWLEDGEMENT,
+      "GITHUB_ACTOR_ID",
+      "GITHUB_ACTOR",
+      "GITHUB_TRIGGERING_ACTOR",
+      "GITHUB_RUN_ATTEMPT",
+      "72639960",
+      "cheekhimself",
+    ]) {
+      expect(validateCommands).toContain(required);
+    }
+    expect(apply.env.SOLO_FOUNDER_ACKNOWLEDGEMENT).toBe(
+      "${{ inputs.solo_founder_acknowledgement }}",
+    );
+    const auditDirectoryIndex = apply.steps.findIndex((step: Record<string, string>) =>
+      String(step.name ?? "").includes("Prepare sanitized audit directory"),
+    );
+    const authorizationIndex = apply.steps.findIndex((step: Record<string, string>) =>
+      String(step.name ?? "").includes("solo-founder production authorization"),
+    );
+    const artifactIndex = apply.steps.findIndex((step: Record<string, string>) =>
+      String(step.name ?? "").includes("authenticated PREFLIGHT artifact"),
+    );
+    const writerIndex = apply.steps.findIndex((step: Record<string, string>) =>
+      String(step.name ?? "").includes("production migration writer to be idle"),
+    );
+    const secretIndex = apply.steps.findIndex(
+      (step: Record<string, string>) => step.uses === "./.github/actions/require-ci-secret",
+    );
+    const installIndex = apply.steps.findIndex((step: Record<string, string>) =>
+      String(step.name ?? "").includes("Install PostgreSQL client"),
+    );
+    const authorizationStep = apply.steps[authorizationIndex];
+    expect(authorizationIndex).toBe(auditDirectoryIndex + 1);
+    expect(authorizationIndex).toBeLessThan(artifactIndex);
+    expect(authorizationIndex).toBeLessThan(writerIndex);
+    expect(authorizationIndex).toBeLessThan(secretIndex);
+    expect(authorizationIndex).toBeLessThan(installIndex);
+    expect(authorizationStep.run.match(/\bgh api\b/g) ?? []).toHaveLength(4);
+    expect(authorizationStep.run.match(/--jq/g) ?? []).toHaveLength(4);
+    expect(authorizationStep.run).toContain(
+      'gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"',
+    );
+    expect(authorizationStep.run).toContain(
+      'gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/approvals"',
+    );
+    expect(authorizationStep.run).toContain(
+      'gh api "repos/${GITHUB_REPOSITORY}/environments/verdant-production-solo-founder"',
+    );
+    expect(authorizationStep.run).toContain("deployment-branch-policies?per_page=100");
+    expect(authorizationStep.run).toContain(
+      "node scripts/verify-solo-founder-production-authorization.mjs",
+    );
+    expect(authorizationStep.run).toContain('"outcome":"authorization_rejected"');
+    expect(authorizationStep.run).toContain('"reason_code":"solo_founder_authorization_rejected"');
     expect(source).toContain("refs/heads/verdant-grow-diary");
     expect(source).toContain("APPLY QUICKLOG MANUAL DELEGATE FORWARD REPAIR");
     expect(source).toContain(
@@ -553,10 +742,68 @@ describe("Quick Log manual delegate production delivery", () => {
     expect(source).toContain("Re-resolve current deploy branch head before database access");
     expect(source).toContain("SUPABASE_DB_CA_CERT_B64");
     expect(source).toContain("retention-days: 30");
-    expect(source).not.toContain("continue-on-error");
   });
 
-  it("requires prevent-self-review and an idle snapshot of every production migration writer", () => {
+  it("fails a successful delivery closed when its immutable evidence upload fails", () => {
+    const parsed = loadYaml(readFileSync(WORKFLOW_PATH, "utf8")) as Record<string, any>;
+    const apply = parsed.jobs.apply;
+    const successUpload = apply.steps.find(
+      (step: Record<string, string>) =>
+        step.name === "Upload sanitized evidence after successful delivery",
+    );
+
+    expect(successUpload).toBeDefined();
+    expect(successUpload.if).toBe("success()");
+    expect(successUpload).not.toHaveProperty("continue-on-error");
+    expect(successUpload.uses).toBe(
+      "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+    );
+    expect(successUpload.with.name).toBe(
+      "quicklog-manual-delegate-forward-repair-evidence-${{ github.run_id }}-${{ github.run_attempt }}",
+    );
+    expect(successUpload.with.path).toContain(
+      "audit/quicklog-manual-delegate-forward-repair/report.md",
+    );
+    expect(successUpload.with.path).toContain(
+      "audit/quicklog-manual-delegate-forward-repair/audit.json",
+    );
+    expect(successUpload.with["if-no-files-found"]).toBe("error");
+    expect(successUpload.with["retention-days"]).toBe(30);
+  });
+
+  it("keeps failed or cancelled evidence publication best-effort without masking the failure", () => {
+    const parsed = loadYaml(readFileSync(WORKFLOW_PATH, "utf8")) as Record<string, any>;
+    const apply = parsed.jobs.apply;
+    const summary = apply.steps.find(
+      (step: Record<string, string>) => step.name === "Publish sanitized summary",
+    );
+    const failureUpload = apply.steps.find(
+      (step: Record<string, string>) =>
+        step.name === "Upload sanitized evidence after failed or cancelled delivery",
+    );
+    const cleanupIndex = apply.steps.findIndex(
+      (step: Record<string, string>) => step.name === "Remove Supabase production CA",
+    );
+    const failureUploadIndex = apply.steps.indexOf(failureUpload);
+
+    expect(summary.if).toContain("always()");
+    expect(summary["continue-on-error"]).toBe(true);
+    expect(failureUpload).toBeDefined();
+    expect(failureUpload.if).toBe("failure() || cancelled()");
+    expect(failureUpload["continue-on-error"]).toBe(true);
+    expect(failureUpload.uses).toBe(
+      "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+    );
+    expect(failureUpload.with.name).toBe(
+      "quicklog-manual-delegate-forward-repair-evidence-${{ github.run_id }}-${{ github.run_attempt }}",
+    );
+    expect(failureUpload.with["if-no-files-found"]).toBe("error");
+    expect(failureUpload.with["retention-days"]).toBe(30);
+    expect(failureUploadIndex).toBeLessThan(cleanupIndex);
+    expect(apply.steps[cleanupIndex].if).toBe("always()");
+  });
+
+  it("requires exact founder self-review policy and an idle snapshot of every production writer", () => {
     const source = readFileSync(WORKFLOW_PATH, "utf8");
     const parsed = loadYaml(source) as Record<string, any>;
     const guard = parsed.jobs.apply.steps.find(
@@ -585,8 +832,22 @@ describe("Quick Log manual delegate production delivery", () => {
       expect(guard.run).toContain(status);
       expect(runbook).toContain(status);
     }
-    expect(runbook).toMatch(/Prevent self-review/i);
-    expect(runbook).toMatch(/required reviewer/i);
+    expect(runbook).toContain("verdant-production-solo-founder");
+    expect(runbook).toContain("cheekhimself");
+    expect(runbook).toContain("72639960");
+    expect(runbook).toContain("Prevent self-review OFF");
+    expect(runbook).toContain("administrator bypass OFF");
+    expect(runbook).toMatch(/exactly one required reviewer/i);
+    expect(runbook).toMatch(/founder self-review/i);
+    expect(runbook).toContain(SOLO_FOUNDER_ACKNOWLEDGEMENT);
+    expect(runbook).toContain("15 minutes");
+    expect(runbook).toContain("24 hours");
+    expect(runbook).toMatch(/fresh dispatch/i);
+    expect(runbook).toContain(
+      "This proves founder identity, intent, provenance, and elapsed time; it is not independent human review.",
+    );
+    expect(runbook).not.toContain("Prevent self-review enabled");
+    expect(runbook).not.toMatch(/distinct GitHub identities/i);
     expect(runbook).toMatch(/no other migration dispatch/i);
     expect(runbook).toMatch(/until APPLY is terminal/i);
     expect(runbook).toContain("gh api");
@@ -660,8 +921,30 @@ describe("Quick Log manual delegate production delivery", () => {
     );
     expect(runbook).toContain("expected_preflight_run_attempt");
     expect(runbook).toContain("expected_preflight_artifact_sha256");
+    expect(runbook).toContain(
+      "quicklog-manual-delegate-forward-repair-preflight-run-<RUN_ID>-attempt-1",
+    );
+    expect(runbook).toMatch(
+      /never use[\s\S]{0,100}quicklog-manual-delegate-forward-repair-evidence/i,
+    );
     expect(runbook).toMatch(/record.*run attempt/i);
     expect(runbook).toMatch(/record[\s\S]{0,100}artifact SHA-256/i);
+  });
+
+  it("keeps both PG15 triggers wired to the shared solo-founder gate and its tests", () => {
+    const workflow = loadYaml(readFileSync(PG15_WORKFLOW_PATH, "utf8")) as Record<string, any>;
+    const paths = workflow.on.pull_request.paths;
+
+    expect(workflow.on.push.paths).toEqual(paths);
+    expect(paths).toEqual(
+      expect.arrayContaining([
+        "scripts/lib/solo-founder-production-authorization.mjs",
+        "scripts/verify-solo-founder-production-authorization.mjs",
+        "src/test/solo-founder-production-authorization.test.ts",
+        "scripts/apply-quicklog-manual-delegate-forward-repair.mjs",
+        "scripts/verify-quicklog-manual-delegate-forward-repair-preflight-artifact.mjs",
+      ]),
+    );
   });
 
   it("documents the no-freeze recovery protocol and exact deletion-free rollback posture", () => {

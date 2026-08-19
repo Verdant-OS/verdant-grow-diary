@@ -81,6 +81,12 @@ describe("temporary authenticated One-Tent Actions lane", () => {
     expect(job).toContain('LOVABLE_E2E_TEARDOWN_AFTER_SUCCESS: "false"');
   });
 
+  it("installs only the pinned browser binary without an apt package transaction", () => {
+    expect(job).toContain("bunx playwright install chromium");
+    expect(job).not.toContain("--with-deps");
+    expect(job).not.toContain("e2e:install:ci");
+  });
+
   it("materializes real auth, preflights, runs the UI proof, and validates its receipt in order", () => {
     const materialize = job.indexOf("scripts/e2e/materialize-managed-session.mjs");
     const publicConfig = job.indexOf("source .env");

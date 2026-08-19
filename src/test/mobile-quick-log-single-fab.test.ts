@@ -32,9 +32,7 @@ describe("mobile Quick Log — single FAB", () => {
   });
 
   it("passes a valid Plant Detail route id into legacy Quick Log prefill", () => {
-    expect(APP_SHELL).toMatch(
-      /setPrefill\(routePlantId \? \{ plantId: routePlantId \} : null\)/,
-    );
+    expect(APP_SHELL).toMatch(/setPrefill\(routePlantId \? \{ plantId: routePlantId \} : null\)/);
   });
 
   it("AppShell mobile FAB is guarded by md:hidden", () => {
@@ -67,9 +65,18 @@ describe("manual sensor save — UUID guard regression", () => {
 });
 
 describe("Tent Detail Quick Log — one fixed entry point", () => {
-  it("keeps the tent-scoped V2 Quick Log entry point", () => {
+  it("keeps one V2 Quick Log entry point, plant-scoped only when the tent proves a sole plant", () => {
+    // Renegotiated with Tranche B+ slice D7: a tent with exactly one active
+    // plant opens the sheet plant-scoped so Better/Same/Worse is reachable
+    // without reselection. Several plants keep the tent scope — the pin holds
+    // the exact new shape rather than loosening to allow any target key.
     expect(TENT_DETAIL).toMatch(
-      /<QuickLogV2Fab\s+defaultTargetKey=\{tent\?\.id\s*\?\s*`tent:\$\{tent\.id\}`\s*:\s*null\}/,
+      /<QuickLogV2Fab\s+defaultTargetKey=\{\s*tent\?\.id\s*\?\s*\(safePlantId\s*\?\s*`plant:\$\{safePlantId\}`\s*:\s*`tent:\$\{tent\.id\}`\)\s*:\s*null\s*\}/,
+    );
+    // safePlantId is null unless exactly one active plant exists, so no
+    // default plant can be invented for a multi-plant tent.
+    expect(TENT_DETAIL).toMatch(
+      /const safePlantId = activePlants\.length === 1 \? \(activePlants\[0\]\?\.id \?\? null\) : null;/,
     );
     expect(TENT_DETAIL.match(/<QuickLogV2Fab\b/g) ?? []).toHaveLength(1);
   });

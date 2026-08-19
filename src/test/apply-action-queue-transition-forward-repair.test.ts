@@ -8,16 +8,14 @@ import { load as loadYaml } from "js-yaml";
 import { afterEach, describe, expect, it } from "vitest";
 import { PRODUCTION_SUPABASE_CA_FILENAME } from "../../scripts/lib/productionSupabaseTls.mjs";
 
-const RUNNER_PATH = resolve("scripts/apply-quicklog-manual-delegate-forward-repair.mjs");
-const WORKFLOW_PATH = resolve(
-  ".github/workflows/apply-quicklog-manual-delegate-forward-repair.yml",
-);
+const RUNNER_PATH = resolve("scripts/apply-action-queue-transition-forward-repair.mjs");
+const WORKFLOW_PATH = resolve(".github/workflows/apply-action-queue-transition-forward-repair.yml");
 const PG15_WORKFLOW_PATH = resolve(
-  ".github/workflows/quicklog-manual-delegate-forward-repair-pg15.yml",
+  ".github/workflows/action-queue-transition-forward-repair-pg15.yml",
 );
-const RUNBOOK_PATH = resolve("docs/quicklog-manual-delegate-forward-repair-operator-runbook.md");
+const RUNBOOK_PATH = resolve("docs/action-queue-transition-forward-repair-operator-runbook.md");
 const MIGRATION_PATH = resolve(
-  "supabase/migrations/20260818010000_quicklog_manual_delegate_forward_repair.sql",
+  "supabase/migrations/20260819190852_action_queue_transition_forward_repair.sql",
 );
 
 const PROJECT_REF = "knkwiiywfkbqznbxwqfh";
@@ -27,7 +25,7 @@ const EXPECTED_REPOSITORY = "Verdant-OS/verdant-grow-diary";
 const EXPECTED_REPOSITORY_ID = "8675309";
 const EXPECTED_RUN_ID = "24680";
 const EXPECTED_RUN_ATTEMPT = "1";
-const DATABASE_SECRET = "delegate-production-password-sentinel";
+const DATABASE_SECRET = "action-queue-production-password-sentinel";
 const DATABASE_URL = `postgresql://postgres:${DATABASE_SECRET}@db.${PROJECT_REF}.supabase.co:5432/postgres?sslmode=require`;
 const CA_SECRET_SENTINEL = "raw-production-ca-secret-sentinel";
 const SOLO_FOUNDER_ACKNOWLEDGEMENT = "I AM THE SOLE FOUNDER AND AUTHORIZE THIS PRODUCTION RUN";
@@ -54,40 +52,48 @@ const SOLO_FOUNDER_AUTHORIZATION_RECEIPT = Object.freeze({
   maximum_review_seconds: 86400,
 });
 
-const DEFECTIVE_STATE = Object.freeze({
+const LEGACY_STATE = Object.freeze({
   ledger_exact_count: 0,
   ledger_conflict_count: 0,
   ledger_exact_names: [],
   ledger_statements_contract: false,
   migration_ledger_contract: true,
   required_roles_contract: true,
-  wrapper_contract: true,
-  wrapper_oid: 11001,
-  wrapper_source_length: 7752,
-  wrapper_source_md5: "0d3098b81787fa90898da921345c0dbc",
-  wrapper_service_execute: true,
-  delegate_contract: true,
-  delegate_oid: 11002,
-  delegate_overload_count: 1,
-  delegate_source_length: 6548,
-  delegate_source_md5: "e161b2e15c8de2e5ae1048edb4c72c3d",
-  delegate_acl_contract: true,
-  helper_functions_contract: true,
-  logged_at_columns_contract: true,
-  request_hash_contract: true,
-  timestamp_triggers_contract: true,
+  table_contract: true,
+  column_contract: true,
+  lineage_contract: true,
+  guard_contract: true,
+  guard_oid: 11001,
+  guard_source_length: 1101,
+  guard_source_md5: "88e81c4dfbc6d17260def35d1a619ee1",
+  transition_overload_count: 0,
+  transition_contract: false,
+  transition_oid: 0,
+  transition_source_length: 0,
+  transition_source_md5: "",
+  required_grants_present: true,
+  required_grants_absent: false,
+  legacy_contract: true,
+  contracted_input_contract: false,
+  canonical_contract: false,
 });
 
 const CANONICAL_LEDGER_ABSENT_STATE = Object.freeze({
-  ...DEFECTIVE_STATE,
-  delegate_source_length: 6734,
-  delegate_source_md5: "7ec296e422f7f47c8b2793b051840798",
+  ...LEGACY_STATE,
+  transition_overload_count: 1,
+  transition_contract: true,
+  transition_oid: 11002,
+  transition_source_length: 4997,
+  transition_source_md5: "ce755f8e6a6515640a2f86c15de3ba63",
+  legacy_contract: false,
+  contracted_input_contract: true,
+  canonical_contract: true,
 });
 
 const RECORDED_CANONICAL_STATE = Object.freeze({
   ...CANONICAL_LEDGER_ABSENT_STATE,
   ledger_exact_count: 1,
-  ledger_exact_names: ["quicklog_manual_delegate_forward_repair"],
+  ledger_exact_names: ["action_queue_transition_forward_repair"],
   ledger_statements_contract: true,
 });
 
@@ -109,9 +115,9 @@ function baseEnv(extra: Record<string, string> = {}) {
     GITHUB_RUN_ATTEMPT: EXPECTED_RUN_ATTEMPT,
     GITHUB_EVENT_NAME: "workflow_dispatch",
     GITHUB_WORKFLOW_REF:
-      "Verdant-OS/verdant-grow-diary/.github/workflows/apply-quicklog-manual-delegate-forward-repair.yml@refs/heads/verdant-grow-diary",
+      "Verdant-OS/verdant-grow-diary/.github/workflows/apply-action-queue-transition-forward-repair.yml@refs/heads/verdant-grow-diary",
     CONFIRM_PROJECT_REF: PROJECT_REF,
-    CONFIRM_APPLY: "APPLY QUICKLOG MANUAL DELEGATE FORWARD REPAIR",
+    CONFIRM_APPLY: "APPLY ACTION QUEUE TRANSITION FORWARD REPAIR",
     PREFLIGHT_RUN_ID: "13579",
     PREFLIGHT_RECEIPT_DIGEST: "",
     SOLO_FOUNDER_ACKNOWLEDGEMENT,
@@ -127,7 +133,7 @@ async function loadRunner() {
     return await import(`${pathToFileURL(RUNNER_PATH).href}?test=${Date.now()}-${Math.random()}`);
   } catch (error) {
     expect.fail(
-      `Quick Log delegate delivery runner could not be imported: ${error instanceof Error ? error.message : String(error)}`,
+      `Action Queue transition delivery runner could not be imported: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
 }
@@ -135,7 +141,7 @@ async function loadRunner() {
 const temporaryRoots: string[] = [];
 
 function evidenceEnv() {
-  const root = mkdtempSync(join(tmpdir(), "verdant-quicklog-delegate-delivery-test-"));
+  const root = mkdtempSync(join(tmpdir(), "verdant-action-queue-transition-delivery-test-"));
   temporaryRoots.push(root);
   const caPath = join(root, PRODUCTION_SUPABASE_CA_FILENAME);
   const ca = rootCertificates[0];
@@ -157,7 +163,7 @@ afterEach(() => {
   }
 });
 
-describe("Quick Log manual delegate production delivery", () => {
+describe("Action Queue transition production delivery", () => {
   it("pins the exact LF migration bytes and preserves its own BEGIN/COMMIT boundary", async () => {
     const runner = await loadRunner();
     const raw = readFileSync(MIGRATION_PATH);
@@ -165,9 +171,9 @@ describe("Quick Log manual delegate production delivery", () => {
     const migration = runner.validatePinnedMigrationFile();
 
     expect(runner.PINNED_MIGRATION).toEqual({
-      version: "20260818010000",
-      name: "quicklog_manual_delegate_forward_repair",
-      file: "20260818010000_quicklog_manual_delegate_forward_repair.sql",
+      version: "20260819190852",
+      name: "action_queue_transition_forward_repair",
+      file: "20260819190852_action_queue_transition_forward_repair.sql",
       sha256: observed,
     });
     expect(raw.includes(13)).toBe(false);
@@ -177,32 +183,41 @@ describe("Quick Log manual delegate production delivery", () => {
       runner.validatePinnedMigrationFile({
         readFile: () => Buffer.concat([raw, Buffer.from(" ")]),
       }),
-    ).toThrow("hash_mismatch:20260818010000");
+    ).toThrow("hash_mismatch:20260819190852");
   });
 
-  it("classifies only defective+absent, canonical+absent, and canonical+exact as recoverable", async () => {
+  it("classifies only exact legacy/contracted inputs and canonical ledger states as recoverable", async () => {
     const runner = await loadRunner();
 
-    expect(runner.classifyPreflight(DEFECTIVE_STATE)).toEqual({ status: "apply" });
+    expect(runner.classifyPreflight(LEGACY_STATE)).toEqual({ status: "apply" });
+    expect(
+      runner.classifyPreflight({
+        ...CANONICAL_LEDGER_ABSENT_STATE,
+        required_grants_present: false,
+        required_grants_absent: true,
+        canonical_contract: false,
+      }),
+    ).toEqual({ status: "apply" });
     expect(runner.classifyPreflight(CANONICAL_LEDGER_ABSENT_STATE)).toEqual({
       status: "schema_live_ledger_absent",
     });
     expect(runner.classifyPreflight(RECORDED_CANONICAL_STATE)).toEqual({
       status: "verify_only",
     });
-    expect(runner.classifyPreflight({ ...DEFECTIVE_STATE, ledger_conflict_count: 1 })).toEqual({
+    expect(runner.classifyPreflight({ ...LEGACY_STATE, ledger_conflict_count: 1 })).toEqual({
       status: "ledger_drift",
       reason: "target_collision",
     });
-    expect(
-      runner.classifyPreflight({ ...DEFECTIVE_STATE, wrapper_service_execute: false }),
-    ).toEqual({ status: "prerequisite_drift", reason: "wrapper_contract" });
+    expect(runner.classifyPreflight({ ...LEGACY_STATE, guard_contract: false })).toEqual({
+      status: "prerequisite_drift",
+      reason: "guard_contract",
+    });
     expect(
       runner.classifyPreflight({
-        ...DEFECTIVE_STATE,
-        delegate_source_md5: "0".repeat(32),
+        ...LEGACY_STATE,
+        legacy_contract: false,
       }),
-    ).toEqual({ status: "schema_drift", reason: "delegate_fingerprint" });
+    ).toEqual({ status: "schema_drift", reason: "catalog_shape" });
     expect(
       runner.classifyPreflight({
         ...RECORDED_CANONICAL_STATE,
@@ -215,10 +230,10 @@ describe("Quick Log manual delegate production delivery", () => {
     const runner = await loadRunner();
     const sql = runner.PREFLIGHT_SQL as string;
 
-    expect(runner.parsePreflightStdout(stdout(DEFECTIVE_STATE))).toEqual(DEFECTIVE_STATE);
+    expect(runner.parsePreflightStdout(stdout(LEGACY_STATE))).toEqual(LEGACY_STATE);
     expect(() => runner.parsePreflightStdout("{}\n")).toThrow("preflight_result_shape");
     expect(() =>
-      runner.parsePreflightStdout(`${stdout(DEFECTIVE_STATE)}${stdout(DEFECTIVE_STATE)}`),
+      runner.parsePreflightStdout(`${stdout(LEGACY_STATE)}${stdout(LEGACY_STATE)}`),
     ).toThrow("preflight_row_count:2");
     expect(sql).toMatch(/set transaction read only/i);
     expect(sql).toContain("set local search_path = pg_catalog, public, pg_temp;");
@@ -226,55 +241,45 @@ describe("Quick Log manual delegate production delivery", () => {
       /^\s*(insert|update|delete|alter|create|drop|truncate|grant|revoke|notify)\b/im,
     );
     expect(sql).toContain("not p.proisstrict");
-    expect(sql).toContain("owner_role.rolname = 'postgres'");
-    expect(sql).toContain("wrapper_service_execute");
-    expect(sql).toContain("'service_role|EXECUTE|f|postgres'");
-    expect(sql).toContain("delegate_acl_contract");
+    expect(sql).toContain("p.owner_name='postgres'");
     expect(sql).toContain("'postgres|EXECUTE|f|postgres'");
-    expect(sql).toContain("quicklog_try_parse_logged_at(text)");
-    expect(sql).toContain("quicklog_try_parse_uuid(text)");
-    expect(sql).toContain("quicklog_stamp_diary_logged_at()");
-    expect(sql).toContain("quicklog_stamp_grow_event_logged_at()");
-    expect(sql).toContain("md5(replace(p.prosrc, E'\\r', ''))");
+    expect(sql).toContain("action_queue_guard_decision_fields()");
+    expect(sql).toContain("action_queue_transition(uuid, text, text, text)");
+    expect(sql).toContain("md5(replace(p.prosrc,E'\\r',''))");
     expect(sql).toContain("tg.tgqual is null");
-    expect(sql).toContain("tg.tgnargs = 0");
-    expect(sql).toContain("octet_length(tg.tgargs) = 0");
-    expect(sql).toContain("tg.tgparentid = 0");
-    expect(sql).toContain("tg.tgenabled in ('O', 'A')");
-    expect(sql).toContain("a.atttypmod = -1");
-    expect(sql).toContain("not a.attnotnull");
-    expect(sql).toContain("a.attgenerated = ''");
-    expect(sql).toContain("a.attidentity = ''");
-    expect(sql).toContain("from pg_attrdef d");
-    expect(sql).toContain("proname='quicklog_save_manual'");
-    expect(sql).toContain("count(*)=4 and bool_and(overload_count=1)");
+    expect(sql).toContain("tg.tgnargs=0");
+    expect(sql).toContain("octet_length(tg.tgargs)=0");
+    expect(sql).toContain("tg.tgparentid=0");
+    expect(sql).toContain("tg.tgenabled='O'");
+    expect(sql).toContain("a.atttypmod=-1");
+    expect(sql).toContain("a.attgenerated='' and a.attidentity=''");
+    expect(sql).toContain("action_insert_fingerprint='02cf2857792d152113b7ab13fae6ca3f'");
+    expect(sql).toContain("event_append_fingerprint='420914cd6ffbd2d552c30e8d7b6ddf73'");
+    expect(sql).toContain("not pr.anon_action_update");
     expect(sql).toContain("supabase_migrations.schema_migrations");
   });
 
-  it("pins wrapper and delegate parallelism plus the exact helper ABI and fingerprint rules", async () => {
+  it("pins transition and guard ABI, source, ACL, role, and ledger contracts", async () => {
     const runner = await loadRunner();
     const sql = runner.CATALOG_STATE_QUERY_SQL as string;
 
-    expect(sql.match(/p\.proparallel = 'u'/g) ?? []).toHaveLength(3);
-    expect(sql).toContain("p.pronargs = e.argument_count");
-    expect(sql).toContain("p.pronargdefaults = 0");
+    expect(sql.match(/p\.proparallel='u'/g) ?? []).toHaveLength(2);
+    expect(sql).toContain("p.pronargs=4 and p.pronargdefaults=1");
+    expect(sql).toContain("p.pronargs=0 and p.pronargdefaults=0");
     expect(sql).toContain("p.proargmodes is null");
     expect(sql).toContain("p.proallargtypes is null");
-    expect(sql).toContain("p.proargnames is not distinct from e.argument_names");
-    expect(sql).toMatch(
-      /case e\.function_name\s+when 'quicklog_try_parse_uuid' then p\.prosrc\s+else replace\(p\.prosrc, E'\\r', ''\)\s+end/g,
+    expect(sql).toContain(
+      "p.proargnames=array['p_action_queue_id','p_transition','p_expected_status','p_note']::text[]",
     );
-    expect(sql.match(/when 'quicklog_try_parse_uuid' then p\.prosrc/g) ?? []).toHaveLength(2);
-    expect(runner.EXPECTED_FUNCTION_FINGERPRINTS.tryParseUuid).toEqual({
-      bytes: 289,
-      md5: "a34d120aad5c37a33ac05fd9597624f4",
+    expect(runner.EXPECTED_FUNCTION_FINGERPRINTS.transition).toEqual({
+      bytes: 4997,
+      md5: "ce755f8e6a6515640a2f86c15de3ba63",
     });
-    expect(runner.EXPECTED_FUNCTION_FINGERPRINTS.tryParseUuidFreshReplay).toEqual({
-      bytes: 290,
-      md5: "4b132ee2034f8e2887da1af582295ad8",
+    expect(runner.EXPECTED_FUNCTION_FINGERPRINTS.guard).toEqual({
+      bytes: 1101,
+      md5: "88e81c4dfbc6d17260def35d1a619ee1",
     });
-    expect(sql).toContain("a34d120aad5c37a33ac05fd9597624f4");
-    expect(sql).toContain("4b132ee2034f8e2887da1af582295ad8");
+    expect(sql).toContain("'authenticated|EXECUTE|f|postgres','postgres|EXECUTE|f|postgres'");
     expect(sql).toMatch(/when rolname='service_role' then[\s\S]*?and rolbypassrls/);
     expect(sql).toMatch(/else[\s\S]*?and not rolbypassrls end/);
     expect(sql).toContain("a.attgenerated,a.attidentity,d.oid is null");
@@ -290,24 +295,24 @@ describe("Quick Log manual delegate production delivery", () => {
 
     expect(sql).toMatch(/^\\set ON_ERROR_STOP on\nbegin;/i);
     expect(sql).toMatch(/\ncommit;\s*$/i);
-    expect(sql).toContain("pg_advisory_xact_lock(20260818, 10000)");
+    expect(sql).toContain("pg_advisory_xact_lock(20260819, 190852)");
     expect(sql).toContain("lock table supabase_migrations.schema_migrations");
-    expect(sql).toContain("quicklog manual delegate ledger collision");
+    expect(sql).toContain("action queue transition ledger collision");
     expect(sql).toContain("insert into supabase_migrations.schema_migrations");
     expect(sql).toContain(runner.PINNED_MIGRATION.sha256);
     expect(sql).not.toMatch(/lock table public\./i);
-    expect(sql).not.toMatch(/\b(create|alter|drop|grant|revoke|update|delete|truncate)\b/i);
+    expect(sql).not.toMatch(/^\s*(create|alter|drop|grant|revoke|update|delete|truncate)\b/im);
     expect(sql.match(/^\s*insert\s+into/gim)).toHaveLength(1);
     expect(sql).not.toContain(readFileSync(MIGRATION_PATH, "utf8"));
   });
 
   it.each([
-    [DEFECTIVE_STATE, "safe_to_apply"],
+    [LEGACY_STATE, "safe_to_apply"],
     [CANONICAL_LEDGER_ABSENT_STATE, "schema_live_ledger_absent"],
   ])("emits an immutable recoverable PREFLIGHT receipt for %s", async (state, outcome) => {
     const runner = await loadRunner();
     const evidence = evidenceEnv();
-    const status = runner.runQuickLogManualDelegateForwardRepair({
+    const status = runner.runActionQueueTransitionForwardRepair({
       env: baseEnv({
         ...evidence,
         OPERATION: "PREFLIGHT",
@@ -326,14 +331,14 @@ describe("Quick Log manual delegate production delivery", () => {
     expect(status).toBe(runner.EXIT.OK);
     expect(JSON.parse(readFileSync(evidence.PREFLIGHT_RECEIPT_PATH, "utf8"))).toMatchObject({
       schema_version: 1,
-      tool: "apply-quicklog-manual-delegate-forward-repair",
+      tool: "apply-action-queue-transition-forward-repair",
       operation: "PREFLIGHT",
       outcome,
       safe_to_apply: true,
-      workflow_path: ".github/workflows/apply-quicklog-manual-delegate-forward-repair.yml",
+      workflow_path: ".github/workflows/apply-action-queue-transition-forward-repair.yml",
       head_sha: EXPECTED_HEAD_SHA,
       project_ref: PROJECT_REF,
-      migration_version: "20260818010000",
+      migration_version: "20260819190852",
       migration_sha256: runner.PINNED_MIGRATION.sha256,
       state_digest: expect.stringMatching(/^[0-9a-f]{64}$/),
       ...SOLO_FOUNDER_AUTHORIZATION_RECEIPT,
@@ -348,12 +353,12 @@ describe("Quick Log manual delegate production delivery", () => {
     const runner = await loadRunner();
     const evidence = evidenceEnv();
     const receipt = runner.buildPreflightReceipt({
-      state: DEFECTIVE_STATE,
+      state: LEGACY_STATE,
       headSha: EXPECTED_HEAD_SHA,
     });
     const calls: Array<{ args: string[]; fileText?: string }> = [];
     let query = 0;
-    const status = runner.runQuickLogManualDelegateForwardRepair({
+    const status = runner.runActionQueueTransitionForwardRepair({
       env: baseEnv({ ...evidence, PREFLIGHT_RECEIPT_DIGEST: receipt.digest }),
       spawnImpl: (_command: string, args: string[]) => {
         const fileIndex = args.indexOf("--file");
@@ -367,7 +372,7 @@ describe("Quick Log manual delegate production delivery", () => {
             status: 0,
             stdout:
               query === 1
-                ? stdout(DEFECTIVE_STATE)
+                ? stdout(LEGACY_STATE)
                 : query === 2
                   ? stdout(CANONICAL_LEDGER_ABSENT_STATE)
                   : stdout(RECORDED_CANONICAL_STATE),
@@ -393,7 +398,7 @@ describe("Quick Log manual delegate production delivery", () => {
     expect(JSON.parse(readFileSync(evidence.AUDIT_PATH, "utf8"))).toMatchObject({
       outcome: "applied_verified",
       recovery_path: "migration_then_ledger",
-      migration_version: "20260818010000",
+      migration_version: "20260819190852",
       ...SOLO_FOUNDER_AUTHORIZATION_RECEIPT,
     });
   });
@@ -407,7 +412,7 @@ describe("Quick Log manual delegate production delivery", () => {
     });
     const calls: string[][] = [];
     let query = 0;
-    const status = runner.runQuickLogManualDelegateForwardRepair({
+    const status = runner.runActionQueueTransitionForwardRepair({
       env: baseEnv({ ...evidence, PREFLIGHT_RECEIPT_DIGEST: receipt.digest }),
       spawnImpl: (_command: string, args: string[]) => {
         calls.push([...args]);
@@ -441,7 +446,7 @@ describe("Quick Log manual delegate production delivery", () => {
     const runner = await loadRunner();
     const evidence = evidenceEnv();
     const calls: string[][] = [];
-    const status = runner.runQuickLogManualDelegateForwardRepair({
+    const status = runner.runActionQueueTransitionForwardRepair({
       env: baseEnv({ ...evidence, PREFLIGHT_RECEIPT_DIGEST: "f".repeat(64) }),
       spawnImpl: (_command: string, args: string[]) => {
         calls.push([...args]);
@@ -474,11 +479,11 @@ describe("Quick Log manual delegate production delivery", () => {
     for (const scenario of scenarios) {
       const evidence = evidenceEnv();
       let calls = 0;
-      const status = runner.runQuickLogManualDelegateForwardRepair({
+      const status = runner.runActionQueueTransitionForwardRepair({
         env: baseEnv({ ...evidence, ...scenario }),
         spawnImpl: () => {
           calls += 1;
-          return { status: 0, stdout: stdout(DEFECTIVE_STATE), stderr: "" };
+          return { status: 0, stdout: stdout(LEGACY_STATE), stderr: "" };
         },
         logger: { log() {}, error() {} },
       });
@@ -516,11 +521,11 @@ describe("Quick Log manual delegate production delivery", () => {
       if (value === undefined) delete (env as Record<string, string | undefined>)[key];
       else (env as Record<string, string | undefined>)[key] = value;
 
-      const status = runner.runQuickLogManualDelegateForwardRepair({
+      const status = runner.runActionQueueTransitionForwardRepair({
         env,
         spawnImpl: () => {
           calls += 1;
-          return { status: 0, stdout: stdout(DEFECTIVE_STATE), stderr: "" };
+          return { status: 0, stdout: stdout(LEGACY_STATE), stderr: "" };
         },
         logger: {
           log: (...args: unknown[]) => lines.push(args.map(String).join(" ")),
@@ -549,11 +554,11 @@ describe("Quick Log manual delegate production delivery", () => {
     const lines: string[] = [];
     let calls = 0;
 
-    const status = runner.runQuickLogManualDelegateForwardRepair({
+    const status = runner.runActionQueueTransitionForwardRepair({
       env: baseEnv({ ...evidence, GITHUB_RUN_ATTEMPT: "2" }),
       spawnImpl: () => {
         calls += 1;
-        return { status: 0, stdout: stdout(DEFECTIVE_STATE), stderr: "" };
+        return { status: 0, stdout: stdout(LEGACY_STATE), stderr: "" };
       },
       logger: {
         log: (...args: unknown[]) => lines.push(args.map(String).join(" ")),
@@ -569,7 +574,7 @@ describe("Quick Log manual delegate production delivery", () => {
     );
     expect(JSON.parse(readFileSync(evidence.AUDIT_PATH, "utf8"))).toMatchObject({
       schema_version: 1,
-      tool: "apply-quicklog-manual-delegate-forward-repair",
+      tool: "apply-action-queue-transition-forward-repair",
       outcome: "authorization_rejected",
       reason_code: "solo_founder_authorization_rejected",
     });
@@ -579,7 +584,7 @@ describe("Quick Log manual delegate production delivery", () => {
   it("never records the ledger after migration or canonical-postflight failure", async () => {
     const runner = await loadRunner();
     const receipt = runner.buildPreflightReceipt({
-      state: DEFECTIVE_STATE,
+      state: LEGACY_STATE,
       headSha: EXPECTED_HEAD_SHA,
     });
 
@@ -587,7 +592,7 @@ describe("Quick Log manual delegate production delivery", () => {
       const evidence = evidenceEnv();
       const calls: string[][] = [];
       let query = 0;
-      const status = runner.runQuickLogManualDelegateForwardRepair({
+      const status = runner.runActionQueueTransitionForwardRepair({
         env: baseEnv({ ...evidence, PREFLIGHT_RECEIPT_DIGEST: receipt.digest }),
         spawnImpl: (_command: string, args: string[]) => {
           calls.push([...args]);
@@ -597,9 +602,9 @@ describe("Quick Log manual delegate production delivery", () => {
               status: 0,
               stdout:
                 query === 1
-                  ? stdout(DEFECTIVE_STATE)
+                  ? stdout(LEGACY_STATE)
                   : failure === "postflight"
-                    ? stdout(DEFECTIVE_STATE)
+                    ? stdout(LEGACY_STATE)
                     : stdout(CANONICAL_LEDGER_ABSENT_STATE),
               stderr: "",
             };
@@ -623,7 +628,7 @@ describe("Quick Log manual delegate production delivery", () => {
     const runner = await loadRunner();
     const evidence = evidenceEnv();
     const lines: string[] = [];
-    const status = runner.runQuickLogManualDelegateForwardRepair({
+    const status = runner.runActionQueueTransitionForwardRepair({
       env: baseEnv({ ...evidence, OPERATION: "PREFLIGHT", CONFIRM_APPLY: "" }),
       spawnImpl: () => ({
         status: 1,
@@ -735,13 +740,19 @@ describe("Quick Log manual delegate production delivery", () => {
     expect(authorizationStep.run).toContain('"outcome":"authorization_rejected"');
     expect(authorizationStep.run).toContain('"reason_code":"solo_founder_authorization_rejected"');
     expect(source).toContain("refs/heads/verdant-grow-diary");
-    expect(source).toContain("APPLY QUICKLOG MANUAL DELEGATE FORWARD REPAIR");
+    expect(source).toContain("APPLY ACTION QUEUE TRANSITION FORWARD REPAIR");
     expect(source).toContain(
-      "verify-quicklog-manual-delegate-forward-repair-preflight-artifact.mjs",
+      "verify-action-queue-transition-forward-repair-preflight-artifact.mjs",
     );
     expect(source).toContain("Re-resolve current deploy branch head before database access");
     expect(source).toContain("SUPABASE_DB_CA_CERT_B64");
     expect(source).toContain("retention-days: 30");
+    expect(source).toContain(
+      "postgres:15.18@sha256:bb0df8b69f086efa2cbe4b8128df2f368a362bbdadef743731a63dd0f2f24c9e",
+    );
+    expect(source).toContain('mounts+=(-v "${mounted_input}:/verdant/input.sql:ro")');
+    expect(source).toContain("-e PGSSLROOTCERT=/verdant/production-root.crt");
+    expect(source).not.toMatch(/apt-get|postgresql-client/);
   });
 
   it("fails a successful delivery closed when its immutable evidence upload fails", () => {
@@ -759,13 +770,13 @@ describe("Quick Log manual delegate production delivery", () => {
       "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
     );
     expect(successUpload.with.name).toBe(
-      "quicklog-manual-delegate-forward-repair-evidence-${{ github.run_id }}-${{ github.run_attempt }}",
+      "action-queue-transition-forward-repair-evidence-${{ github.run_id }}-${{ github.run_attempt }}",
     );
     expect(successUpload.with.path).toContain(
-      "audit/quicklog-manual-delegate-forward-repair/report.md",
+      "audit/action-queue-transition-forward-repair/report.md",
     );
     expect(successUpload.with.path).toContain(
-      "audit/quicklog-manual-delegate-forward-repair/audit.json",
+      "audit/action-queue-transition-forward-repair/audit.json",
     );
     expect(successUpload.with["if-no-files-found"]).toBe("error");
     expect(successUpload.with["retention-days"]).toBe(30);
@@ -795,7 +806,7 @@ describe("Quick Log manual delegate production delivery", () => {
       "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
     );
     expect(failureUpload.with.name).toBe(
-      "quicklog-manual-delegate-forward-repair-evidence-${{ github.run_id }}-${{ github.run_attempt }}",
+      "action-queue-transition-forward-repair-evidence-${{ github.run_id }}-${{ github.run_attempt }}",
     );
     expect(failureUpload.with["if-no-files-found"]).toBe("error");
     expect(failureUpload.with["retention-days"]).toBe(30);
@@ -924,10 +935,10 @@ describe("Quick Log manual delegate production delivery", () => {
     expect(runbook).toContain("expected_preflight_run_attempt");
     expect(runbook).toContain("expected_preflight_artifact_sha256");
     expect(runbook).toContain(
-      "quicklog-manual-delegate-forward-repair-preflight-run-<RUN_ID>-attempt-1",
+      "action-queue-transition-forward-repair-preflight-run-<RUN_ID>-attempt-1",
     );
     expect(runbook).toMatch(
-      /never use[\s\S]{0,100}quicklog-manual-delegate-forward-repair-evidence/i,
+      /never use[\s\S]{0,100}action-queue-transition-forward-repair-evidence/i,
     );
     expect(runbook).toMatch(/record.*run attempt/i);
     expect(runbook).toMatch(/record[\s\S]{0,100}artifact SHA-256/i);
@@ -943,8 +954,8 @@ describe("Quick Log manual delegate production delivery", () => {
         "scripts/lib/solo-founder-production-authorization.mjs",
         "scripts/verify-solo-founder-production-authorization.mjs",
         "src/test/solo-founder-production-authorization.test.ts",
-        "scripts/apply-quicklog-manual-delegate-forward-repair.mjs",
-        "scripts/verify-quicklog-manual-delegate-forward-repair-preflight-artifact.mjs",
+        "scripts/apply-action-queue-transition-forward-repair.mjs",
+        "scripts/verify-action-queue-transition-forward-repair-preflight-artifact.mjs",
       ]),
     );
   });
@@ -956,8 +967,8 @@ describe("Quick Log manual delegate production delivery", () => {
     expect(runbook).toContain("SAFE_TO_APPLY");
     expect(runbook).toContain("schema_live_ledger_absent");
     expect(runbook).toContain("already_applied_verified");
-    expect(runbook).toContain("APPLY QUICKLOG MANUAL DELEGATE FORWARD REPAIR");
-    expect(runbook).toContain("20260818010000");
+    expect(runbook).toContain("APPLY ACTION QUEUE TRANSITION FORWARD REPAIR");
+    expect(runbook).toContain("20260819190852");
     expect(runbook).toContain("verdant-production");
     expect(runbook).toMatch(/do not freeze|no write freeze/i);
     expect(runbook).toMatch(/do not delete|never delete/i);

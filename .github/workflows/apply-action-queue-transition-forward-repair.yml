@@ -1,4 +1,4 @@
-name: Apply Quick Log manual delegate forward repair
+name: Apply Action Queue transition forward repair
 
 on:
   workflow_dispatch:
@@ -20,7 +20,7 @@ on:
         required: true
         type: string
       confirm_apply:
-        description: "APPLY only — type: APPLY QUICKLOG MANUAL DELEGATE FORWARD REPAIR"
+        description: "APPLY only — type: APPLY ACTION QUEUE TRANSITION FORWARD REPAIR"
         required: false
         type: string
         default: ""
@@ -111,7 +111,7 @@ jobs:
             exit 1
           fi
           if [ "$OPERATION" = "APPLY" ]; then
-            if [ "$CONFIRM_APPLY" != "APPLY QUICKLOG MANUAL DELEGATE FORWARD REPAIR" ]; then
+            if [ "$CONFIRM_APPLY" != "APPLY ACTION QUEUE TRANSITION FORWARD REPAIR" ]; then
               echo "::error::The production apply confirmation phrase did not match."
               exit 1
             fi
@@ -148,9 +148,9 @@ jobs:
       EXPECTED_PREFLIGHT_RUN_ATTEMPT: ${{ inputs.expected_preflight_run_attempt }}
       EXPECTED_PREFLIGHT_ARTIFACT_SHA256: ${{ inputs.expected_preflight_artifact_sha256 }}
       SOLO_FOUNDER_ACKNOWLEDGEMENT: ${{ inputs.solo_founder_acknowledgement }}
-      REPORT_PATH: ${{ github.workspace }}/audit/quicklog-manual-delegate-forward-repair/report.md
-      AUDIT_PATH: ${{ github.workspace }}/audit/quicklog-manual-delegate-forward-repair/audit.json
-      PREFLIGHT_RECEIPT_PATH: ${{ github.workspace }}/audit/quicklog-manual-delegate-forward-repair/preflight-receipt.json
+      REPORT_PATH: ${{ github.workspace }}/audit/action-queue-transition-forward-repair/report.md
+      AUDIT_PATH: ${{ github.workspace }}/audit/action-queue-transition-forward-repair/audit.json
+      PREFLIGHT_RECEIPT_PATH: ${{ github.workspace }}/audit/action-queue-transition-forward-repair/preflight-receipt.json
 
     steps:
       - name: Checkout exact candidate
@@ -165,23 +165,23 @@ jobs:
           node-version: "22"
 
       - name: Prepare sanitized audit directory
-        run: mkdir -p "${{ github.workspace }}/audit/quicklog-manual-delegate-forward-repair"
+        run: mkdir -p "${{ github.workspace }}/audit/action-queue-transition-forward-repair"
 
       - name: Verify solo-founder production authorization
         env:
           GH_TOKEN: ${{ github.token }}
-          CURRENT_RUN_JSON: ${{ runner.temp }}/quicklog-manual-delegate-solo-founder/current-run.json
-          CURRENT_RUN_APPROVALS_JSON: ${{ runner.temp }}/quicklog-manual-delegate-solo-founder/approvals.json
-          SOLO_FOUNDER_ENVIRONMENT_JSON: ${{ runner.temp }}/quicklog-manual-delegate-solo-founder/environment.json
-          SOLO_FOUNDER_BRANCH_POLICIES_JSON: ${{ runner.temp }}/quicklog-manual-delegate-solo-founder/branch-policies.json
-          SOLO_FOUNDER_EXPECTED_WORKFLOW_PATH: .github/workflows/apply-quicklog-manual-delegate-forward-repair.yml
+          CURRENT_RUN_JSON: ${{ runner.temp }}/action-queue-transition-solo-founder/current-run.json
+          CURRENT_RUN_APPROVALS_JSON: ${{ runner.temp }}/action-queue-transition-solo-founder/approvals.json
+          SOLO_FOUNDER_ENVIRONMENT_JSON: ${{ runner.temp }}/action-queue-transition-solo-founder/environment.json
+          SOLO_FOUNDER_BRANCH_POLICIES_JSON: ${{ runner.temp }}/action-queue-transition-solo-founder/branch-policies.json
+          SOLO_FOUNDER_EXPECTED_WORKFLOW_PATH: .github/workflows/apply-action-queue-transition-forward-repair.yml
         run: |
           set -euo pipefail
           umask 077
           mkdir -p "$(dirname "$CURRENT_RUN_JSON")"
           authorization_failure() {
             printf '%s\n' \
-              '### Quick Log manual delegate forward repair' \
+              '### Action Queue transition forward repair' \
               '' \
               '**Status:** BLOCKED - solo-founder authorization rejected' \
               '' \
@@ -189,7 +189,7 @@ jobs:
               'No database process was started. No raw API response or credential is included.' \
               > "$REPORT_PATH"
             printf '%s\n' \
-              '{"schema_version":1,"tool":"apply-quicklog-manual-delegate-forward-repair","target_env":"production","outcome":"authorization_rejected","reason_code":"solo_founder_authorization_rejected"}' \
+              '{"schema_version":1,"tool":"apply-action-queue-transition-forward-repair","target_env":"production","outcome":"authorization_rejected","reason_code":"solo_founder_authorization_rejected"}' \
               > "$AUDIT_PATH"
           }
           trap authorization_failure ERR
@@ -213,23 +213,23 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_TOKEN: ${{ github.token }}
-          PREFLIGHT_RUN_JSON: ${{ runner.temp }}/quicklog-manual-delegate-artifact/prior-run.json
-          CURRENT_RUN_JSON: ${{ runner.temp }}/quicklog-manual-delegate-artifact/current-run.json
-          WORKFLOW_JSON: ${{ runner.temp }}/quicklog-manual-delegate-artifact/workflow.json
-          PREFLIGHT_ARTIFACTS_JSON: ${{ runner.temp }}/quicklog-manual-delegate-artifact/artifacts.json
+          PREFLIGHT_RUN_JSON: ${{ runner.temp }}/action-queue-transition-artifact/prior-run.json
+          CURRENT_RUN_JSON: ${{ runner.temp }}/action-queue-transition-artifact/current-run.json
+          WORKFLOW_JSON: ${{ runner.temp }}/action-queue-transition-artifact/workflow.json
+          PREFLIGHT_ARTIFACTS_JSON: ${{ runner.temp }}/action-queue-transition-artifact/artifacts.json
         run: |
           set -euo pipefail
           mkdir -p "$(dirname "$PREFLIGHT_RUN_JSON")"
           artifact_failure() {
             printf '%s\n' \
-              '### Quick Log manual delegate forward repair' \
+              '### Action Queue transition forward repair' \
               '' \
               '**Status:** BLOCKED - authenticated PREFLIGHT artifact rejected' \
               '' \
               'No database process was started. No raw API response or credential is included.' \
               > "$REPORT_PATH"
             printf '%s\n' \
-              '{"schema_version":1,"tool":"apply-quicklog-manual-delegate-forward-repair","target_env":"production","operation":"APPLY","outcome":"artifact_rejected"}' \
+              '{"schema_version":1,"tool":"apply-action-queue-transition-forward-repair","target_env":"production","operation":"APPLY","outcome":"artifact_rejected"}' \
               > "$AUDIT_PATH"
           }
           trap artifact_failure ERR
@@ -238,7 +238,7 @@ jobs:
           WORKFLOW_ID="$(node -e 'const fs=require("fs");const v=JSON.parse(fs.readFileSync(process.env.PREFLIGHT_RUN_JSON,"utf8"));if(!Number.isSafeInteger(v.workflow_id)||v.workflow_id<1)process.exit(1);process.stdout.write(String(v.workflow_id));')"
           gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/${WORKFLOW_ID}" > "$WORKFLOW_JSON" 2>/dev/null
           gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${PREFLIGHT_RUN_ID}/artifacts?per_page=100" > "$PREFLIGHT_ARTIFACTS_JSON" 2>/dev/null
-          node scripts/verify-quicklog-manual-delegate-forward-repair-preflight-artifact.mjs
+          node scripts/verify-action-queue-transition-forward-repair-preflight-artifact.mjs
           trap - ERR
 
       - name: Require every production migration writer to be idle
@@ -257,7 +257,7 @@ jobs:
             apply-action-queue-transition-forward-repair.yml
           )
           active_statuses=(queued in_progress waiting pending requested)
-          guard_root="${RUNNER_TEMP}/quicklog-manual-delegate-writer-guard"
+          guard_root="${RUNNER_TEMP}/action-queue-transition-writer-guard"
           mkdir -p "$guard_root"
           for workflow in "${writer_workflows[@]}"; do
             for status in "${active_statuses[@]}"; do
@@ -296,9 +296,9 @@ jobs:
         with:
           secret-name: SUPABASE_DB_URL
           secret-value: ${{ secrets.SUPABASE_DB_URL }}
-          guard-heading: "Quick Log manual delegate forward-repair gate"
-          report-path: ${{ github.workspace }}/audit/quicklog-manual-delegate-forward-repair/report.md
-          log-prefix: quicklog-manual-delegate-forward-repair
+          guard-heading: "Action Queue transition forward-repair gate"
+          report-path: ${{ github.workspace }}/audit/action-queue-transition-forward-repair/report.md
+          log-prefix: action-queue-transition-forward-repair
           fix-steps-json: >-
             ["1. Open Settings → Environments → verdant-production-solo-founder.",
              "2. Add or repair environment secret SUPABASE_DB_URL for project knkwiiywfkbqznbxwqfh.",
@@ -312,9 +312,9 @@ jobs:
         with:
           secret-name: SUPABASE_DB_CA_CERT_B64
           secret-value: ${{ secrets.SUPABASE_DB_CA_CERT_B64 }}
-          guard-heading: "Quick Log manual delegate forward-repair gate"
-          report-path: ${{ github.workspace }}/audit/quicklog-manual-delegate-forward-repair/report.md
-          log-prefix: quicklog-manual-delegate-forward-repair-ca
+          guard-heading: "Action Queue transition forward-repair gate"
+          report-path: ${{ github.workspace }}/audit/action-queue-transition-forward-repair/report.md
+          log-prefix: action-queue-transition-forward-repair-ca
           fix-steps-json: >-
             ["1. Download the Server root certificate from the production Supabase project Dashboard.",
              "2. Base64-encode the certificate without changing its bytes.",
@@ -334,8 +334,62 @@ jobs:
           chmod 600 "$SUPABASE_DB_CA_CERT_PATH"
           openssl x509 -in "$SUPABASE_DB_CA_CERT_PATH" -noout
 
-      - name: Install PostgreSQL client
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
+      - name: Install PostgreSQL client wrapper (pinned)
+        run: |
+          set -euo pipefail
+          client_root="${RUNNER_TEMP}/verdant-pinned-postgres-client"
+          client_path="${client_root}/psql"
+          image="postgres:15.18@sha256:bb0df8b69f086efa2cbe4b8128df2f368a362bbdadef743731a63dd0f2f24c9e"
+          mkdir -p "$client_root"
+          docker pull "$image" >/dev/null
+          cat > "$client_path" <<'PSQL_WRAPPER'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          image="postgres:15.18@sha256:bb0df8b69f086efa2cbe4b8128df2f368a362bbdadef743731a63dd0f2f24c9e"
+          if [ ! -f "${PGSSLROOTCERT:-}" ]; then
+            exit 64
+          fi
+          mounts=(-v "${PGSSLROOTCERT}:/verdant/production-root.crt:ro")
+          psql_args=()
+          mounted_input=""
+          while [ "$#" -gt 0 ]; do
+            case "$1" in
+              --file|-f)
+                flag="$1"
+                shift
+                [ "$#" -gt 0 ] || exit 64
+                if [ "$1" = "-" ]; then
+                  psql_args+=("$flag" "-")
+                else
+                  [ -z "$mounted_input" ] && [ -f "$1" ] || exit 64
+                  mounted_input="$1"
+                  mounts+=(-v "${mounted_input}:/verdant/input.sql:ro")
+                  psql_args+=("$flag" "/verdant/input.sql")
+                fi
+                ;;
+              --file=*)
+                input_path="${1#--file=}"
+                if [ "$input_path" = "-" ]; then
+                  psql_args+=("--file=-")
+                else
+                  [ -z "$mounted_input" ] && [ -f "$input_path" ] || exit 64
+                  mounted_input="$input_path"
+                  mounts+=(-v "${mounted_input}:/verdant/input.sql:ro")
+                  psql_args+=("--file=/verdant/input.sql")
+                fi
+                ;;
+              *) psql_args+=("$1") ;;
+            esac
+            shift
+          done
+          exec docker run --rm -i "${mounts[@]}" \
+            -e PGHOST -e PGPORT -e PGUSER -e PGPASSWORD -e PGDATABASE \
+            -e PGCONNECT_TIMEOUT -e PGAPPNAME -e PGSSLMODE=verify-full \
+            -e PGSSLROOTCERT=/verdant/production-root.crt \
+            "$image" psql "${psql_args[@]}"
+          PSQL_WRAPPER
+          chmod 700 "$client_path"
+          printf '%s\n' "$client_root" >> "$GITHUB_PATH"
 
       - name: Re-resolve current deploy branch head before database access
         if: inputs.operation == 'APPLY'
@@ -350,34 +404,34 @@ jobs:
           fi
           printf 'CURRENT_DEPLOY_HEAD_SHA=%s\n' "$CURRENT_DEPLOY_HEAD_SHA" >> "$GITHUB_ENV"
 
-      - name: Run the environment-gated Quick Log delegate repair
+      - name: Run the environment-gated Action Queue transition repair
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
           SUPABASE_DB_CA_CERT_PATH: ${{ runner.temp }}/verdant-production-supabase-root.crt
-        run: node scripts/apply-quicklog-manual-delegate-forward-repair.mjs
+        run: node scripts/apply-action-queue-transition-forward-repair.mjs
 
       - name: Upload immutable PREFLIGHT receipt
-        if: success() && inputs.operation == 'PREFLIGHT' && hashFiles('audit/quicklog-manual-delegate-forward-repair/preflight-receipt.json') != ''
+        if: success() && inputs.operation == 'PREFLIGHT' && hashFiles('audit/action-queue-transition-forward-repair/preflight-receipt.json') != ''
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: quicklog-manual-delegate-forward-repair-preflight-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
-          path: audit/quicklog-manual-delegate-forward-repair/preflight-receipt.json
+          name: action-queue-transition-forward-repair-preflight-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: audit/action-queue-transition-forward-repair/preflight-receipt.json
           if-no-files-found: error
           retention-days: 30
 
       - name: Publish sanitized summary
-        if: always() && hashFiles('audit/quicklog-manual-delegate-forward-repair/report.md') != ''
+        if: always() && hashFiles('audit/action-queue-transition-forward-repair/report.md') != ''
         continue-on-error: true
-        run: cat audit/quicklog-manual-delegate-forward-repair/report.md >> "$GITHUB_STEP_SUMMARY"
+        run: cat audit/action-queue-transition-forward-repair/report.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload sanitized evidence after successful delivery
         if: success()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: quicklog-manual-delegate-forward-repair-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          name: action-queue-transition-forward-repair-evidence-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
-            audit/quicklog-manual-delegate-forward-repair/report.md
-            audit/quicklog-manual-delegate-forward-repair/audit.json
+            audit/action-queue-transition-forward-repair/report.md
+            audit/action-queue-transition-forward-repair/audit.json
           if-no-files-found: error
           retention-days: 30
 
@@ -386,10 +440,10 @@ jobs:
         continue-on-error: true
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: quicklog-manual-delegate-forward-repair-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          name: action-queue-transition-forward-repair-evidence-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
-            audit/quicklog-manual-delegate-forward-repair/report.md
-            audit/quicklog-manual-delegate-forward-repair/audit.json
+            audit/action-queue-transition-forward-repair/report.md
+            audit/action-queue-transition-forward-repair/audit.json
           if-no-files-found: error
           retention-days: 30
 

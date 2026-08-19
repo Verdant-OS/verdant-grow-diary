@@ -1,7 +1,10 @@
 # One-Tent Loop Efficiency — Tranche B+ design
 
-**Status:** DRAFT — awaiting Cheek approval. No product implementation has
-occurred.
+**Status:** APPROVED — Cheek, 2026-08-19 ("APPROVED. Execute steps one through
+five, each in its own slice."). The approval covers the design, owner
+decisions **D4, D5, D7**, and the §11 copy; each approved item ships in its
+own slice. Slices gated on Tranche A PRs (B2, B3b, B4's rules edit, B5) stay
+gated until the owning A-PR merges.
 **Author:** Claude (Tranche B+ architect and, after approval, implementer, per
 Cheek's 2026-08-19 reassignment).
 **Verified against:** deploy branch `verdant-grow-diary`, tip
@@ -256,6 +259,10 @@ project, and the §12-format report with exact counts.
 
 ## 10 · Owner decisions required (each blocks only its own slice)
 
+> **Resolved 2026-08-19:** Cheek approved D4, D5, and D7 (and ratified the
+> §11 copy) together with this design. The table below is kept as the record
+> of what each decision was; the "If declined" columns are moot.
+
 | ID                            | Decision                                                                                                                                                                                                                                                                                                                  | Recommendation                                                                                            | If declined                                            |
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
 | **D4** (inherited)            | Sensors→`/doctor` context carry                                                                                                                                                                                                                                                                                           | APPROVE the D-B6 contract: normalization-only threading, fail-closed page validation, no paid-call change | B4 shrinks to the `/doctor` loop-card mount            |
@@ -294,5 +301,5 @@ test-only and inert to the product.
 friction quantified in a same-method baseline, but its runtime before-numbers
 are still source-derived until B0a lands — treat B0a as the tranche's first
 merge gate, and treat any B0a/baseline disagreement as a baseline correction,
-never a green light to skip re-measurement. **DRAFT — awaiting Cheek approval;
-no product implementation until then.**
+never a green light to skip re-measurement. **APPROVED — proceeding to
+implementation in per-slice PRs (B0a first).**

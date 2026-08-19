@@ -60,6 +60,10 @@ import {
 import { useQuickLogV2Save } from "@/hooks/useQuickLogV2Save";
 import { buildPlantQuickLogV2SavePayload } from "@/lib/plantQuickLogV2SaveAdapter";
 import { newQuickLogSaveKey } from "@/lib/quickLogIdempotencyKey";
+import {
+  classifyQuickLogThrownSaveError,
+  describeQuickLogSaveFailure,
+} from "@/lib/quickLogSaveErrorMessage";
 
 interface Props {
   open: boolean;
@@ -281,7 +285,9 @@ export default function PlantQuickLog({
           });
         if (upErr) {
           console.error("PlantQuickLog photo upload failed", upErr);
-          setError("Could not save this log. Check connection and try again.");
+          setError(
+            "Could not upload the photo, so nothing was saved. Check your connection and try again, or remove the photo and save the log without it.",
+          );
           return;
         }
         uploadedPath = path;
@@ -317,7 +323,8 @@ export default function PlantQuickLog({
             .remove([uploadedPath])
             .catch(() => {});
         }
-        setError("Could not save this log. Check connection and try again.");
+        const failure = describeQuickLogSaveFailure(result.reason);
+        setError(`${failure.message} ${failure.recovery}`);
         return;
       }
 
@@ -353,7 +360,8 @@ export default function PlantQuickLog({
           .remove([uploadedPath])
           .catch(() => {});
       }
-      setError("Could not save this log. Check connection and try again.");
+      const failure = describeQuickLogSaveFailure(classifyQuickLogThrownSaveError(err));
+      setError(`${failure.message} ${failure.recovery}`);
     } finally {
       setBusy(false);
     }

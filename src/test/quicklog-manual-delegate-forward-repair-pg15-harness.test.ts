@@ -187,6 +187,29 @@ describe("Quick Log manual delegate forward-repair PostgreSQL 15 runtime gate", 
     expect(source).not.toContain("knkwiiywfkbqznbxwqfh");
   });
 
+  it("ACL fence covers all five private helpers, both wrapper callers, and runtime probes", () => {
+    const source = readFileSync(HARNESS_PATH, "utf8");
+    // The postgres-only matrix must enumerate every private helper by exact
+    // signature — a dropped line here reopens a helper without any signal.
+    expect(source).toContain("private_helper_acl_matrix");
+    expect(source).toContain(
+      "'public.quicklog_save_manual_pre_logged_at(${MANUAL_SIGNATURE})'::regprocedure",
+    );
+    expect(source).toContain("'public.quicklog_try_parse_logged_at(text)'::regprocedure");
+    expect(source).toContain("'public.quicklog_try_parse_uuid(text)'::regprocedure");
+    expect(source).toContain("'public.quicklog_stamp_diary_logged_at()'::regprocedure");
+    expect(source).toContain("'public.quicklog_stamp_grow_event_logged_at()'::regprocedure");
+    expect(source).toContain("has_function_privilege('postgres', sig, 'execute')");
+    // Wrapper must stay executable for BOTH intended callers…
+    expect(source).toContain(
+      "has_function_privilege('service_role','public.quicklog_save_manual(${MANUAL_SIGNATURE})','execute')",
+    );
+    // …and the runtime probes must stay: authenticated dies on a helper,
+    // service_role executes the wrapper.
+    expect(source).toContain("authenticated_helper_probe");
+    expect(source).toContain("service_role_wrapper_call");
+  });
+
   it("runs parallel, helper ABI, and raw UUID fingerprint adversaries through delivery preflight", () => {
     const source = readFileSync(HARNESS_PATH, "utf8");
     for (const proof of [

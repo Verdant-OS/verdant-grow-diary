@@ -40,7 +40,7 @@
  */
 import { test, expect, type Page, type Route } from "@playwright/test";
 import { execFileSync } from "node:child_process";
-import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import {
   evaluateManagedSession,
@@ -63,6 +63,12 @@ const FIXTURE_MARKER = "[GOLDEN-PATH-FIXTURE]";
 const GROW_NAME = `One-Tent Golden Run ${FIXTURE_MARKER}`;
 const TENT_NAME = `Flower Tent A ${FIXTURE_MARKER}`;
 const PLANT_NAME = `Golden Plant 1 ${FIXTURE_MARKER}`;
+const SEED_SCRIPT = fileURLToPath(
+  new URL("../scripts/e2e/seed-one-tent-golden-path.mjs", import.meta.url),
+);
+const TEARDOWN_SCRIPT = fileURLToPath(
+  new URL("../scripts/e2e/teardown-one-tent-golden-path.mjs", import.meta.url),
+);
 const ONE_PIXEL_PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Z2S8AAAAASUVORK5CYII=",
   "base64",
@@ -444,9 +450,8 @@ test.describe("One-Tent Loop — authenticated UI golden path", () => {
       // but fails closed if the browser-created hierarchy is missing or
       // misbound. It cannot rescue a broken creation handoff.
       await stage("photo_and_manual_evidence_persisted", async () => {
-        const seedScript = resolve(__dirname, "..", "scripts/e2e/seed-one-tent-golden-path.mjs");
         try {
-          const seedOutput = execFileSync(process.execPath, [seedScript, "--evidence-only"], {
+          const seedOutput = execFileSync(process.execPath, [SEED_SCRIPT, "--evidence-only"], {
             encoding: "utf8",
             env: process.env,
           });
@@ -924,15 +929,10 @@ test.describe("One-Tent Loop — authenticated UI golden path", () => {
     ) {
       // Repo-rooted path: the worker's cwd is wherever playwright was
       // invoked from, so a cwd-relative script path would ENOENT.
-      const teardownScript = resolve(
-        __dirname,
-        "..",
-        "scripts/e2e/teardown-one-tent-golden-path.mjs",
-      );
       try {
         const out = execFileSync(
           process.execPath,
-          [teardownScript, "--execute", "--confirm-fixture-teardown"],
+          [TEARDOWN_SCRIPT, "--execute", "--confirm-fixture-teardown"],
           { encoding: "utf8" },
         );
         console.log(out);

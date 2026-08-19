@@ -24,6 +24,16 @@ describe("authenticated One-Tent proof covers the production objective", () => {
     expect(SPEC).toContain("height: 844");
   });
 
+  it("resolves child CLIs with ESM-safe module URLs", () => {
+    expect(SPEC).toMatch(
+      /fileURLToPath\(\s*new URL\("\.\.\/scripts\/e2e\/seed-one-tent-golden-path\.mjs",\s*import\.meta\.url\)/,
+    );
+    expect(SPEC).toMatch(
+      /fileURLToPath\(\s*new URL\("\.\.\/scripts\/e2e\/teardown-one-tent-golden-path\.mjs",\s*import\.meta\.url\)/,
+    );
+    expect(SPEC).not.toContain("__dirname");
+  });
+
   it("creates Grow, Tent, and Plant through the real Start Your Room UI", () => {
     for (const testId of [
       "start-room-grow-name",

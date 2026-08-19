@@ -87,17 +87,22 @@ describe("temporary authenticated One-Tent Actions lane", () => {
     expect(job).not.toContain("e2e:install:ci");
   });
 
-  it("materializes real auth, preflights, runs the UI proof, and validates its receipt in order", () => {
+  it("cleans only the retained owner-scoped fixture before rerunning the real UI proof", () => {
     const materialize = job.indexOf("scripts/e2e/materialize-managed-session.mjs");
     const publicConfig = job.indexOf("source .env");
     const preflight = job.indexOf("e2e:one-tent:preflight");
+    const fixtureCleanup = job.indexOf(
+      "scripts/e2e/teardown-one-tent-golden-path.mjs --execute --confirm-fixture-teardown",
+    );
     const ui = job.indexOf("e2e:one-tent:ui");
     const verify = job.indexOf("verify-one-tent-browser-proof-log.mjs");
     expect(materialize).toBeGreaterThan(0);
     expect(publicConfig).toBeGreaterThan(materialize);
     expect(preflight).toBeGreaterThan(publicConfig);
-    expect(ui).toBeGreaterThan(preflight);
+    expect(fixtureCleanup).toBeGreaterThan(preflight);
+    expect(ui).toBeGreaterThan(fixtureCleanup);
     expect(verify).toBeGreaterThan(ui);
+    expect(job.match(/--execute --confirm-fixture-teardown/g)).toHaveLength(1);
   });
 
   it("does not expose elevated credentials, paid AI, artifacts, deployment, or device control", () => {

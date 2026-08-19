@@ -142,7 +142,12 @@ describe("Action Queue transition forward-repair PostgreSQL 15 runtime gate", ()
     expect(paths).toEqual(
       expect.arrayContaining([
         "scripts/run-action-queue-transition-forward-repair-pg15-harness.mjs",
+        "scripts/apply-pinned-production-migrations.mjs",
+        "scripts/verify-quicklog-corrections-preflight-artifact.mjs",
+        "scripts/lib/candidateNumberToolRuntime.mjs",
+        "scripts/lib/productionSupabaseTls.mjs",
         "scripts/lib/solo-founder-production-authorization.mjs",
+        "scripts/lib/supabaseDatabaseTargetIdentity.mjs",
         "scripts/verify-solo-founder-production-authorization.mjs",
         "scripts/apply-action-queue-transition-forward-repair.mjs",
         "scripts/verify-action-queue-transition-forward-repair-preflight-artifact.mjs",

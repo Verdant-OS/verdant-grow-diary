@@ -4,7 +4,12 @@ on:
   pull_request:
     paths: &action_queue_transition_repair_paths
       - "scripts/run-action-queue-transition-forward-repair-pg15-harness.mjs"
+      - "scripts/apply-pinned-production-migrations.mjs"
+      - "scripts/verify-quicklog-corrections-preflight-artifact.mjs"
+      - "scripts/lib/candidateNumberToolRuntime.mjs"
+      - "scripts/lib/productionSupabaseTls.mjs"
       - "scripts/lib/solo-founder-production-authorization.mjs"
+      - "scripts/lib/supabaseDatabaseTargetIdentity.mjs"
       - "scripts/verify-solo-founder-production-authorization.mjs"
       - "scripts/apply-action-queue-transition-forward-repair.mjs"
       - "scripts/verify-action-queue-transition-forward-repair-preflight-artifact.mjs"

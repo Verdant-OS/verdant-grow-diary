@@ -175,6 +175,13 @@ describe("react-router-compat fragment handling (real product shim)", () => {
         >
           set numeric-looking search
         </button>
+        <button
+          type="button"
+          data-testid="set-string-search-button"
+          onClick={() => setSearchParams("?q=a#b")}
+        >
+          set string search with reserved character
+        </button>
       </div>
     );
   }
@@ -288,6 +295,29 @@ describe("react-router-compat fragment handling (real product shim)", () => {
       to: "/hunts/55/workspace?operator=1&page=2",
     });
     expect((searchCall?.[0] as { search?: unknown } | undefined)?.search).toBeUndefined();
+  });
+
+  it("useSearchParams setter percent-encodes reserved characters in string input", async () => {
+    const router = buildWorkspaceRouter();
+    const navigateSpy = vi.spyOn(router, "navigate");
+    render(<RouterProvider router={router} />);
+    await screen.findByTestId("workspace-page");
+
+    fireEvent.click(await screen.findByTestId("set-string-search-button"));
+
+    await waitFor(() => {
+      expect(router.state.location.searchStr).toBe("?q=a%23b");
+    });
+    expect(new URLSearchParams(router.state.location.searchStr).get("q")).toBe("a#b");
+    expect(router.state.location.hash).toBe("");
+
+    const searchCall = navigateSpy.mock.calls.find((call) => {
+      const options = call[0] as { to?: string } | undefined;
+      return typeof options?.to === "string" && options.to.startsWith("/hunts/55/workspace");
+    });
+    expect(searchCall?.[0]).toMatchObject({
+      to: "/hunts/55/workspace?q=a%23b",
+    });
   });
 
   it("clicking a same-page fragment Link commits a clean pathname + hash, no remount, no loop", async () => {

@@ -6,6 +6,7 @@
 // - Performs no real writes, AI calls, ingest, alerts, Action Queue changes,
 //   or device control.
 import { expect, test, type Page } from "@playwright/test";
+import { CURRENT_AGREEMENT_LIST } from "../src/constants/agreements";
 
 const PROJECT_REF = "knkwiiywfkbqznbxwqfh";
 const SESSION_KEY = `sb-${PROJECT_REF}-auth-token`;
@@ -31,12 +32,12 @@ const FAKE_TENT = {
   is_archived: false,
   created_at: "2020-01-01T00:00:00.000Z",
 };
-// Mirrors src/constants/agreements.ts so this operator fixture represents an
-// already-consented grower and never performs a re-consent write.
-const CURRENT_AGREEMENT_ROWS = [
-  { agreement_type: "terms", version: "2026-07-13" },
-  { agreement_type: "privacy", version: "2026-07-13" },
-];
+// Derive the fixture from the product registry so an agreement bump cannot
+// silently turn this read-only browser proof into a re-consent write path.
+const CURRENT_AGREEMENT_ROWS = CURRENT_AGREEMENT_LIST.map((agreement) => ({
+  agreement_type: agreement.type,
+  version: agreement.version,
+}));
 
 async function seedFakeSession(page: Page) {
   await page.addInitScript(
@@ -59,7 +60,11 @@ async function seedFakeSession(page: Page) {
 
 async function mockSignedInSupabase(
   page: Page,
-  options: { operatorGranted: boolean; onOperatorAuditRead?: () => void },
+  options: {
+    operatorGranted: boolean;
+    onOperatorAuditRead?: () => void;
+    onAgreementWrite?: () => void;
+  },
 ) {
   await page.route(/\/auth\/v1\//, async (route, request) => {
     if (/\/user/i.test(request.url())) {
@@ -85,6 +90,9 @@ async function mockSignedInSupabase(
     }
     const selectedColumns = new URL(url).searchParams.get("select") ?? "";
     if (new URL(url).pathname.endsWith("/rest/v1/user_agreement_acceptances")) {
+      if (!["GET", "HEAD"].includes(request.method())) {
+        options.onAgreementWrite?.();
+      }
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -130,8 +138,14 @@ test.describe("post-Claude route and operator-access closure", () => {
   test("/dashboard renders the authenticated Dashboard and preserves grow scope", async ({
     page,
   }) => {
+    let agreementWrites = 0;
     await seedFakeSession(page);
-    await mockSignedInSupabase(page, { operatorGranted: false });
+    await mockSignedInSupabase(page, {
+      operatorGranted: false,
+      onAgreementWrite: () => {
+        agreementWrites += 1;
+      },
+    });
 
     await page.goto("/dashboard?growId=mock-grow");
     await acceptReconsentGateIfShown(page);
@@ -143,17 +157,22 @@ test.describe("post-Claude route and operator-access closure", () => {
       "aria-current",
       "page",
     );
+    expect(agreementWrites).toBe(0);
   });
 
   test("?operator=1 cannot reveal diagnostics or trigger audit reads for a grower", async ({
     page,
   }) => {
     let auditReads = 0;
+    let agreementWrites = 0;
     await seedFakeSession(page);
     await mockSignedInSupabase(page, {
       operatorGranted: false,
       onOperatorAuditRead: () => {
         auditReads += 1;
+      },
+      onAgreementWrite: () => {
+        agreementWrites += 1;
       },
     });
 
@@ -164,15 +183,20 @@ test.describe("post-Claude route and operator-access closure", () => {
     await page.getByRole("button", { name: FAKE_TENT.name }).click();
     await expect(page.getByTestId("sensors-operator-diagnostics")).toHaveCount(0);
     expect(auditReads).toBe(0);
+    expect(agreementWrites).toBe(0);
   });
 
   test("verified operators retain diagnostics and the dedicated audit link", async ({ page }) => {
     let auditReads = 0;
+    let agreementWrites = 0;
     await seedFakeSession(page);
     await mockSignedInSupabase(page, {
       operatorGranted: true,
       onOperatorAuditRead: () => {
         auditReads += 1;
+      },
+      onAgreementWrite: () => {
+        agreementWrites += 1;
       },
     });
 
@@ -193,5 +217,6 @@ test.describe("post-Claude route and operator-access closure", () => {
       "aria-current",
       "page",
     );
+    expect(agreementWrites).toBe(0);
   });
 });

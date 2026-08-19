@@ -388,7 +388,7 @@ export function useSearchParams(): [URLSearchParams, CompatSetSearchParams] {
       resolved instanceof URLSearchParams
         ? resolved.toString()
         : typeof resolved === "string"
-          ? resolved.replace(/^\?/, "")
+          ? new URLSearchParams(resolved.replace(/^\?/, "")).toString()
           : new URLSearchParams(resolved).toString();
     if (legacy) {
       legacy.navigate(

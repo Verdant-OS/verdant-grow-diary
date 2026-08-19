@@ -347,6 +347,10 @@ describe("CreatePlantDialog RTL binding", () => {
     expect(screen.getByTestId("create-plant-form")).toBeInTheDocument();
     expect(onCreated).not.toHaveBeenCalled();
 
+    await userEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(screen.getByTestId("create-plant-form")).toBeInTheDocument();
+    expect(onCreated).not.toHaveBeenCalled();
+
     resolveLegacyPlantsRefresh();
     await Promise.resolve();
     expect(screen.getByTestId("create-plant-form")).toBeInTheDocument();

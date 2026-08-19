@@ -280,6 +280,10 @@ export default function CreatePlantDialog({
   const formBlocked = binding.blockSubmit || !canWriteCreateGrowId(targetGrowId) || tentBlocksWrite;
 
   function handleOpenChange(next: boolean) {
+    // Once the insert has started, keep the dialog mounted through its list
+    // refresh handoff. Otherwise an Escape/outside-close can hide the form and
+    // the completed submit will navigate to Quick Log later without warning.
+    if (!next && busy) return;
     setOpen(next);
     if (!next) {
       setExplicitCompatiblePick(false);

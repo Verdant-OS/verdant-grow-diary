@@ -83,11 +83,13 @@ describe("temporary authenticated One-Tent Actions lane", () => {
 
   it("materializes real auth, preflights, runs the UI proof, and validates its receipt in order", () => {
     const materialize = job.indexOf("scripts/e2e/materialize-managed-session.mjs");
+    const publicConfig = job.indexOf("source .env");
     const preflight = job.indexOf("e2e:one-tent:preflight");
     const ui = job.indexOf("e2e:one-tent:ui");
     const verify = job.indexOf("verify-one-tent-browser-proof-log.mjs");
     expect(materialize).toBeGreaterThan(0);
-    expect(preflight).toBeGreaterThan(materialize);
+    expect(publicConfig).toBeGreaterThan(materialize);
+    expect(preflight).toBeGreaterThan(publicConfig);
     expect(ui).toBeGreaterThan(preflight);
     expect(verify).toBeGreaterThan(ui);
   });

@@ -149,6 +149,7 @@ jobs:
         run: |
           set -euo pipefail
           set -a
+          source .env
           source e2e/.auth/managed-session.env
           set +a
           bun run e2e:one-tent:preflight

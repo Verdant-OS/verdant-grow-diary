@@ -23,8 +23,8 @@ no production telemetry.
 ## 1 · Executive recommendation
 
 Continue **Option A — shared pure rules + progressive convergence** (the same
-posture Tranche A took), decomposed into seven independent slices (B0–B6; B0
-ships as a mocked part and a separately-gated authenticated part). The
+posture Tranche A took), decomposed into independent per-slice PRs
+(B0a/B0b, B1, B2, D5, D7, B3a/B3b, B4, B5, B6 — see §6). The
 headline audit fact still stands and sharpened at this pin: **the 3-tap
 status-only contract already ships in two surfaces (PlantQuickLog, legacy
 QuickLog) — the product's problem is parity and continuity, not a missing
@@ -35,11 +35,12 @@ recovery); closes the two context-drop seams Tranche A deferred (Sensors→AI
 Doctor, global-entry target re-establishment); and proves it all with a
 test-only interaction counter so every claim is a before/after number.
 
-Three decisions are Cheek's, not mine (§10): the Sensors→Doctor context carry
-(D4, deferred from Tranche A), whether a _visible, owner-validated_ "Continue
-with <plant>" suggestion may exist at unscoped entries (D5 — the current test
-fence bans silent remembered defaults, and this design keeps that ban), and
-whether the V2 sheet gains a plant-scoped status-chip row (D7).
+Three decisions were Cheek's, not mine, and all three were approved with this
+design (§10): the Sensors→Doctor context carry (D4, deferred from Tranche A;
+scope corrected to grow/tent-only in D-B6), the _visible, owner-validated_
+"Continue with <plant>?" suggestion at unscoped entries (D5 — the ban on
+_silent_ remembered defaults stays), and the plant-scoped status-chip row in
+the V2 sheet (D7).
 
 ---
 
@@ -84,8 +85,13 @@ New or sharpened facts the design responds to; anchors in the baseline doc.
 4. **The manual payload is built twice.** `useQuickLogActivitySave.ts:132-148`
    duplicates the RPC arg shape inline, omits `p_stage`, and can pass
    `p_idempotency_key: null`, silently disabling server dedupe.
-5. **No recovery state exists** (S6 `MISSING`): empty states say "No recent
-   activity yet." with no status affordance.
+5. **Recovery ships on Plant Detail only** (corrected 2026-08-19 after bot
+   review on PR #1036; an earlier draft wrongly said `MISSING` everywhere):
+   `noRecentLogRecoveryRules.ts` + `PlantDetailRecentActivityRecap` already
+   render the calm 72 h "No recent check-in" prompt with a 3-tap path. The
+   Dashboard (`Dashboard.tsx:1543`) and Grow Detail (`GrowDetail.tsx:306`)
+   empty states still say "No recent activity yet." with no status
+   affordance — that is the actual gap.
 6. **The back half still drops context** at `sensor-snapshot → /doctor`
    (`oneTentLoopNavigationRules.ts:182`, all ids dropped; D4), and `/doctor`
    mounts no loop card.
@@ -141,37 +147,59 @@ divergence at the call sites and adds a static fence pinning that these two
 inserts remain the only sanctioned direct `diary_entries` INSERTs in Quick Log
 code.
 
-**D-B5 — Recovery is copy + affordance, not a new engine.** New pure
-`src/lib/quickLogRecoveryRules.ts`: given the entries a page already loaded
-(no new fetch), classify `recent | none-recent | never` with an injectable
-clock. Pages that show "No recent activity yet." render the ratified recovery
-copy (§11) plus a status-chip affordance that opens the surface's existing
-Quick Log entry with `focusResponseCheckOnOpen` (mechanism already shipped in
-PlantQuickLog). No guilt language, no forced note/sensor, no AI call.
+**D-B5 — Recovery reuses the shipped engine; never a second one.**
+(Corrected 2026-08-19 after Codex/Copilot review.) The recovery engine
+already ships: `src/lib/noRecentLogRecoveryRules.ts` — pure, injectable
+`now`, 72 h window (`NO_RECENT_LOG_STALE_AFTER_HOURS`), tested, and consumed
+by `PlantDetailRecentActivityRecap` with the exact §11 prompt copy and a
+3-tap completion path. B3a therefore creates **no new rules module**: it
+extends `buildNoRecentLogRecovery` consumption to the Dashboard and Grow
+Detail empty states, feeding it rows those pages already load (no new
+fetches), with each "Add quick check" CTA opening that surface's existing
+Quick Log entry. No guilt language, no forced note/sensor, no AI call.
 
-**D-B6 — Back-half context carry (gated on D4).** If Cheek approves D4:
-`sensor-snapshot` branch carries validated scope to `/doctor`
-(`?growId=&tentId=&plantId=`, normalization-only in the rules per A2's
-precedent, validation on the consuming page mirroring `useScopedGrow`'s
-fail-closed pattern); AiDoctorStart renders a "Reviewing <plant>" context chip
-and hands the ids to the existing readiness gate. **No auto-triggered AI call
-— the readiness gate and paid-call behavior are byte-untouched.** `/doctor`
-also mounts the loop card (`current="ai-doctor"`) so the visual chain stops
-breaking between Sensors and Doctor sessions. If D4 is declined, B4 shrinks to
-the loop-card mount only.
+**D-B6 — Back-half context carry (D4 approved; scope corrected 2026-08-19
+after Codex review).** The Sensors loop card provably holds only
+`{ growId, tentId }` (`Sensors.tsx:337-342`), so the carry is
+**`?growId=&tentId=` only** — no plant parameter can honestly be emitted from
+this producer. `sensor-snapshot` branch threads that scope to `/doctor`
+(normalization-only in the rules per A2's precedent; validation on the
+consuming page mirroring `useScopedGrow`'s fail-closed pattern). AiDoctorStart
+uses the validated tent scope to **filter/annotate its plant option list**
+and show a tent-context line; the explicit plant choice stays — "Verdant will
+not guess which plant you mean" (`AiDoctorStart.tsx:50`) is doctrine, and S9's
+tap count is already 2. **No auto-triggered AI call — the readiness gate and
+paid-call behavior are byte-untouched.** `/doctor` also mounts the loop card
+(`current="ai-doctor"`) so the visual chain stops breaking between Sensors
+and Doctor sessions. A validated plant-intent handoff _into_ Sensors (which
+would let a plant survive Timeline→Sensors→Doctor) is a deferred follow-up,
+not part of B4.
 
 **D-B7 — Post-save continuation is one typed contract.** After A5(d) lands
-(single dispatch), B3 unifies the five `verdant:entry-created` shapes onto
+(single dispatch), B3b unifies the five `verdant:entry-created` shapes onto
 `dispatchQuickLogV2EntryCreated`'s typed detail and gives every save surface
 the same continuation guarantee: confirmation + at-most-one intentional
 "View timeline" action, with correct grow/tent/plant attribution. The
 All-Activities section gains the toast + CTA it currently lacks.
 
 **D-B8 — Decompose only what the slices touch.** Extractions are limited to
-the four pure modules named above plus (B6) the legacy dialog's
+the pure modules named above plus (B6) the legacy dialog's
 target-resolution block if — and only if — B1's migration proves it needed.
 Timeline.tsx, ActionQueue.tsx, and the three Quick Log presenters are **not**
 rewritten.
+
+**D-B9 — Remembered-suggestion validity window (added 2026-08-19 after
+Copilot review).** The D5 suggestion is valid only when ALL hold, evaluated
+with an injectable `now`: (a) the stored `savedAt` parses to a finite
+timestamp; (b) it is not in the future (`savedAt > now` → invalid); (c) its
+age is at most **14 days** (`RECENT_TARGET_SUGGESTION_MAX_AGE_MS`; boundary:
+age strictly greater than the max → expired); (d) the stored plant id
+revalidates against the grower's own currently-visible plant rows (archived,
+merged, deleted, or cross-user targets never surface). Any failed condition
+yields **no suggestion** — never an error, never a fallback to the un-scoped
+v1 key — and the stale entry is overwritten on the next successful save.
+These rules live in the D5 slice's pure module with a full boundary-matrix
+test.
 
 ---
 
@@ -184,16 +212,19 @@ rollback, no schema. **Sequencing rule: any PR whose owned files intersect a
 Tranche A PR waits for that PR to merge** (re-verify with a fresh collision
 scan before each slice, per the standing directive).
 
-| PR      | Objective                                                                                                            | Owned files (edit)                                                                                                                                                                                       | New files                                                                                                              | Key tests (RED first)                                                                                                                                          | Waits for                                                                                                                                                                     |
-| ------- | -------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **B0a** | Mocked interaction-counter harness + runtime baselines for S1–S8, S10–S13 (stubbed RPC), keyboard variants           | none (test-only)                                                                                                                                                                                         | `e2e/helpers/interactionCounter.ts`, `e2e/one-tent-efficiency-baseline.spec.ts` (chromium-mocked, self-stubbed routes) | Counter unit tests; per-scenario specs asserting the baseline's exact counts (RED if product drifts)                                                           | nothing — first PR                                                                                                                                                            |
-| **B0b** | Authenticated live measurement variant, honest-receipt gated exactly like the golden path                            | `e2e/one-tent-loop-golden-path-ui.spec.ts` (add counters only)                                                                                                                                           | —                                                                                                                      | Blocked-receipt path re-proven; no fabricated login                                                                                                            | Owner session JSON, or the granted non-deploy branch push so `quicklog-smoke.yml`-class CI (repo secrets) can run it; any workflow-file change ships flagged for owner review |
-| **B1**  | Shared target precedence rules (pure) + first consumer (legacy dialog reads the shared contract; no behavior change) | `src/components/QuickLog.tsx` (resolution call only)                                                                                                                                                     | `src/lib/quickLogTargetResolutionRules.ts` + test                                                                      | Null/invalid/cross-user/stale/encoded-junk fail-closed matrix; precedence order pins; fence `not.toContain("readLastTarget(")` **kept green**                  | nothing (new module); QuickLog.tsx is unowned by A2–A5                                                                                                                        |
-| **B2**  | Idempotency parity + payload convergence (D-B2/-B3/-B4)                                                              | `src/hooks/useQuickLogActivitySave.ts`, `src/components/QuickLogAllActivitiesSection.tsx`, `src/components/PlantQuickLog.tsx`, `src/components/QuickLogV2Sheet.tsx` (key policy adoption)                | `src/lib/quickLogSaveKeyPolicy.ts` + test                                                                              | Retry-reuses-key / edit-rotates-key matrix per surface; duplicate-save regression (lost-response retry = 1 row); reason codes un-collapsed; media-insert fence | **A5 merged** (same files); #1034's deferral note honored                                                                                                                     |
-| **B3**  | Recovery state + continuation parity (D-B5/-B7)                                                                      | `src/components/PlantQuickLog.tsx` (focus wiring), `QuickLogAllActivitiesSection.tsx` (toast/CTA), `Dashboard.tsx:1543`, `GrowDetail.tsx:306`, `PlantDetailRecentActivityRecap.tsx:281`, dispatch shapes | `src/lib/quickLogRecoveryRules.ts` + test                                                                              | Recovery classification (clock injected); copy pins (§11); exactly-one continuation action; typed event detail                                                 | **A5 merged** (dispatch + refresh adjacency)                                                                                                                                  |
-| **B4**  | Back-half context carry + `/doctor` loop card (D-B6)                                                                 | `src/lib/oneTentLoopNavigationRules.ts` (sensor-snapshot branch), `src/pages/AiDoctorStart.tsx`                                                                                                          | `src/lib/doctorStartContextRules.ts` + test                                                                            | Carry matrix incl. whitespace/invalid → bare `/doctor`; fail-closed page validation; **no paid-call regression pin**; card mount                               | **A2 merged** (same rules file) + **owner decision D4**                                                                                                                       |
-| **B5**  | Alert→Action Queue journey proof at journey level (counts S10–S13) incl. observed fail-closed PGRST202 boundary      | none (test-only)                                                                                                                                                                                         | `e2e/one-tent-alert-action-journey.spec.ts` (mocked)                                                                   | One click = one suggestion; approval/completion explicit; RPC-missing → calm boundary, zero fallback writes                                                    | **A3 merged** (labels it asserts)                                                                                                                                             |
-| **B6**  | Focused a11y + keyboard/mobile measurement closure; any B1-proven extraction                                         | touched surfaces only                                                                                                                                                                                    | —                                                                                                                      | S15–S17 measured via B0a harness; focus-restoration and ARIA journey assertions                                                                                | B1–B3 merged                                                                                                                                                                  |
+| PR      | Objective                                                                                                                                                                              | Owned files (edit)                                                                                                                                                                                                                                  | New files                                                                                                              | Key tests (RED first)                                                                                                                                                                                                                                | Waits for                                                                                                                                                                     |
+| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **B0a** | Mocked interaction-counter harness + runtime baselines for S1–S13 (S9 included — it is B4's before/after journey; RPC scenarios stubbed), keyboard variants                            | none (test-only)                                                                                                                                                                                                                                    | `e2e/helpers/interactionCounter.ts`, `e2e/one-tent-efficiency-baseline.spec.ts` (chromium-mocked, self-stubbed routes) | Counter unit tests; per-scenario specs asserting the baseline's exact counts (RED if product drifts)                                                                                                                                                 | nothing — first PR                                                                                                                                                            |
+| **B0b** | Authenticated live measurement variant, honest-receipt gated exactly like the golden path                                                                                              | `e2e/one-tent-loop-golden-path-ui.spec.ts` (add counters only)                                                                                                                                                                                      | —                                                                                                                      | Blocked-receipt path re-proven; no fabricated login                                                                                                                                                                                                  | Owner session JSON, or the granted non-deploy branch push so `quicklog-smoke.yml`-class CI (repo secrets) can run it; any workflow-file change ships flagged for owner review |
+| **B1**  | Shared target precedence rules (pure) + first consumer (legacy dialog reads the shared contract; no behavior change)                                                                   | `src/components/QuickLog.tsx` (resolution call only)                                                                                                                                                                                                | `src/lib/quickLogTargetResolutionRules.ts` + test                                                                      | Null/invalid/cross-user/stale/encoded-junk fail-closed matrix; precedence order pins; fence `not.toContain("readLastTarget(")` **kept green**                                                                                                        | nothing (new module); QuickLog.tsx is unowned by A2–A5                                                                                                                        |
+| **B2**  | Idempotency parity + payload convergence (D-B2/-B3/-B4)                                                                                                                                | `src/hooks/useQuickLogActivitySave.ts`, `src/components/QuickLogAllActivitiesSection.tsx`, `src/components/PlantQuickLog.tsx`, `src/components/QuickLogV2Sheet.tsx` (key policy adoption)                                                           | `src/lib/quickLogSaveKeyPolicy.ts` + test                                                                              | Retry-reuses-key / edit-rotates-key matrix per surface; duplicate-save regression (lost-response retry = 1 row); reason codes un-collapsed; media-insert fence                                                                                       | **A5 merged** (same files); #1034's deferral note honored                                                                                                                     |
+| **D5**  | Visible "Continue with <plant>?" suggestion at unscoped legacy open (explicit selection, never silent) + user-namespaced `verdant.quickLog.lastTarget.v2.<userId>` write/read per D-B9 | `src/components/QuickLog.tsx` (chip + v2 write; v1 write retired), `src/components/LocalDataHealthPanel.tsx` (key inventory), fence renegotiation in `src/test/plant-detail-quicklog-handoff.test.ts` (ban silent defaulting, not the visible chip) | `src/lib/quickLogRecentTargetSuggestion.ts` + boundary-matrix test                                                     | D-B9 validity matrix (finite/future/14-day boundary/cross-user/archived); unscoped open shows chip, never preselects; tap = explicit selection; dismiss works; `quicklog-plant-default` + localStorage-allowlist guardrails renegotiated same-commit | **B1 merged** (consumes the precedence contract)                                                                                                                              |
+| **D7**  | Plant-scoped Better/Same/Worse chip row in the V2 sheet, reusing `RESPONSE_CHECK_STATUSES` + `applyResponseCheck` into the note; save contract unchanged (`quicklog_save_manual` note) | `src/components/QuickLogV2Sheet.tsx` (note-section chip row, plant-target-gated)                                                                                                                                                                    | —                                                                                                                      | Chips render only for plant targets; tap fills note → save enabled with zero typing; payload `p_action:"note"`; tent target shows no chips; V2 pin closure green                                                                                     | nothing (V2 sheet unowned by A2–A5; verify pin inventory in-slice)                                                                                                            |
+| **B3a** | Recovery parity on Dashboard + Grow Detail by extending the SHIPPED `noRecentLogRecoveryRules.ts` (D-B5, corrected) — no new rules module                                              | `src/pages/Dashboard.tsx:1543`, `src/pages/GrowDetail.tsx:306` (empty states consume `buildNoRecentLogRecovery` + CTA opens that surface's existing Quick Log entry)                                                                                | —                                                                                                                      | Prompt renders on no/stale activity with the shipped copy; CTA opens Quick Log (no write); recent activity → no prompt; existing `no-recent-log-recovery-rules` + recap suites untouched and green                                                   | nothing (pages unowned by A2–A5; hooks NOT edited)                                                                                                                            |
+| **B3b** | Continuation parity (D-B7): All-Activities toast + "View timeline" CTA; unify `verdant:entry-created` detail shapes on the typed helper                                                | `src/components/QuickLogAllActivitiesSection.tsx`, `src/components/PlantQuickLog.tsx` (dispatch shape), dispatch call sites                                                                                                                         | —                                                                                                                      | Exactly-one continuation action per surface; typed event detail; listener null-guards proven                                                                                                                                                         | **A5 merged** (same files; A5(d) must land first)                                                                                                                             |
+| **B4**  | Back-half context carry + `/doctor` loop card (D-B6)                                                                                                                                   | `src/lib/oneTentLoopNavigationRules.ts` (sensor-snapshot branch), `src/pages/AiDoctorStart.tsx`                                                                                                                                                     | `src/lib/doctorStartContextRules.ts` + test                                                                            | Carry matrix incl. whitespace/invalid → bare `/doctor`; fail-closed page validation; **no paid-call regression pin**; card mount                                                                                                                     | **A2 merged** (same rules file) + **owner decision D4**                                                                                                                       |
+| **B5**  | Alert→Action Queue journey proof at journey level (counts S10–S13) incl. observed fail-closed PGRST202 boundary                                                                        | none (test-only)                                                                                                                                                                                                                                    | `e2e/one-tent-alert-action-journey.spec.ts` (mocked)                                                                   | One click = one suggestion; approval/completion explicit; RPC-missing → calm boundary, zero fallback writes                                                                                                                                          | **A3 merged** (labels it asserts)                                                                                                                                             |
+| **B6**  | Focused a11y + keyboard/mobile measurement closure; any B1-proven extraction                                                                                                           | touched surfaces only                                                                                                                                                                                                                               | —                                                                                                                      | S15–S17 measured via B0a harness; focus-restoration and ARIA journey assertions                                                                                                                                                                      | B1–B3 merged                                                                                                                                                                  |
 
 **Collision boundaries (standing):** `oneTentLoopNavigationRules.ts` + its
 test family → A2 until merged. `ActionQueue/AlertDetail/ActionDetail` wiring →
@@ -209,16 +240,16 @@ proximity-window pins from Tranche A §1 apply verbatim to every B slice.
 Before-values are the baseline table's; budgets bind only after the harness
 (B0a) reproduces the before-values at runtime.
 
-| Scenario                             | Today                                   | Budget after B+                                                                                           | Via                                             |
-| ------------------------------------ | --------------------------------------- | --------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
-| S1 status-only, plant context        | 3 taps / 0 typing / 0 reselect          | **unchanged (3/0/0)** — protect with a counter regression; ~10 s manual headed target verified in Phase B | B0a pin                                         |
-| S4 tent context → plant status       | 4 + 1 nav, or 5+ with typing            | **≤4 / 0 typing / ≤1 explicit plant choice**                                                              | D7 (if approved) or plant-nav CTA               |
-| S5 global entry, known recent target | ≥5 incl. select churn                   | **≤4 / 0 typing / exactly 1 explicit choice** (visible suggestion, never silent)                          | D5 (if approved); else unchanged and documented |
-| S6 recovery                          | `MISSING`                               | **3 taps from the recovery prompt**, no guilt copy, no forced note/sensor/AI                              | B3                                              |
-| S7 save → timeline evidence          | 0–1, uneven feedback                    | **≤1 everywhere, uniform confirmation, exactly one row**                                                  | B2+B3                                           |
-| S8 timeline → trusted snapshot       | 1 (already met)                         | unchanged; stale honesty via A4                                                                           | pin only                                        |
-| S9 snapshot → doctor context-ready   | 2–3 transitions + full re-establishment | **1 CTA / 0 reselection when context provable; calm missing-context otherwise**                           | B4 (D4)                                         |
-| Duplicate-write risk                 | LOW–HIGH by surface                     | **LOW everywhere**                                                                                        | B2                                              |
+| Scenario                             | Today                                                                             | Budget after B+                                                                                                                        | Via                                             |
+| ------------------------------------ | --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| S1 status-only, plant context        | 3 taps / 0 typing / 0 reselect                                                    | **unchanged (3/0/0)** — protect with a counter regression; ~10 s manual headed target verified in Phase B                              | B0a pin                                         |
+| S4 tent context → plant status       | 4 + 1 nav, or 5+ with typing                                                      | **≤4 / 0 typing / ≤1 explicit plant choice**                                                                                           | D7 (if approved) or plant-nav CTA               |
+| S5 global entry, known recent target | ≥5 incl. select churn                                                             | **≤4 / 0 typing / exactly 1 explicit choice** (visible suggestion, never silent)                                                       | D5 (if approved); else unchanged and documented |
+| S6 recovery                          | SHIPPED on Plant Detail (3 taps, 72 h window); `MISSING` on Dashboard/Grow Detail | **same 3-tap prompt on all three surfaces via the shipped module**, no guilt copy, no forced note/sensor/AI                            | B3a                                             |
+| S7 save → timeline evidence          | 0–1, uneven feedback                                                              | **≤1 everywhere, uniform confirmation, exactly one row**                                                                               | B2+B3                                           |
+| S8 timeline → trusted snapshot       | 1 (already met)                                                                   | unchanged; stale honesty via A4                                                                                                        | pin only                                        |
+| S9 snapshot → doctor context-ready   | 2 interactions / 1 explicit plant choice / 2 transitions (corrected)              | **count unchanged; carried tent scope filters/annotates the plant list and is visible; explicit choice retained; no silent selection** | B4 (D4; grow/tent carry only)                   |
+| Duplicate-write risk                 | LOW–HIGH by surface                                                               | **LOW everywhere**                                                                                                                     | B2                                              |
 
 If runtime measurement contradicts a before-value, the baseline is corrected
 first and the budget re-derived — never the test bent to the budget.
@@ -253,7 +284,7 @@ project, and the §12-format report with exact counts.
 | **Already solved by Tranche A** (do not touch)                  | Mobile FAB plant scoping (A1, merged); grow threading of ai-doctor/alert steps + tent self-link fix (A2); names-not-UUIDs at decision moments (A3); sensors staleMs + Stale/Invalid honesty + °F chip + notes filter (A4); All-Activities refresh, Alerts URL filters, single dispatch (A5) |
 | **Solved by #1034** (merged; build on, don't redo)              | Save-error classification in the canonical hook; PlantQuickLog failure copy + recovery actions; `/diagnostics/quicklog`; helper ACL fences. Inherited deferral → B2: activity-save reason-code collapse                                                                                     |
 | **Blocked by the Action Queue production repair** (Codex-owned) | Live approval/completion journey verification; anything touching `action_queue_transition` server-side. B5 measures the client fail-closed boundary only and never bypasses it                                                                                                              |
-| **Genuinely new Tranche B+**                                    | B0 measurement harness; B1 target precedence contract; B2 idempotency/payload convergence; B3 recovery + continuation parity; B4 back-half context carry (D4); B5 journey proof; B6 a11y/keyboard closure                                                                                   |
+| **Genuinely new Tranche B+**                                    | B0 measurement harness; B1 target precedence contract; B2 idempotency/payload convergence; D5 continue-suggestion; D7 V2 status chips; B3a recovery parity (via the shipped module); B3b continuation parity; B4 back-half context carry (D4); B5 journey proof; B6 a11y/keyboard closure   |
 
 ---
 
@@ -275,12 +306,12 @@ project, and the §12-format report with exact counts.
 
 ## 11 · Copy proposed for ratification
 
-| Where                                                                     | String                                                                         |
-| ------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| Recovery prompt (B3; Dashboard/GrowDetail/PlantDetail recap empty states) | "No recent check-in. Add a 10-second status: Better, Same, or Worse."          |
-| Recovery affordance button                                                | "Add status"                                                                   |
-| D5 suggestion chip (only if D5 approved)                                  | "Continue with <plant name>?" · dismiss: "Choose another"                      |
-| B4 doctor context chip (only if D4 approved)                              | "Reviewing <plant name>" · missing-context: existing readiness copy, unchanged |
+| Where                                                                          | String                                                                                                         | Status                                                                                           |
+| ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Recovery prompt (B3a: Dashboard/GrowDetail; already live on PlantDetail recap) | "No recent check-in." + "Add a 10-second status: Better, Same, or Worse."                                      | **Already shipped verbatim** in `noRecentLogRecoveryRules.ts:33-38` — B3a reuses it, no new copy |
+| Recovery affordance button                                                     | "Add quick check"                                                                                              | **Already shipped** (same module) — supersedes the earlier draft's "Add status"                  |
+| D5 suggestion chip                                                             | "Continue with <plant name>?" · dismiss: "Choose another"                                                      | Ratified 2026-08-19 with this design                                                             |
+| B4 doctor tent-context line                                                    | Exact string proposed in the B4 PR (tent-scoped — a plant is not provable from the Sensors producer; see D-B6) | Pending — ratify at B4 review                                                                    |
 
 No other public copy changes in this tranche.
 

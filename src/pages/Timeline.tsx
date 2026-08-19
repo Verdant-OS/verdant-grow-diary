@@ -113,6 +113,7 @@ import {
 import { MEASUREMENT_DETAIL_KEYS } from "@/lib/timelineEntryClassification";
 import { presentTimelineDiaryEntryDetails } from "@/lib/timelineDiaryEntryDetailPresentationRules";
 import { classifyVpdAgainstStage } from "@/lib/vpdStageTargetRules";
+import { resolveTimelineSensorSnapshot } from "@/lib/timelineSensorSnapshotRules";
 import {
   mapGrowEventsToRecentRawEntries,
   type GrowEventRowForRecent,
@@ -2222,17 +2223,7 @@ export default function Timeline() {
                           const et = getEventType(effectiveCareType);
                           const Icon = et.icon;
                           const plantName = e.details?.plant_name as string | undefined;
-                          // QuickLog writes `sensor_snapshot`; older entries may still use `sensor`.
-                          const sensor = (e.details?.sensor_snapshot ?? e.details?.sensor) as
-                            | {
-                                ts?: string;
-                                temp?: number;
-                                rh?: number;
-                                vpd?: number;
-                                co2?: number;
-                                soil?: number;
-                              }
-                            | undefined;
+                          const sensor = resolveTimelineSensorSnapshot(e.details);
                           const remindAt = e.details?.remind_at as string | undefined;
                           const eventTypeValue = effectiveCareType;
                           // Learning-loop rows (follow-up / outcome / decision) carry join

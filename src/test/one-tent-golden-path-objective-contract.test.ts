@@ -16,6 +16,7 @@ const ROOT = resolve(__dirname, "../..");
 const SPEC = readFileSync(resolve(ROOT, "e2e/one-tent-loop-golden-path-ui.spec.ts"), "utf8");
 const RECEIPT = readFileSync(resolve(ROOT, "e2e/helpers/oneTentBrowserProofReceipt.ts"), "utf8");
 const SEED = readFileSync(resolve(ROOT, "scripts/e2e/seed-one-tent-golden-path.mjs"), "utf8");
+const TIMELINE = readFileSync(resolve(ROOT, "src/pages/Timeline.tsx"), "utf8");
 const RUNBOOK = readFileSync(resolve(ROOT, "docs/one-tent-loop-golden-path.md"), "utf8");
 
 describe("authenticated One-Tent proof covers the production objective", () => {
@@ -91,6 +92,11 @@ describe("authenticated One-Tent proof covers the production objective", () => {
     expect(SPEC).toMatch(/\.eq\("tent_id",\s*fixtureTentId\)/);
     expect(SPEC).toMatch(/\.eq\("id",\s*fixturePlantId\)/);
     expect(SPEC).toContain("await page.reload()");
+  });
+
+  it("wires persisted Plant Quick Log manual evidence into the Timeline snapshot presenter", () => {
+    expect(TIMELINE).toContain("resolveTimelineSensorSnapshot");
+    expect(TIMELINE).toMatch(/resolveTimelineSensorSnapshot\(e\.details\)/);
   });
 
   it("proves Quick Log inherited the exact plant, tent, and grow before save", () => {

@@ -56,6 +56,7 @@ import {
   type OneTentProofStagedResult,
   type StageOutcome,
 } from "./helpers/oneTentBrowserProofReceipt";
+import { DETERMINISTIC_AI_DOCTOR_RESPONSE } from "./helpers/oneTentAiDoctorResponse";
 
 const QUICK_LOG_NOTE = "Observed mild leaf-edge curl after a warm afternoon.";
 const QUICK_LOG_CONTEXT_DRAFT = "Context check only — close without saving.";
@@ -83,40 +84,6 @@ const ONE_PIXEL_PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Z2S8AAAAASUVORK5CYII=",
   "base64",
 );
-
-const DETERMINISTIC_AI_DOCTOR_RESPONSE = {
-  summary: "The available Manual environmental snapshot warrants a cautious re-check.",
-  likely_issue: "Possible short-lived environmental stress",
-  confidence: "low",
-  evidence: [
-    "Plant stage recorded as flower",
-    "Manual sensor snapshot included temperature and 48% RH",
-    "No fresh live sensor reading was available",
-  ],
-  missing_information: [
-    "Current live environmental reading",
-    "Detailed visual symptom description",
-    "Root-zone moisture observation",
-  ],
-  possible_causes: [
-    "Short-lived temperature or humidity variation",
-    "A plant response that cannot be distinguished without visual symptom context",
-  ],
-  immediate_action:
-    "Take a fresh live environmental reading and record the visible symptom before considering any change.",
-  what_not_to_do:
-    "Do not change nutrients, irrigation, lighting, or equipment from this single Manual snapshot.",
-  twenty_four_hour_follow_up:
-    "Compare a fresh live reading with another observation at the same point in the next photoperiod.",
-  three_day_recovery_plan:
-    "Collect comparable observations for three days; escalate only if the symptom persists and corroborating evidence appears.",
-  risk_level: "low",
-  action_queue_suggestion: {
-    title: "Re-check the tent environment",
-    rationale:
-      "Collect a fresh live reading and detailed plant observation before considering any adjustment.",
-  },
-};
 
 function newSupabaseTestClient(session: ManagedSessionReady["session"]): SupabaseClient {
   const url = process.env.VITE_SUPABASE_URL!;

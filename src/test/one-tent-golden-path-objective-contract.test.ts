@@ -15,6 +15,7 @@ import { describe, expect, it } from "vitest";
 const ROOT = resolve(__dirname, "../..");
 const SPEC = readFileSync(resolve(ROOT, "e2e/one-tent-loop-golden-path-ui.spec.ts"), "utf8");
 const RECEIPT = readFileSync(resolve(ROOT, "e2e/helpers/oneTentBrowserProofReceipt.ts"), "utf8");
+const AI_RESPONSE = readFileSync(resolve(ROOT, "e2e/helpers/oneTentAiDoctorResponse.ts"), "utf8");
 const SEED = readFileSync(resolve(ROOT, "scripts/e2e/seed-one-tent-golden-path.mjs"), "utf8");
 const TIMELINE = readFileSync(resolve(ROOT, "src/pages/Timeline.tsx"), "utf8");
 const RUNBOOK = readFileSync(resolve(ROOT, "docs/one-tent-loop-golden-path.md"), "utf8");
@@ -127,8 +128,8 @@ describe("authenticated One-Tent proof covers the production objective", () => {
     expect(SPEC).toContain("DETERMINISTIC_AI_DOCTOR_RESPONSE.evidence");
     expect(SPEC).toContain("DETERMINISTIC_AI_DOCTOR_RESPONSE.missing_information");
     expect(SPEC).toContain("DETERMINISTIC_AI_DOCTOR_RESPONSE.what_not_to_do");
-    expect(SPEC).toContain("twenty_four_hour_follow_up");
-    expect(SPEC).toContain("three_day_recovery_plan");
+    expect(AI_RESPONSE).toContain("twenty_four_hour_follow_up");
+    expect(AI_RESPONSE).toContain("three_day_recovery_plan");
     expect(SPEC).toMatch(
       /body:\s*JSON\.stringify\(\{\s*ok:\s*true,\s*result:\s*DETERMINISTIC_AI_DOCTOR_RESPONSE\s*\}\)/s,
     );
@@ -146,8 +147,8 @@ describe("authenticated One-Tent proof covers the production objective", () => {
     expect(SPEC).toContain('expect(annotation.trust).toBe("medium")');
     expect(SPEC).toContain("expect(annotation.includesValues).toBe(true)");
     expect(SPEC).toContain("expect(packet.missingLiveSensorReadings).toBe(true)");
-    expect(SPEC).toContain("Manual sensor snapshot included temperature and 48% RH");
-    expect(SPEC).toContain("No fresh live sensor reading was available");
+    expect(AI_RESPONSE).toContain("Manual sensor snapshot included temperature and 48% RH");
+    expect(AI_RESPONSE).toContain("No fresh device sensor reading was available");
     expect(SPEC).not.toContain("Grower observation: mild leaf-edge curl");
     expect(SPEC).not.toContain("Grow target: vpd_kpa_max");
   });

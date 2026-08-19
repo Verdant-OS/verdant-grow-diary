@@ -331,7 +331,8 @@ export default function AppShell({ children }: { children?: ReactNode }) {
             } else {
               setOpenScopedLog(false);
               setStructuredOpenIntent(null);
-              setPrefill(null);
+              const routePlantId = resolvePlantQuickLogRouteTarget(location.pathname);
+              setPrefill(routePlantId ? { plantId: routePlantId } : null);
               setOpenLog(true);
             }
           }}

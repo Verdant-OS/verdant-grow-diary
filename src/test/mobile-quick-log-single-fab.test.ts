@@ -31,6 +31,12 @@ describe("mobile Quick Log — single FAB", () => {
     expect(APP_SHELL).toMatch(/aria-label="Open Quick Log"/);
   });
 
+  it("passes a valid Plant Detail route id into legacy Quick Log prefill", () => {
+    expect(APP_SHELL).toMatch(
+      /setPrefill\(routePlantId \? \{ plantId: routePlantId \} : null\)/,
+    );
+  });
+
   it("AppShell mobile FAB is guarded by md:hidden", () => {
     expect(APP_SHELL).toMatch(/data-testid="mobile-quick-log-fab"[\s\S]{0,400}md:hidden/);
   });

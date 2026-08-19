@@ -25,30 +25,36 @@ export type StageOutcome = "pass" | "blocked" | "fail" | "not_run";
 /** Ordered stage keys — order is part of the receipt contract. */
 export const ONE_TENT_PROOF_STAGES = [
   "auth_restored",
+  "hierarchy_created_via_ui",
   "grow_resolved",
   "tent_resolved",
   "plant_resolved",
+  "quick_log_context_verified",
+  "plant_persisted_after_refresh",
+  "photo_and_manual_evidence_persisted",
   "quick_log_persisted",
   "timeline_visible",
   "manual_provenance_visible",
+  "sensor_snapshot_verified",
   "ai_doctor_boundary_verified",
   "alert_verified",
   "action_queue_suggestion_verified",
   "grower_decision_verified",
   "follow_up_marker_verified",
+  "paddle_sandbox_verified",
 ] as const;
 
 export type OneTentProofStage = (typeof ONE_TENT_PROOF_STAGES)[number];
 
 export interface OneTentBrowserProofReceipt {
-  schema_version: "1";
+  schema_version: "2";
   proof: "one-tent-loop-authenticated-ui";
   status: "pass" | "blocked" | "fail";
   blocker_reason: string | null;
   restore_strategy: "storage_session" | "storage_plus_cookies" | "cookies_only" | "none";
   seed_status: "not_started" | "blocked" | "completed" | "failed";
   stages: Record<OneTentProofStage, StageOutcome> & {
-    auto_diary_follow_up: "intentionally_unsupported" | "not_run";
+    auto_diary_follow_up: "pass" | "fail" | "not_run";
   };
   duplicate_fences: {
     quick_log_count: number | null;
@@ -147,7 +153,7 @@ export function buildOneTentBrowserProofReceipt(
   const safety = staged.safety ?? {};
 
   return {
-    schema_version: "1",
+    schema_version: "2",
     proof: "one-tent-loop-authenticated-ui",
     status,
     blocker_reason:
@@ -156,20 +162,32 @@ export function buildOneTentBrowserProofReceipt(
     seed_status: staged.seedStatus,
     stages: {
       auth_restored: rawStages.auth_restored,
+      hierarchy_created_via_ui: rawStages.hierarchy_created_via_ui,
       grow_resolved: rawStages.grow_resolved,
       tent_resolved: rawStages.tent_resolved,
       plant_resolved: rawStages.plant_resolved,
+      quick_log_context_verified: rawStages.quick_log_context_verified,
+      plant_persisted_after_refresh: rawStages.plant_persisted_after_refresh,
+      photo_and_manual_evidence_persisted: rawStages.photo_and_manual_evidence_persisted,
       quick_log_persisted: rawStages.quick_log_persisted,
       timeline_visible: rawStages.timeline_visible,
       manual_provenance_visible: rawStages.manual_provenance_visible,
+      sensor_snapshot_verified: rawStages.sensor_snapshot_verified,
       ai_doctor_boundary_verified: rawStages.ai_doctor_boundary_verified,
       alert_verified: rawStages.alert_verified,
       action_queue_suggestion_verified: rawStages.action_queue_suggestion_verified,
       grower_decision_verified: rawStages.grower_decision_verified,
       follow_up_marker_verified: rawStages.follow_up_marker_verified,
-      // Honest: the app has no auto-diary handoff; a passing proof
-      // records that explicitly instead of pretending coverage.
-      auto_diary_follow_up: status === "pass" ? "intentionally_unsupported" : "not_run",
+      paddle_sandbox_verified: rawStages.paddle_sandbox_verified,
+      // ActionDetail creates the marker only after the grower explicitly
+      // approves and then marks the advisory action complete. Preserve that
+      // stage's own evidence even if a later Paddle or safety gate fails.
+      auto_diary_follow_up:
+        rawStages.follow_up_marker_verified === "pass"
+          ? "pass"
+          : rawStages.follow_up_marker_verified === "fail"
+            ? "fail"
+            : "not_run",
     },
     duplicate_fences: {
       quick_log_count: fences.quick_log_count ?? null,

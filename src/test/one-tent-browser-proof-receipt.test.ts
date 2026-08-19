@@ -46,7 +46,7 @@ describe("blocked receipt", () => {
     expect(line.startsWith(ONE_TENT_BROWSER_PROOF_JSON_PREFIX)).toBe(true);
     expect(line).not.toContain("\n");
     const parsed = JSON.parse(line.slice(ONE_TENT_BROWSER_PROOF_JSON_PREFIX.length));
-    expect(parsed.schema_version).toBe("1");
+    expect(parsed.schema_version).toBe("2");
     expect(parsed.proof).toBe("one-tent-loop-authenticated-ui");
   });
 
@@ -84,8 +84,8 @@ describe("pass receipt", () => {
     expect(receipt.blocker_reason).toBeNull();
   });
 
-  it("auto_diary_follow_up is intentionally_unsupported (honest gap)", () => {
-    expect(receipt.stages.auto_diary_follow_up).toBe("intentionally_unsupported");
+  it("records the completion-created diary follow-up as proven", () => {
+    expect(receipt.stages.auto_diary_follow_up).toBe("pass");
   });
 
   it("safety booleans default false and fabricated_login_used is unrepresentable as true", () => {
@@ -118,6 +118,19 @@ describe("fail receipt", () => {
     expect(receipt.stages.follow_up_marker_verified).toBe("not_run");
     expect(receipt.stages.auto_diary_follow_up).toBe("not_run");
   });
+
+  it("records a failed completion-created diary handoff as fail", () => {
+    const followUpStages = allPassStages();
+    followUpStages.follow_up_marker_verified = "fail";
+    const r = buildOneTentBrowserProofReceipt({
+      restoreStrategy: "storage_session",
+      seedStatus: "completed",
+      blockerReason: "follow_up_marker_failed",
+      stages: followUpStages,
+    });
+    expect(r.status).toBe("fail");
+    expect(r.stages.auto_diary_follow_up).toBe("fail");
+  });
 });
 
 describe("safety violations force fail", () => {
@@ -130,7 +143,7 @@ describe("safety violations force fail", () => {
     });
     expect(r.status).toBe("fail");
     expect(r.safety.paid_ai_request_observed).toBe(true);
-    expect(r.stages.auto_diary_follow_up).toBe("not_run");
+    expect(r.stages.auto_diary_follow_up).toBe("pass");
   });
 
   it("safetyViolationReason (e.g. password auth observed) forces fail and lands in blocker_reason", () => {
@@ -171,5 +184,14 @@ describe("determinism + hygiene", () => {
   it("stage key order is the documented contract order", () => {
     const receipt = buildBlockedOneTentBrowserProofReceipt("x");
     expect(Object.keys(receipt.stages)).toEqual([...ONE_TENT_PROOF_STAGES, "auto_diary_follow_up"]);
+    expect(ONE_TENT_PROOF_STAGES.slice(0, 7)).toEqual([
+      "auth_restored",
+      "hierarchy_created_via_ui",
+      "grow_resolved",
+      "tent_resolved",
+      "plant_resolved",
+      "quick_log_context_verified",
+      "plant_persisted_after_refresh",
+    ]);
   });
 });

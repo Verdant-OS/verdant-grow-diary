@@ -11,6 +11,8 @@ in:
 - `src/test/fixtures/oneTentGoldenPathFixture.ts`
 - `src/test/one-tent-loop-golden-path.test.ts`
 - `src/test/one-tent-loop-safety-regression.test.ts`
+- `e2e/one-tent-loop-golden-path-ui.spec.ts`
+- `e2e/helpers/oneTentBrowserProofReceipt.ts`
 
 ## The loop
 
@@ -44,7 +46,7 @@ Grow (One-Tent Golden Run)
 
 **No real users, no service-role values, no signed URLs, no tokens.**
 
-## Which stages are proven at which layer
+## Which stages are proven by the pure stitched regression
 
 | #   | Stage                           | Layer                  | Notes                                               |
 | --- | ------------------------------- | ---------------------- | --------------------------------------------------- |
@@ -59,24 +61,30 @@ Grow (One-Tent Golden Run)
 | 9   | Approval transitions            | pure rule              | grower-only, cross-user attempt rejected            |
 | 10  | Follow-up linkage               | pure rule              | idempotent marker; rejected items get none          |
 
-The stitched integration lives entirely in pure helpers so it is
+The fast stitched integration lives entirely in pure helpers so it is
 deterministic and cheap to run. Deeper per-stage coverage (React
 Testing Library, Playwright, RLS harnesses) is already provided by the
 existing test files inventoried in the plan (see `.lovable/plan.md`).
+The authenticated browser proof below is the authoritative evidence for
+real UI creation, persistence, refresh, RPC, and route handoffs.
 
-## Honestly unsupported handoffs
+## Layer boundaries and honest limitations
 
-- **Auto-created diary event on action completion.** The current
-  application contract does not automatically write a diary event when
-  an Action Queue item transitions to `completed`. The golden path
-  therefore asserts only that a **follow-up marker** links back to the
-  originating action, and documents the absence of an auto-diary
-  handoff here rather than fabricating one in the fixture. If a real
-  auto-diary contract is added later, extend
-  `linkFollowUp` in the stitched test to assert the diary row and
-  update this section.
+- **Action-completion diary follow-up.** The pure stitched regression
+  models this as an in-memory follow-up marker. The current application
+  contract creates the durable `diary_entries` follow-up only after the
+  grower explicitly approves and then completes the Action Queue item.
+  The authenticated browser proof exercises those two dialogs and
+  verifies one refresh-stable `details.event_type = "action_followup"`
+  row linked to the originating action. A suggestion or approval by
+  itself is never reported as completing this handoff.
 - **Live network AI call.** The regression never calls a paid model.
-  A deterministic in-file stub matches the 12-field cautious contract.
+  The browser proof intercepts the existing AI Doctor Edge Function
+  boundary and returns a deterministic cautious response in the
+  current `{ ok: true, result }` envelope. It then verifies the real
+  plant review UI and durable review history. This proves application
+  wiring without spending credits or treating a stub as a real model
+  result.
   A future integration test may exercise a real edge function under a
   dedicated CI job — that is out of scope for this suite.
 
@@ -117,19 +125,29 @@ check that the _seams_ between them remain consistent.
 
 The loop is green only when **all** of the following hold in one run:
 
-- One grow, one tent, one plant resolved with strict ownership.
-- One Quick Log persisted, one timeline event visible, no duplicates
-  on remount or retry.
+- One grow, one tent, and one plant are created through the real UI;
+  the plant is immediately visible and remains visible after refresh.
+- Quick Log opens with the exact grow/tent/plant context and is enabled
+  without asking the grower to reconstruct the hierarchy.
+- One Quick Log with photo and Manual temperature/humidity evidence is
+  persisted on the exact plant; one Timeline event remains visible after
+  refresh with no duplicates on remount or retry.
 - One manual sensor snapshot with `source`, `captured_at`, `tent_id`,
   `plant_id`, `confidence`, and `raw_payload` preserved.
+- Timeline → Sensor Snapshot → AI Doctor route handoffs retain the
+  intended one-tent context, and Manual evidence is never labeled Live.
 - One cautious AI Doctor result with all 12 required fields, evidence
   citing the actual snapshot, and no aggressive prescription.
 - One alert derived from a real threshold breach.
 - One grower-created suggested Action Queue item, approval-required,
-  no executable payload.
+  with no executable payload and no invented plant attribution for a
+  tent-scoped alert.
 - One explicit grower decision (approve → complete) with an owner-only
   transition helper.
-- One traceable follow-up marker linked to the originating action.
+- One traceable, refresh-stable diary follow-up linked to the originating
+  action.
+- Paddle is visibly sandbox/test mode without opening checkout.
+- The complete browser path works at `390x844`.
 
 No duplicate writes. No fake-live data. No blind automation. No
 device control.
@@ -140,6 +158,8 @@ device control.
 
 - Contract suite: **PASS** (`src/test/one-tent-loop-golden-path.test.ts`, `src/test/one-tent-loop-safety-regression.test.ts`)
 - Authenticated UI proof: **READY TO RUN when managed session is injected**, otherwise **BLOCKED_BY_MANAGED_SESSION_INJECTOR**
+- A BLOCKED receipt is not a partial pass: no hierarchy, seed, paid AI,
+  billing, device-control, or application write is attempted.
 
 ### Required injected environment variables
 
@@ -150,8 +170,8 @@ Variable names only — never document values.
 - `LOVABLE_BROWSER_SUPABASE_STORAGE_KEY`
 - `LOVABLE_BROWSER_COOKIES_JSON` (optional, canonical)
 - `LOVABLE_BROWSER_SUPABASE_COOKIES_JSON` (optional, legacy fallback)
-- `LOVABLE_E2E_TARGET_PROJECT_REF` (required for teardown; optional
-  belt-and-suspenders for seed/preflight)
+- `LOVABLE_E2E_TARGET_PROJECT_REF` (required for every seed or teardown
+  write; preflight itself remains read-only)
 
 ### Machine-readable receipts
 
@@ -160,13 +180,14 @@ exactly **one** compact JSON line with a stable prefix:
 
 ```text
 ONE_TENT_PREFLIGHT_JSON={"schema_version":"1",...}
-ONE_TENT_BROWSER_PROOF_JSON={"schema_version":"1",...}
+ONE_TENT_BROWSER_PROOF_JSON={"schema_version":"2",...}
 ONE_TENT_TEARDOWN_JSON={"schema_version":"1",...}
 ```
 
 Receipt rules (all three):
 
-- One JSON object per line, `schema_version: "1"`.
+- One JSON object per line. Preflight and teardown currently use
+  `schema_version: "1"`; the expanded browser proof uses version `"2"`.
 - Deterministic: same inputs ⇒ byte-identical line. Stable key order,
   lexically sorted `missing[]`, no timestamps, no randomness, no
   worker IDs, no file paths, no stack traces.
@@ -251,12 +272,20 @@ bun run e2e:one-tent:teardown -- --dry-run
 bun run e2e:one-tent:teardown -- \
   --execute \
   --confirm-fixture-teardown
-bun run e2e:one-tent:seed        # idempotent, reconciles golden fixture rows
 bun run e2e:one-tent:ui          # authenticated Playwright walk
 ```
 
 The preflight performs no Supabase call and never prints tokens,
 cookies, session JSON, or authorization headers.
+
+The authenticated UI walk itself creates Grow → Tent → Plant through
+`/start-room`, verifies that the plant survives refresh, and only then
+invokes `seed-one-tent-golden-path.mjs --evidence-only` to add the
+deterministic grow targets and Manual sensor rows needed by the later
+stages. Do **not** run the normal seed before this proof: precreating the
+hierarchy would invalidate the plant-creation and Quick Log-context
+regression evidence. The standalone `e2e:one-tent:seed` command remains
+available for older fixture-oriented checks, not for this UI proof.
 
 ### Fixture teardown
 
@@ -289,6 +318,22 @@ before deleting parents and reports
 `sensor_rows_delete_blocked_by_rls`. Fixing that requires a future
 migration (out of scope for test tooling, which must not change RLS).
 
+The authenticated fixture is **not yet fully disposable** under the
+managed owner's current authority:
+
+- `sensor_readings` blocks the child-before-parent teardown as described
+  above;
+- `ai_doctor_sessions` grants the owner SELECT and INSERT, but not DELETE,
+  so the durable review-history row cannot be removed by this tool; and
+- the browser proof uploads an owner-scoped `diary-photos` object. Storage
+  policy permits the owner to delete it, but the current teardown does not
+  yet resolve and remove that exact object.
+
+Do not weaken RLS or use a browser service-role key to make cleanup look
+successful. A future cleanup contract must address all three resources
+with exact fixture scoping before this runbook may call the fixture fully
+disposable.
+
 Preserve failed-run fixtures until debugging is complete — the
 Playwright spec never auto-tears-down after a BLOCKED or FAILED proof.
 Optional cleanup after a fully **passing** proof only:
@@ -297,21 +342,27 @@ are printed, and a teardown failure is never hidden).
 
 ### Evidence receipt (per-stage, filled by the browser walk)
 
-| #   | Stage                                                                   | Outcome                                      |
-| --- | ----------------------------------------------------------------------- | -------------------------------------------- |
-| 1   | Auth restored                                                           | PASS / BLOCKED_BY_MANAGED_SESSION_INJECTOR   |
-| 2   | Grow resolved                                                           | PASS                                         |
-| 3   | Tent resolved                                                           | PASS                                         |
-| 4   | Plant resolved                                                          | PASS                                         |
-| 5   | Quick Log persisted                                                     | PASS                                         |
-| 6   | Timeline row visible (single, refresh-stable)                           | PASS                                         |
-| 7   | Manual sensor provenance visible (never Live)                           | PASS                                         |
-| 8   | AI Doctor network boundary verified (Edge Function stub, no paid model) | PASS                                         |
-| 9   | Alert verified (VPD > target, single)                                   | PASS                                         |
-| 10  | Action Queue suggestion verified (approval-required, no device command) | PASS                                         |
-| 11  | Grower decision verified (user-initiated approve/complete)              | PASS                                         |
-| 12  | Follow-up marker verified (survives refresh, single)                    | PASS                                         |
-| 13  | Auto-diary follow-up                                                    | **HONESTLY UNSUPPORTED** — marker-level only |
+| #   | Stage                                                            | Outcome                                    |
+| --- | ---------------------------------------------------------------- | ------------------------------------------ |
+| 1   | Auth restored                                                    | PASS / BLOCKED_BY_MANAGED_SESSION_INJECTOR |
+| 2   | Grow → Tent → Plant created through UI                           | PASS                                       |
+| 3   | Grow resolved for the managed owner                              | PASS                                       |
+| 4   | Tent resolved and bound to the grow                              | PASS                                       |
+| 5   | Plant resolved and bound to the tent                             | PASS                                       |
+| 6   | Quick Log exact grow/tent/plant context verified and enabled     | PASS                                       |
+| 7   | Plant immediately visible and refresh-stable                     | PASS                                       |
+| 8   | Photo and Manual evidence persisted on the plant                 | PASS                                       |
+| 9   | Quick Log RPC persisted exactly once                             | PASS                                       |
+| 10  | Timeline row visible once and refresh-stable                     | PASS                                       |
+| 11  | Manual provenance visible and never labeled Live                 | PASS                                       |
+| 12  | Sensor Snapshot row and route handoff verified                   | PASS                                       |
+| 13  | AI Doctor Edge boundary and cautious result UI verified          | PASS                                       |
+| 14  | Tent-scoped alert verified without invented plant attribution    | PASS                                       |
+| 15  | Explicit Action Queue suggestion verified; no device command     | PASS                                       |
+| 16  | Grower explicitly approves and completes                         | PASS                                       |
+| 17  | Completion-created diary follow-up survives refresh exactly once | PASS                                       |
+| 18  | Paddle remains visibly sandboxed without opening checkout        | PASS                                       |
+| —   | `auto_diary_follow_up` receipt annotation                        | Stage 17 PASS/FAIL; otherwise NOT_RUN      |
 
 ### Production-fix rule for this proof
 
@@ -331,7 +382,8 @@ Status matrix (browser-agnostic; verified via Vitest suites):
 - Action Detail follow-up card: PASS
 - Timeline outcome rendering: PASS (`actionFollowupTimelineLabel`)
 - Marker-level relationship: PASS (backward-compatible)
-- Automatic diary follow-up: INTENTIONALLY UNSUPPORTED
+- Completion-created diary follow-up: PASS in the authenticated browser
+  proof; the older pure stitched helper remains marker-level only
 - Optional photo attachment: DEFERRED (no safe existing selector)
 - Optional sensor association: DEFERRED (no safe existing selector)
 - Grower-entered follow-up: PASS
@@ -476,7 +528,6 @@ Slice 4e — Quick Log handoff for capturing a new follow-up photo.
 - No schema, RLS, migration, Edge, auth, storage-policy, AI, device,
   or Action Queue write-path changes in this slice.
 
-
 ## Action Response Memory V1 — Milestone 5 status
 
 Milestone 5 turns the completed Action Queue lifecycle into durable,
@@ -512,8 +563,8 @@ Contract notes for Milestone 5:
 
 - The canonical response row is the Slice 4c evidence row
   (`diary_entries.details.event_type = "action_followup"`) **with an
-  explicit grower-selected `details.outcome`** (`improved | unchanged |
-  declined | too_soon | unclear`). Auto reminder markers (same event type,
+  explicit grower-selected `details.outcome`**
+  (`improved | unchanged | declined | too_soon | unclear`). Auto reminder markers (same event type,
   no outcome) are legacy rows and never become canonical memories.
 - The authoritative relationship is `details.action_queue_id`, written by
   the evidence service from the RLS-reverified action row. Cross-surface

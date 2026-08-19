@@ -44,6 +44,12 @@ const ENV = {
   targetProjectRef: "LOVABLE_E2E_TARGET_PROJECT_REF",
 };
 
+// The authenticated browser proof creates Grow → Tent → Plant through the
+// product UI. In that mode this helper may enrich the already-proven hierarchy
+// with targets and a manual snapshot, but it must never backfill a missing
+// hierarchy and accidentally turn a broken UI handoff green.
+const EVIDENCE_ONLY_FLAG = "--evidence-only";
+
 // Golden fixture — SAFE to mirror. These names/values match
 // src/test/fixtures/oneTentGoldenPathFixture.ts. Any drift is caught by
 // the contract test suite; if you edit these, edit both.
@@ -90,6 +96,7 @@ function blocked(reason, extra = "") {
 }
 
 async function main() {
+  const evidenceOnly = process.argv.slice(2).includes(EVIDENCE_ONLY_FLAG);
   const pf = preflight();
   if (!pf.ok) blocked(pf.reason);
 
@@ -97,22 +104,20 @@ async function main() {
   const anonKey = process.env[ENV.supabaseAnon];
   if (!supabaseUrl || !anonKey) blocked("missing_supabase_config");
 
-  const targetRef = process.env[ENV.targetProjectRef];
-  if (targetRef) {
-    // Belt-and-suspenders: refuse to run if the current URL project ref
-    // does not match the explicitly declared target. Prevents accidental
-    // writes into an unexpected environment.
-    try {
-      const host = new URL(supabaseUrl).host;
-      if (!host.startsWith(`${targetRef}.`)) {
-        blocked(
-          "target_project_mismatch",
-          `Configured ${ENV.targetProjectRef} does not match ${ENV.supabaseUrl}.`,
-        );
-      }
-    } catch {
-      blocked("invalid_supabase_url");
+  const targetRef = (process.env[ENV.targetProjectRef] ?? "").trim();
+  if (!targetRef) blocked("missing_target_project_ref");
+  // Refuse every write unless the operator-declared target matches the
+  // configured Supabase project. An absent declaration is not a safe default.
+  try {
+    const host = new URL(supabaseUrl).host;
+    if (!host.startsWith(`${targetRef}.`)) {
+      blocked(
+        "target_project_mismatch",
+        `Configured ${ENV.targetProjectRef} does not match ${ENV.supabaseUrl}.`,
+      );
     }
+  } catch {
+    blocked("invalid_supabase_url");
   }
 
   // Authed client using the injected managed access token. RLS applies:
@@ -140,6 +145,8 @@ async function main() {
       .maybeSingle();
     if (data) {
       grow = data;
+    } else if (evidenceOnly) {
+      blocked("golden_grow_missing");
     } else {
       const ins = await supabase
         .from("grows")
@@ -164,12 +171,15 @@ async function main() {
   {
     const { data } = await supabase
       .from("tents")
-      .select("id,name")
+      .select("id,name,grow_id")
       .eq("user_id", userId)
       .eq("name", tentName)
       .maybeSingle();
     if (data) {
+      if (evidenceOnly && data.grow_id !== grow.id) blocked("golden_tent_binding_mismatch");
       tent = data;
+    } else if (evidenceOnly) {
+      blocked("golden_tent_missing");
     } else {
       const ins = await supabase
         .from("tents")
@@ -194,12 +204,17 @@ async function main() {
   {
     const { data } = await supabase
       .from("plants")
-      .select("id,name")
+      .select("id,name,grow_id,tent_id")
       .eq("user_id", userId)
       .eq("name", plantName)
       .maybeSingle();
     if (data) {
+      if (evidenceOnly && (data.grow_id !== grow.id || data.tent_id !== tent.id)) {
+        blocked("golden_plant_binding_mismatch");
+      }
       plant = data;
+    } else if (evidenceOnly) {
+      blocked("golden_plant_missing");
     } else {
       const ins = await supabase
         .from("plants")
@@ -221,12 +236,13 @@ async function main() {
 
   // ---------- Grow targets ----------
   {
-    const { data: existing } = await supabase
+    const { data: existing, error: lookupError } = await supabase
       .from("grow_targets")
       .select("id")
       .eq("user_id", userId)
       .eq("tent_id", tent.id)
       .maybeSingle();
+    if (lookupError) throw new Error("grow_target_lookup_failed");
     const payload = {
       tent_id: tent.id,
       grow_id: grow.id,
@@ -237,13 +253,12 @@ async function main() {
     };
     if (existing) {
       const upd = await supabase.from("grow_targets").update(payload).eq("id", existing.id);
-      if (upd.error) console.log(`Grow target: skipped (${upd.error.message})`);
-      else console.log("Grow target: resolved");
+      if (upd.error) throw new Error("grow_target_update_failed");
     } else {
       const ins = await supabase.from("grow_targets").insert(payload);
-      if (ins.error) console.log(`Grow target: skipped (${ins.error.message})`);
-      else console.log("Grow target: resolved");
+      if (ins.error) throw new Error("grow_target_insert_failed");
     }
+    console.log("Grow target: resolved");
   }
 
   // ---------- Manual sensor snapshot ----------

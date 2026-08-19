@@ -7,19 +7,64 @@
  */
 import { useMemo } from "react";
 import { ArrowRight, History, Sprout, Stethoscope } from "lucide-react";
-import { Link } from "@/lib/react-router-compat";
+import { Link, useSearchParams } from "@/lib/react-router-compat";
 
 import EmptyState from "@/components/EmptyState";
 import GrowDataLoadError, { GrowDataLoadingState } from "@/components/GrowDataLoadError";
+import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
 import PageHeader from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
-import { useGrowPlants } from "@/hooks/useGrowData";
+import { useGrowPlants, useGrowTents } from "@/hooks/useGrowData";
 import { buildAiDoctorEntryOptions } from "@/lib/aiDoctorEntryRules";
+import {
+  partitionDoctorEntryOptionsByTent,
+  resolveDoctorStartScope,
+} from "@/lib/doctorStartContextRules";
 import { plantsPath } from "@/lib/routes";
+import { useGrows } from "@/store/grows";
 
 export default function AiDoctorStart() {
   const plantsQuery = useGrowPlants();
   const options = useMemo(() => buildAiDoctorEntryOptions(plantsQuery.data), [plantsQuery.data]);
+
+  // Back-half context carry (D-B6). The Sensors loop card can only ever emit
+  // `{ growId, tentId }`, so that is all this page reads — and it validates
+  // both against rows the grower owns before rendering anything. An id in a
+  // URL is a request, not a grant.
+  const [searchParams] = useSearchParams();
+  const { grows } = useGrows();
+  const tentsQuery = useGrowTents();
+  const scope = useMemo(
+    () =>
+      resolveDoctorStartScope({
+        urlGrowId: searchParams.get("growId"),
+        urlTentId: searchParams.get("tentId"),
+        visibleGrows: grows,
+        visibleTents: tentsQuery.data,
+      }),
+    [searchParams, grows, tentsQuery.data],
+  );
+
+  // Carried tent scope reorders and labels the choices. It never removes one:
+  // the explicit plant choice below is doctrine, and a shorter list is a
+  // softer way of guessing.
+  const partitioned = useMemo(
+    () =>
+      partitionDoctorEntryOptionsByTent({
+        options,
+        plants: plantsQuery.data,
+        tentId: scope.tentId,
+      }),
+    [options, plantsQuery.data, scope.tentId],
+  );
+  const orderedOptions = useMemo(
+    () => [...partitioned.inScope, ...partitioned.others],
+    [partitioned],
+  );
+  const inScopeIds = useMemo(
+    () => new Set(partitioned.inScope.map((option) => option.id)),
+    [partitioned],
+  );
 
   return (
     <div className="mx-auto w-full max-w-4xl">
@@ -37,6 +82,13 @@ export default function AiDoctorStart() {
         }
       />
 
+      <OneTentLoopNextStepCard
+        current="ai-doctor"
+        ids={{ growId: scope.growId, tentId: scope.tentId }}
+        testId="ai-doctor-start-one-tent-loop-next-step-card"
+        className="mb-3"
+      />
+
       <section
         className="glass rounded-2xl p-4 sm:p-6"
         aria-labelledby="ai-doctor-start-plant-heading"
@@ -50,6 +102,25 @@ export default function AiDoctorStart() {
             Verdant will not guess which plant you mean. Opening a plant prepares its existing
             context; AI Doctor runs only after you press the review button there.
           </p>
+          {scope.tentName ? (
+            <p
+              className="mt-2 text-sm text-muted-foreground"
+              data-testid="ai-doctor-start-tent-context"
+            >
+              Carried from your sensor snapshot in{" "}
+              <span className="font-medium text-foreground">{scope.tentName}</span>. Plants in that
+              tent are listed first — you can still choose any plant.
+            </p>
+          ) : null}
+          {scope.hasInvalidScope ? (
+            <p
+              className="mt-2 text-sm text-muted-foreground"
+              data-testid="ai-doctor-start-invalid-scope"
+            >
+              That link carried a grow or tent Verdant couldn't match to your account, so no tent
+              context is applied. Every active plant is listed below.
+            </p>
+          ) : null}
         </div>
 
         {plantsQuery.isLoading ? (
@@ -77,7 +148,7 @@ export default function AiDoctorStart() {
           />
         ) : (
           <ul className="grid gap-3 sm:grid-cols-2" data-testid="ai-doctor-start-options">
-            {options.map((option, index) => (
+            {orderedOptions.map((option, index) => (
               <li key={option.id}>
                 <Link
                   to={option.href}
@@ -87,6 +158,14 @@ export default function AiDoctorStart() {
                 >
                   <span className="min-w-0">
                     <span className="block break-words font-semibold">{option.name}</span>
+                    {inScopeIds.has(option.id) ? (
+                      <span
+                        className="mt-1 inline-block rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary"
+                        data-testid={`ai-doctor-start-option-${index}-in-tent`}
+                      >
+                        In this tent
+                      </span>
+                    ) : null}
                     <span className="mt-1 block break-words text-xs text-muted-foreground">
                       {option.details ?? "Plant context available"}
                     </span>

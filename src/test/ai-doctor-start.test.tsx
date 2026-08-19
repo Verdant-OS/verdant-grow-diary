@@ -8,6 +8,10 @@ const state = vi.hoisted(() => ({
   isError: false,
   refetch: vi.fn(async () => undefined),
   invoke: vi.fn(),
+  // B4a: the page now validates any carried ?growId=/?tentId= against rows
+  // the grower owns, so the harness has to supply those rows.
+  tents: [] as Array<Record<string, unknown>>,
+  grows: [] as Array<Record<string, unknown>>,
 }));
 
 vi.mock("@/hooks/useGrowData", () => ({
@@ -17,6 +21,11 @@ vi.mock("@/hooks/useGrowData", () => ({
     isError: state.isError,
     refetch: state.refetch,
   }),
+  useGrowTents: () => ({ data: state.tents }),
+}));
+
+vi.mock("@/store/grows", () => ({
+  useGrows: () => ({ grows: state.grows }),
 }));
 
 vi.mock("@/integrations/supabase/client", () => ({
@@ -36,9 +45,9 @@ function LocationProbe() {
   );
 }
 
-function renderPage() {
+function renderPage(entry = "/doctor") {
   return render(
-    <MemoryRouter initialEntries={["/doctor"]}>
+    <MemoryRouter initialEntries={[entry]}>
       <LocationProbe />
       <Routes>
         <Route path="/doctor" element={<AiDoctorStart />} />
@@ -55,6 +64,8 @@ describe("AiDoctorStart", () => {
     state.isError = false;
     state.refetch.mockClear();
     state.invoke.mockClear();
+    state.tents = [];
+    state.grows = [];
   });
 
   afterEach(() => cleanup());
@@ -121,5 +132,63 @@ describe("AiDoctorStart", () => {
       screen.getByText(/runs only after you press the review button there/i),
     ).toBeInTheDocument();
     expect(state.invoke).not.toHaveBeenCalled();
+  });
+
+  // ---- Tranche B+ slice B4a — carried context (D-B6, D4) ----
+
+  const SCOPED = {
+    grows: [{ id: "grow-1", name: "Autumn Run" }],
+    tents: [{ id: "tent-a", name: "Tent A", grow_id: "grow-1" }],
+    plants: [
+      { id: "beta", name: "Beta", tentId: "tent-b" },
+      { id: "alpha", name: "Alpha", tentId: "tent-a" },
+    ],
+  };
+
+  it("mounts the loop card so the visual chain does not break at /doctor", () => {
+    renderPage();
+    expect(screen.getByTestId("ai-doctor-start-one-tent-loop-next-step-card")).toHaveAttribute(
+      "data-current-step",
+      "ai-doctor",
+    );
+  });
+
+  it("labels a carried tent and lists its plants first WITHOUT removing any choice", () => {
+    state.grows = SCOPED.grows;
+    state.tents = SCOPED.tents;
+    state.data = SCOPED.plants;
+    renderPage("/doctor?growId=grow-1&tentId=tent-a");
+
+    expect(screen.getByTestId("ai-doctor-start-tent-context")).toHaveTextContent("Tent A");
+    const options = screen.getAllByRole("link", { name: /with AI Doctor/i });
+    // Alpha (in tent-a) is promoted above Beta, but Beta is still choosable —
+    // the doctrine is an explicit choice, and a shortened list is a soft guess.
+    expect(options).toHaveLength(2);
+    expect(options[0]).toHaveAccessibleName("Review Alpha with AI Doctor");
+    expect(screen.getByTestId("ai-doctor-start-option-0-in-tent")).toBeInTheDocument();
+    expect(screen.queryByTestId("ai-doctor-start-option-1-in-tent")).toBeNull();
+  });
+
+  it("fails closed on a tent the grower does not own and says so calmly", () => {
+    state.grows = SCOPED.grows;
+    state.tents = SCOPED.tents;
+    state.data = SCOPED.plants;
+    renderPage("/doctor?growId=grow-1&tentId=tent-someone-else");
+
+    expect(screen.queryByTestId("ai-doctor-start-tent-context")).toBeNull();
+    expect(screen.getByTestId("ai-doctor-start-invalid-scope")).toBeInTheDocument();
+    // Every active plant is still offered.
+    expect(screen.getAllByRole("link", { name: /with AI Doctor/i })).toHaveLength(2);
+  });
+
+  it("never triggers an AI call from carried context", () => {
+    state.grows = SCOPED.grows;
+    state.tents = SCOPED.tents;
+    state.data = SCOPED.plants;
+    renderPage("/doctor?growId=grow-1&tentId=tent-a");
+
+    expect(state.invoke).not.toHaveBeenCalled();
+    expect(screen.getByTestId("location")).toHaveTextContent("/doctor");
+    expect(screen.queryByTestId("plant-detail")).toBeNull();
   });
 });

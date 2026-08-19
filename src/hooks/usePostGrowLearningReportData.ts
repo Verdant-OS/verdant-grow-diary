@@ -37,6 +37,17 @@ export interface UsePostGrowLearningReportDataResult {
   ) => Promise<{ ok: true; actionId: string | null } | { ok: false; message: string }>;
 }
 
+export async function fetchPostGrowLearningDiaryRows(growId: string) {
+  return selectWithRetractionCompat((withRetractionFilter) => {
+    let q = supabase
+      .from("diary_entries")
+      .select("id,note,photo_url,entry_at,details")
+      .eq("grow_id", growId);
+    if (withRetractionFilter) q = q.is("retracted_at", null);
+    return q.order("entry_at", { ascending: false }).limit(250);
+  });
+}
+
 async function signPhotoUrls(rows: PostGrowDiaryLike[]): Promise<PostGrowDiaryLike[]> {
   const paths = rows
     .map((r) => r.photo_url)
@@ -93,14 +104,7 @@ export function usePostGrowLearningReportData(
           .select("harvested_at,yield_grams,medium,notes")
           .eq("grow_id", growId)
           .order("harvested_at", { ascending: false }),
-        selectWithRetractionCompat((withRetractionFilter) => {
-          let query = supabase
-            .from("diary_entries")
-            .select("id,note,photo_url,entry_at,details")
-            .eq("grow_id", growId);
-          if (withRetractionFilter) query = query.is("retracted_at", null);
-          return query.order("entry_at", { ascending: false }).limit(250);
-        }),
+        fetchPostGrowLearningDiaryRows(growId),
         tentIds.length > 0
           ? supabase
               .from("sensor_readings")

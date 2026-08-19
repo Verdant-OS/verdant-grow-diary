@@ -42,6 +42,25 @@ const EMPTY: DiaryRangeReportData = {
   sensorReadings: [],
 };
 
+export async function fetchDiaryRangeReportDiaryRows(
+  growId: string,
+  startIso: string,
+  endIso: string,
+) {
+  return selectWithRetractionCompat((withRetractionFilter) => {
+    let q = supabase
+      .from("diary_entries")
+      .select("id,note,photo_url,entry_at,details")
+      .eq("grow_id", growId);
+    if (withRetractionFilter) q = q.is("retracted_at", null);
+    return q
+      .gte("entry_at", startIso)
+      .lte("entry_at", endIso)
+      .order("entry_at", { ascending: true })
+      .limit(250);
+  });
+}
+
 async function signPhotoUrls(rows: DiaryRangeDiaryRow[]): Promise<DiaryRangeDiaryRow[]> {
   const paths = rows
     .map((r) => r.photo_url)
@@ -97,18 +116,7 @@ export function useDiaryRangeReportData(
       const tentIds = (tents ?? []).map((t) => t.id as string).filter(Boolean);
 
       const [diaryRes, eventsRes, harvestRes, sensorRes] = await Promise.all([
-        selectWithRetractionCompat((withRetractionFilter) => {
-          let query = supabase
-            .from("diary_entries")
-            .select("id,note,photo_url,entry_at,details")
-            .eq("grow_id", growId);
-          if (withRetractionFilter) query = query.is("retracted_at", null);
-          return query
-            .gte("entry_at", startIso)
-            .lte("entry_at", endIso)
-            .order("entry_at", { ascending: true })
-            .limit(250);
-        }),
+        fetchDiaryRangeReportDiaryRows(growId, startIso, endIso),
         supabase
           .from("grow_events")
           .select("id,event_type,occurred_at,note")

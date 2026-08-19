@@ -401,7 +401,13 @@ export function classifyQuicklogWrapperProbe(outcome: {
       return { status: "unexpected_write", reason: null };
     }
     const reason = typeof data.reason === "string" ? data.reason : null;
-    return { status: "reachable_validating", reason };
+    if (data.ok === false && reason === "invalid_target_type") {
+      return { status: "reachable_validating", reason };
+    }
+    // HTTP success alone is not a healthy contract. A malformed envelope or
+    // any other soft-failure reason could hide wrapper drift while painting
+    // the operator diagnostic green.
+    return { status: "unknown_error", reason };
   }
   const code = outcome.errorCode ?? "";
   const message = outcome.errorMessage ?? "";

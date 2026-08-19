@@ -309,6 +309,18 @@ describe("classifyQuicklogWrapperProbe", () => {
     ).toEqual({ status: "reachable_validating", reason: "invalid_target_type" });
   });
 
+  it("fails closed when an HTTP-success payload does not match the exact probe contract", () => {
+    for (const data of [
+      null,
+      {},
+      { ok: false },
+      { ok: false, reason: "save_failed" },
+      { ok: "false", reason: "invalid_target_type" },
+    ]) {
+      expect(classifyQuicklogWrapperProbe({ succeeded: true, data }).status).toBe("unknown_error");
+    }
+  });
+
   it("flags a successful save of the probe payload as an unexpected write", () => {
     expect(
       classifyQuicklogWrapperProbe({ succeeded: true, data: { ok: true, grow_event_id: EVENT_ID } })

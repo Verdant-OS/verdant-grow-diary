@@ -57,6 +57,13 @@ import {
   type StageOutcome,
 } from "./helpers/oneTentBrowserProofReceipt";
 import { DETERMINISTIC_AI_DOCTOR_RESPONSE } from "./helpers/oneTentAiDoctorResponse";
+import {
+  buildActionQueueTransitionDiagnostic,
+  deriveActionQueueTransitionBlockerReason,
+  isActionQueueTransitionResponse,
+  renderActionQueueTransitionDiagnostic,
+  type ActionQueueTransitionDiagnostic,
+} from "./helpers/oneTentActionQueueTransitionDiagnostic";
 
 const QUICK_LOG_NOTE = "Observed mild leaf-edge curl after a warm afternoon.";
 const QUICK_LOG_CONTEXT_DRAFT = "Context check only — close without saving.";
@@ -234,8 +241,10 @@ test.describe("One-Tent Loop — authenticated UI golden path", () => {
     let sawDeviceControl = false;
     let sawServiceRole = false;
     let aiDoctorRequestEnvelope: unknown = null;
+    const actionQueueTransitionDiagnostics: ActionQueueTransitionDiagnostic[] = [];
     let evidenceSeedStatus: OneTentProofStagedResult["seedStatus"] = "not_started";
     let proofReceiptStatus: "pass" | "blocked" | "fail" = "fail";
+    let proofBlockerReason: string | null = null;
 
     async function stage<T>(name: OneTentProofStage, fn: () => Promise<T>): Promise<T> {
       try {
@@ -280,6 +289,21 @@ test.describe("One-Tent Loop — authenticated UI golden path", () => {
           }
         }
       }
+    });
+
+    page.on("response", async (response) => {
+      const request = response.request();
+      if (!isActionQueueTransitionResponse(request.method(), response.url())) return;
+      let body: unknown = null;
+      try {
+        body = await response.json();
+      } catch {
+        // A missing or non-JSON body is classified as malformed below. Never
+        // log or retain raw response text, headers, URLs, or request payloads.
+      }
+      actionQueueTransitionDiagnostics.push(
+        buildActionQueueTransitionDiagnostic(response.status(), body),
+      );
     });
 
     try {
@@ -763,10 +787,39 @@ test.describe("One-Tent Loop — authenticated UI golden path", () => {
       // never executes equipment; completion records a manual/outside-Verdant
       // outcome and creates the idempotent diary follow-up marker.
       await stage("grower_decision_verified", async () => {
+        async function expectSuccessfulTransitionResponse(
+          previousDiagnosticCount: number,
+        ): Promise<void> {
+          proofBlockerReason = "action_queue_transition_not_observed";
+          await expect
+            .poll(() => actionQueueTransitionDiagnostics.length, {
+              message: "the exact Action Queue transition RPC response must be observed",
+            })
+            .toBe(previousDiagnosticCount + 1);
+          const diagnostic =
+            actionQueueTransitionDiagnostics[previousDiagnosticCount] ??
+            buildActionQueueTransitionDiagnostic(null, null);
+          proofBlockerReason = deriveActionQueueTransitionBlockerReason(diagnostic);
+          expect(
+            diagnostic,
+            `ACTION_QUEUE_TRANSITION_DIAGNOSTIC=${renderActionQueueTransitionDiagnostic(diagnostic)}`,
+          ).toEqual({
+            observed: true,
+            http_status: 200,
+            body_kind: "success",
+            ok: true,
+            reason: null,
+            code: null,
+          });
+          proofBlockerReason = "action_queue_transition_status_not_persisted";
+        }
+
+        const approvalDiagnosticCount = actionQueueTransitionDiagnostics.length;
         await page.getByTestId("action-detail-approve").click();
         const approveDialog = page.getByRole("dialog", { name: "Approve Action" });
         await expect(approveDialog).toContainText("No equipment command is sent");
         await approveDialog.getByRole("button", { name: "Approve", exact: true }).click();
+        await expectSuccessfulTransitionResponse(approvalDiagnosticCount);
         await expect
           .poll(async () => {
             const { data } = await authedDb
@@ -777,11 +830,14 @@ test.describe("One-Tent Loop — authenticated UI golden path", () => {
             return data?.status ?? null;
           })
           .toBe("approved");
+        proofBlockerReason = null;
 
+        const completionDiagnosticCount = actionQueueTransitionDiagnostics.length;
         await page.getByTestId("action-detail-complete").click();
         const completeDialog = page.getByRole("dialog", { name: "Mark Action Complete" });
         await expect(completeDialog).toContainText("No equipment command is sent");
         await completeDialog.getByRole("button", { name: "Mark Complete", exact: true }).click();
+        await expectSuccessfulTransitionResponse(completionDiagnosticCount);
         await expect
           .poll(async () => {
             const { data } = await authedDb
@@ -792,6 +848,7 @@ test.describe("One-Tent Loop — authenticated UI golden path", () => {
             return data?.status ?? null;
           })
           .toBe("completed");
+        proofBlockerReason = null;
 
         const { data: completed, error: completedError } = await authedDb
           .from("action_queue")
@@ -888,7 +945,7 @@ test.describe("One-Tent Loop — authenticated UI golden path", () => {
         // Log, or UI assertion failure must not rewrite a completed seed as
         // "not_started" in the evidence receipt.
         seedStatus: evidenceSeedStatus,
-        blockerReason: null,
+        blockerReason: proofBlockerReason,
         safetyViolationReason,
         stages: stageOutcomes,
         duplicateFences: fences,

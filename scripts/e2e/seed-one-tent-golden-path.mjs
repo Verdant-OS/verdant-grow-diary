@@ -251,16 +251,17 @@ async function main() {
       .from("grow_targets")
       .select("id")
       .eq("user_id", userId)
-      .eq("tent_id", tent.id)
+      .eq("grow_id", grow.id)
       .maybeSingle();
     if (lookupError) throw new Error("grow_target_lookup_failed");
     const payload = {
-      tent_id: tent.id,
       grow_id: grow.id,
-      vpd_kpa_max: FIXTURE.targetVpdKpaMax,
-      air_temp_f_max: FIXTURE.targetTempFMax,
-      humidity_pct_min: FIXTURE.targetHumidityPctMin,
-      humidity_pct_max: FIXTURE.targetHumidityPctMax,
+      // grow_targets stores canonical Celsius and uses the same column names
+      // consumed by GrowTargetsEditor/useGrowTargets.
+      temp_max: Math.round((FIXTURE.targetTempFMax - 32) * (5 / 9) * 100) / 100,
+      rh_min: FIXTURE.targetHumidityPctMin,
+      rh_max: FIXTURE.targetHumidityPctMax,
+      vpd_max: FIXTURE.targetVpdKpaMax,
     };
     if (existing) {
       const upd = await supabase.from("grow_targets").update(payload).eq("id", existing.id);

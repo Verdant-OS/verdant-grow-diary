@@ -67,10 +67,21 @@ describe("authenticated One-Tent proof covers the production objective", () => {
   });
 
   it("fails the evidence seed when the alert-driving grow target cannot be reconciled", () => {
+    const targetBlock = SEED.slice(
+      SEED.indexOf("// ---------- Grow targets ----------"),
+      SEED.indexOf("// ---------- Manual sensor snapshot ----------"),
+    );
     expect(SEED).toContain('throw new Error("grow_target_lookup_failed")');
     expect(SEED).toContain('throw new Error("grow_target_update_failed")');
     expect(SEED).toContain('throw new Error("grow_target_insert_failed")');
     expect(SEED).not.toContain("Grow target: skipped");
+    expect(targetBlock).toContain('.eq("grow_id", grow.id)');
+    expect(targetBlock).toContain("temp_max:");
+    expect(targetBlock).toContain("rh_min:");
+    expect(targetBlock).toContain("rh_max:");
+    expect(targetBlock).toContain("vpd_max:");
+    expect(targetBlock).not.toMatch(/\btent_id:|\.eq\("tent_id"/);
+    expect(targetBlock).not.toMatch(/vpd_kpa_max|air_temp_f_max|humidity_pct_(?:min|max)/);
   });
 
   it("proves exact hierarchy binding, immediate appearance, and refresh persistence", () => {

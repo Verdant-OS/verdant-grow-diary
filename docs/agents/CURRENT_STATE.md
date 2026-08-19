@@ -1,6 +1,13 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-18 UTC
+**Last updated:** 2026-08-19 UTC
+**Updated by:** Claude (2026-08-19: records Cheek's approval of One-Tent Loop
+**Tranche A** — five context-threading wiring PRs — and lands the implementation
+specification at `docs/specs/one-tent-loop-tranche-a-specification.md` for the
+Codex handoff. Docs-only; no code, schema, or slice-scope changes. See the
+"Current approved slices" section for the tranche record.)
+
+**Prior update:** 2026-08-18 UTC
 **Updated by:** Claude (2026-08-18, third same-day edit: re-applies the Lovable
 project Knowledge as Version 2026-08-18.1 at Cheek's instruction, sourced from
 this file at deploy tip `87ae05e` (#1026) after the archival slice merged.
@@ -454,6 +461,24 @@ PRs **#828**, **#817**, **#696** stay open and parked — do not start a
 competing Timeline / Alerts / Action Queue UI rewrite. Baseline and
 post-change receipts: `docs/one-tent-loop-operating-order-baseline.md`.
 Persist-path spec: `docs/specs/one-tent-loop-quicklog-single-write-path.md`.
+
+**Tranche A approved (Cheek, 2026-08-19, "approved by all"):** first
+implementation slice of the One-Tent Loop Efficiency Program, scoped as an
+extension of this operating-order slice (the parked-PR / no-competing-rewrite
+instruction above still stands). Scope: five independent wiring PRs — mobile
+FAB plant scoping on `/plants/:id`; grow-scope threading in
+`oneTentLoopNavigationRules.ts`'s back half plus the tent-step self-link fix;
+plant/tent names instead of raw UUIDs on Action Queue rows/drawer and
+Alert/Action detail; five trust fixes (incl. Sensors source-summary `staleMs`
+and honest Stale/Invalid labels); post-save freshness parity, Alerts URL
+filters, and a single `verdant:entry-created` dispatch. No schema, no new
+routes, no new Quick Log write paths. The approval also ratifies the spec's §8
+copy strings. Authoritative spec (verified at deploy tip `f3b3fc49e`,
+adversarially reviewed, zero blockers):
+`docs/specs/one-tent-loop-tranche-a-specification.md`. Implementer: **Codex**
+(PR-A1 first recommended; the five PRs are independent). The Sensors→Doctor
+context carry stays excluded pending owner decision D4. Owner gates on live
+verification are unchanged (managed e2e session; signup apply).
 
 **Named isolated spike (approved 2026-08-13, not SEO):**
 `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE`. Cheek approved a spec-first,

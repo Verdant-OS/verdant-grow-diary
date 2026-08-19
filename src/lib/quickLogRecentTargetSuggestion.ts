@@ -1,0 +1,119 @@
+/**
+ * Remembered Quick Log target — suggestion rules (Tranche B+ slice D5, D-B9).
+ *
+ * A stored recent target may only ever return to the grower as a VISIBLE,
+ * explicitly chosen suggestion. It is never a silent default and never a
+ * fallback when resolution fails: every failing condition yields no
+ * suggestion at all, so an unscoped Quick Log stays a manual selection.
+ *
+ * Four independent conditions must hold, evaluated with an injectable clock:
+ *   1. the stored timestamp parses to a finite instant;
+ *   2. it is not in the future (a skewed clock is not evidence);
+ *   3. it is at most 14 days old (strictly older → expired);
+ *   4. the plant still appears among the grower's own visible rows.
+ *
+ * The storage key is namespaced per account, so one browser shared between
+ * accounts can never surface another grower's plant. Grow and tent scope are
+ * re-derived from the live row rather than trusted from storage.
+ *
+ * Pure: no storage access, no clock, no I/O.
+ */
+
+export const RECENT_TARGET_SUGGESTION_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
+
+const STORAGE_KEY_PREFIX = "verdant.quickLog.lastTarget.v2.";
+
+export interface RecentTargetRecord {
+  plantId: string;
+  growId: string | null;
+  tentId: string | null;
+  savedAt: string;
+}
+
+export interface RecentTargetVisiblePlant {
+  id: string;
+  name?: string | null;
+  grow_id?: string | null;
+  tent_id?: string | null;
+}
+
+export interface RecentTargetSuggestion {
+  plantId: string;
+  plantName: string;
+  growId: string | null;
+  tentId: string | null;
+}
+
+export interface ResolveRecentTargetSuggestionInput {
+  record: RecentTargetRecord | null;
+  now: number;
+  visiblePlants: readonly RecentTargetVisiblePlant[] | null | undefined;
+}
+
+function trimmed(value: unknown): string {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : "";
+}
+
+/**
+ * Per-account storage key. Returns null without a user: an anonymous session
+ * has no account to scope a remembered target to, so nothing is stored.
+ */
+export function buildRecentTargetStorageKey(userId: string | null | undefined): string | null {
+  const id = trimmed(userId);
+  return id ? `${STORAGE_KEY_PREFIX}${id}` : null;
+}
+
+/** Parse a stored payload defensively. Any malformed shape yields null. */
+export function parseRecentTargetRecord(raw: string | null | undefined): RecentTargetRecord | null {
+  if (typeof raw !== "string" || raw.trim().length === 0) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+  const candidate = parsed as Record<string, unknown>;
+  const plantId = trimmed(candidate.plantId);
+  const savedAt = trimmed(candidate.savedAt);
+  if (!plantId || !savedAt) return null;
+  return {
+    plantId,
+    growId: trimmed(candidate.growId) || null,
+    tentId: trimmed(candidate.tentId) || null,
+    savedAt,
+  };
+}
+
+/**
+ * Decide whether a stored target may be offered. Returns null — never an
+ * error, never a partial suggestion — whenever any condition fails.
+ */
+export function resolveRecentTargetSuggestion(
+  input: ResolveRecentTargetSuggestionInput,
+): RecentTargetSuggestion | null {
+  const { record, now, visiblePlants } = input;
+  if (!record) return null;
+  if (typeof now !== "number" || !Number.isFinite(now)) return null;
+
+  const savedAtMs = Date.parse(record.savedAt);
+  if (!Number.isFinite(savedAtMs)) return null;
+  if (savedAtMs > now) return null;
+  if (now - savedAtMs > RECENT_TARGET_SUGGESTION_MAX_AGE_MS) return null;
+
+  // Owner revalidation: the plant must still be visible to this grower.
+  // Archived, merged, deleted, and cross-account targets are all absent here.
+  const plant = (visiblePlants ?? []).find((row) => row && row.id === record.plantId);
+  if (!plant) return null;
+
+  const plantName = trimmed(plant.name);
+  if (!plantName) return null;
+
+  return {
+    plantId: plant.id,
+    plantName,
+    // Scope comes from the live row, never from storage.
+    growId: trimmed(plant.grow_id) || null,
+    tentId: trimmed(plant.tent_id) || null,
+  };
+}

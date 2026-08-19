@@ -106,6 +106,11 @@ import {
   resolveQuickLogWriteTarget,
   type QuickLogResolvedTarget,
 } from "@/lib/quickLogTargetIntegrityRules";
+import {
+  buildRecentTargetStorageKey,
+  parseRecentTargetRecord,
+  resolveRecentTargetSuggestion,
+} from "@/lib/quickLogRecentTargetSuggestion";
 import { buildSensorSnapshotSavePayload } from "@/lib/latestSensorSnapshotRules";
 import { quickLogReasonToOperatorMessage } from "@/lib/quickLogSaveErrorMessage";
 import { buildStaleSnapshotHelperCopy } from "@/lib/quickLogStaleSnapshotHelperCopy";
@@ -283,12 +288,36 @@ type InFlightSaveContext = Readonly<{
   stageWasUserTouched: boolean;
 }>;
 
-function rememberLastTarget(target: LastQuickLogTarget) {
+function rememberLastTarget(target: LastQuickLogTarget, userId?: string | null) {
   if (typeof window === "undefined") return;
+  const payload = JSON.stringify(target);
   try {
-    window.localStorage.setItem(LAST_TARGET_STORAGE_KEY, JSON.stringify(target));
+    window.localStorage.setItem(LAST_TARGET_STORAGE_KEY, payload);
   } catch {
     // Non-critical speed preference. Never block saving if storage is unavailable.
+  }
+  // Account-scoped copy (slice D5). The unscoped key above stays for existing
+  // readers; only this one may ever be offered back to a grower, and only as
+  // a visible suggestion they choose. A shared browser can never surface
+  // another account's plant because the key carries the user id.
+  const scopedKey = buildRecentTargetStorageKey(userId ?? null);
+  if (!scopedKey) return;
+  try {
+    window.localStorage.setItem(scopedKey, payload);
+  } catch {
+    // Same non-critical contract.
+  }
+}
+
+/** Read the account-scoped recent target. Never throws; never falls back. */
+function loadRecentTargetRecord(userId: string | null | undefined) {
+  if (typeof window === "undefined") return null;
+  const scopedKey = buildRecentTargetStorageKey(userId ?? null);
+  if (!scopedKey) return null;
+  try {
+    return parseRecentTargetRecord(window.localStorage.getItem(scopedKey));
+  } catch {
+    return null;
   }
 }
 
@@ -464,6 +493,27 @@ export default function QuickLog({
   const prefillHoldActive =
     prefillRequestKey !== null && dismissedBlockedPrefillKey !== prefillRequestKey;
   const editorPlantId = prefillHoldActive ? (prefillPlantId ?? "") : plantId;
+
+  // Slice D5 — remembered target as a VISIBLE suggestion, never a default.
+  // Offered only on a genuinely unscoped open (no prefill of any kind), only
+  // while the grower has not chosen a plant, and only after the stored record
+  // revalidates against their own visible plants inside its 14-day window.
+  const [recentSuggestionDismissed, setRecentSuggestionDismissed] = useState(false);
+  const recentTargetRecord = useMemo(
+    () => (open && !prefill ? loadRecentTargetRecord(user?.id ?? null) : null),
+    [open, prefill, user?.id],
+  );
+  const recentTargetSuggestion = useMemo(
+    () =>
+      resolveRecentTargetSuggestion({
+        record: recentTargetRecord,
+        now: Date.now(),
+        visiblePlants: plants,
+      }),
+    [recentTargetRecord, plants],
+  );
+  const showRecentTargetSuggestion =
+    !prefill && !recentSuggestionDismissed && !plantId && recentTargetSuggestion !== null;
 
   useEffect(() => {
     if (!open || saveLocked) return;
@@ -761,8 +811,7 @@ export default function QuickLog({
       resolvedHuntId: selectedPhenoHuntId,
       contextStatus: phenoEvidenceContext.status,
       contextHuntId: phenoEvidenceContext.context?.huntId ?? null,
-      configuredGoalIds:
-        phenoEvidenceContext.context?.coverage.goals.map((g) => g.id) ?? null,
+      configuredGoalIds: phenoEvidenceContext.context?.coverage.goals.map((g) => g.id) ?? null,
     });
     if (decision.action !== "seed") return;
     // Consume the handoff BEFORE seeding so any concurrent context refetch
@@ -1218,12 +1267,15 @@ export default function QuickLog({
           : `Saved ${savedVerb(saveEventType)} for ${plantLabel}`;
       toast.success(finalMessage);
 
-      rememberLastTarget({
-        plantId: saveTarget.plantId,
-        growId: saveTarget.growId,
-        tentId: saveTarget.tentId,
-        savedAt: new Date().toISOString(),
-      });
+      rememberLastTarget(
+        {
+          plantId: saveTarget.plantId,
+          growId: saveTarget.growId,
+          tentId: saveTarget.tentId,
+          savedAt: new Date().toISOString(),
+        },
+        user?.id ?? null,
+      );
       setSavedTarget({
         id: savePlant.id,
         name: plantLabel,
@@ -1804,6 +1856,47 @@ export default function QuickLog({
                 </p>
               )}
             </section>
+
+            {showRecentTargetSuggestion && recentTargetSuggestion && (
+              <div
+                data-testid="quick-log-recent-target-suggestion"
+                className="rounded-lg border border-border/60 bg-secondary/20 p-2.5 text-[12px] flex flex-wrap items-center gap-2"
+              >
+                <span className="text-muted-foreground">
+                  Continue with {recentTargetSuggestion.plantName}?
+                </span>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  data-testid="quick-log-recent-target-accept"
+                  onClick={() => {
+                    // Exactly the same explicit selection the Select performs.
+                    if (targetSelectionLocked || isMainDraftMutationLocked()) return;
+                    if (
+                      recentTargetSuggestion.growId &&
+                      recentTargetSuggestion.growId !== activeGrowId
+                    ) {
+                      setActiveGrowId(recentTargetSuggestion.growId);
+                    }
+                    setPlantId(recentTargetSuggestion.plantId);
+                    setSaveError(null);
+                    setRecentSuggestionDismissed(true);
+                  }}
+                >
+                  Continue
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  data-testid="quick-log-recent-target-dismiss"
+                  onClick={() => setRecentSuggestionDismissed(true)}
+                >
+                  Choose another
+                </Button>
+              </div>
+            )}
 
             {prefill?.plantId && selectedPlant && selectedPlant.id !== prefill.plantId && (
               <div

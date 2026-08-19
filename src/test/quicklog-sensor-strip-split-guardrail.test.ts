@@ -25,15 +25,22 @@ describe("QuickLog publish-slice split guardrail", () => {
     expect(QL).not.toMatch(/saveQuickLogSensorAttachPreference/);
   });
 
-  it("only uses localStorage for the narrow last-target memory key (no payloads/secrets/state)", () => {
+  it("only uses localStorage for the narrow last-target memory keys (no payloads/secrets/state)", () => {
     // QuickLog is allowed to remember the grower's last Quick Log target
-    // (plantId/growId/tentId/savedAt) on this device only, under the key
-    // `verdant.quickLog.lastTarget.v1`. Nothing else may live in localStorage:
-    // no raw sensor payloads, no sensor_readings, no secrets/tokens, no
+    // (plantId/growId/tentId/savedAt) on this device only. TWO keys carry
+    // exactly that shape (corrected with Tranche B+ slice D5, which added the
+    // second): the original `verdant.quickLog.lastTarget.v1`, and the
+    // account-scoped `verdant.quickLog.lastTarget.v2.<userId>` — the only one
+    // that may ever be read back, and then only as a visible suggestion the
+    // grower explicitly accepts. Nothing else may live in localStorage: no raw
+    // sensor payloads, no sensor_readings, no secrets/tokens, no
     // bridge/service-role keys, no device-control state, no Action Queue
     // state, no alerts, no AI output.
     const ALLOWED_KEY = "verdant.quickLog.lastTarget.v1";
     expect(QL).toMatch(/verdant\.quickLog\.lastTarget\.v1/);
+    // The v2 key is built in the pure suggestion module, so QuickLog carries
+    // its builder rather than the literal.
+    expect(QL).toMatch(/buildRecentTargetStorageKey/);
 
     // Strip any string literal mentioning the allowed key so the forbidden
     // scans below cannot be tricked by it.

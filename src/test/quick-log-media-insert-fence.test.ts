@@ -13,9 +13,9 @@
 // the use source-text matching is genuinely good at, and expressly permitted
 // for by AGENTS.md — not an attempt to verify effective configuration, so no
 // `@source-scan-justified` marker is required.
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { execFileSync } from "node:child_process";
 
 /** The only Quick Log modules allowed to write `diary_entries` directly. */
 const SANCTIONED = [
@@ -33,6 +33,19 @@ const RPC_ONLY_SURFACES = [
 ] as const;
 
 const INSERT_RE = /from\(\s*["']diary_entries["']\s*\)\s*\.insert\(/;
+
+/** Tolerates chained calls between `.from(...)` and `.insert(...)`. */
+const MULTILINE_INSERT_RE = /from\(\s*["']diary_entries["']\s*\)[\s\S]{0,120}?\.insert\(/;
+
+/** Recursively collect .ts/.tsx paths under `dir`, repo-relative. */
+function walkSourceFiles(dir: string, out: string[] = []): string[] {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) walkSourceFiles(full, out);
+    else if (/\.tsx?$/.test(entry.name)) out.push(full);
+  }
+  return out;
+}
 
 function read(path: string): string {
   return readFileSync(path, "utf8");
@@ -80,22 +93,15 @@ describe("D-B4 — media direct-insert divergence stays exactly two files", () =
   it("no THIRD quicklog module has appeared with a direct insert", () => {
     // Repo-wide sweep over quicklog-named modules. A new media/attachment
     // helper is exactly how a third write path would arrive.
-    const out = execFileSync(
-      "rg",
-      [
-        "-l",
-        "--multiline",
-        String.raw`from\(\s*["']diary_entries["']\s*\)[\s\S]{0,120}?\.insert\(`,
-        "src",
-      ],
-      { encoding: "utf8" },
-    );
-    const quickLogWriters = out
-      .split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean)
+    //
+    // Walked in pure Node rather than shelling out to ripgrep: `rg` is not
+    // installed on the GitHub runner, so a subprocess scan passes locally and
+    // dies with ENOENT in CI — a fence that depends on an optional binary is
+    // not a fence.
+    const quickLogWriters = walkSourceFiles("src")
       .filter((file) => /quicklog/i.test(file))
       .filter((file) => !file.startsWith("src/test/"))
+      .filter((file) => MULTILINE_INSERT_RE.test(readFileSync(file, "utf8")))
       .sort();
     expect(quickLogWriters).toEqual([...SANCTIONED].sort());
   });

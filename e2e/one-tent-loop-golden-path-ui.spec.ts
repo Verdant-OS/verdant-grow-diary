@@ -602,7 +602,7 @@ test.describe("One-Tent Loop — authenticated UI golden path", () => {
 
         await page.getByTestId("sensors-one-tent-loop-next-step-card-cta").click();
         await expect(page).toHaveURL(/\/doctor(?:\?|$)/);
-        await expect(page.getByTestId("ai-doctor-sessions-index-page")).toBeVisible();
+        await expect(page.getByTestId("ai-doctor-start")).toBeVisible();
       });
 
       // AI Doctor is initiated only by the grower on the real plant-scoped
@@ -685,7 +685,7 @@ test.describe("One-Tent Loop — authenticated UI golden path", () => {
           /definitive diagnosis|guaranteed cure|activate pump|turn on light/,
         );
 
-        await page.goto("/doctor");
+        await page.goto("/doctor/sessions");
         await expect(page.getByTestId("ai-doctor-sessions-index-page")).toBeVisible();
         await page.getByTestId("ai-doctor-one-tent-loop-next-step-card-cta").click();
         await expect(page).toHaveURL(/\/alerts(?:\?|$)/);

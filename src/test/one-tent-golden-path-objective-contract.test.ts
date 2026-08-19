@@ -161,6 +161,23 @@ describe("authenticated One-Tent proof covers the production objective", () => {
     expect(SPEC).toContain("golden-path-manual-snapshot");
   });
 
+  it("distinguishes the AI Doctor plant picker from saved review history", () => {
+    const sensorStage = SPEC.slice(
+      SPEC.indexOf('await stage("sensor_snapshot_verified"'),
+      SPEC.indexOf('await stage("ai_doctor_boundary_verified"'),
+    );
+    expect(sensorStage).toContain("toHaveURL(/\\/doctor(?:\\?|$)/)");
+    expect(sensorStage).toContain('getByTestId("ai-doctor-start")');
+    expect(sensorStage).not.toContain('getByTestId("ai-doctor-sessions-index-page")');
+
+    const aiDoctorStage = SPEC.slice(
+      SPEC.indexOf('await stage("ai_doctor_boundary_verified"'),
+      SPEC.indexOf('await stage("alert_verified"'),
+    );
+    expect(aiDoctorStage).toContain('page.goto("/doctor/sessions")');
+    expect(aiDoctorStage).toContain('getByTestId("ai-doctor-sessions-index-page")');
+  });
+
   it("keeps a tent-scoped alert and its queue draft honest instead of inventing plant scope", () => {
     expect(SPEC).toContain("tent-scoped alert must not invent plant attribution");
     expect(SPEC).toContain("tent-scoped action must preserve null plant attribution");

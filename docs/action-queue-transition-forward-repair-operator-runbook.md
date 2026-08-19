@@ -1,10 +1,10 @@
-# Quick Log manual delegate forward-repair operator runbook
+# Action Queue transition forward-repair operator runbook
 
 This runbook delivers exactly one reviewed production migration:
 
-- Version: `20260818010000`
-- File: `20260818010000_quicklog_manual_delegate_forward_repair.sql`
-- SHA-256: `641C033A6453B180505CFB4EEAD8C97EC0C89C7EC0A501A64D4D5B1B71897B1C`
+- Version: `20260819190852`
+- File: `20260819190852_action_queue_transition_forward_repair.sql`
+- SHA-256: `FB887C43BE86AFFC39E59C2113E1D627053A6058E2B8DE06A6571D9F34F66C49`
 - Production project: `knkwiiywfkbqznbxwqfh`
 - Deploy branch: `verdant-grow-diary`
 - Protected GitHub environment: `verdant-production-solo-founder`
@@ -17,18 +17,22 @@ catalog shape.
 
 Do not freeze write activity. No application-table lock and no write freeze is
 part of this procedure. The migration takes only its narrow advisory
-transaction lock while replacing the private function. The later ledger step
+transaction lock while converging the transition function, policies, grants,
+and decision-field guard. The later ledger step
 locks only `supabase_migrations.schema_migrations` for a short transaction.
 
-Do not run the historical `20260723000000` migration out of order. It replaces
-the public wrapper and can bypass the dual-timestamp contract. Do not edit the
-reviewed SQL, concatenate it with wrapper SQL, add `--single-transaction`, or
-use the generic migration runner. The reviewed file already owns `BEGIN` and
-`COMMIT` and must be passed byte-for-byte to `psql --file`.
+Do not manually run the historical `20260726093000` and `20260726094000`
+migrations out of order. The forward repair recognizes only the exact measured
+legacy or already-contracted catalog and converges either one to the reviewed
+server-enforced contract. Do not edit the reviewed SQL, concatenate it with
+additional SQL, add `--single-transaction`, or use the generic migration runner.
+The reviewed file already owns `BEGIN` and `COMMIT` and must be passed
+byte-for-byte to `psql --file`.
 
-This procedure does not delete application data, migration history, functions,
-or audit evidence. Never delete a ledger row to retry. It performs no device
-control and creates no hidden automation.
+This procedure performs no application-row DML, data backfill, device control,
+automatic approval, or hidden automation. It intentionally replaces exact RLS
+policies and revokes direct authenticated/anonymous UPDATE and DELETE
+privileges. Never delete a ledger row or audit event to retry.
 
 ## Required solo-founder environment controls
 
@@ -130,7 +134,7 @@ the empty command output and the APPLY terminal result in the change ticket.
 
 ## Dispatch 1: read-only PREFLIGHT
 
-Open **Actions → Apply Quick Log manual delegate forward repair → Run
+Open **Actions → Apply Action Queue transition forward repair → Run
 workflow** from `verdant-grow-diary` as a fresh dispatch. Do not use **Re-run
 jobs**; both PREFLIGHT and APPLY must be fresh `workflow_dispatch` runs at
 attempt `1`. Enter:
@@ -152,16 +156,17 @@ protection before any database process starts.
 Review both the job summary and sanitized evidence artifact. An APPLY receipt
 is uploaded only for one of these recoverable states:
 
-- `SAFE_TO_APPLY`: the defective delegate is exact and no target ledger
-  identity exists.
-- `schema_live_ledger_absent`: the canonical delegate is exact but the ledger
-  row is absent, normally because an earlier run committed the migration and
-  stopped before the separate ledger transaction.
+- `SAFE_TO_APPLY`: the exact accepted legacy or contracted input catalog is
+  present and no target ledger identity exists.
+- `schema_live_ledger_absent`: the canonical transition function, guard,
+  policies, grants, and direct-mutation fences are exact but the ledger row is
+  absent, normally because an earlier run committed the migration and stopped
+  before the separate ledger transaction.
 
 `already_applied_verified` is a read-only success but does not create an APPLY
 receipt because no write is needed. Every other status is a hard stop. Do not
-override a prerequisite, ACL, owner, helper-source, trigger, overload, or
-ledger collision failure.
+override a table, column, lineage, role, policy, privilege, ACL, owner,
+function-source, guard-trigger, overload, or ledger collision failure.
 
 ## Review gate
 
@@ -174,10 +179,10 @@ Before APPLY:
    In the artifacts response from
    `gh api repos/Verdant-OS/verdant-grow-diary/actions/runs/RUN_ID/artifacts?per_page=100`,
    require exactly one non-expired artifact named
-   `quicklog-manual-delegate-forward-repair-preflight-run-<RUN_ID>-attempt-1`,
+   `action-queue-transition-forward-repair-preflight-run-<RUN_ID>-attempt-1`,
    replacing `<RUN_ID>` with the numeric run ID, and record its lowercase
    `.digest` value without the `sha256:` prefix. Never use the similarly named
-   `quicklog-manual-delegate-forward-repair-evidence` artifact: it is sanitized
+   `action-queue-transition-forward-repair-evidence` artifact: it is sanitized
    operator evidence, not the immutable receipt authenticated by APPLY.
 3. Confirm the deploy branch still points to the same reviewed SHA.
 4. Record the PREFLIGHT run ID, its exact prior run attempt `1`, and the exact
@@ -187,7 +192,7 @@ Before APPLY:
    before creating the APPLY dispatch. APPLY must be created no more than
    24 hours after that completion time. Queue or environment-wait time does not
    satisfy the 15-minute minimum; the review window has a 24-hour maximum.
-6. Confirm the six-writer inventory is still idle, then create a fresh APPLY
+6. Confirm the seven-writer inventory is still idle, then create a fresh APPLY
    dispatch at attempt `1` and approve `verdant-production-solo-founder` as the
    founder.
 
@@ -207,7 +212,7 @@ Dispatch the same workflow from the same exact deploy SHA with:
 - `operation`: `APPLY`
 - `expected_head_sha`: the same reviewed SHA
 - `confirm_project_ref`: `knkwiiywfkbqznbxwqfh`
-- `confirm_apply`: `APPLY QUICKLOG MANUAL DELEGATE FORWARD REPAIR`
+- `confirm_apply`: `APPLY ACTION QUEUE TRANSITION FORWARD REPAIR`
 - `preflight_run_id`: the successful reviewed PREFLIGHT run ID
 - `expected_preflight_run_attempt`: the exact positive run attempt recorded at
   review, which must be `1`
@@ -222,7 +227,7 @@ The protected workflow and runner then perform this sequence:
    projected API resources.
 2. Authenticate the immutable prior PREFLIGHT run ID, attempt, artifact digest,
    founder identity, and inclusive 15-minute-to-24-hour review window.
-3. Prove the exact six-writer inventory idle.
+3. Prove the exact seven-writer inventory idle.
 4. Require the dedicated environment's production URL and CA, then re-resolve
    the live `verdant-grow-diary` head before database access.
 5. Revalidate the fixed nine-field authorization evidence before the runner
@@ -240,8 +245,8 @@ If the migration step fails, no ledger row is inserted. If the migration
 commits but a later step fails, run a new PREFLIGHT; the only accepted recovery
 state is `schema_live_ledger_absent`. If the ledger step commits but the final
 verification is interrupted, a new PREFLIGHT must return
-`already_applied_verified`. Before any recovery PREFLIGHT or APPLY, repeat the
-active-writer check and dedicated environment contract, then use a fresh
+`already_applied_verified`. Before any recovery PREFLIGHT or APPLY, repeat the active-writer check
+and dedicated environment contract, then use a fresh
 dispatch at attempt `1` with a fresh founder approval. Never rerun a protected
 job in place, and again allow no other migration dispatch until APPLY is
 terminal.
@@ -252,10 +257,10 @@ Retain the sanitized APPLY evidence artifact and exact GitHub run URLs. A PASS
 must show `applied_verified`, the pinned migration version and hash, the exact
 deploy SHA, and either recovery path `migration_then_ledger` or `ledger_only`.
 
-There is no destructive automatic rollback. The replaced private delegate is a
-forward repair, while the public wrapper identity, source, owner, ACL, and
-service-role posture are asserted unchanged. On an unexpected postflight,
-leave the schema and ledger untouched, preserve writes, collect protected
-catalog evidence, repeat the active-writer check before any new dispatch, and
-prepare a separately reviewed forward repair. Never delete the migration
-ledger row or replay an older wrapper migration.
+There is no destructive automatic rollback. The transition function and
+database-enforced approval/audit fences are a forward security repair. On an
+unexpected postflight, leave application rows and the ledger untouched,
+preserve writes, collect protected catalog evidence, repeat the active-writer
+check before any new dispatch, and prepare a separately reviewed forward
+repair. Never delete the migration ledger row, restore direct client mutation,
+or replay the older transition migrations out of order.

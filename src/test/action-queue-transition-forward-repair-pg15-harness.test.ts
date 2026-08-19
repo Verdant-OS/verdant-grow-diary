@@ -123,6 +123,11 @@ describe("Action Queue transition forward-repair PostgreSQL 15 runtime gate", ()
     expect(source).toContain("420914cd6ffbd2d552c30e8d7b6ddf73");
     expect(source).toContain("set local role authenticated");
     expect(source).toContain("set local role anon");
+    expect(source).toContain('"delivery_legacy_preflight", "apply"');
+    expect(source).toContain('"delivery_canonical_ledger_absent"');
+    expect(source).toContain('"schema_live_ledger_absent"');
+    expect(source).toContain('"delivery_verify_only", "verify_only"');
+    expect(source).toContain("buildLedgerInsertSql()");
     expect(source).not.toMatch(/supabase\.co|knkwiiywfkbqznbxwqfh/);
   });
 
@@ -137,7 +142,12 @@ describe("Action Queue transition forward-repair PostgreSQL 15 runtime gate", ()
     expect(paths).toEqual(
       expect.arrayContaining([
         "scripts/run-action-queue-transition-forward-repair-pg15-harness.mjs",
+        "scripts/lib/solo-founder-production-authorization.mjs",
+        "scripts/verify-solo-founder-production-authorization.mjs",
+        "scripts/apply-action-queue-transition-forward-repair.mjs",
+        "scripts/verify-action-queue-transition-forward-repair-preflight-artifact.mjs",
         ".github/workflows/action-queue-transition-forward-repair-pg15.yml",
+        ".github/workflows/apply-action-queue-transition-forward-repair.yml",
         "supabase/migrations/20260819190852_action_queue_transition_forward_repair.sql",
         "supabase/migrations/20260725093000_restore_action_queue_owner_decisions.sql",
         "supabase/migrations/20260726093000_action_queue_transition_rpc.sql",
@@ -145,6 +155,9 @@ describe("Action Queue transition forward-repair PostgreSQL 15 runtime gate", ()
         "supabase/migrations/20260728163100_production_breeding_workflow_reconciliation.sql",
         "src/test/action-queue-transition-forward-repair.test.ts",
         "src/test/action-queue-transition-forward-repair-pg15-harness.test.ts",
+        "src/test/solo-founder-production-authorization.test.ts",
+        "src/test/apply-action-queue-transition-forward-repair.test.ts",
+        "src/test/verify-action-queue-transition-forward-repair-preflight-artifact.test.ts",
       ]),
     );
 

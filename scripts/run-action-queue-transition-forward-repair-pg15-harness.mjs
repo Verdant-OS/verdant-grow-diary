@@ -5,6 +5,12 @@ import { createHash } from "node:crypto";
 import { readFileSync, readdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  buildLedgerInsertSql,
+  CATALOG_STATE_QUERY_SQL,
+  classifyPreflight,
+  parsePreflightStdout,
+} from "./apply-action-queue-transition-forward-repair.mjs";
 
 const MAX_PSQL_OUTPUT_BYTES = 1_048_576;
 const DISPOSABLE_DATABASE = "verdant_action_queue_transition_repair";
@@ -186,10 +192,18 @@ export function validatePinnedMigrationFile({
 }
 
 const BASE_SCAFFOLD_SQL = `
+drop schema if exists supabase_migrations cascade;
 drop schema if exists public cascade;
 drop schema if exists auth cascade;
 create schema auth authorization postgres;
 create schema public authorization postgres;
+create schema supabase_migrations authorization postgres;
+create table supabase_migrations.schema_migrations (
+  version text primary key,
+  name text,
+  statements text[]
+);
+alter table supabase_migrations.schema_migrations owner to postgres;
 
 do $roles$
 begin
@@ -523,6 +537,29 @@ function proveLegacyBaseline(env, spawnImpl = spawnSync) {
     env,
     spawnImpl,
   );
+}
+
+function requireDeliveryClassification(stage, expectedStatus, env, spawnImpl = spawnSync) {
+  const raw = executeSql(CATALOG_STATE_QUERY_SQL, env, { stage, spawnImpl });
+  const state = parsePreflightStdout(`${raw}\n`);
+  const classification = classifyPreflight(state);
+  if (classification.status !== expectedStatus) {
+    throw new Error(`${stage}:unexpected_${classification.status}`);
+  }
+  return state;
+}
+
+function proveProtectedDeliveryRecovery(env, spawnImpl = spawnSync) {
+  requireDeliveryClassification("delivery_legacy_preflight", "apply", env, spawnImpl);
+  proveRepairSuccess(env, spawnImpl);
+  requireDeliveryClassification(
+    "delivery_canonical_ledger_absent",
+    "schema_live_ledger_absent",
+    env,
+    spawnImpl,
+  );
+  executeSql(buildLedgerInsertSql(), env, { stage: "delivery_ledger_insert", spawnImpl });
+  requireDeliveryClassification("delivery_verify_only", "verify_only", env, spawnImpl);
 }
 
 function proveRepairSuccess(env, spawnImpl = spawnSync) {
@@ -1034,7 +1071,7 @@ export async function runPg15Harness({
     attestDisposableTarget(env, spawnImpl);
     resetScaffold(env, spawnImpl);
     proveLegacyBaseline(env, spawnImpl);
-    proveRepairSuccess(env, spawnImpl);
+    proveProtectedDeliveryRecovery(env, spawnImpl);
     proveHardenedGrantBaselineConverges(env, spawnImpl);
     proveOwnerTransitionAndRetry(env, spawnImpl);
     proveIllegalTransitionNoWrite(env, spawnImpl);

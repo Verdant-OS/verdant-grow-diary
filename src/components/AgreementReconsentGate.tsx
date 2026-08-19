@@ -168,7 +168,7 @@ export function AgreementReconsentGate() {
   return (
     <Dialog open={open}>
       <DialogContent
-        className="sm:max-w-lg"
+        className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-lg"
         onEscapeKeyDown={(e) => e.preventDefault()}
         onPointerDownOutside={(e) => e.preventDefault()}
         onInteractOutside={(e) => e.preventDefault()}

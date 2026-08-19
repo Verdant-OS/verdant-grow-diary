@@ -1481,6 +1481,7 @@ describe("manual workflow safety contract", () => {
     expect(workflow).toContain("ref: ${{ github.sha }}");
     expect(workflow).toContain("persist-credentials: false");
     expect(workflow).toContain("cancel-in-progress: false");
+    expect(workflow).toContain("queue: max");
     expect(workflow).toMatch(
       /name: Upload sanitized evidence[\s\S]*if-no-files-found: error[\s\S]*retention-days: 30/,
     );

@@ -1,3 +1,11 @@
+/**
+ * Production diary readers must degrade when diary_entries.retracted_at is
+ * missing (Postgres 42703 / migration 20260811090000 not applied).
+ *
+ * #1013 covers Free readers (Daily Grow Check, dashboard, activation,
+ * plant/tent activity). This branch also covers premium report fetchers
+ * that hit the same missing-column failure on the founder walk.
+ */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const MISSING_COLUMN = {
@@ -38,6 +46,8 @@ function builder() {
       if (column === "retracted_at") state.filtered = true;
       return chain;
     },
+    gte: () => chain,
+    lte: () => chain,
     order: () => chain,
     limit: () => chain,
     then: (resolve: (value: QueryResult) => unknown) => {
@@ -68,6 +78,13 @@ import { fetchConnectedActivationDiaryRows } from "@/hooks/useOneTentActivationE
 import { fetchPlantLogDays } from "@/hooks/usePlantLogDays";
 import { fetchPlantRecentActivityRows } from "@/hooks/usePlantRecentActivity";
 import { fetchTentPlantRosterActivityRows } from "@/hooks/useTentPlantRosterActivity";
+import { fetchDiaryRangeReportDiaryRows } from "@/hooks/useDiaryRangeReportData";
+import { fetchPostGrowLearningDiaryRows } from "@/hooks/usePostGrowLearningReportData";
+import {
+  fetchReportsHubActivityDiaryRows,
+  fetchReportsHubDiaryLast7d,
+  fetchReportsHubDiaryTotal,
+} from "@/hooks/useReportsHubData";
 
 beforeEach(() => {
   harness.results = [];
@@ -162,5 +179,64 @@ describe("core Free diary readers retraction compatibility", () => {
 
     await expect(fetchPlantLogDays("plant-1")).resolves.toEqual(["2026-08-15T00:00:00.000Z"]);
     expect(harness.calls.map((call) => call.filtered)).toEqual([true, false]);
+  });
+});
+
+describe("premium report diary readers retraction compatibility", () => {
+  it("retries date-range diary report rows without retracted_at", async () => {
+    harness.results = [
+      { data: null, error: MISSING_COLUMN },
+      { data: [{ id: "range-1", grow_id: "g1" }], error: null },
+    ];
+    const result = await fetchDiaryRangeReportDiaryRows(
+      "g1",
+      "2026-08-10T00:00:00.000Z",
+      "2026-08-16T23:59:59.999Z",
+    );
+    expect(result.error).toBeNull();
+    expect(result.data).toEqual([{ id: "range-1", grow_id: "g1" }]);
+    expect(harness.calls.map((c) => c.filtered)).toEqual([true, false]);
+    expect(harness.calls[0]?.growId).toBe("g1");
+  });
+
+  it("retries post-grow learning diary rows without retracted_at", async () => {
+    harness.results = [
+      { data: null, error: MISSING_COLUMN },
+      { data: [{ id: "pg-1", grow_id: "g1" }], error: null },
+    ];
+    const result = await fetchPostGrowLearningDiaryRows("g1");
+    expect(result.error).toBeNull();
+    expect(result.data).toEqual([{ id: "pg-1", grow_id: "g1" }]);
+    expect(harness.calls.map((c) => c.filtered)).toEqual([true, false]);
+  });
+
+  it("retries reports-hub diary counts and activity rows without retracted_at", async () => {
+    harness.results = [
+      { data: null, error: MISSING_COLUMN },
+      { data: [], error: null },
+      { data: null, error: MISSING_COLUMN },
+      { data: [], error: null },
+      { data: null, error: MISSING_COLUMN },
+      { data: [{ id: "hub-1", grow_id: "g1" }], error: null },
+    ];
+    const total = await fetchReportsHubDiaryTotal("g1");
+    const last7d = await fetchReportsHubDiaryLast7d("g1", "2026-08-09T00:00:00.000Z");
+    const activity = await fetchReportsHubActivityDiaryRows("g1");
+    expect(total.error).toBeNull();
+    expect(last7d.error).toBeNull();
+    expect(activity.error).toBeNull();
+    expect(activity.data).toEqual([{ id: "hub-1", grow_id: "g1" }]);
+    expect(harness.calls.map((c) => c.filtered)).toEqual([true, false, true, false, true, false]);
+  });
+
+  it("does not mask a non-column failure on the date-range report reader", async () => {
+    harness.results = [{ data: null, error: OTHER_ERROR }];
+    const result = await fetchDiaryRangeReportDiaryRows(
+      "g1",
+      "2026-08-10T00:00:00.000Z",
+      "2026-08-16T23:59:59.999Z",
+    );
+    expect(result.error).toMatchObject(OTHER_ERROR);
+    expect(harness.calls).toHaveLength(1);
   });
 });

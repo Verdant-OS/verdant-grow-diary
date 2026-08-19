@@ -19,6 +19,8 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { findUnsafeSqlReason } from "./apply-pinned-production-migrations.mjs";
 import { buildPsqlEnvironment, writeTextFile } from "./lib/candidateNumberToolRuntime.mjs";
+import { hardenProductionPsqlEnvironment } from "./lib/productionSupabaseTls.mjs";
+import { SOLO_FOUNDER_POLICY } from "./lib/solo-founder-production-authorization.mjs";
 import {
   assertSupabaseDatabaseTargetIdentity,
   SUPABASE_DATABASE_TARGETS,
@@ -148,6 +150,7 @@ export const EXIT = Object.freeze({
   DEPLOY_HEAD_ADVANCED: 12,
   RECEIPT_MISMATCH: 13,
   PREREQUISITE_DRIFT: 14,
+  TLS_TRUST_REJECTED: 15,
 });
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -175,6 +178,69 @@ function safePositiveIntegerText(value) {
   const text = String(value ?? "").trim();
   if (!/^[1-9]\d*$/.test(text) || !Number.isSafeInteger(Number(text))) return null;
   return text;
+}
+
+function validateSoloFounderRunnerAuthorization(env) {
+  if (
+    env.GITHUB_RUN_ATTEMPT !== "1" ||
+    env.SOLO_FOUNDER_ACKNOWLEDGEMENT !== SOLO_FOUNDER_POLICY.acknowledgement ||
+    env.SOLO_FOUNDER_DELIVERY_MODE !== SOLO_FOUNDER_POLICY.deliveryMode ||
+    env.SOLO_FOUNDER_VERIFIED_USER_ID !== String(SOLO_FOUNDER_POLICY.founderUserId) ||
+    env.SOLO_FOUNDER_VERIFIED_LOGIN !== SOLO_FOUNDER_POLICY.founderLogin ||
+    env.SOLO_FOUNDER_VERIFIED_ENVIRONMENT !== SOLO_FOUNDER_POLICY.environmentName ||
+    env.SOLO_FOUNDER_ACKNOWLEDGEMENT_VERIFIED !== "true" ||
+    env.SOLO_FOUNDER_ENVIRONMENT_CONTRACT_VERIFIED !== "true" ||
+    env.SOLO_FOUNDER_ENVIRONMENT_APPROVAL_VERIFIED !== "true" ||
+    env.SOLO_FOUNDER_MINIMUM_REVIEW_SECONDS !== String(SOLO_FOUNDER_POLICY.minimumReviewSeconds) ||
+    env.SOLO_FOUNDER_MAXIMUM_REVIEW_SECONDS !== String(SOLO_FOUNDER_POLICY.maximumReviewSeconds)
+  ) {
+    return null;
+  }
+  return Object.freeze({
+    delivery_mode: SOLO_FOUNDER_POLICY.deliveryMode,
+    founder_github_user_id: SOLO_FOUNDER_POLICY.founderUserId,
+    founder_github_login: SOLO_FOUNDER_POLICY.founderLogin,
+    production_environment: SOLO_FOUNDER_POLICY.environmentName,
+    solo_founder_acknowledgement_verified: true,
+    environment_contract_verified: true,
+    environment_approval_verified: true,
+    minimum_review_seconds: SOLO_FOUNDER_POLICY.minimumReviewSeconds,
+    maximum_review_seconds: SOLO_FOUNDER_POLICY.maximumReviewSeconds,
+  });
+}
+
+function writeSoloFounderAuthorizationFailure({ env, logger, now }) {
+  const reasonCode = "solo_founder_authorization_rejected";
+  writeTextFile(
+    env.REPORT_PATH ?? "",
+    [
+      "### Signup-acquisition forward-repair delivery",
+      "",
+      "**Status:** BLOCKED - solo-founder authorization rejected",
+      "",
+      `Reason code: ${reasonCode}`,
+      "No database process was started. No untrusted authorization value is included.",
+      "",
+    ].join("\n"),
+    logger,
+    "signup-acquisition repair report",
+  );
+  writeTextFile(
+    env.AUDIT_PATH ?? "",
+    `${JSON.stringify(
+      {
+        schema_version: 1,
+        tool: "apply-signup-acquisition-forward-repair",
+        checked_at: now().toISOString(),
+        outcome: "authorization_rejected",
+        reason_code: reasonCode,
+      },
+      null,
+      2,
+    )}\n`,
+    logger,
+    "signup-acquisition repair audit",
+  );
 }
 
 function prerequisiteColumnValuesSql() {
@@ -236,6 +302,7 @@ export function buildApplySql(migration) {
     "set transaction isolation level read committed;",
     "set local lock_timeout = '8s';",
     "set local statement_timeout = '120s';",
+    "set local search_path = pg_catalog, public, pg_temp;",
     "lock table supabase_migrations.schema_migrations in share row exclusive mode;",
     "lock table auth.users in share row exclusive mode;",
     "lock table public.profiles in share row exclusive mode;",
@@ -566,7 +633,7 @@ export const PREFLIGHT_SQL = `
 set transaction read only;
 set local lock_timeout = '8s';
 set local statement_timeout = '30s';
-set local search_path = public, pg_catalog;
+set local search_path = pg_catalog, public, pg_temp;
 with target_ledger as (
   select sm.version, sm.name, sm.statements
   from supabase_migrations.schema_migrations sm
@@ -1914,6 +1981,7 @@ const AUDIT_REASON_CODES = new Set([
   "input_rejected",
   "database_secret_missing",
   "target_identity_rejected",
+  "tls_trust_rejected",
   "file_validation_rejected",
   "psql_not_invocable",
   "query_failed",
@@ -1950,14 +2018,23 @@ export function sanitizeAuditExtras(extra = {}) {
   return safe;
 }
 
+export function buildReadOnlyPsqlArgs({ includeCommand = true } = {}) {
+  return [
+    "-X",
+    "-q",
+    "-A",
+    "-t",
+    "-v",
+    "ON_ERROR_STOP=1",
+    "--single-transaction",
+    ...(includeCommand ? ["-c", PREFLIGHT_SQL] : []),
+  ];
+}
+
 function runReadOnlyQuery({ childEnv, spawnImpl }) {
   let result;
   try {
-    result = spawnImpl(
-      "psql",
-      ["-X", "-A", "-t", "-v", "ON_ERROR_STOP=1", "--single-transaction", "-c", PREFLIGHT_SQL],
-      { encoding: "utf8", env: childEnv },
-    );
+    result = spawnImpl("psql", buildReadOnlyPsqlArgs(), { encoding: "utf8", env: childEnv });
   } catch {
     return { ok: false, kind: "not_invocable" };
   }
@@ -1982,7 +2059,14 @@ function runApplyFile({ path, childEnv, spawnImpl }) {
   return { ok: true };
 }
 
-function makeArtifactWriters({ reportPath, auditPath, preflightReceiptPath, now, logger }) {
+function makeArtifactWriters({
+  reportPath,
+  auditPath,
+  preflightReceiptPath,
+  authorization,
+  now,
+  logger,
+}) {
   const writeReport = (status, lines) => {
     writeTextFile(
       reportPath,
@@ -2021,6 +2105,7 @@ function makeArtifactWriters({ reportPath, auditPath, preflightReceiptPath, now,
           workflow_path: EXPECTED_WORKFLOW_PATH,
           run_id: base.runId,
           run_attempt: base.runAttempt,
+          ...authorization,
           ...sanitizeAuditExtras({ operation: base.operation, ...extra }),
         },
         null,
@@ -2053,6 +2138,7 @@ function makeArtifactWriters({ reportPath, auditPath, preflightReceiptPath, now,
           migration_name: PINNED_MIGRATION.name,
           migration_sha256: PINNED_MIGRATION.sha256,
           state_digest: stateDigest,
+          ...authorization,
         },
         null,
         2,
@@ -2071,6 +2157,12 @@ export function runSignupAcquisitionForwardRepair({
   logger = console,
   now = () => new Date(),
 } = {}) {
+  const authorization = validateSoloFounderRunnerAuthorization(env);
+  if (!authorization) {
+    logger.error("solo_founder_authorization_rejected");
+    writeSoloFounderAuthorizationFailure({ env, logger, now });
+    return EXIT.INPUT_REJECTED;
+  }
   const operation = String(env.OPERATION ?? "").trim();
   const expectedHeadSha = String(env.EXPECTED_HEAD_SHA ?? "").trim();
   const observedHeadSha = String(env.GITHUB_SHA ?? "").trim();
@@ -2097,6 +2189,7 @@ export function runSignupAcquisitionForwardRepair({
     reportPath: env.REPORT_PATH ?? "",
     auditPath: env.AUDIT_PATH ?? "",
     preflightReceiptPath: env.PREFLIGHT_RECEIPT_PATH ?? "",
+    authorization,
     now,
     logger,
   });
@@ -2151,7 +2244,7 @@ export function runSignupAcquisitionForwardRepair({
   if (!databaseUrl) {
     logger.error("The protected production database URL is not configured.");
     writeReport("BLOCKED - database secret missing", [
-      "The verdant-production environment did not provide SUPABASE_DB_URL.",
+      "The verdant-production-solo-founder environment did not provide SUPABASE_DB_URL.",
       "No database process was started.",
     ]);
     writeAudit("no_database_url", base, { reason_code: "database_secret_missing" });
@@ -2170,6 +2263,18 @@ export function runSignupAcquisitionForwardRepair({
     ]);
     writeAudit("target_rejected", base, { reason_code: "target_identity_rejected" });
     return EXIT.TARGET_REJECTED;
+  }
+
+  try {
+    childEnv = hardenProductionPsqlEnvironment({ sourceEnv: env, childEnv });
+  } catch {
+    logger.error("Production database TLS trust was rejected.");
+    writeReport("BLOCKED - production TLS trust rejected", [
+      "No database process was started.",
+      "Repair the protected production CA secret before running PREFLIGHT or APPLY.",
+    ]);
+    writeAudit("tls_trust_rejected", base, { reason_code: "tls_trust_rejected" });
+    return EXIT.TLS_TRUST_REJECTED;
   }
 
   let migration;

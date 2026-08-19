@@ -58,6 +58,11 @@ const manualDefinitionPattern = () =>
     `CREATE\\s+(?:OR\\s+REPLACE\\s+)?FUNCTION\\s+public\\.quicklog_save_manual\\s*\\(\\s*${MANUAL_NAMED_SIGNATURE}\\s*\\)\\s*RETURNS\\s+jsonb[\\s\\S]*?AS\\s+(\\$function\\$|\\$\\$)([\\s\\S]*?)\\1`,
     "i",
   );
+const manualDelegateDefinitionPattern = () =>
+  new RegExp(
+    `CREATE\\s+OR\\s+REPLACE\\s+FUNCTION\\s+public\\.(?:"quicklog_save_manual_pre_logged_at"|quicklog_save_manual_pre_logged_at)\\s*\\(\\s*${MANUAL_NAMED_SIGNATURE}\\s*\\)\\s*RETURNS\\s+jsonb[\\s\\S]*?AS\\s+(\\$function\\$|\\$\\$)([\\s\\S]*?)\\1`,
+    "i",
+  );
 const manualDelegateRenamePattern = () =>
   new RegExp(
     `ALTER\\s+FUNCTION\\s+public\\.quicklog_save_manual\\s*\\(\\s*${MANUAL_TYPE_SIGNATURE}\\s*\\)\\s+RENAME\\s+TO\\s+quicklog_save_manual_pre_logged_at`,
@@ -65,8 +70,9 @@ const manualDelegateRenamePattern = () =>
   );
 
 /**
- * Resolve the exact 12-argument implementation that the current public
- * timestamp wrapper renamed to quicklog_save_manual_pre_logged_at.
+ * Resolve the latest exact 12-argument internal implementation used by the
+ * current public timestamp wrapper. A post-wrapper forward repair takes
+ * precedence over the historical public implementation that was renamed.
  */
 function delegatedSaveManualContract(): {
   delegateBody: string;
@@ -89,6 +95,16 @@ function delegatedSaveManualContract(): {
   }
   if (wrapperIndex < 1) {
     return { delegateBody: "", wrapperSql: "" };
+  }
+
+  for (let index = migrations.length - 1; index > wrapperIndex; index -= 1) {
+    const match = migrations[index].sql.match(manualDelegateDefinitionPattern());
+    if (match?.[2]) {
+      return {
+        delegateBody: match[2],
+        wrapperSql: migrations[wrapperIndex].sql,
+      };
+    }
   }
 
   for (let index = wrapperIndex - 1; index >= 0; index -= 1) {

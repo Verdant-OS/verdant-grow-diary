@@ -5,9 +5,10 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { inflateRawSync } from "node:zlib";
 import { SOLO_FOUNDER_POLICY } from "./lib/solo-founder-production-authorization.mjs";
+import { downloadArtifactArchive as downloadBoundedArtifactArchive } from "./verify-quicklog-corrections-preflight-artifact.mjs";
 
-export const WORKFLOW_PATH = ".github/workflows/apply-signup-acquisition-forward-repair.yml";
-export const ARTIFACT_PREFIX = "signup-acquisition-forward-repair-preflight";
+export const WORKFLOW_PATH = ".github/workflows/apply-quicklog-manual-delegate-forward-repair.yml";
+export const ARTIFACT_PREFIX = "quicklog-manual-delegate-forward-repair-preflight";
 export const MAX_ARCHIVE_BYTES = 65_536;
 export const MAX_RECEIPT_BYTES = 32_768;
 
@@ -16,9 +17,9 @@ const ACCEPTED_RUN_WORKFLOW_PATHS = Object.freeze([
   `${WORKFLOW_PATH}@verdant-grow-diary`,
 ]);
 const PROJECT_REF = "knkwiiywfkbqznbxwqfh";
-const MIGRATION_VERSION = "20260813030000";
-const MIGRATION_NAME = "signup_acquisition_forward_repair";
-const MIGRATION_SHA256 = "6C002AB676218C32C27E41E7A8E90FF4F452C41D7EDB446B0FCB950B93D3DEBA";
+const MIGRATION_VERSION = "20260818010000";
+const MIGRATION_NAME = "quicklog_manual_delegate_forward_repair";
+const MIGRATION_SHA256 = "641C033A6453B180505CFB4EEAD8C97EC0C89C7EC0A501A64D4D5B1B71897B1C";
 const RECEIPT_MEMBER = "preflight-receipt.json";
 const RECEIPT_KEYS = Object.freeze([
   "branch",
@@ -37,6 +38,7 @@ const RECEIPT_KEYS = Object.freeze([
   "operation",
   "outcome",
   "project_ref",
+  "production_environment",
   "repository",
   "repository_id",
   "run_attempt",
@@ -47,7 +49,6 @@ const RECEIPT_KEYS = Object.freeze([
   "state_digest",
   "tool",
   "workflow_path",
-  "production_environment",
 ]);
 
 function reject() {
@@ -66,10 +67,6 @@ function positiveInteger(value) {
 
 function lowercaseSha(value) {
   return typeof value === "string" && /^[0-9a-f]{40}$/.test(value) ? value : null;
-}
-
-function acceptedRunWorkflowPath(value) {
-  return typeof value === "string" && ACCEPTED_RUN_WORKFLOW_PATHS.includes(value);
 }
 
 function lowercaseDigest(value) {
@@ -107,20 +104,20 @@ export function validatePreflightArtifactMetadata({
   artifacts,
   expected,
 }) {
-  const expectedRepositoryId = positiveInteger(expected?.repositoryId);
-  const expectedCurrentRunId = positiveInteger(expected?.currentRunId);
-  const expectedPreflightRunId = positiveInteger(expected?.preflightRunId);
-  const expectedPreflightRunAttempt = positiveInteger(expected?.preflightRunAttempt);
-  const expectedPreflightArtifactSha256 = lowercaseDigest(expected?.preflightArtifactSha256);
-  const expectedHeadSha = lowercaseSha(expected?.headSha);
+  const repositoryId = positiveInteger(expected?.repositoryId);
+  const currentRunId = positiveInteger(expected?.currentRunId);
+  const preflightRunId = positiveInteger(expected?.preflightRunId);
+  const preflightRunAttempt = positiveInteger(expected?.preflightRunAttempt);
+  const preflightArtifactSha256 = lowercaseDigest(expected?.preflightArtifactSha256);
+  const headSha = lowercaseSha(expected?.headSha);
   const observedNow = timestamp(expected?.now);
   if (
-    !expectedRepositoryId ||
-    !expectedCurrentRunId ||
-    !expectedPreflightRunId ||
-    !expectedPreflightRunAttempt ||
-    !expectedPreflightArtifactSha256 ||
-    !expectedHeadSha ||
+    !repositoryId ||
+    !currentRunId ||
+    !preflightRunId ||
+    !preflightRunAttempt ||
+    !preflightArtifactSha256 ||
+    !headSha ||
     expected?.repository !== "Verdant-OS/verdant-grow-diary" ||
     observedNow === null
   ) {
@@ -128,7 +125,7 @@ export function validatePreflightArtifactMetadata({
   }
 
   const priorRunId = positiveInteger(priorRun?.id);
-  const currentRunId = positiveInteger(currentRun?.id);
+  const observedCurrentRunId = positiveInteger(currentRun?.id);
   const runAttempt = positiveInteger(priorRun?.run_attempt);
   const currentRunAttempt = positiveInteger(currentRun?.run_attempt);
   const workflowId = positiveInteger(workflow?.id);
@@ -137,35 +134,35 @@ export function validatePreflightArtifactMetadata({
   const currentCreatedAt = timestamp(currentRun?.created_at);
   const workflowUpdatedAt = timestamp(workflow?.updated_at);
   if (
-    priorRunId !== expectedPreflightRunId ||
-    currentRunId !== expectedCurrentRunId ||
-    priorRunId === currentRunId ||
+    priorRunId !== preflightRunId ||
+    observedCurrentRunId !== currentRunId ||
+    priorRunId === observedCurrentRunId ||
     runAttempt !== 1 ||
     currentRunAttempt !== 1 ||
-    expectedPreflightRunAttempt !== runAttempt ||
+    preflightRunAttempt !== runAttempt ||
     !workflowId ||
     priorRun?.workflow_id !== workflowId ||
     currentRun?.workflow_id !== workflowId ||
-    !acceptedRunWorkflowPath(currentRun?.path) ||
+    !ACCEPTED_RUN_WORKFLOW_PATHS.includes(currentRun?.path) ||
     currentRun?.event !== "workflow_dispatch" ||
     !founderIdentity(priorRun?.actor) ||
     !founderIdentity(priorRun?.triggering_actor) ||
     !founderIdentity(currentRun?.actor) ||
     !founderIdentity(currentRun?.triggering_actor) ||
     currentRun?.head_branch !== "verdant-grow-diary" ||
-    currentRun?.head_sha !== expectedHeadSha ||
-    !acceptedRunWorkflowPath(priorRun?.path) ||
+    currentRun?.head_sha !== headSha ||
+    !ACCEPTED_RUN_WORKFLOW_PATHS.includes(priorRun?.path) ||
     workflow?.path !== WORKFLOW_PATH ||
     workflow?.state !== "active" ||
     priorRun?.event !== "workflow_dispatch" ||
     priorRun?.status !== "completed" ||
     priorRun?.conclusion !== "success" ||
     priorRun?.head_branch !== "verdant-grow-diary" ||
-    priorRun?.head_sha !== expectedHeadSha ||
-    !repositoryMatches(priorRun?.repository, expectedRepositoryId, expected.repository) ||
-    !repositoryMatches(priorRun?.head_repository, expectedRepositoryId, expected.repository) ||
-    !repositoryMatches(currentRun?.repository, expectedRepositoryId, expected.repository) ||
-    !repositoryMatches(currentRun?.head_repository, expectedRepositoryId, expected.repository) ||
+    priorRun?.head_sha !== headSha ||
+    !repositoryMatches(priorRun?.repository, repositoryId, expected.repository) ||
+    !repositoryMatches(priorRun?.head_repository, repositoryId, expected.repository) ||
+    !repositoryMatches(currentRun?.repository, repositoryId, expected.repository) ||
+    !repositoryMatches(currentRun?.head_repository, repositoryId, expected.repository) ||
     priorCreatedAt === null ||
     priorUpdatedAt === null ||
     currentCreatedAt === null ||
@@ -176,6 +173,7 @@ export function validatePreflightArtifactMetadata({
   ) {
     reject();
   }
+
   const reviewAgeMs = currentCreatedAt - priorUpdatedAt;
   if (
     reviewAgeMs < SOLO_FOUNDER_POLICY.minimumReviewSeconds * 1000 ||
@@ -211,13 +209,12 @@ export function validatePreflightArtifactMetadata({
     !size ||
     size > MAX_ARCHIVE_BYTES ||
     artifact.expired !== false ||
-    !digest ||
-    digest !== expectedPreflightArtifactSha256 ||
+    digest !== preflightArtifactSha256 ||
     positiveInteger(artifactRun?.id) !== priorRunId ||
-    positiveInteger(artifactRun?.repository_id) !== expectedRepositoryId ||
-    positiveInteger(artifactRun?.head_repository_id) !== expectedRepositoryId ||
+    positiveInteger(artifactRun?.repository_id) !== repositoryId ||
+    positiveInteger(artifactRun?.head_repository_id) !== repositoryId ||
     artifactRun?.head_branch !== "verdant-grow-diary" ||
-    artifactRun?.head_sha !== expectedHeadSha ||
+    artifactRun?.head_sha !== headSha ||
     artifactCreatedAt === null ||
     artifactUpdatedAt === null ||
     artifactExpiresAt === null ||
@@ -232,92 +229,24 @@ export function validatePreflightArtifactMetadata({
   return Object.freeze({ artifact, artifactId, archiveDigest: digest, runAttempt });
 }
 
-async function readBoundedBody(response) {
-  const lengthHeader = response.headers.get("content-length");
-  if (lengthHeader !== null) {
-    const length = positiveInteger(lengthHeader);
-    if (!length || length > MAX_ARCHIVE_BYTES) reject();
+// Reuse the already-reviewed bounded two-hop GitHub download primitive. It
+// accepts only the Verdant repository, sends the token only to api.github.com,
+// requires an HTTPS credential-free signed URL, and enforces the same cap.
+export async function downloadArtifactArchive(options) {
+  try {
+    return await downloadBoundedArtifactArchive(options);
+  } catch {
+    reject();
   }
-  if (!response.body) reject();
-  const reader = response.body.getReader();
-  const chunks = [];
-  let total = 0;
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    total += value.byteLength;
-    if (total > MAX_ARCHIVE_BYTES) {
-      await reader.cancel();
-      reject();
-    }
-    chunks.push(Buffer.from(value));
-  }
-  if (total === 0) reject();
-  return Buffer.concat(chunks, total);
 }
 
-export async function downloadArtifactArchive({
-  repository,
-  artifactId,
-  token,
-  fetchImpl = fetch,
-}) {
-  if (
-    repository !== "Verdant-OS/verdant-grow-diary" ||
-    !positiveInteger(artifactId) ||
-    typeof token !== "string" ||
-    token.length < 1 ||
-    /[\r\n]/.test(token)
-  ) {
-    reject();
-  }
-  const apiUrl = `https://api.github.com/repos/${repository}/actions/artifacts/${artifactId}/zip`;
-  let redirectResponse;
-  try {
-    redirectResponse = await fetchImpl(apiUrl, {
-      method: "GET",
-      redirect: "manual",
-      headers: {
-        Accept: "application/vnd.github+json",
-        Authorization: `Bearer ${token}`,
-        "X-GitHub-Api-Version": "2022-11-28",
-        "User-Agent": "verdant-signup-repair-gate",
-      },
-    });
-  } catch {
-    reject();
-  }
-  if (redirectResponse.status !== 302) reject();
-  const location = redirectResponse.headers.get("location");
-  let signedUrl;
-  try {
-    signedUrl = new URL(location);
-  } catch {
-    reject();
-  }
-  if (signedUrl.protocol !== "https:" || signedUrl.username || signedUrl.password) reject();
-
-  let archiveResponse;
-  try {
-    archiveResponse = await fetchImpl(signedUrl, {
-      method: "GET",
-      redirect: "manual",
-      headers: { Accept: "application/zip" },
-    });
-  } catch {
-    reject();
-  }
-  if (archiveResponse.status !== 200) reject();
-  return readBoundedBody(archiveResponse);
-}
-
-function validateReceipt(value, expected, runAttempt, authenticatedFounderLogin) {
+function validateReceipt(value, expected, runAttempt, priorRun) {
   if (!exactKeys(value, RECEIPT_KEYS)) reject();
   if (
     value.schema_version !== 1 ||
-    value.tool !== "apply-signup-acquisition-forward-repair" ||
+    value.tool !== "apply-quicklog-manual-delegate-forward-repair" ||
     value.operation !== "PREFLIGHT" ||
-    value.outcome !== "safe_to_apply" ||
+    !["safe_to_apply", "schema_live_ledger_absent"].includes(value.outcome) ||
     value.safe_to_apply !== true ||
     value.repository !== expected.repository ||
     value.repository_id !== String(expected.repositoryId) ||
@@ -333,8 +262,9 @@ function validateReceipt(value, expected, runAttempt, authenticatedFounderLogin)
     value.migration_sha256 !== MIGRATION_SHA256 ||
     value.delivery_mode !== SOLO_FOUNDER_POLICY.deliveryMode ||
     value.founder_github_user_id !== SOLO_FOUNDER_POLICY.founderUserId ||
+    value.founder_github_user_id !== priorRun.actor.id ||
     value.founder_github_login !== SOLO_FOUNDER_POLICY.founderLogin ||
-    value.founder_github_login !== authenticatedFounderLogin ||
+    value.founder_github_login !== priorRun.actor.login ||
     value.production_environment !== SOLO_FOUNDER_POLICY.environmentName ||
     value.solo_founder_acknowledgement_verified !== true ||
     value.environment_contract_verified !== true ||
@@ -407,8 +337,7 @@ function inspectSingleZipMember(archive) {
   const name = archive
     .subarray(centralOffset + 46, centralOffset + 46 + nameLength)
     .toString("utf8");
-  const mode = externalAttributes >>> 16;
-  const fileType = mode & 0o170000;
+  const fileType = (externalAttributes >>> 16) & 0o170000;
   if (
     centralEnd !== eocd ||
     (flags & 0x1) !== 0 ||
@@ -449,7 +378,6 @@ function inspectSingleZipMember(archive) {
   ) {
     reject();
   }
-
   if ((flags & 0x8) === 0) {
     if (
       localCrc !== expectedCrc ||
@@ -472,7 +400,6 @@ function inspectSingleZipMember(archive) {
       reject();
     }
   }
-
   return Object.freeze({ method, expectedCrc, compressedSize, uncompressedSize, dataStart });
 }
 
@@ -518,8 +445,7 @@ export async function verifyPreflightArtifactBundle({
   if (!Buffer.isBuffer(archive) || archive.length < 1 || archive.length > MAX_ARCHIVE_BYTES) {
     reject();
   }
-  const observedDigest = createHash("sha256").update(archive).digest("hex");
-  if (observedDigest !== metadata.archiveDigest) reject();
+  if (createHash("sha256").update(archive).digest("hex") !== metadata.archiveDigest) reject();
   const receiptBytes = readSingleZipMember(archive);
   let receipt;
   try {
@@ -527,12 +453,7 @@ export async function verifyPreflightArtifactBundle({
   } catch {
     reject();
   }
-  const receiptDigest = validateReceipt(
-    receipt,
-    expected,
-    metadata.runAttempt,
-    priorRun.actor.login,
-  );
+  const receiptDigest = validateReceipt(receipt, expected, metadata.runAttempt, priorRun);
   return Object.freeze({ receiptDigest, artifactId: metadata.artifactId });
 }
 
@@ -581,16 +502,14 @@ async function main(env = process.env) {
       encoding: "utf8",
       mode: 0o600,
     });
-    console.log("Authenticated PREFLIGHT artifact validated.");
+    console.log("Authenticated Quick Log delegate PREFLIGHT artifact validated.");
     return 0;
   } catch {
-    console.error("Authenticated PREFLIGHT artifact validation failed closed.");
+    console.error("Authenticated Quick Log delegate PREFLIGHT artifact validation failed closed.");
     return 1;
   }
 }
 
 const isDirectInvocation =
   process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url));
-if (isDirectInvocation) {
-  process.exitCode = await main();
-}
+if (isDirectInvocation) process.exitCode = await main();

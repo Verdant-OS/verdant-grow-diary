@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
+import userEvent from "@testing-library/user-event";
+import { Link, MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -72,6 +73,20 @@ function renderSignup(redirectTo = founderRedirectTo) {
   return renderSignupSearch(`/auth?mode=signup&redirectTo=${encodeURIComponent(redirectTo)}`);
 }
 
+function renderLandingToAuth() {
+  return render(
+    <MemoryRouter initialEntries={["/"]}>
+      <Link
+        to="/auth?mode=signup&utm_source=landing_page&utm_medium=owned&utm_campaign=paid_launch"
+        data-testid="landing-signup-cta-handoff"
+      >
+        Create a free account
+      </Link>
+      <Auth />
+    </MemoryRouter>,
+  );
+}
+
 function completeSignupForm({ marketingOptIn = false } = {}) {
   fireEvent.change(screen.getByLabelText("Email"), {
     target: { value: "grower@example.com" },
@@ -87,6 +102,31 @@ function completeSignupForm({ marketingOptIn = false } = {}) {
 }
 
 describe("Auth signup acquisition handoff", () => {
+  it("activates signup and preserves landing attribution after client navigation", async () => {
+    const user = userEvent.setup();
+    renderLandingToAuth();
+
+    const signupLink = screen.getByTestId("landing-signup-cta-handoff");
+    expect(signupLink).toHaveAttribute(
+      "href",
+      "/auth?mode=signup&utm_source=landing_page&utm_medium=owned&utm_campaign=paid_launch",
+    );
+
+    await user.click(signupLink);
+
+    expect(await screen.findByRole("tab", { name: "Create account" })).toHaveAttribute(
+      "data-state",
+      "active",
+    );
+    expect(screen.getByRole("form", { name: "Create account" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Create account" })).toBeEnabled();
+    await waitFor(() =>
+      expect(mocks.track).toHaveBeenCalledWith("signup_page_view", {
+        source: "landing_page",
+      }),
+    );
+  });
+
   it("keeps the exact landing CTA attribution out of auth.users metadata", async () => {
     renderSignupSearch(
       "/auth?mode=signup&utm_source=landing_page&utm_medium=owned&utm_campaign=paid_launch",

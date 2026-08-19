@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import QuicklogDiagnostics from "@/pages/QuicklogDiagnostics";
 
-export const Route = createFileRoute("/_app/_operator/diagnostics/quicklog")({
+export const Route = createFileRoute("/_app/_operator/diagnostics_/quicklog")({
   component: RouteComponent,
 });
 

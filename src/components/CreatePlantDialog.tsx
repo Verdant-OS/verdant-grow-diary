@@ -371,15 +371,22 @@ export default function CreatePlantDialog({
       .insert(validation.value as never)
       .select("id, name")
       .single();
-    setBusy(false);
     if (error) {
+      setBusy(false);
       toast.error(error.message);
       return;
     }
+    // The insert is durable before these reads, but the grower-facing plant
+    // lists can still be showing the pre-create cache. Keep the dialog and its
+    // handoff pending until both legacy Quick Log and owner-scoped grow views
+    // have settled their refresh, matching the guided Start Your Room path.
+    await Promise.allSettled([
+      qc.invalidateQueries({ queryKey: ["plants"] }),
+      qc.invalidateQueries({ queryKey: ["grow", "plants"] }),
+    ]);
+    setBusy(false);
     toast.success("Plant created");
     trackFunnelEvent("plant_created");
-    qc.invalidateQueries({ queryKey: ["plants"] });
-    qc.invalidateQueries({ queryKey: ["grow", "plants"] });
     setForm(emptyForm(initialTentId));
     setExplicitCompatiblePick(false);
     setNestedTents([]);

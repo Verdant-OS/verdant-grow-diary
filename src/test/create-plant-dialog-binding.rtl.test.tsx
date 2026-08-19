@@ -310,4 +310,50 @@ describe("CreatePlantDialog RTL binding", () => {
     expect(payload.tent_id).toBe(T1);
     expect(payload.name).toBe("Happy Plant");
   });
+
+  it("keeps the confirmed create handoff pending until both plant-list refreshes settle", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    let resolveLegacyPlantsRefresh!: () => void;
+    let resolveGrowPlantsRefresh!: () => void;
+    const legacyPlantsRefresh = new Promise<void>((resolve) => {
+      resolveLegacyPlantsRefresh = resolve;
+    });
+    const growPlantsRefresh = new Promise<void>((resolve) => {
+      resolveGrowPlantsRefresh = resolve;
+    });
+    const pendingRefreshes = [legacyPlantsRefresh, growPlantsRefresh];
+    const invalidateSpy = vi
+      .spyOn(client, "invalidateQueries")
+      .mockImplementation(() => pendingRefreshes.shift() ?? Promise.resolve());
+    const onCreated = vi.fn();
+
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter>
+          <CreatePlantDialog
+            initiallyOpen
+            defaultGrowId={G1}
+            defaultTentId={T1}
+            onCreated={onCreated}
+          />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await userEvent.type(screen.getByTestId("create-plant-name"), "Visible Plant");
+    await userEvent.click(screen.getByTestId("plant-create-submit"));
+
+    await waitFor(() => expect(invalidateSpy).toHaveBeenCalledTimes(2));
+    expect(screen.getByTestId("create-plant-form")).toBeInTheDocument();
+    expect(onCreated).not.toHaveBeenCalled();
+
+    resolveLegacyPlantsRefresh();
+    await Promise.resolve();
+    expect(screen.getByTestId("create-plant-form")).toBeInTheDocument();
+    expect(onCreated).not.toHaveBeenCalled();
+
+    resolveGrowPlantsRefresh();
+    await waitFor(() => expect(screen.queryByTestId("create-plant-form")).not.toBeInTheDocument());
+    expect(onCreated).toHaveBeenCalledWith({ id: "plant-1", name: "P" });
+  });
 });

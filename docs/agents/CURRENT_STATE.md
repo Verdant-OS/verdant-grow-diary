@@ -1,6 +1,17 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-19 UTC
+**Last updated:** 2026-08-19 UTC (second same-day edit)
+**Updated by:** Claude (2026-08-19, later edit: Quick Log errors/diagnostics
+slice on `claude/quicklog-errors-diagnostics-c06rci` (owner-assigned). Adds the
+2026-08-19 production re-measure block under the second-drift section: the
+Quick Log manual-save catalog now matches the 20260818010000 forward-repair
+end-state in production, `quicklog_entry_revisions` and
+`diary_entries.retracted_at` are now PRESENT (superseding the 2026-08-15/16
+absence findings), and a rolled-back end-to-end probe of
+`quicklog_save_manual` passed on every axis. No schema changes; no migrations
+applied by this slice.)
+
+**Prior update:** 2026-08-19 UTC
 **Updated by:** Claude (2026-08-19: records Cheek's approval of One-Tent Loop
 **Tranche A** — five context-threading wiring PRs — and lands the implementation
 specification at `docs/specs/one-tent-loop-tranche-a-specification.md` for the
@@ -333,6 +344,50 @@ object lookup, and those keep their own labels. A blocked ledger check and a
 directly-observed missing table are different findings, and flattening both to
 `NOT_MEASURED` would erase a verified defect rather than preserve caution.
 
+### 2026-08-19 production re-measure — the Quick Log manual-save drift has CLOSED
+
+`established fact`, measured 2026-08-19 by Claude through the same Lovable
+read-only SQL channel as the 2026-08-15 investigation (verdantgrowdiary-com
+project; target identity by fingerprint: founder account present, full app
+schema — `inference, high confidence` that this is `knkwiiywfkbqznbxwqfh`,
+since the channel does not expose the raw ref):
+
+- `public.quicklog_entry_revisions` is now **PRESENT** and
+  `diary_entries.retracted_at` is now **PRESENT** — superseding the
+  2026-08-15/16 absence findings above for these objects. An operator apply
+  (Lovable-side) happened between 2026-08-16 and 2026-08-19.
+- The Quick Log manual-save catalog matches the 20260818010000 forward-repair
+  **end-state exactly**: wrapper `quicklog_save_manual` (12-arg, src md5
+  `0d3098b8…`, EXECUTE authenticated + service_role, not anon/PUBLIC); private
+  delegate `quicklog_save_manual_pre_logged_at` repaired body (md5
+  `7ec296e4…`); all four parse/stamp helpers exact; **all five private
+  helpers EXECUTE = postgres only**; both `logged_at` stamp triggers live.
+- A **rolled-back** end-to-end probe of `quicklog_save_manual` as the founder
+  (BEGIN…ROLLBACK, zero committed writes) passed every axis: watering child
+  row, exact backdated `occurred_at`, independent Captured `logged_at`, diary
+  mirror linked via `details.linked_grow_event_id` with column AND
+  `details.logged_at` parity, `entry_at = occurred_at`, stage persisted.
+  Failure paths also verified: malformed `details.logged_at` →
+  `{ok:false, reason:"invalid_logged_at"}`; `quicklog_try_parse_uuid` as
+  authenticated → SQLSTATE 42501.
+- Manual grow_events rows predating the apply carry backfilled
+  `logged_at = created_at` (expected foundation-migration semantics), and no
+  post-apply manual save existed yet at measurement time.
+- The protected GitHub apply workflow
+  (`apply-quicklog-manual-delegate-forward-repair.yml`) ran once —
+  2026-08-19T06:17Z, dispatched by Cheek — and **failed at "Require the
+  protected production database secret"** before any database access. The
+  apply that actually landed was therefore Lovable-side, not workflow-side.
+  The workflow secret remains an owner-only gap.
+- The ledger remains mixed-convention: of the quicklog-window versions, only
+  `20260811090000` (name `2c5c4adb-…`) matched a direct version/name query.
+  Object presence stays the ground truth; the drift-probe caveats above are
+  unchanged.
+- Sandbox `bzatgtgjvuojpoxcknaa` is **far behind**: only a legacy 10-arg
+  `quicklog_save_manual` exists there — no delegate, no helpers, no
+  `logged_at` columns. Do not use sandbox to reason about production Quick
+  Log behavior.
+
 Five red runs — the four scheduled plus the 2026-08-15 dispatch — are five
 absent measurements, `NOT_MEASURED` in the literal sense this repo's status
 vocabulary requires, since not one of them completed a query. But they are not
@@ -344,10 +399,10 @@ way.
 
 ## Branch topology
 
-| Branch               | Role                                             | Verified head                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| -------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Branch               | Role                                             | Verified head                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| -------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `verdant-grow-diary` | **Deploy branch. Production ships from here.**   | `87ae05e5bff419a443ea8f5679129223114e1d48` (#1026), verified 2026-08-18 with `git fetch origin verdant-grow-diary && git rev-parse origin/verdant-grow-diary`. Supersedes `3f2bfe2db` (#1021). After #1021, in `git log --first-parent` merge order oldest-first: `4dd7aed` (#1022), `e34086d` (#1023), `3970f31` (#1024), `e2800ee` (#1025), `87ae05e` (#1026). **Live production was not re-fetched at this verification** — a `/version.json` fetch from the agent session is `BLOCKED` (network policy 403); the 2026-08-15 observation (`/version.json` serving `5e2fcedd4271`, #984) is the last measurement and publish lags git. Merging is not a publish. PR numbers on this branch do not order by merge time — order commits with `git log`, never by PR number. Do not carry older validation tables forward. Older buffers that still show `3f2bfe2db` (#1021) or `1c094a2a3` (#970) are earlier snapshots; discard them |
-| `main`               | Integration branch. It is not production parity. | `b6d747941948ce68157185a2b0847acea6970d44` (#779), verified 2026-08-07                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `main`               | Integration branch. It is not production parity. | `b6d747941948ce68157185a2b0847acea6970d44` (#779), verified 2026-08-07                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 
 `main` and `verdant-grow-diary` are divergent. Do not infer production behavior from
 `main`, and do not backport deploy-only governance or data rules without a scoped branch
@@ -635,7 +690,7 @@ sessions still cannot delete branches (re-confirmed: `git push --delete` →
 HTTP 403 from the branch-scoped push credential, and the GitHub MCP toolset
 exposes no ref-deletion endpoint), so Cheek deleted them himself during the
 2026-08-18 cleanup sweep recorded below, alongside 21 other stale `claude/*`
-branches. The dispositions above remain the record of *why* they died.
+branches. The dispositions above remain the record of _why_ they died.
 
 **Parent program:** MODE A SEO measurement-readiness work.
 

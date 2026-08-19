@@ -1,6 +1,17 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-19 UTC (second same-day edit)
+**Last updated:** 2026-08-19 UTC (third same-day edit)
+**Updated by:** Claude (2026-08-19, third edit: records Cheek's approval of
+One-Tent Loop **Tranche B+** — the efficiency program's second tranche — with
+Claude explicitly reassigned as architect and implementer for B+ only.
+Approval covers the design at
+`docs/superpowers/specs/2026-08-19-one-tent-loop-efficiency-design.md`, owner
+decisions D4/D5/D7, and the design's §11 copy; baseline at
+`docs/one-tent-loop-efficiency-baseline.md`, both verified at deploy tip
+`e012b633`. See the "Current approved slices" section for the tranche record.
+Docs-only edit; no code, schema, or migration changes.)
+
+**Prior update:** 2026-08-19 UTC (second same-day edit)
 **Updated by:** Claude (2026-08-19, later edit: Quick Log errors/diagnostics
 slice on `claude/quicklog-errors-diagnostics-c06rci` (owner-assigned). Adds the
 2026-08-19 production re-measure block under the second-drift section: the
@@ -534,6 +545,29 @@ adversarially reviewed, zero blockers):
 (PR-A1 first recommended; the five PRs are independent). The Sensors→Doctor
 context carry stays excluded pending owner decision D4. Owner gates on live
 verification are unchanged (managed e2e session; signup apply).
+2026-08-19 update: PR-A1 merged as `f8d93f57` (#1029). A2–A5 remain
+Codex-owned and unopened at that tip; their edit points stay collision
+boundaries for Tranche B+ below.
+
+**Tranche B+ approved (Cheek, 2026-08-19, "APPROVED. Execute steps one
+through five, each in its own slice."):** second tranche of the One-Tent Loop
+Efficiency Program. **Claude is explicitly reassigned as architect and, post-
+approval, implementer for Tranche B+ only** — Tranche A stays Codex's; the
+Action Queue transition/RLS production repair stays Codex's; no competing
+navigation implementation. Approved design:
+`docs/superpowers/specs/2026-08-19-one-tent-loop-efficiency-design.md`
+(Option A — shared pure rules, progressive convergence); measured baseline:
+`docs/one-tent-loop-efficiency-baseline.md`; both pinned at deploy tip
+`e012b633`. The approval also resolves owner decisions **D4** (Sensors→Doctor
+context carry), **D5** (visible user-namespaced "Continue with <plant>?"
+suggestion — silent remembered defaults stay banned), **D7** (plant-scoped
+Better/Same/Worse row in the V2 sheet), and ratifies the design's §11 copy.
+Slice plan: each approved item ships as its own PR — B0a measurement harness
+(test-only, first merge gate), B1 target-precedence rules, D5 slice, D7
+slice, B3a recovery + ratified copy; B2/B3b wait for A5, B4's rules edit
+waits for A2, B5 waits for A3, B0b waits for the owner-gated authenticated
+session/CI path. No schema, no migrations, no new routes, no new Quick Log
+write paths, no production telemetry.
 
 **Named isolated spike (approved 2026-08-13, not SEO):**
 `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE`. Cheek approved a spec-first,

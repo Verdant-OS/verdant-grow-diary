@@ -13,7 +13,7 @@
 //   asserts paid_ai_requests === 0.
 // - The only write seam is the stubbed quicklog_save_manual RPC; scenarios
 //   assert the exact RPC count so a second persistence path would fail here.
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 import { createCountedDriver } from "./helpers/countedDriver";
 import {
@@ -28,6 +28,16 @@ import {
   seedFakeSession,
 } from "./helpers/mockedOneTentWorld";
 import { denyAnalyticsConsent } from "./utils/analyticsConsent";
+
+/**
+ * Wait for a surface to finish rendering before the measured journey starts.
+ * Generous by design: the dev server compiles a route on first visit, and a
+ * compile stall is an environment fact, never a grower interaction.
+ */
+const READY_TIMEOUT_MS = 90_000;
+async function waitForReady(locator: ReturnType<Page["getByTestId"]>): Promise<void> {
+  await locator.waitFor({ state: "visible", timeout: READY_TIMEOUT_MS });
+}
 
 test.describe("One-Tent Loop interaction counter baseline", () => {
   test.beforeEach(() => {
@@ -50,7 +60,11 @@ test.describe("One-Tent Loop interaction counter baseline", () => {
     await mockSignedInSupabase(page, world, counter);
 
     await driver.gotoCounted(`/plants/${FAKE_PLANT_ID}`);
-    await expect(page.getByTestId("plant-detail-quick-log-open")).toBeVisible();
+    // Cold-compile tolerance, not a measurement: the first spec in a run pays
+    // the dev server's route compile, which can exceed the action timeout.
+    // Waiting for readiness with an explicit budget keeps the measured
+    // journey honest — counting is driver-level, so this cannot shift counts.
+    await waitForReady(page.getByTestId("plant-detail-quick-log-open"));
 
     // The measured journey: open Quick Log → tap a status chip → save.
     await driver.click(page.getByTestId("plant-detail-quick-log-open"));
@@ -96,6 +110,7 @@ test.describe("One-Tent Loop interaction counter baseline", () => {
     await mockSignedInSupabase(page, world, counter);
 
     await driver.gotoCounted(`/plants/${FAKE_PLANT_ID}`);
+    await waitForReady(page.getByTestId("plant-detail-quick-log-open"));
     await driver.click(page.getByTestId("plant-detail-quick-log-open"));
     await driver.click(page.getByTestId("plant-response-check-better"));
     await driver.click(page.getByTestId("plant-quick-log-save"));

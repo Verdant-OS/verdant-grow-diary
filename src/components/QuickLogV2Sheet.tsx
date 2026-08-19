@@ -36,6 +36,11 @@ import {
   type QuickLogV2Action,
   type ResolvedQuickLogV2Target,
 } from "@/lib/quickLogV2Rules";
+import {
+  RESPONSE_CHECK_STATUSES,
+  applyResponseCheck,
+  readResponseCheckStatus,
+} from "@/lib/tenSecondQuickCheckRules";
 import { buildQuickLogV2SavePayload } from "@/lib/quickLogV2SavePayload";
 import { applyQuickLogV2Refresh } from "@/lib/quickLogV2RefreshRules";
 import { createQuickLogPhotoDiaryEntry } from "@/lib/quickLogPhotoDiaryEntry";
@@ -378,6 +383,11 @@ export default function QuickLogV2Sheet({
   const volumeMissing = form.action === "water" && wateringForm.volumeMl.trim() === "";
   const showMaturityEvidence =
     form.action !== "feed" && resolvedTarget.ok && resolvedTarget.targetType === "plant";
+  // Better/Same/Worse records the PLANT's response, so it is offered only
+  // when the resolved target is a plant. Tent-scoped logs keep today's shape.
+  const showResponseCheck =
+    form.action !== "feed" && resolvedTarget.ok && resolvedTarget.targetType === "plant";
+  const selectedResponseStatus = readResponseCheckStatus(form.note);
   const saveHelper = wateringRetryPending
     ? "Retry sends the exact same watering record. Close and reopen Quick Log to make changes."
     : getSaveHelperMessage({
@@ -1557,6 +1567,36 @@ export default function QuickLogV2Sheet({
                   Checking video before save…
                 </p>
               )}
+            </div>
+          )}
+
+          {showResponseCheck && (
+            <div
+              role="group"
+              aria-label="Plant response check"
+              data-testid="qlv2-response-chips"
+              className="grid gap-2"
+            >
+              <p className="text-sm font-medium">How did the plant respond?</p>
+              <div className="flex flex-wrap gap-2">
+                {RESPONSE_CHECK_STATUSES.map((status) => (
+                  <Button
+                    key={status}
+                    type="button"
+                    variant={selectedResponseStatus === status ? "default" : "outline"}
+                    size="sm"
+                    disabled={wateringSubmissionLocked}
+                    aria-pressed={selectedResponseStatus === status}
+                    data-testid={`qlv2-response-chip-${status.toLowerCase()}`}
+                    onClick={() => setField("note", applyResponseCheck(form.note, status))}
+                  >
+                    {status}
+                  </Button>
+                ))}
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Better/Same/Worse records the plant response, not the grow action.
+              </p>
             </div>
           )}
 

@@ -143,6 +143,10 @@ export default function TentDetail() {
   const snap = header.snapshot;
   const tentMeta = getGrowDataMeta(["grow", "tent", id ?? null], user?.id);
   const activeCount = getActivePlantCount(activePlants);
+  // The one safe plant target this tent can prove. Null for zero or several
+  // plants — we never invent a default selection. Shared by the One-Tent
+  // loop card below and the Quick Log FAB's target key.
+  const safePlantId = activePlants.length === 1 ? (activePlants[0]?.id ?? null) : null;
   // Archive/delete authorization counts all soft-linked plants, including
   // archived/merged history, and fails closed during every non-current state.
   const assignedPlantCount = resolveVerifiedAssignedPlantCount(allPlantsQuery);
@@ -239,7 +243,15 @@ export default function TentDetail() {
 
   return (
     <div>
-      <QuickLogV2Fab defaultTargetKey={tent?.id ? `tent:${tent.id}` : null} />
+      {/* A tent with exactly one active plant can prove its plant target, so
+          the sheet opens plant-scoped and the grower reaches Better/Same/Worse
+          without reselecting. Several plants keep the tent scope and one
+          explicit choice — never a guessed default. */}
+      <QuickLogV2Fab
+        defaultTargetKey={
+          tent?.id ? (safePlantId ? `plant:${safePlantId}` : `tent:${tent.id}`) : null
+        }
+      />
       <Button asChild variant="ghost" size="sm" className="mb-3">
         <Link to={tentsPath()}>
           <ArrowLeft className="h-4 w-4" /> Tents
@@ -264,7 +276,6 @@ export default function TentDetail() {
           multiple plants, keep the calm safe disabled state — we do
           not invent a default selection here. */}
       {(() => {
-        const safePlantId = activePlants.length === 1 ? (activePlants[0]?.id ?? null) : null;
         return (
           <OneTentLoopNextStepCard
             current="tent"
@@ -390,7 +401,6 @@ export default function TentDetail() {
         scopeLabel={tent.name ?? "Tent"}
         className="mb-4"
       />
-
 
       <div className="glass rounded-2xl p-4 mb-6">
         <div className="flex items-center justify-between gap-2 flex-wrap mb-3">

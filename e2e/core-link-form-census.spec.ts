@@ -20,6 +20,7 @@ import {
 } from "@playwright/test";
 import { APP_ROUTES } from "../src/lib/appRouteManifest";
 import { ANALYTICS_CONSENT_STORAGE_KEY } from "../src/lib/analyticsConsent";
+import { dashboardPath } from "../src/lib/routes";
 import {
   AUTHENTICATED_CORE_CENSUS_ROUTES,
   PUBLIC_CORE_CENSUS_ROUTES,
@@ -1565,6 +1566,24 @@ async function assertExpectedRouteContent(page: Page, route: CoreCensusRoute) {
   }
 }
 
+async function settleRouteReadsBeforeLinkAudit(page: Page, sourcePath: string) {
+  // The census records links for a later revisit/click sweep, so the snapshot
+  // must describe the route's settled read model rather than an intermediate
+  // loading render. In particular, Dashboard's connected-loop evidence can
+  // briefly expose the "Log your first plant memory" CTA before the mocked
+  // diary read proves that step complete; recording that transient href makes
+  // the later revisit fail even though the product reached the correct state.
+  //
+  // Every external request in this lane is hermetically intercepted above.
+  // Requiring network idle therefore waits only for the route's mocked reads;
+  // it cannot hide a live dependency, mutation, or unbounded background call.
+  await page.waitForLoadState("networkidle", { timeout: APP_SHELL_READY_TIMEOUT_MS });
+  expect(
+    new URL(page.url()).pathname,
+    `${sourcePath} changed routes while its mocked reads were settling`,
+  ).toBe(new URL(sourcePath, APP_ORIGIN).pathname);
+}
+
 async function navigateForAudit(page: Page, route: CoreCensusRoute) {
   const response = await page.goto(route.path, { waitUntil: "domcontentloaded" });
   expect(response?.status() ?? 200, `${route.path} document response`).toBeLessThan(400);
@@ -1708,7 +1727,18 @@ async function runLaneCensus(
     await test.step(`audit ${route.label} (${route.path})`, async () => {
       const pageErrorsBefore = report.pageErrors.length;
       const finalPath = await navigateForAudit(page, route);
+      const auditedUrl = page.url();
       const fields = await auditAndExerciseFields(page, route);
+      // Exercising a navigation-backed select may legitimately change the
+      // location. Link provenance must still come from the exact route that
+      // was audited, never from the destination mislabeled as route.path.
+      if (page.url() !== auditedUrl) {
+        const response = await page.goto(auditedUrl, { waitUntil: "domcontentloaded" });
+        expect(response?.status() ?? 200, `${route.path} document response`).toBeLessThan(400);
+        await assertMeaningfulPage(page, route.path);
+        await assertExpectedRouteContent(page, route);
+      }
+      await settleRouteReadsBeforeLinkAudit(page, route.path);
       const links = await visibleLinkAudits(page, route.path);
       report.fieldAudits.push(...fields);
       report.linkAudits.push(...links);
@@ -1753,6 +1783,37 @@ test.describe("core link and form census", () => {
       `core census runs once, under the ${MOCKED_PROJECT} project`,
     );
     await page.clock.setFixedTime(CORE_CENSUS_FIXED_TIME);
+  });
+
+  test("settles Dashboard evidence before recording revisit links", async ({ page }) => {
+    test.setTimeout(60_000);
+    const network: NetworkAudit = {
+      blockedMutations: [],
+      unexpectedExternalFetches: [],
+      mockedReadRequests: 0,
+    };
+    await seedFakeSession(page.context());
+    await seedDeniedAnalyticsConsent(page.context());
+    await installNetworkFence(page.context(), true, network);
+
+    const dashboardRoute = AUTHENTICATED_CORE_CENSUS_ROUTES[0];
+    expect(dashboardRoute.path).toBe("/dashboard");
+    await navigateForAudit(page, dashboardRoute);
+    await settleRouteReadsBeforeLinkAudit(page, dashboardRoute.path);
+
+    await expect(page.getByTestId("onboarding-step-first_log")).toHaveAttribute(
+      "data-complete",
+      "true",
+    );
+    await expect(
+      page.locator(visibleLinkByHrefSelector(dashboardPath(GROW_ID))),
+      "the completed first-log step must not leave its loading-state CTA in the settled link set",
+    ).toHaveCount(0);
+    expect(network.blockedMutations, "the focused regression must remain read-only").toEqual([]);
+    expect(
+      network.unexpectedExternalFetches,
+      "the focused regression must remain hermetic",
+    ).toEqual([]);
   });
 
   test("audits every scheduled public page, visible field, and safe internal link", async ({

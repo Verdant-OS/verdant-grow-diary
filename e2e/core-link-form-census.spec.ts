@@ -2080,7 +2080,9 @@ test.describe("core link and form census", () => {
   test("audits every scheduled public page, visible field, and safe internal link", async ({
     page,
   }) => {
-    test.setTimeout(300_000);
+    // This exhaustive lane now proves a fresh quiet window after every route,
+    // click-source revisit, and destination; keep that work below the 40m job ceiling.
+    test.setTimeout(420_000);
     const report = await runLaneCensus(page, "public", PUBLIC_CORE_CENSUS_ROUTES);
     expect(report.routeAudits).toHaveLength(PUBLIC_CORE_CENSUS_ROUTES.length);
     expect(report.linkAudits.length).toBeGreaterThan(0);

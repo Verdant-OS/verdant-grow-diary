@@ -51,6 +51,8 @@ DECLARE
   v_event_insert_granted boolean;
   v_event_update_granted boolean;
   v_event_delete_granted boolean;
+  v_required_grants_present boolean;
+  v_required_grants_absent boolean;
   v_legacy_state boolean;
   v_contracted_state boolean;
 BEGIN
@@ -508,6 +510,16 @@ BEGIN
   v_event_insert_granted := pg_catalog.has_table_privilege(
     'authenticated', 'public.action_queue_events', 'INSERT'
   );
+  v_required_grants_present :=
+    v_action_select_granted
+    AND v_action_insert_granted
+    AND v_event_select_granted
+    AND v_event_insert_granted;
+  v_required_grants_absent :=
+    NOT v_action_select_granted
+    AND NOT v_action_insert_granted
+    AND NOT v_event_select_granted
+    AND NOT v_event_insert_granted;
 
   v_legacy_state :=
     v_transition_overload_count = 0
@@ -525,10 +537,7 @@ BEGIN
     AND v_event_legacy_insert_fingerprint = 'e79ba22f2e33a05579e48db4b022a4a9'
     AND v_event_append_count = 0
     AND v_event_delete_count = 1
-    AND v_action_select_granted
-    AND v_action_insert_granted
-    AND v_event_select_granted
-    AND v_event_insert_granted
+    AND (v_required_grants_present OR v_required_grants_absent)
     AND v_action_update_granted
     AND v_action_delete_granted
     AND v_event_update_granted
@@ -552,10 +561,7 @@ BEGIN
     AND v_event_append_count = 1
     AND v_event_append_fingerprint = '420914cd6ffbd2d552c30e8d7b6ddf73'
     AND v_event_delete_count = 0
-    AND v_action_select_granted
-    AND v_action_insert_granted
-    AND v_event_select_granted
-    AND v_event_insert_granted
+    AND (v_required_grants_present OR v_required_grants_absent)
     AND NOT v_action_update_granted
     AND NOT v_action_delete_granted
     AND NOT v_event_update_granted
@@ -850,6 +856,10 @@ DROP POLICY IF EXISTS "Users update own action_queue"
   ON public.action_queue;
 DROP POLICY IF EXISTS "Users delete own action_queue"
   ON public.action_queue;
+GRANT SELECT, INSERT ON TABLE
+  public.action_queue,
+  public.action_queue_events
+TO authenticated;
 REVOKE UPDATE, DELETE ON TABLE public.action_queue
   FROM PUBLIC, anon, authenticated;
 

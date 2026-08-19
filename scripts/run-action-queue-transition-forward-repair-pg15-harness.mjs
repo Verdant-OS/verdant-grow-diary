@@ -14,7 +14,7 @@ const DISPOSABLE_SENTINEL = "verdant_action_queue_transition_repair_pg15_disposa
 const MIGRATION_SUFFIX = "_action_queue_transition_forward_repair.sql";
 const PINNED_MIGRATION_FILE = "20260819190852_action_queue_transition_forward_repair.sql";
 const EXPECTED_MIGRATION_SHA256 =
-  "588113512eefcbeb412c2126073682e4b799ff045d436b70417edf1a2d848b5c";
+  "fb887c43be86affc39e59c2113e1d627053a6058e2b8de06a6571d9f34f66c49";
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 const OWNER_ID = "11111111-1111-4111-8111-111111111111";
@@ -558,6 +558,31 @@ function proveRepairSuccess(env, spawnImpl = spawnSync) {
   );
 }
 
+function proveHardenedGrantBaselineConverges(env, spawnImpl = spawnSync) {
+  resetScaffold(env, spawnImpl);
+  executeSql(
+    `revoke select, insert on public.action_queue from authenticated;
+     revoke select, insert on public.action_queue_events from authenticated;`,
+    env,
+    { stage: "hardened_grant_baseline_mutation", spawnImpl },
+  );
+  requireMigrationSuccess("hardened_grant_baseline_repair", env, spawnImpl);
+  requireSqlTrue(
+    "hardened_grant_baseline_catalog",
+    `select
+      has_table_privilege('authenticated','public.action_queue','select')
+      and has_table_privilege('authenticated','public.action_queue','insert')
+      and has_table_privilege('authenticated','public.action_queue_events','select')
+      and has_table_privilege('authenticated','public.action_queue_events','insert')
+      and not has_table_privilege('authenticated','public.action_queue','update')
+      and not has_table_privilege('authenticated','public.action_queue','delete')
+      and not has_table_privilege('authenticated','public.action_queue_events','update')
+      and not has_table_privilege('authenticated','public.action_queue_events','delete');`,
+    env,
+    spawnImpl,
+  );
+}
+
 const ROLE_SQL = Object.freeze({
   authenticated: "set local role authenticated;",
   anon: "set local role anon;",
@@ -1010,6 +1035,7 @@ export async function runPg15Harness({
     resetScaffold(env, spawnImpl);
     proveLegacyBaseline(env, spawnImpl);
     proveRepairSuccess(env, spawnImpl);
+    proveHardenedGrantBaselineConverges(env, spawnImpl);
     proveOwnerTransitionAndRetry(env, spawnImpl);
     proveIllegalTransitionNoWrite(env, spawnImpl);
     proveDirectMutationFences(env, spawnImpl);

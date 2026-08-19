@@ -11,6 +11,10 @@ const HISTORICAL_RPC = readFileSync(
   join(MIGRATIONS, "20260726093000_action_queue_transition_rpc.sql"),
   "utf8",
 ).replace(/\r\n?/g, "\n");
+const LOCAL_PARITY_SEED = readFileSync(resolve(ROOT, "supabase/seed.sql"), "utf8").replace(
+  /\r\n?/g,
+  "\n",
+);
 
 function migrationMatches(): string[] {
   return readdirSync(MIGRATIONS)
@@ -112,6 +116,10 @@ describe("Action Queue transition forward repair migration", () => {
   it("attests required read/insert grants and effective mutation denial", () => {
     const sql = repairSql();
 
+    expect(sql).toMatch(
+      /grant\s+select\s*,\s*insert\s+on\s+table\s+public\.action_queue\s*,\s*public\.action_queue_events\s+to\s+authenticated/i,
+    );
+
     for (const [table, privilege] of [
       ["action_queue", "SELECT"],
       ["action_queue", "INSERT"],
@@ -136,6 +144,17 @@ describe("Action Queue transition forward repair migration", () => {
           );
         }
       }
+    }
+  });
+
+  it("keeps the local production-parity seed from reopening lifecycle writes", () => {
+    for (const table of ["action_queue", "action_queue_events"]) {
+      expect(LOCAL_PARITY_SEED).toMatch(
+        new RegExp(
+          `revoke\\s+update\\s*,\\s*delete\\s+on\\s+table\\s+public\\.${table}[\\s\\S]*?from\\s+public\\s*,\\s*anon\\s*,\\s*authenticated`,
+          "i",
+        ),
+      );
     }
   });
 

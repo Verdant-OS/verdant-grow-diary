@@ -111,6 +111,7 @@ describe("Action Queue transition forward-repair PostgreSQL 15 runtime gate", ()
       "proveGuardSourceRejected",
       "proveGuardTriggerRejected",
       "proveRlsDisabledRejected",
+      "proveHardenedGrantBaselineConverges",
       "proveRequiredGrantDriftRejected",
       "proveInheritedMutationGrantRejected",
     ]) {

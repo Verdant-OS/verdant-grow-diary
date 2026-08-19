@@ -1785,7 +1785,9 @@ test.describe("core link and form census", () => {
     await page.clock.setFixedTime(CORE_CENSUS_FIXED_TIME);
   });
 
-  test("settles Dashboard evidence before recording revisit links", async ({ page }) => {
+  test("scheduled authenticated Dashboard evidence settles before recording revisit links", async ({
+    page,
+  }) => {
     test.setTimeout(60_000);
     const network: NetworkAudit = {
       blockedMutations: [],
@@ -1796,19 +1798,50 @@ test.describe("core link and form census", () => {
     await seedDeniedAnalyticsConsent(page.context());
     await installNetworkFence(page.context(), true, network);
 
+    let releaseDiaryRead = () => {};
+    const diaryReadGate = new Promise<void>((resolve) => {
+      releaseDiaryRead = resolve;
+    });
+    await page.context().route(/\/rest\/v1\/diary_entries(?:\?|$)/, async (route) => {
+      await diaryReadGate;
+      await route.fallback();
+    });
+
     const dashboardRoute = AUTHENTICATED_CORE_CENSUS_ROUTES[0];
     expect(dashboardRoute.path).toBe("/dashboard");
     await navigateForAudit(page, dashboardRoute);
-    await settleRouteReadsBeforeLinkAudit(page, dashboardRoute.path);
 
-    await expect(page.getByTestId("onboarding-step-first_log")).toHaveAttribute(
-      "data-complete",
-      "true",
+    const pendingHrefs = (await visibleLinkAudits(page, dashboardRoute.path)).map(
+      (link) => link.href,
     );
-    await expect(
-      page.locator(visibleLinkByHrefSelector(dashboardPath(GROW_ID))),
+    expect(
+      pendingHrefs,
+      "the delayed diary read must expose the Dashboard's transient first-log CTA",
+    ).toContain(dashboardPath(GROW_ID));
+
+    const settlePromise = settleRouteReadsBeforeLinkAudit(page, dashboardRoute.path);
+    const settledBeforeRelease = await Promise.race([
+      settlePromise.then(() => true),
+      new Promise<false>((resolve) => setTimeout(() => resolve(false), 100)),
+    ]);
+    releaseDiaryRead();
+    expect(
+      settledBeforeRelease,
+      "the settling helper must wait for the delayed diary evidence read",
+    ).toBe(false);
+    await settlePromise;
+
+    const links = await visibleLinkAudits(page, dashboardRoute.path);
+    const firstLogComplete = await page
+      .getByTestId("onboarding-step-first_log")
+      .getAttribute("data-complete");
+    const hrefs = links.map((link) => link.href);
+
+    expect(firstLogComplete).toBe("true");
+    expect(
+      hrefs,
       "the completed first-log step must not leave its loading-state CTA in the settled link set",
-    ).toHaveCount(0);
+    ).not.toContain(dashboardPath(GROW_ID));
     expect(network.blockedMutations, "the focused regression must remain read-only").toEqual([]);
     expect(
       network.unexpectedExternalFetches,

@@ -388,6 +388,24 @@ describe("AppShell mobile Quick Log routing", () => {
     expect(screen.queryByTestId("scoped-quick-log")).not.toBeInTheDocument();
   });
 
+  it("binds the Plant Detail mobile FAB to the valid plant UUID in the route", () => {
+    renderAt(`/plants/${PLANT_ID}`);
+
+    fireEvent.click(screen.getByTestId("mobile-quick-log-fab"));
+
+    expect(screen.getByTestId("legacy-quick-log")).toHaveAttribute("data-plant-id", PLANT_ID);
+    expect(screen.queryByTestId("scoped-quick-log")).not.toBeInTheDocument();
+  });
+
+  it("fails closed to unscoped Quick Log for an invalid Plant Detail id", () => {
+    renderAt("/plants/not-a-uuid");
+
+    fireEvent.click(screen.getByTestId("mobile-quick-log-fab"));
+
+    expect(screen.getByTestId("legacy-quick-log")).toHaveAttribute("data-plant-id", "");
+    expect(screen.queryByTestId("scoped-quick-log")).not.toBeInTheDocument();
+  });
+
   it("honors and consumes the saved Quick Log start-screen intent", async () => {
     renderAt("/dashboard?open=quick-log");
 

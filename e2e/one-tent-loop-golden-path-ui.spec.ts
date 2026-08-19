@@ -609,7 +609,14 @@ test.describe("One-Tent Loop — authenticated UI golden path", () => {
       // review surface. The network boundary returns the current credited
       // envelope, then the UI must render the validated cautious contract.
       await stage("ai_doctor_boundary_verified", async () => {
-        await page.goto(`/plants/${fixturePlantId}`);
+        const doctorEntry = page.getByRole("link", {
+          name: `Review ${PLANT_NAME} with AI Doctor`,
+        });
+        await expect(doctorEntry).toBeVisible();
+        await doctorEntry.click();
+        await expect(page).toHaveURL(
+          new RegExp(`/plants/${fixturePlantId}\\?tentId=${fixtureTentId}#plant-ai-doctor-review$`),
+        );
         const review = page.getByTestId("plant-ai-doctor-live-review");
         await expect(review).toBeVisible();
         const importedContinue = review.getByTestId("plant-ai-doctor-imported-history-continue");

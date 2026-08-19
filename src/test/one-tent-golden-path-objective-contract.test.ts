@@ -174,6 +174,11 @@ describe("authenticated One-Tent proof covers the production objective", () => {
       SPEC.indexOf('await stage("ai_doctor_boundary_verified"'),
       SPEC.indexOf('await stage("alert_verified"'),
     );
+    expect(aiDoctorStage).toMatch(
+      /getByRole\(\s*"link",\s*\{\s*name:\s*`Review \$\{PLANT_NAME\} with AI Doctor`/s,
+    );
+    expect(aiDoctorStage).toContain("#plant-ai-doctor-review$");
+    expect(aiDoctorStage).not.toContain("page.goto(`/plants/${fixturePlantId}`)");
     expect(aiDoctorStage).toContain('page.goto("/doctor/sessions")');
     expect(aiDoctorStage).toContain('getByTestId("ai-doctor-sessions-index-page")');
   });

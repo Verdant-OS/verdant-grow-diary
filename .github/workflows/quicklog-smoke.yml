@@ -97,9 +97,9 @@ on:
 jobs:
   # Temporary, branch-pinned proof lane. This intentionally uses the existing
   # end-user E2E credentials against local branch code. It has no elevated
-  # credentials, paid-model calls, or control capability. Before the rerun it
-  # removes only the exact owner-scoped golden fixture retained by a failed
-  # attempt, through the repository's fail-closed teardown CLI.
+  # credentials, paid-model calls, control capability, or teardown mutation.
+  # Each dispatch gets an isolated, validated fixture marker so retained
+  # evidence from a failed attempt is never deleted or reused.
   one-tent-authenticated-proof:
     name: Authenticated One-Tent branch proof
     if: github.event_name == 'workflow_dispatch' && github.ref_name == 'codex/one-tent-loop-plant-refresh'
@@ -114,6 +114,7 @@ jobs:
       PLAYWRIGHT_RETRIES: "0"
       LOVABLE_E2E_TARGET_PROJECT_REF: knkwiiywfkbqznbxwqfh
       LOVABLE_E2E_TEARDOWN_AFTER_SUCCESS: "false"
+      E2E_ONE_TENT_FIXTURE_MARKER: "[GOLDEN-PATH-FIXTURE-RUN-${{ github.run_id }}]"
 
     steps:
       - name: Checkout exact branch commit
@@ -155,7 +156,6 @@ jobs:
           source e2e/.auth/managed-session.env
           set +a
           bun run e2e:one-tent:preflight
-          bun run scripts/e2e/teardown-one-tent-golden-path.mjs --execute --confirm-fixture-teardown
           mkdir -p e2e/results
           set +e
           bun run e2e:one-tent:ui 2>&1 | tee e2e/results/one-tent-authenticated-proof.log

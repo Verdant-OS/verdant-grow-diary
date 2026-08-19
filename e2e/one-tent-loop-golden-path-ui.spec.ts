@@ -59,7 +59,17 @@ import {
 
 const QUICK_LOG_NOTE = "Observed mild leaf-edge curl after a warm afternoon.";
 const QUICK_LOG_CONTEXT_DRAFT = "Context check only — close without saving.";
-const FIXTURE_MARKER = "[GOLDEN-PATH-FIXTURE]";
+const DEFAULT_FIXTURE_MARKER = "[GOLDEN-PATH-FIXTURE]";
+const RUN_FIXTURE_MARKER = /^\[GOLDEN-PATH-FIXTURE-RUN-[0-9]+\]$/;
+const declaredFixtureMarker = process.env.E2E_ONE_TENT_FIXTURE_MARKER?.trim();
+if (
+  declaredFixtureMarker &&
+  declaredFixtureMarker !== DEFAULT_FIXTURE_MARKER &&
+  !RUN_FIXTURE_MARKER.test(declaredFixtureMarker)
+) {
+  throw new Error("invalid_one_tent_fixture_marker");
+}
+const FIXTURE_MARKER = declaredFixtureMarker || DEFAULT_FIXTURE_MARKER;
 const GROW_NAME = `One-Tent Golden Run ${FIXTURE_MARKER}`;
 const TENT_NAME = `Flower Tent A ${FIXTURE_MARKER}`;
 const PLANT_NAME = `Golden Plant 1 ${FIXTURE_MARKER}`;

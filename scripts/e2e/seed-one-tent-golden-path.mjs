@@ -50,6 +50,17 @@ const ENV = {
 // hierarchy and accidentally turn a broken UI handoff green.
 const EVIDENCE_ONLY_FLAG = "--evidence-only";
 
+const DEFAULT_FIXTURE_MARKER = "[GOLDEN-PATH-FIXTURE]";
+const RUN_FIXTURE_MARKER = /^\[GOLDEN-PATH-FIXTURE-RUN-[0-9]+\]$/;
+const declaredFixtureMarker = process.env.E2E_ONE_TENT_FIXTURE_MARKER?.trim();
+if (
+  declaredFixtureMarker &&
+  declaredFixtureMarker !== DEFAULT_FIXTURE_MARKER &&
+  !RUN_FIXTURE_MARKER.test(declaredFixtureMarker)
+) {
+  throw new Error("invalid_one_tent_fixture_marker");
+}
+
 // Golden fixture — SAFE to mirror. These names/values match
 // src/test/fixtures/oneTentGoldenPathFixture.ts. Any drift is caught by
 // the contract test suite; if you edit these, edit both.
@@ -65,7 +76,7 @@ const FIXTURE = {
   targetTempFMax: 85,
   targetHumidityPctMin: 40,
   targetHumidityPctMax: 60,
-  goldenMarker: "[GOLDEN-PATH-FIXTURE]",
+  goldenMarker: declaredFixtureMarker || DEFAULT_FIXTURE_MARKER,
 };
 
 function preflight() {

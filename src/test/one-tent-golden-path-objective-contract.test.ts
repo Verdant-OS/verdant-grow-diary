@@ -34,6 +34,13 @@ describe("authenticated One-Tent proof covers the production objective", () => {
     expect(SPEC).not.toContain("__dirname");
   });
 
+  it("shares a validated per-run fixture marker between the UI walk and evidence helper", () => {
+    expect(SPEC).toContain("process.env.E2E_ONE_TENT_FIXTURE_MARKER");
+    expect(SEED).toContain("process.env.E2E_ONE_TENT_FIXTURE_MARKER");
+    expect(SPEC).toContain("GOLDEN-PATH-FIXTURE-RUN-");
+    expect(SEED).toContain("GOLDEN-PATH-FIXTURE-RUN-");
+  });
+
   it("creates Grow, Tent, and Plant through the real Start Your Room UI", () => {
     for (const testId of [
       "start-room-grow-name",

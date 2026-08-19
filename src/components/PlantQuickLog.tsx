@@ -61,6 +61,11 @@ import { useQuickLogV2Save } from "@/hooks/useQuickLogV2Save";
 import { buildPlantQuickLogV2SavePayload } from "@/lib/plantQuickLogV2SaveAdapter";
 import { newQuickLogSaveKey } from "@/lib/quickLogIdempotencyKey";
 import {
+  buildQuickLogSaveSignature,
+  resolveQuickLogSaveKey,
+  type QuickLogSaveKeyState,
+} from "@/lib/quickLogSaveKeyPolicy";
+import {
   classifyQuickLogThrownSaveError,
   describeQuickLogSaveFailure,
 } from "@/lib/quickLogSaveErrorMessage";
@@ -111,7 +116,10 @@ export default function PlantQuickLog({
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { save } = useQuickLogV2Save();
-  const [saveKey, setSaveKey] = useState<string | null>(null);
+  // One idempotency key per LOGICAL submission (D-B2). Held in a ref, not
+  // state: it is never rendered, and a stale render must never hand the
+  // server a key that does not match the payload being sent.
+  const saveKeyRef = useRef<QuickLogSaveKeyState | null>(null);
   const responseSectionRef = useRef<HTMLElement | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const libraryFileRef = useRef<HTMLInputElement | null>(null);
@@ -133,11 +141,11 @@ export default function PlantQuickLog({
   // to record a status. Land the tired grower on the Better/Same/Worse
   // section (scroll + focus). Focus only — never pre-selects a chip.
   useEffect(() => {
-    if (open) {
-      setSaveKey((current) => current ?? newQuickLogSaveKey());
-      return;
-    }
-    setSaveKey(null);
+    // Closing ends the logical submission, so the next open starts a new one.
+    // Opening mints nothing: the key is resolved lazily at save time from the
+    // payload signature, which guarantees it is STORED alongside the payload
+    // it was issued for.
+    if (!open) saveKeyRef.current = null;
   }, [open]);
 
   useEffect(() => {
@@ -293,6 +301,25 @@ export default function PlantQuickLog({
         uploadedPath = path;
       }
 
+      // Reuse the key on a pure retry, rotate it on an edited one (D-B2).
+      // The signature signs the grower's photo CHOICE, never `uploadedPath`:
+      // that path embeds Date.now() and so differs on every attempt, and
+      // signing it would rotate the key on each retry — the exact duplicate
+      // write this policy exists to prevent.
+      const resolvedSaveKey = resolveQuickLogSaveKey({
+        current: saveKeyRef.current,
+        signature: buildQuickLogSaveSignature({
+          plantId,
+          growId,
+          tentId: tentId ?? null,
+          note: timelineNote,
+          sensors: sensorsForPayload,
+          photo: photoFile ? { name: photoFile.name, size: photoFile.size } : null,
+        }),
+        mint: newQuickLogSaveKey,
+      });
+      saveKeyRef.current = resolvedSaveKey.state;
+
       const built = buildPlantQuickLogV2SavePayload({
         plantId,
         plantName,
@@ -301,7 +328,7 @@ export default function PlantQuickLog({
         note: timelineNote,
         sensors: sensorsForPayload,
         photoUrl: uploadedPath,
-        idempotencyKey: saveKey ?? newQuickLogSaveKey(),
+        idempotencyKey: resolvedSaveKey.state.key,
       });
       if (!built.ok) {
         if (uploadedPath) {

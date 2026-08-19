@@ -14,7 +14,7 @@ const DISPOSABLE_SENTINEL = "verdant_action_queue_transition_repair_pg15_disposa
 const MIGRATION_SUFFIX = "_action_queue_transition_forward_repair.sql";
 const PINNED_MIGRATION_FILE = "20260819190852_action_queue_transition_forward_repair.sql";
 const EXPECTED_MIGRATION_SHA256 =
-  "fa2f9e1f3be8219f22d770a2b26736ed7f9782b5fff54967bbc1e6b2df6b9703";
+  "588113512eefcbeb412c2126073682e4b799ff045d436b70417edf1a2d848b5c";
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 const OWNER_ID = "11111111-1111-4111-8111-111111111111";
@@ -541,6 +541,14 @@ function proveRepairSuccess(env, spawnImpl = spawnSync) {
       and has_function_privilege('authenticated','public.action_queue_transition(uuid,text,text,text)','execute')
       and not has_function_privilege('anon','public.action_queue_transition(uuid,text,text,text)','execute')
       and not has_function_privilege('service_role','public.action_queue_transition(uuid,text,text,text)','execute')
+      and has_table_privilege('authenticated','public.action_queue','select')
+      and has_table_privilege('authenticated','public.action_queue','insert')
+      and has_table_privilege('authenticated','public.action_queue_events','select')
+      and has_table_privilege('authenticated','public.action_queue_events','insert')
+      and not has_table_privilege('anon','public.action_queue','update')
+      and not has_table_privilege('anon','public.action_queue','delete')
+      and not has_table_privilege('anon','public.action_queue_events','update')
+      and not has_table_privilege('anon','public.action_queue_events','delete')
       and not has_table_privilege('authenticated','public.action_queue','update')
       and not has_table_privilege('authenticated','public.action_queue','delete')
       and not has_table_privilege('authenticated','public.action_queue_events','update')
@@ -939,6 +947,48 @@ function proveRlsDisabledRejected(env, spawnImpl = spawnSync) {
   );
 }
 
+function proveRequiredGrantDriftRejected(env, spawnImpl = spawnSync) {
+  requireLegacyRollback(
+    "required_grant_drift",
+    `revoke select on public.action_queue from authenticated;`,
+    env,
+    spawnImpl,
+  );
+}
+
+function proveInheritedMutationGrantRejected(env, spawnImpl = spawnSync) {
+  resetScaffold(env, spawnImpl);
+  executeSql(
+    `do $role$
+     begin
+       if not exists (
+         select 1 from pg_roles where rolname = 'action_queue_inherited_writer'
+       ) then
+         create role action_queue_inherited_writer nologin;
+       end if;
+     end
+     $role$;
+     alter role authenticated inherit;
+     grant action_queue_inherited_writer to authenticated;
+     grant update, delete on public.action_queue, public.action_queue_events
+       to action_queue_inherited_writer;`,
+    env,
+    { stage: "inherited_mutation_grant_mutation", spawnImpl },
+  );
+  requireMigrationFailure("inherited_mutation_grant", env, spawnImpl);
+  requireSqlTrue(
+    "inherited_mutation_grant_rollback",
+    `select
+      to_regprocedure('public.action_queue_transition(uuid,text,text,text)') is null
+      and has_table_privilege('authenticated','public.action_queue','update')
+      and has_table_privilege('authenticated','public.action_queue','delete')
+      and has_table_privilege('authenticated','public.action_queue_events','update')
+      and has_table_privilege('authenticated','public.action_queue_events','delete');`,
+    env,
+    spawnImpl,
+  );
+}
+
 export async function runPg15Harness({
   databaseUrl = process.env.ACTION_QUEUE_TRANSITION_REPAIR_PG15_URL,
   containerId = process.env.ACTION_QUEUE_TRANSITION_REPAIR_PG15_CONTAINER,
@@ -975,6 +1025,8 @@ export async function runPg15Harness({
     proveGuardSourceRejected(env, spawnImpl);
     proveGuardTriggerRejected(env, spawnImpl);
     proveRlsDisabledRejected(env, spawnImpl);
+    proveRequiredGrantDriftRejected(env, spawnImpl);
+    proveInheritedMutationGrantRejected(env, spawnImpl);
   } catch (error) {
     return fail(error instanceof Error ? error.message : "unknown");
   }

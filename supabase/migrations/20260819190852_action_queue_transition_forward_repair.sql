@@ -43,8 +43,12 @@ DECLARE
   v_event_append_count integer;
   v_event_append_fingerprint text;
   v_event_delete_count integer;
+  v_action_select_granted boolean;
+  v_action_insert_granted boolean;
   v_action_update_granted boolean;
   v_action_delete_granted boolean;
+  v_event_select_granted boolean;
+  v_event_insert_granted boolean;
   v_event_update_granted boolean;
   v_event_delete_granted boolean;
   v_legacy_state boolean;
@@ -492,6 +496,18 @@ BEGIN
   v_event_delete_granted := pg_catalog.has_table_privilege(
     'authenticated', 'public.action_queue_events', 'DELETE'
   );
+  v_action_select_granted := pg_catalog.has_table_privilege(
+    'authenticated', 'public.action_queue', 'SELECT'
+  );
+  v_action_insert_granted := pg_catalog.has_table_privilege(
+    'authenticated', 'public.action_queue', 'INSERT'
+  );
+  v_event_select_granted := pg_catalog.has_table_privilege(
+    'authenticated', 'public.action_queue_events', 'SELECT'
+  );
+  v_event_insert_granted := pg_catalog.has_table_privilege(
+    'authenticated', 'public.action_queue_events', 'INSERT'
+  );
 
   v_legacy_state :=
     v_transition_overload_count = 0
@@ -509,6 +525,10 @@ BEGIN
     AND v_event_legacy_insert_fingerprint = 'e79ba22f2e33a05579e48db4b022a4a9'
     AND v_event_append_count = 0
     AND v_event_delete_count = 1
+    AND v_action_select_granted
+    AND v_action_insert_granted
+    AND v_event_select_granted
+    AND v_event_insert_granted
     AND v_action_update_granted
     AND v_action_delete_granted
     AND v_event_update_granted
@@ -532,6 +552,10 @@ BEGIN
     AND v_event_append_count = 1
     AND v_event_append_fingerprint = '420914cd6ffbd2d552c30e8d7b6ddf73'
     AND v_event_delete_count = 0
+    AND v_action_select_granted
+    AND v_action_insert_granted
+    AND v_event_select_granted
+    AND v_event_insert_granted
     AND NOT v_action_update_granted
     AND NOT v_action_delete_granted
     AND NOT v_event_update_granted
@@ -882,7 +906,6 @@ COMMENT ON FUNCTION public.action_queue_guard_decision_fields() IS
 DO $action_queue_transition_postflight$
 DECLARE
   v_authenticated_oid oid;
-  v_anon_oid oid;
   v_postgres_oid oid;
   v_transition_oid oid;
   v_transition_owner oid;
@@ -908,10 +931,6 @@ BEGIN
   SELECT r.oid INTO v_authenticated_oid
   FROM pg_catalog.pg_roles AS r
   WHERE r.rolname = 'authenticated';
-
-  SELECT r.oid INTO v_anon_oid
-  FROM pg_catalog.pg_roles AS r
-  WHERE r.rolname = 'anon';
 
   SELECT r.oid INTO v_postgres_oid
   FROM pg_catalog.pg_roles AS r
@@ -1229,18 +1248,41 @@ BEGIN
      OR v_event_policy_total <> 2
      OR v_event_select_count <> 1
      OR v_event_append_count <> 1
-     OR EXISTS (
-       SELECT 1
-       FROM pg_catalog.pg_class AS c
-       CROSS JOIN LATERAL pg_catalog.aclexplode(
-         COALESCE(c.relacl, pg_catalog.acldefault('r', c.relowner))
-       ) AS acl
-       WHERE c.oid IN (
-         pg_catalog.to_regclass('public.action_queue'),
-         pg_catalog.to_regclass('public.action_queue_events')
-       )
-         AND acl.grantee IN (0, v_anon_oid, v_authenticated_oid)
-         AND acl.privilege_type IN ('UPDATE', 'DELETE')
+     OR NOT pg_catalog.has_table_privilege(
+       'authenticated', 'public.action_queue', 'SELECT'
+     )
+     OR NOT pg_catalog.has_table_privilege(
+       'authenticated', 'public.action_queue', 'INSERT'
+     )
+     OR NOT pg_catalog.has_table_privilege(
+       'authenticated', 'public.action_queue_events', 'SELECT'
+     )
+     OR NOT pg_catalog.has_table_privilege(
+       'authenticated', 'public.action_queue_events', 'INSERT'
+     )
+     OR pg_catalog.has_table_privilege(
+       'anon', 'public.action_queue', 'UPDATE'
+     )
+     OR pg_catalog.has_table_privilege(
+       'anon', 'public.action_queue', 'DELETE'
+     )
+     OR pg_catalog.has_table_privilege(
+       'anon', 'public.action_queue_events', 'UPDATE'
+     )
+     OR pg_catalog.has_table_privilege(
+       'anon', 'public.action_queue_events', 'DELETE'
+     )
+     OR pg_catalog.has_table_privilege(
+       'authenticated', 'public.action_queue', 'UPDATE'
+     )
+     OR pg_catalog.has_table_privilege(
+       'authenticated', 'public.action_queue', 'DELETE'
+     )
+     OR pg_catalog.has_table_privilege(
+       'authenticated', 'public.action_queue_events', 'UPDATE'
+     )
+     OR pg_catalog.has_table_privilege(
+       'authenticated', 'public.action_queue_events', 'DELETE'
      ) THEN
     RAISE EXCEPTION USING
       ERRCODE = '55000',

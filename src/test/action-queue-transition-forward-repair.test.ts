@@ -109,6 +109,36 @@ describe("Action Queue transition forward repair migration", () => {
     );
   });
 
+  it("attests required read/insert grants and effective mutation denial", () => {
+    const sql = repairSql();
+
+    for (const [table, privilege] of [
+      ["action_queue", "SELECT"],
+      ["action_queue", "INSERT"],
+      ["action_queue_events", "SELECT"],
+      ["action_queue_events", "INSERT"],
+    ]) {
+      const pattern = new RegExp(
+        `has_table_privilege\\(\\s*'authenticated'\\s*,\\s*'public\\.${table}'\\s*,\\s*'${privilege}'\\s*\\)`,
+        "gi",
+      );
+      expect(sql.match(pattern)?.length ?? 0).toBeGreaterThanOrEqual(2);
+    }
+
+    for (const role of ["anon", "authenticated"]) {
+      for (const table of ["action_queue", "action_queue_events"]) {
+        for (const privilege of ["UPDATE", "DELETE"]) {
+          expect(sql).toMatch(
+            new RegExp(
+              `or\\s+pg_catalog\\.has_table_privilege\\(\\s*'${role}'\\s*,\\s*'public\\.${table}'\\s*,\\s*'${privilege}'\\s*\\)`,
+              "i",
+            ),
+          );
+        }
+      }
+    }
+  });
+
   it("exposes the SECURITY DEFINER RPC only to authenticated and pins an empty search path", () => {
     const sql = repairSql();
 

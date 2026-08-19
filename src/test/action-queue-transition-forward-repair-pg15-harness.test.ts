@@ -111,6 +111,8 @@ describe("Action Queue transition forward-repair PostgreSQL 15 runtime gate", ()
       "proveGuardSourceRejected",
       "proveGuardTriggerRejected",
       "proveRlsDisabledRejected",
+      "proveRequiredGrantDriftRejected",
+      "proveInheritedMutationGrantRejected",
     ]) {
       expect(source).toContain(proof);
     }

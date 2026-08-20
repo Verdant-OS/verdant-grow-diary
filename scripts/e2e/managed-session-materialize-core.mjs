@@ -126,11 +126,24 @@ export function buildManagedSessionEnv({ sessionJson, storageKey, projectRef }) 
   return env;
 }
 
-/** Serialize an env map to `KEY=$'...'`-safe dotenv lines (single-quoted). */
+function serializeDotenvValue(value) {
+  const text = String(value);
+  if (text.includes("\r") || text.includes("\n")) {
+    throw new Error("managed_session_env_value_contains_newline");
+  }
+  // Bun treats backslash-escaped double quotes in a double-quoted env value as
+  // literal backslashes. Single quotes preserve the JSON bytes; encoding any
+  // apostrophe as a JSON unicode escape keeps the dotenv boundary closed while
+  // JSON.parse restores the original character. Bun expands `$NAME` in every
+  // quote style, so escape dollar signs to preserve untrusted session bytes.
+  return `'${text.replaceAll("$", "\\$").replaceAll("'", "\\u0027")}'`;
+}
+
+/** Serialize an env map to single-quoted, Bun-compatible dotenv lines. */
 export function serializeEnvFile(env) {
   return (
     Object.entries(env)
-      .map(([k, v]) => `${k}=${JSON.stringify(String(v))}`)
+      .map(([k, v]) => `${k}=${serializeDotenvValue(v)}`)
       .join("\n") + "\n"
   );
 }

@@ -150,8 +150,8 @@ Variable names only — never document values.
 - `LOVABLE_BROWSER_SUPABASE_STORAGE_KEY`
 - `LOVABLE_BROWSER_COOKIES_JSON` (optional, canonical)
 - `LOVABLE_BROWSER_SUPABASE_COOKIES_JSON` (optional, legacy fallback)
-- `LOVABLE_E2E_TARGET_PROJECT_REF` (required for teardown; optional
-  belt-and-suspenders for seed/preflight)
+- `LOVABLE_E2E_TARGET_PROJECT_REF` (required exact project pin for
+  materialization, preflight, seed, browser proof, and teardown)
 
 ### Machine-readable receipts
 
@@ -476,7 +476,6 @@ Slice 4e — Quick Log handoff for capturing a new follow-up photo.
 - No schema, RLS, migration, Edge, auth, storage-policy, AI, device,
   or Action Queue write-path changes in this slice.
 
-
 ## Action Response Memory V1 — Milestone 5 status
 
 Milestone 5 turns the completed Action Queue lifecycle into durable,
@@ -513,7 +512,7 @@ Contract notes for Milestone 5:
 - The canonical response row is the Slice 4c evidence row
   (`diary_entries.details.event_type = "action_followup"`) **with an
   explicit grower-selected `details.outcome`** (`improved | unchanged |
-  declined | too_soon | unclear`). Auto reminder markers (same event type,
+declined | too_soon | unclear`). Auto reminder markers (same event type,
   no outcome) are legacy rows and never become canonical memories.
 - The authoritative relationship is `details.action_queue_id`, written by
   the evidence service from the RLS-reverified action row. Cross-surface

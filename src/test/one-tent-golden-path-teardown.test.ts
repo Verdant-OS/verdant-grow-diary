@@ -216,7 +216,8 @@ describe("fixture scope protection", () => {
 
   it("fixture identity stays in lockstep with the seed script (drift guard)", () => {
     const seedSrc = readFileSync(join(ROOT, "scripts/e2e/seed-one-tent-golden-path.mjs"), "utf8");
-    expect(seedSrc).toContain('goldenMarker: "[GOLDEN-PATH-FIXTURE]"');
+    expect(seedSrc).toContain('DEFAULT_FIXTURE_MARKER = "[GOLDEN-PATH-FIXTURE]"');
+    expect(seedSrc).toContain("goldenMarker: declaredFixtureMarker || DEFAULT_FIXTURE_MARKER");
     expect(seedSrc).toContain('growName: "One-Tent Golden Run"');
     expect(seedSrc).toContain('tentName: "Flower Tent A"');
     expect(seedSrc).toContain('plantName: "Golden Plant 1"');

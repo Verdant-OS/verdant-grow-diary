@@ -116,7 +116,14 @@ describe("Quick Log Playwright harness safety", () => {
       // Golden-path UI spec reads action_queue via `.from(...).select(...)`
       // to verify the grower-approved suggestion + dedupe fence. No writes.
       if (/one-tent-loop-golden-path-ui/.test(file)) continue;
-      expect(scrubbed, `${file} must not call action_queue`).not.toMatch(/action_queue/);
+      // The deterministic AI response helper carries exactly the product
+      // contract's `action_queue_suggestion` response field as inert fixture
+      // data. Remove only that token; every other action_queue identifier and
+      // the raw call-site checks below remain guarded.
+      const actionQueueScrubbed = /oneTentAiDoctorResponse/.test(file)
+        ? scrubbed.replace(/\baction_queue_suggestion\b/g, "")
+        : scrubbed;
+      expect(actionQueueScrubbed, `${file} must not call action_queue`).not.toMatch(/action_queue/);
       expect(scrubbed, `${file} must not call functions.invoke`).not.toMatch(/functions\.invoke/);
       expect(scrubbed, `${file} must not import mini-chart UI`).not.toMatch(/MiniChart|mini-chart/);
       // The scrub blanks string literals, so runtime table access like

@@ -30,6 +30,7 @@
  */
 
 import { createClient } from "@supabase/supabase-js";
+import { resolveExactSupabaseProjectOrigin } from "./managed-session-materialize-core.mjs";
 import { evaluateManagedSession, readManagedSessionEnv } from "./one-tent-preflight-core.mjs";
 import {
   ACTION_FOLLOWUP_EVENT_TYPE,
@@ -253,16 +254,12 @@ async function main() {
 
   // Destructive tool: the target project MUST be declared and matching.
   const targetRef = (env.targetProjectRef ?? "").trim();
-  const supabaseUrl = (env.supabaseUrl ?? "").trim();
-  let targetVerified = false;
-  if (targetRef && supabaseUrl) {
-    try {
-      targetVerified = new URL(supabaseUrl).host.startsWith(`${targetRef}.`);
-    } catch {
-      targetVerified = false;
-    }
-  }
-  if (!targetVerified) blocked("target_project_unverified");
+  const configuredSupabaseUrl = (env.supabaseUrl ?? "").trim();
+  const supabaseUrl = resolveExactSupabaseProjectOrigin({
+    supabaseUrl: configuredSupabaseUrl,
+    targetProjectRef: targetRef,
+  });
+  if (!supabaseUrl) blocked("target_project_unverified");
 
   const anonKey = process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
   if (!anonKey) blocked("missing_supabase_config", true);

@@ -59,7 +59,10 @@ test.describe("One-Tent Loop interaction counter baseline", () => {
     await seedFakeSession(page);
     await mockSignedInSupabase(page, world, counter);
 
-    await driver.gotoCounted(`/plants/${FAKE_PLANT_ID}`);
+    // SETUP, not measurement: S1a's journey starts with the grower already
+    // on Plant Detail, so arriving there is not one of their interactions.
+    // Counting it inflated the authoritative before-value by one transition.
+    await page.goto(`/plants/${FAKE_PLANT_ID}`);
     // Cold-compile tolerance, not a measurement: the first spec in a run pays
     // the dev server's route compile, which can exceed the action timeout.
     // Waiting for readiness with an explicit budget keeps the measured
@@ -80,22 +83,29 @@ test.describe("One-Tent Loop interaction counter baseline", () => {
 
     console.log(serializeInteractionCountReceipt(receipt));
 
-    // Exact baseline values (S1a). The route transition is the navigation
-    // that puts the grower on the plant page; the 3 taps are the journey.
-    expect(receipt.clicks).toBe(3);
-    expect(receipt.fills).toBe(0);
-    expect(receipt.keypresses).toBe(0);
-    expect(receipt.target_reselections).toBe(0);
-    expect(receipt.route_transitions).toBe(1);
-    // Exactly one save, through the canonical contract. `has_role` is the
-    // app's read-only role probe (PostgREST addresses RPCs over POST), so it
-    // is tallied by name and is not a write.
-    expect(receipt.supabase_writes.rpc["quicklog_save_manual"]).toBe(1);
-    // Zero direct table writes: a second persistence path would show here.
-    expect(receipt.supabase_writes.rest_post).toBe(0);
-    expect(receipt.supabase_writes.rest_patch).toBe(0);
-    expect(receipt.supabase_writes.rest_delete).toBe(0);
-    expect(receipt.paid_ai_requests).toBe(0);
+    // The COMPLETE receipt, asserted as one object. Field-by-field checks
+    // leave the unasserted fields free to drift, and an added write RPC would
+    // simply appear beside the expected one while a per-key assertion still
+    // passed. Exact equality is what makes this an authoritative before-value.
+    // `has_role` is the app's read-only role probe — PostgREST addresses RPCs
+    // over POST, so it is tallied by name and is not a write.
+    expect(receipt).toEqual({
+      schema_version: "1",
+      scenario: "s1a-plant-status-save",
+      status: "measured",
+      clicks: 3,
+      fills: 0,
+      keypresses: 0,
+      target_reselections: 0,
+      route_transitions: 0,
+      supabase_writes: {
+        rest_post: 0,
+        rest_patch: 0,
+        rest_delete: 0,
+        rpc: { has_role: 1, quicklog_save_manual: 1 },
+      },
+      paid_ai_requests: 0,
+    });
   });
 
   test("S7: post-save timeline evidence costs at most one continuation action", async ({
@@ -109,7 +119,8 @@ test.describe("One-Tent Loop interaction counter baseline", () => {
     await seedFakeSession(page);
     await mockSignedInSupabase(page, world, counter);
 
-    await driver.gotoCounted(`/plants/${FAKE_PLANT_ID}`);
+    // SETUP, not measurement (see S1a).
+    await page.goto(`/plants/${FAKE_PLANT_ID}`);
     await waitForReady(page.getByTestId("plant-detail-quick-log-open"));
     await driver.click(page.getByTestId("plant-detail-quick-log-open"));
     await driver.click(page.getByTestId("plant-response-check-better"));
@@ -118,20 +129,53 @@ test.describe("One-Tent Loop interaction counter baseline", () => {
       .poll(() => counter.snapshot().supabase_writes.rpc["quicklog_save_manual"] ?? 0)
       .toBe(1);
 
-    // Continuation: reach the Timeline where the saved entry is evidence.
-    await driver.gotoCounted("/timeline");
+    // Continuation: the grower's REAL affordance — the app's own Timeline
+    // navigation. Driving this with page.goto() would measure a scripted URL
+    // jump, not a continuation, and would under-count the grower's tap.
+    //
+    // Measured, not assumed: the contextual "Open Timeline" button in the
+    // recent-activity panel (`plant-recent-activity-open-timeline`) is present
+    // in the DOM after a save but resolves as NOT VISIBLE on the desktop
+    // viewport, so it is not a reachable continuation here. The always-visible
+    // sidebar link is what a grower can actually tap. That asymmetry is
+    // recorded in the baseline rather than papered over.
+    await driver.click(page.getByRole("link", { name: "Timeline", exact: true }).first());
+    // Verify only. expectRoute records the transition the click caused; the
+    // click itself is the interaction. Pairing gotoCounted with expectRoute
+    // for one navigation double-counts it.
     await driver.expectRoute("/timeline");
+
+    // Evidence must actually RENDER. Asserting on the mock's backing array
+    // alone would stay green if Timeline loading, grow scoping, merging, or
+    // rendering regressed — the test would claim "correct Timeline evidence"
+    // for an empty page.
+    await expect(page.getByText("Better").first()).toBeVisible({ timeout: 15_000 });
 
     const receipt = counter.snapshot();
 
     console.log(serializeInteractionCountReceipt(receipt));
 
-    expect(receipt.fills).toBe(0);
-    // One deliberate continuation beyond the save journey's 3 taps.
-    expect(receipt.clicks).toBe(3);
-    expect(receipt.supabase_writes.rpc["quicklog_save_manual"]).toBe(1);
-    expect(receipt.supabase_writes.rest_post).toBe(0);
-    expect(receipt.paid_ai_requests).toBe(0);
+    // The COMPLETE receipt (see S1a). One deliberate continuation click
+    // beyond the save journey's 3 taps, and exactly one route transition —
+    // the timeline navigation that click caused. Arriving on Plant Detail is
+    // setup and is not counted.
+    expect(receipt).toEqual({
+      schema_version: "1",
+      scenario: "s7-save-to-timeline",
+      status: "measured",
+      clicks: 4,
+      fills: 0,
+      keypresses: 0,
+      target_reselections: 0,
+      route_transitions: 1,
+      supabase_writes: {
+        rest_post: 0,
+        rest_patch: 0,
+        rest_delete: 0,
+        rpc: { has_role: 1, quicklog_save_manual: 1 },
+      },
+      paid_ai_requests: 0,
+    });
     // The saved row is the single piece of timeline evidence.
     expect(world.savedRows).toHaveLength(1);
   });

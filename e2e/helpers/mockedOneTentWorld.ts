@@ -117,6 +117,9 @@ export async function seedFakeSession(page: Page): Promise<void> {
  * Fulfill a PostgREST read honestly for both list and `.single()` callers:
  * object-accept requests get the first row as a bare object.
  */
+/** Edge functions that meter AI credits (AGENTS.md — AI Credit Enforcement). */
+const PAID_AI_EDGE_FUNCTIONS = ["ai-doctor-review", "ai-coach"] as const;
+
 function fulfillRows(route: Route, request: Request, rows: unknown[]): Promise<void> {
   const accept = request.headers()["accept"] ?? "";
   const wantsObject = accept.includes("vnd.pgrst.object");
@@ -230,9 +233,19 @@ export async function mockSignedInSupabase(
 
   // Paid-AI fence: edge functions stubbed, model hosts aborted, and any leak
   // recorded so an assertion of zero paid requests can catch it.
-  await page.route(/\/functions\/v1\//, (route) =>
-    route.fulfill({ status: 404, contentType: "application/json", body: "{}" }),
-  );
+  //
+  // The metered functions are counted HERE, before the stub answers. A paid
+  // call made through an edge function reaches the provider server-side, so
+  // the browser never sees the model host — the model-host route below cannot
+  // observe it. Counting only there would leave `paid_ai_requests === 0`
+  // green after a regression that starts spending real credits.
+  await page.route(/\/functions\/v1\//, (route, request) => {
+    const path = new URL(request.url()).pathname;
+    if (PAID_AI_EDGE_FUNCTIONS.some((fn) => path.endsWith(`/${fn}`))) {
+      counter?.recordPaidAiRequest();
+    }
+    return route.fulfill({ status: 404, contentType: "application/json", body: "{}" });
+  });
   await page.route(/openai|anthropic|api\.groq/i, (route) => {
     counter?.recordPaidAiRequest();
     return route.abort();

@@ -106,7 +106,13 @@ export function resolveDoctorStartScope(input: ResolveDoctorStartScopeInput): Do
   // tent would be a quiet lie about where the grower is.
   if (tent && grow) {
     const owner = tentGrowId(tent);
-    if (owner && owner !== trimmed(grow.id)) {
+    // `!owner` is deliberate, not an oversight: the schema permits a null
+    // grow_id on legacy tents, and accepting one here would apply an
+    // UNVERIFIED pair — a fail-open in a fail-closed function. When a grow is
+    // carried, an unknown relationship is treated exactly like a wrong one.
+    // (With no grow carried there is nothing to contradict, so an owner-less
+    // tent still stands — that case never reaches this branch.)
+    if (!owner || owner !== trimmed(grow.id)) {
       tent = null;
       invalid = true;
     }

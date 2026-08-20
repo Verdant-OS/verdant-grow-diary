@@ -96,6 +96,37 @@ describe("resolveDoctorStartScope — fail-closed validation", () => {
     expect(result.hasInvalidScope).toBe(true);
   });
 
+  it("rejects a tent whose grow relationship cannot be PROVEN, not just one that conflicts", () => {
+    // The schema permits a null grow_id on legacy tents. Accepting such a tent
+    // alongside a carried grow would apply and badge an unverified pair — a
+    // fail-OPEN in a function whose whole contract is fail-closed. "Unknown
+    // relationship" must be treated like "wrong relationship".
+    const orphanTent = [{ id: "tent-orphan", name: "Legacy Tent", grow_id: null }];
+    const result = resolveDoctorStartScope({
+      urlGrowId: "grow-1",
+      urlTentId: "tent-orphan",
+      visibleGrows: GROWS,
+      visibleTents: orphanTent,
+    });
+    expect(result.growId).toBe("grow-1");
+    expect(result.tentId).toBeNull();
+    expect(result.hasInvalidScope).toBe(true);
+  });
+
+  it("still accepts an owner-less tent when NO grow was carried to contradict it", () => {
+    // Nothing to prove a relationship against, and nothing claiming one.
+    const orphanTent = [{ id: "tent-orphan", name: "Legacy Tent", grow_id: null }];
+    const result = resolveDoctorStartScope({
+      urlGrowId: null,
+      urlTentId: "tent-orphan",
+      visibleGrows: GROWS,
+      visibleTents: orphanTent,
+    });
+    expect(result.tentId).toBe("tent-orphan");
+    expect(result.growId).toBeNull();
+    expect(result.hasInvalidScope).toBe(false);
+  });
+
   it("accepts a tent with no carried grow, and derives the grow from the tent", () => {
     const result = scope({ urlGrowId: null, urlTentId: "tent-2" });
     expect(result.tentId).toBe("tent-2");

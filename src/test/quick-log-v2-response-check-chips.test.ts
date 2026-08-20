@@ -46,14 +46,27 @@ describe("D7 — V2 sheet response-check chips", () => {
     expect(SHEET).not.toMatch(/onClick=\{\(\) => setField\("(?!note)/);
   });
 
-  it("refuses the chip instead of overflowing NOTE_LIMIT", () => {
+  it("refuses the chip instead of overflowing NOTE_LIMIT — per status", () => {
     // `maxLength` bounds typing only. Prepending the response line to a
     // near-limit note would push the note past the limit the watering write
     // enforces, and that rejection locks the retry record and costs the draft.
-    expect(SHEET).toMatch(/responseCheckOverflows[\s\S]{0,200}> NOTE_LIMIT/);
+    //
+    // Renegotiated: the guard was an aggregate `some(...)` across all three
+    // statuses, which disabled every chip as soon as the LONGEST line
+    // overflowed — taking away choices that still fit. The lines differ in
+    // length, so the decision has to be per status.
+    expect(SHEET).toMatch(/responseCheckOverflowByStatus[\s\S]{0,300}> NOTE_LIMIT/);
     // Guarded at BOTH the disabled state and the handler.
-    expect(SHEET).toMatch(/disabled=\{[\s\S]{0,160}responseCheckOverflows/);
+    expect(SHEET).toMatch(/disabled=\{[\s\S]{0,200}responseCheckOverflowByStatus\.get\(status\)/);
     expect(SHEET).toMatch(/if \(next\.length > NOTE_LIMIT\) return;/);
+    // The aggregate survives only where it is correct: the "shorten it first"
+    // copy, which should appear only when NO status fits.
+    expect(SHEET).toMatch(
+      /everyResponseCheckOverflows[\s\S]{0,120}too long to add a response line/,
+    );
+    // And the old all-or-nothing gate cannot come back.
+    expect(SHEET).not.toMatch(/const responseCheckOverflows =/);
+    expect(SHEET).not.toMatch(/disabled=\{[\s\S]{0,200}responseCheckOverflows &&/);
   });
 
   it("clears the plant response marker when the target stops being a plant", () => {

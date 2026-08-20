@@ -41,6 +41,7 @@ import {
   actionTextWithoutResponseContext,
   applyResponseCheck,
   readResponseCheckStatus,
+  type ResponseCheckStatus,
 } from "@/lib/tenSecondQuickCheckRules";
 import { buildQuickLogV2SavePayload } from "@/lib/quickLogV2SavePayload";
 import { applyQuickLogV2Refresh } from "@/lib/quickLogV2RefreshRules";
@@ -394,8 +395,20 @@ export default function QuickLogV2Sheet({
   // the note past NOTE_LIMIT, and the watering write rejects >500, after which
   // the sheet locks the retry record and the grower loses the draft. So the
   // chip is refused BEFORE it mutates state rather than failing at save.
-  const responseCheckOverflows = RESPONSE_CHECK_STATUSES.some(
-    (status) => applyResponseCheck(form.note, status).length > NOTE_LIMIT,
+  //
+  // PER STATUS, not across all of them: the three lines are different lengths
+  // ("Better." 7, "Same." 5, "Worse." 6), so near the limit one status can
+  // overflow while the others still fit. An aggregate `some(...)` disabled
+  // every chip as soon as the longest one failed, taking two valid choices
+  // away from the grower.
+  const responseCheckOverflowByStatus = new Map<ResponseCheckStatus, boolean>(
+    RESPONSE_CHECK_STATUSES.map((status) => [
+      status,
+      applyResponseCheck(form.note, status).length > NOTE_LIMIT,
+    ]),
+  );
+  const everyResponseCheckOverflows = RESPONSE_CHECK_STATUSES.every((status) =>
+    responseCheckOverflowByStatus.get(status),
   );
   const saveHelper = wateringRetryPending
     ? "Retry sends the exact same watering record. Close and reopen Quick Log to make changes."
@@ -1607,7 +1620,8 @@ export default function QuickLogV2Sheet({
                     size="sm"
                     disabled={
                       wateringSubmissionLocked ||
-                      (responseCheckOverflows && selectedResponseStatus !== status)
+                      (responseCheckOverflowByStatus.get(status) === true &&
+                        selectedResponseStatus !== status)
                     }
                     aria-pressed={selectedResponseStatus === status}
                     data-testid={`qlv2-response-chip-${status.toLowerCase()}`}
@@ -1625,7 +1639,7 @@ export default function QuickLogV2Sheet({
                 ))}
               </div>
               <p className="text-sm text-muted-foreground">
-                {responseCheckOverflows
+                {everyResponseCheckOverflows
                   ? "Your note is too long to add a response line. Shorten it first."
                   : "Better/Same/Worse records the plant response, not the grow action."}
               </p>

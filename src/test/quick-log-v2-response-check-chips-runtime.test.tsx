@@ -15,6 +15,7 @@ import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/re
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import QuickLogV2Sheet from "@/components/QuickLogV2Sheet";
+import { RESPONSE_CHECK_STATUSES, applyResponseCheck } from "@/lib/tenSecondQuickCheckRules";
 
 const rpcMock = vi.fn();
 
@@ -150,6 +151,69 @@ describe("D7 chips — note-length boundary", () => {
     fireEvent.click(chip("better"));
     expect(noteTextarea().value).toBe(long);
     expect(noteTextarea().value.length).toBeLessThanOrEqual(NOTE_LIMIT);
+  });
+
+  it("disables only the statuses that would overflow, never the ones that fit", () => {
+    // The three lines are different lengths ("Better." 7, "Same." 5,
+    // "Worse." 6), so near the limit one status can overflow while the others
+    // still fit. Find a note where they genuinely disagree — computed from the
+    // shipped rule, not from a hardcoded guess that could drift.
+    let split: string | null = null;
+    for (let n = NOTE_LIMIT; n > NOTE_LIMIT - 40 && split === null; n -= 1) {
+      const candidate = "x".repeat(n);
+      const overflowing = RESPONSE_CHECK_STATUSES.filter(
+        (status) => applyResponseCheck(candidate, status).length > NOTE_LIMIT,
+      );
+      if (overflowing.length > 0 && overflowing.length < RESPONSE_CHECK_STATUSES.length) {
+        split = candidate;
+      }
+    }
+    expect(split, "no note length makes the statuses disagree").not.toBeNull();
+
+    renderSheet("plant:plant-1");
+    fireEvent.change(noteTextarea(), { target: { value: split as string } });
+
+    let anyEnabled = false;
+    for (const status of RESPONSE_CHECK_STATUSES) {
+      const wouldOverflow = applyResponseCheck(split as string, status).length > NOTE_LIMIT;
+      const element = chip(status.toLowerCase());
+      if (wouldOverflow) {
+        expect(element, `${status} should be disabled`).toBeDisabled();
+      } else {
+        expect(element, `${status} should stay available`).toBeEnabled();
+        anyEnabled = true;
+      }
+    }
+    expect(anyEnabled).toBe(true);
+
+    // And the "shorten it first" copy is reserved for when NOTHING fits.
+    expect(screen.getByTestId("qlv2-response-chips")).not.toHaveTextContent(
+      "Your note is too long to add a response line",
+    );
+  });
+
+  it("lets a still-fitting status be chosen at that boundary", () => {
+    let split: string | null = null;
+    let fitting: string | null = null;
+    for (let n = NOTE_LIMIT; n > NOTE_LIMIT - 40 && split === null; n -= 1) {
+      const candidate = "x".repeat(n);
+      const ok = RESPONSE_CHECK_STATUSES.filter(
+        (status) => applyResponseCheck(candidate, status).length <= NOTE_LIMIT,
+      );
+      if (ok.length > 0 && ok.length < RESPONSE_CHECK_STATUSES.length) {
+        split = candidate;
+        fitting = ok[0];
+      }
+    }
+    expect(split).not.toBeNull();
+
+    renderSheet("plant:plant-1");
+    fireEvent.change(noteTextarea(), { target: { value: split as string } });
+    fireEvent.click(chip((fitting as string).toLowerCase()));
+
+    expect(noteTextarea().value).toContain(`Response check: ${fitting}.`);
+    expect(noteTextarea().value.length).toBeLessThanOrEqual(NOTE_LIMIT);
+    expect(chip((fitting as string).toLowerCase())).toHaveAttribute("aria-pressed", "true");
   });
 
   it("re-enables the chips once the note is short enough again", () => {

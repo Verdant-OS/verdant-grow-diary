@@ -256,4 +256,25 @@ describe("D7 chips — a plant response never survives a switch to a tent", () =
     expect(note).not.toContain("Response check:");
     expect(note).toContain("Watered 1L, runoff clear.");
   });
+
+  it("never rewrites ordinary prose the grower types into a tent note", () => {
+    // The cleanup exists to undo what a CHIP wrote, not to police the grower's
+    // words. `readResponseCheckStatus` matches anywhere in the note, so a
+    // cleanup that ran whenever the chips are merely absent would silently
+    // edit this sentence down to "Previous after watering".
+    renderSheet("tent:tent-1");
+    const prose = "Previous response check: better after watering. Runoff clear.";
+    fireEvent.change(noteTextarea(), { target: { value: prose } });
+
+    expect(screen.queryByTestId("qlv2-response-chips")).not.toBeInTheDocument();
+    expect(noteTextarea().value).toBe(prose);
+  });
+
+  it("leaves the same prose alone on a plant draft too", () => {
+    renderSheet("plant:plant-1");
+    const prose = "Previous response check: better after watering. Runoff clear.";
+    fireEvent.change(noteTextarea(), { target: { value: prose } });
+
+    expect(noteTextarea().value).toBe(prose);
+  });
 });

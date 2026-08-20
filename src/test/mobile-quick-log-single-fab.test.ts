@@ -73,11 +73,18 @@ describe("Tent Detail Quick Log — one fixed entry point", () => {
     expect(TENT_DETAIL).toMatch(
       /<QuickLogV2Fab\s+defaultTargetKey=\{\s*tent\?\.id\s*\?\s*\(safePlantId\s*\?\s*`plant:\$\{safePlantId\}`\s*:\s*`tent:\$\{tent\.id\}`\)\s*:\s*null\s*\}/,
     );
-    // safePlantId is null unless exactly one active plant exists, so no
-    // default plant can be invented for a multi-plant tent.
+    // safePlantId is null unless exactly one active plant exists AND the
+    // roster query has settled, so no default plant can be invented for a
+    // multi-plant tent — or from a cached one-plant result that a pending
+    // refetch is about to contradict.
     expect(TENT_DETAIL).toMatch(
-      /const safePlantId = activePlants\.length === 1 \? \(activePlants\[0\]\?\.id \?\? null\) : null;/,
+      /const verifiedActivePlantCount = resolveVerifiedAssignedPlantCount\(activePlantsQuery\)/,
     );
+    expect(TENT_DETAIL.replace(/\s+/g, " ")).toMatch(
+      /const safePlantId = verifiedActivePlantCount === 1 \? \(activePlants\[0\]\?\.id \?\? null\) : null;/,
+    );
+    // The raw length read cannot come back.
+    expect(TENT_DETAIL).not.toMatch(/const safePlantId = activePlants\.length === 1/);
     expect(TENT_DETAIL.match(/<QuickLogV2Fab\b/g) ?? []).toHaveLength(1);
   });
 

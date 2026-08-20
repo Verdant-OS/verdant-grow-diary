@@ -507,8 +507,16 @@ export default function QuickLogV2Sheet({
   // stays in the note and would persist a plant-response marker against a tent
   // entry — mislabeling the row for every downstream response parser. Strip it
   // when the target stops being a plant, preserving any action prose.
+  const responseCheckWasVisibleRef = useRef(showResponseCheck);
   useEffect(() => {
-    if (showResponseCheck) return;
+    const wasVisible = responseCheckWasVisibleRef.current;
+    responseCheckWasVisibleRef.current = showResponseCheck;
+    // Only on the plant -> non-plant TRANSITION. Running whenever the chips
+    // are merely absent would rewrite ordinary prose the grower types into a
+    // tent-scoped note — "Previous response check: better after watering"
+    // would silently become "Previous after watering". Never edit a grower's
+    // words; only undo what a chip wrote.
+    if (!wasVisible || showResponseCheck) return;
     if (!readResponseCheckStatus(form.note)) return;
     setField("note", actionTextWithoutResponseContext(form.note));
   }, [showResponseCheck, form.note, setField]);

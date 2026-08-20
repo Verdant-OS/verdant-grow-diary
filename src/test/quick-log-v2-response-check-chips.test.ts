@@ -72,9 +72,20 @@ describe("D7 — V2 sheet response-check chips", () => {
   it("clears the plant response marker when the target stops being a plant", () => {
     // A response marker describes a plant; leaving it on a tent-scoped entry
     // would mislabel the row for every downstream response parser.
-    expect(SHEET).toMatch(
-      /if \(showResponseCheck\) return;[\s\S]{0,200}actionTextWithoutResponseContext\(form\.note\)/,
+    //
+    // Renegotiated: the guard was "the chips are absent", which fires on every
+    // keystroke of a tent-scoped note. `readResponseCheckStatus` matches
+    // anywhere in the text, so ordinary prose ("Previous response check:
+    // better after watering") was silently rewritten. It now fires only on the
+    // plant -> non-plant TRANSITION.
+    expect(SHEET.replace(/\s+/g, " ")).toMatch(
+      /const wasVisible = responseCheckWasVisibleRef\.current; responseCheckWasVisibleRef\.current = showResponseCheck;/,
     );
+    expect(SHEET).toMatch(
+      /if \(!wasVisible \|\| showResponseCheck\) return;[\s\S]{0,200}actionTextWithoutResponseContext\(form\.note\)/,
+    );
+    // The unconditional "chips absent" guard cannot come back.
+    expect(SHEET).not.toMatch(/^\s*if \(showResponseCheck\) return;\s*$/m);
   });
 
   it("never pre-fills the note — the optional-note contract is preserved", () => {

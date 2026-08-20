@@ -24,6 +24,7 @@ vi.mock("@/integrations/supabase/client", () => ({
 import { LocalDataHealthPanel } from "@/components/LocalDataHealthPanel";
 import {
   clearLocalStorageForTest,
+  getLocalStorageItemForTest,
   setLocalStorageItemForTest,
 } from "./helpers/localStorageTestHelper";
 
@@ -228,7 +229,7 @@ describe("LocalDataHealthPanel — the account uuid survives no fallback path", 
     await waitFor(() => expect(screen.getByText(/Backup saved/)).toBeInTheDocument());
 
     // The value really is gone, and no stage of the flow printed the account.
-    expect(window.localStorage.getItem(`verdant.quickLog.lastTarget.v2.${ACCOUNT_A}`)).toBeNull();
+    expect(getLocalStorageItemForTest(`verdant.quickLog.lastTarget.v2.${ACCOUNT_A}`)).toBeNull();
     expect(document.body.textContent ?? "").not.toContain(ACCOUNT_A);
   });
 });

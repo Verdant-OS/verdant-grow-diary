@@ -774,6 +774,22 @@ policy 403 — `BLOCKED`); the pack carries the 2026-08-15 stamp `5e2fcedd4271`
 (#984) explicitly labeled as last measurement. Workspace knowledge unchanged.
 Still no Knowledge sync automation authorized and no owner assigned for one.
 
+**Recorded 2026-08-20 (ADVISORY, NOT APPROVED):** Claude triaged an owner-supplied
+100-prompt Lovable build roadmap against the shipping branch at `77d8eec95eac`.
+Deliverable: `docs/lovable/verdant-lovable-prompt-triage-2026-08-20.md`. It selects
+and rewrites eight prompts and rejects the rest with reasons. **It authorizes
+nothing** — no implementation, no schema, no Lovable send, no production write. Two
+findings other agents should not have to rediscover: (1) prompt #96 asks for a
+**Stripe** checkout UI, but production runs **Paddle** (233 references, five live
+edge functions) — sending it would put a second payment provider into a live billing
+system; (2) prompt #60 asks to visually smooth anomalous sensor spikes such as 0%
+humidity, which inverts the Hard Safety Rule on unhealthy telemetry, and is included
+in the pack only in flag-and-label form. Seven of the eight picks require zero new
+tables, chosen deliberately because migrations do not auto-apply (see the second-drift
+section above). Tranche A edit points, PRs #828/#817/#696, and the single
+`quicklog_save_manual` write path were treated as collision boundaries; no pick lands
+inside them. Docs-only; no code, schema, or migration changes.
+
 In scope — these bullets scope the **Mode A SEO parent program above**, not the completed
 #809 entry:
 

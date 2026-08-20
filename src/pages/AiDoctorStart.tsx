@@ -125,9 +125,9 @@ export default function AiDoctorStart() {
               className="mt-2 text-sm text-muted-foreground"
               data-testid="ai-doctor-start-tent-context"
             >
-              Carried from your sensor snapshot in{" "}
-              <span className="font-medium text-foreground">{resolvedScope.tentName}</span>. Plants
-              in that tent are listed first — you can still choose any plant.
+              This link carried tent context:{" "}
+              <span className="font-medium text-foreground">{resolvedScope.tentName}</span>. Its
+              plants are listed first — you can still choose any plant.
             </p>
           ) : null}
           {scopeReadFailed && carriedScopeRequested ? (

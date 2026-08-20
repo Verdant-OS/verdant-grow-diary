@@ -177,7 +177,12 @@ describe("AiDoctorStart", () => {
     state.data = SCOPED.plants;
     renderPage("/doctor?growId=grow-1&tentId=tent-a");
 
-    expect(screen.getByTestId("ai-doctor-start-tent-context")).toHaveTextContent("Tent A");
+    const tentContext = screen.getByTestId("ai-doctor-start-tent-context");
+    expect(tentContext).toHaveTextContent("Tent A");
+    // Origin-neutral: the URL carries no provenance, and B4b (the Sensors
+    // producer) is deferred, so claiming the context came from Sensor Snapshot
+    // would assert a navigation history Verdant cannot observe.
+    expect(tentContext).not.toHaveTextContent(/sensor snapshot/i);
     const options = screen.getAllByRole("link", { name: /with AI Doctor/i });
     // Alpha (in tent-a) is promoted above Beta, but Beta is still choosable —
     // the doctrine is an explicit choice, and a shortened list is a soft guess.

@@ -2,7 +2,11 @@
 
 **Date:** 2026-08-20
 **Author:** Claude (Knowledge Library and Product Specification Architect)
-**Audited ref:** `verdant-grow-diary` @ `77d8eec95eac` — the branch that actually ships
+**Audited ref:** `verdant-grow-diary` @ `cff3efd` — the branch that actually ships
+**Revision:** 2 — re-audited at `cff3efd` after the deploy branch advanced from
+`77d8eec` (three merges: #1035 quicklog review fixes, #1039 **B0a** interaction-counter
+harness, #1047 **B4a** `/doctor` loop card). Revision 1 was pinned at `77d8eec`.
+Changes in this revision are summarised in §10.
 **Status:** ADVISORY / NOT APPROVED. This document selects and rewrites prompts.
 It authorizes no implementation, no schema, no Lovable send, and no production write.
 
@@ -11,9 +15,9 @@ It authorizes no implementation, no schema, no Lovable send, and no production w
 ## 1. Executive recommendation
 
 The 100-prompt roadmap is well-constructed **for a project that does not exist yet.**
-Verdant is not that project. At the audited ref it carries **131 pages, 270 migrations,
-and 35+ edge functions**, with a live public site, a live billing provider, and a live
-AI Doctor. `established fact`, measured by directory count at `77d8eec`.
+Verdant is not that project. At the audited ref it carries **129 page components, 270
+migrations, and 34 edge functions**, with a live public site, a live billing provider,
+and a live AI Doctor. `established fact`, measured by file count at `cff3efd`.
 
 Sent as written, the list would not build Verdant. It would build a **second Verdant
 inside the first one** — a parallel app shell (prompts 1–10) writing to a parallel schema
@@ -32,26 +36,26 @@ cost** — for a reason specific to this repo, explained in §3.
 
 ## 2. Audit findings — what already ships
 
-`established fact`, by source search at the audited ref. Sending these to a builder
+`established fact`, re-verified by source search at `cff3efd`. Sending these to a builder
 would produce a competing implementation of a shipped feature, which
 `AGENTS.md` → Multi-Agent Coordination forbids.
 
-| Prompt | Claim | Reality at `77d8eec` |
+| Prompt | Claim | Reality at `cff3efd` |
 | --- | --- | --- |
 | #5 Quick Log FAB | "implement a FAB" | `AppShell.tsx`, with mobile-FAB tests; plant scoping merged as Tranche A PR-A1 (#1029) |
-| #8 Breadcrumbs | "design a breadcrumb component" | `GrowBreadcrumbs.tsx` + `ui/breadcrumb.tsx` |
-| #9 Skeleton loaders | "implement skeleton states" | `ui/skeleton.tsx`, `ActionQueueLoadingSkeleton.tsx` |
+| #8 Breadcrumbs | "design a breadcrumb component" | `GrowBreadcrumbs.tsx` (22 files reference it) |
+| #9 Skeleton loaders | "implement skeleton states" | `ui/skeleton.tsx`, `ActionQueueLoadingSkeleton.tsx` (16 files) |
 | #29 Move plant between tents | "create a Move Plant action" | `PlantRecentMoveCard.tsx`, `TentCardActionsMenu.tsx` |
-| #33 Genetics lineage | "show a family tree" | `GeneticsBadge.tsx`, `LineageRepairCta.tsx` |
-| #34 Pheno-hunt matrix | "build a comparison table" | `PhenoComparisonView.tsx`, live route `/pheno-comparison` |
-| #35 Terpene radar | "aroma tagging widget" | `PhenoProductSamplingSection.tsx`, `CultivarPhenoSampleModule.tsx` |
+| #33 Genetics lineage | "show a family tree" | `GeneticsBadge.tsx`, `LineageRepairCta.tsx` (19 files) |
+| #34 Pheno-hunt matrix | "build a comparison table" | `PhenoComparisonView.tsx`, live route `/pheno-comparison` (44 files) |
+| #35 Terpene radar | "aroma tagging widget" | `CultivarPhenoSampleModule.tsx`, `PhenoProductSamplingSection.tsx` |
 | #56 VPD optimal zone | "shade the optimal band" | `VpdTimelineStatusWidget.tsx`, `DerivedVpdStatus.tsx`, `AiDoctorVpdDriftSection.tsx` |
 | #75 AI missing-data alert | "list what's missing" | Already a constitutional requirement of AI Doctor output; present in Doctor panels |
 | #76 AI confidence score | "add a confidence meter" | Confidence is a mandated AI Doctor output field |
-| #80 Approval-required queue | "user must click Approve" | Action Queue is approval-required **by constitution**, and shipped |
+| #80 Approval-required queue | "user must click Approve" | Action Queue is approval-required **by constitution**, and shipped (345 files touch it) |
 | #97 Cmd+K omni-search | "build a command palette" | `GlobalSearchDialog.tsx` + `ui/command.tsx` |
 | #98 Export to PDF | "format the diary to PDF" | `grow-diary-pdf-export.test.ts`, `PostGrowLearningReportCards.tsx` |
-| #99 Metric/Imperial toggle | "toggle unit systems" | ~80 files consume unit preference (`SensorChart`, `QuickLogWateringForm`, …) |
+| #99 Metric/Imperial toggle | "toggle unit systems" | `formatTemperatureDisplay` and the unit-preference layer, consumed app-wide |
 
 `practical observation`: prompts 71–80 read as a description of the AI Doctor Verdant
 already has. The 4-agent pipeline framing (#72) is a **UI animation** prompt, not an
@@ -92,13 +96,17 @@ grower. That is the selection filter, not polish.
 Ranked. Each entry gives the reason, the rewritten prompt (brownfield-safe), and the
 guardrail. Prompts are rewritten because the originals assume an empty project.
 
+Absence claims below were re-measured at `cff3efd`; the exact search terms are recorded
+so anyone can reproduce them.
+
 ### Pick 1 — #82 Yield Analytics (g/W and g/sq ft) · **zero new schema**
 
 **Why this is the single highest-leverage prompt in the list.** Both operands already
 exist in the database and nothing multiplies them. `established fact`: `wet_weight_grams`
 and `dry_weight_grams` are captured in `quickLogActivityTypes.ts` and
 `harvestCureQuickLogPersistencePayload.ts`; tent wattage is captured via
-`EditTentDialog.tsx`. Search for `gramsPerWatt` / `yieldEfficiency` returns **zero hits.**
+`EditTentDialog.tsx`. Search for `gramsPerWatt|gPerWatt|gramsPerSquare|yieldEfficiency`
+returns **zero hits at `cff3efd`.**
 
 Verdant records everything needed to answer *"did this grow actually work?"* and then
 never answers it. That is the product promise — *Plant memory. Sensor truth. Better
@@ -123,8 +131,9 @@ real harvest.
 **Why:** root-zone correctness is priority #2 in the constitution's own cultivation
 ordering, behind only environmental stability. `established fact`: runoff pH/EC capture
 already exists (`QuickLogWateringForm.tsx`, `StructuredWateringEntry.tsx`,
-`TentIrrigationHistoryPanel.tsx`); searches for `runoffDifferential` / `phDrift` return
-**zero hits.** Growers are already entering the numbers and getting nothing back.
+`TentIrrigationHistoryPanel.tsx`); searching `runoffDifferential|runoff_delta|phDrift|
+rootZoneDrift` returns **zero hits at `cff3efd`.** Growers are already entering the
+numbers and getting nothing back.
 
 Input-vs-runoff divergence over time is the single most diagnostic cultivation signal a
 diary can compute. It catches salt buildup and lockout *before* the leaves show it —
@@ -143,52 +152,84 @@ which is the difference between a diary and a decision tool.
 irrigation change recommendations from weak evidence. Drift math is evidence; the
 prescription is not this slice's to make.
 
-### Pick 3 — #49 Duplicate Previous Day · **zero new schema**
+### Pick 3 — #49 Duplicate Previous Day · **zero new schema · now has a measured target**
 
-**Why:** zero hits, and it is exactly what the currently-approved Tranche B+ efficiency
-program is for. Daily logging is where diary apps die — a grower who must retype the same
-feed for the fourth night stops logging, and a diary with gaps cannot support AI Doctor
-context, which is the whole dependency chain.
+**Why, and this got stronger in revision 2.** `established fact`: searching
+`duplicatePrevious|copyPreviousDay|repeatLast|sameAsLast` returns **zero hits at
+`cff3efd`** — no repeat shortcut exists. Daily logging is where diary apps die: a grower
+who must retype the same feed for the fourth night stops logging, and a diary with gaps
+cannot support AI Doctor context.
+
+**What changed:** #1039 landed the **B0a interaction-counter harness** and a measured
+baseline at `docs/one-tent-loop-efficiency-baseline.md`. Its scenario table names
+**S5 — "Global/mobile entry → repeat the last valid target"** at **≥5 interactions and
+1+ target reselections** — the most expensive row in the whole table. That is precisely
+what this pick attacks, so the win can now be *measured* rather than asserted.
+
+Read the evidence class carefully: `established fact` that **S1a and S7 are automated and
+passing (2/2)** in `e2e/one-tent-loop-interaction-counter.spec.ts`. **S5 is a documented
+estimate in the table, not a runtime receipt** — no automated scenario drives it yet.
 
 > **Prompt:** Add a "Same as last time" action to the existing Quick Log form that
 > pre-fills the current draft from the grower's most recent entry of the same activity
 > type for the same plant. Pre-fill only; the grower must still review and submit. Stamp
 > the new entry with its own real timestamp — never copy the source timestamp. Persist
 > exclusively through the existing `quicklog_save_manual` path; do not add a new write
-> path or RPC. Show clearly which entry was used as the source.
+> path or RPC. Show clearly which entry was used as the source. Then extend
+> `e2e/one-tent-loop-interaction-counter.spec.ts` with an S5 scenario that counts the
+> repeat-target journey before and after, and update the S5 row in
+> `docs/one-tent-loop-efficiency-baseline.md` with the measured result.
 
-**Guardrail — the important one:** `quicklog_save_manual` is the **single sanctioned
-manual write path** (`docs/specs/one-tent-loop-quicklog-single-write-path.md`). A builder
-asked to "duplicate an entry" will reach for a direct insert. It must not.
+**Guardrails, two of them:**
 
-### Pick 4 — #4 Grow Room / Stealth Mode · **zero new schema, zero collision**
+1. `quicklog_save_manual` is the **single sanctioned manual write path**
+   (`docs/specs/one-tent-loop-quicklog-single-write-path.md`). A builder asked to
+   "duplicate an entry" will reach for a direct insert. It must not.
+2. **This is now the highest-collision pick of the eight** — see §7. The Quick Log path
+   is under active B-series editing (`quickLogSaveErrorMessage.ts`,
+   `quicklogManualDiagnosticsRules.ts` both changed at `cff3efd`). Confirm ownership
+   before sending.
+
+### Pick 4 — #4 Night Mode · **zero new schema · RENAMED in revision 2**
 
 **Why I like this one disproportionately:** it is the only prompt in 100 that shows real
 grow-room empathy. Opening a bright phone inside a tent during lights-off is a genuine
 horticultural problem, not a UI preference — it disturbs the dark cycle and destroys the
-grower's night vision. `established fact`: zero hits for `stealth` in the codebase.
+grower's night vision. `established fact`: `stealth` and `nightVision` both return **zero
+hits at `cff3efd`**, and no dark-adapted palette exists.
 
-It is also the ideal Lovable task: pure presentation, no data, no schema, no collision
-with any parked PR, and theming is what these builders are genuinely best at.
+**⚠️ Name collision found in revision 2 — this is why the prompt is renamed.**
+`established fact`: **`src/pages/GrowRoomMode.tsx` and `src/lib/growRoomModeRules.ts`
+already exist**, with a legacy `/grow-room` route. They are a **read-only multi-tent
+operator view** — aggregated tent cards, alerts, pending Action Queue items — and do
+**no theming or palette work whatsoever**. The *feature* I recommend is still absent, but
+prompt #4's original wording ("a 'Grow Room / Stealth Mode' toggle") would point a builder
+straight at a substantial existing page. Revision 1 repeated that wording and was wrong to.
 
-> **Prompt:** Add a "Grow Room Mode" toggle to the existing app header that switches the
+> **Prompt:** Add a **"Night Mode"** toggle to the existing app header that switches the
 > UI to a dark-adapted low-luminance palette — deep red/amber foreground on near-black,
 > reduced overall brightness, no white surfaces, no bright accent green. Implement it
 > through the project's existing theming tokens rather than by overriding component
-> colors. Persist the preference locally. Keep all text at accessible contrast within the
-> dark-adapted palette and verify every status indicator (including alert and error
-> states) stays distinguishable when green is unavailable.
+> colors. Persist the preference locally. **Do not modify `src/pages/GrowRoomMode.tsx`,
+> `src/lib/growRoomModeRules.ts`, or the `/grow-room` route — that is an unrelated
+> existing multi-tent operator view, not this feature.** Keep all text at accessible
+> contrast within the dark-adapted palette.
 
-**Guardrail:** this palette removes green. Verify Verdant's health/alert semantics do not
-depend on green alone in this mode, or a stale sensor could read as healthy — a Hard
-Safety Rule violation arriving through a theme.
+**Guardrail, sharpened by direct source reading:** this palette removes green *and* leans
+red. `established fact`: existing severity styling already uses amber for `warning`/`stale`
+and **red for `critical`** (`GrowRoomMode.tsx` lines 84–86, `bg-red-500/15
+text-red-300`). A red-dominant night palette therefore collides with the colour that
+currently means *critical*. Every status indicator must stay distinguishable under the
+night palette, or a stale sensor can read as healthy — a Hard Safety Rule violation
+arriving through a theme.
 
 ### Pick 5 — #59 + #53 Synced Chart Cursor and Mobile Zoom · **zero new schema**
 
-**Why:** near-free and disproportionately effective. `syncId` is a built-in Recharts prop
-and returns zero hits. Verdant already renders multiple charts (`SensorChart.tsx`,
-`ui/chart.tsx`). Linking their cursors turns separate graphs into one instrument, which is
-how a grower actually reads *"the humidity spike and the watering happened together."*
+**Why:** near-free and disproportionately effective. `syncId` is a built-in Recharts prop;
+`syncId|<Brush|zoomDomain` returns **zero hits at `cff3efd`**. Verdant already renders
+multiple charts (`SensorChart.tsx`, `ui/chart.tsx`). Linking their cursors turns separate
+graphs into one instrument, which is how a grower actually reads *"the humidity spike and
+the watering happened together."*
 
 > **Prompt:** Link the existing environment and irrigation charts so hovering a point on
 > one highlights the same timestamp on all others, using Recharts' `syncId`. Add
@@ -212,6 +253,11 @@ A humidity sensor reading 0% is not noise to be smoothed. It is **a broken senso
 hiding it produces a clean-looking chart of a grow room nobody is actually monitoring.
 That is the most dangerous single prompt in the 100.
 
+`established fact` at `cff3efd`: `suspectReading|flagSuspect|anomalyFlag` returns exactly
+**one** file — `supabase/functions/payments-webhook/orchestrator.ts`, which is billing
+anomaly handling and unrelated to telemetry. **No sensor-side suspect-reading flag
+exists.** (Revision 1 reported a flat zero; the single match is real but out of domain.)
+
 > **Prompt:** Add a pure module that flags suspect sensor readings using the project's
 > documented suspicious-telemetry patterns — humidity or soil moisture pinned at 0 or 100,
 > pH outside a realistic range, unit-scale mismatches, and readings older than a freshness
@@ -226,9 +272,10 @@ That is the most dangerous single prompt in the 100.
 ### Pick 7 — #39 + #40 Plant-Tag QR · **zero new schema**
 
 **Why:** `established fact` — QR infrastructure exists but only for customer guides
-(`CustomerGuideQrBlock.tsx`); nothing generates or scans a **plant** tag. The
-physical-to-digital bridge is a real grow-room win: a grower with wet hands and eight
-identical fabric pots scans one and lands on the right plant instead of guessing.
+(`CustomerGuideQrBlock.tsx`); `plantQr|PlantQrTag|qrScanner|QrScanner` returns **zero hits
+at `cff3efd`**. Nothing generates or scans a **plant** tag. The physical-to-digital bridge
+is a real grow-room win: a grower with wet hands and eight identical fabric pots scans one
+and lands on the right plant instead of guessing.
 
 > **Prompt:** Add a printable QR tag for an existing plant that encodes the plant's
 > in-app route, sized for a pot label, using the project's existing QR generation
@@ -241,8 +288,9 @@ physical object that leaves the room.
 
 ### Pick 8 — #63 Save Nutrient Recipe · **requires new schema — sequence last**
 
-**Why it is last despite being genuinely good:** zero hits, real repetitive-entry pain,
-but it is the **only** pick needing a new table, which per §3 means UI that ships and a
+**Why it is last despite being genuinely good:** `recipeTemplate|savedRecipe|feedTemplate|
+nutrientMix` returns **zero hits at `cff3efd`**, and the repetitive-entry pain is real.
+But it is the **only** pick needing a new table, which per §3 means UI that ships and a
 migration that does not. Ship it local-first so it degrades honestly.
 
 > **Prompt:** Let a grower save the current nutrient mix from the existing feeding form as
@@ -260,9 +308,10 @@ not let a builder quietly add one.
 
 ### 5.1 #96 Stripe checkout — **the most dangerous prompt in the list**
 
-`established fact`, measured at `77d8eec`: Verdant runs on **Paddle**, not Stripe — 233
-Paddle references and five live edge functions (`paddle-webhook`, `payments-webhook`,
-`checkout-status`, `get-paddle-price`, `paddle-portal-session`).
+`established fact`, re-measured at `cff3efd`: Verdant runs on **Paddle**, not Stripe —
+**233** Paddle references against **20** Stripe references, and five live edge functions
+(`paddle-webhook`, `payments-webhook`, `checkout-status`, `get-paddle-price`,
+`paddle-portal-session`). Counts unchanged from revision 1.
 
 Prompt #96 says *"Implement a Stripe checkout modal UI."* Sending it would introduce a
 **second payment provider into a live billing system.** Best case it is dead code; worst
@@ -317,35 +366,46 @@ owner decision on positioning before any build.
 
 ## 6. Suggested sequence
 
-One prompt per session, verified before the next. Picks 1–3 deliver the most grower value
-per unit of risk; 4–7 are safe parallel work; 8 is gated on the schema question.
+One prompt per session, verified before the next. Revision 2 **moves Pick 3 later** — not
+because its value dropped (it rose) but because the Quick Log path is now the busiest
+collision surface in the repo. Picks 1, 2 and 4 are the safest high-value starts.
 
 ```text
 1. #82  Yield analytics          (zero schema · answers "did it work?")
 2. #66  pH drift / runoff        (zero schema · root-zone truth)
-3. #49  Duplicate previous day   (zero schema · logging adherence)
-4. #4   Grow room mode           (zero schema · zero collision)
-5. #59  Synced charts + zoom     (zero schema · near-free)
-6. #60R Suspect reading flag     (zero schema · safety-inverted)
-7. #39  Plant-tag QR             (zero schema · physical bridge)
+3. #4   Night Mode               (zero schema · zero collision · RENAMED)
+4. #59  Synced charts + zoom     (zero schema · near-free)
+5. #60R Suspect reading flag     (zero schema · safety-inverted)
+6. #39  Plant-tag QR             (zero schema · physical bridge)
+7. #49  Duplicate previous day   (zero schema · HIGH collision — clear ownership first)
 8. #63  Nutrient recipe          (LOCAL-FIRST · schema gated)
 ```
 
 ---
 
-## 7. Collision boundaries — check before sending any of these
+## 7. Collision boundaries — updated at `cff3efd`
 
-`established fact` from `CURRENT_STATE.md` at this ref:
+`established fact` from `CURRENT_STATE.md` plus the `77d8eec..cff3efd` diff:
 
-- **Tranche A items A2–A5 are Codex-owned and unopened.** Their edit points — including
+- **Tranche A items A2–A5 remain Codex-owned and unopened.** Their edit points —
   `oneTentLoopNavigationRules.ts`, Action Queue rows/drawer, Alert detail, Sensors source
-  summary, and post-save freshness — are collision boundaries. None of my eight picks
-  lands inside them; verify before adding a ninth.
+  summary, post-save freshness — are collision boundaries.
+- **Tranche B+ is now actively landing, which is new since revision 1.** #1039 (B0a) and
+  #1047 (B4a) both merged. The live B-series surface is:
+  `src/lib/doctorStartContextRules.ts`, `src/pages/AiDoctorStart.tsx`,
+  `src/pages/QuicklogDiagnostics.tsx`, `src/lib/quickLogSaveErrorMessage.ts`,
+  `src/lib/quicklogManualDiagnosticsRules.ts`, `src/lib/quicklogPrivateHelperGrantRules.ts`,
+  and the e2e harness (`countedDriver.ts`, `interactionCounter.ts`,
+  `mockedOneTentWorld.ts`, `one-tent-loop-interaction-counter.spec.ts`).
+- **Owner decision D4 (Sensors→Doctor context carry) is now partly implemented** by B4a's
+  `resolveDoctorStartScope` / `partitionDoctorEntryOptionsByTent`. Treat the Doctor entry
+  path as owned.
 - **PRs #828, #817, #696 are open and parked.** Do not start a competing Timeline, Alerts,
   or Action Queue UI rewrite. This is why no Timeline-surface prompt is in the pack.
-- **Tranche B+ is Claude-assigned** (architect and implementer, that tranche only). These
-  picks are adjacent to its efficiency goal but are **not** part of it and carry no
-  approval.
+
+**Overlap check for the eight picks, run at `cff3efd`:** only **Pick 3** touches a file
+family the B-series is actively editing (the Quick Log save path). Picks 1, 2, 4, 5, 6, 7
+and 8 land outside every boundary above.
 
 ---
 
@@ -353,17 +413,18 @@ per unit of risk; 4–7 are safe parallel work; 8 is gated on the schema questio
 
 | Item | Status |
 | --- | --- |
-| Chart event annotations (#57) already present? | `uncertainty` — `ReferenceLine`/`annotation` matched 57 files, mostly unrelated. Verify before sending |
+| Chart event annotations (#57) already present? | `uncertainty` — `ReferenceLine`/`annotation` matches many unrelated files. Verify before sending |
 | Carbon filter countdown (#25), canopy layout (#26) | `established fact` absent; both need schema — deferred by §3, not by value |
+| S5 interaction cost (Pick 3's target) | `source claim` — a documented estimate in the baseline table (≥5, 1+ reselections), **not** a runtime receipt. Only S1a and S7 are automated (2/2 PASS) |
 | Production applied-migration ledger | `NOT_MEASURED` — drift probe has never completed a query |
-| Whether any pick is already in an unopened branch | `uncertainty` — open PRs checked; unopened local work by other agents is not observable |
+| Whether any pick is already in an unopened branch | `uncertainty` — open PRs and the merged history are clear; unopened work by other agents is not observable |
 | Live production verification of any pick | `BLOCKED` — agent sessions cannot reach production (network policy 403) |
 
 ---
 
 ## 9. Verdict
 
-`inference`, high confidence, from a direct audit of the shipping branch:
+`inference`, high confidence, from a direct audit of the shipping branch at `cff3efd`:
 
 **The list's value is as a backlog, not a build order, and its best ideas are the ones it
 treats as afterthoughts.** Prompt #82 — buried at position 82 of 100 — is worth more than
@@ -375,6 +436,29 @@ Two items should not be sent in any form: **#96 (Stripe)**, which would put a se
 payment provider into a live Paddle billing system, and **#60 as written**, which would
 teach the app to hide broken sensors. #60 is included here only in inverted form.
 
-I am not confident about one thing and will not pretend otherwise: **whether any of these
-eight are sitting in an unopened branch belonging to another agent.** Open PRs are clear;
-unopened work is not observable from here. Confirm before sending.
+The re-audit changed two entries materially and neither was cosmetic: prompt #4's own
+wording pointed at an existing page, and prompt #49 turned out to have a named,
+measured target it can be held to. Both corrections came from re-reading source at the
+new ref rather than trusting the previous revision — which is the argument for re-pinning
+this document whenever the deploy branch moves.
+
+I remain unconfident about one thing and will not pretend otherwise: **whether any of
+these eight are sitting in an unopened branch belonging to another agent.** Merged history
+and open PRs are clear; unopened work is not observable from here. Confirm before sending.
+
+---
+
+## 10. Revision 2 changelog
+
+Re-audited `77d8eec` → `cff3efd`. What changed:
+
+| Item | Revision 1 | Revision 2 |
+| --- | --- | --- |
+| Audited ref | `77d8eec` | `cff3efd` |
+| Scale figures | "131 pages, 270 migrations, 35+ edge functions" | **129 page components, 270 migrations, 34 edge functions** (revision 1 counted directory entries, including `_shared` and 2 non-`.tsx` files) |
+| **Pick 4** | "Grow Room Mode" toggle | **Renamed "Night Mode"** — `src/pages/GrowRoomMode.tsx` already exists as an unrelated read-only multi-tent operator view. Guardrail sharpened with the actual `red-500` = critical badge collision |
+| **Pick 3** | Efficiency argument only | Anchored to **S5** in the new B0a baseline (≥5 interactions, 1+ reselections); prompt now asks to extend the counter harness and update the baseline row. Also flagged as the **highest-collision** pick and moved to position 7 in the sequence |
+| **Pick 6** | "zero hits" | Exactly one hit, in `payments-webhook/orchestrator.ts` (billing anomaly, out of domain). Sensor-side still absent |
+| Collision boundaries | Tranche A + parked PRs | Adds the **live Tranche B+ surface** (B0a, B4a) and notes D4 is now partly implemented |
+| Sequence | Pick 3 at position 3 | Pick 3 moved to position 7 behind the collision warning |
+| Everything else | — | Re-verified unchanged: all 14 already-ships rows still ship; Paddle 233 / Stripe 20 unchanged; Picks 1, 2, 5, 7, 8 still return zero hits |

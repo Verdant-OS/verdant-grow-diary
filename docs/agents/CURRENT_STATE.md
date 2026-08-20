@@ -774,21 +774,33 @@ policy 403 — `BLOCKED`); the pack carries the 2026-08-15 stamp `5e2fcedd4271`
 (#984) explicitly labeled as last measurement. Workspace knowledge unchanged.
 Still no Knowledge sync automation authorized and no owner assigned for one.
 
-**Recorded 2026-08-20 (ADVISORY, NOT APPROVED):** Claude triaged an owner-supplied
-100-prompt Lovable build roadmap against the shipping branch at `77d8eec95eac`.
-Deliverable: `docs/lovable/verdant-lovable-prompt-triage-2026-08-20.md`. It selects
-and rewrites eight prompts and rejects the rest with reasons. **It authorizes
-nothing** — no implementation, no schema, no Lovable send, no production write. Two
-findings other agents should not have to rediscover: (1) prompt #96 asks for a
-**Stripe** checkout UI, but production runs **Paddle** (233 references, five live
-edge functions) — sending it would put a second payment provider into a live billing
-system; (2) prompt #60 asks to visually smooth anomalous sensor spikes such as 0%
-humidity, which inverts the Hard Safety Rule on unhealthy telemetry, and is included
-in the pack only in flag-and-label form. Seven of the eight picks require zero new
-tables, chosen deliberately because migrations do not auto-apply (see the second-drift
-section above). Tranche A edit points, PRs #828/#817/#696, and the single
-`quicklog_save_manual` write path were treated as collision boundaries; no pick lands
-inside them. Docs-only; no code, schema, or migration changes.
+**Recorded 2026-08-20 (ADVISORY, NOT APPROVED; re-pinned at `cff3efd`):** Claude
+triaged an owner-supplied 100-prompt Lovable build roadmap against the shipping branch.
+Deliverable: `docs/lovable/verdant-lovable-prompt-triage-2026-08-20.md`, now at
+**revision 2**, re-audited from `77d8eec` to `cff3efd` after the deploy branch advanced
+(#1035, #1039 B0a, #1047 B4a). It selects and rewrites eight prompts and rejects the
+rest with reasons. **It authorizes nothing** — no implementation, no schema, no Lovable
+send, no production write.
+
+Findings other agents should not have to rediscover: (1) prompt #96 asks for a **Stripe**
+checkout UI, but production runs **Paddle** (233 references vs 20, five live edge
+functions) — sending it would put a second payment provider into a live billing system;
+(2) prompt #60 asks to visually smooth anomalous sensor spikes such as 0% humidity, which
+inverts the Hard Safety Rule on unhealthy telemetry, and is included only in
+flag-and-label form; (3) **prompt #4's own wording collides with an existing page** —
+`src/pages/GrowRoomMode.tsx` / `src/lib/growRoomModeRules.ts` are a read-only multi-tent
+operator view doing no theming, so the pack renames that pick to "Night Mode" and fences
+the existing files off; (4) prompt #49 now has a measured target — **S5** in the B0a
+baseline (≥5 interactions, 1+ reselections), the most expensive row in that table, though
+S5 is a documented estimate and only S1a/S7 are automated.
+
+Seven of the eight picks require zero new tables, chosen deliberately because migrations
+do not auto-apply (see the second-drift section above). Collision boundaries were
+re-checked at `cff3efd`: Tranche A edit points, PRs #828/#817/#696, the single
+`quicklog_save_manual` write path, and now the **live Tranche B+ surface** (B0a harness,
+B4a `doctorStartContextRules`/`AiDoctorStart`, the quicklog rules files). Only pick #49
+touches an actively-edited family; it is flagged and resequenced behind the others.
+Docs-only; no code, schema, or migration changes.
 
 In scope — these bullets scope the **Mode A SEO parent program above**, not the completed
 #809 entry:

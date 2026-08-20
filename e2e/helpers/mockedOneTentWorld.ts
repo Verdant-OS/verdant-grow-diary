@@ -88,8 +88,17 @@ export interface MockedWorld {
   savedRows: Array<Record<string, unknown>>;
   /** The typed grow_events spine rows the same save writes. */
   savedGrowEvents: Array<Record<string, unknown>>;
-  /** Correctly grow-scoped reads served, per table. */
-  reads: { diary_entries: number; grow_events: number };
+  /**
+   * Correctly grow-scoped reads served, per table.
+   *
+   * `grow_events` counts only the CORE listing read. Timeline also issues a
+   * small supplemental by-id lookup to resolve diary companions whose spine
+   * row the core query missed; that one is counted separately as
+   * `grow_events_by_id`. Collapsing the two would make the S7 evidence
+   * assertion satisfiable by the supplemental lookup alone, so a Timeline
+   * that lost its core grow_events query entirely would still measure green.
+   */
+  reads: { diary_entries: number; grow_events: number; grow_events_by_id: number };
   rpcMode: "ok" | "fail";
 }
 
@@ -97,7 +106,7 @@ export function createMockedWorld(): MockedWorld {
   return {
     savedRows: [],
     savedGrowEvents: [],
-    reads: { diary_entries: 0, grow_events: 0 },
+    reads: { diary_entries: 0, grow_events: 0, grow_events_by_id: 0 },
     rpcMode: "ok",
   };
 }
@@ -143,8 +152,19 @@ function readScoped(
   request: Request,
 ): unknown[] {
   if (!scopedToFakeGrow(request)) return [];
-  world.reads[table] += 1;
-  return table === "diary_entries" ? world.savedRows : world.savedGrowEvents;
+  if (table === "diary_entries") {
+    world.reads.diary_entries += 1;
+    return world.savedRows;
+  }
+  // The supplemental companion-resolution lookup is the only grow_events read
+  // that carries an `id=in.(...)` filter (Timeline.tsx). The core listing read
+  // filters on grow_id/is_deleted and orders by occurred_at instead.
+  world.reads[isByIdLookup(request) ? "grow_events_by_id" : "grow_events"] += 1;
+  return world.savedGrowEvents;
+}
+
+function isByIdLookup(request: Request): boolean {
+  return (new URL(request.url()).searchParams.get("id") ?? "").startsWith("in.");
 }
 
 function scopedToFakeGrow(request: Request): boolean {
@@ -291,13 +311,32 @@ export async function mockSignedInSupabase(
     // and de-duplicates them into one entry, so a fixture that emits only the
     // diary row would exercise the fallback path alone — it could not detect a
     // broken grow-event read, a broken merge, or duplicated evidence.
+    // `quicklog_save_manual` accepts exactly two actions and rejects the rest
+    // (migration 20260818010000:674). A fixture that accepted anything would
+    // let a surface ship an action production refuses.
+    const submittedAction = asText(submitted.p_action);
+    if (submittedAction !== "water" && submittedAction !== "note") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: false, reason: "unsupported_action" }),
+      });
+      return;
+    }
+
     const occurredAt = asText(submitted.p_occurred_at) ?? new Date().toISOString();
     world.savedGrowEvents.push({
       id: FAKE_GROW_EVENT_ID,
       grow_id: FAKE_GROW_ID,
       plant_id: submittedPlantId,
       tent_id: submittedTentId,
-      event_type: asText(submitted.p_action) ?? "observation",
+      // The RPC does NOT persist the transport action verbatim: it maps it to
+      // a spine event_type (migration 20260818010000:730) — 'water' becomes
+      // 'watering', everything else 'observation'. Copying `p_action` through
+      // would give the merged Timeline entry an identity production never
+      // writes, so a break in observation classification or presentation
+      // could not fail this scenario.
+      event_type: submittedAction === "water" ? "watering" : "observation",
       occurred_at: occurredAt,
       note: submittedNote,
       source: "manual",

@@ -193,6 +193,12 @@ test.describe("One-Tent Loop interaction counter baseline", () => {
     // read, the diary companion would still render exactly one "Better" and
     // the count assertion would pass. These counters only increment for reads
     // carrying the correct `grow_id` filter, so they pin the scoping too.
+    //
+    // `grow_events` here is the CORE listing read specifically. Timeline's
+    // supplemental by-id companion lookup is counted separately, because it
+    // also returns the spine row: were both folded into one counter, a
+    // Timeline that lost its core query would still satisfy this assertion
+    // through the supplemental lookup and measure green while broken.
     expect(world.reads.grow_events).toBeGreaterThan(0);
     expect(world.reads.diary_entries).toBeGreaterThan(0);
 

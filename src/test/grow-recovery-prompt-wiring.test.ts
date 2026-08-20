@@ -60,7 +60,13 @@ describe("page wiring — Dashboard and Grow Detail", () => {
 
   it("gates the prompt on a successful read — unknown is never absence", () => {
     expect(DASHBOARD).toMatch(/recent\.status === "ok" && \(\s*<GrowRecoveryPrompt/);
-    expect(GROW_DETAIL).toMatch(/recent\.status === "ok" && \(\s*<GrowRecoveryPrompt/);
+    expect(GROW_DETAIL).toMatch(/recent\.status === "ok" && !grow\.is_archived/);
+  });
+
+  it("never offers a Quick Log recovery action from archived grow history", () => {
+    expect(GROW_DETAIL).toMatch(
+      /recent\.status === "ok" && !grow\.is_archived && \(\s*<GrowRecoveryPrompt/,
+    );
   });
 
   it("preserves the pinned empty-state literals", () => {

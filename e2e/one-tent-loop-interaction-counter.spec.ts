@@ -19,6 +19,8 @@ import { createCountedDriver } from "./helpers/countedDriver";
 import {
   createInteractionCounter,
   serializeInteractionCountReceipt,
+  type InteractionCountReceipt,
+  type InteractionCounter,
 } from "./helpers/interactionCounter";
 import {
   FAKE_PLANT_ID,
@@ -37,6 +39,45 @@ import { denyAnalyticsConsent } from "./utils/analyticsConsent";
 const READY_TIMEOUT_MS = 90_000;
 async function waitForReady(locator: ReturnType<Page["getByTestId"]>): Promise<void> {
   await locator.waitFor({ state: "visible", timeout: READY_TIMEOUT_MS });
+}
+
+/**
+ * Snapshot only once the counters have stopped moving.
+ *
+ * Hiding the Quick Log sheet is NOT a completion fence: PlantQuickLog calls
+ * `onOpenChange(false)` before `onSaved?.()`, so a post-save callback could in
+ * principle issue work that lands after the sheet is gone and after the
+ * receipt was taken — under-counting a write, or worse reporting
+ * `paid_ai_requests: 0` while a paid call was in flight.
+ *
+ * Measured, not assumed: PlantDetail (the mount both scenarios drive) passes
+ * no `onSaved` at all today, so there is no callback to settle and no explicit
+ * post-callback state to wait for. That is a fact about the current mount, not
+ * a property of the harness — adding the prop later would silently reopen the
+ * hole. So the fence is on the observable class rather than the one instance:
+ * wait for the network to go idle, then require the receipt to be byte-stable
+ * across a bounded quiet window before recording it.
+ */
+async function settledReceipt(
+  page: Page,
+  counter: InteractionCounter,
+): Promise<InteractionCountReceipt> {
+  await page.waitForLoadState("networkidle");
+  let stable = 0;
+  let previous = serializeInteractionCountReceipt(counter.snapshot());
+  for (let sample = 0; sample < 20; sample += 1) {
+    await page.waitForTimeout(100);
+    const current = serializeInteractionCountReceipt(counter.snapshot());
+    if (current === previous) {
+      stable += 1;
+      // Three consecutive quiet samples = 300ms with nothing arriving.
+      if (stable >= 3) return counter.snapshot();
+    } else {
+      stable = 0;
+      previous = current;
+    }
+  }
+  throw new Error("interaction counters never settled; a late request is still arriving");
 }
 
 test.describe("One-Tent Loop interaction counter baseline", () => {
@@ -88,7 +129,7 @@ test.describe("One-Tent Loop interaction counter baseline", () => {
     // save-success signal, so wait for it first.
     await expect(page.getByTestId("plant-quick-log-sheet")).toBeHidden({ timeout: 15_000 });
 
-    const receipt = counter.snapshot();
+    const receipt = await settledReceipt(page, counter);
 
     console.log(serializeInteractionCountReceipt(receipt));
 
@@ -167,7 +208,7 @@ test.describe("One-Tent Loop interaction counter baseline", () => {
     const timelineEvidence = page.getByTestId("timeline-entry").filter({ hasText: "Better" });
     await expect(timelineEvidence).toHaveCount(1, { timeout: 15_000 });
 
-    const receipt = counter.snapshot();
+    const receipt = await settledReceipt(page, counter);
 
     console.log(serializeInteractionCountReceipt(receipt));
 

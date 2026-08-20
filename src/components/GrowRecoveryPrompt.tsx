@@ -13,6 +13,7 @@
  * the grower makes exactly one explicit plant choice inside the dialog.
  */
 import { Button } from "@/components/ui/button";
+import { useNowTick } from "@/hooks/useNowTick";
 import { buildNoRecentLogRecovery } from "@/lib/noRecentLogRecoveryRules";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 import {
@@ -29,9 +30,10 @@ interface Props {
 }
 
 export default function GrowRecoveryPrompt({ growId, items, testId, now }: Props) {
+  const nowTick = useNowTick();
   const recovery = buildNoRecentLogRecovery({
     rows: selectRecoveryCheckInRows(items),
-    now: typeof now === "number" ? now : Date.now(),
+    now: typeof now === "number" ? now : nowTick,
   });
   if (!recovery.showPrompt || !growId) return null;
 

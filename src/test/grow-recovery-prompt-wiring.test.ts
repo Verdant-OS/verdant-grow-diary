@@ -45,7 +45,8 @@ describe("GrowRecoveryPrompt — reuses the shipped engine", () => {
 
   it("keeps the clock injectable for deterministic tests", () => {
     expect(PROMPT).toMatch(/now\?:\s*number/);
-    expect(PROMPT).toMatch(/typeof now === "number" \? now : Date\.now\(\)/);
+    expect(PROMPT).toContain("useNowTick");
+    expect(PROMPT).toMatch(/typeof now === "number" \? now : nowTick/);
   });
 });
 

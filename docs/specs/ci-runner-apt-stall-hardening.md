@@ -446,12 +446,24 @@ now reachable from the first canary onward.
 
 1. **Happy path** — every workflow listed in `converged` installs Playwright browsers
    via `uses: ./.github/actions/install-playwright-browsers`.
-2. **Forbidden construct** — no workflow contains an executable
-   `playwright install … --with-deps` **run step** outside the composite action.
-3. **Second seam closed** — no workflow contains `run: bun run e2e:install:ci`. This is
-   the assertion that would have caught `core-link-form-census.yml` and
-   `pheno-journey-smoke.yml`, the two files a `--with-deps` sweep cannot see (§3.1).
-   Without it the fence certifies a fix that missed the worst-affected workflow.
+2. **Forbidden construct — scoped to `converged`.** No workflow **listed in
+   `converged`** contains an executable `playwright install … --with-deps` **run step**
+   outside the composite action.
+3. **Second seam closed — scoped to `converged`.** No workflow **listed in `converged`**
+   contains `run: bun run e2e:install:ci`. This is the assertion that would have caught
+   `core-link-form-census.yml` and `pheno-journey-smoke.yml`, the two files a
+   `--with-deps` sweep cannot see (§3.1). Without it the fence certifies a fix that
+   missed the worst-affected workflow.
+
+   **Why scoped, and not repository-wide.** §7 requires a canary-only merge, at which
+   point the other 18 affected workflows still carry exactly these two constructs — by
+   design, and explicitly permitted by 5b. A repository-wide ban would fail the fence on
+   the very state the manifest exists to model, putting 2/3 in direct contradiction with
+   5b. Scoping them to `converged` keeps each file judged against the state it is
+   actually in. The repository-wide ban is not lost, only deferred: 5e reaches it by
+   construction, because once `converged` equals `affected` the scope IS every affected
+   workflow.
+
 4. **Decoy regression (pins §3.1's trap shut)** — the fence must **pass** on a fixture
    containing the `quicklog-smoke.yml` documentation `echo`, proving it distinguishes an
    `echo` inside a heredoc from a `run:` step. Without this the fence is a plain grep and
@@ -470,10 +482,25 @@ now reachable from the first canary onward.
    5c. **The manifest matches the tree** — `affected` is compared against a fresh
    discovery pass, and a file that discovery finds but the manifest omits fails.
    Otherwise a newly-added browser workflow rides in unfenced.
-   5d. **Monotonic** — a fixture whose `converged` list has lost an entry relative to
-   the committed one fails. Progress is one-way.
+   5d. **Monotonic — compared against the BASE BRANCH, not a fixture.** A commit that
+   removes a workflow from `converged` fails.
+
+   A fixture comparison cannot enforce this and must not be specified as if it does.
+   In the commit that drops an entry, the edited manifest _is_ the committed manifest,
+   so it becomes the test's own baseline: 1, 5 and 5b all pass, and a workflow can be
+   quietly reverted to a legacy seam with the manifest updated to match in the same
+   diff. Comparing the tree against itself proves only that the comparison helper
+   works.
+
+   Monotonicity is a property of history, so it needs history. This repo already has
+   the pattern: the `Published migration integrity` gate compares SHA-256 hashes
+   against the base branch precisely because in-tree state cannot police its own
+   edits. 5d follows it — read `config/playwright-install-migration.json` from the
+   merge base and fail if any entry present there is absent here. That also makes the
+   failure legible: it names the workflow that left the converged set.
    5e. **Completion** — when `converged` equals `affected`, 5b's legacy branch is empty
    and the fence is the original all-19 guarantee, reached incrementally.
+
 6. **Matrix preservation** — `google-analytics-e2e.yml` still passes
    `${{ matrix.browser }}`, not a hardcoded `chromium`.
 7. **Null/invalid** — a workflow with no Playwright usage is unaffected.
@@ -530,6 +557,8 @@ its own merge.
 | Phase 2 flipped without Phase 0 evidence                                                                           | Low                                                          | Phase 2 requires its own approval and cites the Phase 0 measurement                                                                                                              |
 | `with-deps: false` outlives the image or Playwright revision it was measured on, blocking all 19 workflows at once | Medium — both float (`ubuntu-latest`, future upgrades)       | Phase 2 ships `auto`, not `false`: unrecognised provenance takes the slow apt branch, never the blocking one. A Playwright bump turns the provenance fence red in the bumping PR |
 | The Phase 1 fence has no passing placement during the canary merge                                                 | **Certain** if the expected set is hardcoded at 19           | The expected set is a committed manifest; converged and not-yet-converged files are each fenced for their own state                                                              |
+| Assertions 2/3 ban legacy seams repository-wide while 5b permits them, so the fence fails on the canary merge      | **Certain** if 2/3 are unscoped                              | 2 and 3 are scoped to `converged`; 5e reaches the repository-wide ban by construction at completion                                                                              |
+| A later commit removes a workflow from `converged` and reverts its call site in the same diff                      | Medium — invisible to any in-tree comparison                 | 5d compares against the MERGE BASE, following the `Published migration integrity` precedent; a fixture comparison would only test the helper                                     |
 | A not-yet-converged workflow silently stops installing browsers and the fence passes over it                       | Medium — invisible to a rediscovered set                     | The manifest enumerates all 19 by name; a file in neither rollout state fails (5b), and manifest-vs-discovery drift fails (5c)                                                   |
 | Composite `runs.steps` cannot express `timeout-minutes`, so the per-attempt cap silently never exists              | **Certain** as originally written — the key is unsupported   | §4 Option C specifies a process-group timeout instead; §6's fault-injection variant asserts no `apt` process survives a killed attempt                                           |
 | Phase 1 drops `--with-deps` early because the input default was already `auto`                                     | **Certain** if the default is not `true`                     | The Phase 1 default is `true`; only the separately-approved Phase 2 slice changes it                                                                                             |
@@ -570,13 +599,14 @@ was explicitly scoped to "Tranche B+ only".
 
 ## 11. Decision requested
 
-| #          | Decision                                                       | Recommendation                                                        |
-| ---------- | -------------------------------------------------------------- | --------------------------------------------------------------------- |
-| **D-CI-1** | Adopt Option C (composite action + fail-fast + bounded retry)? | **Yes**                                                               |
-| **D-CI-2** | Run Phase 0 (measure whether `--with-deps` is still needed)?   | **Yes — it is the only way Option B ever stops being `NOT_MEASURED`** |
-| **D-CI-3** | Implementer                                                    | **Codex** (CI/release-gate owner)                                     |
-| **D-CI-4** | Rollout order — canary, then bulk, then `ci.yml` last          | **Yes**                                                               |
-| **D-CI-5** | Fault-injection test to genuinely prove the retry path?        | Optional; without it the retry stays `NOT_MEASURED`                   |
+| #          | Decision                                                          | Recommendation                                                                                                                                                                                                              |
+| ---------- | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **D-CI-1** | Adopt Option C (composite action + fail-fast + bounded retry)?    | **Yes**                                                                                                                                                                                                                     |
+| **D-CI-2** | Run Phase 0 (measure whether `--with-deps` is still needed)?      | **Yes — it is the only way Option B ever stops being `NOT_MEASURED`**                                                                                                                                                       |
+| **D-CI-3** | Implementer                                                       | **Codex** (CI/release-gate owner)                                                                                                                                                                                           |
+| **D-CI-4** | Rollout order — canary, then bulk, then `ci.yml` last             | **Yes**                                                                                                                                                                                                                     |
+| **D-CI-5** | Fault-injection test proving the process-GROUP timeout kills apt? | **Required** — §6 makes it mandatory. Without it the per-attempt cap is unverified in the exact way that matters: a timeout that signals only the direct child leaves apt holding the runner while the step reports failure |
+| **D-CI-6** | Fault-injection test for the compounded RETRY rate?               | Not possible on demand — it needs a real mirror stall. The three-attempt clearance estimate stays `NOT_MEASURED` regardless of D-CI-5                                                                                       |
 
 Nothing in this document authorizes an edit. Phase 1 begins only on an explicit approval
 naming D-CI-1 and D-CI-3.

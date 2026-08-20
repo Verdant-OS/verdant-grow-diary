@@ -189,12 +189,14 @@ mode is silent, slow, and misreported as `cancelled`.
 Removes the apt call entirely, which removes the failure at its source. It is the most
 attractive-looking option and the only one whose risk is genuinely unknown.
 
-`uncertainty`: whether the `ubuntu-latest` image ships every shared library Chromium
-needs is **`NOT_MEASURED` from this session** — verifying it requires running a browser
-on a real runner, which cannot be done from here. Playwright's own docs recommend
-`--with-deps` on CI precisely because the answer varies by image and by Playwright
-version. Getting this wrong replaces an intermittent 50%-clearing stall with a
-deterministic 100% failure across 19 workflows.
+`uncertainty`: whether the `ubuntu-latest` image ships every shared library **each
+browser in use** needs is **`NOT_MEASURED` from this session** — verifying it requires
+running a browser on a real runner, which cannot be done from here. Playwright's own
+docs recommend `--with-deps` on CI precisely because the answer varies by image and by
+Playwright version. Note the plural: the wired workflows use **`chromium` and
+`webkit`** (`google-analytics-e2e.yml` runs both as a matrix), and their native-library
+sets differ, so this is two uncertainties and not one. Getting this wrong replaces an
+intermittent 50%-clearing stall with a deterministic 100% failure across 19 workflows.
 
 Do not adopt on reasoning alone. Phase 0 measures it.
 
@@ -222,16 +224,42 @@ Keep `--with-deps` (so no behavior risk), but change how it fails:
      local secs="$1"; shift
      setsid "$@" &                  # new process group; $! is the PGID
      local pgid=$!
-     ( sleep "$secs"
+
+     # Self-terminating watchdog. It polls the GROUP and exits as soon as the
+     # group is empty, so the parent never cancels it — and therefore can never
+     # cancel it mid-escalation. See the note below for why that matters.
+     (
+       waited=0
+       while [ "$waited" -lt "$secs" ]; do
+         kill -0 -- -"$pgid" 2>/dev/null || exit 0   # finished; no timeout
+         sleep 1; waited=$((waited + 1))
+       done
        kill -TERM -- -"$pgid" 2>/dev/null
-       sleep 30
-       kill -KILL -- -"$pgid" 2>/dev/null ) &
+       graced=0
+       while [ "$graced" -lt 30 ]; do
+         kill -0 -- -"$pgid" 2>/dev/null || exit 0   # whole group took TERM
+         sleep 1; graced=$((graced + 1))
+       done
+       kill -KILL -- -"$pgid" 2>/dev/null
+     ) &
      local watchdog=$!
+
      wait "$pgid"; local rc=$?
-     kill "$watchdog" 2>/dev/null
+     wait "$watchdog" 2>/dev/null    # NOT `kill` — see below
      return "$rc"
    }
    ```
+
+   **Why the watchdog is never cancelled by the parent.** An earlier draft of this
+   snippet ended `wait "$pgid"; kill "$watchdog"`, and that reintroduced the very
+   failure the process group exists to prevent. `wait "$pgid"` waits on the group
+   **leader**. On a timeout the leader takes `TERM` and exits while a descendant —
+   `apt`, precisely the process being contained — either ignores `TERM` or sits in
+   uninterruptible I/O. `wait` returns, the next line kills the watchdog during its
+   grace period, and the promised group-wide `KILL` is never sent: the step reports
+   failure and apt keeps holding the runner, which is the exact flaw this section
+   rejects bare `timeout(1)` for. Polling the group instead makes the happy path cost
+   about a second and makes the escalation unskippable.
 
    `coreutils` `timeout` may stand in for the watchdog **only** with the command
    launched into its own group and the signal directed at that group. The requirement is
@@ -246,8 +274,17 @@ Keep `--with-deps` (so no behavior risk), but change how it fails:
 4. **One composite action** at `.github/actions/install-playwright-browsers/`, so all
    19 call sites — across both seams (§3.2) — converge and the next fix is a one-file
    change.
-5. **Honest failure text** — when all attempts fail, print that this is an apt/mirror
-   fault, not a test failure, so nobody spends an hour reading a green test suite.
+5. **Honest failure text** — when all attempts fail, say what actually failed. Name an
+   apt/mirror fault **only when apt was positively identified** as the failing phase
+   (the attempt died at the per-attempt timeout, or the captured output carries an apt
+   signature such as an `archive.ubuntu.com` acquire error). `playwright install
+--with-deps` also fails _after_ the apt phase — a browser download from the
+   Playwright CDN, an unknown browser name, no disk space — and stamping those
+   "apt/mirror fault, not a test failure" replaces Playwright's own actionable message
+   with a wrong one. Otherwise emit a generic browser/dependency-install failure and
+   pass Playwright's output through. The point of this line is to stop an hour being
+   spent reading a green test suite; a confident wrong diagnosis just spends that hour
+   somewhere else.
 
 Cost: one new composite action plus 19 mechanical call-site edits.
 
@@ -264,8 +301,21 @@ nothing wrong.
 ### Phase 0 — Measure, decide, do not change behavior `(first merge gate)`
 
 **Deliverable:** a throwaway workflow, `workflow_dispatch` only, that on `ubuntu-latest`
-installs Chromium **without** `--with-deps`, launches it headless, loads `about:blank`,
-and reports `PASS` / `FAIL` with the missing-library list if any.
+installs **each browser the affected workflows actually use** — measured as `chromium`
+**and `webkit`** — without `--with-deps`, launches each headless, loads `about:blank`,
+and reports `PASS` / `FAIL` **per browser**, with the missing-library list if any.
+
+**Chromium alone is not a sufficient probe, and treating it as one is the dangerous
+error.** `google-analytics-e2e.yml` runs a `matrix.browser: [chromium, webkit]` and
+installs `--with-deps ${{ matrix.browser }}`; that matrix is the reason the composite
+action's `browsers` input must accept an expression at all (§ Phase 1). WebKit's
+native-library set is not Chromium's, so Chromium can launch cleanly while WebKit
+becomes a **deterministic** failure the moment `--with-deps` is dropped for it. Trading
+an intermittent stall for a deterministic break is the outcome §4 rejects Option B for
+today; a per-browser probe is what keeps Phase 2 from doing it by accident.
+
+If a new browser is ever added to any wired workflow, it is unprobed by construction
+and `auto` must resolve it to `true` — see the resolution table below.
 
 **Answers exactly one question:** is `--with-deps` still load-bearing on this runner
 image? Records the result as `established fact` with the image version stamped.
@@ -279,13 +329,21 @@ Phase 2 has nothing to bind to. The deliverable therefore commits
 
 ```json
 {
-  "probe_result": "PASS",
   "runner_image": "<the runner's ImageVersion, e.g. 20260812.1.0>",
   "playwright_version": "<resolved version from the lockfile, not the range>",
   "probed_at": "<UTC>",
-  "evidence_run": "<Actions run URL>"
+  "evidence_run": "<Actions run URL>",
+  "probe_results": {
+    "chromium": "PASS",
+    "webkit": "FAIL"
+  }
 }
 ```
+
+`probe_results` is keyed **per browser** rather than a single `probe_result`, because
+the measurement is per browser. A flat verdict cannot express the most likely real
+outcome — Chromium passing while WebKit does not — and a Phase 2 that read one would
+disable the dependency install for both.
 
 `runner_image` comes from the `ImageVersion` environment variable the hosted runner
 sets, **not** from `ubuntu-latest` — that label is the floating pointer, not the thing
@@ -310,9 +368,10 @@ Inputs (mirroring `require-ci-secret`'s documentation density):
 | `attempt-timeout-minutes` | no       | `3`        | Per-attempt cap, enforced by the process-group timeout in §4 Option C — **not** by `timeout-minutes`, which composite steps do not support                                                                                                                                                                                                                                      |
 
 Behavior: write the apt resilience config; loop up to `attempts`, each bounded by
-`attempt-timeout-minutes`; on total failure, `::error::` naming this as an apt/mirror
-fault with the attempt count and elapsed time; append a short markdown block to
-`$GITHUB_STEP_SUMMARY`.
+`attempt-timeout-minutes`; on total failure, `::error::` with the attempt count and
+elapsed time, naming an apt/mirror fault **only when apt was positively identified**
+per §4 Option C item 5 and a generic install failure otherwise; append a short markdown
+block to `$GITHUB_STEP_SUMMARY`.
 
 **Changed:** all **19** affected workflows, each executable install step replaced by a
 `uses:` of the new action — **including the 3 that currently go through
@@ -346,9 +405,10 @@ today, whatever Phase 0 recorded.
 **`auto`, not `false`. A permanent `false` would be an unsound reading of the
 measurement, and this spec's own §4 says why.**
 
-A Phase 0 `PASS` proves one thing: on the stamped runner image, with the stamped
-Playwright revision, Chromium launches without the apt-installed libraries. Both halves
-of that pair float underneath us:
+A Phase 0 `PASS` proves one thing, and it is narrower than it looks: on the stamped
+runner image, with the stamped Playwright revision, **that one browser** launches
+without the apt-installed libraries. It says nothing about a sibling engine — see the
+per-browser probe above — and both halves of the stamped pair float underneath us:
 
 - every one of the 19 workflows runs on `ubuntu-latest`, which is a moving pointer —
   §3 measured it at Ubuntu 24.04 "noble" **today**, not forever;
@@ -365,19 +425,29 @@ while discarding its scope.
 compares the runner's live `ImageVersion` and the resolved Playwright version against
 `config/playwright-runtime-provenance.json`:
 
-| Live provenance vs. recorded                     | `with-deps` resolves to | Cost                                                                               |
-| ------------------------------------------------ | ----------------------- | ---------------------------------------------------------------------------------- |
-| Both match, `probe_result` is `PASS`             | `false`                 | none — the payoff                                                                  |
-| Either differs, or the file is absent/unreadable | `true`                  | the apt tax, plus a `::notice::` naming which half drifted and pointing at Phase 0 |
+| Live provenance vs. recorded                                                   | `with-deps` resolves to | Cost                                                                               |
+| ------------------------------------------------------------------------------ | ----------------------- | ---------------------------------------------------------------------------------- |
+| Both halves match **and** every requested browser is `PASS` in `probe_results` | `false`                 | none — the payoff                                                                  |
+| Either half differs, or the file is absent/unreadable                          | `true`                  | the apt tax, plus a `::notice::` naming which half drifted and pointing at Phase 0 |
+| **Any requested browser is `FAIL` or absent from `probe_results`**             | `true`                  | the apt tax for that step, plus a `::notice::` naming the unproven browser         |
+
+The third row is what makes a mixed result safe. The `browsers` input can be a matrix
+expression, so a single step may request a browser the probe never covered; resolution
+is over the browsers **that step actually requests**, and an unprobed browser is
+`true` — never an inherited `PASS` from a sibling engine.
 
 The unknown case takes the **slow** branch, never the blocking one. An
 un-revalidated stack pays the tax it has always paid; it does not break. That is the
 whole reason `auto` is worth the extra input over a bare boolean.
 
 **Re-validation is a repo-side gate, not a promise.** Phase 2 also ships
-`src/test/playwright-runtime-provenance-fence.test.ts`, which fails when
-`playwright_version` in the provenance file disagrees with the resolved version in the
-lockfile. A Playwright bump therefore turns the fence red **in the bumping PR**, where
+`src/test/playwright-runtime-provenance-fence.test.ts`, which fails on either of two
+disagreements: when `playwright_version` in the provenance file disagrees with the
+resolved version in the lockfile, **and when any browser requested by a wired workflow
+is absent from `probe_results`**. The second half is the repo-side companion to the
+third resolution row above: adding a browser to a matrix is a commit, so it can and
+should turn a fence red in the PR that adds it, rather than being discovered at run
+time as an unexplained apt tax. A Playwright bump therefore turns the fence red **in the bumping PR**, where
 the fix is one dispatch of the Phase 0 probe and one edit to the JSON — rather than
 discovering it later from 19 red workflows. Per `AGENTS.md`, this one resolves a value
 rather than matching source text: it reads the lockfile and the JSON and compares
@@ -599,14 +669,14 @@ was explicitly scoped to "Tranche B+ only".
 
 ## 11. Decision requested
 
-| #          | Decision                                                          | Recommendation                                                                                                                                                                                                              |
-| ---------- | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **D-CI-1** | Adopt Option C (composite action + fail-fast + bounded retry)?    | **Yes**                                                                                                                                                                                                                     |
-| **D-CI-2** | Run Phase 0 (measure whether `--with-deps` is still needed)?      | **Yes — it is the only way Option B ever stops being `NOT_MEASURED`**                                                                                                                                                       |
-| **D-CI-3** | Implementer                                                       | **Codex** (CI/release-gate owner)                                                                                                                                                                                           |
-| **D-CI-4** | Rollout order — canary, then bulk, then `ci.yml` last             | **Yes**                                                                                                                                                                                                                     |
-| **D-CI-5** | Fault-injection test proving the process-GROUP timeout kills apt? | **Required** — §6 makes it mandatory. Without it the per-attempt cap is unverified in the exact way that matters: a timeout that signals only the direct child leaves apt holding the runner while the step reports failure |
-| **D-CI-6** | Fault-injection test for the compounded RETRY rate?               | Not possible on demand — it needs a real mirror stall. The three-attempt clearance estimate stays `NOT_MEASURED` regardless of D-CI-5                                                                                       |
+| #          | Decision                                                                                                                 | Recommendation                                                                                                                                                                                                              |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **D-CI-1** | Adopt Option C (composite action + fail-fast + bounded retry)?                                                           | **Yes**                                                                                                                                                                                                                     |
+| **D-CI-2** | Run Phase 0 (measure whether `--with-deps` is still needed), probing **every browser in use** — `chromium` and `webkit`? | **Yes — it is the only way Option B ever stops being `NOT_MEASURED`, and a Chromium-only probe would license dropping WebKit's dependencies on evidence that never covered WebKit**                                         |
+| **D-CI-3** | Implementer                                                                                                              | **Codex** (CI/release-gate owner)                                                                                                                                                                                           |
+| **D-CI-4** | Rollout order — canary, then bulk, then `ci.yml` last                                                                    | **Yes**                                                                                                                                                                                                                     |
+| **D-CI-5** | Fault-injection test proving the process-GROUP timeout kills apt?                                                        | **Required** — §6 makes it mandatory. Without it the per-attempt cap is unverified in the exact way that matters: a timeout that signals only the direct child leaves apt holding the runner while the step reports failure |
+| **D-CI-6** | Fault-injection test for the compounded RETRY rate?                                                                      | Not possible on demand — it needs a real mirror stall. The three-attempt clearance estimate stays `NOT_MEASURED` regardless of D-CI-5                                                                                       |
 
 Nothing in this document authorizes an edit. Phase 1 begins only on an explicit approval
 naming D-CI-1 and D-CI-3.

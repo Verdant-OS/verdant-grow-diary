@@ -290,6 +290,41 @@ describe("forward fence — migrations newer than the forward repair", () => {
         "REVOKE ALL ON ROUTINE public.quicklog_save_manual_pre_logged_at(text, uuid, text) FROM authenticated;",
       ),
     ).toBe(false);
+    // PostgreSQL allows the argument list to be omitted when the routine name
+    // is unambiguous, and the catalog contract pins the wrapper to a single
+    // overload — so these strip wrapper access for real and must be flagged.
+    expect(
+      migrationLeavesWrapperWithoutRequiredGrant(
+        "REVOKE EXECUTE ON ROUTINE public.quicklog_save_manual FROM authenticated;",
+      ),
+    ).toBe(true);
+    expect(
+      migrationLeavesWrapperWithoutRequiredGrant(
+        "REVOKE EXECUTE ON FUNCTION quicklog_save_manual FROM service_role;",
+      ),
+    ).toBe(true);
+    // A no-argument revoke genuinely restored by a no-argument grant is still
+    // a legal re-hardening pass.
+    expect(
+      migrationLeavesWrapperWithoutRequiredGrant(
+        `REVOKE EXECUTE ON ROUTINE public.quicklog_save_manual FROM authenticated;
+         GRANT EXECUTE ON ROUTINE public.quicklog_save_manual TO authenticated;`,
+      ),
+    ).toBe(false);
+    // The delegate stays out of scope in the no-argument form as well.
+    expect(
+      migrationLeavesWrapperWithoutRequiredGrant(
+        "REVOKE ALL ON ROUTINE public.quicklog_save_manual_pre_logged_at FROM authenticated;",
+      ),
+    ).toBe(false);
+    // Dropping the mandatory parens removed what used to terminate the
+    // identifier, so a distinct function whose name merely starts with the
+    // wrapper's must not be misreported as the wrapper.
+    expect(
+      migrationLeavesWrapperWithoutRequiredGrant(
+        "REVOKE EXECUTE ON ROUTINE public.quicklog_save_manual_v2 FROM authenticated;",
+      ),
+    ).toBe(false);
   });
 });
 

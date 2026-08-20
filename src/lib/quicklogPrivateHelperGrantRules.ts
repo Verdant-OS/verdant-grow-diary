@@ -122,9 +122,18 @@ export function migrationGrantsClientExecuteOn(
  * file. A revoke-then-regrant re-hardening pass stays legal. The negative
  * lookahead keeps the private delegate's own REVOKEs (…_pre_logged_at) out
  * of scope.
+ *
+ * The argument list is OPTIONAL: PostgreSQL lets a routine target omit it
+ * when the name is unambiguous, and the catalog contract pins the wrapper to
+ * a single overload — so `REVOKE EXECUTE ON ROUTINE public.quicklog_save_manual
+ * FROM authenticated;` really does strip wrapper access. Requiring the parens
+ * left that form invisible. Because the parens are what used to terminate the
+ * identifier, dropping them requires an explicit `(?![\w$])` boundary, or a
+ * different function whose name merely starts with the wrapper's (say
+ * `quicklog_save_manual_v2`) would match and be misreported.
  */
 export function migrationLeavesWrapperWithoutRequiredGrant(executableSql: string): boolean {
-  const wrapperRef = String.raw`(?:public\.)?quicklog_save_manual(?!_pre_logged_at)\s*\([^)]*\)`;
+  const wrapperRef = String.raw`(?:public\.)?quicklog_save_manual(?!_pre_logged_at)(?![\w$])(?:\s*\([^)]*\))?`;
   // Every target form that reaches the wrapper: a direct FUNCTION/ROUTINE
   // target (the wrapper need not be first in a comma-separated list), or a
   // schema-wide ALL FUNCTIONS/ROUTINES IN SCHEMA public. Both directions use

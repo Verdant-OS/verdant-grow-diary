@@ -108,6 +108,14 @@ export interface MockedWorld {
    * assert the key was actually sent.
    */
   lastIdempotencyKey: string | null;
+  /**
+   * The target the last accepted save was aimed at. The fixture deliberately
+   * accepts either fixture target, because tent-scoped journeys are a real
+   * product path and later slices measure them — narrowing it here would
+   * cripple a shared helper. Which target a given scenario REQUIRES is the
+   * scenario's own assertion; this is what lets it make one.
+   */
+  lastTarget: { type: string | null; id: string | null } | null;
   rpcMode: "ok" | "fail";
 }
 
@@ -117,6 +125,7 @@ export function createMockedWorld(): MockedWorld {
     savedGrowEvents: [],
     reads: { diary_entries: 0, grow_events: 0, grow_events_by_id: 0 },
     lastIdempotencyKey: null,
+    lastTarget: null,
     rpcMode: "ok",
   };
 }
@@ -349,6 +358,7 @@ export async function mockSignedInSupabase(
       return;
     }
     world.lastIdempotencyKey = submittedKey;
+    world.lastTarget = { type: submittedTargetType, id: submittedTargetId };
 
     const occurredAt = asText(submitted.p_occurred_at) ?? new Date().toISOString();
     world.savedGrowEvents.push({

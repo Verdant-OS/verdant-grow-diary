@@ -156,6 +156,18 @@ test.describe("One-Tent Loop interaction counter baseline", () => {
       },
       paid_ai_requests: 0,
     });
+
+    // S1a saves too, so it carries the same two save-shape obligations as S7.
+    // Plant Detail's sheet hardcodes `targetType: "plant"`
+    // (PlantQuickLog.tsx:343); the shared fixture accepts either fixture
+    // target on purpose, since tent-scoped journeys are real and a later slice
+    // measures them, so requiring the PLANT target is this scenario's job.
+    expect(world.lastTarget).toEqual({ type: "plant", id: FAKE_PLANT_ID });
+    // Production skips deduplication entirely when the key is absent, so a
+    // dropped key is a silent duplicate-write regression that a successful
+    // save receipt alone cannot see.
+    expect(typeof world.lastIdempotencyKey).toBe("string");
+    expect((world.lastIdempotencyKey ?? "").length).toBeGreaterThanOrEqual(8);
   });
 
   test("S7: post-save timeline evidence costs at most one continuation action", async ({
@@ -246,6 +258,14 @@ test.describe("One-Tent Loop interaction counter baseline", () => {
     // through the supplemental lookup and measure green while broken.
     expect(world.reads.grow_events).toBeGreaterThan(0);
     expect(world.reads.diary_entries).toBeGreaterThan(0);
+
+    // Both scenarios drive Quick Log from Plant Detail, whose sheet hardcodes
+    // `targetType: "plant"` (PlantQuickLog.tsx:343). The shared fixture accepts
+    // either fixture target on purpose — tent-scoped journeys are real and a
+    // later slice measures them — so requiring the PLANT target is this
+    // scenario's job. Without it, a regression that associated the log with the
+    // tent would still render one grow-scoped "Better" and measure green.
+    expect(world.lastTarget).toEqual({ type: "plant", id: FAKE_PLANT_ID });
 
     // The save must actually CARRY an idempotency key. Production skips
     // deduplication entirely when the field is absent, so a dropped key is a

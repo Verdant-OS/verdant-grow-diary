@@ -75,8 +75,26 @@ describe("oneTentLoopNavigationRules", () => {
     expect(r2.href ?? "").not.toMatch(/^\/grows\//);
   });
 
-  it("enables the tent route when its id is present", () => {
-    expect(resolveOneTentLoopNextStep("tent", { tentId: "t1" }).href).toBe("/tents/t1");
+  it("keeps tent → plant disabled until a plant is selected and never self-links to the tent", () => {
+    const tentOnly = resolveOneTentLoopNextStep("tent", { tentId: "t1" });
+    expect(tentOnly).toMatchObject({
+      ctaLabel: "Open plant",
+      disabled: true,
+      disabledReason: ONE_TENT_LOOP_DISABLED_COPY,
+      href: null,
+    });
+    expect(tentOnly.href ?? "").not.toMatch(/^\/tents\//);
+
+    const withPlant = resolveOneTentLoopNextStep("tent", {
+      tentId: "t1",
+      plantId: "p1",
+    });
+    expect(withPlant).toMatchObject({
+      ctaLabel: "Open plant",
+      disabled: false,
+      href: "/plants/p1",
+    });
+    expect(withPlant.href ?? "").not.toMatch(/^\/tents\//);
   });
 
   it("opens an exact Quick Log intent from a fully assigned plant", () => {
@@ -150,6 +168,17 @@ describe("oneTentLoopNavigationRules", () => {
     expect(fallback.href).toBe("/alerts");
     // Fallback must NOT imply opening a specific alert.
     expect(fallback.ctaLabel).toBe("Review alerts");
+
+    const scopedFallback = resolveOneTentLoopNextStep("ai-doctor", { growId: "g1" });
+    expect(scopedFallback.href).toBe("/alerts?growId=g1");
+    expect(scopedFallback.ctaLabel).toBe("Review alerts");
+    expect(resolveOneTentLoopNextStep("ai-doctor", { growId: " g1 " }).href).toBe(
+      "/alerts?growId=g1",
+    );
+    expect(resolveOneTentLoopNextStep("ai-doctor", { growId: "   " }).href).toBe("/alerts");
+    expect(resolveOneTentLoopNextStep("ai-doctor", { growId: "g1", alertId: "a1" }).href).toBe(
+      "/alerts/a1",
+    );
   });
 
   it("alert → Action Queue routes to the existing /actions surface, never back to /alerts", () => {
@@ -159,6 +188,14 @@ describe("oneTentLoopNavigationRules", () => {
     expect(r.href).toBe("/actions");
     expect(resolveOneTentLoopNextStep("alert").href).toBe("/actions");
     expect(resolveOneTentLoopNextStep("alert", { actionId: "x1" }).href).toBe("/actions/x1");
+    const scoped = resolveOneTentLoopNextStep("alert", { growId: "g1" });
+    expect(scoped.href).toBe("/actions?growId=g1");
+    expect(scoped.ctaLabel).toBe("Add to Action Queue");
+    expect(scoped.href).not.toMatch(/^\/alerts/);
+    expect(resolveOneTentLoopNextStep("alert", { growId: "   " }).href).toBe("/actions");
+    expect(resolveOneTentLoopNextStep("alert", { growId: "g1", actionId: "x1" }).href).toBe(
+      "/actions/x1",
+    );
     // Regression guard against the previous /alerts misrouting.
     expect(r.href).not.toMatch(/^\/alerts/);
   });

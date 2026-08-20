@@ -50,6 +50,13 @@ export default function AiDoctorStart() {
   // life of the page, and the grower's only recovery would be a full reload.
   // Retry only what actually failed — re-reading a healthy source is waste.
   const scopeRetrying = growsLoading || tentsQuery.isFetching;
+  // Both scope messages used to end with "Every active plant is listed below."
+  // unconditionally — but when the plants read fails (often the same outage
+  // that broke the scope reads) the list is replaced by an error state, and
+  // when there are no active plants it is replaced by an empty state. Stating
+  // it anyway tells the grower something the page is visibly not doing.
+  const plantsAreListed = !plantsQuery.isLoading && !plantsQuery.isError && options.length > 0;
+  const everyPlantListedSuffix = plantsAreListed ? " Every active plant is listed below." : "";
   const retryScopeReads = () => {
     if (growsError) void refreshGrows();
     if (tentsQuery.isError) void tentsQuery.refetch();
@@ -146,7 +153,7 @@ export default function AiDoctorStart() {
               data-testid="ai-doctor-start-scope-unverified"
             >
               Verdant couldn&apos;t check the grow or tent this link carried, so no tent context is
-              applied. Every active plant is listed below.{" "}
+              applied.{everyPlantListedSuffix}{" "}
               <Button
                 type="button"
                 variant="link"
@@ -166,7 +173,7 @@ export default function AiDoctorStart() {
               data-testid="ai-doctor-start-invalid-scope"
             >
               That link carried a grow or tent Verdant couldn't match to your account, so no tent
-              context is applied. Every active plant is listed below.
+              context is applied.{everyPlantListedSuffix}
             </p>
           ) : null}
         </div>

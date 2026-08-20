@@ -286,6 +286,51 @@ describe("AiDoctorStart", () => {
     expect(retry).toHaveTextContent("Checking");
   });
 
+  it("does not claim plants are listed when the plants read failed", () => {
+    // The same outage that breaks the scope reads usually breaks this one, and
+    // the list is then replaced by an error state. Saying "every active plant
+    // is listed below" over an error panel tells the grower something the page
+    // is visibly not doing.
+    state.growsError = "network down";
+    state.isError = true;
+    renderPage("/doctor?growId=grow-1&tentId=tent-a");
+
+    const message = screen.getByTestId("ai-doctor-start-scope-unverified");
+    expect(message).toBeInTheDocument();
+    expect(message).not.toHaveTextContent("Every active plant is listed below");
+    // The read failure still gets its own honest surface.
+    expect(screen.getByTestId("ai-doctor-start-error")).toBeInTheDocument();
+  });
+
+  it("does not claim plants are listed when there are no active plants", () => {
+    state.growsError = "network down";
+    state.data = [];
+    renderPage("/doctor?growId=grow-1&tentId=tent-a");
+
+    expect(screen.getByTestId("ai-doctor-start-scope-unverified")).not.toHaveTextContent(
+      "Every active plant is listed below",
+    );
+  });
+
+  it("still claims the list when plants really are listed", () => {
+    state.growsError = "network down";
+    state.data = SCOPED.plants;
+    renderPage("/doctor?growId=grow-1&tentId=tent-a");
+
+    expect(screen.getByTestId("ai-doctor-start-scope-unverified")).toHaveTextContent(
+      "Every active plant is listed below",
+    );
+  });
+
+  it("applies the same honesty gate to the unowned-scope message", () => {
+    state.isError = true;
+    state.grows = SCOPED.grows;
+    renderPage("/doctor?growId=grow-1&tentId=tent-does-not-exist");
+
+    const message = screen.getByTestId("ai-doctor-start-invalid-scope");
+    expect(message).not.toHaveTextContent("Every active plant is listed below");
+  });
+
   it("offers no retry when no scope was carried — there is nothing to re-check", () => {
     state.growsError = "network down";
     state.data = SCOPED.plants;

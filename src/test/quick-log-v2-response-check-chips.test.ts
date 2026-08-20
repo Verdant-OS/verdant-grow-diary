@@ -11,6 +11,8 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
+import { stripSourceComments } from "./utils/stripSourceComments";
+
 import { RESPONSE_CHECK_STATUSES, applyResponseCheck } from "@/lib/tenSecondQuickCheckRules";
 
 const SHEET = readFileSync("src/components/QuickLogV2Sheet.tsx", "utf8");
@@ -81,20 +83,35 @@ describe("D7 — V2 sheet response-check chips", () => {
     // Keyed on the PLANT the marker describes, not on chip visibility: the
     // chips stay visible across plant A -> plant B, so a visibility guard
     // silently reattributes A's response to B.
-    const flat = SHEET.replace(/\s+/g, " ");
+    // Comments stripped and whitespace collapsed: these pins are about the
+    // EXECUTABLE shape, so an explanatory comment between two statements must
+    // not be able to break one and teach the next person to relax it.
+    const flat = stripSourceComments(SHEET).replace(/\s+/g, " ");
+    // Keyed on the plant the TARGET names, independent of chip visibility.
+    // Switching the action to Feed hides the chips without changing which
+    // plant the entry is about, and must not read as a retarget.
     expect(flat).toMatch(
-      /const responseCheckPlantId = showResponseCheck && resolvedTarget\.ok \? \(resolvedTarget\.plantId \?\? null\) : null;/,
+      /const responseTargetPlantId = resolvedTarget\.ok && resolvedTarget\.targetType === "plant" \? \(resolvedTarget\.plantId \?\? null\) : null;/,
     );
     expect(flat).toMatch(
-      /const previousPlantId = responseCheckPlantIdRef\.current; responseCheckPlantIdRef\.current = responseCheckPlantId;/,
+      /const previousPlantId = responseTargetPlantIdRef\.current; responseTargetPlantIdRef\.current = responseTargetPlantId;/,
     );
     expect(flat).toMatch(
-      /if \(previousPlantId === null \|\| previousPlantId === responseCheckPlantId\) return;[\s\S]{0,200}actionTextWithoutResponseContext\(form\.note\)/,
+      /if \(previousPlantId === null \|\| previousPlantId === responseTargetPlantId\) return;/,
     );
-    // Neither retired guard can come back: the unconditional "chips absent"
-    // form, nor the visibility-only transition form.
+    // PROVENANCE: only a marker a CHIP wrote may be stripped. Prose the grower
+    // typed that merely reads like one is never touched.
+    expect(flat).toMatch(/chipAuthoredStatusRef\.current = status; setField\("note", next\);/);
+    expect(flat).toMatch(
+      /const authored = chipAuthoredStatusRef\.current; chipAuthoredStatusRef\.current = null; if \(!authored\) return; if \(readResponseCheckStatus\(form\.note\) !== authored\) return; setField\("note", actionTextWithoutResponseContext\(form\.note\)\);/,
+    );
+    // No retired guard can come back: the unconditional "chips absent" form,
+    // the visibility-only transition form, or a strip with no provenance.
     expect(SHEET).not.toMatch(/^\s*if \(showResponseCheck\) return;\s*$/m);
     expect(flat).not.toMatch(/if \(!wasVisible \|\| showResponseCheck\) return;/);
+    expect(flat).not.toMatch(
+      /previousPlantId === responseTargetPlantId\) return; if \(!readResponseCheckStatus/,
+    );
   });
 
   it("never pre-fills the note — the optional-note contract is preserved", () => {

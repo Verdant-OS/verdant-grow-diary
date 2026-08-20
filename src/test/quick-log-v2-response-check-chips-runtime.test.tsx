@@ -320,4 +320,37 @@ describe("D7 chips — a plant response never survives a switch to a tent", () =
     expect(noteTextarea().value).toContain("Response check: Same.");
     expect(noteTextarea().value).toContain("Leaves perked up.");
   });
+
+  it("never strips prose the grower wrote, even on a retarget", () => {
+    // No chip was ever clicked here. `readResponseCheckStatus` matches
+    // anywhere in the note, so without provenance this sentence would be
+    // rewritten to "Previous after watering." on the retarget.
+    renderSheet("plant:plant-1");
+    const prose = "Previous response check: better after watering. Runoff clear.";
+    fireEvent.change(noteTextarea(), { target: { value: prose } });
+
+    fireEvent.click(screen.getByLabelText("Target"));
+    fireEvent.click(screen.getByRole("option", { name: /Plant 2/ }));
+
+    expect(noteTextarea().value).toBe(prose);
+  });
+
+  it("keeps a chosen status when only the ACTION changes", async () => {
+    // Feed hides the chips but does not change which plant the entry is
+    // about. Losing a deliberately chosen status to a tab switch would be the
+    // sheet discarding grower intent.
+    renderSheet("plant:plant-1");
+    fireEvent.click(chip("worse"));
+    expect(noteTextarea().value).toContain("Response check: Worse.");
+
+    fireEvent.click(screen.getByRole("button", { name: "Feed" }));
+    await waitFor(() =>
+      expect(screen.queryByTestId("qlv2-response-chips")).not.toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Note" }));
+
+    await waitFor(() => expect(screen.getByTestId("qlv2-response-chips")).toBeInTheDocument());
+    expect(noteTextarea().value).toContain("Response check: Worse.");
+    expect(chip("worse")).toHaveAttribute("aria-pressed", "true");
+  });
 });

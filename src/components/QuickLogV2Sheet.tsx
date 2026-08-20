@@ -390,6 +390,8 @@ export default function QuickLogV2Sheet({
   const showResponseCheck =
     form.action !== "feed" && resolvedTarget.ok && resolvedTarget.targetType === "plant";
   const selectedResponseStatus = readResponseCheckStatus(form.note);
+  /** The status a CHIP last wrote, or null. Provenance for the cleanup below. */
+  const chipAuthoredStatusRef = useRef<ResponseCheckStatus | null>(null);
   // `maxLength` constrains TYPING only — it does not bound a programmatic
   // setState. Prepending the response line to an already-long note could push
   // the note past NOTE_LIMIT, and the watering write rejects >500, after which
@@ -507,27 +509,35 @@ export default function QuickLogV2Sheet({
   // stays in the note and would persist a plant-response marker against a tent
   // entry — mislabeling the row for every downstream response parser. Strip it
   // when the target stops being a plant, preserving any action prose.
-  // The plant the chips currently describe, or null when they are not offered.
-  const responseCheckPlantId =
-    showResponseCheck && resolvedTarget.ok ? (resolvedTarget.plantId ?? null) : null;
-  const responseCheckPlantIdRef = useRef(responseCheckPlantId);
+  // The plant the resolved target names, independent of whether the chips are
+  // currently offered. Switching the ACTION to Feed hides the chips without
+  // changing which plant the entry is about, and must not be treated as a
+  // retarget — the grower would lose a status they deliberately chose.
+  const responseTargetPlantId =
+    resolvedTarget.ok && resolvedTarget.targetType === "plant"
+      ? (resolvedTarget.plantId ?? null)
+      : null;
+  const responseTargetPlantIdRef = useRef(responseTargetPlantId);
   useEffect(() => {
-    const previousPlantId = responseCheckPlantIdRef.current;
-    responseCheckPlantIdRef.current = responseCheckPlantId;
+    const previousPlantId = responseTargetPlantIdRef.current;
+    responseTargetPlantIdRef.current = responseTargetPlantId;
     // Fire when the plant the marker DESCRIBES changes — to a different plant,
     // or to no plant at all. Both leak: retargeting plant A -> tent leaves a
     // plant marker on a tent row, and plant A -> plant B silently reattributes
     // A's response to B.
-    //
-    // Deliberately NOT "the chips are absent": `readResponseCheckStatus`
-    // matches anywhere in the note, so that guard rewrote ordinary prose the
-    // grower typed into a tent note — "Previous response check: better after
-    // watering" became "Previous after watering". Never edit a grower's words;
-    // only undo what a chip wrote.
-    if (previousPlantId === null || previousPlantId === responseCheckPlantId) return;
-    if (!readResponseCheckStatus(form.note)) return;
+    if (previousPlantId === null || previousPlantId === responseTargetPlantId) return;
+
+    // PROVENANCE. `readResponseCheckStatus` matches anywhere in the note, so a
+    // grower who writes "Previous response check: better after watering" reads
+    // as having a marker. Only ever undo what a CHIP wrote: remember the status
+    // the chip last authored, and strip only while the note still reads as that
+    // exact status. Prose the grower typed is never touched.
+    const authored = chipAuthoredStatusRef.current;
+    chipAuthoredStatusRef.current = null; // provenance does not follow a new plant
+    if (!authored) return;
+    if (readResponseCheckStatus(form.note) !== authored) return;
     setField("note", actionTextWithoutResponseContext(form.note));
-  }, [responseCheckPlantId, form.note, setField]);
+  }, [responseTargetPlantId, form.note, setField]);
 
   const handleAction = (a: QuickLogV2Action) => {
     if (wateringSubmissionLockedRef.current) return;
@@ -1647,6 +1657,7 @@ export default function QuickLogV2Sheet({
                       // case, but never let a programmatic write exceed the
                       // limit the save path enforces.
                       if (next.length > NOTE_LIMIT) return;
+                      chipAuthoredStatusRef.current = status;
                       setField("note", next);
                     }}
                   >

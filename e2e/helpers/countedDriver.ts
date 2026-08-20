@@ -22,13 +22,52 @@ export interface CountedDriver {
   press(locator: Locator, key: string): Promise<void>;
   /** A grow/tent/plant selection the app already had context for. */
   reselectTarget(open: Locator, option: Locator): Promise<void>;
-  /** Navigate and verify the landing path; counts one route transition. */
-  gotoCounted(path: string): Promise<void>;
-  /** Verify an in-app navigation already happened; counts one transition. */
+  /**
+   * Begin counting REAL main-frame route changes. Call once, after the
+   * scenario's setup navigation has settled — setup is not an interaction the
+   * grower performs, so it must not appear in the receipt.
+   */
+  beginRouteObservation(): void;
+  /**
+   * Assert the app landed where the scenario expects. Counts NOTHING: route
+   * transitions are observed, not asserted (see the note on this file's
+   * observer). Calling this is a correctness check, not a measurement.
+   */
   expectRoute(pathFragment: string): Promise<void>;
 }
 
+/**
+ * Route transitions are OBSERVED, never asserted.
+ *
+ * The first version counted one transition per `expectRoute()` call, which
+ * measured the spec's own assertions rather than the app's behavior: an
+ * intermediate redirect still counted one (the assertion only ever sees the
+ * final URL), and a scenario that never called the helper reported zero even
+ * if the app had started auto-navigating. Both preserve an authoritative
+ * receipt number across exactly the regression it exists to catch.
+ *
+ * So the main frame is watched directly. Same-path re-navigations (a
+ * `replace` that keeps the pathname) are not transitions and are skipped;
+ * every genuine pathname change counts, including each hop of a redirect
+ * chain — a hop the grower waits through is a transition they paid for.
+ *
+ * `gotoCounted` was removed rather than adapted: with a live observer it
+ * would have double-counted its own navigation, and no scenario used it.
+ * Setup navigation stays a plain `page.goto()` performed before observation
+ * is armed.
+ */
 export function createCountedDriver(page: Page, counter: InteractionCounter): CountedDriver {
+  let observing = false;
+  let lastPath: string | null = null;
+
+  page.on("framenavigated", (frame) => {
+    if (!observing || frame !== page.mainFrame()) return;
+    const path = safePathname(frame.url());
+    if (path === null || path === lastPath) return;
+    lastPath = path;
+    counter.recordRouteTransition();
+  });
+
   return {
     async click(locator: Locator) {
       await locator.click();
@@ -50,15 +89,23 @@ export function createCountedDriver(page: Page, counter: InteractionCounter): Co
       counter.recordClick();
       counter.recordReselection();
     },
-    async gotoCounted(path: string) {
-      await page.goto(path);
-      counter.recordRouteTransition();
+    beginRouteObservation() {
+      lastPath = safePathname(page.url());
+      observing = true;
     },
     async expectRoute(pathFragment: string) {
       await expect(page).toHaveURL(new RegExp(escapeForRegExp(pathFragment)));
-      counter.recordRouteTransition();
     },
   };
+}
+
+function safePathname(url: string): string | null {
+  try {
+    return new URL(url).pathname;
+  } catch {
+    // about:blank and friends are not app routes.
+    return null;
+  }
 }
 
 function escapeForRegExp(value: string): string {

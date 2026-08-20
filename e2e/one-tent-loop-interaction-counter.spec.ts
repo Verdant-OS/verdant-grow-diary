@@ -68,6 +68,9 @@ test.describe("One-Tent Loop interaction counter baseline", () => {
     // Waiting for readiness with an explicit budget keeps the measured
     // journey honest — counting is driver-level, so this cannot shift counts.
     await waitForReady(page.getByTestId("plant-detail-quick-log-open"));
+    // Setup has landed. From here every real main-frame route change counts,
+    // so a save that started auto-navigating could not report zero.
+    driver.beginRouteObservation();
 
     // The measured journey: open Quick Log → tap a status chip → save.
     await driver.click(page.getByTestId("plant-detail-quick-log-open"));
@@ -128,6 +131,7 @@ test.describe("One-Tent Loop interaction counter baseline", () => {
     // SETUP, not measurement (see S1a).
     await page.goto(`/plants/${FAKE_PLANT_ID}`);
     await waitForReady(page.getByTestId("plant-detail-quick-log-open"));
+    driver.beginRouteObservation();
     await driver.click(page.getByTestId("plant-detail-quick-log-open"));
     await driver.click(page.getByTestId("plant-response-check-better"));
     await driver.click(page.getByTestId("plant-quick-log-save"));
@@ -148,9 +152,9 @@ test.describe("One-Tent Loop interaction counter baseline", () => {
     // sidebar link is what a grower can actually tap. That asymmetry is
     // recorded in the baseline rather than papered over.
     await driver.click(page.getByRole("link", { name: "Timeline", exact: true }).first());
-    // Verify only. expectRoute records the transition the click caused; the
-    // click itself is the interaction. Pairing gotoCounted with expectRoute
-    // for one navigation double-counts it.
+    // Correctness check only — it counts nothing. The transition itself is
+    // observed at the main frame, so this receipt's `route_transitions: 1`
+    // is a measurement of what the app did, not of this assertion firing.
     await driver.expectRoute("/timeline");
 
     // Evidence must actually RENDER, and render EXACTLY ONCE. The mocked
@@ -201,6 +205,13 @@ test.describe("One-Tent Loop interaction counter baseline", () => {
     // through the supplemental lookup and measure green while broken.
     expect(world.reads.grow_events).toBeGreaterThan(0);
     expect(world.reads.diary_entries).toBeGreaterThan(0);
+
+    // The save must actually CARRY an idempotency key. Production skips
+    // deduplication entirely when the field is absent, so a dropped key is a
+    // silent duplicate-write regression that a successful-save receipt alone
+    // cannot see.
+    expect(typeof world.lastIdempotencyKey).toBe("string");
+    expect((world.lastIdempotencyKey ?? "").length).toBeGreaterThanOrEqual(8);
 
     // One canonical save == one spine row + one linked diary companion.
     expect(world.savedGrowEvents).toHaveLength(1);

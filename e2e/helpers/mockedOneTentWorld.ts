@@ -99,6 +99,15 @@ export interface MockedWorld {
    * that lost its core grow_events query entirely would still measure green.
    */
   reads: { diary_entries: number; grow_events: number; grow_events_by_id: number };
+  /**
+   * The `p_idempotency_key` the last accepted save carried, or null if it
+   * carried none. Production treats an absent key as "do not deduplicate at
+   * all" (the dedup lookup sits inside `IF p_idempotency_key IS NOT NULL`),
+   * so a surface that silently dropped the field would still save — and would
+   * write a second row on any lost-response retry. Exposed so a scenario can
+   * assert the key was actually sent.
+   */
+  lastIdempotencyKey: string | null;
   rpcMode: "ok" | "fail";
 }
 
@@ -107,6 +116,7 @@ export function createMockedWorld(): MockedWorld {
     savedRows: [],
     savedGrowEvents: [],
     reads: { diary_entries: 0, grow_events: 0, grow_events_by_id: 0 },
+    lastIdempotencyKey: null,
     rpcMode: "ok",
   };
 }
@@ -323,6 +333,22 @@ export async function mockSignedInSupabase(
       });
       return;
     }
+
+    // Production accepts an idempotency key of 8-200 characters and rejects
+    // anything outside that band before writing
+    // (20260818010000_quicklog_manual_delegate_forward_repair.sql:645).
+    // A stub that took any key would let a surface ship one production
+    // refuses, and the scenario would still show a successful save.
+    const submittedKey = asText(submitted.p_idempotency_key);
+    if (submittedKey !== null && (submittedKey.length < 8 || submittedKey.length > 200)) {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: false, reason: "invalid_idempotency_key" }),
+      });
+      return;
+    }
+    world.lastIdempotencyKey = submittedKey;
 
     const occurredAt = asText(submitted.p_occurred_at) ?? new Date().toISOString();
     world.savedGrowEvents.push({

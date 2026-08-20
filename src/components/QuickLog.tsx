@@ -47,6 +47,7 @@ import {
   shouldBlockQuickLogClose,
 } from "@/lib/quickLogSaveGuardRules";
 import QuickLogAllActivitiesSection, {
+  type QuickLogAllActivitiesSaveSuccess,
   type QuickLogAllActivitiesSaveTarget,
 } from "@/components/QuickLogAllActivitiesSection";
 import { STAGES } from "@/lib/grow";
@@ -712,6 +713,34 @@ export default function QuickLog({
       clearPublicQuickLogStarterDraft();
     }
   }, [prefill?.publicStarterDraftId, prefill?.publicStarterDraftUpdatedAt]);
+
+  /**
+   * Every successful save must refresh the remembered target, not only the
+   * legacy form's. The "All activity types" section has its own save path, and
+   * wiring only the draft-consume to it left a grower who logs that way being
+   * offered an OLDER plant — or nothing — on their next unscoped open, even
+   * though they had just used a target.
+   *
+   * A grow- or tent-scoped save carries no plantId; there is nothing to
+   * remember, and inventing one is exactly what this slice forbids.
+   */
+  const handleAllActivitiesSaveSuccess = useCallback(
+    (result: QuickLogAllActivitiesSaveSuccess) => {
+      consumeReviewedPublicStarterDraft();
+      const plantId = result.target.plantId;
+      if (!plantId) return;
+      rememberLastTarget(
+        {
+          plantId,
+          growId: result.target.growId,
+          tentId: result.target.tentId,
+          savedAt: new Date().toISOString(),
+        },
+        user?.id ?? null,
+      );
+    },
+    [consumeReviewedPublicStarterDraft, user?.id],
+  );
 
   // Slice A2: re-enable stage defaulting ONLY when the grower actively switches
   // from one already-selected plant to a different one — the new target's stage
@@ -1443,7 +1472,7 @@ export default function QuickLog({
           testIdPrefix="quick-log-dialog-all-activities"
           requestedActivityId={prefill?.activityId ?? null}
           requestedNote={prefill?.activityId ? (prefill.note ?? null) : null}
-          onSaveSuccess={consumeReviewedPublicStarterDraft}
+          onSaveSuccess={handleAllActivitiesSaveSuccess}
           onSaveStart={beginAllActivitiesSave}
           onSaveEnd={endAllActivitiesSave}
           saveBlocked={saveLocked}

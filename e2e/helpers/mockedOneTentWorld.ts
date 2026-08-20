@@ -88,11 +88,18 @@ export interface MockedWorld {
   savedRows: Array<Record<string, unknown>>;
   /** The typed grow_events spine rows the same save writes. */
   savedGrowEvents: Array<Record<string, unknown>>;
+  /** Correctly grow-scoped reads served, per table. */
+  reads: { diary_entries: number; grow_events: number };
   rpcMode: "ok" | "fail";
 }
 
 export function createMockedWorld(): MockedWorld {
-  return { savedRows: [], savedGrowEvents: [], rpcMode: "ok" };
+  return {
+    savedRows: [],
+    savedGrowEvents: [],
+    reads: { diary_entries: 0, grow_events: 0 },
+    rpcMode: "ok",
+  };
 }
 
 export async function seedFakeSession(page: Page): Promise<void> {
@@ -122,6 +129,28 @@ export async function seedFakeSession(page: Page): Promise<void> {
  * Fulfill a PostgREST read honestly for both list and `.single()` callers:
  * object-accept requests get the first row as a bare object.
  */
+/**
+ * True only when the request carries the expected `grow_id=eq.<uuid>` filter.
+ *
+ * Dispatching on pathname alone would serve rows for ANY scope, so a Timeline
+ * that dropped or mangled its grow filter would still render this grow's
+ * evidence and the scenario would claim correctly-scoped evidence it never
+ * proved.
+ */
+function readScoped(
+  world: MockedOneTentWorld,
+  table: "diary_entries" | "grow_events",
+  request: Request,
+): unknown[] {
+  if (!scopedToFakeGrow(request)) return [];
+  world.reads[table] += 1;
+  return table === "diary_entries" ? world.savedRows : world.savedGrowEvents;
+}
+
+function scopedToFakeGrow(request: Request): boolean {
+  return new URL(request.url()).searchParams.get("grow_id") === `eq.${FAKE_GROW_ID}`;
+}
+
 /** Edge functions that meter AI credits (AGENTS.md — AI Credit Enforcement). */
 const PAID_AI_EDGE_FUNCTIONS = ["ai-doctor-review", "ai-coach"] as const;
 
@@ -192,9 +221,9 @@ export async function mockSignedInSupabase(
           : pathname.endsWith("/grows")
             ? [FAKE_GROW]
             : pathname.endsWith("/diary_entries")
-              ? world.savedRows
+              ? readScoped(world, "diary_entries", request)
               : pathname.endsWith("/grow_events")
-                ? world.savedGrowEvents
+                ? readScoped(world, "grow_events", request)
                 : [];
     await fulfillRows(route, request, rows);
   });

@@ -78,6 +78,12 @@ test.describe("One-Tent Loop interaction counter baseline", () => {
     await expect
       .poll(() => counter.snapshot().supabase_writes.rpc["quicklog_save_manual"] ?? 0)
       .toBe(1);
+    // The RPC tally increments inside the route handler, BEFORE route.fulfill()
+    // and before the app's post-save continuation runs. Snapshotting on that
+    // alone could miss a follow-on persistence or paid-AI request and still
+    // call the receipt complete. The sheet closing is the app's own definitive
+    // save-success signal, so wait for it first.
+    await expect(page.getByTestId("plant-quick-log-sheet")).toBeHidden({ timeout: 15_000 });
 
     const receipt = counter.snapshot();
 
@@ -128,6 +134,8 @@ test.describe("One-Tent Loop interaction counter baseline", () => {
     await expect
       .poll(() => counter.snapshot().supabase_writes.rpc["quicklog_save_manual"] ?? 0)
       .toBe(1);
+    // Definitive save-success state before continuing (see S1a).
+    await expect(page.getByTestId("plant-quick-log-sheet")).toBeHidden({ timeout: 15_000 });
 
     // Continuation: the grower's REAL affordance — the app's own Timeline
     // navigation. Driving this with page.goto() would measure a scripted URL
@@ -180,6 +188,14 @@ test.describe("One-Tent Loop interaction counter baseline", () => {
       },
       paid_ai_requests: 0,
     });
+    // Prove the dual-source read actually happened. The rendered count alone
+    // is source-agnostic: if Timeline stopped issuing or using the grow_events
+    // read, the diary companion would still render exactly one "Better" and
+    // the count assertion would pass. These counters only increment for reads
+    // carrying the correct `grow_id` filter, so they pin the scoping too.
+    expect(world.reads.grow_events).toBeGreaterThan(0);
+    expect(world.reads.diary_entries).toBeGreaterThan(0);
+
     // One canonical save == one spine row + one linked diary companion.
     expect(world.savedGrowEvents).toHaveLength(1);
     expect(world.savedRows).toHaveLength(1);

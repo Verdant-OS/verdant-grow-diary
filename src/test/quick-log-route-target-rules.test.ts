@@ -14,6 +14,39 @@ describe("resolveMobileQuickLogTarget", () => {
     expect(resolveMobileQuickLogTarget(`/tents/${TENT_ID}/`)).toBe(`tent:${TENT_ID}`);
   });
 
+  it("uses matching sole-active-plant evidence", () => {
+    expect(
+      resolveMobileQuickLogTarget(`/tents/${TENT_ID}`, {
+        tentId: TENT_ID,
+        soleActivePlantId: PLANT_ID,
+      }),
+    ).toBe(`plant:${PLANT_ID}`);
+  });
+
+  it("never guesses a plant when the current tent has zero or several", () => {
+    expect(
+      resolveMobileQuickLogTarget(`/tents/${TENT_ID}`, {
+        tentId: TENT_ID,
+        soleActivePlantId: null,
+      }),
+    ).toBe(`tent:${TENT_ID}`);
+  });
+
+  it("fails back to the tent for malformed or stale sole-plant evidence", () => {
+    expect(
+      resolveMobileQuickLogTarget(`/tents/${TENT_ID}`, {
+        tentId: TENT_ID,
+        soleActivePlantId: "not-a-uuid",
+      }),
+    ).toBe(`tent:${TENT_ID}`);
+    expect(
+      resolveMobileQuickLogTarget(`/tents/${TENT_ID}`, {
+        tentId: "30000000-0000-4000-8000-000000000002",
+        soleActivePlantId: PLANT_ID,
+      }),
+    ).toBe(`tent:${TENT_ID}`);
+  });
+
   it.each(["/tents", "/tents/new", "/plants/plant-1", "/", ""])(
     "fails closed for %s",
     (pathname) => {

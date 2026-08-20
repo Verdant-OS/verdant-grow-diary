@@ -91,6 +91,7 @@ import {
 
 import { plantDetailPath, tentsPath } from "@/lib/routes";
 import StartPhenoHuntButton from "@/components/StartPhenoHuntButton";
+import { useTentQuickLogTargetEvidence } from "@/context/TentQuickLogTargetContext";
 
 const EMPTY_TENT_PLANTS: never[] = [];
 
@@ -156,6 +157,7 @@ export default function TentDetail() {
   // and cannot mis-attribute.
   const verifiedActivePlantCount = resolveVerifiedAssignedPlantCount(activePlantsQuery);
   const safePlantId = verifiedActivePlantCount === 1 ? (activePlants[0]?.id ?? null) : null;
+  useTentQuickLogTargetEvidence(tent?.id ?? null, safePlantId);
   // Archive/delete authorization counts all soft-linked plants, including
   // archived/merged history, and fails closed during every non-current state.
   const assignedPlantCount = resolveVerifiedAssignedPlantCount(allPlantsQuery);

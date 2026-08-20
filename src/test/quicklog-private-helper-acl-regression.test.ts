@@ -38,14 +38,84 @@ import { EXECUTE_ROLE_SERVICE } from "@/lib/pgmqEmailWrapperGrantRules";
 const ROOT = resolve(__dirname, "../..");
 const MIGRATIONS_DIR = resolve(ROOT, "supabase/migrations");
 
+/**
+ * Reduce SQL to its executable projection: comments become whitespace, code
+ * survives byte-for-byte. The forward fence accepts only this projection, so
+ * a commented-out example must never satisfy a later re-grant and hide a real
+ * revoke.
+ *
+ * This scans rather than running a chain of `.replace()`, because a blind
+ * regex cannot tell a comment from a comment MARKER INSIDE A STRING. Given
+ * `SELECT '--'; GRANT EXECUTE ON … TO authenticated;` on one line, stripping
+ * from the first `--` swallows the rest of the line and the forbidden grant is
+ * never scanned at all — the fence reports green precisely because the input
+ * was mutilated. Ordinary quotes (with `''` doubling), quoted identifiers, and
+ * dollar-quoted bodies are therefore passed through intact, and block comments
+ * nest the way PostgreSQL nests them.
+ */
 function stripComments(sql: string): string {
-  // Strip block comments first, then `--` comments through end-of-line.
-  // The forward fence accepts only this executable projection: commented
-  // examples must never satisfy a later re-grant and hide a real revoke.
-  return sql
-    .replace(/\r\n?/g, "\n")
-    .replace(/\/\*[\s\S]*?\*\//g, " ")
-    .replace(/--[^\n]*/g, " ");
+  const src = sql.replace(/\r\n?/g, "\n");
+  let out = "";
+  let i = 0;
+  while (i < src.length) {
+    const dollarTag = /^\$[A-Za-z_]\w*\$|^\$\$/.exec(src.slice(i));
+    if (dollarTag) {
+      const tag = dollarTag[0];
+      const close = src.indexOf(tag, i + tag.length);
+      const stop = close === -1 ? src.length : close + tag.length;
+      out += src.slice(i, stop);
+      i = stop;
+      continue;
+    }
+    const ch = src[i];
+    if (ch === "'" || ch === '"') {
+      let j = i + 1;
+      while (j < src.length) {
+        if (src[j] !== ch) {
+          j += 1;
+          continue;
+        }
+        if (src[j + 1] === ch) {
+          j += 2;
+          continue;
+        }
+        j += 1;
+        break;
+      }
+      out += src.slice(i, j);
+      i = j;
+      continue;
+    }
+    if (ch === "-" && src[i + 1] === "-") {
+      const newline = src.indexOf("\n", i);
+      out += " ";
+      i = newline === -1 ? src.length : newline;
+      continue;
+    }
+    if (ch === "/" && src[i + 1] === "*") {
+      let depth = 1;
+      let j = i + 2;
+      while (j < src.length && depth > 0) {
+        if (src[j] === "/" && src[j + 1] === "*") {
+          depth += 1;
+          j += 2;
+          continue;
+        }
+        if (src[j] === "*" && src[j + 1] === "/") {
+          depth -= 1;
+          j += 2;
+          continue;
+        }
+        j += 1;
+      }
+      out += " ";
+      i = j;
+      continue;
+    }
+    out += ch;
+    i += 1;
+  }
+  return out;
 }
 
 function loadMigration(relPath: string): string {
@@ -323,6 +393,84 @@ describe("forward fence — migrations newer than the forward repair", () => {
     expect(
       migrationLeavesWrapperWithoutRequiredGrant(
         "REVOKE EXECUTE ON ROUTINE public.quicklog_save_manual_v2 FROM authenticated;",
+      ),
+    ).toBe(false);
+  });
+
+  it("finds public anywhere in an IN SCHEMA list, without matching the PUBLIC role", () => {
+    // `public` need not lead the list; reordering must not walk past a fence.
+    expect(
+      migrationGrantsClientExecuteOn(
+        "GRANT EXECUTE ON ALL ROUTINES IN SCHEMA extensions, public TO authenticated;",
+        "quicklog_try_parse_uuid",
+      ),
+    ).toBe(true);
+    expect(
+      migrationGrantsClientExecuteOn(
+        'GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA extensions, "public" TO anon;',
+        "quicklog_stamp_diary_logged_at",
+      ),
+    ).toBe(true);
+    expect(
+      migrationLeavesWrapperWithoutRequiredGrant(
+        "REVOKE EXECUTE ON ALL ROUTINES IN SCHEMA extensions, public FROM authenticated;",
+      ),
+    ).toBe(true);
+    // …but PUBLIC as the GRANTEE is a role, not our schema. A statement that
+    // never names schema public must stay unflagged, or the fence cries wolf.
+    expect(
+      migrationGrantsClientExecuteOn(
+        "GRANT EXECUTE ON ALL ROUTINES IN SCHEMA extensions TO public;",
+        "quicklog_try_parse_uuid",
+      ),
+    ).toBe(false);
+    expect(
+      migrationLeavesWrapperWithoutRequiredGrant(
+        "REVOKE EXECUTE ON ALL ROUTINES IN SCHEMA extensions FROM public;",
+      ),
+    ).toBe(false);
+  });
+
+  it("keeps comment markers that live inside SQL string literals", () => {
+    // The marker is data here, so the grant after it is real and must be seen.
+    expect(
+      migrationGrantsClientExecuteOn(
+        stripComments(
+          "SELECT '--'; GRANT EXECUTE ON ROUTINE public.quicklog_try_parse_uuid(text) TO authenticated;",
+        ),
+        "quicklog_try_parse_uuid",
+      ),
+    ).toBe(true);
+    expect(
+      migrationGrantsClientExecuteOn(
+        stripComments(
+          "SELECT $$/* not a comment $$; GRANT EXECUTE ON FUNCTION public.quicklog_try_parse_uuid(text) TO anon;",
+        ),
+        "quicklog_try_parse_uuid",
+      ),
+    ).toBe(true);
+    expect(
+      migrationLeavesWrapperWithoutRequiredGrant(
+        stripComments(
+          "SELECT '--'; REVOKE EXECUTE ON ROUTINE public.quicklog_save_manual FROM authenticated;",
+        ),
+      ),
+    ).toBe(true);
+    // Real comments are still stripped, including nested block comments.
+    expect(
+      migrationGrantsClientExecuteOn(
+        stripComments(
+          "-- GRANT EXECUTE ON ROUTINE public.quicklog_try_parse_uuid(text) TO authenticated;",
+        ),
+        "quicklog_try_parse_uuid",
+      ),
+    ).toBe(false);
+    expect(
+      migrationGrantsClientExecuteOn(
+        stripComments(
+          "/* outer /* inner */ GRANT EXECUTE ON ROUTINE public.quicklog_try_parse_uuid(text) TO anon; */",
+        ),
+        "quicklog_try_parse_uuid",
       ),
     ).toBe(false);
   });

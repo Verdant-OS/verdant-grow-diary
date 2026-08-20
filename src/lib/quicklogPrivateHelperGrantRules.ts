@@ -89,6 +89,20 @@ const ROUTINE_SINGULAR = String.raw`(?:FUNCTION|ROUTINE)`;
 const ROUTINE_PLURAL = String.raw`(?:FUNCTIONS|ROUTINES)`;
 
 /**
+ * `IN SCHEMA` takes a comma-separated LIST, so `public` need not come first:
+ * `IN SCHEMA extensions, public` reaches these routines exactly as surely as
+ * `IN SCHEMA public` does, and a fence that only recognised the leading form
+ * could be walked past by reordering the list.
+ *
+ * Only identifiers and commas may precede `public` here, and that bound is
+ * load-bearing rather than decorative: a looser `[^;]*?` would run on past the
+ * schema list and match the `public` in `… IN SCHEMA extensions TO public`,
+ * where PUBLIC is the grantee ROLE and the statement touches nothing of ours.
+ */
+const SCHEMA_IDENT = String.raw`(?:[A-Za-z_][\w$]*|"[^"]*")`;
+const IN_SCHEMA_PUBLIC = String.raw`IN\s+SCHEMA\s+(?:${SCHEMA_IDENT}\s*,\s*)*(?:public\b|"public")`;
+
+/**
  * True when a migration SQL body (comments stripped) grants EXECUTE on the
  * named function to any role other than postgres. Used by the static fence
  * that scans migrations newer than the forward repair.
@@ -101,7 +115,7 @@ export function migrationGrantsClientExecuteOn(
   // targeted when its name appears anywhere before TO. Over-matching errs
   // toward flagging, which is the safe polarity for a fence.
   const grantPattern = new RegExp(
-    String.raw`GRANT\s+(?:ALL|EXECUTE)[^;]*?\bON\s+(?:ALL\s+${ROUTINE_PLURAL}\s+IN\s+SCHEMA\s+public\b|${ROUTINE_SINGULAR}\s+[^;]*?\b(?:public\.)?${functionName}\b)[^;]*?\bTO\s+([^;]+);`,
+    String.raw`GRANT\s+(?:ALL|EXECUTE)[^;]*?\bON\s+(?:ALL\s+${ROUTINE_PLURAL}\s+${IN_SCHEMA_PUBLIC}|${ROUTINE_SINGULAR}\s+[^;]*?\b(?:public\.)?${functionName}\b)[^;]*?\bTO\s+([^;]+);`,
     "gis",
   );
   for (const match of executableSql.matchAll(grantPattern)) {
@@ -140,7 +154,7 @@ export function migrationLeavesWrapperWithoutRequiredGrant(executableSql: string
   // the same forms — a schema-wide revoke followed by a schema-wide grant
   // genuinely does restore access, so recognizing it in only one direction
   // would misreport rather than harden.
-  const wrapperTarget = String.raw`(?:ALL\s+${ROUTINE_PLURAL}\s+IN\s+SCHEMA\s+public\b|${ROUTINE_SINGULAR}\s+[^;]*?${wrapperRef})`;
+  const wrapperTarget = String.raw`(?:ALL\s+${ROUTINE_PLURAL}\s+${IN_SCHEMA_PUBLIC}|${ROUTINE_SINGULAR}\s+[^;]*?${wrapperRef})`;
   for (const role of ["authenticated", EXECUTE_ROLE_SERVICE]) {
     // Statement order matters: a GRANT that precedes the REVOKE does not
     // restore access, so compare the LAST occurrence of each per role.

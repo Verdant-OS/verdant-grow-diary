@@ -402,6 +402,39 @@ describe("AiDoctorStart", () => {
     expect(screen.getByTestId("ai-doctor-start-options")).toBeInTheDocument();
   });
 
+  it("does not hold a tent-only URL behind the unrelated grows read", () => {
+    // Ordering keys off the resolved tent, so a still-loading grows list
+    // cannot reorder anything here. Waiting on it would hide a verified tent
+    // and a loaded plant list behind a request the URL does not depend on.
+    state.growsLoading = true;
+    state.tents = SCOPED.tents;
+    state.data = SCOPED.plants;
+    renderPage("/doctor?tentId=tent-a");
+
+    expect(screen.getByTestId("ai-doctor-start-options")).toBeInTheDocument();
+    expect(screen.getByTestId("ai-doctor-start-tent-context")).toBeInTheDocument();
+  });
+
+  it("does not hold a grow-only URL behind the unrelated tents read", () => {
+    state.tentsLoading = true;
+    state.grows = SCOPED.grows;
+    state.data = SCOPED.plants;
+    renderPage("/doctor?growId=grow-1");
+
+    expect(screen.getByTestId("ai-doctor-start-options")).toBeInTheDocument();
+  });
+
+  it("still holds when BOTH ids are carried and either read is pending", () => {
+    // Both are needed then: the rules cross-check that the tent belongs to
+    // the grow, and the result drives ordering.
+    state.tentsLoading = true;
+    state.grows = SCOPED.grows;
+    state.data = SCOPED.plants;
+    renderPage("/doctor?growId=grow-1&tentId=tent-a");
+
+    expect(screen.queryByTestId("ai-doctor-start-options")).toBeNull();
+  });
+
   it("offers no retry when no scope was carried — there is nothing to re-check", () => {
     state.growsError = "network down";
     state.data = SCOPED.plants;

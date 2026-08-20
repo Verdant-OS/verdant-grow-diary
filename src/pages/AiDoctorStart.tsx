@@ -44,7 +44,13 @@ export default function AiDoctorStart() {
   // FAILURE is reported as a failure to verify, never as invalid ownership.
   const requestedGrowId = (searchParams.get("growId") ?? "").trim();
   const requestedTentId = (searchParams.get("tentId") ?? "").trim();
-  const scopeReadsSettled = !growsLoading && !tentsQuery.isLoading;
+  // Settling is per-parameter for the same reason failing is: a read the URL
+  // does not depend on must not gate it. On a tent-only URL the grows read
+  // only enriches the derived owning grow — it cannot change the ordering,
+  // which keys off the resolved tent alone — so waiting on it would hide a
+  // verified tent and a loaded plant list behind an unrelated request.
+  const scopeReadsSettled =
+    (!requestedGrowId || !growsLoading) && (!requestedTentId || !tentsQuery.isLoading);
   // FAILING is narrower than SETTLING, and conflating them discarded verified
   // context. A read may only invalidate the scope it was needed to validate:
   // on a tent-only URL — supported, since a legacy tent may carry a null

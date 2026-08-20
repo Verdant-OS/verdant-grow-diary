@@ -56,6 +56,12 @@ interface LocalSchema {
   expectedVersion?: number;
   optional: boolean;
   /**
+   * Optional allowlist for field names that are safe to render as metadata.
+   * Discovered account-scoped records can contain arbitrary grower-controlled
+   * keys, so their drawer must never preview every property name.
+   */
+  previewFields?: readonly string[];
+  /**
    * Optional shape check for schemas with no `v` field. Valid JSON is not the
    * same as a usable record: `{}` parses fine and is still rejected by the
    * feature that reads it, so without this the panel would report a value as
@@ -90,6 +96,7 @@ const LOCAL_SCHEMAS: LocalSchema[] = [
 ];
 
 const SCOPED_LAST_TARGET_LABEL = "Quick Log last target";
+const SCOPED_LAST_TARGET_PREVIEW_FIELDS = ["plantId", "growId", "tentId", "savedAt"] as const;
 
 /**
  * The Quick Log last-target memory is account-scoped
@@ -125,6 +132,7 @@ function discoverScopedSchemas(): typeof LOCAL_SCHEMAS {
         ? SCOPED_LAST_TARGET_LABEL
         : `${SCOPED_LAST_TARGET_LABEL} (account ${index + 1} of ${keys.length} on this device)`,
     optional: true,
+    previewFields: SCOPED_LAST_TARGET_PREVIEW_FIELDS,
     validate: (raw: string) =>
       parseRecentTargetRecord(raw)
         ? null
@@ -957,8 +965,13 @@ function buildRemediationEntry(key: string): RemediationEntry {
   let foundVersion: unknown;
   if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
     const obj = parsed as Record<string, unknown>;
-    if ("v" in obj) foundVersion = obj.v;
-    topLevelFieldPreview = Object.keys(obj).map((name) => {
+    // Only versioned schemas may surface `v` as metadata. For an unversioned
+    // scoped record it is arbitrary grower-controlled content, not a version.
+    if (expectedVersion !== undefined && "v" in obj) foundVersion = obj.v;
+    const previewFieldNames = schema?.previewFields
+      ? schema.previewFields.filter((name) => Object.prototype.hasOwnProperty.call(obj, name))
+      : Object.keys(obj);
+    topLevelFieldPreview = previewFieldNames.map((name) => {
       if (name === "v") {
         return { name, displayed: `v${JSON.stringify(obj.v)}` };
       }

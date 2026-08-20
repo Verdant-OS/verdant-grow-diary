@@ -104,6 +104,7 @@ import {
   type QuickLogPostSaveSuccess,
 } from "@/lib/quickLogSaveGuardRules";
 import { trackQuickLogSuccess } from "@/lib/quickLogSuccessTelemetry";
+import { rememberRecentQuickLogTarget } from "@/lib/quickLogRecentTargetStore";
 import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 import {
   fahrenheitToCelsius,
@@ -158,6 +159,22 @@ interface LockedWateringSubmission {
 }
 
 const NOTE_LIMIT = 500;
+
+function rememberConfirmedPlantTarget(
+  resolved: ResolvedQuickLogV2Target,
+  userId: string | null | undefined,
+): void {
+  if (!resolved.ok || !resolved.plantId) return;
+  rememberRecentQuickLogTarget(
+    {
+      plantId: resolved.plantId,
+      growId: resolved.growId ?? null,
+      tentId: resolved.tentId ?? null,
+      savedAt: new Date().toISOString(),
+    },
+    userId,
+  );
+}
 
 export default function QuickLogV2Sheet({
   open,
@@ -760,6 +777,7 @@ export default function QuickLogV2Sheet({
         return;
       }
       const growEventId = result.eventId;
+      rememberConfirmedPlantTarget(resolved, user?.id ?? null);
       trackQuickLogSuccess("feed", { reused: result.reused });
       // The logical feeding save is complete. Rotate only now so a retry
       // after a failed/unknown response reuses the original server key.
@@ -974,6 +992,8 @@ export default function QuickLogV2Sheet({
       setSaveStatus("");
       return;
     }
+
+    rememberConfirmedPlantTarget(resolved, user?.id ?? null);
 
     // The core grow event is committed. Rotate immediately, before any
     // best-effort attachment work, so a rejected media promise can never

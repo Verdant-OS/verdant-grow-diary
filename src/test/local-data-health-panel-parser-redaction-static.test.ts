@@ -40,4 +40,16 @@ describe("LocalDataHealthPanel — JSON parser detail redaction", () => {
       '"Stored value is not valid JSON. The parser error is withheld because it can quote the stored value."',
     );
   });
+
+  it("limits scoped remediation metadata to canonical fields and no version value", () => {
+    const discovery = sourceBetween(
+      "function discoverScopedSchemas",
+      "function fallbackSchemaLabel",
+    );
+    const drawerPath = sourceBetween("function buildRemediationEntry", "function categoryLabel");
+
+    expect(discovery).toContain("previewFields: SCOPED_LAST_TARGET_PREVIEW_FIELDS");
+    expect(drawerPath).toContain("schema?.previewFields");
+    expect(drawerPath).toContain('expectedVersion !== undefined && "v" in obj');
+  });
 });

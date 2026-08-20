@@ -202,6 +202,28 @@ describe("LocalDataHealthPanel — the account uuid survives no fallback path", 
     expect(dialog).toHaveTextContent("missing a usable plantId/savedAt pair");
   });
 
+  it("whitelists scoped field metadata and omits an unversioned v value", async () => {
+    const PRIVATE_FIELD_NAME = "grower@example.com";
+    const PRIVATE_VERSION_VALUE = "private grower note";
+    setLocalStorageItemForTest(
+      `verdant.quickLog.lastTarget.v2.${ACCOUNT_A}`,
+      JSON.stringify({
+        [PRIVATE_FIELD_NAME]: "private value",
+        v: PRIVATE_VERSION_VALUE,
+      }),
+    );
+    render(<LocalDataHealthPanel />);
+    await schemaRow("Quick Log last target");
+
+    fireEvent.click(screen.getByRole("button", { name: /Review & clear/i }));
+    const dialog = await screen.findByRole("dialog");
+
+    expect(dialog).toHaveTextContent("Unusable shape");
+    expect(dialog.textContent ?? "").not.toContain(PRIVATE_FIELD_NAME);
+    expect(dialog.textContent ?? "").not.toContain(PRIVATE_VERSION_VALUE);
+    expect(within(dialog).queryByText("Found version")).toBeNull();
+  });
+
   it('still says "no issue detected" for a well-formed record', async () => {
     setLocalStorageItemForTest(`verdant.quickLog.lastTarget.v2.${ACCOUNT_A}`, RECORD);
     // Nothing is fixable, so reach the drawer through a second, broken key.

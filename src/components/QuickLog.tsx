@@ -113,6 +113,7 @@ import {
   parseRecentTargetRecord,
   resolveRecentTargetSuggestion,
 } from "@/lib/quickLogRecentTargetSuggestion";
+import { rememberRecentQuickLogTarget } from "@/lib/quickLogRecentTargetStore";
 import { resolveQuickLogTargetPlan } from "@/lib/quickLogTargetResolutionRules";
 import { buildSensorSnapshotSavePayload } from "@/lib/latestSensorSnapshotRules";
 import { quickLogReasonToOperatorMessage } from "@/lib/quickLogSaveErrorMessage";
@@ -290,7 +291,6 @@ type InFlightSaveContext = Readonly<{
 }>;
 
 function rememberLastTarget(target: LastQuickLogTarget, userId?: string | null) {
-  if (typeof window === "undefined") return;
   // ACCOUNT-SCOPED ONLY (slice D5, per the approved map: "v1 write retired").
   //
   // An earlier revision also wrote the unscoped `…lastTarget.v1` key "for
@@ -304,13 +304,7 @@ function rememberLastTarget(target: LastQuickLogTarget, userId?: string | null) 
   // suggestion the grower chooses. A shared browser cannot surface another
   // account's plant because the key carries the user id, and with no user
   // there is no key and nothing is written at all.
-  const scopedKey = buildRecentTargetStorageKey(userId ?? null);
-  if (!scopedKey) return;
-  try {
-    window.localStorage.setItem(scopedKey, JSON.stringify(target));
-  } catch {
-    // Non-critical speed preference. Never block saving if storage is unavailable.
-  }
+  rememberRecentQuickLogTarget(target, userId ?? null);
 }
 
 /** Read the account-scoped recent target. Never throws; never falls back. */

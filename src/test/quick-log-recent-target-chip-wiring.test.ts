@@ -8,6 +8,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const QUICKLOG = readFileSync("src/components/QuickLog.tsx", "utf8");
+const RECENT_TARGET_STORE = readFileSync("src/lib/quickLogRecentTargetStore.ts", "utf8");
 // Prettier reflows these expressions as they grow, and a pin that breaks on a
 // line wrap teaches people to relax it. Collapse runs of whitespace so the
 // assertions stay about SEMANTICS; the negative pins below keep them strict.
@@ -80,8 +81,11 @@ describe("D5 — remembered target is a suggestion, never a default", () => {
     expect(QUICKLOG).toContain("buildRecentTargetStorageKey");
     expect(QUICKLOG).not.toMatch(/verdant\.quickLog\.lastTarget\.v1/);
     expect(QUICKLOG).toMatch(/rememberLastTarget\([\s\S]{0,260}user\?\.id \?\? null,/);
-    // With no user there is no key, so nothing is written at all.
-    expect(QUICKLOG).toMatch(
+    expect(QUICKLOG).toContain("rememberRecentQuickLogTarget(target, userId ?? null)");
+    // The one shared writer used by legacy and V2 saves keeps the account
+    // guard at the storage boundary. With no user there is no key and no
+    // write, regardless of which confirmed-save presenter called it.
+    expect(RECENT_TARGET_STORE).toMatch(
       /const scopedKey = buildRecentTargetStorageKey[\s\S]{0,120}if \(!scopedKey\) return;/,
     );
   });

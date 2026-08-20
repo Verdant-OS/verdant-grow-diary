@@ -27,27 +27,28 @@ describe("QuickLog publish-slice split guardrail", () => {
 
   it("only uses localStorage for the narrow last-target memory keys (no payloads/secrets/state)", () => {
     // QuickLog is allowed to remember the grower's last Quick Log target
-    // (plantId/growId/tentId/savedAt) on this device only. TWO keys carry
-    // exactly that shape (corrected with Tranche B+ slice D5, which added the
-    // second): the original `verdant.quickLog.lastTarget.v1`, and the
-    // account-scoped `verdant.quickLog.lastTarget.v2.<userId>` — the only one
-    // that may ever be read back, and then only as a visible suggestion the
-    // grower explicitly accepts. Nothing else may live in localStorage: no raw
-    // sensor payloads, no sensor_readings, no secrets/tokens, no
-    // bridge/service-role keys, no device-control state, no Action Queue
-    // state, no alerts, no AI output.
-    const ALLOWED_KEY = "verdant.quickLog.lastTarget.v1";
-    expect(QL).toMatch(/verdant\.quickLog\.lastTarget\.v1/);
+    // (plantId/growId/tentId/savedAt) on this device only. Exactly ONE key
+    // carries that shape: the account-scoped
+    // `verdant.quickLog.lastTarget.v2.<userId>`, and it may only be read back
+    // as a visible suggestion the grower explicitly accepts.
+    //
+    // The unscoped `verdant.quickLog.lastTarget.v1` write was RETIRED in
+    // slice D5. It had zero readers, and because it ran before the signed-in
+    // check it let an anonymous session leave a plant id on a shared device.
+    // Pinned absent here so it cannot come back.
+    //
+    // Nothing else may live in localStorage: no raw sensor payloads, no
+    // sensor_readings, no secrets/tokens, no bridge/service-role keys, no
+    // device-control state, no Action Queue state, no alerts, no AI output.
+    expect(QL).not.toMatch(/verdant\.quickLog\.lastTarget\.v1/);
     // The v2 key is built in the pure suggestion module, so QuickLog carries
-    // its builder rather than the literal.
+    // its builder rather than the literal — and that builder returns null for
+    // a signed-out grower, which is what keeps the anonymous case empty.
     expect(QL).toMatch(/buildRecentTargetStorageKey/);
-
-    // Strip any string literal mentioning the allowed key so the forbidden
-    // scans below cannot be tricked by it.
-    const scrubbed = QL.replace(
-      new RegExp(`["']${ALLOWED_KEY.replace(/\./g, "\\.")}["']`, "g"),
-      '""',
-    );
+    // No bare last-target key literal survives in this component at all, so
+    // the forbidden scans below need no scrubbing to stay honest.
+    expect(QL).not.toMatch(/["'`]verdant\.quickLog\.lastTarget/);
+    const scrubbed = QL;
 
     // Forbidden localStorage payloads / state classes.
     const FORBIDDEN = [

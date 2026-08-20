@@ -250,8 +250,6 @@ interface Props {
   successMessage?: string;
 }
 
-const LAST_TARGET_STORAGE_KEY = "verdant.quickLog.lastTarget.v1";
-
 const QUICK_OBSERVATION_CHIPS = [
   { label: "Watered", text: "Watered today." },
   { label: "Fed", text: "Fed today." },
@@ -290,22 +288,25 @@ type InFlightSaveContext = Readonly<{
 
 function rememberLastTarget(target: LastQuickLogTarget, userId?: string | null) {
   if (typeof window === "undefined") return;
-  const payload = JSON.stringify(target);
-  try {
-    window.localStorage.setItem(LAST_TARGET_STORAGE_KEY, payload);
-  } catch {
-    // Non-critical speed preference. Never block saving if storage is unavailable.
-  }
-  // Account-scoped copy (slice D5). The unscoped key above stays for existing
-  // readers; only this one may ever be offered back to a grower, and only as
-  // a visible suggestion they choose. A shared browser can never surface
-  // another account's plant because the key carries the user id.
+  // ACCOUNT-SCOPED ONLY (slice D5, per the approved map: "v1 write retired").
+  //
+  // An earlier revision also wrote the unscoped `…lastTarget.v1` key "for
+  // existing readers". Measured: there are NO readers — the only other
+  // reference in the repo is the diagnostics inventory entry. Worse, that
+  // write happened BEFORE the user check, so an anonymous session stored a
+  // plant id after all, contradicting this slice's own account-scoped
+  // boundary. Retired here.
+  //
+  // Only the scoped record may ever be offered back, and only as a visible
+  // suggestion the grower chooses. A shared browser cannot surface another
+  // account's plant because the key carries the user id, and with no user
+  // there is no key and nothing is written at all.
   const scopedKey = buildRecentTargetStorageKey(userId ?? null);
   if (!scopedKey) return;
   try {
-    window.localStorage.setItem(scopedKey, payload);
+    window.localStorage.setItem(scopedKey, JSON.stringify(target));
   } catch {
-    // Same non-critical contract.
+    // Non-critical speed preference. Never block saving if storage is unavailable.
   }
 }
 

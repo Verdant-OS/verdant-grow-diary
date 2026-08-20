@@ -21,7 +21,12 @@
 
 export const RECENT_TARGET_SUGGESTION_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
 
-const STORAGE_KEY_PREFIX = "verdant.quickLog.lastTarget.v2.";
+/**
+ * Per-account key prefix. Exported so the diagnostics panel can enumerate the
+ * accounts that have a remembered target on this device — a static key list
+ * cannot, because the account id is part of the key.
+ */
+export const RECENT_TARGET_STORAGE_KEY_PREFIX = "verdant.quickLog.lastTarget.v2.";
 
 export interface RecentTargetRecord {
   plantId: string;
@@ -60,7 +65,7 @@ function trimmed(value: unknown): string {
  */
 export function buildRecentTargetStorageKey(userId: string | null | undefined): string | null {
   const id = trimmed(userId);
-  return id ? `${STORAGE_KEY_PREFIX}${id}` : null;
+  return id ? `${RECENT_TARGET_STORAGE_KEY_PREFIX}${id}` : null;
 }
 
 /** Parse a stored payload defensively. Any malformed shape yields null. */

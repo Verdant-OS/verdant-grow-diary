@@ -1,0 +1,215 @@
+/**
+ * Slice D5 — rendered behaviour of the "Continue with <plant>?" suggestion.
+ *
+ * The pure rules are covered in quick-log-recent-target-suggestion.test.ts and
+ * the wiring is pinned statically in quick-log-recent-target-chip-wiring.test.ts.
+ * This file is the missing third leg: it renders QuickLog and proves the
+ * remembered target is only ever an OFFER.
+ *
+ * Fences asserted here:
+ *  - a stored target is shown, never silently applied;
+ *  - accepting it is an explicit click, and only then is the plant selected;
+ *  - dismissing leaves the target empty and the save disabled;
+ *  - an expired record, an unknown plant, another account's record, and a
+ *    signed-out session all offer nothing.
+ */
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, cleanup, fireEvent } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactElement } from "react";
+
+const rpcMock = vi.fn().mockResolvedValue({ data: { ok: true }, error: null });
+
+vi.mock("@/integrations/supabase/client", () => ({
+  supabase: {
+    rpc: (...a: unknown[]) => rpcMock(...a),
+    from: () => ({
+      insert: vi.fn(),
+      update: () => ({ eq: () => Promise.resolve({ error: null }) }),
+      select: () => ({
+        eq: () => ({
+          order: () => ({
+            limit: () => {
+              const chain: Record<string, unknown> = {
+                abortSignal: () => chain,
+                then: (r: (v: unknown) => unknown, j?: (e: unknown) => unknown) =>
+                  Promise.resolve({ data: [], error: null }).then(r, j),
+              };
+              return chain;
+            },
+          }),
+        }),
+      }),
+    }),
+    storage: { from: () => ({ upload: vi.fn(), remove: vi.fn() }) },
+  },
+}));
+
+let userMock: { id: string } | null = { id: "u1" };
+vi.mock("@/store/auth", () => ({ useAuth: () => ({ user: userMock }) }));
+
+const setActiveGrowIdMock = vi.fn();
+vi.mock("@/store/grows", () => ({
+  useGrows: () => ({
+    grows: [{ id: "g1", name: "Tent 1", stage: "veg" }],
+    activeGrow: { id: "g1", name: "Tent 1", stage: "veg" },
+    activeGrowId: "g1",
+    setActiveGrowId: setActiveGrowIdMock,
+  }),
+}));
+vi.mock("@/hooks/use-tents", () => ({
+  useTents: () => ({ data: [{ id: "t1", name: "Tent 1", grow_id: "g1" }] }),
+}));
+vi.mock("@/hooks/use-plants", () => ({ usePlants: () => ({ data: plantsMock }) }));
+vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn(), message: vi.fn() } }));
+vi.mock("@/components/QuickLogSensorSnapshotStrip", () => ({ default: () => null }));
+
+import QuickLog from "@/components/QuickLog";
+import { RECENT_TARGET_SUGGESTION_MAX_AGE_MS } from "@/lib/quickLogRecentTargetSuggestion";
+import {
+  clearLocalStorageForTest,
+  setLocalStorageItemForTest,
+} from "./helpers/localStorageTestHelper";
+
+const elementPrototype = Element.prototype as Element & {
+  hasPointerCapture?: () => boolean;
+  setPointerCapture?: () => void;
+  releasePointerCapture?: () => void;
+  scrollIntoView?: () => void;
+};
+elementPrototype.hasPointerCapture ??= () => false;
+elementPrototype.setPointerCapture ??= () => {};
+elementPrototype.releasePointerCapture ??= () => {};
+elementPrototype.scrollIntoView ??= () => {};
+
+let plantsMock: Array<Record<string, unknown>> = [];
+
+const PLANTS = [
+  { id: "p1", name: "Blue Dream", strain: "BD", tent_id: "t1", grow_id: "g1" },
+  { id: "p2", name: "OG Kush", strain: "OG", tent_id: "t1", grow_id: "g1" },
+];
+
+// Deterministic clock: the component reads Date.now() when it resolves the
+// suggestion, so freshness is expressed relative to a frozen NOW.
+const NOW = Date.parse("2026-08-19T12:00:00.000Z");
+
+function seed(key: string, plantId: string, ageMs: number) {
+  setLocalStorageItemForTest(
+    key,
+    JSON.stringify({
+      plantId,
+      growId: "g1",
+      tentId: "t1",
+      savedAt: new Date(NOW - ageMs).toISOString(),
+    }),
+  );
+}
+
+function renderQL(ui: ReactElement) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+  return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+}
+
+beforeEach(() => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  vi.setSystemTime(NOW);
+  rpcMock.mockClear();
+  setActiveGrowIdMock.mockClear();
+  userMock = { id: "u1" };
+  plantsMock = PLANTS;
+  clearLocalStorageForTest();
+});
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
+
+describe("QuickLog — remembered target is an offer, never a default", () => {
+  it("shows the suggestion without selecting the plant", () => {
+    seed("verdant.quickLog.lastTarget.v2.u1", "p2", 60_000);
+    renderQL(<QuickLog open onOpenChange={() => {}} />);
+
+    expect(screen.getByTestId("quick-log-recent-target-suggestion")).toHaveTextContent(
+      "Continue with OG Kush?",
+    );
+    // Nothing is selected until the grower says so.
+    expect(screen.getByTestId("quick-log-plant-select")).not.toHaveTextContent("OG Kush");
+    expect(screen.getByTestId("quick-log-plant-error")).toBeInTheDocument();
+    expect(screen.getByTestId("quick-log-save")).toBeDisabled();
+    expect(rpcMock).not.toHaveBeenCalled();
+  });
+
+  it("accepting it selects that plant and retires the offer", () => {
+    seed("verdant.quickLog.lastTarget.v2.u1", "p2", 60_000);
+    renderQL(<QuickLog open onOpenChange={() => {}} />);
+
+    fireEvent.click(screen.getByTestId("quick-log-recent-target-accept"));
+
+    expect(screen.getByTestId("quick-log-plant-select")).toHaveTextContent("OG Kush");
+    expect(screen.queryByTestId("quick-log-recent-target-suggestion")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("quick-log-plant-error")).not.toBeInTheDocument();
+    // Accepting selects. It does not save.
+    expect(rpcMock).not.toHaveBeenCalled();
+  });
+
+  it("dismissing it leaves the target empty and the save disabled", () => {
+    seed("verdant.quickLog.lastTarget.v2.u1", "p2", 60_000);
+    renderQL(<QuickLog open onOpenChange={() => {}} />);
+
+    fireEvent.click(screen.getByTestId("quick-log-recent-target-dismiss"));
+
+    expect(screen.queryByTestId("quick-log-recent-target-suggestion")).not.toBeInTheDocument();
+    expect(screen.getByTestId("quick-log-plant-select")).not.toHaveTextContent("OG Kush");
+    expect(screen.getByTestId("quick-log-save")).toBeDisabled();
+  });
+
+  it("offers nothing once the record is past its freshness window", () => {
+    seed("verdant.quickLog.lastTarget.v2.u1", "p2", RECENT_TARGET_SUGGESTION_MAX_AGE_MS + 1);
+    renderQL(<QuickLog open onOpenChange={() => {}} />);
+
+    expect(screen.getByTestId("quick-log-plant-select")).toBeInTheDocument();
+    expect(screen.queryByTestId("quick-log-recent-target-suggestion")).not.toBeInTheDocument();
+  });
+
+  it("offers nothing when the remembered plant is no longer visible to the grower", () => {
+    seed("verdant.quickLog.lastTarget.v2.u1", "p-deleted", 60_000);
+    renderQL(<QuickLog open onOpenChange={() => {}} />);
+
+    expect(screen.getByTestId("quick-log-plant-select")).toBeInTheDocument();
+    expect(screen.queryByTestId("quick-log-recent-target-suggestion")).not.toBeInTheDocument();
+  });
+
+  it("never reads another account's remembered target", () => {
+    seed("verdant.quickLog.lastTarget.v2.someone-else", "p2", 60_000);
+    renderQL(<QuickLog open onOpenChange={() => {}} />);
+
+    // Same plant, same freshness as the offered case above — only the account
+    // segment differs, so this can only pass because the key is scoped.
+    expect(screen.getByTestId("quick-log-plant-select")).toBeInTheDocument();
+    expect(screen.queryByTestId("quick-log-recent-target-suggestion")).not.toBeInTheDocument();
+  });
+
+  it("offers nothing to a signed-out session", () => {
+    userMock = null;
+    seed("verdant.quickLog.lastTarget.v2.u1", "p2", 60_000);
+    renderQL(<QuickLog open onOpenChange={() => {}} />);
+
+    expect(screen.getByTestId("quick-log-plant-select")).toBeInTheDocument();
+    expect(screen.queryByTestId("quick-log-recent-target-suggestion")).not.toBeInTheDocument();
+  });
+
+  it("is not offered when the dialog opens with a route prefill", () => {
+    seed("verdant.quickLog.lastTarget.v2.u1", "p2", 60_000);
+    renderQL(
+      <QuickLog
+        open
+        onOpenChange={() => {}}
+        prefill={{ plantId: "p1", growId: "g1", tentId: "t1" }}
+      />,
+    );
+
+    // The prefill won: Blue Dream is selected, and OG Kush was never offered.
+    expect(screen.getByTestId("quick-log-plant-select")).toHaveTextContent("Blue Dream");
+    expect(screen.queryByTestId("quick-log-recent-target-suggestion")).not.toBeInTheDocument();
+  });
+});

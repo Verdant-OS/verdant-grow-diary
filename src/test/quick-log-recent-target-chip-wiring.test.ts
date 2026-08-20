@@ -43,10 +43,19 @@ describe("D5 — remembered target is a suggestion, never a default", () => {
     expect(QUICKLOG).toContain("Choose another");
   });
 
-  it("stores an account-scoped copy alongside the pinned v1 key", () => {
+  it("stores ONLY the account-scoped record — the v1 write is retired", () => {
+    // This pin previously asserted the unscoped `.v1` key was written
+    // "alongside" the scoped one. That was the wrong behavior: the approved
+    // D5 map retires the v1 write, it had zero readers, and because it ran
+    // before the user check an anonymous session stored a plant id anyway —
+    // contradicting this slice's own account-scoped boundary. Inverted here.
     expect(QUICKLOG).toContain("buildRecentTargetStorageKey");
-    expect(QUICKLOG).toMatch(/verdant\.quickLog\.lastTarget\.v1/);
+    expect(QUICKLOG).not.toMatch(/verdant\.quickLog\.lastTarget\.v1/);
     expect(QUICKLOG).toMatch(/rememberLastTarget\([\s\S]{0,260}user\?\.id \?\? null,/);
+    // With no user there is no key, so nothing is written at all.
+    expect(QUICKLOG).toMatch(
+      /const scopedKey = buildRecentTargetStorageKey[\s\S]{0,120}if \(!scopedKey\) return;/,
+    );
   });
 
   it("keeps the suggestion copy calm and free of certainty claims", () => {

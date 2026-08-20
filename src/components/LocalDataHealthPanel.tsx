@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/drawer";
 import { supabase } from "@/integrations/supabase/client";
 import { PUBLIC_QUICK_LOG_STARTER_DRAFT_KEY } from "@/lib/publicQuickLogStarterRules";
+import { RECENT_TARGET_STORAGE_KEY_PREFIX } from "@/lib/quickLogRecentTargetSuggestion";
 
 type CheckStatus = "pass" | "warn" | "fail" | "skip";
 
@@ -52,7 +53,6 @@ const LOCAL_SCHEMAS: Array<{
     expectedVersion: 1,
     optional: true,
   },
-  { key: "verdant.quickLog.lastTarget.v1", label: "Quick Log last target", optional: true },
   {
     key: "verdant.quickLogHandoff.notNow.v1",
     label: "Quick Log handoff dismissal",
@@ -69,6 +69,55 @@ const LOCAL_SCHEMAS: Array<{
     optional: true,
   },
 ];
+
+/**
+ * The Quick Log last-target memory is account-scoped
+ * (`verdant.quickLog.lastTarget.v2.<userId>`), so it cannot appear in the
+ * static list above — the account id is part of the key. Enumerate whatever
+ * this device actually holds instead. On a shared browser that surfaces one
+ * row per account, which is the point: a grower can see and clear another
+ * account's leftover target. The retired unscoped `…lastTarget.v1` key is
+ * deliberately absent; nothing writes it any more.
+ *
+ * Only key names are read here. Values stay unread until `checkLocalSchema`
+ * inspects them, and are never printed. The account segment is never shown
+ * either — see `redactStorageKey`.
+ */
+function discoverScopedSchemas(): typeof LOCAL_SCHEMAS {
+  const s = safeStorage();
+  if (!s) return [];
+  const keys: string[] = [];
+  try {
+    for (let i = 0; i < s.length; i += 1) {
+      const key = s.key(i);
+      if (key && key.startsWith(RECENT_TARGET_STORAGE_KEY_PREFIX)) keys.push(key);
+    }
+  } catch {
+    return [];
+  }
+  // Stable order with an explicit tie-breaker so repeat runs read identically.
+  keys.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+  return keys.map((key, index) => ({
+    key,
+    label:
+      keys.length === 1
+        ? "Quick Log last target"
+        : `Quick Log last target (account ${index + 1} of ${keys.length} on this device)`,
+    optional: true,
+  }));
+}
+
+/**
+ * Storage keys are shown to the grower, and the account-scoped last-target key
+ * carries a raw account uuid in its name. Elide that segment everywhere a key
+ * is rendered. The real key stays in the data so clearing and restoring still
+ * target the right entry — only the display is redacted.
+ */
+function redactStorageKey(key: string): string {
+  return key.startsWith(RECENT_TARGET_STORAGE_KEY_PREFIX)
+    ? `${RECENT_TARGET_STORAGE_KEY_PREFIX}<account>`
+    : key;
+}
 
 function safeStorage(): Storage | null {
   try {
@@ -296,6 +345,15 @@ function StatusBadge({ status }: { status: CheckStatus }) {
 
 const LOCAL_SCHEMA_KEYS = new Set(LOCAL_SCHEMAS.map((s) => s.key));
 
+/**
+ * A key is clearable from this panel only if it is one of ours. Account-scoped
+ * last-target keys qualify by prefix, since their full names are not known
+ * ahead of time.
+ */
+function isLocalSchemaKey(key: string): boolean {
+  return LOCAL_SCHEMA_KEYS.has(key) || key.startsWith(RECENT_TARGET_STORAGE_KEY_PREFIX);
+}
+
 export function LocalDataHealthPanel() {
   const [checks, setChecks] = useState<CheckResult[]>([]);
   const [running, setRunning] = useState(false);
@@ -309,7 +367,7 @@ export function LocalDataHealthPanel() {
     try {
       const local: CheckResult[] = [
         checkStorageAvailability(),
-        ...LOCAL_SCHEMAS.map(checkLocalSchema),
+        ...[...LOCAL_SCHEMAS, ...discoverScopedSchemas()].map(checkLocalSchema),
       ];
       let diary: CheckResult[] = [];
       try {
@@ -343,8 +401,7 @@ export function LocalDataHealthPanel() {
     new Set(
       checks
         .filter(
-          (c) =>
-            (c.status === "fail" || c.status === "warn") && c.meta && LOCAL_SCHEMA_KEYS.has(c.meta),
+          (c) => (c.status === "fail" || c.status === "warn") && c.meta && isLocalSchemaKey(c.meta),
         )
         .map((c) => c.meta as string),
     ),
@@ -376,7 +433,9 @@ export function LocalDataHealthPanel() {
           s.removeItem(key);
           cleared.push(key);
         } catch (err) {
-          errors.push(`${key}: ${err instanceof Error ? err.message : String(err)}`);
+          errors.push(
+            `${redactStorageKey(key)}: ${err instanceof Error ? err.message : String(err)}`,
+          );
         }
       }
       const parts: string[] = [];
@@ -499,7 +558,7 @@ export function LocalDataHealthPanel() {
                 <p className="text-xs text-muted-foreground mt-1 break-words">{c.detail}</p>
                 {c.meta && (
                   <p className="text-[11px] text-muted-foreground/80 mt-0.5 font-mono break-all">
-                    key: {c.meta}
+                    key: {redactStorageKey(c.meta)}
                   </p>
                 )}
               </li>
@@ -545,7 +604,7 @@ function buildRemediation(check: CheckResult): RemediationStep | null {
   if (check.status !== "fail" && check.status !== "warn") return null;
 
   // Local schema keys — safe to clear from this device.
-  if (check.meta && LOCAL_SCHEMA_KEYS.has(check.meta)) {
+  if (check.meta && isLocalSchemaKey(check.meta)) {
     if (check.status === "fail") {
       return {
         severity: "fail",
@@ -728,7 +787,8 @@ interface RemediationEntry {
 }
 
 function buildRemediationEntry(key: string): RemediationEntry {
-  const schema = LOCAL_SCHEMAS.find((s) => s.key === key);
+  const schema =
+    LOCAL_SCHEMAS.find((s) => s.key === key) ?? discoverScopedSchemas().find((s) => s.key === key);
   const label = schema?.label ?? key;
   const expectedVersion = schema?.expectedVersion;
 
@@ -928,7 +988,7 @@ function RemediationDrawer({ keys, onCancel, onConfirm, running }: RemediationDr
                 </div>
 
                 <div className="text-[11px] font-mono break-all text-muted-foreground">
-                  key: {e.key}
+                  key: {redactStorageKey(e.key)}
                 </div>
 
                 <dl className="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 text-xs">
@@ -983,7 +1043,7 @@ function RemediationDrawer({ keys, onCancel, onConfirm, running }: RemediationDr
                 <div className="rounded border border-border/60 bg-muted/40 p-2 text-xs">
                   <span className="font-medium">Proposed action:</span>{" "}
                   {e.present
-                    ? `Remove the localStorage entry at "${e.key}" on this device. Any unsaved work in that draft will be lost. Server data is unaffected.`
+                    ? `Remove the localStorage entry at "${redactStorageKey(e.key)}" on this device. Any unsaved work in that draft will be lost. Server data is unaffected.`
                     : "No action needed — key is not present on this device."}
                 </div>
               </div>
@@ -1118,7 +1178,9 @@ function restoreBackup(id: string): { restored: string[]; errors: string[] } {
       }
       restored.push(entry.key);
     } catch (err) {
-      errors.push(`${entry.key}: ${err instanceof Error ? err.message : String(err)}`);
+      errors.push(
+        `${redactStorageKey(entry.key)}: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
   }
   return { restored, errors };
@@ -1203,7 +1265,7 @@ function BackupsPanel({ backups, onRestore, onDelete, running }: BackupsPanelPro
                         key={e.key}
                         className="text-[11px] text-muted-foreground font-mono break-all"
                       >
-                        {e.value === null ? "∅" : `${e.sizeBytes}B`} · {e.key}
+                        {e.value === null ? "∅" : `${e.sizeBytes}B`} · {redactStorageKey(e.key)}
                       </li>
                     ))}
                   </ul>

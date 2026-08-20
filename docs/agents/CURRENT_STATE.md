@@ -1,6 +1,16 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-19 UTC (third same-day edit)
+**Last updated:** 2026-08-20 UTC
+**Updated by:** Claude (2026-08-20: records the owner-authorized apply attempt of
+the Action Queue transition forward repair. The apply **fail-closed with zero
+writes** at a precondition the earlier evidence never covered, and the
+investigation proved a **third** unapplied migration in production
+(`20260725093000`). Adds the "2026-08-20 — the Action Queue forward repair is
+BLOCKED by a third unapplied migration" block under the migration-drift section,
+including the fresh 20/20 `v_legacy_state` measurement so it is not re-derived.
+Docs-only edit; no code, schema, or migration changes, and no production write.)
+
+**Prior update:** 2026-08-19 UTC (third same-day edit)
 **Updated by:** Claude (2026-08-19, third edit: records Cheek's approval of
 One-Tent Loop **Tranche B+** — the efficiency program's second tranche — with
 Claude explicitly reassigned as architect and implementer for B+ only.
@@ -405,6 +415,82 @@ vocabulary requires, since not one of them completed a query. But they are not
 **merely** that. They are also four days (12–15 August) in which the mechanism
 built to catch an invisible outage was itself unable to see, and was left that
 way.
+
+### 2026-08-20 — the Action Queue forward repair is BLOCKED by a third unapplied migration
+
+`established fact`, measured 2026-08-20 21:58–22:08 UTC by Claude through the
+Lovable read-only SQL channel against production (target fingerprint: 92 public
+tables, 20 `auth.users`, 64 `action_queue` rows, 143 `action_queue_events` rows,
+`quicklog_entry_revisions` PRESENT). Cheek authorized the apply of
+`supabase/migrations/20260819190852_action_queue_transition_forward_repair.sql`
+in session with the exact phrase `APPLY ACTION QUEUE TRANSITION FORWARD REPAIR`.
+
+**The apply was attempted and it fail-closed. Zero bytes were written.** The
+migration aborted inside its own preflight at
+`action_queue_transition_forward_repair_guard_drift`, and the whole transaction
+rolled back. Verified _after_ the abort: `action_queue` still carries 4 policies
+under the same names, `action_queue_events` still 3, row counts still 64/143,
+all four `authenticated` UPDATE/DELETE grants still `true`, the guard body md5
+unchanged, and `public.action_queue_transition` still absent. There is nothing
+to undo by hand. The migration's guards worked exactly as designed.
+
+**The 20 `v_legacy_state` conjuncts are `PASS` — do not re-derive them.**
+Re-measured fresh on 2026-08-20 (not carried forward from the 2026-08-19 read),
+each computed exactly as the preflight computes it: transition overloads `0`;
+`action_queue` 4 policies (select 1, insert 1 fp `02cf2857…`, update 1 using
+`b3c61a20…` / check `02cf2857…`, delete 1); `action_queue_events` 3 policies
+(select 1, legacy insert 1 fp `e79ba22f…`, append 0, delete 1); required grants
+coherent; all four `authenticated` UPDATE/DELETE grants present. `v_legacy_state
+= true`. The preflight's _state_ gate would have accepted the repair.
+
+**The blocker is a different and earlier gate.** The guard-drift `IF` runs
+_before_ the legacy/contracted evaluation, and no earlier evidence covered it.
+Production's `public.action_queue_guard_decision_fields` is an **older revision**
+than the forward repair requires, on five independent axes:
+
+| Axis                        | Forward repair expects                           | Production has                     |
+| --------------------------- | ------------------------------------------------ | ---------------------------------- |
+| `proconfig`                 | `search_path=public, pg_temp`                    | `search_path=public`               |
+| `prosrc` length             | 1101                                             | 1028                               |
+| `prosrc` md5                | `88e81c4dfbc6d17260def35d1a619ee1`               | `09459a9cc8532aae905639b3055c680f` |
+| trigger `UPDATE OF` columns | `approved_at, completed_at, rejected_at, status` | `approved_at, rejected_at, status` |
+| EXECUTE ACL                 | `postgres` only                                  | `postgres` **and** `service_role`  |
+
+**`supabase/migrations/20260725093000_restore_action_queue_owner_decisions.sql`
+was never applied to production.** Hash-proven, not inferred: the guard body
+committed in `20260721225930_b34caa3e-…` hashes to exactly production's
+`09459a9cc8532aae905639b3055c680f` at 1028 bytes, and the body committed in
+`20260725093000` hashes to exactly the expected
+`88e81c4dfbc6d17260def35d1a619ee1` at 1101 bytes. Production is running the
+older file. That is a **third** confirmed instance of this section's parent
+finding, alongside the signup forward repair and the (since-applied) Quick Log
+pair — and it was found by object comparison, not by the drift probe, which
+remains blocked.
+
+**Applying `20260725093000` alone will NOT unblock the forward repair.**
+`established fact`: no committed migration anywhere in `supabase/migrations/`
+revokes `service_role` EXECUTE on the guard — `20260721225930` and
+`20260725093000` revoke only `FROM PUBLIC`, and `20260804091142_da8cef1f-…`
+revokes only `FROM anon, authenticated`. `inference, high confidence`: because
+`CREATE OR REPLACE FUNCTION` preserves an existing function's ownership and
+permissions, replaying `20260725093000` would correct the body, `search_path`
+and trigger columns but leave `service_role|EXECUTE|f|postgres` in the ACL, so
+the preflight would abort at the same check. A second, additive forward
+migration performing that revoke is required. Note the forward repair _does_
+explicitly revoke `service_role` on `action_queue_transition` — the omission is
+specific to the guard, so this reads as a gap rather than a deliberate posture.
+
+Nothing here licenses an agent to make either change. Both are production
+security edits outside any approved slice; the merged migration is immutable
+under the Migration Immutability Rules; and the sanctioned path remains the
+#1044 protected PREFLIGHT/APPLY lane, which is owner-only by construction
+(founder dispatcher identity, branch pin, `verdant-production-solo-founder`
+environment approval, and owner-only secrets).
+
+Status of the Action Queue transition contract in production: **`BLOCKED`**, not
+`FAIL`. The live security gap the repair closes is still open and still measured
+— `authenticated` holds UPDATE and DELETE on both `action_queue` and
+`action_queue_events`.
 
 ---
 

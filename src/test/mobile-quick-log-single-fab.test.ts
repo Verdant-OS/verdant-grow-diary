@@ -9,7 +9,7 @@
  *
  * These static-scan tests lock in:
  *   - exactly one mobile Quick Log FAB (AppShell), aria-label "Open Quick Log"
- *   - Tent Detail routes use that FAB to open tent-scoped V2 logging
+ *   - Tent Detail routes use that FAB with verified sole-plant-or-tent scope
  *   - QuickLogV2Fab is hidden on mobile (desktop-only)
  *   - desktop Quick Log behavior is preserved (md:inline-flex)
  *   - the UUID guard on manual sensor saves remains in place
@@ -47,11 +47,15 @@ describe("mobile Quick Log — single FAB", () => {
     expect(QUICK_LOG_FAB).toMatch(/md:bottom-/);
   });
 
-  it("routes the AppShell mobile FAB into tent-scoped V2 logging on Tent Detail", () => {
-    expect(APP_SHELL).toMatch(/resolveMobileQuickLogTarget\(location\.pathname\)/);
-    expect(APP_SHELL).toMatch(/mobileQuickLogTarget[\s\S]{0,300}setOpenScopedLog\(true\)/);
+  it("routes the AppShell mobile FAB through a frozen sole-plant-or-tent target", () => {
     expect(APP_SHELL).toMatch(
-      /<QuickLogV2Sheet[\s\S]{0,350}defaultTargetKey=\{structuredOpenIntent\?\.targetKey \?\? mobileQuickLogTarget\}/,
+      /resolveMobileQuickLogTarget\([\s\S]{0,100}location\.pathname,[\s\S]{0,100}tentQuickLogTargetEvidence[\s\S]{0,20}\)/,
+    );
+    expect(APP_SHELL).toMatch(
+      /mobileQuickLogTarget[\s\S]{0,500}setMobileLaunchTargetKey\(mobileQuickLogTarget\)[\s\S]{0,100}setOpenScopedLog\(true\)/,
+    );
+    expect(APP_SHELL).toMatch(
+      /<QuickLogV2Sheet[\s\S]{0,450}defaultTargetKey=\{structuredOpenIntent\?\.targetKey \?\? mobileLaunchTargetKey\}/,
     );
     expect(APP_SHELL.match(/<QuickLogV2Sheet\b/g) ?? []).toHaveLength(1);
   });

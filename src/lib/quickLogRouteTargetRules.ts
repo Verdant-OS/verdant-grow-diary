@@ -3,6 +3,11 @@ import { isUuid } from "@/lib/isUuid";
 const TENT_DETAIL_PATH = /^\/tents\/([^/?#]+)\/?$/;
 const PLANT_DETAIL_PATH = /^\/plants\/([^/?#]+)\/?$/;
 
+export interface TentQuickLogTargetEvidence {
+  tentId: string;
+  soleActivePlantId: string | null;
+}
+
 /**
  * Resolve the mobile Quick Log target from an authenticated route.
  *
@@ -11,14 +16,26 @@ const PLANT_DETAIL_PATH = /^\/plants\/([^/?#]+)\/?$/;
  * into UUID-backed writes; the existing unscoped Quick Log remains the
  * fallback everywhere else.
  */
-export function resolveMobileQuickLogTarget(pathname: unknown): string | null {
+export function resolveMobileQuickLogTarget(
+  pathname: unknown,
+  evidence: TentQuickLogTargetEvidence | null = null,
+): string | null {
   if (typeof pathname !== "string") return null;
   const match = TENT_DETAIL_PATH.exec(pathname);
   if (!match) return null;
 
   try {
     const tentId = decodeURIComponent(match[1]);
-    return isUuid(tentId) ? `tent:${tentId}` : null;
+    if (!isUuid(tentId)) return null;
+
+    // Tent Detail owns the active-plant query and publishes the same
+    // sole-active-plant derivation used by its desktop FAB. Match the route
+    // tent and validate both ids before becoming more specific. Missing,
+    // loading, stale, multi-plant, or malformed evidence stays tent-scoped.
+    const solePlantId = evidence?.tentId === tentId ? evidence.soleActivePlantId : null;
+    return typeof solePlantId === "string" && isUuid(solePlantId)
+      ? `plant:${solePlantId}`
+      : `tent:${tentId}`;
   } catch {
     return null;
   }

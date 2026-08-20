@@ -82,7 +82,13 @@ export interface DetailsLoggedAtReading {
 /**
  * Strict calendar/time validation. Date.parse silently normalizes impossible
  * dates (e.g. February 30) that PostgreSQL rejects, so components are
- * round-tripped through Date.UTC and compared field by field.
+ * round-tripped and compared field by field.
+ *
+ * The round trip deliberately avoids `Date.UTC`, which remaps years 0–99 to
+ * 1900–1999: `Date.UTC(99, 0, 1)` is 1999, so a server-acceptable stamp like
+ * `0099-01-01T00:00:00Z` would fail its own round trip and be reported
+ * unparseable. `setUTCFullYear` writes the literal year with no coercion.
+ * Year 0 is rejected outright — PostgreSQL has no year zero (1 BC → 1 AD).
  */
 function hasValidCalendarComponents(raw: string): boolean {
   const year = Number(raw.slice(0, 4));
@@ -92,7 +98,9 @@ function hasValidCalendarComponents(raw: string): boolean {
   const minute = Number(raw.slice(14, 16));
   const second = Number(raw.slice(17, 19));
   if (hour > 23 || minute > 59 || second > 59) return false;
-  const roundTrip = new Date(Date.UTC(year, month - 1, day));
+  if (year === 0) return false;
+  const roundTrip = new Date(0);
+  roundTrip.setUTCFullYear(year, month - 1, day);
   return (
     roundTrip.getUTCFullYear() === year &&
     roundTrip.getUTCMonth() === month - 1 &&

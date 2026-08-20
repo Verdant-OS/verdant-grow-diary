@@ -129,11 +129,10 @@ export default function TentDetail() {
   };
 
   const { data: tent, isLoading, isError, refetch } = useGrowTent(id);
-  const {
-    data: activePlants = [],
-    isFetching: activePlantsIsFetching,
-    isError: activePlantsIsError,
-  } = useGrowPlants(id);
+  const activePlantsQuery = useGrowPlants(id);
+  const activePlants = activePlantsQuery.data ?? EMPTY_TENT_PLANTS;
+  const activePlantsIsFetching = activePlantsQuery.isFetching;
+  const activePlantsIsError = activePlantsQuery.isError;
   const allPlantsQuery = useGrowPlants(id, undefined, { includeArchived: true });
   const allPlants = allPlantsQuery.data ?? EMPTY_TENT_PLANTS;
   const { data: readings = [] } = useSensorReadings(id);
@@ -146,7 +145,17 @@ export default function TentDetail() {
   // The one safe plant target this tent can prove. Null for zero or several
   // plants — we never invent a default selection. Shared by the One-Tent
   // loop card below and the Quick Log FAB's target key.
-  const safePlantId = activePlants.length === 1 ? (activePlants[0]?.id ?? null) : null;
+  //
+  // Counted through `resolveVerifiedAssignedPlantCount`, which returns null for
+  // EVERY non-current query state, not just the first load. A cached one-plant
+  // result rendered while a refetch is in flight can be wrong — a second plant
+  // may have been added elsewhere — and `QuickLogV2Fab` freezes whatever key it
+  // is given at click time, so a stale inference would survive the refetch and
+  // attribute the log to the old plant without the explicit selection a
+  // multi-plant tent requires. Unsettled means tent scope, which costs one tap
+  // and cannot mis-attribute.
+  const verifiedActivePlantCount = resolveVerifiedAssignedPlantCount(activePlantsQuery);
+  const safePlantId = verifiedActivePlantCount === 1 ? (activePlants[0]?.id ?? null) : null;
   // Archive/delete authorization counts all soft-linked plants, including
   // archived/merged history, and fails closed during every non-current state.
   const assignedPlantCount = resolveVerifiedAssignedPlantCount(allPlantsQuery);

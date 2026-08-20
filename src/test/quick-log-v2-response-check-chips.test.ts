@@ -122,6 +122,23 @@ describe("D7 — sole-plant tent opens the sheet plant-scoped", () => {
       /safePlantId\s*\?\s*`plant:\$\{safePlantId\}`\s*:\s*`tent:\$\{tent\.id\}`/,
     );
   });
+
+  it("never infers a plant from an unsettled roster", () => {
+    // A cached one-plant result rendered during a refetch can be wrong, and
+    // QuickLogV2Fab freezes whatever key it is handed at click time — so a
+    // stale inference would outlive the refetch. The count must come from
+    // `resolveVerifiedAssignedPlantCount`, which returns null for EVERY
+    // non-current query state (loading, pending, fetching, error,
+    // placeholder), not from a raw `.length` read.
+    expect(TENT_DETAIL).toMatch(
+      /const verifiedActivePlantCount = resolveVerifiedAssignedPlantCount\(activePlantsQuery\)/,
+    );
+    expect(TENT_DETAIL.replace(/\s+/g, " ")).toMatch(
+      /const safePlantId = verifiedActivePlantCount === 1 \? \(activePlants\[0\]\?\.id \?\? null\) : null;/,
+    );
+    // The raw length read cannot come back.
+    expect(TENT_DETAIL).not.toMatch(/const safePlantId = activePlants\.length === 1/);
+  });
 });
 
 describe("D7 — rules module behavior the chips depend on", () => {

@@ -186,18 +186,35 @@ export function readResponseCheckStatus(existingNote: string): ResponseCheckStat
  * is recoverable; silently attributing a response to a plant that never
  * showed it is not.
  *
- * Returns the note unchanged unless the first line starts with the canonical
- * line for `authored`.
+ * `authored` is provenance, not a content assertion. It records THAT a chip
+ * wrote the head slot; it does not promise the grower left that word alone.
+ * Requiring the current status to equal `authored` was tried and leaks: click
+ * Better, edit the visible line to "Response check: Worse.", retarget, and an
+ * authored-status match finds nothing to remove — so a Worse marker rides onto
+ * a plant that never showed it. Any canonical marker in the chip's own head
+ * slot is the chip's to remove.
+ *
+ * Returns the note unchanged unless the first line starts with a canonical
+ * response line.
  */
 export function removeChipAuthoredResponseLine(
   existingNote: string,
   authored: ResponseCheckStatus,
 ): string {
   if (typeof existingNote !== "string" || existingNote.length === 0) return existingNote;
-  const canonical = buildResponseCheckLine(authored);
   const newlineAt = existingNote.indexOf("\n");
   const firstLine = newlineAt === -1 ? existingNote : existingNote.slice(0, newlineAt);
-  if (!firstLine.startsWith(canonical)) return existingNote;
+
+  // `authored` is the PROVENANCE token — it proves a chip wrote into the head
+  // slot of this note. Which status currently sits in that slot is a separate
+  // question: the grower can edit the generated word ("Better." -> "Worse.")
+  // and it is still the chip's line. So match the authored status first, then
+  // any other canonical marker occupying the same slot.
+  const canonical =
+    [authored, ...RESPONSE_CHECK_STATUSES]
+      .map((status) => buildResponseCheckLine(status))
+      .find((line) => firstLine.startsWith(line)) ?? null;
+  if (!canonical) return existingNote;
 
   const rest = newlineAt === -1 ? "" : existingNote.slice(newlineAt + 1);
   const remainder = firstLine.slice(canonical.length).trim();

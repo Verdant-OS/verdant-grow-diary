@@ -6,12 +6,14 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "@/lib/react-router-compat";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, QueryObserver } from "@tanstack/react-query";
 import { isValidElement, type ReactNode } from "react";
 
 const insertMock = vi.hoisted(() => vi.fn());
 const singleMock = vi.hoisted(() => vi.fn());
 const selectMock = vi.hoisted(() => vi.fn(() => ({ single: singleMock })));
+const successToastMock = vi.hoisted(() => vi.fn());
+const funnelEventMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
@@ -36,6 +38,8 @@ vi.mock("@/integrations/supabase/client", () => ({
 vi.mock("@/store/auth", () => ({
   useAuth: () => ({ user: { id: "11111111-1111-4111-8111-111111111111" }, loading: false }),
 }));
+
+vi.mock("@/lib/funnelAnalytics", () => ({ trackFunnelEvent: funnelEventMock }));
 
 const growsState = vi.hoisted(() => ({
   grows: [] as Array<{ id: string; name: string }>,
@@ -83,7 +87,7 @@ vi.mock("@/lib/entitlements/freeTierGates", () => ({
   FREE_TIER_UPGRADE_PATH: "/pricing",
 }));
 
-vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
+vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: successToastMock } }));
 
 vi.mock("@/components/CreateTentDialog", () => ({
   default: ({
@@ -152,6 +156,8 @@ function renderDialog(props: {
 
 beforeEach(() => {
   insertMock.mockReset();
+  successToastMock.mockReset();
+  funnelEventMock.mockReset();
   singleMock.mockReset();
   singleMock.mockResolvedValue({ data: { id: "plant-1", name: "P" }, error: null });
   selectMock.mockClear();
@@ -311,7 +317,89 @@ describe("CreatePlantDialog RTL binding", () => {
     expect(payload.name).toBe("Happy Plant");
   });
 
-  it("keeps the confirmed create handoff pending until both plant-list refreshes settle", async () => {
+  it("refreshes the exact legacy and owner-scoped plant caches before create handoff", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const legacyPlantsKey = ["plants"] as const;
+    const ownerGrowPlantsKey = [
+      "grow",
+      "plants",
+      "all",
+      G1,
+      "owner",
+      "11111111-1111-4111-8111-111111111111",
+    ] as const;
+    let resolveLegacyPlantsRefresh!: () => void;
+    let resolveGrowPlantsRefresh!: () => void;
+    const legacyPlantsRefresh = new Promise<void>((resolve) => {
+      resolveLegacyPlantsRefresh = resolve;
+    });
+    const growPlantsRefresh = new Promise<void>((resolve) => {
+      resolveGrowPlantsRefresh = resolve;
+    });
+    const legacyQueryFn = vi.fn(async () => {
+      await legacyPlantsRefresh;
+      return ["legacy-after"];
+    });
+    const ownerGrowQueryFn = vi.fn(async () => {
+      await growPlantsRefresh;
+      return ["owner-after"];
+    });
+    client.setQueryData(legacyPlantsKey, ["legacy-before"]);
+    client.setQueryData(ownerGrowPlantsKey, ["owner-before"]);
+    const legacyObserver = new QueryObserver(client, {
+      queryKey: legacyPlantsKey,
+      queryFn: legacyQueryFn,
+      staleTime: Number.POSITIVE_INFINITY,
+    });
+    const ownerGrowObserver = new QueryObserver(client, {
+      queryKey: ownerGrowPlantsKey,
+      queryFn: ownerGrowQueryFn,
+      staleTime: Number.POSITIVE_INFINITY,
+    });
+    const unsubscribeLegacy = legacyObserver.subscribe(() => {});
+    const unsubscribeOwnerGrow = ownerGrowObserver.subscribe(() => {});
+    const invalidateSpy = vi.spyOn(client, "invalidateQueries");
+    const onCreated = vi.fn();
+
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter>
+          <CreatePlantDialog
+            initiallyOpen
+            defaultGrowId={G1}
+            defaultTentId={T1}
+            onCreated={onCreated}
+          />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await userEvent.type(screen.getByTestId("create-plant-name"), "Visible Plant");
+    await userEvent.click(screen.getByTestId("plant-create-submit"));
+
+    await waitFor(() => expect(invalidateSpy).toHaveBeenCalledTimes(2));
+    expect(invalidateSpy).toHaveBeenNthCalledWith(1, { queryKey: ["plants"] });
+    expect(invalidateSpy).toHaveBeenNthCalledWith(2, { queryKey: ["grow", "plants"] });
+    expect(legacyQueryFn).toHaveBeenCalledTimes(1);
+    expect(ownerGrowQueryFn).toHaveBeenCalledTimes(1);
+    expect(funnelEventMock).toHaveBeenCalledWith("plant_created");
+    expect(screen.getByTestId("create-plant-form")).toBeInTheDocument();
+    expect(onCreated).not.toHaveBeenCalled();
+
+    resolveLegacyPlantsRefresh();
+    await waitFor(() => expect(client.getQueryData(legacyPlantsKey)).toEqual(["legacy-after"]));
+    expect(screen.getByTestId("create-plant-form")).toBeInTheDocument();
+    expect(onCreated).not.toHaveBeenCalled();
+
+    resolveGrowPlantsRefresh();
+    await waitFor(() => expect(client.getQueryData(ownerGrowPlantsKey)).toEqual(["owner-after"]));
+    await waitFor(() => expect(screen.queryByTestId("create-plant-form")).not.toBeInTheDocument());
+    expect(onCreated).toHaveBeenCalledWith({ id: "plant-1", name: "P" });
+    unsubscribeLegacy();
+    unsubscribeOwnerGrow();
+  });
+
+  it("allows dismissal during refresh without a delayed create handoff", async () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     let resolveLegacyPlantsRefresh!: () => void;
     let resolveGrowPlantsRefresh!: () => void;
@@ -340,24 +428,56 @@ describe("CreatePlantDialog RTL binding", () => {
       </QueryClientProvider>,
     );
 
-    await userEvent.type(screen.getByTestId("create-plant-name"), "Visible Plant");
+    await userEvent.type(screen.getByTestId("create-plant-name"), "Dismissed Plant");
     await userEvent.click(screen.getByTestId("plant-create-submit"));
-
     await waitFor(() => expect(invalidateSpy).toHaveBeenCalledTimes(2));
-    expect(screen.getByTestId("create-plant-form")).toBeInTheDocument();
-    expect(onCreated).not.toHaveBeenCalled();
 
     await userEvent.click(screen.getByRole("button", { name: "Close" }));
-    expect(screen.getByTestId("create-plant-form")).toBeInTheDocument();
-    expect(onCreated).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("create-plant-form")).not.toBeInTheDocument();
 
     resolveLegacyPlantsRefresh();
-    await Promise.resolve();
-    expect(screen.getByTestId("create-plant-form")).toBeInTheDocument();
-    expect(onCreated).not.toHaveBeenCalled();
-
     resolveGrowPlantsRefresh();
-    await waitFor(() => expect(screen.queryByTestId("create-plant-form")).not.toBeInTheDocument());
-    expect(onCreated).toHaveBeenCalledWith({ id: "plant-1", name: "P" });
+    await waitFor(() => expect(successToastMock).toHaveBeenCalledWith("Plant created"));
+    expect(onCreated).not.toHaveBeenCalled();
+  });
+
+  it("suppresses the create handoff when the route unmounts during refresh", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    let resolveLegacyPlantsRefresh!: () => void;
+    let resolveGrowPlantsRefresh!: () => void;
+    const legacyPlantsRefresh = new Promise<void>((resolve) => {
+      resolveLegacyPlantsRefresh = resolve;
+    });
+    const growPlantsRefresh = new Promise<void>((resolve) => {
+      resolveGrowPlantsRefresh = resolve;
+    });
+    const pendingRefreshes = [legacyPlantsRefresh, growPlantsRefresh];
+    const invalidateSpy = vi
+      .spyOn(client, "invalidateQueries")
+      .mockImplementation(() => pendingRefreshes.shift() ?? Promise.resolve());
+    const onCreated = vi.fn();
+
+    const view = render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter>
+          <CreatePlantDialog
+            initiallyOpen
+            defaultGrowId={G1}
+            defaultTentId={T1}
+            onCreated={onCreated}
+          />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await userEvent.type(screen.getByTestId("create-plant-name"), "Unmounted Plant");
+    await userEvent.click(screen.getByTestId("plant-create-submit"));
+    await waitFor(() => expect(invalidateSpy).toHaveBeenCalledTimes(2));
+    view.unmount();
+
+    resolveLegacyPlantsRefresh();
+    resolveGrowPlantsRefresh();
+    await waitFor(() => expect(successToastMock).toHaveBeenCalledWith("Plant created"));
+    expect(onCreated).not.toHaveBeenCalled();
   });
 });

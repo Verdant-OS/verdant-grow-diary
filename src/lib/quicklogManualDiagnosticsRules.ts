@@ -79,6 +79,27 @@ export interface DetailsLoggedAtReading {
   value: string | null;
 }
 
+/**
+ * Strict calendar/time validation. Date.parse silently normalizes impossible
+ * dates (e.g. February 30) that PostgreSQL rejects, so components are
+ * round-tripped through Date.UTC and compared field by field.
+ */
+function hasValidCalendarComponents(raw: string): boolean {
+  const year = Number(raw.slice(0, 4));
+  const month = Number(raw.slice(5, 7));
+  const day = Number(raw.slice(8, 10));
+  const hour = Number(raw.slice(11, 13));
+  const minute = Number(raw.slice(14, 16));
+  const second = Number(raw.slice(17, 19));
+  if (hour > 23 || minute > 59 || second > 59) return false;
+  const roundTrip = new Date(Date.UTC(year, month - 1, day));
+  return (
+    roundTrip.getUTCFullYear() === year &&
+    roundTrip.getUTCMonth() === month - 1 &&
+    roundTrip.getUTCDate() === day
+  );
+}
+
 /** Read details.logged_at with the server parser's acceptance rules. */
 export function readDetailsLoggedAt(details: unknown): DetailsLoggedAtReading {
   if (!details || typeof details !== "object" || Array.isArray(details)) {
@@ -89,6 +110,7 @@ export function readDetailsLoggedAt(details: unknown): DetailsLoggedAtReading {
   if (typeof raw !== "string" || raw.length > 64 || !LOGGED_AT_PATTERN.test(raw)) {
     return { present: true, parseable: false, value: null };
   }
+  if (!hasValidCalendarComponents(raw)) return { present: true, parseable: false, value: null };
   const parsed = Date.parse(raw);
   if (!Number.isFinite(parsed)) return { present: true, parseable: false, value: null };
   return { present: true, parseable: true, value: raw };
@@ -220,8 +242,17 @@ export function buildQuicklogManualEntryDiagnostics(
     mirrorsByEventId.set(link.id, bucket);
   }
 
+  // The trail renders as a chronological sequence, so order it here rather
+  // than trusting caller fetch order. Stable sort: rows without a usable
+  // created_at keep their input position.
   const auditByEventId = new Map<string, string[]>();
-  for (const audit of input.auditEvents ?? []) {
+  const sortedAudits = [...(input.auditEvents ?? [])].sort((left, right) => {
+    const leftMs = Date.parse(left.created_at ?? "");
+    const rightMs = Date.parse(right.created_at ?? "");
+    if (!Number.isFinite(leftMs) || !Number.isFinite(rightMs)) return 0;
+    return leftMs - rightMs;
+  });
+  for (const audit of sortedAudits) {
     const eventId =
       typeof audit.grow_event_id === "string" ? audit.grow_event_id.toLowerCase() : null;
     if (!eventId) continue;
@@ -349,7 +380,9 @@ export function classifyQuicklogPrivateProbe(
   // 0A000: "trigger functions can only be called as triggers" — the call got
   // past the permission check, so EXECUTE is granted. That is the regression.
   if (code === "0A000") return "exposed_regression";
-  if (code === "PGRST202" || code === "42883" || code === "PGRST204") return "sealed_not_exposed";
+  // Only function-not-found codes prove non-exposure. PGRST204 is an
+  // unknown-column/schema-cache error and must not paint the probe healthy.
+  if (code === "PGRST202" || code === "42883") return "sealed_not_exposed";
   if (
     /failed to fetch|networkerror|network request failed|load failed|fetch failed/i.test(message)
   ) {
@@ -440,7 +473,14 @@ export interface QuicklogConsistencyInput {
 export interface QuicklogConsistencyReport {
   checkedDiaryEntries: number;
   checkedGrowEvents: number;
+  /** Links whose occurrence AND Captured timestamps both prove parity. */
   healthyLinks: number;
+  /**
+   * Links whose occurrence matches but whose Captured parity is unprovable —
+   * columns absent from the schema, or both stamps null. Never "healthy":
+   * unknown telemetry must not be classified as healthy.
+   */
+  linksWithoutCapturedParity: number;
   unlinkedDiaryEntries: number;
   danglingDiaryLinks: {
     diaryEntryId: string;
@@ -472,6 +512,7 @@ export function buildQuicklogConsistencyReport(
     checkedDiaryEntries: input.diaryEntries.length,
     checkedGrowEvents: input.growEvents.length,
     healthyLinks: 0,
+    linksWithoutCapturedParity: 0,
     unlinkedDiaryEntries: 0,
     danglingDiaryLinks: [],
     occurrenceMismatches: [],
@@ -501,6 +542,7 @@ export function buildQuicklogConsistencyReport(
     }
     mirroredEventIds.add(link.id);
     let healthy = true;
+    let capturedParityProven = false;
     if (!sameInstant(diary.entry_at, event.occurred_at)) {
       healthy = false;
       report.occurrenceMismatches.push({
@@ -514,7 +556,10 @@ export function buildQuicklogConsistencyReport(
       const diaryLoggedAt = diary.logged_at ?? null;
       const eventLoggedAt = event.logged_at ?? null;
       const bothAbsent = diaryLoggedAt === null && eventLoggedAt === null;
-      if (!bothAbsent && !sameInstant(diaryLoggedAt, eventLoggedAt)) {
+      if (bothAbsent) {
+        // Legacy pre-backfill pair: nothing to compare, so parity is
+        // unprovable — reported as such, never as healthy.
+      } else if (!sameInstant(diaryLoggedAt, eventLoggedAt)) {
         healthy = false;
         report.loggedAtMismatches.push({
           diaryEntryId: diary.id,
@@ -522,9 +567,12 @@ export function buildQuicklogConsistencyReport(
           diaryLoggedAt,
           eventLoggedAt,
         });
+      } else {
+        capturedParityProven = true;
       }
     }
-    if (healthy) report.healthyLinks += 1;
+    if (healthy && capturedParityProven) report.healthyLinks += 1;
+    else if (healthy) report.linksWithoutCapturedParity += 1;
   }
 
   const sortedEvents = [...input.growEvents].sort((a, b) => {

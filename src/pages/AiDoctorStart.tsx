@@ -143,8 +143,10 @@ export default function AiDoctorStart() {
               data-testid="ai-doctor-start-tent-context"
             >
               This link carried tent context:{" "}
-              <span className="font-medium text-foreground">{resolvedScope.tentName}</span>. Its
-              plants are listed first — you can still choose any plant.
+              <span className="font-medium text-foreground">{resolvedScope.tentName}</span>.
+              {plantsAreListed
+                ? " Its plants are listed first — you can still choose any plant."
+                : ""}
             </p>
           ) : null}
           {scopeReadFailed && carriedScopeRequested ? (

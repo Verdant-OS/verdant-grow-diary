@@ -331,6 +331,32 @@ describe("AiDoctorStart", () => {
     expect(message).not.toHaveTextContent("Every active plant is listed below");
   });
 
+  it("keeps the carried-tent fact but drops the list claim when plants fail to load", () => {
+    // The carried context IS true and worth confirming, so the paragraph
+    // stays — only the clause that describes a list which is not on screen
+    // goes. Hiding the whole thing would also break the aria-describedby
+    // relationship the in-tent badge relies on.
+    state.isError = true;
+    state.grows = SCOPED.grows;
+    state.tents = SCOPED.tents;
+    renderPage("/doctor?growId=grow-1&tentId=tent-a");
+
+    const context = screen.getByTestId("ai-doctor-start-tent-context");
+    expect(context).toHaveTextContent("This link carried tent context");
+    expect(context).not.toHaveTextContent("Its plants are listed first");
+  });
+
+  it("keeps the list clause when the plants really are listed", () => {
+    state.data = SCOPED.plants;
+    state.grows = SCOPED.grows;
+    state.tents = SCOPED.tents;
+    renderPage("/doctor?growId=grow-1&tentId=tent-a");
+
+    expect(screen.getByTestId("ai-doctor-start-tent-context")).toHaveTextContent(
+      "Its plants are listed first",
+    );
+  });
+
   it("offers no retry when no scope was carried — there is nothing to re-check", () => {
     state.growsError = "network down";
     state.data = SCOPED.plants;

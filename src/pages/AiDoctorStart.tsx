@@ -32,8 +32,21 @@ export default function AiDoctorStart() {
   // both against rows the grower owns before rendering anything. An id in a
   // URL is a request, not a grant.
   const [searchParams] = useSearchParams();
-  const { grows } = useGrows();
+  const { grows, loading: growsLoading, error: growsError } = useGrows();
   const tentsQuery = useGrowTents();
+
+  // Ownership reads start EMPTY, not absent: `grows` is `[]` while loading and
+  // `tentsQuery.data` is undefined. Resolving against them before they settle
+  // would classify a perfectly valid carried scope as unowned and tell the
+  // grower it "couldn't be matched to your account" — an unknown answer
+  // presented as a negative one. Worse, a failed read would make that false
+  // statement permanent. So scope messaging waits for both reads, and a read
+  // FAILURE is reported as a failure to verify, never as invalid ownership.
+  const scopeReadsSettled = !growsLoading && !tentsQuery.isLoading;
+  const scopeReadFailed = !!growsError || tentsQuery.isError;
+  const carriedScopeRequested =
+    !!searchParams.get("growId")?.trim() || !!searchParams.get("tentId")?.trim();
+
   const scope = useMemo(
     () =>
       resolveDoctorStartScope({
@@ -44,6 +57,11 @@ export default function AiDoctorStart() {
       }),
     [searchParams, grows, tentsQuery.data],
   );
+  // Only trust a resolved scope once the rows it was checked against are real.
+  const resolvedScope =
+    scopeReadsSettled && !scopeReadFailed
+      ? scope
+      : { growId: null, growName: null, tentId: null, tentName: null, hasInvalidScope: false };
 
   // Carried tent scope reorders and labels the choices. It never removes one:
   // the explicit plant choice below is doctrine, and a shorter list is a
@@ -53,9 +71,9 @@ export default function AiDoctorStart() {
       partitionDoctorEntryOptionsByTent({
         options,
         plants: plantsQuery.data,
-        tentId: scope.tentId,
+        tentId: resolvedScope.tentId,
       }),
-    [options, plantsQuery.data, scope.tentId],
+    [options, plantsQuery.data, resolvedScope.tentId],
   );
   const orderedOptions = useMemo(
     () => [...partitioned.inScope, ...partitioned.others],
@@ -84,7 +102,7 @@ export default function AiDoctorStart() {
 
       <OneTentLoopNextStepCard
         current="ai-doctor"
-        ids={{ growId: scope.growId, tentId: scope.tentId }}
+        ids={{ growId: resolvedScope.growId, tentId: resolvedScope.tentId }}
         testId="ai-doctor-start-one-tent-loop-next-step-card"
         className="mb-3"
       />
@@ -102,17 +120,26 @@ export default function AiDoctorStart() {
             Verdant will not guess which plant you mean. Opening a plant prepares its existing
             context; AI Doctor runs only after you press the review button there.
           </p>
-          {scope.tentName ? (
+          {resolvedScope.tentName ? (
             <p
               className="mt-2 text-sm text-muted-foreground"
               data-testid="ai-doctor-start-tent-context"
             >
               Carried from your sensor snapshot in{" "}
-              <span className="font-medium text-foreground">{scope.tentName}</span>. Plants in that
-              tent are listed first — you can still choose any plant.
+              <span className="font-medium text-foreground">{resolvedScope.tentName}</span>. Plants
+              in that tent are listed first — you can still choose any plant.
             </p>
           ) : null}
-          {scope.hasInvalidScope ? (
+          {scopeReadFailed && carriedScopeRequested ? (
+            <p
+              className="mt-2 text-sm text-muted-foreground"
+              data-testid="ai-doctor-start-scope-unverified"
+            >
+              Verdant couldn&apos;t check the grow or tent this link carried, so no tent context is
+              applied. Every active plant is listed below.
+            </p>
+          ) : null}
+          {resolvedScope.hasInvalidScope ? (
             <p
               className="mt-2 text-sm text-muted-foreground"
               data-testid="ai-doctor-start-invalid-scope"
@@ -155,12 +182,22 @@ export default function AiDoctorStart() {
                   className="group flex h-full items-center justify-between gap-3 rounded-xl border border-border/70 bg-card/45 p-4 transition-colors hover:border-primary/50 hover:bg-primary/5 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                   data-testid={`ai-doctor-start-option-${index}`}
                   aria-label={`Review ${option.name} with AI Doctor`}
+                  // The explicit aria-label replaces ALL descendant text in the
+                  // accessible name, so the "In this tent" badge below would be
+                  // silent to screen readers. Expose it as the DESCRIPTION
+                  // instead: same scope cue, action name unchanged.
+                  aria-describedby={
+                    inScopeIds.has(option.id)
+                      ? `ai-doctor-start-option-${index}-in-tent`
+                      : undefined
+                  }
                 >
                   <span className="min-w-0">
                     <span className="block break-words font-semibold">{option.name}</span>
                     {inScopeIds.has(option.id) ? (
                       <span
                         className="mt-1 inline-block rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary"
+                        id={`ai-doctor-start-option-${index}-in-tent`}
                         data-testid={`ai-doctor-start-option-${index}-in-tent`}
                       >
                         In this tent

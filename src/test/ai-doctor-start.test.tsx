@@ -12,6 +12,12 @@ const state = vi.hoisted(() => ({
   // the grower owns, so the harness has to supply those rows.
   tents: [] as Array<Record<string, unknown>>,
   grows: [] as Array<Record<string, unknown>>,
+  // B4a review: ownership reads start EMPTY, not absent. The harness must be
+  // able to say "still loading" and "read failed" as distinct from "no rows".
+  growsLoading: false,
+  growsError: null as string | null,
+  tentsLoading: false,
+  tentsError: false,
 }));
 
 vi.mock("@/hooks/useGrowData", () => ({
@@ -21,11 +27,19 @@ vi.mock("@/hooks/useGrowData", () => ({
     isError: state.isError,
     refetch: state.refetch,
   }),
-  useGrowTents: () => ({ data: state.tents }),
+  useGrowTents: () => ({
+    data: state.tents,
+    isLoading: state.tentsLoading,
+    isError: state.tentsError,
+  }),
 }));
 
 vi.mock("@/store/grows", () => ({
-  useGrows: () => ({ grows: state.grows }),
+  useGrows: () => ({
+    grows: state.grows,
+    loading: state.growsLoading,
+    error: state.growsError,
+  }),
 }));
 
 vi.mock("@/integrations/supabase/client", () => ({
@@ -66,6 +80,10 @@ describe("AiDoctorStart", () => {
     state.invoke.mockClear();
     state.tents = [];
     state.grows = [];
+    state.growsLoading = false;
+    state.growsError = null;
+    state.tentsLoading = false;
+    state.tentsError = false;
   });
 
   afterEach(() => cleanup());
@@ -190,5 +208,51 @@ describe("AiDoctorStart", () => {
     expect(state.invoke).not.toHaveBeenCalled();
     expect(screen.getByTestId("location")).toHaveTextContent("/doctor");
     expect(screen.queryByTestId("plant-detail")).toBeNull();
+  });
+
+  it("does not call a carried scope invalid while the ownership reads are still loading", () => {
+    // grows starts as [] with loading=true. Resolving against that would tell
+    // the grower their own valid link "couldn't be matched" — an unknown
+    // answer presented as a negative one.
+    state.growsLoading = true;
+    state.tentsLoading = true;
+    state.data = SCOPED.plants;
+    renderPage("/doctor?growId=grow-1&tentId=tent-a");
+
+    expect(screen.queryByTestId("ai-doctor-start-invalid-scope")).toBeNull();
+    expect(screen.queryByTestId("ai-doctor-start-tent-context")).toBeNull();
+  });
+
+  it("reports a FAILED ownership read as unverified, never as invalid ownership", () => {
+    state.growsError = "network down";
+    state.data = SCOPED.plants;
+    renderPage("/doctor?growId=grow-1&tentId=tent-a");
+
+    expect(screen.getByTestId("ai-doctor-start-scope-unverified")).toBeInTheDocument();
+    // Crucially NOT the account-mismatch wording — we do not know that.
+    expect(screen.queryByTestId("ai-doctor-start-invalid-scope")).toBeNull();
+  });
+
+  it("says nothing about scope when no scope was carried, even on a failed read", () => {
+    state.growsError = "network down";
+    state.data = SCOPED.plants;
+    renderPage("/doctor");
+
+    expect(screen.queryByTestId("ai-doctor-start-scope-unverified")).toBeNull();
+    expect(screen.queryByTestId("ai-doctor-start-invalid-scope")).toBeNull();
+  });
+
+  it("exposes the in-tent badge to assistive tech as the link's description", () => {
+    state.grows = SCOPED.grows;
+    state.tents = SCOPED.tents;
+    state.data = SCOPED.plants;
+    renderPage("/doctor?growId=grow-1&tentId=tent-a");
+
+    const promoted = screen.getAllByRole("link", { name: /with AI Doctor/i })[0];
+    const badgeId = "ai-doctor-start-option-0-in-tent";
+    expect(promoted).toHaveAttribute("aria-describedby", badgeId);
+    // The action name is unchanged — the badge describes, it does not rename.
+    expect(promoted).toHaveAccessibleName("Review Alpha with AI Doctor");
+    expect(document.getElementById(badgeId)).toHaveTextContent("In this tent");
   });
 });

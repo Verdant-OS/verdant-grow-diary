@@ -57,11 +57,28 @@ describe("resolveDoctorStartScope — fail-closed validation", () => {
     expect(blank.hasInvalidScope).toBe(false);
   });
 
-  it("fails closed on a grow the grower does not own", () => {
+  it("fails closed on a grow the grower does not own — INCLUDING its tent", () => {
     const result = scope({ urlGrowId: "grow-someone-else" });
     expect(result.growId).toBeNull();
     expect(result.growName).toBeNull();
     expect(result.hasInvalidScope).toBe(true);
+    // The pair arrives from ONE producer, so a rejected half taints the tuple.
+    // Returning the tent here would let the page promote and badge that tent
+    // while simultaneously saying no tent context was applied.
+    expect(result.tentId).toBeNull();
+    expect(result.tentName).toBeNull();
+  });
+
+  it("keeps a valid tent only when the carried grow is absent, not when it is rejected", () => {
+    // Absent grow: the tent stands on its own and supplies the grow.
+    const absent = scope({ urlGrowId: null, urlTentId: "tent-1" });
+    expect(absent.tentId).toBe("tent-1");
+    expect(absent.hasInvalidScope).toBe(false);
+
+    // Rejected grow: the tent goes with it.
+    const rejected = scope({ urlGrowId: "nope", urlTentId: "tent-1" });
+    expect(rejected.tentId).toBeNull();
+    expect(rejected.hasInvalidScope).toBe(true);
   });
 
   it("fails closed on a tent the grower does not own", () => {

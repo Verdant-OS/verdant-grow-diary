@@ -85,12 +85,21 @@ export function resolveDoctorStartScope(input: ResolveDoctorStartScopeInput): Do
   const grow = requestedGrowId
     ? (grows.find((row) => row && trimmed(row.id) === requestedGrowId) ?? null)
     : null;
-  if (requestedGrowId && !grow) invalid = true;
+  /** A grow was explicitly carried and did not resolve to one the grower owns. */
+  const growRejected = !!requestedGrowId && !grow;
+  if (growRejected) invalid = true;
 
   let tent = requestedTentId
     ? (tents.find((row) => row && trimmed(row.id) === requestedTentId) ?? null)
     : null;
   if (requestedTentId && !tent) invalid = true;
+
+  // A rejected grow taints the whole tuple. `?growId=&tentId=` arrives from ONE
+  // producer, so a bad half is evidence the pair cannot be trusted — keeping the
+  // tent would let the page promote and badge that tent while simultaneously
+  // telling the grower no tent context was applied. Note this is narrower than
+  // "no grow": an ABSENT grow is fine and lets a valid tent supply one below.
+  if (growRejected) tent = null;
 
   // A tent that resolves but sits in a different grow than the one carried is
   // rejected rather than reconciled — annotating the page with another grow's

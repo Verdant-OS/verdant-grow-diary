@@ -35,8 +35,33 @@ describe("D7 — V2 sheet response-check chips", () => {
   });
 
   it("writes only through the note field the grower can see", () => {
+    // Pin updated (not loosened) when the handler gained an overflow guard:
+    // the chip now computes the candidate first and writes it through the same
+    // visible note field. Both halves of the original intent are still pinned —
+    // the value comes from applyResponseCheck(form.note, status), and the only
+    // write is setField("note", ...).
     expect(SHEET).toMatch(/applyResponseCheck\(\s*form\.note\s*,\s*status\s*\)/);
-    expect(SHEET).toMatch(/setField\("note",\s*applyResponseCheck/);
+    expect(SHEET).toMatch(/setField\("note",\s*next\s*\)/);
+    // No other field may be written from the chip handler.
+    expect(SHEET).not.toMatch(/onClick=\{\(\) => setField\("(?!note)/);
+  });
+
+  it("refuses the chip instead of overflowing NOTE_LIMIT", () => {
+    // `maxLength` bounds typing only. Prepending the response line to a
+    // near-limit note would push the note past the limit the watering write
+    // enforces, and that rejection locks the retry record and costs the draft.
+    expect(SHEET).toMatch(/responseCheckOverflows[\s\S]{0,200}> NOTE_LIMIT/);
+    // Guarded at BOTH the disabled state and the handler.
+    expect(SHEET).toMatch(/disabled=\{[\s\S]{0,160}responseCheckOverflows/);
+    expect(SHEET).toMatch(/if \(next\.length > NOTE_LIMIT\) return;/);
+  });
+
+  it("clears the plant response marker when the target stops being a plant", () => {
+    // A response marker describes a plant; leaving it on a tent-scoped entry
+    // would mislabel the row for every downstream response parser.
+    expect(SHEET).toMatch(
+      /if \(showResponseCheck\) return;[\s\S]{0,200}actionTextWithoutResponseContext\(form\.note\)/,
+    );
   });
 
   it("never pre-fills the note — the optional-note contract is preserved", () => {
@@ -52,7 +77,12 @@ describe("D7 — V2 sheet response-check chips", () => {
   });
 
   it("locks the chips during an in-flight watering submission, like the note", () => {
-    expect(SHEET).toMatch(/qlv2-response-chips[\s\S]{0,600}disabled=\{wateringSubmissionLocked\}/);
+    // Pin updated (not loosened): the disabled expression gained the overflow
+    // clause, so `wateringSubmissionLocked` is now the FIRST term of a
+    // disjunction rather than the whole value. The lock itself is unchanged.
+    expect(SHEET).toMatch(
+      /qlv2-response-chip[\s\S]{0,600}disabled=\{[\s\S]{0,80}wateringSubmissionLocked/,
+    );
   });
 
   it("keeps the save contract unchanged — chips are note text, not a new action", () => {

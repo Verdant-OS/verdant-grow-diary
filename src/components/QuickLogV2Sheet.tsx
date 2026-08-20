@@ -38,6 +38,7 @@ import {
 } from "@/lib/quickLogV2Rules";
 import {
   RESPONSE_CHECK_STATUSES,
+  actionTextWithoutResponseContext,
   applyResponseCheck,
   readResponseCheckStatus,
 } from "@/lib/tenSecondQuickCheckRules";
@@ -388,6 +389,14 @@ export default function QuickLogV2Sheet({
   const showResponseCheck =
     form.action !== "feed" && resolvedTarget.ok && resolvedTarget.targetType === "plant";
   const selectedResponseStatus = readResponseCheckStatus(form.note);
+  // `maxLength` constrains TYPING only — it does not bound a programmatic
+  // setState. Prepending the response line to an already-long note could push
+  // the note past NOTE_LIMIT, and the watering write rejects >500, after which
+  // the sheet locks the retry record and the grower loses the draft. So the
+  // chip is refused BEFORE it mutates state rather than failing at save.
+  const responseCheckOverflows = RESPONSE_CHECK_STATUSES.some(
+    (status) => applyResponseCheck(form.note, status).length > NOTE_LIMIT,
+  );
   const saveHelper = wateringRetryPending
     ? "Retry sends the exact same watering record. Close and reopen Quick Log to make changes."
     : getSaveHelperMessage({
@@ -479,6 +488,17 @@ export default function QuickLogV2Sheet({
     if (wateringSubmissionLockedRef.current) return;
     setForm((prev) => (prev[k] === v ? prev : { ...prev, [k]: v }));
   };
+
+  // A response marker describes a PLANT. If the grower switches the target to
+  // a tent after picking Better/Same/Worse, the chips disappear but the line
+  // stays in the note and would persist a plant-response marker against a tent
+  // entry — mislabeling the row for every downstream response parser. Strip it
+  // when the target stops being a plant, preserving any action prose.
+  useEffect(() => {
+    if (showResponseCheck) return;
+    if (!readResponseCheckStatus(form.note)) return;
+    setField("note", actionTextWithoutResponseContext(form.note));
+  }, [showResponseCheck, form.note, setField]);
 
   const handleAction = (a: QuickLogV2Action) => {
     if (wateringSubmissionLockedRef.current) return;
@@ -1585,17 +1605,29 @@ export default function QuickLogV2Sheet({
                     type="button"
                     variant={selectedResponseStatus === status ? "default" : "outline"}
                     size="sm"
-                    disabled={wateringSubmissionLocked}
+                    disabled={
+                      wateringSubmissionLocked ||
+                      (responseCheckOverflows && selectedResponseStatus !== status)
+                    }
                     aria-pressed={selectedResponseStatus === status}
                     data-testid={`qlv2-response-chip-${status.toLowerCase()}`}
-                    onClick={() => setField("note", applyResponseCheck(form.note, status))}
+                    onClick={() => {
+                      const next = applyResponseCheck(form.note, status);
+                      // Belt and braces: the chip is already disabled in this
+                      // case, but never let a programmatic write exceed the
+                      // limit the save path enforces.
+                      if (next.length > NOTE_LIMIT) return;
+                      setField("note", next);
+                    }}
                   >
                     {status}
                   </Button>
                 ))}
               </div>
               <p className="text-sm text-muted-foreground">
-                Better/Same/Worse records the plant response, not the grow action.
+                {responseCheckOverflows
+                  ? "Your note is too long to add a response line. Shorten it first."
+                  : "Better/Same/Worse records the plant response, not the grow action."}
               </p>
             </div>
           )}

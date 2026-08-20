@@ -29,8 +29,13 @@
  * observationally identical at the server: the key is only ever USED at save
  * time, so both send a fresh key for the first save, reuse it on a pure retry,
  * and rotate it on an edit. `rotate on success/reset` is honored by the caller
- * clearing its stored state on reset AND on close. Flagged for the owner to
- * ratify the wording; the design text is not edited here.
+ * clearing its stored state on reset AND on close.
+ *
+ * RATIFIED by Cheek 2026-08-20: the D-B2 wording relaxes to "mint at first
+ * save", and the pre-signature key state is explicitly NOT required. This is
+ * the sanctioned reading, not an unreviewed deviation. The design document
+ * still carries the original "mint on open" phrasing; it is the owner's text
+ * to amend, so it is not edited from here.
  *
  * Pure: no storage, no clock, no I/O. `mint` is injected. Never throws.
  */

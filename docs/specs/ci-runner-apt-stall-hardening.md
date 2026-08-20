@@ -236,6 +236,27 @@ and reports `PASS` / `FAIL` with the missing-library list if any.
 **Answers exactly one question:** is `--with-deps` still load-bearing on this runner
 image? Records the result as `established fact` with the image version stamped.
 
+**Stamped how, and why it matters.** The answer is not a property of the repo; it is a
+property of a **(runner image, Playwright revision)** pair — §4 says so explicitly:
+"the answer varies by image and by Playwright version". So the receipt is not a
+`PASS`, it is a `PASS` scoped to a pair, and Phase 0 must write both halves down or
+Phase 2 has nothing to bind to. The deliverable therefore commits
+`config/playwright-runtime-provenance.json`:
+
+```json
+{
+  "probe_result": "PASS",
+  "runner_image": "<the runner's ImageVersion, e.g. 20260812.1.0>",
+  "playwright_version": "<resolved version from the lockfile, not the range>",
+  "probed_at": "<UTC>",
+  "evidence_run": "<Actions run URL>"
+}
+```
+
+`runner_image` comes from the `ImageVersion` environment variable the hosted runner
+sets, **not** from `ubuntu-latest` — that label is the floating pointer, not the thing
+measured. `playwright_version` is the resolved lockfile version for the same reason.
+
 **Does not change any existing workflow.** Deleted or left dispatch-only afterwards.
 
 Without Phase 0, Option B stays permanently `NOT_MEASURED` and the repo keeps paying an
@@ -247,12 +268,12 @@ apt tax it may not owe.
 
 Inputs (mirroring `require-ci-secret`'s documentation density):
 
-| Input                     | Required | Default    | Purpose                                                                                                         |
-| ------------------------- | -------- | ---------- | --------------------------------------------------------------------------------------------------------------- |
-| `browsers`                | no       | `chromium` | Passed through verbatim; **must accept a matrix expression** for `google-analytics-e2e.yml`                     |
-| `with-deps`               | no       | `true`     | Kept `true` throughout Phase 1. Becomes the switch a later slice flips if Phase 0 says the deps are unnecessary |
-| `attempts`                | no       | `3`        | Bounded retry count                                                                                             |
-| `attempt-timeout-minutes` | no       | `3`        | Per-attempt cap                                                                                                 |
+| Input                     | Required | Default    | Purpose                                                                                                                                                                                                                            |
+| ------------------------- | -------- | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `browsers`                | no       | `chromium` | Passed through verbatim; **must accept a matrix expression** for `google-analytics-e2e.yml`                                                                                                                                        |
+| `with-deps`               | no       | `auto`     | `true` \| `false` \| `auto`. Kept `true` throughout Phase 1. `auto` is what Phase 2 switches to — it resolves to `false` only when the runner's live provenance matches the recorded `PASS`, and to `true` otherwise (see Phase 2) |
+| `attempts`                | no       | `3`        | Bounded retry count                                                                                                                                                                                                                |
+| `attempt-timeout-minutes` | no       | `3`        | Per-attempt cap                                                                                                                                                                                                                    |
 
 Behavior: write the apt resilience config; loop up to `attempts`, each bounded by
 `attempt-timeout-minutes`; on total failure, `::error::` naming this as an apt/mirror
@@ -279,11 +300,55 @@ the test commands.
 
 ### Phase 2 — Conditional on Phase 0 `(separate approval)`
 
-If Phase 0 returns `PASS` (deps unnecessary), a later slice flips the composite action's
-`with-deps` default to `false` — a **one-line change in one file**, versus 19 edits
-across two seam styles today. That reduction is the entire payoff of the convergence in
-Phase 1. If Phase 0 returns `FAIL`, `with-deps` stays
-`true` forever and Phase 1's retry logic is the permanent mitigation.
+If Phase 0 returns `FAIL`, `with-deps` stays `true` and Phase 1's retry logic is the
+permanent mitigation. Nothing below applies.
+
+If Phase 0 returns `PASS`, a later slice flips the composite action's `with-deps`
+default to **`auto`** — a one-line change in one file, versus 19 edits across two seam
+styles today. That reduction is the payoff of the convergence in Phase 1.
+
+**`auto`, not `false`. A permanent `false` would be an unsound reading of the
+measurement, and this spec's own §4 says why.**
+
+A Phase 0 `PASS` proves one thing: on the stamped runner image, with the stamped
+Playwright revision, Chromium launches without the apt-installed libraries. Both halves
+of that pair float underneath us:
+
+- every one of the 19 workflows runs on `ubuntu-latest`, which is a moving pointer —
+  §3 measured it at Ubuntu 24.04 "noble" **today**, not forever;
+- Playwright will be upgraded, and a new bundled browser revision can want a library
+  the old one did not.
+
+Either drift silently invalidates the measurement, and the failure mode is not subtle:
+Chromium fails to launch and **every browser workflow in the repo blocks at once** —
+the same blast radius §7 sequences `ci.yml` last to avoid, arriving without a PR to
+blame it on. Writing `false` into the file would encode a measurement's conclusion
+while discarding its scope.
+
+**How `auto` resolves, and which way it fails.** At run time the composite action
+compares the runner's live `ImageVersion` and the resolved Playwright version against
+`config/playwright-runtime-provenance.json`:
+
+| Live provenance vs. recorded                     | `with-deps` resolves to | Cost                                                                               |
+| ------------------------------------------------ | ----------------------- | ---------------------------------------------------------------------------------- |
+| Both match, `probe_result` is `PASS`             | `false`                 | none — the payoff                                                                  |
+| Either differs, or the file is absent/unreadable | `true`                  | the apt tax, plus a `::notice::` naming which half drifted and pointing at Phase 0 |
+
+The unknown case takes the **slow** branch, never the blocking one. An
+un-revalidated stack pays the tax it has always paid; it does not break. That is the
+whole reason `auto` is worth the extra input over a bare boolean.
+
+**Re-validation is a repo-side gate, not a promise.** Phase 2 also ships
+`src/test/playwright-runtime-provenance-fence.test.ts`, which fails when
+`playwright_version` in the provenance file disagrees with the resolved version in the
+lockfile. A Playwright bump therefore turns the fence red **in the bumping PR**, where
+the fix is one dispatch of the Phase 0 probe and one edit to the JSON — rather than
+discovering it later from 19 red workflows. Per `AGENTS.md`, this one resolves a value
+rather than matching source text: it reads the lockfile and the JSON and compares
+parsed values.
+
+The runner image cannot be fenced this way — it changes with no commit at all — which
+is exactly why that half is handled at run time by `auto` rather than by a test.
 
 ---
 
@@ -297,8 +362,38 @@ attempt to verify effective configuration, so the
 
 **New:** `src/test/playwright-install-composite-action-fence.test.ts`
 
-1. **Happy path** — every workflow that installs Playwright browsers does so via
-   `uses: ./.github/actions/install-playwright-browsers`.
+**The fence reads a manifest, so every rollout state has a passing placement.**
+
+§7 requires the canary to be its own merge. A fence whose expected set is hardcoded at
+19 has nowhere to sit during that merge: land it with the canary and assertions 1 and 5
+demand all 19 be wired while 18 still use the old commands; defer it and the composite
+action's new logic merges with no regression coverage at all, which the repo's testing
+standard does not allow. Neither is acceptable, so the expected set is **data, not a
+literal**.
+
+Phase 1 commits `config/playwright-install-migration.json`:
+
+```json
+{
+  "total_affected": 19,
+  "converged": ["irrigation-overflow-smoke.yml"]
+}
+```
+
+Every workflow is in exactly one of two states, and the fence asserts the correct thing
+for each: a **converged** file must use the composite action, a **not-yet-converged**
+file must still use one of the three known-good legacy seams (§3.2). Nothing is
+unfenced at any point in the rollout, and no state is unrepresentable.
+
+`total_affected` is pinned to the measured 19 separately, so the manifest cannot be
+used to shrink the problem — only to record progress through it. `converged` may only
+grow: the fence fails if an entry is removed, which is what makes a silently-reverted
+call site loud. The rollout ends when `converged.length === total_affected`, and the
+final assertion is exactly that equality — the same coverage guarantee the hardcoded 19
+was reaching for, now reachable from the first canary onward.
+
+1. **Happy path** — every workflow listed in `converged` installs Playwright browsers
+   via `uses: ./.github/actions/install-playwright-browsers`.
 2. **Forbidden construct** — no workflow contains an executable
    `playwright install … --with-deps` **run step** outside the composite action.
 3. **Second seam closed** — no workflow contains `run: bun run e2e:install:ci`. This is
@@ -309,9 +404,19 @@ attempt to verify effective configuration, so the
    containing the `quicklog-smoke.yml` documentation `echo`, proving it distinguishes an
    `echo` inside a heredoc from a `run:` step. Without this the fence is a plain grep and
    will either fail spuriously or force a corrupting edit.
-5. **Coverage count** — the number of workflows wired to the composite action equals the
-   measured affected set (**19** at `fc11a560`), so a silently-dropped call site fails
-   loudly rather than passing by absence.
+5. **Coverage count** — the number of workflows wired to the composite action equals
+   `converged.length`, and `total_affected` equals the measured affected set (**19** at
+   `fc11a560`), so a silently-dropped call site fails loudly rather than passing by
+   absence. A file wired to the composite action but absent from `converged` fails too:
+   the manifest must describe the tree, not lag it.
+   5b. **Not-yet-converged files are still fenced** — every affected workflow outside
+   `converged` must match one of §3.2's three legacy seams. This is what makes a
+   partial rollout safe to merge: a file cannot quietly stop installing browsers at
+   all, in either direction.
+   5c. **Monotonic manifest** — a fixture whose `converged` list has lost an entry
+   relative to the committed one fails. Progress is one-way.
+   5d. **Completion** — when `converged.length === total_affected`, assertion 5b's set is
+   empty and the fence is the original all-19 guarantee, reached incrementally.
 6. **Matrix preservation** — `google-analytics-e2e.yml` still passes
    `${{ matrix.browser }}`, not a hardcoded `chromium`.
 7. **Null/invalid** — a workflow with no Playwright usage is unaffected.
@@ -350,13 +455,15 @@ its own merge.
 
 ## 8. Risk and rollback
 
-| Risk                                                                                                 | Likelihood                                                   | Mitigation                                                                                                                         |
-| ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
-| Composite action misquotes `${{ matrix.browser }}`, collapsing the GA matrix                         | Medium                                                       | Test 6; canary rollout                                                                                                             |
-| A call site is missed, or the decoy `echo` is edited, or a grep-invisible npm-script site is skipped | **High** — the naive grep is wrong in both directions (§3.1) | Tests 1–4                                                                                                                          |
-| Retry masks a genuine install failure                                                                | Low                                                          | Bounded at 3 attempts; failure text names apt explicitly; total wall-clock capped at ~9 min, still under every current job timeout |
-| `ci.yml` breakage blocks all PRs                                                                     | Low                                                          | Sequenced last, after 15 proven sites                                                                                              |
-| Phase 2 flipped without Phase 0 evidence                                                             | Low                                                          | Phase 2 requires its own approval and cites the Phase 0 measurement                                                                |
+| Risk                                                                                                               | Likelihood                                                   | Mitigation                                                                                                                                                                       |
+| ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Composite action misquotes `${{ matrix.browser }}`, collapsing the GA matrix                                       | Medium                                                       | Test 6; canary rollout                                                                                                                                                           |
+| A call site is missed, or the decoy `echo` is edited, or a grep-invisible npm-script site is skipped               | **High** — the naive grep is wrong in both directions (§3.1) | Tests 1–4                                                                                                                                                                        |
+| Retry masks a genuine install failure                                                                              | Low                                                          | Bounded at 3 attempts; failure text names apt explicitly; total wall-clock capped at ~9 min, still under every current job timeout                                               |
+| `ci.yml` breakage blocks all PRs                                                                                   | Low                                                          | Sequenced last, after 15 proven sites                                                                                                                                            |
+| Phase 2 flipped without Phase 0 evidence                                                                           | Low                                                          | Phase 2 requires its own approval and cites the Phase 0 measurement                                                                                                              |
+| `with-deps: false` outlives the image or Playwright revision it was measured on, blocking all 19 workflows at once | Medium — both float (`ubuntu-latest`, future upgrades)       | Phase 2 ships `auto`, not `false`: unrecognised provenance takes the slow apt branch, never the blocking one. A Playwright bump turns the provenance fence red in the bumping PR |
+| The Phase 1 fence has no passing placement during the canary merge                                                 | **Certain** if the expected set is hardcoded at 19           | The expected set is a committed manifest; converged and not-yet-converged files are each fenced for their own state                                                              |
 
 **Rollback:** revert the PR. The composite action is additive and every call site is a
 mechanical substitution, so a revert restores the prior inline commands exactly. No

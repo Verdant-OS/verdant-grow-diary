@@ -448,8 +448,9 @@ describe("D7 chips — a plant response never survives a switch to a tent", () =
     fireEvent.click(screen.getByLabelText("Target"));
     fireEvent.click(await screen.findByRole("option", { name: /Plant 2/ }));
 
-    await waitFor(() =>
-      expect(noteTextarea().value).toBe("Response check: Better. after watering"),
-    );
+    // Plant 1's response must not ride the retarget onto Plant 2 — that is the
+    // mislabel this whole cleanup exists to prevent. The grower's own words do.
+    await waitFor(() => expect(noteTextarea().value).toBe("after watering"));
+    expect(noteTextarea().value).not.toContain("Response check:");
   });
 });

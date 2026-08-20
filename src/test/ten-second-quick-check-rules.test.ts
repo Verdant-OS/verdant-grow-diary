@@ -180,9 +180,30 @@ describe("legacy ten-second quick check exports", () => {
 });
 
 describe("removeChipAuthoredResponseLine", () => {
-  it("preserves the entire first line once the grower extends the canonical chip line", () => {
-    const edited = "Response check: Better. after watering";
-    expect(removeChipAuthoredResponseLine(edited, "Better")).toBe(edited);
+  it("removes only the canonical bytes, keeping prose the grower added to that line", () => {
+    // The chip writes "Response check: Better."; the grower extends the same
+    // line. Deleting the line would take their words; leaving the line whole
+    // would carry the marker onto whatever plant comes next.
+    expect(removeChipAuthoredResponseLine("Response check: Better. after watering", "Better")).toBe(
+      "after watering",
+    );
+    expect(
+      removeChipAuthoredResponseLine(
+        "Response check: Worse. leaves perked up\nRunoff clear.",
+        "Worse",
+      ),
+    ).toBe("leaves perked up\nRunoff clear.");
+  });
+
+  it("refuses a first line that only resembles the chip's — prefix, not substring", () => {
+    // Ownership is an exact-prefix test against the canonical literal, so a
+    // grower's own sentence is never claimed, whatever it looks like.
+    expect(
+      removeChipAuthoredResponseLine("Previous response check: better after watering", "Better"),
+    ).toBe("Previous response check: better after watering");
+    expect(removeChipAuthoredResponseLine("Quick check: Better.\nWatered.", "Better")).toBe(
+      "Quick check: Better.\nWatered.",
+    );
   });
 
   it("drops the line entirely when the marker was all it held", () => {

@@ -99,7 +99,7 @@ const ROUTINE_PLURAL = String.raw`(?:FUNCTIONS|ROUTINES)`;
  * schema list and match the `public` in `… IN SCHEMA extensions TO public`,
  * where PUBLIC is the grantee ROLE and the statement touches nothing of ours.
  */
-const SCHEMA_IDENT = String.raw`(?:[A-Za-z_][\w$]*|"[^"]*")`;
+const SCHEMA_IDENT = String.raw`(?:[A-Za-z_][\w$]*|"(?:[^"]|"")*")`;
 const IN_SCHEMA_PUBLIC = String.raw`IN\s+SCHEMA\s+(?:${SCHEMA_IDENT}\s*,\s*)*(?:public\b|"public")`;
 
 /**

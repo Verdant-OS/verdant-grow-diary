@@ -10,6 +10,7 @@ import {
   type OneTentProofStage,
   type StageOutcome,
 } from "../../e2e/helpers/oneTentBrowserProofReceipt";
+import { serializeEnvFile } from "../../scripts/e2e/managed-session-materialize-core.mjs";
 
 const ROOT = resolve(__dirname, "../..");
 const WORKFLOW_PATH = resolve(ROOT, ".github/workflows/quicklog-smoke.yml");
@@ -169,6 +170,54 @@ describe("temporary authenticated One-Tent Actions lane", () => {
 });
 
 describe("managed-session materializer target fence", () => {
+  it("round-trips session JSON through Bun env-file loading without escape corruption", () => {
+    const root = mkdtempSync(join(tmpdir(), "one-tent-materializer-env-"));
+    tempRoots.push(root);
+    const envPath = join(root, "managed-session.env");
+    const sessionJson = JSON.stringify({
+      access_token: "fake-access-token",
+      refresh_token: "fake-refresh-token",
+      expires_at: 1,
+      user: { id: "fake-user-id", display_name: "O'Connor $HOME" },
+    });
+    writeFileSync(
+      envPath,
+      serializeEnvFile({
+        LOVABLE_BROWSER_AUTH_STATUS: "signed_in",
+        LOVABLE_BROWSER_SUPABASE_SESSION_JSON: sessionJson,
+        LOVABLE_BROWSER_SUPABASE_STORAGE_KEY: "sb-knkwiiywfkbqznbxwqfh-auth-token",
+      }),
+      "utf8",
+    );
+    const childEnv = { ...process.env };
+    delete childEnv.LOVABLE_BROWSER_SUPABASE_SESSION_JSON;
+    childEnv.HOME = "must-not-expand";
+    const result = spawnSync(
+      "bun",
+      [
+        `--env-file=${envPath}`,
+        "-e",
+        [
+          'const parsed = JSON.parse(process.env.LOVABLE_BROWSER_SUPABASE_SESSION_JSON ?? "")',
+          'if (parsed.access_token !== "fake-access-token") process.exit(2)',
+          'if (parsed.user?.display_name !== "O\'Connor $HOME") process.exit(3)',
+          'console.log("managed-session-env=verified")',
+        ].join("; "),
+      ],
+      { cwd: root, encoding: "utf8", env: childEnv },
+    );
+    expect(result.error).toBeUndefined();
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim()).toBe("managed-session-env=verified");
+    expect(result.stderr).toBe("");
+  });
+
+  it("rejects raw newlines at the managed-session dotenv boundary", () => {
+    expect(() =>
+      serializeEnvFile({ LOVABLE_BROWSER_SUPABASE_SESSION_JSON: "line-one\nline-two" }),
+    ).toThrow("managed_session_env_value_contains_newline");
+  });
+
   it("blocks a mismatched local origin before attempting password authentication", () => {
     const root = mkdtempSync(join(tmpdir(), "one-tent-materializer-target-"));
     tempRoots.push(root);

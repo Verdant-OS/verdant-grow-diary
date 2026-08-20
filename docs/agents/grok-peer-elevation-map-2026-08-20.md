@@ -2,12 +2,27 @@
 
 **Slice:** docs-only governance. Not an One-Tent product fix.
 **Approval:** Cheek (Matthew), in session 2026-08-20 — elevate Grok as a peer to
-Codex and Claude for implementation, audit, and review.
-**Base:** `verdant-grow-diary` (production deploy branch).
+Codex and Claude. **Refined charter (same day):** title **Product Intelligence,
+Adversarial Audit, and Implementation Lead**; five equal powers; **no role rank**;
+explicit task ownership; one owner + independent reviewer per slice.
+**Base:** `verdant-grow-diary` (production deploy branch). PR #1060.
 
 This note is the required pre-edit map of Grok ownership/role references and
-Sentinel parity rules. Authority changes land in the role/handoff files listed
-under "Edits in this slice"; ownership and collision fences stay intact.
+Sentinel parity rules, updated to the refined charter (not the earlier “peer
+implementer + research lead” wording).
+
+---
+
+## Refined charter (authoritative for this slice)
+
+| Item | Rule |
+| ---- | ---- |
+| Title | Product Intelligence, Adversarial Audit, and Implementation Lead |
+| Five equal powers | research · live-app audit · implement assigned slices · test · independent review |
+| Rank | Codex, Claude, and Grok retain different **default strengths**; **none outranks the others** |
+| Control | **Explicit task ownership** — not role rank |
+| Per slice | One **owner** + a **different** peer as **independent reviewer** (owner ≠ reviewer) |
+| Research mission | Retained as a strength, **not** a constitutional fence |
 
 ---
 
@@ -19,67 +34,67 @@ pinned file's non-version content requires a version bump across **all twelve**
 in the same commit. `docs/agents/CURRENT_STATE.md` is **exempt** (no
 `Sentinel-Version`; existence-only).
 
-| # | Path | Pre-slice Grok relevance |
-| - | ---- | ------------------------ |
-| 1 | `AGENTS.md` | Agent Role Routing loads `roles/grok.md`; Multi-Agent Coordination listed Codex/Claude/Lovable only |
-| 2 | `GEMINI.md` | Embeds full `AGENTS.md` between `SENTINEL-CORE` markers (must stay byte-equivalent) |
-| 3 | `CLAUDE.md` | Claude bootstrap; no Grok mission text (version-parity only unless content changes) |
-| 4 | `.grok/rules/verdant-grok-role.md` | Auto-loaded Grok rules: research-only; "Do not write application code" |
-| 5 | `docs/agents/README.md` | Layout + load table for Grok |
-| 6 | `docs/agents/HANDOFF_PROTOCOL.md` | Sequential order: Grok = research only → Claude → Codex |
-| 7 | `docs/agents/roles/grok.md` | Full mission: Search/Market/Backlink; "do not write production code" unless Cheek authorizes |
-| 8 | `docs/agents/roles/claude.md` | Mentions Grok section structure; default non-primary coder |
-| 9 | `docs/agents/roles/codex.md` | Default implementer; others implement only when Cheek reassigns |
-| 10 | `docs/agents/roles/security.md` | No Grok mission text (parity bump only) |
-| 11 | `docs/agents/roles/gemini.md` | No Grok mission text (parity bump only) |
-| 12 | `docs/agents/roles/council-chair.md` | Conflict note: Grok demand evidence vs Claude architecture |
+| # | Path | Relevance |
+| - | ---- | --------- |
+| 1 | `AGENTS.md` | Peer language; preferred path (not rank); one-owner + independent-reviewer |
+| 2 | `GEMINI.md` | Embeds full `AGENTS.md` between `SENTINEL-CORE` markers |
+| 3 | `CLAUDE.md` | Claude bootstrap; default strength ≠ exclusivity |
+| 4 | `.grok/rules/verdant-grok-role.md` | Auto-loaded: new title + five powers |
+| 5 | `docs/agents/README.md` | Layout + load table + Grok title |
+| 6 | `docs/agents/HANDOFF_PROTOCOL.md` | Preferred path; owner + reviewer fields |
+| 7 | `docs/agents/roles/grok.md` | Full refined charter |
+| 8 | `docs/agents/roles/claude.md` | Peer language; no “primary coder” exclusivity |
+| 9 | `docs/agents/roles/codex.md` | Build lead as **preference**, not exclusivity |
+| 10 | `docs/agents/roles/security.md` | Parity bump |
+| 11 | `docs/agents/roles/gemini.md` | Parity bump |
+| 12 | `docs/agents/roles/council-chair.md` | No rank when weighing peer outputs |
 
-Helper: `scripts/sync-sentinel-mirror.mjs` (`--set-version=…` + GEMINI re-embed).
-Pre-slice version across the set: `2026-08-09.3`.
+Helper: `scripts/sync-sentinel-mirror.mjs`. This refined commit targets
+`Sentinel-Version: 2026-08-20.2`.
 
 ---
 
 ## Operating-state and workflow references (not in the twelve)
 
-| Path | Pre-slice Grok signal |
-| ---- | --------------------- |
-| `docs/agents/CURRENT_STATE.md` | Agents table: Grok on `ONE_TENT_LOOP_OPERATING_ORDER` + Cursor SDK spike; "Not Unassigned". DIRTY-PR note still said "Grok remains Unassigned" (stale vs table). Tranche A = Codex; Tranche B+ = Claude |
-| `docs/agents/CURRENT_STATE_ARCHIVE.md` | Historical Grok update attributions — leave as archive |
-| `docs/agents/cheek-approval-workflow.md` | Default pipeline diagram: Grok = Research only |
-| `docs/lovable/verdant-project-knowledge-*.md` | Snapshot packs; not rewritten in this slice |
-| `docs/specs/convex-component-physical-sandbox-spike.md` | "Grok stays the Search/Market lead and does not implement this spike" — historical spike contract; not rewritten here |
-| `docs/specs/one-tent-loop-quicklog-single-write-path.md` | Author attribution to Grok — historical |
-| Other `docs/**` Grok author/disposition notes | Historical evidence only |
+| Path | Signal |
+| ---- | ------ |
+| `docs/agents/CURRENT_STATE.md` | Agents table + approval record for refined charter (edit assignment only) |
+| `docs/agents/CURRENT_STATE_ARCHIVE.md` | Historical — leave as archive |
+| `docs/agents/cheek-approval-workflow.md` | Preferred path labels; peer / owner-reviewer notes |
+| `docs/lovable/verdant-project-knowledge-*.md` | Snapshots — not rewritten |
+| Historical specs / dispositions naming Grok | Archive — not rewritten |
 
 ---
 
-## Collision / ownership fences that do **not** change
+## Collision / safety fences that do **not** change
 
-- Parked PRs **#828**, **#817**, **#696** — no competing Timeline / Alerts /
-  Action Queue UI rewrite.
-- **Tranche A** edit points and remaining A2–A5 work: **Codex**.
-- **Tranche B+** product code: **Claude** (architect + implementer for B+ only).
-- Action Queue transition/RLS production repair: **Codex**.
-- Parallel implementation of the same slice remains a protocol failure.
-- Grok does **not** take Claude's or Codex's assigned slices unless
-  `CURRENT_STATE` already marks that slice done and unassigned (or Cheek
-  reassigns).
+- Parked PRs **#828**, **#817**, **#696**
+- Remaining **Tranche A** edit points: **Codex** until reassigned
+- **Tranche B+** product code: **Claude** until reassigned
+- No merge / deploy / apply / migrations / outreach / external writes without Cheek
+- No parallel same-slice builds
+- No invented SEO / live metrics
 
 ---
 
-## Authority that **does** change (this slice)
+## Phrases removed for Codex exclusivity (this refinement)
 
-- Grok gains **equal** authority with Claude and Codex for **implementation,
-  audit, and review** when `CURRENT_STATE` / Cheek assigns a slice.
-- Research / market / backlink mission is **retained**, not deleted.
-- Default research → architecture → build sequence remains the preferred
-  handoff path; it no longer means Grok is research-only by constitution.
+Exact (or near-exact) exclusivity wording replaced with peer + preference language:
+
+- “Codex is Verdant's default implementation and integration agent”
+- “Claude and Grok are **peer** implementers… they may implement when… assigns”
+  (implied Codex exclusivity with exceptions)
+- “You are not the primary code-writing agent by default”
+- “becoming the primary code-writing agent is not, unless Cheek reassigns it”
+- “a specification precise enough that Codex does not have to guess” (as if only Codex builds)
+- “-> Codex     default build / integration”
+- “Build (Codex, or peer assigned in CURRENT_STATE)”
+- Map rows that still described Codex as “Default implementer; others implement only when Cheek reassigns” and Grok auto-rules as research-only / “Do not write application code”
 
 ---
 
 ## Edits in this slice (docs-only)
 
-Pinned governance files as needed for peer language + `Sentinel-Version`
-bump; `CURRENT_STATE.md` assignment/approval record; this map; optional
-`cheek-approval-workflow.md` peer note. No `src/`, no `supabase/migrations/`,
-no product-behavior workflows.
+Pinned governance files + `CURRENT_STATE.md` assignment/approval + this map +
+`cheek-approval-workflow.md`. No `src/`, no `supabase/migrations/`, no
+product-behavior workflows.

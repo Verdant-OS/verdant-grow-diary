@@ -1,6 +1,6 @@
 # Verdant Agent Governance
 
-**Sentinel-Version: 2026-08-20.1**
+**Sentinel-Version: 2026-08-20.2**
 
 Multi-agent work on Verdant runs under one shared constitution plus a small
 platform-specific bootstrap per agent. A single file cannot reach every AI platform
@@ -40,9 +40,11 @@ HISTORICAL — never active instructions
 | Security      | nothing automatically                | all of: `AGENTS.md`, `CURRENT_STATE.md`, `roles/security.md`      |
 | Council Chair | nothing automatically                | all of: `AGENTS.md`, `CURRENT_STATE.md`, `roles/council-chair.md` |
 
-Grok is also a peer implementer/auditor/reviewer with Claude and Codex when
-`CURRENT_STATE.md` or Cheek assigns a slice (Cheek, 2026-08-20). Research mission
-remains; see `docs/agents/roles/grok.md` and
+Grok is Verdant's **Product Intelligence, Adversarial Audit, and Implementation Lead**
+(Cheek, 2026-08-20, refined): equally empowered to research, audit the live app,
+implement assigned slices, test, and independently review. Codex, Claude, and Grok
+retain different default strengths but **none outranks the others** — explicit task
+ownership controls. See `docs/agents/roles/grok.md` and
 `docs/agents/grok-peer-elevation-map-2026-08-20.md`.
 
 Verify Grok's discovery with `grok inspect`.

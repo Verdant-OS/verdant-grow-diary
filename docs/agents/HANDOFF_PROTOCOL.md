@@ -1,24 +1,36 @@
 # Verdant Agent Handoff Protocol
 
-**Sentinel-Version: 2026-08-20.1**
+**Sentinel-Version: 2026-08-20.2**
 
 Operating order is sequential for a given slice. Parallel implementation of the **same**
 slice by multiple agents is the failure this protocol exists to prevent.
 
-**Peer implementers (Cheek, 2026-08-20):** Grok, Claude, and Codex have equal authority
-for implementation, audit, and review when `CURRENT_STATE.md` or Cheek assigns the
-slice. Peer elevation does **not** erase file ownership or collision fences (Tranche A =
-Codex; Tranche B+ product code = Claude; parked PRs #828 / #817 / #696 stay parked).
+**Peers (Cheek, 2026-08-20, refined):** Codex, Claude, and Grok have equal authority.
+None outranks the others. Explicit task ownership controls who researches, architects,
+implements, audits, tests, or independently reviews. Default strengths differ (Grok:
+product intelligence / adversarial audit / implementation; Claude: specs & knowledge
+architecture; Codex: often build / integration) — preference, not exclusivity. Peer
+rules do **not** erase collision fences (Tranche A remaining edit points = Codex until
+reassigned; Tranche B+ product code = Claude until reassigned; parked PRs #828 / #817 /
+#696 stay parked).
 
-Default research → architecture → build sequence (preferred handoff path; roles may be
-reassigned by `CURRENT_STATE.md`):
+### One owner + independent reviewer (standing rule)
+
+Every assigned slice names:
+
+1. **One owner** — the peer who delivers the slice
+2. **One independent reviewer** — a **different** peer who reviews that work
+
+The owner cannot be their own reviewer. Grok, Claude, or Codex may fill either seat.
+Record both names in `CURRENT_STATE.md` and in the handoff block when known.
+
+Preferred research → architecture → build path (not rank; any peer may own any stage
+when assigned):
 
 ```text
-Grok      research demand, competitors, SERPs, authority opportunities
-          (also peer implement / audit / review when assigned)
-  -> Claude    convert evidence into taxonomy, page systems, implementation-ready specs
-          (also implement when CURRENT_STATE / Cheek assigns, e.g. Tranche B+)
-  -> Codex     default build / integration; audit the repository; implement assigned slices
+Grok      product intelligence, research, live-app audit, implement, test, independent review
+  -> Claude    architecture / specs (and any peer power when owning the slice)
+  -> Codex     build / integration (often; not exclusive) + peer powers when owning
   -> Security  review trust boundaries, exposure, secrets, infrastructure risk
   -> Gemini    independently audit quality, scope, evidence, safety, release readiness
   -> Council   resolve disagreements, give Cheek one recommendation
@@ -26,8 +38,9 @@ Grok      research demand, competitors, SERPs, authority opportunities
 ```
 
 An agent may hand _back_ (returning work as under-specified or unsafe) at any point. An
-agent may not hand _forward_ past its successor on the default path, except when
-`CURRENT_STATE.md` already names a different peer as the next owner.
+agent may not hand _forward_ past its successor on the preferred path, except when
+`CURRENT_STATE.md` already names a different peer as the next owner or independent
+reviewer.
 
 ---
 
@@ -42,6 +55,9 @@ from_agent:
 to_agent:
 sentinel_version:
 date:
+
+slice_owner:
+independent_reviewer:
 
 completed:
   - what was actually done, not what was attempted
@@ -69,6 +85,9 @@ files_touched:
   - paths, or "none"
 ```
 
+`slice_owner` and `independent_reviewer` must name different peers among Grok, Claude,
+and Codex (or Security/Gemini when those roles own the review seat). Omit only when the
+slice has not yet been assigned; do not invent an owner.
 ---
 
 ## Rules that make handoffs trustworthy

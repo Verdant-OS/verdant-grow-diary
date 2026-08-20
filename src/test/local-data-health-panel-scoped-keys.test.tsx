@@ -232,4 +232,36 @@ describe("LocalDataHealthPanel — the account uuid survives no fallback path", 
     expect(getLocalStorageItemForTest(`verdant.quickLog.lastTarget.v2.${ACCOUNT_A}`)).toBeNull();
     expect(document.body.textContent ?? "").not.toContain(ACCOUNT_A);
   });
+
+  it("withholds the JSON parser error, which can quote the stored value", async () => {
+    // V8's SyntaxError message includes an excerpt of the offending input, so
+    // echoing it would put the stored value on screen — the exact thing this
+    // panel's header promises it never does.
+    const SECRET = "plant-7f3a-grower-private-note";
+    setLocalStorageItemForTest(`verdant.quickLog.lastTarget.v2.${ACCOUNT_A}`, SECRET);
+    const { container } = render(<LocalDataHealthPanel />);
+
+    const row = await schemaRow("Quick Log last target");
+    expect(within(row).getByText("Fail")).toBeInTheDocument();
+    expect(row).toHaveTextContent("not valid JSON");
+    expect(row).toHaveTextContent("parser error is withheld");
+    expect(container.textContent ?? "").not.toContain(SECRET);
+
+    // And not through the drawer either.
+    fireEvent.click(screen.getByRole("button", { name: /Review & clear/i }));
+    await waitFor(() => expect(screen.getByRole("dialog")).toBeInTheDocument());
+    expect(document.body.textContent ?? "").not.toContain(SECRET);
+  });
+
+  it("proves the withheld text really would have leaked", () => {
+    // Control: without this the assertion above could pass for any reason.
+    const SECRET = "plant-7f3a-grower-private-note";
+    let message = "";
+    try {
+      JSON.parse(SECRET);
+    } catch (err) {
+      message = err instanceof Error ? err.message : String(err);
+    }
+    expect(message).toContain("plant-7f3a");
+  });
 });

@@ -221,9 +221,12 @@ function checkLocalSchema(schema: (typeof LOCAL_SCHEMAS)[number]): CheckResult {
     return {
       name: schema.label,
       status: "fail",
-      detail: `Present but not valid JSON (${sizeBytes} bytes). Clearing the key in DevTools will remove the corrupt value. Error: ${
-        err instanceof Error ? err.message : String(err)
-      }`,
+      // Never echo the parser exception. V8's SyntaxError message quotes an
+      // excerpt of the offending input, so printing it would put the stored
+      // value on screen — the exact thing this panel promises it never does.
+      // The position is useless to a grower anyway; "it is corrupt, clear it"
+      // is the whole actionable content.
+      detail: `Present but not valid JSON (${sizeBytes} bytes). Clearing the key will remove the corrupt value. The parser error is withheld because it can quote the stored value.`,
       meta: schema.key,
     };
   }
@@ -922,7 +925,11 @@ function buildRemediationEntry(key: string): RemediationEntry {
       present: true,
       sizeBytes,
       category: "invalid-json",
-      errorMessage: err instanceof Error ? err.message : String(err),
+      // Same reason as `checkLocalSchema`: the parser exception can quote the
+      // stored value. The redacted field preview and char-class summary below
+      // are how this drawer describes a value without printing it.
+      errorMessage:
+        "Stored value is not valid JSON. The parser error is withheld because it can quote the stored value.",
       charClassSummary,
     };
   }

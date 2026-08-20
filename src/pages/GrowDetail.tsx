@@ -301,7 +301,7 @@ export default function GrowDetail() {
         </div>
         {/* Recovery prompt only on a successful read: "unavailable" is
             unknown, and unknown must never render as measured absence. */}
-        {recent.status === "ok" && (
+        {recent.status === "ok" && !grow.is_archived && (
           <GrowRecoveryPrompt
             growId={growId ?? null}
             items={recent.items}

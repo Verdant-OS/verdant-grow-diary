@@ -131,8 +131,6 @@ test.describe("One-Tent Loop interaction counter baseline", () => {
 
     const receipt = await settledReceipt(page, counter);
 
-    console.log(serializeInteractionCountReceipt(receipt));
-
     // The COMPLETE receipt, asserted as one object. Field-by-field checks
     // leave the unasserted fields free to drift, and an added write RPC would
     // simply appear beside the expected one while a per-key assertion still
@@ -180,6 +178,13 @@ test.describe("One-Tent Loop interaction counter baseline", () => {
       humidity_pct: null,
       vpd_kpa: null,
     });
+
+    // Emitted LAST, after every check above. The receipt is a greppable,
+    // machine-consumable artifact labelled `status: "measured"` — printing it
+    // before the source-read, payload, target, sensor and row-shape assertions
+    // would let a log collector harvest an authoritative-looking measurement
+    // out of a scenario that went on to fail.
+    console.log(serializeInteractionCountReceipt(receipt));
   });
 
   test("S7: post-save timeline evidence costs at most one continuation action", async ({
@@ -233,8 +238,6 @@ test.describe("One-Tent Loop interaction counter baseline", () => {
     await expect(timelineEvidence).toHaveCount(1, { timeout: 15_000 });
 
     const receipt = await settledReceipt(page, counter);
-
-    console.log(serializeInteractionCountReceipt(receipt));
 
     // The COMPLETE receipt (see S1a). One deliberate continuation click
     // beyond the save journey's 3 taps, and exactly one route transition —
@@ -304,5 +307,12 @@ test.describe("One-Tent Loop interaction counter baseline", () => {
     expect(world.savedRows[0].details).toMatchObject({
       linked_grow_event_id: world.savedGrowEvents[0].id,
     });
+
+    // Emitted LAST, after every check above. The receipt is a greppable,
+    // machine-consumable artifact labelled `status: "measured"` — printing it
+    // before the source-read, payload, target, sensor and row-shape assertions
+    // would let a log collector harvest an authoritative-looking measurement
+    // out of a scenario that went on to fail.
+    console.log(serializeInteractionCountReceipt(receipt));
   });
 });

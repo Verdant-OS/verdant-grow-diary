@@ -18,6 +18,11 @@ const state = vi.hoisted(() => ({
   growsError: null as string | null,
   tentsLoading: false,
   tentsError: false,
+  // B4a review: neither ownership read retries on its own, so the page owns a
+  // retry affordance. The harness has to be able to observe it firing.
+  tentsFetching: false,
+  tentsRefetch: vi.fn(async () => undefined),
+  growsRefresh: vi.fn(async () => undefined),
 }));
 
 vi.mock("@/hooks/useGrowData", () => ({
@@ -31,6 +36,8 @@ vi.mock("@/hooks/useGrowData", () => ({
     data: state.tents,
     isLoading: state.tentsLoading,
     isError: state.tentsError,
+    isFetching: state.tentsFetching,
+    refetch: state.tentsRefetch,
   }),
 }));
 
@@ -39,6 +46,7 @@ vi.mock("@/store/grows", () => ({
     grows: state.grows,
     loading: state.growsLoading,
     error: state.growsError,
+    refresh: state.growsRefresh,
   }),
 }));
 
@@ -84,6 +92,9 @@ describe("AiDoctorStart", () => {
     state.growsError = null;
     state.tentsLoading = false;
     state.tentsError = false;
+    state.tentsFetching = false;
+    state.tentsRefetch.mockClear();
+    state.growsRefresh.mockClear();
   });
 
   afterEach(() => cleanup());
@@ -236,6 +247,51 @@ describe("AiDoctorStart", () => {
     expect(screen.getByTestId("ai-doctor-start-scope-unverified")).toBeInTheDocument();
     // Crucially NOT the account-mismatch wording — we do not know that.
     expect(screen.queryByTestId("ai-doctor-start-invalid-scope")).toBeNull();
+  });
+
+  it("offers a retry when the ownership reads fail, and retries only what failed", () => {
+    // Neither read recovers on its own (`useGrowTents` sets retry:false; the
+    // grows store refreshes on mount only), so without this affordance one
+    // transient failure would disable valid carried context until a reload.
+    state.growsError = "network down";
+    state.data = SCOPED.plants;
+    renderPage("/doctor?growId=grow-1&tentId=tent-a");
+
+    fireEvent.click(screen.getByTestId("ai-doctor-start-scope-retry"));
+
+    expect(state.growsRefresh).toHaveBeenCalledTimes(1);
+    // The tents read succeeded — re-reading a healthy source is waste.
+    expect(state.tentsRefetch).not.toHaveBeenCalled();
+  });
+
+  it("retries the tents read when that is the one that failed", () => {
+    state.tentsError = true;
+    state.data = SCOPED.plants;
+    renderPage("/doctor?growId=grow-1&tentId=tent-a");
+
+    fireEvent.click(screen.getByTestId("ai-doctor-start-scope-retry"));
+
+    expect(state.tentsRefetch).toHaveBeenCalledTimes(1);
+    expect(state.growsRefresh).not.toHaveBeenCalled();
+  });
+
+  it("disables the retry while a re-read is already in flight", () => {
+    state.tentsError = true;
+    state.tentsFetching = true;
+    state.data = SCOPED.plants;
+    renderPage("/doctor?growId=grow-1&tentId=tent-a");
+
+    const retry = screen.getByTestId("ai-doctor-start-scope-retry");
+    expect(retry).toBeDisabled();
+    expect(retry).toHaveTextContent("Checking");
+  });
+
+  it("offers no retry when no scope was carried — there is nothing to re-check", () => {
+    state.growsError = "network down";
+    state.data = SCOPED.plants;
+    renderPage("/doctor");
+
+    expect(screen.queryByTestId("ai-doctor-start-scope-retry")).toBeNull();
   });
 
   it("says nothing about scope when no scope was carried, even on a failed read", () => {

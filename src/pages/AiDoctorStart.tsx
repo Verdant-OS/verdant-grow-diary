@@ -32,7 +32,7 @@ export default function AiDoctorStart() {
   // both against rows the grower owns before rendering anything. An id in a
   // URL is a request, not a grant.
   const [searchParams] = useSearchParams();
-  const { grows, loading: growsLoading, error: growsError } = useGrows();
+  const { grows, loading: growsLoading, error: growsError, refresh: refreshGrows } = useGrows();
   const tentsQuery = useGrowTents();
 
   // Ownership reads start EMPTY, not absent: `grows` is `[]` while loading and
@@ -44,6 +44,16 @@ export default function AiDoctorStart() {
   // FAILURE is reported as a failure to verify, never as invalid ownership.
   const scopeReadsSettled = !growsLoading && !tentsQuery.isLoading;
   const scopeReadFailed = !!growsError || tentsQuery.isError;
+  // Neither read retries on its own: `useGrowTents` sets `retry: false` and
+  // the grows store refreshes only on mount. Without an explicit affordance a
+  // single transient failure would disable valid carried context for the whole
+  // life of the page, and the grower's only recovery would be a full reload.
+  // Retry only what actually failed — re-reading a healthy source is waste.
+  const scopeRetrying = growsLoading || tentsQuery.isFetching;
+  const retryScopeReads = () => {
+    if (growsError) void refreshGrows();
+    if (tentsQuery.isError) void tentsQuery.refetch();
+  };
   const carriedScopeRequested =
     !!searchParams.get("growId")?.trim() || !!searchParams.get("tentId")?.trim();
 
@@ -136,7 +146,18 @@ export default function AiDoctorStart() {
               data-testid="ai-doctor-start-scope-unverified"
             >
               Verdant couldn&apos;t check the grow or tent this link carried, so no tent context is
-              applied. Every active plant is listed below.
+              applied. Every active plant is listed below.{" "}
+              <Button
+                type="button"
+                variant="link"
+                size="sm"
+                className="h-auto p-0 text-sm align-baseline"
+                onClick={retryScopeReads}
+                disabled={scopeRetrying}
+                data-testid="ai-doctor-start-scope-retry"
+              >
+                {scopeRetrying ? "Checking…" : "Try the check again"}
+              </Button>
             </p>
           ) : null}
           {resolvedScope.hasInvalidScope ? (

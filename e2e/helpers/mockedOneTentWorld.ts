@@ -243,21 +243,45 @@ export async function mockSignedInSupabase(
       });
       return;
     }
+    // Rows are DERIVED FROM THE INTERCEPTED PAYLOAD, never hard-coded.
+    // Manufacturing a correctly-scoped "Better" entry regardless of what the
+    // app submitted would make S7 circular: it would render the expected
+    // evidence and record an authoritative passing receipt even if the UI sent
+    // the wrong note, target, or action. Echoing the submission means a wrong
+    // save produces wrong evidence and the scenario fails, which is the whole
+    // point of calling this measured.
+    const submitted = (() => {
+      try {
+        return (request.postDataJSON() ?? {}) as Record<string, unknown>;
+      } catch {
+        return {} as Record<string, unknown>;
+      }
+    })();
+    const asText = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
+    const submittedNote = asText(submitted.p_note);
+    const submittedTargetType = asText(submitted.p_target_type);
+    const submittedTargetId = asText(submitted.p_target_id);
+    const submittedPlantId = submittedTargetType === "plant" ? submittedTargetId : null;
+    const submittedTentId =
+      submittedTargetType === "tent"
+        ? submittedTargetId
+        : (asText(submitted.p_tent_id) ?? FAKE_TENT_ID);
+
     // One canonical save writes TWO rows, exactly as quicklog_save_manual
     // does: the typed grow_events spine, plus a diary companion carrying
     // `details.linked_grow_event_id` back to it. Timeline reads BOTH sources
     // and de-duplicates them into one entry, so a fixture that emits only the
     // diary row would exercise the fallback path alone — it could not detect a
     // broken grow-event read, a broken merge, or duplicated evidence.
-    const occurredAt = new Date().toISOString();
+    const occurredAt = asText(submitted.p_occurred_at) ?? new Date().toISOString();
     world.savedGrowEvents.push({
       id: FAKE_GROW_EVENT_ID,
       grow_id: FAKE_GROW_ID,
-      plant_id: FAKE_PLANT_ID,
-      tent_id: FAKE_TENT_ID,
-      event_type: "observation",
+      plant_id: submittedPlantId,
+      tent_id: submittedTentId,
+      event_type: asText(submitted.p_action) ?? "observation",
       occurred_at: occurredAt,
-      note: "Better",
+      note: submittedNote,
       source: "manual",
       is_deleted: false,
       watering_events: [],
@@ -265,11 +289,11 @@ export async function mockSignedInSupabase(
     });
     world.savedRows.push({
       id: FAKE_DIARY_ENTRY_ID,
-      plant_id: FAKE_PLANT_ID,
-      tent_id: FAKE_TENT_ID,
+      plant_id: submittedPlantId,
+      tent_id: submittedTentId,
       grow_id: FAKE_GROW_ID,
       event_type: "quick_log",
-      note: "Better",
+      note: submittedNote,
       photo_url: null,
       stage: null,
       entry_at: occurredAt,

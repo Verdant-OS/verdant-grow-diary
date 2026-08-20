@@ -78,14 +78,23 @@ describe("D7 — V2 sheet response-check chips", () => {
     // anywhere in the text, so ordinary prose ("Previous response check:
     // better after watering") was silently rewritten. It now fires only on the
     // plant -> non-plant TRANSITION.
-    expect(SHEET.replace(/\s+/g, " ")).toMatch(
-      /const wasVisible = responseCheckWasVisibleRef\.current; responseCheckWasVisibleRef\.current = showResponseCheck;/,
+    // Keyed on the PLANT the marker describes, not on chip visibility: the
+    // chips stay visible across plant A -> plant B, so a visibility guard
+    // silently reattributes A's response to B.
+    const flat = SHEET.replace(/\s+/g, " ");
+    expect(flat).toMatch(
+      /const responseCheckPlantId = showResponseCheck && resolvedTarget\.ok \? \(resolvedTarget\.plantId \?\? null\) : null;/,
     );
-    expect(SHEET).toMatch(
-      /if \(!wasVisible \|\| showResponseCheck\) return;[\s\S]{0,200}actionTextWithoutResponseContext\(form\.note\)/,
+    expect(flat).toMatch(
+      /const previousPlantId = responseCheckPlantIdRef\.current; responseCheckPlantIdRef\.current = responseCheckPlantId;/,
     );
-    // The unconditional "chips absent" guard cannot come back.
+    expect(flat).toMatch(
+      /if \(previousPlantId === null \|\| previousPlantId === responseCheckPlantId\) return;[\s\S]{0,200}actionTextWithoutResponseContext\(form\.note\)/,
+    );
+    // Neither retired guard can come back: the unconditional "chips absent"
+    // form, nor the visibility-only transition form.
     expect(SHEET).not.toMatch(/^\s*if \(showResponseCheck\) return;\s*$/m);
+    expect(flat).not.toMatch(/if \(!wasVisible \|\| showResponseCheck\) return;/);
   });
 
   it("never pre-fills the note — the optional-note contract is preserved", () => {

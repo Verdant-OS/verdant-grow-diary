@@ -24,7 +24,10 @@ vi.mock("@/integrations/supabase/client", () => ({
 }));
 vi.mock("@/hooks/use-plants", () => ({
   usePlants: () => ({
-    data: [{ id: "plant-1", name: "Plant 1", tent_id: "tent-1", grow_id: "grow-1" }],
+    data: [
+      { id: "plant-1", name: "Plant 1", tent_id: "tent-1", grow_id: "grow-1" },
+      { id: "plant-2", name: "Plant 2", tent_id: "tent-1", grow_id: "grow-1" },
+    ],
   }),
 }));
 vi.mock("@/hooks/use-tents", () => ({
@@ -276,5 +279,45 @@ describe("D7 chips — a plant response never survives a switch to a tent", () =
     fireEvent.change(noteTextarea(), { target: { value: prose } });
 
     expect(noteTextarea().value).toBe(prose);
+  });
+
+  it("strips the marker when the grower retargets to a DIFFERENT plant", async () => {
+    // The chips stay visible across plant A -> plant B, so a guard keyed only
+    // on visibility skips cleanup and silently reattributes A's response to B.
+    renderSheet("plant:plant-1");
+
+    fireEvent.change(noteTextarea(), { target: { value: "Watered 1L, runoff clear." } });
+    fireEvent.click(chip("better"));
+    expect(noteTextarea().value).toContain("Response check: Better.");
+
+    fireEvent.click(screen.getByLabelText("Target"));
+    fireEvent.click(await screen.findByRole("option", { name: /Plant 2/ }));
+
+    // Chips are still offered — it is still a plant — but A's response is gone.
+    await waitFor(() => expect(noteTextarea().value).not.toContain("Response check:"));
+    expect(screen.getByTestId("qlv2-response-chips")).toBeInTheDocument();
+    expect(noteTextarea().value).toContain("Watered 1L, runoff clear.");
+    for (const status of ["better", "same", "worse"]) {
+      expect(chip(status)).toHaveAttribute("aria-pressed", "false");
+    }
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    const note = await savedNote();
+    expect(note).not.toContain("Response check:");
+    expect(note).toContain("Watered 1L, runoff clear.");
+  });
+
+  it("leaves the marker alone while the grower stays on the same plant", () => {
+    renderSheet("plant:plant-1");
+    fireEvent.click(chip("same"));
+    expect(noteTextarea().value).toBe("Response check: Same.");
+
+    // An unrelated edit re-runs the effect; the plant has not changed.
+    fireEvent.change(noteTextarea(), {
+      target: { value: `${noteTextarea().value} Leaves perked up.` },
+    });
+
+    expect(noteTextarea().value).toContain("Response check: Same.");
+    expect(noteTextarea().value).toContain("Leaves perked up.");
   });
 });

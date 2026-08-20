@@ -507,19 +507,27 @@ export default function QuickLogV2Sheet({
   // stays in the note and would persist a plant-response marker against a tent
   // entry — mislabeling the row for every downstream response parser. Strip it
   // when the target stops being a plant, preserving any action prose.
-  const responseCheckWasVisibleRef = useRef(showResponseCheck);
+  // The plant the chips currently describe, or null when they are not offered.
+  const responseCheckPlantId =
+    showResponseCheck && resolvedTarget.ok ? (resolvedTarget.plantId ?? null) : null;
+  const responseCheckPlantIdRef = useRef(responseCheckPlantId);
   useEffect(() => {
-    const wasVisible = responseCheckWasVisibleRef.current;
-    responseCheckWasVisibleRef.current = showResponseCheck;
-    // Only on the plant -> non-plant TRANSITION. Running whenever the chips
-    // are merely absent would rewrite ordinary prose the grower types into a
-    // tent-scoped note — "Previous response check: better after watering"
-    // would silently become "Previous after watering". Never edit a grower's
-    // words; only undo what a chip wrote.
-    if (!wasVisible || showResponseCheck) return;
+    const previousPlantId = responseCheckPlantIdRef.current;
+    responseCheckPlantIdRef.current = responseCheckPlantId;
+    // Fire when the plant the marker DESCRIBES changes — to a different plant,
+    // or to no plant at all. Both leak: retargeting plant A -> tent leaves a
+    // plant marker on a tent row, and plant A -> plant B silently reattributes
+    // A's response to B.
+    //
+    // Deliberately NOT "the chips are absent": `readResponseCheckStatus`
+    // matches anywhere in the note, so that guard rewrote ordinary prose the
+    // grower typed into a tent note — "Previous response check: better after
+    // watering" became "Previous after watering". Never edit a grower's words;
+    // only undo what a chip wrote.
+    if (previousPlantId === null || previousPlantId === responseCheckPlantId) return;
     if (!readResponseCheckStatus(form.note)) return;
     setField("note", actionTextWithoutResponseContext(form.note));
-  }, [showResponseCheck, form.note, setField]);
+  }, [responseCheckPlantId, form.note, setField]);
 
   const handleAction = (a: QuickLogV2Action) => {
     if (wateringSubmissionLockedRef.current) return;

@@ -12,7 +12,8 @@
  *   3. it is at most 14 days old (strictly older → expired);
  *   4. the plant still appears among the grower's own visible rows;
  *   5. that live row still has the grow and tent scope required for a save;
- *   6. that grow is still one of the grower's ACTIVE grows.
+ *   6. that grow is still one of the grower's ACTIVE grows;
+ *   7. that tent is still live and still belongs to that same grow.
  *
  * Condition 6 is not implied by condition 4. `archiveGrow` (`src/lib/db.ts`)
  * updates only the `grows` row, so a plant in a newly archived grow keeps
@@ -21,6 +22,13 @@
  * and `GrowsProvider` — which lists active grows only — replaces an unknown
  * id with `grows[0].id`. The grower would land on a DIFFERENT grow with the
  * remembered plant absent from the filtered options. Fail closed instead.
+ *
+ * Condition 7 closes the same shape one level down. A nonempty `tent_id` on the
+ * plant row is not proof the tent is live: `useTents()` excludes archived
+ * tents, and `resolveQuickLogWriteTarget` blocks the save as `tent_not_found`,
+ * `tent_inactive`, `tent_grow_unassigned`, or `tent_grow_mismatch`. Offering a
+ * target the write path will refuse is worse than offering nothing, so the
+ * suggestion mirrors those checks rather than trusting the id.
  *
  * The storage key is namespaced per account, so one browser shared between
  * accounts can never surface another grower's plant. Grow and tent scope are
@@ -63,6 +71,13 @@ export interface RecentTargetVisibleGrow {
   id: string;
 }
 
+export interface RecentTargetVisibleTent {
+  id: string;
+  grow_id?: string | null;
+  is_archived?: boolean | null;
+  archived_at?: string | null;
+}
+
 export interface ResolveRecentTargetSuggestionInput {
   record: RecentTargetRecord | null;
   now: number;
@@ -73,6 +88,12 @@ export interface ResolveRecentTargetSuggestionInput {
    * closed: an unverifiable grow is not evidence that the grow is live.
    */
   visibleGrows: readonly RecentTargetVisibleGrow[] | null | undefined;
+  /**
+   * The grower's live tents — the same archived-filtered list `useTents()`
+   * returns and `resolveQuickLogWriteTarget` validates against. Absent or
+   * empty fails closed, for the same reason as `visibleGrows`.
+   */
+  visibleTents: readonly RecentTargetVisibleTent[] | null | undefined;
 }
 
 function trimmed(value: unknown): string {
@@ -126,7 +147,7 @@ export function parseRecentTargetRecord(raw: string | null | undefined): RecentT
 export function resolveRecentTargetSuggestion(
   input: ResolveRecentTargetSuggestionInput,
 ): RecentTargetSuggestion | null {
-  const { record, now, visiblePlants, visibleGrows } = input;
+  const { record, now, visiblePlants, visibleGrows, visibleTents } = input;
   if (!record) return null;
   if (typeof now !== "number" || !Number.isFinite(now)) return null;
 
@@ -151,6 +172,14 @@ export function resolveRecentTargetSuggestion(
   // leaves its plants visible, so the plant row alone cannot prove this.
   const growIsActive = (visibleGrows ?? []).some((row) => row && row.id === growId);
   if (!growIsActive) return null;
+
+  // Mirror the write path's tent checks (`resolveQuickLogWriteTarget`): the
+  // tent must exist in the live list, not be archived, and belong to the same
+  // grow as the plant. Anything else is a target the save would refuse.
+  const tent = (visibleTents ?? []).find((row) => row && row.id === tentId);
+  if (!tent) return null;
+  if (tent.is_archived === true || trimmed(tent.archived_at)) return null;
+  if (trimmed(tent.grow_id) !== growId) return null;
 
   return {
     plantId: plant.id,

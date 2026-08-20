@@ -39,16 +39,20 @@ describe("D5 — remembered target is a suggestion, never a default", () => {
     expect(FLAT).not.toMatch(/open && !prefill \? loadRecentTargetRecord/);
   });
 
-  it("revalidates the stored target against the grower's visible plants AND active grows", () => {
-    // Renegotiated to the new exact shape, and strengthened: the active-grow
-    // list is now part of the contract. A plant in an archived grow stays in
-    // `usePlants()`, so `visiblePlants` alone cannot prove the grow is live.
+  it("revalidates the stored target against visible plants, active grows AND live tents", () => {
+    // Renegotiated to the new exact shape, and strengthened twice: a plant in
+    // an archived grow stays in `usePlants()`, and a plant whose TENT was
+    // archived or moved keeps its `tent_id`. Neither list alone proves the
+    // target is one the write path would accept.
     expect(QUICKLOG).toMatch(
-      /resolveRecentTargetSuggestion\(\{[\s\S]{0,240}visiblePlants: plants,[\s\S]{0,80}visibleGrows: grows/,
+      /resolveRecentTargetSuggestion\(\{[\s\S]{0,240}visiblePlants: plants,[\s\S]{0,140}visibleGrows: grows,[\s\S]{0,80}visibleTents: activeTents/,
     );
-    // The pre-archived-grow form cannot come back at either call site.
+    // Neither pre-fix form can come back at either call site.
     expect(QUICKLOG).not.toMatch(
       /resolveRecentTargetSuggestion\(\{[^}]*visiblePlants: plants,\s*\}\)/,
+    );
+    expect(QUICKLOG).not.toMatch(
+      /resolveRecentTargetSuggestion\(\{[^}]*visibleGrows: grows,\s*\}\)/,
     );
   });
 
@@ -57,7 +61,7 @@ describe("D5 — remembered target is a suggestion, never a default", () => {
     // CURRENT clock before applying it, so the handler selects from that
     // re-derived value rather than the one captured when the dialog opened.
     expect(FLAT).toMatch(
-      /quick-log-recent-target-accept[\s\S]{0,1500}resolveRecentTargetSuggestion\(\{ record: recentTargetRecord, now: Date\.now\(\), visiblePlants: plants, visibleGrows: grows, \}\)/,
+      /quick-log-recent-target-accept[\s\S]{0,1500}resolveRecentTargetSuggestion\(\{ record: recentTargetRecord, now: Date\.now\(\), visiblePlants: plants, visibleGrows: grows, visibleTents: activeTents, \}\)/,
     );
     expect(FLAT).toMatch(
       /quick-log-recent-target-accept[\s\S]{0,1600}setPlantId\(current\.plantId\)/,

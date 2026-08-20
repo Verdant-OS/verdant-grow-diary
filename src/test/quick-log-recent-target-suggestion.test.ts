@@ -24,6 +24,9 @@ const PLANTS = [
 // The grower's ACTIVE grows — the archived-filtered list `useGrows()` returns.
 const GROWS = [{ id: "grow-1" }];
 
+// The grower's live tents — the archived-filtered list `useTents()` returns.
+const TENTS = [{ id: "tent-1", grow_id: "grow-1", is_archived: false, archived_at: null }];
+
 function record(overrides: Record<string, unknown> = {}) {
   return {
     plantId: "plant-1",
@@ -69,6 +72,7 @@ describe("resolveRecentTargetSuggestion — D-B9 validity window", () => {
       now: NOW,
       visiblePlants: PLANTS,
       visibleGrows: GROWS,
+      visibleTents: TENTS,
     });
     expect(suggestion).toEqual({
       plantId: "plant-1",
@@ -86,6 +90,7 @@ describe("resolveRecentTargetSuggestion — D-B9 validity window", () => {
       now: NOW,
       visiblePlants: PLANTS,
       visibleGrows: GROWS,
+      visibleTents: TENTS,
     });
     expect(atBoundary).not.toBeNull();
 
@@ -96,6 +101,7 @@ describe("resolveRecentTargetSuggestion — D-B9 validity window", () => {
       now: NOW,
       visiblePlants: PLANTS,
       visibleGrows: GROWS,
+      visibleTents: TENTS,
     });
     expect(pastBoundary).toBeNull();
   });
@@ -107,6 +113,7 @@ describe("resolveRecentTargetSuggestion — D-B9 validity window", () => {
         now: NOW,
         visiblePlants: PLANTS,
         visibleGrows: GROWS,
+        visibleTents: TENTS,
       }),
     ).toBeNull();
   });
@@ -118,6 +125,7 @@ describe("resolveRecentTargetSuggestion — D-B9 validity window", () => {
         now: NOW,
         visiblePlants: PLANTS,
         visibleGrows: GROWS,
+        visibleTents: TENTS,
       }),
     ).toBeNull();
   });
@@ -131,6 +139,7 @@ describe("resolveRecentTargetSuggestion — D-B9 validity window", () => {
         now: NOW,
         visiblePlants: PLANTS,
         visibleGrows: GROWS,
+        visibleTents: TENTS,
       }),
     ).toBeNull();
     expect(
@@ -139,6 +148,7 @@ describe("resolveRecentTargetSuggestion — D-B9 validity window", () => {
         now: NOW,
         visiblePlants: [],
         visibleGrows: GROWS,
+        visibleTents: TENTS,
       }),
     ).toBeNull();
   });
@@ -149,6 +159,7 @@ describe("resolveRecentTargetSuggestion — D-B9 validity window", () => {
       now: NOW,
       visiblePlants: PLANTS,
       visibleGrows: GROWS,
+      visibleTents: TENTS,
     });
     expect(suggestion?.growId).toBe("grow-1");
     expect(suggestion?.tentId).toBe("tent-1");
@@ -165,6 +176,7 @@ describe("resolveRecentTargetSuggestion — D-B9 validity window", () => {
           now: NOW,
           visiblePlants: [plant],
           visibleGrows: GROWS,
+          visibleTents: TENTS,
         }),
       ).toBeNull();
     }
@@ -177,6 +189,7 @@ describe("resolveRecentTargetSuggestion — D-B9 validity window", () => {
         now: NOW,
         visiblePlants: PLANTS,
         visibleGrows: GROWS,
+        visibleTents: TENTS,
       }),
     ).toBeNull();
     expect(
@@ -185,12 +198,19 @@ describe("resolveRecentTargetSuggestion — D-B9 validity window", () => {
         now: Number.NaN,
         visiblePlants: PLANTS,
         visibleGrows: GROWS,
+        visibleTents: TENTS,
       }),
     ).toBeNull();
   });
 
   it("is deterministic", () => {
-    const input = { record: record(), now: NOW, visiblePlants: PLANTS, visibleGrows: GROWS };
+    const input = {
+      record: record(),
+      now: NOW,
+      visiblePlants: PLANTS,
+      visibleGrows: GROWS,
+      visibleTents: TENTS,
+    };
     expect(resolveRecentTargetSuggestion(input)).toEqual(resolveRecentTargetSuggestion(input));
   });
 });
@@ -243,6 +263,7 @@ describe("resolveRecentTargetSuggestion — the grow must still be active", () =
         visiblePlants: PLANTS,
         // grow-1 archived; the grower still has another active grow.
         visibleGrows: [{ id: "grow-2" }],
+        visibleTents: TENTS,
       }),
     ).toBeNull();
   });
@@ -256,6 +277,7 @@ describe("resolveRecentTargetSuggestion — the grow must still be active", () =
           now: NOW,
           visiblePlants: PLANTS,
           visibleGrows,
+          visibleTents: TENTS,
         }),
       ).toBeNull();
     }
@@ -270,8 +292,91 @@ describe("resolveRecentTargetSuggestion — the grow must still be active", () =
       now: NOW,
       visiblePlants: PLANTS,
       visibleGrows: [{ id: "grow-2" }, { id: "grow-1" }],
+      visibleTents: TENTS,
     });
     expect(suggestion).toEqual({
+      plantId: "plant-1",
+      plantName: "Blue Dream #1",
+      growId: "grow-1",
+      tentId: "tent-1",
+    });
+  });
+});
+
+describe("resolveRecentTargetSuggestion — the tent must still be live and in that grow", () => {
+  // Same shape as the archived-grow gap, one level down. A nonempty `tent_id`
+  // on the plant row is not proof the tent is usable: `useTents()` excludes
+  // archived tents, and `resolveQuickLogWriteTarget` blocks the save as
+  // tent_not_found / tent_inactive / tent_grow_unassigned / tent_grow_mismatch.
+  it("withholds the suggestion when the tent is gone from the live list", () => {
+    expect(
+      resolveRecentTargetSuggestion({
+        record: record(),
+        now: NOW,
+        visiblePlants: PLANTS,
+        visibleGrows: GROWS,
+        visibleTents: [{ id: "tent-9", grow_id: "grow-1" }],
+      }),
+    ).toBeNull();
+  });
+
+  it("withholds it for an archived tent, by either archival marker", () => {
+    for (const tent of [
+      { id: "tent-1", grow_id: "grow-1", is_archived: true },
+      { id: "tent-1", grow_id: "grow-1", archived_at: "2026-08-01T00:00:00.000Z" },
+    ]) {
+      expect(
+        resolveRecentTargetSuggestion({
+          record: record(),
+          now: NOW,
+          visiblePlants: PLANTS,
+          visibleGrows: GROWS,
+          visibleTents: [tent],
+        }),
+      ).toBeNull();
+    }
+  });
+
+  it("withholds it when the tent belongs to another grow, or to none", () => {
+    for (const grow_id of ["grow-2", null, undefined, "   "]) {
+      expect(
+        resolveRecentTargetSuggestion({
+          record: record(),
+          now: NOW,
+          visiblePlants: PLANTS,
+          visibleGrows: GROWS,
+          visibleTents: [{ id: "tent-1", grow_id }],
+        }),
+      ).toBeNull();
+    }
+  });
+
+  it("fails closed while the live-tent list is unestablished", () => {
+    for (const visibleTents of [[], null, undefined]) {
+      expect(
+        resolveRecentTargetSuggestion({
+          record: record(),
+          now: NOW,
+          visiblePlants: PLANTS,
+          visibleGrows: GROWS,
+          visibleTents,
+        }),
+      ).toBeNull();
+    }
+  });
+
+  it("still offers the target when the tent is live and in the same grow", () => {
+    // Positive control: every negative case above differs from this one ONLY
+    // in the tent list.
+    expect(
+      resolveRecentTargetSuggestion({
+        record: record(),
+        now: NOW,
+        visiblePlants: PLANTS,
+        visibleGrows: GROWS,
+        visibleTents: TENTS,
+      }),
+    ).toEqual({
       plantId: "plant-1",
       plantName: "Blue Dream #1",
       growId: "grow-1",

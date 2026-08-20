@@ -62,8 +62,12 @@ vi.mock("@/store/grows", () => ({
     setActiveGrowId: setActiveGrowIdMock,
   }),
 }));
+// Mutable so a test can archive the remembered plant's tent. `useTents()`
+// returns live tents only, and the write path also checks the tent's grow.
+const LIVE_TENT = { id: "t1", name: "Tent 1", grow_id: "g1" };
+let tentsMock: Array<Record<string, unknown>> = [LIVE_TENT];
 vi.mock("@/hooks/use-tents", () => ({
-  useTents: () => ({ data: [{ id: "t1", name: "Tent 1", grow_id: "g1" }] }),
+  useTents: () => ({ data: tentsMock }),
 }));
 vi.mock("@/hooks/use-plants", () => ({ usePlants: () => ({ data: plantsMock }) }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn(), message: vi.fn() } }));
@@ -133,6 +137,7 @@ beforeEach(() => {
   rpcMock.mockClear();
   setActiveGrowIdMock.mockClear();
   growsMock = [ACTIVE_GROW];
+  tentsMock = [LIVE_TENT];
   userMock = { id: "u1" };
   plantsMock = PLANTS;
   clearLocalStorageForTest();
@@ -225,6 +230,17 @@ describe("QuickLog — remembered target is an offer, never a default", () => {
 
   it("offers nothing when the remembered plant is no longer visible to the grower", () => {
     seed("verdant.quickLog.lastTarget.v2.u1", "p-deleted", 60_000);
+    renderQL(<QuickLog open onOpenChange={() => {}} />);
+
+    expect(screen.getByTestId("quick-log-plant-select")).toBeInTheDocument();
+    expect(screen.queryByTestId("quick-log-recent-target-suggestion")).not.toBeInTheDocument();
+  });
+
+  it("offers nothing when the remembered plant's TENT is archived or moved", () => {
+    // The plant keeps its tent_id, so the plant lookup cannot catch this. The
+    // write path would refuse the save as tent_not_found / tent_grow_mismatch.
+    tentsMock = [{ id: "t9", name: "Other Tent", grow_id: "g1" }];
+    seed("verdant.quickLog.lastTarget.v2.u1", "p1", 60_000);
     renderQL(<QuickLog open onOpenChange={() => {}} />);
 
     expect(screen.getByTestId("quick-log-plant-select")).toBeInTheDocument();

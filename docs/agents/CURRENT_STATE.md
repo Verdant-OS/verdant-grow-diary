@@ -1,6 +1,15 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-20 UTC (refined charter)
+**Last updated:** 2026-08-20 UTC (third same-day docs-only edit)
+**Updated by:** Grok (2026-08-20, third same-day docs-only edit on PR #1060:
+Sentinel stamp set to `2026-09-01.1` across the twelve pinned governance files;
+`docs/agents/roles/gemini.md` replaced with Cheek's authoritative Gemini role —
+title **QA, Search Integrity, Risk Auditor, and Sentinel**; DERIVED banner
+removed. Gemini remains Unassigned in the agents table (no invented assignment).
+Map note updated. No `src/`, schema, migration, UI, or One-Tent product code.
+Production `/version.json` NOT_MEASURED this turn.)
+
+**Prior update:** 2026-08-20 UTC (refined charter)
 **Updated by:** Grok (2026-08-20, second same-day docs-only edit on PR #1060:
 Cheek refined the Grok peer-elevation charter. Title: **Product Intelligence,
 Adversarial Audit, and Implementation Lead**. Five equal powers: research,

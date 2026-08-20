@@ -1,6 +1,6 @@
 # Verdant Agent Constitution
 
-**Sentinel-Version: 2026-08-20.2**
+**Sentinel-Version: 2026-09-01.1**
 
 This is Verdant's universal Sentinel Code. Every agent inherits these durable product,
 engineering, data, safety, and release rules. Platform-specific bootstraps live at the
@@ -580,7 +580,8 @@ example remaining Tranche A edit points for Codex, Tranche B+ product code for C
 parked PRs #828 / #817 / #696).
 
 Every assigned slice names **one owner** and a **different peer** as **independent
-reviewer**. The owner cannot review their own work.
+reviewer**. The owner cannot review their own work. **No code ships without peer
+review** — an owned slice without a named independent reviewer is incomplete.
 
 Use `docs/agents/HANDOFF_PROTOCOL.md` for cross-role work. The preferred sequence is:
 

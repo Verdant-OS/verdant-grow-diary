@@ -1,6 +1,6 @@
 # Role — Council Chair: Final Integrator and Work Sequencer
 
-**Sentinel-Version: 2026-08-20.2**
+**Sentinel-Version: 2026-09-01.1**
 
 > **DERIVED, NOT AUTHORITATIVE.** The full pack text for this role was not received. This
 > file is reconstructed from the pack summary. Replace with the authoritative text.

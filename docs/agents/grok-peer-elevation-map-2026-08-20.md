@@ -7,6 +7,13 @@ Adversarial Audit, and Implementation Lead**; five equal powers; **no role rank*
 explicit task ownership; one owner + independent reviewer per slice.
 **Base:** `verdant-grow-diary` (production deploy branch). PR #1060.
 
+**Follow-up (same PR, 2026-08-20 third edit):** Sentinel stamp now
+`2026-09-01.1` across all twelve pinned files. `docs/agents/roles/gemini.md`
+replaced with Cheek's authoritative role — title **QA, Search Integrity, Risk
+Auditor, and Sentinel**; DERIVED banner removed. Gemini remains Unassigned in
+`CURRENT_STATE` (no invented assignment). `AGENTS.md` not shrunk; one peer-review
+sentence added ("No code ships without peer review").
+
 This note is the required pre-edit map of Grok ownership/role references and
 Sentinel parity rules, updated to the refined charter (not the earlier “peer
 implementer + research lead” wording).
@@ -46,11 +53,11 @@ in the same commit. `docs/agents/CURRENT_STATE.md` is **exempt** (no
 | 8 | `docs/agents/roles/claude.md` | Peer language; no “primary coder” exclusivity |
 | 9 | `docs/agents/roles/codex.md` | Build lead as **preference**, not exclusivity |
 | 10 | `docs/agents/roles/security.md` | Parity bump |
-| 11 | `docs/agents/roles/gemini.md` | Parity bump |
+| 11 | `docs/agents/roles/gemini.md` | **Authoritative** (Cheek 2026-08-20): QA, Search Integrity, Risk Auditor, and Sentinel |
 | 12 | `docs/agents/roles/council-chair.md` | No rank when weighing peer outputs |
 
-Helper: `scripts/sync-sentinel-mirror.mjs`. This refined commit targets
-`Sentinel-Version: 2026-08-20.2`.
+Helper: `scripts/sync-sentinel-mirror.mjs`. Current stamp for this follow-up:
+`Sentinel-Version: 2026-09-01.1`.
 
 ---
 

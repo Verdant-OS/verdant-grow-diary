@@ -2,7 +2,12 @@
 
 **Date:** 2026-08-20
 **Author:** Claude (Knowledge Library and Product Specification Architect)
-**Audited ref:** `verdant-grow-diary` @ `cff3efd` — the branch that actually ships
+**Audited ref:** `verdant-grow-diary` @ `cff3efd` — the branch that actually ships.
+The base has since advanced to `f09febc` (#1049, **B2a** shared save-key policy). That
+commit touches only `PlantQuickLog.tsx`, `quickLogSaveKeyPolicy.ts` and two tests — no
+overlap with this document's files, no conflict — and the eight picks were re-probed
+against it and still hold. Its one consequence for the pack is the third Pick 3
+guardrail below.
 **Revision:** 2 — re-audited at `cff3efd` after the deploy branch advanced from
 `77d8eec` (three merges: #1035 quicklog review fixes, #1039 **B0a** interaction-counter
 harness, #1047 **B4a** `/doctor` loop card). Revision 1 was pinned at `77d8eec`.
@@ -180,15 +185,25 @@ estimate in the table, not a runtime receipt** — no automated scenario drives 
 > repeat-target journey before and after, and update the S5 row in
 > `docs/one-tent-loop-efficiency-baseline.md` with the measured result.
 
-**Guardrails, two of them:**
+**Guardrails, three of them:**
 
 1. `quicklog_save_manual` is the **single sanctioned manual write path**
    (`docs/specs/one-tent-loop-quicklog-single-write-path.md`). A builder asked to
    "duplicate an entry" will reach for a direct insert. It must not.
 2. **This is now the highest-collision pick of the eight** — see §7. The Quick Log path
    is under active B-series editing (`quickLogSaveErrorMessage.ts`,
-   `quicklogManualDiagnosticsRules.ts` both changed at `cff3efd`). Confirm ownership
-   before sending.
+   `quicklogManualDiagnosticsRules.ts` at `cff3efd`; `PlantQuickLog.tsx` and
+   `quickLogSaveKeyPolicy.ts` at `f09febc`). Confirm ownership before sending.
+3. **The pre-fill must rotate the idempotency key, not reuse it.** `established fact`
+   from `src/lib/quickLogSaveKeyPolicy.ts` (B2a, #1049): the save key is
+   **signature-aware** — a *pure* retry reuses the key, an *edited* retry rotates it, and
+   `quicklog_save_manual` returns the original row with `reused=true` when it sees a key
+   again. A "Same as last time" pre-fill produces a payload whose signature closely
+   resembles the entry it copied, which is exactly the module's documented
+   **over-reusing** failure: *"a genuinely new submission comes back as the previous row,
+   so the grower's log silently does not save."* A repeat log is a new submission, not a
+   retry. Require a test that saves the same values twice via the pre-fill and asserts
+   **two** distinct rows.
 
 ### Pick 4 — #4 Night Mode · **zero new schema · RENAMED in revision 2**
 
@@ -395,7 +410,8 @@ collision surface in the repo. Picks 1, 2 and 4 are the safest high-value starts
   `src/lib/doctorStartContextRules.ts`, `src/pages/AiDoctorStart.tsx`,
   `src/pages/QuicklogDiagnostics.tsx`, `src/lib/quickLogSaveErrorMessage.ts`,
   `src/lib/quicklogManualDiagnosticsRules.ts`, `src/lib/quicklogPrivateHelperGrantRules.ts`,
-  and the e2e harness (`countedDriver.ts`, `interactionCounter.ts`,
+  plus **B2a at `f09febc`** (`src/components/PlantQuickLog.tsx`,
+  `src/lib/quickLogSaveKeyPolicy.ts`), and the e2e harness (`countedDriver.ts`, `interactionCounter.ts`,
   `mockedOneTentWorld.ts`, `one-tent-loop-interaction-counter.spec.ts`).
 - **Owner decision D4 (Sensors→Doctor context carry) is now partly implemented** by B4a's
   `resolveDoctorStartScope` / `partitionDoctorEntryOptionsByTent`. Treat the Doctor entry
@@ -461,4 +477,5 @@ Re-audited `77d8eec` → `cff3efd`. What changed:
 | **Pick 6** | "zero hits" | Exactly one hit, in `payments-webhook/orchestrator.ts` (billing anomaly, out of domain). Sensor-side still absent |
 | Collision boundaries | Tranche A + parked PRs | Adds the **live Tranche B+ surface** (B0a, B4a) and notes D4 is now partly implemented |
 | Sequence | Pick 3 at position 3 | Pick 3 moved to position 7 behind the collision warning |
+| Post-audit base advance | n/a | Base moved `cff3efd` → `f09febc` (#1049 B2a) after the re-audit. No overlap with this document's files, `git merge-tree` reports zero conflicts, and Pick 3's absence probe still returns zero against the new tree. Added a third Pick 3 guardrail from B2a's signature-aware idempotency policy |
 | Everything else | — | Re-verified unchanged: all 14 already-ships rows still ship; Paddle 233 / Stripe 20 unchanged; Picks 1, 2, 5, 7, 8 still return zero hits |

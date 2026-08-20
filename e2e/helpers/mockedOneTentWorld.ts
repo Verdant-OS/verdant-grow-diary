@@ -267,6 +267,24 @@ export async function mockSignedInSupabase(
         ? submittedTargetId
         : (asText(submitted.p_tent_id) ?? FAKE_TENT_ID);
 
+    // The real RPC validates the target against rows the caller owns and fails
+    // closed on anything else. Copying p_target_id without checking it would
+    // just relocate the circularity the payload derivation was meant to remove:
+    // a save aimed at the WRONG plant would still manufacture a matching row,
+    // and because Timeline is only grow-scoped the "Better" assertion would
+    // still pass with a wrong plant association.
+    const targetRecognized =
+      (submittedTargetType === "plant" && submittedTargetId === FAKE_PLANT_ID) ||
+      (submittedTargetType === "tent" && submittedTargetId === FAKE_TENT_ID);
+    if (!targetRecognized) {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: false, reason: "plant_not_found" }),
+      });
+      return;
+    }
+
     // One canonical save writes TWO rows, exactly as quicklog_save_manual
     // does: the typed grow_events spine, plus a diary companion carrying
     // `details.linked_grow_event_id` back to it. Timeline reads BOTH sources
@@ -300,7 +318,7 @@ export async function mockSignedInSupabase(
       retracted_at: null,
       details: {
         event_type: "observation",
-        plant_name: FAKE_PLANT.name,
+        plant_name: submittedPlantId === FAKE_PLANT_ID ? FAKE_PLANT.name : null,
         linked_grow_event_id: FAKE_GROW_EVENT_ID,
       },
     });

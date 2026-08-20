@@ -13,7 +13,7 @@
  * file is only about the local half.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, cleanup, waitFor, within } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
@@ -35,6 +35,26 @@ const RECORD = JSON.stringify({
   tentId: "t1",
   savedAt: "2026-08-19T00:00:00.000Z",
 });
+
+/**
+ * The checks list and the remediation checklist both render a check's name, so
+ * an unscoped text query matches twice as soon as a row becomes fixable. Scope
+ * every lookup to the checks list.
+ */
+async function checksList(): Promise<HTMLElement> {
+  const anchor = await screen.findByText("Browser storage available");
+  const list = anchor.closest("ul");
+  expect(list).not.toBeNull();
+  return list as HTMLElement;
+}
+
+async function schemaRow(name: string): Promise<HTMLElement> {
+  const row = within(await checksList())
+    .getByText(name)
+    .closest("li");
+  expect(row).not.toBeNull();
+  return row as HTMLElement;
+}
 
 beforeEach(() => clearLocalStorageForTest());
 afterEach(() => cleanup());
@@ -58,14 +78,14 @@ describe("LocalDataHealthPanel — scoped Quick Log last-target keys", () => {
     setLocalStorageItemForTest(`verdant.quickLog.lastTarget.v2.${ACCOUNT_A}`, RECORD);
     render(<LocalDataHealthPanel />);
 
-    await waitFor(() => expect(screen.getByText("Quick Log last target")).toBeInTheDocument());
+    expect(await schemaRow("Quick Log last target")).toBeInTheDocument();
   });
 
   it("never renders the account uuid embedded in the key name", async () => {
     setLocalStorageItemForTest(`verdant.quickLog.lastTarget.v2.${ACCOUNT_A}`, RECORD);
     const { container } = render(<LocalDataHealthPanel />);
 
-    await waitFor(() => expect(screen.getByText("Quick Log last target")).toBeInTheDocument());
+    await schemaRow("Quick Log last target");
     // The key IS shown — with its account segment elided.
     expect(screen.getByText("key: verdant.quickLog.lastTarget.v2.<account>")).toBeInTheDocument();
     expect(container.textContent ?? "").not.toContain(ACCOUNT_A);
@@ -76,9 +96,8 @@ describe("LocalDataHealthPanel — scoped Quick Log last-target keys", () => {
     render(<LocalDataHealthPanel />);
 
     await waitFor(() => expect(screen.getByText("Browser storage available")).toBeInTheDocument());
-    const list = screen.getByText("Browser storage available").closest("ul");
-    expect(list).not.toBeNull();
-    expect(within(list as HTMLElement).queryByText(/lastTarget\.v1/)).toBeNull();
+    const list = await checksList();
+    expect(within(list).queryByText(/lastTarget\.v1/)).toBeNull();
     expect(screen.queryByText(/Quick Log last target/)).toBeNull();
   });
 
@@ -87,5 +106,88 @@ describe("LocalDataHealthPanel — scoped Quick Log last-target keys", () => {
 
     await waitFor(() => expect(screen.getByText("Browser storage available")).toBeInTheDocument());
     expect(screen.queryByText(/Quick Log last target/)).toBeNull();
+  });
+});
+
+describe("LocalDataHealthPanel — a malformed scoped record is never reported healthy", () => {
+  it("warns on valid JSON that the record parser rejects", async () => {
+    // `{}` parses fine. `parseRecentTargetRecord` rejects it, so Quick Log
+    // silently offers nothing — the exact shape of failure a diagnostics card
+    // exists to make visible.
+    setLocalStorageItemForTest(`verdant.quickLog.lastTarget.v2.${ACCOUNT_A}`, "{}");
+    render(<LocalDataHealthPanel />);
+
+    const row = await schemaRow("Quick Log last target");
+    expect(within(row).getByText("Warn")).toBeInTheDocument();
+    expect(row).toHaveTextContent("missing a usable plantId/savedAt pair");
+    expect(row).toHaveTextContent("the stored value has no effect");
+  });
+
+  it("warns on a record missing savedAt", async () => {
+    setLocalStorageItemForTest(
+      `verdant.quickLog.lastTarget.v2.${ACCOUNT_A}`,
+      JSON.stringify({ plantId: "p1", growId: "g1", tentId: "t1" }),
+    );
+    render(<LocalDataHealthPanel />);
+
+    const row = await schemaRow("Quick Log last target");
+    expect(within(row).getByText("Warn")).toBeInTheDocument();
+  });
+
+  it("passes a well-formed record", async () => {
+    setLocalStorageItemForTest(`verdant.quickLog.lastTarget.v2.${ACCOUNT_A}`, RECORD);
+    render(<LocalDataHealthPanel />);
+
+    const row = await schemaRow("Quick Log last target");
+    expect(within(row).getByText("Pass")).toBeInTheDocument();
+  });
+
+  it("offers honest remediation copy rather than the version-mismatch default", async () => {
+    setLocalStorageItemForTest(`verdant.quickLog.lastTarget.v2.${ACCOUNT_A}`, "{}");
+    render(<LocalDataHealthPanel />);
+
+    await schemaRow("Quick Log last target");
+    // The canned warn copy would claim a future migration handles this. It
+    // does not — nothing will ever read this value again.
+    expect(screen.queryByText(/A future migration will handle it automatically/)).toBeNull();
+    expect(screen.getByText(/does not match the shape this build expects/)).toBeInTheDocument();
+  });
+});
+
+describe("LocalDataHealthPanel — the account uuid survives no fallback path", () => {
+  it("keeps the label redacted when the key vanishes between the run and the drawer", async () => {
+    setLocalStorageItemForTest(`verdant.quickLog.lastTarget.v2.${ACCOUNT_A}`, "{}");
+    const { container } = render(<LocalDataHealthPanel />);
+
+    await schemaRow("Quick Log last target");
+
+    // Another tab (or DevTools) removes the key after the run. Rediscovery in
+    // the drawer now finds no descriptor for it.
+    clearLocalStorageForTest();
+
+    fireEvent.click(screen.getByRole("button", { name: /Review & clear/i }));
+    await waitFor(() => expect(screen.getByRole("dialog")).toBeInTheDocument());
+
+    expect(container.textContent ?? "").not.toContain(ACCOUNT_A);
+    expect(document.body.textContent ?? "").not.toContain(ACCOUNT_A);
+  });
+
+  it("keeps it redacted through the whole clear flow, including the backup list", async () => {
+    setLocalStorageItemForTest(`verdant.quickLog.lastTarget.v2.${ACCOUNT_A}`, "{}");
+    render(<LocalDataHealthPanel />);
+    await schemaRow("Quick Log last target");
+
+    // Checklist → review drawer → confirm → notice + backup row. Every one of
+    // those renders a storage key somewhere.
+    fireEvent.click(screen.getByRole("button", { name: /Review & clear/i }));
+    await waitFor(() => expect(screen.getByRole("dialog")).toBeInTheDocument());
+    expect(document.body.textContent ?? "").not.toContain(ACCOUNT_A);
+
+    fireEvent.click(screen.getByRole("button", { name: /Confirm — clear/i }));
+    await waitFor(() => expect(screen.getByText(/Backup saved/)).toBeInTheDocument());
+
+    // The value really is gone, and no stage of the flow printed the account.
+    expect(window.localStorage.getItem(`verdant.quickLog.lastTarget.v2.${ACCOUNT_A}`)).toBeNull();
+    expect(document.body.textContent ?? "").not.toContain(ACCOUNT_A);
   });
 });

@@ -30,7 +30,10 @@ import {
 } from "@/components/ui/drawer";
 import { supabase } from "@/integrations/supabase/client";
 import { PUBLIC_QUICK_LOG_STARTER_DRAFT_KEY } from "@/lib/publicQuickLogStarterRules";
-import { RECENT_TARGET_STORAGE_KEY_PREFIX } from "@/lib/quickLogRecentTargetSuggestion";
+import {
+  parseRecentTargetRecord,
+  RECENT_TARGET_STORAGE_KEY_PREFIX,
+} from "@/lib/quickLogRecentTargetSuggestion";
 
 type CheckStatus = "pass" | "warn" | "fail" | "skip";
 
@@ -39,14 +42,30 @@ interface CheckResult {
   status: CheckStatus;
   detail: string;
   meta?: string;
+  /**
+   * Overrides the canned remediation copy. The two defaults ("invalid JSON"
+   * and "schema version mismatch") would both misdescribe a value that parses
+   * and carries no version but has the wrong shape.
+   */
+  remediationAction?: string;
 }
 
-const LOCAL_SCHEMAS: Array<{
+interface LocalSchema {
   key: string;
   label: string;
   expectedVersion?: number;
   optional: boolean;
-}> = [
+  /**
+   * Optional shape check for schemas with no `v` field. Valid JSON is not the
+   * same as a usable record: `{}` parses fine and is still rejected by the
+   * feature that reads it, so without this the panel would report a value as
+   * healthy while the feature silently ignores it. Returns null when the shape
+   * is good, or a short reason to show the grower.
+   */
+  validate?: (raw: string) => string | null;
+}
+
+const LOCAL_SCHEMAS: LocalSchema[] = [
   {
     key: PUBLIC_QUICK_LOG_STARTER_DRAFT_KEY,
     label: "Public Quick Log starter draft",
@@ -69,6 +88,8 @@ const LOCAL_SCHEMAS: Array<{
     optional: true,
   },
 ];
+
+const SCOPED_LAST_TARGET_LABEL = "Quick Log last target";
 
 /**
  * The Quick Log last-target memory is account-scoped
@@ -101,17 +122,29 @@ function discoverScopedSchemas(): typeof LOCAL_SCHEMAS {
     key,
     label:
       keys.length === 1
-        ? "Quick Log last target"
-        : `Quick Log last target (account ${index + 1} of ${keys.length} on this device)`,
+        ? SCOPED_LAST_TARGET_LABEL
+        : `${SCOPED_LAST_TARGET_LABEL} (account ${index + 1} of ${keys.length} on this device)`,
     optional: true,
+    validate: (raw: string) =>
+      parseRecentTargetRecord(raw)
+        ? null
+        : "the stored record is missing a usable plantId/savedAt pair",
   }));
+}
+
+/** Label for a key no descriptor could be found for. Never a raw key. */
+function fallbackSchemaLabel(key: string): string {
+  return key.startsWith(RECENT_TARGET_STORAGE_KEY_PREFIX)
+    ? SCOPED_LAST_TARGET_LABEL
+    : redactStorageKey(key);
 }
 
 /**
  * Storage keys are shown to the grower, and the account-scoped last-target key
  * carries a raw account uuid in its name. Elide that segment everywhere a key
- * is rendered. The real key stays in the data so clearing and restoring still
- * target the right entry — only the display is redacted.
+ * is rendered — check rows, the remediation checklist, the review drawer and
+ * the backup list alike. The real key stays in the data so clearing and
+ * restoring still target the right entry; only the display is redacted.
  */
 function redactStorageKey(key: string): string {
   return key.startsWith(RECENT_TARGET_STORAGE_KEY_PREFIX)
@@ -209,6 +242,17 @@ function checkLocalSchema(schema: (typeof LOCAL_SCHEMAS)[number]): CheckResult {
         meta: schema.key,
       };
     }
+  }
+  const shapeProblem = schema.validate?.(raw) ?? null;
+  if (shapeProblem) {
+    return {
+      name: schema.label,
+      status: "warn",
+      detail: `Present and valid JSON (${sizeBytes} bytes), but ${shapeProblem}. Whatever reads this key ignores it, so the stored value has no effect.`,
+      meta: schema.key,
+      remediationAction:
+        "This stored value parses as JSON but does not match the shape this build expects, so the feature that reads it ignores it entirely. Nothing is broken — clearing it just removes a value that can never be used again. Server data is unaffected.",
+    };
   }
   return {
     name: schema.label,
@@ -605,6 +649,14 @@ function buildRemediation(check: CheckResult): RemediationStep | null {
 
   // Local schema keys — safe to clear from this device.
   if (check.meta && isLocalSchemaKey(check.meta)) {
+    if (check.remediationAction) {
+      return {
+        severity: check.status === "fail" ? "fail" : "warn",
+        title: check.name,
+        action: check.remediationAction,
+        fixableKey: check.meta,
+      };
+    }
     if (check.status === "fail") {
       return {
         severity: "fail",
@@ -725,7 +777,7 @@ function RemediationChecklist({ checks, onReviewKey, running }: RemediationCheck
                       Review & clear…
                     </Button>
                     <span className="text-[11px] text-muted-foreground font-mono break-all">
-                      {s.fixableKey}
+                      {redactStorageKey(s.fixableKey)}
                     </span>
                   </div>
                 )}
@@ -789,7 +841,10 @@ interface RemediationEntry {
 function buildRemediationEntry(key: string): RemediationEntry {
   const schema =
     LOCAL_SCHEMAS.find((s) => s.key === key) ?? discoverScopedSchemas().find((s) => s.key === key);
-  const label = schema?.label ?? key;
+  // Rediscovery can miss: the key may have been removed between the run and
+  // this drawer (another tab, DevTools), or storage may have become
+  // unavailable. The fallback must still never print an account uuid.
+  const label = schema?.label ?? fallbackSchemaLabel(key);
   const expectedVersion = schema?.expectedVersion;
 
   const s = safeStorage();

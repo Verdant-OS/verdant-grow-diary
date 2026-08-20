@@ -391,6 +391,9 @@ export default function CreatePlantDialog({
       toast.error(error.message);
       return;
     }
+    // The insert is now durable. Record that fact before any cache refresh can
+    // stall or the grower can leave; navigation remains refresh-gated below.
+    trackFunnelEvent("plant_created");
     // The insert is durable before these reads, but the grower-facing plant
     // lists can still be showing the pre-create cache. Keep the dialog and its
     // handoff pending until both legacy Quick Log and owner-scoped grow views
@@ -403,7 +406,6 @@ export default function CreatePlantDialog({
     const handoffSuppressed = handoffSuppressedRef.current;
     if (stillMounted) setBusy(false);
     toast.success("Plant created");
-    trackFunnelEvent("plant_created");
     if (!stillMounted || handoffSuppressed) return;
     setForm(emptyForm(initialTentId));
     setExplicitCompatiblePick(false);

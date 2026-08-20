@@ -13,6 +13,7 @@ const insertMock = vi.hoisted(() => vi.fn());
 const singleMock = vi.hoisted(() => vi.fn());
 const selectMock = vi.hoisted(() => vi.fn(() => ({ single: singleMock })));
 const successToastMock = vi.hoisted(() => vi.fn());
+const funnelEventMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
@@ -37,6 +38,8 @@ vi.mock("@/integrations/supabase/client", () => ({
 vi.mock("@/store/auth", () => ({
   useAuth: () => ({ user: { id: "11111111-1111-4111-8111-111111111111" }, loading: false }),
 }));
+
+vi.mock("@/lib/funnelAnalytics", () => ({ trackFunnelEvent: funnelEventMock }));
 
 const growsState = vi.hoisted(() => ({
   grows: [] as Array<{ id: string; name: string }>,
@@ -154,6 +157,7 @@ function renderDialog(props: {
 beforeEach(() => {
   insertMock.mockReset();
   successToastMock.mockReset();
+  funnelEventMock.mockReset();
   singleMock.mockReset();
   singleMock.mockResolvedValue({ data: { id: "plant-1", name: "P" }, error: null });
   selectMock.mockClear();
@@ -378,6 +382,7 @@ describe("CreatePlantDialog RTL binding", () => {
     expect(invalidateSpy).toHaveBeenNthCalledWith(2, { queryKey: ["grow", "plants"] });
     expect(legacyQueryFn).toHaveBeenCalledTimes(1);
     expect(ownerGrowQueryFn).toHaveBeenCalledTimes(1);
+    expect(funnelEventMock).toHaveBeenCalledWith("plant_created");
     expect(screen.getByTestId("create-plant-form")).toBeInTheDocument();
     expect(onCreated).not.toHaveBeenCalled();
 

@@ -402,9 +402,13 @@ collision surface in the repo. Picks 1, 2 and 4 are the safest high-value starts
 
 `established fact` from `CURRENT_STATE.md` plus the `77d8eec..cff3efd` diff:
 
-- **Tranche A items A2–A5 remain Codex-owned and unopened.** Their edit points —
-  `oneTentLoopNavigationRules.ts`, Action Queue rows/drawer, Alert detail, Sensors source
-  summary, post-save freshness — are collision boundaries.
+- **Tranche A2 has LANDED** as #1048 (`59bb33b`, "preserve One-Tent navigation scope"),
+  whose own commit message records "full A2 closure: 12 files, 108/108 tests" and notes
+  that B4a "intentionally defers B4b until A2 lands". `src/lib/oneTentLoopNavigationRules.ts`
+  is therefore no longer an unopened edit point — grow-scope threading and the Tent Detail
+  self-link removal are merged. **A3–A5 remain Codex-owned and unopened**; their edit
+  points — Action Queue rows/drawer, Alert detail, Sensors source summary, post-save
+  freshness — are still collision boundaries. None of the eight picks touch any of them.
 - **Tranche B+ is now actively landing, which is new since revision 1.** #1039 (B0a) and
   #1047 (B4a) both merged. The live B-series surface is:
   `src/lib/doctorStartContextRules.ts`, `src/pages/AiDoctorStart.tsx`,
@@ -477,5 +481,6 @@ Re-audited `77d8eec` → `cff3efd`. What changed:
 | **Pick 6** | "zero hits" | Exactly one hit, in `payments-webhook/orchestrator.ts` (billing anomaly, out of domain). Sensor-side still absent |
 | Collision boundaries | Tranche A + parked PRs | Adds the **live Tranche B+ surface** (B0a, B4a) and notes D4 is now partly implemented |
 | Sequence | Pick 3 at position 3 | Pick 3 moved to position 7 behind the collision warning |
+| Post-audit base advance (2) | n/a | Base moved `f09febc` → `59bb33b` (#1046 plant-refresh settle, #1048 **A2**). No overlap with this document's files, zero merge conflicts, and no pick's absence claim affected — none touch `oneTentLoopNavigationRules.ts`. Corrected §7: A2 is merged, not unopened |
 | Post-audit base advance | n/a | Base moved `cff3efd` → `f09febc` (#1049 B2a) after the re-audit. No overlap with this document's files, `git merge-tree` reports zero conflicts, and Pick 3's absence probe still returns zero against the new tree. Added a third Pick 3 guardrail from B2a's signature-aware idempotency policy |
 | Everything else | — | Re-verified unchanged: all 14 already-ships rows still ship; Paddle 233 / Stripe 20 unchanged; Picks 1, 2, 5, 7, 8 still return zero hits |

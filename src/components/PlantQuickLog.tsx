@@ -61,6 +61,7 @@ import { useQuickLogV2Save } from "@/hooks/useQuickLogV2Save";
 import { buildPlantQuickLogV2SavePayload } from "@/lib/plantQuickLogV2SaveAdapter";
 import { newQuickLogSaveKey } from "@/lib/quickLogIdempotencyKey";
 import {
+  buildQuickLogPhotoIdentity,
   buildQuickLogSaveSignature,
   resolveQuickLogSaveKey,
   type QuickLogSaveKeyState,
@@ -211,6 +212,11 @@ export default function PlantQuickLog({
   }
 
   function resetForm() {
+    // Resetting ends the logical submission, so the key must not survive it.
+    // The success path calls resetForm() and then onOpenChange(false); clearing
+    // here means rotation does not depend on a parent actually honoring that
+    // close, which is the only other thing that clears the key.
+    saveKeyRef.current = null;
     setPhotoFile(null);
     setPhotoPreview(null);
     setNote("");
@@ -314,7 +320,7 @@ export default function PlantQuickLog({
           tentId: tentId ?? null,
           note: timelineNote,
           sensors: sensorsForPayload,
-          photo: photoFile ? { name: photoFile.name, size: photoFile.size } : null,
+          photo: buildQuickLogPhotoIdentity(photoFile),
         }),
         mint: newQuickLogSaveKey,
       });

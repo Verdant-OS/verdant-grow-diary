@@ -8,6 +8,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildQuickLogPhotoIdentity,
   buildQuickLogSaveSignature,
   resolveQuickLogSaveKey,
   type QuickLogSaveKeyState,
@@ -135,5 +136,79 @@ describe("resolveQuickLogSaveKey — mint / reuse / rotate", () => {
     const a = resolveQuickLogSaveKey({ current, signature: "sig-1", mint });
     const b = resolveQuickLogSaveKey({ current, signature: "sig-1", mint });
     expect(a).toEqual(b);
+  });
+});
+
+describe("buildQuickLogPhotoIdentity", () => {
+  const photo = { name: "IMG_1234.jpg", size: 2048, type: "image/jpeg", lastModified: 1700000000 };
+
+  it("carries all four identity fields — name and size alone do not identify a file", () => {
+    // Matches the shipped precedent in aiCoachRequestRecoveryRules.ts.
+    expect(buildQuickLogPhotoIdentity(photo)).toEqual(photo);
+  });
+
+  it("distinguishes two files that share a name and a size", () => {
+    // The realistic collision: the same camera filename after a re-take.
+    const other = { ...photo, lastModified: photo.lastModified + 60_000 };
+    expect(buildQuickLogPhotoIdentity(photo)).not.toEqual(buildQuickLogPhotoIdentity(other));
+  });
+
+  it("distinguishes two files that differ only by MIME type", () => {
+    expect(buildQuickLogPhotoIdentity(photo)).not.toEqual(
+      buildQuickLogPhotoIdentity({ ...photo, type: "image/heic" }),
+    );
+  });
+
+  it("returns null for no photo, and never throws on junk", () => {
+    expect(buildQuickLogPhotoIdentity(null)).toBeNull();
+    expect(buildQuickLogPhotoIdentity(undefined)).toBeNull();
+    expect(() => buildQuickLogPhotoIdentity({} as unknown as typeof photo)).not.toThrow();
+    expect(buildQuickLogPhotoIdentity({} as unknown as typeof photo)).toEqual({
+      name: "",
+      size: 0,
+      type: "",
+      lastModified: 0,
+    });
+  });
+
+  it("is stable across attempts, so widening identity cannot rotate a pure retry", () => {
+    // Every field describes the File the grower picked, not the attempt.
+    const first = buildQuickLogSaveSignature({
+      note: "better",
+      photo: buildQuickLogPhotoIdentity(photo),
+    });
+    const second = buildQuickLogSaveSignature({
+      note: "better",
+      photo: buildQuickLogPhotoIdentity(photo),
+    });
+    expect(second).toBe(first);
+
+    const resolved = resolveQuickLogSaveKey({ current: null, signature: first, mint: () => "k1" });
+    const retried = resolveQuickLogSaveKey({
+      current: resolved.state,
+      signature: second,
+      mint: () => "k2",
+    });
+    expect(retried.decision).toBe("reuse");
+    expect(retried.state.key).toBe("k1");
+  });
+
+  it("swapping the photo for a same-name same-size file ROTATES the key", () => {
+    const before = buildQuickLogSaveSignature({
+      note: "n",
+      photo: buildQuickLogPhotoIdentity(photo),
+    });
+    const after = buildQuickLogSaveSignature({
+      note: "n",
+      photo: buildQuickLogPhotoIdentity({ ...photo, lastModified: photo.lastModified + 1 }),
+    });
+    const first = resolveQuickLogSaveKey({ current: null, signature: before, mint: () => "k1" });
+    const next = resolveQuickLogSaveKey({
+      current: first.state,
+      signature: after,
+      mint: () => "k2",
+    });
+    expect(next.decision).toBe("rotate");
+    expect(next.state.key).toBe("k2");
   });
 });

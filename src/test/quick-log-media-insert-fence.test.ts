@@ -52,15 +52,25 @@ function read(path: string): string {
 }
 
 /**
- * Strip comments before a forbidden-construct scan.
+ * Everything after the file's leading doc-comment header.
  *
- * These helpers document their own safety properties in prose ("no
- * service_role, no sensor tables"), so scanning raw source would flag a
- * correct safety CLAIM as a violation. Comments cannot execute, so removing
- * them can only hide a non-violation — it cannot mask real code.
+ * Both helpers state their own safety properties in prose ("no service_role,
+ * no sensor tables"), so scanning raw source flags a correct safety CLAIM as a
+ * violation. The first attempt at this stripped ALL comments before scanning,
+ * which a comment sequence inside a string literal defeats: a stripper is not
+ * a parser, and a scan that a string literal can switch off is not a fence.
+ *
+ * Slicing off only the LEADING header is positional, so it needs no syntax
+ * awareness, and it is strictly stronger — every occurrence in the body fails,
+ * whether it sits in code, in a string, or in a comment added later. The
+ * failure direction is right too: a new mid-file mention of service_role in
+ * either helper should force a human look, not be waved through.
  */
-function codeOnly(src: string): string {
-  return src.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/[^\n]*/g, "$1 ");
+function bodyAfterHeader(src: string): string {
+  const trimmed = src.trimStart();
+  if (!trimmed.startsWith("/*")) return src;
+  const close = src.indexOf(String.fromCharCode(42, 47));
+  return close === -1 ? src : src.slice(close + 2);
 }
 
 describe("D-B4 — media direct-insert divergence stays exactly two files", () => {
@@ -72,11 +82,18 @@ describe("D-B4 — media direct-insert divergence stays exactly two files", () =
 
   it("each sanctioned helper documents WHY it diverges", () => {
     // A bare exception with no rationale is how an accepted divergence turns
-    // into an unexamined habit.
+    // into an unexamined habit. A bare "Safety:"/"Contract:" heading is not a
+    // rationale, so require the header to name what the helper does NOT do —
+    // the claim a reviewer can actually check against the body below it.
     for (const file of SANCTIONED) {
-      const src = read(file);
-      expect(src).toMatch(/diary_entries/);
-      expect(src.slice(0, 1200)).toMatch(/Safety|Contract|no service_role|No service_role/i);
+      const header = read(file).slice(0, 1200);
+      expect(header, `${file} header must name the table it writes`).toMatch(/diary_entries/);
+      expect(header, `${file} header must carry a labelled safety section`).toMatch(
+        /Safety:|Contract:/,
+      );
+      expect(header, `${file} header must state a negative bound (what it does NOT do)`).toMatch(
+        /\b(No|NOT|Does NOT|never)\b/,
+      );
     }
   });
 
@@ -108,8 +125,10 @@ describe("D-B4 — media direct-insert divergence stays exactly two files", () =
 
   it("neither helper smuggles in a privileged or unrelated write", () => {
     for (const file of SANCTIONED) {
-      const src = codeOnly(read(file));
-      expect(src, `${file} code must not reference service_role`).not.toMatch(/service_role/i);
+      const src = bodyAfterHeader(read(file));
+      expect(src, `${file} must not reference service_role below its header`).not.toMatch(
+        /service_role/i,
+      );
       expect(src).not.toMatch(/functions\.invoke/);
       expect(src).not.toMatch(
         /from\(\s*["'](action_queue|alerts|sensor_readings|profiles|subscriptions)["']\s*\)/,

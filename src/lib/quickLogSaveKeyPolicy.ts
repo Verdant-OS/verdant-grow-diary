@@ -21,6 +21,17 @@
  * as `p_idempotency_key`). It is unrelated to `rotateQuickLogIdempotencyKey`
  * in `quickLogSaveGuardRules.ts`, which advances a numeric attempt counter.
  *
+ * Deviation from the D-B2 wording, recorded rather than glossed: the design
+ * says "mint on open". This module mints lazily, at the first save, because a
+ * key minted at open has no signature yet — `resolve` would see a mismatch and
+ * rotate it away on that very first save, so the open-time mint would be dead
+ * weight unless a pre-signature state were added for it. The two are
+ * observationally identical at the server: the key is only ever USED at save
+ * time, so both send a fresh key for the first save, reuse it on a pure retry,
+ * and rotate it on an edit. `rotate on success/reset` is honored by the caller
+ * clearing its stored state on reset AND on close. Flagged for the owner to
+ * ratify the wording; the design text is not edited here.
+ *
  * Pure: no storage, no clock, no I/O. `mint` is injected. Never throws.
  */
 
@@ -47,6 +58,44 @@ export interface ResolveQuickLogSaveKeyResult {
   /** State the caller MUST store — minting without storing defeats the point. */
   state: QuickLogSaveKeyState;
   decision: QuickLogSaveKeyDecision;
+}
+
+/**
+ * The fields that identify a chosen photo for signature purposes.
+ *
+ * Structural, not `File`, so this module keeps no DOM dependency — a `File`
+ * satisfies it by shape.
+ */
+export interface QuickLogPhotoIdentity {
+  name: string;
+  size: number;
+  type: string;
+  lastModified: number;
+}
+
+/**
+ * Identity of the grower's photo CHOICE.
+ *
+ * All four fields, matching the shipped precedent in
+ * `aiCoachRequestRecoveryRules.ts:38`. Name and size alone do not identify a
+ * file: two different photos can share both (same camera filename after a
+ * re-take, same byte count), and swapping one for the other is a real edit
+ * that must rotate the key rather than silently reuse it.
+ *
+ * Every field is stable across retries of one submission — they describe the
+ * File the grower picked, not the attempt — so widening the identity cannot
+ * introduce per-attempt churn.
+ */
+export function buildQuickLogPhotoIdentity(
+  file: QuickLogPhotoIdentity | null | undefined,
+): QuickLogPhotoIdentity | null {
+  if (!file) return null;
+  return {
+    name: typeof file.name === "string" ? file.name : "",
+    size: typeof file.size === "number" ? file.size : 0,
+    type: typeof file.type === "string" ? file.type : "",
+    lastModified: typeof file.lastModified === "number" ? file.lastModified : 0,
+  };
 }
 
 /** Timestamp fields re-stamped per attempt; never a grower edit. */

@@ -139,6 +139,21 @@ describe("resolveRecentTargetSuggestion — D-B9 validity window", () => {
     expect(suggestion?.tentId).toBe("tent-1");
   });
 
+  it("rejects a visible plant without live grow and tent scope", () => {
+    for (const plant of [
+      { id: "plant-1", name: "Blue Dream #1", grow_id: null, tent_id: "tent-1" },
+      { id: "plant-1", name: "Blue Dream #1", grow_id: "grow-1", tent_id: null },
+    ]) {
+      expect(
+        resolveRecentTargetSuggestion({
+          record: record(),
+          now: NOW,
+          visiblePlants: [plant],
+        }),
+      ).toBeNull();
+    }
+  });
+
   it("returns null (never throws, never falls back) for a null record or bad clock", () => {
     expect(
       resolveRecentTargetSuggestion({ record: null, now: NOW, visiblePlants: PLANTS }),

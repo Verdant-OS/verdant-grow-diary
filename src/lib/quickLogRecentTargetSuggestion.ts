@@ -6,11 +6,12 @@
  * fallback when resolution fails: every failing condition yields no
  * suggestion at all, so an unscoped Quick Log stays a manual selection.
  *
- * Four independent conditions must hold, evaluated with an injectable clock:
+ * Five independent conditions must hold, evaluated with an injectable clock:
  *   1. the stored timestamp parses to a finite instant;
  *   2. it is not in the future (a skewed clock is not evidence);
  *   3. it is at most 14 days old (strictly older → expired);
  *   4. the plant still appears among the grower's own visible rows.
+ *   5. that live row still has the grow and tent scope required for a save.
  *
  * The storage key is namespaced per account, so one browser shared between
  * accounts can never surface another grower's plant. Grow and tent scope are
@@ -122,12 +123,15 @@ export function resolveRecentTargetSuggestion(
 
   const plantName = trimmed(plant.name);
   if (!plantName) return null;
+  const growId = trimmed(plant.grow_id);
+  const tentId = trimmed(plant.tent_id);
+  if (!growId || !tentId) return null;
 
   return {
     plantId: plant.id,
     plantName,
     // Scope comes from the live row, never from storage.
-    growId: trimmed(plant.grow_id) || null,
-    tentId: trimmed(plant.tent_id) || null,
+    growId,
+    tentId,
   };
 }

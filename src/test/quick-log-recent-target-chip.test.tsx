@@ -16,7 +16,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { ReactElement } from "react";
+import { useState, type ReactElement } from "react";
 
 const rpcMock = vi.fn().mockResolvedValue({ data: { ok: true }, error: null });
 
@@ -110,6 +110,18 @@ function renderQL(ui: ReactElement) {
   return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
 }
 
+function ReopenableQuickLog() {
+  const [open, setOpen] = useState(true);
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)}>
+        Open Quick Log
+      </button>
+      <QuickLog open={open} onOpenChange={setOpen} />
+    </>
+  );
+}
+
 beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
   vi.setSystemTime(NOW);
@@ -161,6 +173,40 @@ describe("QuickLog — remembered target is an offer, never a default", () => {
     expect(screen.queryByTestId("quick-log-recent-target-suggestion")).not.toBeInTheDocument();
     expect(screen.getByTestId("quick-log-plant-select")).not.toHaveTextContent("OG Kush");
     expect(screen.getByTestId("quick-log-save")).toBeDisabled();
+  });
+
+  it("offers the remembered target again in a new session after Choose another", () => {
+    seed("verdant.quickLog.lastTarget.v2.u1", "p2", 60_000);
+    renderQL(<ReopenableQuickLog />);
+
+    fireEvent.click(screen.getByTestId("quick-log-recent-target-dismiss"));
+    expect(screen.queryByTestId("quick-log-recent-target-suggestion")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    fireEvent.click(screen.getByRole("button", { name: "Open Quick Log" }));
+
+    expect(screen.getByTestId("quick-log-recent-target-suggestion")).toHaveTextContent(
+      "Continue with OG Kush?",
+    );
+    expect(screen.getByTestId("quick-log-plant-select")).not.toHaveTextContent("OG Kush");
+    expect(screen.getByTestId("quick-log-save")).toBeDisabled();
+  });
+
+  it("offers the remembered target again without preselecting it after an accepted session closes", () => {
+    seed("verdant.quickLog.lastTarget.v2.u1", "p2", 60_000);
+    renderQL(<ReopenableQuickLog />);
+
+    fireEvent.click(screen.getByTestId("quick-log-recent-target-accept"));
+    expect(screen.getByTestId("quick-log-plant-select")).toHaveTextContent("OG Kush");
+
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    fireEvent.click(screen.getByRole("button", { name: "Open Quick Log" }));
+
+    expect(screen.getByTestId("quick-log-recent-target-suggestion")).toHaveTextContent(
+      "Continue with OG Kush?",
+    );
+    expect(screen.getByTestId("quick-log-plant-select")).not.toHaveTextContent("OG Kush");
+    expect(rpcMock).not.toHaveBeenCalled();
   });
 
   it("offers nothing once the record is past its freshness window", () => {

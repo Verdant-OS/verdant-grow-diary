@@ -953,6 +953,7 @@ export default function QuickLog({
     setEventType("observation");
     setPlantId("");
     setDismissedBlockedPrefillKey(null);
+    setRecentSuggestionDismissed(false);
     setStage("");
     stageUserTouchedRef.current = false;
     prevPlantIdRef.current = "";

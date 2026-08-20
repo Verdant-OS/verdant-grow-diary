@@ -202,8 +202,42 @@ Do not adopt on reasoning alone. Phase 0 measures it.
 
 Keep `--with-deps` (so no behavior risk), but change how it fails:
 
-1. **Step-level `timeout-minutes: 3`** on the install step. A stall dies in 3 minutes
+1. **A process-level per-attempt timeout of 3 minutes.** A stall dies in 3 minutes
    instead of eating 15–75.
+
+   **Not `timeout-minutes`.** A composite action's `runs.steps` does not support that
+   key — [the metadata syntax for composite `runs.steps`](https://docs.github.com/en/actions/sharing-automations/creating-actions/metadata-syntax-for-github-actions#runssteps)
+   lists `run`, `shell`, `env`, `working-directory`, `if`, `id`, `name`, `uses` and
+   `with`, and nothing else. Putting `timeout-minutes` on the **caller's** step instead
+   caps all three attempts together, which defeats the retry: one 9-minute stall would
+   consume the budget before attempt 2 ever started.
+
+   **A bare `timeout(1)` is not enough either.** `timeout` signals only its direct
+   child. The stall is in `apt`, which `playwright install` spawns — so the parent dies,
+   the step reports failure, and apt keeps holding the runner. The attempt must run in
+   its **own process group** and the timeout must signal the **group**:
+
+   ```bash
+   attempt() {                      # $1 = seconds, $2… = command
+     local secs="$1"; shift
+     setsid "$@" &                  # new process group; $! is the PGID
+     local pgid=$!
+     ( sleep "$secs"
+       kill -TERM -- -"$pgid" 2>/dev/null
+       sleep 30
+       kill -KILL -- -"$pgid" 2>/dev/null ) &
+     local watchdog=$!
+     wait "$pgid"; local rc=$?
+     kill "$watchdog" 2>/dev/null
+     return "$rc"
+   }
+   ```
+
+   `coreutils` `timeout` may stand in for the watchdog **only** with the command
+   launched into its own group and the signal directed at that group. The requirement is
+   the group, not the tool — and §6's fault-injection variant is what proves it, by
+   asserting no `apt` process survives a killed attempt.
+
 2. **apt resilience config** written before the install:
    `Acquire::Retries "3";` and `Acquire::http::Timeout "20";` in
    `/etc/apt/apt.conf.d/`, so apt itself gives up and retries rather than hanging.
@@ -268,12 +302,12 @@ apt tax it may not owe.
 
 Inputs (mirroring `require-ci-secret`'s documentation density):
 
-| Input                     | Required | Default    | Purpose                                                                                                                                                                                                                            |
-| ------------------------- | -------- | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `browsers`                | no       | `chromium` | Passed through verbatim; **must accept a matrix expression** for `google-analytics-e2e.yml`                                                                                                                                        |
-| `with-deps`               | no       | `auto`     | `true` \| `false` \| `auto`. Kept `true` throughout Phase 1. `auto` is what Phase 2 switches to — it resolves to `false` only when the runner's live provenance matches the recorded `PASS`, and to `true` otherwise (see Phase 2) |
-| `attempts`                | no       | `3`        | Bounded retry count                                                                                                                                                                                                                |
-| `attempt-timeout-minutes` | no       | `3`        | Per-attempt cap                                                                                                                                                                                                                    |
+| Input                     | Required | Default    | Purpose                                                                                                                                                                                                                                                                                                                                                                         |
+| ------------------------- | -------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `browsers`                | no       | `chromium` | Passed through verbatim; **must accept a matrix expression** for `google-analytics-e2e.yml`                                                                                                                                                                                                                                                                                     |
+| `with-deps`               | no       | **`true`** | `true` \| `false` \| `auto`. The default is `true` in Phase 1 and **must stay `true` until Phase 2 is separately approved** — Phase 1 is behavior-preserving, and a Phase 0 `PASS` alone must not silently start dropping `--with-deps`. `auto` is accepted by the action from the start so Phase 2 is a default change rather than a schema change, but nothing selects it yet |
+| `attempts`                | no       | `3`        | Bounded retry count                                                                                                                                                                                                                                                                                                                                                             |
+| `attempt-timeout-minutes` | no       | `3`        | Per-attempt cap, enforced by the process-group timeout in §4 Option C — **not** by `timeout-minutes`, which composite steps do not support                                                                                                                                                                                                                                      |
 
 Behavior: write the apt resilience config; loop up to `attempts`, each bounded by
 `attempt-timeout-minutes`; on total failure, `::error::` naming this as an apt/mirror
@@ -304,8 +338,10 @@ If Phase 0 returns `FAIL`, `with-deps` stays `true` and Phase 1's retry logic is
 permanent mitigation. Nothing below applies.
 
 If Phase 0 returns `PASS`, a later slice flips the composite action's `with-deps`
-default to **`auto`** — a one-line change in one file, versus 19 edits across two seam
-styles today. That reduction is the payoff of the convergence in Phase 1.
+**default** from `true` to **`auto`** — a one-line change in one file, versus 19 edits
+across two seam styles today. That reduction is the payoff of the convergence in
+Phase 1. Until that slice is approved and merged, Phase 1 installs deps exactly as
+today, whatever Phase 0 recorded.
 
 **`auto`, not `false`. A permanent `false` would be an unsound reading of the
 measurement, and this spec's own §4 says why.**
@@ -371,26 +407,42 @@ action's new logic merges with no regression coverage at all, which the repo's t
 standard does not allow. Neither is acceptable, so the expected set is **data, not a
 literal**.
 
-Phase 1 commits `config/playwright-install-migration.json`:
+Phase 1 commits `config/playwright-install-migration.json`, which **names all 19**:
 
 ```json
 {
-  "total_affected": 19,
+  "affected": [
+    "irrigation-overflow-smoke.yml",
+    "core-link-form-census.yml",
+    "pheno-journey-smoke.yml",
+    "google-analytics-e2e.yml",
+    "ci.yml"
+  ],
   "converged": ["irrigation-overflow-smoke.yml"]
 }
 ```
 
-Every workflow is in exactly one of two states, and the fence asserts the correct thing
-for each: a **converged** file must use the composite action, a **not-yet-converged**
-file must still use one of the three known-good legacy seams (§3.2). Nothing is
-unfenced at any point in the rollout, and no state is unrepresentable.
+(abbreviated — `affected` carries the measured 19 in full.)
 
-`total_affected` is pinned to the measured 19 separately, so the manifest cannot be
-used to shrink the problem — only to record progress through it. `converged` may only
-grow: the fence fails if an entry is removed, which is what makes a silently-reverted
-call site loud. The rollout ends when `converged.length === total_affected`, and the
-final assertion is exactly that equality — the same coverage guarantee the hardcoded 19
-was reaching for, now reachable from the first canary onward.
+**A count would not have been enough, and this is the trap it walks into.** With only
+`total_affected: 19` plus the converged names, the manifest cannot say which 18 files
+remain, so the fence has to rediscover them by looking for install steps. If an install
+step then _disappears_ from a not-yet-converged workflow, discovery stops classifying
+that file as affected, the count still reads 19, and the composite-action total still
+equals `converged.length`. The not-yet-converged assertion then passes over a set that
+no longer contains the broken file, certifying a workflow that silently stopped
+installing browsers at all. The fence would be measuring its own blind spot.
+
+Naming all 19 closes it: the set is **data, not a discovery result**, so a file cannot
+leave the problem by changing. Every named file must be in exactly one rollout state,
+and a file in neither fails loudly — which is precisely the case above.
+
+`affected` is pinned to the measured 19 and may not shrink, so the manifest cannot make
+the problem smaller, only record progress through it. `converged` may only grow: the
+fence fails if an entry is removed, which is what makes a silently-reverted call site
+loud. The rollout ends when `converged` equals `affected`, and the final assertion is
+exactly that equality — the same coverage guarantee the hardcoded 19 was reaching for,
+now reachable from the first canary onward.
 
 1. **Happy path** — every workflow listed in `converged` installs Playwright browsers
    via `uses: ./.github/actions/install-playwright-browsers`.
@@ -405,18 +457,23 @@ was reaching for, now reachable from the first canary onward.
    `echo` inside a heredoc from a `run:` step. Without this the fence is a plain grep and
    will either fail spuriously or force a corrupting edit.
 5. **Coverage count** — the number of workflows wired to the composite action equals
-   `converged.length`, and `total_affected` equals the measured affected set (**19** at
+   `converged.length`, and `affected` holds exactly the measured set (**19** at
    `fc11a560`), so a silently-dropped call site fails loudly rather than passing by
    absence. A file wired to the composite action but absent from `converged` fails too:
    the manifest must describe the tree, not lag it.
-   5b. **Not-yet-converged files are still fenced** — every affected workflow outside
-   `converged` must match one of §3.2's three legacy seams. This is what makes a
-   partial rollout safe to merge: a file cannot quietly stop installing browsers at
-   all, in either direction.
-   5c. **Monotonic manifest** — a fixture whose `converged` list has lost an entry
-   relative to the committed one fails. Progress is one-way.
-   5d. **Completion** — when `converged.length === total_affected`, assertion 5b's set is
-   empty and the fence is the original all-19 guarantee, reached incrementally.
+   5b. **Every named file is in exactly one state** — each entry in `affected` either
+   uses the composite action (and is listed in `converged`) or still matches one of
+   §3.2's three legacy seams. A file in **neither** state fails. This is the assertion
+   that catches a workflow which quietly stopped installing browsers at all, and it is
+   why `affected` is enumerated rather than counted: a rediscovered set would simply
+   lose that file and pass over it.
+   5c. **The manifest matches the tree** — `affected` is compared against a fresh
+   discovery pass, and a file that discovery finds but the manifest omits fails.
+   Otherwise a newly-added browser workflow rides in unfenced.
+   5d. **Monotonic** — a fixture whose `converged` list has lost an entry relative to
+   the committed one fails. Progress is one-way.
+   5e. **Completion** — when `converged` equals `affected`, 5b's legacy branch is empty
+   and the fence is the original all-19 guarantee, reached incrementally.
 6. **Matrix preservation** — `google-analytics-e2e.yml` still passes
    `${{ matrix.browser }}`, not a hardcoded `chromium`.
 7. **Null/invalid** — a workflow with no Playwright usage is unaffected.
@@ -434,9 +491,18 @@ bunx vitest run --reporter=dot        # or the shard scripts
 from a unit test. Phase 1's real evidence is that the 19 affected workflows still go
 green on the implementation PR. That proves the happy path only — **it does not prove
 the retry works**, because the retry needs a live apt stall to exercise. State this as
-`NOT_MEASURED` rather than claiming the mitigation is verified. Consider a
-`workflow_dispatch` fault-injection variant (unreachable apt host) if Cheek wants the
-retry path genuinely proven.
+`NOT_MEASURED` rather than claiming the mitigation is verified.
+
+**One runtime proof is required rather than optional**, because §4 Option C's timeout
+is only correct if it kills the process _group_: a `workflow_dispatch` fault-injection
+variant that points apt at an unreachable host, runs one attempt, and asserts that
+after the timeout fires **no `apt`/`apt-get`/`dpkg` process survives**. Signalling only
+the direct child leaves apt holding the runner while the step reports failure — the
+failure mode that makes a bare `timeout(1)` look like it works. Without this the
+per-attempt cap is `NOT_MEASURED` in the way that matters.
+
+The compounded-retry claim (three attempts at ~50% each) stays `NOT_MEASURED`
+regardless; it needs a real mirror stall, which cannot be summoned on demand.
 
 ---
 
@@ -464,6 +530,9 @@ its own merge.
 | Phase 2 flipped without Phase 0 evidence                                                                           | Low                                                          | Phase 2 requires its own approval and cites the Phase 0 measurement                                                                                                              |
 | `with-deps: false` outlives the image or Playwright revision it was measured on, blocking all 19 workflows at once | Medium — both float (`ubuntu-latest`, future upgrades)       | Phase 2 ships `auto`, not `false`: unrecognised provenance takes the slow apt branch, never the blocking one. A Playwright bump turns the provenance fence red in the bumping PR |
 | The Phase 1 fence has no passing placement during the canary merge                                                 | **Certain** if the expected set is hardcoded at 19           | The expected set is a committed manifest; converged and not-yet-converged files are each fenced for their own state                                                              |
+| A not-yet-converged workflow silently stops installing browsers and the fence passes over it                       | Medium — invisible to a rediscovered set                     | The manifest enumerates all 19 by name; a file in neither rollout state fails (5b), and manifest-vs-discovery drift fails (5c)                                                   |
+| Composite `runs.steps` cannot express `timeout-minutes`, so the per-attempt cap silently never exists              | **Certain** as originally written — the key is unsupported   | §4 Option C specifies a process-group timeout instead; §6's fault-injection variant asserts no `apt` process survives a killed attempt                                           |
+| Phase 1 drops `--with-deps` early because the input default was already `auto`                                     | **Certain** if the default is not `true`                     | The Phase 1 default is `true`; only the separately-approved Phase 2 slice changes it                                                                                             |
 
 **Rollback:** revert the PR. The composite action is additive and every call site is a
 mechanical substitution, so a revert restores the prior inline commands exactly. No

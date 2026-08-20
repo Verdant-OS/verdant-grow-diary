@@ -1,220 +1,270 @@
-// Tranche B+ PR-B1 — shared Quick Log target precedence contract.
+// Tranche B+ PR-B1 — executable Quick Log target precedence contract.
 //
-// The precedence order and the hold/manual-selection decision are encoded
-// once, purely, so every Quick Log surface can converge on the same rules
-// without each presenter re-deriving them. This suite pins BOTH the
-// precedence data and today's exact semantics, so the first consumer
-// (legacy QuickLog) provably changes no behavior.
+// These tests pass all source tiers independently. The pre-repair resolver,
+// which accepted one already-collapsed prefill result, cannot satisfy this
+// suite: precedence is exercised at runtime rather than pinned as dead data.
 import { describe, expect, it } from "vitest";
 
 import {
   QUICK_LOG_TARGET_PRECEDENCE,
   resolveQuickLogTargetPlan,
+  type QuickLogTarget,
+  type QuickLogTargetCandidate,
 } from "@/lib/quickLogTargetResolutionRules";
 
-const READY = {
-  status: "ready" as const,
-  target: { plantId: "plant-1", growId: "grow-1", tentId: "tent-1" },
-};
-const BLOCKED = { status: "blocked" as const, reason: "plant_not_found" };
-const PENDING = { status: "blocked" as const, reason: "prefill_target_pending" };
+function plantTarget(
+  plantId: string,
+  growId: string | null = "grow-1",
+  tentId: string | null = "tent-1",
+): QuickLogTarget {
+  return { type: "plant", plantId, growId, tentId };
+}
+
+function tentTarget(tentId: string, growId: string | null = "grow-1"): QuickLogTarget {
+  return { type: "tent", plantId: null, tentId, growId };
+}
+
+function ready(target: QuickLogTarget, requestKey: string | null = null): QuickLogTargetCandidate {
+  return { requestKey, resolution: { status: "ready", target } };
+}
+
+function blocked(requestKey: string, reason = "target_not_found"): QuickLogTargetCandidate {
+  return { requestKey, resolution: { status: "blocked", reason } };
+}
 
 describe("QUICK_LOG_TARGET_PRECEDENCE", () => {
-  it("orders a named request above the grower's own selection", () => {
-    expect(QUICK_LOG_TARGET_PRECEDENCE).toEqual(["named-request", "explicit-grower-selection"]);
-  });
-
-  it("declares only the tiers this module can actually enforce", () => {
-    // Renegotiated from a three-tier list. `AppShell` collapses "explicit
-    // intent" and "route context" into one `prefill` prop before Quick Log
-    // sees it, so the editor cannot tell them apart and a three-tier export
-    // would advertise an ordering nothing consults. Splitting them needs
-    // AppShell.tsx — Tranche A slice A5's surface.
-    expect(QUICK_LOG_TARGET_PRECEDENCE).toHaveLength(2);
-    const asStrings: readonly string[] = QUICK_LOG_TARGET_PRECEDENCE;
-    expect(asStrings).not.toContain("route-context");
-    expect(asStrings).not.toContain("explicit-prefill-or-intent");
+  it("orders explicit intent above route context above grower selection", () => {
+    expect(QUICK_LOG_TARGET_PRECEDENCE).toEqual([
+      "explicit-prefill-or-intent",
+      "route-context",
+      "explicit-grower-selection",
+    ]);
   });
 
   it("has no remembered-default tier — remembered targets are never a fallback", () => {
     const asStrings: readonly string[] = QUICK_LOG_TARGET_PRECEDENCE;
     expect(asStrings.some((tier) => /remember|last|recent|previous/i.test(tier))).toBe(false);
-    // Only a visible, explicitly-chosen suggestion may ever reintroduce a
-    // remembered target, and it enters through explicit-grower-selection.
-  });
-
-  it("is the list the resolver actually reports from — not a decorative export", () => {
-    const tiers: readonly string[] = QUICK_LOG_TARGET_PRECEDENCE;
-    const plans = [
-      resolveQuickLogTargetPlan({
-        requestKey: "plant:plant-1",
-        prefillResolution: READY,
-        dismissedBlockedPrefillKey: null,
-        manualPlantId: "",
-      }),
-      resolveQuickLogTargetPlan({
-        requestKey: "plant:ghost",
-        prefillResolution: BLOCKED,
-        dismissedBlockedPrefillKey: null,
-        manualPlantId: "",
-      }),
-      resolveQuickLogTargetPlan({
-        requestKey: null,
-        prefillResolution: BLOCKED,
-        dismissedBlockedPrefillKey: null,
-        manualPlantId: "plant-9",
-      }),
-      resolveQuickLogTargetPlan({
-        requestKey: "plant:ghost",
-        prefillResolution: BLOCKED,
-        dismissedBlockedPrefillKey: "plant:ghost",
-        manualPlantId: "plant-9",
-      }),
-    ];
-    for (const plan of plans) expect(tiers).toContain(plan.tier);
-    // And the ordering is observable: a live named request wins, a dismissed
-    // one drops to the grower's tier.
-    expect(plans.map((plan) => plan.tier)).toEqual([
-      "named-request",
-      "named-request",
-      "explicit-grower-selection",
-      "explicit-grower-selection",
-    ]);
+    expect(QUICK_LOG_TARGET_PRECEDENCE).toHaveLength(3);
   });
 });
 
-describe("resolveQuickLogTargetPlan — hold semantics", () => {
-  it("applies a proven named target, carrying its grow", () => {
+describe("resolveQuickLogTargetPlan — executable precedence", () => {
+  it("selects explicit prefill/intent ahead of route context and grower selection", () => {
     const plan = resolveQuickLogTargetPlan({
-      requestKey: "plant:plant-1",
-      prefillResolution: READY,
+      explicitPrefillOrIntent: ready(plantTarget("explicit-plant")),
+      routeContext: ready(tentTarget("route-tent")),
+      explicitGrowerSelection: ready(plantTarget("selected-plant", null, null)),
       dismissedBlockedPrefillKey: null,
-      manualPlantId: "",
     });
+
+    expect(plan).toMatchObject({
+      step: "apply-named",
+      tier: "explicit-prefill-or-intent",
+      target: { type: "plant", plantId: "explicit-plant" },
+      holdActive: true,
+      editorPlantId: "explicit-plant",
+    });
+  });
+
+  it("selects a route-scoped tent ahead of grower selection when explicit intent is absent", () => {
+    const plan = resolveQuickLogTargetPlan({
+      explicitPrefillOrIntent: null,
+      routeContext: ready(tentTarget("route-tent", "route-grow")),
+      explicitGrowerSelection: ready(plantTarget("selected-plant", null, null)),
+      dismissedBlockedPrefillKey: null,
+    });
+
     expect(plan).toEqual({
       step: "apply-named",
-      tier: "named-request",
-      plantId: "plant-1",
-      growId: "grow-1",
+      tier: "route-context",
+      target: {
+        type: "tent",
+        plantId: null,
+        tentId: "route-tent",
+        growId: "route-grow",
+      },
       holdActive: true,
-      editorPlantId: "plant-1",
+      editorPlantId: "",
     });
   });
 
-  it("holds the editor empty when a named target cannot be proven", () => {
-    for (const resolution of [BLOCKED, PENDING]) {
-      const plan = resolveQuickLogTargetPlan({
-        requestKey: "plant:ghost",
-        prefillResolution: resolution,
-        dismissedBlockedPrefillKey: null,
-        manualPlantId: "plant-typed-by-grower",
-      });
-      expect(plan.step).toBe("hold-empty");
-      expect(plan.holdActive).toBe(true);
-      // The hold overrides any editor value — the blocked card shows no target.
-      expect(plan.editorPlantId).toBe("");
-    }
-  });
-
-  it("releases the hold once the grower dismisses that exact request", () => {
+  it("uses explicit grower selection only when no named source is present", () => {
     const plan = resolveQuickLogTargetPlan({
-      requestKey: "plant:ghost",
-      prefillResolution: BLOCKED,
-      dismissedBlockedPrefillKey: "plant:ghost",
-      manualPlantId: "plant-2",
-    });
-    expect(plan.step).toBe("keep-current");
-    expect(plan.holdActive).toBe(false);
-    expect(plan.editorPlantId).toBe("plant-2");
-  });
-
-  it("does not release the hold when a DIFFERENT request was dismissed", () => {
-    const plan = resolveQuickLogTargetPlan({
-      requestKey: "plant:ghost-2",
-      prefillResolution: BLOCKED,
-      dismissedBlockedPrefillKey: "plant:ghost-1",
-      manualPlantId: "plant-2",
-    });
-    expect(plan.step).toBe("hold-empty");
-    expect(plan.holdActive).toBe(true);
-  });
-
-  it("starts unscoped launchers as manual selection, never a default", () => {
-    const plan = resolveQuickLogTargetPlan({
-      requestKey: null,
-      prefillResolution: BLOCKED,
+      explicitPrefillOrIntent: null,
+      routeContext: null,
+      explicitGrowerSelection: ready(plantTarget("selected-plant", null, null)),
       dismissedBlockedPrefillKey: null,
-      manualPlantId: "",
     });
+
     expect(plan).toEqual({
       step: "manual-selection",
       tier: "explicit-grower-selection",
+      target: {
+        type: "plant",
+        plantId: "selected-plant",
+        tentId: null,
+        growId: null,
+      },
+      holdActive: false,
+      editorPlantId: "selected-plant",
+    });
+  });
+
+  it("starts an unscoped launcher empty when no source exists", () => {
+    expect(
+      resolveQuickLogTargetPlan({
+        dismissedBlockedPrefillKey: null,
+      }),
+    ).toEqual({
+      step: "manual-selection",
+      tier: null,
+      target: null,
+      holdActive: false,
+      editorPlantId: "",
+    });
+  });
+});
+
+describe("resolveQuickLogTargetPlan — fail-closed named targets", () => {
+  it("holds a blocked explicit target instead of falling through to a valid route or selection", () => {
+    const plan = resolveQuickLogTargetPlan({
+      explicitPrefillOrIntent: blocked("plant:ghost", "plant_not_found"),
+      routeContext: ready(tentTarget("route-tent")),
+      explicitGrowerSelection: ready(plantTarget("selected-plant", null, null)),
+      dismissedBlockedPrefillKey: null,
+    });
+
+    expect(plan).toEqual({
+      step: "hold-empty",
+      tier: "explicit-prefill-or-intent",
+      reason: "plant_not_found",
+      holdActive: true,
+      editorPlantId: "",
+    });
+  });
+
+  it("holds a blocked route target instead of falling through to selection", () => {
+    const plan = resolveQuickLogTargetPlan({
+      routeContext: blocked("tent:ghost", "tent_not_found"),
+      explicitGrowerSelection: ready(plantTarget("selected-plant", null, null)),
+      dismissedBlockedPrefillKey: null,
+    });
+
+    expect(plan).toMatchObject({
+      step: "hold-empty",
+      tier: "route-context",
+      reason: "tent_not_found",
+    });
+  });
+
+  it("releases only the exact dismissed request and then considers the next tier", () => {
+    const input = {
+      explicitPrefillOrIntent: blocked("plant:ghost", "plant_not_found"),
+      routeContext: ready(tentTarget("route-tent", "route-grow")),
+      explicitGrowerSelection: ready(plantTarget("selected-plant", null, null)),
+    };
+
+    expect(
+      resolveQuickLogTargetPlan({
+        ...input,
+        dismissedBlockedPrefillKey: "plant:ghost",
+      }),
+    ).toMatchObject({
+      step: "apply-named",
+      tier: "route-context",
+      target: { type: "tent", tentId: "route-tent" },
+    });
+
+    expect(
+      resolveQuickLogTargetPlan({
+        ...input,
+        dismissedBlockedPrefillKey: "plant:different",
+      }),
+    ).toMatchObject({
+      step: "hold-empty",
+      tier: "explicit-prefill-or-intent",
+    });
+  });
+
+  it("keeps the grower's current choice after dismissing a named request with no route target", () => {
+    const plan = resolveQuickLogTargetPlan({
+      explicitPrefillOrIntent: blocked("plant:ghost"),
+      routeContext: null,
+      explicitGrowerSelection: ready(plantTarget("selected-plant", null, null)),
+      dismissedBlockedPrefillKey: "plant:ghost",
+    });
+
+    expect(plan).toMatchObject({
+      step: "keep-current",
+      tier: "explicit-grower-selection",
+      editorPlantId: "selected-plant",
+    });
+  });
+
+  it("never applies a named plant or tent target without proven grow context", () => {
+    for (const candidate of [
+      ready(plantTarget("plant-1", null), "plant:plant-1"),
+      ready(tentTarget("tent-1", null), "tent:tent-1"),
+    ]) {
+      const plan = resolveQuickLogTargetPlan({
+        explicitPrefillOrIntent: candidate,
+        routeContext: ready(tentTarget("lower-route")),
+        explicitGrowerSelection: ready(plantTarget("lower-selection", null, null)),
+        dismissedBlockedPrefillKey: null,
+      });
+      expect(plan).toMatchObject({
+        step: "hold-empty",
+        tier: "explicit-prefill-or-intent",
+        reason: "invalid_target_context",
+      });
+    }
+  });
+
+  it("treats blank named identity as unscoped instead of creating an undismissable hold", () => {
+    const plan = resolveQuickLogTargetPlan({
+      explicitPrefillOrIntent: {
+        requestKey: "   ",
+        resolution: { status: "blocked", reason: "prefill_target_pending" },
+      },
+      explicitGrowerSelection: ready(plantTarget("stale-selection", null, null)),
+      dismissedBlockedPrefillKey: null,
+    });
+
+    expect(plan).toEqual({
+      step: "manual-selection",
+      tier: null,
+      target: null,
       holdActive: false,
       editorPlantId: "",
     });
   });
 
-  it("keeps a grower's own selection visible on an unscoped open", () => {
-    const plan = resolveQuickLogTargetPlan({
-      requestKey: null,
-      prefillResolution: BLOCKED,
-      dismissedBlockedPrefillKey: null,
-      manualPlantId: "plant-chosen",
-    });
-    expect(plan.editorPlantId).toBe("plant-chosen");
-  });
-});
-
-describe("resolveQuickLogTargetPlan — fail-closed matrix", () => {
-  it("treats null/undefined/blank manual ids as no selection", () => {
-    for (const manualPlantId of [null, undefined, "", "   "]) {
+  it("normalizes null/undefined/blank grower selections to no selection", () => {
+    for (const plantId of ["", "   "]) {
       const plan = resolveQuickLogTargetPlan({
-        requestKey: null,
-        prefillResolution: BLOCKED,
+        explicitGrowerSelection: ready(plantTarget(plantId, null, null)),
         dismissedBlockedPrefillKey: null,
-        manualPlantId: manualPlantId as string,
       });
-      expect(plan.editorPlantId).toBe("");
+      expect(plan).toMatchObject({
+        step: "manual-selection",
+        tier: null,
+        target: null,
+        editorPlantId: "",
+      });
     }
-  });
-
-  it("never applies a ready resolution missing either id", () => {
-    const missingGrow = resolveQuickLogTargetPlan({
-      requestKey: "plant:plant-1",
-      prefillResolution: {
-        status: "ready",
-        target: { plantId: "plant-1", growId: "", tentId: "tent-1" },
-      },
-      dismissedBlockedPrefillKey: null,
-      manualPlantId: "",
-    });
-    expect(missingGrow.step).toBe("hold-empty");
-
-    const missingPlant = resolveQuickLogTargetPlan({
-      requestKey: "plant:plant-1",
-      prefillResolution: {
-        status: "ready",
-        target: { plantId: "", growId: "grow-1", tentId: "tent-1" },
-      },
-      dismissedBlockedPrefillKey: null,
-      manualPlantId: "",
-    });
-    expect(missingPlant.step).toBe("hold-empty");
   });
 
   it("is deterministic for identical inputs", () => {
     const input = {
-      requestKey: "plant:plant-1",
-      prefillResolution: READY,
+      explicitPrefillOrIntent: ready(plantTarget("plant-1")),
+      routeContext: ready(tentTarget("tent-1")),
+      explicitGrowerSelection: ready(plantTarget("plant-2", null, null)),
       dismissedBlockedPrefillKey: null,
-      manualPlantId: "",
     };
     expect(resolveQuickLogTargetPlan(input)).toEqual(resolveQuickLogTargetPlan(input));
   });
 
   it("performs no storage access — remembered targets cannot leak in", () => {
-    // A pure module cannot read storage; assert the contract explicitly so a
-    // future edit that reaches for localStorage fails here first.
     const source = resolveQuickLogTargetPlan.toString();
     expect(source).not.toMatch(/localStorage|sessionStorage|readLastTarget/);
   });

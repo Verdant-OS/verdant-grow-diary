@@ -39,7 +39,13 @@ const ROOT = resolve(__dirname, "../..");
 const MIGRATIONS_DIR = resolve(ROOT, "supabase/migrations");
 
 function stripComments(sql: string): string {
-  return sql.replace(/\r\n?/g, "\n").replace(/^\s*--.*$/gm, "");
+  // Strip block comments first, then `--` comments through end-of-line.
+  // The forward fence accepts only this executable projection: commented
+  // examples must never satisfy a later re-grant and hide a real revoke.
+  return sql
+    .replace(/\r\n?/g, "\n")
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/--[^\n]*/g, " ");
 }
 
 function loadMigration(relPath: string): string {
@@ -270,6 +276,14 @@ describe("forward fence — migrations newer than the forward repair", () => {
          GRANT EXECUTE ON ALL ROUTINES IN SCHEMA public TO authenticated, service_role;`,
       ),
     ).toBe(false);
+    // A commented schema-wide GRANT is not executable SQL and must not hide
+    // the live revoke in the corpus path used by the forward fence.
+    expect(
+      migrationLeavesWrapperWithoutRequiredGrant(
+        stripComments(`REVOKE EXECUTE ON ROUTINE public.quicklog_save_manual(text) FROM authenticated;
+          /* GRANT EXECUTE ON ALL ROUTINES IN SCHEMA public TO authenticated; */`),
+      ),
+    ).toBe(true);
     // The private delegate's own REVOKEs stay out of scope under ROUTINE too.
     expect(
       migrationLeavesWrapperWithoutRequiredGrant(

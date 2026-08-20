@@ -13,10 +13,12 @@
  *    source of truth for source-label display.
  */
 import type { SensorReadingSource } from "@/mock";
+import { validateManualSnapshot } from "@/lib/manualSensorSnapshotRules";
 import { resolveSensorSourceLabel, type ResolvedSourceLabel } from "@/lib/sensorSourceLabelRules";
 import { tempFFromC } from "@/lib/temperatureUnits";
 
-export type TimelineSensorChipMetric = "temp_f" | "temp_c" | "rh" | "vpd" | "soil_moisture" | "co2";
+export type TimelineSensorChipMetric =
+  "temp_f" | "temp_c" | "rh" | "ph" | "ec" | "vpd" | "soil_moisture" | "co2";
 
 export interface TimelineSensorChip {
   metric: TimelineSensorChipMetric;
@@ -32,10 +34,13 @@ export interface TimelineSensorChip {
 
 export type TimelineSensorSnapshotViewModel =
   | { kind: "none" }
-  | { kind: "invalid"; message: string }
+  | { kind: "invalid"; message: string; errors?: string[]; warnings?: string[] }
   | {
       kind: "chips";
       chips: TimelineSensorChip[];
+      /** Existing manual-snapshot validation findings, when requested. */
+      errors: string[];
+      warnings: string[];
       /** Resolved source label; null when no source was provided. */
       sourceLabel: string | null;
       /** Resolved source details, for data-attr / styling hooks. */
@@ -45,6 +50,7 @@ export type TimelineSensorSnapshotViewModel =
     };
 
 const UNAVAILABLE_MESSAGE = "Sensor snapshot unavailable";
+const MANUAL_REVIEW_MESSAGE = "Review manual snapshot — invalid readings were not shown.";
 
 function isFiniteNumber(v: unknown): v is number {
   return typeof v === "number" && Number.isFinite(v);
@@ -83,8 +89,8 @@ function readSource(raw: unknown): SensorReadingSource | null {
  *
  * Accepted shapes (all optional, only finite values rendered):
  *   { temp_f|temperature_f|temp_c|temperature_c|temp|temperature,
- *     rh|humidity, vpd|vpd_kpa,
- *     soil_moisture|soil_water_content|swc,
+ *     rh|humidity|humidity_percent, ph, ec, vpd|vpd_kpa,
+ *     soil|soil_moisture|soil_water_content|swc,
  *     co2|co2_ppm,
  *     source, vendor, metadata: { vendor } }
  *
@@ -95,7 +101,7 @@ function readSource(raw: unknown): SensorReadingSource | null {
  */
 export function buildTimelineSensorSnapshotViewModel(
   input: unknown,
-  options: { preferUnit?: "F" | "C" } = {},
+  options: { preferUnit?: "F" | "C"; validateManualCompatibility?: boolean } = {},
 ): TimelineSensorSnapshotViewModel {
   if (input === null || input === undefined) return { kind: "none" };
   if (typeof input !== "object") {
@@ -108,10 +114,20 @@ export function buildTimelineSensorSnapshotViewModel(
   const tempF = pick(obj, "temp_f", "temperature_f", "tempF", "temperatureF");
   const tempC = pick(obj, "temp_c", "temperature_c", "tempC", "temperatureC");
   const tempGeneric = pick(obj, "temp", "temperature");
-  const rh = pick(obj, "rh", "humidity", "relative_humidity", "relativeHumidity");
+  const rh = pick(
+    obj,
+    "rh",
+    "humidity",
+    "humidity_percent",
+    "relative_humidity",
+    "relativeHumidity",
+  );
+  const ph = pick(obj, "ph");
+  const ec = pick(obj, "ec", "ec_ms_cm", "ecMsCm");
   const vpd = pick(obj, "vpd", "vpd_kpa", "vpdKpa");
   const soil = pick(
     obj,
+    "soil",
     "soil_moisture",
     "soilMoisture",
     "soil_water_content",
@@ -120,10 +136,27 @@ export function buildTimelineSensorSnapshotViewModel(
   );
   const co2 = pick(obj, "co2", "co2_ppm", "co2Ppm");
 
+  const manualValidation = options.validateManualCompatibility
+    ? validateManualSnapshot({
+        airTemp: isFiniteNumber(tempF) ? tempF : isFiniteNumber(tempC) ? tempC : null,
+        airTempUnit: isFiniteNumber(tempF) ? "F" : "C",
+        humidityPct: isFiniteNumber(rh) ? rh : null,
+        vpdKpa: isFiniteNumber(vpd) ? vpd : null,
+        co2Ppm: isFiniteNumber(co2) ? co2 : null,
+        soilMoisturePct: isFiniteNumber(soil) ? soil : null,
+        reservoirPh: isFiniteNumber(ph) ? ph : null,
+        reservoirEc: isFiniteNumber(ec) ? ec : null,
+        reservoirEcUnit: "mS/cm",
+      })
+    : null;
+  const allowedManualFields = new Set(manualValidation?.metrics.map((metric) => metric.field));
+  const allows = (field: Parameters<typeof allowedManualFields.has>[0]): boolean =>
+    manualValidation === null || allowedManualFields.has(field);
+
   const chips: TimelineSensorChip[] = [];
 
   // Temperature chip — never double-convert explicit Fahrenheit values.
-  if (isFiniteNumber(tempF)) {
+  if (isFiniteNumber(tempF) && allows("air_temp_c")) {
     const v = roundTo(tempF, 1);
     chips.push({
       metric: "temp_f",
@@ -132,7 +165,7 @@ export function buildTimelineSensorSnapshotViewModel(
       unit: "°F",
       display: `${v}°F`,
     });
-  } else if (isFiniteNumber(tempC)) {
+  } else if (isFiniteNumber(tempC) && allows("air_temp_c")) {
     if (options.preferUnit === "C") {
       const v = roundTo(tempC, 1);
       chips.push({
@@ -162,7 +195,7 @@ export function buildTimelineSensorSnapshotViewModel(
     chips.push({ metric, label: "Temp", value: v, unit, display: `${v}${unit}` });
   }
 
-  if (isFiniteNumber(rh)) {
+  if (isFiniteNumber(rh) && allows("humidity_pct")) {
     const v = roundTo(rh, 1);
     chips.push({
       metric: "rh",
@@ -173,7 +206,23 @@ export function buildTimelineSensorSnapshotViewModel(
     });
   }
 
-  if (isFiniteNumber(vpd)) {
+  if (isFiniteNumber(ph) && allows("reservoir_ph")) {
+    const v = roundTo(ph, 2);
+    chips.push({ metric: "ph", label: "pH", value: v, unit: "pH", display: `${v} pH` });
+  }
+
+  if (isFiniteNumber(ec) && allows("reservoir_ec_mscm")) {
+    const v = roundTo(ec, 2);
+    chips.push({
+      metric: "ec",
+      label: "EC",
+      value: v,
+      unit: "mS/cm",
+      display: `${v} mS/cm`,
+    });
+  }
+
+  if (isFiniteNumber(vpd) && allows("vpd_kpa")) {
     const v = roundTo(vpd, 2);
     chips.push({
       metric: "vpd",
@@ -184,7 +233,7 @@ export function buildTimelineSensorSnapshotViewModel(
     });
   }
 
-  if (isFiniteNumber(soil)) {
+  if (isFiniteNumber(soil) && allows("soil_moisture_pct")) {
     const v = roundTo(soil, 1);
     chips.push({
       metric: "soil_moisture",
@@ -195,7 +244,7 @@ export function buildTimelineSensorSnapshotViewModel(
     });
   }
 
-  if (isFiniteNumber(co2)) {
+  if (isFiniteNumber(co2) && allows("co2_ppm")) {
     const v = Math.round(co2);
     chips.push({
       metric: "co2",
@@ -207,7 +256,12 @@ export function buildTimelineSensorSnapshotViewModel(
   }
 
   if (chips.length === 0) {
-    return { kind: "invalid", message: UNAVAILABLE_MESSAGE };
+    return {
+      kind: "invalid",
+      message: manualValidation?.errors.length ? MANUAL_REVIEW_MESSAGE : UNAVAILABLE_MESSAGE,
+      errors: manualValidation?.errors ?? [],
+      warnings: manualValidation?.warnings ?? [],
+    };
   }
 
   const sourceRaw =
@@ -234,6 +288,8 @@ export function buildTimelineSensorSnapshotViewModel(
   return {
     kind: "chips",
     chips,
+    errors: manualValidation?.errors ?? [],
+    warnings: manualValidation?.warnings ?? [],
     sourceLabel: resolved ? resolved.label : null,
     source: resolved,
     isLive: source === "live",

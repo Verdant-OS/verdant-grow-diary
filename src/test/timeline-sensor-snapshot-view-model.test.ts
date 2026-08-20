@@ -30,6 +30,60 @@ describe("buildTimelineSensorSnapshotViewModel", () => {
     expect(vm.chips[2].display).toBe("1.23 kPa");
   });
 
+  it("maps Plant Quick Log manual snapshot fields without promoting them to live", () => {
+    const vm = buildTimelineSensorSnapshotViewModel({
+      temp_f: 82,
+      humidity_percent: 48,
+      ph: 6.2,
+      ec: 1.65,
+      source: "manual",
+    });
+
+    expect(vm.kind).toBe("chips");
+    if (vm.kind !== "chips") return;
+    expect(vm.chips.map((chip) => chip.display)).toEqual(["82°F", "48%", "6.2 pH", "1.65 mS/cm"]);
+    expect(vm.sourceLabel).toBe("Manual");
+    expect(vm.isLive).toBe(false);
+  });
+
+  it("keeps the exact legacy soil alias visible", () => {
+    const vm = buildTimelineSensorSnapshotViewModel({ temp_f: 70, soil: 42 });
+
+    expect(vm.kind).toBe("chips");
+    if (vm.kind !== "chips") return;
+    expect(vm.chips.map((chip) => chip.display)).toEqual(["70°F", "42%"]);
+  });
+
+  it("fails impossible Plant Quick Log manual values closed", () => {
+    const vm = buildTimelineSensorSnapshotViewModel(
+      { humidity_percent: 150, ph: 99, ec: -2, source: "manual" },
+      { validateManualCompatibility: true },
+    );
+
+    expect(vm.kind).toBe("invalid");
+    if (vm.kind !== "invalid") return;
+    expect(vm.message).toMatch(/review/i);
+    expect(vm.errors).toEqual([
+      "Humidity must be between 0% and 100%.",
+      "Reservoir EC cannot be negative.",
+      "Reservoir pH must be between 0 and 14.",
+    ]);
+  });
+
+  it("carries realistic-range warnings with otherwise visible manual values", () => {
+    const vm = buildTimelineSensorSnapshotViewModel(
+      { ph: 4.2, source: "manual" },
+      { validateManualCompatibility: true },
+    );
+
+    expect(vm.kind).toBe("chips");
+    if (vm.kind !== "chips") return;
+    expect(vm.chips.map((chip) => chip.display)).toEqual(["4.2 pH"]);
+    expect(vm.errors).toEqual([]);
+    expect(vm.warnings).toHaveLength(1);
+    expect(vm.warnings[0]).toMatch(/outside the realistic/i);
+  });
+
   it("renders soil moisture and CO2 only when present", () => {
     const a = buildTimelineSensorSnapshotViewModel({ temp_f: 70 });
     expect(a.kind === "chips" && a.chips.some((c) => c.metric === "soil_moisture")).toBe(false);

@@ -34,6 +34,8 @@ export const FAKE_GROW_ID = "11111111-1111-4111-8111-111111111111";
 export const FAKE_TENT_ID = "22222222-2222-4222-8222-222222222222";
 export const FAKE_PLANT_ID = "33333333-3333-4333-8333-333333333333";
 export const FAKE_GROW_EVENT_ID = "44444444-4444-4444-8444-444444444444";
+/** Distinct from the spine id — production never reuses one id for both rows. */
+export const FAKE_DIARY_ENTRY_ID = "55555555-5555-4555-8555-555555555555";
 
 const FAKE_GROW = {
   id: FAKE_GROW_ID,
@@ -82,12 +84,15 @@ const AGREEMENT_ROWS = [
 ];
 
 export interface MockedWorld {
+  /** Diary companions, linked to a spine row via details.linked_grow_event_id. */
   savedRows: Array<Record<string, unknown>>;
+  /** The typed grow_events spine rows the same save writes. */
+  savedGrowEvents: Array<Record<string, unknown>>;
   rpcMode: "ok" | "fail";
 }
 
 export function createMockedWorld(): MockedWorld {
-  return { savedRows: [], rpcMode: "ok" };
+  return { savedRows: [], savedGrowEvents: [], rpcMode: "ok" };
 }
 
 export async function seedFakeSession(page: Page): Promise<void> {
@@ -188,7 +193,9 @@ export async function mockSignedInSupabase(
             ? [FAKE_GROW]
             : pathname.endsWith("/diary_entries")
               ? world.savedRows
-              : [];
+              : pathname.endsWith("/grow_events")
+                ? world.savedGrowEvents
+                : [];
     await fulfillRows(route, request, rows);
   });
 
@@ -207,16 +214,42 @@ export async function mockSignedInSupabase(
       });
       return;
     }
-    world.savedRows.push({
+    // One canonical save writes TWO rows, exactly as quicklog_save_manual
+    // does: the typed grow_events spine, plus a diary companion carrying
+    // `details.linked_grow_event_id` back to it. Timeline reads BOTH sources
+    // and de-duplicates them into one entry, so a fixture that emits only the
+    // diary row would exercise the fallback path alone — it could not detect a
+    // broken grow-event read, a broken merge, or duplicated evidence.
+    const occurredAt = new Date().toISOString();
+    world.savedGrowEvents.push({
       id: FAKE_GROW_EVENT_ID,
+      grow_id: FAKE_GROW_ID,
+      plant_id: FAKE_PLANT_ID,
+      tent_id: FAKE_TENT_ID,
+      event_type: "observation",
+      occurred_at: occurredAt,
+      note: "Better",
+      source: "manual",
+      is_deleted: false,
+      watering_events: [],
+      feeding_events: [],
+    });
+    world.savedRows.push({
+      id: FAKE_DIARY_ENTRY_ID,
       plant_id: FAKE_PLANT_ID,
       tent_id: FAKE_TENT_ID,
       grow_id: FAKE_GROW_ID,
       event_type: "quick_log",
       note: "Better",
       photo_url: null,
-      entry_at: new Date().toISOString(),
-      details: { event_type: "observation", plant_name: FAKE_PLANT.name },
+      stage: null,
+      entry_at: occurredAt,
+      retracted_at: null,
+      details: {
+        event_type: "observation",
+        plant_name: FAKE_PLANT.name,
+        linked_grow_event_id: FAKE_GROW_EVENT_ID,
+      },
     });
     await route.fulfill({
       status: 200,
@@ -225,7 +258,7 @@ export async function mockSignedInSupabase(
         ok: true,
         grow_event_id: FAKE_GROW_EVENT_ID,
         environment_event_id: null,
-        diary_entry_id: null,
+        diary_entry_id: FAKE_DIARY_ENTRY_ID,
         reused: false,
       }),
     });

@@ -145,11 +145,15 @@ test.describe("One-Tent Loop interaction counter baseline", () => {
     // for one navigation double-counts it.
     await driver.expectRoute("/timeline");
 
-    // Evidence must actually RENDER. Asserting on the mock's backing array
-    // alone would stay green if Timeline loading, grow scoping, merging, or
-    // rendering regressed — the test would claim "correct Timeline evidence"
-    // for an empty page.
-    await expect(page.getByText("Better").first()).toBeVisible({ timeout: 15_000 });
+    // Evidence must actually RENDER, and render EXACTLY ONCE. The mocked
+    // world writes the same two rows production does — a grow_events spine
+    // plus a linked diary companion — so Timeline's dual-source read and its
+    // companion de-duplication are both exercised here. Asserting only that
+    // "Better" appears would pass through the diary fallback alone even if the
+    // grow-event read or the merge were broken; asserting the COUNT is what
+    // proves one canonical save yields one piece of evidence, not two.
+    const timelineEvidence = page.getByTestId("timeline-entry").filter({ hasText: "Better" });
+    await expect(timelineEvidence).toHaveCount(1, { timeout: 15_000 });
 
     const receipt = counter.snapshot();
 
@@ -176,7 +180,11 @@ test.describe("One-Tent Loop interaction counter baseline", () => {
       },
       paid_ai_requests: 0,
     });
-    // The saved row is the single piece of timeline evidence.
+    // One canonical save == one spine row + one linked diary companion.
+    expect(world.savedGrowEvents).toHaveLength(1);
     expect(world.savedRows).toHaveLength(1);
+    expect(world.savedRows[0].details).toMatchObject({
+      linked_grow_event_id: world.savedGrowEvents[0].id,
+    });
   });
 });

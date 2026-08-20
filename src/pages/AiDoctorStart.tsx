@@ -58,29 +58,37 @@ export default function AiDoctorStart() {
   // failure must not throw away a tent `tentsQuery` confirmed the grower owns.
   const scopeReadFailed =
     (!!requestedGrowId && !!growsError) || (!!requestedTentId && tentsQuery.isError);
-  // Neither read retries on its own: `useGrowTents` sets `retry: false` and
-  // the grows store refreshes only on mount. Without an explicit affordance a
-  // single transient failure would disable valid carried context for the whole
-  // life of the page, and the grower's only recovery would be a full reload.
-  // Retry only what actually failed — re-reading a healthy source is waste.
-  const scopeRetrying = growsLoading || tentsQuery.isFetching;
-  // Both scope messages used to end with "Every active plant is listed below."
-  // unconditionally — but when the plants read fails (often the same outage
-  // that broke the scope reads) the list is replaced by an error state, and
-  // when there are no active plants it is replaced by an empty state. Stating
-  // it anyway tells the grower something the page is visibly not doing.
-  const plantsAreListed = !plantsQuery.isLoading && !plantsQuery.isError && options.length > 0;
-  const everyPlantListedSuffix = plantsAreListed ? " Every active plant is listed below." : "";
-  const retryScopeReads = () => {
-    if (requestedGrowId && growsError) void refreshGrows();
-    if (requestedTentId && tentsQuery.isError) void tentsQuery.refetch();
-  };
   const carriedScopeRequested = !!requestedGrowId || !!requestedTentId;
   // Ordering and badges depend on the ownership reads. Rendering the list
   // before they settle shows the unscoped alphabetical order, then reorders
   // and re-badges under the grower's pointer — a link can move mid-click, and
   // a choice made in that window bypasses the carried context entirely.
   const scopeOrderingPending = carriedScopeRequested && !scopeReadsSettled;
+  // Neither read retries on its own: `useGrowTents` sets `retry: false` and
+  // the grows store refreshes only on mount. Without an explicit affordance a
+  // single transient failure would disable valid carried context for the whole
+  // life of the page, and the grower's only recovery would be a full reload.
+  //
+  // Per-parameter for the same reason as settled/failed: both reads always
+  // mount, so a global rule left the button disabled and labelled "Checking…"
+  // while an UNRELATED slow request was in flight and the failed required read
+  // was not being retried at all.
+  const scopeRetrying =
+    (!!requestedGrowId && growsLoading) || (!!requestedTentId && tentsQuery.isFetching);
+  // Both scope messages used to end with "Every active plant is listed below."
+  // unconditionally — but the list is only actually on screen when the plants
+  // read produced one AND scope ordering is not holding it behind a loading
+  // panel. The retry path makes that second condition reachable: clicking
+  // retry sets the scope read loading again while its error still stands, so
+  // the failure paragraph would otherwise describe a list the page has just
+  // replaced.
+  const plantsAreListed =
+    !plantsQuery.isLoading && !plantsQuery.isError && !scopeOrderingPending && options.length > 0;
+  const everyPlantListedSuffix = plantsAreListed ? " Every active plant is listed below." : "";
+  const retryScopeReads = () => {
+    if (requestedGrowId && growsError) void refreshGrows();
+    if (requestedTentId && tentsQuery.isError) void tentsQuery.refetch();
+  };
 
   const scope = useMemo(
     () =>

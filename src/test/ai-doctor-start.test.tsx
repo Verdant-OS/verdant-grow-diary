@@ -435,6 +435,44 @@ describe("AiDoctorStart", () => {
     expect(screen.queryByTestId("ai-doctor-start-options")).toBeNull();
   });
 
+  it("does not claim a list while scope ordering has replaced it with a loader", () => {
+    // Reachable via the retry path: clicking retry sets the scope read loading
+    // again while its error still stands, so the failure paragraph would
+    // otherwise describe a list the page has just swapped for a loading panel.
+    state.growsError = "network down";
+    state.growsLoading = true;
+    state.data = SCOPED.plants;
+    renderPage("/doctor?growId=grow-1&tentId=tent-a");
+
+    expect(screen.queryByTestId("ai-doctor-start-options")).toBeNull();
+    expect(screen.getByTestId("ai-doctor-start-scope-unverified")).not.toHaveTextContent(
+      "Every active plant is listed below",
+    );
+  });
+
+  it("does not disable the retry because an UNRELATED read is in flight", () => {
+    // Both reads always mount. On a grow-only URL a slow tents query must not
+    // leave the button stuck on "Checking…" while the failed grows read is not
+    // being retried at all.
+    state.growsError = "network down";
+    state.tentsFetching = true;
+    state.data = SCOPED.plants;
+    renderPage("/doctor?growId=grow-1");
+
+    const retry = screen.getByTestId("ai-doctor-start-scope-retry");
+    expect(retry).toBeEnabled();
+    expect(retry).toHaveTextContent("Try the check again");
+  });
+
+  it("still disables the retry while the REQUIRED read is being re-fetched", () => {
+    state.tentsError = true;
+    state.tentsFetching = true;
+    state.data = SCOPED.plants;
+    renderPage("/doctor?tentId=tent-a");
+
+    expect(screen.getByTestId("ai-doctor-start-scope-retry")).toBeDisabled();
+  });
+
   it("offers no retry when no scope was carried — there is nothing to re-check", () => {
     state.growsError = "network down";
     state.data = SCOPED.plants;

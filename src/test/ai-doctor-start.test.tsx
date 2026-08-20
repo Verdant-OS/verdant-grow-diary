@@ -21,6 +21,7 @@ const state = vi.hoisted(() => ({
   // B4a review: neither ownership read retries on its own, so the page owns a
   // retry affordance. The harness has to be able to observe it firing.
   tentsFetching: false,
+  tentsPending: false,
   tentsRefetch: vi.fn(async () => undefined),
   growsRefresh: vi.fn(async () => undefined),
 }));
@@ -35,6 +36,7 @@ vi.mock("@/hooks/useGrowData", () => ({
   useGrowTents: () => ({
     data: state.tents,
     isLoading: state.tentsLoading,
+    isPending: state.tentsPending || state.tentsLoading,
     isError: state.tentsError,
     isFetching: state.tentsFetching,
     refetch: state.tentsRefetch,
@@ -93,6 +95,7 @@ describe("AiDoctorStart", () => {
     state.tentsLoading = false;
     state.tentsError = false;
     state.tentsFetching = false;
+    state.tentsPending = false;
     state.tentsRefetch.mockClear();
     state.growsRefresh.mockClear();
   });
@@ -471,6 +474,20 @@ describe("AiDoctorStart", () => {
     renderPage("/doctor?tentId=tent-a");
 
     expect(screen.getByTestId("ai-doctor-start-scope-retry")).toBeDisabled();
+  });
+
+  it("treats an offline-PAUSED tent read as unsettled, not as a mismatch", () => {
+    // TanStack v5 reports a paused query as isPending with isLoading false, so
+    // an isLoading-only check would resolve the scope against undefined and
+    // tell the grower their valid tent could not be matched to their account.
+    state.tentsPending = true;
+    state.tentsLoading = false;
+    state.grows = SCOPED.grows;
+    state.data = SCOPED.plants;
+    renderPage("/doctor?tentId=tent-a");
+
+    expect(screen.queryByTestId("ai-doctor-start-invalid-scope")).toBeNull();
+    expect(screen.queryByTestId("ai-doctor-start-options")).toBeNull();
   });
 
   it("offers no retry when no scope was carried — there is nothing to re-check", () => {

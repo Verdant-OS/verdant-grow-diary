@@ -49,8 +49,17 @@ export default function AiDoctorStart() {
   // only enriches the derived owning grow — it cannot change the ordering,
   // which keys off the resolved tent alone — so waiting on it would hide a
   // verified tent and a loaded plant list behind an unrelated request.
+  //
+  // `isPending`, not `isLoading`: in TanStack Query v5 `isLoading` is
+  // `isPending && isFetching`, so a query PAUSED by an offline browser reports
+  // `isLoading: false` while holding no data and no error. Treating that as
+  // settled resolves the scope against `undefined` and tells the grower their
+  // valid tent "couldn't be matched to your account" — an unavailable read
+  // presented as an ownership mismatch, the exact failure this whole block
+  // exists to prevent. `useGrowTents` sets no `enabled`, so `isPending` cannot
+  // get stuck true on a disabled query.
   const scopeReadsSettled =
-    (!requestedGrowId || !growsLoading) && (!requestedTentId || !tentsQuery.isLoading);
+    (!requestedGrowId || !growsLoading) && (!requestedTentId || !tentsQuery.isPending);
   // FAILING is narrower than SETTLING, and conflating them discarded verified
   // context. A read may only invalidate the scope it was needed to validate:
   // on a tent-only URL — supported, since a legacy tent may carry a null

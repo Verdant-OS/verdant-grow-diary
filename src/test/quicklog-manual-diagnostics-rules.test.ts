@@ -137,6 +137,27 @@ describe("buildQuicklogManualEntryDiagnostics", () => {
     });
   });
 
+  it("orders the audit trail chronologically regardless of input order", () => {
+    const rows = buildQuicklogManualEntryDiagnostics({
+      events: [event()],
+      diaryEntries: [mirror()],
+      auditEvents: [
+        {
+          grow_event_id: EVENT_ID,
+          status: "save_succeeded",
+          created_at: "2026-08-19T08:00:01Z",
+        },
+        {
+          grow_event_id: EVENT_ID,
+          status: "save_started",
+          created_at: "2026-08-19T08:00:00Z",
+        },
+      ],
+      loggedAtColumnAvailable: true,
+    });
+    expect(rows[0].auditStatuses).toEqual(["save_started", "save_succeeded"]);
+  });
+
   it("marks legacy-key links and missing mirrors as warn (historical states)", () => {
     const rows = buildQuicklogManualEntryDiagnostics({
       events: [event(), event({ id: OTHER_EVENT_ID, created_at: "2026-08-19T07:00:00Z" })],
@@ -404,14 +425,15 @@ describe("buildQuicklogConsistencyReport", () => {
     expect(report.healthyLinks).toBe(0);
   });
 
-  it("treats both-absent captured stamps as healthy and skips the check without the columns", () => {
+  it("never counts unprovable Captured parity as healthy (both-null or columns absent)", () => {
     const bare = buildQuicklogConsistencyReport({
       diaryEntries: [mirror({ logged_at: null, details: { linked_grow_event_id: EVENT_ID } })],
       growEvents: [event({ logged_at: null })],
       loggedAtColumnAvailable: true,
     });
     expect(bare.loggedAtMismatches).toHaveLength(0);
-    expect(bare.healthyLinks).toBe(1);
+    expect(bare.healthyLinks).toBe(0);
+    expect(bare.linksWithoutCapturedParity).toBe(1);
 
     const withoutColumns = buildQuicklogConsistencyReport({
       diaryEntries: [
@@ -421,6 +443,37 @@ describe("buildQuicklogConsistencyReport", () => {
       loggedAtColumnAvailable: false,
     });
     expect(withoutColumns.loggedAtMismatches).toHaveLength(0);
+    expect(withoutColumns.healthyLinks).toBe(0);
+    expect(withoutColumns.linksWithoutCapturedParity).toBe(1);
+  });
+
+  it("rejects impossible calendar dates the platform Date would normalize", () => {
+    expect(readDetailsLoggedAt({ logged_at: "2026-02-30T08:00:00Z" }).parseable).toBe(false);
+    expect(readDetailsLoggedAt({ logged_at: "2026-13-01T08:00:00Z" }).parseable).toBe(false);
+    expect(readDetailsLoggedAt({ logged_at: "2026-08-19T99:00:00Z" }).parseable).toBe(false);
+    expect(readDetailsLoggedAt({ logged_at: "2026-02-28T23:59:59Z" }).parseable).toBe(true);
+  });
+
+  it("accepts low years instead of tripping Date.UTC's 1900-century remap", () => {
+    // Date.UTC(99, 0, 1) is 1999, so a year-based round trip through Date.UTC
+    // would report these server-acceptable stamps as unparseable.
+    expect(readDetailsLoggedAt({ logged_at: "0099-01-01T00:00:00Z" }).parseable).toBe(true);
+    expect(readDetailsLoggedAt({ logged_at: "0001-01-01T00:00:00Z" }).parseable).toBe(true);
+    expect(readDetailsLoggedAt({ logged_at: "0100-06-15T12:30:00Z" }).parseable).toBe(true);
+    // Impossible dates stay rejected in the low-year range too.
+    expect(readDetailsLoggedAt({ logged_at: "0099-02-30T00:00:00Z" }).parseable).toBe(false);
+    // PostgreSQL has no year zero (1 BC is followed by 1 AD).
+    expect(readDetailsLoggedAt({ logged_at: "0000-01-01T00:00:00Z" }).parseable).toBe(false);
+  });
+
+  it("keeps PGRST204 (unknown column) out of the sealed classification", () => {
+    expect(
+      classifyQuicklogPrivateProbe({
+        succeeded: false,
+        errorCode: "PGRST204",
+        errorMessage: "column not found in schema cache",
+      }),
+    ).toBe("unknown_error");
   });
 
   it("is deterministic for identical inputs in different order", () => {

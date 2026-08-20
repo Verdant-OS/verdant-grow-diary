@@ -1,0 +1,93 @@
+name: Action Queue transition forward repair PG15
+
+on:
+  pull_request:
+    paths: &action_queue_transition_repair_paths
+      - "scripts/run-action-queue-transition-forward-repair-pg15-harness.mjs"
+      - "scripts/apply-pinned-production-migrations.mjs"
+      - "scripts/verify-quicklog-corrections-preflight-artifact.mjs"
+      - "scripts/lib/candidateNumberToolRuntime.mjs"
+      - "scripts/lib/productionSupabaseTls.mjs"
+      - "scripts/lib/solo-founder-production-authorization.mjs"
+      - "scripts/lib/supabaseDatabaseTargetIdentity.mjs"
+      - "scripts/verify-solo-founder-production-authorization.mjs"
+      - "scripts/apply-action-queue-transition-forward-repair.mjs"
+      - "scripts/verify-action-queue-transition-forward-repair-preflight-artifact.mjs"
+      - ".github/workflows/action-queue-transition-forward-repair-pg15.yml"
+      - ".github/workflows/apply-action-queue-transition-forward-repair.yml"
+      - "supabase/migrations/20260819190852_action_queue_transition_forward_repair.sql"
+      - "supabase/migrations/20260725093000_restore_action_queue_owner_decisions.sql"
+      - "supabase/migrations/20260726093000_action_queue_transition_rpc.sql"
+      - "supabase/migrations/20260726094000_action_queue_transition_contract.sql"
+      - "supabase/migrations/20260728163100_production_breeding_workflow_reconciliation.sql"
+      - "src/test/action-queue-transition-forward-repair.test.ts"
+      - "src/test/action-queue-transition-forward-repair-pg15-harness.test.ts"
+      - "src/test/solo-founder-production-authorization.test.ts"
+      - "src/test/apply-action-queue-transition-forward-repair.test.ts"
+      - "src/test/verify-action-queue-transition-forward-repair-preflight-artifact.test.ts"
+  push:
+    branches:
+      - verdant-grow-diary
+    paths: *action_queue_transition_repair_paths
+  merge_group:
+
+permissions:
+  contents: read
+
+jobs:
+  pg15_runtime:
+    name: PostgreSQL 15 runtime contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:15.18@sha256:bb0df8b69f086efa2cbe4b8128df2f368a362bbdadef743731a63dd0f2f24c9e
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: verdant-runtime-only
+          POSTGRES_DB: verdant_action_queue_transition_repair
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d verdant_action_queue_transition_repair"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      ACTION_QUEUE_TRANSITION_REPAIR_PG15_URL: postgresql://postgres:verdant-runtime-only@127.0.0.1:5432/verdant_action_queue_transition_repair
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: "22"
+
+      - name: Create disposable PostgreSQL harness sentinel
+        env:
+          POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+        run: |
+          docker exec -i \
+            -e PGHOST=127.0.0.1 \
+            -e PGPORT=5432 \
+            -e PGUSER=postgres \
+            -e PGPASSWORD=verdant-runtime-only \
+            -e PGDATABASE=verdant_action_queue_transition_repair \
+            "$POSTGRES_CONTAINER" \
+            psql -X -q -v ON_ERROR_STOP=1 --single-transaction --file=- <<'SQL'
+          create schema verdant_action_queue_transition_repair_harness authorization postgres;
+          revoke all on schema verdant_action_queue_transition_repair_harness from public;
+          create table verdant_action_queue_transition_repair_harness.runtime_sentinel (
+            sentinel text primary key
+          );
+          revoke all on table verdant_action_queue_transition_repair_harness.runtime_sentinel
+            from public;
+          insert into verdant_action_queue_transition_repair_harness.runtime_sentinel(sentinel)
+          values ('verdant_action_queue_transition_repair_pg15_disposable_v1');
+          SQL
+
+      - name: Run isolated PostgreSQL 15 harness
+        env:
+          ACTION_QUEUE_TRANSITION_REPAIR_PG15_CONTAINER: ${{ job.services.postgres.id }}
+        run: node scripts/run-action-queue-transition-forward-repair-pg15-harness.mjs

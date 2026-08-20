@@ -238,6 +238,7 @@ describe("LocalDataHealthPanel — the account uuid survives no fallback path", 
     // echoing it would put the stored value on screen — the exact thing this
     // panel's header promises it never does.
     const SECRET = "plant-7f3a-grower-private-note";
+    const LEAKED_EXCERPT = "plant-7f3a";
     setLocalStorageItemForTest(`verdant.quickLog.lastTarget.v2.${ACCOUNT_A}`, SECRET);
     const { container } = render(<LocalDataHealthPanel />);
 
@@ -245,12 +246,12 @@ describe("LocalDataHealthPanel — the account uuid survives no fallback path", 
     expect(within(row).getByText("Fail")).toBeInTheDocument();
     expect(row).toHaveTextContent("not valid JSON");
     expect(row).toHaveTextContent("parser error is withheld");
-    expect(container.textContent ?? "").not.toContain(SECRET);
+    expect(container.textContent ?? "").not.toContain(LEAKED_EXCERPT);
 
     // And not through the drawer either.
     fireEvent.click(screen.getByRole("button", { name: /Review & clear/i }));
     await waitFor(() => expect(screen.getByRole("dialog")).toBeInTheDocument());
-    expect(document.body.textContent ?? "").not.toContain(SECRET);
+    expect(document.body.textContent ?? "").not.toContain(LEAKED_EXCERPT);
   });
 
   it("proves the withheld text really would have leaked", () => {

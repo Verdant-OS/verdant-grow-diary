@@ -152,6 +152,24 @@ function redactStorageKey(key: string): string {
     : key;
 }
 
+const INVALID_JSON_DETAIL =
+  "Stored value is not valid JSON. The parser error is withheld because it can quote the stored value.";
+
+type StoredJsonResult = { ok: true; value: unknown } | { ok: false };
+
+/**
+ * JSON parser boundary for anything rendered by local-data diagnostics.
+ * V8 parser messages can quote the beginning of the stored value, so the
+ * exception itself must never leave this function.
+ */
+function parseStoredJson(raw: string): StoredJsonResult {
+  try {
+    return { ok: true, value: JSON.parse(raw) };
+  } catch {
+    return { ok: false };
+  }
+}
+
 function safeStorage(): Storage | null {
   try {
     if (typeof window === "undefined") return null;
@@ -214,10 +232,8 @@ function checkLocalSchema(schema: (typeof LOCAL_SCHEMAS)[number]): CheckResult {
     };
   }
   const sizeBytes = new Blob([raw]).size;
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch (err) {
+  const parseResult = parseStoredJson(raw);
+  if (!parseResult.ok) {
     return {
       name: schema.label,
       status: "fail",
@@ -226,10 +242,11 @@ function checkLocalSchema(schema: (typeof LOCAL_SCHEMAS)[number]): CheckResult {
       // value on screen — the exact thing this panel promises it never does.
       // The position is useless to a grower anyway; "it is corrupt, clear it"
       // is the whole actionable content.
-      detail: `Present but not valid JSON (${sizeBytes} bytes). Clearing the key will remove the corrupt value. The parser error is withheld because it can quote the stored value.`,
+      detail: `${INVALID_JSON_DETAIL} Size: ${sizeBytes} bytes. Clearing the key will remove the corrupt value.`,
       meta: schema.key,
     };
   }
+  const parsed = parseResult.value;
   if (schema.expectedVersion !== undefined) {
     const v =
       parsed && typeof parsed === "object" && "v" in parsed
@@ -914,10 +931,8 @@ function buildRemediationEntry(key: string): RemediationEntry {
     else charClassSummary.nonAscii += 1;
   }
 
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch (err) {
+  const parseResult = parseStoredJson(raw);
+  if (!parseResult.ok) {
     return {
       key,
       label,
@@ -928,11 +943,11 @@ function buildRemediationEntry(key: string): RemediationEntry {
       // Same reason as `checkLocalSchema`: the parser exception can quote the
       // stored value. The redacted field preview and char-class summary below
       // are how this drawer describes a value without printing it.
-      errorMessage:
-        "Stored value is not valid JSON. The parser error is withheld because it can quote the stored value.",
+      errorMessage: INVALID_JSON_DETAIL,
       charClassSummary,
     };
   }
+  const parsed = parseResult.value;
 
   // Parseable JSON — build a redacted top-level field preview. We show
   // field NAMES only, plus the `v` version integer (which is metadata,

@@ -182,6 +182,13 @@ describe("forward fence — migrations newer than the forward repair", () => {
         "quicklog_try_parse_uuid",
       ),
     ).toBe(false);
+    // Multi-function target lists must not slip past the fence.
+    expect(
+      migrationGrantsClientExecuteOn(
+        "GRANT EXECUTE ON FUNCTION public.other_fn(), public.quicklog_try_parse_uuid(text) TO authenticated;",
+        "quicklog_try_parse_uuid",
+      ),
+    ).toBe(true);
     expect(
       migrationLeavesWrapperWithoutRequiredGrant(
         "REVOKE EXECUTE ON FUNCTION public.quicklog_save_manual(text, uuid, text) FROM authenticated;",
@@ -198,6 +205,14 @@ describe("forward fence — migrations newer than the forward repair", () => {
         "REVOKE ALL ON FUNCTION public.quicklog_save_manual_pre_logged_at(text, uuid, text) FROM authenticated;",
       ),
     ).toBe(false);
+    // Statement order matters: a grant BEFORE the final revoke does not
+    // restore access, so this must still trip the fence.
+    expect(
+      migrationLeavesWrapperWithoutRequiredGrant(
+        `GRANT EXECUTE ON FUNCTION public.quicklog_save_manual(text, uuid, text) TO authenticated;
+         REVOKE EXECUTE ON FUNCTION public.quicklog_save_manual(text, uuid, text) FROM authenticated;`,
+      ),
+    ).toBe(true);
   });
 });
 

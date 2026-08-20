@@ -88,8 +88,11 @@ export function migrationGrantsClientExecuteOn(
   executableSql: string,
   functionName: QuicklogPrivateHelperFunction,
 ): boolean {
+  // The FUNCTION target may be a comma-separated list; the helper counts as
+  // targeted when its name appears anywhere before TO. Over-matching errs
+  // toward flagging, which is the safe polarity for a fence.
   const grantPattern = new RegExp(
-    String.raw`GRANT\s+(?:ALL|EXECUTE)[^;]*?\bON\s+(?:ALL\s+FUNCTIONS\s+IN\s+SCHEMA\s+public|FUNCTION\s+(?:public\.)?${functionName}\b)[^;]*?\bTO\s+([^;]+);`,
+    String.raw`GRANT\s+(?:ALL|EXECUTE)[^;]*?\bON\s+(?:ALL\s+FUNCTIONS\s+IN\s+SCHEMA\s+public\b|FUNCTION\s+[^;]*?\b(?:public\.)?${functionName}\b)[^;]*?\bTO\s+([^;]+);`,
     "gis",
   );
   for (const match of executableSql.matchAll(grantPattern)) {
@@ -114,16 +117,26 @@ export function migrationGrantsClientExecuteOn(
 export function migrationLeavesWrapperWithoutRequiredGrant(executableSql: string): boolean {
   const wrapperRef = String.raw`(?:public\.)?quicklog_save_manual(?!_pre_logged_at)\s*\([^)]*\)`;
   for (const role of ["authenticated", EXECUTE_ROLE_SERVICE]) {
+    // Statement order matters: a GRANT that precedes the REVOKE does not
+    // restore access, so compare the LAST occurrence of each per role.
     const revokePattern = new RegExp(
       String.raw`REVOKE\s+(?:ALL|EXECUTE)[^;]*?\bON\s+FUNCTION\s+${wrapperRef}[^;]*?\bFROM\s+[^;]*\b${role}\b[^;]*;`,
-      "is",
+      "gis",
     );
-    if (!revokePattern.test(executableSql)) continue;
     const regrantPattern = new RegExp(
       String.raw`GRANT\s+(?:ALL|EXECUTE)[^;]*?\bON\s+FUNCTION\s+${wrapperRef}[^;]*?\bTO\s+[^;]*\b${role}\b[^;]*;`,
-      "is",
+      "gis",
     );
-    if (!regrantPattern.test(executableSql)) return true;
+    let lastRevokeIndex = -1;
+    for (const match of executableSql.matchAll(revokePattern)) {
+      lastRevokeIndex = match.index ?? lastRevokeIndex;
+    }
+    if (lastRevokeIndex === -1) continue;
+    let lastGrantIndex = -1;
+    for (const match of executableSql.matchAll(regrantPattern)) {
+      lastGrantIndex = match.index ?? lastGrantIndex;
+    }
+    if (lastGrantIndex < lastRevokeIndex) return true;
   }
   return false;
 }

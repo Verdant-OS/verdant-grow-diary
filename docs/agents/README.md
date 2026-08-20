@@ -1,6 +1,6 @@
 # Verdant Agent Governance
 
-**Sentinel-Version: 2026-08-09.3**
+**Sentinel-Version: 2026-08-20.1**
 
 Multi-agent work on Verdant runs under one shared constitution plus a small
 platform-specific bootstrap per agent. A single file cannot reach every AI platform
@@ -39,6 +39,11 @@ HISTORICAL — never active instructions
 | Gemini        | `GEMINI.md`                          | `docs/agents/roles/gemini.md`, `CURRENT_STATE.md`                 |
 | Security      | nothing automatically                | all of: `AGENTS.md`, `CURRENT_STATE.md`, `roles/security.md`      |
 | Council Chair | nothing automatically                | all of: `AGENTS.md`, `CURRENT_STATE.md`, `roles/council-chair.md` |
+
+Grok is also a peer implementer/auditor/reviewer with Claude and Codex when
+`CURRENT_STATE.md` or Cheek assigns a slice (Cheek, 2026-08-20). Research mission
+remains; see `docs/agents/roles/grok.md` and
+`docs/agents/grok-peer-elevation-map-2026-08-20.md`.
 
 Verify Grok's discovery with `grok inspect`.
 

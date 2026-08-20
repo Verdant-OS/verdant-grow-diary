@@ -1,6 +1,6 @@
 # Verdant Agent Constitution
 
-**Sentinel-Version: 2026-08-09.3**
+**Sentinel-Version: 2026-08-20.1**
 
 This is Verdant's universal Sentinel Code. Every agent inherits these durable product,
 engineering, data, safety, and release rules. Platform-specific bootstraps live at the
@@ -63,7 +63,7 @@ Use small, scoped changes. Avoid broad rewrites.
 
 ## Multi-Agent Coordination
 
-This repo is worked on by more than one AI agent (Codex, Claude Code, Lovable) at once, sometimes on the same feature independently, without either side knowing.
+This repo is worked on by more than one AI agent (Codex, Claude Code, Grok, Lovable) at once, sometimes on the same feature independently, without either side knowing.
 
 - Before starting substantial new work, check recent merged PRs and open PRs (`gh pr list --state all`, `git log`) for the same or an overlapping feature area. Do not build a second implementation of something that already shipped or is already in review elsewhere.
 - If you discover another agent already has open, unmerged work in your target area, stop and report the collision rather than silently building a competing version.
@@ -570,6 +570,10 @@ assigned role and read its file.
 - Council Chair must read `docs/agents/roles/council-chair.md`.
 
 Do not adopt another agent's responsibilities unless Cheek explicitly reassigns them.
+Grok, Claude, and Codex are peers for implementation, audit, and review when
+`CURRENT_STATE.md` or Cheek assigns the slice (Cheek, 2026-08-20). Standing file
+ownership and collision fences in `CURRENT_STATE.md` still bind (for example Tranche A
+for Codex, Tranche B+ product code for Claude, parked PRs #828 / #817 / #696).
 
 Use `docs/agents/HANDOFF_PROTOCOL.md` for cross-role work. The default sequence is:
 

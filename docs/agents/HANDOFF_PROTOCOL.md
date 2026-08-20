@@ -1,14 +1,24 @@
 # Verdant Agent Handoff Protocol
 
-**Sentinel-Version: 2026-08-09.3**
+**Sentinel-Version: 2026-08-20.1**
 
-Operating order is sequential. Parallel implementation by all agents is the failure this
-protocol exists to prevent.
+Operating order is sequential for a given slice. Parallel implementation of the **same**
+slice by multiple agents is the failure this protocol exists to prevent.
+
+**Peer implementers (Cheek, 2026-08-20):** Grok, Claude, and Codex have equal authority
+for implementation, audit, and review when `CURRENT_STATE.md` or Cheek assigns the
+slice. Peer elevation does **not** erase file ownership or collision fences (Tranche A =
+Codex; Tranche B+ product code = Claude; parked PRs #828 / #817 / #696 stay parked).
+
+Default research → architecture → build sequence (preferred handoff path; roles may be
+reassigned by `CURRENT_STATE.md`):
 
 ```text
 Grok      research demand, competitors, SERPs, authority opportunities
+          (also peer implement / audit / review when assigned)
   -> Claude    convert evidence into taxonomy, page systems, implementation-ready specs
-  -> Codex     audit the repository and implement the smallest approved slice
+          (also implement when CURRENT_STATE / Cheek assigns, e.g. Tranche B+)
+  -> Codex     default build / integration; audit the repository; implement assigned slices
   -> Security  review trust boundaries, exposure, secrets, infrastructure risk
   -> Gemini    independently audit quality, scope, evidence, safety, release readiness
   -> Council   resolve disagreements, give Cheek one recommendation
@@ -16,7 +26,8 @@ Grok      research demand, competitors, SERPs, authority opportunities
 ```
 
 An agent may hand _back_ (returning work as under-specified or unsafe) at any point. An
-agent may not hand _forward_ past its successor.
+agent may not hand _forward_ past its successor on the default path, except when
+`CURRENT_STATE.md` already names a different peer as the next owner.
 
 ---
 

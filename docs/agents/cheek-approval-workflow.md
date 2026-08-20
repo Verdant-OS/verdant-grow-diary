@@ -48,13 +48,20 @@ Default sequence ([`AGENTS.md`](../../AGENTS.md) / [`HANDOFF_PROTOCOL.md`](./HAN
 ```text
 Research (Grok)
   → Architecture (Claude)
-    → Build (Codex)
+    → Build (Codex, or peer assigned in CURRENT_STATE)
       → Security Review (stop-ship on FAIL)
         → QA Audit (Gemini)
           → Council (one recommendation)
             → Cheek approval          ← terminal human gate
               → merge / hold / close / reassign / ship-verify
 ```
+
+**Peer implementers (Cheek, 2026-08-20):** Grok, Claude, and Codex have equal
+authority for implementation, audit, and review when assigned. The default
+Research → Architecture → Build labels above are the preferred handoff path, not
+a permanent research-only fence on Grok. Standing ownership/collision fences in
+`CURRENT_STATE.md` still bind (Tranche A = Codex; Tranche B+ = Claude; parked
+PRs #828 / #817 / #696).
 
 Scoped work may use a **subset** of roles. Parallel implementation of the same
 slice is a protocol failure — Cheek should reject “two agents both shipping X.”
@@ -366,9 +373,9 @@ House style matches other repo docs (e.g. `docs/specs/daily-walk-closed-learning
 ```mermaid
 flowchart TB
   subgraph pipeline["Multi-agent operating order"]
-    Grok["Grok - Research"]
-    Claude["Claude - Architecture / specs"]
-    Codex["Codex - Build smallest slice"]
+    Grok["Grok - Research + peer implement/audit/review"]
+    Claude["Claude - Architecture / specs + peer build when assigned"]
+    Codex["Codex - Default build / peer audit"]
     Security["Security - Trust boundaries"]
     Gemini["Gemini - QA / release risk"]
     Council["Council Chair - One recommendation"]

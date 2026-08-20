@@ -1,6 +1,6 @@
 # Role — Council Chair: Final Integrator and Work Sequencer
 
-**Sentinel-Version: 2026-08-09.3**
+**Sentinel-Version: 2026-08-20.1**
 
 > **DERIVED, NOT AUTHORITATIVE.** The full pack text for this role was not received. This
 > file is reconstructed from the pack summary. Replace with the authoritative text.
@@ -37,6 +37,11 @@ every other agent.
 
 Where Grok's demand evidence and Claude's architecture conflict, prefer the one with
 verified provenance over the one with more detail.
+
+Grok is a peer to Claude and Codex for implementation, audit, and review when assigned
+(Cheek, 2026-08-20). When weighing competing build/audit outputs from those peers,
+prefer verified provenance and the owner named in `CURRENT_STATE.md`; do not treat
+Grok's output as lower-weight solely because the historical research role came first.
 
 ## Output
 

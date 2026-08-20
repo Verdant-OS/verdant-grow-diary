@@ -20,12 +20,20 @@ const BLOCKED = { status: "blocked" as const, reason: "plant_not_found" };
 const PENDING = { status: "blocked" as const, reason: "prefill_target_pending" };
 
 describe("QUICK_LOG_TARGET_PRECEDENCE", () => {
-  it("orders explicit intent above route context above grower selection", () => {
-    expect(QUICK_LOG_TARGET_PRECEDENCE).toEqual([
-      "explicit-prefill-or-intent",
-      "route-context",
-      "explicit-grower-selection",
-    ]);
+  it("orders a named request above the grower's own selection", () => {
+    expect(QUICK_LOG_TARGET_PRECEDENCE).toEqual(["named-request", "explicit-grower-selection"]);
+  });
+
+  it("declares only the tiers this module can actually enforce", () => {
+    // Renegotiated from a three-tier list. `AppShell` collapses "explicit
+    // intent" and "route context" into one `prefill` prop before Quick Log
+    // sees it, so the editor cannot tell them apart and a three-tier export
+    // would advertise an ordering nothing consults. Splitting them needs
+    // AppShell.tsx — Tranche A slice A5's surface.
+    expect(QUICK_LOG_TARGET_PRECEDENCE).toHaveLength(2);
+    const asStrings: readonly string[] = QUICK_LOG_TARGET_PRECEDENCE;
+    expect(asStrings).not.toContain("route-context");
+    expect(asStrings).not.toContain("explicit-prefill-or-intent");
   });
 
   it("has no remembered-default tier — remembered targets are never a fallback", () => {
@@ -33,7 +41,45 @@ describe("QUICK_LOG_TARGET_PRECEDENCE", () => {
     expect(asStrings.some((tier) => /remember|last|recent|previous/i.test(tier))).toBe(false);
     // Only a visible, explicitly-chosen suggestion may ever reintroduce a
     // remembered target, and it enters through explicit-grower-selection.
-    expect(QUICK_LOG_TARGET_PRECEDENCE).toHaveLength(3);
+  });
+
+  it("is the list the resolver actually reports from — not a decorative export", () => {
+    const tiers: readonly string[] = QUICK_LOG_TARGET_PRECEDENCE;
+    const plans = [
+      resolveQuickLogTargetPlan({
+        requestKey: "plant:plant-1",
+        prefillResolution: READY,
+        dismissedBlockedPrefillKey: null,
+        manualPlantId: "",
+      }),
+      resolveQuickLogTargetPlan({
+        requestKey: "plant:ghost",
+        prefillResolution: BLOCKED,
+        dismissedBlockedPrefillKey: null,
+        manualPlantId: "",
+      }),
+      resolveQuickLogTargetPlan({
+        requestKey: null,
+        prefillResolution: BLOCKED,
+        dismissedBlockedPrefillKey: null,
+        manualPlantId: "plant-9",
+      }),
+      resolveQuickLogTargetPlan({
+        requestKey: "plant:ghost",
+        prefillResolution: BLOCKED,
+        dismissedBlockedPrefillKey: "plant:ghost",
+        manualPlantId: "plant-9",
+      }),
+    ];
+    for (const plan of plans) expect(tiers).toContain(plan.tier);
+    // And the ordering is observable: a live named request wins, a dismissed
+    // one drops to the grower's tier.
+    expect(plans.map((plan) => plan.tier)).toEqual([
+      "named-request",
+      "named-request",
+      "explicit-grower-selection",
+      "explicit-grower-selection",
+    ]);
   });
 });
 
@@ -47,6 +93,7 @@ describe("resolveQuickLogTargetPlan — hold semantics", () => {
     });
     expect(plan).toEqual({
       step: "apply-named",
+      tier: "named-request",
       plantId: "plant-1",
       growId: "grow-1",
       holdActive: true,
@@ -101,6 +148,7 @@ describe("resolveQuickLogTargetPlan — hold semantics", () => {
     });
     expect(plan).toEqual({
       step: "manual-selection",
+      tier: "explicit-grower-selection",
       holdActive: false,
       editorPlantId: "",
     });

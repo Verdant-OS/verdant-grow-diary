@@ -462,9 +462,12 @@ export default function QuickLog({
   );
   const prefillPlantId = prefillTarget.status === "ready" ? prefillTarget.target.plantId : null;
   const prefillGrowId = prefillTarget.status === "ready" ? prefillTarget.target.growId : null;
-  // Ordering lives in the shared precedence contract (explicit intent → route
-  // context → explicit grower selection, with no remembered-default tier);
-  // proving the target still belongs to resolveQuickLogPrefillTarget above.
+  // Ordering lives in the shared precedence contract (a named request beats
+  // the grower's own selection, with no remembered-default tier); proving the
+  // target still belongs to resolveQuickLogPrefillTarget above. AppShell
+  // collapses explicit intent and route context before this component sees
+  // them, so the contract encodes two tiers rather than three — see the
+  // module header.
   const targetPlan = useMemo(
     () =>
       resolveQuickLogTargetPlan({

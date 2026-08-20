@@ -172,6 +172,33 @@ describe("LocalDataHealthPanel — the account uuid survives no fallback path", 
     expect(document.body.textContent ?? "").not.toContain(ACCOUNT_A);
   });
 
+  it('reports the shape problem in the drawer, not "no issue detected"', async () => {
+    setLocalStorageItemForTest(`verdant.quickLog.lastTarget.v2.${ACCOUNT_A}`, "{}");
+    render(<LocalDataHealthPanel />);
+    await schemaRow("Quick Log last target");
+
+    fireEvent.click(screen.getByRole("button", { name: /Review & clear/i }));
+    const dialog = await screen.findByRole("dialog");
+
+    // The drawer opened BECAUSE of this problem; saying otherwise contradicts
+    // the row the grower just clicked.
+    expect(within(dialog).queryByText(/No validation issue detected/)).toBeNull();
+    expect(dialog).toHaveTextContent("Unusable shape");
+    expect(dialog).toHaveTextContent("missing a usable plantId/savedAt pair");
+  });
+
+  it('still says "no issue detected" for a well-formed record', async () => {
+    setLocalStorageItemForTest(`verdant.quickLog.lastTarget.v2.${ACCOUNT_A}`, RECORD);
+    // Nothing is fixable, so reach the drawer through a second, broken key.
+    setLocalStorageItemForTest("verdant.quickLogStarter.draft.v1", "{ not json");
+    render(<LocalDataHealthPanel />);
+    await schemaRow("Quick Log last target");
+
+    fireEvent.click(screen.getByRole("button", { name: /Review & clear/i }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).queryByText(/Unusable shape/)).toBeNull();
+  });
+
   it("keeps it redacted through the whole clear flow, including the backup list", async () => {
     setLocalStorageItemForTest(`verdant.quickLog.lastTarget.v2.${ACCOUNT_A}`, "{}");
     render(<LocalDataHealthPanel />);

@@ -825,7 +825,13 @@ interface RemediationEntry {
   expectedVersion?: number;
   present: boolean;
   sizeBytes: number;
-  category: "invalid-json" | "version-mismatch" | "read-error" | "missing-required" | "unknown";
+  category:
+    | "invalid-json"
+    | "version-mismatch"
+    | "shape-mismatch"
+    | "read-error"
+    | "missing-required"
+    | "unknown";
   errorMessage: string;
   foundVersion?: unknown;
   // Redacted safe metadata (never raw values):
@@ -968,6 +974,25 @@ function buildRemediationEntry(key: string): RemediationEntry {
     };
   }
 
+  // The same validator the checks list ran. Without this the drawer opened
+  // BECAUSE of a shape problem and then reported "no validation issue
+  // detected" — contradicting the row the grower just clicked.
+  const shapeProblem = schema?.validate?.(raw) ?? null;
+  if (shapeProblem) {
+    return {
+      key,
+      label,
+      expectedVersion,
+      present: true,
+      sizeBytes,
+      category: "shape-mismatch",
+      errorMessage: `Parses as JSON, but ${shapeProblem}. Whatever reads this key ignores it.`,
+      foundVersion,
+      topLevelFieldPreview,
+      charClassSummary,
+    };
+  }
+
   return {
     key,
     label,
@@ -988,6 +1013,8 @@ function categoryLabel(cat: RemediationEntry["category"]): string {
       return "Corrupted (invalid JSON)";
     case "version-mismatch":
       return "Outdated schema version";
+    case "shape-mismatch":
+      return "Unusable shape";
     case "read-error":
       return "Read error";
     case "missing-required":

@@ -198,6 +198,30 @@ describe("QuickLog — remembered target is an offer, never a default", () => {
     expect(screen.queryByTestId("quick-log-recent-target-suggestion")).not.toBeInTheDocument();
   });
 
+  it("is still offered for an activity-only prefill, which scopes nothing", () => {
+    // AppShell sends `{ eventType }` for a context-free Fast Add. It preselects
+    // a form, not a target, so this is exactly the unscoped open the
+    // suggestion exists for. A truthiness test on `prefill` withheld it here.
+    seed("verdant.quickLog.lastTarget.v2.u1", "p2", 60_000);
+    renderQL(<QuickLog open onOpenChange={() => {}} prefill={{ eventType: "feeding" }} />);
+
+    expect(screen.getByTestId("quick-log-recent-target-suggestion")).toHaveTextContent(
+      "Continue with OG Kush?",
+    );
+  });
+
+  it("is withheld when the prefill names a grow or a tent but no plant", () => {
+    // Not a named plant, but not unscoped either — the grower already said
+    // where they are. Offering a plant here would widen their context for them.
+    for (const prefill of [{ growId: "g1" }, { tentId: "t1" }]) {
+      cleanup();
+      seed("verdant.quickLog.lastTarget.v2.u1", "p2", 60_000);
+      renderQL(<QuickLog open onOpenChange={() => {}} prefill={prefill} />);
+      expect(screen.getByTestId("quick-log-plant-select")).toBeInTheDocument();
+      expect(screen.queryByTestId("quick-log-recent-target-suggestion")).not.toBeInTheDocument();
+    }
+  });
+
   it("is not offered when the dialog opens with a route prefill", () => {
     seed("verdant.quickLog.lastTarget.v2.u1", "p2", 60_000);
     renderQL(

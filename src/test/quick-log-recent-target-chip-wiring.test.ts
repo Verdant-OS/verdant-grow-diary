@@ -15,13 +15,25 @@ describe("D5 — remembered target is a suggestion, never a default", () => {
   });
 
   it("offers the chip only on a genuinely unscoped open with no plant chosen", () => {
+    // Renegotiated from `!prefill`. That truthiness test answered the wrong
+    // question: AppShell sends an activity-only prefill (`{ eventType }`) for a
+    // context-free Fast Add, which names no target at all, and the old gate
+    // withheld the suggestion on exactly that open. "Unscoped" now means the
+    // prefill names no plant, grow, or tent.
     expect(QUICKLOG).toMatch(
-      /const showRecentTargetSuggestion =\s*!prefill && !recentSuggestionDismissed && !plantId && recentTargetSuggestion !== null;/,
+      /const showRecentTargetSuggestion =\s*!prefillNamesTarget && !recentSuggestionDismissed && !plantId && recentTargetSuggestion !== null;/,
     );
-    // Reading is gated the same way, so a prefilled open never even looks.
     expect(QUICKLOG).toMatch(
-      /open && !prefill \? loadRecentTargetRecord\(user\?\.id \?\? null\) : null/,
+      /const prefillNamesTarget = quickLogPrefillNamesAnyTarget\(prefill\);/,
     );
+    // Reading is gated the same way, so a scoped open never even looks.
+    expect(QUICKLOG).toMatch(
+      /open && !prefillNamesTarget \? loadRecentTargetRecord\(user\?\.id \?\? null\) : null/,
+    );
+    // And the retired gate cannot come back: a bare truthiness test on the
+    // prefill object must never guard either the read or the render.
+    expect(QUICKLOG).not.toMatch(/showRecentTargetSuggestion =\s*!prefill &&/);
+    expect(QUICKLOG).not.toMatch(/open && !prefill \? loadRecentTargetRecord/);
   });
 
   it("revalidates the stored target against the grower's visible plants", () => {

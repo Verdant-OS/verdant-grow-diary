@@ -100,6 +100,7 @@ import {
 } from "@/lib/legacyQuickLogUnifiedSave";
 import {
   QUICK_LOG_TARGET_BLOCKED_COPY,
+  quickLogPrefillNamesAnyTarget,
   quickLogPrefillTargetKey,
   resolveQuickLogEditorTarget,
   resolveQuickLogPrefillTarget,
@@ -496,13 +497,20 @@ export default function QuickLog({
   const editorPlantId = prefillHoldActive ? (prefillPlantId ?? "") : plantId;
 
   // Slice D5 — remembered target as a VISIBLE suggestion, never a default.
-  // Offered only on a genuinely unscoped open (no prefill of any kind), only
-  // while the grower has not chosen a plant, and only after the stored record
-  // revalidates against their own visible plants inside its 14-day window.
+  // Offered only on a genuinely unscoped open, only while the grower has not
+  // chosen a plant, and only after the stored record revalidates against their
+  // own visible plants inside its 14-day window.
+  //
+  // "Unscoped" means the prefill names no plant, grow, or tent — NOT merely
+  // that the prefill object is absent. AppShell sends an activity-only prefill
+  // (`{ eventType: "feeding" }`) for a context-free Fast Add, which preselects
+  // a form and nothing else; testing the object for truthiness would withhold
+  // the suggestion on exactly the open that needs it most.
   const [recentSuggestionDismissed, setRecentSuggestionDismissed] = useState(false);
+  const prefillNamesTarget = quickLogPrefillNamesAnyTarget(prefill);
   const recentTargetRecord = useMemo(
-    () => (open && !prefill ? loadRecentTargetRecord(user?.id ?? null) : null),
-    [open, prefill, user?.id],
+    () => (open && !prefillNamesTarget ? loadRecentTargetRecord(user?.id ?? null) : null),
+    [open, prefillNamesTarget, user?.id],
   );
   const recentTargetSuggestion = useMemo(
     () =>
@@ -514,7 +522,10 @@ export default function QuickLog({
     [recentTargetRecord, plants],
   );
   const showRecentTargetSuggestion =
-    !prefill && !recentSuggestionDismissed && !plantId && recentTargetSuggestion !== null;
+    !prefillNamesTarget &&
+    !recentSuggestionDismissed &&
+    !plantId &&
+    recentTargetSuggestion !== null;
 
   useEffect(() => {
     if (!open || saveLocked) return;

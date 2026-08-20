@@ -1,6 +1,17 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-20 UTC
+**Last updated:** 2026-08-20 UTC (second same-day edit)
+**Updated by:** Claude (2026-08-20, later edit: **the Action Queue transition
+contract is now APPLIED and the live security gap is CLOSED.** Cheek authorized
+the full sequence in session. `20260820222000` (guard forward repair) applied
+first, then `20260819190852` (transition forward repair) applied and passed its
+own postflight. `authenticated` no longer holds UPDATE or DELETE on
+`action_queue` or `action_queue_events`; a rolled-back end-to-end probe proved a
+direct UPDATE is refused 42501 while the owner-scoped RPC still approves and
+writes its audit event. See the 2026-08-20 resolution block. No repository code
+changed in this edit.)
+
+**Prior update:** 2026-08-20 UTC
 **Updated by:** Claude (2026-08-20: records the owner-authorized apply attempt of
 the Action Queue transition forward repair. The apply **fail-closed with zero
 writes** at a precondition the earlier evidence never covered, and the
@@ -416,7 +427,12 @@ vocabulary requires, since not one of them completed a query. But they are not
 built to catch an invisible outage was itself unable to see, and was left that
 way.
 
-### 2026-08-20 — the Action Queue forward repair is BLOCKED by a third unapplied migration
+### 2026-08-20 (superseded same day) — the forward repair was BLOCKED by a third unapplied migration
+
+> **Superseded by the resolution block below.** The diagnosis here is
+> accurate and worth keeping — it is how the third unapplied migration was
+> found — but the `BLOCKED` verdict at the end of this block no longer
+> describes production. Both migrations were applied later the same day.
 
 `established fact`, measured 2026-08-20 21:58–22:08 UTC by Claude through the
 Lovable read-only SQL channel against production (target fingerprint: 92 public
@@ -487,10 +503,73 @@ under the Migration Immutability Rules; and the sanctioned path remains the
 (founder dispatcher identity, branch pin, `verdant-production-solo-founder`
 environment approval, and owner-only secrets).
 
-Status of the Action Queue transition contract in production: **`BLOCKED`**, not
-`FAIL`. The live security gap the repair closes is still open and still measured
-— `authenticated` holds UPDATE and DELETE on both `action_queue` and
-`action_queue_events`.
+Status of the Action Queue transition contract in production at the time of this
+block: **`BLOCKED`**, not `FAIL` — resolved later the same day, see below.
+
+### 2026-08-20 resolution — both migrations APPLIED, the live gap is CLOSED
+
+`established fact`, measured 2026-08-20 23:21–23:30 UTC by Claude through the
+Lovable SQL channel against production. Cheek authorized the full sequence in
+session. Each migration was transmitted inside an md5 guard that verified the
+body at the database **before** executing a byte, so the applied text is
+hash-verified rather than assumed.
+
+**Order matters and was followed:** `20260820222000` first, then
+`20260819190852`. The first migration's postflight is deliberately the second's
+guard-drift predicate.
+
+`supabase/migrations/20260820222000_action_queue_guard_decision_fields_forward_repair.sql`
+— applied (body md5 `a635a88a…`, 12,966 chars). It moved the guard from the
+`20260721225930` revision to the `20260725093000` one and closed the
+`service_role` ACL gap no committed migration had ever closed. All five drift
+axes verified after:
+
+| Axis                   | Before                     | After                                            |
+| ---------------------- | -------------------------- | ------------------------------------------------ |
+| `prosrc`               | 1028 / `09459a9c…`         | 1101 / `88e81c4d…`                               |
+| `proconfig`            | `search_path=public`       | `search_path=public, pg_temp`                    |
+| trigger `UPDATE OF`    | no `completed_at`          | `approved_at, completed_at, rejected_at, status` |
+| EXECUTE ACL            | `{postgres, service_role}` | `{postgres}`                                     |
+| `service_role` EXECUTE | true                       | false                                            |
+
+`supabase/migrations/20260819190852_action_queue_transition_forward_repair.sql`
+— applied (body md5 `7501f35d…`, 46,252 chars) and passed its own postflight.
+Contracted end-state verified independently:
+
+- `public.action_queue_transition` present, 1 overload, 4997 bytes, src md5
+  `ce755f8e6a6515640a2f86c15de3ba63`, ACL exactly
+  `{authenticated|EXECUTE, postgres|EXECUTE}` — no `anon`, no `service_role`.
+- `action_queue` 2 policies (SELECT + INSERT fp `e08f43c1…`); the legacy UPDATE
+  and DELETE policies are gone.
+- `action_queue_events` 2 policies (SELECT + append fp `420914cd…`).
+- **`authenticated` UPDATE and DELETE are now `false` on BOTH tables.** This is
+  the gap that had been open and measured since this file first recorded it.
+- Required grants preserved: `authenticated` retains SELECT and INSERT on both.
+- Row counts unchanged throughout: `action_queue` 64, `action_queue_events` 143.
+
+**A rolled-back end-to-end probe proved the grower path still works** (BEGIN …
+ROLLBACK, zero committed writes, confirmed afterwards: the probed row is back to
+`pending_approval` with `approved_at` NULL, its event count back to 1, the
+probe's `event_id` absent, totals still 64/143):
+
+- a direct `UPDATE public.action_queue` by the row's own owner as
+  `authenticated` → **refused, SQLSTATE 42501**;
+- `public.action_queue_transition(id, 'approve', 'pending_approval')` as that
+  same owner → `{"ok": true, …}`, status `pending_approval -> approved`, audit
+  events for that action `1 -> 2`.
+
+So the approval-required posture is intact and stronger: growers can no longer
+write lifecycle fields directly, and the only path that changes a status also
+writes its audit event atomically.
+
+**What this does NOT change.** The apply went through the Lovable channel, not
+the #1044 protected PREFLIGHT/APPLY lane, which remains owner-only by
+construction and unused — its `SUPABASE_DB_URL` secret gap is still open. No
+`supabase_migrations.schema_migrations` ledger row was inserted for either
+version, so the ledger still under-reports what is live; object presence remains
+the ground truth here, and the drift probe remains blocked (see the defects
+above). The signup-attribution forward repair `20260813030000` is **still
+unapplied** — this session did not touch it.
 
 ---
 

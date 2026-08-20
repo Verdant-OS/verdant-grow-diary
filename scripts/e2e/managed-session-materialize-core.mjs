@@ -16,6 +16,27 @@
  */
 
 /**
+ * Resolve the one canonical HTTPS origin for an explicitly pinned Supabase
+ * project. Returns null for lookalike hosts, credentials, paths, query/hash,
+ * non-HTTPS schemes, nondefault ports, or malformed refs.
+ */
+export function resolveExactSupabaseProjectOrigin({ supabaseUrl, targetProjectRef } = {}) {
+  const ref = typeof targetProjectRef === "string" ? targetProjectRef.trim() : "";
+  const rawUrl = typeof supabaseUrl === "string" ? supabaseUrl.trim() : "";
+  if (!/^[a-z0-9]{20}$/.test(ref) || !rawUrl) return null;
+  const expectedOrigin = `https://${ref}.supabase.co`;
+  try {
+    const parsed = new URL(rawUrl);
+    if (parsed.origin !== expectedOrigin) return null;
+    if (parsed.username || parsed.password) return null;
+    if (parsed.pathname !== "/" || parsed.search || parsed.hash) return null;
+    return expectedOrigin;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Derive the supabase-js v2 default auth storage key: `sb-<ref>-auth-token`.
  * The project ref is the first DNS label of the Supabase URL host
  * (`https://<ref>.supabase.co`) or an explicitly provided project id.

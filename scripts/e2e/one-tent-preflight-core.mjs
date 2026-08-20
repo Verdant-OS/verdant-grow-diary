@@ -13,6 +13,8 @@
  * Pure: no I/O, no network, no Date.now, no randomness.
  */
 
+import { resolveExactSupabaseProjectOrigin } from "./managed-session-materialize-core.mjs";
+
 export const MANAGED_SESSION_ENV = {
   status: "LOVABLE_BROWSER_AUTH_STATUS",
   sessionJson: "LOVABLE_BROWSER_SUPABASE_SESSION_JSON",
@@ -188,16 +190,11 @@ export function evaluateManagedSession(env) {
 
   const targetRef = (env.targetProjectRef ?? "").trim();
   const supabaseUrl = (env.supabaseUrl ?? "").trim();
-  if (targetRef && supabaseUrl) {
-    let host = "";
-    try {
-      host = new URL(supabaseUrl).host;
-    } catch {
-      host = "";
-    }
-    if (!host.startsWith(`${targetRef}.`)) {
-      return blockedNoRestore("target_project_mismatch", [MANAGED_SESSION_ENV.targetProjectRef]);
-    }
+  if (!targetRef) {
+    return blockedNoRestore("missing_target_project_ref", [MANAGED_SESSION_ENV.targetProjectRef]);
+  }
+  if (!resolveExactSupabaseProjectOrigin({ supabaseUrl, targetProjectRef: targetRef })) {
+    return blockedNoRestore("target_project_mismatch", [MANAGED_SESSION_ENV.supabaseUrl]);
   }
 
   return {
@@ -249,14 +246,11 @@ export function buildManagedSessionPreflightReceipt(env, result) {
 
   const targetRef = (env.targetProjectRef ?? "").trim();
   const supabaseUrl = (env.supabaseUrl ?? "").trim();
-  let targetProjectVerified = false;
-  if (targetRef && supabaseUrl) {
-    try {
-      targetProjectVerified = new URL(supabaseUrl).host.startsWith(`${targetRef}.`);
-    } catch {
-      targetProjectVerified = false;
-    }
-  }
+  const targetProjectVerified = Boolean(
+    targetRef &&
+    supabaseUrl &&
+    resolveExactSupabaseProjectOrigin({ supabaseUrl, targetProjectRef: targetRef }),
+  );
 
   const presence = sessionFieldPresence(env);
   const ready = result.status === "ready";

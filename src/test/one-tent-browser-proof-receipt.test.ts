@@ -28,7 +28,6 @@ describe("blocked receipt", () => {
     for (const key of ONE_TENT_PROOF_STAGES) {
       expect(["blocked", "not_run"]).toContain(receipt.stages[key]);
     }
-    expect(receipt.stages.auto_diary_follow_up).toBe("not_run");
   });
 
   it("carries the blocker reason and null duplicate fences", () => {
@@ -37,7 +36,6 @@ describe("blocked receipt", () => {
       quick_log_count: null,
       alert_count: null,
       action_queue_count: null,
-      follow_up_marker_count: null,
     });
   });
 
@@ -46,7 +44,7 @@ describe("blocked receipt", () => {
     expect(line.startsWith(ONE_TENT_BROWSER_PROOF_JSON_PREFIX)).toBe(true);
     expect(line).not.toContain("\n");
     const parsed = JSON.parse(line.slice(ONE_TENT_BROWSER_PROOF_JSON_PREFIX.length));
-    expect(parsed.schema_version).toBe("1");
+    expect(parsed.schema_version).toBe("3");
     expect(parsed.proof).toBe("one-tent-loop-authenticated-ui");
   });
 
@@ -73,7 +71,6 @@ describe("pass receipt", () => {
       quick_log_count: 1,
       alert_count: 1,
       action_queue_count: 1,
-      follow_up_marker_count: 1,
     },
   });
 
@@ -84,8 +81,11 @@ describe("pass receipt", () => {
     expect(receipt.blocker_reason).toBeNull();
   });
 
-  it("auto_diary_follow_up is intentionally_unsupported (honest gap)", () => {
-    expect(receipt.stages.auto_diary_follow_up).toBe("intentionally_unsupported");
+  it("ends at the approval boundary without an execution or follow-up stage", () => {
+    expect(receipt.stages.approval_boundary_verified).toBe("pass");
+    expect(receipt.stages).not.toHaveProperty("grower_decision_verified");
+    expect(receipt.stages).not.toHaveProperty("follow_up_marker_verified");
+    expect(receipt.stages).not.toHaveProperty("auto_diary_follow_up");
   });
 
   it("safety booleans default false and fabricated_login_used is unrepresentable as true", () => {
@@ -115,8 +115,7 @@ describe("fail receipt", () => {
     expect(receipt.stages.plant_resolved).toBe("pass");
     expect(receipt.stages.quick_log_persisted).toBe("fail");
     expect(receipt.stages.timeline_visible).toBe("not_run");
-    expect(receipt.stages.follow_up_marker_verified).toBe("not_run");
-    expect(receipt.stages.auto_diary_follow_up).toBe("not_run");
+    expect(receipt.stages.approval_boundary_verified).toBe("not_run");
   });
 });
 
@@ -130,7 +129,6 @@ describe("safety violations force fail", () => {
     });
     expect(r.status).toBe("fail");
     expect(r.safety.paid_ai_request_observed).toBe(true);
-    expect(r.stages.auto_diary_follow_up).toBe("not_run");
   });
 
   it("safetyViolationReason (e.g. password auth observed) forces fail and lands in blocker_reason", () => {
@@ -170,6 +168,15 @@ describe("determinism + hygiene", () => {
 
   it("stage key order is the documented contract order", () => {
     const receipt = buildBlockedOneTentBrowserProofReceipt("x");
-    expect(Object.keys(receipt.stages)).toEqual([...ONE_TENT_PROOF_STAGES, "auto_diary_follow_up"]);
+    expect(Object.keys(receipt.stages)).toEqual([...ONE_TENT_PROOF_STAGES]);
+    expect(ONE_TENT_PROOF_STAGES.slice(0, 7)).toEqual([
+      "auth_restored",
+      "hierarchy_created_via_ui",
+      "grow_resolved",
+      "tent_resolved",
+      "plant_resolved",
+      "quick_log_context_verified",
+      "plant_persisted_after_refresh",
+    ]);
   });
 });

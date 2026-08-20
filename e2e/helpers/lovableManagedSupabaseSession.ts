@@ -44,6 +44,8 @@
  *   src/test/one-tent-cookie-restoration.test.ts
  */
 
+import { resolveExactSupabaseProjectOrigin } from "../../scripts/e2e/managed-session-materialize-core.mjs";
+
 export const MANAGED_SESSION_ENV = {
   status: "LOVABLE_BROWSER_AUTH_STATUS",
   sessionJson: "LOVABLE_BROWSER_SUPABASE_SESSION_JSON",
@@ -66,6 +68,7 @@ export type ManagedSessionBlockedReason =
   | "invalid_cookies_json"
   | "conflicting_cookie_sources"
   | "cookie_only_seed_unavailable"
+  | "missing_target_project_ref"
   | "target_project_mismatch";
 
 export type ManagedSessionRestoreStrategy =
@@ -324,20 +327,15 @@ export function evaluateManagedSession(
   }
 
   // Target-project belt-and-suspenders (pure string check, mirrors the
-  // seed script): when a target ref is DECLARED it must match the
-  // configured Supabase URL host. Undeclared ref does not block.
+  // seed script): the authenticated proof must pin one exact project before
+  // any browser restore or bearer-authenticated database request.
   const targetRef = (env.targetProjectRef ?? "").trim();
   const supabaseUrl = (env.supabaseUrl ?? "").trim();
-  if (targetRef && supabaseUrl) {
-    let host = "";
-    try {
-      host = new URL(supabaseUrl).host;
-    } catch {
-      host = "";
-    }
-    if (!host.startsWith(`${targetRef}.`)) {
-      return blockedNoRestore("target_project_mismatch", [MANAGED_SESSION_ENV.targetProjectRef]);
-    }
+  if (!targetRef) {
+    return blockedNoRestore("missing_target_project_ref", [MANAGED_SESSION_ENV.targetProjectRef]);
+  }
+  if (!resolveExactSupabaseProjectOrigin({ supabaseUrl, targetProjectRef: targetRef })) {
+    return blockedNoRestore("target_project_mismatch", [MANAGED_SESSION_ENV.supabaseUrl]);
   }
 
   return {
@@ -474,14 +472,11 @@ export function buildManagedSessionPreflightReceipt(
 
   const targetRef = (env.targetProjectRef ?? "").trim();
   const supabaseUrl = (env.supabaseUrl ?? "").trim();
-  let targetProjectVerified = false;
-  if (targetRef && supabaseUrl) {
-    try {
-      targetProjectVerified = new URL(supabaseUrl).host.startsWith(`${targetRef}.`);
-    } catch {
-      targetProjectVerified = false;
-    }
-  }
+  const targetProjectVerified = Boolean(
+    targetRef &&
+    supabaseUrl &&
+    resolveExactSupabaseProjectOrigin({ supabaseUrl, targetProjectRef: targetRef }),
+  );
 
   const presence = sessionFieldPresence(env);
   const ready = result.status === "ready";

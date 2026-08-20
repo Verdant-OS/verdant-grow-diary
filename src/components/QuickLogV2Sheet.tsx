@@ -38,9 +38,9 @@ import {
 } from "@/lib/quickLogV2Rules";
 import {
   RESPONSE_CHECK_STATUSES,
-  actionTextWithoutResponseContext,
   applyResponseCheck,
   readResponseCheckStatus,
+  removeChipAuthoredResponseLine,
   type ResponseCheckStatus,
 } from "@/lib/tenSecondQuickCheckRules";
 import { buildQuickLogV2SavePayload } from "@/lib/quickLogV2SavePayload";
@@ -537,10 +537,14 @@ export default function QuickLogV2Sheet({
     // the chip last authored, and strip only while the note still reads as that
     // exact status. Prose the grower typed is never touched.
     const authored = chipAuthoredStatusRef.current;
-    chipAuthoredStatusRef.current = null; // provenance does not follow a new plant
+    // provenance does not follow a new plant
+    chipAuthoredStatusRef.current = null;
     if (!authored) return;
-    if (readResponseCheckStatus(form.note) !== authored) return;
-    setField("note", actionTextWithoutResponseContext(form.note));
+    // Remove the chip's own line and nothing else. A whole-note strip would
+    // also delete a grower's later sentence that merely reads like a marker.
+    const next = removeChipAuthoredResponseLine(form.note, authored);
+    if (next === form.note) return;
+    setField("note", next);
   }, [responseTargetPlantId, form.note, setField]);
 
   const handleAction = (a: QuickLogV2Action) => {

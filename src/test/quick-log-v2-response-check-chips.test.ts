@@ -103,8 +103,11 @@ describe("D7 — V2 sheet response-check chips", () => {
     // typed that merely reads like one is never touched.
     expect(flat).toMatch(/chipAuthoredStatusRef\.current = status; setField\("note", next\);/);
     expect(flat).toMatch(
-      /const authored = chipAuthoredStatusRef\.current; chipAuthoredStatusRef\.current = null; if \(!authored\) return; if \(readResponseCheckStatus\(form\.note\) !== authored\) return; setField\("note", actionTextWithoutResponseContext\(form\.note\)\);/,
+      /const authored = chipAuthoredStatusRef\.current; chipAuthoredStatusRef\.current = null; if \(!authored\) return; const next = removeChipAuthoredResponseLine\(form\.note, authored\); if \(next === form\.note\) return; setField\("note", next\);/,
     );
+    // The whole-note strip cannot come back: it deletes a grower's later
+    // sentence that merely reads like a marker.
+    expect(flat).not.toMatch(/actionTextWithoutResponseContext\(form\.note\)/);
     // Provenance is per DRAFT: it must be cleared wherever a draft resets, or
     // a stale status would let the cleanup strip the NEXT draft's prose.
     expect(flat.match(/chipAuthoredStatusRef\.current = null;/g) ?? []).toHaveLength(3);

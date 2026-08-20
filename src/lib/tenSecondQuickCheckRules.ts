@@ -164,6 +164,32 @@ export function readResponseCheckStatus(existingNote: string): ResponseCheckStat
 }
 
 /**
+ * Removes ONLY the leading response-check line — the exact shape
+ * `applyResponseCheck` writes, which always lands first — and returns
+ * everything after it byte-for-byte.
+ *
+ * `actionTextWithoutResponseContext` strips response markers ANYWHERE in the
+ * note. That is right for classification and wrong for undoing one chip click:
+ * a grower who wrote "Previous response check: better after watering" on a
+ * later line would lose that sentence. Undoing a chip must remove the chip's
+ * line and nothing else, including the grower's own line breaks.
+ *
+ * Returns the note unchanged unless the first line is a response line whose
+ * status matches `authored`.
+ */
+export function removeChipAuthoredResponseLine(
+  existingNote: string,
+  authored: ResponseCheckStatus,
+): string {
+  if (typeof existingNote !== "string" || existingNote.length === 0) return existingNote;
+  const newlineAt = existingNote.indexOf("\n");
+  const firstLine = newlineAt === -1 ? existingNote : existingNote.slice(0, newlineAt);
+  if (!RESPONSE_CHECK_AT_LINE_START.test(firstLine.trim())) return existingNote;
+  if (readResponseCheckStatus(firstLine) !== authored) return existingNote;
+  return newlineAt === -1 ? "" : existingNote.slice(newlineAt + 1);
+}
+
+/**
  * Removes response-only context before classifying grow actions. A line that
  * starts with a response marker is entirely response context; a marker later
  * in a line is removed while the preceding action prose is preserved.

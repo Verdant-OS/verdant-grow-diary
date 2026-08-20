@@ -409,4 +409,20 @@ describe("D7 chips — a plant response never survives a switch to a tent", () =
 
     expect(noteTextarea().value).toBe(prose);
   });
+
+  it("removes the chip's own line and leaves a later marker-shaped sentence", async () => {
+    // Chip-authored AND grower prose that reads like a marker, in one note.
+    // A whole-note strip deletes both; only the chip's line may go.
+    renderSheet("plant:plant-1");
+    fireEvent.change(noteTextarea(), {
+      target: { value: "Previous response check: better after watering. Runoff clear." },
+    });
+    fireEvent.click(chip("worse"));
+
+    fireEvent.click(screen.getByLabelText("Target"));
+    fireEvent.click(await screen.findByRole("option", { name: /Plant 2/ }));
+
+    await waitFor(() => expect(noteTextarea().value).not.toContain("Response check: Worse."));
+    expect(noteTextarea().value).toContain("Runoff clear.");
+  });
 });

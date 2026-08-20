@@ -8,6 +8,10 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const QUICKLOG = readFileSync("src/components/QuickLog.tsx", "utf8");
+// Prettier reflows these expressions as they grow, and a pin that breaks on a
+// line wrap teaches people to relax it. Collapse runs of whitespace so the
+// assertions stay about SEMANTICS; the negative pins below keep them strict.
+const FLAT = QUICKLOG.replace(/\s+/g, " ");
 
 describe("D5 — remembered target is a suggestion, never a default", () => {
   it("keeps the fence name banned — no readLastTarget( in the dialog", () => {
@@ -20,20 +24,18 @@ describe("D5 — remembered target is a suggestion, never a default", () => {
     // context-free Fast Add, which names no target at all, and the old gate
     // withheld the suggestion on exactly that open. "Unscoped" now means the
     // prefill names no plant, grow, or tent.
-    expect(QUICKLOG).toMatch(
-      /const showRecentTargetSuggestion =\s*!prefillNamesTarget && !recentSuggestionDismissed && !plantId && recentTargetSuggestion !== null;/,
+    expect(FLAT).toMatch(
+      /const showRecentTargetSuggestion = !prefillNamesTarget && !recentSuggestionDismissed && !plantId && recentTargetSuggestion !== null;/,
     );
-    expect(QUICKLOG).toMatch(
-      /const prefillNamesTarget = quickLogPrefillNamesAnyTarget\(prefill\);/,
-    );
+    expect(FLAT).toMatch(/const prefillNamesTarget = quickLogPrefillNamesAnyTarget\(prefill\);/);
     // Reading is gated the same way, so a scoped open never even looks.
-    expect(QUICKLOG).toMatch(
+    expect(FLAT).toMatch(
       /open && !prefillNamesTarget \? loadRecentTargetRecord\(user\?\.id \?\? null\) : null/,
     );
     // And the retired gate cannot come back: a bare truthiness test on the
     // prefill object must never guard either the read or the render.
-    expect(QUICKLOG).not.toMatch(/showRecentTargetSuggestion =\s*!prefill &&/);
-    expect(QUICKLOG).not.toMatch(/open && !prefill \? loadRecentTargetRecord/);
+    expect(FLAT).not.toMatch(/showRecentTargetSuggestion = !prefill &&/);
+    expect(FLAT).not.toMatch(/open && !prefill \? loadRecentTargetRecord/);
   });
 
   it("revalidates the stored target against the grower's visible plants", () => {
@@ -41,12 +43,26 @@ describe("D5 — remembered target is a suggestion, never a default", () => {
   });
 
   it("accepting the chip runs the same explicit selection as the Select", () => {
-    expect(QUICKLOG).toMatch(
-      /quick-log-recent-target-accept[\s\S]{0,700}setPlantId\(recentTargetSuggestion\.plantId\)/,
+    // Renegotiated: acceptance now re-derives the suggestion against the
+    // CURRENT clock before applying it, so the handler selects from that
+    // re-derived value rather than the one captured when the dialog opened.
+    expect(FLAT).toMatch(
+      /quick-log-recent-target-accept[\s\S]{0,1400}resolveRecentTargetSuggestion\(\{ record: recentTargetRecord, now: Date\.now\(\), visiblePlants: plants, \}\)/,
+    );
+    expect(FLAT).toMatch(
+      /quick-log-recent-target-accept[\s\S]{0,1600}setPlantId\(current\.plantId\)/,
+    );
+    // An expired or no-longer-visible target retires the offer instead.
+    expect(FLAT).toMatch(
+      /quick-log-recent-target-accept[\s\S]{0,1500}if \(!current\) \{ setRecentSuggestionDismissed\(true\); return; \}/,
     );
     // Same lock guards the Select honors.
-    expect(QUICKLOG).toMatch(
+    expect(FLAT).toMatch(
       /quick-log-recent-target-accept[\s\S]{0,500}targetSelectionLocked \|\| isMainDraftMutationLocked\(\)/,
+    );
+    // The open-time value must never be what gets applied.
+    expect(FLAT).not.toMatch(
+      /quick-log-recent-target-accept[\s\S]{0,1600}setPlantId\(recentTargetSuggestion\.plantId\)/,
     );
   });
 

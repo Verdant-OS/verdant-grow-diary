@@ -68,7 +68,15 @@ export function buildRecentTargetStorageKey(userId: string | null | undefined): 
   return id ? `${RECENT_TARGET_STORAGE_KEY_PREFIX}${id}` : null;
 }
 
-/** Parse a stored payload defensively. Any malformed shape yields null. */
+/**
+ * Parse a stored payload defensively. Any malformed shape yields null.
+ *
+ * `savedAt` must be a timestamp `Date.parse` can actually read, not merely a
+ * nonempty string. `resolveRecentTargetSuggestion` rejects an unparseable one
+ * anyway, so accepting it here made the parser and the resolver disagree about
+ * what a valid record is — and anything reasoning from the parser alone (the
+ * diagnostics panel does) would call an unusable record healthy.
+ */
 export function parseRecentTargetRecord(raw: string | null | undefined): RecentTargetRecord | null {
   if (typeof raw !== "string" || raw.trim().length === 0) return null;
   let parsed: unknown;
@@ -82,6 +90,7 @@ export function parseRecentTargetRecord(raw: string | null | undefined): RecentT
   const plantId = trimmed(candidate.plantId);
   const savedAt = trimmed(candidate.savedAt);
   if (!plantId || !savedAt) return null;
+  if (!Number.isFinite(Date.parse(savedAt))) return null;
   return {
     plantId,
     growId: trimmed(candidate.growId) || null,

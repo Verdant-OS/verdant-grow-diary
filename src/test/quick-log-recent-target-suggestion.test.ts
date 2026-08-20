@@ -153,3 +153,35 @@ describe("resolveRecentTargetSuggestion — D-B9 validity window", () => {
     expect(resolveRecentTargetSuggestion(input)).toEqual(resolveRecentTargetSuggestion(input));
   });
 });
+
+describe("parseRecentTargetRecord — savedAt must be a readable timestamp", () => {
+  const base = { plantId: "p1", growId: "g1", tentId: "t1" };
+
+  it("rejects a nonempty but unparseable savedAt", () => {
+    // The resolver already rejects this. Accepting it here made the parser and
+    // the resolver disagree about what a valid record is, and the diagnostics
+    // panel — which reasons from the parser alone — called it healthy while
+    // Quick Log silently offered nothing.
+    expect(parseRecentTargetRecord(JSON.stringify({ ...base, savedAt: "whenever" }))).toBeNull();
+    expect(parseRecentTargetRecord(JSON.stringify({ ...base, savedAt: "   " }))).toBeNull();
+    expect(parseRecentTargetRecord(JSON.stringify({ ...base, savedAt: "2026-13-45" }))).toBeNull();
+  });
+
+  it("still accepts a real ISO timestamp", () => {
+    const record = parseRecentTargetRecord(
+      JSON.stringify({ ...base, savedAt: "2026-08-19T00:00:00.000Z" }),
+    );
+    expect(record?.savedAt).toBe("2026-08-19T00:00:00.000Z");
+    expect(record?.plantId).toBe("p1");
+  });
+
+  it("agrees with the resolver on every timestamp it accepts", () => {
+    // The property that was broken: anything the parser returns must be a
+    // record the resolver can at least reason about, not one it discards.
+    for (const savedAt of ["2026-08-19T00:00:00.000Z", "2026-08-19", "August 19, 2026 UTC"]) {
+      const record = parseRecentTargetRecord(JSON.stringify({ ...base, savedAt }));
+      if (!record) continue;
+      expect(Number.isFinite(Date.parse(record.savedAt))).toBe(true);
+    }
+  });
+});

@@ -1885,13 +1885,26 @@ export default function QuickLog({
                   onClick={() => {
                     // Exactly the same explicit selection the Select performs.
                     if (targetSelectionLocked || isMainDraftMutationLocked()) return;
-                    if (
-                      recentTargetSuggestion.growId &&
-                      recentTargetSuggestion.growId !== activeGrowId
-                    ) {
-                      setActiveGrowId(recentTargetSuggestion.growId);
+                    // Freshness is revalidated AT ACCEPTANCE, not at open. The
+                    // dialog can sit open across the 14-day boundary (or the
+                    // plant can stop being visible), and a value captured when
+                    // it opened would let an expired target through on a click
+                    // made minutes or hours later. Re-run the same pure rule
+                    // against the current clock; if it no longer holds, retire
+                    // the offer instead of applying it.
+                    const current = resolveRecentTargetSuggestion({
+                      record: recentTargetRecord,
+                      now: Date.now(),
+                      visiblePlants: plants,
+                    });
+                    if (!current) {
+                      setRecentSuggestionDismissed(true);
+                      return;
                     }
-                    setPlantId(recentTargetSuggestion.plantId);
+                    if (current.growId && current.growId !== activeGrowId) {
+                      setActiveGrowId(current.growId);
+                    }
+                    setPlantId(current.plantId);
                     setSaveError(null);
                     setRecentSuggestionDismissed(true);
                   }}

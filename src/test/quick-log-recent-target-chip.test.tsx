@@ -236,4 +236,32 @@ describe("QuickLog — remembered target is an offer, never a default", () => {
     expect(screen.getByTestId("quick-log-plant-select")).toHaveTextContent("Blue Dream");
     expect(screen.queryByTestId("quick-log-recent-target-suggestion")).not.toBeInTheDocument();
   });
+
+  it("revalidates freshness at the moment of acceptance, not at open", () => {
+    // The dialog can sit open across the 14-day boundary. A value captured at
+    // open would let an expired target through on a click made later.
+    seed("verdant.quickLog.lastTarget.v2.u1", "p2", RECENT_TARGET_SUGGESTION_MAX_AGE_MS - 60_000);
+    renderQL(<QuickLog open onOpenChange={() => {}} />);
+    expect(screen.getByTestId("quick-log-recent-target-suggestion")).toBeInTheDocument();
+
+    // Time passes while the sheet stays open; the record is now stale.
+    vi.setSystemTime(NOW + 120_000);
+    fireEvent.click(screen.getByTestId("quick-log-recent-target-accept"));
+
+    // The offer is retired rather than applied — no plant is selected.
+    expect(screen.queryByTestId("quick-log-recent-target-suggestion")).not.toBeInTheDocument();
+    expect(screen.getByTestId("quick-log-plant-select")).not.toHaveTextContent("OG Kush");
+    expect(screen.getByTestId("quick-log-save")).toBeDisabled();
+    expect(rpcMock).not.toHaveBeenCalled();
+  });
+
+  it("still accepts a target that is fresh at click time", () => {
+    seed("verdant.quickLog.lastTarget.v2.u1", "p2", RECENT_TARGET_SUGGESTION_MAX_AGE_MS - 600_000);
+    renderQL(<QuickLog open onOpenChange={() => {}} />);
+
+    vi.setSystemTime(NOW + 60_000);
+    fireEvent.click(screen.getByTestId("quick-log-recent-target-accept"));
+
+    expect(screen.getByTestId("quick-log-plant-select")).toHaveTextContent("OG Kush");
+  });
 });

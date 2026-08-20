@@ -134,6 +134,20 @@ describe("LocalDataHealthPanel — a malformed scoped record is never reported h
     expect(within(row).getByText("Warn")).toBeInTheDocument();
   });
 
+  it("warns on a nonempty but unreadable savedAt", async () => {
+    // `"whenever"` is a nonempty string, so a shape-only check called this
+    // healthy while Quick Log silently offered nothing. The parser now
+    // requires a timestamp Date.parse can actually read.
+    setLocalStorageItemForTest(
+      `verdant.quickLog.lastTarget.v2.${ACCOUNT_A}`,
+      JSON.stringify({ plantId: "p1", growId: "g1", tentId: "t1", savedAt: "whenever" }),
+    );
+    render(<LocalDataHealthPanel />);
+
+    const row = await schemaRow("Quick Log last target");
+    expect(within(row).getByText("Warn")).toBeInTheDocument();
+  });
+
   it("passes a well-formed record", async () => {
     setLocalStorageItemForTest(`verdant.quickLog.lastTarget.v2.${ACCOUNT_A}`, RECORD);
     render(<LocalDataHealthPanel />);

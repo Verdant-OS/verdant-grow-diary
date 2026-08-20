@@ -24,15 +24,32 @@ export const SITEMAP_ONLY_ROUTES = Object.freeze([
   "/", // Homepage served by index.html itself; head baked at build.
 ]);
 
-/** STATIC_PUBLIC_SEO_DOCUMENTS paths intentionally excluded from sitemap.xml. */
+/**
+ * STATIC_PUBLIC_SEO_DOCUMENTS paths intentionally excluded from sitemap.xml.
+ *
+ * Was six entries until 2026-08-20. All six were live, HTTP 200, self-canonical
+ * and "index, follow" while unadvertised — the "indexable routes outside the
+ * sitemap" FAIL. Owner adjudication resolved it in favour of the sitemap, and
+ * five moved into public/sitemap.xml. The exclusion that remains is a duplicate
+ * -control call, not an oversight; do not "tidy" it away without reading why.
+ */
 export const STATIC_ONLY_ROUTES = Object.freeze([
-  "/glossary",
+  // /breeder-beta and /creator-beta both render <BetaLanding>, differing only
+  // in kicker, support copy, and meta description — BetaLanding's own header
+  // describes the breeder route as a "copy-only difference". Measured 2026-08-20
+  // against live HTML: 233 of ~237 unique visible tokens shared, identical h1,
+  // identical every h2. Both are self-canonical, so advertising the pair would
+  // set two near-identical URLs competing on the same queries.
+  //
+  // /creator-beta is the one advertised: its audience (growers, breeders, and
+  // grower-educators) is the superset, and its title already reads "Creator &
+  // Breeder Beta".
+  //
+  // To retire this exclusion, pick one and say so here:
+  //   (a) differentiate /breeder-beta's body copy enough to stand alone, then
+  //       add it to public/sitemap.xml; or
+  //   (b) point its canonical at /creator-beta, keeping it indexable for direct
+  //       and paid traffic while conceding the ranking URL.
+  // Leaving it self-canonical AND sitemapped is the one option to avoid.
   "/breeder-beta",
-  "/creator-beta",
-  "/pheno-comparison",
-  "/pheno-expression-showcase",
-  // Pre-rendered so its canonical is itself rather than the shell's root
-  // canonical (which would mark it a homepage duplicate for non-JS crawlers).
-  // Whether to ADVERTISE it in sitemap.xml is a separate acquisition call.
-  "/docs/mcp-api",
 ]);

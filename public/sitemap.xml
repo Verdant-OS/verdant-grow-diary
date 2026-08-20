@@ -342,4 +342,48 @@
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
+  <!--
+    Added 2026-08-20. These routes were already live, HTTP 200, self-canonical
+    and "index, follow", but absent from this sitemap — the long-standing
+    "indexable routes outside the sitemap" FAIL. Owner adjudication on that date
+    resolved it in favour of advertising them.
+
+    /breeder-beta is deliberately NOT here. It renders the same <BetaLanding>
+    component as /creator-beta, and its own source header calls the breeder
+    variant a "copy-only difference"; measured overlap is 233 of ~237 unique
+    visible tokens, with identical h1 and h2s. Advertising both would put a
+    near-duplicate pair in front of crawlers. It stays in STATIC_ONLY_ROUTES
+    pending a differentiate-or-canonicalise decision — see
+    scripts/public-route-parity.config.mjs.
+  -->
+  <url>
+    <loc>https://verdantgrowdiary.com/glossary</loc>
+    <lastmod>2026-08-20</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://verdantgrowdiary.com/docs/mcp-api</loc>
+    <lastmod>2026-08-20</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://verdantgrowdiary.com/pheno-expression-showcase</loc>
+    <lastmod>2026-08-20</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://verdantgrowdiary.com/pheno-comparison</loc>
+    <lastmod>2026-08-20</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://verdantgrowdiary.com/creator-beta</loc>
+    <lastmod>2026-08-20</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
 </urlset>

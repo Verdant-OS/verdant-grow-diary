@@ -105,6 +105,9 @@ describe("D7 — V2 sheet response-check chips", () => {
     expect(flat).toMatch(
       /const authored = chipAuthoredStatusRef\.current; chipAuthoredStatusRef\.current = null; if \(!authored\) return; if \(readResponseCheckStatus\(form\.note\) !== authored\) return; setField\("note", actionTextWithoutResponseContext\(form\.note\)\);/,
     );
+    // Provenance is per DRAFT: it must be cleared wherever a draft resets, or
+    // a stale status would let the cleanup strip the NEXT draft's prose.
+    expect(flat.match(/chipAuthoredStatusRef\.current = null;/g) ?? []).toHaveLength(3);
     // No retired guard can come back: the unconditional "chips absent" form,
     // the visibility-only transition form, or a strip with no provenance.
     expect(SHEET).not.toMatch(/^\s*if \(showResponseCheck\) return;\s*$/m);

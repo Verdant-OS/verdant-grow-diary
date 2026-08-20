@@ -459,6 +459,10 @@ export default function QuickLogV2Sheet({
         action: defaultAction,
       });
       manualTempEntryUnitRef.current = null;
+      // A new draft has no chip-authored marker, so the provenance record must
+      // not survive from the previous one. A stale status would let the
+      // cleanup strip prose this draft's grower typed.
+      chipAuthoredStatusRef.current = null;
       setFeedingForm(EMPTY_QUICKLOG_FEEDING_FORM);
       feedingTempEntryUnitRef.current = null;
       setWateringForm(EMPTY_QUICKLOG_WATERING_FORM);
@@ -1196,6 +1200,9 @@ export default function QuickLogV2Sheet({
       selectedKey: prev.selectedKey,
     }));
     manualTempEntryUnitRef.current = null;
+    // Same reason as the open reset: "Log another" begins a new draft, and its
+    // note is empty, so no chip has authored anything in it yet.
+    chipAuthoredStatusRef.current = null;
     setFeedingForm(EMPTY_QUICKLOG_FEEDING_FORM);
     feedingTempEntryUnitRef.current = null;
     setWateringForm(EMPTY_QUICKLOG_WATERING_FORM);

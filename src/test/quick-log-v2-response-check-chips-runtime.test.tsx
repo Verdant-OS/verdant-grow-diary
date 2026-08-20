@@ -58,6 +58,28 @@ function renderSheet(defaultTargetKey: string) {
   );
 }
 
+/** Render with a caller-controlled `open`, so a close/reopen can be driven. */
+function renderSheetControlled(defaultTargetKey: string, open: boolean) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+  const view = render(
+    <QueryClientProvider client={client}>
+      <QuickLogV2Sheet open={open} onOpenChange={vi.fn()} defaultTargetKey={defaultTargetKey} />
+    </QueryClientProvider>,
+  );
+  return {
+    rerender: (nextOpen: boolean) =>
+      view.rerender(
+        <QueryClientProvider client={client}>
+          <QuickLogV2Sheet
+            open={nextOpen}
+            onOpenChange={vi.fn()}
+            defaultTargetKey={defaultTargetKey}
+          />
+        </QueryClientProvider>,
+      ),
+  };
+}
+
 function noteTextarea(): HTMLTextAreaElement {
   return screen.getByLabelText("Note (optional)") as HTMLTextAreaElement;
 }
@@ -352,5 +374,39 @@ describe("D7 chips — a plant response never survives a switch to a tent", () =
     await waitFor(() => expect(screen.getByTestId("qlv2-response-chips")).toBeInTheDocument());
     expect(noteTextarea().value).toContain("Response check: Worse.");
     expect(chip("worse")).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("does not carry chip provenance into a reopened sheet", async () => {
+    const { rerender } = renderSheetControlled("plant:plant-1", true);
+    fireEvent.click(chip("better"));
+    expect(noteTextarea().value).toContain("Response check: Better.");
+
+    // Close and reopen: a brand-new draft, in which no chip has been clicked.
+    rerender(false);
+    rerender(true);
+
+    const prose = "Previous response check: better after watering. Runoff clear.";
+    fireEvent.change(noteTextarea(), { target: { value: prose } });
+    fireEvent.click(screen.getByLabelText("Target"));
+    fireEvent.click(await screen.findByRole("option", { name: /Plant 2/ }));
+
+    expect(noteTextarea().value).toBe(prose);
+  });
+
+  it("does not carry chip provenance into a Log another draft", async () => {
+    rpcMock.mockResolvedValue({ data: { ok: true, grow_event_id: "ge-1" }, error: null });
+    renderSheet("plant:plant-1");
+    fireEvent.click(chip("same"));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(rpcMock).toHaveBeenCalled());
+
+    fireEvent.click(await screen.findByRole("button", { name: /Log another/i }));
+
+    const prose = "Previous response check: same as yesterday. Runoff clear.";
+    fireEvent.change(noteTextarea(), { target: { value: prose } });
+    fireEvent.click(screen.getByLabelText("Target"));
+    fireEvent.click(await screen.findByRole("option", { name: /Plant 2/ }));
+
+    expect(noteTextarea().value).toBe(prose);
   });
 });

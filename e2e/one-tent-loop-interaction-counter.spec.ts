@@ -168,6 +168,18 @@ test.describe("One-Tent Loop interaction counter baseline", () => {
     // save receipt alone cannot see.
     expect(typeof world.lastIdempotencyKey).toBe("string");
     expect((world.lastIdempotencyKey ?? "").length).toBeGreaterThanOrEqual(8);
+
+    // Status-only means status-only. Production fans any non-null reading out
+    // into an extra environment grow-event and an environment-event child,
+    // which this fixture does not model — so a blank-to-zero regression would
+    // persist telemetry the grower never entered while both the receipt and
+    // the two-row baseline stayed unchanged. Phantom sensor data is a safety
+    // rule here, not just fixture fidelity.
+    expect(world.lastSensors).toEqual({
+      temperature_c: null,
+      humidity_pct: null,
+      vpd_kpa: null,
+    });
   });
 
   test("S7: post-save timeline evidence costs at most one continuation action", async ({
@@ -273,6 +285,18 @@ test.describe("One-Tent Loop interaction counter baseline", () => {
     // cannot see.
     expect(typeof world.lastIdempotencyKey).toBe("string");
     expect((world.lastIdempotencyKey ?? "").length).toBeGreaterThanOrEqual(8);
+
+    // Status-only means status-only. Production fans any non-null reading out
+    // into an extra environment grow-event and an environment-event child,
+    // which this fixture does not model — so a blank-to-zero regression would
+    // persist telemetry the grower never entered while both the receipt and
+    // the two-row baseline stayed unchanged. Phantom sensor data is a safety
+    // rule here, not just fixture fidelity.
+    expect(world.lastSensors).toEqual({
+      temperature_c: null,
+      humidity_pct: null,
+      vpd_kpa: null,
+    });
 
     // One canonical save == one spine row + one linked diary companion.
     expect(world.savedGrowEvents).toHaveLength(1);

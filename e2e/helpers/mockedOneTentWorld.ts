@@ -116,6 +116,16 @@ export interface MockedWorld {
    * scenario's own assertion; this is what lets it make one.
    */
   lastTarget: { type: string | null; id: string | null } | null;
+  /**
+   * The sensor fields the last accepted save carried. Production fans a
+   * non-null reading out into an extra environment grow-event plus an
+   * environment-event child, which this fixture does NOT model — so a
+   * status-only scenario that started submitting telemetry (a blank-to-zero
+   * regression, say) would persist readings the receipt never shows. Exposed
+   * so status-only scenarios can require these to be absent; a scenario that
+   * genuinely logs a reading would need the fan-out modelled first.
+   */
+  lastSensors: { temperature_c: unknown; humidity_pct: unknown; vpd_kpa: unknown } | null;
   rpcMode: "ok" | "fail";
 }
 
@@ -126,6 +136,7 @@ export function createMockedWorld(): MockedWorld {
     reads: { diary_entries: 0, grow_events: 0, grow_events_by_id: 0 },
     lastIdempotencyKey: null,
     lastTarget: null,
+    lastSensors: null,
     rpcMode: "ok",
   };
 }
@@ -359,6 +370,11 @@ export async function mockSignedInSupabase(
     }
     world.lastIdempotencyKey = submittedKey;
     world.lastTarget = { type: submittedTargetType, id: submittedTargetId };
+    world.lastSensors = {
+      temperature_c: submitted.p_temperature_c ?? null,
+      humidity_pct: submitted.p_humidity_pct ?? null,
+      vpd_kpa: submitted.p_vpd_kpa ?? null,
+    };
 
     const occurredAt = asText(submitted.p_occurred_at) ?? new Date().toISOString();
     world.savedGrowEvents.push({

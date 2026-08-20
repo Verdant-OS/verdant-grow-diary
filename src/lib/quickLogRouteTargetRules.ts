@@ -3,9 +3,51 @@ import { isUuid } from "@/lib/isUuid";
 const TENT_DETAIL_PATH = /^\/tents\/([^/?#]+)\/?$/;
 const PLANT_DETAIL_PATH = /^\/plants\/([^/?#]+)\/?$/;
 
+export type QuickLogDetailRouteIdentity = `plant:${string}` | `tent:${string}`;
+
 export interface TentQuickLogTargetEvidence {
   tentId: string;
   soleActivePlantId: string | null;
+}
+
+function resolveDetailRouteId(pathname: string, pattern: RegExp): string | null {
+  const match = pattern.exec(pathname);
+  if (!match) return null;
+
+  try {
+    const id = decodeURIComponent(match[1]);
+    return isUuid(id) ? id : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Return the authenticated detail resource named by the pathname.
+ *
+ * Query-string refinements are intentionally absent: React Router exposes
+ * them separately from `pathname`, and they must not invalidate a grower's
+ * already-open Quick Log draft. A different detail UUID, however, means the
+ * frozen target belongs to a different resource and is no longer safe.
+ */
+export function resolveQuickLogDetailRouteIdentity(
+  pathname: unknown,
+): QuickLogDetailRouteIdentity | null {
+  if (typeof pathname !== "string") return null;
+
+  const plantId = resolveDetailRouteId(pathname, PLANT_DETAIL_PATH);
+  if (plantId) return `plant:${plantId}`;
+
+  const tentId = resolveDetailRouteId(pathname, TENT_DETAIL_PATH);
+  return tentId ? `tent:${tentId}` : null;
+}
+
+/** A frozen launch target is stale whenever its authenticated detail changes. */
+export function didQuickLogDetailRouteChange(
+  previous: QuickLogDetailRouteIdentity | null,
+  next: QuickLogDetailRouteIdentity | null,
+): boolean {
+  return previous !== null && next !== null && previous !== next;
 }
 
 /**
@@ -21,24 +63,17 @@ export function resolveMobileQuickLogTarget(
   evidence: TentQuickLogTargetEvidence | null = null,
 ): string | null {
   if (typeof pathname !== "string") return null;
-  const match = TENT_DETAIL_PATH.exec(pathname);
-  if (!match) return null;
+  const tentId = resolveDetailRouteId(pathname, TENT_DETAIL_PATH);
+  if (!tentId) return null;
 
-  try {
-    const tentId = decodeURIComponent(match[1]);
-    if (!isUuid(tentId)) return null;
-
-    // Tent Detail owns the active-plant query and publishes the same
-    // sole-active-plant derivation used by its desktop FAB. Match the route
-    // tent and validate both ids before becoming more specific. Missing,
-    // loading, stale, multi-plant, or malformed evidence stays tent-scoped.
-    const solePlantId = evidence?.tentId === tentId ? evidence.soleActivePlantId : null;
-    return typeof solePlantId === "string" && isUuid(solePlantId)
-      ? `plant:${solePlantId}`
-      : `tent:${tentId}`;
-  } catch {
-    return null;
-  }
+  // Tent Detail owns the active-plant query and publishes the same
+  // sole-active-plant derivation used by its desktop FAB. Match the route
+  // tent and validate both ids before becoming more specific. Missing,
+  // loading, stale, multi-plant, or malformed evidence stays tent-scoped.
+  const solePlantId = evidence?.tentId === tentId ? evidence.soleActivePlantId : null;
+  return typeof solePlantId === "string" && isUuid(solePlantId)
+    ? `plant:${solePlantId}`
+    : `tent:${tentId}`;
 }
 
 /**
@@ -48,13 +83,5 @@ export function resolveMobileQuickLogTarget(
  */
 export function resolvePlantQuickLogRouteTarget(pathname: unknown): string | null {
   if (typeof pathname !== "string") return null;
-  const match = PLANT_DETAIL_PATH.exec(pathname);
-  if (!match) return null;
-
-  try {
-    const plantId = decodeURIComponent(match[1]);
-    return isUuid(plantId) ? plantId : null;
-  } catch {
-    return null;
-  }
+  return resolveDetailRouteId(pathname, PLANT_DETAIL_PATH);
 }

@@ -492,9 +492,14 @@ export default function QuickLogV2Sheet({
     if (form.action !== "feed") return;
     if (feedingDefaultsApplied) return;
     if (!feedingDefaults.defaults) return;
-    // Only prefill if the user has not started typing — preserves manual input.
-    if (!isFeedingFormPristine(feedingForm)) return;
-    setFeedingForm(applyFeedingDefaultsToForm(feedingDefaults));
+    // Defaults affect only the recipe. A note handed off from Note/Water (for
+    // example a selected Better/Same/Worse response) must neither block those
+    // defaults nor be overwritten by them.
+    if (!isFeedingFormPristine({ ...feedingForm, note: "" })) return;
+    setFeedingForm((previous) => ({
+      ...applyFeedingDefaultsToForm(feedingDefaults),
+      note: previous.note,
+    }));
     setFeedingDefaultsApplied(true);
   }, [open, form.action, feedingDefaults, feedingDefaultsApplied, feedingForm]);
 
@@ -543,8 +548,14 @@ export default function QuickLogV2Sheet({
     // Remove the chip's own line and nothing else. A whole-note strip would
     // also delete a grower's later sentence that merely reads like a marker.
     const next = removeChipAuthoredResponseLine(form.note, authored);
-    if (next === form.note) return;
-    setField("note", next);
+    if (next !== form.note) setField("note", next);
+    // Feed has its own visible note field. If the selected response was handed
+    // into it before this retarget, remove the same exact chip-owned line so a
+    // plant response cannot persist on a different plant or a tent entry.
+    setFeedingForm((previous) => {
+      const nextFeedingNote = removeChipAuthoredResponseLine(previous.note, authored);
+      return nextFeedingNote === previous.note ? previous : { ...previous, note: nextFeedingNote };
+    });
   }, [responseTargetPlantId, form.note, setField]);
 
   const handleAction = (a: QuickLogV2Action) => {
@@ -569,9 +580,14 @@ export default function QuickLogV2Sheet({
       wateringTempEntryUnitRef.current = null;
     }
     // Entering feed → maturity evidence surface hides; clear its draft
-    // so stale plant-maturity notes don't get retained under the hood.
+    // so stale plant-maturity notes don't get retained under the hood. Feed
+    // writes through its own visible note field, so hand the current note into
+    // that field instead of retaining an unsavable hidden response/status.
     if (a === "feed") {
       setMaturityEvidenceForm(EMPTY_QUICK_LOG_MATURITY_EVIDENCE_FORM);
+      setFeedingForm((previous) =>
+        previous.note === form.note ? previous : { ...previous, note: form.note },
+      );
     }
   };
 

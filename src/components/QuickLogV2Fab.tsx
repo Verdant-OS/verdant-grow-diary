@@ -1,6 +1,11 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { PlusCircle } from "lucide-react";
+import { useLocation } from "@/lib/react-router-compat";
+import {
+  didQuickLogDetailRouteChange,
+  resolveQuickLogDetailRouteIdentity,
+} from "@/lib/quickLogRouteTargetRules";
 import QuickLogV2Sheet from "./QuickLogV2Sheet";
 
 interface Props {
@@ -9,6 +14,7 @@ interface Props {
 }
 
 export default function QuickLogV2Fab({ defaultTargetKey, label = "Quick Log" }: Props) {
+  const { pathname } = useLocation();
   const [open, setOpen] = useState(false);
   // The default target is a LAUNCH PARAMETER, not a live binding.
   //
@@ -24,6 +30,21 @@ export default function QuickLogV2Fab({ defaultTargetKey, label = "Quick Log" }:
   // provable afterwards is simply used on the next open. Never lose input to
   // make a target more specific.
   const [launchTargetKey, setLaunchTargetKey] = useState<string | null>(null);
+  const routeIdentity = resolveQuickLogDetailRouteIdentity(pathname);
+  const previousRouteIdentityRef = useRef(routeIdentity);
+
+  useEffect(() => {
+    const previousRouteIdentity = previousRouteIdentityRef.current;
+    previousRouteIdentityRef.current = routeIdentity;
+
+    // A route-id change is categorically different from a query refining the
+    // same detail page. The frozen target belongs to the prior plant/tent, so
+    // close the sheet and clear it before it can be reused on the new detail.
+    if (!didQuickLogDetailRouteChange(previousRouteIdentity, routeIdentity)) return;
+    setOpen(false);
+    setLaunchTargetKey(null);
+  }, [routeIdentity]);
+
   return (
     <>
       {/* Hidden on mobile — the universal mobile Quick Log entry point lives

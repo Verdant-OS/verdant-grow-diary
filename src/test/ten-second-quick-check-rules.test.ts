@@ -76,25 +76,32 @@ describe("Quick Log action + response rules", () => {
     expect(applyResponseCheck(note, "Same")).toBe("Response check: Same.\nWatered.");
   });
 
-  it("treats legacy Quick check lines as response checks", () => {
+  it("recognizes legacy Quick check lines without treating them as chip-owned", () => {
     const note = "Quick check: Worse.\nWatered.";
-    expect(applyResponseCheck(note, "Better")).toBe("Response check: Better.\nWatered.");
+    expect(applyResponseCheck(note, "Better")).toBe(`Response check: Better.\n${note}`);
     expect(hasResponseCheck("Quick check: Same.")).toBe(true);
   });
 
   it("preserves grower prose that follows an inline response prefix", () => {
     expect(
       applyResponseCheck("Response check: Worse. Leaves perked up after lights-on.", "Same"),
-    ).toBe("Response check: Same. Leaves perked up after lights-on.");
+    ).toBe("Response check: Same.\nResponse check: Worse. Leaves perked up after lights-on.");
   });
 
-  it("removes mid-line and repeated response statuses without losing action prose", () => {
-    expect(applyResponseCheck("Watered. Response check: Better.", "Same")).toBe(
-      "Response check: Same.\nWatered.",
-    );
-    expect(applyResponseCheck("Response check: Worse. Response check: Better.", "Same")).toBe(
-      "Response check: Same.",
-    );
+  it("adds one canonical chip line without rewriting marker-looking grower prose", () => {
+    const prose = [
+      "Previous response check: better after watering.",
+      "Quick check: Worse. might have been heat stress.",
+    ].join("\n");
+
+    expect(applyResponseCheck(prose, "Same")).toBe(`Response check: Same.\n${prose}`);
+  });
+
+  it("preserves mid-line and repeated response-looking grower prose", () => {
+    const midLine = "Watered. Response check: Better.";
+    const repeated = "Response check: Worse. Response check: Better.";
+    expect(applyResponseCheck(midLine, "Same")).toBe(`Response check: Same.\n${midLine}`);
+    expect(applyResponseCheck(repeated, "Same")).toBe(`Response check: Same.\n${repeated}`);
   });
 
   it("recognizes canonical and legacy response prefixes case-insensitively", () => {
@@ -127,7 +134,7 @@ describe("Quick Log action + response rules", () => {
     const note = "Response: Response check: Better. Watering less helped.";
     expect(readResponseCheckStatus(note)).toBe("Better");
     expect(actionTextWithoutResponseContext(note)).toBe("");
-    expect(applyResponseCheck(note, "Same")).toBe("Response check: Same. Watering less helped.");
+    expect(applyResponseCheck(note, "Same")).toBe(`Response check: Same.\n${note}`);
   });
 
   it("defines one equal-time action/response chronology policy", () => {
@@ -173,12 +180,9 @@ describe("legacy ten-second quick check exports", () => {
 });
 
 describe("removeChipAuthoredResponseLine", () => {
-  it("removes only the marker, keeping prose the grower added to that line", () => {
-    // The chip writes "Response check: Better."; the grower extends the same
-    // line. Deleting the line would take their words with the marker.
-    expect(removeChipAuthoredResponseLine("Response check: Better. after watering", "Better")).toBe(
-      "after watering",
-    );
+  it("preserves the entire first line once the grower extends the canonical chip line", () => {
+    const edited = "Response check: Better. after watering";
+    expect(removeChipAuthoredResponseLine(edited, "Better")).toBe(edited);
   });
 
   it("drops the line entirely when the marker was all it held", () => {

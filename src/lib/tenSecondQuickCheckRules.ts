@@ -93,27 +93,23 @@ export function buildQuickCheckLine(status: TenSecondQuickCheckStatus): string {
 }
 
 export function applyResponseCheck(existingNote: string, status: ResponseCheckStatus): string {
-  const responseContext: string[] = [];
-  const remainingLines: string[] = [];
+  const responseLine = buildResponseCheckLine(status);
+  if (existingNote.length === 0) return responseLine;
 
-  for (const line of splitLines(existingNote)) {
-    if (!isResponseCheckLine(line)) {
-      remainingLines.push(line);
-      continue;
-    }
+  // A chip owns only the exact canonical first line it previously wrote. Text
+  // elsewhere that merely looks like a response marker is grower prose and
+  // must remain byte-for-byte. This also means an edited first line is no
+  // longer safe to replace: prepend a fresh canonical line and preserve the
+  // grower's edit instead of guessing which span still belongs to the chip.
+  const newlineAt = existingNote.indexOf("\n");
+  const firstLine = newlineAt === -1 ? existingNote : existingNote.slice(0, newlineAt);
+  const hasCanonicalFirstLine = RESPONSE_CHECK_STATUSES.some(
+    (candidate) => firstLine === buildResponseCheckLine(candidate),
+  );
+  if (!hasCanonicalFirstLine) return `${responseLine}\n${existingNote}`;
 
-    const stripped = stripResponseCheckTokens(line);
-    if (!stripped) continue;
-
-    if (RESPONSE_CHECK_AT_LINE_START.test(line)) {
-      responseContext.push(stripped);
-    } else {
-      remainingLines.push(stripped);
-    }
-  }
-
-  const responseLine = [buildResponseCheckLine(status), ...responseContext].join(" ");
-  return [responseLine, ...remainingLines].join("\n");
+  const rest = newlineAt === -1 ? "" : existingNote.slice(newlineAt + 1);
+  return rest.length === 0 ? responseLine : `${responseLine}\n${rest}`;
 }
 
 // Backward-compatible wrapper. Better/Same/Worse are response checks now.
@@ -164,9 +160,8 @@ export function readResponseCheckStatus(existingNote: string): ResponseCheckStat
 }
 
 /**
- * Removes ONLY the marker a chip wrote: the canonical response-check prefix at
- * the head of the first line. Everything else survives byte-for-byte — the rest
- * of that first line, every later line, and the grower's own line breaks.
+ * Removes ONLY the exact, untouched canonical line a chip wrote at the head of
+ * the note. Everything else survives byte-for-byte.
  *
  * Two things this deliberately does NOT do, each of which loses grower text:
  *
@@ -174,13 +169,12 @@ export function readResponseCheckStatus(existingNote: string): ResponseCheckStat
  *   ANYWHERE, which is right for classification and wrong here: a grower who
  *   wrote "Previous response check: better after watering" on a later line
  *   would lose that sentence.
- * - It does not delete the whole first line. `applyResponseCheck` composes that
- *   line as the marker plus any carried response context, and a grower can
- *   extend it inline ("Response check: Better after watering") — deleting the
- *   line takes their words with the marker.
+ * - It does not strip a marker prefix from an edited first line. Once a grower
+ *   extends "Response check: Better." inline, the line is no longer exactly
+ *   chip-authored; preserving the whole line is safer than guessing at spans.
  *
- * Returns the note unchanged unless the first line opens with a response marker
- * whose status matches `authored`.
+ * Returns the note unchanged unless the first line exactly equals the canonical
+ * line for `authored`.
  */
 export function removeChipAuthoredResponseLine(
   existingNote: string,
@@ -189,13 +183,8 @@ export function removeChipAuthoredResponseLine(
   if (typeof existingNote !== "string" || existingNote.length === 0) return existingNote;
   const newlineAt = existingNote.indexOf("\n");
   const firstLine = newlineAt === -1 ? existingNote : existingNote.slice(0, newlineAt);
-  const rest = newlineAt === -1 ? "" : existingNote.slice(newlineAt + 1);
-  if (!RESPONSE_CHECK_AT_LINE_START.test(firstLine.trim())) return existingNote;
-  if (readResponseCheckStatus(firstLine) !== authored) return existingNote;
-
-  const remainder = firstLine.trim().replace(RESPONSE_CHECK_AT_LINE_START, "").trim();
-  if (!remainder) return rest;
-  return newlineAt === -1 ? remainder : `${remainder}\n${rest}`;
+  if (firstLine !== buildResponseCheckLine(authored)) return existingNote;
+  return newlineAt === -1 ? "" : existingNote.slice(newlineAt + 1);
 }
 
 /**

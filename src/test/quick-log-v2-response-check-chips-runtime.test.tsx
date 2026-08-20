@@ -156,6 +156,17 @@ describe("D7 chips — selection and payload", () => {
     expect(note).toContain("Response check: Same.");
     expect(note).toContain("Watered 1L, runoff clear.");
   });
+
+  it("does not rewrite marker-looking grower prose when a chip is applied", () => {
+    renderSheet("plant:plant-1");
+    const prose = "Previous response check: better after watering. Runoff clear.";
+    fireEvent.change(noteTextarea(), { target: { value: prose } });
+
+    fireEvent.click(chip("same"));
+
+    expect(noteTextarea().value).toBe(`Response check: Same.\n${prose}`);
+    expect(chip("same")).toHaveAttribute("aria-pressed", "true");
+  });
 });
 
 describe("D7 chips — note-length boundary", () => {
@@ -437,7 +448,8 @@ describe("D7 chips — a plant response never survives a switch to a tent", () =
     fireEvent.click(screen.getByLabelText("Target"));
     fireEvent.click(await screen.findByRole("option", { name: /Plant 2/ }));
 
-    await waitFor(() => expect(noteTextarea().value).not.toContain("Response check: Better."));
-    expect(noteTextarea().value).toContain("after watering");
+    await waitFor(() =>
+      expect(noteTextarea().value).toBe("Response check: Better. after watering"),
+    );
   });
 });

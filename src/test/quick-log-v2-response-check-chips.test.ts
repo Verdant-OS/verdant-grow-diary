@@ -103,7 +103,12 @@ describe("D7 — V2 sheet response-check chips", () => {
     // typed that merely reads like one is never touched.
     expect(flat).toMatch(/chipAuthoredStatusRef\.current = status; setField\("note", next\);/);
     expect(flat).toMatch(
-      /const authored = chipAuthoredStatusRef\.current; chipAuthoredStatusRef\.current = null; if \(!authored\) return; const next = removeChipAuthoredResponseLine\(form\.note, authored\); if \(next === form\.note\) return; setField\("note", next\);/,
+      /const authored = chipAuthoredStatusRef\.current; chipAuthoredStatusRef\.current = null; if \(!authored\) return; const next = removeChipAuthoredResponseLine\(form\.note, authored\); if \(next !== form\.note\) setField\("note", next\);/,
+    );
+    // Feed owns a separate visible note. If the response was handed into it,
+    // the same target transition must clear that exact chip-owned line there.
+    expect(flat).toMatch(
+      /setFeedingForm\(\(previous\) => \{ const nextFeedingNote = removeChipAuthoredResponseLine\(previous\.note, authored\); return nextFeedingNote === previous\.note \? previous : \{ \.\.\.previous, note: nextFeedingNote \}; \}\);/,
     );
     // The whole-note strip cannot come back: it deletes a grower's later
     // sentence that merely reads like a marker.

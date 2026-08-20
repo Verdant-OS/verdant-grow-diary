@@ -559,8 +559,9 @@ export default function QuickLog({
         record: recentTargetRecord,
         now: Date.now(),
         visiblePlants: plants,
+        visibleGrows: grows,
       }),
-    [recentTargetRecord, plants],
+    [recentTargetRecord, plants, grows],
   );
   const showRecentTargetSuggestion =
     !prefillNamesTarget &&
@@ -1966,6 +1967,7 @@ export default function QuickLog({
                       record: recentTargetRecord,
                       now: Date.now(),
                       visiblePlants: plants,
+                      visibleGrows: grows,
                     });
                     if (!current) {
                       setRecentSuggestionDismissed(true);

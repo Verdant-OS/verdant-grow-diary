@@ -49,10 +49,15 @@ let userMock: { id: string } | null = { id: "u1" };
 vi.mock("@/store/auth", () => ({ useAuth: () => ({ user: userMock }) }));
 
 const setActiveGrowIdMock = vi.fn();
+// Mutable so a test can archive the remembered plant's grow. `useGrows()`
+// returns ACTIVE grows only, so archiving one removes it from this list while
+// leaving the plant itself in `usePlants()`.
+const ACTIVE_GROW = { id: "g1", name: "Tent 1", stage: "veg" };
+let growsMock: Array<Record<string, unknown>> = [ACTIVE_GROW];
 vi.mock("@/store/grows", () => ({
   useGrows: () => ({
-    grows: [{ id: "g1", name: "Tent 1", stage: "veg" }],
-    activeGrow: { id: "g1", name: "Tent 1", stage: "veg" },
+    grows: growsMock,
+    activeGrow: growsMock.find((g) => g.id === "g1") ?? null,
     activeGrowId: "g1",
     setActiveGrowId: setActiveGrowIdMock,
   }),
@@ -127,6 +132,7 @@ beforeEach(() => {
   vi.setSystemTime(NOW);
   rpcMock.mockClear();
   setActiveGrowIdMock.mockClear();
+  growsMock = [ACTIVE_GROW];
   userMock = { id: "u1" };
   plantsMock = PLANTS;
   clearLocalStorageForTest();
@@ -223,6 +229,22 @@ describe("QuickLog — remembered target is an offer, never a default", () => {
 
     expect(screen.getByTestId("quick-log-plant-select")).toBeInTheDocument();
     expect(screen.queryByTestId("quick-log-recent-target-suggestion")).not.toBeInTheDocument();
+  });
+
+  it("offers nothing when the remembered plant's GROW has been archived", () => {
+    // Archiving a grow updates only the `grows` row, so p1 is still visible in
+    // `usePlants()` — the plant lookup alone cannot catch this. Accepting would
+    // call setActiveGrowId("g1"), which GrowsProvider does not recognise and
+    // replaces with a different grow, stranding the grower.
+    growsMock = [{ id: "g2", name: "Other Tent", stage: "veg" }];
+    seed("verdant.quickLog.lastTarget.v2.u1", "p1", 60_000);
+    renderQL(<QuickLog open onOpenChange={() => {}} />);
+
+    // Positive control: the plant select still renders, so "nothing found" is
+    // not passing as "the offer was correctly withheld".
+    expect(screen.getByTestId("quick-log-plant-select")).toBeInTheDocument();
+    expect(screen.queryByTestId("quick-log-recent-target-suggestion")).not.toBeInTheDocument();
+    expect(setActiveGrowIdMock).not.toHaveBeenCalled();
   });
 
   it("never reads another account's remembered target", () => {

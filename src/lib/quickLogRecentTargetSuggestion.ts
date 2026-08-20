@@ -6,12 +6,21 @@
  * fallback when resolution fails: every failing condition yields no
  * suggestion at all, so an unscoped Quick Log stays a manual selection.
  *
- * Five independent conditions must hold, evaluated with an injectable clock:
+ * Six independent conditions must hold, evaluated with an injectable clock:
  *   1. the stored timestamp parses to a finite instant;
  *   2. it is not in the future (a skewed clock is not evidence);
  *   3. it is at most 14 days old (strictly older → expired);
- *   4. the plant still appears among the grower's own visible rows.
- *   5. that live row still has the grow and tent scope required for a save.
+ *   4. the plant still appears among the grower's own visible rows;
+ *   5. that live row still has the grow and tent scope required for a save;
+ *   6. that grow is still one of the grower's ACTIVE grows.
+ *
+ * Condition 6 is not implied by condition 4. `archiveGrow` (`src/lib/db.ts`)
+ * updates only the `grows` row, so a plant in a newly archived grow keeps
+ * `is_archived: false` and stays in `usePlants()`. Offering it looked
+ * harmless and was not: accepting calls `setActiveGrowId(archivedGrowId)`,
+ * and `GrowsProvider` — which lists active grows only — replaces an unknown
+ * id with `grows[0].id`. The grower would land on a DIFFERENT grow with the
+ * remembered plant absent from the filtered options. Fail closed instead.
  *
  * The storage key is namespaced per account, so one browser shared between
  * accounts can never surface another grower's plant. Grow and tent scope are
@@ -50,10 +59,20 @@ export interface RecentTargetSuggestion {
   tentId: string | null;
 }
 
+export interface RecentTargetVisibleGrow {
+  id: string;
+}
+
 export interface ResolveRecentTargetSuggestionInput {
   record: RecentTargetRecord | null;
   now: number;
   visiblePlants: readonly RecentTargetVisiblePlant[] | null | undefined;
+  /**
+   * The grower's ACTIVE grows — the same archived-filtered list the grow
+   * picker renders. Absent or empty means "not established", which fails
+   * closed: an unverifiable grow is not evidence that the grow is live.
+   */
+  visibleGrows: readonly RecentTargetVisibleGrow[] | null | undefined;
 }
 
 function trimmed(value: unknown): string {
@@ -107,7 +126,7 @@ export function parseRecentTargetRecord(raw: string | null | undefined): RecentT
 export function resolveRecentTargetSuggestion(
   input: ResolveRecentTargetSuggestionInput,
 ): RecentTargetSuggestion | null {
-  const { record, now, visiblePlants } = input;
+  const { record, now, visiblePlants, visibleGrows } = input;
   if (!record) return null;
   if (typeof now !== "number" || !Number.isFinite(now)) return null;
 
@@ -117,7 +136,8 @@ export function resolveRecentTargetSuggestion(
   if (now - savedAtMs > RECENT_TARGET_SUGGESTION_MAX_AGE_MS) return null;
 
   // Owner revalidation: the plant must still be visible to this grower.
-  // Archived, merged, deleted, and cross-account targets are all absent here.
+  // Archived PLANTS, merged, deleted, and cross-account targets are all absent
+  // here. A plant whose GROW was archived is not — see condition 6 below.
   const plant = (visiblePlants ?? []).find((row) => row && row.id === record.plantId);
   if (!plant) return null;
 
@@ -126,6 +146,11 @@ export function resolveRecentTargetSuggestion(
   const growId = trimmed(plant.grow_id);
   const tentId = trimmed(plant.tent_id);
   if (!growId || !tentId) return null;
+
+  // The grow must still be one of the grower's active grows. An archived grow
+  // leaves its plants visible, so the plant row alone cannot prove this.
+  const growIsActive = (visibleGrows ?? []).some((row) => row && row.id === growId);
+  if (!growIsActive) return null;
 
   return {
     plantId: plant.id,

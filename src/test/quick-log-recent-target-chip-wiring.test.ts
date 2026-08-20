@@ -39,8 +39,17 @@ describe("D5 — remembered target is a suggestion, never a default", () => {
     expect(FLAT).not.toMatch(/open && !prefill \? loadRecentTargetRecord/);
   });
 
-  it("revalidates the stored target against the grower's visible plants", () => {
-    expect(QUICKLOG).toMatch(/resolveRecentTargetSuggestion\(\{[\s\S]{0,200}visiblePlants: plants/);
+  it("revalidates the stored target against the grower's visible plants AND active grows", () => {
+    // Renegotiated to the new exact shape, and strengthened: the active-grow
+    // list is now part of the contract. A plant in an archived grow stays in
+    // `usePlants()`, so `visiblePlants` alone cannot prove the grow is live.
+    expect(QUICKLOG).toMatch(
+      /resolveRecentTargetSuggestion\(\{[\s\S]{0,240}visiblePlants: plants,[\s\S]{0,80}visibleGrows: grows/,
+    );
+    // The pre-archived-grow form cannot come back at either call site.
+    expect(QUICKLOG).not.toMatch(
+      /resolveRecentTargetSuggestion\(\{[^}]*visiblePlants: plants,\s*\}\)/,
+    );
   });
 
   it("accepting the chip runs the same explicit selection as the Select", () => {
@@ -48,7 +57,7 @@ describe("D5 — remembered target is a suggestion, never a default", () => {
     // CURRENT clock before applying it, so the handler selects from that
     // re-derived value rather than the one captured when the dialog opened.
     expect(FLAT).toMatch(
-      /quick-log-recent-target-accept[\s\S]{0,1400}resolveRecentTargetSuggestion\(\{ record: recentTargetRecord, now: Date\.now\(\), visiblePlants: plants, \}\)/,
+      /quick-log-recent-target-accept[\s\S]{0,1500}resolveRecentTargetSuggestion\(\{ record: recentTargetRecord, now: Date\.now\(\), visiblePlants: plants, visibleGrows: grows, \}\)/,
     );
     expect(FLAT).toMatch(
       /quick-log-recent-target-accept[\s\S]{0,1600}setPlantId\(current\.plantId\)/,

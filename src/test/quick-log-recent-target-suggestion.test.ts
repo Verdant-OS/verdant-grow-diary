@@ -21,6 +21,9 @@ const PLANTS = [
   { id: "plant-2", name: "Gelato #2", grow_id: "grow-1", tent_id: "tent-1" },
 ];
 
+// The grower's ACTIVE grows — the archived-filtered list `useGrows()` returns.
+const GROWS = [{ id: "grow-1" }];
+
 function record(overrides: Record<string, unknown> = {}) {
   return {
     plantId: "plant-1",
@@ -65,6 +68,7 @@ describe("resolveRecentTargetSuggestion — D-B9 validity window", () => {
       record: record(),
       now: NOW,
       visiblePlants: PLANTS,
+      visibleGrows: GROWS,
     });
     expect(suggestion).toEqual({
       plantId: "plant-1",
@@ -81,6 +85,7 @@ describe("resolveRecentTargetSuggestion — D-B9 validity window", () => {
       }),
       now: NOW,
       visiblePlants: PLANTS,
+      visibleGrows: GROWS,
     });
     expect(atBoundary).not.toBeNull();
 
@@ -90,6 +95,7 @@ describe("resolveRecentTargetSuggestion — D-B9 validity window", () => {
       }),
       now: NOW,
       visiblePlants: PLANTS,
+      visibleGrows: GROWS,
     });
     expect(pastBoundary).toBeNull();
   });
@@ -100,6 +106,7 @@ describe("resolveRecentTargetSuggestion — D-B9 validity window", () => {
         record: record({ savedAt: new Date(NOW + 1000).toISOString() }),
         now: NOW,
         visiblePlants: PLANTS,
+        visibleGrows: GROWS,
       }),
     ).toBeNull();
   });
@@ -110,6 +117,7 @@ describe("resolveRecentTargetSuggestion — D-B9 validity window", () => {
         record: record({ savedAt: "whenever" }),
         now: NOW,
         visiblePlants: PLANTS,
+        visibleGrows: GROWS,
       }),
     ).toBeNull();
   });
@@ -122,10 +130,16 @@ describe("resolveRecentTargetSuggestion — D-B9 validity window", () => {
         record: record({ plantId: "plant-gone" }),
         now: NOW,
         visiblePlants: PLANTS,
+        visibleGrows: GROWS,
       }),
     ).toBeNull();
     expect(
-      resolveRecentTargetSuggestion({ record: record(), now: NOW, visiblePlants: [] }),
+      resolveRecentTargetSuggestion({
+        record: record(),
+        now: NOW,
+        visiblePlants: [],
+        visibleGrows: GROWS,
+      }),
     ).toBeNull();
   });
 
@@ -134,6 +148,7 @@ describe("resolveRecentTargetSuggestion — D-B9 validity window", () => {
       record: record({ growId: "stale-grow", tentId: "stale-tent" }),
       now: NOW,
       visiblePlants: PLANTS,
+      visibleGrows: GROWS,
     });
     expect(suggestion?.growId).toBe("grow-1");
     expect(suggestion?.tentId).toBe("tent-1");
@@ -149,6 +164,7 @@ describe("resolveRecentTargetSuggestion — D-B9 validity window", () => {
           record: record(),
           now: NOW,
           visiblePlants: [plant],
+          visibleGrows: GROWS,
         }),
       ).toBeNull();
     }
@@ -156,15 +172,25 @@ describe("resolveRecentTargetSuggestion — D-B9 validity window", () => {
 
   it("returns null (never throws, never falls back) for a null record or bad clock", () => {
     expect(
-      resolveRecentTargetSuggestion({ record: null, now: NOW, visiblePlants: PLANTS }),
+      resolveRecentTargetSuggestion({
+        record: null,
+        now: NOW,
+        visiblePlants: PLANTS,
+        visibleGrows: GROWS,
+      }),
     ).toBeNull();
     expect(
-      resolveRecentTargetSuggestion({ record: record(), now: Number.NaN, visiblePlants: PLANTS }),
+      resolveRecentTargetSuggestion({
+        record: record(),
+        now: Number.NaN,
+        visiblePlants: PLANTS,
+        visibleGrows: GROWS,
+      }),
     ).toBeNull();
   });
 
   it("is deterministic", () => {
-    const input = { record: record(), now: NOW, visiblePlants: PLANTS };
+    const input = { record: record(), now: NOW, visiblePlants: PLANTS, visibleGrows: GROWS };
     expect(resolveRecentTargetSuggestion(input)).toEqual(resolveRecentTargetSuggestion(input));
   });
 });
@@ -198,5 +224,58 @@ describe("parseRecentTargetRecord — savedAt must be a readable timestamp", () 
       if (!record) continue;
       expect(Number.isFinite(Date.parse(record.savedAt))).toBe(true);
     }
+  });
+});
+
+describe("resolveRecentTargetSuggestion — the grow must still be active", () => {
+  // Regression for the archived-grow gap. `archiveGrow` (src/lib/db.ts) updates
+  // only the `grows` row, so the grow's plants keep `is_archived: false` and
+  // stay in `usePlants()`. The plant lookup alone therefore cannot prove the
+  // grow is live, and accepting an archived-grow target is worse than useless:
+  // `GrowsProvider` (src/store/grows.tsx) replaces an activeGrowId it does not
+  // recognise with `grows[0].id`, landing the grower on a DIFFERENT grow with
+  // the remembered plant filtered out of the options.
+  it("withholds the suggestion when the plant's grow is no longer active", () => {
+    expect(
+      resolveRecentTargetSuggestion({
+        record: record(),
+        now: NOW,
+        visiblePlants: PLANTS,
+        // grow-1 archived; the grower still has another active grow.
+        visibleGrows: [{ id: "grow-2" }],
+      }),
+    ).toBeNull();
+  });
+
+  it("fails closed while the active-grow list is unestablished", () => {
+    // Empty, null and undefined are "not established", not "no archived grows".
+    for (const visibleGrows of [[], null, undefined]) {
+      expect(
+        resolveRecentTargetSuggestion({
+          record: record(),
+          now: NOW,
+          visiblePlants: PLANTS,
+          visibleGrows,
+        }),
+      ).toBeNull();
+    }
+  });
+
+  it("still offers the target when that grow is among the active grows", () => {
+    // Positive control: the negative cases above differ from this one ONLY in
+    // the active-grow list, so "nothing returned" can never pass as correct
+    // withholding of an otherwise-invalid target.
+    const suggestion = resolveRecentTargetSuggestion({
+      record: record(),
+      now: NOW,
+      visiblePlants: PLANTS,
+      visibleGrows: [{ id: "grow-2" }, { id: "grow-1" }],
+    });
+    expect(suggestion).toEqual({
+      plantId: "plant-1",
+      plantName: "Blue Dream #1",
+      growId: "grow-1",
+      tentId: "tent-1",
+    });
   });
 });

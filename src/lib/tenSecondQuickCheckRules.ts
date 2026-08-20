@@ -164,18 +164,23 @@ export function readResponseCheckStatus(existingNote: string): ResponseCheckStat
 }
 
 /**
- * Removes ONLY the leading response-check line — the exact shape
- * `applyResponseCheck` writes, which always lands first — and returns
- * everything after it byte-for-byte.
+ * Removes ONLY the marker a chip wrote: the canonical response-check prefix at
+ * the head of the first line. Everything else survives byte-for-byte — the rest
+ * of that first line, every later line, and the grower's own line breaks.
  *
- * `actionTextWithoutResponseContext` strips response markers ANYWHERE in the
- * note. That is right for classification and wrong for undoing one chip click:
- * a grower who wrote "Previous response check: better after watering" on a
- * later line would lose that sentence. Undoing a chip must remove the chip's
- * line and nothing else, including the grower's own line breaks.
+ * Two things this deliberately does NOT do, each of which loses grower text:
  *
- * Returns the note unchanged unless the first line is a response line whose
- * status matches `authored`.
+ * - It does not use `actionTextWithoutResponseContext`. That strips markers
+ *   ANYWHERE, which is right for classification and wrong here: a grower who
+ *   wrote "Previous response check: better after watering" on a later line
+ *   would lose that sentence.
+ * - It does not delete the whole first line. `applyResponseCheck` composes that
+ *   line as the marker plus any carried response context, and a grower can
+ *   extend it inline ("Response check: Better after watering") — deleting the
+ *   line takes their words with the marker.
+ *
+ * Returns the note unchanged unless the first line opens with a response marker
+ * whose status matches `authored`.
  */
 export function removeChipAuthoredResponseLine(
   existingNote: string,
@@ -184,9 +189,13 @@ export function removeChipAuthoredResponseLine(
   if (typeof existingNote !== "string" || existingNote.length === 0) return existingNote;
   const newlineAt = existingNote.indexOf("\n");
   const firstLine = newlineAt === -1 ? existingNote : existingNote.slice(0, newlineAt);
+  const rest = newlineAt === -1 ? "" : existingNote.slice(newlineAt + 1);
   if (!RESPONSE_CHECK_AT_LINE_START.test(firstLine.trim())) return existingNote;
   if (readResponseCheckStatus(firstLine) !== authored) return existingNote;
-  return newlineAt === -1 ? "" : existingNote.slice(newlineAt + 1);
+
+  const remainder = firstLine.trim().replace(RESPONSE_CHECK_AT_LINE_START, "").trim();
+  if (!remainder) return rest;
+  return newlineAt === -1 ? remainder : `${remainder}\n${rest}`;
 }
 
 /**

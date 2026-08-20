@@ -454,6 +454,18 @@ describe("buildQuicklogConsistencyReport", () => {
     expect(readDetailsLoggedAt({ logged_at: "2026-02-28T23:59:59Z" }).parseable).toBe(true);
   });
 
+  it("accepts low years instead of tripping Date.UTC's 1900-century remap", () => {
+    // Date.UTC(99, 0, 1) is 1999, so a year-based round trip through Date.UTC
+    // would report these server-acceptable stamps as unparseable.
+    expect(readDetailsLoggedAt({ logged_at: "0099-01-01T00:00:00Z" }).parseable).toBe(true);
+    expect(readDetailsLoggedAt({ logged_at: "0001-01-01T00:00:00Z" }).parseable).toBe(true);
+    expect(readDetailsLoggedAt({ logged_at: "0100-06-15T12:30:00Z" }).parseable).toBe(true);
+    // Impossible dates stay rejected in the low-year range too.
+    expect(readDetailsLoggedAt({ logged_at: "0099-02-30T00:00:00Z" }).parseable).toBe(false);
+    // PostgreSQL has no year zero (1 BC is followed by 1 AD).
+    expect(readDetailsLoggedAt({ logged_at: "0000-01-01T00:00:00Z" }).parseable).toBe(false);
+  });
+
   it("keeps PGRST204 (unknown column) out of the sealed classification", () => {
     expect(
       classifyQuicklogPrivateProbe({

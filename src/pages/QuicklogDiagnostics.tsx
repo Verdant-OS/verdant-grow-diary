@@ -50,6 +50,12 @@ const MANUAL_EVENT_WINDOW = 20;
 const CONSISTENCY_DIARY_WINDOW = 200;
 const CONSISTENCY_EVENT_WINDOW = 100;
 
+// Only the manual-save PARENT rows carry a diary mirror. A sensor-bearing
+// save also writes a companion `environment` grow event (source "manual")
+// that the delegate intentionally does NOT mirror — including it here would
+// paint every healthy sensor save as a spurious missing-mirror warning.
+const MANUAL_PARENT_EVENT_TYPES = ["watering", "observation"] as const;
+
 const EVENT_COLUMNS_WITH_LOGGED_AT =
   "id, event_type, source, occurred_at, logged_at, created_at, plant_id, tent_id, grow_id";
 const EVENT_COLUMNS_LEGACY =
@@ -83,6 +89,7 @@ async function fetchManualEvents(limit: number): Promise<{
     .from("grow_events")
     .select(EVENT_COLUMNS_WITH_LOGGED_AT)
     .eq("source", "manual")
+    .in("event_type", [...MANUAL_PARENT_EVENT_TYPES])
     .order("created_at", { ascending: false })
     .limit(limit);
   if (!withLoggedAt.error) {
@@ -96,6 +103,7 @@ async function fetchManualEvents(limit: number): Promise<{
     .from("grow_events")
     .select(EVENT_COLUMNS_LEGACY)
     .eq("source", "manual")
+    .in("event_type", [...MANUAL_PARENT_EVENT_TYPES])
     .order("created_at", { ascending: false })
     .limit(limit);
   if (legacy.error) throw legacy.error;
@@ -153,11 +161,15 @@ async function fetchManualDiagnostics(): Promise<ManualDiagnosticsData> {
   let auditRows: QuicklogDiagnosticsAuditRow[] = [];
   let recentRejections: QuicklogDiagnosticsAuditRow[] = [];
   let auditReadable = true;
+  // Chronological order with a stable tie-breaker — the UI renders these as
+  // an ordered trail, and PostgREST guarantees nothing without an ORDER BY.
   const auditForEvents = eventIds.length
     ? await supabase
         .from("quicklog_audit_events" as never)
         .select("grow_event_id, status, reason, created_at")
         .in("grow_event_id", eventIds)
+        .order("created_at", { ascending: true })
+        .order("id", { ascending: true })
     : { data: [], error: null };
   if (auditForEvents.error) {
     auditReadable = false;
@@ -170,6 +182,7 @@ async function fetchManualDiagnostics(): Promise<ManualDiagnosticsData> {
       .select("grow_event_id, status, reason, created_at")
       .eq("status", "validation_failed")
       .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
       .limit(15);
     if (rejections.error) {
       auditReadable = false;
@@ -579,6 +592,7 @@ export default function QuicklogDiagnostics() {
                 Checked {consistency.report.checkedDiaryEntries} diary entries and{" "}
                 {consistency.report.checkedGrowEvents} grow events —{" "}
                 {consistency.report.healthyLinks} healthy links,{" "}
+                {consistency.report.linksWithoutCapturedParity} without provable Captured parity,{" "}
                 {consistency.report.unlinkedDiaryEntries} standalone diary entries.
               </p>
               {consistency.report.danglingDiaryLinks.length === 0 &&

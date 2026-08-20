@@ -140,6 +140,31 @@ function functionPresent(signature: string): boolean {
   );
 }
 
+/**
+ * True only when the function is owned by postgres AND its resolved ACL is
+ * exactly one entry: postgres=EXECUTE. Enumerating named roles is not
+ * enough — a grant to ANY other role (or an ownership transfer) must fail
+ * this check, mirroring the forward-repair postcondition's full-ACL match.
+ */
+function aclExactlyPostgres(signature: string): boolean | null {
+  const out = psqlScalar(
+    `SELECT owner_role.rolname = 'postgres'
+        AND COALESCE((
+          SELECT array_agg(
+                   format('%s|%s', COALESCE(grantee.rolname, 'PUBLIC'), a.privilege_type)
+                   ORDER BY COALESCE(grantee.rolname, 'PUBLIC'), a.privilege_type
+                 )
+            FROM aclexplode(COALESCE(p.proacl, acldefault('f', p.proowner))) a
+            LEFT JOIN pg_roles grantee ON grantee.oid = a.grantee
+        ), ARRAY[]::text[]) = ARRAY['postgres|EXECUTE']
+       FROM pg_proc p
+       JOIN pg_roles owner_role ON owner_role.oid = p.proowner
+      WHERE p.oid = '${signature.replaceAll("'", "''")}'::regprocedure;`,
+  );
+  if (out === null) return null;
+  return out === "t";
+}
+
 console.log("→ quicklog manual-save private-helper EXECUTE matrix (resolved values)");
 
 // Preflight: every function must exist. A missing function would make each
@@ -171,6 +196,10 @@ for (const helper of QUICKLOG_PRIVATE_HELPER_FUNCTIONS) {
   check(`${helper}: service_role cannot EXECUTE`, hasExecute("service_role", signature) === false);
   check(`${helper}: postgres CAN EXECUTE`, hasExecute("postgres", signature) === true);
   check(`${helper}: PUBLIC pseudo-role holds no EXECUTE`, publicHasExecute(signature) === false);
+  check(
+    `${helper}: resolved ACL is exactly postgres=EXECUTE with postgres owner (no other grantee)`,
+    aclExactlyPostgres(signature) === true,
+  );
 }
 
 // 2. Wrapper matrix.
@@ -236,6 +265,10 @@ try {
   check(
     "negative control: probe sees the re-opened grant",
     hasExecute("authenticated", PROBE_HELPER) === true,
+  );
+  check(
+    "negative control: exact-ACL check rejects the extra grantee",
+    aclExactlyPostgres(PROBE_HELPER) === false,
   );
 } finally {
   const restored = psqlRun(

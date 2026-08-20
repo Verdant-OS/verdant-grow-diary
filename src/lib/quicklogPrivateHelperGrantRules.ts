@@ -80,6 +80,15 @@ export const QUICKLOG_PRIVATE_HELPER_OWNER_ROLE = "postgres" as const;
 export { EXECUTE_ROLE_SERVICE };
 
 /**
+ * PostgreSQL 11+ accepts ROUTINE as an alias for FUNCTION in GRANT/REVOKE,
+ * and ALL ROUTINES IN SCHEMA alongside ALL FUNCTIONS IN SCHEMA. A fence that
+ * only knows the FUNCTION spelling can be walked straight past by the other
+ * one, so both detectors below build their target forms from these.
+ */
+const ROUTINE_SINGULAR = String.raw`(?:FUNCTION|ROUTINE)`;
+const ROUTINE_PLURAL = String.raw`(?:FUNCTIONS|ROUTINES)`;
+
+/**
  * True when a migration SQL body (comments stripped) grants EXECUTE on the
  * named function to any role other than postgres. Used by the static fence
  * that scans migrations newer than the forward repair.
@@ -92,7 +101,7 @@ export function migrationGrantsClientExecuteOn(
   // targeted when its name appears anywhere before TO. Over-matching errs
   // toward flagging, which is the safe polarity for a fence.
   const grantPattern = new RegExp(
-    String.raw`GRANT\s+(?:ALL|EXECUTE)[^;]*?\bON\s+(?:ALL\s+FUNCTIONS\s+IN\s+SCHEMA\s+public\b|FUNCTION\s+[^;]*?\b(?:public\.)?${functionName}\b)[^;]*?\bTO\s+([^;]+);`,
+    String.raw`GRANT\s+(?:ALL|EXECUTE)[^;]*?\bON\s+(?:ALL\s+${ROUTINE_PLURAL}\s+IN\s+SCHEMA\s+public\b|${ROUTINE_SINGULAR}\s+[^;]*?\b(?:public\.)?${functionName}\b)[^;]*?\bTO\s+([^;]+);`,
     "gis",
   );
   for (const match of executableSql.matchAll(grantPattern)) {
@@ -116,15 +125,22 @@ export function migrationGrantsClientExecuteOn(
  */
 export function migrationLeavesWrapperWithoutRequiredGrant(executableSql: string): boolean {
   const wrapperRef = String.raw`(?:public\.)?quicklog_save_manual(?!_pre_logged_at)\s*\([^)]*\)`;
+  // Every target form that reaches the wrapper: a direct FUNCTION/ROUTINE
+  // target (the wrapper need not be first in a comma-separated list), or a
+  // schema-wide ALL FUNCTIONS/ROUTINES IN SCHEMA public. Both directions use
+  // the same forms — a schema-wide revoke followed by a schema-wide grant
+  // genuinely does restore access, so recognizing it in only one direction
+  // would misreport rather than harden.
+  const wrapperTarget = String.raw`(?:ALL\s+${ROUTINE_PLURAL}\s+IN\s+SCHEMA\s+public\b|${ROUTINE_SINGULAR}\s+[^;]*?${wrapperRef})`;
   for (const role of ["authenticated", EXECUTE_ROLE_SERVICE]) {
     // Statement order matters: a GRANT that precedes the REVOKE does not
     // restore access, so compare the LAST occurrence of each per role.
     const revokePattern = new RegExp(
-      String.raw`REVOKE\s+(?:ALL|EXECUTE)[^;]*?\bON\s+FUNCTION\s+${wrapperRef}[^;]*?\bFROM\s+[^;]*\b${role}\b[^;]*;`,
+      String.raw`REVOKE\s+(?:ALL|EXECUTE)[^;]*?\bON\s+${wrapperTarget}[^;]*?\bFROM\s+[^;]*\b${role}\b[^;]*;`,
       "gis",
     );
     const regrantPattern = new RegExp(
-      String.raw`GRANT\s+(?:ALL|EXECUTE)[^;]*?\bON\s+FUNCTION\s+${wrapperRef}[^;]*?\bTO\s+[^;]*\b${role}\b[^;]*;`,
+      String.raw`GRANT\s+(?:ALL|EXECUTE)[^;]*?\bON\s+${wrapperTarget}[^;]*?\bTO\s+[^;]*\b${role}\b[^;]*;`,
       "gis",
     );
     let lastRevokeIndex = -1;

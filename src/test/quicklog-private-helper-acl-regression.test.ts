@@ -214,6 +214,69 @@ describe("forward fence — migrations newer than the forward repair", () => {
       ),
     ).toBe(true);
   });
+
+  it("fence detectors cover PostgreSQL's ROUTINE spellings (self-test)", () => {
+    // PostgreSQL 11+ accepts ROUTINE wherever FUNCTION is accepted, and
+    // ALL ROUTINES IN SCHEMA alongside ALL FUNCTIONS IN SCHEMA. A fence that
+    // only knew the FUNCTION spelling could be walked past by the other one.
+    expect(
+      migrationGrantsClientExecuteOn(
+        "GRANT EXECUTE ON ROUTINE public.quicklog_try_parse_uuid(text) TO authenticated;",
+        "quicklog_try_parse_uuid",
+      ),
+    ).toBe(true);
+    expect(
+      migrationGrantsClientExecuteOn(
+        "GRANT EXECUTE ON ALL ROUTINES IN SCHEMA public TO anon;",
+        "quicklog_try_parse_uuid",
+      ),
+    ).toBe(true);
+    // ROUTINE spelling must still respect the postgres-only exemption.
+    expect(
+      migrationGrantsClientExecuteOn(
+        "GRANT EXECUTE ON ROUTINE public.quicklog_try_parse_uuid(text) TO postgres;",
+        "quicklog_try_parse_uuid",
+      ),
+    ).toBe(false);
+
+    // Wrapper fence: schema-wide and ROUTINE revokes remove wrapper access
+    // just as surely as a direct FUNCTION revoke.
+    expect(
+      migrationLeavesWrapperWithoutRequiredGrant(
+        "REVOKE EXECUTE ON ALL ROUTINES IN SCHEMA public FROM authenticated;",
+      ),
+    ).toBe(true);
+    expect(
+      migrationLeavesWrapperWithoutRequiredGrant(
+        "REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA public FROM service_role;",
+      ),
+    ).toBe(true);
+    expect(
+      migrationLeavesWrapperWithoutRequiredGrant(
+        "REVOKE EXECUTE ON ROUTINE public.quicklog_save_manual(text, uuid, text) FROM authenticated;",
+      ),
+    ).toBe(true);
+    // The wrapper need not be first in a comma-separated target list.
+    expect(
+      migrationLeavesWrapperWithoutRequiredGrant(
+        "REVOKE EXECUTE ON FUNCTION public.other_fn(), public.quicklog_save_manual(text, uuid, text) FROM authenticated;",
+      ),
+    ).toBe(true);
+    // A schema-wide revoke genuinely restored by a schema-wide grant is a
+    // legal re-hardening pass, not a fence breach.
+    expect(
+      migrationLeavesWrapperWithoutRequiredGrant(
+        `REVOKE EXECUTE ON ALL ROUTINES IN SCHEMA public FROM authenticated, service_role;
+         GRANT EXECUTE ON ALL ROUTINES IN SCHEMA public TO authenticated, service_role;`,
+      ),
+    ).toBe(false);
+    // The private delegate's own REVOKEs stay out of scope under ROUTINE too.
+    expect(
+      migrationLeavesWrapperWithoutRequiredGrant(
+        "REVOKE ALL ON ROUTINE public.quicklog_save_manual_pre_logged_at(text, uuid, text) FROM authenticated;",
+      ),
+    ).toBe(false);
+  });
 });
 
 describe("runtime lane wiring", () => {

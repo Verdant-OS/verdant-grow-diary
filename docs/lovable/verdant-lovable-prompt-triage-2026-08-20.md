@@ -398,34 +398,57 @@ collision surface in the repo. Picks 1, 2 and 4 are the safest high-value starts
 
 ---
 
-## 7. Collision boundaries — updated at `cff3efd`
+## 7. Collision boundaries — a method, not a snapshot
 
-`established fact` from `CURRENT_STATE.md` plus the `77d8eec..cff3efd` diff:
+**Read this section differently from the rest of the document.** The picks in §4 are
+grounded in what Verdant *does not have*, and absence is stable — those claims have now
+survived five base advances unchanged. This section is grounded in what other agents are
+*currently editing*, which changes hourly. `established fact`, measured over one afternoon:
+the deploy branch moved `77d8eec` → `cff3efd` → `f09febc` → `59bb33b` → `9b64456`, landing
+A2, B0a, B2a, B3a and B4a. Any hand-maintained file list here is stale within the hour.
 
-- **Tranche A2 has LANDED** as #1048 (`59bb33b`, "preserve One-Tent navigation scope"),
-  whose own commit message records "full A2 closure: 12 files, 108/108 tests" and notes
-  that B4a "intentionally defers B4b until A2 lands". `src/lib/oneTentLoopNavigationRules.ts`
-  is therefore no longer an unopened edit point — grow-scope threading and the Tent Detail
-  self-link removal are merged. **A3–A5 remain Codex-owned and unopened**; their edit
-  points — Action Queue rows/drawer, Alert detail, Sensors source summary, post-save
-  freshness — are still collision boundaries. None of the eight picks touch any of them.
-- **Tranche B+ is now actively landing, which is new since revision 1.** #1039 (B0a) and
-  #1047 (B4a) both merged. The live B-series surface is:
-  `src/lib/doctorStartContextRules.ts`, `src/pages/AiDoctorStart.tsx`,
-  `src/pages/QuicklogDiagnostics.tsx`, `src/lib/quickLogSaveErrorMessage.ts`,
-  `src/lib/quicklogManualDiagnosticsRules.ts`, `src/lib/quicklogPrivateHelperGrantRules.ts`,
-  plus **B2a at `f09febc`** (`src/components/PlantQuickLog.tsx`,
-  `src/lib/quickLogSaveKeyPolicy.ts`), and the e2e harness (`countedDriver.ts`, `interactionCounter.ts`,
-  `mockedOneTentWorld.ts`, `one-tent-loop-interaction-counter.spec.ts`).
-- **Owner decision D4 (Sensors→Doctor context carry) is now partly implemented** by B4a's
+So this section names the **method** and the durable boundaries, and gives the file list
+only as a dated example.
+
+**Re-derive the live surface before sending any prompt:**
+
+```bash
+git fetch origin verdant-grow-diary
+git log --oneline --first-parent <your-last-pin>..origin/verdant-grow-diary
+git diff --name-only <your-last-pin>..origin/verdant-grow-diary
+```
+
+Then read each commit's **body, not its title** — this is not pedantry. #1048 announced
+itself as "fix: preserve One-Tent navigation scope"; only its body revealed
+"full A2 closure", which is what actually retired an edit point. Titles in this repo
+under-describe tranche closure.
+
+**Durable boundaries — these do not churn:**
+
+- **The single manual write path.** `quicklog_save_manual` is the only sanctioned manual
+  Quick Log write (`docs/specs/one-tent-loop-quicklog-single-write-path.md`). Any prompt
+  that persists a log goes through it. This is the boundary Pick 3 sits on.
+- **Parked PRs #828, #817, #696.** Do not start a competing Timeline, Alerts, or Action
+  Queue UI rewrite. This is why no Timeline-surface prompt is in the pack.
+- **Tranche A3–A5 remain Codex-owned and unopened** as of `9b64456` — Action Queue
+  rows/drawer, Alert detail, Sensors source summary, post-save freshness. **A2 has landed**
+  (#1048), so `src/lib/oneTentLoopNavigationRules.ts` is no longer an unopened edit point.
+- **Owner decision D4 (Sensors→Doctor context carry) is partly implemented** by B4a's
   `resolveDoctorStartScope` / `partitionDoctorEntryOptionsByTent`. Treat the Doctor entry
   path as owned.
-- **PRs #828, #817, #696 are open and parked.** Do not start a competing Timeline, Alerts,
-  or Action Queue UI rewrite. This is why no Timeline-surface prompt is in the pack.
 
-**Overlap check for the eight picks, run at `cff3efd`:** only **Pick 3** touches a file
-family the B-series is actively editing (the Quick Log save path). Picks 1, 2, 4, 5, 6, 7
-and 8 land outside every boundary above.
+**The live Tranche B+ file surface, as measured at `9b64456` — expect this list to be
+stale, re-derive it:** `doctorStartContextRules.ts`, `AiDoctorStart.tsx`,
+`QuicklogDiagnostics.tsx`, `quickLogSaveErrorMessage.ts`, `quicklogManualDiagnosticsRules.ts`,
+`quicklogPrivateHelperGrantRules.ts` (B0a/B4a); `PlantQuickLog.tsx`,
+`quickLogSaveKeyPolicy.ts` (B2a, #1049); `GrowRecoveryPrompt.tsx`,
+`recoveryCheckInProjection.ts`, `Dashboard.tsx`, `GrowDetail.tsx` (**B3a**, #1042); and the
+e2e harness (`countedDriver.ts`, `interactionCounter.ts`, `mockedOneTentWorld.ts`,
+`one-tent-loop-interaction-counter.spec.ts`).
+
+**Overlap verdict, re-run at `9b64456`:** only **Pick 3** touches an actively-edited family
+(the Quick Log save path). Picks 1, 2, 4, 5, 6, 7 and 8 land outside every boundary above —
+unchanged across all five base advances.
 
 ---
 
@@ -481,6 +504,7 @@ Re-audited `77d8eec` → `cff3efd`. What changed:
 | **Pick 6** | "zero hits" | Exactly one hit, in `payments-webhook/orchestrator.ts` (billing anomaly, out of domain). Sensor-side still absent |
 | Collision boundaries | Tranche A + parked PRs | Adds the **live Tranche B+ surface** (B0a, B4a) and notes D4 is now partly implemented |
 | Sequence | Pick 3 at position 3 | Pick 3 moved to position 7 behind the collision warning |
+| Post-audit base advance (3) | n/a | Base moved `59bb33b` → `9b64456` (#1052 ACL fences, #1042 **B3a** recovery parity). No overlap, zero conflicts, no pick affected. §7 rewritten as a **method** rather than a hand-maintained file list, because the branch moved five times during this document's life and any static list goes stale within the hour |
 | Post-audit base advance (2) | n/a | Base moved `f09febc` → `59bb33b` (#1046 plant-refresh settle, #1048 **A2**). No overlap with this document's files, zero merge conflicts, and no pick's absence claim affected — none touch `oneTentLoopNavigationRules.ts`. Corrected §7: A2 is merged, not unopened |
 | Post-audit base advance | n/a | Base moved `cff3efd` → `f09febc` (#1049 B2a) after the re-audit. No overlap with this document's files, `git merge-tree` reports zero conflicts, and Pick 3's absence probe still returns zero against the new tree. Added a third Pick 3 guardrail from B2a's signature-aware idempotency policy |
 | Everything else | — | Re-verified unchanged: all 14 already-ships rows still ship; Paddle 233 / Stripe 20 unchanged; Picks 1, 2, 5, 7, 8 still return zero hits |

@@ -34,22 +34,26 @@ export const SITEMAP_ONLY_ROUTES = Object.freeze([
  * -control call, not an oversight; do not "tidy" it away without reading why.
  */
 export const STATIC_ONLY_ROUTES = Object.freeze([
-  // /breeder-beta and /creator-beta both render <BetaLanding>, differing only
-  // in kicker, support copy, and meta description — BetaLanding's own header
-  // describes the breeder route as a "copy-only difference". Measured 2026-08-20
-  // against live HTML: 233 of ~237 unique visible tokens shared, identical h1,
-  // identical every h2. Both are self-canonical, so advertising the pair would
-  // set two near-identical URLs competing on the same queries.
+  // RESOLVED 2026-08-20 — the owner chose option (b): /breeder-beta now
+  // CANONICALISES to /creator-beta and must therefore stay out of the sitemap.
   //
-  // /creator-beta is the one advertised: its audience (growers, breeders, and
-  // grower-educators) is the superset, and its title already reads "Creator &
-  // Breeder Beta".
+  // Why: both routes render <BetaLanding>, differing only in kicker, support
+  // copy, and meta description — BetaLanding's own header describes the breeder
+  // route as a "copy-only difference". Measured against live HTML: 233 of ~237
+  // unique visible tokens shared, identical h1, identical every h2. Two
+  // self-canonical URLs would have competed on the same queries. /creator-beta
+  // keeps the ranking URL: its audience (growers, breeders, grower-educators)
+  // is the superset and its title already reads "Creator & Breeder Beta".
   //
-  // To retire this exclusion, pick one and say so here:
-  //   (a) differentiate /breeder-beta's body copy enough to stand alone, then
-  //       add it to public/sitemap.xml; or
-  //   (b) point its canonical at /creator-beta, keeping it indexable for direct
-  //       and paid traffic while conceding the ranking URL.
-  // Leaving it self-canonical AND sitemapped is the one option to avoid.
+  // This entry is now load-bearing rather than a deferral. A URL whose canonical
+  // points elsewhere must never be advertised in a sitemap — that asks crawlers
+  // to index a page that disclaims itself. Moving /breeder-beta into
+  // public/sitemap.xml WITHOUT first restoring its self-canonical (in BOTH
+  // src/pages/BreederBeta.tsx and the crossCanonicalDocument entry in
+  // src/lib/build/staticPublicSeoDocuments.ts) is the specific mistake to avoid.
+  //
+  // The route stays affirmatively indexable — "index, follow", not noindex — so
+  // direct and paid traffic still land on breeder-oriented copy. Pairing
+  // noindex with a cross-canonical would send two contradictory signals.
   "/breeder-beta",
 ]);

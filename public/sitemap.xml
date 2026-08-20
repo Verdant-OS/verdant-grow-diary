@@ -348,12 +348,20 @@
     "indexable routes outside the sitemap" FAIL. Owner adjudication on that date
     resolved it in favour of advertising them.
 
-    /breeder-beta is deliberately NOT here. It renders the same <BetaLanding>
-    component as /creator-beta, and its own source header calls the breeder
-    variant a "copy-only difference"; measured overlap is 233 of ~237 unique
-    visible tokens, with identical h1 and h2s. Advertising both would put a
-    near-duplicate pair in front of crawlers. It stays in STATIC_ONLY_ROUTES
-    pending a differentiate-or-canonicalise decision — see
+    /breeder-beta is deliberately NOT here, and that is now a resolved decision
+    rather than a deferral. It renders the same <BetaLanding> component as
+    /creator-beta, and its own source header calls the breeder variant a
+    "copy-only difference"; measured overlap is 233 of ~237 unique visible
+    tokens, with identical h1 and h2s. The owner adjudicated on 2026-08-20 that
+    it CANONICALISES to /creator-beta while staying indexable for direct and
+    paid traffic.
+
+    So it must stay out of this file: advertising a URL whose canonical points
+    elsewhere asks crawlers to index a page that disclaims itself. Do not add it
+    without first restoring its self-canonical in BOTH src/pages/BreederBeta.tsx
+    and the crossCanonicalDocument entry in
+    src/lib/build/staticPublicSeoDocuments.ts. Pinned by
+    src/test/breeder-beta-cross-canonical.test.ts; rationale in
     scripts/public-route-parity.config.mjs.
   -->
   <url>

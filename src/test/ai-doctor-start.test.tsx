@@ -357,6 +357,51 @@ describe("AiDoctorStart", () => {
     );
   });
 
+  it("keeps a verified tent when only the UNNEEDED grows read failed", () => {
+    // A tent-only URL is supported (a legacy tent may carry a null grow_id).
+    // There, the grows read only enriches the tent's owning grow, so its
+    // failure must not discard a tent tentsQuery confirmed the grower owns —
+    // that would be a read failure silently costing valid context.
+    state.growsError = "network down";
+    state.tents = SCOPED.tents;
+    state.data = SCOPED.plants;
+    renderPage("/doctor?tentId=tent-a");
+
+    expect(screen.getByTestId("ai-doctor-start-tent-context")).toBeInTheDocument();
+    expect(screen.queryByTestId("ai-doctor-start-scope-unverified")).toBeNull();
+    expect(screen.queryByTestId("ai-doctor-start-invalid-scope")).toBeNull();
+  });
+
+  it("still reports unverified when the read the URL actually needed failed", () => {
+    state.growsError = "network down";
+    state.tents = SCOPED.tents;
+    state.data = SCOPED.plants;
+    renderPage("/doctor?growId=grow-1");
+
+    expect(screen.getByTestId("ai-doctor-start-scope-unverified")).toBeInTheDocument();
+  });
+
+  it("holds the plant list until carried-scope ordering has settled", () => {
+    // Rendering first would show the unscoped alphabetical order and then
+    // reorder and re-badge under the grower's pointer; a link can move
+    // mid-click and the choice would bypass the carried context.
+    state.tentsLoading = true;
+    state.data = SCOPED.plants;
+    renderPage("/doctor?growId=grow-1&tentId=tent-a");
+
+    expect(screen.queryByTestId("ai-doctor-start-options")).toBeNull();
+    expect(screen.getByTestId("ai-doctor-start-loading")).toBeInTheDocument();
+  });
+
+  it("does not hold the list when no scope was carried", () => {
+    // Nothing can reorder, so waiting would be a stall for no benefit.
+    state.tentsLoading = true;
+    state.data = SCOPED.plants;
+    renderPage("/doctor");
+
+    expect(screen.getByTestId("ai-doctor-start-options")).toBeInTheDocument();
+  });
+
   it("offers no retry when no scope was carried — there is nothing to re-check", () => {
     state.growsError = "network down";
     state.data = SCOPED.plants;

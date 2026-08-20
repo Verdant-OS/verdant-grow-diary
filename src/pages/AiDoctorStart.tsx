@@ -42,8 +42,16 @@ export default function AiDoctorStart() {
   // presented as a negative one. Worse, a failed read would make that false
   // statement permanent. So scope messaging waits for both reads, and a read
   // FAILURE is reported as a failure to verify, never as invalid ownership.
+  const requestedGrowId = (searchParams.get("growId") ?? "").trim();
+  const requestedTentId = (searchParams.get("tentId") ?? "").trim();
   const scopeReadsSettled = !growsLoading && !tentsQuery.isLoading;
-  const scopeReadFailed = !!growsError || tentsQuery.isError;
+  // FAILING is narrower than SETTLING, and conflating them discarded verified
+  // context. A read may only invalidate the scope it was needed to validate:
+  // on a tent-only URL — supported, since a legacy tent may carry a null
+  // grow_id — the grows read merely enriches the tent's owning grow, so its
+  // failure must not throw away a tent `tentsQuery` confirmed the grower owns.
+  const scopeReadFailed =
+    (!!requestedGrowId && !!growsError) || (!!requestedTentId && tentsQuery.isError);
   // Neither read retries on its own: `useGrowTents` sets `retry: false` and
   // the grows store refreshes only on mount. Without an explicit affordance a
   // single transient failure would disable valid carried context for the whole
@@ -58,11 +66,15 @@ export default function AiDoctorStart() {
   const plantsAreListed = !plantsQuery.isLoading && !plantsQuery.isError && options.length > 0;
   const everyPlantListedSuffix = plantsAreListed ? " Every active plant is listed below." : "";
   const retryScopeReads = () => {
-    if (growsError) void refreshGrows();
-    if (tentsQuery.isError) void tentsQuery.refetch();
+    if (requestedGrowId && growsError) void refreshGrows();
+    if (requestedTentId && tentsQuery.isError) void tentsQuery.refetch();
   };
-  const carriedScopeRequested =
-    !!searchParams.get("growId")?.trim() || !!searchParams.get("tentId")?.trim();
+  const carriedScopeRequested = !!requestedGrowId || !!requestedTentId;
+  // Ordering and badges depend on the ownership reads. Rendering the list
+  // before they settle shows the unscoped alphabetical order, then reorders
+  // and re-badges under the grower's pointer — a link can move mid-click, and
+  // a choice made in that window bypasses the carried context entirely.
+  const scopeOrderingPending = carriedScopeRequested && !scopeReadsSettled;
 
   const scope = useMemo(
     () =>
@@ -180,7 +192,7 @@ export default function AiDoctorStart() {
           ) : null}
         </div>
 
-        {plantsQuery.isLoading ? (
+        {plantsQuery.isLoading || scopeOrderingPending ? (
           <GrowDataLoadingState resource="Active plants" testId="ai-doctor-start-loading" />
         ) : plantsQuery.isError ? (
           <GrowDataLoadError

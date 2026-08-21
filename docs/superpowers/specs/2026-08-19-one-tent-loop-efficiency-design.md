@@ -337,12 +337,30 @@ project, and the §12-format report with exact counts.
 
 ## 11 · Copy proposed for ratification
 
-| Where                                                                          | String                                                                                                         | Status                                                                                           |
-| ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| Recovery prompt (B3a: Dashboard/GrowDetail; already live on PlantDetail recap) | "No recent check-in." + "Add a 10-second status: Better, Same, or Worse."                                      | **Already shipped verbatim** in `noRecentLogRecoveryRules.ts:33-38` — B3a reuses it, no new copy |
-| Recovery affordance button                                                     | "Add quick check"                                                                                              | **Already shipped** (same module) — supersedes the earlier draft's "Add status"                  |
-| D5 suggestion chip                                                             | "Continue with <plant name>?" · dismiss: "Choose another"                                                      | Ratified 2026-08-19 with this design                                                             |
-| B4 doctor tent-context line                                                    | Exact string proposed in the B4 PR (tent-scoped — a plant is not provable from the Sensors producer; see D-B6) | Pending — ratify at B4 review                                                                    |
+| Where                                                                          | String                                                                                                                                                                                              | Status                                                                                           |
+| ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Recovery prompt (B3a: Dashboard/GrowDetail; already live on PlantDetail recap) | "No recent check-in." + "Add a 10-second status: Better, Same, or Worse."                                                                                                                           | **Already shipped verbatim** in `noRecentLogRecoveryRules.ts:33-38` — B3a reuses it, no new copy |
+| Recovery affordance button                                                     | "Add quick check"                                                                                                                                                                                   | **Already shipped** (same module) — supersedes the earlier draft's "Add status"                  |
+| D5 suggestion chip                                                             | "Continue with <plant name>?" · dismiss: "Choose another"                                                                                                                                           | Ratified 2026-08-19 with this design                                                             |
+| B4 doctor tent-context line                                                    | "This link carried tent context: **<tent name>**." + (only when plants really are listed) " Its plants are listed first — you can still choose any plant."                                          | **Ratified 2026-08-21 by Cheek**, as shipped in B4a                                              |
+| B4 in-tent option badge                                                        | "In this tent"                                                                                                                                                                                      | Shipped with the line above; exposed to assistive tech as the link's description, not its name   |
+| B4 unverified-scope line                                                       | "Verdant couldn't check the grow or tent this link carried, so no tent context is applied." + (only when listed) " Every active plant is listed below." + retry "Try the check again" / "Checking…" | Shipped with the line above — distinct from the invalid case below, deliberately                 |
+| B4 unowned-scope line                                                          | "That link carried a grow or tent Verdant couldn't match to your account, so no tent context is applied." + (only when listed) " Every active plant is listed below."                               | Shipped with the line above                                                                      |
+
+The ratified line is **tent-scoped, never plant-scoped** — the Sensors loop card
+provably holds only `{ growId, tentId }`, so no plant is honestly nameable from
+this producer (D-B6). Two properties of the wording are load-bearing rather than
+stylistic, and a later edit must preserve both:
+
+- **"listed first", not "filtered to".** The carried scope reorders and badges
+  the options; it never removes one. A shorter list would be a softer way of
+  guessing, and "Verdant will not guess which plant you mean" is doctrine.
+- **Unverified ≠ unowned.** A failed ownership _read_ says Verdant could not
+  check, and offers a retry; a scope the account does not own says so plainly.
+  Collapsing them would report a network failure as a permissions verdict.
+
+Both list clauses are conditional on plants actually being listed, so the page
+never claims a list it is not showing.
 
 No other public copy changes in this tranche.
 

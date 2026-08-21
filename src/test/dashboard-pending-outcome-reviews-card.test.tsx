@@ -72,12 +72,16 @@ describe("DashboardPendingOutcomeReviewsCard render", () => {
         {
           action_queue_id: "a1",
           completed_at: "2026-05-29T10:00:00Z",
+          approved_at: null,
+          plant_id: null,
           suggested_change: "Lower RH by 5%",
           hours_since_completed: 26,
         },
         {
           action_queue_id: "a2",
           completed_at: "2026-05-28T10:00:00Z",
+          approved_at: null,
+          plant_id: null,
           suggested_change: "Raise temp",
           hours_since_completed: 50,
         },
@@ -101,6 +105,8 @@ describe("DashboardPendingOutcomeReviewsCard render", () => {
         {
           action_queue_id: "a1",
           completed_at: "2026-05-29T10:00:00Z",
+          approved_at: null,
+          plant_id: null,
           suggested_change: null,
           hours_since_completed: 25,
         },

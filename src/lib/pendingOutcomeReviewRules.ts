@@ -17,6 +17,8 @@ export interface CompletedActionRowLike {
   id?: string | null;
   status?: string | null;
   completed_at?: string | null;
+  approved_at?: string | null;
+  plant_id?: string | null;
   suggested_change?: string | null;
 }
 
@@ -31,6 +33,10 @@ export interface OutcomeDiaryRowLike {
 export interface PendingOutcomeReview {
   action_queue_id: string;
   completed_at: string;
+  /** Present when the action row carried an approval timestamp; may be null. */
+  approved_at: string | null;
+  /** Exact plant scope when set; null for tent/grow-level actions. */
+  plant_id: string | null;
   suggested_change: string | null;
   hours_since_completed: number;
 }
@@ -89,6 +95,8 @@ export function findPendingOutcomeReviews(
     reviews.push({
       action_queue_id: id,
       completed_at: a.completed_at as string,
+      approved_at: nonEmptyString(a.approved_at),
+      plant_id: nonEmptyString(a.plant_id),
       suggested_change: nonEmptyString(a.suggested_change),
       hours_since_completed: Math.floor(ageMs / (60 * 60 * 1000)),
     });

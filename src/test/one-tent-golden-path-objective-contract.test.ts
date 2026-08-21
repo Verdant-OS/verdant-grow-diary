@@ -58,9 +58,10 @@ describe("authenticated One-Tent proof covers the production objective", () => {
   });
 
   it("uses a comment-stripped static wiring fence for the imported runtime contract", () => {
-    expect(EXECUTABLE_SPEC).toContain(
-      "test.use({ viewport: ONE_TENT_PROOF_RUNTIME_CONTRACT.viewport })",
-    );
+    expect(EXECUTABLE_SPEC).toContain("test.use({");
+    expect(EXECUTABLE_SPEC).toContain("viewport: ONE_TENT_PROOF_RUNTIME_CONTRACT.viewport");
+    expect(EXECUTABLE_SPEC).toContain("isMobile: true");
+    expect(EXECUTABLE_SPEC).toContain("hasTouch: true");
     expect(EXECUTABLE_SPEC).toContain(
       "test.setTimeout(ONE_TENT_PROOF_RUNTIME_CONTRACT.proofTimeoutMs)",
     );

@@ -476,6 +476,9 @@ export function LocalDataHealthPanel({ now = Date.now }: LocalDataHealthPanelPro
   const [fixNotice, setFixNotice] = useState<string | null>(null);
   const [drawerKeys, setDrawerKeys] = useState<string[] | null>(null);
   const [backups, setBackups] = useState<BackupSnapshot[]>(() => listBackups());
+  const [emergencyRecovery, setEmergencyRecovery] = useState<BackupSnapshot | null>(() =>
+    readEmergencyRecoverySnapshot(),
+  );
 
   const run = useCallback(async () => {
     setRunning(true);
@@ -567,7 +570,15 @@ export function LocalDataHealthPanel({ now = Date.now }: LocalDataHealthPanelPro
 
       // Snapshot BEFORE mutation so every clear is reversible, using the
       // exact reviewed bytes rather than re-reading a potentially newer value.
-      const provisionalSnapshot = createBackupSnapshot(candidates, "fix-issues");
+      const backupTransaction = createBackupTransaction(candidates, "fix-issues");
+      if (candidates.length > 0 && !backupTransaction) {
+        setFixNotice(
+          "Could not clear — a reversible backup could not be saved. No local data was removed.",
+        );
+        setDrawerKeys(null);
+        await run();
+        return;
+      }
       const cleared: string[] = [];
       const errors: string[] = [];
       for (const candidate of candidates) {
@@ -593,14 +604,31 @@ export function LocalDataHealthPanel({ now = Date.now }: LocalDataHealthPanelPro
       // cross-tab repair during the write), so make only keys that were
       // actually removed restorable. Otherwise Restore could overwrite the
       // newer bytes that the comparison correctly preserved.
-      const snapshot = finalizeBackupSnapshot(provisionalSnapshot, cleared);
+      const finalization = finalizeBackupTransaction(backupTransaction, cleared);
       const parts: string[] = [];
-      if (snapshot && cleared.length > 0)
+      if (finalization.status === "saved") {
+        setEmergencyRecovery(null);
         parts.push(
-          `Backup saved (${snapshot.id.slice(0, 8)}) — ${cleared.length} key${cleared.length === 1 ? "" : "s"} cleared. Restore below if needed.`,
+          `Backup saved (${finalization.snapshot.id.slice(0, 8)}) — ${cleared.length} key${cleared.length === 1 ? "" : "s"} cleared. Restore below if needed.`,
         );
-      else if (cleared.length > 0)
-        parts.push(`Cleared ${cleared.length} local key${cleared.length === 1 ? "" : "s"}.`);
+      } else if (finalization.status === "rolled-back") {
+        setEmergencyRecovery(null);
+        parts.push(
+          `Backup finalization failed. ${finalization.restored} cleared key${finalization.restored === 1 ? " was" : "s were"} restored${finalization.preserved > 0 ? `; ${finalization.preserved} key${finalization.preserved === 1 ? " already held" : "s already held"} newer local data` : ""}; nothing remains cleared. Existing backups were unchanged.`,
+        );
+      } else if (finalization.status === "emergency") {
+        setEmergencyRecovery(finalization.recovery);
+        const missingCount = finalization.recovery?.entries.length ?? 0;
+        parts.push(
+          `Backup finalization failed. Automatic rollback could not restore ${missingCount} cleared key${missingCount === 1 ? "" : "s"}. ${
+            missingCount > 0
+              ? `Emergency recovery is available below${finalization.recoveryDurable ? " and was verified on this device" : " for this open tab, but durable quarantine could not be verified"}.`
+              : "No cleared recovery entry remains, but backup history could not be verified."
+          }`,
+        );
+      } else {
+        setEmergencyRecovery(null);
+      }
       if (skipped.size > 0)
         parts.push(
           `Skipped ${skipped.size} key${skipped.size === 1 ? "" : "s"} because local data changed after review or no longer needs clearing. Re-run checks before trying again.`,
@@ -637,6 +665,26 @@ export function LocalDataHealthPanel({ now = Date.now }: LocalDataHealthPanelPro
     setBackups(listBackups());
     setFixNotice(`Backup ${id.slice(0, 8)} deleted.`);
   }, []);
+
+  const handleEmergencyRestore = useCallback(async () => {
+    if (!emergencyRecovery) return;
+    const result = restoreMissingBackupEntries(emergencyRecovery.entries);
+    if (result.failed.length === 0) {
+      void clearPendingBackup(emergencyRecovery.id);
+      setEmergencyRecovery(null);
+      setFixNotice(
+        `Emergency recovery complete — restored ${result.restored.length} key${result.restored.length === 1 ? "" : "s"}${result.preserved.length > 0 ? `; preserved ${result.preserved.length} newer cross-tab value${result.preserved.length === 1 ? "" : "s"}` : ""}.`,
+      );
+    } else {
+      const remaining = { ...emergencyRecovery, entries: result.failed };
+      const durable = persistEmergencyRecovery(remaining);
+      setEmergencyRecovery(remaining);
+      setFixNotice(
+        `Emergency recovery incomplete — ${result.failed.length} key${result.failed.length === 1 ? " is" : "s are"} still missing. Retry below.${durable ? " Recovery bytes remain verified on this device." : " Keep this tab open; durable quarantine could not be verified."}`,
+      );
+    }
+    await run();
+  }, [emergencyRecovery, run]);
 
   return (
     <>
@@ -738,6 +786,32 @@ export function LocalDataHealthPanel({ now = Date.now }: LocalDataHealthPanelPro
         onDelete={handleDeleteBackup}
         running={running}
       />
+
+      {emergencyRecovery && (
+        <Card className="mt-4 border-destructive/50" data-testid="local-backup-emergency-recovery">
+          <CardHeader className="space-y-2 pb-2">
+            <CardTitle className="text-base">Emergency local recovery</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              A normal backup could not be finalized after clearing. Recovery contains only the keys
+              still missing after verified rollback; it never overwrites a newer cross-tab value.
+            </p>
+          </CardHeader>
+          <CardContent className="flex flex-wrap items-center gap-3 text-sm">
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => void handleEmergencyRestore()}
+              disabled={running}
+            >
+              Emergency Restore/Retry
+            </Button>
+            <span className="text-xs text-muted-foreground">
+              {emergencyRecovery.entries.length} missing key
+              {emergencyRecovery.entries.length === 1 ? "" : "s"}
+            </span>
+          </CardContent>
+        </Card>
+      )}
 
       <RemediationDrawer
         keys={drawerKeys}
@@ -1335,6 +1409,7 @@ function RemediationDrawer({ keys, onCancel, onConfirm, running, now }: Remediat
 // ---------------------------------------------------------------------------
 
 const BACKUP_STORE_KEY = "verdant.diagnostics.local-backups.v1";
+const PENDING_BACKUP_STORE_KEY = "verdant.diagnostics.local-backup-pending.v1";
 const BACKUP_MAX = 10;
 
 interface BackupEntry {
@@ -1351,49 +1426,180 @@ interface BackupSnapshot {
   entries: BackupEntry[];
 }
 
-function readBackupStore(): BackupSnapshot[] {
-  const s = safeStorage();
-  if (!s) return [];
+interface PendingBackupRecord {
+  v: 1;
+  state: "candidates" | "emergency";
+  snapshot: BackupSnapshot;
+}
+
+interface BackupTransaction {
+  snapshot: BackupSnapshot;
+  previousStoreRaw: string | null;
+}
+
+interface MissingEntryRestoreResult {
+  restored: string[];
+  preserved: string[];
+  failed: BackupEntry[];
+}
+
+type BackupFinalizationResult =
+  | { status: "empty"; snapshot: null }
+  | { status: "saved"; snapshot: BackupSnapshot }
+  | {
+      status: "rolled-back";
+      snapshot: null;
+      restored: number;
+      preserved: number;
+    }
+  | {
+      status: "emergency";
+      snapshot: null;
+      recovery: BackupSnapshot | null;
+      recoveryDurable: boolean;
+      restored: number;
+      preserved: number;
+    };
+
+function isBackupEntry(value: unknown): value is BackupEntry {
+  if (!value || typeof value !== "object") return false;
+  const entry = value as Record<string, unknown>;
+  return (
+    typeof entry.key === "string" &&
+    (typeof entry.value === "string" || entry.value === null) &&
+    typeof entry.sizeBytes === "number" &&
+    Number.isFinite(entry.sizeBytes) &&
+    entry.sizeBytes >= 0
+  );
+}
+
+function isBackupSnapshot(value: unknown): value is BackupSnapshot {
+  if (!value || typeof value !== "object") return false;
+  const snapshot = value as Record<string, unknown>;
+  return (
+    typeof snapshot.id === "string" &&
+    typeof snapshot.createdAt === "string" &&
+    typeof snapshot.reason === "string" &&
+    Array.isArray(snapshot.entries) &&
+    snapshot.entries.every(isBackupEntry)
+  );
+}
+
+function parseBackupStore(raw: string | null): BackupSnapshot[] {
+  if (!raw) return [];
   try {
-    const raw = s.getItem(BACKUP_STORE_KEY);
-    if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
-      (b): b is BackupSnapshot =>
-        b &&
-        typeof b.id === "string" &&
-        Array.isArray(b.entries) &&
-        typeof b.createdAt === "string",
-    );
+    return parsed.filter(isBackupSnapshot);
   } catch {
     return [];
   }
 }
 
-function writeBackupStore(
-  list: BackupSnapshot[],
-  { enforceRetentionCap = true }: { enforceRetentionCap?: boolean } = {},
-): void {
+function readStorageRaw(key: string): { ok: true; value: string | null } | { ok: false } {
   const s = safeStorage();
-  if (!s) return;
+  if (!s) return { ok: false };
   try {
-    const persisted = enforceRetentionCap ? list.slice(0, BACKUP_MAX) : list;
-    s.setItem(BACKUP_STORE_KEY, JSON.stringify(persisted));
+    return { ok: true, value: s.getItem(key) };
   } catch {
-    // Quota or serialization failure — silently drop; caller checks return of listBackups.
+    return { ok: false };
   }
+}
+
+function writeStorageRawWithReadback(key: string, value: string): boolean {
+  const s = safeStorage();
+  if (!s) return false;
+  try {
+    s.setItem(key, value);
+    return s.getItem(key) === value;
+  } catch {
+    return false;
+  }
+}
+
+function removeStorageRawWithReadback(key: string): boolean {
+  const s = safeStorage();
+  if (!s) return false;
+  try {
+    s.removeItem(key);
+    return s.getItem(key) === null;
+  } catch {
+    return false;
+  }
+}
+
+function ensureStorageRaw(key: string, expected: string | null): boolean {
+  const current = readStorageRaw(key);
+  if (current.ok && current.value === expected) return true;
+  return expected === null
+    ? removeStorageRawWithReadback(key)
+    : writeStorageRawWithReadback(key, expected);
+}
+
+function readBackupStore(): BackupSnapshot[] {
+  const result = readStorageRaw(BACKUP_STORE_KEY);
+  return result.ok ? parseBackupStore(result.value) : [];
+}
+
+function writeBackupStore(list: BackupSnapshot[]): boolean {
+  return writeStorageRawWithReadback(BACKUP_STORE_KEY, JSON.stringify(list.slice(0, BACKUP_MAX)));
 }
 
 function listBackups(): BackupSnapshot[] {
   return readBackupStore().sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 }
 
-function createBackupSnapshot(entries: BackupEntry[], reason: string): BackupSnapshot | null {
-  const s = safeStorage();
-  if (!s || entries.length === 0) return null;
+function parsePendingBackupRecord(raw: string | null): PendingBackupRecord | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as Partial<PendingBackupRecord>;
+    if (
+      parsed.v !== 1 ||
+      (parsed.state !== "candidates" && parsed.state !== "emergency") ||
+      !isBackupSnapshot(parsed.snapshot)
+    ) {
+      return null;
+    }
+    return parsed as PendingBackupRecord;
+  } catch {
+    return null;
+  }
+}
+
+function readPendingBackupRecord(): PendingBackupRecord | null {
+  const result = readStorageRaw(PENDING_BACKUP_STORE_KEY);
+  return result.ok ? parsePendingBackupRecord(result.value) : null;
+}
+
+function readEmergencyRecoverySnapshot(): BackupSnapshot | null {
+  const pending = readPendingBackupRecord();
+  return pending?.state === "emergency" && pending.snapshot.entries.length > 0
+    ? pending.snapshot
+    : null;
+}
+
+function persistPendingBackup(record: PendingBackupRecord): boolean {
+  return writeStorageRawWithReadback(PENDING_BACKUP_STORE_KEY, JSON.stringify(record));
+}
+
+function clearPendingBackup(snapshotId: string): boolean {
+  const current = readPendingBackupRecord();
+  if (!current) {
+    const raw = readStorageRaw(PENDING_BACKUP_STORE_KEY);
+    return raw.ok && raw.value === null;
+  }
+  if (current.snapshot.id !== snapshotId) return false;
+  return removeStorageRawWithReadback(PENDING_BACKUP_STORE_KEY);
+}
+
+function createBackupTransaction(entries: BackupEntry[], reason: string): BackupTransaction | null {
+  if (entries.length === 0) return null;
   // Only bother saving if at least one key had a value.
   if (entries.every((e) => e.value === null)) return null;
+  // Never overwrite unresolved recovery bytes from an interrupted operation.
+  if (readPendingBackupRecord()) return null;
+  const previousStore = readStorageRaw(BACKUP_STORE_KEY);
+  if (!previousStore.ok) return null;
   const snapshot: BackupSnapshot = {
     id:
       typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -1403,30 +1609,99 @@ function createBackupSnapshot(entries: BackupEntry[], reason: string): BackupSna
     reason,
     entries,
   };
-  // Keep every existing snapshot until final comparison decides whether this
-  // provisional one represents a real clear. Applying the cap now would evict
-  // the oldest backup even when every candidate is subsequently skipped.
-  const next = [snapshot, ...readBackupStore()];
-  writeBackupStore(next, { enforceRetentionCap: false });
-  return snapshot;
+  const pending: PendingBackupRecord = { v: 1, state: "candidates", snapshot };
+  return persistPendingBackup(pending) ? { snapshot, previousStoreRaw: previousStore.value } : null;
 }
 
-function finalizeBackupSnapshot(
-  snapshot: BackupSnapshot | null,
+function restoreMissingBackupEntries(entries: readonly BackupEntry[]): MissingEntryRestoreResult {
+  const s = safeStorage();
+  if (!s) return { restored: [], preserved: [], failed: [...entries] };
+  const restored: string[] = [];
+  const preserved: string[] = [];
+  const failed: BackupEntry[] = [];
+  for (const entry of entries) {
+    try {
+      // Re-read immediately before every rollback write. A newer cross-tab
+      // value always wins; recovery only fills a key that is still absent.
+      const before = s.getItem(entry.key);
+      if (before !== null || entry.value === null) {
+        preserved.push(entry.key);
+        continue;
+      }
+      s.setItem(entry.key, entry.value);
+      const after = s.getItem(entry.key);
+      if (after === entry.value) restored.push(entry.key);
+      else if (after !== null) preserved.push(entry.key);
+      else failed.push(entry);
+    } catch {
+      try {
+        const after = s.getItem(entry.key);
+        if (after === entry.value) restored.push(entry.key);
+        else if (after !== null) preserved.push(entry.key);
+        else failed.push(entry);
+      } catch {
+        failed.push(entry);
+      }
+    }
+  }
+  return { restored, preserved, failed };
+}
+
+function persistEmergencyRecovery(snapshot: BackupSnapshot): boolean {
+  const record: PendingBackupRecord = { v: 1, state: "emergency", snapshot };
+  if (persistPendingBackup(record)) return true;
+  // The all-candidate pending record must never remain the reload-visible
+  // recovery authority. Remove it and retry with only still-missing entries.
+  void removeStorageRawWithReadback(PENDING_BACKUP_STORE_KEY);
+  return persistPendingBackup(record);
+}
+
+function finalizeBackupTransaction(
+  transaction: BackupTransaction | null,
   clearedKeys: readonly string[],
-): BackupSnapshot | null {
-  if (!snapshot) return null;
+): BackupFinalizationResult {
+  if (!transaction) return { status: "empty", snapshot: null };
   const cleared = new Set(clearedKeys);
-  let finalized: BackupSnapshot | null = null;
-  const next = readBackupStore().flatMap((stored) => {
-    if (stored.id !== snapshot.id) return [stored];
-    const entries = stored.entries.filter((entry) => cleared.has(entry.key));
-    if (entries.length === 0) return [];
-    finalized = { ...stored, entries };
-    return [finalized];
+  const entries = transaction.snapshot.entries.filter((entry) => cleared.has(entry.key));
+  if (entries.length === 0) {
+    void clearPendingBackup(transaction.snapshot.id);
+    return { status: "empty", snapshot: null };
+  }
+  const finalized: BackupSnapshot = { ...transaction.snapshot, entries };
+  const previousBackups = parseBackupStore(transaction.previousStoreRaw);
+  if (writeBackupStore([finalized, ...previousBackups])) {
+    void clearPendingBackup(transaction.snapshot.id);
+    return { status: "saved", snapshot: finalized };
+  }
+
+  const mainHistoryRestored = ensureStorageRaw(BACKUP_STORE_KEY, transaction.previousStoreRaw);
+  const rollback = restoreMissingBackupEntries(entries);
+  if (mainHistoryRestored && rollback.failed.length === 0) {
+    void clearPendingBackup(transaction.snapshot.id);
+    return {
+      status: "rolled-back",
+      snapshot: null,
+      restored: rollback.restored.length,
+      preserved: rollback.preserved.length,
+    };
+  }
+
+  const stillMissing = rollback.failed.filter((entry) => {
+    const current = readStorageRaw(entry.key);
+    return !current.ok || current.value === null;
   });
-  writeBackupStore(next);
-  return finalized;
+  const recovery =
+    stillMissing.length > 0 ? { ...transaction.snapshot, entries: stillMissing } : null;
+  const recoveryDurable = recovery ? persistEmergencyRecovery(recovery) : false;
+  if (!recovery) void clearPendingBackup(transaction.snapshot.id);
+  return {
+    status: "emergency",
+    snapshot: null,
+    recovery,
+    recoveryDurable,
+    restored: rollback.restored.length,
+    preserved: rollback.preserved.length,
+  };
 }
 
 function restoreBackup(id: string): { restored: string[]; errors: string[] } {

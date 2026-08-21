@@ -33,12 +33,32 @@ import {
 const ACCOUNT_A = "11111111-2222-3333-4444-555555555555";
 const ACCOUNT_B = "99999999-8888-7777-6666-555555555555";
 const NOW_MS = Date.parse("2026-08-20T00:00:00.000Z");
+const BACKUP_STORE_KEY = "verdant.diagnostics.local-backups.v1";
+const PENDING_BACKUP_STORE_KEY = "verdant.diagnostics.local-backup-pending.v1";
 const RECORD = JSON.stringify({
   plantId: "p1",
   growId: "g1",
   tentId: "t1",
   savedAt: "2026-08-19T00:00:00.000Z",
 });
+
+function makePreviousSnapshots(count: number) {
+  return Array.from({ length: count }, (_, index) => {
+    const value = JSON.stringify({ previousSnapshot: index });
+    return {
+      id: `existing-backup-${index}`,
+      createdAt: new Date(NOW_MS - index * 60_000).toISOString(),
+      reason: "existing-test-backup",
+      entries: [
+        {
+          key: `verdant.existing.test.${index}`,
+          value,
+          sizeBytes: value.length,
+        },
+      ],
+    };
+  });
+}
 
 /**
  * The checks list and the remediation checklist both render a check's name, so
@@ -390,7 +410,10 @@ describe("LocalDataHealthPanel — the account uuid survives no fallback path", 
       value: string,
     ) {
       originalSetItem.call(this, storageKey, value);
-      if (!replacedDuringBackup && storageKey === backupStoreKey) {
+      if (
+        !replacedDuringBackup &&
+        (storageKey === backupStoreKey || storageKey === PENDING_BACKUP_STORE_KEY)
+      ) {
         replacedDuringBackup = true;
         originalSetItem.call(this, key, RECORD);
       }
@@ -408,24 +431,9 @@ describe("LocalDataHealthPanel — the account uuid survives no fallback path", 
 
   it("preserves a full backup store when every final pre-delete comparison skips", async () => {
     const key = `verdant.quickLog.lastTarget.v2.${ACCOUNT_A}`;
-    const backupStoreKey = "verdant.diagnostics.local-backups.v1";
-    const previousSnapshots = Array.from({ length: 10 }, (_, index) => {
-      const value = JSON.stringify({ previousSnapshot: index });
-      return {
-        id: `existing-backup-${index}`,
-        createdAt: new Date(NOW_MS - index * 60_000).toISOString(),
-        reason: "existing-test-backup",
-        entries: [
-          {
-            key: `verdant.existing.test.${index}`,
-            value,
-            sizeBytes: value.length,
-          },
-        ],
-      };
-    });
+    const previousSnapshots = makePreviousSnapshots(10);
     const previousStoreBytes = JSON.stringify(previousSnapshots);
-    setLocalStorageItemForTest(backupStoreKey, previousStoreBytes);
+    setLocalStorageItemForTest(BACKUP_STORE_KEY, previousStoreBytes);
     setLocalStorageItemForTest(key, "{}");
     render(<LocalDataHealthPanel />);
     await schemaRow("Quick Log last target");
@@ -447,7 +455,10 @@ describe("LocalDataHealthPanel — the account uuid survives no fallback path", 
       value: string,
     ) {
       originalSetItem.call(this, storageKey, value);
-      if (!replacedDuringBackup && storageKey === backupStoreKey) {
+      if (
+        !replacedDuringBackup &&
+        (storageKey === BACKUP_STORE_KEY || storageKey === PENDING_BACKUP_STORE_KEY)
+      ) {
         replacedDuringBackup = true;
         originalSetItem.call(this, key, RECORD);
       }
@@ -459,8 +470,336 @@ describe("LocalDataHealthPanel — the account uuid survives no fallback path", 
     expect(replacedDuringBackup).toBe(true);
     expect(getLocalStorageItemForTest(key)).toBe(RECORD);
     expect(screen.getByText(/Skipped 1 key/)).toBeInTheDocument();
-    expect(getLocalStorageItemForTest(backupStoreKey)).toBe(previousStoreBytes);
+    expect(getLocalStorageItemForTest(BACKUP_STORE_KEY)).toBe(previousStoreBytes);
     expect(screen.getAllByRole("button", { name: "Restore" })).toHaveLength(10);
+  });
+
+  it("does not clear when the provisional backup cannot be persisted", async () => {
+    const key = `verdant.quickLog.lastTarget.v2.${ACCOUNT_A}`;
+    const malformedValue = "{}";
+    setLocalStorageItemForTest(key, malformedValue);
+    render(<LocalDataHealthPanel />);
+    await schemaRow("Quick Log last target");
+
+    fireEvent.click(screen.getByRole("button", { name: /Review & clear/i }));
+    await screen.findByRole("dialog");
+
+    const storage = ensureLocalStorageForTest();
+    const methodOwner = getLocalStorageMethodOwnerForTest(storage, "setItem");
+    const originalSetItem = methodOwner.setItem;
+    const removeItemOwner = Object.prototype.hasOwnProperty.call(storage, "removeItem")
+      ? storage
+      : (Object.getPrototypeOf(storage) as Storage);
+    const originalRemoveItem = removeItemOwner.removeItem;
+    let targetRemoveAttempts = 0;
+    vi.spyOn(methodOwner, "setItem").mockImplementation(function (
+      this: Storage,
+      storageKey: string,
+      value: string,
+    ) {
+      if (storageKey === BACKUP_STORE_KEY || storageKey === PENDING_BACKUP_STORE_KEY) {
+        throw new DOMException("Backup quota exhausted", "QuotaExceededError");
+      }
+      originalSetItem.call(this, storageKey, value);
+    });
+    vi.spyOn(removeItemOwner, "removeItem").mockImplementation(function (
+      this: Storage,
+      storageKey: string,
+    ) {
+      if (storageKey === key) targetRemoveAttempts += 1;
+      originalRemoveItem.call(this, storageKey);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Confirm — clear/i }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(targetRemoveAttempts).toBe(0);
+    expect(getLocalStorageItemForTest(key)).toBe(malformedValue);
+    expect(getLocalStorageItemForTest(BACKUP_STORE_KEY)).toBeNull();
+    expect(
+      screen.getByText(/Could not clear — a reversible backup could not be saved/i),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Cleared 1 local key/i)).toBeNull();
+  });
+
+  it("preserves a nine-snapshot store when every candidate is skipped", async () => {
+    const key = `verdant.quickLog.lastTarget.v2.${ACCOUNT_A}`;
+    const previousSnapshots = makePreviousSnapshots(9);
+    const previousStoreBytes = JSON.stringify(previousSnapshots);
+    setLocalStorageItemForTest(BACKUP_STORE_KEY, previousStoreBytes);
+    setLocalStorageItemForTest(key, "{}");
+    render(<LocalDataHealthPanel />);
+    await schemaRow("Quick Log last target");
+
+    fireEvent.click(screen.getByRole("button", { name: /Review & clear/i }));
+    await screen.findByRole("dialog");
+
+    const storage = ensureLocalStorageForTest();
+    const methodOwner = getLocalStorageMethodOwnerForTest(storage, "setItem");
+    const originalSetItem = methodOwner.setItem;
+    let replacedDuringBackup = false;
+    vi.spyOn(methodOwner, "setItem").mockImplementation(function (
+      this: Storage,
+      storageKey: string,
+      value: string,
+    ) {
+      originalSetItem.call(this, storageKey, value);
+      if (
+        !replacedDuringBackup &&
+        (storageKey === BACKUP_STORE_KEY || storageKey === PENDING_BACKUP_STORE_KEY)
+      ) {
+        replacedDuringBackup = true;
+        originalSetItem.call(this, key, RECORD);
+      }
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Confirm — clear/i }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(replacedDuringBackup).toBe(true);
+    expect(getLocalStorageItemForTest(key)).toBe(RECORD);
+    expect(getLocalStorageItemForTest(BACKUP_STORE_KEY)).toBe(previousStoreBytes);
+    expect(screen.getAllByRole("button", { name: "Restore" })).toHaveLength(9);
+  });
+
+  it("retains exactly ten snapshots after one successful clear at full capacity", async () => {
+    const key = `verdant.quickLog.lastTarget.v2.${ACCOUNT_A}`;
+    const malformedValue = "{}";
+    const previousSnapshots = makePreviousSnapshots(10);
+    setLocalStorageItemForTest(BACKUP_STORE_KEY, JSON.stringify(previousSnapshots));
+    setLocalStorageItemForTest(key, malformedValue);
+    render(<LocalDataHealthPanel />);
+    await schemaRow("Quick Log last target");
+
+    fireEvent.click(screen.getByRole("button", { name: /Review & clear/i }));
+    await screen.findByRole("dialog");
+    fireEvent.click(screen.getByRole("button", { name: /Confirm — clear/i }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(getLocalStorageItemForTest(key)).toBeNull();
+    const stored = JSON.parse(getLocalStorageItemForTest(BACKUP_STORE_KEY) ?? "[]");
+    expect(stored).toHaveLength(10);
+    expect(stored[0].entries).toEqual([
+      { key, value: malformedValue, sizeBytes: malformedValue.length },
+    ]);
+    expect(stored.slice(1).map((snapshot: { id: string }) => snapshot.id)).toEqual(
+      previousSnapshots.slice(0, 9).map((snapshot) => snapshot.id),
+    );
+    expect(screen.getAllByRole("button", { name: "Restore" })).toHaveLength(10);
+  });
+
+  it("finalizes only the cleared key and never restores over the skipped healthy key", async () => {
+    const skippedKey = `verdant.quickLog.lastTarget.v2.${ACCOUNT_A}`;
+    const clearedKey = "verdant.quickLogStarter.draft.v1";
+    const clearedValue = "{ broken starter draft";
+    const previousSnapshots = makePreviousSnapshots(10);
+    setLocalStorageItemForTest(BACKUP_STORE_KEY, JSON.stringify(previousSnapshots));
+    setLocalStorageItemForTest(skippedKey, "{}");
+    setLocalStorageItemForTest(clearedKey, clearedValue);
+    render(<LocalDataHealthPanel />);
+    await schemaRow("Quick Log last target");
+
+    fireEvent.click(screen.getByRole("button", { name: "Fix issues (2)" }));
+    await screen.findByRole("dialog");
+
+    const storage = ensureLocalStorageForTest();
+    const methodOwner = getLocalStorageMethodOwnerForTest(storage, "setItem");
+    const originalSetItem = methodOwner.setItem;
+    let replacedDuringBackup = false;
+    vi.spyOn(methodOwner, "setItem").mockImplementation(function (
+      this: Storage,
+      storageKey: string,
+      value: string,
+    ) {
+      originalSetItem.call(this, storageKey, value);
+      if (
+        !replacedDuringBackup &&
+        (storageKey === BACKUP_STORE_KEY || storageKey === PENDING_BACKUP_STORE_KEY)
+      ) {
+        replacedDuringBackup = true;
+        originalSetItem.call(this, skippedKey, RECORD);
+      }
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Confirm — clear 2 keys/i }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(getLocalStorageItemForTest(clearedKey)).toBeNull();
+    expect(getLocalStorageItemForTest(skippedKey)).toBe(RECORD);
+    const stored = JSON.parse(getLocalStorageItemForTest(BACKUP_STORE_KEY) ?? "[]");
+    expect(stored).toHaveLength(10);
+    expect(stored[0].entries).toEqual([
+      { key: clearedKey, value: clearedValue, sizeBytes: clearedValue.length },
+    ]);
+    expect(stored.slice(1).map((snapshot: { id: string }) => snapshot.id)).toEqual(
+      previousSnapshots.slice(0, 9).map((snapshot) => snapshot.id),
+    );
+    expect(stored.map((snapshot: { id: string }) => snapshot.id)).not.toContain(
+      previousSnapshots[9].id,
+    );
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Restore" })[0]);
+    await waitFor(() => expect(getLocalStorageItemForTest(clearedKey)).toBe(clearedValue));
+    expect(getLocalStorageItemForTest(skippedKey)).toBe(RECORD);
+  });
+
+  it("preserves the exact full store when every local removal throws", async () => {
+    const key = `verdant.quickLog.lastTarget.v2.${ACCOUNT_A}`;
+    const malformedValue = "{}";
+    const previousStoreBytes = JSON.stringify(makePreviousSnapshots(10));
+    setLocalStorageItemForTest(BACKUP_STORE_KEY, previousStoreBytes);
+    setLocalStorageItemForTest(key, malformedValue);
+    render(<LocalDataHealthPanel />);
+    await schemaRow("Quick Log last target");
+    fireEvent.click(screen.getByRole("button", { name: /Review & clear/i }));
+    await screen.findByRole("dialog");
+
+    const storage = ensureLocalStorageForTest();
+    const removeItemOwner = Object.prototype.hasOwnProperty.call(storage, "removeItem")
+      ? storage
+      : (Object.getPrototypeOf(storage) as Storage);
+    const originalRemoveItem = removeItemOwner.removeItem;
+    let targetRemoveAttempts = 0;
+    vi.spyOn(removeItemOwner, "removeItem").mockImplementation(function (
+      this: Storage,
+      storageKey: string,
+    ) {
+      if (storageKey === key) {
+        targetRemoveAttempts += 1;
+        throw new DOMException("Removal blocked", "SecurityError");
+      }
+      originalRemoveItem.call(this, storageKey);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Confirm — clear/i }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(targetRemoveAttempts).toBe(1);
+    expect(getLocalStorageItemForTest(key)).toBe(malformedValue);
+    expect(getLocalStorageItemForTest(BACKUP_STORE_KEY)).toBe(previousStoreBytes);
+    expect(screen.getByText(/Failed to clear/i)).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Restore" })).toHaveLength(10);
+  });
+
+  it("rolls back a cleared key when final backup persistence fails", async () => {
+    const skippedKey = `verdant.quickLog.lastTarget.v2.${ACCOUNT_A}`;
+    const clearedKey = "verdant.quickLogStarter.draft.v1";
+    const clearedValue = "{ broken starter draft";
+    const previousStoreBytes = JSON.stringify(makePreviousSnapshots(10));
+    setLocalStorageItemForTest(BACKUP_STORE_KEY, previousStoreBytes);
+    setLocalStorageItemForTest(skippedKey, "{}");
+    setLocalStorageItemForTest(clearedKey, clearedValue);
+    render(<LocalDataHealthPanel />);
+    await schemaRow("Quick Log last target");
+    fireEvent.click(screen.getByRole("button", { name: "Fix issues (2)" }));
+    await screen.findByRole("dialog");
+
+    const storage = ensureLocalStorageForTest();
+    const methodOwner = getLocalStorageMethodOwnerForTest(storage, "setItem");
+    const originalSetItem = methodOwner.setItem;
+    let mainStoreWrites = 0;
+    let replacedDuringBackup = false;
+    vi.spyOn(methodOwner, "setItem").mockImplementation(function (
+      this: Storage,
+      storageKey: string,
+      value: string,
+    ) {
+      if (storageKey === BACKUP_STORE_KEY) {
+        mainStoreWrites += 1;
+        const pendingExists = this.getItem(PENDING_BACKUP_STORE_KEY) !== null;
+        if (pendingExists || mainStoreWrites > 1) {
+          throw new DOMException("Final backup write failed", "QuotaExceededError");
+        }
+      }
+      originalSetItem.call(this, storageKey, value);
+      if (
+        !replacedDuringBackup &&
+        (storageKey === BACKUP_STORE_KEY || storageKey === PENDING_BACKUP_STORE_KEY)
+      ) {
+        replacedDuringBackup = true;
+        originalSetItem.call(this, skippedKey, RECORD);
+      }
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Confirm — clear 2 keys/i }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(getLocalStorageItemForTest(clearedKey)).toBe(clearedValue);
+    expect(getLocalStorageItemForTest(skippedKey)).toBe(RECORD);
+    expect(getLocalStorageItemForTest(BACKUP_STORE_KEY)).toBe(previousStoreBytes);
+    expect(screen.queryByText(/Backup saved/i)).toBeNull();
+    expect(
+      screen.getByText(
+        /backup finalization failed.*cleared key was restored.*nothing remains cleared/i,
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Restore" })).toHaveLength(10);
+    expect(screen.queryByRole("button", { name: /Emergency Restore/i })).toBeNull();
+  });
+
+  it("quarantines only the still-cleared key when finalization and rollback fail", async () => {
+    const skippedKey = `verdant.quickLog.lastTarget.v2.${ACCOUNT_A}`;
+    const clearedKey = "verdant.quickLogStarter.draft.v1";
+    const clearedValue = "{ broken starter draft";
+    const previousStoreBytes = JSON.stringify(makePreviousSnapshots(10));
+    setLocalStorageItemForTest(BACKUP_STORE_KEY, previousStoreBytes);
+    setLocalStorageItemForTest(skippedKey, "{}");
+    setLocalStorageItemForTest(clearedKey, clearedValue);
+    render(<LocalDataHealthPanel />);
+    await schemaRow("Quick Log last target");
+    fireEvent.click(screen.getByRole("button", { name: "Fix issues (2)" }));
+    await screen.findByRole("dialog");
+
+    const storage = ensureLocalStorageForTest();
+    const methodOwner = getLocalStorageMethodOwnerForTest(storage, "setItem");
+    const originalSetItem = methodOwner.setItem;
+    let mainStoreWrites = 0;
+    let replacedDuringBackup = false;
+    const setItemSpy = vi.spyOn(methodOwner, "setItem").mockImplementation(function (
+      this: Storage,
+      storageKey: string,
+      value: string,
+    ) {
+      if (storageKey === BACKUP_STORE_KEY) {
+        mainStoreWrites += 1;
+        const pendingExists = this.getItem(PENDING_BACKUP_STORE_KEY) !== null;
+        if (pendingExists || mainStoreWrites > 1) {
+          throw new DOMException("Final backup write failed", "QuotaExceededError");
+        }
+      }
+      if (storageKey === clearedKey) {
+        throw new DOMException("Rollback write failed", "QuotaExceededError");
+      }
+      originalSetItem.call(this, storageKey, value);
+      if (
+        !replacedDuringBackup &&
+        (storageKey === BACKUP_STORE_KEY || storageKey === PENDING_BACKUP_STORE_KEY)
+      ) {
+        replacedDuringBackup = true;
+        originalSetItem.call(this, skippedKey, RECORD);
+      }
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Confirm — clear 2 keys/i }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(getLocalStorageItemForTest(clearedKey)).toBeNull();
+    expect(getLocalStorageItemForTest(skippedKey)).toBe(RECORD);
+    expect(getLocalStorageItemForTest(BACKUP_STORE_KEY)).toBe(previousStoreBytes);
+    const quarantine = JSON.parse(getLocalStorageItemForTest(PENDING_BACKUP_STORE_KEY) ?? "null");
+    expect(quarantine.state).toBe("emergency");
+    expect(quarantine.snapshot.entries).toEqual([
+      { key: clearedKey, value: clearedValue, sizeBytes: clearedValue.length },
+    ]);
+    expect(screen.queryByText(/Backup saved/i)).toBeNull();
+    expect(screen.getByRole("button", { name: /Emergency Restore\/Retry/i })).toBeEnabled();
+    expect(screen.getAllByRole("button", { name: "Restore" })).toHaveLength(10);
+
+    setItemSpy.mockRestore();
+    fireEvent.click(screen.getByRole("button", { name: /Emergency Restore\/Retry/i }));
+    await waitFor(() => expect(getLocalStorageItemForTest(clearedKey)).toBe(clearedValue));
+    expect(getLocalStorageItemForTest(skippedKey)).toBe(RECORD);
+    expect(screen.queryByRole("button", { name: /Emergency Restore\/Retry/i })).toBeNull();
   });
 
   it("whitelists scoped field metadata and omits an unversioned v value", async () => {

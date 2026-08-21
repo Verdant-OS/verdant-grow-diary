@@ -44,9 +44,17 @@ describe("TentDetail · real sensor readings", () => {
   });
 
   it("passes active-plant loading/error truth without inferring the first plant", () => {
+    // Renegotiated from the destructured form. The page now keeps the whole
+    // query object so the sole-plant inference can be gated on a SETTLED
+    // roster (`resolveVerifiedAssignedPlantCount`) rather than a raw length
+    // read of possibly-stale cached data. The loading/error truth this test
+    // exists for is still threaded, from the same query.
+    expect(TENT_DETAIL).toMatch(/const activePlantsQuery = useGrowPlants\(id\);/);
     expect(TENT_DETAIL).toMatch(
-      /const\s+\{[\s\S]*?data:\s*activePlants\s*=\s*\[\],[\s\S]*?isFetching:\s*activePlantsIsFetching,[\s\S]*?isError:\s*activePlantsIsError,[\s\S]*?\}\s*=\s*useGrowPlants\(id\)/,
+      /const activePlants = activePlantsQuery\.data \?\? EMPTY_TENT_PLANTS;/,
     );
+    expect(TENT_DETAIL).toMatch(/const activePlantsIsFetching = activePlantsQuery\.isFetching;/);
+    expect(TENT_DETAIL).toMatch(/const activePlantsIsError = activePlantsQuery\.isError;/);
     const panelStart = TENT_DETAIL.indexOf("<ImportedSensorHistoryPanel");
     const panelEnd = TENT_DETAIL.indexOf("/>", panelStart);
     const panel = TENT_DETAIL.slice(panelStart, panelEnd);

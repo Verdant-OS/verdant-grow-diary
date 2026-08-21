@@ -36,6 +36,13 @@ import {
   type QuickLogV2Action,
   type ResolvedQuickLogV2Target,
 } from "@/lib/quickLogV2Rules";
+import {
+  RESPONSE_CHECK_STATUSES,
+  applyResponseCheck,
+  readResponseCheckStatus,
+  removeChipAuthoredResponseLine,
+  type ResponseCheckStatus,
+} from "@/lib/tenSecondQuickCheckRules";
 import { buildQuickLogV2SavePayload } from "@/lib/quickLogV2SavePayload";
 import { applyQuickLogV2Refresh } from "@/lib/quickLogV2RefreshRules";
 import { createQuickLogPhotoDiaryEntry } from "@/lib/quickLogPhotoDiaryEntry";
@@ -378,6 +385,33 @@ export default function QuickLogV2Sheet({
   const volumeMissing = form.action === "water" && wateringForm.volumeMl.trim() === "";
   const showMaturityEvidence =
     form.action !== "feed" && resolvedTarget.ok && resolvedTarget.targetType === "plant";
+  // Better/Same/Worse records the PLANT's response, so it is offered only
+  // when the resolved target is a plant. Tent-scoped logs keep today's shape.
+  const showResponseCheck =
+    form.action !== "feed" && resolvedTarget.ok && resolvedTarget.targetType === "plant";
+  const selectedResponseStatus = readResponseCheckStatus(form.note);
+  /** The status a CHIP last wrote, or null. Provenance for the cleanup below. */
+  const chipAuthoredStatusRef = useRef<ResponseCheckStatus | null>(null);
+  // `maxLength` constrains TYPING only — it does not bound a programmatic
+  // setState. Prepending the response line to an already-long note could push
+  // the note past NOTE_LIMIT, and the watering write rejects >500, after which
+  // the sheet locks the retry record and the grower loses the draft. So the
+  // chip is refused BEFORE it mutates state rather than failing at save.
+  //
+  // PER STATUS, not across all of them: the three lines are different lengths
+  // ("Better." 7, "Same." 5, "Worse." 6), so near the limit one status can
+  // overflow while the others still fit. An aggregate `some(...)` disabled
+  // every chip as soon as the longest one failed, taking two valid choices
+  // away from the grower.
+  const responseCheckOverflowByStatus = new Map<ResponseCheckStatus, boolean>(
+    RESPONSE_CHECK_STATUSES.map((status) => [
+      status,
+      applyResponseCheck(form.note, status).length > NOTE_LIMIT,
+    ]),
+  );
+  const everyResponseCheckOverflows = RESPONSE_CHECK_STATUSES.every((status) =>
+    responseCheckOverflowByStatus.get(status),
+  );
   const saveHelper = wateringRetryPending
     ? "Retry sends the exact same watering record. Close and reopen Quick Log to make changes."
     : getSaveHelperMessage({
@@ -425,6 +459,10 @@ export default function QuickLogV2Sheet({
         action: defaultAction,
       });
       manualTempEntryUnitRef.current = null;
+      // A new draft has no chip-authored marker, so the provenance record must
+      // not survive from the previous one. A stale status would let the
+      // cleanup strip prose this draft's grower typed.
+      chipAuthoredStatusRef.current = null;
       setFeedingForm(EMPTY_QUICKLOG_FEEDING_FORM);
       feedingTempEntryUnitRef.current = null;
       setWateringForm(EMPTY_QUICKLOG_WATERING_FORM);
@@ -454,9 +492,14 @@ export default function QuickLogV2Sheet({
     if (form.action !== "feed") return;
     if (feedingDefaultsApplied) return;
     if (!feedingDefaults.defaults) return;
-    // Only prefill if the user has not started typing — preserves manual input.
-    if (!isFeedingFormPristine(feedingForm)) return;
-    setFeedingForm(applyFeedingDefaultsToForm(feedingDefaults));
+    // Defaults affect only the recipe. A note handed off from Note/Water (for
+    // example a selected Better/Same/Worse response) must neither block those
+    // defaults nor be overwritten by them.
+    if (!isFeedingFormPristine({ ...feedingForm, note: "" })) return;
+    setFeedingForm((previous) => ({
+      ...applyFeedingDefaultsToForm(feedingDefaults),
+      note: previous.note,
+    }));
     setFeedingDefaultsApplied(true);
   }, [open, form.action, feedingDefaults, feedingDefaultsApplied, feedingForm]);
 
@@ -469,6 +512,53 @@ export default function QuickLogV2Sheet({
     if (wateringSubmissionLockedRef.current) return;
     setForm((prev) => (prev[k] === v ? prev : { ...prev, [k]: v }));
   };
+
+  // A response marker describes a PLANT. If the grower switches the target to
+  // a tent after picking Better/Same/Worse, the chips disappear but the line
+  // stays in the note and would persist a plant-response marker against a tent
+  // entry — mislabeling the row for every downstream response parser. Strip it
+  // when the target stops being a plant, preserving any action prose.
+  // The plant the resolved target names, independent of whether the chips are
+  // currently offered. Switching the ACTION to Feed hides the chips without
+  // changing which plant the entry is about, and must not be treated as a
+  // retarget — the grower would lose a status they deliberately chose.
+  const responseTargetPlantId =
+    resolvedTarget.ok && resolvedTarget.targetType === "plant"
+      ? (resolvedTarget.plantId ?? null)
+      : null;
+  const responseTargetPlantIdRef = useRef(responseTargetPlantId);
+  useEffect(() => {
+    const previousPlantId = responseTargetPlantIdRef.current;
+    responseTargetPlantIdRef.current = responseTargetPlantId;
+    // Fire when the plant the marker DESCRIBES changes — to a different plant,
+    // or to no plant at all. Both leak: retargeting plant A -> tent leaves a
+    // plant marker on a tent row, and plant A -> plant B silently reattributes
+    // A's response to B.
+    if (previousPlantId === null || previousPlantId === responseTargetPlantId) return;
+
+    // PROVENANCE. `readResponseCheckStatus` matches anywhere in the note, so a
+    // grower who writes "Previous response check: better after watering" reads
+    // as having a marker. Only ever undo what a CHIP wrote: remember that a
+    // chip owns the head slot, then strip any canonical response marker still
+    // occupying that slot. The grower may re-word Better/Same/Worse without
+    // transferring that plant response to a new target. Noncanonical prose is
+    // never touched.
+    const authored = chipAuthoredStatusRef.current;
+    // provenance does not follow a new plant
+    chipAuthoredStatusRef.current = null;
+    if (!authored) return;
+    // Remove the chip's own line and nothing else. A whole-note strip would
+    // also delete a grower's later sentence that merely reads like a marker.
+    const next = removeChipAuthoredResponseLine(form.note, authored);
+    if (next !== form.note) setField("note", next);
+    // Feed has its own visible note field. If the selected response was handed
+    // into it before this retarget, remove the same exact chip-owned line so a
+    // plant response cannot persist on a different plant or a tent entry.
+    setFeedingForm((previous) => {
+      const nextFeedingNote = removeChipAuthoredResponseLine(previous.note, authored);
+      return nextFeedingNote === previous.note ? previous : { ...previous, note: nextFeedingNote };
+    });
+  }, [responseTargetPlantId, form.note, setField]);
 
   const handleAction = (a: QuickLogV2Action) => {
     if (wateringSubmissionLockedRef.current) return;
@@ -492,9 +582,14 @@ export default function QuickLogV2Sheet({
       wateringTempEntryUnitRef.current = null;
     }
     // Entering feed → maturity evidence surface hides; clear its draft
-    // so stale plant-maturity notes don't get retained under the hood.
+    // so stale plant-maturity notes don't get retained under the hood. Feed
+    // writes through its own visible note field, so hand the current note into
+    // that field instead of retaining an unsavable hidden response/status.
     if (a === "feed") {
       setMaturityEvidenceForm(EMPTY_QUICK_LOG_MATURITY_EVIDENCE_FORM);
+      setFeedingForm((previous) =>
+        previous.note === form.note ? previous : { ...previous, note: form.note },
+      );
     }
   };
 
@@ -1127,6 +1222,9 @@ export default function QuickLogV2Sheet({
       selectedKey: prev.selectedKey,
     }));
     manualTempEntryUnitRef.current = null;
+    // Same reason as the open reset: "Log another" begins a new draft, and its
+    // note is empty, so no chip has authored anything in it yet.
+    chipAuthoredStatusRef.current = null;
     setFeedingForm(EMPTY_QUICKLOG_FEEDING_FORM);
     feedingTempEntryUnitRef.current = null;
     setWateringForm(EMPTY_QUICKLOG_WATERING_FORM);
@@ -1557,6 +1655,50 @@ export default function QuickLogV2Sheet({
                   Checking video before save…
                 </p>
               )}
+            </div>
+          )}
+
+          {showResponseCheck && (
+            <div
+              role="group"
+              aria-label="Plant response check"
+              data-testid="qlv2-response-chips"
+              className="grid gap-2"
+            >
+              <p className="text-sm font-medium">How did the plant respond?</p>
+              <div className="flex flex-wrap gap-2">
+                {RESPONSE_CHECK_STATUSES.map((status) => (
+                  <Button
+                    key={status}
+                    type="button"
+                    variant={selectedResponseStatus === status ? "default" : "outline"}
+                    size="sm"
+                    disabled={
+                      wateringSubmissionLocked ||
+                      (responseCheckOverflowByStatus.get(status) === true &&
+                        selectedResponseStatus !== status)
+                    }
+                    aria-pressed={selectedResponseStatus === status}
+                    data-testid={`qlv2-response-chip-${status.toLowerCase()}`}
+                    onClick={() => {
+                      const next = applyResponseCheck(form.note, status);
+                      // Belt and braces: the chip is already disabled in this
+                      // case, but never let a programmatic write exceed the
+                      // limit the save path enforces.
+                      if (next.length > NOTE_LIMIT) return;
+                      chipAuthoredStatusRef.current = status;
+                      setField("note", next);
+                    }}
+                  >
+                    {status}
+                  </Button>
+                ))}
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {everyResponseCheckOverflows
+                  ? "Your note is too long to add a response line. Shorten it first."
+                  : "Better/Same/Worse records the plant response, not the grow action."}
+              </p>
             </div>
           )}
 

@@ -225,66 +225,111 @@ Keep `--with-deps` (so no behavior risk), but change how it fails:
      setsid "$@" &                  # new process group; $! is the PGID
      local pgid=$!
 
+     # Liveness is probed with pgrep, and signals are sent with sudo. Both
+     # matter, and neither is optional — see "the apt is not ours to signal"
+     # below.
+     group_alive() { pgrep -g "$pgid" >/dev/null 2>&1; }
+     signal_group() {
+       sudo -n kill "-$1" -- -"$pgid" 2>/dev/null || kill "-$1" -- -"$pgid" 2>/dev/null
+     }
+
      # Self-terminating watchdog. It polls the GROUP and exits as soon as the
      # group is empty, so the parent never cancels it — and therefore can never
-     # cancel it mid-escalation. See the note below for why that matters.
+     # cancel it mid-escalation.
      (
        waited=0
        while [ "$waited" -lt "$secs" ]; do
-         kill -0 -- -"$pgid" 2>/dev/null || exit 0   # finished; no timeout
+         group_alive || exit 0                       # finished; no timeout
          sleep 1; waited=$((waited + 1))
        done
-       kill -TERM -- -"$pgid" 2>/dev/null
+       signal_group TERM
        graced=0
        while [ "$graced" -lt 30 ]; do
-         kill -0 -- -"$pgid" 2>/dev/null || exit 0   # whole group took TERM
+         group_alive || exit 0                       # whole group took TERM
          sleep 1; graced=$((graced + 1))
        done
-       kill -KILL -- -"$pgid" 2>/dev/null
+       signal_group KILL
+       # Never fail silently here. A group still alive after KILL means the
+       # signal did not land, and an unreported one is exactly how the runner
+       # ends up held by the apt this was built to stop.
+       group_alive && echo "::error::attempt timeout could not kill process \
+   ```
+
+group $pgid — apt may still hold this runner (no passwordless sudo?)"
      ) &
      local watchdog=$!
 
      wait "$pgid"; local rc=$?
      wait "$watchdog" 2>/dev/null    # NOT `kill` — see below
      return "$rc"
-   }
-   ```
 
-   **Why the watchdog is never cancelled by the parent.** An earlier draft of this
-   snippet ended `wait "$pgid"; kill "$watchdog"`, and that reintroduced the very
-   failure the process group exists to prevent. `wait "$pgid"` waits on the group
-   **leader**. On a timeout the leader takes `TERM` and exits while a descendant —
-   `apt`, precisely the process being contained — either ignores `TERM` or sits in
-   uninterruptible I/O. `wait` returns, the next line kills the watchdog during its
-   grace period, and the promised group-wide `KILL` is never sent: the step reports
-   failure and apt keeps holding the runner, which is the exact flaw this section
-   rejects bare `timeout(1)` for. Polling the group instead makes the happy path cost
-   about a second and makes the escalation unskippable.
+}
 
-   `coreutils` `timeout` may stand in for the watchdog **only** with the command
-   launched into its own group and the signal directed at that group. The requirement is
-   the group, not the tool — and §6's fault-injection variant is what proves it, by
-   asserting no `apt` process survives a killed attempt.
+````
+
+**The apt is not ours to signal, and an earlier draft of this snippet did not
+notice.** `playwright install --with-deps` does not run apt itself. Verified
+in the lock-resolved `playwright-core@1.62.1`, function
+`transformCommandsForRoot`: when the process is not already root and `sudo`
+exists, it spawns `sudo -- sh -c "<apt commands>"`. The GitHub-hosted
+`ubuntu-latest` runner executes as the unprivileged `runner` user, so on
+every affected workflow the surviving `apt`/`dpkg` descendants are
+**root-owned** while this watchdog is not.
+
+Two consequences, and the first is the subtle one:
+
+- **`kill -0` cannot be used as the liveness probe.** Against a root-owned
+  process it fails with `EPERM`, and the shell surfaces that identically to
+  `ESRCH`. A `kill -0 … || exit 0` loop therefore reads "I am not allowed to
+  signal this" as "the group is empty", exits before the grace period, and
+  skips the `KILL` — silently restoring the exact failure this section
+  rejects bare `timeout(1)` for. `pgrep -g` reads `/proc` instead, which
+  needs no signal privilege and reports the truth.
+- **The signals themselves need privilege.** An unprivileged `kill -TERM`
+  at a root-owned group is a no-op that reports success. Hence `sudo -n`,
+  with the unprivileged call kept as a fallback for a root or
+  sudo-less environment.
+
+**Why the watchdog is never cancelled by the parent.** An earlier draft of this
+snippet ended `wait "$pgid"; kill "$watchdog"`, and that reintroduced the very
+failure the process group exists to prevent. `wait "$pgid"` waits on the group
+**leader**. On a timeout the leader takes `TERM` and exits while a descendant —
+`apt`, precisely the process being contained — either ignores `TERM` or sits in
+uninterruptible I/O. `wait` returns, the next line kills the watchdog during its
+grace period, and the promised group-wide `KILL` is never sent: the step reports
+failure and apt keeps holding the runner, which is the exact flaw this section
+rejects bare `timeout(1)` for. Polling the group instead makes the happy path cost
+about a second and makes the escalation unskippable.
+
+`coreutils` `timeout` may stand in for the watchdog **only** with the command
+launched into its own group and the signal directed at that group. The requirement is
+the group, not the tool — and §6's fault-injection variant is what proves it, by
+asserting no `apt` process survives a killed attempt.
 
 2. **apt resilience config** written before the install:
-   `Acquire::Retries "3";` and `Acquire::http::Timeout "20";` in
-   `/etc/apt/apt.conf.d/`, so apt itself gives up and retries rather than hanging.
+`Acquire::Retries "3";` and `Acquire::http::Timeout "20";` in
+`/etc/apt/apt.conf.d/`, so apt itself gives up and retries rather than hanging.
 3. **Bounded retry** — up to 3 attempts, so the ~50%-per-attempt clearance rate
-   compounds to roughly 1-in-8 residual failure instead of 1-in-2.
+compounds to roughly 1-in-8 residual failure instead of 1-in-2.
 4. **One composite action** at `.github/actions/install-playwright-browsers/`, so all
-   19 call sites — across both seams (§3.2) — converge and the next fix is a one-file
-   change.
+19 call sites — across both seams (§3.2) — converge and the next fix is a one-file
+change.
 5. **Honest failure text** — when all attempts fail, say what actually failed. Name an
-   apt/mirror fault **only when apt was positively identified** as the failing phase
-   (the attempt died at the per-attempt timeout, or the captured output carries an apt
-   signature such as an `archive.ubuntu.com` acquire error). `playwright install
+apt/mirror fault **only when apt was positively identified** as the failing phase:
+the captured output carries an apt signature (an `archive.ubuntu.com` acquire
+error, an `apt-get`/`dpkg` diagnostic), or the action set an explicit
+still-in-the-apt-phase marker before handing off. **A timeout alone is not
+identification** — an earlier revision of this line accepted one, and that was
+wrong: the browser DOWNLOAD can equally stall past the per-attempt cap, and it
+dies at the same timeout. Inferring apt from the clock reproduces the confident
+misdiagnosis this item exists to prevent, just with extra steps. `playwright install
 --with-deps` also fails _after_ the apt phase — a browser download from the
-   Playwright CDN, an unknown browser name, no disk space — and stamping those
-   "apt/mirror fault, not a test failure" replaces Playwright's own actionable message
-   with a wrong one. Otherwise emit a generic browser/dependency-install failure and
-   pass Playwright's output through. The point of this line is to stop an hour being
-   spent reading a green test suite; a confident wrong diagnosis just spends that hour
-   somewhere else.
+Playwright CDN, an unknown browser name, no disk space — and stamping those
+"apt/mirror fault, not a test failure" replaces Playwright's own actionable message
+with a wrong one. Otherwise emit a generic browser/dependency-install failure and
+pass Playwright's output through. The point of this line is to stop an hour being
+spent reading a green test suite; a confident wrong diagnosis just spends that hour
+somewhere else.
 
 Cost: one new composite action plus 19 mechanical call-site edits.
 
@@ -329,16 +374,16 @@ Phase 2 has nothing to bind to. The deliverable therefore commits
 
 ```json
 {
-  "runner_image": "<the runner's ImageVersion, e.g. 20260812.1.0>",
-  "playwright_version": "<resolved version from the lockfile, not the range>",
-  "probed_at": "<UTC>",
-  "evidence_run": "<Actions run URL>",
-  "probe_results": {
-    "chromium": "PASS",
-    "webkit": "FAIL"
-  }
+"runner_image": "<the runner's ImageVersion, e.g. 20260812.1.0>",
+"playwright_version": "<resolved version from the lockfile, not the range>",
+"probed_at": "<UTC>",
+"evidence_run": "<Actions run URL>",
+"probe_results": {
+ "chromium": "PASS",
+ "webkit": "FAIL"
 }
-```
+}
+````
 
 `probe_results` is keyed **per browser** rather than a single `probe_result`, because
 the measurement is per browser. A flat verdict cannot express the most likely real
@@ -369,8 +414,9 @@ Inputs (mirroring `require-ci-secret`'s documentation density):
 
 Behavior: write the apt resilience config; loop up to `attempts`, each bounded by
 `attempt-timeout-minutes`; on total failure, `::error::` with the attempt count and
-elapsed time, naming an apt/mirror fault **only when apt was positively identified**
-per §4 Option C item 5 and a generic install failure otherwise; append a short markdown
+elapsed time, naming an apt/mirror fault **only when an apt signature or phase marker
+positively identifies it** per §4 Option C item 5 — never from a timeout alone — and a
+generic install failure otherwise; append a short markdown
 block to `$GITHUB_STEP_SUMMARY`.
 
 **Changed:** all **19** affected workflows, each executable install step replaced by a
@@ -597,6 +643,17 @@ after the timeout fires **no `apt`/`apt-get`/`dpkg` process survives**. Signalli
 the direct child leaves apt holding the runner while the step reports failure — the
 failure mode that makes a bare `timeout(1)` look like it works. Without this the
 per-attempt cap is `NOT_MEASURED` in the way that matters.
+
+**The injected stall must be ROOT-owned, or the test is theatre.** This is the one
+detail that decides whether D-CI-5 can catch anything. Per §4 Option C, the real apt
+runs under `sudo -- sh -c`, so it is root-owned while the watchdog is not; the whole
+privilege problem lives in that asymmetry. A fault-injection variant that stalls an
+_unprivileged_ process would be killed by an unprivileged watchdog and report `PASS`
+against an implementation that cannot touch the real thing — a green light for the
+exact bug. So the variant must drive the genuine
+`playwright install --with-deps` path (pointing apt at an unreachable host), not a
+hand-rolled `sleep`, and it must assert on the process table rather than on the step's
+exit code, since the step fails either way.
 
 The compounded-retry claim (three attempts at ~50% each) stays `NOT_MEASURED`
 regardless; it needs a real mirror stall, which cannot be summoned on demand.

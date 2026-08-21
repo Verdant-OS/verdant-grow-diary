@@ -28,7 +28,7 @@ vi.mock("@/hooks/usePaddleCheckout", () => ({
   usePaddleCheckout: () => ({
     openCheckout: openCheckoutMock,
     loading: false,
-    environment: "live",
+    environment: "sandbox",
     unavailable: false,
     unavailableMessage: null,
     blockedReason: null,
@@ -82,21 +82,22 @@ describe("Pricing page — built-in Paddle wiring", () => {
     expect(founderCard.textContent).toMatch(/\$129/);
   });
 
-  it("labels the production purchase path as live and requires buyer review", async () => {
+  it("labels the public purchase path as sandbox test-only with no real charges", async () => {
     const user = userEvent.setup();
     renderPricing();
 
     const trust = screen.getByTestId("pricing-checkout-trust");
-    expect(trust).toHaveAttribute("data-checkout-state", "live");
-    expect(trust).toHaveTextContent("Secure live checkout");
-    expect(trust).toHaveTextContent("review the plan, price, and total");
+    expect(trust).toHaveAttribute("data-checkout-state", "sandbox");
+    expect(trust).toHaveTextContent("Paddle sandbox");
+    expect(trust).toHaveTextContent("Test only");
+    expect(trust).toHaveTextContent("No real charges");
 
     await user.click(screen.getByTestId("pricing-faq-checkout-status").querySelector("button")!);
     expect(screen.getByTestId("pricing-faq-checkout-status")).toHaveTextContent(
-      "A charge happens only when Paddle confirms a real payment",
+      "cannot create a real charge",
     );
     expect(screen.getByTestId("pricing-faq-checkout-status")).toHaveTextContent(
-      "Verdant verifies that payment server-side",
+      "Live checkout is intentionally disabled",
     );
   });
 

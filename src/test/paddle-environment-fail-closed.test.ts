@@ -129,22 +129,19 @@ describe("resolvePaddleCheckoutEnvironment", () => {
     ).toBe("sandbox");
   });
 
-  it("returns live for a live token on a non-loopback production host", () => {
+  it("fails closed for a live token on every host", () => {
     expect(
       resolvePaddleCheckoutEnvironment({
         token: "live_abc",
         hostname: "verdantgrowdiary.com",
       }),
-    ).toBe("live");
+    ).toBe("unavailable");
     expect(
       resolvePaddleCheckoutEnvironment({
         token: "live_abc",
         hostname: "www.verdantgrowdiary.com",
       }),
-    ).toBe("live");
-  });
-
-  it("FAILS CLOSED: live token on loopback → unavailable", () => {
+    ).toBe("unavailable");
     expect(
       resolvePaddleCheckoutEnvironment({
         token: "live_abc",
@@ -169,6 +166,12 @@ describe("resolvePaddleCheckoutEnvironment", () => {
         hostname: "app.localhost",
       }),
     ).toBe("unavailable");
+    expect(
+      resolvePaddleCheckoutEnvironment({
+        token: "live_abc",
+        hostname: "id-preview--x.lovable.app",
+      }),
+    ).toBe("unavailable");
   });
 
   it("returns unavailable for missing / malformed tokens regardless of host", () => {
@@ -189,21 +192,18 @@ describe("resolvePaddleCheckoutEnvironment", () => {
     ).toBe("unavailable");
   });
 
-  it("returns unavailable when hostname is missing and token is live (fail closed)", () => {
-    // Missing hostname cannot prove non-loopback safety, but classification of
-    // the token still runs; live+unknown host still resolves to live because
-    // isLoopbackHostname(null) === false. We accept that: server-side / SSR
-    // callers must pass a real hostname. Document the behavior explicitly.
-    expect(resolvePaddleCheckoutEnvironment({ token: "live_abc", hostname: null })).toBe("live");
-    // And a sandbox token with unknown host still classifies as sandbox.
+  it("requires sandbox even when hostname is missing", () => {
+    expect(resolvePaddleCheckoutEnvironment({ token: "live_abc", hostname: null })).toBe(
+      "unavailable",
+    );
     expect(resolvePaddleCheckoutEnvironment({ token: "test_abc", hostname: null })).toBe("sandbox");
   });
 });
 
 describe("blocking copy constants", () => {
-  it("localhost message matches spec verbatim", () => {
+  it("live-token blocking copy states the sandbox-only policy", () => {
     expect(CHECKOUT_UNAVAILABLE_LOCALHOST_MESSAGE).toBe(
-      "Checkout disabled: localhost requires a Paddle sandbox token.",
+      "Checkout disabled: Verdant currently supports Paddle sandbox testing only.",
     );
   });
 

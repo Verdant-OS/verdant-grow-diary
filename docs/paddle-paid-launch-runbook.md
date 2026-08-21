@@ -4,13 +4,23 @@ Presence/absence checks only — this document and its scripts never print
 secret values. Nothing here deploys, migrates, or charges by itself. Every
 production step requires Matthew's explicit approval.
 
+## Current policy: production is test-only
+
+As of 2026-08-21, Verdant intentionally supports Paddle sandbox checkout only,
+including on the published production hostname. The tracked production client
+token is sandbox-class, and client code rejects live-class tokens on every
+host before script loading, price resolution, authentication redirects,
+session writes, or overlay opening. Public pricing and the payment banner must
+say sandbox/test-only and no real charges. This runbook does not itself
+authorize or perform a settings change.
+
 ## Project identity (proven 2026-07-14)
 
-| Question | Answer | Evidence |
-| --- | --- | --- |
-| Production Supabase project | **`knkwiiywfkbqznbxwqfh`** (Lovable-managed) | Committed `.env` `VITE_SUPABASE_URL`/`VITE_SUPABASE_PROJECT_ID`; `supabase/config.toml` `project_id`; CI local stack container name; the Lovable project DB holds the live data (18 profiles, 94 diary entries, the founder billing row) |
-| `bzatgtgjvuojpoxcknaa` | Personal dev sandbox — **never a deploy target** | Only project visible to the personal Supabase account; near-zero data (0 diary entries, 0 billing rows); schema drifted AHEAD of production (has `billing_customer_links` etc.) |
-| Who can touch production DB | Lovable deploys / Lovable cloud tooling only | The Supabase MCP in agent sessions sees only the personal account — it structurally cannot migrate production |
+| Question                    | Answer                                           | Evidence                                                                                                                                                                                                                                 |
+| --------------------------- | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Production Supabase project | **`knkwiiywfkbqznbxwqfh`** (Lovable-managed)     | Committed `.env` `VITE_SUPABASE_URL`/`VITE_SUPABASE_PROJECT_ID`; `supabase/config.toml` `project_id`; CI local stack container name; the Lovable project DB holds the live data (18 profiles, 94 diary entries, the founder billing row) |
+| `bzatgtgjvuojpoxcknaa`      | Personal dev sandbox — **never a deploy target** | Only project visible to the personal Supabase account; near-zero data (0 diary entries, 0 billing rows); schema drifted AHEAD of production (has `billing_customer_links` etc.)                                                          |
+| Who can touch production DB | Lovable deploys / Lovable cloud tooling only     | The Supabase MCP in agent sessions sees only the personal account — it structurally cannot migrate production                                                                                                                            |
 
 ## Canonical lane decision (revised 2026-07-16)
 
@@ -62,8 +72,9 @@ Apply in timestamp order via the Lovable/Supabase migration path for
 
 ## Checkout metadata contract (attribution)
 
-The BYO webhook attributes buyers ONLY from checkout `custom_data`. The live
-checkout (`src/hooks/usePaddleCheckout.ts`) sends `customData: { userId }`,
+The BYO webhook attributes buyers ONLY from checkout `custom_data`. The
+sandbox checkout (`src/hooks/usePaddleCheckout.ts`) sends
+`customData: { userId }`,
 and the webhook accepts `verdant_user_id`, `user_id`, `userId`,
 `auth_user_id`, or `verdant_auth_user_id`. If the checkout payload shape ever
 changes, update the webhook's extraction list in the SAME change — a mismatch
@@ -73,14 +84,14 @@ records paid events with `missing_user_id` and grants no entitlement.
 
 Edge function secrets on the production project:
 
-| Secret | Used by | Presence check |
-| --- | --- | --- |
-| `PADDLE_WEBHOOK_SECRET` | paddle-webhook | `supabase secrets list` shows the NAME |
-| `PADDLE_ENVIRONMENT` | paddle-webhook (must be `sandbox` until live approval) | same |
-| `PADDLE_PRICE_PRO_MONTHLY` / `PADDLE_PRICE_PRO_ANNUAL` / `PADDLE_PRICE_FOUNDER_LIFETIME` | paddle-webhook plan mapping | same |
-| `PAYMENTS_ENVIRONMENT` | get-paddle-price env selection (server-controlled) | same |
-| `PADDLE_SANDBOX_API_KEY` (+ `PADDLE_LIVE_API_KEY` only at live approval) | gateway price lookups | same |
-| `LOVABLE_API_KEY`, `PAYMENTS_SANDBOX_WEBHOOK_SECRET` (+ `PAYMENTS_LIVE_WEBHOOK_SECRET` at live) | Lovable lane | same |
+| Secret                                                                                          | Used by                                                | Presence check                         |
+| ----------------------------------------------------------------------------------------------- | ------------------------------------------------------ | -------------------------------------- |
+| `PADDLE_WEBHOOK_SECRET`                                                                         | paddle-webhook                                         | `supabase secrets list` shows the NAME |
+| `PADDLE_ENVIRONMENT`                                                                            | paddle-webhook (must be `sandbox` until live approval) | same                                   |
+| `PADDLE_PRICE_PRO_MONTHLY` / `PADDLE_PRICE_PRO_ANNUAL` / `PADDLE_PRICE_FOUNDER_LIFETIME`        | paddle-webhook plan mapping                            | same                                   |
+| `PAYMENTS_ENVIRONMENT`                                                                          | get-paddle-price env selection (server-controlled)     | same                                   |
+| `PADDLE_SANDBOX_API_KEY` (+ `PADDLE_LIVE_API_KEY` only at live approval)                        | gateway price lookups                                  | same                                   |
+| `LOVABLE_API_KEY`, `PAYMENTS_SANDBOX_WEBHOOK_SECRET` (+ `PAYMENTS_LIVE_WEBHOOK_SECRET` at live) | Lovable lane                                           | same                                   |
 
 JWT posture (now pinned in `supabase/config.toml`): `get-paddle-price`
 verify_jwt=true; `paddle-webhook` and `payments-webhook` verify_jwt=false
@@ -98,7 +109,35 @@ webhook secret and `PADDLE_ENVIRONMENT`.
 5. [ ] All required secret NAMES present (list above)
 6. [ ] Price IDs configured for the matching Paddle environment
 7. [ ] Sandbox smoke green — see `docs/paddle-sandbox-smoke.md`: one sandbox checkout → `lovable_paddle_events` row `processed_ok=true` → `public.subscriptions` row `environment='sandbox' status='active'`; duplicate delivery → noop (23505); Founder Lifetime cap decrements; cancel-and-resubscribe leaves both rows and resolves to the newer active one
-8. [ ] **Production stays blocked** — until Matthew approves the live-enable change: live `VITE_PAYMENTS_CLIENT_TOKEN`, `PAYMENTS_LIVE_WEBHOOK_SECRET`, `PADDLE_LIVE_API_KEY`, live price IDs, and `PAYMENTS_ENVIRONMENT=live` land as one reviewed slice
+8. [ ] **Production remains sandbox-only** — the client token, client gate,
+       `PAYMENTS_ENVIRONMENT`, legacy `PADDLE_ENVIRONMENT`, API key, webhook
+       secret, price IDs, notification destination, public copy, and smoke
+       evidence all agree on sandbox.
+
+## Coordinated settings transitions
+
+### Apply the current sandbox-only policy
+
+1. Verify sandbox secret and catalog key **names** without printing values.
+2. Set `PAYMENTS_ENVIRONMENT=sandbox` and legacy
+   `PADDLE_ENVIRONMENT=sandbox` through the approved operator path.
+3. Confirm sandbox API key, webhook secret, price IDs, and notification
+   destination all belong to the same Paddle sandbox account.
+4. Publish the reviewed source build containing the sandbox-class production
+   client token and exact-sandbox gates.
+5. Run the sandbox smoke against the published hostname and retain only
+   classifications, IDs, counts, and pass/fail evidence—never token values.
+
+### Propose a future live transition
+
+A future live launch requires a new explicit owner authorization. It must be
+one independently reviewed release that changes the client resolver and
+presenter copy together with the live-class production token,
+`PAYMENTS_ENVIRONMENT=live`, legacy `PADDLE_ENVIRONMENT=live`, live API and
+webhook secrets, live price IDs, notification destinations, monitoring, and a
+tested rollback. Flipping any single setting or token is insufficient and
+must fail closed. On rollback, restore the reviewed sandbox build and all
+sandbox selectors/catalog bindings as one coordinated operation.
 
 ## Business axis (refresh before every report)
 

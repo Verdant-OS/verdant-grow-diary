@@ -60,6 +60,7 @@ const ZERO_RETAINED = Object.freeze({
   action_queue_rows: 0,
   action_queue_event_rows: 0,
   alert_rows: 0,
+  alert_event_rows: 0,
   ai_doctor_session_rows: 0,
   ai_credit_accounting_rows: 0,
   plants: 0,
@@ -143,6 +144,30 @@ async function optionalCount(ops, method, ...args) {
   return typeof ops[method] === "function" ? Number(await ops[method](...args)) : 0;
 }
 
+function exactAlertIds(value) {
+  if (
+    !Array.isArray(value) ||
+    value.some((id) => typeof id !== "string" || id.length === 0) ||
+    new Set(value).size !== value.length
+  ) {
+    throw new Error("alert_ids_invalid");
+  }
+  return [...value];
+}
+
+function exactRetainedCount(value) {
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0) {
+    throw new Error("retained_count_invalid");
+  }
+  return value;
+}
+
+function sameIds(left, right) {
+  if (left.length !== right.length) return false;
+  const expected = new Set(left);
+  return right.every((id) => expected.has(id));
+}
+
 export async function discoverFixture(ops, names = FIXTURE_NAMES) {
   const grow = await ops.findGrowByExactName(names.grow);
   if (!grow) return { found: false, names };
@@ -151,6 +176,10 @@ export async function discoverFixture(ops, names = FIXTURE_NAMES) {
   const plantIds = await ops.listPlantIds(grow.id);
   const photoPaths =
     typeof ops.listDiaryPhotoPaths === "function" ? await ops.listDiaryPhotoPaths(grow.id) : [];
+  const alertIds = exactAlertIds(await ops.listAlertIds(grow.id));
+  const alertEventRows = alertIds.length
+    ? exactRetainedCount(await ops.countAlertEvents(alertIds))
+    : 0;
   return {
     found: true,
     names,
@@ -158,6 +187,7 @@ export async function discoverFixture(ops, names = FIXTURE_NAMES) {
     tentIds,
     plantIds,
     photoPaths,
+    alertIds,
     counts: {
       photo_objects: photoPaths.length,
       diary_entries: await optionalCount(ops, "countDiaryEntries", grow.id),
@@ -166,7 +196,8 @@ export async function discoverFixture(ops, names = FIXTURE_NAMES) {
       action_queue_events: await optionalCount(ops, "countActionQueueEvents", grow.id),
       ai_doctor_sessions: await optionalCount(ops, "countAiDoctorSessions", grow.id),
       ai_credit_accounting: await optionalCount(ops, "countAiCreditAccounting", grow.id),
-      alerts: await optionalCount(ops, "countAlerts", grow.id),
+      alerts: alertIds.length,
+      alert_events: alertEventRows,
       quick_logs: await optionalCount(ops, "countQuickLogs", grow.id),
       sensor_rows: tentIds.length ? await optionalCount(ops, "countSensorRows", tentIds) : 0,
       grow_targets: await optionalCount(ops, "countGrowTargets", grow.id),
@@ -204,8 +235,10 @@ export async function executeTeardown(ops, discovery, { dryRun }) {
     counts.photo_objects_deleted = c.photo_objects ?? 0;
     if (c.diary_entries > 0) counts.diary_entries_deleted = c.diary_entries;
     else counts.follow_ups_deleted = c.follow_ups ?? 0;
-    if (retainFixtureAlerts) retained.alert_rows = c.alerts ?? 0;
-    else counts.alerts_deleted = c.alerts ?? 0;
+    if (retainFixtureAlerts) {
+      retained.alert_rows = c.alerts ?? 0;
+      retained.alert_event_rows = c.alert_events ?? 0;
+    } else counts.alerts_deleted = c.alerts ?? 0;
     counts.quick_logs_deleted = c.quick_logs ?? 0;
     counts.sensor_rows_deleted = c.sensor_rows ?? 0;
     counts.grow_targets_deleted = c.grow_targets ?? 0;
@@ -213,6 +246,7 @@ export async function executeTeardown(ops, discovery, { dryRun }) {
       retained.action_queue_rows +
       retained.action_queue_event_rows +
       retained.alert_rows +
+      retained.alert_event_rows +
       retained.ai_doctor_session_rows +
       retained.ai_credit_accounting_rows;
     if (retainedChildHistory === 0) {
@@ -234,17 +268,24 @@ export async function executeTeardown(ops, discovery, { dryRun }) {
       : ["follow_ups", () => ops.deleteFollowUps(growId), () => ops.countFollowUps(growId)];
   if (retainFixtureAlerts) {
     try {
-      const verifiedAlertRows = Number(await ops.countAlerts(growId));
-      if (
-        !Number.isFinite(verifiedAlertRows) ||
-        verifiedAlertRows < 1 ||
-        verifiedAlertRows !== c.alerts
-      ) {
+      const verifiedAlertIds = exactAlertIds(await ops.listAlertIds(growId));
+      if (verifiedAlertIds.length < 1 || !sameIds(discovery.alertIds, verifiedAlertIds)) {
         return result("failed", "alerts_retention_verification_failed", counts, retained);
       }
-      retained.alert_rows = verifiedAlertRows;
+      retained.alert_rows = verifiedAlertIds.length;
     } catch {
       return result("failed", "alerts_retention_verification_failed", counts, retained);
+    }
+    try {
+      const verifiedAlertEventRows = exactRetainedCount(
+        await ops.countAlertEvents(discovery.alertIds),
+      );
+      if (verifiedAlertEventRows !== c.alert_events) {
+        return result("failed", "alert_events_retention_verification_failed", counts, retained);
+      }
+      retained.alert_event_rows = verifiedAlertEventRows;
+    } catch {
+      return result("failed", "alert_events_retention_verification_failed", counts, retained);
     }
   }
   const activeStages = [

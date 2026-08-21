@@ -188,6 +188,24 @@ function buildOps(supabase, userId, fixtureNames) {
         .eq("grow_id", growId);
       return exactCount(res, "alerts_count");
     },
+    async listAlertIds(growId) {
+      const { data, error } = await supabase
+        .from("alerts")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("grow_id", growId);
+      if (error || !Array.isArray(data)) throw new Error("alert_ids_lookup_error");
+      return data.map((row) => row.id);
+    },
+    async countAlertEvents(alertIds) {
+      if (!Array.isArray(alertIds) || alertIds.length === 0) return 0;
+      const res = await supabase
+        .from("alert_events")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .in("alert_id", alertIds);
+      return exactCount(res, "alert_events_count");
+    },
     async countQuickLogs(growId) {
       const res = await supabase
         .from("grow_events")
@@ -399,6 +417,7 @@ async function main() {
     `Fixture rows ${dryRun ? "planned for removal" : "removed"}: ${receipt.counts.total_deleted}`,
   );
   human.push(`Source alert rows retained: ${receipt.retained_history.alert_rows}`);
+  human.push(`Source alert event rows retained: ${receipt.retained_history.alert_event_rows}`);
   human.push(`History rows retained: ${receipt.retained_history.total_retained}`);
   emit(receipt, human, result.status === "failed" ? 1 : 0);
 }

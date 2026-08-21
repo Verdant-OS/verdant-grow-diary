@@ -40,6 +40,8 @@ interface FakeState {
   followUps: number;
   actionQueue: number;
   actionQueueEvents: number;
+  alertIds: string[];
+  alertEvents: number;
   alerts: number;
   quickLogs: number;
   sensorRows: number;
@@ -82,6 +84,13 @@ function makeOps(state: FakeState) {
     async countActionQueueEvents() {
       return state.actionQueueEvents;
     },
+    async listAlertIds() {
+      return [...state.alertIds];
+    },
+    async countAlertEvents(alertIds: string[]) {
+      expect(alertIds).toEqual(state.alertIds);
+      return state.alertEvents;
+    },
     async countAlerts() {
       return state.alerts;
     },
@@ -102,6 +111,8 @@ function makeOps(state: FakeState) {
     deleteAlerts: del("alerts", () => {
       const n = state.alerts;
       state.alerts = 0;
+      state.alertIds = [];
+      state.alertEvents = 0;
       return n;
     }),
     deleteQuickLogs: del("quick_logs", () => {
@@ -148,6 +159,8 @@ function seededState(): FakeState {
     followUps: 1,
     actionQueue: 0,
     actionQueueEvents: 0,
+    alertIds: ["alert-1"],
+    alertEvents: 2,
     alerts: 1,
     quickLogs: 1,
     sensorRows: 0, // sensor delete is RLS-blocked in prod; 0 keeps happy path pure
@@ -354,7 +367,9 @@ describe("delete ordering (child before parent)", () => {
     expect(deletes).not.toContain("delete:grows");
     expect(result.retainedHistory.action_queue_rows).toBe(1);
     expect(result.retainedHistory.alert_rows).toBe(1);
+    expect(result.retainedHistory.alert_event_rows).toBe(2);
     expect(result.retainedHistory.grows).toBe(1);
+    expect(result.retainedHistory.total_retained).toBe(7);
     expect(state.actionQueue).toBe(1);
     expect(state.alerts).toBe(1);
   });
@@ -368,8 +383,10 @@ describe("delete ordering (child before parent)", () => {
     expect(result.status).toBe("dry_run");
     expect(result.counts.alerts_deleted).toBe(0);
     expect(result.retainedHistory.alert_rows).toBe(1);
+    expect(result.retainedHistory.alert_event_rows).toBe(2);
     expect(result.retainedHistory.action_queue_rows).toBe(1);
     expect(result.retainedHistory.grows).toBe(1);
+    expect(result.retainedHistory.total_retained).toBe(7);
     expect(ops.calls).not.toContain("delete:alerts");
   });
 
@@ -382,6 +399,7 @@ describe("delete ordering (child before parent)", () => {
     expect(result.status).toBe("completed_with_retained_history");
     expect(result.retainedHistory.action_queue_event_rows).toBe(1);
     expect(result.retainedHistory.alert_rows).toBe(1);
+    expect(result.retainedHistory.alert_event_rows).toBe(2);
     expect(ops.calls).not.toContain("delete:alerts");
     expect(state.alerts).toBe(1);
   });
@@ -391,15 +409,57 @@ describe("delete ordering (child before parent)", () => {
     state.actionQueue = 1;
     const ops = makeOps(state);
     const discovery = await discoverFixture(ops);
-    ops.countAlerts = async () => {
+    ops.countAlertEvents = async () => {
       throw new Error("provider error with SECRET details");
     };
     const result = await executeTeardown(ops, discovery, { dryRun: false });
 
     expect(result.status).toBe("failed");
-    expect(result.reason).toBe("alerts_retention_verification_failed");
+    expect(result.reason).toBe("alert_events_retention_verification_failed");
     expect(ops.calls.filter((call) => call.startsWith("delete:"))).toEqual([]);
     expect(JSON.stringify(result)).not.toContain("SECRET");
+  });
+
+  it.each([undefined, Number.NaN, -1, 1.5])(
+    "fails closed before deletion for an invalid retained alert-event count: %s",
+    async (invalidCount) => {
+      const state = seededState();
+      state.actionQueue = 1;
+      const ops = makeOps(state);
+      const discovery = await discoverFixture(ops);
+      ops.countAlertEvents = async () => invalidCount as number;
+      const result = await executeTeardown(ops, discovery, { dryRun: false });
+
+      expect(result.status).toBe("failed");
+      expect(result.reason).toBe("alert_events_retention_verification_failed");
+      expect(ops.calls.filter((call) => call.startsWith("delete:"))).toEqual([]);
+    },
+  );
+
+  it("fails closed before deletion when retained alert-event history changes after discovery", async () => {
+    const state = seededState();
+    state.actionQueue = 1;
+    const ops = makeOps(state);
+    const discovery = await discoverFixture(ops);
+    state.alertEvents += 1;
+    const result = await executeTeardown(ops, discovery, { dryRun: false });
+
+    expect(result.status).toBe("failed");
+    expect(result.reason).toBe("alert_events_retention_verification_failed");
+    expect(ops.calls.filter((call) => call.startsWith("delete:"))).toEqual([]);
+  });
+
+  it("fails closed when the retained alert ID changes even if the alert count stays the same", async () => {
+    const state = seededState();
+    state.actionQueue = 1;
+    const ops = makeOps(state);
+    const discovery = await discoverFixture(ops);
+    state.alertIds = ["different-alert"];
+    const result = await executeTeardown(ops, discovery, { dryRun: false });
+
+    expect(result.status).toBe("failed");
+    expect(result.reason).toBe("alerts_retention_verification_failed");
+    expect(ops.calls.filter((call) => call.startsWith("delete:"))).toEqual([]);
   });
 
   it("fails closed when an unreferenced alert survives its required deletion", async () => {
@@ -412,6 +472,16 @@ describe("delete ordering (child before parent)", () => {
     expect(result.reason).toBe("alerts_rows_survived_delete");
     expect(ops.calls).not.toContain("delete:quick_logs");
     expect(ops.calls).not.toContain("delete:grows");
+  });
+
+  it("deletes unreferenced alert events by cascade and reports none as retained", async () => {
+    const state = seededState();
+    const ops = makeOps(state);
+    const result = await executeTeardown(ops, await discoverFixture(ops), { dryRun: false });
+
+    expect(result.status).toBe("completed_active_rows_removed");
+    expect(result.retainedHistory.alert_event_rows).toBe(0);
+    expect(state.alertEvents).toBe(0);
   });
 
   it("failed child deletion prevents parent deletion and reports sanitized reason", async () => {
@@ -602,6 +672,7 @@ describe("teardown receipt", () => {
         action_queue_rows: 1,
         action_queue_event_rows: 1,
         alert_rows: 1,
+        alert_event_rows: 2,
         ai_doctor_session_rows: 1,
         ai_credit_accounting_rows: 0,
         plants: 1,
@@ -610,7 +681,7 @@ describe("teardown receipt", () => {
       },
     });
     expect(receipt.counts.total_deleted).toBe(8);
-    expect(receipt.retained_history.total_retained).toBe(10);
+    expect(receipt.retained_history.total_retained).toBe(12);
   });
 
   it("receipt contains no IDs, tokens, emails, or paths", () => {
@@ -670,6 +741,7 @@ describe("teardown receipt", () => {
       "action_queue_rows",
       "action_queue_event_rows",
       "alert_rows",
+      "alert_event_rows",
       "ai_doctor_session_rows",
       "ai_credit_accounting_rows",
       "plants",
@@ -714,6 +786,14 @@ describe("static hygiene", () => {
     expect(CLI_SRC).toContain('.eq("grow_id", growId)');
     expect(CLEANUP_SRC).toContain("completed_with_retained_history");
     expect(CLEANUP_SRC).not.toContain("status=completed with all-zero");
+  });
+
+  it("counts retained alert events only through owner-scoped exact discovered alert IDs", () => {
+    expect(CLI_SRC).toContain('.from("alert_events")');
+    expect(CLI_SRC).toContain('.eq("user_id", userId)');
+    expect(CLI_SRC).toContain('.in("alert_id", alertIds)');
+    expect(CLI_SRC).toContain("listAlertIds");
+    expect(CLEANUP_SRC).toContain("discovery.alertIds");
   });
 
   it("no product code imports teardown tooling", () => {

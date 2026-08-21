@@ -308,8 +308,10 @@ relationships (grow → tent/plant → scoped children). It:
   readings, grow targets, and unreferenced alerts in dependency order;
 - retains append-only Action Queue/events, AI Doctor, and AI-credit history;
   when retained Action Queue history can point to the fixture alert, it also
-  retains and counts that source alert so the protected audit link remains
-  usable, together with the hierarchy needed to preserve that history;
+  retains and counts that source alert and its append-only alert events so the
+  protected audit link remains usable, together with the hierarchy needed to
+  preserve that history; the sanitized receipt reports those counts as
+  `alert_rows` and `alert_event_rows`, never their identifiers or contents;
 - reports `completed_with_retained_history` whenever protected history
   remains; it never claims zero-count or full cleanup;
 - reports `fixture_not_found` when the exact dynamic fixture is absent;

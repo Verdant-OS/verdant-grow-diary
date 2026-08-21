@@ -406,6 +406,63 @@ describe("LocalDataHealthPanel — the account uuid survives no fallback path", 
     expect(JSON.parse(getLocalStorageItemForTest(backupStoreKey) ?? "[]")).toEqual([]);
   });
 
+  it("preserves a full backup store when every final pre-delete comparison skips", async () => {
+    const key = `verdant.quickLog.lastTarget.v2.${ACCOUNT_A}`;
+    const backupStoreKey = "verdant.diagnostics.local-backups.v1";
+    const previousSnapshots = Array.from({ length: 10 }, (_, index) => {
+      const value = JSON.stringify({ previousSnapshot: index });
+      return {
+        id: `existing-backup-${index}`,
+        createdAt: new Date(NOW_MS - index * 60_000).toISOString(),
+        reason: "existing-test-backup",
+        entries: [
+          {
+            key: `verdant.existing.test.${index}`,
+            value,
+            sizeBytes: value.length,
+          },
+        ],
+      };
+    });
+    const previousStoreBytes = JSON.stringify(previousSnapshots);
+    setLocalStorageItemForTest(backupStoreKey, previousStoreBytes);
+    setLocalStorageItemForTest(key, "{}");
+    render(<LocalDataHealthPanel />);
+    await schemaRow("Quick Log last target");
+    expect(screen.getAllByRole("button", { name: "Restore" })).toHaveLength(10);
+
+    fireEvent.click(screen.getByRole("button", { name: /Review & clear/i }));
+    await screen.findByRole("dialog");
+
+    // Replace the only clear candidate while its provisional backup is being
+    // persisted. Since the final comparison skips it, no real backup was
+    // added and retention must not evict any existing snapshot.
+    const storage = ensureLocalStorageForTest();
+    const methodOwner = getLocalStorageMethodOwnerForTest(storage, "setItem");
+    const originalSetItem = methodOwner.setItem;
+    let replacedDuringBackup = false;
+    vi.spyOn(methodOwner, "setItem").mockImplementation(function (
+      this: Storage,
+      storageKey: string,
+      value: string,
+    ) {
+      originalSetItem.call(this, storageKey, value);
+      if (!replacedDuringBackup && storageKey === backupStoreKey) {
+        replacedDuringBackup = true;
+        originalSetItem.call(this, key, RECORD);
+      }
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Confirm — clear/i }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(replacedDuringBackup).toBe(true);
+    expect(getLocalStorageItemForTest(key)).toBe(RECORD);
+    expect(screen.getByText(/Skipped 1 key/)).toBeInTheDocument();
+    expect(getLocalStorageItemForTest(backupStoreKey)).toBe(previousStoreBytes);
+    expect(screen.getAllByRole("button", { name: "Restore" })).toHaveLength(10);
+  });
+
   it("whitelists scoped field metadata and omits an unversioned v value", async () => {
     const PRIVATE_FIELD_NAME = "grower@example.com";
     const PRIVATE_VERSION_VALUE = "private grower note";

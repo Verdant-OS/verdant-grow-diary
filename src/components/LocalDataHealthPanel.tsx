@@ -1371,11 +1371,15 @@ function readBackupStore(): BackupSnapshot[] {
   }
 }
 
-function writeBackupStore(list: BackupSnapshot[]): void {
+function writeBackupStore(
+  list: BackupSnapshot[],
+  { enforceRetentionCap = true }: { enforceRetentionCap?: boolean } = {},
+): void {
   const s = safeStorage();
   if (!s) return;
   try {
-    s.setItem(BACKUP_STORE_KEY, JSON.stringify(list.slice(0, BACKUP_MAX)));
+    const persisted = enforceRetentionCap ? list.slice(0, BACKUP_MAX) : list;
+    s.setItem(BACKUP_STORE_KEY, JSON.stringify(persisted));
   } catch {
     // Quota or serialization failure — silently drop; caller checks return of listBackups.
   }
@@ -1399,8 +1403,11 @@ function createBackupSnapshot(entries: BackupEntry[], reason: string): BackupSna
     reason,
     entries,
   };
-  const next = [snapshot, ...readBackupStore()].slice(0, BACKUP_MAX);
-  writeBackupStore(next);
+  // Keep every existing snapshot until final comparison decides whether this
+  // provisional one represents a real clear. Applying the cap now would evict
+  // the oldest backup even when every candidate is subsequently skipped.
+  const next = [snapshot, ...readBackupStore()];
+  writeBackupStore(next, { enforceRetentionCap: false });
   return snapshot;
 }
 

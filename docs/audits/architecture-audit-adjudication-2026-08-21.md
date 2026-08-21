@@ -259,6 +259,33 @@ stamper uses:
 | **Stamped by the live build**                | `8773f6b2c0edb2618a7b1b6fc4f0d4bb01b984cbc9e3ed33be896a1e40152d41` |
 | Match                                        | **no**                                                             |
 
+> **Re-verified 2026-08-21 after merging base `5a13d0b4` (#1089), and both halves of that check
+> matter.**
+>
+> _The measurement reproduces._ Re-extracting `4b1c4867e685` and re-running
+> `computeTreeHash()` from `scripts/lib/tree-hash.mjs` returns
+> `1f0eb7b4e6cd2ef0d375ee039c86704a39372feeb2c0b8bbb78fcfa76cb55674` with `fileCount: 5840` —
+> the exact values tabled above. The 5,840 is the count **inside `TREE_HASH_ROOTS`**; the full
+> tree at that commit holds 6,586 files.
+>
+> _The method is the correct one, stated explicitly because the base branch now documents the
+> trap._ `CURRENT_STATE.md` warns that `treeHash` is Verdant's SHA-256 over the allowlisted
+> roots manifest, **not** a Git tree object ID, and that a mismatch must never be "confirmed" by
+> diffing it against `git rev-parse <commit>^{tree}` — those never match, healthy builds
+> included, and #1077 removed exactly that false corroboration elsewhere. This section did not
+> use that comparison: it ran the stamper's own module over the commit's extracted tree, which
+> is the only comparison that means anything. Do not re-derive this with `git rev-parse`.
+>
+> _The specific reading is superseded; the finding is not._ Production republished several times
+> on 2026-08-21 and now serves `39935889fe02` (#1080), so the `4b1c4867e685` / `8773f6b2c0ed`
+> pair above is a snapshot of one publish, not current state — treat it as perishable, exactly
+> as `CURRENT_STATE.md` instructs for every live row. But that later, independent measurement
+> records `dirty: true`, `ref: "__orphan__"`, provenance explicitly **not** `PASS`, and cause
+> `NOT_MEASURED`. So the provenance gap is **not** a one-off artifact of the publish this
+> section happened to catch: a second observer found the same class of gap on a different commit
+> hours later. That corroborates the finding while leaving its bound untouched — whether any
+> shipped byte differs is still `NOT_MEASURED`.
+
 **Production stamped commit `4b1c4867e685` from a build workspace whose hashed roots did not
 match that commit's tree.** State it that way and no more strongly — corrected after review.
 

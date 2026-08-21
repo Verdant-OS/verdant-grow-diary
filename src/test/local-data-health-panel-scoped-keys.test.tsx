@@ -169,6 +169,82 @@ describe("LocalDataHealthPanel — a malformed scoped record is never reported h
   });
 });
 
+describe("LocalDataHealthPanel — a future timestamp is a fault, expiry is not", () => {
+  // `resolveRecentTargetSuggestion` refuses a record stamped in the FUTURE
+  // outright — a skewed clock is not evidence — while the panel's validator
+  // only asked the parser, which accepts any readable timestamp. The record
+  // therefore reported Pass while the suggestion silently never appeared:
+  // a clean bill of health over an invisible failure.
+  //
+  // Offsets are relative to the real clock and deliberately coarse. Fake
+  // timers were tried first and deadlock this panel: it runs its checks
+  // asynchronously, so freezing the clock hangs RTL's `waitFor` and every
+  // case times out at 5s. The rule's EXACT boundary — reject at `savedAt`
+  // one millisecond past now, accept at equality — is pinned where it can be
+  // tested honestly, in `quick-log-recent-target-suggestion.test.ts` against
+  // an injected clock. These cases prove the panel agrees with that rule in
+  // kind, which is the part that was missing.
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  const stampedAt = (offsetMs: number) =>
+    JSON.stringify({
+      plantId: "p1",
+      growId: "g1",
+      tentId: "t1",
+      savedAt: new Date(Date.now() + offsetMs).toISOString(),
+    });
+
+  it("warns on a record stamped in the future, and says what to do about it", async () => {
+    setLocalStorageItemForTest(
+      `verdant.quickLog.lastTarget.v2.${ACCOUNT_A}`,
+      stampedAt(5 * DAY_MS),
+    );
+    render(<LocalDataHealthPanel />);
+
+    const row = await schemaRow("Quick Log last target");
+    expect(within(row).getByText("Warn")).toBeInTheDocument();
+    expect(row).toHaveTextContent("the stored timestamp is in the future");
+    // A cause with no action is only half a diagnostic.
+    expect(row).toHaveTextContent("clear this entry to restore it now");
+  });
+
+  it("passes a record stamped moments ago — the positive control", async () => {
+    // Differs from the case above in the SIGN of the offset and nothing else,
+    // so a Warn there cannot be an artifact of the fixture.
+    setLocalStorageItemForTest(`verdant.quickLog.lastTarget.v2.${ACCOUNT_A}`, stampedAt(-60_000));
+    render(<LocalDataHealthPanel />);
+
+    const row = await schemaRow("Quick Log last target");
+    expect(within(row).getByText("Pass")).toBeInTheDocument();
+  });
+
+  it("passes an EXPIRED record — ageing out is not a fault", async () => {
+    // 30 days old: the suggestion is gone, and that is the record doing
+    // exactly what it was designed to do. Reporting it as a failure would
+    // spend the grower's attention on normal behaviour. Deliberate, and
+    // pinned so a later change to the future-timestamp rule cannot quietly
+    // start flagging ordinary expiry too.
+    setLocalStorageItemForTest(
+      `verdant.quickLog.lastTarget.v2.${ACCOUNT_A}`,
+      stampedAt(-30 * DAY_MS),
+    );
+    render(<LocalDataHealthPanel />);
+
+    const row = await schemaRow("Quick Log last target");
+    expect(within(row).getByText("Pass")).toBeInTheDocument();
+  });
+
+  it("still never renders the account uuid when reporting a future timestamp", async () => {
+    setLocalStorageItemForTest(
+      `verdant.quickLog.lastTarget.v2.${ACCOUNT_A}`,
+      stampedAt(5 * DAY_MS),
+    );
+    const { container } = render(<LocalDataHealthPanel />);
+
+    await schemaRow("Quick Log last target");
+    expect(container.textContent ?? "").not.toContain(ACCOUNT_A);
+  });
+});
+
 describe("LocalDataHealthPanel — the account uuid survives no fallback path", () => {
   it("keeps the label redacted when the key vanishes between the run and the drawer", async () => {
     setLocalStorageItemForTest(`verdant.quickLog.lastTarget.v2.${ACCOUNT_A}`, "{}");

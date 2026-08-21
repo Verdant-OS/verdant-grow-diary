@@ -147,15 +147,13 @@ describe("Action Queue transition forward repair migration", () => {
     }
   });
 
-  it("keeps the local production-parity seed from reopening lifecycle writes", () => {
-    for (const table of ["action_queue", "action_queue_events"]) {
-      expect(LOCAL_PARITY_SEED).toMatch(
-        new RegExp(
-          `revoke\\s+update\\s*,\\s*delete\\s+on\\s+table\\s+public\\.${table}[\\s\\S]*?from\\s+public\\s*,\\s*anon\\s*,\\s*authenticated`,
-          "i",
-        ),
-      );
-    }
+  it("keeps the local production-parity seed from reopening the client ACL", () => {
+    expect(LOCAL_PARITY_SEED).toMatch(
+      /revoke\s+all\s+privileges\s+on\s+table\s+public\.action_queue\s*,\s*public\.action_queue_events\s+from\s+public\s*,\s*anon\s*,\s*authenticated/i,
+    );
+    expect(LOCAL_PARITY_SEED).toMatch(
+      /grant\s+select\s*,\s*insert\s+on\s+table\s+public\.action_queue\s*,\s*public\.action_queue_events\s+to\s+authenticated/i,
+    );
   });
 
   it("exposes the SECURITY DEFINER RPC only to authenticated and pins an empty search path", () => {

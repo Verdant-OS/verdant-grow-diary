@@ -1,11 +1,12 @@
 /**
  * usePaddleCancelNotice — presentation-only.
  *
- * Fetches the caller's newest RECURRING subscription row (skipping the
- * `lifetime_%` pseudo-subscription IDs) and derives the cancel-notice
- * presentation via `derivePaddleCancelNotice`. Never mutates rows, never
- * re-implements access rules, and never gates capabilities — the entitlement
- * hook / access rules remain the source of truth for what a user can do.
+ * Fetches bounded newest-first RECURRING subscription windows for live and
+ * sandbox (skipping `lifetime_%` pseudo-subscription IDs), selects an entitling
+ * live row before a sandbox fallback, and derives the cancel-notice presentation
+ * via `derivePaddleCancelNotice`. Never mutates rows, never re-implements access
+ * rules, and never gates capabilities — the entitlement hook / access rules
+ * remain the source of truth for what a user can do.
  *
  * RLS on public.subscriptions is select-own; passing user_id is redundant
  * but harmless. The hook returns HIDDEN while loading or on error.

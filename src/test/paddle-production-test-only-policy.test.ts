@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, rmdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { resolve } from "node:path";
+import { loadEnv } from "vite";
 import { classifyPaddleToken } from "@/lib/paddleEnvironment";
 
 const invokeMock = vi.hoisted(() => vi.fn());
@@ -9,14 +11,8 @@ vi.mock("@/integrations/supabase/client", () => ({
   supabase: { functions: { invoke: invokeMock } },
 }));
 
-function readProductionToken(): string | null {
-  const text = readFileSync(resolve(process.cwd(), ".env.production"), "utf8");
-  const line = text
-    .split(/\r?\n/)
-    .find((candidate) => candidate.startsWith("VITE_PAYMENTS_CLIENT_TOKEN="));
-  if (!line) return null;
-  const raw = line.slice(line.indexOf("=") + 1).trim();
-  return raw.replace(/^(["'])(.*)\1$/, "$2");
+function readProductionToken(envDir = process.cwd()): string | null {
+  return loadEnv("production", envDir, "VITE_PAYMENTS_").VITE_PAYMENTS_CLIENT_TOKEN ?? null;
 }
 
 async function loadPaddleWithToken(token: string) {
@@ -39,6 +35,31 @@ afterEach(() => {
 describe("Paddle production test-only policy", () => {
   it("tracks a sandbox-class client token in the production build", () => {
     expect(classifyPaddleToken(readProductionToken())).toBe("sandbox");
+  });
+
+  it("reads the same last duplicate assignment that Vite resolves for production", () => {
+    const envDir = mkdtempSync(resolve(tmpdir(), "verdant-paddle-production-env-"));
+    const envFile = resolve(envDir, ".env.production");
+    const previousToken = process.env.VITE_PAYMENTS_CLIENT_TOKEN;
+    delete process.env.VITE_PAYMENTS_CLIENT_TOKEN;
+    try {
+      writeFileSync(
+        envFile,
+        [
+          "VITE_PAYMENTS_CLIENT_TOKEN=test_policy_first",
+          "VITE_PAYMENTS_CLIENT_TOKEN=live_policy_last",
+          "",
+        ].join("\n"),
+        "utf8",
+      );
+
+      expect(classifyPaddleToken(readProductionToken(envDir))).toBe("live");
+    } finally {
+      if (previousToken === undefined) delete process.env.VITE_PAYMENTS_CLIENT_TOKEN;
+      else process.env.VITE_PAYMENTS_CLIENT_TOKEN = previousToken;
+      rmSync(envFile, { force: true });
+      rmdirSync(envDir);
+    }
   });
 
   it("initializes only the Paddle sandbox environment", async () => {

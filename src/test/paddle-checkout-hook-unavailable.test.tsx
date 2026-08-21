@@ -68,7 +68,7 @@ vi.mock("@/lib/paddle", async () => {
     initializePaddle: vi.fn(async () => {
       if (paddleState.initShouldThrow === "unavailable") {
         throw new PaddleCheckoutUnavailableError(
-          "Checkout disabled: localhost requires a Paddle sandbox token.",
+          "Checkout disabled: Verdant currently supports Paddle sandbox testing only.",
         );
       }
       if (paddleState.initShouldThrow === "generic") {
@@ -80,6 +80,10 @@ vi.mock("@/lib/paddle", async () => {
 });
 
 import { usePaddleCheckout } from "@/hooks/usePaddleCheckout";
+import {
+  _peekActiveSessionForTests,
+  _resetCheckoutOverlaySessionForTests,
+} from "@/lib/checkoutOverlaySession";
 
 function wrapper({ children }: { children: ReactNode }) {
   return <MemoryRouter initialEntries={["/pricing"]}>{children}</MemoryRouter>;
@@ -91,6 +95,8 @@ beforeEach(() => {
   paddleState.env = "sandbox";
   paddleState.message = null;
   paddleState.initShouldThrow = null;
+  _resetCheckoutOverlaySessionForTests();
+  window.sessionStorage.clear();
   // Ensure window.Paddle stub exists for the success path.
   (window as any).Paddle = { Checkout: { open: vi.fn() } };
 });
@@ -98,21 +104,23 @@ beforeEach(() => {
 describe("usePaddleCheckout — Slice B calm-blocked behavior", () => {
   it("exposes unavailable=true and the blocking message when environment is unavailable", () => {
     paddleState.env = "unavailable";
-    paddleState.message = "Checkout disabled: localhost requires a Paddle sandbox token.";
+    paddleState.message =
+      "Checkout disabled: Verdant currently supports Paddle sandbox testing only.";
 
     const { result } = renderHook(() => usePaddleCheckout(), { wrapper });
 
     expect(result.current.environment).toBe("unavailable");
     expect(result.current.unavailable).toBe(true);
     expect(result.current.unavailableMessage).toBe(
-      "Checkout disabled: localhost requires a Paddle sandbox token.",
+      "Checkout disabled: Verdant currently supports Paddle sandbox testing only.",
     );
     expect(result.current.blockedReason).toBeNull();
   });
 
   it("refuses to open checkout when unavailable — no /auth redirect, no toast, calm blockedReason", async () => {
     paddleState.env = "unavailable";
-    paddleState.message = "Checkout disabled: localhost requires a Paddle sandbox token.";
+    paddleState.message =
+      "Checkout disabled: Verdant currently supports Paddle sandbox testing only.";
 
     const { result } = renderHook(() => usePaddleCheckout(), { wrapper });
 
@@ -123,24 +131,49 @@ describe("usePaddleCheckout — Slice B calm-blocked behavior", () => {
     expect(navigateMock).not.toHaveBeenCalled();
     expect(toastMock).not.toHaveBeenCalled();
     expect(result.current.blockedReason).toBe(
-      "Checkout disabled: localhost requires a Paddle sandbox token.",
+      "Checkout disabled: Verdant currently supports Paddle sandbox testing only.",
     );
     // Loading must not stay stuck on true after the calm short-circuit.
     expect(result.current.loading).toBe(false);
   });
 
-  it("exposes the available environment used by the checkout gate", () => {
+  it("treats a live environment as unavailable", () => {
     paddleState.env = "live";
+    paddleState.message =
+      "Checkout disabled: Verdant currently supports Paddle sandbox testing only.";
 
     const { result } = renderHook(() => usePaddleCheckout(), { wrapper });
 
     expect(result.current.environment).toBe("live");
-    expect(result.current.unavailable).toBe(false);
+    expect(result.current.unavailable).toBe(true);
+    expect(result.current.unavailableMessage).toContain("sandbox testing only");
+  });
+
+  it("blocks a live environment before auth, storage, session, or overlay work", async () => {
+    paddleState.env = "live";
+    paddleState.message =
+      "Checkout disabled: Verdant currently supports Paddle sandbox testing only.";
+    const openSpy = vi.fn();
+    (window as any).Paddle = { Checkout: { open: openSpy } };
+
+    const { result } = renderHook(() => usePaddleCheckout(), { wrapper });
+
+    await act(async () => {
+      await result.current.openCheckout({ priceId: "pro_monthly" });
+    });
+
+    expect(result.current.blockedReason).toContain("sandbox testing only");
+    expect(navigateMock).not.toHaveBeenCalled();
+    expect(toastMock).not.toHaveBeenCalled();
+    expect(window.sessionStorage.length).toBe(0);
+    expect(_peekActiveSessionForTests()).toBeNull();
+    expect(openSpy).not.toHaveBeenCalled();
   });
 
   it("dismissBlocked() clears the calm blocked state", async () => {
     paddleState.env = "unavailable";
-    paddleState.message = "Checkout disabled: localhost requires a Paddle sandbox token.";
+    paddleState.message =
+      "Checkout disabled: Verdant currently supports Paddle sandbox testing only.";
 
     const { result } = renderHook(() => usePaddleCheckout(), { wrapper });
     await act(async () => {
@@ -167,7 +200,7 @@ describe("usePaddleCheckout — Slice B calm-blocked behavior", () => {
 
     expect(toastMock).not.toHaveBeenCalled();
     expect(result.current.blockedReason).toBe(
-      "Checkout disabled: localhost requires a Paddle sandbox token.",
+      "Checkout disabled: Verdant currently supports Paddle sandbox testing only.",
     );
   });
 

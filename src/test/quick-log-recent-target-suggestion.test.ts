@@ -11,6 +11,7 @@ import {
   buildRecentTargetStorageKey,
   parseRecentTargetRecord,
   resolveRecentTargetSuggestion,
+  recentTargetSuggestionFitsPrefillScope,
 } from "@/lib/quickLogRecentTargetSuggestion";
 
 const NOW = Date.parse("2026-08-19T12:00:00.000Z");
@@ -382,5 +383,92 @@ describe("resolveRecentTargetSuggestion — the tent must still be live and in t
       growId: "grow-1",
       tentId: "tent-1",
     });
+  });
+});
+
+describe("recentTargetSuggestionFitsPrefillScope — offerability, not validity", () => {
+  const SUGGESTION = {
+    plantId: "p1",
+    plantName: "Blue Dream",
+    growId: "grow-1",
+    tentId: "tent-1",
+  } as const;
+
+  it("offers nothing when there is no suggestion, whatever the scope", () => {
+    expect(recentTargetSuggestionFitsPrefillScope(null, null)).toBe(false);
+    expect(recentTargetSuggestionFitsPrefillScope(null, { growId: "grow-1" })).toBe(false);
+  });
+
+  it("offers on a fully unscoped open", () => {
+    expect(recentTargetSuggestionFitsPrefillScope(SUGGESTION, null)).toBe(true);
+    expect(recentTargetSuggestionFitsPrefillScope(SUGGESTION, undefined)).toBe(true);
+    expect(recentTargetSuggestionFitsPrefillScope(SUGGESTION, {})).toBe(true);
+  });
+
+  it("offers for an activity-only prefill, which names no target", () => {
+    // AppShell's context-free Fast Add. Extra fields name a FORM, not a target.
+    const activityOnly = { eventType: "feeding" } as Record<string, unknown>;
+    expect(recentTargetSuggestionFitsPrefillScope(SUGGESTION, activityOnly)).toBe(true);
+  });
+
+  it("never competes with a named plant — including the same plant", () => {
+    expect(recentTargetSuggestionFitsPrefillScope(SUGGESTION, { plantId: "p2" })).toBe(false);
+    expect(recentTargetSuggestionFitsPrefillScope(SUGGESTION, { plantId: "p1" })).toBe(false);
+    // A named plant loses the offer even when the rest of the scope agrees.
+    expect(
+      recentTargetSuggestionFitsPrefillScope(SUGGESTION, {
+        plantId: "p1",
+        growId: "grow-1",
+        tentId: "tent-1",
+      }),
+    ).toBe(false);
+  });
+
+  it("offers inside a matching grow scope and refuses a different one", () => {
+    expect(recentTargetSuggestionFitsPrefillScope(SUGGESTION, { growId: "grow-1" })).toBe(true);
+    expect(recentTargetSuggestionFitsPrefillScope(SUGGESTION, { growId: "grow-2" })).toBe(false);
+  });
+
+  it("offers inside a matching tent scope and refuses a different one", () => {
+    expect(recentTargetSuggestionFitsPrefillScope(SUGGESTION, { tentId: "tent-1" })).toBe(true);
+    expect(recentTargetSuggestionFitsPrefillScope(SUGGESTION, { tentId: "tent-2" })).toBe(false);
+  });
+
+  it("requires EVERY named scope to agree, not just one", () => {
+    expect(
+      recentTargetSuggestionFitsPrefillScope(SUGGESTION, { growId: "grow-1", tentId: "tent-1" }),
+    ).toBe(true);
+    expect(
+      recentTargetSuggestionFitsPrefillScope(SUGGESTION, { growId: "grow-1", tentId: "tent-2" }),
+    ).toBe(false);
+    expect(
+      recentTargetSuggestionFitsPrefillScope(SUGGESTION, { growId: "grow-2", tentId: "tent-1" }),
+    ).toBe(false);
+  });
+
+  it("refuses a scope the suggestion cannot answer", () => {
+    // A suggestion with no live grow or tent never reaches this rule in
+    // production (conditions 5-7 reject it first), but the rule must not treat
+    // "unknown" as "matches" if one ever did.
+    const scopeless = { plantId: "p1", plantName: "Blue Dream", growId: null, tentId: null };
+    expect(recentTargetSuggestionFitsPrefillScope(scopeless, { growId: "grow-1" })).toBe(false);
+    expect(recentTargetSuggestionFitsPrefillScope(scopeless, { tentId: "tent-1" })).toBe(false);
+    expect(recentTargetSuggestionFitsPrefillScope(scopeless, null)).toBe(true);
+  });
+
+  it("treats blank and whitespace-only ids as naming nothing", () => {
+    expect(recentTargetSuggestionFitsPrefillScope(SUGGESTION, { plantId: "   " })).toBe(true);
+    expect(recentTargetSuggestionFitsPrefillScope(SUGGESTION, { growId: "" })).toBe(true);
+    expect(recentTargetSuggestionFitsPrefillScope(SUGGESTION, { tentId: "\t\n" })).toBe(true);
+    // Padding around a real id still matches the trimmed live value.
+    expect(recentTargetSuggestionFitsPrefillScope(SUGGESTION, { growId: "  grow-1  " })).toBe(true);
+  });
+
+  it("is deterministic", () => {
+    const scope = { growId: "grow-1" };
+    const first = recentTargetSuggestionFitsPrefillScope(SUGGESTION, scope);
+    for (let i = 0; i < 5; i += 1) {
+      expect(recentTargetSuggestionFitsPrefillScope(SUGGESTION, scope)).toBe(first);
+    }
   });
 });

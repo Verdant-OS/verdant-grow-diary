@@ -2,8 +2,9 @@
 //
 // The remembered target returns ONLY as a visible suggestion the grower
 // accepts. These pins hold the two properties that make that true in the
-// component: it is offered only on a genuinely unscoped open, and accepting
-// it performs the same explicit selection the target Select performs.
+// component: it is offered only where the launcher has not already named a
+// plant AND the revalidated scope agrees, and accepting it performs the same
+// explicit selection the target Select performs.
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
@@ -21,24 +22,38 @@ describe("D5 — remembered target is a suggestion, never a default", () => {
     expect(QUICKLOG).not.toContain("readLastTarget(");
   });
 
-  it("offers the chip only on a genuinely unscoped open with no plant chosen", () => {
-    // Renegotiated from `!prefill`. That truthiness test answered the wrong
+  it("offers the chip only when no plant is named and the scope agrees", () => {
+    // Renegotiated twice, never loosened.
+    //
+    // Round 1 replaced `!prefill`. That truthiness test answered the wrong
     // question: AppShell sends an activity-only prefill (`{ eventType }`) for a
     // context-free Fast Add, which names no target at all, and the old gate
-    // withheld the suggestion on exactly that open. "Unscoped" now means the
-    // prefill names no plant, grow, or tent.
+    // withheld the suggestion on exactly that open.
+    //
+    // Round 2 replaces "names ANY target". A prefill naming only a grow or tent
+    // has NOT answered "which plant?" — `GrowRecoveryPrompt` sends `{ growId }`
+    // and leaves the Select empty, which is the very dialog the approved S6
+    // target expects this chip to reduce to one tap. Scope agreement is now
+    // decided by a pure rule against the revalidated suggestion instead of by
+    // rejecting every scoped open.
     expect(FLAT).toMatch(
-      /const showRecentTargetSuggestion = !prefillNamesTarget && !recentSuggestionDismissed && !plantId && recentTargetSuggestion !== null;/,
+      /const showRecentTargetSuggestion = !prefillNamesPlant && !recentSuggestionDismissed && !plantId && recentTargetSuggestionFitsPrefillScope\(recentTargetSuggestion, prefill\);/,
     );
-    expect(FLAT).toMatch(/const prefillNamesTarget = quickLogPrefillNamesAnyTarget\(prefill\);/);
-    // Reading is gated the same way, so a scoped open never even looks.
+    expect(FLAT).toMatch(/const prefillNamesPlant = quickLogPrefillNamesPlant\(prefill\);/);
+    // Reading is gated on the same narrower question, so a plant-named open
+    // never even looks — but a grow-scoped one does, and must.
     expect(FLAT).toMatch(
-      /open && !prefillNamesTarget \? loadRecentTargetRecord\(user\?\.id \?\? null\) : null/,
+      /open && !prefillNamesPlant \? loadRecentTargetRecord\(user\?\.id \?\? null\) : null/,
     );
-    // And the retired gate cannot come back: a bare truthiness test on the
-    // prefill object must never guard either the read or the render.
+    // Acceptance re-asserts scope as well as identity: the render that produced
+    // the button is not evidence about the record at click time.
+    expect(FLAT).toMatch(/if \(!recentTargetSuggestionFitsPrefillScope\(current, prefill\)\) \{/);
+    // No retired gate can come back — neither the bare truthiness test on the
+    // prefill object, nor the any-target form that suppressed grow-scoped opens.
     expect(FLAT).not.toMatch(/showRecentTargetSuggestion = !prefill &&/);
     expect(FLAT).not.toMatch(/open && !prefill \? loadRecentTargetRecord/);
+    expect(FLAT).not.toMatch(/quickLogPrefillNamesAnyTarget/);
+    expect(FLAT).not.toMatch(/!prefillNamesTarget/);
   });
 
   it("revalidates the stored target against visible plants, active grows AND live tents", () => {
@@ -79,8 +94,15 @@ describe("D5 — remembered target is a suggestion, never a default", () => {
     expect(FLAT).toMatch(
       /quick-log-recent-target-accept[\s\S]{0,1500}const latestRecord = loadRecentTargetRecord\(user\?\.id \?\? null\);[\s\S]{0,300}resolveRecentTargetSuggestion\(\{ record: latestRecord, now: Date\.now\(\), visiblePlants: plants, visibleGrows: grows, visibleTents: activeTents, \}\)/,
     );
+    // Window widened from 1600 to the measured 1900: acceptance now also
+    // re-asserts prefill scope before applying, which sits between the
+    // testid and this call. Measured span at this commit is 1823 characters.
     expect(FLAT).toMatch(
-      /quick-log-recent-target-accept[\s\S]{0,1600}setPlantId\(current\.plantId\)/,
+      /quick-log-recent-target-accept[\s\S]{0,1900}setPlantId\(current\.plantId\)/,
+    );
+    // Scope is re-asserted BEFORE the plant is applied, not after.
+    expect(FLAT).toMatch(
+      /if \(!recentTargetSuggestionFitsPrefillScope\(current, prefill\)\) \{[\s\S]{0,300}record: latestRecord,[\s\S]{0,80}return; \}[\s\S]{0,600}setPlantId\(current\.plantId\)/,
     );
     // An expired or no-longer-visible target retires the offer instead.
     expect(FLAT).toMatch(
@@ -96,8 +118,10 @@ describe("D5 — remembered target is a suggestion, never a default", () => {
       /quick-log-recent-target-accept[\s\S]{0,500}targetSelectionLocked \|\| isMainDraftMutationLocked\(\)/,
     );
     // The open-time value must never be what gets applied.
+    // Widening a NEGATIVE window strengthens it — the retired form is now
+    // forbidden across a larger span, not a smaller one.
     expect(FLAT).not.toMatch(
-      /quick-log-recent-target-accept[\s\S]{0,1600}setPlantId\(recentTargetSuggestion\.plantId\)/,
+      /quick-log-recent-target-accept[\s\S]{0,1900}setPlantId\(recentTargetSuggestion\.plantId\)/,
     );
   });
 

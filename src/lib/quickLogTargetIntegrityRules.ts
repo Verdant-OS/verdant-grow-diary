@@ -126,20 +126,24 @@ export function quickLogPrefillTargetKey(
 }
 
 /**
- * True when a prefill names a target of any kind — plant, grow, or tent.
+ * True when a prefill names a PLANT.
  *
- * An activity-only prefill such as `{ eventType: "feeding" }` names none of
- * them: it preselects a FORM, not a target, so the open is still unscoped and
- * the grower still has to say where the entry belongs. Callers that need "is
- * this a genuinely unscoped open?" must ask this rather than testing the
- * prefill object for truthiness, which answers a different question.
+ * This is the line that decides whether the launcher has already answered
+ * "which plant?". A prefill naming only a grow or a tent has not: it fixes a
+ * scope and leaves the plant Select empty, which is precisely the grow-scoped
+ * recovery dialog the approved S6 target expects the D5 chip to reduce to one
+ * tap. Asking "names any target at all?" conflated the two and withheld the
+ * chip from every scoped open — see `recentTargetSuggestionFitsPrefillScope`
+ * in `quickLogRecentTargetSuggestion`, which compares the scope instead.
+ *
+ * An activity-only prefill such as `{ eventType: "feeding" }` names no target
+ * whatsoever: it preselects a FORM, so the open is fully unscoped and the
+ * grower still has to say where the entry belongs. Callers must ask this rather
+ * than testing the prefill object for truthiness, which answers a different
+ * question.
  */
-export function quickLogPrefillNamesAnyTarget(
-  prefill?: QuickLogPrefillTargetRequest | null,
-): boolean {
-  return Boolean(
-    normalizeId(prefill?.plantId) || normalizeId(prefill?.growId) || normalizeId(prefill?.tentId),
-  );
+export function quickLogPrefillNamesPlant(prefill?: QuickLogPrefillTargetRequest | null): boolean {
+  return normalizeId(prefill?.plantId) !== null;
 }
 
 /**

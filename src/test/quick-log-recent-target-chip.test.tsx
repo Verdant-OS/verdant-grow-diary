@@ -326,12 +326,44 @@ describe("QuickLog — remembered target is an offer, never a default", () => {
     );
   });
 
-  it("is withheld when the prefill names a grow or a tent but no plant", () => {
-    // Not a named plant, but not unscoped either — the grower already said
-    // where they are. Offering a plant here would widen their context for them.
+  it("is offered in a scoped open whose revalidated scope matches", () => {
+    // `GrowRecoveryPrompt` dispatches `{ growId }` from Dashboard and Grow
+    // Detail: a scope with an empty plant Select behind it. The approved S6
+    // target names this chip as what reduces that dialog to one explicit tap,
+    // so withholding it here was the gap, not the safety property. Matching is
+    // decided against the suggestion's LIVE grow/tent, never the stored ones.
     for (const prefill of [{ growId: "g1" }, { tentId: "t1" }]) {
       cleanup();
-      seed("verdant.quickLog.lastTarget.v2.u1", "p2", 60_000);
+      seed(USER_STORAGE_KEY, "p2", 60_000);
+      renderQL(<QuickLog open onOpenChange={() => {}} prefill={prefill} />);
+      // Offered, and still only an offer: nothing is preselected.
+      expect(screen.getByTestId("quick-log-recent-target-suggestion")).toHaveTextContent(
+        "Continue with OG Kush?",
+      );
+      expect(screen.getByTestId("quick-log-plant-select")).not.toHaveTextContent("OG Kush");
+    }
+  });
+
+  it("applies the scoped offer only on an explicit click", () => {
+    seed(USER_STORAGE_KEY, "p2", 60_000);
+    renderQL(<QuickLog open onOpenChange={() => {}} prefill={{ growId: "g1" }} />);
+
+    expect(screen.getByTestId("quick-log-plant-select")).not.toHaveTextContent("OG Kush");
+    fireEvent.click(screen.getByTestId("quick-log-recent-target-accept"));
+
+    expect(screen.getByTestId("quick-log-plant-select")).toHaveTextContent("OG Kush");
+    expect(screen.queryByTestId("quick-log-recent-target-suggestion")).not.toBeInTheDocument();
+    // Accepting selects a target. It never saves.
+    expect(rpcMock).not.toHaveBeenCalled();
+  });
+
+  it("is withheld when the scoped open names a different grow or tent", () => {
+    // The positive control is the matching case above: same seed, same plant,
+    // same freshness — only the requested scope differs, so "nothing rendered"
+    // here cannot pass as correct withholding.
+    for (const prefill of [{ growId: "g2" }, { tentId: "t2" }, { growId: "g1", tentId: "t2" }]) {
+      cleanup();
+      seed(USER_STORAGE_KEY, "p2", 60_000);
       renderQL(<QuickLog open onOpenChange={() => {}} prefill={prefill} />);
       expect(screen.getByTestId("quick-log-plant-select")).toBeInTheDocument();
       expect(screen.queryByTestId("quick-log-recent-target-suggestion")).not.toBeInTheDocument();

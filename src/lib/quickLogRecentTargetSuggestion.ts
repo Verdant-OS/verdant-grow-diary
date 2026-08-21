@@ -42,6 +42,13 @@
  * accounts can never surface another grower's plant. Grow and tent scope are
  * re-derived from the live row rather than trusted from storage.
  *
+ * Validity and OFFERABILITY are separate questions. `resolveRecentTargetSuggestion`
+ * answers the first — is this target still real and still savable? — with no view
+ * of how Quick Log was opened. `recentTargetSuggestionFitsPrefillScope` answers the
+ * second, against the launcher's own scope. Keeping them apart is what lets a
+ * grow-scoped open reuse the identical validity contract instead of a relaxed copy
+ * of it.
+ *
  * Pure: no storage access, no clock, no I/O.
  */
 
@@ -196,4 +203,59 @@ export function resolveRecentTargetSuggestion(
     growId,
     tentId,
   };
+}
+
+/**
+ * The scope a launcher asked for. `QuickLogPrefillTargetRequest` in
+ * `quickLogTargetIntegrityRules` is structurally identical; this module states
+ * its own shape so the pure rules stay independent of the editor's target types.
+ */
+export interface RecentTargetPrefillScope {
+  plantId?: string | null;
+  growId?: string | null;
+  tentId?: string | null;
+}
+
+/**
+ * Decide whether an already-valid suggestion may be OFFERED for this open.
+ *
+ * A prefill that names a PLANT is the target. Offering a remembered plant
+ * beside it would put two competing answers on screen for a question the
+ * launcher already settled, so those opens never see the chip — the same
+ * behaviour this rule replaced.
+ *
+ * A prefill that names only a GROW or a TENT is different: it fixes a scope and
+ * then leaves the grower an empty plant Select. `GrowRecoveryPrompt` dispatches
+ * exactly that (`{ growId }`), and the approved S6 target for Dashboard and Grow
+ * Detail is "3 taps + exactly one explicit plant choice inside the grow-scoped
+ * dialog", with the D5 chip named as what reduces that choice to one tap.
+ * Withholding the chip there is not a safety property — it is the S6 gap.
+ *
+ * Offering it is safe because the suggestion's `growId` / `tentId` are re-derived
+ * from live rows by `resolveRecentTargetSuggestion`, never read from storage. A
+ * scope match therefore means the remembered plant genuinely lives inside the
+ * scope the grower just chose. Anything else — including a scope this rule cannot
+ * compare — yields no offer, so the grow-scoped dialog degrades to the manual
+ * selection it performs today rather than to a guess.
+ *
+ * An activity-only prefill (`{ eventType: "feeding" }`, sent by AppShell's
+ * context-free Fast Add) names no target at all and is fully unscoped: it
+ * preselects a FORM. Testing the prefill object for truthiness would withhold
+ * the chip on exactly the open that needs it most.
+ */
+export function recentTargetSuggestionFitsPrefillScope(
+  suggestion: RecentTargetSuggestion | null,
+  prefill?: RecentTargetPrefillScope | null,
+): boolean {
+  if (!suggestion) return false;
+  // A named plant is the target; never compete with it.
+  if (trimmed(prefill?.plantId)) return false;
+
+  const requestedGrowId = trimmed(prefill?.growId);
+  if (requestedGrowId && requestedGrowId !== suggestion.growId) return false;
+
+  const requestedTentId = trimmed(prefill?.tentId);
+  if (requestedTentId && requestedTentId !== suggestion.tentId) return false;
+
+  return true;
 }

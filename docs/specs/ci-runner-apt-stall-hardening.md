@@ -252,20 +252,17 @@ Keep `--with-deps` (so no behavior risk), but change how it fails:
        # Never fail silently here. A group still alive after KILL means the
        # signal did not land, and an unreported one is exactly how the runner
        # ends up held by the apt this was built to stop.
-       group_alive && echo "::error::attempt timeout could not kill process \
-   ```
-
-group $pgid — apt may still hold this runner (no passwordless sudo?)"
+       if group_alive; then
+         echo "::error::timeout could not kill group $pgid; apt may still hold this runner"
+       fi
      ) &
      local watchdog=$!
 
      wait "$pgid"; local rc=$?
      wait "$watchdog" 2>/dev/null    # NOT `kill` — see below
      return "$rc"
-
-}
-
-````
+   }
+   ```
 
 **The apt is not ours to signal, and an earlier draft of this snippet did not
 notice.** `playwright install --with-deps` does not run apt itself. Verified
@@ -307,29 +304,29 @@ the group, not the tool — and §6's fault-injection variant is what proves it,
 asserting no `apt` process survives a killed attempt.
 
 2. **apt resilience config** written before the install:
-`Acquire::Retries "3";` and `Acquire::http::Timeout "20";` in
-`/etc/apt/apt.conf.d/`, so apt itself gives up and retries rather than hanging.
+   `Acquire::Retries "3";` and `Acquire::http::Timeout "20";` in
+   `/etc/apt/apt.conf.d/`, so apt itself gives up and retries rather than hanging.
 3. **Bounded retry** — up to 3 attempts, so the ~50%-per-attempt clearance rate
-compounds to roughly 1-in-8 residual failure instead of 1-in-2.
+   compounds to roughly 1-in-8 residual failure instead of 1-in-2.
 4. **One composite action** at `.github/actions/install-playwright-browsers/`, so all
-19 call sites — across both seams (§3.2) — converge and the next fix is a one-file
-change.
+   19 call sites — across both seams (§3.2) — converge and the next fix is a one-file
+   change.
 5. **Honest failure text** — when all attempts fail, say what actually failed. Name an
-apt/mirror fault **only when apt was positively identified** as the failing phase:
-the captured output carries an apt signature (an `archive.ubuntu.com` acquire
-error, an `apt-get`/`dpkg` diagnostic), or the action set an explicit
-still-in-the-apt-phase marker before handing off. **A timeout alone is not
-identification** — an earlier revision of this line accepted one, and that was
-wrong: the browser DOWNLOAD can equally stall past the per-attempt cap, and it
-dies at the same timeout. Inferring apt from the clock reproduces the confident
-misdiagnosis this item exists to prevent, just with extra steps. `playwright install
+   apt/mirror fault **only when apt was positively identified** as the failing phase:
+   the captured output carries an apt signature (an `archive.ubuntu.com` acquire
+   error, an `apt-get`/`dpkg` diagnostic), or the action set an explicit
+   still-in-the-apt-phase marker before handing off. **A timeout alone is not
+   identification** — an earlier revision of this line accepted one, and that was
+   wrong: the browser DOWNLOAD can equally stall past the per-attempt cap, and it
+   dies at the same timeout. Inferring apt from the clock reproduces the confident
+   misdiagnosis this item exists to prevent, just with extra steps. `playwright install
 --with-deps` also fails _after_ the apt phase — a browser download from the
-Playwright CDN, an unknown browser name, no disk space — and stamping those
-"apt/mirror fault, not a test failure" replaces Playwright's own actionable message
-with a wrong one. Otherwise emit a generic browser/dependency-install failure and
-pass Playwright's output through. The point of this line is to stop an hour being
-spent reading a green test suite; a confident wrong diagnosis just spends that hour
-somewhere else.
+   Playwright CDN, an unknown browser name, no disk space — and stamping those
+   "apt/mirror fault, not a test failure" replaces Playwright's own actionable message
+   with a wrong one. Otherwise emit a generic browser/dependency-install failure and
+   pass Playwright's output through. The point of this line is to stop an hour being
+   spent reading a green test suite; a confident wrong diagnosis just spends that hour
+   somewhere else.
 
 Cost: one new composite action plus 19 mechanical call-site edits.
 
@@ -374,16 +371,16 @@ Phase 2 has nothing to bind to. The deliverable therefore commits
 
 ```json
 {
-"runner_image": "<the runner's ImageVersion, e.g. 20260812.1.0>",
-"playwright_version": "<resolved version from the lockfile, not the range>",
-"probed_at": "<UTC>",
-"evidence_run": "<Actions run URL>",
-"probe_results": {
- "chromium": "PASS",
- "webkit": "FAIL"
+  "runner_image": "<the runner's ImageVersion, e.g. 20260812.1.0>",
+  "playwright_version": "<resolved version from the lockfile, not the range>",
+  "probed_at": "<UTC>",
+  "evidence_run": "<Actions run URL>",
+  "probe_results": {
+    "chromium": "PASS",
+    "webkit": "FAIL"
+  }
 }
-}
-````
+```
 
 `probe_results` is keyed **per browser** rather than a single `probe_result`, because
 the measurement is per browser. A flat verdict cannot express the most likely real

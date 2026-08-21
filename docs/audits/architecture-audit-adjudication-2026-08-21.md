@@ -717,14 +717,75 @@ boundaries are untouched, and no `BLOCKED` or `NOT_MEASURED` label was upgraded 
 
 ## 11. Handoff
 
-Per `docs/agents/HANDOFF_PROTOCOL.md`, this slice's owner is **Claude** and it requires a
-**different peer as independent reviewer**.
+Per `docs/agents/HANDOFF_PROTOCOL.md`, in that document's mandatory structure:
 
-**Recommended reviewer: Grok** (Product Intelligence, Adversarial Audit and Implementation
-Lead — peer, no rank). The adversarial questions worth putting to this document:
+```text
+HANDOFF
+from_agent: Claude
+to_agent: Cheek
+sentinel_version: 2026-09-01.2
+date: 2026-08-21
 
-1. Re-run the four live probes in §6.2 from a different network. Is HTTP 200 with no
-   `Location` reproducible, or was one observation a cache artifact?
+slice_owner: Claude
+independent_reviewer: Codex — performed, not merely nominated. Codex reviewed successive
+  heads of PR #1087 and its findings drove four outright withdrawals, one reversed
+  conclusion, one partly-refuted claim, and one CI failure this document itself caused.
+  Every review thread is replied to and resolved. Grok is NOT the reviewer of record; an
+  earlier revision of this section recommended Grok, which contradicted the PR.
+
+completed:
+  - 21 stack determinations re-derived from source at 28c01a017; 21 held
+  - ARCH-00 collision inventory discharged (§3)
+  - vercel.json measured: redirects, rewrites and headers all measured, not inferred (§6.2)
+  - release-provenance gap bounded to build-workspace drift at stamp time (§6.1)
+  - lockfile transition dated: gate first fails 2026-08-26 UTC (§6.4)
+
+verified_by:
+  - repository counts: measured at commit 28c01a017 on branch verdant-grow-diary
+  - redirects: all 8 declared entries plus a positive control, curl --max-redirs 0,
+    commands recorded in §6.2
+  - rewrites: response-content comparison across 4 paths (§6.2)
+  - headers: response-header capture on /, /welcome, /pricing (§6.2)
+  - provenance: commit 4b1c4867e685 fetched by SHA, tree recomputed with
+    scripts/lib/tree-hash.mjs -> 1f0eb7b4e6cd vs stamped 8773f6b2c0ed
+  - gates: check-sentinel-version-parity, assert-docs-safety, prettier, check:lockfile
+
+not_done:
+  - ARCH-01 not executed: #1051 owned that ground and has since merged as 5c60bcd9
+  - no code, schema, migration, config or workflow change; documentation only
+  - §7.1 ADR not written — it needs an owner decision first
+
+unknowns:
+  - where the 3 delivered security headers originate (NOT_MEASURED; needs edge/origin config)
+  - whether the preview Vercel project verdant-command-center-preview is still live
+  - whether NON_CANONICAL_SOURCE_ALIASES is enforced at every ingest call site, or only
+    declared — this document verified the constant, not its call sites
+  - whether client rendering fills /features and /terms-of-service after hydration
+
+blocked:
+  - why the build workspace's hashed roots differed from the stamped commit's tree.
+    Owner: whoever holds the publisher's build log. Unblocked by that log. Lead recorded:
+    x-deployment-id ecbb2146eba6 on live responses
+  - GA4 / GSC authenticated baselines — unchanged, blockers 2 and 3 in CURRENT_STATE
+
+assumptions:
+  - projectSettings is labelled `inference`, not measured: nothing probed from outside the
+    host can observe it. If a host does honour it, §6.2's scope narrows accordingly
+  - repository counts assume 28c01a017 is the tree the reader is reasoning about; they do
+    not describe production, which is a separate question (§6.1)
+
+next_slice:
+  - Owner: Cheek. Decide whether to commission the §7.1 ADR appended to the merged
+    docs/codebase-map.md. ARCH-01/ARCH-02 are unblocked; everything else here is bounded.
+```
+
+### Adversarial questions worth putting to this document
+
+1. Re-run **all eight** declared redirect probes in §6.2 from a different network, plus the
+   positive control. An earlier revision of this list said "four", which was stale after §6.2
+   widened the matrix — following it would have validated half the declared routes while the
+   document concluded about all eight. Is HTTP 200 with no `Location` reproducible on every
+   entry, or was any single observation a cache artifact?
 2. **Reproduce the own-commit hash comparison**, which is the surviving finding: fetch
    `4b1c4867e685` by SHA, recompute its tree with `scripts/lib/tree-hash.mjs`, and confirm it
    yields `1f0eb7b4e6cd…` against the live stamp's `8773f6b2c0ed…`. **Do not re-run the

@@ -1,6 +1,35 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-21 UTC
+**Last updated:** 2026-08-21 UTC (~15:23 UTC / 10:23 AM CT)
+**Updated by:** Grok (2026-08-21: **docs-only correction** — #1077 pinned
+production at `1400a7e77eff` and leftover Action Queue prose still said
+`20260813030000` was unapplied; both are now false on a fresh point-in-time
+re-measure. Host `/version.json` re-fetched just now serves
+`39935889fe02` (#1080), **not** #1077 (`999b6da`) and **not** #1083
+(`1400a7e`). Identity vs provenance recorded separately: identity
+`39935889fe022efd441dc5ab86bfbf636d284739`; provenance remains
+`dirty: true` / `ref: "__orphan__"` / `commitSource: "git"` — **not** upgraded
+to provenance `PASS`. Cause of dirty/orphan `NOT_MEASURED`. Do **not**
+compare `treeHash` to `git rev-parse ^{tree}` (different hash functions;
+#1077 already corrected that false corroboration).
+
+Production signup objects re-checked the same window via Lovable
+`query_database` on project `66255e7b-892c-4be5-8686-ab1cfc3666db`
+(production, not sandbox): table + helpers + failure-safe `handle_new_user`
+(`md5 34405b3ee446340a55ad4f25e2193c9a`, `RAISE LOG` guard present from
+`20260821150000_signup_acquisition_failure_safe_attribution.sql` via Lovable
+SQL — **not** via the GitHub apply-signup workflow, which still shows only
+the failed PREFLIGHT) + readiness RPC. Ledger **name-rows** for
+`20260813030000` and `20260821150000` are present (founder backfill marker
+`ledger-only;objects-already-applied;no-rerun`, `created_by`
+`founder-ledger-backfill`); `20260821064300` is still **not** in the ledger.
+**Hard stop:** do **not** GitHub-APPLY
+`20260813030000_signup_acquisition_forward_repair.sql` — that file would
+re-issue an unguarded `handle_new_user` and overwrite the live `RAISE LOG`
+guard. Touches this file only. Does **not** re-measure GA4/GSC, Day 0,
+parked #828/#817/#696, or invent metrics.)
+
+**Prior update:** 2026-08-21 UTC (post-publish Production status rows, #1077)
 **Updated by:** Claude (2026-08-21: applies the measured post-publish production
 rows. The 2026-08-20 sitemap adjudication PUBLISHED, so five Production status
 rows plus the branch-topology row were stale in the direction that matters —
@@ -11,22 +40,21 @@ five advertised and self-canonical, `/breeder-beta` correctly absent while
 cross-canonicalising to `/creator-beta` and staying `index, follow`, verified
 live rather than inferred from the merge. Closes blocker 8's sibling item.
 
-**Read the Production commit row before quoting it.** Production republished
-mid-session and now serves `1400a7e77eff` with **`dirty: true`** and provenance
-**`NO_MATCH`** — the served tree hash reproduces from no scanned commit,
-including the stamped commit itself. Commit _identity_ is `PASS`; commit
-_provenance_ is not. The earlier same-day stamp `92a983b4832e` (#1061) measured `dirty: false`
-and MATCH, so this is a new condition as of the 12:11Z publish, not a standing
-one. It is recorded rather than smoothed over, and it is **not** claimed to be
-diagnosed — cause `NOT_MEASURED`.
+**Read the Production commit row before quoting it.** At that 12:57 UTC
+reading production served `1400a7e77eff` with **`dirty: true`** and provenance
+**`NO_MATCH`**. **Superseded same day ~15:23 UTC** — host now serves
+`39935889fe02` (#1080); see the Latest updated block and the Production
+status table. Commit _identity_ remains separable from _provenance_; do not
+smooth provenance into a `PASS`. Cause of dirty/orphan stays `NOT_MEASURED`.
 
 These rows were specified in §8 of `docs/specs/current-state-refresh-2026-08-20.md`
 (#1067) and routed to PR #1060, which owned this file; #1060 merged without
 folding them in, and the collision that blocked a direct edit ended with it. The
-values here are a FRESH measurement, not a replay of §8 — production moved
-`6cf3ffda0686` → `92a983b4832e` → `1400a7e77eff` across this single session,
-which is the whole argument for re-measuring before writing, and the reason
-every row here carries its own timestamp.
+values here were a FRESH measurement at write time, not a replay of §8 —
+production moved `6cf3ffda0686` → `92a983b4832e` → `1400a7e77eff` across that
+session, then later to `39935889fe02`, which is the whole argument for
+re-measuring before writing, and the reason every row here carries its own
+timestamp.
 
 This edit changes no schema, migration, or governance file — it touches this file
 only. The merge commit carrying it does inherit the deploy branch's own changes
@@ -37,8 +65,7 @@ migration state, and does **not** set Day 0.
 Ordering note: this edit and the signup-attribution resolution directly below
 are independent same-day changes touching different sections of this file. The
 order here reflects when each edit landed in this document, not when each
-measurement was taken — the production rows above were read over live HTTPS
-before the signup forward repair was applied. Neither supersedes the other.)
+measurement was taken.)
 
 **Prior update:** 2026-08-21 UTC (signup-attribution resolution, #1080)
 **Updated by:** Claude (2026-08-21: **the signup-attribution forward repair is
@@ -279,13 +306,47 @@ deliberately left for a normal migration-apply pass rather than a second
 ad-hoc production SQL session, in keeping with "fix things ... rather than
 widening scope."
 
-**No `supabase_migrations.schema_migrations` ledger row was inserted for
-either signup version.** Consistent with this repo's own established framing
-for this exact class of write — the runbook's own "Safe disposition" section
-calls a ledger write "a founder decision" — no agent session touched the
-ledger. Object presence remains the ground truth here, exactly as for the
-Action Queue repairs, and the drift probe remains blocked for the same two
-reasons already recorded in the next section.
+**Ledger name-rows (supersedes the same-day "no ledger row" claim above).**
+At apply time #1080 recorded that no agent session wrote
+`supabase_migrations.schema_migrations` for either signup version. A later
+same-day **founder ledger backfill** (2026-08-21, marker
+`ledger-only;objects-already-applied;no-rerun`, `created_by`
+`founder-ledger-backfill`) inserted name-rows without re-running the files:
+`20260813030000` / `signup_acquisition_forward_repair` and
+`20260821150000` / `signup_acquisition_failure_safe_attribution`, plus seven
+legacy name-rows (`20260515204616`, `20260515204637`, `20260515211702`,
+`20260714231627`, `20260715002000`, `20260716215516`, `20260721107000`).
+`20260721194325` was already present. **`20260821064300` is still not in the
+ledger** — leave it unrecorded; ACLs on the objects it names already match
+except the new readiness RPC (see next paragraph). Object presence remains
+ground truth; the drift probe remains blocked for the two reasons already
+recorded in the next section.
+
+### 2026-08-21 ~15:23 UTC — failure-safe guard live; HARD STOP on GitHub APPLY
+
+`practical observation` / point-in-time, measured 2026-08-21 ~15:23 UTC by
+Grok via Lovable `query_database` on production project
+`66255e7b-892c-4be5-8686-ab1cfc3666db` (not the sandbox):
+
+- `public.signup_acquisition_attributions` exists
+- three helper functions exist
+- `handle_new_user` md5 `34405b3ee446340a55ad4f25e2193c9a` with **`RAISE LOG`
+  guard text present** — applied from existing file
+  `20260821150000_signup_acquisition_failure_safe_attribution.sql` via
+  Lovable SQL; **not** via the GitHub apply-signup workflow
+- `signup_acquisition_readiness_operator_snapshot` exists
+- `handle_new_user` EXECUTE denied to `anon` / `authenticated`
+- table has no `service_role` ACL; the original four functions have no
+  `service_role`. Readiness RPC **does** have `service_role=X` (default
+  privileges leftover)
+- **Do not call the 42P01 table-missing outage still OPEN** — it is CLOSED
+
+**Hard stop — do not GitHub-APPLY `20260813030000`.** That migration body
+would re-issue an **unguarded** `handle_new_user` and overwrite the live
+`RAISE LOG` guard. The GitHub apply-signup workflow still shows only the
+failed PREFLIGHT; objects are already live through Lovable. Treating
+"ledger name-row present" or leftover "still unapplied" prose as license to
+APPLY that file is a production incident.
 
 **What this does not change.** GA4/GSC baselines, Day 0, and the four-week
 measurement clock are untouched. No schema beyond the table and functions
@@ -306,7 +367,10 @@ repository-side facts below were verified directly.
 and edge functions only. Migrations reach production solely through the
 operator's own apply path. This corrects an assumption stated repeatedly in
 `docs/specs/postgres-restricted-role-alternative.md` (now fixed in its §5.4.1)
-and it explains why the signup-attribution fix above is "merged, NOT applied".
+and it explains why the signup-attribution fix above was once "merged, NOT
+applied" (historical as of 2026-08-15; the signup repair was applied
+2026-08-21 — see the RESOLVED section. The publishing-vs-migration lesson
+still stands).
 
 **At least one further migration is unapplied, and it is not the signup one.**
 `supabase/migrations/20260811090000_quicklog_corrections_retractions.sql` is
@@ -749,8 +813,13 @@ construction and unused — its `SUPABASE_DB_URL` secret gap is still open. No
 `supabase_migrations.schema_migrations` ledger row was inserted for either
 version, so the ledger still under-reports what is live; object presence remains
 the ground truth here, and the drift probe remains blocked (see the defects
-above). The signup-attribution forward repair `20260813030000` is **still
-unapplied** — this session did not touch it.
+above). **Superseded 2026-08-21:** the signup-attribution forward repair
+`20260813030000` is **APPLIED** (see the RESOLVED signup section). This Action
+Queue session did not touch it; a later same-day Lovable apply closed the
+42P01 outage. **Hard stop:** do **not** GitHub-APPLY
+`20260813030000_signup_acquisition_forward_repair.sql` — that file would
+re-issue an unguarded `handle_new_user` and overwrite the live `RAISE LOG`
+guard from `20260821150000_signup_acquisition_failure_safe_attribution.sql`.
 
 ---
 
@@ -758,7 +827,7 @@ unapplied** — this session did not touch it.
 
 | Branch               | Role                                             | Verified head                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | -------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `verdant-grow-diary` | **Deploy branch. Production ships from here.**   | `39935889f` (#1080), verified 2026-08-21T12:57 UTC with `git fetch origin verdant-grow-diary && git rev-parse origin/verdant-grow-diary`. Supersedes `ac973ed9f` (#1074) and `9b6445653` (#1042). **Live production WAS re-fetched at this verification** and serves `1400a7e77eff`, confirmed an ancestor of this tip (`git merge-base --is-ancestor`) — publish lags git by **2** first-parent commits. That lag figure is the most perishable number in this file: it read "four" on 2026-08-20, **17** earlier on 2026-08-21, and **2** now, because both the branch and the publish moved during a single session. Re-measure it; never carry it forward. The 2026-08-18 note that a `/version.json` fetch from an agent session is `BLOCKED` (network policy 403) was session-specific and does not hold generally — see `docs/agent-session-network-reachability.md`. Merging is not a publish. PR numbers on this branch do not order by merge time — order commits with `git log`, never by PR number. Do not carry older validation tables forward. Older buffers showing `9b6445653` (#1042), `87ae05e5b` (#1026), `3f2bfe2db` (#1021) or `1c094a2a3` (#970) are earlier snapshots; discard them |
+| `verdant-grow-diary` | **Deploy branch. Production ships from here.**   | `999b6da93` (#1077), verified 2026-08-21 ~15:23 UTC with `git fetch origin verdant-grow-diary && git rev-parse origin/verdant-grow-diary`. Supersedes `39935889f` (#1080) as tip and earlier buffers (`ac973ed9f` / #1074, `9b6445653` / #1042). **Live production WAS re-fetched at this verification** and serves `39935889fe02` (#1080), confirmed an ancestor of this tip (`git merge-base --is-ancestor`) — publish lags git by **1** first-parent commit (the #1077 docs-only CURRENT_STATE refresh). That lag figure is perishable: it read "four" on 2026-08-20, **17** / **2** earlier on 2026-08-21 under #1077's 12:57 UTC pin of live `1400a7e77eff`, and **1** now with live on `39935889fe02`. Re-measure it; never carry it forward. The 2026-08-18 note that a `/version.json` fetch from an agent session is `BLOCKED` (network policy 403) was session-specific and does not hold generally — see `docs/agent-session-network-reachability.md`. Merging is not a publish. PR numbers on this branch do not order by merge time — order commits with `git log`, never by PR number. Do not carry older validation tables forward. Older buffers showing live `1400a7e77eff`, tip `39935889f`, `9b6445653` (#1042), `87ae05e5b` (#1026), `3f2bfe2db` (#1021) or `1c094a2a3` (#970) are earlier snapshots; discard them |
 | `main`               | Integration branch. It is not production parity. | `b6d747941948ce68157185a2b0847acea6970d44` (#779), verified 2026-08-07                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 
 `main` and `verdant-grow-diary` are divergent. Do not infer production behavior from
@@ -821,18 +890,18 @@ not land a hybrid patch on any of them solely to clear `DIRTY`.
 
 ## Production status
 
-Analytics axes verified directly on 2026-08-02. Release identity, build time,
-sitemap, and the six previously-unsitemapped indexable routes were re-measured
-**2026-08-21** over live HTTPS from a Claude Code remote session, after the
-publish that carried the sitemap adjudication. Public root and robots.txt keep
-their 2026-08-20 dates; GA4 lighting / singleton rows keep their 2026-08-02 dates
-— none was re-opened this turn. Each row carries its own verification date:
+Analytics axes verified directly on 2026-08-02. Release identity and build time
+were re-measured **2026-08-21 ~15:23 UTC** over live HTTPS (Grok). Sitemap and
+the six previously-unsitemapped indexable routes keep their 2026-08-21T12:57 UTC
+(#1077) readings — not re-opened this turn. Public root and robots.txt keep
+their 2026-08-20 dates; GA4 lighting / singleton rows keep their 2026-08-02 dates.
+Each row carries its own verification date:
 
 | Axis                                        | Status                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `https://verdantgrowdiary.com/version.json` | `PASS` — HTTP 200 (re-verified 2026-08-21 through the agent proxy). The 2026-08-18 `BLOCKED` (network policy 403) was a property of that session, not of this endpoint — re-test rather than carrying it forward                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| Production commit                           | Identity `PASS`, provenance **`NO_MATCH`** — re-measured 2026-08-21T12:57 UTC. Production serves real SHA `1400a7e77eff` (`commitSource: "git"`), but the stamp is **`dirty: true`** with `ref: "__orphan__"` and `tag: null`, and `scripts/resolve-release-provenance.mjs --hash=b797bd1c7482… --ref=1400a7e77eff --scan=8` returned **NO_MATCH**: no scanned commit reproduces the served `treeHash`, and the stamped commit `1400a7e77eff` is itself the first commit in that window, so the recomputation did cover it. Read this as an editor-modified or pipeline-mutated snapshot, per the resolver's own guidance; it is **not** a clean, recomputable release. **The resolver's own canary was already satisfied earlier the same day** — `92a983b4832e` resolved MATCH against its own commit — so this is specific to the 12:11Z build, not a systemic hash-roots or pipeline-mutation problem. Note for whoever checks this next: `treeHash` is Verdant's SHA-256 over the allowlisted `TREE_HASH_ROOTS` manifest (`scripts/lib/tree-hash.mjs`), **not** a Git tree object ID. Do not "confirm" a mismatch by diffing it against `git rev-parse <commit>^{tree}` — those are different hash functions over different inputs and never match, on healthy builds included. Recomputation via the resolver is the only valid check. Do **not** record this as a provenance `PASS`. Supersedes the earlier same-day stamp `92a983b4832e` (#1061), which measured `dirty: false` and MATCH by recomputation — so the dirty/NO_MATCH state is **new as of the 12:11Z publish**, not a standing condition. Publish lags git — see the branch topology row. Single observations remain point-in-time |
-| Production build time                       | `2026-08-21T12:11:38.661Z` (from the same `/version.json`; the served commit was authored `2026-08-21T07:10:07-05:00`). Prior live stamps `2026-08-21T00:59:52.370Z` (the `92a983b4832e` publish), `2026-08-21T00:27:10.316Z` and `2026-08-20T18:49:50.600Z` are historical. Production republished **three times** inside 2026-08-21 — treat any single reading here as perishable                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `https://verdantgrowdiary.com/version.json` | `PASS` — HTTP 200 (re-verified 2026-08-21 ~15:23 UTC). The 2026-08-18 `BLOCKED` (network policy 403) was a property of that session, not of this endpoint — re-test rather than carrying it forward                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| Production commit                           | Identity `PASS`, provenance **not** `PASS` — re-measured 2026-08-21 ~15:23 UTC. Production serves real SHA `39935889fe022efd441dc5ab86bfbf636d284739` / short `39935889fe02` (#1080 merge), with `commitSource: "git"`, `treeHash: 1fe0606c134a0b8aa3887d17b966ef0b95e9876d72ee987ad8a601b42d1ef346`, **`dirty: true`**, `ref: "__orphan__"`, `ciRunId: null`, `version: "0.0.0+20260821.39935889fe02-dirty"`. Record identity and provenance separately: identity is the #1080 SHA; provenance flags stay as measured — do **not** upgrade provenance to `PASS`. Cause of dirty/orphan remains `NOT_MEASURED`. Note for whoever checks this next: `treeHash` is Verdant's SHA-256 over the allowlisted `TREE_HASH_ROOTS` manifest (`scripts/lib/tree-hash.mjs`), **not** a Git tree object ID. Do not "confirm" a mismatch by diffing it against `git rev-parse <commit>^{tree}` — those are different hash functions over different inputs and never match, on healthy builds included (#1077 already removed that false corroboration). Supersedes the earlier same-day #1077 pin `1400a7e77eff` (#1083) and the still-earlier `92a983b4832e` (#1061). Publish lags git — see the branch topology row. Single observations remain point-in-time |
+| Production build time                       | `2026-08-21T12:53:03.024Z` (from the same ~15:23 UTC `/version.json`; the served commit was authored `2026-08-21T07:51:31-05:00`). Prior live stamps `2026-08-21T12:11:38.661Z` (`1400a7e77eff`), `2026-08-21T00:59:52.370Z` (`92a983b4832e`), `2026-08-21T00:27:10.316Z` and `2026-08-20T18:49:50.600Z` are historical. Production republished multiple times inside 2026-08-21 — treat any single reading here as perishable                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | Public sitemap                              | `PASS` — HTTP 200, **61** `<loc>` entries live (re-count 2026-08-21). **Live and in-repo now agree**: the 2026-08-20 adjudication published, moving live from 56 → 61. The earlier note that a 56 reading was "expected, not a regression" is spent — from 2026-08-21 a 56 reading would be a real regression                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | Public root route `/`                       | `PASS` — re-measured 2026-08-20. HTTP 200; `<h1>` “See what changed. Decide what to do next.”; `<link rel="canonical" href="https://verdantgrowdiary.com/"/>`; `<meta name="robots" content="index, follow">`; one JSON-LD block; no loading skeleton. Visible body words measured **845–1034** depending on tokenization — the 2026-08-15 figure of 1141 recorded no method, so the two are **not comparable and this is not evidence of content loss**. `www.` host `302`s to the apex. Slice 2 (`/welcome` → `/` consolidation) remains unapproved — see blocker 7                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | Indexable routes outside the sitemap        | `PASS` — **resolved live**, re-measured 2026-08-21. Was `FAIL` while the fix sat unpublished. Five of the six are now advertised in the live `sitemap.xml` (`/glossary`, `/docs/mcp-api`, `/pheno-expression-showcase`, `/pheno-comparison`, `/creator-beta`), each self-canonical. `/breeder-beta` is correctly absent **by design**: it serves `<link rel="canonical" href="https://verdantgrowdiary.com/creator-beta">` and stays `index, follow`, so advertising it would push a URL that disclaims itself. Verified live, not inferred from the merge — the cross-canonical survived hydration, which was the silent failure mode. Closes blocker 8’s sibling item                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
@@ -906,9 +975,11 @@ separately scoped follow-up (see blocker 5 below).
 without dual write paths, dead next-step CTAs, or fabricated proof.
 Grok delivered the repo slices (handoff ids, PlantQuickLog →
 `quicklog_save_manual`, smoke-audit alignment). This does **not** pause
-the Convex or Postgres spikes below. Owner-only gates remain `BLOCKED`:
-Lovable-apply of `20260813030000_signup_acquisition_forward_repair.sql`,
-and a managed `e2e:one-tent:ui` session. Slice 5 recorded the honest
+the Convex or Postgres spikes below. Owner-only gate remaining `BLOCKED`: a
+managed `e2e:one-tent:ui` session. The Lovable-apply of
+`20260813030000_signup_acquisition_forward_repair.sql` is **done** (RESOLVED
+2026-08-21); **do not** GitHub-APPLY that file — it would clobber the live
+`RAISE LOG` guard from `20260821150000`. Slice 5 recorded the honest
 `missing_session_json` receipt rather than fabricating a walk. Colliding
 PRs **#828**, **#817**, and **#696** all closed unmerged on 2026-08-15 within a
 54-minute window (verified 2026-08-21 by direct PR read). The fence they carried

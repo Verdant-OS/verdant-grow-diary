@@ -99,6 +99,31 @@ function markUnresolved(
   chunk.done = true;
 }
 
+function markExhausted(
+  chunk: ChunkScanState,
+  byTent: Record<string, TentManualSnapshotResolution>,
+  newestNonAirCardByTent: Readonly<Record<string, ManualSnapshotTimelineCard>>,
+): void {
+  for (const tentId of unresolvedTentIds(chunk, byTent)) {
+    const newestNonAirCard = newestNonAirCardByTent[tentId];
+    byTent[tentId] = newestNonAirCard
+      ? { kind: "found", card: newestNonAirCard }
+      : { kind: "empty" };
+  }
+  chunk.done = true;
+}
+
+function hasCompatibleDirectAirReading(card: ManualSnapshotTimelineCard): boolean {
+  return card.readings.some(
+    (reading) =>
+      reading.derived === false &&
+      Number.isFinite(reading.value) &&
+      (reading.field === "air_temp_c" ||
+        reading.field === "humidity_pct" ||
+        reading.field === "vpd_kpa"),
+  );
+}
+
 function nextActiveChunk(chunks: readonly ChunkScanState[], startIndex: number): number | null {
   for (let offset = 0; offset < chunks.length; offset += 1) {
     const index = (startIndex + offset) % chunks.length;
@@ -141,6 +166,9 @@ export async function scanLatestTentManualSnapshots(
   );
   const chunks = chunkTentIds(normalizedTentIds, chunkSize);
   const byTent: Record<string, TentManualSnapshotResolution> = {};
+  // Preserve the newest adapter-valid non-air card only as an exhaustion
+  // fallback. Cap or boundary ambiguity must still resolve unavailable.
+  const newestNonAirCardByTent: Record<string, ManualSnapshotTimelineCard> = {};
   let pageRequests = 0;
   let roundRobinIndex = 0;
 
@@ -184,10 +212,12 @@ export async function scanLatestTentManualSnapshots(
       if (byTent[candidate.tent_id]?.kind === "found") continue;
       const record = diaryRowToManualSnapshotRecord(candidate);
       if (!record || record.tentId !== candidate.tent_id) continue;
-      byTent[candidate.tent_id] = {
-        kind: "found",
-        card: buildManualSnapshotTimelineCard(record),
-      };
+      const card = buildManualSnapshotTimelineCard(record);
+      if (hasCompatibleDirectAirReading(card)) {
+        byTent[candidate.tent_id] = { kind: "found", card };
+      } else if (!newestNonAirCardByTent[candidate.tent_id]) {
+        newestNonAirCardByTent[candidate.tent_id] = card;
+      }
     }
 
     if (unresolvedTentIds(chunk, byTent).length === 0) {
@@ -196,7 +226,7 @@ export async function scanLatestTentManualSnapshots(
     }
 
     if (rows.length < pageSize) {
-      markUnresolved(chunk, byTent, { kind: "empty" });
+      markExhausted(chunk, byTent, newestNonAirCardByTent);
       continue;
     }
 

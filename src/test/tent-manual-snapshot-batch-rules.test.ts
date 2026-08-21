@@ -107,7 +107,7 @@ describe("tent manual snapshot batch rules", () => {
     expect(result.byTent[tentId]).toMatchObject({ kind: "found", card: { id: valid.id } });
   });
 
-  it("resolves each tent from its first adapter-valid candidate and ignores duplicate row ids", async () => {
+  it("resolves each tent from its first compatible air candidate and ignores duplicate row ids", async () => {
     const tentA = uuid(1);
     const tentB = uuid(2);
     const newestA = row(uuid(10), tentA, "2026-08-20T12:00:00.000Z");
@@ -124,6 +124,103 @@ describe("tent manual snapshot batch rules", () => {
     expect(result.byTent[tentA]).toMatchObject({ kind: "found", card: { id: newestA.id } });
     expect(result.byTent[tentB]).toMatchObject({ kind: "found", card: { id: newestB.id } });
     expect(result.pageRequests).toBe(1);
+  });
+
+  it("skips a newer non-air card and selects the newest compatible air card without mixing evidence", async () => {
+    const tentId = uuid(1);
+    const newestNonAir = row(uuid(20), tentId, "2026-08-20T12:00:00.000Z", {
+      source: "manual",
+      ph: 6.1,
+      ec: 1.2,
+    });
+    const olderAir = row(uuid(21), tentId, "2026-08-20T11:00:00.000Z", {
+      source: "manual",
+      temp_f: 72,
+      humidity_percent: 55,
+    });
+
+    const result = await scanLatestTentManualSnapshots([tentId], async () => [
+      newestNonAir,
+      olderAir,
+    ]);
+
+    expect(result.byTent[tentId]).toMatchObject({
+      kind: "found",
+      card: {
+        id: olderAir.id,
+        capturedAt: olderAir.entry_at,
+        source: "manual",
+        severity: "ok",
+      },
+    });
+    const resolution = result.byTent[tentId];
+    if (resolution.kind !== "found") throw new Error("Expected compatible air card");
+    expect(resolution.card.readings.map((reading) => reading.field)).not.toContain("reservoir_ph");
+    expect(resolution.card.readings.map((reading) => reading.field)).not.toContain(
+      "reservoir_ec_mscm",
+    );
+  });
+
+  it("preserves the newest non-air card as explicit unusable evidence only after exhaustion", async () => {
+    const tentId = uuid(1);
+    const newestNonAir = row(uuid(30), tentId, "2026-08-20T12:00:00.000Z", {
+      source: "manual",
+      ph: 6.1,
+    });
+    const olderNonAir = row(uuid(31), tentId, "2026-08-20T11:00:00.000Z", {
+      source: "manual",
+      ec: 1.2,
+    });
+
+    const result = await scanLatestTentManualSnapshots([tentId], async () => [
+      newestNonAir,
+      olderNonAir,
+    ]);
+
+    expect(result.byTent[tentId]).toMatchObject({
+      kind: "found",
+      card: { id: newestNonAir.id, capturedAt: newestNonAir.entry_at, source: "manual" },
+    });
+  });
+
+  it("does not promote retained non-air evidence when the page cap prevents exhaustion", async () => {
+    const tentId = uuid(1);
+    const newestNonAir = row(uuid(40), tentId, "2026-08-20T12:00:00.000Z", {
+      source: "manual",
+      ph: 6.1,
+    });
+    const boundary = invalidRow(40, tentId);
+
+    const result = await scanLatestTentManualSnapshots(
+      [tentId],
+      async () => [newestNonAir, boundary],
+      { pageSize: 2, maxPageRequests: 1 },
+    );
+
+    expect(result.byTent[tentId]).toEqual({ kind: "unavailable", reason: "cap_exhausted" });
+  });
+
+  it("does not promote retained non-air evidence across an ambiguous page boundary", async () => {
+    const tentId = uuid(1);
+    const newestNonAir = row(uuid(50), tentId, "2026-08-20T12:00:00.000Z", {
+      source: "manual",
+      ph: 6.1,
+    });
+    const boundary = invalidRow(50, tentId);
+
+    const result = await scanLatestTentManualSnapshots(
+      [tentId],
+      async (request) =>
+        request.pageIndex === 0
+          ? [newestNonAir, boundary]
+          : [invalidRow(999, tentId), row(uuid(51), tentId, "2026-08-20T11:00:00.000Z")],
+      { pageSize: 2, maxPageRequests: 2 },
+    );
+
+    expect(result.byTent[tentId]).toEqual({
+      kind: "unavailable",
+      reason: "concurrency_ambiguous",
+    });
   });
 
   it("round-robins chunks so a noisy first chunk cannot starve a later tent at the global budget", async () => {

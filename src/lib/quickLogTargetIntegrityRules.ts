@@ -126,6 +126,23 @@ export function quickLogPrefillTargetKey(
 }
 
 /**
+ * True when a prefill names a target of any kind — plant, grow, or tent.
+ *
+ * An activity-only prefill such as `{ eventType: "feeding" }` names none of
+ * them: it preselects a FORM, not a target, so the open is still unscoped and
+ * the grower still has to say where the entry belongs. Callers that need "is
+ * this a genuinely unscoped open?" must ask this rather than testing the
+ * prefill object for truthiness, which answers a different question.
+ */
+export function quickLogPrefillNamesAnyTarget(
+  prefill?: QuickLogPrefillTargetRequest | null,
+): boolean {
+  return Boolean(
+    normalizeId(prefill?.plantId) || normalizeId(prefill?.growId) || normalizeId(prefill?.tentId),
+  );
+}
+
+/**
  * Keep a named route/event target authoritative until it resolves exactly or
  * the grower explicitly chooses another target. This gate sits in front of
  * both presenter readiness and persistence so a stale, remembered, or

@@ -29,6 +29,7 @@ import { cn } from "@/lib/utils";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
+import { rememberRecentQuickLogTarget } from "@/lib/quickLogRecentTargetStore";
 import { applyQuickLogV2Refresh } from "@/lib/quickLogV2RefreshRules";
 import {
   buildManualSensorSnapshot,
@@ -372,6 +373,23 @@ export default function PlantQuickLog({
       }
 
       toast.success("Log saved to timeline.");
+      // D5: this is a confirmed plant-scoped save, so it is the most recent
+      // target. Without this the remembered record goes stale here and an
+      // unscoped Quick Log would offer an OLDER plant — a suggestion that is
+      // valid but wrong, which is worse than offering nothing. Best-effort by
+      // construction: the helper swallows storage failures so a speed
+      // preference can never turn a confirmed save into a failure.
+      if (growId) {
+        rememberRecentQuickLogTarget(
+          {
+            plantId,
+            growId,
+            tentId: tentId ?? null,
+            savedAt: new Date().toISOString(),
+          },
+          user?.id ?? null,
+        );
+      }
       applyQuickLogV2Refresh(queryClient, {
         targetType: "plant",
         targetId: plantId,

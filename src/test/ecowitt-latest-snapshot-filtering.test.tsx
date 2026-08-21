@@ -16,12 +16,19 @@ const PLANT_1 = "33333333-3333-3333-3333-333333333333";
 
 function row(
   overrides: Partial<EcowittSensorReadingRow> = {},
-  payload: Record<string, unknown> = { temp1f: 77, humidity1: 55, dateutc: FRESH_AT },
+  payload: Record<string, unknown> = {
+    vendor: "ecowitt",
+    temp1f: 77,
+    humidity1: 55,
+    dateutc: FRESH_AT,
+  },
 ): EcowittSensorReadingRow {
   return {
     tent_id: TENT_A,
     plant_id: null,
-    source: "ecowitt",
+    // Canonical stored source. Vendor lineage lives in raw_payload.vendor —
+    // never in `source` (constitution Sensor Truth fence).
+    source: "live",
     captured_at: FRESH_AT,
     raw_payload: payload,
     ...overrides,
@@ -37,11 +44,11 @@ describe("ecowittLatestSnapshotFilter", () => {
     const rows: EcowittSensorReadingRow[] = [
       row(
         { tent_id: TENT_A, captured_at: FRESH_AT },
-        { temp1f: 70, humidity1: 50, dateutc: FRESH_AT },
+        { vendor: "ecowitt", temp1f: 70, humidity1: 50, dateutc: FRESH_AT },
       ),
       row(
         { tent_id: TENT_B, captured_at: NEWER_AT },
-        { temp1f: 90, humidity1: 80, dateutc: NEWER_AT },
+        { vendor: "ecowitt", temp1f: 90, humidity1: 80, dateutc: NEWER_AT },
       ),
     ];
     const vm = buildEcowittLatestSnapshot(rows, { tentId: TENT_A }, { now: NOW });
@@ -53,11 +60,11 @@ describe("ecowittLatestSnapshotFilter", () => {
     const rows: EcowittSensorReadingRow[] = [
       row(
         { plant_id: PLANT_1, captured_at: FRESH_AT },
-        { temp1f: 77, humidity1: 55, dateutc: FRESH_AT },
+        { vendor: "ecowitt", temp1f: 77, humidity1: 55, dateutc: FRESH_AT },
       ),
       row(
         { plant_id: null, captured_at: NEWER_AT },
-        { temp1f: 80, humidity1: 60, dateutc: NEWER_AT },
+        { vendor: "ecowitt", temp1f: 80, humidity1: 60, dateutc: NEWER_AT },
       ),
     ];
     const vm = buildEcowittLatestSnapshot(rows, { tentId: TENT_A, plantId: PLANT_1 }, { now: NOW });
@@ -73,15 +80,30 @@ describe("ecowittLatestSnapshotFilter", () => {
     );
   });
 
-  it("treats source=ecowitt + fresh as Live and labels Ecowitt", () => {
-    const vm = buildEcowittLatestSnapshot([row()], { tentId: TENT_A }, { now: NOW });
+  it("never promotes source=ecowitt to Live (constitution vendor fence)", () => {
+    const vm = buildEcowittLatestSnapshot(
+      [row({ source: "ecowitt" })],
+      { tentId: TENT_A },
+      { now: NOW },
+    );
+    expect(vm.source).toBe("invalid");
+    expect(vm.sourceLabel?.label).not.toBe("Live");
+    expect(vm.sourceLabel?.label).not.toBe("Ecowitt");
+  });
+
+  it("treats canonical live + EcoWitt vendor as Live labeled Ecowitt", () => {
+    const vm = buildEcowittLatestSnapshot(
+      [row({ source: "live" }, { vendor: "ecowitt", temp1f: 77, humidity1: 55, dateutc: FRESH_AT })],
+      { tentId: TENT_A },
+      { now: NOW },
+    );
     expect(vm.source).toBe("live");
     expect(vm.sourceLabel?.label).toBe("Ecowitt");
   });
 
   it.each([
     ["live", "live"],
-    ["ecowitt", "live"],
+    ["ecowitt", "invalid"],
     ["manual", "manual"],
     ["csv", "csv"],
     ["demo", "demo"],
@@ -171,7 +193,12 @@ describe("ecowittLatestSnapshotFilter", () => {
 
   it("demotes stale listener readings to Stale (never Live)", () => {
     const vm = buildEcowittLatestSnapshot(
-      [row({ captured_at: STALE_AT }, { temp1f: 77, humidity1: 55, dateutc: STALE_AT })],
+      [
+        row(
+          { source: "stale", captured_at: STALE_AT },
+          { vendor: "ecowitt", temp1f: 77, humidity1: 55, dateutc: STALE_AT },
+        ),
+      ],
       { tentId: TENT_A },
       { now: NOW },
     );
@@ -426,7 +453,7 @@ describe("ecowittLatestSnapshotFilter", () => {
   });
 
   it("preserves raw payload on the chosen snapshot", () => {
-    const payload = { temp1f: 77, humidity1: 55, dateutc: FRESH_AT };
+    const payload = { vendor: "ecowitt", temp1f: 77, humidity1: 55, dateutc: FRESH_AT };
     const vm = buildEcowittLatestSnapshot([row({}, payload)], { tentId: TENT_A }, { now: NOW });
     expect(vm.snapshot?.rawPayload).toBe(payload);
   });

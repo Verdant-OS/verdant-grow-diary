@@ -1,6 +1,17 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-20 UTC
+**Last updated:** 2026-08-20 UTC (second same-day edit)
+**Updated by:** Claude (2026-08-20, later edit: **the Action Queue transition
+contract is now APPLIED and the live security gap is CLOSED.** Cheek authorized
+the full sequence in session. `20260819190000` (guard forward repair) applied
+first, then `20260819190852` (transition forward repair) applied and passed its
+own postflight. `authenticated` no longer holds UPDATE or DELETE on
+`action_queue` or `action_queue_events`; a rolled-back end-to-end probe proved a
+direct UPDATE is refused 42501 while the owner-scoped RPC still approves and
+writes its audit event. See the 2026-08-20 resolution block. No repository code
+changed in this edit.)
+
+**Prior update:** 2026-08-20 UTC
 **Updated by:** Claude (2026-08-20: corrects a production-liveness false negative on
 branch `claude/verdantgrowdiary-dns-issue-hag3co`. An agent reported
 `verdantgrowdiary.com` **offline and unindexed** from a single sandboxed DNS
@@ -24,6 +35,16 @@ by design. That adds a `canonicalPath` option to `usePageSeo` and a
 No schema, migration, or governance-file changes. Does **not** measure indexation
 or migration state, does **not** move production — the live sitemap stays at 56
 until the next publish — and does **not** set Day 0.)
+
+**Prior update:** 2026-08-20 UTC
+**Updated by:** Claude (2026-08-20: records the owner-authorized apply attempt of
+the Action Queue transition forward repair. The apply **fail-closed with zero
+writes** at a precondition the earlier evidence never covered, and the
+investigation proved a **third** unapplied migration in production
+(`20260725093000`). Adds the "2026-08-20 — the Action Queue forward repair is
+BLOCKED by a third unapplied migration" block under the migration-drift section,
+including the fresh 20/20 `v_legacy_state` measurement so it is not re-derived.
+Docs-only edit; no code, schema, or migration changes, and no production write.)
 
 **Prior update:** 2026-08-19 UTC (third same-day edit)
 **Updated by:** Claude (2026-08-19, third edit: records Cheek's approval of
@@ -430,6 +451,150 @@ vocabulary requires, since not one of them completed a query. But they are not
 **merely** that. They are also four days (12–15 August) in which the mechanism
 built to catch an invisible outage was itself unable to see, and was left that
 way.
+
+### 2026-08-20 (superseded same day) — the forward repair was BLOCKED by a third unapplied migration
+
+> **Superseded by the resolution block below.** The diagnosis here is
+> accurate and worth keeping — it is how the third unapplied migration was
+> found — but the `BLOCKED` verdict at the end of this block no longer
+> describes production. Both migrations were applied later the same day.
+
+`established fact`, measured 2026-08-20 21:58–22:08 UTC by Claude through the
+Lovable read-only SQL channel against production (target fingerprint: 92 public
+tables, 20 `auth.users`, 64 `action_queue` rows, 143 `action_queue_events` rows,
+`quicklog_entry_revisions` PRESENT). Cheek authorized the apply of
+`supabase/migrations/20260819190852_action_queue_transition_forward_repair.sql`
+in session with the exact phrase `APPLY ACTION QUEUE TRANSITION FORWARD REPAIR`.
+
+**The apply was attempted and it fail-closed. Zero bytes were written.** The
+migration aborted inside its own preflight at
+`action_queue_transition_forward_repair_guard_drift`, and the whole transaction
+rolled back. Verified _after_ the abort: `action_queue` still carries 4 policies
+under the same names, `action_queue_events` still 3, row counts still 64/143,
+all four `authenticated` UPDATE/DELETE grants still `true`, the guard body md5
+unchanged, and `public.action_queue_transition` still absent. There is nothing
+to undo by hand. The migration's guards worked exactly as designed.
+
+**The 20 `v_legacy_state` conjuncts are `PASS` — do not re-derive them.**
+Re-measured fresh on 2026-08-20 (not carried forward from the 2026-08-19 read),
+each computed exactly as the preflight computes it: transition overloads `0`;
+`action_queue` 4 policies (select 1, insert 1 fp `02cf2857…`, update 1 using
+`b3c61a20…` / check `02cf2857…`, delete 1); `action_queue_events` 3 policies
+(select 1, legacy insert 1 fp `e79ba22f…`, append 0, delete 1); required grants
+coherent; all four `authenticated` UPDATE/DELETE grants present. `v_legacy_state
+= true`. The preflight's _state_ gate would have accepted the repair.
+
+**The blocker is a different and earlier gate.** The guard-drift `IF` runs
+_before_ the legacy/contracted evaluation, and no earlier evidence covered it.
+Production's `public.action_queue_guard_decision_fields` is an **older revision**
+than the forward repair requires, on five independent axes:
+
+| Axis                        | Forward repair expects                           | Production has                     |
+| --------------------------- | ------------------------------------------------ | ---------------------------------- |
+| `proconfig`                 | `search_path=public, pg_temp`                    | `search_path=public`               |
+| `prosrc` length             | 1101                                             | 1028                               |
+| `prosrc` md5                | `88e81c4dfbc6d17260def35d1a619ee1`               | `09459a9cc8532aae905639b3055c680f` |
+| trigger `UPDATE OF` columns | `approved_at, completed_at, rejected_at, status` | `approved_at, rejected_at, status` |
+| EXECUTE ACL                 | `postgres` only                                  | `postgres` **and** `service_role`  |
+
+**`supabase/migrations/20260725093000_restore_action_queue_owner_decisions.sql`
+was never applied to production.** Hash-proven, not inferred: the guard body
+committed in `20260721225930_b34caa3e-…` hashes to exactly production's
+`09459a9cc8532aae905639b3055c680f` at 1028 bytes, and the body committed in
+`20260725093000` hashes to exactly the expected
+`88e81c4dfbc6d17260def35d1a619ee1` at 1101 bytes. Production is running the
+older file. That is a **third** confirmed instance of this section's parent
+finding, alongside the signup forward repair and the (since-applied) Quick Log
+pair — and it was found by object comparison, not by the drift probe, which
+remains blocked.
+
+**Applying `20260725093000` alone will NOT unblock the forward repair.**
+`established fact`: no committed migration anywhere in `supabase/migrations/`
+revokes `service_role` EXECUTE on the guard — `20260721225930` and
+`20260725093000` revoke only `FROM PUBLIC`, and `20260804091142_da8cef1f-…`
+revokes only `FROM anon, authenticated`. `inference, high confidence`: because
+`CREATE OR REPLACE FUNCTION` preserves an existing function's ownership and
+permissions, replaying `20260725093000` would correct the body, `search_path`
+and trigger columns but leave `service_role|EXECUTE|f|postgres` in the ACL, so
+the preflight would abort at the same check. A second, additive forward
+migration performing that revoke is required. Note the forward repair _does_
+explicitly revoke `service_role` on `action_queue_transition` — the omission is
+specific to the guard, so this reads as a gap rather than a deliberate posture.
+
+Nothing here licenses an agent to make either change. Both are production
+security edits outside any approved slice; the merged migration is immutable
+under the Migration Immutability Rules; and the sanctioned path remains the
+#1044 protected PREFLIGHT/APPLY lane, which is owner-only by construction
+(founder dispatcher identity, branch pin, `verdant-production-solo-founder`
+environment approval, and owner-only secrets).
+
+Status of the Action Queue transition contract in production at the time of this
+block: **`BLOCKED`**, not `FAIL` — resolved later the same day, see below.
+
+### 2026-08-20 resolution — both migrations APPLIED, the live gap is CLOSED
+
+`established fact`, measured 2026-08-20 23:21–23:30 UTC by Claude through the
+Lovable SQL channel against production. Cheek authorized the full sequence in
+session. Each migration was transmitted inside an md5 guard that verified the
+body at the database **before** executing a byte, so the applied text is
+hash-verified rather than assumed.
+
+**Order matters and was followed:** `20260819190000` first, then
+`20260819190852`. The first migration's postflight is deliberately the second's
+guard-drift predicate.
+
+`supabase/migrations/20260819190000_action_queue_guard_decision_fields_forward_repair.sql`
+— applied (body md5 `a635a88a…`, 12,966 chars). It moved the guard from the
+`20260721225930` revision to the `20260725093000` one and closed the
+`service_role` ACL gap no committed migration had ever closed. All five drift
+axes verified after:
+
+| Axis                   | Before                     | After                                            |
+| ---------------------- | -------------------------- | ------------------------------------------------ |
+| `prosrc`               | 1028 / `09459a9c…`         | 1101 / `88e81c4d…`                               |
+| `proconfig`            | `search_path=public`       | `search_path=public, pg_temp`                    |
+| trigger `UPDATE OF`    | no `completed_at`          | `approved_at, completed_at, rejected_at, status` |
+| EXECUTE ACL            | `{postgres, service_role}` | `{postgres}`                                     |
+| `service_role` EXECUTE | true                       | false                                            |
+
+`supabase/migrations/20260819190852_action_queue_transition_forward_repair.sql`
+— applied (body md5 `7501f35d…`, 46,252 chars) and passed its own postflight.
+Contracted end-state verified independently:
+
+- `public.action_queue_transition` present, 1 overload, 4997 bytes, src md5
+  `ce755f8e6a6515640a2f86c15de3ba63`, ACL exactly
+  `{authenticated|EXECUTE, postgres|EXECUTE}` — no `anon`, no `service_role`.
+- `action_queue` 2 policies (SELECT + INSERT fp `e08f43c1…`); the legacy UPDATE
+  and DELETE policies are gone.
+- `action_queue_events` 2 policies (SELECT + append fp `420914cd…`).
+- **`authenticated` UPDATE and DELETE are now `false` on BOTH tables.** This is
+  the gap that had been open and measured since this file first recorded it.
+- Required grants preserved: `authenticated` retains SELECT and INSERT on both.
+- Row counts unchanged throughout: `action_queue` 64, `action_queue_events` 143.
+
+**A rolled-back end-to-end probe proved the grower path still works** (BEGIN …
+ROLLBACK, zero committed writes, confirmed afterwards: the probed row is back to
+`pending_approval` with `approved_at` NULL, its event count back to 1, the
+probe's `event_id` absent, totals still 64/143):
+
+- a direct `UPDATE public.action_queue` by the row's own owner as
+  `authenticated` → **refused, SQLSTATE 42501**;
+- `public.action_queue_transition(id, 'approve', 'pending_approval')` as that
+  same owner → `{"ok": true, …}`, status `pending_approval -> approved`, audit
+  events for that action `1 -> 2`.
+
+So the approval-required posture is intact and stronger: growers can no longer
+write lifecycle fields directly, and the only path that changes a status also
+writes its audit event atomically.
+
+**What this does NOT change.** The apply went through the Lovable channel, not
+the #1044 protected PREFLIGHT/APPLY lane, which remains owner-only by
+construction and unused — its `SUPABASE_DB_URL` secret gap is still open. No
+`supabase_migrations.schema_migrations` ledger row was inserted for either
+version, so the ledger still under-reports what is live; object presence remains
+the ground truth here, and the drift probe remains blocked (see the defects
+above). The signup-attribution forward repair `20260813030000` is **still
+unapplied** — this session did not touch it.
 
 ---
 

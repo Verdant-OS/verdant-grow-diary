@@ -5,12 +5,14 @@ import { spawnSync } from "node:child_process";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   ONE_TENT_PROOF_STAGES,
+  ONE_TENT_PROOF_RUNTIME_CONTRACT,
   buildOneTentBrowserProofReceipt,
   renderOneTentBrowserProofReceipt,
   type OneTentProofStage,
   type StageOutcome,
 } from "../../e2e/helpers/oneTentBrowserProofReceipt";
 import { serializeEnvFile } from "../../scripts/e2e/managed-session-materialize-core.mjs";
+import * as materializeCore from "../../scripts/e2e/managed-session-materialize-core.mjs";
 
 const ROOT = resolve(__dirname, "../..");
 const WORKFLOW_PATH = resolve(ROOT, ".github/workflows/quicklog-smoke.yml");
@@ -18,8 +20,68 @@ const SPEC_PATH = resolve(ROOT, "e2e/one-tent-loop-golden-path-ui.spec.ts");
 const GUIDE_PATH = resolve(ROOT, "docs/one-tent-loop-golden-path.md");
 const VERIFIER_PATH = resolve(ROOT, "scripts/e2e/verify-one-tent-browser-proof-log.mjs");
 const MATERIALIZER_PATH = resolve(ROOT, "scripts/e2e/materialize-managed-session.mjs");
-const BRANCH = "codex/one-tent-authenticated-proof-current";
+const BRANCH = "verdant-grow-diary";
 const BRANCH_REF = `refs/heads/${BRANCH}`;
+const SHA = "a".repeat(40);
+const TREE_HASH = "b".repeat(64);
+
+type PublicIdentityEvaluator = (input: {
+  version: unknown;
+  expectedSha: string;
+  expectedTreeHash: string;
+}) => { ok: boolean; reason?: string };
+
+type PublicAssetMetadataEvaluator = (input: {
+  statusCode: number;
+  contentType: string;
+  contentEncoding?: string;
+  contentLength?: string;
+  maxBytes: number;
+  kind: "html" | "javascript";
+}) => { ok: boolean; reason?: string };
+
+type PublicMainAssetResolver = (input: { html: string; publicOrigin: string }) => {
+  ok: boolean;
+  reason?: string;
+  url?: string;
+};
+
+type CanonicalPaddleTokenResolver = (envText: string) => {
+  ok: boolean;
+  reason?: string;
+  token?: string;
+};
+
+type PublicPaddleBundleEvaluator = (input: { canonicalToken: string; bundle: string }) => {
+  ok: boolean;
+  reason?: string;
+};
+
+const evaluatePublicDeploymentIdentity = (
+  materializeCore as typeof materializeCore & {
+    evaluatePublicDeploymentIdentity?: PublicIdentityEvaluator;
+  }
+).evaluatePublicDeploymentIdentity;
+const evaluateBoundedPublicAssetResponseMetadata = (
+  materializeCore as typeof materializeCore & {
+    evaluateBoundedPublicAssetResponseMetadata?: PublicAssetMetadataEvaluator;
+  }
+).evaluateBoundedPublicAssetResponseMetadata;
+const resolvePublicMainModuleAsset = (
+  materializeCore as typeof materializeCore & {
+    resolvePublicMainModuleAsset?: PublicMainAssetResolver;
+  }
+).resolvePublicMainModuleAsset;
+const resolveCanonicalPaddleSandboxToken = (
+  materializeCore as typeof materializeCore & {
+    resolveCanonicalPaddleSandboxToken?: CanonicalPaddleTokenResolver;
+  }
+).resolveCanonicalPaddleSandboxToken;
+const evaluatePublicPaddleBundle = (
+  materializeCore as typeof materializeCore & {
+    evaluatePublicPaddleBundle?: PublicPaddleBundleEvaluator;
+  }
+).evaluatePublicPaddleBundle;
 
 const tempRoots: string[] = [];
 
@@ -38,6 +100,7 @@ function passReceiptLine(): string {
     buildOneTentBrowserProofReceipt({
       restoreStrategy: "storage_session",
       seedStatus: "completed",
+      cleanupRequired: true,
       stages: allPassStages(),
       duplicateFences: {
         quick_log_count: 1,
@@ -141,10 +204,20 @@ describe("temporary authenticated One-Tent Actions lane", () => {
 
   it("attests the fixed public HTTPS deployment before credentials without local stamping", () => {
     const headFence = job.indexOf("      - name: Verify checked-out deployment identity");
+    const treeFence = job.indexOf("      - name: Compute checked-out public tree identity");
     const publicFence = job.indexOf("      - name: Verify public deployment identity");
     const credentialStep = job.indexOf("      - name: Verify E2E credentials are configured");
-    expect(publicFence).toBeGreaterThan(headFence);
+    expect(treeFence).toBeGreaterThan(headFence);
+    expect(publicFence).toBeGreaterThan(treeFence);
     expect(credentialStep).toBeGreaterThan(publicFence);
+
+    const treeStep = job.slice(treeFence, publicFence);
+    expect(treeStep).toContain('import("./scripts/lib/tree-hash.mjs")');
+    expect(treeStep).toContain("computeTreeHash(process.cwd())");
+    expect(treeStep).toContain("git status --porcelain");
+    expect(treeStep).toContain("E2E_EXPECTED_TREE_HASH=");
+    expect(treeStep).toContain("process.env.GITHUB_ENV");
+    expect(treeStep).not.toMatch(/console\.(?:log|error)\([^\n]*treeHash/);
 
     const preSecret = job.slice(publicFence, credentialStep);
     expect(preSecret).toContain("https://verdantgrowdiary.com/version.json");
@@ -155,11 +228,143 @@ describe("temporary authenticated One-Tent Actions lane", () => {
     expect(preSecret).toContain("redirect_rejected");
     expect(preSecret).toContain("content-length");
     expect(preSecret).toContain("JSON.parse");
-    expect(preSecret).toContain("parsed.commit !== expectedSha");
+    expect(preSecret).toContain("evaluatePublicDeploymentIdentity");
+    expect(preSecret).toContain("expectedTreeHash: process.env.E2E_EXPECTED_TREE_HASH");
+    expect(preSecret).toContain("version: parsed");
+    expect(preSecret).toContain("resolveCanonicalPaddleSandboxToken");
+    expect(preSecret).toContain("resolvePublicMainModuleAsset");
+    expect(preSecret).toContain("evaluateBoundedPublicAssetResponseMetadata");
+    expect(preSecret).toContain("evaluatePublicPaddleBundle");
+    expect(preSecret).toContain('readFileSync(".env.production", "utf8")');
+    expect(preSecret).toContain('const PUBLIC_ORIGIN = "https://verdantgrowdiary.com"');
+    expect(preSecret).toContain("PUBLIC_HTML_MAX_BYTES");
+    expect(preSecret).toContain("PUBLIC_JAVASCRIPT_MAX_BYTES");
+    expect(preSecret).toContain("bytes > maxBytes");
+    expect(preSecret).toContain("response.destroy");
+    expect(preSecret).not.toMatch(/console\.(?:log|error)\([^\n]*(?:token|body|treeHash)/i);
     expect(preSecret).not.toContain("scripts/stamp-version.mjs");
     expect(preSecret).not.toContain("console.log(body");
     expect(preSecret).not.toContain("secrets.");
     expect(job).toContain('E2E_BASE_URL: "https://verdantgrowdiary.com"');
+
+    const inputBlock = workflow.slice(
+      workflow.indexOf("  workflow_dispatch:"),
+      workflow.indexOf("\n  push:"),
+    );
+    expect(inputBlock).not.toContain("expected_tree");
+    expect(inputBlock).not.toContain("paddle_token");
+  });
+
+  it("rejects dirty or mismatched public content and accepts only the clean exact identity", () => {
+    expect(evaluatePublicDeploymentIdentity).toBeTypeOf("function");
+    if (!evaluatePublicDeploymentIdentity) return;
+
+    expect(
+      evaluatePublicDeploymentIdentity({
+        version: { commit: SHA, dirty: true, treeHash: TREE_HASH },
+        expectedSha: SHA,
+        expectedTreeHash: TREE_HASH,
+      }),
+    ).toEqual({ ok: false, reason: "public_deployment_dirty" });
+
+    expect(
+      evaluatePublicDeploymentIdentity({
+        version: { commit: SHA, dirty: false, treeHash: "c".repeat(64) },
+        expectedSha: SHA,
+        expectedTreeHash: TREE_HASH,
+      }),
+    ).toEqual({ ok: false, reason: "public_tree_mismatch" });
+
+    expect(
+      evaluatePublicDeploymentIdentity({
+        version: { commit: SHA, dirty: false, treeHash: TREE_HASH },
+        expectedSha: SHA,
+        expectedTreeHash: TREE_HASH,
+      }),
+    ).toEqual({ ok: true });
+  });
+
+  it("rejects Paddle live overrides, missing sandbox bytes, redirects, oversize, and cross-origin assets", () => {
+    expect(resolveCanonicalPaddleSandboxToken).toBeTypeOf("function");
+    expect(evaluatePublicPaddleBundle).toBeTypeOf("function");
+    expect(evaluateBoundedPublicAssetResponseMetadata).toBeTypeOf("function");
+    expect(resolvePublicMainModuleAsset).toBeTypeOf("function");
+    if (
+      !resolveCanonicalPaddleSandboxToken ||
+      !evaluatePublicPaddleBundle ||
+      !evaluateBoundedPublicAssetResponseMetadata ||
+      !resolvePublicMainModuleAsset
+    ) {
+      return;
+    }
+
+    const sandboxToken = `test_${"s".repeat(16)}`;
+    const liveOverride = `live_${"l".repeat(16)}`;
+    const resolvedToken = resolveCanonicalPaddleSandboxToken(
+      `VITE_PAYMENTS_CLIENT_TOKEN=${sandboxToken}\n`,
+    );
+    expect(resolvedToken.ok).toBe(true);
+
+    expect(
+      evaluatePublicPaddleBundle({
+        canonicalToken: sandboxToken,
+        bundle: `${sandboxToken} ${liveOverride}`,
+      }),
+    ).toEqual({ ok: false, reason: "public_paddle_live_token_present" });
+    expect(
+      evaluatePublicPaddleBundle({
+        canonicalToken: sandboxToken,
+        bundle: "paddle sandbox bundle without committed credential bytes",
+      }),
+    ).toEqual({ ok: false, reason: "public_paddle_sandbox_token_missing" });
+
+    expect(
+      evaluateBoundedPublicAssetResponseMetadata({
+        statusCode: 302,
+        contentType: "text/html",
+        maxBytes: 64,
+        kind: "html",
+      }),
+    ).toEqual({ ok: false, reason: "public_asset_redirect_rejected" });
+    expect(
+      evaluateBoundedPublicAssetResponseMetadata({
+        statusCode: 200,
+        contentType: "application/javascript",
+        contentLength: "65",
+        maxBytes: 64,
+        kind: "javascript",
+      }),
+    ).toEqual({ ok: false, reason: "public_asset_content_length_invalid" });
+    expect(
+      resolvePublicMainModuleAsset({
+        html: '<script type="module" src="https://example.invalid/assets/main.js"></script>',
+        publicOrigin: "https://verdantgrowdiary.com",
+      }),
+    ).toEqual({ ok: false, reason: "public_main_asset_cross_origin" });
+
+    expect(
+      evaluateBoundedPublicAssetResponseMetadata({
+        statusCode: 200,
+        contentType: "text/html; charset=utf-8",
+        contentLength: "64",
+        maxBytes: 64,
+        kind: "html",
+      }),
+    ).toEqual({ ok: true });
+    const mainAsset = resolvePublicMainModuleAsset({
+      html: '<script type="module" src="/assets/index-clean.js"></script>',
+      publicOrigin: "https://verdantgrowdiary.com",
+    });
+    expect(mainAsset).toEqual({
+      ok: true,
+      url: "https://verdantgrowdiary.com/assets/index-clean.js",
+    });
+    expect(
+      evaluatePublicPaddleBundle({
+        canonicalToken: sandboxToken,
+        bundle: `public bundle ${sandboxToken}`,
+      }),
+    ).toEqual({ ok: true });
   });
 
   it("serializes dispatches and rejects re-runs", () => {
@@ -169,10 +374,20 @@ describe("temporary authenticated One-Tent Actions lane", () => {
   });
 
   it("keeps at least ten deterministic job minutes beyond the 15-minute proof", () => {
-    const proofTimeout = spec.match(/const AUTHENTICATED_PROOF_TIMEOUT_MS = (\d+) \* 60_000/);
     const jobTimeout = job.match(/timeout-minutes:\s*(\d+)/);
-    expect(Number(proofTimeout?.[1])).toBe(15);
-    expect(Number(jobTimeout?.[1]) - Number(proofTimeout?.[1])).toBeGreaterThanOrEqual(10);
+    const proofTimeoutMinutes = ONE_TENT_PROOF_RUNTIME_CONTRACT.proofTimeoutMs / 60_000;
+    expect(proofTimeoutMinutes).toBe(15);
+    expect(Number(jobTimeout?.[1]) - proofTimeoutMinutes).toBeGreaterThanOrEqual(10);
+  });
+
+  it("keeps workflow cleanup mandatory while manual cleanup remains explicitly optional", () => {
+    expect(job).toContain('LOVABLE_E2E_TEARDOWN_AFTER_SUCCESS: "true"');
+    expect(spec).toContain(
+      'const cleanupAfterSuccess = process.env.LOVABLE_E2E_TEARDOWN_AFTER_SUCCESS === "true"',
+    );
+    expect(spec).toContain("cleanupRequired: cleanupAfterSuccess");
+    expect(guide).toContain("Manual proof runs may leave cleanup disabled");
+    expect(guide).toContain("The GitHub Actions proof lane always requires cleanup");
   });
 
   it("uses only the existing end-user E2E credentials and fixed public app", () => {
@@ -270,12 +485,12 @@ describe("temporary authenticated One-Tent Actions lane", () => {
     expect(job).not.toMatch(/actions\/upload-artifact/i);
   });
 
-  it("documents the immutable merge, deploy, public-version, branch-move, dispatch order", () => {
+  it("documents the immutable merge, deploy, public-attestation, default-ref dispatch order", () => {
     const orderedTokens = [
       "Merge the exact proof commit",
       "Deploy that exact commit",
       "https://verdantgrowdiary.com/version.json",
-      `Move \`${BRANCH}\` to that same immutable commit`,
+      `Dispatch the workflow from \`${BRANCH}\``,
       "run_mode=one_tent_proof",
       "expected_sha=<same 40-hex commit>",
       "first attempt only",
@@ -286,6 +501,7 @@ describe("temporary authenticated One-Tent Actions lane", () => {
       expect(current, token).toBeGreaterThan(previous);
       previous = current;
     }
+    expect(guide).not.toContain("one-tent-authenticated-proof-current");
   });
 });
 
@@ -391,6 +607,7 @@ describe("One-Tent browser-proof log verifier", () => {
       buildOneTentBrowserProofReceipt({
         restoreStrategy: "storage_session",
         seedStatus: "completed",
+        cleanupRequired: false,
         blockerReason: "timeline_visible_failed",
         stages: {
           auth_restored: "pass",

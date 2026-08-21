@@ -147,7 +147,7 @@ jobs:
           [ "$GITHUB_ACTOR" = "cheekhimself" ]
           [ "$GITHUB_TRIGGERING_ACTOR" = "cheekhimself" ]
           [ "$GITHUB_RUN_ATTEMPT" = "1" ]
-          [ "$GITHUB_REF" = "refs/heads/codex/one-tent-authenticated-proof-current" ]
+          [ "$GITHUB_REF" = "refs/heads/verdant-grow-diary" ]
 
       - name: Checkout exact expected commit
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -165,6 +165,34 @@ jobs:
           [ "$(git rev-parse HEAD)" = "$EXPECTED_SHA" ]
           [ "$EXPECTED_SHA" = "$GITHUB_CONTEXT_SHA" ]
 
+      - name: Compute checked-out public tree identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          [ -z "$(git status --porcelain)" ]
+          node <<'NODE'
+          const { appendFileSync } = require("node:fs");
+
+          async function computeExpectedTreeIdentity() {
+            const { computeTreeHash } = await import("./scripts/lib/tree-hash.mjs");
+            const { treeHash } = await computeTreeHash(process.cwd());
+            if (!/^[0-9a-f]{64}$/u.test(treeHash)) {
+              throw new Error("checked_out_tree_hash_invalid");
+            }
+            appendFileSync(
+              process.env.GITHUB_ENV,
+              `E2E_EXPECTED_TREE_HASH=${treeHash}\n`,
+              "utf8",
+            );
+          }
+
+          computeExpectedTreeIdentity().catch(() => {
+            console.error("checked_out_tree_identity=failed");
+            process.exitCode = 1;
+          });
+          NODE
+          [ -z "$(git status --porcelain)" ]
+
       - name: Verify public deployment identity
         env:
           EXPECTED_SHA: "${{ inputs.expected_sha }}"
@@ -173,13 +201,91 @@ jobs:
           set -euo pipefail
           node <<'NODE'
           const https = require("node:https");
+          const { readFileSync, statSync } = require("node:fs");
 
+          const PUBLIC_ORIGIN = "https://verdantgrowdiary.com";
           const PUBLIC_VERSION_URL = "https://verdantgrowdiary.com/version.json";
           const PUBLIC_VERSION_TIMEOUT_MS = 5_000;
           const PUBLIC_VERSION_MAX_BYTES = 4_096;
+          const PUBLIC_HTML_MAX_BYTES = 131_072;
+          const PUBLIC_JAVASCRIPT_MAX_BYTES = 8_388_608;
+          const PRODUCTION_ENV_MAX_BYTES = 65_536;
           const expectedSha = process.env.EXPECTED_SHA ?? "";
 
+          function readBoundedProductionEnv() {
+            const metadata = statSync(".env.production");
+            if (!metadata.isFile() || metadata.size > PRODUCTION_ENV_MAX_BYTES) {
+              throw new Error("canonical_paddle_env_invalid");
+            }
+            return readFileSync(".env.production", "utf8");
+          }
+
+          function fetchBoundedPublicAsset(url, kind, maxBytes, evaluateMetadata) {
+            const parsedUrl = new URL(url);
+            if (
+              parsedUrl.origin !== PUBLIC_ORIGIN ||
+              parsedUrl.protocol !== "https:" ||
+              parsedUrl.username ||
+              parsedUrl.password
+            ) {
+              return Promise.reject(new Error("public_asset_origin_invalid"));
+            }
+            return new Promise((resolve, reject) => {
+              const request = https.get(
+                parsedUrl,
+                {
+                  headers: {
+                    accept: kind === "html" ? "text/html" : "application/javascript",
+                    "accept-encoding": "identity",
+                  },
+                  signal: AbortSignal.timeout(PUBLIC_VERSION_TIMEOUT_MS),
+                  timeout: PUBLIC_VERSION_TIMEOUT_MS,
+                },
+                async (response) => {
+                  const metadata = evaluateMetadata({
+                    statusCode: response.statusCode,
+                    contentType: String(response.headers["content-type"] ?? ""),
+                    contentEncoding: String(response.headers["content-encoding"] ?? "identity"),
+                    contentLength: response.headers["content-length"],
+                    maxBytes,
+                    kind,
+                  });
+                  if (!metadata.ok) {
+                    response.destroy();
+                    reject(new Error(metadata.reason));
+                    return;
+                  }
+
+                  const chunks = [];
+                  let bytes = 0;
+                  response.setTimeout(PUBLIC_VERSION_TIMEOUT_MS, () =>
+                    response.destroy(new Error("response_timeout")),
+                  );
+                  response.on("data", (chunk) => {
+                    bytes += chunk.length;
+                    if (bytes > maxBytes) {
+                      response.destroy(new Error("body_too_large"));
+                      return;
+                    }
+                    chunks.push(chunk);
+                  });
+                  response.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+                  response.on("error", () => reject(new Error("response_failed")));
+                },
+              );
+              request.on("timeout", () => request.destroy(new Error("request_timeout")));
+              request.on("error", () => reject(new Error("request_failed")));
+            });
+          }
+
           async function attestPublicVersion() {
+            const {
+              evaluateBoundedPublicAssetResponseMetadata,
+              evaluatePublicDeploymentIdentity,
+              evaluatePublicPaddleBundle,
+              resolveCanonicalPaddleSandboxToken,
+              resolvePublicMainModuleAsset,
+            } = await import("./scripts/e2e/managed-session-materialize-core.mjs");
             const response = await new Promise((resolve, reject) => {
               const request = https.get(
                 PUBLIC_VERSION_URL,
@@ -249,14 +355,43 @@ jobs:
             } catch {
               throw new Error("invalid_json");
             }
-            if (
-              parsed === null ||
-              Array.isArray(parsed) ||
-              typeof parsed !== "object" ||
-              typeof parsed.commit !== "string" ||
-              parsed.commit !== expectedSha
-            ) {
-              throw new Error("public_commit_mismatch");
+            const identity = evaluatePublicDeploymentIdentity({
+              version: parsed,
+              expectedSha,
+              expectedTreeHash: process.env.E2E_EXPECTED_TREE_HASH,
+            });
+            if (!identity.ok) {
+              throw new Error(identity.reason);
+            }
+
+            const canonicalToken = resolveCanonicalPaddleSandboxToken(
+              readBoundedProductionEnv(),
+            );
+            if (!canonicalToken.ok) {
+              throw new Error(canonicalToken.reason);
+            }
+            const html = await fetchBoundedPublicAsset(
+              `${PUBLIC_ORIGIN}/`,
+              "html",
+              PUBLIC_HTML_MAX_BYTES,
+              evaluateBoundedPublicAssetResponseMetadata,
+            );
+            const mainAsset = resolvePublicMainModuleAsset({ html, publicOrigin: PUBLIC_ORIGIN });
+            if (!mainAsset.ok) {
+              throw new Error(mainAsset.reason);
+            }
+            const bundle = await fetchBoundedPublicAsset(
+              mainAsset.url,
+              "javascript",
+              PUBLIC_JAVASCRIPT_MAX_BYTES,
+              evaluateBoundedPublicAssetResponseMetadata,
+            );
+            const paddle = evaluatePublicPaddleBundle({
+              canonicalToken: canonicalToken.token,
+              bundle,
+            });
+            if (!paddle.ok) {
+              throw new Error(paddle.reason);
             }
           }
 

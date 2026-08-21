@@ -210,6 +210,17 @@ describe("teardown identity prerequisites", () => {
 // ---------------------------------------------------------------------------
 
 describe("fixture scope protection", () => {
+  it("uses the canonical static marker only when the marker env is absent", () => {
+    expect(parseOneTentFixtureMarker(undefined)).toBe(GOLDEN_MARKER);
+    expect(parseOneTentFixtureMarker("[GOLDEN-PATH-FIXTURE-RUN-123456-ATTEMPT-1]")).toBe(
+      "[GOLDEN-PATH-FIXTURE-RUN-123456-ATTEMPT-1]",
+    );
+    expect(() => parseOneTentFixtureMarker("")).toThrow("fixture_marker_invalid");
+    expect(() => parseOneTentFixtureMarker("[GOLDEN-PATH-FIXTURE-RUN-123456-ATTEMPT-2]")).toThrow(
+      "fixture_marker_invalid",
+    );
+  });
+
   it("accepts only the static marker or a run-and-attempt-scoped dynamic marker", () => {
     const marker = "[GOLDEN-PATH-FIXTURE-RUN-123456-ATTEMPT-1]";
     expect(parseOneTentFixtureMarker(marker)).toBe(marker);
@@ -236,8 +247,13 @@ describe("fixture scope protection", () => {
 
   it("fixture identity stays in lockstep with the seed script (drift guard)", () => {
     const seedSrc = readFileSync(join(ROOT, "scripts/e2e/seed-one-tent-golden-path.mjs"), "utf8");
-    expect(seedSrc).toContain('DEFAULT_FIXTURE_MARKER = "[GOLDEN-PATH-FIXTURE]"');
-    expect(seedSrc).toContain("goldenMarker: declaredFixtureMarker || DEFAULT_FIXTURE_MARKER");
+    expect(seedSrc).toContain(
+      'import { parseOneTentFixtureMarker } from "./one-tent-golden-path-fixture-cleanup.mjs"',
+    );
+    expect(seedSrc).toContain(
+      "goldenMarker: parseOneTentFixtureMarker(process.env.E2E_ONE_TENT_FIXTURE_MARKER)",
+    );
+    expect(seedSrc).not.toContain("DEFAULT_FIXTURE_MARKER");
     expect(seedSrc).toContain('growName: "One-Tent Golden Run"');
     expect(seedSrc).toContain('tentName: "Flower Tent A"');
     expect(seedSrc).toContain('plantName: "Golden Plant 1"');
@@ -649,8 +665,10 @@ describe("static hygiene", () => {
   it("Playwright spec never auto-tears-down after BLOCKED or FAIL", () => {
     const spec = readFileSync(join(ROOT, "e2e/one-tent-loop-golden-path-ui.spec.ts"), "utf8");
     // Opt-in env var + pass-only guard, both present.
-    expect(spec).toContain("LOVABLE_E2E_TEARDOWN_AFTER_SUCCESS");
-    expect(spec).toMatch(/proofReceiptStatus === "pass" &&[\s\S]{0,120}TEARDOWN_AFTER_SUCCESS/);
+    expect(spec).toContain(
+      'const cleanupAfterSuccess = process.env.LOVABLE_E2E_TEARDOWN_AFTER_SUCCESS === "true"',
+    );
+    expect(spec).toMatch(/proofReceiptStatus === "pass" &&[\s\S]{0,120}cleanupAfterSuccess/);
   });
 
   it("package.json wires the teardown script", () => {

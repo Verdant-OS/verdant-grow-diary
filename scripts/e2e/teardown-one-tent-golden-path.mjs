@@ -34,6 +34,7 @@ import { resolveExactSupabaseProjectOrigin } from "./managed-session-materialize
 import { evaluateManagedSession, readManagedSessionEnv } from "./one-tent-preflight-core.mjs";
 import {
   ACTION_FOLLOWUP_EVENT_TYPE,
+  GOLDEN_MARKER,
   buildFixtureNames,
   buildTeardownReceipt,
   discoverFixture,
@@ -334,6 +335,9 @@ async function main() {
   let fixtureNames;
   try {
     const fixtureMarker = parseOneTentFixtureMarker(process.env.E2E_ONE_TENT_FIXTURE_MARKER);
+    if (!process.env.E2E_ONE_TENT_FIXTURE_MARKER && fixtureMarker !== GOLDEN_MARKER) {
+      throw new Error("fixture_marker_invalid");
+    }
     fixtureNames = buildFixtureNames(fixtureMarker);
   } catch {
     blocked("fixture_marker_invalid", true);

@@ -58,6 +58,7 @@ describe("blocked receipt", () => {
     const r = buildOneTentBrowserProofReceipt({
       restoreStrategy: "none",
       seedStatus: "blocked",
+      cleanupRequired: false,
       blockerReason: "x",
       stages: { auth_restored: "pass", grow_resolved: "blocked" },
     });
@@ -72,6 +73,7 @@ describe("pass receipt", () => {
   const receipt = buildOneTentBrowserProofReceipt({
     restoreStrategy: "storage_session",
     seedStatus: "completed",
+    cleanupRequired: true,
     stages: allPassStages(),
     duplicateFences: {
       quick_log_count: 1,
@@ -111,6 +113,56 @@ describe("pass receipt", () => {
       paddle_checkout_request_observed: false,
     });
   });
+
+  it("allows an honest manual pass when optional cleanup was not requested", () => {
+    const manualReceipt = buildOneTentBrowserProofReceipt({
+      restoreStrategy: "storage_session",
+      seedStatus: "completed",
+      stages: allPassStages(),
+      cleanupRequired: false,
+      cleanup: {
+        status: "not_run",
+        active_rows_removed: false,
+        retained_history: false,
+      },
+    });
+
+    expect(manualReceipt.status).toBe("pass");
+    expect(manualReceipt.blocker_reason).toBeNull();
+    expect(manualReceipt.cleanup).toEqual({
+      status: "not_run",
+      active_rows_removed: false,
+      retained_history: false,
+    });
+  });
+
+  it("keeps workflow-required cleanup fail-closed", () => {
+    const requiredReceipt = buildOneTentBrowserProofReceipt({
+      restoreStrategy: "storage_session",
+      seedStatus: "completed",
+      stages: allPassStages(),
+      cleanupRequired: true,
+      cleanup: {
+        status: "not_run",
+        active_rows_removed: false,
+        retained_history: false,
+      },
+    });
+    expect(requiredReceipt.status).toBe("fail");
+
+    const failedOptionalCleanup = buildOneTentBrowserProofReceipt({
+      restoreStrategy: "storage_session",
+      seedStatus: "completed",
+      stages: allPassStages(),
+      cleanupRequired: false,
+      cleanup: {
+        status: "failed",
+        active_rows_removed: false,
+        retained_history: false,
+      },
+    });
+    expect(failedOptionalCleanup.status).toBe("fail");
+  });
 });
 
 describe("fail receipt", () => {
@@ -120,6 +172,7 @@ describe("fail receipt", () => {
   const receipt = buildOneTentBrowserProofReceipt({
     restoreStrategy: "storage_plus_cookies",
     seedStatus: "completed",
+    cleanupRequired: false,
     blockerReason: "quick_log_save_failed",
     stages,
   });
@@ -139,6 +192,7 @@ describe("safety violations force fail", () => {
     const r = buildOneTentBrowserProofReceipt({
       restoreStrategy: "storage_session",
       seedStatus: "completed",
+      cleanupRequired: false,
       stages: allPassStages(),
       safety: { paid_ai_request_observed: true },
     });
@@ -150,6 +204,7 @@ describe("safety violations force fail", () => {
     const r = buildOneTentBrowserProofReceipt({
       restoreStrategy: "storage_session",
       seedStatus: "completed",
+      cleanupRequired: false,
       stages: allPassStages(),
       safetyViolationReason: "password_auth_request_observed",
     });
@@ -163,6 +218,7 @@ describe("safety violations force fail", () => {
       const r = buildOneTentBrowserProofReceipt({
         restoreStrategy: "storage_session",
         seedStatus: "completed",
+        cleanupRequired: false,
         stages: allPassStages(),
         safety: { [flag]: true },
       });
@@ -177,6 +233,7 @@ describe("determinism + hygiene", () => {
     const staged = {
       restoreStrategy: "storage_session" as const,
       seedStatus: "completed" as const,
+      cleanupRequired: false,
       stages: allPassStages(),
       duplicateFences: { quick_log_count: 1 },
     };

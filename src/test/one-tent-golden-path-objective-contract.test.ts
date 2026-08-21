@@ -1,36 +1,76 @@
 /**
  * Authenticated One-Tent browser proof — objective coverage contract.
  *
- * This is intentionally a source-level fence around the real Playwright walk.
- * It does not pretend to replace the authenticated run; it prevents that run
- * from going green while skipping the exact production defects it exists to
- * prove: UI hierarchy creation, refresh persistence, bound Quick Log context,
- * photo/manual evidence, cautious AI, approval-required actions, mobile, and
- * Paddle sandbox truth.
+ * Critical runtime values are imported and asserted as executable data.
+ * @source-scan-justified The remaining source checks are narrowly scoped
+ * static wiring/selector fences because importing the Playwright spec would
+ * register and execute tests. They do not replace the authenticated run; they
+ * prevent it from silently omitting the production handoffs it exists to prove.
  */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import * as browserProofContract from "../../e2e/helpers/oneTentBrowserProofReceipt";
+import { stripSourceComments } from "./utils/stripSourceComments";
+import { parseOneTentFixtureMarker } from "../../scripts/e2e/one-tent-golden-path-fixture-cleanup.mjs";
 
 const ROOT = resolve(__dirname, "../..");
 const SPEC = readFileSync(resolve(ROOT, "e2e/one-tent-loop-golden-path-ui.spec.ts"), "utf8");
-const RECEIPT = readFileSync(resolve(ROOT, "e2e/helpers/oneTentBrowserProofReceipt.ts"), "utf8");
+const EXECUTABLE_SPEC = stripSourceComments(SPEC);
 const AI_RESPONSE = readFileSync(resolve(ROOT, "e2e/helpers/oneTentAiDoctorResponse.ts"), "utf8");
 const SEED = readFileSync(resolve(ROOT, "scripts/e2e/seed-one-tent-golden-path.mjs"), "utf8");
 
+type RuntimeContract = {
+  viewport: { width: number; height: number };
+  proofTimeoutMs: number;
+  childProcess: { timeoutMs: number; killSignal: string; maxBufferBytes: number };
+};
+
+const runtimeContract = (
+  browserProofContract as typeof browserProofContract & {
+    ONE_TENT_PROOF_RUNTIME_CONTRACT?: RuntimeContract;
+  }
+).ONE_TENT_PROOF_RUNTIME_CONTRACT;
+const assertRuntimeContract = (
+  browserProofContract as typeof browserProofContract & {
+    assertOneTentProofRuntimeContract?: (contract: RuntimeContract) => RuntimeContract;
+  }
+).assertOneTentProofRuntimeContract;
+
 describe("authenticated One-Tent proof covers the production objective", () => {
-  it("runs the authoritative walk at the defect-reproducing mobile viewport", () => {
-    expect(SPEC).toContain("width: 390");
-    expect(SPEC).toContain("height: 844");
+  it("resolves the critical viewport, proof timeout, and child-process bounds from executable data", () => {
+    expect(runtimeContract).toEqual({
+      viewport: { width: 390, height: 844 },
+      proofTimeoutMs: 15 * 60_000,
+      childProcess: {
+        timeoutMs: 60_000,
+        killSignal: "SIGKILL",
+        maxBufferBytes: 64 * 1024,
+      },
+    });
+    expect(assertRuntimeContract).toBeTypeOf("function");
+    expect(() =>
+      assertRuntimeContract?.({
+        ...runtimeContract!,
+        proofTimeoutMs: 60_000,
+      }),
+    ).toThrow("one_tent_proof_runtime_contract_invalid");
   });
 
-  it("gives the real-network walk more than the global minute without outliving the job", () => {
-    const timeout = SPEC.match(/const AUTHENTICATED_PROOF_TIMEOUT_MS = (\d+) \* 60_000/);
-    expect(timeout).not.toBeNull();
-    const timeoutMinutes = Number(timeout?.[1]);
-    expect(timeoutMinutes).toBeGreaterThan(1);
-    expect(timeoutMinutes).toBeLessThan(20);
-    expect(SPEC).toContain("test.setTimeout(AUTHENTICATED_PROOF_TIMEOUT_MS)");
+  it("uses a comment-stripped static wiring fence for the imported runtime contract", () => {
+    expect(EXECUTABLE_SPEC).toContain(
+      "test.use({ viewport: ONE_TENT_PROOF_RUNTIME_CONTRACT.viewport })",
+    );
+    expect(EXECUTABLE_SPEC).toContain(
+      "test.setTimeout(ONE_TENT_PROOF_RUNTIME_CONTRACT.proofTimeoutMs)",
+    );
+
+    const adversarialDecoy = [
+      "// const AUTHENTICATED_PROOF_TIMEOUT_MS = 15 * 60_000;",
+      "// test.setTimeout(AUTHENTICATED_PROOF_TIMEOUT_MS);",
+    ].join("\n");
+    expect(adversarialDecoy).toContain("test.setTimeout(AUTHENTICATED_PROOF_TIMEOUT_MS)");
+    expect(stripSourceComments(adversarialDecoy)).not.toContain("test.setTimeout");
   });
 
   it("resolves child CLIs with ESM-safe module URLs", () => {
@@ -43,10 +83,7 @@ describe("authenticated One-Tent proof covers the production objective", () => {
     expect(SPEC).not.toContain("__dirname");
   });
 
-  it("bounds both seed and teardown child processes", () => {
-    expect(SPEC).toContain("const ONE_TENT_CHILD_TIMEOUT_MS = 60_000");
-    expect(SPEC).toContain("const ONE_TENT_CHILD_MAX_BUFFER_BYTES = 64 * 1024");
-
+  it("statically wires both child CLIs to the resolved process bounds", () => {
     const seedStart = SPEC.indexOf(
       "execFileSync(process.execPath",
       SPEC.indexOf('"operator_sensor_evidence_seeded"'),
@@ -61,9 +98,16 @@ describe("authenticated One-Tent proof covers the production objective", () => {
     const teardownCall = SPEC.slice(teardownStart, teardownEnd);
 
     for (const call of [seedCall, teardownCall]) {
-      expect(call).toContain("timeout: ONE_TENT_CHILD_TIMEOUT_MS");
-      expect(call).toContain('killSignal: "SIGKILL"');
-      expect(call).toContain("maxBuffer: ONE_TENT_CHILD_MAX_BUFFER_BYTES");
+      const executableCall = stripSourceComments(call);
+      expect(executableCall).toContain(
+        "timeout: ONE_TENT_PROOF_RUNTIME_CONTRACT.childProcess.timeoutMs",
+      );
+      expect(executableCall).toContain(
+        "killSignal: ONE_TENT_PROOF_RUNTIME_CONTRACT.childProcess.killSignal",
+      );
+      expect(executableCall).toContain(
+        "maxBuffer: ONE_TENT_PROOF_RUNTIME_CONTRACT.childProcess.maxBufferBytes",
+      );
     }
   });
 
@@ -71,16 +115,20 @@ describe("authenticated One-Tent proof covers the production objective", () => {
     expect(SPEC).toContain("process.env.E2E_ONE_TENT_FIXTURE_MARKER");
     expect(SEED).toContain("process.env.E2E_ONE_TENT_FIXTURE_MARKER");
     expect(SPEC).toContain("GOLDEN-PATH-FIXTURE-RUN-");
-    expect(SEED).toContain("GOLDEN-PATH-FIXTURE-RUN-");
     expect(SPEC).toContain("-ATTEMPT-");
-    expect(SEED).toContain("-ATTEMPT-");
+    expect(SEED).toContain("parseOneTentFixtureMarker");
+    expect(parseOneTentFixtureMarker("[GOLDEN-PATH-FIXTURE-RUN-123456-ATTEMPT-1]")).toBe(
+      "[GOLDEN-PATH-FIXTURE-RUN-123456-ATTEMPT-1]",
+    );
   });
 
   it("proves the served public build is the exact expected deployment SHA", () => {
     expect(SPEC).toContain("process.env.E2E_EXPECTED_SHA");
+    expect(SPEC).toContain("process.env.E2E_EXPECTED_TREE_HASH");
     expect(SPEC).toContain("/version.json");
     expect(SPEC).toContain('await stage("deployment_sha_verified"');
-    expect(SPEC).toContain("expect(version.commit).toBe(expectedSha)");
+    expect(SPEC).toContain("evaluatePublicDeploymentIdentity");
+    expect(SPEC).toContain("expect(deploymentIdentity).toEqual({ ok: true })");
   });
 
   it("creates Grow, Tent, and Plant through the connected generic dialogs", () => {
@@ -444,7 +492,7 @@ describe("authenticated One-Tent proof covers the production objective", () => {
       "approval_boundary_verified",
       "paddle_sandbox_verified",
     ]) {
-      expect(RECEIPT).toContain(`"${stage}"`);
+      expect(browserProofContract.ONE_TENT_PROOF_STAGES).toContain(stage);
     }
   });
 

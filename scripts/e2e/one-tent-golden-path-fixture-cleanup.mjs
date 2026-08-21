@@ -9,7 +9,7 @@ export const GOLDEN_MARKER = "[GOLDEN-PATH-FIXTURE]";
 const RUN_MARKER = /^\[GOLDEN-PATH-FIXTURE-RUN-[0-9]+-ATTEMPT-1\]$/;
 
 export function parseOneTentFixtureMarker(raw) {
-  const marker = typeof raw === "string" ? raw.trim() : "";
+  const marker = raw === undefined ? GOLDEN_MARKER : typeof raw === "string" ? raw.trim() : "";
   if (marker === GOLDEN_MARKER || RUN_MARKER.test(marker)) return marker;
   throw new Error("fixture_marker_invalid");
 }

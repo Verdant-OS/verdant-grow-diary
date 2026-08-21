@@ -20,6 +20,47 @@
 
 export const ONE_TENT_BROWSER_PROOF_JSON_PREFIX = "ONE_TENT_BROWSER_PROOF_JSON=";
 
+export interface OneTentProofRuntimeContract {
+  viewport: { width: 390; height: 844 };
+  proofTimeoutMs: number;
+  childProcess: {
+    timeoutMs: number;
+    killSignal: "SIGKILL";
+    maxBufferBytes: number;
+  };
+}
+
+/**
+ * Resolved runtime values shared by the real Playwright walk and pure tests.
+ * Source scans may prove only that the spec wires this object into Playwright;
+ * they are not substitutes for validating these executable values.
+ */
+export function assertOneTentProofRuntimeContract(
+  contract: OneTentProofRuntimeContract,
+): OneTentProofRuntimeContract {
+  if (
+    contract.viewport.width !== 390 ||
+    contract.viewport.height !== 844 ||
+    contract.proofTimeoutMs !== 15 * 60_000 ||
+    contract.childProcess.timeoutMs !== 60_000 ||
+    contract.childProcess.killSignal !== "SIGKILL" ||
+    contract.childProcess.maxBufferBytes !== 64 * 1024
+  ) {
+    throw new Error("one_tent_proof_runtime_contract_invalid");
+  }
+  return contract;
+}
+
+export const ONE_TENT_PROOF_RUNTIME_CONTRACT = assertOneTentProofRuntimeContract({
+  viewport: { width: 390, height: 844 },
+  proofTimeoutMs: 15 * 60_000,
+  childProcess: {
+    timeoutMs: 60_000,
+    killSignal: "SIGKILL",
+    maxBufferBytes: 64 * 1024,
+  },
+});
+
 export type StageOutcome = "pass" | "blocked" | "fail" | "not_run";
 
 /** Ordered stage keys — order is part of the receipt contract. */
@@ -99,6 +140,8 @@ export interface OneTentProofStagedResult {
    */
   stages?: Partial<Record<OneTentProofStage, StageOutcome>>;
   duplicateFences?: Partial<OneTentBrowserProofReceipt["duplicate_fences"]>;
+  /** True for the deployed workflow; false for explicitly manual runs. */
+  cleanupRequired: boolean;
   cleanup?: OneTentBrowserProofReceipt["cleanup"];
   safety?: Partial<Omit<OneTentBrowserProofReceipt["safety"], "fabricated_login_used">>;
 }
@@ -164,7 +207,9 @@ export function buildOneTentBrowserProofReceipt(
     "completed_active_rows_removed",
     "completed_with_retained_history",
   ].includes(cleanupStatus);
-  if (!cleanupCompleted && status === "pass") status = "fail";
+  const cleanupAcceptable =
+    cleanupCompleted || (!staged.cleanupRequired && cleanupStatus === "not_run");
+  if (!cleanupAcceptable && status === "pass") status = "fail";
 
   // A blocked proof must not report any stage as pass or fail.
   if (status === "blocked") {
@@ -249,6 +294,7 @@ export function buildBlockedOneTentBrowserProofReceipt(
   return buildOneTentBrowserProofReceipt({
     restoreStrategy,
     seedStatus,
+    cleanupRequired: false,
     blockerReason,
     stages,
   });

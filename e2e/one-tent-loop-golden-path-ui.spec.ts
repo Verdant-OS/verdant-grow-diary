@@ -51,12 +51,14 @@ import {
 import {
   buildBlockedOneTentBrowserProofReceipt,
   buildOneTentBrowserProofReceipt,
+  ONE_TENT_PROOF_RUNTIME_CONTRACT,
   renderOneTentBrowserProofReceipt,
   type OneTentProofStage,
   type OneTentProofStagedResult,
   type StageOutcome,
 } from "./helpers/oneTentBrowserProofReceipt";
 import { DETERMINISTIC_AI_DOCTOR_RESPONSE } from "./helpers/oneTentAiDoctorResponse";
+import { evaluatePublicDeploymentIdentity } from "../scripts/e2e/managed-session-materialize-core.mjs";
 import {
   classifyOneTentForbiddenNetworkRequest,
   hasOneTentServiceRoleCredential,
@@ -69,6 +71,7 @@ const QUICK_LOG_CONTEXT_DRAFT = "Context check only — close without saving.";
 const DEFAULT_FIXTURE_MARKER = "[GOLDEN-PATH-FIXTURE]";
 const RUN_FIXTURE_MARKER = /^\[GOLDEN-PATH-FIXTURE-RUN-[0-9]+-ATTEMPT-1\]$/;
 const EXPECTED_SHA = process.env.E2E_EXPECTED_SHA?.trim() ?? "";
+const EXPECTED_TREE_HASH = process.env.E2E_EXPECTED_TREE_HASH?.trim() ?? "";
 const TARGET_PROJECT_REF = process.env.LOVABLE_E2E_TARGET_PROJECT_REF?.trim() ?? "";
 const declaredFixtureMarker = process.env.E2E_ONE_TENT_FIXTURE_MARKER?.trim();
 if (
@@ -88,8 +91,7 @@ const SEED_SCRIPT = fileURLToPath(
 const TEARDOWN_SCRIPT = fileURLToPath(
   new URL("../scripts/e2e/teardown-one-tent-golden-path.mjs", import.meta.url),
 );
-const ONE_TENT_CHILD_TIMEOUT_MS = 60_000;
-const ONE_TENT_CHILD_MAX_BUFFER_BYTES = 64 * 1024;
+const cleanupAfterSuccess = process.env.LOVABLE_E2E_TEARDOWN_AFTER_SUCCESS === "true";
 const ONE_PIXEL_PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Z2S8AAAAASUVORK5CYII=",
   "base64",
@@ -187,7 +189,7 @@ async function installOneTentNetworkBoundary(
 const env = readManagedSessionEnv();
 const preflight = evaluateManagedSession(env);
 
-test.use({ viewport: { width: 390, height: 844 } });
+test.use({ viewport: ONE_TENT_PROOF_RUNTIME_CONTRACT.viewport });
 
 // BLOCKED receipt is emitted even when the walk never starts, so
 // operators/CI always get exactly one machine-readable proof line.
@@ -202,8 +204,6 @@ test.use({ viewport: { width: 390, height: 844 } });
 // managed-injection environment (context creation would fail before the
 // receipt), and contaminating when present.
 const PROOF_PROJECT = "chromium-mocked";
-const AUTHENTICATED_PROOF_TIMEOUT_MS = 15 * 60_000;
-
 if (preflight.status !== "ready") {
   test("One-Tent proof blocked — emits receipt (no walk, no writes)", () => {
     test.skip(
@@ -233,7 +233,7 @@ test.describe("One-Tent Loop — authenticated UI golden path", () => {
   test("walks Grow → Tent → Plant → Quick Log → Photo → Timeline → Sensor Snapshot → AI Doctor → Alert → approval-required Action Queue → Paddle sandbox", async ({
     page,
   }, testInfo) => {
-    test.setTimeout(AUTHENTICATED_PROOF_TIMEOUT_MS);
+    test.setTimeout(ONE_TENT_PROOF_RUNTIME_CONTRACT.proofTimeoutMs);
     test.skip(
       test.info().project.name !== PROOF_PROJECT,
       `authenticated proof runs once, under the ${PROOF_PROJECT} project`,
@@ -305,10 +305,16 @@ test.describe("One-Tent Loop — authenticated UI golden path", () => {
       await stage("deployment_sha_verified", async () => {
         const expectedSha = EXPECTED_SHA;
         expect(expectedSha).toMatch(/^[0-9a-f]{40}$/);
+        expect(EXPECTED_TREE_HASH).toMatch(/^[0-9a-f]{64}$/);
         const response = await page.request.get("/version.json", { failOnStatusCode: false });
         expect(response.ok()).toBe(true);
-        const version = (await response.json()) as { commit?: unknown };
-        expect(version.commit).toBe(expectedSha);
+        const version = await response.json();
+        const deploymentIdentity = evaluatePublicDeploymentIdentity({
+          version,
+          expectedSha,
+          expectedTreeHash: EXPECTED_TREE_HASH,
+        });
+        expect(deploymentIdentity).toEqual({ ok: true });
       });
 
       // Stage 2 — Create the hierarchy through the connected generic dialogs.
@@ -599,9 +605,9 @@ test.describe("One-Tent Loop — authenticated UI golden path", () => {
           const seedOutput = execFileSync(process.execPath, [SEED_SCRIPT, "--evidence-only"], {
             encoding: "utf8",
             env: process.env,
-            timeout: ONE_TENT_CHILD_TIMEOUT_MS,
-            killSignal: "SIGKILL",
-            maxBuffer: ONE_TENT_CHILD_MAX_BUFFER_BYTES,
+            timeout: ONE_TENT_PROOF_RUNTIME_CONTRACT.childProcess.timeoutMs,
+            killSignal: ONE_TENT_PROOF_RUNTIME_CONTRACT.childProcess.killSignal,
+            maxBuffer: ONE_TENT_PROOF_RUNTIME_CONTRACT.childProcess.maxBufferBytes,
           });
           expect(seedOutput).toContain("One-Tent Golden Path seed: OK");
           evidenceSeedStatus = "completed";
@@ -966,19 +972,16 @@ test.describe("One-Tent Loop — authenticated UI golden path", () => {
     // Cleanup runs only after the complete safe walk. Its child output is
     // parsed but never echoed: the single browser receipt below is the only
     // retained artifact and composites the sanitized cleanup outcome.
-    if (
-      proofReceiptStatus === "pass" &&
-      process.env.LOVABLE_E2E_TEARDOWN_AFTER_SUCCESS === "true"
-    ) {
+    if (proofReceiptStatus === "pass" && cleanupAfterSuccess) {
       try {
         const out = execFileSync(
           process.execPath,
           [TEARDOWN_SCRIPT, "--execute", "--confirm-fixture-teardown"],
           {
             encoding: "utf8",
-            timeout: ONE_TENT_CHILD_TIMEOUT_MS,
-            killSignal: "SIGKILL",
-            maxBuffer: ONE_TENT_CHILD_MAX_BUFFER_BYTES,
+            timeout: ONE_TENT_PROOF_RUNTIME_CONTRACT.childProcess.timeoutMs,
+            killSignal: ONE_TENT_PROOF_RUNTIME_CONTRACT.childProcess.killSignal,
+            maxBuffer: ONE_TENT_PROOF_RUNTIME_CONTRACT.childProcess.maxBufferBytes,
           },
         );
         const lines = out
@@ -1021,6 +1024,7 @@ test.describe("One-Tent Loop — authenticated UI golden path", () => {
       safetyViolationReason,
       stages: stageOutcomes,
       duplicateFences: fences,
+      cleanupRequired: cleanupAfterSuccess,
       cleanup,
       safety: {
         paid_ai_request_observed: sawPaidModel,

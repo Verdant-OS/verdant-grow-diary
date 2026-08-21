@@ -37,6 +37,186 @@ export function resolveExactSupabaseProjectOrigin({ supabaseUrl, targetProjectRe
 }
 
 /**
+ * Compare the public version record with identity derived from the exact
+ * checked-out commit. Returns only fixed reason codes; it never reflects
+ * hashes, response bodies, or other caller-controlled detail.
+ */
+export function evaluatePublicDeploymentIdentity({ version, expectedSha, expectedTreeHash } = {}) {
+  if (
+    typeof expectedSha !== "string" ||
+    !/^[0-9a-f]{40}$/.test(expectedSha) ||
+    typeof expectedTreeHash !== "string" ||
+    !/^[0-9a-f]{64}$/.test(expectedTreeHash)
+  ) {
+    return { ok: false, reason: "invalid_expected_identity" };
+  }
+  if (version === null || typeof version !== "object" || Array.isArray(version)) {
+    return { ok: false, reason: "invalid_public_version" };
+  }
+  if (version.commit !== expectedSha) {
+    return { ok: false, reason: "public_commit_mismatch" };
+  }
+  if (version.dirty !== false) {
+    return { ok: false, reason: "public_deployment_dirty" };
+  }
+  if (version.treeHash !== expectedTreeHash) {
+    return { ok: false, reason: "public_tree_mismatch" };
+  }
+  return { ok: true };
+}
+
+const PADDLE_SANDBOX_TOKEN_PATTERN = /^test_[A-Za-z0-9_-]+$/;
+const PADDLE_LIVE_TOKEN_PATTERN = /(?:^|[^A-Za-z0-9_])live_[A-Za-z0-9_-]+/;
+
+/**
+ * Read the single committed Paddle client token from production dotenv text.
+ * The token remains an internal return value for byte comparison; failures
+ * use fixed codes and never reflect dotenv content or credential bytes.
+ */
+export function resolveCanonicalPaddleSandboxToken(envText) {
+  if (typeof envText !== "string") {
+    return { ok: false, reason: "canonical_paddle_env_invalid" };
+  }
+  const assignments = envText
+    .split(/\r?\n/u)
+    .filter((line) => /^VITE_PAYMENTS_CLIENT_TOKEN\s*=/u.test(line));
+  if (assignments.length !== 1) {
+    return { ok: false, reason: "canonical_paddle_token_count_invalid" };
+  }
+
+  let token = assignments[0].slice(assignments[0].indexOf("=") + 1).trim();
+  const first = token[0];
+  if (first === '"' || first === "'") {
+    if (token.length < 2 || token.at(-1) !== first) {
+      return { ok: false, reason: "canonical_paddle_token_invalid" };
+    }
+    token = token.slice(1, -1);
+  }
+  if (!PADDLE_SANDBOX_TOKEN_PATTERN.test(token)) {
+    return { ok: false, reason: "canonical_paddle_token_not_sandbox" };
+  }
+  return { ok: true, token };
+}
+
+/** Validate public HTML/JS response metadata before buffering any body bytes. */
+export function evaluateBoundedPublicAssetResponseMetadata({
+  statusCode,
+  contentType,
+  contentEncoding = "identity",
+  contentLength,
+  maxBytes,
+  kind,
+} = {}) {
+  if (Number.isInteger(statusCode) && statusCode >= 300 && statusCode < 400) {
+    return { ok: false, reason: "public_asset_redirect_rejected" };
+  }
+  if (statusCode !== 200) {
+    return { ok: false, reason: "public_asset_status_invalid" };
+  }
+  const normalizedType = typeof contentType === "string" ? contentType.toLowerCase() : "";
+  const validType =
+    kind === "html"
+      ? /^text\/html(?:;|$)/u.test(normalizedType)
+      : kind === "javascript"
+        ? /^(?:application|text)\/(?:javascript|x-javascript)(?:;|$)/u.test(normalizedType)
+        : false;
+  if (!validType) {
+    return { ok: false, reason: "public_asset_content_type_invalid" };
+  }
+  if (contentEncoding !== "identity") {
+    return { ok: false, reason: "public_asset_content_encoding_invalid" };
+  }
+  if (!Number.isSafeInteger(maxBytes) || maxBytes <= 0 || Array.isArray(contentLength)) {
+    return { ok: false, reason: "public_asset_content_length_invalid" };
+  }
+  if (
+    contentLength !== undefined &&
+    (typeof contentLength !== "string" ||
+      !/^\d+$/u.test(contentLength) ||
+      Number(contentLength) > maxBytes)
+  ) {
+    return { ok: false, reason: "public_asset_content_length_invalid" };
+  }
+  return { ok: true };
+}
+
+/** Resolve exactly one same-origin hashed Vite entry module from bounded HTML. */
+export function resolvePublicMainModuleAsset({ html, publicOrigin } = {}) {
+  if (typeof html !== "string" || typeof publicOrigin !== "string") {
+    return { ok: false, reason: "public_main_asset_invalid" };
+  }
+  let origin;
+  try {
+    const parsedOrigin = new URL(publicOrigin);
+    if (
+      parsedOrigin.protocol !== "https:" ||
+      parsedOrigin.username ||
+      parsedOrigin.password ||
+      parsedOrigin.pathname !== "/" ||
+      parsedOrigin.search ||
+      parsedOrigin.hash
+    ) {
+      return { ok: false, reason: "public_origin_invalid" };
+    }
+    origin = parsedOrigin.origin;
+  } catch {
+    return { ok: false, reason: "public_origin_invalid" };
+  }
+
+  const sources = [];
+  for (const match of html.matchAll(/<script\b([^>]*)>/giu)) {
+    const attributes = match[1];
+    const type = attributes.match(/(?:^|\s)type\s*=\s*(["'])module\1/iu);
+    const source = attributes.match(/(?:^|\s)src\s*=\s*(["'])([^"']+)\1/iu);
+    if (type && source) sources.push(source[2]);
+    if (sources.length > 1) {
+      return { ok: false, reason: "public_main_asset_count_invalid" };
+    }
+  }
+  if (sources.length !== 1) {
+    return { ok: false, reason: "public_main_asset_count_invalid" };
+  }
+
+  try {
+    const asset = new URL(sources[0], `${origin}/`);
+    if (asset.origin !== origin) {
+      return { ok: false, reason: "public_main_asset_cross_origin" };
+    }
+    if (
+      asset.protocol !== "https:" ||
+      asset.username ||
+      asset.password ||
+      asset.search ||
+      asset.hash ||
+      !/^\/assets\/[A-Za-z0-9._~-]+\.js$/u.test(asset.pathname)
+    ) {
+      return { ok: false, reason: "public_main_asset_invalid" };
+    }
+    return { ok: true, url: asset.href };
+  } catch {
+    return { ok: false, reason: "public_main_asset_invalid" };
+  }
+}
+
+/** Compare the bounded deployed entry bundle with the committed token class. */
+export function evaluatePublicPaddleBundle({ canonicalToken, bundle } = {}) {
+  if (
+    typeof canonicalToken !== "string" ||
+    !PADDLE_SANDBOX_TOKEN_PATTERN.test(canonicalToken) ||
+    typeof bundle !== "string"
+  ) {
+    return { ok: false, reason: "public_paddle_contract_invalid" };
+  }
+  if (PADDLE_LIVE_TOKEN_PATTERN.test(bundle)) {
+    return { ok: false, reason: "public_paddle_live_token_present" };
+  }
+  if (!bundle.includes(canonicalToken)) {
+    return { ok: false, reason: "public_paddle_sandbox_token_missing" };
+  }
+  return { ok: true };
+}
+
+/**
  * Derive the supabase-js v2 default auth storage key: `sb-<ref>-auth-token`.
  * The project ref is the first DNS label of the Supabase URL host
  * (`https://<ref>.supabase.co`) or an explicitly provided project id.

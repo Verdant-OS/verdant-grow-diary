@@ -163,18 +163,23 @@ Variable names only — never document values.
 The proof dispatch is intentionally unavailable as a pre-deploy preview. Follow
 this immutable sequence; do not reuse an earlier run or rerun a failed attempt:
 
-1. Merge the exact proof commit without rewriting its identity.
+1. Merge the exact proof commit into `verdant-grow-diary` without rewriting its
+   identity.
 2. Deploy that exact commit to `https://verdantgrowdiary.com`.
 3. Wait until `https://verdantgrowdiary.com/version.json` returns strict JSON
-   whose `commit` is that exact lowercase 40-hex SHA.
-4. Move `codex/one-tent-authenticated-proof-current` to that same immutable commit.
-5. Dispatch the workflow with `run_mode=one_tent_proof` and
+   whose `commit` is that exact lowercase 40-hex SHA, whose `dirty` field is
+   `false`, and whose `treeHash` matches the canonical hash computed from the
+   checked-out commit. The fixed-origin HTML and same-origin main JavaScript
+   must also contain the committed sandbox Paddle client token and no live-class
+   Paddle token.
+4. Dispatch the workflow from `verdant-grow-diary` with `run_mode=one_tent_proof` and
    `expected_sha=<same 40-hex commit>`, first attempt only.
 
 Proof mode uses the fixed public HTTPS origin and fails before credentials when
-the mode, branch, SHA format, Actions SHA, checked-out HEAD, or public version
-does not match. `run_mode=quicklog_smoke` remains the separate ordinary smoke
-dispatch and does not require `expected_sha`.
+the mode, default ref, SHA format, Actions SHA, checked-out HEAD, canonical tree,
+clean public version, or deployed Paddle token class does not match.
+`run_mode=quicklog_smoke` remains the separate ordinary smoke dispatch and does
+not require `expected_sha`.
 
 ### Machine-readable receipts
 
@@ -314,10 +319,12 @@ history and keeps parent rows instead of erasing or obscuring that evidence.
 
 Preserve failed-run fixtures until debugging is complete — the
 Playwright spec never auto-tears-down after a BLOCKED or FAILED proof.
-Optional cleanup after a fully **passing** proof only:
-`LOVABLE_E2E_TEARDOWN_AFTER_SUCCESS=true` (the sanitized teardown result is
-composited into the browser receipt, raw child output is not retained, and a
-teardown failure is never hidden).
+Manual proof runs may leave cleanup disabled; a passing receipt then reports
+`cleanup.status=not_run` honestly. Optional cleanup after a fully **passing**
+manual proof is enabled with `LOVABLE_E2E_TEARDOWN_AFTER_SUCCESS=true`.
+The GitHub Actions proof lane always requires cleanup and sets that variable to
+`true`; the sanitized teardown result is composited into the browser receipt,
+raw child output is not retained, and a teardown failure is never hidden.
 
 ### Evidence receipt (per-stage, filled by the browser walk)
 

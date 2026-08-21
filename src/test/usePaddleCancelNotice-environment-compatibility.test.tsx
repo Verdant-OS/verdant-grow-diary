@@ -161,9 +161,30 @@ describe("usePaddleCancelNotice environment compatibility", () => {
     expect(result.current.accessUntilIso).toBe(LIVE_END);
   });
 
-  it("hides the notice when either required environment read fails", async () => {
+  it("REGRESSION: preserves a proven live cancellation notice when the sandbox read fails", async () => {
+    testState.rows = [recurringRow("live", LIVE_END)];
+    testState.errors.sandbox = { message: "temporary sandbox read failure" };
+
+    const result = await renderNotice();
+
+    await waitFor(() => expect(result.current.visible).toBe(true));
+    expect(result.current.accessUntilIso).toBe(LIVE_END);
+    expect(testState.queriedEnvironments).toEqual(["live", "sandbox"]);
+  });
+
+  it("hides the notice when the live read fails even if a sandbox row entitles", async () => {
     testState.rows = [recurringRow("sandbox", SANDBOX_END)];
     testState.errors.live = { message: "temporary live read failure" };
+
+    const result = await renderNotice();
+
+    await waitFor(() => expect(testState.queriedEnvironments).toEqual(["live", "sandbox"]));
+    expect(result.current.visible).toBe(false);
+  });
+
+  it("hides the notice when no live row entitles and the sandbox read fails", async () => {
+    testState.rows = [recurringRow("live", "2020-01-01T00:00:00.000Z", { status: "canceled" })];
+    testState.errors.sandbox = { message: "temporary sandbox read failure" };
 
     const result = await renderNotice();
 

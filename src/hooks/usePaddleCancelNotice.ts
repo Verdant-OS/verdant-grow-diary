@@ -9,7 +9,8 @@
  * remain the source of truth for what a user can do.
  *
  * RLS on public.subscriptions is select-own; passing user_id is redundant
- * but harmless. The hook returns HIDDEN while loading or on error.
+ * but harmless. The hook returns HIDDEN while loading, when the live read
+ * fails, or when sandbox fallback cannot be evaluated safely.
  */
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -71,32 +72,38 @@ export function usePaddleCancelNotice(): PaddleCancelNotice {
         recurringRows("sandbox"),
       ]);
       if (cancelled) return;
-      if (liveResult.error || sandboxResult.error) {
+      if (liveResult.error) {
         setNotice(HIDDEN);
         return;
       }
 
       const now = new Date();
       const liveRows = (liveResult.data ?? []) as PaddleCancelSubscriptionRow[];
-      const sandboxRows = (sandboxResult.data ?? []) as PaddleCancelSubscriptionRow[];
       const liveRow = pickEntitlingLovableRow(
         liveRows,
         "live",
         now,
       ) as PaddleCancelSubscriptionRow | null;
+      const liveRowEntitles = liveRow != null && lovableRowEntitles(liveRow, "live", now);
+      if (liveRowEntitles) {
+        setNotice(derivePaddleCancelNotice(liveRow));
+        return;
+      }
+      if (sandboxResult.error) {
+        setNotice(HIDDEN);
+        return;
+      }
+
+      const sandboxRows = (sandboxResult.data ?? []) as PaddleCancelSubscriptionRow[];
       const sandboxRow = pickEntitlingLovableRow(
         sandboxRows,
         "sandbox",
         now,
       ) as PaddleCancelSubscriptionRow | null;
-      const liveRowEntitles = liveRow != null && lovableRowEntitles(liveRow, "live", now);
       const sandboxRowEntitles =
         sandboxRow != null && lovableRowEntitles(sandboxRow, "sandbox", now);
-      const selectedRow = liveRowEntitles
-        ? liveRow
-        : sandboxRowEntitles || expectedEnvironment === "sandbox"
-          ? sandboxRow
-          : liveRow;
+      const selectedRow =
+        sandboxRowEntitles || expectedEnvironment === "sandbox" ? sandboxRow : liveRow;
 
       setNotice(derivePaddleCancelNotice(selectedRow));
     })();

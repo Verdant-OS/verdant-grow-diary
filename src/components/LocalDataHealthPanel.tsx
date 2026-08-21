@@ -464,6 +464,11 @@ interface LocalDataHealthPanelProps {
   now?: () => number;
 }
 
+interface ReviewedRemediationEntry {
+  key: string;
+  reviewedValue: string;
+}
+
 export function LocalDataHealthPanel({ now = Date.now }: LocalDataHealthPanelProps = {}) {
   const [checks, setChecks] = useState<CheckResult[]>([]);
   const [running, setRunning] = useState(false);
@@ -532,24 +537,53 @@ export function LocalDataHealthPanel({ now = Date.now }: LocalDataHealthPanelPro
   }, []);
 
   const handleConfirmClear = useCallback(
-    async (keys: string[]) => {
+    async (reviewedEntries: ReviewedRemediationEntry[]) => {
       const s = safeStorage();
       if (!s) {
         setFixNotice("Could not clear — local storage is unavailable.");
         setDrawerKeys(null);
         return;
       }
-      // Snapshot BEFORE mutation so every clear is reversible.
-      const snapshot = createBackupSnapshot(keys, "fix-issues");
+      // Re-read and reclassify the exact bytes the grower reviewed. Another
+      // tab can repair or replace a record while this drawer is open; a stale
+      // key list is never authority to delete the new value.
+      const candidates: BackupEntry[] = [];
+      const skipped = new Set<string>();
+      for (const reviewed of reviewedEntries) {
+        const current = buildRemediationEntry(reviewed.key, now());
+        if (
+          !isRemediationEntryClearable(current) ||
+          current.reviewedValue !== reviewed.reviewedValue
+        ) {
+          skipped.add(reviewed.key);
+          continue;
+        }
+        candidates.push({
+          key: current.key,
+          value: current.reviewedValue,
+          sizeBytes: current.sizeBytes,
+        });
+      }
+
+      // Snapshot BEFORE mutation so every clear is reversible, using the
+      // exact reviewed bytes rather than re-reading a potentially newer value.
+      const snapshot = createBackupSnapshot(candidates, "fix-issues");
       const cleared: string[] = [];
       const errors: string[] = [];
-      for (const key of keys) {
+      for (const candidate of candidates) {
         try {
-          s.removeItem(key);
-          cleared.push(key);
+          // Final compare immediately before the destructive operation closes
+          // the remaining review-to-confirm race without exposing raw values.
+          const current = buildRemediationEntry(candidate.key, now());
+          if (!isRemediationEntryClearable(current) || current.reviewedValue !== candidate.value) {
+            skipped.add(candidate.key);
+            continue;
+          }
+          s.removeItem(candidate.key);
+          cleared.push(candidate.key);
         } catch (err) {
           errors.push(
-            `${redactStorageKey(key)}: ${err instanceof Error ? err.message : String(err)}`,
+            `${redactStorageKey(candidate.key)}: ${err instanceof Error ? err.message : String(err)}`,
           );
         }
       }
@@ -560,13 +594,17 @@ export function LocalDataHealthPanel({ now = Date.now }: LocalDataHealthPanelPro
         );
       else if (cleared.length > 0)
         parts.push(`Cleared ${cleared.length} local key${cleared.length === 1 ? "" : "s"}.`);
+      if (skipped.size > 0)
+        parts.push(
+          `Skipped ${skipped.size} key${skipped.size === 1 ? "" : "s"} because local data changed after review or no longer needs clearing. Re-run checks before trying again.`,
+        );
       if (errors.length > 0) parts.push(`Failed to clear: ${errors.join("; ")}`);
       setFixNotice(parts.join(" "));
       setBackups(listBackups());
       setDrawerKeys(null);
       await run();
     },
-    [run],
+    [now, run],
   );
 
   const handleRestore = useCallback(
@@ -907,6 +945,8 @@ interface RemediationEntry {
     | "unknown";
   errorMessage: string;
   clearRecommended?: boolean;
+  /** Exact private bytes classified in this review; never rendered. */
+  reviewedValue?: string;
   foundVersion?: unknown;
   // Redacted safe metadata (never raw values):
   topLevelFieldPreview?: Array<{ name: string; displayed: string }>;
@@ -995,6 +1035,8 @@ function buildRemediationEntry(key: string, now: number): RemediationEntry {
       present: true,
       sizeBytes,
       category: "invalid-json",
+      clearRecommended: true,
+      reviewedValue: raw,
       // Same reason as `checkLocalSchema`: the parser exception can quote the
       // stored value. The redacted field preview and char-class summary below
       // are how this drawer describes a value without printing it.
@@ -1047,6 +1089,8 @@ function buildRemediationEntry(key: string, now: number): RemediationEntry {
       present: true,
       sizeBytes,
       category: "version-mismatch",
+      clearRecommended: true,
+      reviewedValue: raw,
       errorMessage: `Stored schema version is ${
         foundVersion === undefined ? "missing" : JSON.stringify(foundVersion)
       }, but this build expects v${expectedVersion}.`,
@@ -1073,6 +1117,7 @@ function buildRemediationEntry(key: string, now: number): RemediationEntry {
         ? `${validationIssue.detail}. Quick Log temporarily withholds this remembered target; it can become usable when the current time catches up.`
         : `Parses as JSON, but ${validationIssue.detail}. Whatever reads this key ignores it.`,
       clearRecommended: !isClockMismatch,
+      reviewedValue: raw,
       foundVersion,
       topLevelFieldPreview,
       charClassSummary,
@@ -1087,10 +1132,25 @@ function buildRemediationEntry(key: string, now: number): RemediationEntry {
     sizeBytes,
     category: "unknown",
     errorMessage: "No validation issue detected for this key right now.",
+    clearRecommended: false,
+    reviewedValue: raw,
     foundVersion,
     topLevelFieldPreview,
     charClassSummary,
   };
+}
+
+function isRemediationEntryClearable(
+  entry: RemediationEntry,
+): entry is RemediationEntry & { reviewedValue: string } {
+  return (
+    entry.present &&
+    entry.clearRecommended === true &&
+    typeof entry.reviewedValue === "string" &&
+    (entry.category === "invalid-json" ||
+      entry.category === "version-mismatch" ||
+      entry.category === "shape-mismatch")
+  );
 }
 
 function categoryLabel(cat: RemediationEntry["category"]): string {
@@ -1115,7 +1175,7 @@ function categoryLabel(cat: RemediationEntry["category"]): string {
 interface RemediationDrawerProps {
   keys: string[] | null;
   onCancel: () => void;
-  onConfirm: (keys: string[]) => void;
+  onConfirm: (entries: ReviewedRemediationEntry[]) => void;
   running: boolean;
   now: () => number;
 }
@@ -1126,9 +1186,10 @@ function RemediationDrawer({ keys, onCancel, onConfirm, running, now }: Remediat
     const currentTime = now();
     return (keys ?? []).map((key) => buildRemediationEntry(key, currentTime));
   }, [keys, now]);
-  const clearableKeys = entries
-    .filter((e) => e.present && e.clearRecommended !== false)
-    .map((e) => e.key);
+  const clearableEntries = entries.filter(isRemediationEntryClearable).map((entry) => ({
+    key: entry.key,
+    reviewedValue: entry.reviewedValue,
+  }));
 
   return (
     <Drawer open={open} onOpenChange={(next) => (!next ? onCancel() : undefined)}>
@@ -1225,9 +1286,11 @@ function RemediationDrawer({ keys, onCancel, onConfirm, running, now }: Remediat
                   <span className="font-medium">Proposed action:</span>{" "}
                   {e.category === "clock-mismatch"
                     ? "Check this device's date and time. If it is correct, wait for the current time to catch up. Keep this local record; no data needs to be cleared."
-                    : e.present
+                    : isRemediationEntryClearable(e)
                       ? `Remove the localStorage entry at "${redactStorageKey(e.key)}" on this device. Any unsaved work in that draft will be lost. Server data is unaffected.`
-                      : "No action needed — key is not present on this device."}
+                      : e.present
+                        ? "No clearing recommended — the current record has no destructive validation issue."
+                        : "No action needed — key is not present on this device."}
                 </div>
               </div>
             ))
@@ -1246,12 +1309,12 @@ function RemediationDrawer({ keys, onCancel, onConfirm, running, now }: Remediat
             </Button>
             <Button
               variant="destructive"
-              onClick={() => onConfirm(clearableKeys)}
-              disabled={running || clearableKeys.length === 0}
+              onClick={() => onConfirm(clearableEntries)}
+              disabled={running || clearableEntries.length === 0}
             >
-              {clearableKeys.length === 0
+              {clearableEntries.length === 0
                 ? "Nothing to clear"
-                : `Confirm — clear ${clearableKeys.length} key${clearableKeys.length === 1 ? "" : "s"}`}
+                : `Confirm — clear ${clearableEntries.length} key${clearableEntries.length === 1 ? "" : "s"}`}
             </Button>
           </div>
         </DrawerFooter>
@@ -1315,22 +1378,9 @@ function listBackups(): BackupSnapshot[] {
   return readBackupStore().sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 }
 
-function createBackupSnapshot(keys: string[], reason: string): BackupSnapshot | null {
+function createBackupSnapshot(entries: BackupEntry[], reason: string): BackupSnapshot | null {
   const s = safeStorage();
-  if (!s || keys.length === 0) return null;
-  const entries: BackupEntry[] = keys.map((key) => {
-    let value: string | null = null;
-    try {
-      value = s.getItem(key);
-    } catch {
-      value = null;
-    }
-    return {
-      key,
-      value,
-      sizeBytes: value === null ? 0 : new Blob([value]).size,
-    };
-  });
+  if (!s || entries.length === 0) return null;
   // Only bother saving if at least one key had a value.
   if (entries.every((e) => e.value === null)) return null;
   const snapshot: BackupSnapshot = {

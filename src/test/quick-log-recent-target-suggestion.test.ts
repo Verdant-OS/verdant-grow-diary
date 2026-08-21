@@ -179,6 +179,22 @@ describe("resolveRecentTargetSuggestion — D-B9 validity window", () => {
     ).toBeNull();
   });
 
+  it.each([
+    { marker: "is_archived", row: { is_archived: true } },
+    { marker: "archived_at", row: { archived_at: "2026-08-19T11:00:00.000Z" } },
+    { marker: "merged_into_plant_id", row: { merged_into_plant_id: "plant-2" } },
+  ])("rejects a visible plant marked inactive by $marker", ({ row }) => {
+    expect(
+      resolveRecentTargetSuggestion({
+        record: record(),
+        now: NOW,
+        visiblePlants: [{ ...PLANTS[0], ...row }],
+        visibleGrows: GROWS,
+        visibleTents: TENTS,
+      }),
+    ).toBeNull();
+  });
+
   it("re-derives grow and tent from the live row, never trusting stored scope", () => {
     const suggestion = resolveRecentTargetSuggestion({
       record: record({ growId: "stale-grow", tentId: "stale-tent" }),

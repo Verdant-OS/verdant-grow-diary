@@ -10,7 +10,8 @@
  *   1. the stored timestamp parses to a finite instant;
  *   2. it is not in the future (a skewed clock is not evidence);
  *   3. it is at most 14 days old (strictly older → expired);
- *   4. the plant still appears among the grower's own visible rows;
+ *   4. the plant still appears among the grower's own visible rows and is not
+ *      archived or merged under the canonical Quick Log inactivity rule;
  *   5. that live row still has the grow and tent scope required for a save;
  *   6. that grow is still one of the grower's ACTIVE grows;
  *   7. that tent is still live and still belongs to that same grow.
@@ -45,6 +46,8 @@
  * Pure: no storage access, no clock, no I/O.
  */
 
+import { isInactiveQuickLogPlant, type MinimalQuickLogPlant } from "./quickLogPlantOptionRules";
+
 export const RECENT_TARGET_SUGGESTION_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
 
 /**
@@ -68,12 +71,7 @@ export interface RecentTargetRecord {
   savedAt: string;
 }
 
-export interface RecentTargetVisiblePlant {
-  id: string;
-  name?: string | null;
-  grow_id?: string | null;
-  tent_id?: string | null;
-}
+export type RecentTargetVisiblePlant = MinimalQuickLogPlant;
 
 export interface RecentTargetSuggestion {
   plantId: string;
@@ -204,11 +202,11 @@ export function resolveRecentTargetSuggestion(
   if (savedAtMs > now) return null;
   if (now - savedAtMs > RECENT_TARGET_SUGGESTION_MAX_AGE_MS) return null;
 
-  // Owner revalidation: the plant must still be visible to this grower.
-  // Archived PLANTS, merged, deleted, and cross-account targets are all absent
-  // here. A plant whose GROW was archived is not — see condition 6 below.
+  // Owner and activity revalidation: query results may still contain soft-
+  // archived or merged rows, so visibility alone is not proof of eligibility.
+  // A plant whose GROW was archived also remains visible — see condition 6.
   const plant = (visiblePlants ?? []).find((row) => row && row.id === record.plantId);
-  if (!plant) return null;
+  if (!plant || isInactiveQuickLogPlant(plant)) return null;
 
   const plantName = trimmed(plant.name);
   if (!plantName) return null;

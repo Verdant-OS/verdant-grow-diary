@@ -324,6 +324,43 @@ describe("LocalDataHealthPanel — the account uuid survives no fallback path", 
     expect(getLocalStorageItemForTest(key)).not.toBeNull();
   });
 
+  it("does not offer to clear a malformed record that became valid before review", async () => {
+    const key = `verdant.quickLog.lastTarget.v2.${ACCOUNT_A}`;
+    setLocalStorageItemForTest(key, "{}");
+    render(<LocalDataHealthPanel />);
+    await schemaRow("Quick Log last target");
+
+    // The checks list is now stale. The drawer must classify the current
+    // bytes and fail closed when there is no longer a destructive issue.
+    setLocalStorageItemForTest(key, RECORD);
+    fireEvent.click(screen.getByRole("button", { name: /Review & clear/i }));
+    const dialog = await screen.findByRole("dialog");
+
+    expect(dialog).toHaveTextContent("No issue detected");
+    expect(screen.getByRole("button", { name: "Nothing to clear" })).toBeDisabled();
+    expect(getLocalStorageItemForTest(key)).toBe(RECORD);
+  });
+
+  it("revalidates reviewed bytes immediately before confirm-time deletion", async () => {
+    const key = `verdant.quickLog.lastTarget.v2.${ACCOUNT_A}`;
+    setLocalStorageItemForTest(key, "{}");
+    render(<LocalDataHealthPanel />);
+    await schemaRow("Quick Log last target");
+
+    fireEvent.click(screen.getByRole("button", { name: /Review & clear/i }));
+    await screen.findByRole("dialog");
+    expect(screen.getByRole("button", { name: /Confirm — clear/i })).toBeEnabled();
+
+    // Another document repairs the record after review but before the grower
+    // confirms. Deleting the reviewed key list would erase healthy data.
+    setLocalStorageItemForTest(key, RECORD);
+    fireEvent.click(screen.getByRole("button", { name: /Confirm — clear/i }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(getLocalStorageItemForTest(key)).toBe(RECORD);
+    expect(screen.queryByText(/Backup saved/)).toBeNull();
+  });
+
   it("whitelists scoped field metadata and omits an unversioned v value", async () => {
     const PRIVATE_FIELD_NAME = "grower@example.com";
     const PRIVATE_VERSION_VALUE = "private grower note";

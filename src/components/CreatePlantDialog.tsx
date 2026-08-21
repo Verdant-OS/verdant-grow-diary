@@ -28,11 +28,16 @@ import { Link } from "@/lib/react-router-compat";
 import CreateTentDialog, { type CreatedTent } from "@/components/CreateTentDialog";
 import { validatePlantInsertPayload } from "@/lib/plantPayloadValidation";
 import {
-  confirmCreatedPlantRow,
   primeConfirmedPlantCaches,
   reaffirmConfirmedPlantCacheMeta,
 } from "@/lib/confirmedPlantCacheService";
 import { recordConfirmedGrowPlantMeta } from "@/hooks/useGrowData";
+import {
+  confirmPlantCreateAttemptRow,
+  isAmbiguousPlantInsertError,
+  newPlantCreateAttemptId,
+  reconcilePlantCreateAttempt,
+} from "@/lib/plantCreatePersistence";
 import {
   buildCreateGrowBindingView,
   canWriteCreateGrowId,
@@ -209,6 +214,7 @@ export default function CreatePlantDialog({
 
   const [open, setOpen] = useState(initiallyOpen);
   const [busy, setBusy] = useState(false);
+  const [createOutcomeUnknown, setCreateOutcomeUnknown] = useState(false);
   const handoffSuppressedRef = useRef(false);
   const mountedRef = useRef(true);
   const currentOwnerIdRef = useRef<string | null>(user?.id ?? null);
@@ -295,7 +301,11 @@ export default function CreatePlantDialog({
     if (open && !nestedTentCreateBlocked) setNestedTentCreatorMounted(true);
   }, [open, nestedTentCreateBlocked]);
 
-  const formBlocked = binding.blockSubmit || !canWriteCreateGrowId(targetGrowId) || tentBlocksWrite;
+  const formBlocked =
+    createOutcomeUnknown ||
+    binding.blockSubmit ||
+    !canWriteCreateGrowId(targetGrowId) ||
+    tentBlocksWrite;
 
   function handleOpenChange(next: boolean) {
     // The insert may already be durable, so closing cannot cancel it. Let the
@@ -350,6 +360,10 @@ export default function CreatePlantDialog({
       toast.error("Not signed in");
       return;
     }
+    if (createOutcomeUnknown) {
+      toast.error("Refresh this page before trying to create another plant.");
+      return;
+    }
     if (formBlocked || !targetGrowId) {
       if (binding.toastMessage) toast.error(binding.toastMessage);
       else if (suppliedTent.blockSubmit) toast.error(suppliedTent.title);
@@ -367,10 +381,19 @@ export default function CreatePlantDialog({
       }
     }
 
+    let plantId: string;
+    try {
+      plantId = newPlantCreateAttemptId();
+    } catch {
+      toast.error("Verdant could not start a safe plant save. Refresh and try again.");
+      return;
+    }
+
     handoffSuppressedRef.current = false;
     setBusy(true);
     const trimmedStrain = form.strain.trim();
     const payload: Record<string, unknown> = {
+      id: plantId,
       user_id: user.id,
       name: form.name.trim(),
       strain: trimmedStrain || null,
@@ -389,24 +412,59 @@ export default function CreatePlantDialog({
       return;
     }
 
-    const { data, error } = await supabase
-      .from("plants")
-      .insert(validation.value as never)
-      .select("*")
-      .single();
-    if (error) {
+    const attempt = {
+      plantId,
+      ownerId: user.id,
+      growId: targetGrowId,
+      tentId: validation.value.tent_id ?? null,
+    };
+    let data: unknown = null;
+    let error: unknown = null;
+    let insertThrew = false;
+    try {
+      const result = await supabase
+        .from("plants")
+        .insert(validation.value as never)
+        .select("*")
+        .single();
+      data = result.data;
+      error = result.error;
+    } catch {
+      insertThrew = true;
+    }
+
+    let confirmed = !error ? confirmPlantCreateAttemptRow(data, attempt) : null;
+    const needsReconciliation =
+      insertThrew || isAmbiguousPlantInsertError(error) || (!error && !confirmed);
+    if (needsReconciliation) {
+      const reconciliation = await reconcilePlantCreateAttempt(supabase, attempt);
+      if (reconciliation.status === "confirmed") confirmed = reconciliation.confirmed;
+    }
+
+    if (!confirmed && needsReconciliation) {
+      if (mountedRef.current) {
+        setBusy(false);
+        setCreateOutcomeUnknown(true);
+      }
+      toast.error(
+        "Verdant could not confirm whether this plant was saved. Refresh before adding another.",
+      );
+      return;
+    }
+    if (error && !confirmed) {
       if (mountedRef.current) setBusy(false);
-      toast.error(error.message);
+      const message =
+        typeof error === "object" &&
+        error &&
+        typeof (error as { message?: unknown }).message === "string"
+          ? (error as { message: string }).message
+          : "Plant could not be created";
+      toast.error(message);
       return;
     }
     // The insert is now durable. Record that fact before any cache refresh can
     // stall or the grower can leave; navigation remains refresh-gated below.
     trackFunnelEvent("plant_created");
-    const confirmed = confirmCreatedPlantRow(data, {
-      ownerId: user.id,
-      growId: targetGrowId,
-      tentId: validation.value.tent_id ?? null,
-    });
     if (!confirmed) {
       if (mountedRef.current) {
         setBusy(false);
@@ -455,7 +513,7 @@ export default function CreatePlantDialog({
     setPendingNestedTentId(null);
     setNestedTentCreatorMounted(false);
     setOpen(false);
-    if (data && onCreated) onCreated(data as { id: string; name: string });
+    if (onCreated) onCreated(confirmed.row);
   }
 
   return (
@@ -517,6 +575,15 @@ export default function CreatePlantDialog({
               </p>
             )}
           </div>
+        )}
+        {createOutcomeUnknown && (
+          <p
+            className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs"
+            data-testid="plant-create-outcome-unknown"
+          >
+            Verdant could not confirm whether that plant was saved. Refresh this page before
+            creating another plant so you do not make a duplicate.
+          </p>
         )}
         {binding.showRequestedUnavailable && (
           <div

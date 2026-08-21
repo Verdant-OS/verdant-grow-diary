@@ -12,6 +12,11 @@ import { isValidElement, type ReactNode } from "react";
 const insertMock = vi.hoisted(() => vi.fn());
 const singleMock = vi.hoisted(() => vi.fn());
 const selectMock = vi.hoisted(() => vi.fn(() => ({ single: singleMock })));
+const plantLookupMaybeSingleMock = vi.hoisted(() => vi.fn());
+const plantLookupEqMock = vi.hoisted(() =>
+  vi.fn(() => ({ maybeSingle: plantLookupMaybeSingleMock })),
+);
+const plantLookupSelectMock = vi.hoisted(() => vi.fn(() => ({ eq: plantLookupEqMock })));
 const successToastMock = vi.hoisted(() => vi.fn());
 const funnelEventMock = vi.hoisted(() => vi.fn());
 const authState = vi.hoisted(() => ({
@@ -27,6 +32,7 @@ vi.mock("@/integrations/supabase/client", () => ({
             insertMock(payload);
             return { select: selectMock };
           },
+          select: plantLookupSelectMock,
         };
       }
       return {
@@ -195,6 +201,11 @@ beforeEach(() => {
   singleMock.mockReset();
   singleMock.mockResolvedValue({ data: CREATED_ROW, error: null });
   selectMock.mockClear();
+  plantLookupMaybeSingleMock.mockReset();
+  plantLookupMaybeSingleMock.mockResolvedValue({ data: null, error: null });
+  plantLookupEqMock.mockClear();
+  plantLookupSelectMock.mockClear();
+  vi.spyOn(globalThis.crypto, "randomUUID").mockReturnValue(CREATED_ROW.id);
   growsState.grows = [{ id: G1, name: "Spring" }];
   growsState.activeGrowId = G1;
   growsState.loading = false;
@@ -349,7 +360,164 @@ describe("CreatePlantDialog RTL binding", () => {
     expect(payload.grow_id).toBe(G1);
     expect(payload.tent_id).toBe(T1);
     expect(payload.name).toBe("Happy Plant");
+    expect(payload.id).toBe(CREATED_ROW.id);
     expect(selectMock).toHaveBeenCalledWith("*");
+  });
+
+  it("reconciles an exact preallocated plant after a duplicate response", async () => {
+    singleMock.mockResolvedValueOnce({
+      data: null,
+      error: { code: "23505", message: "duplicate key" },
+    });
+    plantLookupMaybeSingleMock.mockResolvedValueOnce({ data: CREATED_ROW, error: null });
+    const onCreated = vi.fn();
+
+    render(
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      >
+        <MemoryRouter>
+          <CreatePlantDialog
+            initiallyOpen
+            defaultGrowId={G1}
+            defaultTentId={T1}
+            onCreated={onCreated}
+          />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await userEvent.type(screen.getByTestId("create-plant-name"), CREATED_ROW.name);
+    await userEvent.click(screen.getByTestId("plant-create-submit"));
+
+    await waitFor(() => expect(onCreated).toHaveBeenCalledWith(CREATED_ROW));
+    expect(insertMock).toHaveBeenCalledTimes(1);
+    expect(insertMock.mock.calls[0][0]).toMatchObject({ id: CREATED_ROW.id });
+    expect(plantLookupSelectMock).toHaveBeenCalledWith("*");
+    expect(plantLookupEqMock).toHaveBeenCalledWith("id", CREATED_ROW.id);
+    expect(successToastMock).toHaveBeenCalledWith("Plant created");
+  });
+
+  it("blocks a blind retry when a duplicate response cannot be reconciled", async () => {
+    singleMock.mockResolvedValueOnce({
+      data: null,
+      error: { code: "23505", message: "duplicate key" },
+    });
+    plantLookupMaybeSingleMock.mockResolvedValueOnce({ data: null, error: null });
+    const onCreated = vi.fn();
+
+    render(
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      >
+        <MemoryRouter>
+          <CreatePlantDialog
+            initiallyOpen
+            defaultGrowId={G1}
+            defaultTentId={T1}
+            onCreated={onCreated}
+          />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await userEvent.type(screen.getByTestId("create-plant-name"), "Possibly Saved Plant");
+    await userEvent.click(screen.getByTestId("plant-create-submit"));
+
+    expect(await screen.findByTestId("plant-create-outcome-unknown")).toHaveTextContent(
+      "Refresh this page before creating another plant",
+    );
+    expect(screen.getByTestId("plant-create-submit")).toBeDisabled();
+    await userEvent.click(screen.getByTestId("plant-create-submit"));
+    expect(insertMock).toHaveBeenCalledTimes(1);
+    expect(onCreated).not.toHaveBeenCalled();
+    expect(successToastMock).not.toHaveBeenCalled();
+  });
+
+  it("reconciles a committed plant after a returned transport failure", async () => {
+    singleMock.mockResolvedValueOnce({
+      data: null,
+      error: { code: "", message: "TypeError: Failed to fetch" },
+    });
+    plantLookupMaybeSingleMock.mockResolvedValueOnce({ data: CREATED_ROW, error: null });
+    const onCreated = vi.fn();
+
+    render(
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      >
+        <MemoryRouter>
+          <CreatePlantDialog
+            initiallyOpen
+            defaultGrowId={G1}
+            defaultTentId={T1}
+            onCreated={onCreated}
+          />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await userEvent.type(screen.getByTestId("create-plant-name"), CREATED_ROW.name);
+    await userEvent.click(screen.getByTestId("plant-create-submit"));
+
+    await waitFor(() => expect(onCreated).toHaveBeenCalledWith(CREATED_ROW));
+    expect(insertMock).toHaveBeenCalledTimes(1);
+    expect(plantLookupEqMock).toHaveBeenCalledWith("id", CREATED_ROW.id);
+    expect(screen.queryByTestId("plant-create-outcome-unknown")).not.toBeInTheDocument();
+  });
+
+  it("reconciles a committed plant after a thrown transport failure", async () => {
+    singleMock.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    plantLookupMaybeSingleMock.mockResolvedValueOnce({ data: CREATED_ROW, error: null });
+    const onCreated = vi.fn();
+
+    render(
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      >
+        <MemoryRouter>
+          <CreatePlantDialog
+            initiallyOpen
+            defaultGrowId={G1}
+            defaultTentId={T1}
+            onCreated={onCreated}
+          />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await userEvent.type(screen.getByTestId("create-plant-name"), CREATED_ROW.name);
+    await userEvent.click(screen.getByTestId("plant-create-submit"));
+
+    await waitFor(() => expect(onCreated).toHaveBeenCalledWith(CREATED_ROW));
+    expect(insertMock).toHaveBeenCalledTimes(1);
+    expect(plantLookupEqMock).toHaveBeenCalledWith("id", CREATED_ROW.id);
+    expect(screen.queryByTestId("plant-create-outcome-unknown")).not.toBeInTheDocument();
+  });
+
+  it("keeps a definitive insert rejection retryable without an ambiguity lookup", async () => {
+    singleMock.mockResolvedValueOnce({
+      data: null,
+      error: { code: "23514", message: "stage constraint rejected" },
+    });
+
+    render(
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      >
+        <MemoryRouter>
+          <CreatePlantDialog initiallyOpen defaultGrowId={G1} defaultTentId={T1} />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await userEvent.type(screen.getByTestId("create-plant-name"), "Rejected Plant");
+    await userEvent.click(screen.getByTestId("plant-create-submit"));
+
+    await waitFor(() => expect(screen.getByTestId("plant-create-submit")).toBeEnabled());
+    expect(insertMock).toHaveBeenCalledTimes(1);
+    expect(plantLookupMaybeSingleMock).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("plant-create-outcome-unknown")).not.toBeInTheDocument();
   });
 
   it("refreshes the exact legacy and owner-scoped plant caches before create handoff", async () => {

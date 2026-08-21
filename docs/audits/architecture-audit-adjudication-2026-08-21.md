@@ -281,11 +281,25 @@ gave. The "58" was an artifact of the clone, not a property of the branch.
 > `git rev-parse --is-shallow-repository` **before** citing any count, absence, or
 > "exhaustive" claim derived from local history.
 
-So the search bound, stated correctly: **60 commits recomputed out of 16,604**, plus 244
-annotated tags of 700. It is **not** exhaustive over the deploy branch, and not over the
-repository — **456 tags carry no `Tree-Hash:` annotation** and 169 other remote branches were
-not recomputed. The canary below validates the _algorithm_; it never validated the _coverage_,
-which is precisely what the reviewer said twice.
+So the search bound, stated correctly. Re-run on the **unshallowed** clone with `--scan=400`:
+also **`NO_MATCH`**. Final bound:
+
+| Dimension             | Covered                                                            | Not covered                    |
+| --------------------- | ------------------------------------------------------------------ | ------------------------------ |
+| Deploy-branch commits | **400** recomputed, spanning **2026-08-04 → 2026-08-21 (17 days)** | 16,204 older commits           |
+| Release tags          | 244 annotated with `Tree-Hash:`                                    | **456** carrying no annotation |
+| Other refs            | none                                                               | 169 other remote branches      |
+
+**400 of 16,604 is 2.4% — still a sample, so the universal claim stays `NOT_MEASURED`.** But
+the bound is now interpretable rather than a bare count, and it bears on one of the two
+surviving explanations: the resolver's "the build may predate the scan window" is **weak for
+this build**, whose own stamp reports `commitTime` `2026-08-21T09:44:40Z` — inside the scanned
+17 days by a wide margin. `uncertainty`: that timestamp is self-reported by a build whose SHA is
+absent from the repository, so it cannot be independently checked, and a matching commit could
+sit on one of the 169 unscanned branches rather than the deploy branch.
+
+The canary validates the _algorithm_; it never validated the _coverage_, which is precisely what
+the reviewer said twice.
 
 **A canary rules out the tooling.** The resolver's own output warns that a `NO_MATCH` could mean
 the hash roots are broken rather than the build being unmatched, and prescribes resolving a
@@ -297,9 +311,9 @@ recorded hash reproduces under local recomputation. The resolver works.
 So the `NO_MATCH` is a **measured negative, not a tooling artifact** — stated to exactly its own
 reach:
 
-> Production's tree hash matched **none of the 60 commits recomputed** (of 16,604 in the deploy
-> tip's ancestry) and **no annotated release tag** (244 of 700). Whether some commit reproduces
-> it is **`NOT_MEASURED`** — the search is a bounded sample, not a proof of absence.
+> Production's tree hash matched **none of the 400 commits recomputed** (of 16,604, covering the
+> last 17 days of the deploy branch) and **no annotated release tag** (244 of 700). Whether some
+> commit reproduces it is **`NOT_MEASURED`** — a 2.4% sample is not a proof of absence.
 
 Two earlier revisions got this wrong in opposite directions, and the sequence is the lesson.
 The first called it `BLOCKED` when a local resolver could measure it. The correction overshot to
@@ -508,7 +522,7 @@ commented-out or relocated setting is indistinguishable from a live one to a tex
 | Applied-migration ledger vs. the 272 committed files                 | `NOT_MEASURED` — drift probe still blocked on both an owner secret and defect 3 (name-bound matching) |
 | Does production deliver the security headers `vercel.json` declares? | `NOT_MEASURED` — first check for OPS-02                                                               |
 | Does the served SHA exist in the repository?                         | **`FAIL` — measured on complete history after `git fetch --unshallow` (§6.1)**                        |
-| Does production's tree hash match any commit?                        | `NOT_MEASURED` — 60 of 16,604 recomputed, 244 of 700 tags annotated; a bounded sample                 |
+| Does production's tree hash match any commit?                        | `NOT_MEASURED` — 400 of 16,604 recomputed (last 17 days) plus 244 of 700 tags; a 2.4% sample          |
 | What _is_ production commit `4b1c4867e685`, and why is it dirty?     | `BLOCKED` — narrowed, but still needs the publisher's view; owner-only                                |
 | Are all five npm consumers still real after §6.2?                    | `NOT_MEASURED` — cheapest TOOL-01 progress                                                            |
 | Runtime AI Doctor behaviour under the twenty adversarial cases       | `NOT_MEASURED` — AI-02 not run                                                                        |

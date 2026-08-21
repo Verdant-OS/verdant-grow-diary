@@ -445,12 +445,23 @@ probe behind it had captured only status codes — never headers. Measured now, 
 | `x-frame-options`           | `SAMEORIGIN`                                           | **absent**                                                           |
 | `permissions-policy`        | `geolocation=(), camera=(), microphone=(), payment=()` | **absent**                                                           |
 
-So the blanket claim was wrong — three of five arrive. **But the HSTS mismatch is the decisive
-evidence that they do not come from `vercel.json`:** the delivered `max-age` is half the declared
-value and omits `preload`. A config that were actually applied would produce the declared string.
-Combined with `server: cloudflare` on every response, the headers originate from the
-Cloudflare/Lovable edge, not from this file — which **strengthens** the inert-config conclusion
-rather than weakening it.
+So the blanket claim was wrong — three of five arrive.
+
+**What this measures is delivery, not origin.** Two findings are solid and bounded: the delivered
+HSTS `max-age` is half the declared value and omits `preload`, and two declared headers do not
+arrive at all. A `vercel.json` applied as written would produce the declared string and deliver
+all five, so **that file is not being applied as declared** — which corroborates the inert-config
+conclusion the redirect probe establishes independently.
+
+**Where the three delivered headers actually come from is `NOT_MEASURED`, and this document does
+not claim otherwise.** An earlier revision inferred a Cloudflare/Lovable origin from `server:
+cloudflare` on every response. That inference does not hold: the `server` header identifies the
+proxy that answered, not the hop at which any given header was introduced. A fronted origin can
+emit a header that the proxy passes through untouched, and a proxy can override one field while
+leaving others alone — which is consistent with exactly what was observed. The two exact matches
+are also common defaults, so matching proves nothing about their source either. Settling origin
+needs the edge and origin configuration, which is owner-gated; it is OPS-02's first question, not
+a conclusion available from response headers alone.
 
 **Two declared headers are absent, and nothing substitutes for one of them.** `established
 fact`: no `content-security-policy` header is present either, so there is no `frame-ancestors`
@@ -616,20 +627,19 @@ commented-out or relocated setting is indistinguishable from a live one to a tex
 
 ## 8. Known unknowns, and what stays blocked
 
-| Question                                                             | Status                                                                                                                                                                                             |
-| -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Applied-migration ledger vs. the 272 committed files                 | `NOT_MEASURED` — drift probe still blocked on both an owner secret and defect 3 (name-bound matching)                                                                                              |
-| Does production deliver the security headers `vercel.json` declares? | **Measured (§6.2).** 3 of 5 arrive; `x-frame-options` and `permissions-policy` absent, no CSP substitutes; HSTS present with a different value, so they do not originate from that file            |
-| Does the served SHA exist in the repository?                         | **`PASS` — it does.** Confirmed via the GitHub commit endpoint; a Lovable merge commit off the deploy tip, unreachable from fetched refs (§6.1)                                                    |
-| Does production's tree hash match its **own stamped commit**?        | **`FAIL` — measured.** `1f0eb7b4e6cd` vs stamped `8773f6b2c0ed` (§6.1)                                                                                                                             |
-| Why does the published tree differ from that commit's tree?          | `BLOCKED` — needs the publisher's build log; owner-only                                                                                                                                            |
-| What _is_ production commit `4b1c4867e685`?                          | **`PASS` — resolved.** "Completed Verdant audit", `lovable-dev[bot]`, merge of `28c01a017` + `a684da59b`, `2026-08-21T09:44:40Z`, via the GitHub commit endpoint (§6.1). Do not re-run this lookup |
-| Why does the published tree differ from that commit's tree?          | `BLOCKED` — needs the publisher's build log; owner-only                                                                                                                                            |
-| Are all five npm consumers still real after §6.2?                    | `NOT_MEASURED` — cheapest TOOL-01 progress                                                                                                                                                         |
-| Runtime AI Doctor behaviour under the twenty adversarial cases       | `NOT_MEASURED` — AI-02 not run                                                                                                                                                                     |
-| False-positive rate for any SPC rule                                 | `NOT_MEASURED` — no synthetic dataset exists yet (SENSOR-02)                                                                                                                                       |
-| GA4 / GSC authenticated baselines                                    | `BLOCKED` — unchanged, blockers 2 and 3                                                                                                                                                            |
-| Indexation                                                           | `NOT_MEASURED` — unchanged                                                                                                                                                                         |
+| Question                                                                           | Status                                                                                                                                                                                                                                                                 |
+| ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Applied-migration ledger vs. the 272 committed files                               | `NOT_MEASURED` — drift probe still blocked on both an owner secret and defect 3 (name-bound matching)                                                                                                                                                                  |
+| Does production deliver the security headers `vercel.json` declares?               | **Measured (§6.2).** 3 of 5 arrive; `x-frame-options` and `permissions-policy` absent, no CSP substitutes; HSTS present with a different value — so that file is **not being applied as declared**. Where the three delivered headers _do_ originate is `NOT_MEASURED` |
+| Does the served SHA exist in the repository?                                       | **`PASS` — it does.** Confirmed via the GitHub commit endpoint; a Lovable merge commit off the deploy tip, unreachable from fetched refs (§6.1)                                                                                                                        |
+| Does the tree hash production **stamped** match the tree of the commit it stamped? | **`FAIL` — measured.** Recomputed `1f0eb7b4e6cd` vs stamped `8773f6b2c0ed` (§6.1)                                                                                                                                                                                      |
+| Why did the build **workspace's** hashed roots differ from that commit's tree?     | `BLOCKED` — needs the publisher's build log; owner-only. Note the question: §6.1 establishes workspace drift only. Whether any **shipped byte** differs is `NOT_MEASURED`                                                                                              |
+| What _is_ production commit `4b1c4867e685`?                                        | **`PASS` — resolved.** "Completed Verdant audit", `lovable-dev[bot]`, merge of `28c01a017` + `a684da59b`, `2026-08-21T09:44:40Z`, via the GitHub commit endpoint (§6.1). Do not re-run this lookup                                                                     |
+| Are all five npm consumers still real after §6.2?                                  | `NOT_MEASURED` — cheapest TOOL-01 progress                                                                                                                                                                                                                             |
+| Runtime AI Doctor behaviour under the twenty adversarial cases                     | `NOT_MEASURED` — AI-02 not run                                                                                                                                                                                                                                         |
+| False-positive rate for any SPC rule                                               | `NOT_MEASURED` — no synthetic dataset exists yet (SENSOR-02)                                                                                                                                                                                                           |
+| GA4 / GSC authenticated baselines                                                  | `BLOCKED` — unchanged, blockers 2 and 3                                                                                                                                                                                                                                |
+| Indexation                                                                         | `NOT_MEASURED` — unchanged                                                                                                                                                                                                                                             |
 
 ---
 

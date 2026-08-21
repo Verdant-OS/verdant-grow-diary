@@ -1,6 +1,33 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-20 UTC (second same-day edit)
+**Last updated:** 2026-08-21 UTC
+**Updated by:** Claude (2026-08-21: **the signup-attribution forward repair is
+now APPLIED and the live outage is CLOSED.** Acted on Cheek's in-session
+"fix things I deliberately left for you" instruction, covering the three items
+recorded at the end of the prior turn's work. Applied
+`supabase/migrations/20260813030000_signup_acquisition_forward_repair.sql` to
+production verbatim through the same Lovable SQL channel as the Action Queue
+repairs, guarded by an md5 transcription check against the runbook's pinned
+SHA-256 identity so the applied bytes are verified, not assumed — the first
+attempt caught a real transcription slip and aborted with zero writes before
+the corrected retry succeeded. `public.signup_acquisition_attributions` and
+all four functions now exist; a rolled-back end-to-end probe of the exact
+allowlisted-source failure path passed. The merged migration never revokes
+`service_role` (zero occurrences, confirmed by grep), so this project's legacy
+default privileges would otherwise leave `service_role` holding unintended
+access on all five objects — the same class of gap already recorded for the
+Action Queue guard below. An ad-hoc supplemental `service_role` revoke was
+applied through the same channel at apply time and is now captured as a new
+additive migration, `20260821064300_signup_acquisition_service_role_hardening.sql`,
+validated on a local PostgreSQL 16 replay, so a fresh provision or
+disaster-recovery restore reaches the same hardened state rather than
+silently reopening it. See the 2026-08-21 resolution block under the
+signup-attribution section for full evidence. No `schema_migrations` ledger
+row was written for either signup version, consistent with this file's own
+"founder decision" framing for that class of write. No governance file
+changed in this edit.)
+
+**Prior update:** 2026-08-20 UTC (second same-day edit)
 **Updated by:** Claude (2026-08-20, later edit: **the Action Queue transition
 contract is now APPLIED and the live security gap is CLOSED.** Cheek authorized
 the full sequence in session. `20260819190000` (guard forward repair) applied
@@ -113,9 +140,16 @@ inside the active governance handoff.
 
 ---
 
-## ⚠️ Open production incident — attributed signups hard-fail
+## ✅ RESOLVED 2026-08-21 — attributed signups hard-fail
 
-**Status 2026-08-13: OPEN. Fix merged, NOT applied. Production is still broken.**
+**Status 2026-08-21: RESOLVED. The forward repair is applied to production
+and the outage is closed.** The block immediately below is preserved verbatim
+for its diagnosis and evidence — it is still an accurate description of the
+bug that was fixed — and the original 2026-08-13 status line is superseded.
+See the dated resolution subsection at the end of this section for what
+changed and what was verified.
+
+**Status 2026-08-13 (superseded): OPEN. Fix merged, NOT applied. Production is still broken.**
 
 Account creation aborts for any signup carrying an allowlisted acquisition source —
 including the front-door CTA on `/` and `/welcome`. The live `handle_new_user`
@@ -137,6 +171,88 @@ already deployed ahead of the repo.
 
 **Full detail, evidence, apply steps and post-apply verification:**
 `docs/signup-attribution-outage-operator-runbook.md`
+
+### 2026-08-21 resolution — the forward repair is APPLIED, the live outage is CLOSED
+
+`established fact`, applied 2026-08-21 by Claude through the same Lovable SQL
+channel used for the Action Queue repairs above, at Cheek's authorization in
+session to act on the three items left open at the end of that prior work.
+
+`supabase/migrations/20260813030000_signup_acquisition_forward_repair.sql` was
+applied to production **verbatim** — transcription verified before any
+statement executed, by wrapping the exact file bytes in an md5 guard and
+checking them against the runbook's pinned identity (SHA-256 `6c002ab6…`,
+17297 bytes) rather than trusting a copy-paste. The first attempt caught a
+real one-character transcription slip (a stray leading newline from this
+session's own dollar-quote formatting) and aborted with **zero writes** before
+it could apply anything wrong; the corrected retry succeeded.
+`public.signup_acquisition_attributions` and all four functions
+(`handle_new_user`, `record_signup_acquisition_first_touch`,
+`signup_acquisition_operator_snapshot`, `signup_to_paid_operator_snapshot`)
+now exist in production.
+
+**A rolled-back, zero-committed-write functional probe exercised the exact
+failure path this section describes** — an allowlisted acquisition source
+through `handle_new_user` — and passed all 8 assertions checked (BEGIN …
+ROLLBACK throughout; the first attempt hit a permission-denied error writing
+probe results while impersonating `authenticated` against an ungranted temp
+table, was restructured so the role switch wraps only the privileged calls,
+and then passed clean).
+
+**The merged migration never revokes `service_role`** — zero occurrences of
+the string anywhere in the 456-line file, confirmed by grep before relying on
+it. On this hosted project's legacy default privileges (the same posture
+`supabase/seed.sql`'s header documents for tables, now confirmed by direct
+probe to extend to functions too), a freshly created table or function grants
+`service_role` full access automatically with no explicit `GRANT` — the
+identical class of gap this file already records for the Action Queue guard.
+An ad-hoc supplemental `REVOKE ALL ... FROM service_role` on all five objects
+was issued through the same channel immediately after the forward repair, so
+production is not just fixed but hardened.
+
+**That ad-hoc supplement is now captured in version control**, so it is not
+left to silently drop out of a future replay the way the Action Queue's
+initial state very nearly was:
+`supabase/migrations/20260821064300_signup_acquisition_service_role_hardening.sql`
+is a new additive migration (`20260813030000` itself is untouched, per
+Migration Immutability Rules) that revokes `service_role` on the table and
+all four functions, with a preflight that fails closed if the prerequisite
+objects are absent and a postflight that asserts `service_role` holds nothing
+while `authenticated`'s intended grants survive unchanged. Validated against a
+local PostgreSQL 16 replay under a simulated permissive-default-privilege
+regime reproducing this project's posture: applies cleanly after
+`20260813030000`, hardens all five objects, is idempotent on re-run, and
+fails closed with zero writes when the prerequisite objects are missing.
+Static contract tests:
+`src/test/signup-acquisition-service-role-hardening-migration.test.ts`
+(7 tests), adversarially verified — a real injected
+`GRANT ... TO service_role` statement was caught before the test was trusted.
+
+**This new migration has not itself been re-applied to production**, and does
+not need to be: production already carries the ad-hoc supplement's effect.
+The migration exists so a fresh replay, CI reset, or disaster-recovery restore
+reaches the same hardened end state instead of silently reopening the gap —
+not to change production's current state, which is already correct. Applying
+it to production anyway would be safe (`REVOKE` is idempotent and its
+preflight would simply confirm the prerequisites it expects), but that is
+deliberately left for a normal migration-apply pass rather than a second
+ad-hoc production SQL session, in keeping with "fix things ... rather than
+widening scope."
+
+**No `supabase_migrations.schema_migrations` ledger row was inserted for
+either signup version.** Consistent with this repo's own established framing
+for this exact class of write — the runbook's own "Safe disposition" section
+calls a ledger write "a founder decision" — no agent session touched the
+ledger. Object presence remains the ground truth here, exactly as for the
+Action Queue repairs, and the drift probe remains blocked for the same two
+reasons already recorded in the next section.
+
+**What this does not change.** GA4/GSC baselines, Day 0, and the four-week
+measurement clock are untouched. No schema beyond the table and functions
+this migration and its predecessor define. No RLS, auth, or edge-function
+change. The frontend attribution code (`Landing.tsx` and the signup URL
+builder) was already deployed ahead of the repo per the original diagnosis
+above, and was not touched by this repair.
 
 ---
 
@@ -798,19 +914,19 @@ Slice plan: each approved item ships as its own PR. **Status measured
 2026-08-21 at deploy tip `6cf3ffda` — Tranche B+ is substantially
 delivered, not pending:**
 
-| Slice | Status |
-| --- | --- |
-| B0a measurement harness (first merge gate) | **MERGED** — #1039 `de8ebad` |
-| B1 target-precedence rules | **MERGED** — #1040 `9141be8` |
-| B3a recovery + ratified copy | **MERGED** — #1042 `9b64456` |
-| B2a shared save-key policy | **MERGED** — #1049 `f09febc` |
-| B4a `/doctor` loop card | **MERGED** — #1047 `cff3efd` |
-| D7 plant-scoped Better/Same/Worse | **MERGED** — #1041 `5640d77` |
-| D5 "Continue with <plant>?" | **OPEN** — #1043 |
-| B2b | still deferred to **A5** (unopened) |
-| B4b | still deferred to **A2** (unopened) |
-| B5 | waits for **A3** (unopened) |
-| B0b | owner-gated authenticated session/CI path |
+| Slice                                      | Status                                    |
+| ------------------------------------------ | ----------------------------------------- |
+| B0a measurement harness (first merge gate) | **MERGED** — #1039 `de8ebad`              |
+| B1 target-precedence rules                 | **MERGED** — #1040 `9141be8`              |
+| B3a recovery + ratified copy               | **MERGED** — #1042 `9b64456`              |
+| B2a shared save-key policy                 | **MERGED** — #1049 `f09febc`              |
+| B4a `/doctor` loop card                    | **MERGED** — #1047 `cff3efd`              |
+| D7 plant-scoped Better/Same/Worse          | **MERGED** — #1041 `5640d77`              |
+| D5 "Continue with <plant>?"                | **OPEN** — #1043                          |
+| B2b                                        | still deferred to **A5** (unopened)       |
+| B4b                                        | still deferred to **A2** (unopened)       |
+| B5                                         | waits for **A3** (unopened)               |
+| B0b                                        | owner-gated authenticated session/CI path |
 
 Note the new dependency this created: B2b and B4b now block on Tranche A
 slices that have never been opened, so Tranche A is no longer only its own
@@ -1162,11 +1278,11 @@ schema change and does not authorize production writes.
 
 ## Agents currently assigned
 
-| Agent             | Assignment                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Codex             | Standing SEO measurement readiness and analytics integrity. Option A slice 1 (#949) is live-verified. Convex Phase 1 of `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` remains in review: PR #977, still OPEN 2026-08-15. Scope stays Phase 1 only, under `spikes/convex-component-sandbox/`. **Do NOT rebuild the Postgres domain-reach detector — Phase 0 and Phase 1 of `POSTGRES_RESTRICTED_ROLE_SPIKE` are already delivered by Claude.** Incoming #986 still said Phase 1 was `HOLD`; that row was stale. Phase 2 of that arm is HOLD (JWT secret unobtainable on Lovable Cloud; role durability `UNKNOWN`)                                                                            |
-| Claude            | **One-Tent Loop Tranche B+ — architect and implementer (Cheek, 2026-08-19). Substantially delivered as of 2026-08-21:** B0a (#1039), B1 (#1040), B3a (#1042), B2a (#1049), B4a (#1047) and D7 (#1041) merged; D5 (#1043) open; B2b/B4b/B5 blocked on unopened Tranche A slices A5/A2/A3. Also delivered #1062, the routed `CURRENT_STATE` refresh specification (`docs/specs/current-state-refresh-2026-08-20.md`). `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` specification — delivered. `POSTGRES_RESTRICTED_ROLE_SPIKE`: spec delivered, **Phase 0 detector measured and Phase 1 role harness delivered (local-only)**, 2026-08-14 under Cheek's approval and full-authority grant. Not the 2026-08-13 “spec-only / not implementation” row. Prior completed out-of-slice work (#586/#809/#812/#885) unchanged                                                                                                                                                                                                                                                                                            |
+| Agent             | Assignment                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Codex             | Standing SEO measurement readiness and analytics integrity. Option A slice 1 (#949) is live-verified. Convex Phase 1 of `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` remains in review: PR #977, still OPEN 2026-08-15. Scope stays Phase 1 only, under `spikes/convex-component-sandbox/`. **Do NOT rebuild the Postgres domain-reach detector — Phase 0 and Phase 1 of `POSTGRES_RESTRICTED_ROLE_SPIKE` are already delivered by Claude.** Incoming #986 still said Phase 1 was `HOLD`; that row was stale. Phase 2 of that arm is HOLD (JWT secret unobtainable on Lovable Cloud; role durability `UNKNOWN`)                                                                                                                                                                                                                                  |
+| Claude            | **One-Tent Loop Tranche B+ — architect and implementer (Cheek, 2026-08-19). Substantially delivered as of 2026-08-21:** B0a (#1039), B1 (#1040), B3a (#1042), B2a (#1049), B4a (#1047) and D7 (#1041) merged; D5 (#1043) open; B2b/B4b/B5 blocked on unopened Tranche A slices A5/A2/A3. Also delivered #1062, the routed `CURRENT_STATE` refresh specification (`docs/specs/current-state-refresh-2026-08-20.md`). `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` specification — delivered. `POSTGRES_RESTRICTED_ROLE_SPIKE`: spec delivered, **Phase 0 detector measured and Phase 1 role harness delivered (local-only)**, 2026-08-14 under Cheek's approval and full-authority grant. Not the 2026-08-13 “spec-only / not implementation” row. Prior completed out-of-slice work (#586/#809/#812/#885) unchanged                              |
 | Grok              | **Product Intelligence, Adversarial Audit, and Implementation Lead** (Cheek 2026-08-20, refined). Equally empowered to research, audit the live app, implement assigned slices, test, and independently review. Peer with Claude and Codex — **none outranks the others**; explicit task ownership controls. SEO/market/backlink strength retained (not a fence). Map: `docs/agents/grok-peer-elevation-map-2026-08-20.md`. Does **not** take Tranche A remaining edit points (Codex) or Tranche B+ product code (Claude) unless done and unassigned. Prior delivered work unchanged: `ONE_TENT_LOOP_OPERATING_ORDER` repo slices 0/2/3/4; Slices 1 and 5 owner-`BLOCKED`; Cursor SDK spike gates on #985 / `CURSOR_API_KEY`. Reuse of the dispatcher not approved. Convex/Postgres spikes not paused. Production Convex HOLD. Not Unassigned |
-| Security reviewer | Unassigned until Convex Phase 1 spike code is ready for review before any Convex cloud credential                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| Gemini            | Unassigned                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| Council Chair     | Convex-vs-Postgres comparison: **recommendation delivered in spec §10 — adopt Postgres incrementally, hold Convex.** Postgres arm has a measured number (8 cross-domain reaches across 22 service-role functions). Convex arm remains `NOT_MEASURED` pending #977 isolation proofs (green CI on #977 is not those proofs). Incoming #986 still said “do not issue a recommendation until both arms carry evidence”; that sentence is stale — the recommendation already shipped. `ai-coach`'s five reaches are the case neither architecture removes cheaply                                                                                                                            |
+| Security reviewer | Unassigned until Convex Phase 1 spike code is ready for review before any Convex cloud credential                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| Gemini            | Unassigned                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Council Chair     | Convex-vs-Postgres comparison: **recommendation delivered in spec §10 — adopt Postgres incrementally, hold Convex.** Postgres arm has a measured number (8 cross-domain reaches across 22 service-role functions). Convex arm remains `NOT_MEASURED` pending #977 isolation proofs (green CI on #977 is not those proofs). Incoming #986 still said “do not issue a recommendation until both arms carry evidence”; that sentence is stale — the recommendation already shipped. `ai-coach`'s five reaches are the case neither architecture removes cheaply                                                                                                                                                                                                                                                                                  |

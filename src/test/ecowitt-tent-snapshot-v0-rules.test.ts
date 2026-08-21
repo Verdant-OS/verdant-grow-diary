@@ -1,5 +1,6 @@
 /**
  * EcoWitt tent Snapshot V0 — Sensor Truth tagging + quiet bridge + stuck extremes.
+ * Post-merge QA (Testy): tent/plant isolation, malformed timestamps, unit fail-closed.
  */
 import { describe, expect, it } from "vitest";
 import {
@@ -11,17 +12,25 @@ import {
   isForbiddenSensorTruthSourceToken,
   isStuckZeroOrHundredPct,
   mapEcowittTentSnapshotV0MetricKey,
+  parseEcowittTentSnapshotV0DateUtcMs,
 } from "@/lib/ecowittTentSnapshotV0Rules";
 import {
   buildEcowittTentSnapshotV0ViewModel,
   ECOWITT_TENT_SNAPSHOT_V0_UNUSED_FIELD_NAMES,
 } from "@/lib/ecowittTentSnapshotV0ViewModel";
-import { selectEcowittCandidates } from "@/lib/ecowittLatestSnapshotFilter";
+import {
+  selectEcowittCandidates,
+  type EcowittSensorReadingRow,
+} from "@/lib/ecowittLatestSnapshotFilter";
 
 const NOW = new Date("2026-08-20T18:00:00.000Z");
 const FRESH_AT = "2026-08-20T17:50:00.000Z"; // 10 min ago
+const NEWER_AT = "2026-08-20T17:55:00.000Z"; // 5 min ago — newer than FRESH_AT
 const STALE_AT = "2026-08-20T16:00:00.000Z"; // 2h ago
 const TENT = "11111111-1111-4111-8111-111111111111";
+const TENT_B = "22222222-2222-4222-8222-222222222222";
+const PLANT_A = "33333333-3333-4333-8333-333333333333";
+const PLANT_B = "44444444-4444-4444-8444-444444444444";
 
 function row(
   overrides: Partial<{
@@ -30,11 +39,14 @@ function row(
     metric: string;
     value: number;
     raw_payload: unknown;
+    tent_id: string | null;
+    plant_id: string | null;
   }> = {},
 ) {
   const capturedAt = overrides.captured_at ?? FRESH_AT;
   return {
-    tent_id: TENT,
+    tent_id: overrides.tent_id === undefined ? TENT : overrides.tent_id,
+    plant_id: overrides.plant_id === undefined ? null : overrides.plant_id,
     source: overrides.source ?? "live",
     captured_at: capturedAt,
     metric: overrides.metric ?? "temperature_c",
@@ -42,6 +54,25 @@ function row(
     raw_payload:
       overrides.raw_payload ??
       ({ vendor: "ecowitt", dateutc: capturedAt } as Record<string, unknown>),
+  };
+}
+
+function filterRow(
+  overrides: Partial<EcowittSensorReadingRow> = {},
+  payload: Record<string, unknown> = {
+    vendor: "ecowitt",
+    temp1f: 77,
+    humidity1: 55,
+    dateutc: FRESH_AT,
+  },
+): EcowittSensorReadingRow {
+  return {
+    tent_id: TENT,
+    plant_id: null,
+    source: "live",
+    captured_at: FRESH_AT,
+    raw_payload: payload,
+    ...overrides,
   };
 }
 
@@ -290,5 +321,236 @@ describe("ecowittLatestSnapshotFilter — vendor ecowitt never resolves to live"
     );
     expect(candidates).toHaveLength(1);
     expect(candidates[0]?.source).toBe(expected);
+  });
+});
+
+describe("post-merge QA — plant/tent scope isolation", () => {
+  it("V0 view-model: newer tent B row never appears on tent A", () => {
+    const vm = buildEcowittTentSnapshotV0ViewModel(
+      [
+        row({
+          tent_id: TENT,
+          metric: "temperature_c",
+          value: 24,
+          captured_at: FRESH_AT,
+        }),
+        row({
+          tent_id: TENT_B,
+          metric: "temperature_c",
+          value: 99,
+          captured_at: NEWER_AT,
+          raw_payload: { vendor: "ecowitt", dateutc: NEWER_AT },
+        }),
+      ],
+      { tentId: TENT, now: NOW },
+    );
+    const temp = vm.metrics.find((m) => m.key === "temp");
+    expect(temp?.value).toBe(24);
+    expect(temp?.capturedAt).toBe(FRESH_AT);
+    expect(temp?.value).not.toBe(99);
+  });
+
+  it("V0 view-model: null tent_id rows never bleed into a scoped tent", () => {
+    const vm = buildEcowittTentSnapshotV0ViewModel(
+      [
+        row({
+          tent_id: null,
+          metric: "humidity_pct",
+          value: 88,
+          captured_at: NEWER_AT,
+          raw_payload: { vendor: "ecowitt", dateutc: NEWER_AT },
+        }),
+        row({
+          tent_id: TENT,
+          metric: "humidity_pct",
+          value: 55,
+          captured_at: FRESH_AT,
+        }),
+      ],
+      { tentId: TENT, now: NOW },
+    );
+    const rh = vm.metrics.find((m) => m.key === "rh");
+    expect(rh?.value).toBe(55);
+    expect(rh?.value).not.toBe(88);
+  });
+
+  it("selectEcowittCandidates: newer tent B never bleeds into tent A", () => {
+    const candidates = selectEcowittCandidates(
+      [
+        filterRow(
+          { tent_id: TENT, captured_at: FRESH_AT },
+          { vendor: "ecowitt", temp1f: 70, humidity1: 50, dateutc: FRESH_AT },
+        ),
+        filterRow(
+          { tent_id: TENT_B, captured_at: NEWER_AT },
+          { vendor: "ecowitt", temp1f: 90, humidity1: 80, dateutc: NEWER_AT },
+        ),
+      ],
+      { tentId: TENT },
+    );
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0]?.payload.humidity1).toBe(50);
+    expect(candidates[0]?.payload.temp1f).toBe(70);
+  });
+
+  it("selectEcowittCandidates: newer plant B never leaks when plantId=plant A", () => {
+    // Existing filtering suite covered plant vs null; this pins plant-vs-plant leak.
+    const candidates = selectEcowittCandidates(
+      [
+        filterRow(
+          { plant_id: PLANT_A, captured_at: FRESH_AT },
+          { vendor: "ecowitt", temp1f: 72, humidity1: 52, dateutc: FRESH_AT },
+        ),
+        filterRow(
+          { plant_id: PLANT_B, captured_at: NEWER_AT },
+          { vendor: "ecowitt", temp1f: 91, humidity1: 81, dateutc: NEWER_AT },
+        ),
+      ],
+      { tentId: TENT, plantId: PLANT_A },
+    );
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0]?.payload.humidity1).toBe(52);
+    expect(candidates[0]?.payload.temp1f).toBe(72);
+  });
+});
+
+describe("post-merge QA — malformed timestamps fail closed (never Live)", () => {
+  it.each([
+    ["", null],
+    ["not-a-date", null],
+    ["NaN", null],
+    ["2026-13-40T99:99:99.000Z", null],
+    ["totally-invalid-iso", null],
+    ["2026-08-20T17:50:00.000Z", Date.parse(FRESH_AT)],
+  ] as const)("parseEcowittTentSnapshotV0DateUtcMs(%j) → %s", (raw, expectedMs) => {
+    const ms = parseEcowittTentSnapshotV0DateUtcMs(raw);
+    if (expectedMs === null) {
+      expect(ms).toBeNull();
+    } else {
+      expect(ms).toBe(expectedMs);
+    }
+  });
+
+  it("rejects non-string garbage (NaN number, null, object)", () => {
+    expect(parseEcowittTentSnapshotV0DateUtcMs(Number.NaN)).toBeNull();
+    expect(parseEcowittTentSnapshotV0DateUtcMs(null)).toBeNull();
+    expect(parseEcowittTentSnapshotV0DateUtcMs({ iso: FRESH_AT })).toBeNull();
+    expect(parseEcowittTentSnapshotV0DateUtcMs(1724171400000)).toBeNull();
+  });
+
+  it.each([
+    ["", ""],
+    ["not-a-date", "not-a-date"],
+    ["NaN", "NaN"],
+    ["2026-13-40T99:99:99.000Z", "totally-invalid-iso"],
+  ] as const)(
+    "canonical live + garbage dateutc=%j / captured_at=%j is invalid, never Live",
+    (dateutc, capturedAt) => {
+      const truth = classifyEcowittTentSnapshotV0Source({
+        row: row({
+          source: "live",
+          captured_at: capturedAt,
+          raw_payload: { vendor: "ecowitt", dateutc },
+        }),
+        now: NOW,
+      });
+      expect(truth).toBe("invalid");
+      expect(truth).not.toBe("live");
+    },
+  );
+
+  it("V0 view-model: garbage timestamps never render as healthy Live", () => {
+    const vm = buildEcowittTentSnapshotV0ViewModel(
+      [
+        row({
+          source: "live",
+          metric: "temperature_c",
+          value: 24,
+          captured_at: "not-a-date",
+          raw_payload: { vendor: "ecowitt", dateutc: "" },
+        }),
+        row({
+          source: "live",
+          metric: "humidity_pct",
+          value: 55,
+          captured_at: "NaN",
+          raw_payload: { vendor: "ecowitt", dateutc: "not-a-date" },
+        }),
+      ],
+      { tentId: TENT, now: NOW },
+    );
+    for (const m of vm.metrics) {
+      expect(m.badgeLabel).not.toBe("Live");
+      expect(m.truthSource).not.toBe("live");
+    }
+    // Unparseable observation time → row skipped from latest pick → no Live badges.
+    expect(vm.metrics.every((m) => m.badgeLabel !== "Live")).toBe(true);
+  });
+});
+
+describe("post-merge QA — unit ambiguity fail-closed (no C/F mix as healthy Live °C)", () => {
+  /**
+   * Stored convention is canonical Celsius (temperatureUnitPreference + V0 VM unit °C).
+   * Fahrenheit-looking numbers must not present as healthy Live °C without conversion.
+   * V0 soil is pct only — no µS/cm / mS/cm / EC / CO2 / VPD product surface here.
+   *
+   * PRODUCT HOLE (post-merge QA, Testy): `evaluateEcowittTentSnapshotV0Metric`
+   * accepts looksLikeF (60–110) as valid, and the view-model surfaces value 77
+   * with unit °C + Live. Card then assumes Celsius via convertCelsiusForDisplay.
+   * Owner remains Forge for any product fix — Testy does not change rules/VM.
+   * `it.fails` keeps the Safe-by-Design proof; suite turns red when the hole closes.
+   */
+  it.fails(
+    "Fahrenheit-looking temperature_c must not present as healthy Live °C without convert",
+    () => {
+      const evaluation = evaluateEcowittTentSnapshotV0Metric("temp", 77);
+      const vm = buildEcowittTentSnapshotV0ViewModel(
+        [row({ metric: "temperature_c", value: 77, captured_at: FRESH_AT })],
+        { tentId: TENT, now: NOW },
+      );
+      const temp = vm.metrics.find((m) => m.key === "temp");
+      expect(temp?.unit).toBe("°C");
+
+      // Safe-by-Design: either fail closed (invalid / null value) OR convert — never
+      // show the raw Fahrenheit-looking number as healthy Live Celsius.
+      const presentsFAsHealthyLiveC =
+        evaluation.valid === true &&
+        temp?.valid === true &&
+        temp?.truthSource === "live" &&
+        temp?.badgeLabel === "Live" &&
+        temp?.value === 77 &&
+        temp?.unit === "°C";
+      expect(presentsFAsHealthyLiveC).toBe(false);
+    },
+  );
+
+  it.fails(
+    "metric temp_f Fahrenheit value must not surface as Celsius-without-convert Live",
+    () => {
+      expect(mapEcowittTentSnapshotV0MetricKey("temp_f")).toBe("temp");
+      const vm = buildEcowittTentSnapshotV0ViewModel(
+        [row({ metric: "temp_f", value: 77, captured_at: FRESH_AT })],
+        { tentId: TENT, now: NOW },
+      );
+      const temp = vm.metrics.find((m) => m.key === "temp");
+      const presentsFAsHealthyLiveC =
+        temp?.valid === true &&
+        temp?.truthSource === "live" &&
+        temp?.badgeLabel === "Live" &&
+        temp?.value === 77 &&
+        temp?.unit === "°C";
+      expect(presentsFAsHealthyLiveC).toBe(false);
+    },
+  );
+
+  it("plausible Celsius temperature_c still tags Live when fresh", () => {
+    const vm = buildEcowittTentSnapshotV0ViewModel(
+      [row({ metric: "temperature_c", value: 24, captured_at: FRESH_AT })],
+      { tentId: TENT, now: NOW },
+    );
+    const temp = vm.metrics.find((m) => m.key === "temp");
+    expect(temp?.value).toBe(24);
+    expect(temp?.unit).toBe("°C");
+    expect(temp?.badgeLabel).toBe("Live");
   });
 });

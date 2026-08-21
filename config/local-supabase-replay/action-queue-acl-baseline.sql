@@ -34,7 +34,8 @@ BEGIN
   ) <> 3 THEN
     RAISE EXCEPTION USING
       ERRCODE = '55000',
-      MESSAGE = 'action_queue_local_replay_acl_baseline_drift';
+      MESSAGE = 'action_queue_local_replay_acl_baseline_drift',
+      DETAIL = 'required_roles_missing';
   END IF;
 
   SELECT oid INTO v_postgres_oid
@@ -72,7 +73,12 @@ BEGIN
   IF v_client_role_contract_count <> 2 OR v_table_contract_count <> 2 THEN
     RAISE EXCEPTION USING
       ERRCODE = '55000',
-      MESSAGE = 'action_queue_local_replay_acl_baseline_drift';
+      MESSAGE = 'action_queue_local_replay_acl_baseline_drift',
+      DETAIL = pg_catalog.format(
+        'client_role_contract_count=%s table_contract_count=%s',
+        v_client_role_contract_count,
+        v_table_contract_count
+      );
   END IF;
 
   LOCK TABLE public.action_queue, public.action_queue_events IN SHARE MODE;
@@ -210,7 +216,15 @@ BEGIN
      OR (NOT v_local_replay_acl_state AND NOT v_canonical_acl_state) THEN
     RAISE EXCEPTION USING
       ERRCODE = '55000',
-      MESSAGE = 'action_queue_local_replay_acl_baseline_drift';
+      MESSAGE = 'action_queue_local_replay_acl_baseline_drift',
+      DETAIL = pg_catalog.format(
+        'public_acl_count=%s client_column_acl_count=%s client_grant_option_count=%s direct_client_acl=%s effective_client_acl=%s',
+        v_public_acl_count,
+        v_client_column_acl_count,
+        v_client_grant_option_count,
+        v_direct_client_acl::text,
+        v_effective_client_acl::text
+      );
   END IF;
 END;
 $action_queue_local_replay_acl_baseline$;

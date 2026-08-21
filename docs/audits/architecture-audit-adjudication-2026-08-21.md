@@ -288,10 +288,14 @@ stamper uses:
 > | `4b1c4867e685`         | `8773f6b2c0ed…`      | `1f0eb7b4e6cd…` (5,840)    | no    |
 > | `39935889fe02` (#1080) | `1fe0606c134a…`      | `8e117dc65711…` (5,850)    | no    |
 > | `5a13d0b47cb7` (#1089) | `1fe0606c134a…`      | `8e117dc65711…` (5,850)    | no    |
+> | `ea31fbdfb934` (#1086) | `831bd3b4f230…`      | `2cee190ff72b…` (5,856)    | no    |
 >
-> The third row was fetched live from `/version.json` during this check — production republished
-> again while this PR was in review, at `2026-08-21T15:39:34Z`. The first two rows' stamps come
-> from this document's own earlier fetch and from `CURRENT_STATE.md` respectively.
+> The third and fourth rows were fetched live from `/version.json` during this review —
+> production republished **twice more** while this PR was open, at `2026-08-21T15:39:34Z` and
+> `2026-08-21T15:53:46Z`. The first two rows' stamps come from this document's own earlier fetch
+> and from `CURRENT_STATE.md` respectively. **Four publishes, three distinct committed trees,
+> four mismatches, every one `dirty: true`** — this is a repeated property of the publisher, not
+> an artifact of any single build.
 >
 > **Two details make this stronger than a repeated coincidence.** `39935889fe02` and
 > `5a13d0b47cb7` differ in exactly one file — `docs/agents/CURRENT_STATE.md` — which is outside
@@ -429,9 +433,19 @@ between them.** Two earlier attempts to adjudicate that with the `dirty` flag ar
 yields precisely this mismatch. With 16,204 deploy-branch commits and 169 other refs unscanned,
 that possibility is **`NOT_MEASURED`** — retrieving the SHA did not close it.
 
-What the retrieval _does_ explain is why the scans found nothing: the commit is a Lovable merge
-**not on the deploy branch**, so no scan depth over `origin/verdant-grow-diary` would have
-reached it.
+What the retrieval explains is narrower than an earlier revision claimed. It explains why the
+**SHA** was not found by a SHA lookup: the commit is a Lovable merge **not on the deploy branch**,
+so no scan depth over `origin/verdant-grow-diary` would have reached that identity.
+
+**It does not explain the hash miss, and saying so conflated identity with content.** The
+resolver matches on recomputed content, not on commit reachability — its own header states that
+"one `treeHash` may map to several commits: changes outside the hashed roots (docs, e2e,
+workflows) do not move it… identical app content is identical app content"
+(`scripts/resolve-release-provenance.mjs:19-21`). So a deploy-branch commit could carry matching
+hashed content even though the stamped SHA is unreachable from that branch. **This document
+contains a worked example of exactly that:** `39935889fe02` and `5a13d0b47cb7` are different
+commits with the same recomputed hash. The hash miss therefore stays bounded by the **commits
+actually scanned** — 400 of 16,604, with 169 other refs untouched — and not by reachability.
 
 **What is owner-gated is now a single, specific question:** why the build workspace's hashed
 roots differed from the tree of the commit it stamped. That rests on the direct hash comparison above, not on the two

@@ -63,21 +63,29 @@ One-Tent Loop module index, the entitlements API surface) live in
 this repo still says "React + Vite + TypeScript SPA"; treat that as stale wording, and
 prefer what the code shows:
 
-| Concern    | What it actually is                                                                                          |
-| ---------- | ------------------------------------------------------------------------------------------------------------ |
-| Framework  | `@tanstack/react-start` + `@tanstack/react-router`; SSR entry `src/server.ts`, app config `src/start.ts`     |
-| Routing    | File-based under `src/routes/`, compiled into generated `src/routeTree.gen.ts`, consumed by `src/router.tsx` |
-| Build      | Vite via the `@lovable.dev/vite-tanstack-config` preset; `nitro` for the server output                       |
-| UI         | React, Tailwind v4 (`@tailwindcss/vite`), shadcn/ui over Radix primitives, `lucide-react`, `sonner`          |
-| Data       | `@tanstack/react-query`; hosted Supabase via `@supabase/supabase-js` + `@supabase/ssr`                       |
-| Validation | `zod`                                                                                                        |
-| Platform   | Lovable Cloud (`@lovable.dev/*`); deployed through Vercel (`vercel.json`)                                    |
+| Concern    | What it actually is                                                                                             |
+| ---------- | --------------------------------------------------------------------------------------------------------------- |
+| Framework  | `@tanstack/react-start` + `@tanstack/react-router`; SSR entry `src/server.ts`, app config `src/start.ts`        |
+| Routing    | File-based under `src/routes/`, compiled into generated `src/routeTree.gen.ts`, consumed by `src/router.tsx`    |
+| Build      | Vite via the `@lovable.dev/vite-tanstack-config` preset; `nitro` for the server output                          |
+| UI         | React, Tailwind v4 (`@tailwindcss/vite`), shadcn/ui over Radix primitives, `lucide-react`, `sonner`             |
+| Data       | `@tanstack/react-query`; hosted Supabase via `@supabase/supabase-js` + `@supabase/ssr`                          |
+| Validation | `zod`                                                                                                           |
+| Platform   | Lovable Cloud (`@lovable.dev/*`) — **Lovable is the production publisher**; see the note below on `vercel.json` |
 
 There is **no `App.tsx` and no react-router** — but see the compat shim below, which is
 what almost all component code imports.
 
 `vite.config.ts` is a thin wrapper over the Lovable preset. The preset already supplies
 tanstackStart, viteReact, tailwindcss, tsconfigPaths and the `@` alias; do not re-add them.
+
+**`vercel.json` does not govern production.** Lovable publishes production and does not apply
+Vercel host configuration, so the redirects and headers in that file do not fire there — the
+six legacy public redirects return HTTP 200 with no `Location` header, and the destination is
+reached by client rendering instead (`docs/seo/lighting-launch-verification.md`,
+§Non-blocking host mismatch). `CURRENT_STATE_ARCHIVE.md` lists the file as stale pre-SSR
+configuration awaiting retirement. Never reason about production redirect or header behaviour
+from `vercel.json`.
 
 ## Repository map
 
@@ -112,20 +120,31 @@ tanstackStart, viteReact, tailwindcss, tsconfigPaths and the `@` alias; do not r
 `AGENTS.md` states the intended layering. What the tree contains, measured at `src/lib/`
 root:
 
-| Suffix          | Count | Contract                                                                  |
-| --------------- | ----: | ------------------------------------------------------------------------- |
-| `*Rules.ts`     |   474 | Pure. No React, no Supabase, no fetch, no clock — `now: Date` is injected |
-| `*ViewModel.ts` |   167 | Pure presentation shaping. Zero import React; zero import Supabase        |
-| `*Service.ts`   |    26 | The I/O layer — 25 of 26 import the Supabase client                       |
-| `*Advisor.ts`   |     0 | Named in the constitution's table; **no such files exist**                |
+| Suffix          | Count | Contract                                                                           |
+| --------------- | ----: | ---------------------------------------------------------------------------------- |
+| `*Rules.ts`     |   474 | _Intended:_ pure — no React, no Supabase, no fetch, no clock; `now: Date` injected |
+| `*ViewModel.ts` |   167 | Pure presentation shaping. Zero import React; zero import Supabase                 |
+| `*Service.ts`   |    26 | The I/O layer — 25 of 26 import the Supabase client                                |
+| `*Advisor.ts`   |     0 | Named in the constitution's table; **no such files exist**                         |
 
 Put new business logic in a `*Rules.ts`, new presentation shaping in a `*ViewModel.ts`, new
 I/O in a `*Service.ts` or a hook. Components and pages stay presenters.
 
-Known drift, so you recognise it rather than copy it: two `*Rules.ts` files import Supabase
-(`sensorIngestNormalizationRules.ts`, `sensorWebhookIngestRules.ts`), and 39/488 components
-plus 34/138 pages import `@/integrations/supabase/client` directly instead of going through
-a hook. Do not extend either pattern.
+The `*Rules.ts` row is the **intended** contract, not a measured property — measured drift,
+so you recognise it rather than copy it:
+
+- **55 of 474 `*Rules.ts` call `Date.now()` directly** and **7 call `Math.random()`**
+  (`ecowittCanaryAuditRules.ts`, `plantProfilePhotoStorageRules.ts`, `leadSavedViewsRules.ts`,
+  `aiDoctorSessionsSavedViewsRules.ts`, `environmentSummaryExportAuditRules.ts`,
+  `publicQuickLogStarterRules.ts`, `sensorDiagnosticsExportRules.ts`). Those modules are not
+  deterministic and not time-injectable. Inject the clock and seed in new code; do not cite
+  these as precedent.
+- Two `*Rules.ts` import Supabase (`sensorIngestNormalizationRules.ts`,
+  `sensorWebhookIngestRules.ts`).
+- 39 of 492 components and 34 of 139 pages import `@/integrations/supabase/client` directly
+  instead of going through a hook.
+
+Do not extend any of these patterns.
 
 User-facing copy is **data**, not JSX: it is pinned in `src/constants/*Copy.ts` /
 `*Messages.ts` or as `as const` exports in rules files so tests can assert exact strings.

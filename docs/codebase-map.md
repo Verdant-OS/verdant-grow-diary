@@ -50,9 +50,14 @@ with `access: public | auth | operator | internal | redirect` and an optional
 | Legal                    | `terms.tsx`, `terms-of-service.tsx`, `privacy.tsx`, `privacy-policy.tsx`, `refund.tsx`, `refunds.tsx`, `refund-policy.tsx`, `unsubscribe.tsx`                                                                                                                                              |
 | OAuth                    | `[.]lovable.oauth.consent.tsx`                                                                                                                                                                                                                                                             |
 
-Several legal/marketing duplicates exist as routes **and** as permanent redirects in
+Several legal/marketing duplicates exist as routes **and** as redirect entries in
 `vercel.json` (`/strains → /cultivars`, `/features → /welcome`, `/terms-of-service → /terms`,
 `/privacy-policy → /privacy`, `/refunds` and `/refund-policy → /refund`, `/demo → /welcome`).
+**Those redirects do not fire in production.** Lovable is the production publisher and does
+not apply Vercel host configuration — the six legacy public redirects return HTTP 200 with no
+`Location` header, so the destination is reached by client rendering, not by a host redirect
+(`docs/seo/lighting-launch-verification.md`, §Non-blocking host mismatch). `vercel.json` is
+stale pre-SSR configuration that `CURRENT_STATE_ARCHIVE.md` lists for retirement.
 
 ### Authenticated routes (`src/routes/_app/*.tsx`)
 

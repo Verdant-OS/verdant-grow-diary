@@ -13,7 +13,7 @@ describe("EcoWitt pipeline integration: payload → snapshot view-model", () => 
       [
         {
           tent_id: TENT,
-          source: "ecowitt",
+          source: "live",
           captured_at: FRESH_AT,
           raw_payload: {
             vendor: "ecowitt",
@@ -58,7 +58,7 @@ describe("EcoWitt pipeline integration: payload → snapshot view-model", () => 
       [
         {
           tent_id: TENT,
-          source: "ecowitt",
+          source: "live",
           captured_at: STALE_AT,
           raw_payload: { vendor: "ecowitt", temp1f: 77, humidity1: 55, dateutc: STALE_AT },
         },
@@ -67,6 +67,24 @@ describe("EcoWitt pipeline integration: payload → snapshot view-model", () => 
       { now: NOW },
     );
     expect(vm.sourceLabel?.label).toBe("Stale");
+  });
+
+  it("legacy source=ecowitt never promotes to Live", () => {
+    const vm = buildEcowittLatestSnapshot(
+      [
+        {
+          tent_id: TENT,
+          source: "ecowitt",
+          captured_at: FRESH_AT,
+          raw_payload: { vendor: "ecowitt", temp1f: 77, humidity1: 55, dateutc: FRESH_AT },
+        },
+      ],
+      { tentId: TENT },
+      { now: NOW },
+    );
+    expect(vm.source).toBe("invalid");
+    expect(vm.sourceLabel?.label).not.toBe("Live");
+    expect(vm.sourceLabel?.label).not.toBe("Ecowitt");
   });
 
   it("invalid EcoWitt reading (RH > 100) renders Invalid with calm copy", () => {

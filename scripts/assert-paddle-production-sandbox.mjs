@@ -44,7 +44,26 @@ function resolveEffectiveSandboxToken(token) {
 async function loadEffectiveProductionEnv(rootDir) {
   const hadDebug = Object.hasOwn(process.env, "DEBUG");
   const previousDebug = process.env.DEBUG;
+  const previousStdoutWrite = process.stdout.write;
+  const previousStderrWrite = process.stderr.write;
+  const previousConsole = {
+    debug: console.debug,
+    error: console.error,
+    info: console.info,
+    log: console.log,
+    warn: console.warn,
+  };
+  const suppressConsoleOutput = () => undefined;
+  const suppressStreamOutput = () => true;
+
   delete process.env.DEBUG;
+  process.stdout.write = suppressStreamOutput;
+  process.stderr.write = suppressStreamOutput;
+  console.debug = suppressConsoleOutput;
+  console.error = suppressConsoleOutput;
+  console.info = suppressConsoleOutput;
+  console.log = suppressConsoleOutput;
+  console.warn = suppressConsoleOutput;
 
   try {
     const { loadEnv } = await import("vite");
@@ -52,6 +71,13 @@ async function loadEffectiveProductionEnv(rootDir) {
   } catch {
     return fixedFailure("effective_paddle_env_resolution_failed");
   } finally {
+    process.stdout.write = previousStdoutWrite;
+    process.stderr.write = previousStderrWrite;
+    console.debug = previousConsole.debug;
+    console.error = previousConsole.error;
+    console.info = previousConsole.info;
+    console.log = previousConsole.log;
+    console.warn = previousConsole.warn;
     if (hadDebug) process.env.DEBUG = previousDebug;
     else delete process.env.DEBUG;
   }

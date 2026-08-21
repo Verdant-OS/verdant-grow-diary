@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
 
 const TOKEN_NAME = "VITE_PAYMENTS_CLIENT_TOKEN";
@@ -11,6 +11,7 @@ const OTHER_SANDBOX_TOKEN = "test_prebuild_policy_override";
 const TEST_LIVE_TOKEN = "live_prebuild_policy_fixture";
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const GUARD_SCRIPT = resolve(REPO_ROOT, "scripts/assert-paddle-production-sandbox.mjs");
+const VITE_IMPORT = pathToFileURL(resolve(REPO_ROOT, "node_modules/vite/dist/node/index.js")).href;
 
 let temporaryRoots: string[] = [];
 let previousToken: string | undefined;
@@ -35,13 +36,14 @@ function createEnvRoot(productionLines: string[], productionLocalLines: string[]
   return root;
 }
 
-function runGuard(root: string, tokenOverride?: string, debug?: string) {
+function runGuard(root: string, tokenOverride?: string, debug?: string, preloadVite = false) {
   const env = { ...process.env };
   delete env[TOKEN_NAME];
   delete env.DEBUG;
   if (tokenOverride !== undefined) env[TOKEN_NAME] = tokenOverride;
   if (debug !== undefined) env.DEBUG = debug;
-  return spawnSync(process.execPath, [GUARD_SCRIPT], {
+  const args = preloadVite ? ["--import", VITE_IMPORT, GUARD_SCRIPT] : [GUARD_SCRIPT];
+  return spawnSync(process.execPath, args, {
     cwd: root,
     env,
     encoding: "utf8",
@@ -180,5 +182,29 @@ describe("Paddle production prebuild guard", () => {
     expect(result.stderr).toBe(`[paddle-production-policy] ${reason}\n`);
     expect(combinedOutput(result)).not.toContain(TEST_SANDBOX_TOKEN);
     if (token) expect(combinedOutput(result)).not.toContain(token);
+  });
+
+  it("suppresses cached Vite debug output during effective resolution", () => {
+    const root = createEnvRoot([`${TOKEN_NAME}=${TEST_SANDBOX_TOKEN}`]);
+    const result = runGuard(root, undefined, "vite:env", true);
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toBe("[paddle-production-policy] sandbox source verified.\n");
+    expect(result.stderr).toBe("");
+    expect(combinedOutput(result)).not.toContain(TEST_SANDBOX_TOKEN);
+  });
+
+  it("keeps both canonical and override bytes private with cached Vite", () => {
+    const root = createEnvRoot(
+      [`${TOKEN_NAME}=${TEST_SANDBOX_TOKEN}`],
+      [`${TOKEN_NAME}=${OTHER_SANDBOX_TOKEN}`],
+    );
+    const result = runGuard(root, undefined, "vite:env", true);
+
+    expect(result.status).toBe(1);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toBe("[paddle-production-policy] effective_paddle_token_mismatch\n");
+    expect(combinedOutput(result)).not.toContain(TEST_SANDBOX_TOKEN);
+    expect(combinedOutput(result)).not.toContain(OTHER_SANDBOX_TOKEN);
   });
 });

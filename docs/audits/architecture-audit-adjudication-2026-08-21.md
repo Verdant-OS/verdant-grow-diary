@@ -8,21 +8,46 @@
 This document is **read-only adjudication**. It changes no code, schema, policy, migration,
 or governance file, and it carries no `Sentinel-Version` (it is not one of the twelve).
 
+> ### Update — 2026-08-21, later the same day: #1051 has MERGED
+>
+> The blocking collision recorded in §3 is **resolved**. #1051 merged to `verdant-grow-diary`
+> as `5c60bcd9`; `docs/codebase-map.md` is live at 490 lines and `Sentinel-Version` is now
+> `2026-09-01.2` on the deploy branch. **ARCH-01 and ARCH-02 are no longer blocked** — see the
+> revised §7 and §7.1.
+>
+> Two findings from this document were fixed and shipped inside that PR, with owner permission
+> to push to its branch (commit `d40dc39`, verified present on the deploy branch):
+>
+> - the `.env.production` payments-token row, which described a **sandbox-class** token as live
+>   and so inverted the billing safety contract #1078 had just established;
+> - the edge-function caller row, which said "mostly in hooks" when hooks are a minority
+>   (6 of 15 production files).
+>
+> **All measurements below stay pinned to `28c01a017` and are not restated at the new tip.**
+> A measurement is a record of what was true at a named commit; re-pointing it at a newer SHA
+> without re-running it would be exactly the drift this document was written to catch.
+
 ---
 
 ## 1. Calibrated verdict
 
 > **The supplied audit's technical conclusions are substantially CORRECT and should be
-> adopted. Its _task assignment_ must NOT be executed as written: ARCH-01 collides with an
-> open, reviewed, mergeable pull request, and building it would create the second
+> adopted. Its _task assignment_ must NOT be executed as written: ARCH-01 collided with an
+> open, reviewed, mergeable pull request, and building it would have created the second
 > implementation that `AGENTS.md` forbids.**
+>
+> **That pull request (#1051) has since merged as `5c60bcd9`, which settles the point rather
+> than softening it:** the competing map this document declined to write now exists as
+> `docs/codebase-map.md`, shipped by its actual owner. ARCH-01 is unblocked and reduces to the
+> short ADR described in §7.1.
 
 Nineteen of the audit's stack determinations were re-derived independently from source and
 **every one held**. Three of its evidence labels were too weak, one of its priorities is
 wrong against a dated gate, and it missed four findings — one of which is a live production
 provenance gap that no governance file currently records.
 
-ARCH-00 verdict, in the audit's own vocabulary: **`BLOCKED_BY_ACTIVE_OWNER`.**
+ARCH-00 verdict, in the audit's own vocabulary: **`BLOCKED_BY_ACTIVE_OWNER`** at the time of
+writing — now **`SAFE_TO_PLAN`**, since the blocking owner's work has landed.
 
 ---
 
@@ -42,24 +67,24 @@ ARCH-00 verdict, in the audit's own vocabulary: **`BLOCKED_BY_ACTIVE_OWNER`.**
 
 Open pull requests against `verdant-grow-diary`, classified:
 
-| PR                                                                                                                                                                                                            | Branch                                             | Area                                            | Label                |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- | ----------------------------------------------- | -------------------- |
-| [#1051](https://github.com/Verdant-OS/verdant-grow-diary/pull/1051)                                                                                                                                           | `claude/claude-md-documentation-j9b3ac`            | **Codebase map + stale stack-fact corrections** | **`ACTIVE OWNER`**   |
-| [#1033](https://github.com/Verdant-OS/verdant-grow-diary/pull/1033)                                                                                                                                           | `claude/governance-operating-facts`                | Repository operating facts, validation commands | `OPEN — REVIEW ONLY` |
-| [#1077](https://github.com/Verdant-OS/verdant-grow-diary/pull/1077)                                                                                                                                           | `claude/verdantgrowdiary-dns-issue-hag3co`         | `CURRENT_STATE` production rows                 | `OPEN — REVIEW ONLY` |
-| [#1080](https://github.com/Verdant-OS/verdant-grow-diary/pull/1080)                                                                                                                                           | `claude/quicklog-errors-diagnostics-c06rci`        | Signup-acquisition migration hardening          | `OPEN — REVIEW ONLY` |
-| [#1073](https://github.com/Verdant-OS/verdant-grow-diary/pull/1073)                                                                                                                                           | `codex/quicklog-stale-target-fail-closed-20260821` | Quick Log stale local targets                   | `OPEN — REVIEW ONLY` |
-| [#1083](https://github.com/Verdant-OS/verdant-grow-diary/pull/1083)                                                                                                                                           | `cursor/signup-attribution-failure-safe-f6d4`      | Signup attribution write path                   | `OPEN — REVIEW ONLY` |
-| [#1084](https://github.com/Verdant-OS/verdant-grow-diary/pull/1084)                                                                                                                                           | `cursor/ecowitt-v0-temp-unit-safety-5ba1`          | EcoWitt C/F fail-closed                         | `OPEN — REVIEW ONLY` |
-| [#1082](https://github.com/Verdant-OS/verdant-grow-diary/pull/1082)                                                                                                                                           | `cursor/ecowitt-v0-post-merge-qa-tests-41e8`       | EcoWitt QA proofs (tests only)                  | `OPEN — REVIEW ONLY` |
-| [#1085](https://github.com/Verdant-OS/verdant-grow-diary/pull/1085)                                                                                                                                           | `cursor/plant-pending-outcome-notice-73ec`         | PlantDetail follow-up outcomes                  | `OPEN — REVIEW ONLY` |
-| [#1076](https://github.com/Verdant-OS/verdant-grow-diary/pull/1076), [#1079](https://github.com/Verdant-OS/verdant-grow-diary/pull/1079), [#1081](https://github.com/Verdant-OS/verdant-grow-diary/pull/1081) | tenki / CI                                         | CI runner migration                             | `OPEN — REVIEW ONLY` |
-| [#1068](https://github.com/Verdant-OS/verdant-grow-diary/pull/1068)                                                                                                                                           | `cheekhimself-patch-1`                             | CodeQL workflow                                 | `OPEN — REVIEW ONLY` |
-| [#1028](https://github.com/Verdant-OS/verdant-grow-diary/pull/1028), [#1018](https://github.com/Verdant-OS/verdant-grow-diary/pull/1018), [#719](https://github.com/Verdant-OS/verdant-grow-diary/pull/719)   | env / e2e / plantuml                               | Older, unrelated                                | `OPEN — REVIEW ONLY` |
+| PR                                                                                                                                                                                                            | Branch                                             | Area                                            | Label                                                           |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- | ----------------------------------------------- | --------------------------------------------------------------- |
+| [#1051](https://github.com/Verdant-OS/verdant-grow-diary/pull/1051)                                                                                                                                           | `claude/claude-md-documentation-j9b3ac`            | **Codebase map + stale stack-fact corrections** | **`MERGED — REUSE`** (was `ACTIVE OWNER`; merged as `5c60bcd9`) |
+| [#1033](https://github.com/Verdant-OS/verdant-grow-diary/pull/1033)                                                                                                                                           | `claude/governance-operating-facts`                | Repository operating facts, validation commands | `OPEN — REVIEW ONLY`                                            |
+| [#1077](https://github.com/Verdant-OS/verdant-grow-diary/pull/1077)                                                                                                                                           | `claude/verdantgrowdiary-dns-issue-hag3co`         | `CURRENT_STATE` production rows                 | `OPEN — REVIEW ONLY`                                            |
+| [#1080](https://github.com/Verdant-OS/verdant-grow-diary/pull/1080)                                                                                                                                           | `claude/quicklog-errors-diagnostics-c06rci`        | Signup-acquisition migration hardening          | `OPEN — REVIEW ONLY`                                            |
+| [#1073](https://github.com/Verdant-OS/verdant-grow-diary/pull/1073)                                                                                                                                           | `codex/quicklog-stale-target-fail-closed-20260821` | Quick Log stale local targets                   | `OPEN — REVIEW ONLY`                                            |
+| [#1083](https://github.com/Verdant-OS/verdant-grow-diary/pull/1083)                                                                                                                                           | `cursor/signup-attribution-failure-safe-f6d4`      | Signup attribution write path                   | `OPEN — REVIEW ONLY`                                            |
+| [#1084](https://github.com/Verdant-OS/verdant-grow-diary/pull/1084)                                                                                                                                           | `cursor/ecowitt-v0-temp-unit-safety-5ba1`          | EcoWitt C/F fail-closed                         | `OPEN — REVIEW ONLY`                                            |
+| [#1082](https://github.com/Verdant-OS/verdant-grow-diary/pull/1082)                                                                                                                                           | `cursor/ecowitt-v0-post-merge-qa-tests-41e8`       | EcoWitt QA proofs (tests only)                  | `OPEN — REVIEW ONLY`                                            |
+| [#1085](https://github.com/Verdant-OS/verdant-grow-diary/pull/1085)                                                                                                                                           | `cursor/plant-pending-outcome-notice-73ec`         | PlantDetail follow-up outcomes                  | `OPEN — REVIEW ONLY`                                            |
+| [#1076](https://github.com/Verdant-OS/verdant-grow-diary/pull/1076), [#1079](https://github.com/Verdant-OS/verdant-grow-diary/pull/1079), [#1081](https://github.com/Verdant-OS/verdant-grow-diary/pull/1081) | tenki / CI                                         | CI runner migration                             | `OPEN — REVIEW ONLY`                                            |
+| [#1068](https://github.com/Verdant-OS/verdant-grow-diary/pull/1068)                                                                                                                                           | `cheekhimself-patch-1`                             | CodeQL workflow                                 | `OPEN — REVIEW ONLY`                                            |
+| [#1028](https://github.com/Verdant-OS/verdant-grow-diary/pull/1028), [#1018](https://github.com/Verdant-OS/verdant-grow-diary/pull/1018), [#719](https://github.com/Verdant-OS/verdant-grow-diary/pull/719)   | env / e2e / plantuml                               | Older, unrelated                                | `OPEN — REVIEW ONLY`                                            |
 
 ### 3.1 The blocking collision, stated precisely
 
-**#1051 is open, non-draft, `mergeable_state: clean`, 15 files, +823/−57, with all twelve
+**#1051 was open, non-draft, `mergeable_state: clean`, 15 files, +823/−57, with all twelve
 review threads resolved.** It adds `docs/codebase-map.md` (480 lines: route inventory,
 One-Tent Loop module index, 34 edge functions, entitlements surface, 86 workflows, script
 index, Supabase layout, env/secret boundary, observed drift), rewrites `CLAUDE.md`, and
@@ -278,19 +303,19 @@ owned by this slice; it belongs to whoever next touches `vite.config.ts`.
 The audit's sequence is sound in shape — architecture truth → production truth → data safety
 → boundary safety → type safety → AI evaluation → telemetry → tooling. Four changes:
 
-| Step                | Audit                       | Adjudicated                                                                                             | Reason                          |
-| ------------------- | --------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------- |
-| **ARCH-00**         | Grok, P0                    | **DONE** — §3 above                                                                                     | Discharged in this document     |
-| **ARCH-01**         | Claude, P0                  | **`BLOCKED_BY_ACTIVE_OWNER`** — land or close #1051 first                                               | §3.1                            |
-| **ARCH-02**         | Grok, executable manifest   | **Hold until #1051 lands**, then build the manifest to pin _`docs/codebase-map.md`_, not a new document | Avoids a third architecture doc |
-| **OPS-01 / OPS-02** | P0, after CURRENT_STATE PRs | **Raise — a live provenance gap exists now**                                                            | §6.1                            |
-| **BOUNDARY-01**     | P1                          | **Raise to P0-adjacent**                                                                                | §6.3: 11 of ~1,700 files        |
-| **TOOL-01**         | P2, post-V0                 | **P1, dated 2026-08-25**                                                                                | §6.4                            |
-| Everything else     | —                           | **Unchanged**                                                                                           | The audit's ordering holds      |
+| Step                | Audit                       | Adjudicated                                                                                            | Reason                          |
+| ------------------- | --------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------- |
+| **ARCH-00**         | Grok, P0                    | **DONE** — §3 above                                                                                    | Discharged in this document     |
+| **ARCH-01**         | Claude, P0                  | **UNBLOCKED** — #1051 merged as `5c60bcd9`. Reduces to the ADR in §7.1, appended to the merged map     | §3.1                            |
+| **ARCH-02**         | Grok, executable manifest   | **Actionable now** — build the manifest to pin the merged _`docs/codebase-map.md`_, not a new document | Avoids a third architecture doc |
+| **OPS-01 / OPS-02** | P0, after CURRENT_STATE PRs | **Raise — a live provenance gap exists now**                                                           | §6.1                            |
+| **BOUNDARY-01**     | P1                          | **Raise to P0-adjacent**                                                                               | §6.3: 11 of ~1,700 files        |
+| **TOOL-01**         | P2, post-V0                 | **P1, dated 2026-08-25**                                                                               | §6.4                            |
+| Everything else     | —                           | **Unchanged**                                                                                          | The audit's ordering holds      |
 
-### 7.1 What ARCH-01 should become once #1051 lands
+### 7.1 What ARCH-01 should become now that #1051 has landed
 
-Not a new document. `docs/codebase-map.md` will already carry the inventory. The residual gap
+Not a new document. `docs/codebase-map.md` now carries the inventory. The residual gap
 is the **decision record** — the _rejected and deferred_ alternatives, which no existing
 document holds:
 
@@ -307,9 +332,9 @@ Deferred pending a measured need: pgvector, background queues, new state library
 ```
 
 That is a short ADR appended to the merged map — not a 3,000-word parallel contract. Three
-architecture documents already exist (`docs/architecture.md`, `docs/grow-diary-architecture.md`,
-`docs/grow-os-architecture.md`); `docs/codebase-map.md` will be the fourth. A fifth needs a
-much better reason than "the roadmap said so".
+architecture documents already existed (`docs/architecture.md`, `docs/grow-diary-architecture.md`,
+`docs/grow-os-architecture.md`); with #1051 merged, `docs/codebase-map.md` is the fourth. A fifth
+needs a much better reason than "the roadmap said so".
 
 **Precedent worth reusing:** `docs/grow-diary-architecture.md` is pinned by
 `src/test/grow-diary-architecture-doc.test.ts`. ARCH-02 should follow that pattern, and per
@@ -374,7 +399,8 @@ Lead — peer, no rank). The adversarial questions worth putting to this documen
 4. Confirm `NON_CANONICAL_SOURCE_ALIASES` is actually _enforced_ at every ingest path, not
    merely declared. This document verified the constant, not its call sites.
 
-**Next decision belongs to Cheek:** land or close #1051, which unblocks ARCH-01/ARCH-02; and
+**Next decision belongs to Cheek:** #1051 is merged, so ARCH-01/ARCH-02 are unblocked — the
+remaining call is whether to commission the §7.1 ADR at all; and
 route §6.1 to whoever holds the publisher's view.
 
 ---

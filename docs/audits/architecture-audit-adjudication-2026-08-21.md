@@ -427,11 +427,41 @@ Note the corroborating repository evidence: `src/routes/` contains real route mo
 compensates _in-app_ for redirects the host never performs.
 
 `inference, high confidence`: `vercel.json`'s `redirects`, `rewrites`, `headers` and
-`projectSettings` are inert in production. That matters twice over — the file's catch-all
-rewrite `/((?!assets/).*)` → `/` is an SPA fallback that would defeat SSR entirely **if** it
-were ever honoured by a host serving this app, and its security `headers` block is
-**not** delivering those headers. Whether the security headers arrive by another mechanism is
-`NOT_MEASURED` and should be OPS-02's first check.
+`projectSettings` are inert in production. The file's catch-all rewrite `/((?!assets/).*)` → `/`
+is an SPA fallback that would defeat SSR entirely **if** a host serving this app ever honoured it.
+
+#### Security headers — measured, and the earlier claim was wrong in both directions
+
+An earlier revision asserted the `headers` block is "**not** delivering those headers" while
+§8 simultaneously recorded that as `NOT_MEASURED`. The document contradicted itself, and the
+probe behind it had captured only status codes — never headers. Measured now, on `/`,
+`/welcome` and `/pricing` (identical on all three):
+
+| Header                      | `vercel.json` declares                                 | Production delivers                                                  |
+| --------------------------- | ------------------------------------------------------ | -------------------------------------------------------------------- |
+| `x-content-type-options`    | `nosniff`                                              | `nosniff` — **matches**                                              |
+| `referrer-policy`           | `strict-origin-when-cross-origin`                      | `strict-origin-when-cross-origin` — **matches**                      |
+| `strict-transport-security` | `max-age=63072000; includeSubDomains; preload`         | `max-age=31536000; includeSubDomains` — **present, different value** |
+| `x-frame-options`           | `SAMEORIGIN`                                           | **absent**                                                           |
+| `permissions-policy`        | `geolocation=(), camera=(), microphone=(), payment=()` | **absent**                                                           |
+
+So the blanket claim was wrong — three of five arrive. **But the HSTS mismatch is the decisive
+evidence that they do not come from `vercel.json`:** the delivered `max-age` is half the declared
+value and omits `preload`. A config that were actually applied would produce the declared string.
+Combined with `server: cloudflare` on every response, the headers originate from the
+Cloudflare/Lovable edge, not from this file — which **strengthens** the inert-config conclusion
+rather than weakening it.
+
+**Two declared headers are absent, and nothing substitutes for one of them.** `established
+fact`: no `content-security-policy` header is present either, so there is no `frame-ancestors`
+directive standing in for the missing `x-frame-options`. Whether those absences are intentional
+is `NOT_MEASURED` — this document records the measurement, not a verdict on the posture, and
+makes no vulnerability claim.
+
+`practical observation` worth handing to whoever takes the §6.1 provenance question: responses
+carry an `x-deployment-id` (`ecbb2146eba6…` at this measurement). That is a publisher-side
+identifier and may be the fastest route from a live response back to the build log that §6.1
+needs.
 
 ### 6.3 Zod's reach is narrow — but that is a prompt to inventory, not a measured gap
 
@@ -589,7 +619,7 @@ commented-out or relocated setting is indistinguishable from a live one to a tex
 | Question                                                             | Status                                                                                                                                                                                             |
 | -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Applied-migration ledger vs. the 272 committed files                 | `NOT_MEASURED` — drift probe still blocked on both an owner secret and defect 3 (name-bound matching)                                                                                              |
-| Does production deliver the security headers `vercel.json` declares? | `NOT_MEASURED` — first check for OPS-02                                                                                                                                                            |
+| Does production deliver the security headers `vercel.json` declares? | **Measured (§6.2).** 3 of 5 arrive; `x-frame-options` and `permissions-policy` absent, no CSP substitutes; HSTS present with a different value, so they do not originate from that file            |
 | Does the served SHA exist in the repository?                         | **`PASS` — it does.** Confirmed via the GitHub commit endpoint; a Lovable merge commit off the deploy tip, unreachable from fetched refs (§6.1)                                                    |
 | Does production's tree hash match its **own stamped commit**?        | **`FAIL` — measured.** `1f0eb7b4e6cd` vs stamped `8773f6b2c0ed` (§6.1)                                                                                                                             |
 | Why does the published tree differ from that commit's tree?          | `BLOCKED` — needs the publisher's build log; owner-only                                                                                                                                            |

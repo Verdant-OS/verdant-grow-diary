@@ -249,6 +249,10 @@ describe("Plants page async-state contract", () => {
     expect(screen.getByTestId("plants-primary-refresh-error")).toHaveTextContent(
       "Plant list refresh unavailable",
     );
+    expect(screen.queryByText(/No plants/i)).not.toBeInTheDocument();
+    expect(screen.getByTestId("plants-empty-unconfirmed")).toHaveTextContent(
+      "cannot confirm whether this grow has plants",
+    );
     fireEvent.click(screen.getByRole("button", { name: "Retry plant list refresh" }));
     expect(staleEmptyPrimary.refetch).toHaveBeenCalledTimes(1);
   });

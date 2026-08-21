@@ -6,6 +6,7 @@ import {
 } from "@/lib/confirmedPlantCacheService";
 
 const OWNER_ID = "11111111-1111-4111-8111-111111111111";
+const OTHER_OWNER_ID = "22222222-2222-4222-8222-222222222222";
 const GROW_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const TENT_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const PLANT_ID = "99999999-9999-4999-8999-999999999999";
@@ -134,7 +135,9 @@ describe("confirmedPlantCacheService", () => {
     });
     expect(confirmed).not.toBeNull();
 
-    await primeConfirmedPlantCaches(client, OWNER_ID, confirmed!);
+    await primeConfirmedPlantCaches(client, OWNER_ID, confirmed!, {
+      isOwnerCurrent: () => true,
+    });
 
     expect(client.getQueryData<Array<{ id: string }>>(legacyKey)?.map((row) => row.id)).toEqual([
       olderId,
@@ -147,7 +150,9 @@ describe("confirmedPlantCacheService", () => {
     expect(client.getQueryData(unrelatedKey)).toBe(unrelatedBefore);
     expect(client.getQueryData(absentMatchingKey)).toBeUndefined();
 
-    await primeConfirmedPlantCaches(client, OWNER_ID, confirmed!);
+    await primeConfirmedPlantCaches(client, OWNER_ID, confirmed!, {
+      isOwnerCurrent: () => true,
+    });
     expect(client.getQueryData<Array<{ id: string }>>(growKey)?.map((row) => row.id)).toEqual([
       PLANT_ID,
       olderId,
@@ -173,7 +178,9 @@ describe("confirmedPlantCacheService", () => {
       tentId: TENT_ID,
     });
     expect(confirmed).not.toBeNull();
-    await primeConfirmedPlantCaches(client, OWNER_ID, confirmed!);
+    await primeConfirmedPlantCaches(client, OWNER_ID, confirmed!, {
+      isOwnerCurrent: () => true,
+    });
     expect(client.getQueryData<Array<{ id: string }>>(queryKey)?.map((row) => row.id)).toEqual([
       PLANT_ID,
     ]);
@@ -185,5 +192,141 @@ describe("confirmedPlantCacheService", () => {
     ]);
 
     unsubscribe();
+  });
+
+  it("seeds already-running legacy and owner-scoped queries whose data is still undefined", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const legacyKey = ["plants"] as const;
+    const growKey = ["grow", "plants", "all", GROW_ID, "owner", OWNER_ID] as const;
+    let resolveLegacy!: (rows: unknown[]) => void;
+    let resolveGrow!: (rows: unknown[]) => void;
+    const legacyRead = new Promise<unknown[]>((resolve) => {
+      resolveLegacy = resolve;
+    });
+    const growRead = new Promise<unknown[]>((resolve) => {
+      resolveGrow = resolve;
+    });
+    const legacyObserver = new QueryObserver(client, {
+      queryKey: legacyKey,
+      queryFn: () => legacyRead,
+      retry: false,
+    });
+    const growObserver = new QueryObserver(client, {
+      queryKey: growKey,
+      queryFn: () => growRead,
+      retry: false,
+    });
+    const unsubscribeLegacy = legacyObserver.subscribe(() => {});
+    const unsubscribeGrow = growObserver.subscribe(() => {});
+    await vi.waitFor(() => {
+      expect(client.getQueryState(legacyKey)?.fetchStatus).toBe("fetching");
+      expect(client.getQueryState(growKey)?.fetchStatus).toBe("fetching");
+    });
+    expect(client.getQueryData(legacyKey)).toBeUndefined();
+    expect(client.getQueryData(growKey)).toBeUndefined();
+
+    const confirmed = confirmCreatedPlantRow(ROW, {
+      ownerId: OWNER_ID,
+      growId: GROW_ID,
+      tentId: TENT_ID,
+    });
+    expect(confirmed).not.toBeNull();
+    await primeConfirmedPlantCaches(client, OWNER_ID, confirmed!, {
+      isOwnerCurrent: () => true,
+    });
+
+    expect(client.getQueryData<Array<{ id: string }>>(legacyKey)?.map((row) => row.id)).toEqual([
+      PLANT_ID,
+    ]);
+    expect(client.getQueryData<Array<{ id: string }>>(growKey)?.map((row) => row.id)).toEqual([
+      PLANT_ID,
+    ]);
+
+    resolveLegacy([]);
+    resolveGrow([]);
+    await vi.waitFor(() => {
+      expect(client.getQueryState(legacyKey)?.fetchStatus).toBe("idle");
+      expect(client.getQueryState(growKey)?.fetchStatus).toBe("idle");
+    });
+    expect(client.getQueryData<Array<{ id: string }>>(legacyKey)?.map((row) => row.id)).toEqual([
+      PLANT_ID,
+    ]);
+    expect(client.getQueryData<Array<{ id: string }>>(growKey)?.map((row) => row.id)).toEqual([
+      PLANT_ID,
+    ]);
+
+    unsubscribeLegacy();
+    unsubscribeGrow();
+  });
+
+  it("does not publish a late confirmed row after the authenticated owner changes", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const legacyKey = ["plants"] as const;
+    const growKey = ["grow", "plants", "all", GROW_ID, "owner", OWNER_ID] as const;
+    const otherOwnerRow = {
+      ...ROW,
+      id: "77777777-7777-4777-8777-777777777777",
+      user_id: OTHER_OWNER_ID,
+    };
+    client.setQueryData(legacyKey, [otherOwnerRow]);
+    client.setQueryData(growKey, []);
+    let currentOwnerId = OWNER_ID;
+    const originalCancelQueries = client.cancelQueries.bind(client);
+    vi.spyOn(client, "cancelQueries").mockImplementation(async (filters, options) => {
+      const result = await originalCancelQueries(filters, options);
+      currentOwnerId = OTHER_OWNER_ID;
+      return result;
+    });
+    const confirmed = confirmCreatedPlantRow(ROW, {
+      ownerId: OWNER_ID,
+      growId: GROW_ID,
+      tentId: TENT_ID,
+    });
+    expect(confirmed).not.toBeNull();
+
+    await primeConfirmedPlantCaches(client, OWNER_ID, confirmed!, {
+      isOwnerCurrent: () => currentOwnerId === OWNER_ID,
+    });
+
+    expect(client.getQueryData(legacyKey)).toEqual([otherOwnerRow]);
+    expect(client.getQueryData(growKey)).toEqual([]);
+  });
+
+  it("does not recreate cleared owner caches or append into a replacement legacy query", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const legacyKey = ["plants"] as const;
+    const growKey = ["grow", "plants", "all", GROW_ID, "owner", OWNER_ID] as const;
+    const replacementRow = {
+      ...ROW,
+      id: "66666666-6666-4666-8666-666666666666",
+      user_id: OTHER_OWNER_ID,
+    };
+    client.setQueryData(legacyKey, []);
+    client.setQueryData(growKey, []);
+    const originalCancelQueries = client.cancelQueries.bind(client);
+    let identityCacheCleared = false;
+    vi.spyOn(client, "cancelQueries").mockImplementation(async (filters, options) => {
+      const result = await originalCancelQueries(filters, options);
+      if (!identityCacheCleared) {
+        identityCacheCleared = true;
+        client.clear();
+        client.setQueryData(legacyKey, [replacementRow]);
+      }
+      return result;
+    });
+    const confirmed = confirmCreatedPlantRow(ROW, {
+      ownerId: OWNER_ID,
+      growId: GROW_ID,
+      tentId: TENT_ID,
+    });
+    expect(confirmed).not.toBeNull();
+
+    await primeConfirmedPlantCaches(client, OWNER_ID, confirmed!, {
+      // Query identity must independently protect the cache-clear boundary.
+      isOwnerCurrent: () => true,
+    });
+
+    expect(client.getQueryData(legacyKey)).toEqual([replacementRow]);
+    expect(client.getQueryData(growKey)).toBeUndefined();
   });
 });

@@ -30,6 +30,7 @@ import { validatePlantInsertPayload } from "@/lib/plantPayloadValidation";
 import {
   confirmCreatedPlantRow,
   primeConfirmedPlantCaches,
+  reaffirmConfirmedPlantCacheMeta,
 } from "@/lib/confirmedPlantCacheService";
 import { recordConfirmedGrowPlantMeta } from "@/hooks/useGrowData";
 import {
@@ -210,6 +211,8 @@ export default function CreatePlantDialog({
   const [busy, setBusy] = useState(false);
   const handoffSuppressedRef = useRef(false);
   const mountedRef = useRef(true);
+  const currentOwnerIdRef = useRef<string | null>(user?.id ?? null);
+  currentOwnerIdRef.current = user?.id ?? null;
   const [form, setForm] = useState(() => emptyForm(initialTentId));
   /** Once grower explicitly picks a compatible tent after a conflict, allow write. */
   const [explicitCompatiblePick, setExplicitCompatiblePick] = useState(false);
@@ -414,11 +417,20 @@ export default function CreatePlantDialog({
       );
       return;
     }
-    await primeConfirmedPlantCaches(qc, user.id, confirmed, {
+    const isSubmittedOwnerCurrent = () =>
+      mountedRef.current && currentOwnerIdRef.current === user.id;
+    const cacheOptions = {
+      isOwnerCurrent: isSubmittedOwnerCurrent,
       onGrowCacheConfirmed: (key) => {
         recordConfirmedGrowPlantMeta(user.id, key);
       },
-    });
+    };
+    const cacheReceipt = await primeConfirmedPlantCaches(qc, user.id, confirmed, cacheOptions);
+    if (!isSubmittedOwnerCurrent()) {
+      if (mountedRef.current) setBusy(false);
+      else toast.success("Plant created");
+      return;
+    }
     // The insert is durable before these reads. Keep the dialog and its handoff
     // pending until both legacy Quick Log and owner-scoped grow views have
     // attempted authoritative reconciliation, matching Start Your Room.
@@ -426,6 +438,12 @@ export default function CreatePlantDialog({
       qc.invalidateQueries({ queryKey: ["plants"] }),
       qc.invalidateQueries({ queryKey: ["grow", "plants"] }),
     ]);
+    reaffirmConfirmedPlantCacheMeta(qc, confirmed, cacheReceipt, cacheOptions);
+    if (!isSubmittedOwnerCurrent()) {
+      if (mountedRef.current) setBusy(false);
+      else toast.success("Plant created");
+      return;
+    }
     const stillMounted = mountedRef.current;
     const handoffSuppressed = handoffSuppressedRef.current;
     if (stillMounted) setBusy(false);

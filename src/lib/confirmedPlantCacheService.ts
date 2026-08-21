@@ -16,10 +16,15 @@ interface ExpectedCreatedPlantScope {
 }
 
 export interface ConfirmedPlantCacheReceipt {
-  growMetaKeys: readonly QueryKey[];
+  growCaches: readonly {
+    queryKey: QueryKey;
+    logicalKey: QueryKey;
+  }[];
 }
 
 interface PrimeConfirmedPlantCachesOptions {
+  /** Re-checks the active identity after async cancellation and before writes. */
+  isOwnerCurrent: () => boolean;
   /** Runs immediately before the matching owner-scoped cache is published. */
   onGrowCacheConfirmed?: (logicalKey: QueryKey) => void;
 }
@@ -62,6 +67,7 @@ function upsertPlantRow<T extends { id: string }>(
   next: T,
   direction: "ascending" | "descending",
 ): unknown {
+  if (current == null) return [next];
   if (!Array.isArray(current)) return current;
   const withoutDuplicate = current.filter((candidate) => rowId(candidate) !== next.id);
   return direction === "ascending" ? [...withoutDuplicate, next] : [next, ...withoutDuplicate];
@@ -112,17 +118,18 @@ export async function primeConfirmedPlantCaches(
   queryClient: QueryClient,
   ownerId: string,
   confirmed: ConfirmedCreatedPlant,
-  options: PrimeConfirmedPlantCachesOptions = {},
+  options: PrimeConfirmedPlantCachesOptions,
 ): Promise<ConfirmedPlantCacheReceipt> {
   const legacyKey = ["plants"] as const;
-  const updateLegacy = Array.isArray(queryClient.getQueryData(legacyKey));
+  const legacyQuery = queryClient.getQueryCache().find({ queryKey: legacyKey, exact: true });
+  const updateLegacy = !!legacyQuery;
   const matchingGrowQueries = queryClient
     .getQueryCache()
     .findAll({ queryKey: ["grow", "plants"] })
     .flatMap((query) => {
       const scope = parseGrowPlantsCacheScope(query.queryKey, ownerId);
-      return scope && scopeIncludesPlant(scope, confirmed.row) && Array.isArray(query.state.data)
-        ? [{ queryKey: query.queryKey, scope }]
+      return scope && scopeIncludesPlant(scope, confirmed.row)
+        ? [{ query, queryKey: query.queryKey, scope }]
         : [];
     });
 
@@ -136,20 +143,59 @@ export async function primeConfirmedPlantCaches(
     ),
   ]);
 
-  if (updateLegacy) {
+  // A durable response may complete after sign-out/account-switch cleanup.
+  // Never repopulate the ownerless legacy cache, or any old owner query, unless
+  // the submitting identity is still current at the actual publish boundary.
+  if (!options.isOwnerCurrent()) return { growCaches: [] };
+
+  const legacyQueryIsUnchanged =
+    updateLegacy &&
+    queryClient.getQueryCache().find({ queryKey: legacyKey, exact: true }) === legacyQuery;
+  if (legacyQueryIsUnchanged) {
     queryClient.setQueryData(["plants"], (current) =>
       upsertPlantRow(current, confirmed.row, "ascending"),
     );
   }
 
-  const growMetaKeys: QueryKey[] = [];
-  for (const { queryKey, scope } of matchingGrowQueries) {
+  const growCaches: Array<{ queryKey: QueryKey; logicalKey: QueryKey }> = [];
+  for (const { query, queryKey, scope } of matchingGrowQueries) {
+    if (!options.isOwnerCurrent()) break;
+    if (queryClient.getQueryCache().find({ queryKey, exact: true }) !== query) continue;
     options.onGrowCacheConfirmed?.(scope.logicalKey);
+    if (!options.isOwnerCurrent()) break;
     queryClient.setQueryData(queryKey, (current) =>
       upsertPlantRow(current, confirmed.plant, "descending"),
     );
-    growMetaKeys.push(scope.logicalKey);
+    growCaches.push({ queryKey, logicalKey: scope.logicalKey });
   }
 
-  return { growMetaKeys };
+  return { growCaches };
+}
+
+/**
+ * A failed authoritative refresh leaves React Query's error state intact, but
+ * its query boundary can overwrite source metadata. Re-affirm only cache rows
+ * that still contain this server-confirmed plant; never recreate missing data.
+ */
+export function reaffirmConfirmedPlantCacheMeta(
+  queryClient: QueryClient,
+  confirmed: ConfirmedCreatedPlant,
+  receipt: ConfirmedPlantCacheReceipt,
+  options: PrimeConfirmedPlantCachesOptions,
+): number {
+  if (!options.isOwnerCurrent()) return 0;
+  let reaffirmed = 0;
+  for (const cache of receipt.growCaches) {
+    if (!options.isOwnerCurrent()) break;
+    const current = queryClient.getQueryData(cache.queryKey);
+    if (
+      !Array.isArray(current) ||
+      !current.some((candidate) => rowId(candidate) === confirmed.row.id)
+    ) {
+      continue;
+    }
+    options.onGrowCacheConfirmed?.(cache.logicalKey);
+    reaffirmed += 1;
+  }
+  return reaffirmed;
 }

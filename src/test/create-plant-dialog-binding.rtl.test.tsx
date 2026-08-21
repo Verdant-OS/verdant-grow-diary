@@ -14,6 +14,9 @@ const singleMock = vi.hoisted(() => vi.fn());
 const selectMock = vi.hoisted(() => vi.fn(() => ({ single: singleMock })));
 const successToastMock = vi.hoisted(() => vi.fn());
 const funnelEventMock = vi.hoisted(() => vi.fn());
+const authState = vi.hoisted(() => ({
+  userId: "11111111-1111-4111-8111-111111111111" as string | null,
+}));
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
@@ -36,7 +39,10 @@ vi.mock("@/integrations/supabase/client", () => ({
 }));
 
 vi.mock("@/store/auth", () => ({
-  useAuth: () => ({ user: { id: "11111111-1111-4111-8111-111111111111" }, loading: false }),
+  useAuth: () => ({
+    user: authState.userId ? { id: authState.userId } : null,
+    loading: false,
+  }),
 }));
 
 vi.mock("@/lib/funnelAnalytics", () => ({ trackFunnelEvent: funnelEventMock }));
@@ -182,6 +188,7 @@ function renderDialog(props: {
 }
 
 beforeEach(() => {
+  authState.userId = USER_ID;
   insertMock.mockReset();
   successToastMock.mockReset();
   funnelEventMock.mockReset();
@@ -519,10 +526,50 @@ describe("CreatePlantDialog RTL binding", () => {
     expect(client.getQueryData(otherGrowPlantsKey)).toEqual([]);
     expect(client.getQueryData(otherOwnerPlantsKey)).toEqual([]);
     const refreshFailureMeta = getGrowDataMeta(["grow", "plants", "all", G1], USER_ID);
-    expect(refreshFailureMeta.dataSource).toBe("unavailable");
-    expect(refreshFailureMeta.sourceReason).not.toBe("supabase:rows");
+    expect(refreshFailureMeta.dataSource).toBe("supabase");
+    expect(refreshFailureMeta.sourceReason).toBe("supabase:rows");
 
     unsubscribers.forEach((unsubscribe) => unsubscribe());
+  });
+
+  it("does not publish a late insert response into the next authenticated owner's cache", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const legacyPlantsKey = ["plants"] as const;
+    const replacementRow = { ...CREATED_ROW, id: G2, user_id: OTHER_USER_ID };
+    let resolveInsert!: () => void;
+    const insertResult = new Promise<{ data: typeof CREATED_ROW; error: null }>((resolve) => {
+      resolveInsert = () => resolve({ data: CREATED_ROW, error: null });
+    });
+    singleMock.mockReturnValueOnce(insertResult);
+    const onCreated = vi.fn();
+    const view = () => (
+      <QueryClientProvider client={client}>
+        <MemoryRouter>
+          <CreatePlantDialog
+            initiallyOpen
+            defaultGrowId={G1}
+            defaultTentId={T1}
+            onCreated={onCreated}
+          />
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+    const rendered = render(view());
+
+    await userEvent.type(screen.getByTestId("create-plant-name"), CREATED_ROW.name);
+    await userEvent.click(screen.getByTestId("plant-create-submit"));
+    await waitFor(() => expect(insertMock).toHaveBeenCalledTimes(1));
+
+    client.clear();
+    client.setQueryData(legacyPlantsKey, [replacementRow]);
+    authState.userId = OTHER_USER_ID;
+    rendered.rerender(view());
+    resolveInsert();
+
+    await waitFor(() => expect(client.getQueryData(legacyPlantsKey)).toEqual([replacementRow]));
+    expect(onCreated).not.toHaveBeenCalled();
+    expect(successToastMock).not.toHaveBeenCalled();
+    expect(client.getQueriesData({ queryKey: ["grow", "plants"] })).toEqual([]);
   });
 
   it("allows dismissal during refresh without a delayed create handoff", async () => {

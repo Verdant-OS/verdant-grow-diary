@@ -720,7 +720,18 @@ export default function Plants() {
         )}
       </div>
 
-      {filtered.length === 0 ? (
+      {filtered.length === 0 &&
+      plantsAsyncState.kind === "limited" &&
+      plantsAsyncState.primaryRefreshFailed ? (
+        <p
+          role="status"
+          data-testid="plants-empty-unconfirmed"
+          className="rounded-xl border border-border/60 bg-card/40 p-4 text-sm text-muted-foreground"
+        >
+          Verdant cannot confirm whether this grow has plants while the plant list refresh is
+          unavailable. Retry the plant list above.
+        </p>
+      ) : filtered.length === 0 ? (
         <EmptyState
           icon={<Sprout className="h-6 w-6" />}
           title={emptyCopy ?? "No plants yet"}

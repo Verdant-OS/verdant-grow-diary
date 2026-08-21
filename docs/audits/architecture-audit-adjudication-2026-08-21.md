@@ -201,7 +201,7 @@ These are the audit's strongest calls and they should survive into whatever cont
 
 ## 6. Findings the audit missed
 
-### 6.1 Production's published content does not match the tree of the commit it names
+### 6.1 The build workspace that stamped production did not match its commit's tree
 
 `established fact`, measured 2026-08-21 from `https://verdantgrowdiary.com/version.json`
 (HTTP 200):
@@ -259,9 +259,16 @@ stamper uses:
 | **Stamped by the live build**                | `8773f6b2c0edb2618a7b1b6fc4f0d4bb01b984cbc9e3ed33be896a1e40152d41` |
 | Match                                        | **no**                                                             |
 
-**Production stamped commit `4b1c4867e685` and published content whose build-defining roots do
-not match that commit's tree.** Because only the hashed roots move this value, the difference
-lies inside build-defining paths — not in docs, e2e, or workflows.
+**Production stamped commit `4b1c4867e685` from a build workspace whose hashed roots did not
+match that commit's tree.** State it that way and no more strongly — corrected after review.
+
+`TREE_HASH_ROOTS` covers `src`, `public`, `supabase`, `scripts`, `config`, the committed `.env`
+files, and the build config; `tree-hash.mjs:27` says the hash moves for "test files under
+`src/test` and `scripts/`" too. **Many of those inputs never reach the deployed bundle.** A
+change confined to a test file, a `scripts/` helper, or a `supabase/` migration would produce
+exactly this mismatch while the published runtime output stayed byte-identical. So the
+measurement establishes **workspace drift at stamp time**, not that the artifact users receive
+differs from the commit. Whether any shipped byte differs is **`NOT_MEASURED`**.
 
 That is the whole finding, and it is narrow. Per the resolver's own text the explanations are an
 editor-modified snapshot at build time, or a publish pipeline that mutates hashed files such as
@@ -357,14 +364,22 @@ actually supports.
 
 Per the resolver's own text the surviving explanations are a build predating the search, or
 content that never matched any commit — "editor-modified snapshot, or a publish pipeline that
-mutates hashed files such as `bun.lock` before prebuild". `dirty: true` points at the second.
-The first is ruled out, not merely weakened. The stamped `commitTime` `2026-08-21T09:44:40Z` is
-**confirmed by the GitHub commit endpoint** (§6.1), and the commit was retrieved by SHA — so the
-build did not predate anything. The scans missed it because it is a Lovable merge that is **not
-on the deploy branch**, which no scan depth over `origin/verdant-grow-diary` could have fixed.
+mutates hashed files such as `bun.lock` before prebuild". **This document takes no position
+between them.** Two earlier attempts to adjudicate that with the `dirty` flag are withdrawn
+(§6.1): the flag is repository-wide and the hash is not, so it cannot favour either.
 
-**What is owner-gated is now a single, specific question:** why the published tree differs from
-the tree of the commit it stamps. That rests on the direct hash comparison above, not on the two
+**An older commit reproducing the live hash also remains open.** The endpoint-confirmed
+`commitTime` dates the stamped **`HEAD`**, not the workspace content that produced the
+`treeHash`. A recent `HEAD` whose hashed files were reverted to, or copied from, an older state
+yields precisely this mismatch. With 16,204 deploy-branch commits and 169 other refs unscanned,
+that possibility is **`NOT_MEASURED`** — retrieving the SHA did not close it.
+
+What the retrieval _does_ explain is why the scans found nothing: the commit is a Lovable merge
+**not on the deploy branch**, so no scan depth over `origin/verdant-grow-diary` would have
+reached it.
+
+**What is owner-gated is now a single, specific question:** why the build workspace's hashed
+roots differed from the tree of the commit it stamped. That rests on the direct hash comparison above, not on the two
 withdrawn claims. It is a real release-provenance gap — a stamp that cannot be tied back to a
 committed tree defeats the purpose of stamping — and it is the kind of thing OPS-01 and OPS-02
 exist to define and detect. **It is not evidence that production is serving wrong or unreviewed
@@ -620,6 +635,6 @@ route §6.1 to whoever holds the publisher's view.
 determinations survive independent re-derivation intact. Its first two assignments were
 blocked by an open PR it had already noticed — **#1051, now merged as `5c60bcd9`, so ARCH-01
 and ARCH-02 are live work rather than blocked.** What remains unresolved is the thing that was never on its
-roadmap: production's published content does not match the tree of the commit it stamps
+roadmap: the build workspace that stamped production did not match its commit's tree
 (§6.1) — a narrower finding than earlier revisions of this document claimed, and one that took
 several review rounds to state correctly.

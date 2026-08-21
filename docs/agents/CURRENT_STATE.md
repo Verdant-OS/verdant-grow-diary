@@ -1,6 +1,23 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-20 UTC (third same-day docs-only edit)
+**Last updated:** 2026-08-21 UTC
+**Updated by:** Claude (2026-08-21, on PR #1060 at Cheek's instruction: retires
+the expired parked-PR collision fence and refreshes the stale operating facts.
+**#828 / #817 / #696 all closed unmerged on 2026-08-15** within a 54-minute
+window (verified by direct PR read 2026-08-21), so the fence naming them is
+replaced everywhere by the durable rule it stood for — no competing Timeline /
+Alerts / Action Queue rewrite — in `AGENTS.md`, the `GEMINI.md` mirror,
+`HANDOFF_PROTOCOL.md`, `cheek-approval-workflow.md`, `roles/grok.md`, the
+peer-elevation map, and this file. Also: deploy topology row moved from
+`87ae05e` (#1026) to `6cf3ffda` (#1062) after **26** first-parent merges; the
+Tranche B+ slice plan replaced with measured per-slice status (B0a/B1/B3a/B2a/
+B4a/D7 merged, D5 open, B2b/B4b/B5 blocked on unopened Tranche A); Claude's
+agents-table row updated to match. Evidence and method:
+`docs/specs/current-state-refresh-2026-08-20.md` (#1062). Docs-only; no `src/`,
+schema, migration, or UI. Production `/version.json` NOT_MEASURED — outbound
+fetch is network-policy blocked from the agent session.)
+
+**Prior update:** 2026-08-20 UTC (third same-day docs-only edit)
 **Updated by:** Grok (2026-08-20, third same-day docs-only edit on PR #1060:
 Sentinel stamp set to `2026-09-01.1` across the twelve pinned governance files;
 `docs/agents/roles/gemini.md` replaced with Cheek's authoritative Gemini role —
@@ -17,8 +34,8 @@ live-app audit, implement assigned slices, test, independent review. Codex /
 Claude / Grok retain different default strengths but **none outranks the
 others** — explicit task ownership controls. Standing rule: every assigned
 slice names one owner and a different peer as independent reviewer. Collision
-fences unchanged (Tranche A remaining = Codex; Tranche B+ = Claude; parked
-#828 / #817 / #696). Map updated:
+fences unchanged (Tranche A remaining = Codex; Tranche B+ = Claude; no
+competing Timeline / Alerts / Action Queue rewrite). Map updated:
 `docs/agents/grok-peer-elevation-map-2026-08-20.md`. Sentinel bump to
 `2026-08-20.2`. No `src/`, schema, migration, UI, or One-Tent product code.)
 
@@ -27,7 +44,7 @@ fences unchanged (Tranche A remaining = Codex; Tranche B+ = Claude; parked
 in-session approval elevating Grok as a **peer** to Claude and Codex for
 implementation, audit, and review. Research / market / backlink mission retained.
 Ownership and collision fences unchanged: Tranche A = Codex; Tranche B+ product
-code = Claude; parked PRs #828 / #817 / #696. Map:
+code = Claude; no competing Timeline / Alerts / Action Queue rewrite. Map:
 `docs/agents/grok-peer-elevation-map-2026-08-20.md`. Sentinel-Version bump on the
 twelve pinned governance files. No `src/`, schema, migration, UI, or One-Tent
 product code in this edit.)
@@ -444,7 +461,7 @@ way.
 
 | Branch               | Role                                             | Verified head                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | -------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `verdant-grow-diary` | **Deploy branch. Production ships from here.**   | `87ae05e5bff419a443ea8f5679129223114e1d48` (#1026), verified 2026-08-18 with `git fetch origin verdant-grow-diary && git rev-parse origin/verdant-grow-diary`. Supersedes `3f2bfe2db` (#1021). After #1021, in `git log --first-parent` merge order oldest-first: `4dd7aed` (#1022), `e34086d` (#1023), `3970f31` (#1024), `e2800ee` (#1025), `87ae05e` (#1026). **Live production was not re-fetched at this verification** — a `/version.json` fetch from the agent session is `BLOCKED` (network policy 403); the 2026-08-15 observation (`/version.json` serving `5e2fcedd4271`, #984) is the last measurement and publish lags git. Merging is not a publish. PR numbers on this branch do not order by merge time — order commits with `git log`, never by PR number. Do not carry older validation tables forward. Older buffers that still show `3f2bfe2db` (#1021) or `1c094a2a3` (#970) are earlier snapshots; discard them |
+| `verdant-grow-diary` | **Deploy branch. Production ships from here.**   | `6cf3ffda0686cfe77f3c4eda5d5ded6a770f7bc0` (#1062), verified 2026-08-21 with `git fetch origin verdant-grow-diary && git rev-parse origin/verdant-grow-diary`. Supersedes `87ae05e5bff4` (#1026), which this row carried while **26 first-parent merges** landed beyond it — order them with `git log --first-parent 87ae05e..6cf3ffda`, not from this table. Notable in that span: the Tranche B+ delivery run (#1039, #1040, #1042, #1047, #1049), the Action Queue transition/repair pair (#1038, #1044), the Quick Log ACL fence hardening (#1035, #1052, #1057), and D7 (#1041). **Live production was not re-fetched at this verification** — a `/version.json` fetch from the agent session is `BLOCKED` (network policy 403); the 2026-08-15 observation (`/version.json` serving `5e2fcedd4271`, #984) is the last measurement and publish lags git. Merging is not a publish. PR numbers on this branch do not order by merge time — order commits with `git log`, never by PR number. Do not carry older validation tables forward. Older buffers that still show `3f2bfe2db` (#1021) or `1c094a2a3` (#970) are earlier snapshots; discard them |
 | `main`               | Integration branch. It is not production parity. | `b6d747941948ce68157185a2b0847acea6970d44` (#779), verified 2026-08-07                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 
 `main` and `verdant-grow-diary` are divergent. Do not infer production behavior from
@@ -559,8 +576,10 @@ the Convex or Postgres spikes below. Owner-only gates remain `BLOCKED`:
 Lovable-apply of `20260813030000_signup_acquisition_forward_repair.sql`,
 and a managed `e2e:one-tent:ui` session. Slice 5 recorded the honest
 `missing_session_json` receipt rather than fabricating a walk. Colliding
-PRs **#828**, **#817**, **#696** stay open and parked — do not start a
-competing Timeline / Alerts / Action Queue UI rewrite. Baseline and
+PRs **#828**, **#817**, and **#696** all closed unmerged on 2026-08-15 within a
+54-minute window (verified 2026-08-21 by direct PR read). The fence they carried
+stands on its own: do not start a competing Timeline / Alerts / Action Queue UI
+rewrite. Baseline and
 post-change receipts: `docs/one-tent-loop-operating-order-baseline.md`.
 Persist-path spec: `docs/specs/one-tent-loop-quicklog-single-write-path.md`.
 
@@ -598,12 +617,28 @@ navigation implementation. Approved design:
 context carry), **D5** (visible user-namespaced "Continue with <plant>?"
 suggestion — silent remembered defaults stay banned), **D7** (plant-scoped
 Better/Same/Worse row in the V2 sheet), and ratifies the design's §11 copy.
-Slice plan: each approved item ships as its own PR — B0a measurement harness
-(test-only, first merge gate), B1 target-precedence rules, D5 slice, D7
-slice, B3a recovery + ratified copy; B2/B3b wait for A5, B4's rules edit
-waits for A2, B5 waits for A3, B0b waits for the owner-gated authenticated
-session/CI path. No schema, no migrations, no new routes, no new Quick Log
-write paths, no production telemetry.
+Slice plan: each approved item ships as its own PR. **Status measured
+2026-08-21 at deploy tip `6cf3ffda` — Tranche B+ is substantially
+delivered, not pending:**
+
+| Slice | Status |
+| --- | --- |
+| B0a measurement harness (first merge gate) | **MERGED** — #1039 `de8ebad` |
+| B1 target-precedence rules | **MERGED** — #1040 `9141be8` |
+| B3a recovery + ratified copy | **MERGED** — #1042 `9b64456` |
+| B2a shared save-key policy | **MERGED** — #1049 `f09febc` |
+| B4a `/doctor` loop card | **MERGED** — #1047 `cff3efd` |
+| D7 plant-scoped Better/Same/Worse | **MERGED** — #1041 `5640d77` |
+| D5 "Continue with <plant>?" | **OPEN** — #1043 |
+| B2b | still deferred to **A5** (unopened) |
+| B4b | still deferred to **A2** (unopened) |
+| B5 | waits for **A3** (unopened) |
+| B0b | owner-gated authenticated session/CI path |
+
+Note the new dependency this created: B2b and B4b now block on Tranche A
+slices that have never been opened, so Tranche A is no longer only its own
+tranche — it gates the completion of Tranche B+. No schema, no migrations,
+no new routes, no new Quick Log write paths, no production telemetry.
 
 **Named isolated spike (approved 2026-08-13, not SEO):**
 `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE`. Cheek approved a spec-first,
@@ -895,7 +930,7 @@ schema change and does not authorize production writes.
 | Agent             | Assignment                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Codex             | Standing SEO measurement readiness and analytics integrity. Option A slice 1 (#949) is live-verified. Convex Phase 1 of `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` remains in review: PR #977, still OPEN 2026-08-15. Scope stays Phase 1 only, under `spikes/convex-component-sandbox/`. **Do NOT rebuild the Postgres domain-reach detector — Phase 0 and Phase 1 of `POSTGRES_RESTRICTED_ROLE_SPIKE` are already delivered by Claude.** Incoming #986 still said Phase 1 was `HOLD`; that row was stale. Phase 2 of that arm is HOLD (JWT secret unobtainable on Lovable Cloud; role durability `UNKNOWN`)                                                                            |
-| Claude            | `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` specification — delivered. `POSTGRES_RESTRICTED_ROLE_SPIKE`: spec delivered, **Phase 0 detector measured and Phase 1 role harness delivered (local-only)**, 2026-08-14 under Cheek's approval and full-authority grant. Not the 2026-08-13 “spec-only / not implementation” row. Prior completed out-of-slice work (#586/#809/#812/#885) unchanged                                                                                                                                                                                                                                                                                            |
+| Claude            | **One-Tent Loop Tranche B+ — architect and implementer (Cheek, 2026-08-19). Substantially delivered as of 2026-08-21:** B0a (#1039), B1 (#1040), B3a (#1042), B2a (#1049), B4a (#1047) and D7 (#1041) merged; D5 (#1043) open; B2b/B4b/B5 blocked on unopened Tranche A slices A5/A2/A3. Also delivered #1062, the routed `CURRENT_STATE` refresh specification (`docs/specs/current-state-refresh-2026-08-20.md`). `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` specification — delivered. `POSTGRES_RESTRICTED_ROLE_SPIKE`: spec delivered, **Phase 0 detector measured and Phase 1 role harness delivered (local-only)**, 2026-08-14 under Cheek's approval and full-authority grant. Not the 2026-08-13 “spec-only / not implementation” row. Prior completed out-of-slice work (#586/#809/#812/#885) unchanged                                                                                                                                                                                                                                                                                            |
 | Grok              | **Product Intelligence, Adversarial Audit, and Implementation Lead** (Cheek 2026-08-20, refined). Equally empowered to research, audit the live app, implement assigned slices, test, and independently review. Peer with Claude and Codex — **none outranks the others**; explicit task ownership controls. SEO/market/backlink strength retained (not a fence). Map: `docs/agents/grok-peer-elevation-map-2026-08-20.md`. Does **not** take Tranche A remaining edit points (Codex) or Tranche B+ product code (Claude) unless done and unassigned. Prior delivered work unchanged: `ONE_TENT_LOOP_OPERATING_ORDER` repo slices 0/2/3/4; Slices 1 and 5 owner-`BLOCKED`; Cursor SDK spike gates on #985 / `CURSOR_API_KEY`. Reuse of the dispatcher not approved. Convex/Postgres spikes not paused. Production Convex HOLD. Not Unassigned |
 | Security reviewer | Unassigned until Convex Phase 1 spike code is ready for review before any Convex cloud credential                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | Gemini            | Unassigned                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |

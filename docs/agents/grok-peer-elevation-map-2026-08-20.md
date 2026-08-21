@@ -75,7 +75,9 @@ Helper: `scripts/sync-sentinel-mirror.mjs`. Current stamp for this follow-up:
 
 ## Collision / safety fences that do **not** change
 
-- Parked PRs **#828**, **#817**, **#696**
+- No competing Timeline / Alerts / Action Queue UI rewrite (the PRs that carried this
+  fence — **#828**, **#817**, **#696** — all closed unmerged 2026-08-15; rule stands,
+  PR numbers expired)
 - Remaining **Tranche A** edit points: **Codex** until reassigned
 - **Tranche B+** product code: **Claude** until reassigned
 - No merge / deploy / apply / migrations / outreach / external writes without Cheek

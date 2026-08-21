@@ -11,8 +11,8 @@ implements, audits, tests, or independently reviews. Default strengths differ (G
 product intelligence / adversarial audit / implementation; Claude: specs & knowledge
 architecture; Codex: often build / integration) — preference, not exclusivity. Peer
 rules do **not** erase collision fences (Tranche A remaining edit points = Codex until
-reassigned; Tranche B+ product code = Claude until reassigned; parked PRs #828 / #817 /
-#696 stay parked).
+reassigned; Tranche B+ product code = Claude until reassigned; no competing Timeline /
+Alerts / Action Queue rewrite).
 
 ### One owner + independent reviewer (standing rule)
 

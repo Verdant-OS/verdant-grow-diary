@@ -55,8 +55,9 @@ external writes unless Cheek explicitly authorizes that as a separate action.
   already marks that work done and unassigned (or Cheek reassigns).
 - Do not take Codex's **Tranche A** / release-gate ownership unless likewise done and
   unassigned (or Cheek reassigns).
-- Parked collision PRs (**#828**, **#817**, **#696**) stay parked — no competing
-  Timeline / Alerts / Action Queue UI rewrite.
+- No competing Timeline / Alerts / Action Queue UI rewrite. The PRs that once carried
+  this fence — #828, #817, #696 — all closed unmerged on 2026-08-15; the rule outlived
+  them, so treat it as standing on its own, not as a watch on three open branches.
 - Before substantial new work, check recent and open PRs for the same area. Parallel
   implementation of the same slice remains a protocol failure.
 - The research → architecture → build sequence is a **preferred path**, not rank.

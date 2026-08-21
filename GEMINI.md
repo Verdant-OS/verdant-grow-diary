@@ -585,7 +585,7 @@ refined). Explicit task ownership controls who researches, architects, implement
 audits, tests, or independently reviews. Default strengths differ; they are preference,
 not exclusivity. Standing collision fences in `CURRENT_STATE.md` still bind (for
 example remaining Tranche A edit points for Codex, Tranche B+ product code for Claude,
-parked PRs #828 / #817 / #696).
+and no competing Timeline / Alerts / Action Queue rewrite).
 
 Every assigned slice names **one owner** and a **different peer** as **independent
 reviewer**. The owner cannot review their own work. **No code ships without peer

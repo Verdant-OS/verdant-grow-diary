@@ -66,8 +66,8 @@ the slice.
 different peer as independent reviewer. Owner cannot review their own work.
 
 Standing collision fences in `CURRENT_STATE.md` still bind (Tranche A remaining edit
-points = Codex until reassigned; Tranche B+ = Claude until reassigned; parked PRs
-#828 / #817 / #696).
+points = Codex until reassigned; Tranche B+ = Claude until reassigned; no competing
+Timeline / Alerts / Action Queue rewrite).
 
 Scoped work may use a **subset** of roles. Parallel implementation of the same
 slice is a protocol failure — Cheek should reject “two agents both shipping X.”

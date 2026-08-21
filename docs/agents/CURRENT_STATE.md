@@ -1438,10 +1438,14 @@ Two findings other agents should not rediscover:
   `vercel.json`, the SEO-monitoring workflow, `README.md`, the agent run skill,
   and the preview-deployment checklist. The gate requires every declared
   consumer while `package-lock.json` remains, so retiring the preview Vercel
-  project resolves one of five, not the question. Do **not** drop the
-  compatibility lock on the strength of the preview project alone — one of the
-  remaining four is a workflow that actually runs. An earlier reading that
-  treated production and preview as the same deployment was reversed.
+  project does not by itself clear the gate. Do **not** drop the compatibility
+  lock on the strength of that project alone — one of the others is a workflow
+  that actually runs. **Map contracts to deployments before counting what
+  remains:** the preview checklist and `vercel.json` describe the _same_
+  deployment (the checklist requires the project's settings to match that file,
+  and its rollback step removes it), so five files are not five deployments. An
+  earlier reading that treated production and preview as the same deployment was
+  reversed; a later one that counted the five as independent was too.
 
 Owner-gated, unchanged by this slice: the publisher's build log (the only thing
 that explains why a build workspace's hashed roots differed from the commit it

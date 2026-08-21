@@ -317,11 +317,19 @@ exactly this mismatch while the published runtime output stayed byte-identical. 
 measurement establishes **workspace drift at stamp time**, not that the artifact users receive
 differs from the commit. Whether any shipped byte differs is **`NOT_MEASURED`**.
 
-That is the whole finding, and it is narrow. Per the resolver's own text the explanations are an
+That is the whole finding, and it is narrow. Per the resolver's own text, two explanations are an
 editor-modified snapshot at build time, or a publish pipeline that mutates hashed files such as
-`bun.lock` before prebuild. Distinguishing them needs the publisher's build log, which is
-owner-gated; **nothing here shows wrong content shipped, only that the stamp cannot be tied back
-to a committed tree.**
+`bun.lock` before prebuild. **A third stays open and must not be dropped here:** the hashed
+content may match an _older committed state_ — `commitTime` dates the stamped `HEAD`, not the
+workspace that produced the `treeHash`, and 16,204 deploy-branch commits plus 169 other refs are
+unscanned. §6.1's later subsection records that as **`NOT_MEASURED`**, and an earlier revision of
+this summary silently narrowed the list to two, which would have let the publisher investigation
+exclude it prematurely.
+
+Distinguishing all three needs the publisher's build log, which is owner-gated; **nothing here
+shows wrong content shipped, only that the stamp has not been tied back to a committed tree** —
+"has not been", not "cannot be", because the third explanation is precisely the case where it
+could yet be.
 
 It also explains the scans below: the commit is a Lovable merge that is **not on the deploy
 branch**, so recomputing over `origin/verdant-grow-diary` could never have found it, at any scan
@@ -427,7 +435,7 @@ reached it.
 
 **What is owner-gated is now a single, specific question:** why the build workspace's hashed
 roots differed from the tree of the commit it stamped. That rests on the direct hash comparison above, not on the two
-withdrawn claims. It is a real release-provenance gap — a stamp that cannot be tied back to a
+withdrawn claims. It is a real release-provenance gap — a stamp not yet tied back to a
 committed tree defeats the purpose of stamping — and it is the kind of thing OPS-01 and OPS-02
 exist to define and detect. **It is not evidence that production is serving wrong or unreviewed
 code, and this document does not claim that.**
@@ -668,11 +676,23 @@ remains:
 | `.claude/skills/run-verdant-grow-diary/SKILL.md` | the agent run guide (1 marker) |
 | `docs/preview-deployment-verification.md`        | the preview checklist (3)      |
 
-So retiring the preview project would resolve **one of five**. An owner who read the earlier
-wording, found the preview project retired, and dropped the compatibility lock would break the
-remaining four — including a workflow that actually runs. **TOOL-01's prerequisite is an
-inventory and migration decision across all five**, not a single question. The preview project is
-merely the one this document happened to surface.
+An owner who read the earlier wording, found the preview project retired, and dropped the
+compatibility lock would break consumers that still need it — including a workflow that actually
+runs. **TOOL-01's prerequisite is an inventory and migration decision across all five**, not a
+single question.
+
+**But do not turn that into a residual count either** — corrected again after review. Two of the
+five are **contract files describing the same deployment**, not independent consumers:
+`docs/preview-deployment-verification.md` opens by referring to `vercel.json` for the
+production-deploy rules, requires the project's settings to _match_ `vercel.json` in its §1, and
+its §7 rollback step 1 says to remove `vercel.json` when the repo-controlled preview
+configuration is retired. So retiring that project could clear **two** contracts, not one — and
+saying "one of five" understates it just as "the precondition" overstated the opposite.
+
+The honest instruction is therefore structural, not numerical: **map each declared contract to
+the deployment it actually governs before counting anything.** Five files do not imply five
+deployments, and this document has now been wrong in both directions on the same paragraph. What
+remains after any given retirement is `NOT_MEASURED` here.
 
 > Those two commands are described rather than quoted, which is not fussiness — it is a measured
 > property of the gate, learned by tripping it. `check-bun-lockfile-policy.mjs` scans **every
@@ -859,7 +879,8 @@ not_done:
 unknowns:
   - where the 3 delivered security headers originate (NOT_MEASURED; needs edge/origin config)
   - whether each of the five declared npm consumers is still real (the preview Vercel
-    project is one of five, not the whole question)
+    project is one of five files, and two of the five are contracts over the SAME
+    deployment — map contracts to deployments before counting what remains)
   - whether NON_CANONICAL_SOURCE_ALIASES is enforced at every ingest call site, or only
     declared — this document verified the constant, not its call sites
   - whether client rendering fills /features and /terms-of-service after hydration

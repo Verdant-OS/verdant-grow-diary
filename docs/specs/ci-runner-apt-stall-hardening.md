@@ -274,11 +274,32 @@ Keep `--with-deps` (so no behavior risk), but change how it fails:
        if ! kill -0 "$child" 2>/dev/null; then
          wait "$child"; return $?                    # finished inside the handshake
        fi
-       # Still running and still unpublished: its group id is unknown, so this
-       # function cannot bound it and must not pretend to. Kill what is
-       # reachable and fail loudly rather than blocking forever.
+       # The publish failed, but the group is still DISCOVERABLE: ask the
+       # kernel rather than the `ps` that just let us down.
+       #
+       # Which pid leads the group depends on whether setsid forked, so
+       # neither candidate can be assumed. Measured, both modes: without job
+       # control $child leads the group itself; with job control $child leads
+       # its OWN group and the worker leads a different one. Signalling
+       # $child alone therefore leaves the worker's entire subtree — the apt
+       # this function exists to contain — running.
+       #
+       # Reading /proc covers both shapes. The stat parse strips through the
+       # last ")" first because field 2 is the comm, which is parenthesised
+       # and may contain spaces; after that, field 3 is pgrp.
+       local kids="" childfile="/proc/$child/task/$child/children"
+       if [ -r "$childfile" ]; then kids="$(cat "$childfile" 2>/dev/null)"; fi
+       local worker="${kids%% *}"; [ -n "$worker" ] || worker="$child"
+       local rescued
+       rescued="$(sed 's/.*) //' "/proc/$worker/stat" 2>/dev/null | cut -d" " -f3)"
+
        echo "::error::attempt: process group never published; cannot bound $*"
-       kill -TERM "$child" 2>/dev/null; sleep 2; kill -KILL "$child" 2>/dev/null
+       if [ -n "$rescued" ]; then
+         sudo -n kill -TERM -- -"$rescued" 2>/dev/null || kill -TERM -- -"$rescued" 2>/dev/null
+         sleep 2
+         sudo -n kill -KILL -- -"$rescued" 2>/dev/null || kill -KILL -- -"$rescued" 2>/dev/null
+       fi
+       kill -KILL "$child" 2>/dev/null
        wait "$child" 2>/dev/null
        return 125                                    # timeout(1): the bound itself failed
      fi

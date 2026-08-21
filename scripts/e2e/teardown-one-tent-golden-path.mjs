@@ -398,6 +398,7 @@ async function main() {
   human.push(
     `Fixture rows ${dryRun ? "planned for removal" : "removed"}: ${receipt.counts.total_deleted}`,
   );
+  human.push(`Source alert rows retained: ${receipt.retained_history.alert_rows}`);
   human.push(`History rows retained: ${receipt.retained_history.total_retained}`);
   emit(receipt, human, result.status === "failed" ? 1 : 0);
 }

@@ -1,8 +1,9 @@
 /**
  * Pure owner-scoped cleanup planner for the authenticated One-Tent proof.
- * Active, user-visible fixture rows are removed when owner RLS permits it.
- * Append-only or owner-undeletable history is retained and reported, and
- * parent hierarchy rows are retained when deleting them could erase it.
+ * Active, user-visible fixture rows are removed when owner RLS permits it,
+ * except source alerts required by retained Action Queue provenance.
+ * Protected history is retained and reported, together with the parent
+ * hierarchy and source evidence needed to keep that history usable.
  */
 
 export const GOLDEN_MARKER = "[GOLDEN-PATH-FIXTURE]";
@@ -58,6 +59,7 @@ const ZERO_RETAINED = Object.freeze({
   sensor_rows: 0,
   action_queue_rows: 0,
   action_queue_event_rows: 0,
+  alert_rows: 0,
   ai_doctor_session_rows: 0,
   ai_credit_accounting_rows: 0,
   plants: 0,
@@ -195,18 +197,22 @@ export async function executeTeardown(ops, discovery, { dryRun }) {
   retained.action_queue_event_rows = c.action_queue_events ?? 0;
   retained.ai_doctor_session_rows = c.ai_doctor_sessions ?? 0;
   retained.ai_credit_accounting_rows = c.ai_credit_accounting ?? 0;
+  const retainFixtureAlerts =
+    retained.action_queue_rows > 0 || retained.action_queue_event_rows > 0;
 
   if (dryRun) {
     counts.photo_objects_deleted = c.photo_objects ?? 0;
     if (c.diary_entries > 0) counts.diary_entries_deleted = c.diary_entries;
     else counts.follow_ups_deleted = c.follow_ups ?? 0;
-    counts.alerts_deleted = c.alerts ?? 0;
+    if (retainFixtureAlerts) retained.alert_rows = c.alerts ?? 0;
+    else counts.alerts_deleted = c.alerts ?? 0;
     counts.quick_logs_deleted = c.quick_logs ?? 0;
     counts.sensor_rows_deleted = c.sensor_rows ?? 0;
     counts.grow_targets_deleted = c.grow_targets ?? 0;
     const retainedChildHistory =
       retained.action_queue_rows +
       retained.action_queue_event_rows +
+      retained.alert_rows +
       retained.ai_doctor_session_rows +
       retained.ai_credit_accounting_rows;
     if (retainedChildHistory === 0) {
@@ -226,6 +232,21 @@ export async function executeTeardown(ops, discovery, { dryRun }) {
     typeof ops.deleteDiaryEntries === "function"
       ? ["diary_entries", () => ops.deleteDiaryEntries(growId), () => ops.countDiaryEntries(growId)]
       : ["follow_ups", () => ops.deleteFollowUps(growId), () => ops.countFollowUps(growId)];
+  if (retainFixtureAlerts) {
+    try {
+      const verifiedAlertRows = Number(await ops.countAlerts(growId));
+      if (
+        !Number.isFinite(verifiedAlertRows) ||
+        verifiedAlertRows < 1 ||
+        verifiedAlertRows !== c.alerts
+      ) {
+        return result("failed", "alerts_retention_verification_failed", counts, retained);
+      }
+      retained.alert_rows = verifiedAlertRows;
+    } catch {
+      return result("failed", "alerts_retention_verification_failed", counts, retained);
+    }
+  }
   const activeStages = [
     [
       "photo_objects",
@@ -236,7 +257,9 @@ export async function executeTeardown(ops, discovery, { dryRun }) {
       async () => 0,
     ],
     diaryStage,
-    ["alerts", () => ops.deleteAlerts(growId), () => ops.countAlerts(growId)],
+    ...(retainFixtureAlerts
+      ? []
+      : [["alerts", () => ops.deleteAlerts(growId), () => ops.countAlerts(growId)]]),
     ["quick_logs", () => ops.deleteQuickLogs(growId), () => ops.countQuickLogs(growId)],
   ];
 

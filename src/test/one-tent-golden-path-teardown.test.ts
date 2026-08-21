@@ -39,6 +39,7 @@ interface FakeState {
   plants: string[];
   followUps: number;
   actionQueue: number;
+  actionQueueEvents: number;
   alerts: number;
   quickLogs: number;
   sensorRows: number;
@@ -77,6 +78,9 @@ function makeOps(state: FakeState) {
     },
     async countActionQueue() {
       return state.actionQueue;
+    },
+    async countActionQueueEvents() {
+      return state.actionQueueEvents;
     },
     async countAlerts() {
       return state.alerts;
@@ -143,6 +147,7 @@ function seededState(): FakeState {
     plants: ["plant-1"],
     followUps: 1,
     actionQueue: 0,
+    actionQueueEvents: 0,
     alerts: 1,
     quickLogs: 1,
     sensorRows: 0, // sensor delete is RLS-blocked in prod; 0 keeps happy path pure
@@ -345,10 +350,68 @@ describe("delete ordering (child before parent)", () => {
     const deletes = ops.calls.filter((c) => c.startsWith("delete:"));
     expect(result.status).toBe("completed_with_retained_history");
     expect(deletes).not.toContain("delete:action_queue");
+    expect(deletes).not.toContain("delete:alerts");
     expect(deletes).not.toContain("delete:grows");
     expect(result.retainedHistory.action_queue_rows).toBe(1);
+    expect(result.retainedHistory.alert_rows).toBe(1);
     expect(result.retainedHistory.grows).toBe(1);
     expect(state.actionQueue).toBe(1);
+    expect(state.alerts).toBe(1);
+  });
+
+  it("dry-run preserves the same source-alert link whenever Action Queue history is retained", async () => {
+    const state = seededState();
+    state.actionQueue = 1;
+    const ops = makeOps(state);
+    const result = await executeTeardown(ops, await discoverFixture(ops), { dryRun: true });
+
+    expect(result.status).toBe("dry_run");
+    expect(result.counts.alerts_deleted).toBe(0);
+    expect(result.retainedHistory.alert_rows).toBe(1);
+    expect(result.retainedHistory.action_queue_rows).toBe(1);
+    expect(result.retainedHistory.grows).toBe(1);
+    expect(ops.calls).not.toContain("delete:alerts");
+  });
+
+  it("retains the source alert when protected Action Queue events are the only visible history", async () => {
+    const state = seededState();
+    state.actionQueueEvents = 1;
+    const ops = makeOps(state);
+    const result = await executeTeardown(ops, await discoverFixture(ops), { dryRun: false });
+
+    expect(result.status).toBe("completed_with_retained_history");
+    expect(result.retainedHistory.action_queue_event_rows).toBe(1);
+    expect(result.retainedHistory.alert_rows).toBe(1);
+    expect(ops.calls).not.toContain("delete:alerts");
+    expect(state.alerts).toBe(1);
+  });
+
+  it("fails closed before deletion when retained source-alert verification cannot complete", async () => {
+    const state = seededState();
+    state.actionQueue = 1;
+    const ops = makeOps(state);
+    const discovery = await discoverFixture(ops);
+    ops.countAlerts = async () => {
+      throw new Error("provider error with SECRET details");
+    };
+    const result = await executeTeardown(ops, discovery, { dryRun: false });
+
+    expect(result.status).toBe("failed");
+    expect(result.reason).toBe("alerts_retention_verification_failed");
+    expect(ops.calls.filter((call) => call.startsWith("delete:"))).toEqual([]);
+    expect(JSON.stringify(result)).not.toContain("SECRET");
+  });
+
+  it("fails closed when an unreferenced alert survives its required deletion", async () => {
+    const state = seededState();
+    state.survivors = new Set(["alerts"]);
+    const ops = makeOps(state);
+    const result = await executeTeardown(ops, await discoverFixture(ops), { dryRun: false });
+
+    expect(result.status).toBe("failed");
+    expect(result.reason).toBe("alerts_rows_survived_delete");
+    expect(ops.calls).not.toContain("delete:quick_logs");
+    expect(ops.calls).not.toContain("delete:grows");
   });
 
   it("failed child deletion prevents parent deletion and reports sanitized reason", async () => {
@@ -538,6 +601,7 @@ describe("teardown receipt", () => {
         sensor_rows: 3,
         action_queue_rows: 1,
         action_queue_event_rows: 1,
+        alert_rows: 1,
         ai_doctor_session_rows: 1,
         ai_credit_accounting_rows: 0,
         plants: 1,
@@ -546,7 +610,7 @@ describe("teardown receipt", () => {
       },
     });
     expect(receipt.counts.total_deleted).toBe(8);
-    expect(receipt.retained_history.total_retained).toBe(9);
+    expect(receipt.retained_history.total_retained).toBe(10);
   });
 
   it("receipt contains no IDs, tokens, emails, or paths", () => {
@@ -600,6 +664,18 @@ describe("teardown receipt", () => {
       "tents_deleted",
       "grows_deleted",
       "total_deleted",
+    ]);
+    expect(Object.keys(parsed.retained_history)).toEqual([
+      "sensor_rows",
+      "action_queue_rows",
+      "action_queue_event_rows",
+      "alert_rows",
+      "ai_doctor_session_rows",
+      "ai_credit_accounting_rows",
+      "plants",
+      "tents",
+      "grows",
+      "total_retained",
     ]);
   });
 });

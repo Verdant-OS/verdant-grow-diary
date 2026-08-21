@@ -304,10 +304,12 @@ relationships (grow → tent/plant → scoped children). It:
 - uses the managed user's own authenticated client (anon key + Bearer
   token), never service_role, so RLS remains part of the safety
   boundary;
-- removes owner-deletable diary photos, diary entries, alerts, Quick Logs,
-  sensor readings, and grow targets in dependency order;
-- retains append-only Action Queue/events, AI Doctor, and AI-credit history,
-  and retains the hierarchy needed to preserve that history;
+- removes owner-deletable diary photos, diary entries, Quick Logs, sensor
+  readings, grow targets, and unreferenced alerts in dependency order;
+- retains append-only Action Queue/events, AI Doctor, and AI-credit history;
+  when retained Action Queue history can point to the fixture alert, it also
+  retains and counts that source alert so the protected audit link remains
+  usable, together with the hierarchy needed to preserve that history;
 - reports `completed_with_retained_history` whenever protected history
   remains; it never claims zero-count or full cleanup;
 - reports `fixture_not_found` when the exact dynamic fixture is absent;

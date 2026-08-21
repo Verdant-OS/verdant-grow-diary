@@ -194,9 +194,11 @@ describe("PlantDetailAiDoctorLiveReview", () => {
     expect(trackFunnelEvent).toHaveBeenCalledWith("ai_doctor_review_started", {
       surface: "standard",
     });
-    expect(trackFunnelEvent).toHaveBeenCalledWith("ai_doctor_result_received", {
-      surface: "standard",
-    });
+    await waitFor(() =>
+      expect(trackFunnelEvent).toHaveBeenCalledWith("ai_doctor_result_received", {
+        surface: "standard",
+      }),
+    );
     // No approve/reject buttons rendered.
     expect(screen.queryByText(/approve/i)).toBeNull();
     expect(screen.queryByText(/reject/i)).toBeNull();

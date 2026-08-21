@@ -44,7 +44,7 @@ permissions:
 jobs:
   ga-e2e:
     name: GA E2E (${{ matrix.browser }})
-    runs-on: tenki-standard-medium-4c-8g
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
       # Never cancel the sibling engine: a Chromium failure must not hide a

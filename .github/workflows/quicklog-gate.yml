@@ -27,7 +27,7 @@ on:
 jobs:
   quicklog-gate:
     name: Typecheck, then targeted Quick Log tests
-    runs-on: tenki-standard-medium-4c-8g
+    runs-on: ubuntu-latest
     timeout-minutes: 15
 
     steps:

@@ -20,7 +20,7 @@ on:
 jobs:
   batched-suite:
     name: Batched Vitest (matrix)
-    runs-on: tenki-standard-medium-4c-8g
+    runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
       # Raise Node's old-space heap above the 2 GB default. Chunking +

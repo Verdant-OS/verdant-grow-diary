@@ -19,7 +19,7 @@ on:
 jobs:
   forwarding-tests:
     name: Python forwarding + static safety + typecheck
-    runs-on: tenki-standard-medium-4c-8g
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     # No repository secrets required. Safe for forked PRs. No real
     # forwarding occurs; Python tests mock the requests module.

@@ -583,7 +583,7 @@ jobs:
   # Playwright artifacts (report/results/screenshots) upload only on failure.
   legal-seo:
     name: test:legal-seo
-    runs-on: tenki-standard-medium-4c-8g
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: read
@@ -654,7 +654,7 @@ jobs:
   # See docs/testing/ci-full-suite-shards.md.
   full-suite:
     name: Full test suite (shard ${{ matrix.shard }}/32)
-    runs-on: tenki-standard-medium-4c-8g
+    runs-on: ubuntu-latest
     # Matrix shard N covers vitest partitions (8N-7)..(8N) of 256 (eight
     # sequential 1/256 processes). Heavy shards (e.g. 6/32, 8/32) still
     # approached the old 45m ceiling on ubuntu-latest (#697 cancelled at

@@ -51,7 +51,7 @@ concurrency:
 jobs:
   demo-proof-readonly:
     name: Demo Proof Walkthrough readonly E2E (mocked)
-    runs-on: tenki-standard-medium-4c-8g
+    runs-on: ubuntu-latest
     timeout-minutes: 15
 
     steps:

@@ -19,7 +19,7 @@ on:
 jobs:
   lighthouse:
     name: Lighthouse (published sitemap, ${{ matrix.shard.label }})
-    runs-on: tenki-standard-medium-4c-8g
+    runs-on: ubuntu-latest
     timeout-minutes: 25
     strategy:
       fail-fast: false

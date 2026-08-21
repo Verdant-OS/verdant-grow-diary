@@ -17,7 +17,7 @@ concurrency:
 jobs:
   seo-parity-and-head-fidelity:
     name: sitemap parity + head fidelity
-    runs-on: tenki-standard-medium-4c-8g
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - name: Checkout

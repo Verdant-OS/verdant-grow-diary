@@ -17,7 +17,7 @@ permissions:
 jobs:
   security:
     name: Lockfile policy, dependency audit, typecheck, build, tests
-    runs-on: tenki-standard-medium-4c-8g
+    runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
       - name: Checkout

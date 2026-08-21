@@ -158,8 +158,24 @@ describe("oneTentLoopNavigationRules", () => {
     expect(resolveOneTentLoopNextStep("timeline", { tentId: "tent-a" }).href).toBe("/sensors");
   });
 
-  it("routes sensor-snapshot → ai doctor entry", () => {
-    expect(resolveOneTentLoopNextStep("sensor-snapshot").href).toBe("/doctor");
+  it("routes sensor-snapshot → ai doctor with only a complete normalized grow/tent scope", () => {
+    expect(
+      resolveOneTentLoopNextStep("sensor-snapshot", {
+        growId: " grow / one ",
+        tentId: " tent ? one ",
+        plantId: "plant-must-not-carry",
+      }).href,
+    ).toBe("/doctor?growId=grow%20%2F%20one&tentId=tent%20%3F%20one");
+
+    for (const ids of [
+      {},
+      { growId: "g1" },
+      { tentId: "t1" },
+      { growId: "   ", tentId: "t1" },
+      { growId: "g1", tentId: "   " },
+    ]) {
+      expect(resolveOneTentLoopNextStep("sensor-snapshot", ids).href).toBe("/doctor");
+    }
   });
 
   it("ai-doctor with alertId deep-links; without alertId falls back to /alerts with a clarifying CTA label", () => {

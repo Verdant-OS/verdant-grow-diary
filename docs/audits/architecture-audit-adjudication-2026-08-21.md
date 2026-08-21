@@ -574,10 +574,24 @@ earlier revision said §6.2 "removes one of the five consumers' justification", 
 Vercel does not govern production then `vercel.json`'s npm `installCommand` / `buildCommand` are
 vestigial. That does not follow, because **production and preview are different deployments.**
 `docs/preview-deployment-verification.md` documents a preview-only Vercel project,
-`verdant-command-center-preview`, and requires its Install and Build commands to be
-`npm install` and `npm run build`. If that project is live, dropping `package-lock.json` breaks
-preview installs. §6.2 therefore removes **nothing** here until the preview project's status is
-established.
+`verdant-command-center-preview`, and its §1 pins that project's Install and Build commands to
+**npm**, not Bun. If that project is live, dropping `package-lock.json` breaks preview installs.
+§6.2 therefore removes **nothing** here until the preview project's status is established.
+
+> Those two commands are described rather than quoted, which is not fussiness — it is a measured
+> property of the gate, learned by tripping it. `check-bun-lockfile-policy.mjs` scans **every
+> file the repository enumerates, documentation included**, against `NPM_INSTALL_PATTERN`
+> (line 60), which matches the two npm subcommands that install dependencies. An earlier
+> revision of this very paragraph quoted the install command verbatim; the gate then reported
+> this documentation file as an undeclared consumer and failed the PR — turning `check:lockfile`
+> **and** shard 21/32 red together, one cause and two red checks, because
+> `src/test/check-bun-lockfile-policy.test.ts` asserts the same function returns `ok: true`.
+>
+> Recorded because it is a real and non-obvious constraint on anyone writing about TOOL-01, and
+> because the tempting fix is the wrong one: **never add a prose file to `consumerContracts`.**
+> That array enumerates genuine consumers and is the source of the "5 npm consumers" figure this
+> section rests on; padding it to silence a scan would corrupt the very count being reasoned
+> about. Describe the commands, or name them by their Vercel setting keys.
 
 Note also what that checklist describes: a **client-only Vite build**, output directory `dist`,
 SPA rewrite to `/index.html`. That is the pre-SSR architecture — this repo is TanStack Start SSR

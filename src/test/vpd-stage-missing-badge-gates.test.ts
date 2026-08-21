@@ -13,8 +13,8 @@ import { mapTentRow, mapPlantRow } from "@/lib/growAdapters";
 
 const SITES: { file: string; gate: RegExp }[] = [
   {
-    file: "src/pages/Tents.tsx",
-    gate: /normalizeVpdStage\(t\.stage\)\s*===\s*"unknown"/,
+    file: "src/components/TentEnvironmentSnapshotStrip.tsx",
+    gate: /normalizeVpdStage\(stage\)\s*===\s*"unknown"/,
   },
   {
     file: "src/pages/Sensors.tsx",

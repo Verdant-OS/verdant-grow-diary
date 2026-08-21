@@ -69,6 +69,15 @@ const FIXTURES: Record<string, Array<Record<string, unknown>>> = {
 
 const REQUESTED_TENT_IDS = vi.hoisted(() => [] as string[]);
 const FAILED_TENT_IDS = vi.hoisted(() => new Set<string>());
+const PENDING_TENT_IDS = vi.hoisted(() => new Set<string>());
+const PENDING_REQUESTS = vi.hoisted(
+  () =>
+    [] as Array<{
+      tentId: string;
+      rows: Array<Record<string, unknown>>;
+      resolve: (value: { data: Array<Record<string, unknown>>; error: null }) => void;
+    }>,
+);
 
 vi.mock("@/integrations/supabase/client", () => {
   const builder = (tentId: string | null, sourceFilter: ReadonlySet<string> | null = null) => {
@@ -84,6 +93,14 @@ vi.mock("@/integrations/supabase/client", () => {
       const scopedRows = sourceFilter
         ? tentRows.filter((row) => sourceFilter.has(String(row.source ?? "")))
         : tentRows;
+      if (tentId && PENDING_TENT_IDS.has(tentId)) {
+        return new Promise<{
+          data: Array<Record<string, unknown>>;
+          error: null;
+        }>((resolve) => {
+          PENDING_REQUESTS.push({ tentId, rows: scopedRows.slice(0, limit), resolve });
+        });
+      }
       return Promise.resolve({ data: scopedRows.slice(0, limit), error: null });
     };
     b.eq = (_col: string, id: string) => builder(id, sourceFilter);
@@ -110,6 +127,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   REQUESTED_TENT_IDS.length = 0;
   FAILED_TENT_IDS.clear();
+  PENDING_TENT_IDS.clear();
+  PENDING_REQUESTS.length = 0;
 });
 
 describe("useSensorReadingsByTents", () => {
@@ -150,6 +169,37 @@ describe("useSensorReadingsByTents", () => {
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.statusByTent["tent-c"]).toBe("success");
     expect(result.current.byTent["tent-c"]).toEqual([]);
+  });
+
+  it("reports a cached-empty background refetch without hiding other cached sensor rows", async () => {
+    const { result } = renderHook(() => useSensorReadingsByTents(["tent-a", "tent-c"]), {
+      wrapper,
+    });
+    await waitFor(() => expect(result.current.statusByTent["tent-c"]).toBe("success"));
+    expect(result.current.refreshingByTent["tent-c"]).toBe(false);
+
+    PENDING_TENT_IDS.add("tent-c");
+    let retryPromise: Promise<void> | undefined;
+    act(() => {
+      retryPromise = result.current.retryTent("tent-c");
+    });
+
+    await waitFor(() => expect(result.current.refreshingByTent["tent-c"]).toBe(true));
+    expect(result.current.statusByTent["tent-c"]).toBe("success");
+    expect(result.current.byTent["tent-c"]).toEqual([]);
+    expect(result.current.refreshingByTent["tent-a"]).toBe(false);
+    expect(result.current.byTent["tent-a"].map((row) => row.id)).toEqual(["ra1", "ra2"]);
+
+    const pending = PENDING_REQUESTS.find((request) => request.tentId === "tent-c");
+    expect(pending).toBeDefined();
+    PENDING_TENT_IDS.delete("tent-c");
+    await act(async () => {
+      pending?.resolve({ data: pending.rows, error: null });
+      await retryPromise;
+    });
+
+    await waitFor(() => expect(result.current.refreshingByTent["tent-c"]).toBe(false));
+    expect(result.current.statusByTent["tent-c"]).toBe("success");
   });
 
   it("retries exactly the requested tent window and ignores unknown ids", async () => {

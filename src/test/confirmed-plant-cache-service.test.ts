@@ -259,6 +259,70 @@ describe("confirmedPlantCacheService", () => {
     unsubscribeGrow();
   });
 
+  it("retains the confirmed row when already-erroring undefined caches fail reconciliation again", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const legacyKey = ["plants"] as const;
+    const growKey = ["grow", "plants", "all", GROW_ID, "owner", OWNER_ID] as const;
+    const legacyQueryFn = vi.fn().mockRejectedValue(new Error("legacy refresh failed"));
+    const growQueryFn = vi.fn().mockRejectedValue(new Error("grow refresh failed"));
+    const legacyObserver = new QueryObserver(client, {
+      queryKey: legacyKey,
+      queryFn: legacyQueryFn,
+      retry: false,
+    });
+    const growObserver = new QueryObserver(client, {
+      queryKey: growKey,
+      queryFn: growQueryFn,
+      retry: false,
+    });
+    const unsubscribeLegacy = legacyObserver.subscribe(() => {});
+    const unsubscribeGrow = growObserver.subscribe(() => {});
+
+    await vi.waitFor(() => {
+      expect(client.getQueryState(legacyKey)?.status).toBe("error");
+      expect(client.getQueryState(growKey)?.status).toBe("error");
+    });
+    expect(client.getQueryData(legacyKey)).toBeUndefined();
+    expect(client.getQueryData(growKey)).toBeUndefined();
+
+    const confirmed = confirmCreatedPlantRow(ROW, {
+      ownerId: OWNER_ID,
+      growId: GROW_ID,
+      tentId: TENT_ID,
+    });
+    expect(confirmed).not.toBeNull();
+    await primeConfirmedPlantCaches(client, OWNER_ID, confirmed!, {
+      isOwnerCurrent: () => true,
+    });
+
+    expect(client.getQueryData<Array<{ id: string }>>(legacyKey)?.map((row) => row.id)).toEqual([
+      PLANT_ID,
+    ]);
+    expect(client.getQueryData<Array<{ id: string }>>(growKey)?.map((row) => row.id)).toEqual([
+      PLANT_ID,
+    ]);
+
+    await Promise.allSettled([
+      client.invalidateQueries({ queryKey: legacyKey, exact: true }),
+      client.invalidateQueries({ queryKey: growKey, exact: true }),
+    ]);
+    await vi.waitFor(() => {
+      expect(client.getQueryState(legacyKey)?.status).toBe("error");
+      expect(client.getQueryState(growKey)?.status).toBe("error");
+    });
+    expect(client.getQueryData<Array<{ id: string }>>(legacyKey)?.map((row) => row.id)).toEqual([
+      PLANT_ID,
+    ]);
+    expect(client.getQueryData<Array<{ id: string }>>(growKey)?.map((row) => row.id)).toEqual([
+      PLANT_ID,
+    ]);
+    expect(legacyQueryFn).toHaveBeenCalledTimes(2);
+    expect(growQueryFn).toHaveBeenCalledTimes(2);
+
+    unsubscribeLegacy();
+    unsubscribeGrow();
+  });
+
   it("does not publish a late confirmed row after the authenticated owner changes", async () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const legacyKey = ["plants"] as const;

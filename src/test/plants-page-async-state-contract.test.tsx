@@ -257,6 +257,23 @@ describe("Plants page async-state contract", () => {
     expect(staleEmptyPrimary.refetch).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps filter-specific no-match copy when cached rows exist during a refresh failure", () => {
+    const stalePrimary = {
+      ...successfulQuery([mocks.plant]),
+      isError: true,
+    };
+    mocks.queries.archivedByGrow.set("grow-a", stalePrimary);
+
+    renderPlants();
+    fireEvent.change(screen.getByTestId("plants-search-input"), {
+      target: { value: "not this plant" },
+    });
+
+    expect(screen.getByTestId("plants-primary-refresh-error")).toBeInTheDocument();
+    expect(screen.getByText("No plants match this search.")).toBeInTheDocument();
+    expect(screen.queryByTestId("plants-empty-unconfirmed")).not.toBeInTheDocument();
+  });
+
   it("retries only the selected failed supplemental query", () => {
     const failedTents = { ...mocks.makeQuery(undefined), isError: true };
     mocks.queries.tents = failedTents;

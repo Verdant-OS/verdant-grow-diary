@@ -721,6 +721,7 @@ export default function Plants() {
       </div>
 
       {filtered.length === 0 &&
+      allPlants.length === 0 &&
       plantsAsyncState.kind === "limited" &&
       plantsAsyncState.primaryRefreshFailed ? (
         <p

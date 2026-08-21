@@ -6,6 +6,13 @@
  * variant: data-free, no Supabase writes, no AI calls, no auto-keeper
  * selection, no auto-disqualification, no equipment control, no guaranteed
  * yield claims, no medical claims.
+ *
+ * SEO: this route is a copy-only variant of /creator-beta (same <BetaLanding>
+ * component), so per the owner adjudication of 2026-08-20 it stays indexable
+ * for direct and paid traffic but canonicalises to /creator-beta rather than
+ * competing with it. The build-time half lives in staticPublicSeoDocuments.ts;
+ * this hook runs after hydration and would overwrite the pre-rendered canonical
+ * if it did not name the same target.
  */
 import BetaLanding from "@/components/BetaLanding";
 import { usePageSeo } from "@/hooks/usePageSeo";
@@ -16,6 +23,7 @@ export default function BreederBeta() {
     description:
       "Controlled beta for breeders and pheno hunters. See how Verdant records lab evidence, pathogen screening, sensory rubrics, and pheno decisions — while the breeder always decides which plants advance.",
     path: "/breeder-beta",
+    canonicalPath: "/creator-beta",
   });
 
   return (

@@ -804,6 +804,14 @@ assumptions:
 next_slice:
   - Owner: Cheek. Decide whether to commission the §7.1 ADR appended to the merged
     docs/codebase-map.md. ARCH-01/ARCH-02 are unblocked; everything else here is bounded.
+
+files_touched:
+  - docs/audits/architecture-audit-adjudication-2026-08-21.md (this document; the only
+    file PR #1087 changes)
+  - docs/codebase-map.md — two corrections pushed to #1051's branch under this
+    assignment, NOT via #1087: the payments-token class inversion and the
+    functions.invoke call-site count. Listed because this slice produced them; they
+    landed with #1051 as 5c60bcd9
 ```
 
 ### Adversarial questions worth putting to this document

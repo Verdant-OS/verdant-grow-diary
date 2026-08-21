@@ -206,6 +206,13 @@
       "output_path": "supabase/migrations/20260722062643_local_replay_irrigation_acl_baseline.sql",
       "required_before_path": "supabase/migrations/20260722062644_8cdef271-abf0-4d82-9eca-970a91b6c547.sql",
       "reason": "Fresh Supabase uses hardened default ACLs; inject the hosted read and service-role baseline immediately before the immutable irrigation revoke verifies it."
+    },
+    {
+      "template_path": "config/local-supabase-replay/action-queue-acl-baseline.sql",
+      "template_sha256": "49f74837db1e8f87fe7de8f0d6f984b140f4bd4a1c03e18f9de1408a1f55fd37",
+      "output_path": "supabase/migrations/20260820235859_local_replay_action_queue_acl_baseline.sql",
+      "required_before_path": "supabase/migrations/20260820235900_action_queue_table_acl_forward_repair.sql",
+      "reason": "Fresh replay retains local Data API SELECT/INSERT defaults for both browser roles after the transition repair revokes UPDATE/DELETE; validate that exact local-only ACL and converge it to the immutable repair's authenticated-only canonical precondition."
     }
   ]
 }

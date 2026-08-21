@@ -400,7 +400,7 @@ describe("Quick Log starter-handoff consume-once", () => {
     // wrong-plant selection would be one click from a mis-attributed save.
     seedDraft();
     setLocalStorageItemForTest(
-      "verdant.quickLog.lastTarget.v1",
+      "verdant.quickLog.lastTarget.v2.user-1",
       JSON.stringify({
         plantId: "plant-1",
         growId: "grow-1",
@@ -465,7 +465,7 @@ describe("Quick Log starter-handoff consume-once", () => {
     // refuse to write until the grower picks.
     seedDraft();
     setLocalStorageItemForTest(
-      "verdant.quickLog.lastTarget.v1",
+      "verdant.quickLog.lastTarget.v2.user-1",
       JSON.stringify({
         plantId: "plant-1",
         growId: "grow-1",

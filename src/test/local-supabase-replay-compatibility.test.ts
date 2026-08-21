@@ -1,6 +1,14 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -11,6 +19,10 @@ const SECURITY_DB_WORKFLOW = resolve(".github/workflows/security-db-local.yml");
 const IRRIGATION_EVIDENCE_WORKFLOW = resolve(".github/workflows/irrigation-evidence-gate.yml");
 const IRRIGATION_PGTAP_WORKFLOW = resolve(".github/workflows/irrigation-pgtap-rls-gate.yml");
 const LOCAL_SEED = resolve("supabase/seed.sql");
+const ACTION_QUEUE_ACL_MIGRATION =
+  "supabase/migrations/20260820235900_action_queue_table_acl_forward_repair.sql";
+const ACTION_QUEUE_ACL_MIGRATION_SHA256 =
+  "25867036eccb978aa73b3a6268de20d46cab74cc818ee8ef33fbe7f072ceaf1e";
 const temporaryRoots: string[] = [];
 
 function sha256(value: string): string {
@@ -260,7 +272,7 @@ describe("local Supabase replay compatibility workspace", () => {
       mode: "verify_only",
       compatibility_entry_count: 18,
       compatibility_patch_count: 4,
-      compatibility_injection_count: 1,
+      compatibility_injection_count: 2,
       source_migrations_unchanged: true,
     });
   });
@@ -294,6 +306,56 @@ describe("local Supabase replay compatibility workspace", () => {
     );
     expect(patch?.replacements[0]?.to).toContain(
       "ALTER DEFAULT PRIVILEGES FOR ROLE postgres REVOKE ALL ON FUNCTIONS",
+    );
+  });
+
+  it("injects an exact Action Queue browser ACL baseline immediately before the immutable repair", () => {
+    const output = join(makeTemporaryRoot(), "replay");
+    const sourceMigration = readFileSync(resolve(ACTION_QUEUE_ACL_MIGRATION), "utf8");
+    const result = runScript([`--manifest=${REAL_MANIFEST}`, `--output=${output}`, "--json"]);
+
+    expect(result.status).toBe(0);
+    const report = JSON.parse(result.stdout.trim()) as {
+      injections: Array<{
+        template_path: string;
+        output_path: string;
+        required_before_path: string;
+      }>;
+    };
+    const injection = report.injections.find(
+      (entry) => entry.required_before_path === ACTION_QUEUE_ACL_MIGRATION,
+    );
+
+    expect(injection).toMatchObject({
+      template_path: "config/local-supabase-replay/action-queue-acl-baseline.sql",
+      output_path: "supabase/migrations/20260820235859_local_replay_action_queue_acl_baseline.sql",
+      required_before_path: ACTION_QUEUE_ACL_MIGRATION,
+    });
+
+    const replayMigrations = readdirSync(join(output, "supabase", "migrations")).sort();
+    const baselineName = injection?.output_path.split("/").at(-1) ?? "";
+    const repairName = ACTION_QUEUE_ACL_MIGRATION.split("/").at(-1) ?? "";
+    expect(replayMigrations.indexOf(repairName) - replayMigrations.indexOf(baselineName)).toBe(1);
+
+    const baselineSql = readFileSync(resolve(output, injection?.output_path ?? "missing"), "utf8");
+    expect(baselineSql).toContain("action_queue_local_replay_acl_baseline_drift");
+    expect(baselineSql).toContain("v_local_replay_acl_state");
+    expect(baselineSql).toContain("v_canonical_acl_state");
+    expect(baselineSql).toContain("v_public_acl_count <> 0");
+    expect(baselineSql).toContain("v_client_column_acl_count <> 0");
+    expect(baselineSql).toContain("v_client_grant_option_count <> 0");
+    expect(baselineSql).toContain("'action_queue|anon|INSERT|f'");
+    expect(baselineSql).toContain("'action_queue_events|anon|SELECT|f'");
+    expect(baselineSql).toContain("REVOKE ALL PRIVILEGES ON TABLE");
+    expect(baselineSql).toContain("FROM PUBLIC, anon, authenticated");
+    expect(baselineSql).toContain("GRANT SELECT, INSERT ON TABLE");
+    expect(baselineSql).toContain("TO authenticated");
+    expect(baselineSql).not.toContain("service_role");
+    expect(baselineSql).not.toContain("sandbox_exec");
+
+    expect(sha256(sourceMigration)).toBe(ACTION_QUEUE_ACL_MIGRATION_SHA256);
+    expect(sha256(readFileSync(resolve(output, ACTION_QUEUE_ACL_MIGRATION), "utf8"))).toBe(
+      ACTION_QUEUE_ACL_MIGRATION_SHA256,
     );
   });
 

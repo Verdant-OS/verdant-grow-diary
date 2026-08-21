@@ -242,7 +242,10 @@ Keep `--with-deps` (so no behavior risk), but change how it fails:
      # Liveness is probed with pgrep, and signals are sent with sudo. Both
      # matter, and neither is optional — see "the apt is not ours to signal"
      # below.
-     group_alive() { pgrep -g "$pgid" >/dev/null 2>&1; }
+     # `--runstates D,R,S,T` covers every LIVE state and excludes Z: a zombie
+     # holds nothing and is not what this watchdog bounds. Needs procps-ng
+     # >= 3.3.16; ubuntu-latest ships 4.x.
+     group_alive() { pgrep -g "$pgid" --runstates D,R,S,T >/dev/null 2>&1; }
      signal_group() {
        sudo -n kill "-$1" -- -"$pgid" 2>/dev/null || kill "-$1" -- -"$pgid" 2>/dev/null
      }
@@ -263,6 +266,17 @@ Keep `--with-deps` (so no behavior risk), but change how it fails:
          sleep 1; graced=$((graced + 1))
        done
        signal_group KILL
+       # KILL is asynchronous: the kernel marks the target, it does not tear it
+       # down before the next syscall returns. Give the group a bounded moment
+       # to actually disappear before declaring failure. Costs nothing when the
+       # signal worked — the loop breaks on its first pass — and only delays the
+       # case where something genuinely survived, which is exactly when you want
+       # to be sure before shouting.
+       reaped=0
+       while [ "$reaped" -lt 5 ]; do
+         group_alive || break
+         sleep 1; reaped=$((reaped + 1))
+       done
        # Never fail silently here. A group still alive after KILL means the
        # signal did not land, and an unreported one is exactly how the runner
        # ends up held by the apt this was built to stop.
@@ -277,6 +291,27 @@ Keep `--with-deps` (so no behavior risk), but change how it fails:
      return "$rc"
    }
    ```
+
+**A probe taken the instant after `KILL` can report a failure that did not
+happen.** `kill -KILL` is asynchronous — the kernel marks the target rather than
+tearing it down before the next syscall returns — and `pgrep` additionally
+matches a process that is already dead but not yet reaped. An immediate probe
+can therefore print "apt may still hold this runner" when the escalation in fact
+succeeded.
+
+That is worth guarding even though the window is small, because of what the
+alarm is for. This repository already carries a worked example of the cost: the
+migration-drift probe went red, was correct, and was left unremediated for four
+days. An escalation alarm that cries wolf is one people learn to scroll past,
+and then the true positive lands in the same blind spot.
+
+`inference, not measured here`: reproducing the bare signal-and-probe sequence
+locally 30 times gave **0** false positives, not the failure rate the review
+reported — but that reproduction had a single `sleep` in the group, promptly
+reaped, with none of the root-owned `sudo`/`apt` descendants whose teardown is
+the slow part. It shows the race is not trivially reproducible, not that it
+cannot occur. The bounded poll is kept because it costs nothing when the signal
+worked and removes the question entirely.
 
 **The group id is not `$!`, and an immediate probe can miss the group
 entirely.** Two independent defects in the earlier `setsid "$@" & pgid=$!`

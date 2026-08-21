@@ -222,8 +222,22 @@ Keep `--with-deps` (so no behavior risk), but change how it fails:
    ```bash
    attempt() {                      # $1 = seconds, $2… = command
      local secs="$1"; shift
-     setsid "$@" &                  # new process group; $! is the PGID
-     local pgid=$!
+
+     # The child PUBLISHES its own process group id; the parent never guesses
+     # it. See "the group id is not $!" below for the two ways guessing fails.
+     local pgidfile; pgidfile="$(mktemp)"
+     local publish='ps -o pgid= -p $$ | tr -d " " >"$1"; shift; exec "$@"'
+     setsid sh -c "$publish" _ "$pgidfile" "$@" &
+     local child=$!
+
+     # Handshake: block until the group id is published, or the child is gone.
+     # No fixed sleep, and no assumption about when setsid(2) takes effect.
+     while [ ! -s "$pgidfile" ]; do
+       kill -0 "$child" 2>/dev/null || break
+       sleep 0.05
+     done
+     local pgid; pgid="$(cat "$pgidfile" 2>/dev/null)"; rm -f "$pgidfile"
+     if [ -z "$pgid" ]; then wait "$child"; return $?; fi   # finished already
 
      # Liveness is probed with pgrep, and signals are sent with sudo. Both
      # matter, and neither is optional — see "the apt is not ours to signal"
@@ -258,11 +272,32 @@ Keep `--with-deps` (so no behavior risk), but change how it fails:
      ) &
      local watchdog=$!
 
-     wait "$pgid"; local rc=$?
+     wait "$child"; local rc=$?
      wait "$watchdog" 2>/dev/null    # NOT `kill` — see below
      return "$rc"
    }
    ```
+
+**The group id is not `$!`, and an immediate probe can miss the group
+entirely.** Two independent defects in the earlier `setsid "$@" & pgid=$!`
+form, both surfaced in review:
+
+- **Startup race.** The shell returns from the fork before the child has
+  necessarily called `setsid(2)`. A `pgrep -g` issued in that window finds no
+  such group, the watchdog reads that as "the install finished" and exits, and
+  the attempt then runs with **no timeout at all** — the exact opposite of this
+  function's purpose. It is also nondeterministic, which `AGENTS.md` forbids on
+  its own.
+- **`setsid` may fork.** util-linux `setsid` forks when the caller is already a
+  process group leader, so `$!` is then the parent it discards, not the group
+  id. A handshake that waited on `$!` alone would give up the moment that
+  parent exited and leave the real group unbounded.
+
+Publishing the id from inside the child closes both: the value is read from
+`ps -o pgid= -p $$` after the group exists, so it is correct by construction
+rather than inferred, and the parent blocks until it is published or the child
+is gone. An install that finishes inside the handshake window needs no watchdog
+and returns directly.
 
 **The apt is not ours to signal, and an earlier draft of this snippet did not
 notice.** `playwright install --with-deps` does not run apt itself. Verified

@@ -69,6 +69,19 @@ describe("AI Doctor One-Tent Loop next-step card wiring", () => {
     expect(cta).toHaveTextContent(/Review alerts/i);
   });
 
+  it("preserves grow scope when falling back to the alerts index", () => {
+    renderCard(
+      <OneTentLoopNextStepCard
+        current="ai-doctor"
+        ids={{ growId: "g1" }}
+        testId="ai-doctor-one-tent-loop-next-step-card"
+      />,
+    );
+    const cta = screen.getByTestId("ai-doctor-one-tent-loop-next-step-card-cta");
+    expect(cta.getAttribute("href")).toBe("/alerts?growId=g1");
+    expect(cta).toHaveTextContent(/Review alerts/i);
+  });
+
   it("does not call fetch (no AI calls triggered by rendering)", () => {
     renderCard(
       <OneTentLoopNextStepCard

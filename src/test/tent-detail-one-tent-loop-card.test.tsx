@@ -57,7 +57,7 @@ describe("TentDetail One-Tent Loop next-step card wiring", () => {
     ).toHaveTextContent(/Next step unavailable until this record is selected\./);
   });
 
-  it("shows the Open plant CTA when a tentId is available", () => {
+  it("keeps Open plant disabled when only the current tent is available", () => {
     renderCard(
       <OneTentLoopNextStepCard
         current="tent"
@@ -65,8 +65,10 @@ describe("TentDetail One-Tent Loop next-step card wiring", () => {
         testId="tent-detail-one-tent-loop-next-step-card"
       />,
     );
-    const cta = screen.getByTestId("tent-detail-one-tent-loop-next-step-card-cta");
-    expect(cta).toHaveTextContent(/Open plant/i);
+    expect(
+      screen.getByTestId("tent-detail-one-tent-loop-next-step-card-disabled"),
+    ).toHaveTextContent(/Next step unavailable until this record is selected\./i);
+    expect(screen.queryByTestId("tent-detail-one-tent-loop-next-step-card-cta")).toBeNull();
   });
 
   it("does not render UUID-looking internal IDs in visible text", () => {

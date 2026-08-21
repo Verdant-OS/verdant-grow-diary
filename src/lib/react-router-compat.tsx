@@ -26,8 +26,8 @@ import {
   type ReactNode,
 } from "react";
 import {
-  Link as TanStackLink,
   Outlet as TanStackOutlet,
+  createLink,
   useNavigate as useTanStackNavigate,
   useParams as useTanStackParams,
   useRouter,
@@ -198,6 +198,40 @@ export interface CompatLinkProps extends Omit<AnchorHTMLAttributes<HTMLAnchorEle
   children?: ReactNode;
 }
 
+interface CompatTanStackAnchorProps extends AnchorHTMLAttributes<HTMLAnchorElement> {
+  compatAriaCurrent?: AnchorHTMLAttributes<HTMLAnchorElement>["aria-current"];
+  disabled?: boolean;
+  "data-status"?: string;
+}
+
+/**
+ * TanStack Link always appends its own active aria-current after activeProps.
+ * A react-router plain Link has no active-state semantics, while NavLink below
+ * supplies aria-current explicitly. The supported custom-link host lets us
+ * discard TanStack's automatic marker and restore only the caller's value.
+ */
+const CompatTanStackAnchor = forwardRef<HTMLAnchorElement, CompatTanStackAnchorProps>(
+  function CompatTanStackAnchor(
+    {
+      compatAriaCurrent,
+      "aria-current": _tanStackAriaCurrent,
+      "data-status": _tanStackDataStatus,
+      disabled: _tanStackDisabled,
+      ...anchorProps
+    },
+    ref,
+  ) {
+    return (
+      <a
+        ref={ref}
+        {...anchorProps}
+        {...(compatAriaCurrent !== undefined ? { "aria-current": compatAriaCurrent } : {})}
+      />
+    );
+  },
+);
+const TanStackCompatLink = createLink(CompatTanStackAnchor);
+
 /** react-router `<Link to="/path">` over the TanStack Link. */
 export const Link = forwardRef<HTMLAnchorElement, CompatLinkProps>(function Link(
   { to, replace, state, preventScrollReset, children, onClick, ...rest },
@@ -229,8 +263,9 @@ export const Link = forwardRef<HTMLAnchorElement, CompatLinkProps>(function Link
     );
   }
   const target = toTanStackTarget(to);
+  const explicitAriaCurrent = rest["aria-current"];
   return (
-    <TanStackLink
+    <TanStackCompatLink
       ref={ref}
       to={target.to as never}
       {...(target.hash !== undefined ? { hash: target.hash } : {})}
@@ -238,9 +273,11 @@ export const Link = forwardRef<HTMLAnchorElement, CompatLinkProps>(function Link
       {...(state !== undefined ? { state: state as never } : {})}
       resetScroll={preventScrollReset !== true}
       {...rest}
+      activeProps={{}}
+      compatAriaCurrent={explicitAriaCurrent}
     >
       {children}
-    </TanStackLink>
+    </TanStackCompatLink>
   );
 });
 
@@ -351,7 +388,7 @@ export function useSearchParams(): [URLSearchParams, CompatSetSearchParams] {
       resolved instanceof URLSearchParams
         ? resolved.toString()
         : typeof resolved === "string"
-          ? resolved.replace(/^\?/, "")
+          ? new URLSearchParams(resolved.replace(/^\?/, "")).toString()
           : new URLSearchParams(resolved).toString();
     if (legacy) {
       legacy.navigate(
@@ -365,13 +402,12 @@ export function useSearchParams(): [URLSearchParams, CompatSetSearchParams] {
     // target would move the wrong page's search params.
     const { pathname, hash } = selectCommittedLocation(router.state);
     const normalizedHash = hash ? hash.replace(/^#/, "") : undefined;
-    // Query AND fragment go in TanStack's dedicated options; inside `to` they
-    // would ride into the committed pathname (see toTanStackTarget). The
-    // fragment is carried over so changing a filter does not silently drop
+    // Query stays string-serialized in `to` so TanStack's JSON search
+    // serializer cannot quote numeric-looking string values. The fragment is
+    // still carried separately so changing a filter does not silently drop
     // the grower's current anchor.
     void router.navigate({
-      to: pathname as never,
-      search: (serialized ? Object.fromEntries(new URLSearchParams(serialized)) : {}) as never,
+      to: `${pathname}${serialized ? `?${serialized}` : ""}` as never,
       ...(normalizedHash ? { hash: normalizedHash } : {}),
       replace: options?.replace ?? false,
       resetScroll: options?.preventScrollReset !== true,

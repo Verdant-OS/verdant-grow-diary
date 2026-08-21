@@ -90,6 +90,7 @@ import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.
 import { Route as AppOperatorDiagnosticsRouteImport } from './routes/_app/_operator/diagnostics'
 import { Route as AppOperatorDiagnosticsLightingMeasurementRouteImport } from './routes/_app/_operator/diagnostics-lighting-measurement'
 import { Route as AppOperatorDiagnosticsSeoArtifactsRouteImport } from './routes/_app/_operator/diagnostics-seo-artifacts'
+import { Route as AppOperatorDiagnosticsQuicklogRouteImport } from './routes/_app/_operator/diagnostics_.quicklog'
 import { Route as AppOperatorIngestInspectorRouteImport } from './routes/_app/_operator/ingest-inspector'
 import { Route as AppOperatorLeadsRouteImport } from './routes/_app/_operator/leads'
 import { Route as AppOperatorOneTentLoopProofRouteImport } from './routes/_app/_operator/one-tent-loop-proof'
@@ -563,6 +564,12 @@ const AppOperatorDiagnosticsSeoArtifactsRoute =
     path: '/diagnostics-seo-artifacts',
     getParentRoute: () => AppOperatorRoute,
   } as any)
+const AppOperatorDiagnosticsQuicklogRoute =
+  AppOperatorDiagnosticsQuicklogRouteImport.update({
+    id: '/diagnostics_/quicklog',
+    path: '/diagnostics/quicklog',
+    getParentRoute: () => AppOperatorRoute,
+  } as any)
 const AppOperatorIngestInspectorRoute =
   AppOperatorIngestInspectorRouteImport.update({
     id: '/ingest-inspector',
@@ -1002,6 +1009,7 @@ export interface FileRoutesByFullPath {
   '/diagnostics': typeof AppOperatorDiagnosticsRoute
   '/diagnostics-lighting-measurement': typeof AppOperatorDiagnosticsLightingMeasurementRoute
   '/diagnostics-seo-artifacts': typeof AppOperatorDiagnosticsSeoArtifactsRoute
+  '/diagnostics/quicklog': typeof AppOperatorDiagnosticsQuicklogRoute
   '/ingest-inspector': typeof AppOperatorIngestInspectorRoute
   '/leads': typeof AppOperatorLeadsRoute
   '/one-tent-loop-proof': typeof AppOperatorOneTentLoopProofRoute
@@ -1146,6 +1154,7 @@ export interface FileRoutesByTo {
   '/diagnostics': typeof AppOperatorDiagnosticsRoute
   '/diagnostics-lighting-measurement': typeof AppOperatorDiagnosticsLightingMeasurementRoute
   '/diagnostics-seo-artifacts': typeof AppOperatorDiagnosticsSeoArtifactsRoute
+  '/diagnostics/quicklog': typeof AppOperatorDiagnosticsQuicklogRoute
   '/ingest-inspector': typeof AppOperatorIngestInspectorRoute
   '/leads': typeof AppOperatorLeadsRoute
   '/one-tent-loop-proof': typeof AppOperatorOneTentLoopProofRoute
@@ -1294,6 +1303,7 @@ export interface FileRoutesById {
   '/_app/_operator/diagnostics': typeof AppOperatorDiagnosticsRoute
   '/_app/_operator/diagnostics-lighting-measurement': typeof AppOperatorDiagnosticsLightingMeasurementRoute
   '/_app/_operator/diagnostics-seo-artifacts': typeof AppOperatorDiagnosticsSeoArtifactsRoute
+  '/_app/_operator/diagnostics_/quicklog': typeof AppOperatorDiagnosticsQuicklogRoute
   '/_app/_operator/ingest-inspector': typeof AppOperatorIngestInspectorRoute
   '/_app/_operator/leads': typeof AppOperatorLeadsRoute
   '/_app/_operator/one-tent-loop-proof': typeof AppOperatorOneTentLoopProofRoute
@@ -1441,6 +1451,7 @@ export interface FileRouteTypes {
     | '/diagnostics'
     | '/diagnostics-lighting-measurement'
     | '/diagnostics-seo-artifacts'
+    | '/diagnostics/quicklog'
     | '/ingest-inspector'
     | '/leads'
     | '/one-tent-loop-proof'
@@ -1585,6 +1596,7 @@ export interface FileRouteTypes {
     | '/diagnostics'
     | '/diagnostics-lighting-measurement'
     | '/diagnostics-seo-artifacts'
+    | '/diagnostics/quicklog'
     | '/ingest-inspector'
     | '/leads'
     | '/one-tent-loop-proof'
@@ -1732,6 +1744,7 @@ export interface FileRouteTypes {
     | '/_app/_operator/diagnostics'
     | '/_app/_operator/diagnostics-lighting-measurement'
     | '/_app/_operator/diagnostics-seo-artifacts'
+    | '/_app/_operator/diagnostics_/quicklog'
     | '/_app/_operator/ingest-inspector'
     | '/_app/_operator/leads'
     | '/_app/_operator/one-tent-loop-proof'
@@ -2425,6 +2438,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppOperatorDiagnosticsSeoArtifactsRouteImport
       parentRoute: typeof AppOperatorRoute
     }
+    '/_app/_operator/diagnostics_/quicklog': {
+      id: '/_app/_operator/diagnostics_/quicklog'
+      path: '/diagnostics/quicklog'
+      fullPath: '/diagnostics/quicklog'
+      preLoaderRoute: typeof AppOperatorDiagnosticsQuicklogRouteImport
+      parentRoute: typeof AppOperatorRoute
+    }
     '/_app/_operator/ingest-inspector': {
       id: '/_app/_operator/ingest-inspector'
       path: '/ingest-inspector'
@@ -2880,6 +2900,7 @@ interface AppOperatorRouteChildren {
   AppOperatorDiagnosticsRoute: typeof AppOperatorDiagnosticsRoute
   AppOperatorDiagnosticsLightingMeasurementRoute: typeof AppOperatorDiagnosticsLightingMeasurementRoute
   AppOperatorDiagnosticsSeoArtifactsRoute: typeof AppOperatorDiagnosticsSeoArtifactsRoute
+  AppOperatorDiagnosticsQuicklogRoute: typeof AppOperatorDiagnosticsQuicklogRoute
   AppOperatorIngestInspectorRoute: typeof AppOperatorIngestInspectorRoute
   AppOperatorLeadsRoute: typeof AppOperatorLeadsRoute
   AppOperatorOneTentLoopProofRoute: typeof AppOperatorOneTentLoopProofRoute
@@ -2922,6 +2943,7 @@ const AppOperatorRouteChildren: AppOperatorRouteChildren = {
     AppOperatorDiagnosticsLightingMeasurementRoute,
   AppOperatorDiagnosticsSeoArtifactsRoute:
     AppOperatorDiagnosticsSeoArtifactsRoute,
+  AppOperatorDiagnosticsQuicklogRoute: AppOperatorDiagnosticsQuicklogRoute,
   AppOperatorIngestInspectorRoute: AppOperatorIngestInspectorRoute,
   AppOperatorLeadsRoute: AppOperatorLeadsRoute,
   AppOperatorOneTentLoopProofRoute: AppOperatorOneTentLoopProofRoute,

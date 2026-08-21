@@ -1592,7 +1592,7 @@ export default function Timeline() {
               onChange={(e) => setPlantFilter(e.target.value)}
               aria-label="Filter by plant"
               data-testid="timeline-plant-filter"
-              className="rounded-md border border-border/50 bg-background/60 px-2 py-1.5 text-sm"
+              className="min-w-0 max-w-full rounded-md border border-border/50 bg-background/60 px-2 py-1.5 text-sm"
             >
               <option value="">All plants</option>
               {plantOptions.map((o) => (
@@ -1608,7 +1608,7 @@ export default function Timeline() {
               onChange={(e) => setTentFilter(e.target.value)}
               aria-label="Filter by tent"
               data-testid="timeline-tent-filter"
-              className="rounded-md border border-border/50 bg-background/60 px-2 py-1.5 text-sm"
+              className="min-w-0 max-w-full rounded-md border border-border/50 bg-background/60 px-2 py-1.5 text-sm"
             >
               <option value="">All tents</option>
               {tentOptions.map((o) => (
@@ -1624,7 +1624,7 @@ export default function Timeline() {
               onChange={(e) => setEventTypeFilter(e.target.value)}
               aria-label="Filter by log type"
               data-testid="timeline-event-type-filter"
-              className="rounded-md border border-border/50 bg-background/60 px-2 py-1.5 text-sm"
+              className="min-w-0 max-w-full rounded-md border border-border/50 bg-background/60 px-2 py-1.5 text-sm"
             >
               <option value="">All log types</option>
               {eventTypeOptions.map((o) => (

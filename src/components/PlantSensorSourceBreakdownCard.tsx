@@ -24,6 +24,7 @@ import {
 } from "@/lib/sensorSourceSummaryRules";
 import SensorSourceSummaryWidget from "@/components/SensorSourceSummaryWidget";
 import SensorSourceInlineLegend from "@/components/SensorSourceInlineLegend";
+import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
 
 interface Props {
   plantId: string | null | undefined;
@@ -78,13 +79,11 @@ export function buildPlantSensorSourceReadings(
 export const PLANT_SENSOR_SOURCE_HISTORY_LIMIT = 200;
 
 async function fetchPlantDiaryRows(plantId: string): Promise<DiaryRow[]> {
-  const { data, error } = await supabase
-    .from("diary_entries")
-    .select("entry_at, details")
-    .eq("plant_id", plantId)
-    .is("retracted_at", null)
-    .order("entry_at", { ascending: false })
-    .limit(PLANT_SENSOR_SOURCE_HISTORY_LIMIT);
+  const { data, error } = await selectWithRetractionCompat((withRetractionFilter) => {
+    let query = supabase.from("diary_entries").select("entry_at, details").eq("plant_id", plantId);
+    if (withRetractionFilter) query = query.is("retracted_at", null);
+    return query.order("entry_at", { ascending: false }).limit(PLANT_SENSOR_SOURCE_HISTORY_LIMIT);
+  });
   if (error) throw error;
   return (data ?? []) as DiaryRow[];
 }

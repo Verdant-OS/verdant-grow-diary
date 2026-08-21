@@ -106,6 +106,7 @@ import {
   resolveQuickLogWriteTarget,
   type QuickLogResolvedTarget,
 } from "@/lib/quickLogTargetIntegrityRules";
+import { resolveQuickLogTargetPlan } from "@/lib/quickLogTargetResolutionRules";
 import { buildSensorSnapshotSavePayload } from "@/lib/latestSensorSnapshotRules";
 import { quickLogReasonToOperatorMessage } from "@/lib/quickLogSaveErrorMessage";
 import { buildStaleSnapshotHelperCopy } from "@/lib/quickLogStaleSnapshotHelperCopy";
@@ -461,22 +462,67 @@ export default function QuickLog({
   );
   const prefillPlantId = prefillTarget.status === "ready" ? prefillTarget.target.plantId : null;
   const prefillGrowId = prefillTarget.status === "ready" ? prefillTarget.target.growId : null;
-  const prefillHoldActive =
-    prefillRequestKey !== null && dismissedBlockedPrefillKey !== prefillRequestKey;
-  const editorPlantId = prefillHoldActive ? (prefillPlantId ?? "") : plantId;
+  // Legacy adapter boundary: AppShell currently supplies one already-collapsed
+  // named prefill, so this first consumer maps it to the highest named tier.
+  // The shared resolver still owns the complete explicit → route → selection
+  // ordering for later surface migrations. Ownership proof remains with
+  // resolveQuickLogPrefillTarget above; no remembered target enters here.
+  const targetPlan = useMemo(
+    () =>
+      resolveQuickLogTargetPlan({
+        explicitPrefillOrIntent:
+          prefillRequestKey === null
+            ? null
+            : {
+                requestKey: prefillRequestKey,
+                resolution:
+                  prefillTarget.status === "ready"
+                    ? {
+                        status: "ready",
+                        target: {
+                          type: "plant",
+                          plantId: prefillTarget.target.plantId,
+                          tentId: prefillTarget.target.tentId ?? null,
+                          growId: prefillTarget.target.growId,
+                        },
+                      }
+                    : prefillTarget,
+              },
+        routeContext: null,
+        explicitGrowerSelection:
+          typeof plantId === "string" && plantId.trim().length > 0
+            ? {
+                requestKey: null,
+                resolution: {
+                  status: "ready",
+                  target: {
+                    type: "plant",
+                    plantId,
+                    tentId: null,
+                    growId: null,
+                  },
+                },
+              }
+            : null,
+        dismissedBlockedPrefillKey,
+      }),
+    [prefillRequestKey, prefillTarget, dismissedBlockedPrefillKey, plantId],
+  );
+  const prefillHoldActive = targetPlan.holdActive;
+  const editorPlantId = targetPlan.editorPlantId;
 
   useEffect(() => {
     if (!open || saveLocked) return;
-    if (prefillHoldActive && prefillPlantId && prefillGrowId) {
-      if (prefillGrowId !== activeGrowId) {
-        setActiveGrowId(prefillGrowId);
+    if (targetPlan.step === "apply-named") {
+      if (targetPlan.target.growId && targetPlan.target.growId !== activeGrowId) {
+        setActiveGrowId(targetPlan.target.growId);
       }
-      setPlantId(prefillPlantId);
-    } else if (prefillHoldActive) {
+      setPlantId(targetPlan.target.type === "plant" ? targetPlan.target.plantId : "");
+    } else if (targetPlan.step === "hold-empty") {
       // A named target that cannot be proven must hold the editor empty. It
       // may be released only by an explicit grower selection below.
       setPlantId("");
-    } else if (!prefillRequestKey) {
+    } else if (targetPlan.step === "manual-selection") {
       // Global and grow-only launchers always begin as manual selection.
       setPlantId("");
     }
@@ -761,8 +807,7 @@ export default function QuickLog({
       resolvedHuntId: selectedPhenoHuntId,
       contextStatus: phenoEvidenceContext.status,
       contextHuntId: phenoEvidenceContext.context?.huntId ?? null,
-      configuredGoalIds:
-        phenoEvidenceContext.context?.coverage.goals.map((g) => g.id) ?? null,
+      configuredGoalIds: phenoEvidenceContext.context?.coverage.goals.map((g) => g.id) ?? null,
     });
     if (decision.action !== "seed") return;
     // Consume the handoff BEFORE seeding so any concurrent context refetch

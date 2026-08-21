@@ -7,6 +7,7 @@
  */
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables, TablesInsert, TablesUpdate, Enums } from "@/integrations/supabase/types";
+import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
 
 /* ------------------------------------------------------------------ */
 //  Row types — what comes back from SELECT *
@@ -119,9 +120,12 @@ export async function archiveGrow(id: string): Promise<void> {
 //  Typed CRUD helpers — Diary Entries
 /* ------------------------------------------------------------------ */
 export async function fetchDiaryEntryRows(growId?: string): Promise<DiaryEntryRow[]> {
-  let q = supabase.from("diary_entries").select("*").is("retracted_at", null);
-  if (growId) q = q.eq("grow_id", growId);
-  const { data, error } = await q.order("entry_at", { ascending: false });
+  const { data, error } = await selectWithRetractionCompat((withRetractionFilter) => {
+    let q = supabase.from("diary_entries").select("*");
+    if (withRetractionFilter) q = q.is("retracted_at", null);
+    if (growId) q = q.eq("grow_id", growId);
+    return q.order("entry_at", { ascending: false });
+  });
   if (error) fail("fetchDiaryEntryRows", error);
   return (data as DiaryEntryRow[]) ?? [];
 }

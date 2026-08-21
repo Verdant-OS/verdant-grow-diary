@@ -19,11 +19,12 @@ on:
 permissions:
   contents: read
 
-# Same production concurrency group as the three-file reconciliation lane so
-# the two protected runners can never touch production concurrently.
+# Shared by every protected production migration writer so unrelated delivery
+# lanes cannot touch production concurrently.
 concurrency:
-  group: pinned-production-migrations
+  group: verdant-production-migration-writer
   cancel-in-progress: false
+  queue: max
 
 jobs:
   validate:

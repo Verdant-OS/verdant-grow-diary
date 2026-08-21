@@ -1,154 +1,87 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-15 UTC
-**Updated by:** Grok (2026-08-15 merge: resolved two simple `CURRENT_STATE.md`
-conflicts against origin `1c094a2a3`. Incoming since `89ddea93f`:
-`74be85232` (#967 verdant-grow-os Cursor plugin scaffold — no overlap)
-and `1c094a2a3` (#970 DIRTY PR conflict-reconciliation dispositions —
-overlapping header plus topology row; the DIRTY-PR section auto-merged).
-Topology tip is now `1c094a2a3`. Production `/version.json` was **not**
-re-measured in this merge; the 2026-08-15 observation `5e2fcedd4271`
-(#984) still stands. Does **not** apply migrations or set Day 0.)
+**Last updated:** 2026-08-20 UTC
+**Updated by:** Claude (2026-08-20: corrects a production-liveness false negative on
+branch `claude/verdantgrowdiary-dns-issue-hag3co`. An agent reported
+`verdantgrowdiary.com` **offline and unindexed** from a single sandboxed DNS
+failure and recommended repointing production DNS; the site was live throughout.
+Re-measures seven Production status rows over live HTTPS — release identity is now
+`f09febc354a4` (#1049), build `2026-08-20T18:49:50.600Z`, provenance MATCH — and
+refreshes the deploy-branch topology row to tip `9b644565` (#1042). Adds
+`docs/agent-session-network-reachability.md`.
 
-**Prior same-day update:** 2026-08-15 UTC
-**Updated by:** Grok (merge-conflict resolve of #970 onto fetched deploy tip
-`89ddea93f` (#993). Takes the incoming Claude migration-drift header as prior
-identity. Unique surviving work remains the DIRTY-PR reconciliation section.
-No production, GA4, GSC, sitemap, or release-identity row was re-measured.)
+Second, executes Cheek's 2026-08-20 **SITEMAP** adjudication on the unsitemapped
+indexable routes. The set measured **six**, not the four this file recorded; five
+were added to `public/sitemap.xml` (56 → 61 `<loc>` in-repo). `/breeder-beta`, a
+self-declared copy-only duplicate of `/creator-beta`, was held for an owner call
+and then resolved the same day: Cheek chose canonicalisation, so it now points its
+canonical at `/creator-beta`, stays `index, follow`, and stays out of the sitemap
+by design. That adds a `canonicalPath` option to `usePageSeo` and a
+`crossCanonicalDocument` build-time helper, pinned by
+`src/test/breeder-beta-cross-canonical.test.ts` and
+`src/test/use-page-seo-canonical-path.test.tsx`.
 
-**Prior same-day update:** 2026-08-15 UTC
-**Updated by:** Grok (2026-08-15 merge: resolved the `CURRENT_STATE.md`
-attribution-header conflict against origin `89ddea93f`. Incoming since
-`bb66f4302`: `f3324a2b0` (#992 migration-drift alarm — the overlapping
-header plus the new ⚠️ section, which auto-merged) and `89ddea93f`
-(#993 protected signup-repair delivery path). Topology tip is now
-`89ddea93f`. #993 does **not** apply the signup repair; the attributed-
-signup incident stays OPEN. Production `/version.json` was **not**
-re-measured in this merge; the 2026-08-15 observation `5e2fcedd4271`
-(#984) still stands. Does **not** apply migrations or set Day 0.)
+No schema, migration, or governance-file changes. Does **not** measure indexation
+or migration state, does **not** move production — the live sitemap stays at 56
+until the next publish — and does **not** set Day 0.)
 
-**Prior same-day update:** 2026-08-15 UTC
-**Updated by:** Claude (2026-08-15, additive: answers Cheek's "migration ledger
-reconciliation" ask with the finding that the reconciliation tool **already
-exists and has never once completed a measurement** — four scheduled runs since
-2026-08-12, all `failure`, plus an on-demand re-run at Cheek's instruction that
-reproduced the connection failure byte-for-byte (three of the five runs reach
-the socket; the other two never got that far); issues #912 and #916 open and
-unactioned;
-the `verdant-production` environment's `SUPABASE_DB_URL` resolves to the
-**sandbox** project ref and to an unreachable IPv6 address — **and**, found in review, the
-probe's exact-version matching would misreport Lovable-recorded migrations as
-drift even once it connects, so the ledger is blocked behind two independent
-faults, not one. New section
-"The migration-drift alarm has never once completed a measurement". No new tool
-was built and none should be; the existing one needs repairing. Merged with
-deploy tip `bb66f4302` to resolve an
-attribution-header conflict; every Grok note below is retained unchanged and no
-other section was touched. No production, GA4, GSC, sitemap, or release-identity
-row was re-measured in this edit.)
+**Prior update:** 2026-08-19 UTC (third same-day edit)
+**Updated by:** Claude (2026-08-19, third edit: records Cheek's approval of
+One-Tent Loop **Tranche B+** — the efficiency program's second tranche — with
+Claude explicitly reassigned as architect and implementer for B+ only.
+Approval covers the design at
+`docs/superpowers/specs/2026-08-19-one-tent-loop-efficiency-design.md`, owner
+decisions D4/D5/D7, and the design's §11 copy; baseline at
+`docs/one-tent-loop-efficiency-baseline.md`, both verified at deploy tip
+`e012b633`. See the "Current approved slices" section for the tranche record.
+Docs-only edit; no code, schema, or migration changes.)
 
-**Prior same-day update:** 2026-08-15 UTC
-**Updated by:** Grok (2026-08-15 merge: resolved the `CURRENT_STATE.md`
-conflict against origin `bb66f4302`. Incoming since this branch's previous
-base `0522eefb1` (#990): `a54040c30` (#989 pgmq / PUBLIC EXECUTE restrict),
-`22c130600` (#986 One-Tent Loop operating-order — the overlapping
-CURRENT_STATE edit), `bb66f4302` (#960 zero-defect board refresh). Topology
-tip is now `bb66f4302`. Production `/version.json` was **not** re-measured
-in this merge; the 2026-08-15 observation `5e2fcedd4271` (#984) still
-stands. Agent row keeps both the Lovable Knowledge rewrite and the merged
-`ONE_TENT_LOOP_OPERATING_ORDER` assignment. Does **not** apply migrations
-or set Day 0.)
+**Prior update:** 2026-08-19 UTC (second same-day edit)
+**Updated by:** Claude (2026-08-19, later edit: Quick Log errors/diagnostics
+slice on `claude/quicklog-errors-diagnostics-c06rci` (owner-assigned). Adds the
+2026-08-19 production re-measure block under the second-drift section: the
+Quick Log manual-save catalog now matches the 20260818010000 forward-repair
+end-state in production, `quicklog_entry_revisions` and
+`diary_entries.retracted_at` are now PRESENT (superseding the 2026-08-15/16
+absence findings), and a rolled-back end-to-end probe of
+`quicklog_save_manual` passed on every axis. No schema changes; no migrations
+applied by this slice.)
 
-**Prior update:** 2026-08-15 UTC
-**Updated by:** Grok (2026-08-15, later additive: refresh the stale cited
-rows — topology still named `f2a03998f` / older buffers still showed
-`6434ea2a8`; production identity still named `3f773b680dcc` (2026-08-05);
-`/` still `FAIL` (2026-08-07); agent table still said Grok Unassigned /
-Claude spec-only / Council Chair waiting. Live re-measure 2026-08-15:
-production `/version.json` serves `5e2fcedd4271` (#984) with treeHash MATCH;
-`/` SSR is `PASS` (landing h1 + canonical, 1141 body words) after #949.
-Origin tip at that refresh was `0522eefb1` (#990). Publish lags git.
-GA4/GSC/Day 0 were not re-opened. Lovable Knowledge pack updated to match.
+**Prior update:** 2026-08-19 UTC
+**Updated by:** Claude (2026-08-19: records Cheek's approval of One-Tent Loop
+**Tranche A** — five context-threading wiring PRs — and lands the implementation
+specification at `docs/specs/one-tent-loop-tranche-a-specification.md` for the
+Codex handoff. Docs-only; no code, schema, or slice-scope changes. See the
+"Current approved slices" section for the tranche record.)
+
+**Prior update:** 2026-08-18 UTC
+**Updated by:** Claude (2026-08-18, third same-day edit: re-applies the Lovable
+project Knowledge as Version 2026-08-18.1 at Cheek's instruction, sourced from
+this file at deploy tip `87ae05e` (#1026) after the archival slice merged.
+Snapshot: `docs/lovable/verdant-project-knowledge-2026-08-18.md` (9,979/10,000
+chars). Pre-write read confirmed the live field matched the committed
+2026-08-15 snapshot exactly. Live `/version.json` re-measure was `BLOCKED`
+from the agent session (network policy 403), so the pack carries the
+2026-08-15 stamp labeled as last measurement. Topology row refreshed to
+fetched tip `87ae05e` (#1026). Still no Knowledge sync automation authorized.
 Does **not** apply migrations or set Day 0.)
 
-**Prior same-day update:** 2026-08-15 UTC
-**Updated by:** Grok (2026-08-15 merge: combined `ONE_TENT_LOOP_OPERATING_ORDER`
-on this branch with deploy tip `534b28434` — Cursor SDK local-orchestration
-spike #985, Free signup / Quick Log handoff #987, AI Doctor E2E path #988,
-and nanoid pin #966. Both programs stay active; neither pauses Convex or
-Postgres spikes. No production, GA4, GSC, sitemap, or release-identity row
-was re-measured in this edit; those retain their earlier verification dates.
-Superseded as the tip row by the later merge to `bb66f4302`.)
+**Prior same-day update:** 2026-08-18 UTC
+**Updated by:** Claude (2026-08-18, later edit: executes the Cheek-approved
+Tranche 1 of `docs/specs/current-state-archival-slice.md`. Moves, verbatim, to
+the new `docs/agents/CURRENT_STATE_ARCHIVE.md`: the superseded
+update-attribution chain (2026-08-13 → 2026-08-15), the deploy-head validation
+body pinned to `5611b130e81a`, the five "Completed, out of slice" records
+(2026-08-07 → 2026-08-18), and resolved blocker 6; relocates the
+release-provenance runbook to `docs/release-provenance-runbook.md`. Each move
+leaves a pointer with its still-live takeaways. Nothing under a ⚠️ heading and
+no open item moved. The archive is never imported by `CLAUDE.md`;
+`check-sentinel-version-parity.mjs` verified PASS with 0 governance files
+changed. No production, GA4, GSC, sitemap, or release-identity row was
+re-measured in this edit. Does **not** apply migrations or set Day 0.)
 
-**Prior same-day update:** 2026-08-15 UTC
-**Updated by:** Grok (2026-08-15, later additive: next gates on
-`VERDANT_CURSOR_SDK_LOCAL_ORCHESTRATION_SPIKE`. `POSTGRES_RESTRICTED_ROLE_SPIKE`
-was not touched. Optional live proof remains `BLOCKED` — `CURSOR_API_KEY` is
-absent here. Dispatcher security review is at
-`spikes/cursor-sdk-local-orchestration/docs/dispatcher-security-review.md`.
-Host receipt-integrity findings are closed; live SDK tool enforcement stays
-`NOT_MEASURED`; reuse is not approved. No production, GA4, GSC, sitemap, or
-release-identity row was re-measured in this edit.)
-
-**Prior same-day update:** 2026-08-15 UTC
-**Updated by:** Grok (2026-08-15, additive: records implementation of isolated
-`VERDANT_CURSOR_SDK_LOCAL_ORCHESTRATION_SPIKE` under
-`spikes/cursor-sdk-local-orchestration/`. This spike does **not** replace,
-pause, or delay `POSTGRES_RESTRICTED_ROLE_SPIKE`. Manual Cursor SDK live proof
-is `BLOCKED` without `CURSOR_API_KEY`. No production, GA4, GSC, sitemap, or
-release-identity row was re-measured in this edit.)
-
-**Prior same-day update:** 2026-08-15 UTC
-**Updated by:** Grok (2026-08-15 later: `ONE_TENT_LOOP_OPERATING_ORDER`
-repo slices 2–4 landed; Slice 5 recorded as owner-`BLOCKED` with an
-honest `missing_session_json` browser-proof receipt — no fabricated
-login. Post-change smoke is 32 files / 512 tests. This does **not**
-pause Convex or Postgres spikes. No production, GA4, GSC, sitemap, or
-release-identity row was re-measured in this edit; those retain their
-earlier verification dates.)
-
-**Prior same-day update:** 2026-08-15 UTC
-**Updated by:** Grok (2026-08-15: records Cheek's in-session implement
-instruction for `ONE_TENT_LOOP_OPERATING_ORDER`. This does **not** pause
-`CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` or `POSTGRES_RESTRICTED_ROLE_SPIKE`.
-Slice 0 baseline measured on deploy tip `f2a03998f`. Colliding PRs #828 /
-#817 / #696 stay open and parked. No production, GA4, GSC, sitemap, or
-release-identity row was re-measured in this edit; those retain their earlier
-verification dates.)
-
-**Prior update:** 2026-08-14 UTC
-**Updated by:** Claude (2026-08-14, later edit: records Cheek's in-session
-approval of `POSTGRES_RESTRICTED_ROLE_SPIKE` and the **delivered, measured**
-Phase 0 detector — 22 service-role edge functions, 8 cross-domain table reaches
-against deploy tip `e1214d3df`. Records Cheek's decision to abandon
-`claude/breeder-mode-genetics` and `claude/cultivar-library-p1`. Refreshes the
-Branch topology row from `cbbd7122` to `e1214d3df` after five merges this
-session (#979, #815, #710, #795, #980). Sentinel-Version moved to 2026-08-09.3
-via #710; the tip then moved to `7843a3fcb` (#981, Phase 0) and `f2a03998f`
-(#982, Phase 1). Records Cheek's "execute phase 1" decision and the
-**demonstrated** local-only role harness — 10/10 proofs. Also records Cheek's
-2026-08-14 approval-in-principle of **Phase 2 production adoption** (execution
-gated on three items, see the slice entry) and the **Convex-vs-Postgres
-recommendation**: adopt Postgres incrementally, hold Convex. No production, GA4,
-GSC, sitemap, or release-identity row was re-measured in this edit; those retain
-their earlier verification dates.)
-
-**Prior update:** 2026-08-13 UTC
-**Updated by:** Claude (records Cheek's 2026-08-13 in-session approval of the
-named isolated Convex component sandbox spike, plus the deploy-branch HEAD
-observed while writing that spec. Public-surface, GA4, and release-identity
-rows retain their earlier verification dates; none were re-measured in this
-update. Same-day follow-up: records the previously-untracked Lovable
-knowledge-pack mechanism and this session's audit of its pre-2026-08-13
-backup content against deploy-branch HEAD `e7690396e` — see the new
-"Completed, out of slice (recorded 2026-08-13)" entry below; that audit's
-evidence is pinned to `e7690396e` and was not re-verified against a later
-tip. Second same-day follow-up, per Codex review on PR #975: the Branch
-topology row below was stale at `6434ea2a8` (#942) even before this file's
-own `e7690396e` (#943) reference was added, and the branch has since moved
-again — refreshed the row to the actual current tip, `fb42ce00e` (#968),
-verified with a fresh `git fetch` rather than by re-asserting either older
-number)
+Older update-attribution entries (2026-08-13 → 2026-08-18) are archived
+verbatim — see `docs/agents/CURRENT_STATE_ARCHIVE.md`.
 
 This is the changing shift report. Permanent rules live in `/AGENTS.md`; do not edit
 that constitution to record branch, deployment, blocker, or assignment changes.
@@ -447,6 +380,50 @@ object lookup, and those keep their own labels. A blocked ledger check and a
 directly-observed missing table are different findings, and flattening both to
 `NOT_MEASURED` would erase a verified defect rather than preserve caution.
 
+### 2026-08-19 production re-measure — the Quick Log manual-save drift has CLOSED
+
+`established fact`, measured 2026-08-19 by Claude through the same Lovable
+read-only SQL channel as the 2026-08-15 investigation (verdantgrowdiary-com
+project; target identity by fingerprint: founder account present, full app
+schema — `inference, high confidence` that this is `knkwiiywfkbqznbxwqfh`,
+since the channel does not expose the raw ref):
+
+- `public.quicklog_entry_revisions` is now **PRESENT** and
+  `diary_entries.retracted_at` is now **PRESENT** — superseding the
+  2026-08-15/16 absence findings above for these objects. An operator apply
+  (Lovable-side) happened between 2026-08-16 and 2026-08-19.
+- The Quick Log manual-save catalog matches the 20260818010000 forward-repair
+  **end-state exactly**: wrapper `quicklog_save_manual` (12-arg, src md5
+  `0d3098b8…`, EXECUTE authenticated + service_role, not anon/PUBLIC); private
+  delegate `quicklog_save_manual_pre_logged_at` repaired body (md5
+  `7ec296e4…`); all four parse/stamp helpers exact; **all five private
+  helpers EXECUTE = postgres only**; both `logged_at` stamp triggers live.
+- A **rolled-back** end-to-end probe of `quicklog_save_manual` as the founder
+  (BEGIN…ROLLBACK, zero committed writes) passed every axis: watering child
+  row, exact backdated `occurred_at`, independent Captured `logged_at`, diary
+  mirror linked via `details.linked_grow_event_id` with column AND
+  `details.logged_at` parity, `entry_at = occurred_at`, stage persisted.
+  Failure paths also verified: malformed `details.logged_at` →
+  `{ok:false, reason:"invalid_logged_at"}`; `quicklog_try_parse_uuid` as
+  authenticated → SQLSTATE 42501.
+- Manual grow_events rows predating the apply carry backfilled
+  `logged_at = created_at` (expected foundation-migration semantics), and no
+  post-apply manual save existed yet at measurement time.
+- The protected GitHub apply workflow
+  (`apply-quicklog-manual-delegate-forward-repair.yml`) ran once —
+  2026-08-19T06:17Z, dispatched by Cheek — and **failed at "Require the
+  protected production database secret"** before any database access. The
+  apply that actually landed was therefore Lovable-side, not workflow-side.
+  The workflow secret remains an owner-only gap.
+- The ledger remains mixed-convention: of the quicklog-window versions, only
+  `20260811090000` (name `2c5c4adb-…`) matched a direct version/name query.
+  Object presence stays the ground truth; the drift-probe caveats above are
+  unchanged.
+- Sandbox `bzatgtgjvuojpoxcknaa` is **far behind**: only a legacy 10-arg
+  `quicklog_save_manual` exists there — no delegate, no helpers, no
+  `logged_at` columns. Do not use sandbox to reason about production Quick
+  Log behavior.
+
 Five red runs — the four scheduled plus the 2026-08-15 dispatch — are five
 absent measurements, `NOT_MEASURED` in the literal sense this repo's status
 vocabulary requires, since not one of them completed a query. But they are not
@@ -458,10 +435,10 @@ way.
 
 ## Branch topology
 
-| Branch               | Role                                             | Verified head                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| -------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `verdant-grow-diary` | **Deploy branch. Production ships from here.**   | `1c094a2a36a1f576ee95e2c46d70777ae24a3e53` (#970), verified 2026-08-15 with `git fetch origin verdant-grow-diary && git rev-parse origin/verdant-grow-diary`. Supersedes `89ddea93f` (#993). After #982, in `git log` merge order oldest-first: `883bee2ff` (#983), `5e2fcedd4` (#984), `9c1ada616` (#987), `24382b5ad` (#988), `f1e097740` (#985), `534b28434` (#966), `0522eefb1` (#990), `a54040c30` (#989), `22c130600` (#986), `bb66f4302` (#960), `f3324a2b0` (#992), `89ddea93f` (#993), `74be85232` (#967), `1c094a2a3` (#970). **Live production is not this tip** — `/version.json` on 2026-08-15 served `5e2fcedd4271` (#984) and was not re-fetched in this merge. #993 adds a protected PREFLIGHT/APPLY path and does **not** apply the signup repair. Merging is not a publish. PR numbers on this branch do not order by merge time — order commits with `git log`, never by PR number. Do not carry older validation tables forward. Older buffers that still show `6434ea2a8` (#942) are the 2026-08-13 snapshot; discard them |
-| `main`               | Integration branch. It is not production parity. | `b6d747941948ce68157185a2b0847acea6970d44` (#779), verified 2026-08-07                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| Branch               | Role                                             | Verified head                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| -------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `verdant-grow-diary` | **Deploy branch. Production ships from here.**   | `9b6445653326dbac179dfabfb4192b190b8e5e29` (#1042), verified 2026-08-20 with `git fetch origin verdant-grow-diary && git rev-parse origin/verdant-grow-diary`. Supersedes `87ae05e5b` (#1026). **Live production WAS re-fetched at this verification** and serves `f09febc354a4` (#1049), an ancestor of this tip — so publish lags git by four first-parent commits, oldest-first: `44d15f3` (#1046), `59bb33b` (#1048), `b589ad3` (#1052), `9b64456` (#1042). The 2026-08-18 note that a `/version.json` fetch from an agent session is `BLOCKED` (network policy 403) was session-specific and does not hold generally — see `docs/agent-session-network-reachability.md`. Merging is not a publish. PR numbers on this branch do not order by merge time — order commits with `git log`, never by PR number. Do not carry older validation tables forward. Older buffers that still show `87ae05e5b` (#1026), `3f2bfe2db` (#1021) or `1c094a2a3` (#970) are earlier snapshots; discard them |
+| `main`               | Integration branch. It is not production parity. | `b6d747941948ce68157185a2b0847acea6970d44` (#779), verified 2026-08-07                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 
 `main` and `verdant-grow-diary` are divergent. Do not infer production behavior from
 `main`, and do not backport deploy-only governance or data rules without a scoped branch
@@ -519,86 +496,80 @@ not land a hybrid patch on any of them solely to clear `DIRTY`.
 
 ## Production status
 
-Analytics axes verified directly on 2026-08-02; release identity and public
-root were re-measured 2026-08-15. Sitemap loc-count re-counted 2026-08-15.
-GA4 lighting / singleton rows retain their 2026-08-02 dates — they were not
-re-opened this turn. Each row carries its own verification date:
+Analytics axes verified directly on 2026-08-02. Release identity, build time,
+public root, sitemap, robots.txt, and the four unsitemapped indexable routes were
+re-measured **2026-08-20** over live HTTPS from a Claude Code remote session. GA4
+lighting / singleton rows retain their 2026-08-02 dates — they were not re-opened
+this turn. Each row carries its own verification date:
 
-| Axis                                        | Status                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `https://verdantgrowdiary.com/version.json` | `PASS` — HTTP 200 (re-verified 2026-08-15)                                                                                                                                                                                                                                                                                                                                                                                               |
-| Production commit                           | `PASS` — verified 2026-08-15: production serves real SHA `5e2fcedd4271` (#984) (`commitSource: "git"`, `treeHash: 761818d8a191…`, `ref: "__orphan__"`, `dirty: false`); `scripts/resolve-release-provenance.mjs --hash=<treeHash> --ref=5e2fcedd4271 --scan=1` returned MATCH. This supersedes the 2026-08-05 stamp `3f773b680dcc`. Origin tip is later (`89ddea93f`, #993) — publish lags git. Single observations remain point-in-time |
-| Production build time                       | `2026-08-15T00:34:11.592Z` (from the same `/version.json`). Prior live stamp `2026-08-05T22:06:15.869Z` is historical                                                                                                                                                                                                                                                                                                                    |
-| Public sitemap                              | `PASS` — HTTP 200, **56** `<loc>` entries (live re-count 2026-08-15; same count as 2026-08-12). First loc is `https://verdantgrowdiary.com/`                                                                                                                                                                                                                                                                                             |
-| Public root route `/`                       | `PASS` — measured 2026-08-15. SSR body is the public landing: HTTP 200, `<h1>` “See what changed. Decide what to do next.”, `<link rel="canonical">` present, 1141 body words, no loading skeleton. This supersedes the 2026-08-07 empty-shell `FAIL`. Slice 1 of Option A (#949 `741f99e1b`) is live. Slice 2 (`/welcome` → `/` consolidation) remains unapproved — see blocker 7                                                       |
-| Indexable routes outside the sitemap        | `FAIL` — four routes still serve HTTP 200 with `robots: index, follow` and are absent from the sitemap (re-confirmed 2026-08-15): `/glossary`, `/breeder-beta`, `/creator-beta`, `/pheno-comparison`. Two are beta surfaces and one is a preview; none has a recorded eligibility decision — see blocker 8's sibling note                                                                                                                |
-| robots.txt                                  | `PASS` — HTTP 200, production sitemap declared; neither lighting route is disallowed (not re-measured 2026-08-15; last verified with the lighting-route crawl)                                                                                                                                                                                                                                                                           |
-| Lighting route technical SEO                | `PASS` — two HTTP 200 routes; page metadata and route-scoped JSON-LD verified (not re-measured 2026-08-15)                                                                                                                                                                                                                                                                                                                               |
-| GA4 explicit lighting-page identity         | `PASS` — nine exact intercepted SPA page-view events; no test traffic transmitted (2026-08-02; not re-measured 2026-08-15)                                                                                                                                                                                                                                                                                                               |
-| GA4 page-view singleton contract            | `FAIL` — five automatic tag-generated events observed beside explicit application events (2026-08-02; not re-measured 2026-08-15)                                                                                                                                                                                                                                                                                                        |
-| GA4 authenticated baseline                  | `BLOCKED` — authenticated access unavailable                                                                                                                                                                                                                                                                                                                                                                                             |
-| GSC authenticated baseline                  | `BLOCKED` — authenticated access unavailable                                                                                                                                                                                                                                                                                                                                                                                             |
-| Measurement Day 0                           | `UNSET`                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| Four-week measurement clock                 | `NOT_STARTED`                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| Axis                                        | Status                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `https://verdantgrowdiary.com/version.json` | `PASS` — HTTP 200 (re-verified 2026-08-20 through the agent proxy). The 2026-08-18 `BLOCKED` (network policy 403) was a property of that session, not of this endpoint — re-test rather than carrying it forward                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| Production commit                           | `PASS` — verified 2026-08-20: production serves real SHA `f09febc354a4` (#1049) (`commitSource: "git"`, `treeHash: 4464b3e20873…`, `ref: "__orphan__"`, `dirty: false`); `scripts/resolve-release-provenance.mjs --hash=<treeHash> --ref=f09febc354a4 --scan=1` returned MATCH by recomputation. This supersedes the 2026-08-15 stamp `5e2fcedd4271` (#984). Deploy tip is later, so publish still lags git — see the branch topology row. Single observations remain point-in-time                                                                                                                                                                                                                                                                                                                                                                            |
+| Production build time                       | `2026-08-20T18:49:50.600Z` (from the same `/version.json`; the served commit was authored `2026-08-20T18:42:01Z`, so publish followed merge by roughly eight minutes). Prior live stamp `2026-08-15T00:34:11.592Z` is historical                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| Public sitemap                              | `PASS` — HTTP 200, **56** `<loc>` entries live (re-count 2026-08-20; unchanged from 2026-08-15 and 2026-08-12). First loc is `https://verdantgrowdiary.com/`. **The repo now carries 61** after the 2026-08-20 sitemap adjudication; the live count moves to 61 only on the next publish, so a 56 reading after this merges is expected, not a regression                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Public root route `/`                       | `PASS` — re-measured 2026-08-20. HTTP 200; `<h1>` “See what changed. Decide what to do next.”; `<link rel="canonical" href="https://verdantgrowdiary.com/"/>`; `<meta name="robots" content="index, follow">`; one JSON-LD block; no loading skeleton. Visible body words measured **845–1034** depending on tokenization — the 2026-08-15 figure of 1141 recorded no method, so the two are **not comparable and this is not evidence of content loss**. `www.` host `302`s to the apex. Slice 2 (`/welcome` → `/` consolidation) remains unapproved — see blocker 7                                                                                                                                                                                                                                                                                          |
+| Indexable routes outside the sitemap        | `FAIL` **live**, `RESOLVED` in-repo pending publish. Measured 2026-08-20: the set is **six**, not the four previously recorded — `/glossary`, `/breeder-beta`, `/creator-beta`, `/pheno-comparison`, `/pheno-expression-showcase`, `/docs/mcp-api` — each HTTP 200, self-canonical, `index, follow`, absent from the live `sitemap.xml`, and blocked by no robots group. Cheek adjudicated SITEMAP on 2026-08-20; five are now in `public/sitemap.xml`, and `/breeder-beta` — a near-duplicate of `/creator-beta` — was resolved the same day by the owner’s follow-up call: it **canonicalises to `/creator-beta`** and stays indexable, so it is correctly absent from the sitemap rather than pending. All six are now dispositioned. **Live stays `FAIL` until the next publish** — the repo change does not move production. See blocker 8’s sibling note |
+| robots.txt                                  | `PASS` — re-measured 2026-08-20: HTTP 200, declares `Sitemap: https://verdantgrowdiary.com/sitemap.xml`, and carries no global `Disallow: /`. Authenticated surfaces (`/dashboard`, `/tents`, `/plants`, `/sensors`, `/timeline`, `/doctor`, `/actions`, `/auth`, …) are disallowed as intended; neither lighting route is disallowed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| Lighting route technical SEO                | `PASS` — two HTTP 200 routes; page metadata and route-scoped JSON-LD verified (not re-measured 2026-08-15)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| GA4 explicit lighting-page identity         | `PASS` — nine exact intercepted SPA page-view events; no test traffic transmitted (2026-08-02; not re-measured 2026-08-15)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| GA4 page-view singleton contract            | `FAIL` — five automatic tag-generated events observed beside explicit application events (2026-08-02; not re-measured 2026-08-15)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| GA4 authenticated baseline                  | `BLOCKED` — authenticated access unavailable                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| GSC authenticated baseline                  | `BLOCKED` — authenticated access unavailable                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| Measurement Day 0                           | `UNSET`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| Four-week measurement clock                 | `NOT_STARTED`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 
 No page-level traffic, impression, click, position, or CTR claim is authorized while the
 authenticated GA4/GSC baseline remains blocked. Stream identity alone is not an
 authenticated measurement baseline.
 
+### 2026-08-20 — a DNS false negative, and the reachability rule it produced
+
+`established fact`, measured 2026-08-20: an agent reported this domain **offline and
+not indexed** on the strength of a single `socket.gethostbyname` failure raised inside
+a code-execution sandbox, and recommended repointing production DNS on that basis.
+Every axis in the table above was re-measured the same day. The site was live
+throughout, serving a build published hours earlier.
+
+The error string is the tell. It was `EAI_AGAIN` (_Temporary failure in name
+resolution_) — **the resolver did not answer**. It is not `NXDOMAIN`, which is what an
+unregistered or unpointed domain returns. To a caller that only checks whether the call
+threw, the two are indistinguishable, and they mean opposite things: one measures the
+session, the other measures the domain. Acting on the wrong one would have applied DNS
+surgery to working DNS.
+
+Two durable consequences:
+
+- **A resolver or socket error is `BLOCKED`, never `FAIL`.** It licenses no claim about
+  deployment, DNS, or indexing. Only an HTTP response that was actually read is a
+  measurement of the site.
+- **`BLOCKED` is per-session, not a property of the target.** The `/version.json` fetch
+  recorded `BLOCKED` (network policy 403) on 2026-08-18 returned `200` on 2026-08-20
+  from a different session. Re-test before carrying a `BLOCKED` forward.
+
+Procedure, the control-host pairing that separates the two cases, and the
+output-reading traps (the proxy's `127.0.0.1` is not the origin IP; the landing HTML
+carries NUL bytes that silence `grep`) are in
+`docs/agent-session-network-reachability.md`.
+
+**Indexation itself remains unmeasured.** Two pages surface in a third-party web index
+with correct titles — a `practical observation` sufficient to refute "not indexed", and
+nothing more. The Ahrefs endpoints that would measure it returned `Insufficient plan`,
+and the GA4/GSC authenticated baselines stay `BLOCKED` (blockers 2 and 3). No
+impression, click, position, or CTR claim is authorized by this section.
+
 ---
 
 ## Latest deploy-head validation
 
-**Replay-repair slice landed 2026-08-05.** Merged migration `20260804091142` revokes
-EXECUTE on three function signatures that exist only in production, so every fresh
-disposable-local-Supabase replay failed with SQLSTATE 42883, breaking the Security DB
-Local, irrigation, and pgTAP replay lanes — and `continue-on-error: true` masked the
-resulting job failure as a run-level success for a full day (run `30940375065`).
-[PR #724](https://github.com/Verdant-OS/verdant-grow-diary/pull/724)
-(`fc144485409a`) repaired the replay with a fingerprinted `compatibility_patches`
-entry guarding exactly the three verified-missing signatures (`email_queue_dispatch()`,
-`email_queue_wake()`, two-argument `admin_schema_audit`) — the migration file itself is
-byte-unchanged — and removed the `continue-on-error` masking; the lane stays
-non-required, but enabled failures now propagate to the run conclusion.
-[PR #726](https://github.com/Verdant-OS/verdant-grow-diary/pull/726)
-(`5611b130e81a`) tightened the audit provenance and lane docs and added a contract test
-that fails the suite if any `continue-on-error` key returns to that workflow.
-
-GitHub Actions push runs observed 2026-08-05 ~16:05 UTC for deploy commit
-`5611b130e81a` (not exhaustive; listed runs are those observed):
-
-| Check                                      | Status         | Evidence                                                                                                                                             |
-| ------------------------------------------ | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Typecheck (tsgo) + build                   | `PASS`         | run `31021832816`                                                                                                                                    |
-| Security DB Local                          | `PASS`         | run `31021835479` — full enabled run, not an opt-out skip: replay workspace prepared, `db reset` applied every migration, all harness steps executed |
-| Irrigation evidence gate                   | `PASS`         | run `31021834439`                                                                                                                                    |
-| Dependency & Security CI                   | `PASS`         | run `31021832498`                                                                                                                                    |
-| auto-tag-release                           | `PASS`         | run `31021832735`                                                                                                                                    |
-| Full Vitest Suite (PR gate)                | `NOT_MEASURED` | push run `31021833370` cancelled by queue supersession (not an intentional skip); all 35 required checks were `PASS` on the pre-merge PR head        |
-| Core Link and Form Census                  | `NOT_MEASURED` | run `31021832698` still in progress at observation; the census pair is a pre-existing non-required failure on every branch                           |
-| Required core schema present               | `FAIL`         | run `31021832568`                                                                                                                                    |
-| Required money-critical migrations present | `FAIL`         | run `31021837013`                                                                                                                                    |
-
-The validation evidence in this section is tied to deploy commit `5611b130e81a` and
-must not be carried forward to later commits. The tip has since advanced through
-`acad6cb938e5` (#727), `864eab892` (#725), `1ae1677645a0` (#729), `1a2df78ac3`
-(#735), `6c78266edb7f` (#737), `a9a88e6ed` (#809), `63ed76c6d` (#794),
-`ad29943ea9ec` (#785), `821adb9fafda` (#812), `b972ad8225ef` (#821) and on to
-`c09b33d95ed2` (#814) — **69 commits ahead of `5611b130e81a`**, counted with
-`git log --oneline 5611b130e81a..c09b33d95ed2` on 2026-08-07.
-(PR numbers on this branch do not order by merge time: #809 merged before #794, which
-merged before #785. Order commits with `git log`, never by PR number.)
-None of the checks in the table above have been re-measured against any of those
-commits; treat every row as evidence about `5611b130e81a` only. The Branch
-topology row above names its own verification snapshot and is decoupled from this
-section's evidence.
-Notably, the full enabled Security DB Local run cited above (`31021835479`)
-executed against `5611b130e81a` and is the replay-repair proof point regardless of
-tip movement.
-
-The two failing schema/migration guards remain outside the replay-repair and Mode A SEO
-slices (board item #561). They are not converted to passes and prevent describing the
-deploy branch as fully green; they require their own scoped owner/integration follow-up.
+Validation evidence for deploy commit `5611b130e81a` (2026-08-05 replay-repair
+slice, PRs #724/#726) is archived verbatim — see `CURRENT_STATE_ARCHIVE.md`. By
+its own terms that evidence is tied to that commit and must not be carried
+forward. Still-live takeaways: the full enabled Security DB Local run
+`31021835479` remains the replay-repair proof point, and the two failing
+schema/migration guards (`Required core schema present`, `Required
+money-critical migrations present`) were `FAIL` there and remain an unresolved,
+separately scoped follow-up (see blocker 5 below).
 
 ---
 
@@ -617,6 +588,47 @@ PRs **#828**, **#817**, **#696** stay open and parked — do not start a
 competing Timeline / Alerts / Action Queue UI rewrite. Baseline and
 post-change receipts: `docs/one-tent-loop-operating-order-baseline.md`.
 Persist-path spec: `docs/specs/one-tent-loop-quicklog-single-write-path.md`.
+
+**Tranche A approved (Cheek, 2026-08-19, "approved by all"):** first
+implementation slice of the One-Tent Loop Efficiency Program, scoped as an
+extension of this operating-order slice (the parked-PR / no-competing-rewrite
+instruction above still stands). Scope: five independent wiring PRs — mobile
+FAB plant scoping on `/plants/:id`; grow-scope threading in
+`oneTentLoopNavigationRules.ts`'s back half plus the tent-step self-link fix;
+plant/tent names instead of raw UUIDs on Action Queue rows/drawer and
+Alert/Action detail; five trust fixes (incl. Sensors source-summary `staleMs`
+and honest Stale/Invalid labels); post-save freshness parity, Alerts URL
+filters, and a single `verdant:entry-created` dispatch. No schema, no new
+routes, no new Quick Log write paths. The approval also ratifies the spec's §8
+copy strings. Authoritative spec (verified at deploy tip `f3b3fc49e`,
+adversarially reviewed, zero blockers):
+`docs/specs/one-tent-loop-tranche-a-specification.md`. Implementer: **Codex**
+(PR-A1 first recommended; the five PRs are independent). The Sensors→Doctor
+context carry stays excluded pending owner decision D4. Owner gates on live
+verification are unchanged (managed e2e session; signup apply).
+2026-08-19 update: PR-A1 merged as `f8d93f57` (#1029). A2–A5 remain
+Codex-owned and unopened at that tip; their edit points stay collision
+boundaries for Tranche B+ below.
+
+**Tranche B+ approved (Cheek, 2026-08-19, "APPROVED. Execute steps one
+through five, each in its own slice."):** second tranche of the One-Tent Loop
+Efficiency Program. **Claude is explicitly reassigned as architect and, post-
+approval, implementer for Tranche B+ only** — Tranche A stays Codex's; the
+Action Queue transition/RLS production repair stays Codex's; no competing
+navigation implementation. Approved design:
+`docs/superpowers/specs/2026-08-19-one-tent-loop-efficiency-design.md`
+(Option A — shared pure rules, progressive convergence); measured baseline:
+`docs/one-tent-loop-efficiency-baseline.md`; both pinned at deploy tip
+`e012b633`. The approval also resolves owner decisions **D4** (Sensors→Doctor
+context carry), **D5** (visible user-namespaced "Continue with <plant>?"
+suggestion — silent remembered defaults stay banned), **D7** (plant-scoped
+Better/Same/Worse row in the V2 sheet), and ratifies the design's §11 copy.
+Slice plan: each approved item ships as its own PR — B0a measurement harness
+(test-only, first merge gate), B1 target-precedence rules, D5 slice, D7
+slice, B3a recovery + ratified copy; B2/B3b wait for A5, B4's rules edit
+waits for A2, B5 waits for A3, B0b waits for the owner-gated authenticated
+session/CI path. No schema, no migrations, no new routes, no new Quick Log
+write paths, no production telemetry.
 
 **Named isolated spike (approved 2026-08-13, not SEO):**
 `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE`. Cheek approved a spec-first,
@@ -768,9 +780,12 @@ ships tables without ACL awareness) is the binding constraint on any role design
   raises `42P07` and aborts the replay, taking `security-db-local` and the pgTAP
   lanes with it. It is an earlier draft of a feature that already shipped.
 
-Neither branch could be deleted from this environment (the agent proxy refuses
-GitHub API writes and `git push --delete` alike), so both still exist on origin.
-They are dead by decision, not by absence — treat this entry as the disposition.
+Update 2026-08-18: **both branches are now deleted from origin.** Agent
+sessions still cannot delete branches (re-confirmed: `git push --delete` →
+HTTP 403 from the branch-scoped push credential, and the GitHub MCP toolset
+exposes no ref-deletion endpoint), so Cheek deleted them himself during the
+2026-08-18 cleanup sweep recorded below, alongside 21 other stale `claude/*`
+branches. The dispositions above remain the record of _why_ they died.
 
 **Parent program:** MODE A SEO measurement-readiness work.
 
@@ -789,163 +804,36 @@ and in every mirror that carries a status table (`GEMINI.md`, `docs/agents/roles
 `docs/agents/roles/gemini.md`); the corrected signed-out root-route description is present in
 `AGENTS.md`. Both items read as complete. The stale-facts refresh is this edit.
 
-**Completed, out of slice (recorded 2026-08-07):** #586 Action Queue atomic create. This
-shipped as three separate merges, recorded separately because each carries different
-migrations and different client moves:
+Five **Completed, out of slice** records are archived verbatim in
+`CURRENT_STATE_ARCHIVE.md`. One-line dispositions:
 
-- [PR #586](https://github.com/Verdant-OS/verdant-grow-diary/pull/586) merged as
-  `dc29093b5`. **Introduced the RPC migration**
-  `supabase/migrations/20260807010000_action_queue_create_rpc.sql` (nullable `dedupe_key`
-  column, partial unique index on non-terminal statuses, and the `action_queue_create`
-  SECURITY DEFINER RPC that writes the queue row and its `created` audit event in one
-  transaction), plus `src/lib/actionQueueCreateRules.ts`,
-  `src/lib/actionQueueCreateService.ts`, and the **Alert Detail** and **AI Doctor** client
-  moves onto the RPC.
-- [PR #809](https://github.com/Verdant-OS/verdant-grow-diary/pull/809) merged as
-  `a9a88e6ed`. Added **only** `20260807140000_action_queue_create_allow_ai_coach.sql`
-  (adds `ai_coach` to the RPC source allowlist) and the **Coach** client move, with tests.
-  It did **not** introduce the RPC migration — that file already exists in `a9a88e6ed^`.
-- [PR #812](https://github.com/Verdant-OS/verdant-grow-diary/pull/812) merged as
-  `821adb9fa`, reconciling three lagging Action Queue pins against the atomic RPC.
+- 2026-08-07 — #586/#809/#812 Action Queue atomic-create RPC shipped across
+  three merges; production application of its two migrations remains `BLOCKED`
+  from agent sessions, and the RPC's expand-step constraints do not bind
+  legacy direct-insert writers.
+- 2026-08-11 — #885 agent-integrations MCP publication audit (docs only); live
+  publication state remains `BLOCKED` from agent sessions.
+- 2026-08-13 — Lovable knowledge-pack mechanism first recorded; its
+  pre-2026-08-13 backup audited against `e7690396e`. No sync automation
+  authorized, no owner assigned, replacement pack unread.
+- 2026-08-15 — Lovable project Knowledge rewritten from CURRENT_STATE
+  (Version 2026-08-15.1; snapshot
+  `docs/lovable/verdant-project-knowledge-2026-08-15.md`); still no sync bot
+  authorized.
+- 2026-08-18 — Claude PR/branch cleanup sweep: zero open Claude-authored PRs;
+  all 23 stale `claude/*` branches deleted by Cheek; branch deletion remains
+  impossible from agent sessions (HTTP 403, branch-scoped credential).
 
-All three (`dc29093b5`, `a9a88e6ed`, `821adb9fa`) are ancestors of the deploy tip recorded
-in Branch topology above — verified 2026-08-07 with `git merge-base --is-ancestor` against
-`c09b33d95ed2290c3364e54c77d5d980eb4e714a`. Re-verify this block
-alongside the Branch-topology row: if a later reader advances that row, the ancestry claim
-here is only as current as the head it was checked against.
-
-Read directly from the migration bodies: the RPC inserts `status` `'pending_approval'`
-literally, inserts `target_device` as NULL literally, and derives `user_id` from
-`auth.uid()` rather than any client argument. That is an observation about this RPC only —
-it is **not** a cleared system-wide fence. Per the migration's own header this is an expand
-step: client `INSERT` on `action_queue` is deliberately not revoked and legacy
-direct-insert paths remain functional, so the RPC's constraints do not bind writers that
-bypass it. A contract/revoke step would be a separate slice.
-
-Authoring agent is **not determinable from git**: all three commits are squash merges
-attributed to the repository owner, and #809's source branch is deleted. The fact recorded
-here is that this work shipped while this file listed the active slice as Mode A SEO and
-every agent row except Codex as `Unassigned`. This entry records that; it does not
-retroactively authorize it, and it does not assign it to an agent.
-
-Production application state of both migrations: `BLOCKED` — not verified, and not
-verifiable from an agent session. The Supabase MCP path available to agents resolves to the
-**sandbox** project `bzatgtgjvuojpoxcknaa`, not production `knkwiiywfkbqznbxwqfh`
-(refs pinned in `scripts/lib/supabaseDatabaseTargetIdentity.mjs`). A sandbox check on
-2026-08-07 found the column, index, and function absent there; that is a sandbox
-observation and carries no implication about production.
-`scripts/apply-pinned-production-migrations.mjs` is SHA-pinned to three 2026-07-28 files
-and does not cover these two.
-
-**Completed, out of slice (recorded 2026-08-11):** #885 agent-integrations MCP
-publication audit.
-[PR #885](https://github.com/Verdant-OS/verdant-grow-diary/pull/885) merged
-2026-08-11 via the merge queue as squash `1a9082bb1`. Documentation only — it adds
-`docs/agent-integrations-mcp-server-spec.md` and changes no runtime, tool, schema,
-or manifest code. Authoring agent **is** determinable for this one: Claude, in a
-Claude Code session tasked with Lovable's "publish your app as an MCP server" flow,
-while this file listed Claude as Unassigned. The audit found the MCP server itself
-already shipped (PR #253, fixes #255/#256/#363) and needed no new implementation;
-the doc records the three read-only tool contracts, the OAuth access model, the
-pinned-surface change-control rule (repo-wide search for existing tool names before
-any tool change), PASS/HOLD/REJECT expansion gates (Action Queue mutation, device
-control, and no-login access all REJECT), and two sensor-contract gaps recorded as
-specified-but-unapproved follow-up slices: `McpSensorReading` carries no
-`confidence` field, and noncanonical legacy `source` labels (`sim`, vendor names)
-pass through verbatim to connecting assistants. Live publication state (Lovable
-Active status, OAuth 2.1 dashboard setting, endpoint reachability) remains
-`BLOCKED` from agent sessions — the doc's §6 lists the owner actions. Five rounds
-of automated (Codex-connector) inline review were verified against source and
-addressed pre-merge. This entry records the work; it does not open a new slice.
-
-**Completed, out of slice (recorded 2026-08-13):** Lovable knowledge-pack mechanism now
-tracked. Cheek supplied a backup of the pre-2026-08-13 Lovable "Workspace/Project
-Knowledge" pack content (`verdant_project_knowledge_BACKUP_pre-2026-08-13.md`, saved
-outside this repo before Lovable's connector overwrote it) with no other instruction.
-Claude audited its 8 factual claims against deploy-branch HEAD `e7690396e` (#943, this
-branch's tip observed at audit time). The Branch topology row above has since been
-refreshed to the branch's actual current tip, `fb42ce00e` (#968) — this audit's evidence
-remains pinned to `e7690396e` specifically and was not re-verified against the newer
-commits. On request, this entry records the mechanism here. This is the first appearance of
-this mechanism anywhere in governance docs: it is a separate, ungoverned knowledge
-surface (Lovable's project-level "Knowledge" field, populated via its own connector) that
-`AGENTS.md`, this file, and every role file were previously silent on.
-
-Audit verdicts (full evidence trail — file/line citations, git commits, PR numbers — lives
-in the originating Claude Code session; not reproduced here):
-
-- `PARTIALLY_ACCURATE` — public `/welcome` + `/demo` shipped with writes excluded from a
-  "demo mode": `/welcome` holds; `/demo` does not — the standalone Demo page was deleted
-  2026-06-03, six weeks before the pack's own ~2026-07-14 capture window, and `/demo` is
-  now only a client-side redirect to `/welcome`. No app-wide demo-mode write-exclusion
-  mechanism exists for any public surface.
-- `PARTIALLY_ACCURATE` — CSV/TSV handling is a read-only review surface with disabled
-  persistence: true for `CsvPreviewReviewGate.tsx` itself, which remains genuinely
-  unreachable (imported only by its own test files, no page or route mounts it) — but
-  that component is distinct from the public `/sensors/csv-preview` route, which is a
-  live, reachable page (`src/pages/SensorCsvPreview.tsx` mounting
-  `CsvSensorPreviewPanel.tsx`, linked from `/hardware-integrations` and
-  `/partners/csv-preview`). `/sensors/csv-preview` is read-only in the same sense —
-  no Supabase/network call in that component either — so the no-persistence verdict
-  holds, but "unreachable" does not; do not conflate the two components. Separately,
-  a live, authenticated write flow (`EnvironmentCsvImportLauncher` →
-  `environmentCsvImportPersistence.ts`, mounted in `src/pages/Sensors.tsx`) really
-  does insert into `sensor_readings` on confirm, shipped 2026-06-28, before the
-  pack's own capture date — so "CSV/TSV handling" as a whole is not read-only either.
-- `PARTIALLY_ACCURATE` — grower action follow-up evidence supported, outcomes never
-  inferred, automatic diary creation unsupported: the outcome-never-inferred half holds.
-  But `ActionDetail.tsx` does auto-insert (best-effort, not transactional — an insert
-  failure does not roll back the completed status) a templated, outcome-less
-  `diary_entries` marker row when an action is completed **from the Action Detail
-  page** — a mechanism from 2026-05-26, predating the pack. This is narrower than "every
-  Action Queue completion": completing via the Action Queue **list's** own "Mark
-  Complete" control (`ActionQueue.tsx`, calling the `action_queue_transition` RPC
-  directly) does not create a diary row at all.
-- `PARTIALLY_ACCURATE` — real-data One-Tent smoke test blocked pending an actual tent
-  reading, ghost seeding prohibited: the ghost-seeding prohibition is real and current.
-  The actual block condition is a missing authenticated managed Supabase session, not
-  literally an absent physical tent reading — once authenticated, the e2e spec enters a
-  scripted, labeled "manual" reading.
-- `STALE_NOW_DIFFERENT` — AI Doctor semantic output evaluator labeled an unmerged draft
-  PR: [PR #230](https://github.com/Verdant-OS/verdant-grow-diary/pull/230) is confirmed
-  **MERGED** (2026-07-14) and wired into required CI (`ci.yml` step
-  `ai_doctor_output_eval`). Its content landed on the deploy branch via squash commit
-  `0c4b3c1a4`, titled after unrelated PR #229 ("harden re-consent gate") — another
-  instance of this repo's known squash-merge title/content mismatch pattern (see the
-  #586/#809/#812 entry above for a prior example).
-- `PARTIALLY_ACCURATE` — expanded pheno taxonomy migration merged but unverified on the
-  live schema, cross-form UI gated pending confirmation: the migration-merged half holds,
-  and production-schema verification remains genuinely `BLOCKED` from any agent session
-  (same sandbox-vs-production Supabase MCP mismatch already documented in the #586 entry
-  above). But no schema-confirmation gate exists in the live `PhenoKeepersPage` code — it
-  silently degrades to an empty list / generic error on any Supabase error instead of
-  holding for confirmation.
-- `STILL_ACCURATE` — EcoWitt continuous live sync unverified until one real payload
-  completes the full payload → dry-run → webhook → in-app provenance path: the repo's own
-  acceptance ledger (`docs/ecowitt-hardware-validation-runbook.md`, "Final live proof
-  ledger") remains a blank template as of its last edit (2026-07-18); every EcoWitt CI
-  lane runs on fixtures/mocks only. This file carried zero EcoWitt mentions before this
-  edit.
-- `STILL_ACCURATE` — Quick Log legacy and V2 contracts remain separate with typecheck as
-  a stop-ship gate: unchanged since PR #156 (2026-07-06); `quicklog-gate.yml` still runs
-  `bun run typecheck` as a hard first gate before either note-sync test suite.
-
-This entry does not authorize any new automation to keep the Lovable pack synchronized
-with this repo, does not assign an owner for that mechanism going forward, and does not
-claim the pack that replaced it on 2026-08-13 (which no agent session has read) is
-accurate — only that the mechanism now exists in governance memory and that its prior
-content's accuracy has been checked once.
-
-**Completed, out of slice (recorded 2026-08-15):** Cheek asked Grok to rewrite the
-Lovable project Knowledge field from current CURRENT_STATE rather than restore the
-July backup. Applied 2026-08-15 via Lovable `set_project_knowledge` to
-`verdantgrowdiary-com` (`66255e7b-892c-4be5-8686-ab1cfc3666db`). Same-day follow-up:
-Cheek cited the stale 2026-08-13 buffer rows (topology `6434ea2a8`, Claude Convex
-header, `/` `FAIL`, Grok Unassigned). Those rows were refreshed from live
-production and origin tip; Lovable Knowledge re-applied as Version 2026-08-15.1.
-Dated snapshot: `docs/lovable/verdant-project-knowledge-2026-08-15.md`. This still
-does not authorize a sync bot. Workspace knowledge was not changed. Migrations
-were not applied. Day 0 remains `UNSET`.
+**Completed, out of slice (recorded 2026-08-18):** Lovable project Knowledge
+re-applied as Version 2026-08-18.1 at Cheek's instruction, sourced from this
+file at deploy tip `87ae05e` (#1026) after the archival slice merged. Snapshot:
+`docs/lovable/verdant-project-knowledge-2026-08-18.md` (9,979/10,000 chars).
+The pre-write read confirmed the live Knowledge field still matched the
+committed 2026-08-15 snapshot, so nothing unrecorded was overwritten. Live
+`/version.json` could not be re-measured from the agent session (network
+policy 403 — `BLOCKED`); the pack carries the 2026-08-15 stamp `5e2fcedd4271`
+(#984) explicitly labeled as last measurement. Workspace knowledge unchanged.
+Still no Knowledge sync automation authorized and no owner assigned for one.
 
 In scope — these bullets scope the **Mode A SEO parent program above**, not the completed
 #809 entry:
@@ -984,24 +872,10 @@ Out of scope:
 5. Handle the unrelated deploy-head schema/migration guard failures in a separate scoped
    workstream.
 6. Production release-identity resilience — **RESOLVED repo-side and verified
-   live 2026-08-05**. History: the 15:47:45Z build stamped `commit: "unknown"`
-   (history-less Lovable publish sandbox, unborn-HEAD `git init`, no `GITHUB_*`
-   env — proven and sandbox-reproduced); production self-healed at 15:52:18Z.
-   Resilience shipped via PR #735 (`1a2df78ac3`, merged 17:41Z) with hardening
-   in #737 (`6c78266edb`, merged 22:28:50Z) and follow-ups. **Verified live
-   against the 22:06:15Z publish** — which, per its own commit `3f773b680dcc`,
-   contained #735's stamper but predated #737's merge, so the live evidence
-   attributes to #735's code; #737's hardening (trust-gated cross-era
-   execution, annotation-line anchoring) awaits its first published build.
-   The verification itself: production served `commitSource: "git"` and
-   `treeHash: c8fc076f0011…`, and the resolver matched that hash to the exact
-   commit via the `v2026.08.05-3f773b680dcc` tag annotation — Lovable's sandbox
-   and the GitHub runner computed identical hashes independently, which shows
-   the publish pipeline did not mutate hashed inputs **for that publish**
-   (point-in-time evidence, not a permanent guarantee). Residual owner-side
-   items (optional): raise the intermittent history-less sandbox with Lovable;
-   retire the stale pre-SSR `vercel.json`.
-   See the release-provenance runbook below for how to read and resolve stamps.
+   live 2026-08-05** (shipped via PR #735, hardened in #737; live verification
+   matched the 22:06Z publish exactly). Full history and the residual optional
+   owner items are archived — see `CURRENT_STATE_ARCHIVE.md`. How to read and
+   resolve release stamps: `docs/release-provenance-runbook.md`.
 7. **Public root route `/` empty-shell — Slice 1 live-verified 2026-08-15.** Found 2026-08-07 while
    reconciling the Ahrefs site audit (project `10204962`, crawl `2026-08-07T07:14:05Z`).
    Root cause isolated 2026-08-12: the deliberate loading-until-hydrated gate in
@@ -1022,43 +896,46 @@ Out of scope:
    _No fake live data_. Record it as an accepted exception in `config/seo-allowlist.json`.
    The genuinely fixable defect in the same cluster is `Article.image` on all 17 Article
    pages pointing at the 512px brand logo rather than article imagery — the local gate
-   cannot see it, because it only checks whether `image` is absent. Sibling note: the four
-   unsitemapped indexable routes in the Production status table repeat the
-   `/cultivars/*`-outside-the-gate pattern and need a sitemap-or-noindex adjudication.
+   cannot see it, because it only checks whether `image` is absent. Sibling note:
+   **the unsitemapped indexable routes were adjudicated 2026-08-20 — RESOLVED
+   repo-side, pending publish.** Cheek's call was SITEMAP, not noindex. The set was
+   **six**, not the four this file had recorded: `scripts/public-route-parity.config.mjs`
+   also carried `/pheno-expression-showcase` and `/docs/mcp-api` in
+   `STATIC_ONLY_ROUTES`, and all six measured HTTP 200, self-canonical,
+   `index, follow`, absent from `sitemap.xml`, and disallowed by no robots group.
+   Five were added to `public/sitemap.xml` (61 `<loc>` in-repo, up from 56).
+   **`/breeder-beta` was held, then resolved the same day.** It renders the same
+   `<BetaLanding>` component as `/creator-beta` — whose own source header calls the
+   breeder route a "copy-only difference" — and measured 233 of ~237 shared unique
+   visible tokens with identical `h1` and every `h2`. Both being self-canonical would
+   have set two near-identical URLs competing on the same queries, so it was held for
+   an owner call. **Cheek chose canonicalisation:** `/breeder-beta` now points its
+   canonical at `/creator-beta` and stays affirmatively `index, follow`, keeping
+   breeder-oriented copy for direct and paid traffic while conceding the ranking URL.
+   It therefore stays out of `sitemap.xml` **by design** — never advertise a URL whose
+   canonical points elsewhere.
+
+   Implementation spans three halves that must agree, because a drift in any one is
+   silent: the build-time head (`crossCanonicalDocument` in
+   `src/lib/build/staticPublicSeoDocuments.ts`), the hydrated runtime head
+   (`canonicalPath` on `usePageSeo`, passed from `src/pages/BreederBeta.tsx` — if this
+   drifts back to a self-canonical it overwrites the pre-rendered one for every
+   JS-rendering crawler), and the sitemap exclusion in
+   `scripts/public-route-parity.config.mjs`. All three are pinned by
+   `src/test/breeder-beta-cross-canonical.test.ts`.
+
+   Note the distinction from the older `/strains/*` aliases: those use
+   `aliasDocument`, which inherits the target's copy and marks the page
+   `noindex, follow`. A cross-canonical must **not** also be `noindex` — that sends
+   crawlers two contradictory instructions about one URL — so the two helpers are
+   deliberately separate.
 
 ---
 
 ## Release-provenance runbook (added 2026-08-05)
 
-How to identify what production is running, even when a publish build had no
-git context:
-
-- **Read `/version.json`.** `commitSource` says where identity came from:
-  `github-env` or `git` → `commit` is authoritative; `none` → `commit` is
-  honestly `"unknown"` and identity lives in `treeHash` (the version string
-  reads `<pkg>+<date>.t<hash12>`). `inherited` (if present) is the last
-  repo-tracked stamp, explicitly `trusted: false` — lineage context, never
-  identity. A null `treeHash` comes with `treeHashError` explaining why.
-- **Resolve a treeHash to commits:** from any checkout with history,
-  `node scripts/resolve-release-provenance.mjs --hash=<treeHash>`.
-  Release tags created by `auto-tag-release` carry `Tree-Hash:` annotations
-  (instant answer); the union scan then recomputes over recent commits
-  (`--scan=N` caps it — the scan is slow on loaded Windows machines) and
-  reports every content-identical commit **within the annotated tags plus the
-  bounded scan window** — a partial-history answer, not exhaustive
-  provenance. Candidates whose stamps predate the current hash algorithm are
-  re-hashed by executing their own committed module, gated to ancestors of
-  the protected release branch (`--trust-ref`) in a scrubbed environment —
-  never code from arbitrary refs.
-- **Canary practice:** periodically take a healthy stamp (`commitSource:
-"git"` or `"github-env"` — both authoritative) and resolve its treeHash
-  **pinned to its own recorded commit**:
-  `node scripts/resolve-release-provenance.mjs --hash=<treeHash>
---ref=<stamped commit> --scan=1`. Only a NO_MATCH on that pinned scan
-  indicates the publish pipeline mutated hashed inputs; an unpinned default
-  scan can NO_MATCH merely because the commit fell outside the 30-commit
-  window or the default remote ref is absent. First live run 2026-08-05
-  22:06Z: PASS (exact match via tag annotation).
+Relocated 2026-08-18 to `docs/release-provenance-runbook.md` — durable
+reference, not a changing operational fact.
 
 No new content family, automation, device control, production schema change, or
 direct production write is approved by this state file. The 2026-08-13 Convex

@@ -14,8 +14,11 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   buildQuickLogRevisionBadges,
   type QuickLogRevisionBadge,
-  type QuickLogRevisionRow,
 } from "@/lib/quick-log/quickLogRevisionRules";
+import {
+  adaptQuickLogRevisionDatabaseRows,
+  QUICKLOG_REVISION_TABLE,
+} from "@/lib/quickLogRevisionService";
 
 export function buildQuickLogRevisionBadgesQueryKey(rootIds: readonly string[]) {
   return ["quicklog_entry_revisions", "badges", [...rootIds].sort().join(",")] as const;
@@ -29,14 +32,14 @@ export function useQuickLogRevisionBadges(rootIds: readonly string[]) {
     staleTime: 30_000,
     queryFn: async (): Promise<Map<string, QuickLogRevisionBadge>> => {
       const { data, error } = await supabase
-        .from("quicklog_entry_revisions")
+        .from(QUICKLOG_REVISION_TABLE)
         .select(
           "id, grow_event_id, diary_entry_id, root_id, user_id, actor_id, revision_no, kind, reason_code, reason_note, previous_state, new_state, created_at",
         )
         .in("root_id", ids)
         .order("revision_no", { ascending: true });
       if (error) return new Map();
-      return buildQuickLogRevisionBadges((data ?? []) as QuickLogRevisionRow[]);
+      return buildQuickLogRevisionBadges(adaptQuickLogRevisionDatabaseRows(data));
     },
   });
   return {

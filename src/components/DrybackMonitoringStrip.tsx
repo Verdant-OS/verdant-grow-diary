@@ -74,7 +74,10 @@ function WindowBlock({
         {window.sampleCount > 0 ? ` · ${window.sampleCount} samples` : ""}
       </p>
       {window.warnings.length > 0 ? (
-        <ul className="text-xs text-muted-foreground list-disc pl-4" data-testid={`${testId}-warnings`}>
+        <ul
+          className="text-xs text-muted-foreground list-disc pl-4"
+          data-testid={`${testId}-warnings`}
+        >
           {window.warnings.map((w) => (
             <li key={w}>{w}</li>
           ))}
@@ -105,6 +108,10 @@ export function DrybackMonitoringStrip({
     growId,
     tentId: tent,
   });
+  const calibrationAvailable =
+    calibrationsQuery.availability === "available" && !calibrationsQuery.isError;
+  const calibrationUnavailable =
+    calibrationsQuery.availability === "schema_unavailable" || calibrationsQuery.isError;
 
   const model = useMemo(() => {
     const waterings = ledger.rows
@@ -116,18 +123,28 @@ export function DrybackMonitoringStrip({
       }));
     return buildDrybackMonitoringFromSensorRows(readingsQuery.data ?? [], waterings, {
       now: Date.now(),
-      calibration: {
-        context: {
-          growId: growId ?? null,
-          tentId: tent,
-          // Plant-scoped baselines win when present; tent-level still applies.
-          plantId: plant,
-          deviceId: null,
-        },
-        calibrations: calibrationsQuery.data ?? [],
-      },
+      calibration: calibrationAvailable
+        ? {
+            context: {
+              growId: growId ?? null,
+              tentId: tent,
+              // Plant-scoped baselines win when present; tent-level still applies.
+              plantId: plant,
+              deviceId: null,
+            },
+            calibrations: calibrationsQuery.data ?? [],
+          }
+        : null,
     });
-  }, [readingsQuery.data, ledger.rows, calibrationsQuery.data, growId, tent, plant]);
+  }, [
+    readingsQuery.data,
+    ledger.rows,
+    calibrationsQuery.data,
+    calibrationAvailable,
+    growId,
+    tent,
+    plant,
+  ]);
 
   const ariaLabel = scopeLabel
     ? `${DRYBACK_MONITORING_TITLE} for ${scopeLabel}`
@@ -226,6 +243,7 @@ export function DrybackMonitoringStrip({
       data-testid="dryback-monitoring-strip"
       data-status={model.status}
       data-series-kind={model.seriesValueKind}
+      data-calibration-availability={calibrationsQuery.availability}
       data-usable-windows={model.usableWindowCount}
       data-sample-count={model.sampleCount}
       aria-label={ariaLabel}
@@ -306,6 +324,17 @@ export function DrybackMonitoringStrip({
           {model.wateringMarkerCount === 1 ? "" : "s"} · {model.usableWindowCount} usable window
           {model.usableWindowCount === 1 ? "" : "s"}
         </p>
+
+        {calibrationUnavailable && (
+          <p
+            className="text-xs text-muted-foreground"
+            role="status"
+            data-testid="dryback-monitoring-calibration-unavailable"
+          >
+            Calibration records are unavailable. Dryback is using raw soil moisture, and calibration
+            status is unknown.
+          </p>
+        )}
 
         {(readingsQuery.isError || ledger.isError || ledger.isOlderError) && (
           <p className="text-xs text-muted-foreground" data-testid="dryback-monitoring-partial">

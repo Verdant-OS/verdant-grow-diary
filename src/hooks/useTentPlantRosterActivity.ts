@@ -18,12 +18,24 @@
 import { useMemo } from "react";
 import { useQueries } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
 
 import { buildPlantRecentActivity } from "@/lib/plantRecentActivityRules";
 import { buildPlantDetailHarvestWatchCardViewModel } from "@/lib/plantDetailHarvestWatchCardViewModel";
 import { isHarvestWatchEligible } from "@/lib/harvestWatchEligibilityRules";
 
 export const TENT_PLANT_ROSTER_ACTIVITY_LIMIT = 10;
+
+export async function fetchTentPlantRosterActivityRows(plantId: string) {
+  const { data, error } = await selectWithRetractionCompat((withRetractionFilter) => {
+    let query = supabase.from("diary_entries").select("*").eq("plant_id", plantId);
+    if (withRetractionFilter) query = query.is("retracted_at", null);
+    return query.order("entry_at", { ascending: false }).limit(TENT_PLANT_ROSTER_ACTIVITY_LIMIT);
+  });
+
+  if (error) throw error;
+  return data ?? [];
+}
 
 export interface TentPlantRosterActivityPlant {
   id: string;
@@ -84,17 +96,7 @@ export function useTentPlantRosterActivity(
   const results = useQueries({
     queries: ids.map((plantId) => ({
       queryKey: ["tent_plant_roster_activity", plantId, TENT_PLANT_ROSTER_ACTIVITY_LIMIT],
-      queryFn: async () => {
-        const { data, error } = await supabase
-          .from("diary_entries")
-          .select("*")
-          .eq("plant_id", plantId)
-          .is("retracted_at", null)
-          .order("entry_at", { ascending: false })
-          .limit(TENT_PLANT_ROSTER_ACTIVITY_LIMIT);
-        if (error) throw error;
-        return data ?? [];
-      },
+      queryFn: () => fetchTentPlantRosterActivityRows(plantId),
     })),
   });
   const byPlantId = useMemo<Record<string, TentPlantRosterActivityEntry>>(() => {

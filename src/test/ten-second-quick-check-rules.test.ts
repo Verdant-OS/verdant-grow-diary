@@ -17,6 +17,7 @@ import {
   applyTenSecondQuickCheck,
   buildQuickCheckLine,
   hasTenSecondQuickCheck,
+  removeChipAuthoredResponseLine,
 } from "@/lib/tenSecondQuickCheckRules";
 
 describe("Quick Log action + response rules", () => {
@@ -75,25 +76,32 @@ describe("Quick Log action + response rules", () => {
     expect(applyResponseCheck(note, "Same")).toBe("Response check: Same.\nWatered.");
   });
 
-  it("treats legacy Quick check lines as response checks", () => {
+  it("recognizes legacy Quick check lines without treating them as chip-owned", () => {
     const note = "Quick check: Worse.\nWatered.";
-    expect(applyResponseCheck(note, "Better")).toBe("Response check: Better.\nWatered.");
+    expect(applyResponseCheck(note, "Better")).toBe(`Response check: Better.\n${note}`);
     expect(hasResponseCheck("Quick check: Same.")).toBe(true);
   });
 
   it("preserves grower prose that follows an inline response prefix", () => {
     expect(
       applyResponseCheck("Response check: Worse. Leaves perked up after lights-on.", "Same"),
-    ).toBe("Response check: Same. Leaves perked up after lights-on.");
+    ).toBe("Response check: Same.\nResponse check: Worse. Leaves perked up after lights-on.");
   });
 
-  it("removes mid-line and repeated response statuses without losing action prose", () => {
-    expect(applyResponseCheck("Watered. Response check: Better.", "Same")).toBe(
-      "Response check: Same.\nWatered.",
-    );
-    expect(applyResponseCheck("Response check: Worse. Response check: Better.", "Same")).toBe(
-      "Response check: Same.",
-    );
+  it("adds one canonical chip line without rewriting marker-looking grower prose", () => {
+    const prose = [
+      "Previous response check: better after watering.",
+      "Quick check: Worse. might have been heat stress.",
+    ].join("\n");
+
+    expect(applyResponseCheck(prose, "Same")).toBe(`Response check: Same.\n${prose}`);
+  });
+
+  it("preserves mid-line and repeated response-looking grower prose", () => {
+    const midLine = "Watered. Response check: Better.";
+    const repeated = "Response check: Worse. Response check: Better.";
+    expect(applyResponseCheck(midLine, "Same")).toBe(`Response check: Same.\n${midLine}`);
+    expect(applyResponseCheck(repeated, "Same")).toBe(`Response check: Same.\n${repeated}`);
   });
 
   it("recognizes canonical and legacy response prefixes case-insensitively", () => {
@@ -126,7 +134,7 @@ describe("Quick Log action + response rules", () => {
     const note = "Response: Response check: Better. Watering less helped.";
     expect(readResponseCheckStatus(note)).toBe("Better");
     expect(actionTextWithoutResponseContext(note)).toBe("");
-    expect(applyResponseCheck(note, "Same")).toBe("Response check: Same. Watering less helped.");
+    expect(applyResponseCheck(note, "Same")).toBe(`Response check: Same.\n${note}`);
   });
 
   it("defines one equal-time action/response chronology policy", () => {
@@ -168,5 +176,80 @@ describe("legacy ten-second quick check exports", () => {
     expect(applyTenSecondQuickCheck("Watered.", "Same")).toBe("Response check: Same.\nWatered.");
     expect(applyQuickCheckDetailChip("", "Watered")).toBe("Watered.");
     expect(hasTenSecondQuickCheck("Response check: Worse.")).toBe(true);
+  });
+});
+
+describe("removeChipAuthoredResponseLine", () => {
+  it("removes only the canonical bytes, keeping prose the grower added to that line", () => {
+    // The chip writes "Response check: Better."; the grower extends the same
+    // line. Deleting the line would take their words; leaving the line whole
+    // would carry the marker onto whatever plant comes next.
+    expect(removeChipAuthoredResponseLine("Response check: Better. after watering", "Better")).toBe(
+      "after watering",
+    );
+    expect(
+      removeChipAuthoredResponseLine(
+        "Response check: Worse. leaves perked up\nRunoff clear.",
+        "Worse",
+      ),
+    ).toBe("leaves perked up\nRunoff clear.");
+  });
+
+  it("refuses a first line that only resembles the chip's — prefix, not substring", () => {
+    // Ownership is an exact-prefix test against the canonical literal, so a
+    // grower's own sentence is never claimed, whatever it looks like.
+    expect(
+      removeChipAuthoredResponseLine("Previous response check: better after watering", "Better"),
+    ).toBe("Previous response check: better after watering");
+    expect(removeChipAuthoredResponseLine("Quick check: Better.\nWatered.", "Better")).toBe(
+      "Quick check: Better.\nWatered.",
+    );
+  });
+
+  it("drops the line entirely when the marker was all it held", () => {
+    expect(removeChipAuthoredResponseLine("Response check: Same.\nRunoff clear.", "Same")).toBe(
+      "Runoff clear.",
+    );
+    expect(removeChipAuthoredResponseLine("Response check: Same.", "Same")).toBe("");
+  });
+
+  it("returns everything after the first line byte-for-byte", () => {
+    const rest = "Runoff clear.\n\n  Indented note with  double  spaces.";
+    expect(removeChipAuthoredResponseLine(`Response check: Worse.\n${rest}`, "Worse")).toBe(rest);
+  });
+
+  it("never touches a marker-shaped sentence on a later line", () => {
+    const note = "Response check: Better.\nPrevious response check: better after watering.";
+    expect(removeChipAuthoredResponseLine(note, "Better")).toBe(
+      "Previous response check: better after watering.",
+    );
+  });
+
+  it("leaves the note alone when the first line is not a response line", () => {
+    const note = "Watered 1L.\nResponse check: Better.";
+    expect(removeChipAuthoredResponseLine(note, "Better")).toBe(note);
+  });
+
+  it("leaves the note alone when the status does not match what the chip wrote", () => {
+    const note = "Response check: Worse.\nRunoff clear.";
+    expect(removeChipAuthoredResponseLine(note, "Better")).toBe(note);
+  });
+
+  it("is null-safe and deterministic", () => {
+    expect(removeChipAuthoredResponseLine("", "Better")).toBe("");
+    const note = "Response check: Better.\nRunoff clear.";
+    expect(removeChipAuthoredResponseLine(note, "Better")).toBe(
+      removeChipAuthoredResponseLine(note, "Better"),
+    );
+  });
+
+  it("round-trips with applyResponseCheck: apply then remove restores the note", () => {
+    // The property that matters — undoing a chip returns what was there before.
+    for (const before of ["", "Runoff clear.", "Watered 1L.\nRunoff clear."]) {
+      for (const status of RESPONSE_CHECK_STATUSES) {
+        const applied = applyResponseCheck(before, status);
+        expect(removeChipAuthoredResponseLine(applied, status)).toBe(before);
+      }
+    }
   });
 });

@@ -25,6 +25,21 @@ import {
   type ConnectedActivationGrowEventRow,
 } from "@/lib/connectedOneTentActivationRules";
 import { resolveQuickLogEventTimelineLabel } from "@/lib/quickLogActivityRules";
+import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
+
+export async function fetchDashboardDiaryRows(growId: string) {
+  const { data, error } = await selectWithRetractionCompat((withRetractionFilter) => {
+    let query = supabase
+      .from("diary_entries")
+      .select("id,plant_id,entry_at,stage,note,details")
+      .eq("grow_id", growId);
+    if (withRetractionFilter) query = query.is("retracted_at", null);
+    return query.order("entry_at", { ascending: false }).limit(5);
+  });
+
+  if (error) throw error;
+  return data ?? [];
+}
 
 export interface PendingAction {
   id: string;
@@ -75,13 +90,7 @@ export function useDashboardScopedData(growId: string | null | undefined): UseDa
     // latest 5 action_queue_events.
     try {
       const [diaryRes, growEventsRes, eventsRes] = await Promise.all([
-        supabase
-          .from("diary_entries")
-          .select("id,plant_id,entry_at,stage,note,details")
-          .eq("grow_id", growId)
-          .is("retracted_at", null)
-          .order("entry_at", { ascending: false })
-          .limit(5),
+        fetchDashboardDiaryRows(growId),
         supabase
           .from("grow_events")
           .select("id,tent_id,plant_id,event_type,occurred_at,source,is_deleted,deleted_at,note")
@@ -98,13 +107,13 @@ export function useDashboardScopedData(growId: string | null | undefined): UseDa
           .limit(5),
       ]);
 
-      if (diaryRes.error || growEventsRes.error || eventsRes.error) {
+      if (growEventsRes.error || eventsRes.error) {
         setRecent({ status: "unavailable" });
       } else {
         // Companion diary rows dedupe against their grow_events parents so a
         // single Quick Log save never shows up twice.
         const activityRows = dedupeMergedManualGrowActivityRows({
-          diaryEntries: (diaryRes.data ?? []) as (ConnectedActivationDiaryEntryRow & {
+          diaryEntries: diaryRes as (ConnectedActivationDiaryEntryRow & {
             stage?: string | null;
             note?: string | null;
           })[],

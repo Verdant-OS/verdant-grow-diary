@@ -16,6 +16,7 @@ import {
   type ActionFollowUpPhotoContext,
   type ExistingPhotoCandidate,
 } from "@/lib/actionFollowUpExistingPhotoRules";
+import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
 
 export type ExistingPhotoCandidateLoadResult =
   | { status: "loaded"; candidates: ExistingPhotoCandidate[] }
@@ -42,16 +43,18 @@ export async function loadActionFollowUpExistingPhotoCandidates(
 ): Promise<ExistingPhotoCandidateLoadResult> {
   const client = deps?.supabase ?? defaultSupabase;
   try {
-    let q = client
-      .from("diary_entries")
-      .select("id,grow_id,tent_id,plant_id,entry_at,photo_url")
-      .eq("grow_id", context.growId)
-      .is("retracted_at", null)
-      .not("photo_url", "is", null);
-    if (context.tentId) q = q.eq("tent_id", context.tentId);
-    // Plant scope is applied client-side per documented rule so we
-    // also include tent/grow-level photos with null plant_id.
-    const { data, error } = await q.limit(50);
+    const { data, error } = await selectWithRetractionCompat((withRetractionFilter) => {
+      let q = client
+        .from("diary_entries")
+        .select("id,grow_id,tent_id,plant_id,entry_at,photo_url")
+        .eq("grow_id", context.growId);
+      if (withRetractionFilter) q = q.is("retracted_at", null);
+      q = q.not("photo_url", "is", null);
+      if (context.tentId) q = q.eq("tent_id", context.tentId);
+      // Plant scope is applied client-side per documented rule so we
+      // also include tent/grow-level photos with null plant_id.
+      return q.limit(50);
+    });
     if (error) return { status: "failed", reason: "query_failed" };
     const rows = (data ?? []) as DiaryPhotoRow[];
     const raw: ExistingPhotoCandidate[] = rows

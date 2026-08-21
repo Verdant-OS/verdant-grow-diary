@@ -1,0 +1,88 @@
+name: Quick Log manual delegate forward repair PG15
+
+on:
+  pull_request:
+    paths: &quicklog_delegate_repair_paths
+      - "scripts/run-quicklog-manual-delegate-forward-repair-pg15-harness.mjs"
+      - "scripts/apply-quicklog-manual-delegate-forward-repair.mjs"
+      - "scripts/verify-quicklog-manual-delegate-forward-repair-preflight-artifact.mjs"
+      - "scripts/lib/productionSupabaseTls.mjs"
+      - "scripts/lib/solo-founder-production-authorization.mjs"
+      - "scripts/verify-solo-founder-production-authorization.mjs"
+      - "supabase/migrations/20260818010000_quicklog_manual_delegate_forward_repair.sql"
+      - "src/test/quicklog-manual-delegate-forward-repair-pg15-harness.test.ts"
+      - "src/test/apply-quicklog-manual-delegate-forward-repair.test.ts"
+      - "src/test/verify-quicklog-manual-delegate-forward-repair-preflight-artifact.test.ts"
+      - "src/test/production-supabase-tls.test.ts"
+      - "src/test/solo-founder-production-authorization.test.ts"
+      - "docs/quicklog-manual-delegate-forward-repair-operator-runbook.md"
+      - ".github/workflows/apply-quicklog-manual-delegate-forward-repair.yml"
+      - ".github/workflows/quicklog-manual-delegate-forward-repair-pg15.yml"
+      - "supabase/migrations/20260722165149_922e7389-1a95-4bc4-8efb-12f3a98e33f7.sql"
+      - "supabase/migrations/20260723000000_quicklog_manual_always_mirror_diary.sql"
+      - "supabase/migrations/20260725024026_quicklog_dual_timestamp_foundation.sql"
+  push:
+    branches:
+      - verdant-grow-diary
+    paths: *quicklog_delegate_repair_paths
+  merge_group:
+
+permissions:
+  contents: read
+
+jobs:
+  pg15_runtime:
+    name: PostgreSQL 15 runtime contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:15.18@sha256:bb0df8b69f086efa2cbe4b8128df2f368a362bbdadef743731a63dd0f2f24c9e
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: verdant-runtime-only
+          POSTGRES_DB: verdant_quicklog_delegate_repair
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d verdant_quicklog_delegate_repair"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      QUICKLOG_MANUAL_DELEGATE_REPAIR_PG15_URL: postgresql://postgres:verdant-runtime-only@127.0.0.1:5432/verdant_quicklog_delegate_repair
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: "22"
+
+      - name: Create disposable PostgreSQL harness sentinel
+        env:
+          POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+        run: |
+          docker exec -i \
+            -e PGHOST=127.0.0.1 \
+            -e PGPORT=5432 \
+            -e PGUSER=postgres \
+            -e PGPASSWORD=verdant-runtime-only \
+            -e PGDATABASE=verdant_quicklog_delegate_repair \
+            "$POSTGRES_CONTAINER" \
+            psql -X -q -v ON_ERROR_STOP=1 --single-transaction --file=- <<'SQL'
+          create schema verdant_quicklog_delegate_repair_harness authorization postgres;
+          revoke all on schema verdant_quicklog_delegate_repair_harness from public;
+          create table verdant_quicklog_delegate_repair_harness.runtime_sentinel (
+            sentinel text primary key
+          );
+          revoke all on table verdant_quicklog_delegate_repair_harness.runtime_sentinel from public;
+          insert into verdant_quicklog_delegate_repair_harness.runtime_sentinel(sentinel)
+          values ('verdant_quicklog_delegate_repair_pg15_disposable_v1');
+          SQL
+
+      - name: Run isolated PostgreSQL 15 harness
+        env:
+          QUICKLOG_MANUAL_DELEGATE_REPAIR_PG15_CONTAINER: ${{ job.services.postgres.id }}
+        run: node scripts/run-quicklog-manual-delegate-forward-repair-pg15-harness.mjs

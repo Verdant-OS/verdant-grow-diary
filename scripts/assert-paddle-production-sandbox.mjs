@@ -87,7 +87,7 @@ async function loadEffectiveProductionEnv(rootDir) {
  * Verify both committed production source and the exact value Vite will
  * bundle. Results contain fixed codes only; token bytes never leave locals.
  */
-export async function verifyPaddleProductionSandbox(rootDir = process.cwd()) {
+async function verifyPaddleProductionSandbox(rootDir = process.cwd()) {
   const rawEnv = readCanonicalProductionEnv(rootDir);
   if (!rawEnv.ok) return rawEnv;
 

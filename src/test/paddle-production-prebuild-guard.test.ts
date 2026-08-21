@@ -11,6 +11,7 @@ const OTHER_SANDBOX_TOKEN = "test_prebuild_policy_override";
 const TEST_LIVE_TOKEN = "live_prebuild_policy_fixture";
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const GUARD_SCRIPT = resolve(REPO_ROOT, "scripts/assert-paddle-production-sandbox.mjs");
+const GUARD_MODULE_URL = pathToFileURL(GUARD_SCRIPT).href;
 const VITE_IMPORT = pathToFileURL(resolve(REPO_ROOT, "node_modules/vite/dist/node/index.js")).href;
 
 let temporaryRoots: string[] = [];
@@ -68,6 +69,12 @@ afterEach(() => {
 });
 
 describe("Paddle production prebuild guard", () => {
+  it("does not expose a reentrant process-global verifier API", async () => {
+    const guardModule = await import(/* @vite-ignore */ GUARD_MODULE_URL);
+
+    expect(Object.keys(guardModule)).toEqual([]);
+  });
+
   it("runs before every existing prebuild command without changing dev scripts", () => {
     const packageJson = JSON.parse(readFileSync(resolve(REPO_ROOT, "package.json"), "utf8"));
     const prebuildCommands = packageJson.scripts.prebuild.split(/\s*&&\s*/u);

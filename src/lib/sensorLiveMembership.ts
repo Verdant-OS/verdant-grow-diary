@@ -75,14 +75,6 @@ export const VERIFIED_SNAPSHOT_LIVE_ROW_SOURCES: ReadonlySet<string> = new Set([
 /**
  * (4) Trust-label aliases that normalizeSensorSource maps to `live`.
  * Unknown tokens must never appear here.
- *
- * Display vs trust-live: these aliases affect trust normalization and
- * health fences only. User-visible Source labels must still go through
- * `resolveSensorSourceDisplayCanon` / `sensorSourceLabel` so vendor and
- * bridge tokens never render as the Source word (provenance is separate).
- * First-party bridge tokens such as `pi_bridge` may also normalize to
- * `live` via `sensorSourceRules` ALIAS for trust — that is not a sixth
- * display source.
  */
 export const TRUST_LIVE_ALIASES: ReadonlySet<string> = new Set(["live", "sensor", "realtime"]);
 

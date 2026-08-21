@@ -20,12 +20,14 @@ import {
   PRE_WINDOW_HOURS,
 } from "@/lib/actionOutcomeWindowRules";
 import { actionDetailOutcomePath } from "@/lib/routes";
-import type { PendingOutcomeReview } from "@/lib/pendingOutcomeReviewRules";
 
 const MS_PER_HOUR = 3_600_000;
 
-/** Source row: Dashboard pending-review shape, plus optional loose fields. */
-export type PlantPendingOutcomeNoticeSourceRow = Partial<PendingOutcomeReview> & {
+/**
+ * Source row: same fields as Dashboard `PendingOutcomeReview`, kept
+ * null-tolerant so malformed loader rows fail closed instead of throwing.
+ */
+export type PlantPendingOutcomeNoticeSourceRow = {
   action_queue_id?: string | null;
   plant_id?: string | null;
   completed_at?: string | null;
@@ -38,7 +40,7 @@ export interface PlantPendingOutcomeNoticeItem {
   actionId: string;
   plantId: string;
   suggestedChange: string | null;
-  /** ISO timestamp used for sort (approved_at, else completed_at). */
+  /** ISO timestamp used for sort (dueAt, else approved_at, else completed_at). */
   sortTimestamp: string;
   /** When the 24h outcome window opened (completed_at + PRE_WINDOW_HOURS). */
   dueAt: string | null;
@@ -58,16 +60,15 @@ export interface BuildPlantPendingOutcomeNoticeInput {
    * via `outcomeMatchesAction` is dropped (defense in depth; the Dashboard
    * loader already excludes these).
    */
-  outcomes?: readonly
-    | {
+  outcomes?:
+    | readonly {
         details?: {
           event_type?: unknown;
           action_queue_id?: unknown;
           outcome_kind?: unknown;
         } | null;
-      }
-    | null
-    | undefined;
+      }[]
+    | null;
 }
 
 function nonEmptyString(v: unknown): string | null {

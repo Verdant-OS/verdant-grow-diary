@@ -114,8 +114,8 @@ import { trackQuickLogSuccess } from "@/lib/quickLogSuccessTelemetry";
 import { rememberRecentQuickLogTarget } from "@/lib/quickLogRecentTargetStore";
 import {
   buildRecentTargetStorageKey,
+  getRecentTargetSuggestionWakeDelayMs,
   parseRecentTargetRecord,
-  RECENT_TARGET_SUGGESTION_MAX_AGE_MS,
   resolveRecentTargetSuggestion,
 } from "@/lib/quickLogRecentTargetSuggestion";
 import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
@@ -376,8 +376,8 @@ export default function QuickLogV2Sheet({
     record: open && !launcherNamesTarget ? loadRecentTargetRecord(user?.id ?? null) : null,
   }));
   const [recentSuggestionDismissed, setRecentSuggestionDismissed] = useState(false);
-  // Advanced once at the expiry boundary. This is not a polling clock and
-  // cannot select or save anything; it only removes an expired offer.
+  // Advanced at eligibility boundaries. This is not a polling clock and
+  // cannot select, save, or mutate storage.
   const [recentSuggestionClockMs, setRecentSuggestionClockMs] = useState(() => Date.now());
   const recentTargetRecord =
     open && !launcherNamesTarget && recentTargetSnapshot.storageKey === recentTargetStorageKey
@@ -431,16 +431,21 @@ export default function QuickLogV2Sheet({
 
   useEffect(() => {
     if (!open || !recentTargetRecord) return;
-    const savedAtMs = Date.parse(recentTargetRecord.savedAt);
-    if (!Number.isFinite(savedAtMs)) return;
-    const expiryDelayMs = savedAtMs + RECENT_TARGET_SUGGESTION_MAX_AGE_MS + 1 - Date.now();
-    if (expiryDelayMs <= 0) return;
-    const expiryTimer = window.setTimeout(
-      () => setRecentSuggestionClockMs(Date.now()),
-      expiryDelayMs,
+    const wakeDelayMs = getRecentTargetSuggestionWakeDelayMs(
+      recentTargetRecord,
+      Math.max(Date.now(), recentSuggestionClockMs),
     );
-    return () => window.clearTimeout(expiryTimer);
-  }, [open, recentTargetRecord]);
+    if (wakeDelayMs === null) return;
+
+    // Future records use safe checkpoints until savedAt. That boundary tick
+    // re-runs this effect and arms the later strict-expiry wake. Close/record
+    // changes clear the active timer.
+    const boundaryTimer = window.setTimeout(
+      () => setRecentSuggestionClockMs(Date.now()),
+      wakeDelayMs,
+    );
+    return () => window.clearTimeout(boundaryTimer);
+  }, [open, recentTargetRecord, recentSuggestionClockMs]);
   const targetPanel = useMemo(
     () =>
       buildQuickLogTargetPanel({

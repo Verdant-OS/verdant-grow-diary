@@ -8,13 +8,16 @@ import { describe, expect, it } from "vitest";
 
 import {
   RECENT_TARGET_SUGGESTION_MAX_AGE_MS,
+  RECENT_TARGET_SUGGESTION_MAX_WAKE_DELAY_MS,
   buildRecentTargetStorageKey,
+  getRecentTargetSuggestionWakeDelayMs,
   parseRecentTargetRecord,
   resolveRecentTargetSuggestion,
 } from "@/lib/quickLogRecentTargetSuggestion";
 
 const NOW = Date.parse("2026-08-19T12:00:00.000Z");
 const DAY = 24 * 60 * 60 * 1000;
+const MAX_SAFE_TIMER_DELAY_MS = 2_147_483_647;
 
 const PLANTS = [
   { id: "plant-1", name: "Blue Dream #1", grow_id: "grow-1", tent_id: "tent-1" },
@@ -235,6 +238,53 @@ describe("resolveRecentTargetSuggestion — D-B9 validity window", () => {
       visibleTents: TENTS,
     };
     expect(resolveRecentTargetSuggestion(input)).toEqual(resolveRecentTargetSuggestion(input));
+  });
+});
+
+describe("getRecentTargetSuggestionWakeDelayMs", () => {
+  it("wakes exactly when a future record becomes current", () => {
+    expect(
+      getRecentTargetSuggestionWakeDelayMs(
+        record({ savedAt: new Date(NOW + 60_000).toISOString() }),
+        NOW,
+      ),
+    ).toBe(60_000);
+  });
+
+  it("caps a distant-future checkpoint at the safe browser timer ceiling", () => {
+    expect(RECENT_TARGET_SUGGESTION_MAX_WAKE_DELAY_MS).toBe(MAX_SAFE_TIMER_DELAY_MS);
+    expect(
+      getRecentTargetSuggestionWakeDelayMs(
+        record({
+          savedAt: new Date(NOW + MAX_SAFE_TIMER_DELAY_MS + 60_000).toISOString(),
+        }),
+        NOW,
+      ),
+    ).toBe(MAX_SAFE_TIMER_DELAY_MS);
+  });
+
+  it("wakes one millisecond past strict expiry for a current record", () => {
+    const savedAt = NOW - 60_000;
+    const current = record({ savedAt: new Date(savedAt).toISOString() });
+
+    expect(getRecentTargetSuggestionWakeDelayMs(current, NOW)).toBe(
+      RECENT_TARGET_SUGGESTION_MAX_AGE_MS - 60_000 + 1,
+    );
+    expect(
+      getRecentTargetSuggestionWakeDelayMs(current, savedAt + RECENT_TARGET_SUGGESTION_MAX_AGE_MS),
+    ).toBe(1);
+    expect(
+      getRecentTargetSuggestionWakeDelayMs(
+        current,
+        savedAt + RECENT_TARGET_SUGGESTION_MAX_AGE_MS + 1,
+      ),
+    ).toBeNull();
+  });
+
+  it("does not schedule malformed, absent, or invalid-clock records", () => {
+    expect(getRecentTargetSuggestionWakeDelayMs(null, NOW)).toBeNull();
+    expect(getRecentTargetSuggestionWakeDelayMs(record({ savedAt: "whenever" }), NOW)).toBeNull();
+    expect(getRecentTargetSuggestionWakeDelayMs(record(), Number.NaN)).toBeNull();
   });
 });
 

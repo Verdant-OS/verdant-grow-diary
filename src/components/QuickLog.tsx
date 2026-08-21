@@ -109,8 +109,8 @@ import {
 } from "@/lib/quickLogTargetIntegrityRules";
 import {
   buildRecentTargetStorageKey,
+  getRecentTargetSuggestionWakeDelayMs,
   parseRecentTargetRecord,
-  RECENT_TARGET_SUGGESTION_MAX_AGE_MS,
   resolveRecentTargetSuggestion,
 } from "@/lib/quickLogRecentTargetSuggestion";
 import { rememberRecentQuickLogTarget } from "@/lib/quickLogRecentTargetStore";
@@ -547,9 +547,9 @@ export default function QuickLog({
   // context-free Fast Add; it names no target and remains eligible. A plant
   // prefill is authoritative and suppresses the memory read entirely.
   const [recentSuggestionDismissed, setRecentSuggestionDismissed] = useState(false);
-  // A single scheduled tick re-evaluates the rendered offer when its 14-day
-  // window closes. This is not a polling clock and never changes selection;
-  // it only removes a now-invalid action while the dialog remains open.
+  // Scheduled boundary ticks re-evaluate a future record when it becomes
+  // current, then retire it when its 14-day window closes. This is not a
+  // polling clock and never changes selection or storage.
   const [recentSuggestionClockMs, setRecentSuggestionClockMs] = useState(() => Date.now());
   const prefillNamesPlant = prefillRequestKey !== null;
   const recentTargetStorageKey = buildRecentTargetStorageKey(user?.id ?? null);
@@ -593,7 +593,7 @@ export default function QuickLog({
       resolveRecentTargetSuggestion({
         record: recentTargetRecord,
         // Date.now() revalidates on ordinary renders; the state timestamp is
-        // advanced by the expiry timer to guarantee a render at the boundary.
+        // advanced by boundary timers to guarantee a render at each boundary.
         now: Math.max(Date.now(), recentSuggestionClockMs),
         visiblePlants: plants,
         visibleGrows: grows,
@@ -613,20 +613,21 @@ export default function QuickLog({
   );
   useEffect(() => {
     if (!open || !recentTargetRecord) return;
-    const savedAtMs = Date.parse(recentTargetRecord.savedAt);
-    if (!Number.isFinite(savedAtMs)) return;
-
-    // The pure rule accepts the record at exactly MAX_AGE and rejects it one
-    // millisecond later, so schedule the same strict boundary. Fourteen days
-    // is below the browser timeout ceiling; close/record changes clear it.
-    const expiryDelayMs = savedAtMs + RECENT_TARGET_SUGGESTION_MAX_AGE_MS + 1 - Date.now();
-    if (expiryDelayMs <= 0) return;
-    const expiryTimer = window.setTimeout(
-      () => setRecentSuggestionClockMs(Date.now()),
-      expiryDelayMs,
+    const wakeDelayMs = getRecentTargetSuggestionWakeDelayMs(
+      recentTargetRecord,
+      Math.max(Date.now(), recentSuggestionClockMs),
     );
-    return () => window.clearTimeout(expiryTimer);
-  }, [open, recentTargetRecord]);
+    if (wakeDelayMs === null) return;
+
+    // Future records use safe checkpoints until savedAt. That boundary tick
+    // re-runs this effect and arms the later strict-expiry wake. Close/record
+    // changes clear the active timer.
+    const boundaryTimer = window.setTimeout(
+      () => setRecentSuggestionClockMs(Date.now()),
+      wakeDelayMs,
+    );
+    return () => window.clearTimeout(boundaryTimer);
+  }, [open, recentTargetRecord, recentSuggestionClockMs]);
   const showRecentTargetSuggestion =
     !prefillNamesPlant && !recentSuggestionDismissed && !plantId && recentTargetSuggestion !== null;
 

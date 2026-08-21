@@ -77,6 +77,7 @@ elementPrototype.scrollIntoView ??= () => {};
 
 const NOW = Date.parse("2026-08-20T12:00:00.000Z");
 const USER_STORAGE_KEY = "verdant.quickLog.lastTarget.v2.u1";
+const MAX_SAFE_TIMER_DELAY_MS = 2_147_483_647;
 const PLANTS = [
   { id: "p1", name: "Blue Dream", tent_id: "t1", grow_id: "g1" },
   { id: "p2", name: "OG Kush", tent_id: "t1", grow_id: "g1" },
@@ -159,6 +160,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.restoreAllMocks();
   vi.useRealTimers();
 });
 
@@ -274,6 +276,67 @@ describe("QuickLogV2Sheet remembered-target suggestion", () => {
     fireEvent.click(screen.getByTestId("qlv2-recent-target-accept"));
     expect(targetTrigger()).toHaveTextContent("OG Kush");
     expect(saveMock).not.toHaveBeenCalled();
+  });
+
+  it("re-evaluates a future record at savedAt without selecting, saving, or rewriting storage", () => {
+    seed(USER_STORAGE_KEY, "p2", -60_000);
+    const storedRecord = getLocalStorageItemForTest(USER_STORAGE_KEY);
+    renderSheet(<QuickLogV2Sheet open onOpenChange={() => {}} />);
+
+    expect(screen.queryByTestId("qlv2-recent-target-suggestion")).not.toBeInTheDocument();
+    expect(targetTrigger()).not.toHaveTextContent("OG Kush");
+    expect(saveMock).not.toHaveBeenCalled();
+    expect(getLocalStorageItemForTest(USER_STORAGE_KEY)).toBe(storedRecord);
+
+    act(() => vi.advanceTimersByTime(59_999));
+    expect(screen.queryByTestId("qlv2-recent-target-suggestion")).not.toBeInTheDocument();
+    expect(targetTrigger()).not.toHaveTextContent("OG Kush");
+    expect(saveMock).not.toHaveBeenCalled();
+    expect(getLocalStorageItemForTest(USER_STORAGE_KEY)).toBe(storedRecord);
+
+    act(() => vi.advanceTimersByTime(1));
+    expect(screen.getByTestId("qlv2-recent-target-suggestion")).toHaveTextContent(
+      "Continue with OG Kush?",
+    );
+    expect(targetTrigger()).not.toHaveTextContent("OG Kush");
+    expect(saveMock).not.toHaveBeenCalled();
+    expect(getLocalStorageItemForTest(USER_STORAGE_KEY)).toBe(storedRecord);
+
+    act(() => vi.advanceTimersByTime(RECENT_TARGET_SUGGESTION_MAX_AGE_MS + 1));
+    expect(screen.queryByTestId("qlv2-recent-target-suggestion")).not.toBeInTheDocument();
+    expect(targetTrigger()).not.toHaveTextContent("OG Kush");
+    expect(saveMock).not.toHaveBeenCalled();
+    expect(getLocalStorageItemForTest(USER_STORAGE_KEY)).toBe(storedRecord);
+  });
+
+  it("bounds a distant-future timer without an immediate rearm and clears it on unmount", () => {
+    seed(USER_STORAGE_KEY, "p2", -(MAX_SAFE_TIMER_DELAY_MS + 60_000));
+    const storedRecord = getLocalStorageItemForTest(USER_STORAGE_KEY);
+    const setTimeoutSpy = vi.spyOn(window, "setTimeout");
+    const clearTimeoutSpy = vi.spyOn(window, "clearTimeout");
+
+    const { unmount } = renderSheet(<QuickLogV2Sheet open onOpenChange={() => {}} />);
+    const boundaryCallIndices = setTimeoutSpy.mock.calls.flatMap(([, delay], index) =>
+      delay === MAX_SAFE_TIMER_DELAY_MS ? [index] : [],
+    );
+    expect(boundaryCallIndices.length).toBeGreaterThan(0);
+    const activeBoundaryCallIndex = boundaryCallIndices.at(-1)!;
+    const boundaryTimer = setTimeoutSpy.mock.results[activeBoundaryCallIndex]?.value;
+    expect(boundaryTimer).toBeDefined();
+    expect(clearTimeoutSpy).not.toHaveBeenCalledWith(boundaryTimer);
+
+    act(() => vi.advanceTimersByTime(1));
+
+    expect(
+      setTimeoutSpy.mock.calls.filter(([, delay]) => delay === MAX_SAFE_TIMER_DELAY_MS),
+    ).toHaveLength(boundaryCallIndices.length);
+    expect(screen.queryByTestId("qlv2-recent-target-suggestion")).not.toBeInTheDocument();
+    expect(targetTrigger()).not.toHaveTextContent("OG Kush");
+    expect(saveMock).not.toHaveBeenCalled();
+    expect(getLocalStorageItemForTest(USER_STORAGE_KEY)).toBe(storedRecord);
+
+    unmount();
+    expect(clearTimeoutSpy).toHaveBeenCalledWith(boundaryTimer);
   });
 
   it("removes the rendered offer at the strict 14-day expiry boundary", () => {

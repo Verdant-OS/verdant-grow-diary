@@ -104,6 +104,7 @@ const PLANTS = [
 // suggestion, so freshness is expressed relative to a frozen NOW.
 const NOW = Date.parse("2026-08-19T12:00:00.000Z");
 const USER_STORAGE_KEY = "verdant.quickLog.lastTarget.v2.u1";
+const MAX_SAFE_TIMER_DELAY_MS = 2_147_483_647;
 
 function seed(key: string, plantId: string, ageMs: number) {
   setLocalStorageItemForTest(
@@ -176,6 +177,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   cleanup();
+  vi.restoreAllMocks();
   vi.useRealTimers();
 });
 
@@ -411,6 +413,70 @@ describe("QuickLog — remembered target is an offer, never a default", () => {
     expect(screen.getByTestId("quick-log-plant-select")).not.toHaveTextContent("OG Kush");
     expect(screen.getByTestId("quick-log-save")).toBeDisabled();
     expect(rpcMock).not.toHaveBeenCalled();
+  });
+
+  it("re-evaluates a future record at savedAt without selecting, saving, or rewriting storage", () => {
+    seed(USER_STORAGE_KEY, "p2", -60_000);
+    const storedRecord = getLocalStorageItemForTest(USER_STORAGE_KEY);
+    renderQL(<QuickLog open onOpenChange={() => {}} />);
+
+    expect(screen.queryByTestId("quick-log-recent-target-suggestion")).not.toBeInTheDocument();
+    expect(screen.getByTestId("quick-log-plant-select")).not.toHaveTextContent("OG Kush");
+    expect(screen.getByTestId("quick-log-save")).toBeDisabled();
+    expect(rpcMock).not.toHaveBeenCalled();
+    expect(getLocalStorageItemForTest(USER_STORAGE_KEY)).toBe(storedRecord);
+
+    act(() => vi.advanceTimersByTime(59_999));
+    expect(screen.queryByTestId("quick-log-recent-target-suggestion")).not.toBeInTheDocument();
+    expect(screen.getByTestId("quick-log-plant-select")).not.toHaveTextContent("OG Kush");
+    expect(rpcMock).not.toHaveBeenCalled();
+    expect(getLocalStorageItemForTest(USER_STORAGE_KEY)).toBe(storedRecord);
+
+    act(() => vi.advanceTimersByTime(1));
+    expect(screen.getByTestId("quick-log-recent-target-suggestion")).toHaveTextContent(
+      "Continue with OG Kush?",
+    );
+    expect(screen.getByTestId("quick-log-plant-select")).not.toHaveTextContent("OG Kush");
+    expect(screen.getByTestId("quick-log-save")).toBeDisabled();
+    expect(rpcMock).not.toHaveBeenCalled();
+    expect(getLocalStorageItemForTest(USER_STORAGE_KEY)).toBe(storedRecord);
+
+    act(() => vi.advanceTimersByTime(RECENT_TARGET_SUGGESTION_MAX_AGE_MS + 1));
+    expect(screen.queryByTestId("quick-log-recent-target-suggestion")).not.toBeInTheDocument();
+    expect(screen.getByTestId("quick-log-plant-select")).not.toHaveTextContent("OG Kush");
+    expect(rpcMock).not.toHaveBeenCalled();
+    expect(getLocalStorageItemForTest(USER_STORAGE_KEY)).toBe(storedRecord);
+  });
+
+  it("bounds a distant-future timer without an immediate rearm and clears it on unmount", () => {
+    seed(USER_STORAGE_KEY, "p2", -(MAX_SAFE_TIMER_DELAY_MS + 60_000));
+    const storedRecord = getLocalStorageItemForTest(USER_STORAGE_KEY);
+    const setTimeoutSpy = vi.spyOn(window, "setTimeout");
+    const clearTimeoutSpy = vi.spyOn(window, "clearTimeout");
+
+    const { unmount } = renderQL(<QuickLog open onOpenChange={() => {}} />);
+    const boundaryCallIndices = setTimeoutSpy.mock.calls.flatMap(([, delay], index) =>
+      delay === MAX_SAFE_TIMER_DELAY_MS ? [index] : [],
+    );
+    expect(boundaryCallIndices.length).toBeGreaterThan(0);
+    const activeBoundaryCallIndex = boundaryCallIndices.at(-1)!;
+    const boundaryTimer = setTimeoutSpy.mock.results[activeBoundaryCallIndex]?.value;
+    expect(boundaryTimer).toBeDefined();
+    expect(clearTimeoutSpy).not.toHaveBeenCalledWith(boundaryTimer);
+
+    act(() => vi.advanceTimersByTime(1));
+
+    expect(
+      setTimeoutSpy.mock.calls.filter(([, delay]) => delay === MAX_SAFE_TIMER_DELAY_MS),
+    ).toHaveLength(boundaryCallIndices.length);
+    expect(screen.queryByTestId("quick-log-recent-target-suggestion")).not.toBeInTheDocument();
+    expect(screen.getByTestId("quick-log-plant-select")).not.toHaveTextContent("OG Kush");
+    expect(screen.getByTestId("quick-log-save")).toBeDisabled();
+    expect(rpcMock).not.toHaveBeenCalled();
+    expect(getLocalStorageItemForTest(USER_STORAGE_KEY)).toBe(storedRecord);
+
+    unmount();
+    expect(clearTimeoutSpy).toHaveBeenCalledWith(boundaryTimer);
   });
 
   it("removes the rendered offer as soon as its freshness window expires", () => {

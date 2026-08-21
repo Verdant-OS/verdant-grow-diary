@@ -48,6 +48,13 @@
 export const RECENT_TARGET_SUGGESTION_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
 
 /**
+ * Browsers coerce timeout delays through a signed 32-bit integer. Keeping each
+ * checkpoint at or below this ceiling prevents a distant future timestamp
+ * from becoming an immediate timer/re-render loop.
+ */
+export const RECENT_TARGET_SUGGESTION_MAX_WAKE_DELAY_MS = 2_147_483_647;
+
+/**
  * Per-account key prefix. Exported so the diagnostics panel can enumerate the
  * accounts that have a remembered target on this device — a static key list
  * cannot, because the account id is part of the key.
@@ -153,6 +160,31 @@ export function parseRecentTargetRecord(raw: string | null | undefined): RecentT
     tentId: trimmed(candidate.tentId) || null,
     savedAt,
   };
+}
+
+/**
+ * Return the delay until this record's next eligibility boundary.
+ *
+ * A future timestamp is temporarily ineligible, so a nearby one wakes exactly
+ * at `savedAt`; a distant one uses bounded checkpoints until that boundary.
+ * Once current, the next wake is one millisecond past the inclusive 14-day
+ * window. Invalid and already-expired records need no timer.
+ *
+ * Pure: callers inject `now`; this helper does not read the clock or storage.
+ */
+export function getRecentTargetSuggestionWakeDelayMs(
+  record: RecentTargetRecord | null,
+  now: number,
+): number | null {
+  if (!record || typeof now !== "number" || !Number.isFinite(now)) return null;
+
+  const savedAtMs = Date.parse(record.savedAt);
+  if (!Number.isFinite(savedAtMs)) return null;
+
+  const wakeAtMs =
+    savedAtMs > now ? savedAtMs : savedAtMs + RECENT_TARGET_SUGGESTION_MAX_AGE_MS + 1;
+  const delayMs = wakeAtMs - now;
+  return delayMs > 0 ? Math.min(delayMs, RECENT_TARGET_SUGGESTION_MAX_WAKE_DELAY_MS) : null;
 }
 
 /**

@@ -111,7 +111,7 @@ const SCOPED_LAST_TARGET_PREVIEW_FIELDS = ["plantId", "growId", "tentId", "saved
  * inspects them, and are never printed. The account segment is never shown
  * either — see `redactStorageKey`.
  */
-function discoverScopedSchemas(): typeof LOCAL_SCHEMAS {
+function discoverScopedSchemas(now: number = Date.now()): typeof LOCAL_SCHEMAS {
   const s = safeStorage();
   if (!s) return [];
   const keys: string[] = [];
@@ -133,10 +133,26 @@ function discoverScopedSchemas(): typeof LOCAL_SCHEMAS {
         : `${SCOPED_LAST_TARGET_LABEL} (account ${index + 1} of ${keys.length} on this device)`,
     optional: true,
     previewFields: SCOPED_LAST_TARGET_PREVIEW_FIELDS,
-    validate: (raw: string) =>
-      parseRecentTargetRecord(raw)
-        ? null
-        : "the stored record is missing a usable plantId/savedAt pair",
+    validate: (raw: string) => {
+      const record = parseRecentTargetRecord(raw);
+      if (!record) return "the stored record is missing a usable plantId/savedAt pair";
+      // `parseRecentTargetRecord` accepts any timestamp `Date.parse` can read,
+      // but `resolveRecentTargetSuggestion` refuses one in the FUTURE outright
+      // (a skewed clock is not evidence). Reporting Pass on such a record would
+      // be the panel's worst failure mode: the grower sees a clean bill of
+      // health while the suggestion silently never appears, with nothing naming
+      // the cause and nothing to act on.
+      //
+      // An EXPIRED record is deliberately NOT reported here. Ageing past the
+      // 14-day window is the record doing exactly what it is designed to do —
+      // healthy data at the end of its life, not a fault — and calling it a
+      // failure would spend the grower's attention on normal behaviour.
+      const savedAtMs = Date.parse(record.savedAt);
+      if (Number.isFinite(savedAtMs) && savedAtMs > now) {
+        return "the stored timestamp is in the future, so the Quick Log suggestion stays hidden until this device's clock passes it; clear this entry to restore it now";
+      }
+      return null;
+    },
   }));
 }
 

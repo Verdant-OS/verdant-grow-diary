@@ -77,6 +77,7 @@ import QuickLog from "@/components/QuickLog";
 import { RECENT_TARGET_SUGGESTION_MAX_AGE_MS } from "@/lib/quickLogRecentTargetSuggestion";
 import {
   clearLocalStorageForTest,
+  getLocalStorageItemForTest,
   removeLocalStorageItemForTest,
   setLocalStorageItemForTest,
 } from "./helpers/localStorageTestHelper";
@@ -402,9 +403,9 @@ describe("QuickLog — remembered target is an offer, never a default", () => {
       "Continue with Blue Dream?",
     );
 
-    const oldValue = window.localStorage.getItem(USER_STORAGE_KEY);
+    const oldValue = getLocalStorageItemForTest(USER_STORAGE_KEY);
     seed(USER_STORAGE_KEY, "p2", 30_000);
-    const newValue = window.localStorage.getItem(USER_STORAGE_KEY);
+    const newValue = getLocalStorageItemForTest(USER_STORAGE_KEY);
     act(() => dispatchStorageChange(USER_STORAGE_KEY, oldValue, newValue));
 
     expect(screen.getByTestId("quick-log-recent-target-suggestion")).toHaveTextContent(
@@ -417,7 +418,7 @@ describe("QuickLog — remembered target is an offer, never a default", () => {
 
   it("re-reads the newest value instead of regressing to a delayed event payload", () => {
     seed(USER_STORAGE_KEY, "p1", 60_000);
-    const delayedOldPayload = window.localStorage.getItem(USER_STORAGE_KEY);
+    const delayedOldPayload = getLocalStorageItemForTest(USER_STORAGE_KEY);
     renderQL(<QuickLog open onOpenChange={() => {}} />);
     expect(screen.getByTestId("quick-log-recent-target-suggestion")).toHaveTextContent(
       "Continue with Blue Dream?",
@@ -440,7 +441,7 @@ describe("QuickLog — remembered target is an offer, never a default", () => {
 
     const otherKey = "verdant.quickLog.lastTarget.v2.someone-else";
     seed(otherKey, "p2", 30_000);
-    act(() => dispatchStorageChange(otherKey, null, window.localStorage.getItem(otherKey)));
+    act(() => dispatchStorageChange(otherKey, null, getLocalStorageItemForTest(otherKey)));
 
     expect(screen.getByTestId("quick-log-recent-target-suggestion")).toHaveTextContent(
       "Continue with Blue Dream?",
@@ -465,10 +466,10 @@ describe("QuickLog — remembered target is an offer, never a default", () => {
     );
 
     // The retired u1 listener cannot overwrite the u2 offer.
-    const oldU1 = window.localStorage.getItem(USER_STORAGE_KEY);
+    const oldU1 = getLocalStorageItemForTest(USER_STORAGE_KEY);
     seed(USER_STORAGE_KEY, "p1", 10_000);
     act(() =>
-      dispatchStorageChange(USER_STORAGE_KEY, oldU1, window.localStorage.getItem(USER_STORAGE_KEY)),
+      dispatchStorageChange(USER_STORAGE_KEY, oldU1, getLocalStorageItemForTest(USER_STORAGE_KEY)),
     );
     expect(screen.getByTestId("quick-log-recent-target-suggestion")).toHaveTextContent(
       "Continue with OG Kush?",
@@ -481,7 +482,7 @@ describe("QuickLog — remembered target is an offer, never a default", () => {
     renderQL(<QuickLog open onOpenChange={() => {}} />);
     expect(screen.getByTestId("quick-log-recent-target-suggestion")).toBeInTheDocument();
 
-    const oldValue = window.localStorage.getItem(USER_STORAGE_KEY);
+    const oldValue = getLocalStorageItemForTest(USER_STORAGE_KEY);
     removeLocalStorageItemForTest(USER_STORAGE_KEY);
     act(() => dispatchStorageChange(USER_STORAGE_KEY, oldValue, null));
 

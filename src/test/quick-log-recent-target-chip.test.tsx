@@ -326,16 +326,58 @@ describe("QuickLog — remembered target is an offer, never a default", () => {
     );
   });
 
-  it("is withheld when the prefill names a grow or a tent but no plant", () => {
-    // Not a named plant, but not unscoped either — the grower already said
-    // where they are. Offering a plant here would widen their context for them.
+  it("offers a matching remembered plant inside a grow- or tent-scoped recovery", () => {
+    // Dashboard/Grow Detail recovery deliberately opens a grow-scoped editor.
+    // The chip is the one explicit plant choice promised by S6; it may appear
+    // only because the live row proves the remembered plant is in that scope.
     for (const prefill of [{ growId: "g1" }, { tentId: "t1" }]) {
       cleanup();
       seed("verdant.quickLog.lastTarget.v2.u1", "p2", 60_000);
       renderQL(<QuickLog open onOpenChange={() => {}} prefill={prefill} />);
+      expect(screen.getByTestId("quick-log-recent-target-suggestion")).toHaveTextContent(
+        "Continue with OG Kush?",
+      );
+      expect(screen.getByTestId("quick-log-plant-select")).not.toHaveTextContent("OG Kush");
+      expect(screen.getByTestId("quick-log-save")).toBeDisabled();
+      expect(rpcMock).not.toHaveBeenCalled();
+    }
+  });
+
+  it("withholds a remembered plant outside the named grow or tent scope", () => {
+    growsMock = [ACTIVE_GROW, { id: "g2", name: "Other Grow", stage: "veg" }];
+    tentsMock = [LIVE_TENT, { id: "t2", name: "Other Tent", grow_id: "g1" }];
+
+    for (const prefill of [{ growId: "g2" }, { tentId: "t2" }]) {
+      cleanup();
+      seed(USER_STORAGE_KEY, "p2", 60_000);
+      renderQL(<QuickLog open onOpenChange={() => {}} prefill={prefill} />);
       expect(screen.getByTestId("quick-log-plant-select")).toBeInTheDocument();
       expect(screen.queryByTestId("quick-log-recent-target-suggestion")).not.toBeInTheDocument();
     }
+  });
+
+  it("revalidates named scope at acceptance when storage races to another plant", () => {
+    growsMock = [ACTIVE_GROW, { id: "g2", name: "Other Grow", stage: "veg" }];
+    tentsMock = [LIVE_TENT, { id: "t2", name: "Other Tent", grow_id: "g2" }];
+    plantsMock = [
+      ...PLANTS,
+      { id: "p3", name: "Other Plant", strain: "Other", tent_id: "t2", grow_id: "g2" },
+    ];
+    seed(USER_STORAGE_KEY, "p1", 60_000);
+    renderQL(<QuickLog open onOpenChange={() => {}} prefill={{ growId: "g1" }} />);
+    expect(screen.getByTestId("quick-log-recent-target-suggestion")).toHaveTextContent(
+      "Continue with Blue Dream?",
+    );
+
+    // Another tab has already moved memory outside g1, but its event is late.
+    seed(USER_STORAGE_KEY, "p3", 30_000);
+    fireEvent.click(screen.getByTestId("quick-log-recent-target-accept"));
+
+    expect(screen.queryByTestId("quick-log-recent-target-suggestion")).not.toBeInTheDocument();
+    expect(screen.getByTestId("quick-log-plant-select")).not.toHaveTextContent("Blue Dream");
+    expect(screen.getByTestId("quick-log-plant-select")).not.toHaveTextContent("Other Plant");
+    expect(screen.getByTestId("quick-log-save")).toBeDisabled();
+    expect(rpcMock).not.toHaveBeenCalled();
   });
 
   it("is not offered when the dialog opens with a route prefill", () => {

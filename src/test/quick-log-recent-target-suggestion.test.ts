@@ -82,6 +82,29 @@ describe("resolveRecentTargetSuggestion — D-B9 validity window", () => {
     });
   });
 
+  it("offers only a live target inside an explicitly required grow or tent scope", () => {
+    const input = {
+      record: record(),
+      now: NOW,
+      visiblePlants: PLANTS,
+      visibleGrows: GROWS,
+      visibleTents: TENTS,
+    };
+
+    expect(resolveRecentTargetSuggestion({ ...input, requiredGrowId: "grow-1" })).not.toBeNull();
+    expect(resolveRecentTargetSuggestion({ ...input, requiredTentId: "tent-1" })).not.toBeNull();
+    expect(
+      resolveRecentTargetSuggestion({
+        ...input,
+        requiredGrowId: "grow-1",
+        requiredTentId: "tent-1",
+      }),
+    ).not.toBeNull();
+
+    expect(resolveRecentTargetSuggestion({ ...input, requiredGrowId: "grow-2" })).toBeNull();
+    expect(resolveRecentTargetSuggestion({ ...input, requiredTentId: "tent-2" })).toBeNull();
+  });
+
   it("expires strictly past the 14-day window, and not before", () => {
     const atBoundary = resolveRecentTargetSuggestion({
       record: record({

@@ -112,6 +112,12 @@ import {
 } from "@/lib/quickLogSaveGuardRules";
 import { trackQuickLogSuccess } from "@/lib/quickLogSuccessTelemetry";
 import { rememberRecentQuickLogTarget } from "@/lib/quickLogRecentTargetStore";
+import {
+  buildRecentTargetStorageKey,
+  parseRecentTargetRecord,
+  RECENT_TARGET_SUGGESTION_MAX_AGE_MS,
+  resolveRecentTargetSuggestion,
+} from "@/lib/quickLogRecentTargetSuggestion";
 import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 import {
   fahrenheitToCelsius,
@@ -181,6 +187,18 @@ function rememberConfirmedPlantTarget(
     },
     userId,
   );
+}
+
+/** Read the account-scoped recent target. Never throws and never falls back. */
+function loadRecentTargetRecord(userId: string | null | undefined) {
+  if (typeof window === "undefined") return null;
+  const scopedKey = buildRecentTargetStorageKey(userId ?? null);
+  if (!scopedKey) return null;
+  try {
+    return parseRecentTargetRecord(window.localStorage.getItem(scopedKey));
+  } catch {
+    return null;
+  }
 }
 
 export default function QuickLogV2Sheet({
@@ -347,6 +365,82 @@ export default function QuickLogV2Sheet({
     [options, form.selectedKey],
   );
   const { grows } = useGrows();
+  // A remembered plant is an offer on a genuinely global/null-target open,
+  // never an implicit default. Pair the record with the account key that
+  // produced it so an account switch fails closed during the effect boundary.
+  const launcherNamesTarget =
+    typeof defaultTargetKey === "string" && defaultTargetKey.trim().length > 0;
+  const recentTargetStorageKey = buildRecentTargetStorageKey(user?.id ?? null);
+  const [recentTargetSnapshot, setRecentTargetSnapshot] = useState(() => ({
+    storageKey: recentTargetStorageKey,
+    record: open && !launcherNamesTarget ? loadRecentTargetRecord(user?.id ?? null) : null,
+  }));
+  const [recentSuggestionDismissed, setRecentSuggestionDismissed] = useState(false);
+  // Advanced once at the expiry boundary. This is not a polling clock and
+  // cannot select or save anything; it only removes an expired offer.
+  const [recentSuggestionClockMs, setRecentSuggestionClockMs] = useState(() => Date.now());
+  const recentTargetRecord =
+    open && !launcherNamesTarget && recentTargetSnapshot.storageKey === recentTargetStorageKey
+      ? recentTargetSnapshot.record
+      : null;
+
+  useEffect(() => {
+    if (!open || launcherNamesTarget || !recentTargetStorageKey) {
+      setRecentTargetSnapshot({ storageKey: recentTargetStorageKey, record: null });
+      return;
+    }
+
+    setRecentTargetSnapshot({
+      storageKey: recentTargetStorageKey,
+      record: loadRecentTargetRecord(user?.id ?? null),
+    });
+
+    // Storage events arrive in other documents. Re-read the current value
+    // instead of trusting event.newValue, because an older event can arrive
+    // after storage already contains a newer target.
+    const handleRecentTargetStorage = (event: StorageEvent) => {
+      if (event.storageArea && event.storageArea !== window.localStorage) return;
+      if (event.key !== null && event.key !== recentTargetStorageKey) return;
+      setRecentTargetSnapshot({
+        storageKey: recentTargetStorageKey,
+        record: loadRecentTargetRecord(user?.id ?? null),
+      });
+    };
+    window.addEventListener("storage", handleRecentTargetStorage);
+    return () => window.removeEventListener("storage", handleRecentTargetStorage);
+  }, [open, launcherNamesTarget, recentTargetStorageKey, user?.id]);
+
+  // Dismissal belongs to one account/session. A fresh open or account starts
+  // with an empty target and may render that account's independently scoped
+  // offer again; neither transition applies it.
+  useEffect(() => {
+    if (open) setRecentSuggestionDismissed(false);
+  }, [open, recentTargetStorageKey]);
+
+  const recentTargetSuggestion = useMemo(
+    () =>
+      resolveRecentTargetSuggestion({
+        record: recentTargetRecord,
+        now: Math.max(Date.now(), recentSuggestionClockMs),
+        visiblePlants: plants,
+        visibleGrows: grows,
+        visibleTents: tents,
+      }),
+    [recentTargetRecord, plants, grows, tents, recentSuggestionClockMs],
+  );
+
+  useEffect(() => {
+    if (!open || !recentTargetRecord) return;
+    const savedAtMs = Date.parse(recentTargetRecord.savedAt);
+    if (!Number.isFinite(savedAtMs)) return;
+    const expiryDelayMs = savedAtMs + RECENT_TARGET_SUGGESTION_MAX_AGE_MS + 1 - Date.now();
+    if (expiryDelayMs <= 0) return;
+    const expiryTimer = window.setTimeout(
+      () => setRecentSuggestionClockMs(Date.now()),
+      expiryDelayMs,
+    );
+    return () => window.clearTimeout(expiryTimer);
+  }, [open, recentTargetRecord]);
   const targetPanel = useMemo(
     () =>
       buildQuickLogTargetPanel({
@@ -395,6 +489,12 @@ export default function QuickLogV2Sheet({
   const hasFetchError = Boolean(plantsQ.isError || tentsQ.isError);
   const hasNoTargets = !isLoadingContext && !hasFetchError && options.length === 0;
   const contextBlocked = isLoadingContext || hasFetchError || hasNoTargets;
+  const showRecentTargetSuggestion =
+    !launcherNamesTarget &&
+    !contextBlocked &&
+    !recentSuggestionDismissed &&
+    !form.selectedKey &&
+    recentTargetSuggestion !== null;
 
   const selectedTargetMissing = !contextBlocked && !form.selectedKey;
   const selectedTargetStale = isStaleQuickLogV2TargetSelection(resolvedTarget);
@@ -497,6 +597,7 @@ export default function QuickLogV2Sheet({
       saveInFlightRef.current = false;
       idempotencyKeyRef.current = 1;
       saveIdempotencyKeyRef.current = newQuickLogSaveKey();
+      setRecentSuggestionDismissed(false);
       resetPhotoSelection();
     }
   }, [open, defaultTargetKey, defaultAction]);
@@ -1422,6 +1523,71 @@ export default function QuickLogV2Sheet({
               >
                 Start by choosing a plant or tent above.
               </p>
+            )}
+            {showRecentTargetSuggestion && recentTargetSuggestion && (
+              <div
+                data-testid="qlv2-recent-target-suggestion"
+                className="mt-2 flex flex-wrap items-center gap-2 rounded-md border border-border/60 bg-secondary/20 p-2.5 text-sm"
+              >
+                <span className="text-muted-foreground">
+                  Continue with {recentTargetSuggestion.plantName}?
+                </span>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  data-testid="qlv2-recent-target-accept"
+                  onClick={() => {
+                    if (contextBlocked || wateringSubmissionLockedRef.current) return;
+                    // Revalidate storage and all live relationships at click
+                    // time. Opening the sheet is not consent, and consent for
+                    // rendered plant A must never be reinterpreted for B.
+                    const latestRecord = loadRecentTargetRecord(user?.id ?? null);
+                    const current = resolveRecentTargetSuggestion({
+                      record: latestRecord,
+                      now: Date.now(),
+                      visiblePlants: plants,
+                      visibleGrows: grows,
+                      visibleTents: tents,
+                    });
+                    if (!current) {
+                      setRecentTargetSnapshot({
+                        storageKey: recentTargetStorageKey,
+                        record: latestRecord,
+                      });
+                      setRecentSuggestionDismissed(true);
+                      return;
+                    }
+                    if (current.plantId !== recentTargetSuggestion.plantId) {
+                      setRecentTargetSnapshot({
+                        storageKey: recentTargetStorageKey,
+                        record: latestRecord,
+                      });
+                      return;
+                    }
+                    const selectedKey = `plant:${current.plantId}`;
+                    if (!options.some((option) => `${option.type}:${option.id}` === selectedKey)) {
+                      setRecentSuggestionDismissed(true);
+                      return;
+                    }
+                    setField("selectedKey", selectedKey);
+                    setLocalError(null);
+                    setSaveStatus("");
+                    setRecentSuggestionDismissed(true);
+                  }}
+                >
+                  Continue
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  data-testid="qlv2-recent-target-dismiss"
+                  onClick={() => setRecentSuggestionDismissed(true)}
+                >
+                  Choose another
+                </Button>
+              </div>
             )}
             <QuickLogTargetPanel panel={targetPanel} />
           </div>

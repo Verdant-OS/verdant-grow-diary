@@ -101,7 +101,6 @@ import {
 } from "@/lib/legacyQuickLogUnifiedSave";
 import {
   QUICK_LOG_TARGET_BLOCKED_COPY,
-  quickLogPrefillNamesAnyTarget,
   quickLogPrefillTargetKey,
   resolveQuickLogEditorTarget,
   resolveQuickLogPrefillTarget,
@@ -539,35 +538,34 @@ export default function QuickLog({
   const editorPlantId = targetPlan.editorPlantId;
 
   // Slice D5 — remembered target as a VISIBLE suggestion, never a default.
-  // Offered only on a genuinely unscoped open, only while the grower has not
-  // chosen a plant, and only after the stored record revalidates against their
-  // own visible plants inside its 14-day window.
+  // Offered only while the launcher has not already named a plant and the
+  // grower has not chosen one. An unscoped open may offer any valid remembered
+  // plant; a grow/tent recovery may offer it only when the live row matches
+  // that named scope. In every case the grower must explicitly accept.
   //
-  // "Unscoped" means the prefill names no plant, grow, or tent — NOT merely
-  // that the prefill object is absent. AppShell sends an activity-only prefill
-  // (`{ eventType: "feeding" }`) for a context-free Fast Add, which preselects
-  // a form and nothing else; testing the object for truthiness would withhold
-  // the suggestion on exactly the open that needs it most.
+  // AppShell sends an activity-only prefill (`{ eventType: "feeding" }`) for a
+  // context-free Fast Add; it names no target and remains eligible. A plant
+  // prefill is authoritative and suppresses the memory read entirely.
   const [recentSuggestionDismissed, setRecentSuggestionDismissed] = useState(false);
   // A single scheduled tick re-evaluates the rendered offer when its 14-day
   // window closes. This is not a polling clock and never changes selection;
   // it only removes a now-invalid action while the dialog remains open.
   const [recentSuggestionClockMs, setRecentSuggestionClockMs] = useState(() => Date.now());
-  const prefillNamesTarget = quickLogPrefillNamesAnyTarget(prefill);
+  const prefillNamesPlant = prefillRequestKey !== null;
   const recentTargetStorageKey = buildRecentTargetStorageKey(user?.id ?? null);
   const [recentTargetSnapshot, setRecentTargetSnapshot] = useState(() => ({
     storageKey: recentTargetStorageKey,
-    record: open && !prefillNamesTarget ? loadRecentTargetRecord(user?.id ?? null) : null,
+    record: open && !prefillNamesPlant ? loadRecentTargetRecord(user?.id ?? null) : null,
   }));
   // Keep the snapshot paired with the account key that produced it. On an
   // account change this makes the old account's record ineligible during the
   // render before the effect below loads the new key.
   const recentTargetRecord =
-    open && !prefillNamesTarget && recentTargetSnapshot.storageKey === recentTargetStorageKey
+    open && !prefillNamesPlant && recentTargetSnapshot.storageKey === recentTargetStorageKey
       ? recentTargetSnapshot.record
       : null;
   useEffect(() => {
-    if (!open || prefillNamesTarget || !recentTargetStorageKey) {
+    if (!open || prefillNamesPlant || !recentTargetStorageKey) {
       setRecentTargetSnapshot({ storageKey: recentTargetStorageKey, record: null });
       return;
     }
@@ -589,7 +587,7 @@ export default function QuickLog({
     };
     window.addEventListener("storage", handleRecentTargetStorage);
     return () => window.removeEventListener("storage", handleRecentTargetStorage);
-  }, [open, prefillNamesTarget, recentTargetStorageKey, user?.id]);
+  }, [open, prefillNamesPlant, recentTargetStorageKey, user?.id]);
   const recentTargetSuggestion = useMemo(
     () =>
       resolveRecentTargetSuggestion({
@@ -600,8 +598,18 @@ export default function QuickLog({
         visiblePlants: plants,
         visibleGrows: grows,
         visibleTents: activeTents,
+        requiredGrowId: prefill?.growId,
+        requiredTentId: prefill?.tentId,
       }),
-    [recentTargetRecord, plants, grows, activeTents, recentSuggestionClockMs],
+    [
+      recentTargetRecord,
+      plants,
+      grows,
+      activeTents,
+      recentSuggestionClockMs,
+      prefill?.growId,
+      prefill?.tentId,
+    ],
   );
   useEffect(() => {
     if (!open || !recentTargetRecord) return;
@@ -620,10 +628,7 @@ export default function QuickLog({
     return () => window.clearTimeout(expiryTimer);
   }, [open, recentTargetRecord]);
   const showRecentTargetSuggestion =
-    !prefillNamesTarget &&
-    !recentSuggestionDismissed &&
-    !plantId &&
-    recentTargetSuggestion !== null;
+    !prefillNamesPlant && !recentSuggestionDismissed && !plantId && recentTargetSuggestion !== null;
 
   useEffect(() => {
     if (!open || saveLocked) return;
@@ -2026,6 +2031,8 @@ export default function QuickLog({
                       visiblePlants: plants,
                       visibleGrows: grows,
                       visibleTents: activeTents,
+                      requiredGrowId: prefill?.growId,
+                      requiredTentId: prefill?.tentId,
                     });
                     if (!current) {
                       setRecentTargetSnapshot({

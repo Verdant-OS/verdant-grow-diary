@@ -18,7 +18,19 @@ export function rememberRecentQuickLogTarget(
   if (!scopedKey) return;
 
   try {
-    window.localStorage.setItem(scopedKey, JSON.stringify(target));
+    // Project the approved schema explicitly. TypeScript's structural typing
+    // cannot prevent a wider runtime object from reaching this boundary, so
+    // serializing `target` wholesale could persist unrelated fields added by
+    // a caller. Local memory is target identity only.
+    window.localStorage.setItem(
+      scopedKey,
+      JSON.stringify({
+        plantId: target.plantId,
+        growId: target.growId,
+        tentId: target.tentId,
+        savedAt: target.savedAt,
+      }),
+    );
   } catch {
     // Non-critical speed preference. Never block saving if storage is unavailable.
   }

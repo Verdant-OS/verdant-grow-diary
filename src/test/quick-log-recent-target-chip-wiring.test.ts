@@ -21,19 +21,21 @@ describe("D5 — remembered target is a suggestion, never a default", () => {
     expect(QUICKLOG).not.toContain("readLastTarget(");
   });
 
-  it("offers the chip only on a genuinely unscoped open with no plant chosen", () => {
-    // Renegotiated from `!prefill`. That truthiness test answered the wrong
-    // question: AppShell sends an activity-only prefill (`{ eventType }`) for a
-    // context-free Fast Add, which names no target at all, and the old gate
-    // withheld the suggestion on exactly that open. "Unscoped" now means the
-    // prefill names no plant, grow, or tent.
+  it("offers the chip until a plant is named, with grow/tent scope enforced by live-row matching", () => {
+    // Activity-only opens remain eligible. Grow/tent recovery also remains
+    // eligible, but the resolver must prove the live target matches every
+    // named scope. A plant-prefilled route stays authoritative and suppresses
+    // the suggestion entirely.
     expect(FLAT).toMatch(
-      /const showRecentTargetSuggestion = !prefillNamesTarget && !recentSuggestionDismissed && !plantId && recentTargetSuggestion !== null;/,
+      /const showRecentTargetSuggestion = !prefillNamesPlant && !recentSuggestionDismissed && !plantId && recentTargetSuggestion !== null;/,
     );
-    expect(FLAT).toMatch(/const prefillNamesTarget = quickLogPrefillNamesAnyTarget\(prefill\);/);
-    // Reading is gated the same way, so a scoped open never even looks.
+    expect(FLAT).toMatch(/const prefillNamesPlant = prefillRequestKey !== null;/);
+    // Reading is gated by plant scope, not by a grow/tent recovery prefill.
     expect(FLAT).toMatch(
-      /open && !prefillNamesTarget \? loadRecentTargetRecord\(user\?\.id \?\? null\) : null/,
+      /open && !prefillNamesPlant \? loadRecentTargetRecord\(user\?\.id \?\? null\) : null/,
+    );
+    expect(FLAT).toMatch(
+      /resolveRecentTargetSuggestion\(\{[^}]*requiredGrowId: prefill\?\.growId,[^}]*requiredTentId: prefill\?\.tentId,/,
     );
     // And the retired gate cannot come back: a bare truthiness test on the
     // prefill object must never guard either the read or the render.
@@ -77,7 +79,7 @@ describe("D5 — remembered target is a suggestion, never a default", () => {
     // CURRENT clock before applying it, so the handler selects from that
     // re-derived value rather than the one captured when the dialog opened.
     expect(FLAT).toMatch(
-      /quick-log-recent-target-accept[\s\S]{0,1500}const latestRecord = loadRecentTargetRecord\(user\?\.id \?\? null\);[\s\S]{0,300}resolveRecentTargetSuggestion\(\{ record: latestRecord, now: Date\.now\(\), visiblePlants: plants, visibleGrows: grows, visibleTents: activeTents, \}\)/,
+      /quick-log-recent-target-accept[\s\S]{0,1500}const latestRecord = loadRecentTargetRecord\(user\?\.id \?\? null\);[\s\S]{0,500}resolveRecentTargetSuggestion\(\{ record: latestRecord, now: Date\.now\(\), visiblePlants: plants, visibleGrows: grows, visibleTents: activeTents, requiredGrowId: prefill\?\.growId, requiredTentId: prefill\?\.tentId, \}\)/,
     );
     expect(FLAT).toMatch(
       /quick-log-recent-target-accept[\s\S]{0,1600}setPlantId\(current\.plantId\)/,

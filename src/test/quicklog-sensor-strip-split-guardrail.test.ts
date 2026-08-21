@@ -8,6 +8,10 @@ import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 
 const QL = readFileSync(resolve(__dirname, "../components/QuickLog.tsx"), "utf8");
+const RECENT_TARGET_STORE = readFileSync(
+  resolve(__dirname, "../lib/quickLogRecentTargetStore.ts"),
+  "utf8",
+);
 
 describe("QuickLog publish-slice split guardrail", () => {
   it("does not import or mount the sensor mini-chart", () => {
@@ -48,7 +52,15 @@ describe("QuickLog publish-slice split guardrail", () => {
     // No bare last-target key literal survives in this component at all, so
     // the forbidden scans below need no scrubbing to stay honest.
     expect(QL).not.toMatch(/["'`]verdant\.quickLog\.lastTarget/);
-    const scrubbed = QL;
+    // The write moved into a shared store, so scan BOTH the presenter reads
+    // and the module that actually serializes and writes the record. Scanning
+    // QuickLog alone would leave the privacy fence green while the writer
+    // persisted a newly added forbidden field.
+    const scrubbed = `${QL}\n${RECENT_TARGET_STORE}`;
+    expect(RECENT_TARGET_STORE).toMatch(/localStorage\.setItem\(/);
+    expect(RECENT_TARGET_STORE).toMatch(
+      /JSON\.stringify\(\{[\s\S]*plantId: target\.plantId,[\s\S]*growId: target\.growId,[\s\S]*tentId: target\.tentId,[\s\S]*savedAt: target\.savedAt,[\s\S]*\}\)/,
+    );
 
     // Forbidden localStorage payloads / state classes.
     const FORBIDDEN = [

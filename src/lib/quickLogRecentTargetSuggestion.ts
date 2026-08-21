@@ -91,6 +91,13 @@ export interface ResolveRecentTargetSuggestionInput {
   now: number;
   visiblePlants: readonly RecentTargetVisiblePlant[] | null | undefined;
   /**
+   * Optional scope already named by the launcher. A grow/tent recovery may
+   * offer the remembered plant only when its current live relationships match
+   * every named id. Empty values mean that scope was not named.
+   */
+  requiredGrowId?: string | null;
+  requiredTentId?: string | null;
+  /**
    * The grower's ACTIVE grows — the same archived-filtered list the grow
    * picker renders. Absent or empty means "not established", which fails
    * closed: an unverifiable grow is not evidence that the grow is live.
@@ -155,7 +162,8 @@ export function parseRecentTargetRecord(raw: string | null | undefined): RecentT
 export function resolveRecentTargetSuggestion(
   input: ResolveRecentTargetSuggestionInput,
 ): RecentTargetSuggestion | null {
-  const { record, now, visiblePlants, visibleGrows, visibleTents } = input;
+  const { record, now, visiblePlants, visibleGrows, visibleTents, requiredGrowId, requiredTentId } =
+    input;
   if (!record) return null;
   if (typeof now !== "number" || !Number.isFinite(now)) return null;
 
@@ -175,6 +183,14 @@ export function resolveRecentTargetSuggestion(
   const growId = trimmed(plant.grow_id);
   const tentId = trimmed(plant.tent_id);
   if (!growId || !tentId) return null;
+
+  // Grow/tent launchers are scoped recovery flows, not global suggestions.
+  // Match against relationships re-derived from the live plant row; the
+  // stored grow/tent ids remain untrusted history.
+  const requiredGrow = trimmed(requiredGrowId);
+  if (requiredGrow && requiredGrow !== growId) return null;
+  const requiredTent = trimmed(requiredTentId);
+  if (requiredTent && requiredTent !== tentId) return null;
 
   // The grow must still be one of the grower's active grows. An archived grow
   // leaves its plants visible, so the plant row alone cannot prove this.

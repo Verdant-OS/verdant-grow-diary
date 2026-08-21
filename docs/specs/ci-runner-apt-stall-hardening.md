@@ -293,11 +293,25 @@ Keep `--with-deps` (so no behavior risk), but change how it fails:
        local rescued
        rescued="$(sed 's/.*) //' "/proc/$worker/stat" 2>/dev/null | cut -d" " -f3)"
 
+       # NEVER signal a group this shell might be in. If the child has not
+       # reached setsid(2) yet — which is the very reason publication can time
+       # out — it is STILL IN THE CALLER'S process group, so the pgrp read
+       # above is ours and `kill -- -$rescued` would terminate this shell, the
+       # step, and any sibling work in it. Measured by holding setsid past the
+       # handshake: the caller died with status 143. A rescue that can kill the
+       # rescuer is worse than no rescue, so the check is a refusal, not a
+       # warning.
+       local mypgid
+       mypgid="$(sed 's/.*) //' "/proc/$$/stat" 2>/dev/null | cut -d" " -f3)"
+       case "$rescued" in "" | *[!0-9]*) rescued="" ;; esac   # only a real pgid
+
        echo "::error::attempt: process group never published; cannot bound $*"
-       if [ -n "$rescued" ]; then
+       if [ -n "$rescued" ] && [ "$rescued" != "$mypgid" ] && [ "$rescued" != "1" ]; then
          sudo -n kill -TERM -- -"$rescued" 2>/dev/null || kill -TERM -- -"$rescued" 2>/dev/null
          sleep 2
          sudo -n kill -KILL -- -"$rescued" 2>/dev/null || kill -KILL -- -"$rescued" 2>/dev/null
+       else
+         echo "::error::attempt: the worker never left this shell's process group; refusing to signal it"
        fi
        kill -KILL "$child" 2>/dev/null
        wait "$child" 2>/dev/null

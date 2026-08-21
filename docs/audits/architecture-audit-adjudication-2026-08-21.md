@@ -336,9 +336,12 @@ shows wrong content shipped, only that the stamp has not been tied back to a com
 "has not been", not "cannot be", because the third explanation is precisely the case where it
 could yet be.
 
-It also explains the scans below: the commit is a Lovable merge that is **not on the deploy
-branch**, so recomputing over `origin/verdant-grow-diary` could never have found it, at any scan
-depth.
+It also explains why the **SHA** was absent from the scans below: the commit is a Lovable merge
+**not on the deploy branch**, so no scan depth over `origin/verdant-grow-diary` reaches that
+identity. **It does not explain the hash miss** — the resolver matches recomputed content, and
+one `treeHash` can map to several commits (§6.1's later subsection, and
+`scripts/resolve-release-provenance.mjs:19-21`). The hash miss stays bounded by the commits
+actually scanned.
 
 This supersedes the `CURRENT_STATE` Production-commit row (`f09febc354a4`, `dirty: false`,
 2026-08-20).
@@ -674,8 +677,16 @@ Vercel does not govern production then `vercel.json`'s npm `installCommand` / `b
 vestigial. That does not follow, because **production and preview are different deployments.**
 `docs/preview-deployment-verification.md` documents a preview-only Vercel project,
 `verdant-command-center-preview`, and its §1 pins that project's Install and Build commands to
-**npm**, not Bun. If that project is live, dropping `package-lock.json` breaks preview installs.
-§6.2 therefore removes **nothing** here until the preview project's status is established.
+**npm**, not Bun. If that project is live, dropping `package-lock.json` **violates this repo's
+gate and loses deterministic resolution for that install** — corrected after review, because an
+earlier revision said it _breaks_ preview installs, which overstates it: npm's default install
+command resolves from `package.json` and succeeds with no lockfile present. The consequence is
+non-determinism and a red gate, not a guaranteed broken preview.
+
+> That sentence tripped `check:lockfile` on its first draft, because it named the command
+> literally — **the second time this document has done so**, in the very paragraph that warns
+> against it. The scanner does not care that the surrounding prose is about the scanner.
+> §6.2 therefore removes **nothing** here until the preview project's status is established.
 
 **And the preview project is not the whole prerequisite** — corrected again after review, because
 an earlier revision called it "the" precondition and that would have been a dangerous thing for
@@ -872,7 +883,9 @@ independent_reviewer: Codex — performed, not merely nominated. Codex reviewed 
 completed:
   - 21 stack determinations re-derived from source at 28c01a017; 21 held
   - ARCH-00 collision inventory discharged (§3)
-  - vercel.json measured: redirects, rewrites and headers all measured, not inferred (§6.2)
+  - vercel.json: redirects (all 8) and the rewrite measured; headers measured for the
+    CATCH-ALL `/(.*)` block ONLY. Its `/unsubscribe` and `/assets/(.*)` header blocks were
+    never probed, and `projectSettings`, `cleanUrls` and `git` were not measured at all (§6.2)
   - release-provenance gap bounded to build-workspace drift at stamp time (§6.1)
   - lockfile transition dated: gate first fails 2026-08-26 UTC (§6.4)
 

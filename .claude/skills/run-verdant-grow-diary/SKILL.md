@@ -164,10 +164,13 @@ Targeted sub-suites exist (`bun run test:payments-security`,
 - **Port 8080, not 5173.** `vite.config.ts` hardcodes `port: 8080`. When reusing
   a running server for Playwright, set `E2E_BASE_URL=http://127.0.0.1:8080` so it
   doesn't spawn its own server on 5173.
-- **`/` is session-aware.** Signed-out visitors render the public Landing directly;
-  signed-in growers retain the Dashboard inside `AppShell`. The HTTP status remains
-  200 because the route is server-rendered either way. Deep links like `/dashboard`
-  still require the authenticated application shell.
+- **`/` is session-aware, but SSR only ever proves the landing.** The server has no
+  trusted session, so SSR _and the first client pass_ always render the public Landing
+  (`RootEntry.tsx`); the signed-in Dashboard resolves only after hydration and auth
+  settle. A 200 on `/` therefore proves the landing rendered — never that the
+  authenticated surface did. Do not assert dashboard HTML from a server response; wait
+  for the hydrated surface. Deep links like `/dashboard` still require the
+  authenticated application shell.
 - **No local Supabase stack.** The app points at the hosted project; the mocked
   Playwright project intercepts all Supabase traffic so e2e works without
   staging credentials.

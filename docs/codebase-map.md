@@ -41,7 +41,7 @@ with `access: public | auth | operator | internal | redirect` and an optional
 
 | Group                    | Files                                                                                                                                                                                                                                                                                      |
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Entry / auth             | `index.tsx` (apex, session-aware via `RootEntry`), `auth.tsx`, `login.tsx`, `signup.tsx`, `register.tsx`, `reset-password.tsx`, `welcome.tsx`, `invite` (under `_app`)                                                                                                                     |
+| Entry / auth             | `index.tsx` (apex, session-aware via `RootEntry`), `auth.tsx`, `login.tsx`, `signup.tsx`, `register.tsx`, `reset-password.tsx`, `welcome.tsx`                                                                                                                                              |
 | Marketing                | `features.tsx`, `pricing.tsx`, `founder.tsx`, `upgrade.tsx`, `demo.tsx`, `contact.tsx`, `feedback.tsx`, `hardware-integrations.tsx`, `how-ai-doctor-works.tsx`                                                                                                                             |
 | Commerce                 | `billing.$plan.tsx`, `checkout.success.tsx`, `checkout.cancel.tsx`                                                                                                                                                                                                                         |
 | Content / SEO            | `guides.index.tsx`, `guides.$slug.tsx`, `guides.grow-stage-care-guide.tsx`, `cultivars.index.tsx`, `cultivars.$slug.tsx`, `strains.index.tsx`, `strains.$slug.tsx`, `glossary.tsx`, `customer.guide.oreoz-vs-gelonade-comparison.tsx`, `docs.mcp-api.tsx`                                  |
@@ -63,17 +63,28 @@ stale pre-SSR configuration that `CURRENT_STATE_ARCHIVE.md` lists for retirement
 
 | Domain                | Routes                                                                                                                                                                                                                             |
 | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Core loop             | `dashboard`, `grows`, `grows_.$growId`, `grows_.$growId_.learning`, `tents`, `tents_.$id`, `plants`, `plants_.$id`, `timeline`, `logs`, `daily-check`, `tasks`                                                                     |
-| Sensors / environment | `sensors`, `grow-room`, `health`, `start-room`                                                                                                                                                                                     |
-| AI                    | `doctor`, `doctor_.sessions`, `doctor_.sessions_.$sessionId`, `ai-doctor` (alias → `/doctor`)                                                                                                                                      |
-| Alerts & actions      | `alerts`, `alerts_.$alertId`, `actions`, `actions_.$actionId`, `action-queue` (alias → `/actions`)                                                                                                                                 |
+| Core loop             | `dashboard`, `grows`, `grows_.$growId`, `grows_.$growId_.learning`, `tents`, `tents_.$id`, `plants`, `plants_.$id`, `timeline`, `daily-check`                                                                                      |
+| Sensors / environment | `sensors`, `health`, `start-room`                                                                                                                                                                                                  |
+| AI                    | `doctor`, `doctor_.sessions`, `doctor_.sessions_.$sessionId`                                                                                                                                                                       |
+| Alerts & actions      | `alerts`, `alerts_.$alertId`, `actions`, `actions_.$actionId`                                                                                                                                                                      |
 | Genetics / breeding   | `genetics`, `genetics.index`, `genetics.accessions.$id`, `genetics.batches.$id`, `genetics.health.$kind.$id`, `genetics.trace.$kind.$id`, `breeding`, `breeding_.new`, `breeding_.$programId`, `breeding_.log.new`, `grow-lineage` |
 | Pheno hunts           | `pheno-hunts`, `pheno-hunts_.new`, `pheno-hunts_.$id.keepers`, `pheno-hunts_.$id.workspace`, `diary.pheno-expression-comparison`                                                                                                   |
 | Reports & diary       | `reports`, `reports_.diary-range`, `reports_.post-grow.$growId`, `diary.environment-summary`, `diary.strains.$slug`                                                                                                                |
 | Account               | `settings`, `settings_.analytics`, `settings_.agent-integrations`, `account.preferences`, `onboarding`, `invite`                                                                                                                   |
 
-Aliases are real components, not config redirects: `_app/ai-doctor.tsx` and
-`_app/action-queue.tsx` render `<RouteAliasRedirect to="/doctor" />` and `to="/actions"`.
+**Five `_app` routes are aliases, not pages.** They are real components rendering
+`<RouteAliasRedirect>`, not config redirects, and `appRouteManifest.ts` classifies all five
+as `access: "redirect"`. They are listed here rather than in the domain tables above,
+because editing or testing them as if they were pages is wasted work — the surface lives at
+the target:
+
+| Alias route             | Redirects to |
+| ----------------------- | ------------ |
+| `_app/ai-doctor.tsx`    | `/doctor`    |
+| `_app/action-queue.tsx` | `/actions`   |
+| `_app/tasks.tsx`        | `/actions`   |
+| `_app/logs.tsx`         | `/timeline`  |
+| `_app/grow-room.tsx`    | `/`          |
 
 ### Operator routes (`src/routes/_app/_operator/*.tsx`, 38)
 

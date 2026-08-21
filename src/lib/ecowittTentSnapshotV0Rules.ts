@@ -64,10 +64,6 @@ export const FORBIDDEN_SENSOR_TRUTH_SOURCE_TOKENS = [
   "webhook",
 ] as const;
 
-/** Night window for "drifted last night" (UTC hours, inclusive start / exclusive end). */
-export const ECOWITT_TENT_SNAPSHOT_V0_NIGHT_UTC_START_HOUR = 0;
-export const ECOWITT_TENT_SNAPSHOT_V0_NIGHT_UTC_END_HOUR = 6;
-
 export interface EcowittTentSnapshotV0RowLike {
   source?: string | null;
   captured_at?: string | null;
@@ -320,20 +316,6 @@ export function classifyEcowittTentSnapshotV0BridgeQuiet(
     sawNonLive = true;
   }
   return sawNonLive ? "has_non_live_only" : "quiet";
-}
-
-export function isUtcNightHour(
-  iso: string,
-  startHour = ECOWITT_TENT_SNAPSHOT_V0_NIGHT_UTC_START_HOUR,
-  endHour = ECOWITT_TENT_SNAPSHOT_V0_NIGHT_UTC_END_HOUR,
-): boolean {
-  const ms = Date.parse(iso);
-  if (!Number.isFinite(ms)) return false;
-  const hour = new Date(ms).getUTCHours();
-  if (startHour === endHour) return true;
-  if (startHour < endHour) return hour >= startHour && hour < endHour;
-  // Wrap past midnight (not used by V0 defaults, but keep deterministic).
-  return hour >= startHour || hour < endHour;
 }
 
 export function toFiniteMetricValue(value: unknown): number | null {

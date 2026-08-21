@@ -472,7 +472,7 @@ export default function TentDetail() {
         aria-label="EcoWitt tent sensor snapshot"
         data-testid="tent-detail-ecowitt-section"
       >
-        <EcowittTentSnapshotV0Card tentId={id ?? null} stage={tent?.stage ?? null} />
+        <EcowittTentSnapshotV0Card tentId={id ?? null} />
       </section>
 
       <TentManualSnapshotHistoryList tentId={id ?? null} readings={readings} />

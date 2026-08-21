@@ -202,7 +202,7 @@ describe("buildEcowittTentSnapshotV0ViewModel", () => {
         row({ metric: "humidity_pct", value: 55 }),
         row({ metric: "soil_moisture_pct", value: 40 }),
       ],
-      { tentId: TENT, now: NOW, stage: "veg" },
+      { tentId: TENT, now: NOW },
     );
     expect(vm.metrics).toHaveLength(3);
     expect(vm.metrics.map((m) => m.key)).toEqual(["temp", "rh", "soil"]);

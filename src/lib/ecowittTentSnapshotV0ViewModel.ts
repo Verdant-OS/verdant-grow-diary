@@ -4,6 +4,8 @@
  *
  * Pure. Builds latest packet + last-24h sparkline points + constitution badges.
  * UI must remain a stateless presenter over this model.
+ *
+ * Scope fence: no in-spec / night-drift product surface in V0.
  */
 
 import {
@@ -13,7 +15,6 @@ import {
   ECOWITT_TENT_SNAPSHOT_V0_METRICS,
   ECOWITT_TENT_SNAPSHOT_V0_NO_LIVE_DATA,
   evaluateEcowittTentSnapshotV0Metric,
-  isUtcNightHour,
   mapEcowittTentSnapshotV0MetricKey,
   readObservedAtIso,
   toFiniteMetricValue,
@@ -21,11 +22,6 @@ import {
   type EcowittTentSnapshotV0RowLike,
   type EcowittTentSnapshotV0TruthSource,
 } from "@/lib/ecowittTentSnapshotV0Rules";
-import {
-  classifyTempAgainstStage,
-  classifyRhAgainstStage,
-  type EnvClassification,
-} from "@/lib/environmentStageTargetRules";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -47,17 +43,6 @@ export interface EcowittTentSnapshotV0MetricView {
   reason: string | null;
   sparkline: EcowittTentSnapshotV0SparkPoint[];
   sparklineState: "ok" | "empty" | "stale" | "demo";
-  /** Stage-band status for current value when stage known; else unavailable. */
-  inSpecNow: EnvClassification | "unavailable";
-}
-
-export interface EcowittTentSnapshotV0NightDrift {
-  /** True when any night sample was outside stage targets. */
-  drifted: boolean;
-  /** Calm copy; never invents a claim when evidence is missing. */
-  summary: string;
-  nightSampleCount: number;
-  outOfSpecCount: number;
 }
 
 export interface EcowittTentSnapshotV0ViewModel {
@@ -69,7 +54,6 @@ export interface EcowittTentSnapshotV0ViewModel {
   overallBadgeLabel: string;
   latestCapturedAt: string | null;
   metrics: EcowittTentSnapshotV0MetricView[];
-  nightDrift: EcowittTentSnapshotV0NightDrift;
   /** Fields seen in payloads that V0 refuses to guess (report-only). */
   unusedFieldNamesRefused: readonly string[];
 }
@@ -77,8 +61,6 @@ export interface EcowittTentSnapshotV0ViewModel {
 export interface BuildEcowittTentSnapshotV0Options {
   tentId?: string | null;
   now?: Date;
-  /** Grow stage for in-spec / night-drift checks (optional). */
-  stage?: string | null;
   historyWindowMs?: number;
 }
 
@@ -115,7 +97,6 @@ function emptyMetric(key: EcowittTentSnapshotV0MetricKey): EcowittTentSnapshotV0
     reason: null,
     sparkline: [],
     sparklineState: "empty",
-    inSpecNow: "unavailable",
   };
 }
 
@@ -218,78 +199,6 @@ function buildSparkline(
   return { points, state: "ok" };
 }
 
-function classifyInSpec(
-  key: EcowittTentSnapshotV0MetricKey,
-  value: number | null,
-  stage: string | null | undefined,
-  stale: boolean,
-): EnvClassification | "unavailable" {
-  if (value === null || !Number.isFinite(value)) return "unavailable";
-  if (key === "temp") {
-    // Stored Celsius.
-    return classifyTempAgainstStage(value, { stage: stage ?? null, stale }).classification;
-  }
-  if (key === "rh") {
-    return classifyRhAgainstStage(value, { stage: stage ?? null, stale }).classification;
-  }
-  // Soil stage bands are not part of environmentStageTargetRules — honest unavailable.
-  return "unavailable";
-}
-
-function buildNightDrift(
-  rows: readonly EcowittTentSnapshotV0RowLike[],
-  stage: string | null | undefined,
-  windowStartMs: number,
-): EcowittTentSnapshotV0NightDrift {
-  let nightSampleCount = 0;
-  let outOfSpecCount = 0;
-
-  for (const row of rows) {
-    const key = mapEcowittTentSnapshotV0MetricKey(row.metric);
-    if (key !== "temp" && key !== "rh") continue;
-    const value = toFiniteMetricValue(row.value);
-    if (value === null) continue;
-    if (!evaluateEcowittTentSnapshotV0Metric(key, value).valid) continue;
-    const capturedAt = readObservedAtIso(row);
-    if (!capturedAt) continue;
-    const ms = Date.parse(capturedAt);
-    if (!Number.isFinite(ms) || ms < windowStartMs) continue;
-    if (!isUtcNightHour(capturedAt)) continue;
-
-    nightSampleCount += 1;
-    const classification = classifyInSpec(key, value, stage, false);
-    if (classification === "below_target" || classification === "above_target") {
-      outOfSpecCount += 1;
-    }
-  }
-
-  if (nightSampleCount === 0) {
-    return {
-      drifted: false,
-      summary: "No night samples in the last 24 hours to judge drift.",
-      nightSampleCount: 0,
-      outOfSpecCount: 0,
-    };
-  }
-  if (!stage) {
-    return {
-      drifted: false,
-      summary: "Night samples present, but stage targets are unknown — drift not judged.",
-      nightSampleCount,
-      outOfSpecCount: 0,
-    };
-  }
-  const drifted = outOfSpecCount > 0;
-  return {
-    drifted,
-    summary: drifted
-      ? `Drifted last night — ${outOfSpecCount} of ${nightSampleCount} night samples outside stage targets.`
-      : `In-spec overnight — ${nightSampleCount} night samples within stage targets.`,
-    nightSampleCount,
-    outOfSpecCount,
-  };
-}
-
 function overallTruth(
   metrics: EcowittTentSnapshotV0MetricView[],
   bridgeQuiet: boolean,
@@ -325,7 +234,6 @@ export function buildEcowittTentSnapshotV0ViewModel(
       : list;
 
   const quietState = classifyEcowittTentSnapshotV0BridgeQuiet(tentScoped, { now });
-  const bridgeQuiet = quietState === "quiet" || quietState === "has_non_live_only";
   // "Quiet" for grower copy means no live packet. Non-live-only still shows
   // the readings with honest badges, but surfaces the quiet message.
   const showQuietMessage = quietState !== "has_live";
@@ -338,7 +246,6 @@ export function buildEcowittTentSnapshotV0ViewModel(
     if (!entry) {
       return { ...base, sparkline: spark.points, sparklineState: spark.state };
     }
-    const stale = entry.truth === "stale" || entry.truth === "invalid" || entry.truth === "demo";
     const displayValue = entry.evaluation.valid ? entry.value : null;
     return {
       ...base,
@@ -350,7 +257,6 @@ export function buildEcowittTentSnapshotV0ViewModel(
       reason: entry.evaluation.reason,
       sparkline: spark.points,
       sparklineState: spark.state,
-      inSpecNow: classifyInSpec(key, displayValue, options.stage, stale),
     };
   });
 
@@ -371,7 +277,6 @@ export function buildEcowittTentSnapshotV0ViewModel(
     overallBadgeLabel: constitutionSensorTruthBadgeLabel(overall),
     latestCapturedAt,
     metrics,
-    nightDrift: buildNightDrift(tentScoped, options.stage, windowStartMs),
     unusedFieldNamesRefused: ECOWITT_TENT_SNAPSHOT_V0_UNUSED_FIELD_NAMES,
   };
 }

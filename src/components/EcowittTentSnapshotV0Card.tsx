@@ -20,7 +20,6 @@ import { cn } from "@/lib/utils";
 
 export interface EcowittTentSnapshotV0CardProps {
   tentId: string | null | undefined;
-  stage?: string | null;
   className?: string;
   /** Injected clock for deterministic tests. */
   now?: Date;
@@ -53,23 +52,6 @@ function badgeClass(truth: EcowittTentSnapshotV0MetricView["truthSource"]): stri
     case "none":
     default:
       return "border-border text-muted-foreground";
-  }
-}
-
-function inSpecLabel(state: EcowittTentSnapshotV0MetricView["inSpecNow"]): string | null {
-  switch (state) {
-    case "in_target":
-      return "In spec now";
-    case "below_target":
-      return "Below target";
-    case "above_target":
-      return "Above target";
-    case "context_only":
-      return "Context only";
-    case "stage_unknown":
-      return "Stage unknown";
-    default:
-      return null;
   }
 }
 
@@ -119,7 +101,7 @@ function MetricSparkline({
 }
 
 export function EcowittTentSnapshotV0Card(props: EcowittTentSnapshotV0CardProps) {
-  const { tentId, stage, className, now } = props;
+  const { tentId, className, now } = props;
   // Oversample so 24h history can populate sparklines for ~60s EcoWitt cadence.
   const readingsQuery = useSensorReadings(tentId ?? null, 1500);
   const temperatureUnit = useTemperatureUnitPreference();
@@ -129,10 +111,9 @@ export function EcowittTentSnapshotV0Card(props: EcowittTentSnapshotV0CardProps)
     () =>
       buildEcowittTentSnapshotV0ViewModel(readingsQuery.data ?? [], {
         tentId: tentId ?? null,
-        stage: stage ?? null,
         now,
       }),
-    [readingsQuery.data, tentId, stage, now],
+    [readingsQuery.data, tentId, now],
   );
 
   return (
@@ -187,82 +168,63 @@ export function EcowittTentSnapshotV0Card(props: EcowittTentSnapshotV0CardProps)
       ) : null}
 
       {!readingsQuery.isLoading && !readingsQuery.isError ? (
-        <>
-          <div className="grid gap-3 sm:grid-cols-3">
-            {vm.metrics.map((metric) => {
-              const displayValue =
-                metric.key === "temp" && metric.value !== null
-                  ? convertCelsiusForDisplay(metric.value, temperatureUnit)
-                  : metric.value;
-              const unit = metric.key === "temp" ? temperatureSymbol : metric.unit;
-              const spec = inSpecLabel(metric.inSpecNow);
-              return (
-                <div
-                  key={metric.key}
-                  className="rounded-md border border-border/60 p-3"
-                  data-testid={`ecowitt-tent-snapshot-v0-metric-${metric.key}`}
-                  data-truth={metric.truthSource}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <dt className="text-xs text-muted-foreground">{metric.label}</dt>
-                    <span
-                      className={cn(
-                        "rounded-full border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
-                        badgeClass(metric.truthSource),
-                      )}
-                      data-testid={`ecowitt-tent-snapshot-v0-badge-${metric.key}`}
-                    >
-                      {metric.badgeLabel}
-                    </span>
-                  </div>
-                  <dd
-                    className="mt-1 font-display text-xl tabular-nums"
-                    data-testid={`ecowitt-tent-snapshot-v0-value-${metric.key}`}
+        <div className="grid gap-3 sm:grid-cols-3">
+          {vm.metrics.map((metric) => {
+            const displayValue =
+              metric.key === "temp" && metric.value !== null
+                ? convertCelsiusForDisplay(metric.value, temperatureUnit)
+                : metric.value;
+            const unit = metric.key === "temp" ? temperatureSymbol : metric.unit;
+            return (
+              <div
+                key={metric.key}
+                className="rounded-md border border-border/60 p-3"
+                data-testid={`ecowitt-tent-snapshot-v0-metric-${metric.key}`}
+                data-truth={metric.truthSource}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <dt className="text-xs text-muted-foreground">{metric.label}</dt>
+                  <span
+                    className={cn(
+                      "rounded-full border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+                      badgeClass(metric.truthSource),
+                    )}
+                    data-testid={`ecowitt-tent-snapshot-v0-badge-${metric.key}`}
                   >
-                    {displayValue === null || !Number.isFinite(displayValue)
-                      ? "—"
-                      : `${metric.key === "temp" ? displayValue.toFixed(1) : Math.round(displayValue)} ${unit}`}
-                  </dd>
-                  <p
-                    className="mt-1 text-[11px] text-muted-foreground"
-                    data-testid={`ecowitt-tent-snapshot-v0-captured-${metric.key}`}
-                  >
-                    {formatCapturedAt(metric.capturedAt)}
-                  </p>
-                  {spec ? (
-                    <p
-                      className="mt-0.5 text-[11px] text-muted-foreground"
-                      data-testid={`ecowitt-tent-snapshot-v0-inspec-${metric.key}`}
-                    >
-                      {spec}
-                    </p>
-                  ) : null}
-                  {metric.reason ? (
-                    <p
-                      className="mt-0.5 text-[11px] text-destructive"
-                      data-testid={`ecowitt-tent-snapshot-v0-reason-${metric.key}`}
-                    >
-                      {metric.reason}
-                    </p>
-                  ) : null}
-                  <MetricSparkline
-                    points={metric.sparkline}
-                    state={metric.sparklineState}
-                    testId={`ecowitt-tent-snapshot-v0-spark-${metric.key}`}
-                  />
+                    {metric.badgeLabel}
+                  </span>
                 </div>
-              );
-            })}
-          </div>
-
-          <p
-            className="mt-3 text-xs text-muted-foreground"
-            data-testid="ecowitt-tent-snapshot-v0-night-drift"
-            data-drifted={vm.nightDrift.drifted ? "true" : "false"}
-          >
-            {vm.nightDrift.summary}
-          </p>
-        </>
+                <dd
+                  className="mt-1 font-display text-xl tabular-nums"
+                  data-testid={`ecowitt-tent-snapshot-v0-value-${metric.key}`}
+                >
+                  {displayValue === null || !Number.isFinite(displayValue)
+                    ? "—"
+                    : `${metric.key === "temp" ? displayValue.toFixed(1) : Math.round(displayValue)} ${unit}`}
+                </dd>
+                <p
+                  className="mt-1 text-[11px] text-muted-foreground"
+                  data-testid={`ecowitt-tent-snapshot-v0-captured-${metric.key}`}
+                >
+                  {formatCapturedAt(metric.capturedAt)}
+                </p>
+                {metric.reason ? (
+                  <p
+                    className="mt-0.5 text-[11px] text-destructive"
+                    data-testid={`ecowitt-tent-snapshot-v0-reason-${metric.key}`}
+                  >
+                    {metric.reason}
+                  </p>
+                ) : null}
+                <MetricSparkline
+                  points={metric.sparkline}
+                  state={metric.sparklineState}
+                  testId={`ecowitt-tent-snapshot-v0-spark-${metric.key}`}
+                />
+              </div>
+            );
+          })}
+        </div>
       ) : null}
     </section>
   );

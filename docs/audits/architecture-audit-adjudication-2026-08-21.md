@@ -26,6 +26,25 @@ or governance file, and it carries no `Sentinel-Version` (it is not one of the t
 > **All measurements below stay pinned to `28c01a017` and are not restated at the new tip.**
 > A measurement is a record of what was true at a named commit; re-pointing it at a newer SHA
 > without re-running it would be exactly the drift this document was written to catch.
+>
+> ### Numeric re-verification sweep
+>
+> Review found three counting errors in this document across three rounds — "~1,700" `src`
+> files lifted from a `tsconfig.json` comment, "2 of 34" edge functions from a substring grep
+> that matched a code comment, and "nineteen" stack determinations against a §4.1 table holding
+> twenty-one. Three of a kind is a pattern, so rather than patch a third digit, **every numeric
+> claim in this document was re-derived from `28c01a017`.**
+>
+> Result: **13 of 13 re-derived claims hold.** Route modules 147 · edge functions 34 ·
+> migrations 272 · `src` files 4,948 · `src` Zod importers 11 · edge Zod importers 1 ·
+> top-level `src/lib/*Advisor.ts` 0 · npm consumer contracts 5 · VPD α 0.3 · VPD min readings 6
+> · canonical sensor sources 6 · `.functions.invoke(` 17 expressions across 15 files · layer
+> split hooks 6 / components 4 / lib 3 / pages 2.
+>
+> The failure was narrower than the three errors suggested, and worth naming precisely: **every
+> error was in a summary or derived figure written from memory or copied from prose — none was
+> in a measurement actually taken.** The discipline that failed was re-deriving totals, not
+> measuring.
 
 ---
 
@@ -41,8 +60,10 @@ or governance file, and it carries no `Sentinel-Version` (it is not one of the t
 > `docs/codebase-map.md`, shipped by its actual owner. ARCH-01 is unblocked and reduces to the
 > short ADR described in §7.1.
 
-Nineteen of the audit's stack determinations were re-derived independently from source and
-**every one held**. Three of its evidence labels were too weak, one of its priorities is
+**Twenty-one** of the audit's stack determinations were re-derived independently from source
+and **every one held** — one row (canonical sensor sources) came back stronger than the audit
+had stated. An earlier revision said "nineteen", a summary total written early and never
+recounted as §4.1 grew. Three of its evidence labels were too weak, one of its priorities is
 wrong against a dated gate, and it missed four findings — one of which is a live production
 provenance gap that no governance file currently records.
 

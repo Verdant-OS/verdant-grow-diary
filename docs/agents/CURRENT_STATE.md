@@ -1,6 +1,26 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-21 UTC (~15:23 UTC / 10:23 AM CT)
+**Last updated:** 2026-08-21 UTC (function default-privilege investigation)
+**Updated by:** Claude (2026-08-21: investigation only — no code, migration, or
+production write in this edit. Recorded for Grok, who has been actively
+working this exact signup/production surface today (`20260821150000`,
+the RAISE LOG guard, the readiness RPC): before drafting any further
+service_role hardening, measured how widespread the class of gap
+`20260821064300` closed for one table actually is across every
+SECURITY DEFINER function in `public`. See the new subsection under
+"Second production drift" below for the full findings and the specific
+open question. Headline, evidence-labeled: `established fact` — 66 of 76
+SECURITY DEFINER functions in `public` currently grant `service_role`
+EXECUTE by default, and exactly 2 grant `anon` EXECUTE (both look like an
+intentional public "founders wall" counter — `founders_seats_consumed`,
+`founders_wall_count` — worth one owner confirmation, not urgent).
+`uncertainty` — `20260807133000`'s own self-test fails if reproduced today
+against a fresh probe function, but two functions from Grok's own
+`20260821150000` migration do _not_ show the same exposure despite one of
+them never receiving an explicit `service_role` revoke. Left unresolved
+rather than guessed at. No fix proposed or applied.)
+
+**Prior update:** 2026-08-21 UTC (~15:23 UTC / 10:23 AM CT)
 **Updated by:** Grok (2026-08-21: **docs-only correction** — #1077 pinned
 production at `1400a7e77eff` and leftover Action Queue prose still said
 `20260813030000` was unapplied; both are now false on a fresh point-in-time
@@ -354,6 +374,105 @@ this migration and its predecessor define. No RLS, auth, or edge-function
 change. The frontend attribution code (`Landing.tsx` and the signup URL
 builder) was already deployed ahead of the repo per the original diagnosis
 above, and was not touched by this repair.
+
+---
+
+## 🔶 Function default-privilege exposure — measured, not yet actioned (2026-08-21)
+
+`practical observation`, measured 2026-08-21 by Claude via the same Lovable
+`query_database` read-only channel used elsewhere in this file, against
+production project `66255e7b-892c-4be5-8686-ab1cfc3666db`. **This is a
+coordination note, not a fix.** Nothing here was changed, drafted, or
+applied — see "What this does and does not license" at the end.
+
+**Why this was measured now.** `20260821064300` (this file's RESOLVED
+signup-attribution section above) closed one specific instance of a pattern
+— a function whose migration revoked PUBLIC/anon/authenticated but not
+`service_role`. The Action Queue guard forward repair closed the same class
+of gap for one other function. Two individually-found instances raised the
+obvious question: how many more are there, and is the pattern actually
+still live for newly-created functions, or purely historical?
+
+### Confirmed: the scale of service_role exposure
+
+```sql
+SELECT count(*) FILTER (WHERE has_function_privilege('service_role', p.oid, 'EXECUTE')) AS service_exec_count,
+       count(*) FILTER (WHERE has_function_privilege('anon', p.oid, 'EXECUTE')) AS anon_exec_count,
+       count(*) AS total
+FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+WHERE n.nspname = 'public' AND p.prokind = 'f' AND p.prosecdef = true;
+```
+
+Returns **66 of 76** SECURITY DEFINER functions in `public` currently grant
+`service_role` EXECUTE, and **3 of 76** grant `anon` EXECUTE. This is
+`established fact` — a direct count, not an inference. Read it in context,
+not as 66 new incidents: `service_role` already holds broad direct table
+access on this project by design (`supabase/seed.sql`'s own documented
+legacy-grant posture), so function-level `service_role` EXECUTE is mostly
+consistent with the platform's existing accepted trust model, not a new
+class of exposure. The two functions individually hardened so far
+(Action Queue guard, signup) were judged sensitive enough to warrant the
+extra step on a case-by-case basis — that pattern, not a blanket revoke
+across all 66, is what this file's precedent supports.
+
+**The `anon` set is the one worth an owner's eyes.** All 3 are
+`founders_guard_immutables()` (returns `trigger`, not callable as an RPC —
+Postgres refuses to invoke a trigger-typed function outside trigger
+context regardless of its grants), `founders_seats_consumed()`, and
+`founders_wall_count()` — the latter two are `SELECT COUNT(*)::int FROM
+public.founders [WHERE status = 'confirmed']`, no PII, and read like a
+deliberate public "X founders joined" counter. `inference`: probably
+intentional. Not verified with Cheek.
+
+### Uncertain: whether the default-privilege mechanism is still live today
+
+`20260807133000_global_default_privilege_hardening.sql` REVOKEs
+`EXECUTE ON FUNCTIONS` and `ALL ON TABLES` from `PUBLIC, anon` at the
+default-privilege level, in four role/schema-scope combinations, all of
+them `FOR ROLE postgres` (explicitly or via the executing role). Its own
+postflight self-test creates a throwaway function and asserts `anon` gets
+no EXECUTE.
+
+Reproducing that exact self-test today, in a rolled-back transaction via
+the Lovable SQL channel, **it fails** — a fresh throwaway function gets
+`anon` **and** `service_role` EXECUTE. `pg_default_acl` shows why on its
+face: there are two separate default-ACL entries for functions in `public`
+— one owned by `postgres` (unchanged by that migration; still lists
+`anon=X` and `service_role=X`) and a second owned by `supabase_admin`,
+which `20260807133000` never targeted at all. Both grant EXECUTE to
+`anon`/`authenticated`/`service_role` by default. The identical two-bucket
+split exists for tables too.
+
+**That would be a clean root-cause finding, except it doesn't hold up
+against real migrations.** Two functions created by Grok's own
+`20260821150000` today — the replaced `handle_new_user()` and the new
+`signup_acquisition_readiness_operator_snapshot()` — do **not** show
+`service_role` EXECUTE, and the second one never received an explicit
+`service_role` revoke in that migration (only `PUBLIC` and `anon` are
+revoked; `service_role` is untouched in the file). If the `postgres`-owned
+default-ACL bucket really governs objects created by real migrations the
+way it governs my probe functions, that function should be exposed. It
+is not.
+
+I do not have a confirmed explanation for the discrepancy — plausibly the
+role/connection context Lovable's SQL-editor channel runs under differs
+from whatever applies committed migrations, but that is `inference`, not
+verified. Rather than draft an `ALTER DEFAULT PRIVILEGES ... FOR ROLE
+supabase_admin` corrective migration on an unconfirmed theory, this is
+left as an open question.
+
+### What this does and does not license
+
+Confirmed: the 66/76 and 3/76 counts, and the self-test-fails-via-this-probe-channel
+result. Not confirmed: why real migrations don't show the same exposure, or
+whether any corrective migration is actually needed. **No migration was
+drafted or applied.** No table, function, grant, or default privilege was
+changed. This does not authorize anyone to apply
+`20260807133000`-style `ALTER DEFAULT PRIVILEGES` changes on the strength
+of this note alone — the mechanism is not yet understood well enough for
+that. Grok: if your migration-apply path can confirm which role actually
+executes committed migrations against production, that single fact would
+resolve the open question above.
 
 ---
 
